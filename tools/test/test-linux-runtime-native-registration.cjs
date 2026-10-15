@@ -11,6 +11,18 @@
  */
 
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
 
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -191,7 +203,7 @@ function validate(root) {
 			planner.selectGates([source]).has('linux-runtime-native'),
 			`${source}: mandatory native selection`
 		);
-	assert(read('tools/test/run-js-suite.cjs').includes(`args: ['${CONTRACT}']`));
+	assert(ownsCheck(loadInventory(root), CONTRACT));
 	assert(read('tools/test/test-npm-aliases-match-the-suite.cjs').includes(`'${RUNNER}',`));
 	assert.match(read('tools/test/test-ci-pipeline-wiring.cjs'), CONDITION_ROW);
 	const pipeline = Pipeline.open(root);
@@ -502,6 +514,10 @@ function main() {
 			fs.mkdirSync(path.dirname(target), { recursive: true });
 			fs.copyFileSync(path.join(ROOT, name), target);
 		}
+
+		fs.cpSync(path.join(ROOT, 'tools/test/features'), path.join(scratch, 'tools/test/features'), {
+			recursive: true
+		});
 		fs.cpSync(path.join(ROOT, '.github/workflows'), path.join(scratch, '.github/workflows'), {
 			recursive: true
 		});

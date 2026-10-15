@@ -50,7 +50,12 @@ Test("api_entries: save path no longer calls synchronous LLM_RemoteIsReady (remo
 
 _RAVB_SavePathUsesAsyncProbe() {
 	Body := _DriverFuncBody("_LLM_Menu_PromptApiEntry")
-	Assert(InStr(Body, "LLM_RemoteIsReady_Async(") > 0,
+	Assert(Body != "", "the real API entry save caller must remain source-visible")
+	ReadyAt := InStr(Body, '`tReadyFn := Options.Get("ready", LLM_RemoteIsReady_Async)', true)
+	DispatchAt := InStr(Body, "try ReadyFn.Call(new_entry,", true)
+	HandlerAt := InStr(Body, '_LLM_Menu_MakeApiValidationHandler(new_name, new_entry["Id"],', true)
+	OwnerAt := InStr(Body, "ValidationOwner), ValidationOwner)", true)
+	Assert(ReadyAt > 0 && DispatchAt > ReadyAt && HandlerAt > DispatchAt && OwnerAt > HandlerAt,
 		"_LLM_Menu_PromptApiEntry must dispatch LLM_RemoteIsReady_Async() so the save path returns immediately and the message pump keeps running (remote-api-validate-blocks-message-pump)")
 }
 Test("api_entries: save path dispatches LLM_RemoteIsReady_Async instead (remote-api-validate-blocks-message-pump)", _RAVB_SavePathUsesAsyncProbe)

@@ -1,0 +1,543 @@
+{
+  "schema": 1,
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "run": "38766625752",
+  "attempt": "1",
+  "common": {
+    "inventory_sha256": "b0d71426916eaaad4fc613d17658cd2620e5ded7093c7b803a0c488980faed33",
+    "checks": 435,
+    "exact_once": true,
+    "features": [
+      {
+        "feature": "ai-and-network",
+        "checks": 45,
+        "producer_attempt": "1",
+        "journal_sha256": "89f390f1801dc089436e649069820e9cdac739238865560f92f101a72e54f603",
+        "duration_ms": 147039.892
+      },
+      {
+        "feature": "data-and-source-contracts",
+        "checks": 61,
+        "producer_attempt": "1",
+        "journal_sha256": "4bad41bbc128e14296a94c3b976dc5cbdb1df4195e021e11270a9b0a6bb3779f",
+        "duration_ms": 46987.407
+      },
+      {
+        "feature": "diagnostics-and-metrics",
+        "checks": 44,
+        "producer_attempt": "1",
+        "journal_sha256": "11a628a5d9564e9054e2466bf0d84515c576d1310f7c3707393b5ff6f52bf90c",
+        "duration_ms": 6249.292
+      },
+      {
+        "feature": "distribution-and-updates",
+        "checks": 61,
+        "producer_attempt": "1",
+        "journal_sha256": "094fb94da5d83987109d4c393e43bfd5d80e826ebe47825bdfc86154a96b8459",
+        "duration_ms": 51229.298
+      },
+      {
+        "feature": "input-and-actions",
+        "checks": 76,
+        "producer_attempt": "1",
+        "journal_sha256": "c3d32520ded2a6615e16a2fec555c57182149b1f19db9a71ebfaf78c7169ad29",
+        "duration_ms": 8107.184
+      },
+      {
+        "feature": "menus",
+        "checks": 31,
+        "producer_attempt": "1",
+        "journal_sha256": "4ec4b876cffb8fa97ac61888645c73a7fc84f76cb09aa088ae45641ff3c42bcc",
+        "duration_ms": 382450.228
+      },
+      {
+        "feature": "release-ci",
+        "checks": 33,
+        "producer_attempt": "1",
+        "journal_sha256": "72e383f95b81385a850c15c508c1874492c94ccca2c4e491429b80859c24d879",
+        "duration_ms": 104451.773
+      },
+      {
+        "feature": "shared-ui",
+        "checks": 31,
+        "producer_attempt": "1",
+        "journal_sha256": "b3f6bd30864a99ed4d315bd0fde4aa9ccdf9a5a9f6a85da88f8fee0c655a9603",
+        "duration_ms": 14394.683
+      },
+      {
+        "feature": "test-infrastructure",
+        "checks": 53,
+        "producer_attempt": "1",
+        "journal_sha256": "69f3dcbcffdffe25159b2bd85eadcba8cf73d3f31f79514f729e1000f66671cd",
+        "duration_ms": 29156.39
+      }
+    ],
+    "all11_actual_writers": [
+      {
+        "lot": "Ai and network",
+        "suite": "js",
+        "feature": "ai-and-network",
+        "job_id": 116532179875,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Data and source contracts",
+        "suite": "js",
+        "feature": "data-and-source-contracts",
+        "job_id": 116532180019,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Diagnostics and metrics",
+        "suite": "js",
+        "feature": "diagnostics-and-metrics",
+        "job_id": 116532180073,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Distribution and updates",
+        "suite": "js",
+        "feature": "distribution-and-updates",
+        "job_id": 116532179670,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Input and actions",
+        "suite": "js",
+        "feature": "input-and-actions",
+        "job_id": 116532179866,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Menus",
+        "suite": "js",
+        "feature": "menus",
+        "job_id": 116532179905,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Release ci",
+        "suite": "js",
+        "feature": "release-ci",
+        "job_id": 116532179767,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Shared ui",
+        "suite": "js",
+        "feature": "shared-ui",
+        "job_id": 116532179886,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Test infrastructure",
+        "suite": "js",
+        "feature": "test-infrastructure",
+        "job_id": 116532179920,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Property tests",
+        "suite": "properties",
+        "feature": "properties",
+        "job_id": 116532179852,
+        "attempt": 1,
+        "writer_status": "success"
+      },
+      {
+        "lot": "Hotstring TOML formatting",
+        "suite": "hotstrings-format",
+        "feature": "hotstrings-format",
+        "job_id": 116532180115,
+        "attempt": 1,
+        "writer_status": "success"
+      }
+    ],
+    "actual_consumer_union_line_unique": true,
+    "property_count": 27,
+    "hotstrings_format": "actual original check step and writer both successful",
+    "property_actual_raw_pass_count": 27,
+    "scope_receipt": "full; qualified=false in qualification envelope is not a borrowed deferred waiver; real journals received"
+  },
+  "linux": {
+    "unit_passed": 13857,
+    "unit_failed": 0,
+    "unique_case_ids": 13857,
+    "module_timings_not_extra_cases": 521,
+    "timing_errors": 0,
+    "stage_documents": [
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-distro-alpine/members/alpine.json",
+        "subjects": {
+          "distro-alpine": 1
+        },
+        "sha256": "cfb9d86ee21e99bcc8a3f80410ea9ed4e42555f393ed991c6dcab4aaf2546be9"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-distro-arch/members/arch.json",
+        "subjects": {
+          "distro-arch": 1
+        },
+        "sha256": "153aca794a7a1f4581c207cd1a4aff5e8e98e6fcccf173d8df81a9bffe5a5cd5"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-distro-debian/members/debian.json",
+        "subjects": {
+          "distro-debian": 1
+        },
+        "sha256": "28667d99203ac668afd32939596913781ad26818dff71a30864daf297c265f3b"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-distro-fedora/members/fedora.json",
+        "subjects": {
+          "distro-fedora": 1
+        },
+        "sha256": "5f1c3eeb5b5baeb2e1e22737eee8e7841b1e6026821b3dc8c8c8d847ee2742dc"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-distro-opensuse/members/opensuse.json",
+        "subjects": {
+          "distro-opensuse": 1
+        },
+        "sha256": "3ada2a9e72f933f13db49475f178023c43369ed8a60ddf8a5d49b64e787535fe"
+      },
+      {
+        "job": "e2e-linux",
+        "file": "artifacts/linux-ci-evidence-e2e-linux/members/e2e-linux.json",
+        "subjects": {
+          "uinput-roundtrip": 1,
+          "grab-race": 1,
+          "system-keymaps": 1,
+          "xkb-source-qualification": 65,
+          "window-switch-receipts": 34,
+          "native-fixture-family": 5,
+          "http-stream-receipts": 262,
+          "managed-network-runtime": 4,
+          "nix-installed-runtime": 7,
+          "retained-fd-sha256": 12,
+          "managed-http-output": 18,
+          "managed-http-public": 30,
+          "updater-native-namespace-cleanup": 5,
+          "updater-temp-ownership": 24,
+          "updater-temp-allocation": 24,
+          "updater-archive-pipeline": 15,
+          "archive-source-crypto": 8,
+          "archive-source-bin-parent": 4,
+          "archive-private-snapshot": 5,
+          "connect-terminal-protocol-model": 9,
+          "x11-display": 1,
+          "wayland-display": 1,
+          "tray-symbols": 1,
+          "tray-sni-registration": 1,
+          "atspi-focus-probe": 1,
+          "daemon-live": 1,
+          "ollama-live": 1,
+          "touchpad-capability": 1,
+          "gesture-roundtrip": 1,
+          "webview-settings": 1,
+          "webview-editor": 1,
+          "webview-roundtrip": 1,
+          "page-load-errors": 1,
+          "hotstring-e2e": 193
+        },
+        "sha256": "3dc308121fae116ea61d191d53ca2d0e35d1be0115e48eb1a4435d3c77e2ccd1"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-alpine/members/first-install-alpine.json",
+        "subjects": {
+          "first-install-alpine": 1
+        },
+        "sha256": "ab100c7fdc2447993cba7e15099b39e2156204025d80ad3fe6f7f7b5630028ff"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-arch/members/first-install-arch.json",
+        "subjects": {
+          "first-install-arch": 1
+        },
+        "sha256": "08855dc26980d3da90640f8ecd7b871605616629de944392cd28463297528535"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-debian-12/members/first-install-debian-12.json",
+        "subjects": {
+          "first-install-debian-12": 1
+        },
+        "sha256": "15bd575544f39257b99950f1677d72a97f6696445935dd154e3a5261c90023a4"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-debian-13/members/first-install-debian-13.json",
+        "subjects": {
+          "first-install-debian-13": 1
+        },
+        "sha256": "c93311eb25a51b894ba315c0345c255655d8320102c90b1c8c4416b13a03fe14"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-fedora-41/members/first-install-fedora-41.json",
+        "subjects": {
+          "first-install-fedora-41": 1
+        },
+        "sha256": "9e9e99cf8bd9b4007e5aaffd3e2091b54dd14e2e6483db3ff22725ce47fc5f6f"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-fedora-latest/members/first-install-fedora-latest.json",
+        "subjects": {
+          "first-install-fedora-latest": 1
+        },
+        "sha256": "3b00b7fd14f991fee9f01c43fc485a11e1c009e1b66236e9721a4667d940e66e"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-opensuse-tumbleweed/members/first-install-opensuse-tumbleweed.json",
+        "subjects": {
+          "first-install-opensuse-tumbleweed": 1
+        },
+        "sha256": "bd307caecf3a024e18d2ca8c02e07734baa9105a58165941c7f0dac4feee22b6"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-ubuntu-22.04/members/first-install-ubuntu-22.04.json",
+        "subjects": {
+          "first-install-ubuntu-22.04": 1
+        },
+        "sha256": "3f071b21703822da1aab78edf5e39094eb994d3c44fe4b5e3aac289264cfe54f"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-first-install-ubuntu-24.04/members/first-install-ubuntu-24.04.json",
+        "subjects": {
+          "first-install-ubuntu-24.04": 1
+        },
+        "sha256": "9fbc6f83a9333df9e238efe436ff3766f15d142d426d46f421ff7f0f39600374"
+      },
+      {
+        "job": "package-linux",
+        "file": "artifacts/linux-ci-evidence-package-linux/members/package-linux.json",
+        "subjects": {
+          "build-deb": 1,
+          "build-rpm": 1,
+          "build-appimage": 1,
+          "build-flatpak": 1,
+          "smoke-flatpak-run": 1,
+          "smoke-tarball-install": 1
+        },
+        "sha256": "93f1b3ecb32c7a6ca883aa4dbd7076f9bbc18639d3d7e867734d7e76ccdce5eb"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-smoke-appimage-run/members/smoke-appimage-run.json",
+        "subjects": {
+          "smoke-appimage-run": 1
+        },
+        "sha256": "21b76ccdcc47560a9f829a85cb1f025ee0531c1451d076339f3fdc56bf7bfaea"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-smoke-deb-install/members/smoke-deb-install.json",
+        "subjects": {
+          "smoke-deb-install": 1
+        },
+        "sha256": "074aef3a7b87c218c6f6bd01985ec1edb06756e54826784f56cf84a439d24c30"
+      },
+      {
+        "job": "install-linux",
+        "file": "artifacts/linux-ci-evidence-smoke-rpm-install/members/smoke-rpm-install.json",
+        "subjects": {
+          "smoke-rpm-install": 1
+        },
+        "sha256": "6d2c270dca85155f484925dba285b7dd0ff29029bbc0a613e21b0268918f1d79"
+      },
+      {
+        "job": "test-linux",
+        "file": "artifacts/linux-ci-evidence-test-linux/members/test-linux.json",
+        "subjects": {
+          "unit": 13857
+        },
+        "sha256": "3a9b30657df3bcea5a8bec399fdd28b7ddfd6c56adba33f152069ac014f5f959"
+      }
+    ],
+    "required_subjects_verified": {
+      "install-linux/distro-alpine": 1,
+      "install-linux/distro-arch": 1,
+      "install-linux/distro-debian": 1,
+      "install-linux/distro-fedora": 1,
+      "install-linux/distro-opensuse": 1,
+      "e2e-linux/uinput-roundtrip": 1,
+      "e2e-linux/grab-race": 1,
+      "e2e-linux/system-keymaps": 1,
+      "e2e-linux/xkb-source-qualification": 65,
+      "e2e-linux/window-switch-receipts": 34,
+      "e2e-linux/native-fixture-family": 5,
+      "e2e-linux/http-stream-receipts": 262,
+      "e2e-linux/managed-network-runtime": 4,
+      "e2e-linux/nix-installed-runtime": 7,
+      "e2e-linux/retained-fd-sha256": 12,
+      "e2e-linux/managed-http-output": 18,
+      "e2e-linux/managed-http-public": 30,
+      "e2e-linux/updater-native-namespace-cleanup": 5,
+      "e2e-linux/updater-temp-ownership": 24,
+      "e2e-linux/updater-temp-allocation": 24,
+      "e2e-linux/updater-archive-pipeline": 15,
+      "e2e-linux/archive-source-crypto": 8,
+      "e2e-linux/archive-source-bin-parent": 4,
+      "e2e-linux/archive-private-snapshot": 5,
+      "e2e-linux/connect-terminal-protocol-model": 9,
+      "e2e-linux/x11-display": 1,
+      "e2e-linux/wayland-display": 1,
+      "e2e-linux/tray-symbols": 1,
+      "e2e-linux/tray-sni-registration": 1,
+      "e2e-linux/atspi-focus-probe": 1,
+      "e2e-linux/daemon-live": 1,
+      "e2e-linux/ollama-live": 1,
+      "e2e-linux/touchpad-capability": 1,
+      "e2e-linux/gesture-roundtrip": 1,
+      "e2e-linux/webview-settings": 1,
+      "e2e-linux/webview-editor": 1,
+      "e2e-linux/webview-roundtrip": 1,
+      "e2e-linux/page-load-errors": 1,
+      "e2e-linux/hotstring-e2e": 193,
+      "install-linux/first-install-alpine": 1,
+      "install-linux/first-install-arch": 1,
+      "install-linux/first-install-debian-12": 1,
+      "install-linux/first-install-debian-13": 1,
+      "install-linux/first-install-fedora-41": 1,
+      "install-linux/first-install-fedora-latest": 1,
+      "install-linux/first-install-opensuse-tumbleweed": 1,
+      "install-linux/first-install-ubuntu-22.04": 1,
+      "install-linux/first-install-ubuntu-24.04": 1,
+      "package-linux/build-deb": 1,
+      "package-linux/build-rpm": 1,
+      "package-linux/build-appimage": 1,
+      "package-linux/build-flatpak": 1,
+      "package-linux/smoke-flatpak-run": 1,
+      "package-linux/smoke-tarball-install": 1,
+      "install-linux/smoke-appimage-run": 1,
+      "install-linux/smoke-deb-install": 1,
+      "install-linux/smoke-rpm-install": 1,
+      "test-linux/unit": 13857
+    },
+    "deferred_subjects": 0,
+    "verdict_actual_success_line_unique": true,
+    "e2e_hotstring_actual_raw_passed": 193,
+    "e2e_hotstring_actual_raw_total": 193,
+    "e2e_raw_sha256": "fc4b02b033aadd3a70119ca35edc92f42665d1b75052fd2eadd6977704b962e1"
+  },
+  "runtime_model": {
+    "passed": true,
+    "native_executed": true,
+    "child_status": 0,
+    "zero_descendants": true,
+    "scope": "actual Engine/Coordinator/EventLoop; daemon entrypoint and physical GUI excluded",
+    "model": "granite4:350m-h",
+    "inference_bytes": 6,
+    "receipt": {
+      "archive_bytes": 1198635318,
+      "archive_http_settled": true,
+      "archive_sha256": "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb",
+      "chat_dispatches": 1,
+      "event_loop_stop_before_ack": false,
+      "explicit_binary_choices": 1,
+      "explicit_model_choices": 1,
+      "inference_bytes": 6,
+      "native_loop_retired": true,
+      "owned_serve_settled": true,
+      "pull_dispatches": 1,
+      "pull_http_settled": true,
+      "shutdown_idle_polls": 2305,
+      "terminal_shutdown_requested": true,
+      "typed_version": "0.24.0"
+    },
+    "sources_before_after_exact": 1390,
+    "physical_closure": {
+      "adopted": 1,
+      "pending": 0,
+      "rescue": 0
+    }
+  },
+  "committed_source_frame_hash_matches": 1393,
+  "xi2": {
+    "qualified": true,
+    "scope": "CONTROLLED diagnostic only",
+    "abi_comparisons": 29,
+    "native_cases": 3,
+    "input_injections": 0,
+    "input_output_grant": false,
+    "native_epoch_claim": false,
+    "family_closed": true,
+    "display_retired": true,
+    "rescue": 0,
+    "original_c3_receiving": [
+      {
+        "path": "artifacts/linux-xi2-luajit-ae27870cc98bdeb903eeca7a3ff1a2061bb15836-1/members/original-c3/receiving.json",
+        "sha256": "c5667b10b6497af10e8bb8fb4b4b58a022f33a3b0ab811edbefc0dc04a07eabd",
+        "cases": [
+          "property-created",
+          "property-modified",
+          "property-deleted"
+        ],
+        "native_epoch_claim": false,
+        "input_output_grant": false,
+        "fetched_freed_published": 3,
+        "native_family_closed": true
+      },
+      {
+        "path": "artifacts/linux-xi2-property-cookies-ae27870cc98bdeb903eeca7a3ff1a2061bb15836-1/members/linux-xi2-property-cookies/receiving.json",
+        "sha256": "d8205d21fe40bea3dbe1695e2c178df67a4e566a402b2a875d8913b973127cd9",
+        "cases": [
+          "property-created",
+          "property-modified",
+          "property-deleted"
+        ],
+        "native_epoch_claim": false,
+        "input_output_grant": false,
+        "fetched_freed_published": 3,
+        "native_family_closed": true
+      }
+    ]
+  },
+  "release_plan": {
+    "schema_version": 1,
+    "context": {
+      "repository": "adrienm7/ergopti",
+      "source_sha": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+      "run_id": "38766625752",
+      "producer_attempt": "1",
+      "event": "workflow_dispatch",
+      "ref": "refs/heads/feat/actions",
+      "selection": "windows+linux"
+    },
+    "plan": {
+      "release": "false",
+      "version": "",
+      "tag": "",
+      "title": "",
+      "prerelease": "",
+      "channel": "dev",
+      "linux_bundle": "ergopti-plus-linux.tar.gz",
+      "native_qualification_profile": "",
+      "lane_windows": "true",
+      "lane_macos": "false",
+      "lane_linux": "true"
+    }
+  },
+  "unit_raw_sha256": "e42010f78654a417af6ceb8e374474e8f498de5ae29656c9af18c26f076cd371",
+  "artifact_receiver_tests_or_native_launch": false
+}

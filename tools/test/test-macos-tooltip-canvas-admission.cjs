@@ -18,6 +18,8 @@ const path = require('node:path');
 const { verify } = require('./desktop-ci-evidence.cjs');
 const { coldBootstrapRecord } = require('./fixtures/macos-cold-bootstrap-receipt.cjs');
 const pipeline = require('./ci-full-default.cjs');
+const macRole = require('./fixtures/macos-stage-source.cjs');
+const macPlans = require('../ci/macos-stage-roles.cjs');
 const { run } = require('./run-macos-tooltip-canvas-tests.cjs');
 const { selectGates, GATE_COMMANDS } = require('./verify-change.cjs');
 
@@ -78,15 +80,46 @@ for (const job of ['managed-ollama-native', 'cold-bootstrap-native']) {
 	}
 }
 
-const canvas = pipeline.job('tooltip-canvas');
-assert.deepEqual(pipeline.needsOf(canvas), ['test-hs', 'e2e-hs']);
-assert.equal(pipeline.field(canvas, 'runs-on'), 'macos-15');
-assert.equal(pipeline.field(canvas, 'if'), null);
-assert.equal(pipeline.field(canvas, 'continue-on-error'), null);
-assert.equal(pipeline.field(canvas, 'timeout-minutes'), '10');
-assert.deepEqual(
-	pipeline.needsOf(pipeline.job('macos-ok')).sort(),
-	[...oldJobs, 'tooltip-canvas', 'managed-ollama-native', 'cold-bootstrap-native'].sort()
+const canvasStage = pipeline.job('e2e-hs');
+const canvas = macRole.body(pipeline.file('.github/workflows/ci-macos.yml'), 'tooltip-canvas');
+assert.deepEqual(pipeline.needsOf(canvasStage), ['test-hs']);
+assert.equal(
+	pipeline.field(canvasStage, 'runs-on'),
+	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}'
+);
+assert.equal(pipeline.field(canvasStage, 'if'), null);
+assert.equal(pipeline.field(canvasStage, 'continue-on-error'), null);
+assert.equal(
+	pipeline.field(canvasStage, 'timeout-minutes'),
+	'${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}'
+);
+for (const release of [false, true])
+	for (const event_name of ['push', 'pull_request', 'workflow_dispatch']) {
+		const cells = macPlans.plan('e2e', {
+			source_sha: 'a'.repeat(40),
+			run_id: '1',
+			event_name,
+			release,
+			scenarios: ['clean']
+		});
+		assert.deepEqual(
+			cells.filter((cell) => cell.role === 'tooltip-canvas'),
+			[
+				{
+					role: 'tooltip-canvas',
+					runner: 'macos-15',
+					architecture: 'arm64',
+					timeout_minutes: 10,
+					scenario: ''
+				}
+			]
+		);
+	}
+assert.deepEqual(pipeline.needsOf(pipeline.job('macos-ok')), ['launch']);
+assert.ok(
+	pipeline
+		.step(pipeline.job('macos-ok'), 'Require the complete source-bound stage chain')
+		.includes('macos-stage-roles.cjs verdict')
 );
 assert.ok(canvas.includes("python-version: '3.13'"));
 const prepare = pipeline.step(canvas, 'Prepare independent pixel observer');
@@ -96,7 +129,7 @@ const observe = pipeline.step(
 	'Observe actual production canvas pixels and retire its native owner'
 );
 for (const step of [prepare, acquire, observe]) {
-	assert.equal(pipeline.stepField(step, 'if'), null);
+	assert.equal(pipeline.stepField(step, 'if'), macRole.condition('tooltip-canvas'));
 	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 }
 assert.ok(prepare.includes('Pillow==11.3.0'));
@@ -115,7 +148,7 @@ const retain = pipeline.step(
 	canvas,
 	'Retain native captures, source, provisioning and retirement receipts'
 );
-assert.equal(pipeline.stepField(retain, 'if'), 'always()');
+assert.equal(pipeline.stepField(retain, 'if'), macRole.condition('tooltip-canvas', 'always()'));
 assert.ok(retain.includes('if-no-files-found: error'));
 assert.ok(
 	retain.includes(

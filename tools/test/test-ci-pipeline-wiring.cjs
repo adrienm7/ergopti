@@ -41,9 +41,9 @@
  * 1. Derived, not listed: every plan output must come from a plan step that
  *    writes it, every caller input must be the plan output of the same name,
  *    and release must wait, directly or through a lane, on every other job of
- *    ci.yml except the dispatch-only verdict. No job forgives failure; OS callers
- *    consume exact selection outputs. Release and the manual verdict retain
- *    their separate event guards.
+ *    ci.yml. No job forgives failure; OS callers consume exact selection
+ *    outputs. The publication preflight receives the retained original plan
+ *    and every required lane before release can run.
  * 2. Private secrets reach a lane only on a release run, through one exact
  *    expression; the public Sparkle key is the only allow-listed exception.
  *    Every pipeline file reads contents only; release alone may write.
@@ -52,12 +52,11 @@
  *    parallel core matrix has a separate shallow checkout for its JS gates,
  *    properties and main-only mutations, pinned by test-desktop-ci-evidence.
  * 4. One root, one lane per OS: ci.yml has exactly one job without needs, the
- *    root; each lane caller needs the root alone; release needs the root and
- *    core and the three lanes, nothing else. Each OS exposes the same five
- *    phases and one final verdict. Linux and Windows start their
- *    two suites independently. macOS has five entries: the scoped native
- *    archive, independent unit/E2E tests, managed Ollama and cold bootstrap.
- *    Its native tooltip canvas still waits for both suites.
+ *    root; each lane caller needs the root alone. The publication preflight
+ *    needs core and the three lanes; release needs only that preflight.
+ *    Each OS exposes Unit, E2E, Build, Testbuild and Verdict in order.
+ *    macOS retains every native role inside its E2E and Testbuild matrices,
+ *    including the scoped manual roles and the native tooltip canvas.
  * 5. Only the steps in STEP_CONDITIONS set an `if`, each exactly its own, and
  *    e2e-linux's harnesses run under !cancelled(). No script swallows a test
  *    runner's failure with `|| true`, and every `| tee` runs under pipefail.
@@ -77,6 +76,87 @@
 
 const pipeline = require('./ci-full-default.cjs');
 const scoped = require('./fixtures/ci-scoped-full-branches.cjs');
+const macRole = require('./fixtures/macos-stage-source.cjs');
+const macContract = require('./fixtures/macos-stage-contract.json');
+const YAML = require('yaml');
+// Initialized before early matrix admission invokes the Mac source guard.
+const LEASE_SILENCE_NATIVE_BODY =
+	"    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt";
+
+/** Builds a mutation seam from the actual retained step and independently fixed predicate. */
+function macConditionalPrefix(head, stage = null) {
+	const name = /- name: ([^\n]+)/.exec(head)?.[1];
+	const expected = macContract.jobs
+		.filter((job) => stage === null || job.id === stage)
+		.flatMap((job) => job.steps)
+		.filter((step) => step.name === name);
+	assert.equal(expected.length, 1, 'One authored Mac step condition.');
+	const actual = pipeline
+		.jobs(MACOS_BOX)
+		.filter((job) => stage === null || job.id === stage)
+		.flatMap((job) => pipeline.steps(job.body))
+		.filter((step) => step.name === name);
+	assert.equal(actual.length, 1, 'One actual Mac condition owner.');
+	assert.equal(pipeline.stepField(actual[0].body, 'if'), expected[0].if);
+	const marker = '        if: ' + expected[0].if + '\n';
+	const offset = actual[0].body.indexOf(marker);
+	assert.ok(offset >= 0);
+	return actual[0].body.slice(0, offset) + marker;
+}
+/** Relocates fixed original managed step bytes, preserving their complete run bodies. */
+function retainedManagedStep(original) {
+	const originalIf = pipeline.stepField(original, 'if');
+	const environment =
+		"        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'\n";
+	const marker = original.indexOf('\n') + 1;
+	assert.ok(marker > 0 && originalIf !== null);
+	return (original.slice(0, marker) + environment + original.slice(marker)).replace(
+		'        if: ' + originalIf + '\n',
+		'        if: ' + macRole.condition('managed-ollama-native', originalIf) + '\n'
+	);
+}
+function macConditionEntry(row) {
+	const [file, role, name, condition] = row;
+	if (file !== '.github/workflows/ci-macos.yml' || condition?.includes('steps.stage-admission'))
+		return row;
+	return [file, macRole.stage[role], name, macRole.condition(role, condition)];
+}
+/** The fixed contract is reviewed independently; altered workflow bytes cannot refresh it. */
+function macStageProblems(source) {
+	try {
+		const actual = YAML.parse(source, { uniqueKeys: true });
+		const observed = Object.entries(actual.jobs).map(([id, job]) => ({
+			id,
+			metadata: Object.fromEntries(Object.entries(job).filter(([key]) => key !== 'steps')),
+			steps: job.steps.map((step) =>
+				Object.fromEntries(
+					macContract.step_fields
+						.filter((key) => Object.hasOwn(step, key))
+						.map((key) => [key, step[key]])
+				)
+			)
+		}));
+		assert.deepEqual(
+			observed,
+			macContract.jobs,
+			'Mac stage/role registration or predicate differs.'
+		);
+		const expectedLease = YAML.parse('job:\n' + LEASE_SILENCE_NATIVE_BODY).job.steps.map(
+			(step) => ({
+				...macRole.metadata(step, 'lease-silence-native'),
+				if: macRole.condition('lease-silence-native', step.if)
+			})
+		);
+		assert.deepEqual(
+			YAML.parse(macRole.body(source, 'lease-silence-native')).steps,
+			expectedLease,
+			'Mac lease commands and evidence must remain exact.'
+		);
+		return [];
+	} catch (error) {
+		return ['Mac stage source refused: ' + error.message];
+	}
+}
 function isRetainedQualification(entry, candidate, step) {
 	const owner = scoped.contract.retained_steps.find(
 		(owner) => owner.file === entry.rel && owner.job === candidate.id && owner.name === step.name
@@ -97,31 +177,23 @@ const manual = require('../ci/manual-ci-lanes.cjs');
 const { bashExecutable } = require('../lib/git-bash.cjs');
 
 const ENTRY = pipeline.ENTRY_REL;
+const COMMON_BOX = '.github/workflows/ci-common.yml';
 const MACOS_BOX = '.github/workflows/ci-macos.yml';
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
 const LINUX_BOX = '.github/workflows/ci-linux.yml';
 const BOXES = [MACOS_BOX, WINDOWS_BOX, LINUX_BOX];
-const MACOS_NATIVE_ENTRIES = ['managed-ollama-native', 'cold-bootstrap-native'];
-const MACOS_VERDICT_NEEDS = [
-	'cold-bootstrap-native',
-	'test-hs',
-	'e2e-hs',
-	'package-macos',
-	'launch',
-	'tooltip-canvas',
-	'managed-ollama-native'
-];
 // The run graph's single root: the repository-wide checks, then the release
 // plan every lane and release read.
 const ROOT = 'validate';
 const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
-const RELEASE_IF = `github.event_name == 'push' && needs.${ROOT}.outputs.release == 'true'`;
+const RELEASE_IF =
+	"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'";
 const NOT_CANCELLED = '${{ !cancelled() }}';
 const MANUAL_RUNTIME_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
 const MANUAL_RUNTIME_EVIDENCE_IF =
 	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
-const MANUAL_VERDICT_IF = "always() && github.event_name == 'workflow_dispatch'";
+const MANUAL_VERDICT_IF = 'always() && !cancelled()';
 const LANE_IF = (os) => `needs.${ROOT}.outputs.lane_${os} == 'true'`;
 // Public by design: SUPublicEDKey ships inside every app, and a CI package
 // without it cannot pass the launch gate.
@@ -140,7 +212,7 @@ const MIN_GATED_SECRETS = 6;
 
 // The root's checks after its setup, in order, with the one command each runs.
 const VALIDATE_SETUP = 'Prepare plan validation';
-const VALIDATE_CHECKS = [
+const COMMON_FORMAT_CHECKS = [
 	[
 		'Check hotstring TOML files are sorted and formatted',
 		'python tools/format_toml.py --hotstrings --all --check'
@@ -366,7 +438,7 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	],
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain official cold Ollama receipt only', 'always()'],
 	[MACOS_BOX, 'cold-bootstrap-native', 'Retain native cold bootstrap evidence', 'always()']
-];
+].map(macConditionEntry);
 const WINDOWS_FILE_RETENTION = [
 	{
 		name: 'Retain managed Ollama file component evidence',
@@ -389,6 +461,14 @@ const WINDOWS_FILE_RETENTION = [
 ];
 
 const STEP_CONDITIONS = [
+	[LINUX_BOX, 'test-linux', 'Retain Linux Lua timing diagnostics', '${{ !cancelled() }}'],
+	[MACOS_BOX, 'test-hs', 'Retain macOS Lua timing diagnostics', '${{ !cancelled() }}'],
+	[
+		COMMON_BOX,
+		'shared-validation',
+		'Retain captured JS failure output',
+		"always() && steps.common-lot.outputs.suite == 'js'"
+	],
 	[MACOS_BOX, 'lease-silence-native', 'Retain exact paired-process native receiving', 'always()'],
 	...WINDOWS_FILE_RETENTION.map((owner) => [WINDOWS_BOX, 'test-ahk', owner.name, owner.condition]),
 	...MACOS_NATIVE_STEP_CONDITIONS,
@@ -434,11 +514,12 @@ const STEP_CONDITIONS = [
 	[LINUX_BOX, 'e2e-linux', 'Qualify native managed HTTP public and retained output', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify native updater archive pipeline', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Qualify archive crypto and bin parent source controls', NOT_CANCELLED],
-	[ENTRY, 'core', 'Install shared UI browsers', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared layer editor rendering', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared physical shortcut rendering', "matrix.suite == 'js'"],
-	[ENTRY, 'core', 'Test shared Versions installation rendering', "matrix.suite == 'js'"],
-	[ENTRY, 'validate', 'Check hotstring TOML files are sorted and formatted', NOT_CANCELLED],
+	[
+		COMMON_BOX,
+		'shared-validation',
+		'Check hotstring TOML files are sorted and formatted',
+		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
+	],
 	[ENTRY, 'release', 'Create git tag', "steps.preflight.outputs.create_tag == 'true'"],
 	[
 		ENTRY,
@@ -519,7 +600,7 @@ const STEP_CONDITIONS = [
 		MACOS_BOX,
 		'launch',
 		'Retain source-bound AppleEvent launch qualification receipt',
-		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+		"${{ env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config' }}"
 	],
 	[
 		MACOS_BOX,
@@ -554,114 +635,149 @@ const STEP_CONDITIONS = [
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory launch evidence', 'always()'],
 	// Failed upgrade setup/launch must retain its negative receipt before the verdict.
 	[WINDOWS_BOX, 'launch-windows', 'Upload mandatory compiled upgrade failure evidence', 'always()'],
-	[LINUX_BOX, 'install-linux', 'Prepare the container', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Verify source compiler and checkout', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Create the installation user', "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Prepare the container', "env.INSTALL_KIND == 'install'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Verify source compiler and checkout',
+		"env.INSTALL_KIND == 'install'"
+	],
+	[LINUX_BOX, 'install-linux', 'Create the installation user', "env.INSTALL_KIND == 'install'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Install as an ordinary user without runtime dependencies',
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed tree is the one the daemon expects',
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		"The unit suite on this distribution's LuaJIT",
-		"matrix.kind == 'install'"
+		"env.INSTALL_KIND == 'install'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload the native distro unit log',
-		"${{ !cancelled() && matrix.kind == 'install' }}"
+		"${{ !cancelled() && env.INSTALL_KIND == 'install' }}"
 	],
-	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "matrix.kind == 'install'"],
-	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "matrix.kind == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Record mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
+	[LINUX_BOX, 'install-linux', 'Upload mandatory distro evidence', "env.INSTALL_KIND == 'install'"],
 	[
 		LINUX_BOX,
 		'install-linux',
-		'Install on ${{ matrix.image }} and verify the first run',
-		"matrix.kind == 'first'"
+		'Install on ${{ env.INSTALL_IMAGE }} and verify the first run',
+		"env.INSTALL_KIND == 'first'"
 	],
-	[LINUX_BOX, 'install-linux', 'Record mandatory first-install evidence', "matrix.kind == 'first'"],
-	[LINUX_BOX, 'install-linux', 'Upload mandatory first-install evidence', "matrix.kind == 'first'"],
-	[LINUX_BOX, 'install-linux', 'Download the .deb built above (deb)', "matrix.kind == 'deb'"],
-	[LINUX_BOX, 'install-linux', 'Install it the way a user would (deb)', "matrix.kind == 'deb'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Record mandatory first-install evidence',
+		"env.INSTALL_KIND == 'first'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Upload mandatory first-install evidence',
+		"env.INSTALL_KIND == 'first'"
+	],
+	[LINUX_BOX, 'install-linux', 'Download the .deb built above (deb)', "env.INSTALL_KIND == 'deb'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install it the way a user would (deb)',
+		"env.INSTALL_KIND == 'deb'"
+	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The package installed the files the daemon reads (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
-	[LINUX_BOX, 'install-linux', 'Launch the installed binary (deb)', "matrix.kind == 'deb'"],
+	[LINUX_BOX, 'install-linux', 'Launch the installed binary (deb)', "env.INSTALL_KIND == 'deb'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed shared data tree resolves and opens (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory .deb smoke evidence (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory .deb smoke evidence (deb)',
-		"matrix.kind == 'deb'"
+		"env.INSTALL_KIND == 'deb'"
 	],
-	[LINUX_BOX, 'install-linux', 'Tools the job itself needs (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Download the .rpm built above (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Install it the way a user would (rpm)', "matrix.kind == 'rpm'"],
-	[LINUX_BOX, 'install-linux', 'Launch the installed binary (rpm)', "matrix.kind == 'rpm'"],
+	[LINUX_BOX, 'install-linux', 'Tools the job itself needs (rpm)', "env.INSTALL_KIND == 'rpm'"],
+	[LINUX_BOX, 'install-linux', 'Download the .rpm built above (rpm)', "env.INSTALL_KIND == 'rpm'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Install it the way a user would (rpm)',
+		"env.INSTALL_KIND == 'rpm'"
+	],
+	[LINUX_BOX, 'install-linux', 'Launch the installed binary (rpm)', "env.INSTALL_KIND == 'rpm'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The installed shared data tree resolves and opens (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory .rpm smoke evidence (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory .rpm smoke evidence (rpm)',
-		"matrix.kind == 'rpm'"
+		"env.INSTALL_KIND == 'rpm'"
 	],
-	[LINUX_BOX, 'install-linux', 'Download the AppImage built above', "matrix.kind == 'appimage'"],
-	[LINUX_BOX, 'install-linux', 'Unpack it (no FUSE on this runner)', "matrix.kind == 'appimage'"],
-	[LINUX_BOX, 'install-linux', 'Launch it', "matrix.kind == 'appimage'"],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Download the AppImage built above',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'Unpack it (no FUSE on this runner)',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[LINUX_BOX, 'install-linux', 'Launch it', "env.INSTALL_KIND == 'appimage'"],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'The bundled shared data tree resolves and opens',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Record mandatory AppImage smoke evidence',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	],
 	[
 		LINUX_BOX,
 		'install-linux',
 		'Upload mandatory AppImage smoke evidence',
-		"matrix.kind == 'appimage'"
+		"env.INSTALL_KIND == 'appimage'"
 	]
-];
+].map(macConditionEntry);
 // test-linux runs each harness under !cancelled(), so a red one hides no other;
 // tools/test/test-linux-ci-evidence.cjs pins which of its steps those are.
 const HARNESS_JOB = 'e2e-linux';
@@ -856,19 +972,427 @@ for (const [key, value] of planOutputs) {
 		errors.push(`${ROOT} output ${key} reads step '${source[1]}', which never writes ${key}`);
 	}
 }
-for (const match of pipeline
-	.text()
-	.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
-	// Only the root publishes a plan; a lane's own jobs read their scenarios
-	// from package-macos, which test-macos-swift-launcher-ci.cjs pins.
-	if (match[1] === 'package-macos') continue;
-	if (match[1] !== ROOT) {
-		errors.push(
-			`needs.${match[1]}.outputs.${match[2]} is read, but the plan lives in ${ROOT} alone`
+const COMMON_MATRIX = '${{ fromJSON(inputs.common_plan).matrix }}';
+
+/** Admit the one root plan transport and its complete cross-workflow consumer. */
+function commonPlanProblems(files) {
+	const problems = [];
+	try {
+		const root = YAML.parse(files.find((file) => file.rel === ENTRY).text, { uniqueKeys: true });
+		const common = YAML.parse(files.find((file) => file.rel === COMMON_BOX).text, {
+			uniqueKeys: true
+		});
+		const prepare = root.jobs['prepare-common'];
+		assert.deepEqual(
+			prepare,
+			{
+				name: 'Check formatting and plan unit tests',
+				'runs-on': 'ubuntu-latest',
+				outputs: { plan: '${{ steps.plan.outputs.plan }}' },
+				steps: [
+					{ uses: 'actions/checkout@v4' },
+					{
+						uses: 'actions/setup-node@v4',
+						with: { 'node-version-file': '.node-version', cache: 'npm' }
+					},
+					{ uses: 'actions/setup-python@v5', with: { 'python-version': '3.12' } },
+					{ run: 'npm ci' },
+					{
+						name: 'Check formatting',
+						run: 'python3 -m pip install --disable-pip-version-check "ruff==$(node tools/lint/format.cjs --ruff-version)"\nnode tools/lint/format.cjs --check\n'
+					},
+					{
+						name: 'Plan every canonical feature and additional suite',
+						id: 'plan',
+						run: 'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan\n'
+					}
+				]
+			},
+			'One genuine shallow formatter and plan producer'
 		);
-	} else if (!planOutputs.has(match[2])) {
-		errors.push(`needs.${ROOT}.outputs.${match[2]} is read but ${ROOT} declares no such output`);
+		for (const id of ['core', 'macos', 'windows', 'linux'])
+			assert.deepEqual(
+				root.jobs[id].needs,
+				['validate', 'prepare-common'],
+				'Every lane awaits formatting and release plan'
+			);
+		assert.equal(root.jobs.core.with.common_plan, '${{ needs.prepare-common.outputs.plan }}');
+		assert.deepEqual(root.jobs.core.permissions, { contents: 'read', actions: 'read' });
+		assert.deepEqual(common.on.workflow_call.inputs.common_plan, {
+			description: 'Complete source/ref-bound plan from the shallow formatter checkout',
+			required: true,
+			type: 'string'
+		});
+		const unit = common.jobs['shared-validation'];
+		assert.equal(unit.needs, undefined);
+		assert.deepEqual(unit.strategy, {
+			'fail-fast': false,
+			matrix: '${{ fromJSON(inputs.common_plan).matrix }}'
+		});
+		assert.equal(unit.env.COMMON_LOT, '${{ matrix.lot }}');
+		assert.equal(unit.env.COMMON_PLAN, '${{ inputs.common_plan }}');
+		assert.equal(common.jobs['common-e2e'].env.COMMON_PLAN, '${{ inputs.common_plan }}');
+		assert.deepEqual(
+			unit.steps.filter((step) => step.id === 'common-lot'),
+			[
+				{
+					name: 'Admit the complete Common lot map',
+					id: 'common-lot',
+					run: 'node tools/ci/js-feature-matrix.cjs select'
+				}
+			]
+		);
+		assert.ok(
+			unit.steps.findIndex((step) => step.id === 'common-lot') <
+				unit.steps.findIndex((step) => step.name === 'Install native validation tools')
+		);
+		const expectedReads = [
+			[ENTRY, '      common_plan: ${{ needs.prepare-common.outputs.plan }}'],
+			[COMMON_BOX, '      matrix: ${{ fromJSON(inputs.common_plan).matrix }}'],
+			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}'],
+			[COMMON_BOX, '      COMMON_PLAN: ${{ inputs.common_plan }}']
+		];
+		const reads = files.flatMap((file) =>
+			file.text
+				.split('\n')
+				.filter((line) => /needs\.prepare-common\.outputs|inputs\.common_plan/.test(line))
+				.map((line) => [file.rel, line])
+		);
+		assert.deepEqual(reads, expectedReads, 'No extra or foreign root plan readers');
+	} catch (error) {
+		problems.push('Common root plan transport: ' + error.message);
 	}
+	return problems;
+}
+
+const LUA_TIMING_RETENTION = [
+	{
+		file: LINUX_BOX,
+		job: 'test-linux',
+		producer: 'Run the driver unit test suite',
+		after: 'Upload manual runtime acceptance evidence',
+		directory: 'static/ergopti_plus/linux',
+		step: 'Retain Linux Lua timing diagnostics',
+		artifact:
+			'lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/linux-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
+	},
+	{
+		file: MACOS_BOX,
+		job: 'test-hs',
+		producer: 'Run unit + meta tests',
+		after: 'Run unit + meta tests',
+		directory: 'static/ergopti_plus/macos',
+		step: 'Retain macOS Lua timing diagnostics',
+		artifact:
+			'lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		path: '${{ runner.temp }}/macos-lua.json',
+		command:
+			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua'
+	}
+];
+
+/** Admits only each matrix include and its exact authored stage-plan producer. */
+/** Bind every human-lot output read to its exact adjacent producer and closed field. */
+function lotTransport(source, rel) {
+	const ranges = [];
+	const problems = [];
+	try {
+		const document = YAML.parse(source, { uniqueKeys: true });
+		const jobs = pipeline.jobsOfText(source, rel);
+		const routes =
+			rel === MACOS_BOX
+				? [
+						[
+							'test-hs',
+							'e2e-hs',
+							'stage-plan',
+							'e2e_matrix',
+							'e2e_metadata',
+							'Resolve exact E2E stage roles',
+							'node tools/ci/macos-stage-roles.cjs plan e2e'
+						],
+						[
+							'package-macos',
+							'launch',
+							'stage-plan',
+							'testbuild_matrix',
+							'testbuild_metadata',
+							'Resolve exact test-build stage roles',
+							'node tools/ci/macos-stage-roles.cjs plan testbuild'
+						]
+					]
+				: rel === COMMON_BOX
+					? [
+							[
+								'common-e2e',
+								'common-build',
+								'site-plan',
+								'site_matrix',
+								'site_metadata',
+								'Plan both production site targets',
+								'node tools/ci/site-matrix.cjs plan'
+							],
+							[
+								'common-build',
+								'common-testbuild',
+								'site-plan',
+								'site_matrix',
+								'site_metadata',
+								'Admit the complete production site map',
+								'node tools/ci/site-matrix.cjs admit'
+							]
+						]
+					: rel === LINUX_BOX
+						? [
+								[
+									'package-linux',
+									'install-linux',
+									'install-plan',
+									'install_matrix',
+									'install_metadata',
+									'Plan every authored installation lot',
+									'node tools/ci/linux-install-matrix.cjs'
+								]
+							]
+						: [];
+		if (rel === MACOS_BOX) assert.deepEqual(macStageProblems(source), []);
+		for (const [producer, consumer, id, matrix, metadata, name, run] of routes) {
+			const preceding = document.jobs[producer],
+				receiving = document.jobs[consumer];
+			assert.deepEqual(receiving.needs, [producer], 'Exact immediate lot predecessor required');
+			const outputs =
+				id === 'site-plan' || id === 'install-plan' ? ['matrix', 'metadata'] : [matrix, metadata];
+			for (const [index, key] of [matrix, metadata].entries())
+				assert.equal(
+					preceding.outputs[key],
+					'${{ steps.' + id + '.outputs.' + outputs[index] + ' }}'
+				);
+			const expected = { name, id, run };
+			if (rel === MACOS_BOX && producer === 'package-macos')
+				expected.env = { MACOS_LAUNCH_SCENARIOS: '${{ steps.profile.outputs.scenarios }}' };
+			assert.deepEqual(
+				preceding.steps.filter((step) => step.id === id),
+				[expected],
+				'Mandatory exact lot producer required'
+			);
+			const expression = '${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}';
+			assert.deepEqual(receiving.strategy, { 'fail-fast': false, matrix: expression });
+			const selected = 'fromJSON(needs.' + producer + '.outputs.' + metadata + ')[matrix.lot]';
+			const fields = [[6, 'matrix', expression]];
+			if (rel === MACOS_BOX) {
+				fields.push(
+					[4, 'runs-on', '${{ ' + selected + '.runner }}'],
+					[4, 'timeout-minutes', '${{ ' + selected + '.timeout_minutes }}']
+				);
+				const env = {
+					MACOS_STAGE_LOT: '${{ matrix.lot }}',
+					MACOS_STAGE_METADATA: '${{ needs.' + producer + '.outputs.' + metadata + ' }}',
+					MACOS_STAGE_CELL: '${{ toJSON(' + selected + ') }}',
+					...Object.fromEntries(
+						['role', 'runner', 'architecture', 'scenario'].map((field) => [
+							'MACOS_STAGE_' + field.toUpperCase(),
+							'${{ ' + selected + '.' + field + ' }}'
+						])
+					)
+				};
+				assert.deepEqual(receiving.env, env);
+				for (const [key, value] of Object.entries(env))
+					if (key !== 'MACOS_STAGE_LOT') fields.push([6, key, value]);
+			} else if (rel === COMMON_BOX) {
+				const env = {
+					SITE_LOT: '${{ matrix.lot }}',
+					SITE_METADATA: '${{ needs.' + producer + '.outputs.' + metadata + ' }}',
+					ERGOPTI_SITE_TARGET: '${{ ' + selected + '.target }}',
+					BASE_PATH: '${{ ' + selected + '.base_path }}',
+					ERGOPTI_SITE_SOURCE_SHA: '${{ github.sha }}'
+				};
+				assert.deepEqual(receiving.env, env);
+				for (const key of ['SITE_METADATA', 'ERGOPTI_SITE_TARGET', 'BASE_PATH'])
+					fields.push([6, key, env[key]]);
+				assert.deepEqual(
+					receiving.steps.filter((step) => step.id === 'site-plan'),
+					[
+						{
+							name: 'Admit the complete production site map',
+							id: 'site-plan',
+							run: 'node tools/ci/site-matrix.cjs admit'
+						}
+					]
+				);
+				assert.equal(
+					receiving.steps[3].id,
+					'site-plan',
+					'Admit the whole map before any production action'
+				);
+			} else {
+				const env = Object.fromEntries(
+					['id', 'kind', 'distro', 'image', 'prep', 'known'].map((field) => [
+						'INSTALL_' + field.toUpperCase(),
+						'${{ ' + selected + '.' + field + ' }}'
+					])
+				);
+				assert.deepEqual(receiving.env, env);
+				assert.equal(receiving.container, '${{ ' + selected + '.container }}');
+				fields.push(
+					[4, 'container', receiving.container],
+					...Object.entries(env).map(([key, value]) => [6, key, value])
+				);
+				assert.deepEqual(receiving.steps[0], {
+					name: 'Require a declared installation lot',
+					shell: 'sh',
+					run: 'set -eu\ntest -n "$INSTALL_ID"\ncase "$INSTALL_KIND" in\n  install|first|deb|rpm|appimage) ;;\n  *) exit 1 ;;\nesac\n'
+				});
+				assert.equal(preceding.steps.at(-1).id, id, 'Plan only after mandatory packaging evidence');
+			}
+			const body = jobs.find((job) => job.id === consumer).body;
+			for (const [indent, key, value] of fields) {
+				const line = ' '.repeat(indent) + key + ': ' + value + '\n';
+				assert.equal(body.split(line).length, 2, 'One exact metadata read field required');
+				const start = source.indexOf(body) + body.indexOf(line) + indent + key.length + 2;
+				ranges.push({ start, end: start + value.length });
+			}
+		}
+	} catch (error) {
+		problems.push(rel + ': human lot transport refused: ' + error.message);
+		return { ranges: [], problems };
+	}
+	return { ranges, problems };
+}
+
+/** Keep release-plan outputs at validate and feature matrices at their exact consumers. */
+function planReferenceProblems(files) {
+	const problems = commonPlanProblems(files);
+	for (const file of files) {
+		const transport = lotTransport(file.text, file.rel);
+		problems.push(...transport.problems);
+		const macReferences = transport.ranges;
+		const consumers =
+			file.rel === COMMON_BOX
+				? pipeline.jobsOfText(file.text, file.rel).filter((job) => job.id === 'shared-validation')
+				: [];
+		const consumer = consumers.length === 1 ? consumers[0] : null;
+		const consumerStart = consumer
+			? file.text.split('\n').slice(0, consumer.line).join('\n').length + 1
+			: -1;
+		const strategy =
+			consumer && /^ {4}strategy:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/m.exec(consumer.body);
+		const matrixField = strategy && /^ {6}matrix: ([^\n]+)$/m.exec(strategy[0]);
+		const matrixStart =
+			matrixField && matrixField[1] === COMMON_MATRIX
+				? consumerStart + strategy.index + matrixField.index + '      matrix: '.length
+				: -1;
+		for (const match of file.text.matchAll(/needs\.([A-Za-z0-9_-]+)\.outputs\.([A-Za-z0-9_-]+)/g)) {
+			if (file.rel === LINUX_BOX && match[1] === 'e2e-linux' && match[2] === 'ci_unit_result') {
+				const build = pipeline
+					.jobsOfText(file.text, file.rel)
+					.find((job) => job.id === 'package-linux');
+				const condition = build && /^ {4}if: ([^\n]+)$/m.exec(build.body);
+				const start = condition ? file.text.indexOf(build.body) + condition.index : -1;
+				if (
+					start >= 0 &&
+					match.index >= start &&
+					match.index + match[0].length <= start + condition[0].length
+				)
+					continue;
+			}
+			const owner = pipeline.jobsOfText(file.text, file.rel).find((job) => {
+				const start = file.text.indexOf(job.body);
+				return match.index >= start && match.index < start + job.body.length;
+			});
+			if (
+				macReferences.some(
+					({ start, end }) => match.index >= start && match.index + match[0].length <= end
+				)
+			)
+				continue;
+			if (
+				file.rel === ENTRY &&
+				owner?.id === 'release' &&
+				match[1] === 'publication-plan' &&
+				planOutputs.has(match[2])
+			)
+				continue;
+			if (
+				file.rel === ENTRY &&
+				owner?.id === 'core' &&
+				match[1] === 'prepare-common' &&
+				match[2] === 'plan' &&
+				commonPlanProblems(files).length === 0
+			)
+				continue;
+			if (match[1] !== ROOT) {
+				problems.push(
+					`needs.${match[1]}.outputs.${match[2]} is read, but the plan lives in ${ROOT} alone`
+				);
+			} else if (!planOutputs.has(match[2])) {
+				problems.push(
+					`needs.${ROOT}.outputs.${match[2]} is read but ${ROOT} declares no such output`
+				);
+			}
+		}
+	}
+	return problems;
+}
+errors.push(...planReferenceProblems(pipeline.files()));
+
+// Each output remains private to its actual matrix include and canonical producer.
+for (const [producer, consumer, stage, roleStep, role] of [
+	[
+		'test-hs',
+		'e2e-hs',
+		'e2e',
+		'Run virtual-keyboard harness (stubbed hs.* — no real Hammerspoon)',
+		'e2e-hs'
+	],
+	['package-macos', 'launch', 'testbuild', 'Launch over the user state and judge it', 'launch']
+]) {
+	const key = stage + '_matrix';
+	const reference = 'needs.' + producer + '.outputs.' + key;
+	const include = '      matrix: ${{ fromJSON(' + reference + ') }}\n';
+	const roleHead = '      - name: ' + roleStep + '\n';
+	const rolePrefix = macConditionalPrefix(roleHead, consumer);
+	assert.ok(rolePrefix.endsWith('        if: ' + macRole.condition(role) + '\n'));
+	for (const [label, before, after] of [
+		['foreign producer', include, include.replace('needs.' + producer, 'needs.foreign')],
+		['unknown key', include, include.replace('.outputs.' + key, '.outputs.foreign')],
+		['wrong consumer', '  ' + consumer + ':\n', '  foreign-consumer:\n'],
+		[
+			'changed producer command',
+			'run: node tools/ci/macos-stage-roles.cjs plan ' + stage + '\n',
+			'run: echo foreign-plan\n'
+		],
+		[
+			'changed producer output',
+			key + ': ${{ steps.stage-plan.outputs.' + key + ' }}',
+			key + ': ${{ steps.foreign.outputs.' + key + ' }}'
+		],
+		[
+			'foreign role',
+			rolePrefix,
+			rolePrefix.replace(
+				"env.MACOS_STAGE_ROLE == '" + role + "'",
+				"env.MACOS_STAGE_ROLE == 'foreign'"
+			)
+		],
+		[
+			'extra reader inside the legitimate consumer',
+			roleHead,
+			'      - name: Foreign matrix reader\n        run: echo "${{ ' +
+				reference +
+				' }}"\n' +
+				roleHead
+		]
+	])
+		mustCatch(
+			'Mac ' + stage + ' matrix: ' + label,
+			MACOS_BOX,
+			before,
+			after,
+			planReferenceProblems
+		);
 }
 
 /**
@@ -913,12 +1437,13 @@ function rootProblems(files) {
 			? []
 			: rootSteps.slice(setupAt + 1).filter((step) => step.name !== 'Select native OS lanes');
 	const expected = [
-		...VALIDATE_CHECKS.map(([name]) => name),
 		DEEPEN_STEP,
 		...PLAN_STEPS,
-		'Select the proposed one-candidate native qualification'
+		'Select the proposed one-candidate native qualification',
+		'Persist the exact validated publication plan',
+		'Retain the plan for failed-job reruns'
 	];
-	const qualifier = after.at(-1);
+	const qualifier = after.at(-3);
 	if (
 		pipeline.stepField(qualifier?.body ?? '', 'run') !==
 		'node tools/ci/dev-release-qualification.cjs --publication-select >> "$GITHUB_OUTPUT"'
@@ -943,12 +1468,72 @@ function rootProblems(files) {
 		);
 		return problems;
 	}
-	for (const [index, [name, command]] of VALIDATE_CHECKS.entries()) {
-		const run = pipeline.stepField(after[index].body, 'run');
-		if (run !== command)
-			problems.push(`${ROOT} step "${name}" must run exactly \`${command}\`, got: ${run}`);
+	const producer = after.at(-2),
+		upload = after.at(-1);
+	if (
+		pipeline.stepField(producer.body, 'run') !==
+		'node tools/ci/publication-plan.cjs create ci-publication-plan.json'
+	)
+		problems.push('Validate must persist its final source/run-bound plan.');
+	const uploadValue = YAML.parse('steps:\n' + upload.body).steps[0];
+	if (
+		JSON.stringify(uploadValue) !==
+		JSON.stringify({
+			name: 'Retain the plan for failed-job reruns',
+			uses: 'actions/upload-artifact@v4',
+			with: {
+				name: 'ci-publication-plan-${{ github.sha }}-${{ github.run_id }}',
+				path: 'ci-publication-plan.json',
+				'if-no-files-found': 'error',
+				overwrite: true
+			}
+		})
+	)
+		problems.push('Validate must retain its exact terminal plan artifact.');
+	const bound = YAML.parse('steps:\n' + producer.body).steps[0];
+	for (const [key, owner] of Object.entries({
+		release: 'meta',
+		version: 'meta',
+		tag: 'meta',
+		title: 'meta',
+		prerelease: 'meta',
+		channel: 'meta',
+		linux_bundle: 'contract',
+		native_qualification_profile: 'qualification',
+		lane_windows: 'lanes',
+		lane_macos: 'lanes',
+		lane_linux: 'lanes'
+	}))
+		if (
+			bound.env['CI_PLAN_' + key.toUpperCase()] !==
+			'${{ steps.' + owner + '.outputs.' + key + ' }}'
+		)
+			problems.push('Retained plan binding differs: ' + key);
+	if (bound.env.CI_OS_SELECTION !== "${{ inputs.os_lanes || 'all' }}")
+		problems.push('Retained plan selection differs.');
+	for (const [name, command] of COMMON_FORMAT_CHECKS) {
+		const matches = files.flatMap((entry) =>
+			pipeline.jobsOfText(entry.text, entry.rel).flatMap((job) =>
+				pipeline
+					.steps(job.body)
+					.filter((step) => step.name === name)
+					.map((step) => ({ entry, job, step }))
+			)
+		);
+		if (
+			matches.length !== 1 ||
+			matches[0].entry.rel !== COMMON_BOX ||
+			matches[0].job.id !== 'shared-validation' ||
+			pipeline.stepField(matches[0].step.body, 'run') !== command ||
+			pipeline.stepField(matches[0].step.body, 'if') !==
+				"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}" ||
+			pipeline.stepField(matches[0].step.body, 'continue-on-error') !== null
+		)
+			problems.push(
+				'The real hotstring TOML check must run exactly once in its mandatory Common lot.'
+			);
 	}
-	const deepen = pipeline.runOf(after[VALIDATE_CHECKS.length].body) ?? [];
+	const deepen = pipeline.runOf(after[0].body) ?? [];
 	if (JSON.stringify(deepen) !== JSON.stringify(DEEPEN_SCRIPT)) {
 		const differs = deepen.findIndex((line, index) => line !== DEEPEN_SCRIPT[index]);
 		problems.push(
@@ -1052,28 +1637,42 @@ if (contract !== null) {
 // ======================================
 
 // What each caller needs is pinned with the graph shape in section 3.
+/** Keep release qualification inputs and the independent shallow inventory producer exact. */
+function callerInputProblems(id, inputs) {
+	const problems = [];
+	if (inputs.get('release') !== RELEASE_INPUT) {
+		problems.push(
+			`caller ${id} must pass release: ${RELEASE_INPUT}, got: ${inputs.get('release')}`
+		);
+	}
+	for (const [key, value] of inputs) {
+		if (key === 'release') continue;
+		if (id === 'core' && key === 'common_plan') {
+			if (value !== '${{ needs.prepare-common.outputs.plan }}')
+				problems.push('Common plan must come from the mandatory shallow formatter owner');
+			continue;
+		}
+		if (value !== `\${{ needs.${ROOT}.outputs.${key} }}`) {
+			problems.push(
+				`caller ${id} must pass ${key}: \${{ needs.${ROOT}.outputs.${key} }}, got: ${value}`
+			);
+		}
+	}
+	if (id === 'core' && !inputs.has('common_plan'))
+		problems.push('Common caller requires the complete shallow formatter plan');
+	return problems;
+}
+
 const callers = pipeline.calls();
-if (callers.length !== 3)
-	errors.push(`ci.yml must call the three OS lanes, found ${callers.length} call(s)`);
+if (callers.length !== 4)
+	errors.push(`ci.yml must call Common and the three OS lanes, found ${callers.length} call(s)`);
 let gatedSecrets = 0;
 for (const call of callers) {
 	const body = pipeline.job(call.id);
 	// The release input is the only computed one: a false value on a release
 	// run skips the lane's release build while the lane still succeeds.
 	const inputs = mappingOf(body, 'with', call.id) ?? new Map();
-	if (inputs.get('release') !== RELEASE_INPUT) {
-		errors.push(
-			`caller ${call.id} must pass release: ${RELEASE_INPUT}, got: ${inputs.get('release')}`
-		);
-	}
-	for (const [key, value] of inputs) {
-		if (key === 'release') continue;
-		if (value !== `\${{ needs.${ROOT}.outputs.${key} }}`) {
-			errors.push(
-				`caller ${call.id} must pass ${key}: \${{ needs.${ROOT}.outputs.${key} }}, got: ${value}`
-			);
-		}
-	}
+	errors.push(...callerInputProblems(call.id, inputs));
 	const inlineSecrets = /^ {4}secrets:[ \t]*([^\s#].*)$/m.exec(body);
 	if (inlineSecrets) {
 		errors.push(
@@ -1095,6 +1694,69 @@ for (const call of callers) {
 		}
 	}
 }
+
+for (const [label, id, entries] of [
+	['missing Common plan', 'core', [['release', RELEASE_INPUT]]],
+	[
+		'foreign Common producer',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.validate.outputs.plan }}']
+		]
+	],
+	[
+		'foreign Common output',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.matrix }}']
+		]
+	],
+	[
+		'Common plan routed into Windows',
+		'windows',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'Common plan routed into macOS',
+		'macos',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'Common plan routed into Linux',
+		'linux',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	],
+	[
+		'qualification input uses inventory owner',
+		'core',
+		[
+			['release', RELEASE_INPUT],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}'],
+			['version', '${{ needs.prepare-common.outputs.version }}']
+		]
+	],
+	[
+		'release predicate weakened',
+		'core',
+		[
+			['release', 'true'],
+			['common_plan', '${{ needs.prepare-common.outputs.plan }}']
+		]
+	]
+])
+	assert.ok(callerInputProblems(id, new Map(entries)).length > 0, label);
+
 if (gatedSecrets < MIN_GATED_SECRETS) {
 	errors.push(
 		`found ${gatedSecrets} release-only secret(s) passed to the lanes (floor ${MIN_GATED_SECRETS}); the secrets parse drifted`
@@ -1105,6 +1767,1101 @@ if (/^\s*secrets:\s*inherit\b/m.test(pipeline.text())) {
 		'no job may use secrets: inherit, which hands every secret, PAT_ERGOPTI included, to the called workflow'
 	);
 }
+
+const COMMON_INPUTS = ['release', 'version', 'tag', 'prerelease', 'channel'];
+const COMMON_DISPATCH = [
+	'case "$SUITE" in',
+	'    js) npm run test:js -- --feature "$FEATURE" ;;',
+	'    properties) npm run test:properties ;;',
+	'    mutation) npm run test:mutation ;;',
+	'    hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
+	'    *) exit 1 ;;',
+	'esac'
+].join('\n');
+
+/** Preserve the reusable Common caller, literal inventory, exact union and browser custody. */
+/** Keep production output custody separate from the existing source-rendering E2Es. */
+/** Pin the actual receipt pair consumer; a display-only final job cannot pass. */
+function commonVerdictProblems(source) {
+	const problems = [];
+	try {
+		const job = YAML.parse(source, { uniqueKeys: true }).jobs['common-unit-verdict'];
+		assert.deepEqual(job, {
+			name: 'Verdict',
+			needs: ['common-testbuild'],
+			if: 'always()',
+			'runs-on': 'ubuntu-latest',
+			permissions: { contents: 'read', actions: 'read' },
+			env: {
+				SITE_PREDECESSOR_RESULT: '${{ needs.common-testbuild.result }}',
+				GH_TOKEN: '${{ github.token }}'
+			},
+			steps: [
+				{ uses: 'actions/checkout@v4' },
+				{ uses: 'actions/setup-node@v4', with: { 'node-version-file': '.node-version' } },
+				{
+					name: 'Receive stable production browser proof',
+					uses: 'actions/download-artifact@v4',
+					with: { name: 'common-site-testbuild-main', path: 'site-proof/main' }
+				},
+				{
+					name: 'Receive development production browser proof',
+					uses: 'actions/download-artifact@v4',
+					with: { name: 'common-site-testbuild-dev', path: 'site-proof/dev' }
+				},
+				{
+					name: 'Require both exact Build and browser receipts',
+					run: 'node tools/ci/site-verdict.cjs verify site-proof'
+				}
+			]
+		});
+	} catch (error) {
+		problems.push('Shared Verdict must receive both tested receipt pairs: ' + error.message);
+	}
+	return problems;
+}
+
+function commonSiteProblems(source) {
+	const errors = [];
+	try {
+		const doc = require('yaml').parse(source);
+		const same = (a, b, label) => {
+			if (JSON.stringify(a) !== JSON.stringify(b)) errors.push(label);
+		};
+		const command = (job, name, run) => {
+			const rows = job.steps.filter((s) => s.name === name);
+			if (
+				rows.length !== 1 ||
+				rows[0].run !== run ||
+				rows[0].if !== undefined ||
+				rows[0]['continue-on-error'] !== undefined
+			)
+				errors.push(name);
+		};
+		const build = doc.jobs['common-build'],
+			test = doc.jobs['common-testbuild'];
+		for (const [job, previous, name, timeout] of [
+			[build, 'common-e2e', 'Build', 60],
+			[test, 'common-build', 'Install and launch', 30]
+		]) {
+			same(job.needs, [previous], 'adjacent production stage');
+			same(job.name, name, 'actual API stage name');
+			same(job['runs-on'], 'ubuntu-latest', 'production runner');
+			same(job['timeout-minutes'], timeout, 'bounded production stage');
+			same(
+				job.strategy,
+				{
+					'fail-fast': false,
+					matrix: '${{ fromJSON(needs.' + previous + '.outputs.site_matrix) }}'
+				},
+				'two exact independent production targets'
+			);
+			same(
+				job.env,
+				{
+					SITE_LOT: '${{ matrix.lot }}',
+					SITE_METADATA: '${{ needs.' + previous + '.outputs.site_metadata }}',
+					ERGOPTI_SITE_TARGET:
+						'${{ fromJSON(needs.' + previous + '.outputs.site_metadata)[matrix.lot].target }}',
+					BASE_PATH:
+						'${{ fromJSON(needs.' + previous + '.outputs.site_metadata)[matrix.lot].base_path }}',
+					ERGOPTI_SITE_SOURCE_SHA: '${{ github.sha }}'
+				},
+				'actual source and separate target'
+			);
+			for (const key of ['if', 'continue-on-error', 'permissions'])
+				if (job[key] !== undefined) errors.push('production job ' + key);
+			same(
+				job.outputs,
+				job === build
+					? {
+							site_matrix: '${{ steps.site-plan.outputs.matrix }}',
+							site_metadata: '${{ steps.site-plan.outputs.metadata }}'
+						}
+					: undefined,
+				'whole map forwarding only from Build'
+			);
+			same(
+				job.steps[3],
+				{
+					name: 'Admit the complete production site map',
+					id: 'site-plan',
+					run: 'node tools/ci/site-matrix.cjs admit'
+				},
+				'admit the whole source map before production'
+			);
+			for (const step of job.steps)
+				for (const key of ['if', 'continue-on-error'])
+					if (step[key] !== undefined) errors.push('production step ' + key);
+			same(
+				job.steps.slice(0, 3),
+				[
+					{ uses: 'actions/checkout@v4' },
+					{
+						uses: 'actions/setup-node@v4',
+						with: { 'node-version-file': '.node-version', cache: 'npm' }
+					},
+					{ run: 'npm ci' }
+				],
+				'actual production dependencies'
+			);
+		}
+		same(build.steps.length, 6, 'closed production build steps');
+		command(
+			build,
+			'Build and seal production site — ${{ matrix.lot }}',
+			'set -euo pipefail\nbundle="$RUNNER_TEMP/common-site-$ERGOPTI_SITE_TARGET"\nmkdir "$bundle"\nnpm run build\ncmp -- static/CNAME build/CNAME\nmv build "$bundle/site"\nnode tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"\n'
+		);
+		same(
+			build.steps[5],
+			{
+				name: 'Retain exact production site',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'common-site-build-${{ env.ERGOPTI_SITE_TARGET }}',
+					path: '${{ runner.temp }}/common-site-${{ env.ERGOPTI_SITE_TARGET }}/',
+					'include-hidden-files': true,
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain complete sealed output'
+		);
+		same(test.steps.length, 8, 'closed production receiving steps');
+		same(
+			test.steps[4],
+			{
+				name: 'Install production site browsers',
+				run: 'node tools/ci/install-playwright.cjs chromium webkit'
+			},
+			'both production browser engines'
+		);
+		same(
+			test.steps[5],
+			{
+				name: 'Receive exact production site',
+				uses: 'actions/download-artifact@v4',
+				with: {
+					name: 'common-site-build-${{ env.ERGOPTI_SITE_TARGET }}',
+					path: '${{ runner.temp }}/received-site'
+				}
+			},
+			'receive the actual target build'
+		);
+		command(
+			test,
+			'Test received production site — ${{ matrix.lot }}',
+			'set -euo pipefail\nnode tools/test/browser/site-artifact-smoke.playwright.cjs "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-testbuild.json"\nmkdir "$RUNNER_TEMP/site-proof"\ncp "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/site-proof/build.json"\ncp "$RUNNER_TEMP/site-testbuild.json" "$RUNNER_TEMP/site-proof/site-testbuild.json"\n'
+		);
+		same(
+			test.steps[7],
+			{
+				name: 'Retain production browser proof',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'common-site-testbuild-${{ env.ERGOPTI_SITE_TARGET }}',
+					path: '${{ runner.temp }}/site-proof/',
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain actual production proof'
+		);
+	} catch (error) {
+		errors.push(error.message);
+	}
+	return errors;
+}
+
+/** Publication gets write permission only after receiving the exact tested artifact. */
+function siteDeploymentProblems(source) {
+	const errors = [];
+	try {
+		const doc = require('yaml').parse(source);
+		const same = (a, b, label) => {
+			if (JSON.stringify(a) !== JSON.stringify(b)) errors.push(label);
+		};
+		same(
+			doc.on,
+			{
+				workflow_run: { workflows: ['CI'], types: ['completed'], branches: ['main', 'dev'] },
+				workflow_dispatch: {
+					inputs: {
+						run_id: {
+							description: 'Exact successful canonical CI run containing the tested site',
+							required: true,
+							type: 'string'
+						}
+					}
+				}
+			},
+			'all completed source changes and exact manual run'
+		);
+		same(doc.permissions, { contents: 'read', actions: 'read' }, 'read-only before preflight');
+		same(Object.keys(doc.jobs), ['preflight', 'deploy'], 'closed publication chain');
+		const pre = doc.jobs.preflight,
+			deploy = doc.jobs.deploy;
+		same(pre.needs, undefined, 'preflight entry');
+		same(pre.permissions, undefined, 'preflight cannot gain write permission');
+		same(deploy.needs, ['preflight'], 'write job awaits completed byte verification');
+		same(
+			deploy.permissions,
+			{ contents: 'write', actions: 'read' },
+			'write permission only after preflight'
+		);
+		same(
+			deploy.concurrency,
+			{ group: 'deploy-site-gh-pages', 'cancel-in-progress': false },
+			'serialize shared publication branch'
+		);
+		same(
+			deploy.env,
+			{
+				SITE_TARGET: '${{ needs.preflight.outputs.target }}',
+				SITE_SOURCE_SHA: '${{ needs.preflight.outputs.source_sha }}'
+			},
+			'publish admitted source and target'
+		);
+		same(
+			pre.outputs,
+			Object.fromEntries(
+				['source_sha', 'target', 'run_id', 'build_artifact_id', 'testbuild_artifact_id'].map(
+					(key) => [key, '${{ steps.admit.outputs.' + key + ' }}']
+				)
+			),
+			'forward actual admission'
+		);
+		for (const job of [pre, deploy]) {
+			same(job['runs-on'], 'ubuntu-latest', 'publication runner');
+			same(job['timeout-minutes'], 20, 'bounded publication');
+			for (const key of ['if', 'continue-on-error', 'strategy', 'uses'])
+				if (job[key] !== undefined) errors.push('publication job ' + key);
+			for (const step of job.steps)
+				for (const key of ['if', 'continue-on-error'])
+					if (step[key] !== undefined) errors.push('publication step ' + key);
+			same(
+				job.steps[0],
+				{
+					name: 'Checkout trusted receiver',
+					uses: 'actions/checkout@v4',
+					with: { 'persist-credentials': false }
+				},
+				'trusted receiver without stored token'
+			);
+			same(
+				job.steps[1],
+				{ uses: 'actions/setup-node@v4', with: { 'node-version-file': '.node-version' } },
+				'canonical receiver runtime'
+			);
+		}
+		same(pre.steps.length, 8, 'closed preflight steps');
+		same(deploy.steps.length, 8, 'closed publication steps');
+		same(
+			pre.steps[2],
+			{
+				name: 'Admit exact completed producer',
+				id: 'admit',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: 'node tools/ci/site-deploy-admission.cjs admit "$GITHUB_EVENT_PATH" "$RUNNER_TEMP/site-admission.json"'
+			},
+			'actual metadata admission'
+		);
+		const downloaded = (prefix, key, directory, name) => ({
+			name,
+			uses: 'actions/download-artifact@v4',
+			with: {
+				'artifact-ids': '${{ ' + prefix + '.' + key + ' }}',
+				'merge-multiple': true,
+				'run-id': '${{ ' + prefix + '.run_id }}',
+				'github-token': '${{ github.token }}',
+				path: '${{ runner.temp }}/' + directory
+			}
+		});
+		same(
+			pre.steps[3],
+			{
+				name: 'Checkout exact producer source',
+				uses: 'actions/checkout@v4',
+				with: {
+					ref: '${{ steps.admit.outputs.source_sha }}',
+					path: 'producer-source',
+					'persist-credentials': false
+				}
+			},
+			'exact read-only source checkout'
+		);
+		same(
+			pre.steps[4],
+			downloaded(
+				'steps.admit.outputs',
+				'build_artifact_id',
+				'received-site',
+				'Receive selected build artifact'
+			),
+			'preflight exact build ID'
+		);
+		same(
+			pre.steps[5],
+			downloaded(
+				'steps.admit.outputs',
+				'testbuild_artifact_id',
+				'received-testbuild',
+				'Receive selected browser proof'
+			),
+			'preflight exact proof ID'
+		);
+		const verify = (admission) =>
+			'node tools/ci/site-deploy-admission.cjs verify "$RUNNER_TEMP/' +
+			admission +
+			'/site-admission.json" "$RUNNER_TEMP/received-site/site" "$RUNNER_TEMP/received-site/build.json" "$RUNNER_TEMP/received-testbuild/site-testbuild.json" "$GITHUB_WORKSPACE/producer-source"';
+		same(
+			pre.steps[6],
+			{
+				name: 'Verify tested bytes and source',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: verify('').replace('$RUNNER_TEMP//', '$RUNNER_TEMP/')
+			},
+			'preflight actual byte and proof receiving'
+		);
+		same(
+			pre.steps[7],
+			{
+				name: 'Retain admitted producer identity',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: 'site-deployment-admission',
+					path: '${{ runner.temp }}/site-admission.json',
+					'if-no-files-found': 'error',
+					overwrite: true
+				}
+			},
+			'retain validated admission'
+		);
+		same(
+			deploy.steps[2],
+			{
+				name: 'Checkout exact publication source',
+				uses: 'actions/checkout@v4',
+				with: { ref: '${{ needs.preflight.outputs.source_sha }}', path: 'producer-source' }
+			},
+			'exact publication source'
+		);
+		same(
+			deploy.steps[3],
+			{
+				name: 'Receive admitted producer identity',
+				uses: 'actions/download-artifact@v4',
+				with: { name: 'site-deployment-admission', path: '${{ runner.temp }}/admission' }
+			},
+			'receive admitted identity'
+		);
+		same(
+			deploy.steps[4],
+			downloaded(
+				'needs.preflight.outputs',
+				'build_artifact_id',
+				'received-site',
+				'Receive selected build artifact'
+			),
+			'publication exact build ID'
+		);
+		same(
+			deploy.steps[5],
+			downloaded(
+				'needs.preflight.outputs',
+				'testbuild_artifact_id',
+				'received-testbuild',
+				'Receive selected browser proof'
+			),
+			'publication exact proof ID'
+		);
+		same(
+			deploy.steps[6],
+			{
+				name: 'Verify tested bytes and source again',
+				env: { GH_TOKEN: '${{ github.token }}' },
+				run: verify('admission')
+			},
+			'repeat actual receiving before mutation'
+		);
+		const publish = deploy.steps[7];
+		same(publish.name, 'Deploy to GitHub Pages', 'terminal publication owner');
+		same(publish['working-directory'], 'producer-source', 'isolated admitted source checkout');
+		same(
+			publish.env,
+			{ GH_TOKEN: '${{ github.token }}' },
+			'read API token for final source freshness'
+		);
+		for (const line of [
+			'set -euo pipefail',
+			'test "$(git rev-parse HEAD)" = "$SITE_SOURCE_SHA"',
+			'case "$SITE_TARGET" in',
+			'main) DEPLOY_DIR=.; LABEL=ergopti.fr/ ;;',
+			'dev) DEPLOY_DIR=dev; LABEL=ergopti.fr/dev/ ;;',
+			'*) exit 1 ;;',
+			'SITE="$RUNNER_TEMP/received-site/site"',
+			'cmp -- static/CNAME "$SITE/CNAME"',
+			'if [[ "$SITE_TARGET" == main ]]; then',
+			'test ! -e "$SITE/dev"',
+			'node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"',
+			'GHP="$RUNNER_TEMP/gh-pages"',
+			'test ! -e "$GHP"',
+			'git worktree add -b gh-pages "$GHP" FETCH_HEAD',
+			'git worktree add --orphan -b gh-pages "$GHP"',
+			"! -name '.git'",
+			"! -name 'dev'",
+			'cp -r "$SITE"/. "$GHP"/',
+			'rm -rf "${GHP:?}/$DEPLOY_DIR"',
+			'cp -r "$SITE"/. "$GHP/$DEPLOY_DIR/"',
+			'cmp -- static/CNAME "$GHP/$DEPLOY_DIR/CNAME"',
+			'touch "$GHP/.nojekyll"',
+			'git -C "$GHP" add -A',
+			'if git -C "$GHP" diff --cached --quiet; then',
+			'exit 0',
+			'git -C "$GHP" commit -m "deploy: ${LABEL} from ${SITE_SOURCE_SHA} (${SITE_TARGET})"',
+			'git -C "$GHP" push origin gh-pages'
+		]) {
+			if (!publish.run.split('\n').some((row) => row.trim().replace(/\s+\\$/, '') === line))
+				errors.push('publication must retain ' + line);
+		}
+		if (
+			/npm|build\/|github\.sha|github\.ref_name|GITHUB_REF_NAME|continue-on-error|\|\| true/.test(
+				publish.run
+			)
+		)
+			errors.push('no source rebuild or default event identity fallback');
+		if (
+			publish.run.indexOf('cmp -- static/CNAME "$SITE/CNAME"') > publish.run.indexOf('git config')
+		)
+			errors.push('domain before mutation');
+		if (publish.run.indexOf('test ! -e "$SITE/dev"') > publish.run.indexOf('git config'))
+			errors.push('received main cannot overwrite dev');
+		if (
+			!publish.run.includes(
+				'node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"\ngit -C "$GHP" push origin gh-pages'
+			)
+		)
+			errors.push('current target tip immediately before push');
+	} catch (error) {
+		errors.push(error.message);
+	}
+	return errors;
+}
+
+const SITE_BUILD_REFUSALS = [
+	['missing production build', '  common-build:\n', '  foreign-build:\n'],
+	['missing production testbuild', '  common-testbuild:\n', '  foreign-testbuild:\n'],
+	['crossed Build dependency', '    needs: [common-e2e]\n', '    needs: [common-unit-verdict]\n'],
+	['crossed Testbuild dependency', '    needs: [common-build]\n', '    needs: [common-e2e]\n'],
+	[
+		'forgiven production build',
+		'  common-build:\n',
+		'  common-build:\n    continue-on-error: true\n'
+	],
+	[
+		'skipped production browser',
+		'      - name: Test received production site — ${{ matrix.lot }}\n',
+		'      - name: Test received production site — ${{ matrix.lot }}\n        if: false\n'
+	],
+	['unverified domain', '          cmp -- static/CNAME build/CNAME\n', ''],
+	[
+		'unsealed output',
+		'          node tools/ci/site-artifact.cjs seal "$bundle/site" "$bundle/build.json"\n',
+		''
+	],
+	[
+		'hidden output omitted',
+		'          include-hidden-files: true\n',
+		'          include-hidden-files: false\n'
+	],
+	[
+		'Testbuild rebuild fallback',
+		'      - name: Test received production site — ${{ matrix.lot }}\n',
+		'      - run: npm run build\n\n      - name: Test received production site — ${{ matrix.lot }}\n'
+	],
+	[
+		'wrong downloaded target',
+		'          name: common-site-build-${{ env.ERGOPTI_SITE_TARGET }}\n          path: ${{ runner.temp }}/received-site',
+		'          name: common-site-build-main\n          path: ${{ runner.temp }}/received-site'
+	],
+	[
+		'missing browser proof',
+		'          path: ${{ runner.temp }}/site-proof/\n',
+		'          path: missing.json\n'
+	],
+	[
+		'false stable base',
+		'      BASE_PATH: ${{ fromJSON(needs.common-e2e.outputs.site_metadata)[matrix.lot].base_path }}\n',
+		"      BASE_PATH: '/dev'\n"
+	]
+];
+const SITE_DEPLOY_REFUSALS = [
+	[
+		'steps.admit.outputs build_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n'
+	],
+	[
+		'steps.admit.outputs testbuild_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ steps.admit.outputs.testbuild_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ steps.admit.outputs.testbuild_artifact_id }}\n'
+	],
+	[
+		'needs.preflight.outputs build_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.build_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ needs.preflight.outputs.build_artifact_id }}\n'
+	],
+	[
+		'needs.preflight.outputs testbuild_artifact_id must flatten the one exact admitted ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n          merge-multiple: true\n',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n'
+	],
+	['main artifact overwrites dev', '              test ! -e "$SITE/dev"\n', ''],
+	[
+		'missing final source freshness',
+		'          node "$GITHUB_WORKSPACE/tools/ci/site-deploy-admission.cjs" current "$RUNNER_TEMP/admission/site-admission.json"\n',
+		''
+	],
+	[
+		'premature write permission',
+		'permissions:\n  contents: read\n',
+		'permissions:\n  contents: write\n'
+	],
+	['missing preflight edge', '    needs: [preflight]\n', '    needs: []\n'],
+	['forgiven preflight', '  preflight:\n', '  preflight:\n    continue-on-error: true\n'],
+	['domain-only changes excluded', '    branches: [main, dev]\n', '    branches: [dev]\n'],
+	['missing exact manual identity', '      run_id:\n', '      latest:\n'],
+	[
+		'wrong source checkout',
+		'          ref: ${{ steps.admit.outputs.source_sha }}\n',
+		'          ref: main\n'
+	],
+	[
+		'wrong selected build ID',
+		'          artifact-ids: ${{ steps.admit.outputs.build_artifact_id }}\n',
+		'          artifact-ids: 1\n'
+	],
+	[
+		'wrong selected proof ID',
+		'          artifact-ids: ${{ needs.preflight.outputs.testbuild_artifact_id }}\n',
+		'          artifact-ids: 1\n'
+	],
+	[
+		'missing preflight verification',
+		'      - name: Verify tested bytes and source\n',
+		'      - name: Missing byte verification\n'
+	],
+	[
+		'missing publication verification',
+		'      - name: Verify tested bytes and source again\n',
+		'      - name: Missing repeated verification\n'
+	],
+	[
+		'root copy from source',
+		'              cp -r "$SITE"/. "$GHP"/\n',
+		'              cp -r build/. "$GHP"/\n'
+	],
+	[
+		'development overwrite root',
+		'              cp -r "$SITE"/. "$GHP/$DEPLOY_DIR/"\n',
+		'              cp -r "$SITE"/. "$GHP"/\n'
+	],
+	['main erases dev', "                     ! -name 'dev' \\\n", ''],
+	['missing root nojekyll', '          touch "$GHP/.nojekyll"\n', ''],
+	['missing copied domain check', '          cmp -- static/CNAME "$GHP/$DEPLOY_DIR/CNAME"\n', ''],
+	['wrong commit source', 'from ${SITE_SOURCE_SHA}', 'from ${GITHUB_SHA}']
+];
+
+function commonProblems(files) {
+	const problems = commonPlanProblems(files);
+	const entry = files.find((file) => file.rel === ENTRY);
+	const common = files.find((file) => file.rel === COMMON_BOX);
+	const callers = entry ? pipeline.jobsOfText(entry.text, ENTRY) : [];
+	const call = callers.find((job) => job.id === 'core');
+	const children = common ? pipeline.jobsOfText(common.text, COMMON_BOX) : [];
+	const byId = new Map(children.map((job) => [job.id, job]));
+	const child = byId.get('shared-validation');
+	const prepare = callers.find((job) => job.id === 'prepare-common');
+	const verdict = byId.get('common-unit-verdict');
+	const browser = byId.get('common-e2e');
+	if (!call || pipeline.field(call.body, 'uses') !== './.github/workflows/ci-common.yml')
+		problems.push('core must call the exact reusable Common workflow');
+	if (
+		!call ||
+		JSON.stringify(pipeline.needsOf(call.body)) !== JSON.stringify([ROOT, 'prepare-common'])
+	)
+		problems.push('Common caller must await validation and the independent formatter');
+	for (const key of ['if', 'continue-on-error', 'secrets', 'runs-on', 'strategy', 'env', 'steps'])
+		if (call && pipeline.field(call.body, key) !== null)
+			problems.push('Common caller must set no ' + key);
+	const fieldBlock = (body, key) =>
+		new RegExp('^ {4}' + key + ':\\n((?: {6}[^\\n]*(?:\\n|$)|\\n)*)', 'm')
+			.exec(body)?.[0]
+			.trimEnd();
+	const callerInputs =
+		'    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n' +
+		COMMON_INPUTS.map(
+			(key) =>
+				`      ${key}: \${{ needs.validate.outputs.${key}${key === 'release' ? " == 'true'" : ''} }}`
+		).join('\n');
+	if (!call || fieldBlock(call.body, 'with') !== callerInputs)
+		problems.push('Common caller must forward exactly the five canonical plan inputs');
+	const dependencies = {
+		'shared-validation': [],
+		'common-unit-verdict': ['common-testbuild'],
+		'common-e2e': ['shared-validation'],
+		'common-build': ['common-e2e'],
+		'common-testbuild': ['common-build']
+	};
+	if (
+		JSON.stringify(children.map((job) => job.id).sort()) !==
+		JSON.stringify(Object.keys(dependencies).sort())
+	)
+		problems.push('Common must retain its complete Unit, E2E, Build and Testbuild chain');
+	for (const [id, needs] of Object.entries(dependencies)) {
+		const job = byId.get(id);
+		if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(needs))
+			problems.push(id + ' must await its exact mandatory prerequisites');
+		for (const key of ['if', 'continue-on-error', 'uses', 'secrets'])
+			if (
+				job &&
+				pipeline.field(job.body, key) !==
+					(id === 'common-unit-verdict' && key === 'if' ? 'always()' : null)
+			)
+				problems.push(id + ' must set no ' + key);
+		if (!job || pipeline.field(job.body, 'runs-on') !== 'ubuntu-latest')
+			problems.push(id + ' must retain its Ubuntu runner');
+	}
+	const strategy = '    strategy:\n      fail-fast: false\n      matrix: ' + COMMON_MATRIX;
+	if (!child || fieldBlock(child.body, 'strategy') !== strategy)
+		problems.push('Common must consume the exact prepared inventory matrix without fail-fast');
+	if (
+		!prepare ||
+		fieldBlock(prepare.body, 'outputs') !==
+			'    outputs:\n      plan: ${{ steps.plan.outputs.plan }}'
+	)
+		problems.push('Common must expose the actual prepared matrix');
+	const environment =
+		'    env:\n' +
+		['RELEASE', 'PRERELEASE', 'CHANNEL', 'TAG', 'VERSION']
+			.map((key) => `      ERGOPTI_DEV_RELEASE_${key}: \${{ inputs.${key.toLowerCase()} }}`)
+			.join('\n');
+	for (const job of [child, browser])
+		if (
+			!job ||
+			fieldBlock(job.body, 'env') !==
+				(job === child
+					? environment.replace(
+							'    env:\n',
+							'    env:\n      COMMON_LOT: ${{ matrix.lot }}\n      COMMON_PLAN: ${{ inputs.common_plan }}\n'
+						)
+					: environment.replace(
+							'    env:\n',
+							'    env:\n      COMMON_PLAN: ${{ inputs.common_plan }}\n      COMMON_PREDECESSOR_RESULT: ${{ needs.shared-validation.result }}\n      GH_TOKEN: ${{ github.token }}\n'
+						))
+		)
+			problems.push('Common must retain exact qualification input bindings');
+	if (common) {
+		if (/^concurrency:/m.test(common.text))
+			problems.push('Common must leave concurrency ownership with its root caller');
+		const onStart = common.text.indexOf('\non:\n');
+		const permissionStart = common.text.indexOf('\npermissions:\n');
+		const trigger = common.text.slice(onStart + 1, permissionStart);
+		const names = [...trigger.matchAll(/^ {6}([a-z_]+):$/gm)].map((match) => match[1]);
+		if (
+			onStart < 0 ||
+			permissionStart <= onStart ||
+			!trigger.startsWith('on:\n  workflow_call:\n    inputs:\n') ||
+			JSON.stringify(names) !== JSON.stringify(['common_plan', ...COMMON_INPUTS]) ||
+			[...trigger.matchAll(/^ {2}([a-z_]+):$/gm)].some((match) => match[1] !== 'workflow_call')
+		)
+			problems.push('Common must accept only its exact workflow_call interface');
+		for (const key of ['common_plan', ...COMMON_INPUTS]) {
+			const type = key === 'release' ? 'boolean' : 'string';
+			if (
+				!new RegExp(
+					'^ {6}' +
+						key +
+						':\\n(?: {8}description:[^\\n]*\\n)? {8}required: true\\n {8}type: ' +
+						type +
+						'(?=\\n|$)',
+					'm'
+				).test(trigger)
+			)
+				problems.push('Common input ' + key + ' must retain its required type');
+		}
+		if (!common.text.includes('permissions:\n  contents: read\n\njobs:\n'))
+			problems.push('Common must retain read-only contents permission');
+	}
+	const exactStep = (job, name, command) => {
+		const matches = job ? pipeline.steps(job.body).filter((step) => step.name === name) : [];
+		if (
+			matches.length !== 1 ||
+			pipeline.runOf(matches[0].body)?.join('\n') !== command ||
+			pipeline.stepField(matches[0].body, 'if') !== null ||
+			pipeline.stepField(matches[0].body, 'continue-on-error') !== null
+		)
+			problems.push(name + ' must retain its mandatory exact command');
+		return matches[0]?.body;
+	};
+	const plan = exactStep(
+		prepare,
+		'Plan every canonical feature and additional suite',
+		'set -euo pipefail\nnode tools/ci/js-feature-matrix.cjs plan'
+	);
+	if (!plan || pipeline.stepField(plan, 'id') !== 'plan')
+		problems.push('Common matrix output must come from its actual plan step');
+	const selected = exactStep(
+		child,
+		'Admit the complete Common lot map',
+		'node tools/ci/js-feature-matrix.cjs select'
+	);
+	if (!selected || pipeline.stepField(selected, 'id') !== 'common-lot')
+		problems.push('Common must admit the whole source-owned lot map before dispatch.');
+	const dispatch = exactStep(child, 'Run shared validation suite', COMMON_DISPATCH);
+	if (
+		!dispatch ||
+		pipeline.stepField(dispatch, 'env') !==
+			'SUITE: ${{ steps.common-lot.outputs.suite }} FEATURE: ${{ steps.common-lot.outputs.feature }}'
+	)
+		problems.push('Common must dispatch the exact suite and feature from its declared matrix');
+	const consumer = scoped.contract.receipt_consumers[0];
+	exactStep(browser, consumer.step, consumer.body);
+	for (const [name, artifact, directory] of [
+		[
+			'Download exact source-bound qualification',
+			'name: assets-qualification-core-js',
+			'qualification'
+		],
+		['Download completed feature timings', 'pattern: core-js-timings-*', 'feature-timings']
+	]) {
+		const matches = browser
+			? pipeline.steps(browser.body).filter((step) => step.name === name)
+			: [];
+		if (
+			matches.length !== 1 ||
+			pipeline.stepField(matches[0].body, 'uses') !== 'actions/download-artifact@v4' ||
+			pipeline.stepField(matches[0].body, 'with') !== `${artifact} path: ${directory}` ||
+			pipeline.stepField(matches[0].body, 'if') !== null ||
+			pipeline.stepField(matches[0].body, 'continue-on-error') !== null
+		)
+			problems.push(name + ' must acquire its exact source-bound evidence');
+	}
+	for (const [name, command] of [
+		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
+		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
+		['Test shared physical shortcut rendering', 'npm run test:browser:physical-shortcuts'],
+		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
+	])
+		exactStep(browser, name, command);
+	if (browser) {
+		const steps = pipeline.steps(browser.body);
+		const admission = steps.findIndex((step) => step.name === consumer.step);
+		const firstSetup = steps.findIndex(
+			(step) => pipeline.stepField(step.body, 'uses') === 'actions/setup-python@v5'
+		);
+		if (admission < 0 || admission >= firstSetup)
+			problems.push('Unit receipt admission must precede all browser preparation');
+	}
+	if (common)
+		problems.push(...commonSiteProblems(common.text), ...commonVerdictProblems(common.text));
+	return problems;
+}
+errors.push(...commonProblems(pipeline.files()));
+
+for (const [label, from, to] of [
+	['missing site Verdict', '  common-unit-verdict:\n', '  missing-verdict:\n'],
+	['Verdict wrong predecessor', '    needs: [common-testbuild]\n', '    needs: [common-build]\n'],
+	[
+		'Verdict forged aggregate',
+		'      SITE_PREDECESSOR_RESULT: ${{ needs.common-testbuild.result }}\n',
+		'      SITE_PREDECESSOR_RESULT: success\n'
+	],
+	[
+		'Verdict missing stable proof',
+		'          name: common-site-testbuild-main\n',
+		'          name: foreign\n'
+	],
+	[
+		'Verdict missing development proof',
+		'          name: common-site-testbuild-dev\n',
+		'          name: foreign\n'
+	],
+	[
+		'Verdict omits actual receipt receiving',
+		'run: node tools/ci/site-verdict.cjs verify site-proof',
+		'run: echo passed'
+	],
+	[
+		'Verdict forgives receiving',
+		'      - name: Require both exact Build and browser receipts\n',
+		'      - name: Require both exact Build and browser receipts\n        continue-on-error: true\n'
+	]
+])
+	mustCatch(label, COMMON_BOX, from, to, (files) =>
+		commonVerdictProblems(files.find((file) => file.rel === COMMON_BOX).text)
+	);
+
+for (const [label, from, to] of SITE_BUILD_REFUSALS) {
+	const source = pipeline.file(COMMON_BOX);
+	assert.equal(source.split(from).length, 2, label + ' has one real source seam');
+	assert.ok(commonSiteProblems(source.replace(from, () => to)).length > 0, label);
+}
+
+assert.deepEqual(
+	planReferenceProblems(pipeline.files()),
+	[],
+	'actual prepared matrix keeps its exact Common consumer'
+);
+for (const [label, from, to] of [
+	['foreign matrix producer', COMMON_MATRIX, '${{ fromJSON(needs.foreign.outputs.matrix) }}'],
+	[
+		'unknown prepared output',
+		COMMON_MATRIX,
+		'${{ fromJSON(needs.prepare-common.outputs.foreign) }}'
+	],
+	['unknown root output', COMMON_MATRIX, '${{ fromJSON(needs.validate.outputs.foreign) }}'],
+	[
+		'noncanonical matrix expression',
+		COMMON_MATRIX,
+		'${{ fromJSON(needs.prepare-common.outputs.matrix) || false }}'
+	],
+	[
+		'arbitrary step script in the legitimate consumer',
+		'      - name: Run shared validation suite\n',
+		'      - name: Foreign prepared output reader\n        run: echo "${{ needs.prepare-common.outputs.matrix }}"\n\n      - name: Run shared validation suite\n'
+	],
+	[
+		'arbitrary job field in the legitimate consumer',
+		"    name: 'Unit tests'\n",
+		"    name: 'Unit tests ${{ needs.prepare-common.outputs.matrix }}'\n"
+	],
+	[
+		'foreign Common consumer',
+		'  common-e2e:\n',
+		'  common-e2e:\n    env:\n      FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\n'
+	],
+	[
+		'prepared output outside a job',
+		'jobs:\n',
+		'env:\n  FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\njobs:\n'
+	],
+	[
+		'duplicate Common consumer',
+		'  shared-validation:\n',
+		'  shared-validation:\n    runs-on: ubuntu-latest\n    env:\n      FORGED_MATRIX: ${{ needs.prepare-common.outputs.matrix }}\n  shared-validation:\n'
+	]
+]) {
+	mustCatch(label, COMMON_BOX, from, to, planReferenceProblems);
+}
+mustCatch(
+	'prepared matrix cannot become a release caller input',
+	ENTRY,
+	"    uses: ./.github/workflows/ci-common.yml\n    permissions:\n      contents: read\n      actions: read\n    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.validate.outputs.tag }}\n",
+	"    uses: ./.github/workflows/ci-common.yml\n    permissions:\n      contents: read\n      actions: read\n    with:\n      common_plan: ${{ needs.prepare-common.outputs.plan }}\n      release: ${{ needs.validate.outputs.release == 'true' }}\n      version: ${{ needs.validate.outputs.version }}\n      tag: ${{ needs.prepare-common.outputs.matrix }}\n",
+	planReferenceProblems
+);
+for (const [what, file, from, to] of [
+	['missing Common workflow call', ENTRY, '    uses: ./.github/workflows/ci-common.yml\n', ''],
+	[
+		'redirected Common workflow call',
+		ENTRY,
+		'./.github/workflows/ci-common.yml',
+		'./.github/workflows/foreign.yml'
+	],
+	[
+		'dropped Common plan input',
+		ENTRY,
+		pipeline.job('core'),
+		pipeline.job('core').replace('      tag: ${{ needs.validate.outputs.tag }}\n', '')
+	],
+	[
+		'Common caller skips',
+		ENTRY,
+		"    name: 'YAML, shared code & web'\n",
+		"    name: 'YAML, shared code & web'\n    if: false\n"
+	],
+	[
+		'Common claims caller concurrency',
+		COMMON_BOX,
+		'\npermissions:\n',
+		'\nconcurrency: caller-group\n\npermissions:\n'
+	],
+	['Common missing child', COMMON_BOX, '  shared-validation:\n', '  foreign:\n'],
+	[
+		'Common child skips',
+		COMMON_BOX,
+		'  shared-validation:\n',
+		'  shared-validation:\n    if: false\n'
+	],
+	[
+		'Common serializes fail-fast',
+		COMMON_BOX,
+		'      fail-fast: false\n      matrix: ' + COMMON_MATRIX,
+		'      fail-fast: true\n      matrix: ' + COMMON_MATRIX
+	],
+	[
+		'Common withdraws canonical matrix',
+		COMMON_BOX,
+		COMMON_MATRIX,
+		`\${{ fromJSON('["js","properties"]') }}`
+	],
+	[
+		'Common changes release binding',
+		COMMON_BOX,
+		pipeline.job('shared-validation'),
+		pipeline
+			.job('shared-validation')
+			.replace(
+				'      ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}\n',
+				'      ERGOPTI_DEV_RELEASE_RELEASE: false\n'
+			)
+	],
+	['Common changes input type', COMMON_BOX, '        type: boolean\n', '        type: string\n'],
+	[
+		'Common drops shared command',
+		COMMON_BOX,
+		'js) npm run test:js -- --feature "$FEATURE" ;;',
+		'echo skipped-shared-validation'
+	],
+	[
+		'Common omits prepare dependency',
+		ENTRY,
+		pipeline.job('core'),
+		pipeline.job('core').replace('needs: [validate, prepare-common]', 'needs: [validate]')
+	],
+	[
+		'Common omits a unit verdict prerequisite',
+		COMMON_BOX,
+		'    needs: [shared-validation]\n',
+		'    needs: [prepare-common]\n'
+	],
+	[
+		'Common browsers bypass exact unit union',
+		COMMON_BOX,
+		'      - name: Require every declared check exactly once\n',
+		'      - name: Require every declared check exactly once\n        if: false\n'
+	],
+	[
+		'Common substitutes matrix planner',
+		ENTRY,
+		'node tools/ci/js-feature-matrix.cjs plan',
+		'node tools/ci/foreign-matrix.cjs'
+	],
+	[
+		'Common drops planner identity',
+		ENTRY,
+		pipeline.job('prepare-common'),
+		pipeline.job('prepare-common').replace('        id: plan\n', '        id: foreign\n')
+	],
+	[
+		'Common changes feature input',
+		COMMON_BOX,
+		'          FEATURE: ${{ steps.common-lot.outputs.feature }}\n',
+		'          FEATURE: foreign\n'
+	],
+	[
+		'Common omits property dispatch',
+		COMMON_BOX,
+		'    properties) npm run test:properties ;;',
+		'    properties) echo skipped ;;'
+	],
+	[
+		'Common omits mutation dispatch',
+		COMMON_BOX,
+		'    mutation) npm run test:mutation ;;',
+		'    mutation) echo skipped ;;'
+	],
+	[
+		'Common omits qualified union consumer',
+		COMMON_BOX,
+		'node tools/ci/validate-js-feature-results.cjs feature-timings',
+		'echo skipped-union'
+	],
+	[
+		'Common substitutes qualification artifact',
+		COMMON_BOX,
+		'          name: assets-qualification-core-js\n          path: qualification',
+		'          name: unrelated-qualification\n          path: qualification'
+	],
+	[
+		'Common substitutes feature artifacts',
+		COMMON_BOX,
+		'          pattern: core-js-timings-*\n',
+		'          pattern: unrelated-timings-*\n'
+	],
+	[
+		'Common drops browser command',
+		COMMON_BOX,
+		'npm run test:browser:physical-shortcuts',
+		'echo skipped-physical-browser'
+	]
+])
+	mustCatch(what, file, from, to, commonProblems);
+
+/** Reject additional issuers, missing consumers and changed readonly union commands. */
+function checkCommonReceiptConsumer() {
+	const owners = scoped.contract.receipt_consumers.filter((owner) => owner.file === COMMON_BOX);
+	assert.equal(owners.length, 1);
+	const owner = owners[0];
+	assert.equal(owner.job, 'common-e2e');
+	assert.equal(owner.scope, 'core-js-suite');
+	assert.equal(owner.issuer_job, 'shared-validation');
+	assert.equal(owner.issuer_step, 'Run shared validation suite');
+	assert.equal(owner.issuer_command, 'npm run test:js');
+	const source = pipeline.rawFiles().find((entry) => entry.rel === COMMON_BOX).text;
+	const job = pipeline.jobsOfText(source, COMMON_BOX).find((entry) => entry.id === owner.job);
+	const step = pipeline.step(job.body, owner.step);
+	assert.equal(pipeline.runOf(step).join('\n'), owner.body);
+	assert.ok(scoped.projectScopedSteps(source, COMMON_BOX));
+	const retained = scoped.contract.retained_steps.filter((entry) => entry.file === COMMON_BOX);
+	assert.equal(retained.length, 2);
+	for (const entry of retained) {
+		const child = pipeline
+			.jobsOfText(source, COMMON_BOX)
+			.find((candidate) => candidate.id === entry.job);
+		const transport = pipeline.step(child.body, entry.name).replace(/\n+$/, '');
+		assert.match(transport, /^ {10}overwrite: true$/m);
+		assert.equal(
+			isRetainedQualification(
+				{ rel: COMMON_BOX },
+				{ id: entry.job },
+				{ name: entry.name, body: transport }
+			),
+			true
+		);
+		const missingOverwrite = transport.replace('          overwrite: true', '');
+		assert.notEqual(missingOverwrite, transport);
+		assert.throws(() =>
+			isRetainedQualification(
+				{ rel: COMMON_BOX },
+				{ id: entry.job },
+				{ name: entry.name, body: missingOverwrite }
+			)
+		);
+	}
+	for (const [before, after] of [
+		[owner.step, 'Unknown readonly consumer'],
+		[
+			'--validate-scope-receipt qualification/stable-core-js-suite.json',
+			'--receipt qualification/stable-core-js-suite.json'
+		],
+		[
+			'node tools/ci/validate-js-feature-results.cjs feature-timings',
+			'node tools/ci/validate-js-feature-results.cjs feature-timings || true'
+		],
+		['node tools/ci/validate-js-feature-results.cjs feature-timings', 'echo skipped-union']
+	]) {
+		const changed = source.replace(before, after);
+		assert.notEqual(changed, source);
+		assert.throws(() => scoped.projectScopedSteps(changed, COMMON_BOX));
+	}
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, ''), COMMON_BOX));
+	const unknown =
+		'      - name: Unknown receipt reader\n        run: node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json\n';
+	assert.throws(() => scoped.projectScopedSteps(source.replace(step, step + unknown), COMMON_BOX));
+}
+checkCommonReceiptConsumer();
 
 // Release waits for every original job. The dispatch-only verdict cannot run
 // on a release push and is checked independently below.
@@ -1121,11 +2878,7 @@ while (pending.length > 0) {
 	pending.push(...(needsById.get(id) ?? []));
 }
 for (const candidate of topJobs) {
-	if (
-		candidate.id !== 'release' &&
-		candidate.id !== 'manual-verdict' &&
-		!awaited.has(candidate.id)
-	) {
+	if (candidate.id !== 'release' && !awaited.has(candidate.id)) {
 		errors.push(`release can publish without waiting for ${candidate.id}`);
 	}
 }
@@ -1149,8 +2902,6 @@ for (const candidate of topJobs) {
  * @returns {string[]}
  */
 // Exact intended independent receiver from the previously reviewed manual enrollment design.
-const LEASE_SILENCE_NATIVE_BODY =
-	"    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt";
 
 function graphProblems(files) {
 	const problems = [];
@@ -1158,43 +2909,50 @@ function graphProblems(files) {
 	const roots = topLevel
 		.filter((candidate) => pipeline.needsOf(candidate.body).length === 0)
 		.map((candidate) => candidate.id);
-	if (JSON.stringify(roots) !== JSON.stringify([ROOT])) {
+	if (JSON.stringify(roots) !== JSON.stringify(['prepare-common', ROOT])) {
 		problems.push(
-			`ci.yml must have exactly one root job, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`
+			`ci.yml must have exactly the formatter and release-plan roots, ${ROOT}, that needs nothing; got [${roots.join(', ')}]`
 		);
 	}
 	const lanes = topLevel.filter((candidate) => pipeline.field(candidate.body, 'uses') !== null);
 	for (const lane of lanes) {
 		const needs = pipeline.needsOf(lane.body);
-		if (JSON.stringify(needs) !== JSON.stringify([ROOT])) {
+		if (JSON.stringify(needs) !== JSON.stringify([ROOT, 'prepare-common'])) {
 			problems.push(
-				`caller ${lane.id} must need the root alone, [${ROOT}], so the root fans out to one job per lane; got [${needs.join(', ')}]`
+				`caller ${lane.id} must need the formatter and release-plan roots, [${ROOT}], so the root fans out to one job per lane; got [${needs.join(', ')}]`
 			);
 		}
 	}
 	const release = topLevel.find((candidate) => candidate.id === 'release');
 	const releaseNeeds = release ? [...pipeline.needsOf(release.body)].sort() : [];
-	const expectedRelease = [ROOT, 'core', ...lanes.map((lane) => lane.id)].sort();
+	const expectedRelease = ['publication-plan'];
 	if (JSON.stringify(releaseNeeds) !== JSON.stringify(expectedRelease)) {
 		problems.push(
-			`release must need exactly the root and the three lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
+			`release must need exactly the root, Common and the three OS lanes, [${expectedRelease.join(', ')}]; got [${releaseNeeds.join(', ')}]`
 		);
 	}
-	const verdict = topLevel.find((candidate) => candidate.id === 'manual-verdict');
+	const verdict = topLevel.find((candidate) => candidate.id === 'publication-plan');
 	if (
 		!verdict ||
 		JSON.stringify(pipeline.needsOf(verdict.body)) !==
-			JSON.stringify([ROOT, 'core', 'macos', 'windows', 'linux'])
+			JSON.stringify(['macos', 'windows', 'linux', 'core'])
 	) {
 		problems.push('the manual verdict must wait for the root, shared core and every OS result');
 	}
 	if (
-		topLevel.length !== 7 ||
+		topLevel.length !== 8 ||
 		topLevel.some(
 			(job) =>
-				!['validate', 'core', 'macos', 'windows', 'linux', 'manual-verdict', 'release'].includes(
-					job.id
-				)
+				![
+					'prepare-common',
+					'validate',
+					'core',
+					'macos',
+					'windows',
+					'linux',
+					'publication-plan',
+					'release'
+				].includes(job.id)
 		)
 	) {
 		problems.push('ci.yml must contain only the original jobs and the manual verdict');
@@ -1211,20 +2969,7 @@ function graphProblems(files) {
 			[WINDOWS_BOX]: ['test-ahk', 'e2e-ahk', 'package-windows', 'launch-windows', 'windows-ok'],
 			[LINUX_BOX]: ['test-linux', 'e2e-linux', 'package-linux', 'install-linux', 'linux-ok']
 		}[rel];
-		// Preserve the five original phases and require each independent native job.
-		const exposed =
-			rel === MACOS_BOX
-				? [
-						'item36-native',
-						'lease-silence-native',
-						'managed-ollama-native',
-						...sequence.slice(0, 2),
-						'tooltip-canvas',
-						...sequence.slice(2, 4),
-						'cold-bootstrap-native',
-						sequence[4]
-					]
-				: sequence;
+		const exposed = sequence;
 		if (JSON.stringify(jobs.map((job) => job.id)) !== JSON.stringify(exposed)) {
 			problems.push(
 				`${rel} must expose unit tests, E2E, package, installed launch and verdict in order`
@@ -1232,34 +2977,39 @@ function graphProblems(files) {
 		}
 		for (const [index, id] of sequence.entries()) {
 			const job = jobs.find((candidate) => candidate.id === id);
-			const expected =
-				index === 0
-					? []
-					: index === 4
-						? rel === MACOS_BOX
-							? MACOS_VERDICT_NEEDS
-							: sequence.slice(0, 4)
-						: rel === WINDOWS_BOX && id === 'e2e-ahk'
-							? []
-							: rel === WINDOWS_BOX && id === 'package-windows'
-								? ['test-ahk', 'e2e-ahk']
-								: rel === MACOS_BOX && id === 'e2e-hs'
-									? []
-									: rel === MACOS_BOX && id === 'package-macos'
-										? ['test-hs', 'e2e-hs', 'managed-ollama-native']
-										: rel === LINUX_BOX && id === 'e2e-linux'
-											? []
-											: rel === LINUX_BOX && id === 'package-linux'
-												? ['test-linux', 'e2e-linux']
-												: [sequence[index - 1]];
+			const expected = index === 0 ? [] : [sequence[index - 1]];
 			if (!job || JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(expected)) {
 				problems.push(`${rel} ${id} must need exactly ${expected.join(', ')}`);
+			}
+			if (job && rel !== MACOS_BOX && index > 0 && index < 4) {
+				const expectedOutputs = [
+					'    outputs:',
+					...(rel === LINUX_BOX && index === 2
+						? [
+								'      install_matrix: ${{ steps.install-plan.outputs.matrix }}',
+								'      install_metadata: ${{ steps.install-plan.outputs.metadata }}'
+							]
+						: []),
+					'      ci_predecessors: ${{ toJSON(needs) }}',
+					'      ci_source_sha: ${{ github.sha }}',
+					'      ci_run_id: ${{ github.run_id }}',
+					'      ci_attempt: ${{ github.run_attempt }}',
+					...(rel === LINUX_BOX && index === 1
+						? ['      ci_unit_result: ${{ needs.test-linux.result }}']
+						: [])
+				].join('\n');
+				const blocks = [...job.body.matchAll(/^ {4}outputs:\n((?: {6}[^\n]*(?:\n|$)|\n)*)/gm)];
+				if (blocks.length !== 1 || blocks[0][0].trimEnd() !== expectedOutputs)
+					problems.push(`${rel} ${id} must retain genuine adjacent scheduler custody`);
+			}
+			if (job && pipeline.field(job.body, 'continue-on-error') !== null) {
+				problems.push(`${rel} ${id} must remain a mandatory phase`);
 			}
 			const expectedCondition =
 				index === 4
 					? 'always()'
 					: rel === LINUX_BOX && id === 'package-linux'
-						? "${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
+						? "${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}"
 						: null;
 			if (job && pipeline.field(job.body, 'if') !== expectedCondition) {
 				problems.push(
@@ -1267,47 +3017,7 @@ function graphProblems(files) {
 				);
 			}
 		}
-		if (rel === MACOS_BOX) {
-			const silence = jobs.filter((candidate) => candidate.id === 'lease-silence-native');
-			if (silence.length !== 1 || silence[0].body !== LEASE_SILENCE_NATIVE_BODY)
-				problems.push(
-					'lease-silence-native exact manual nonrelease source/host/artifact owner refused'
-				);
-			const scoped = jobs.find((candidate) => candidate.id === 'item36-native');
-			if (
-				!scoped ||
-				pipeline.needsOf(scoped.body).length !== 0 ||
-				pipeline.field(scoped.body, 'if') !==
-					"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}" ||
-				pipeline.field(scoped.body, 'continue-on-error') !== null ||
-				pipeline.field(scoped.body, 'outputs') !== null ||
-				pipeline.field(scoped.body, 'secrets') !== null
-			)
-				problems.push(
-					'item36-native must retain its independent manual nonrelease diagnosis boundary'
-				);
-			for (const id of MACOS_NATIVE_ENTRIES) {
-				const native = jobs.find((candidate) => candidate.id === id);
-				if (!native || pipeline.needsOf(native.body).length !== 0) {
-					problems.push(`${rel} ${id} must remain an independent entry`);
-				}
-				for (const key of ['if', 'continue-on-error']) {
-					if (native && pipeline.field(native.body, key) !== null) {
-						problems.push(`${rel} ${id} must set no ${key}; native qualification is mandatory`);
-					}
-				}
-			}
-			const canvas = jobs.find((candidate) => candidate.id === 'tooltip-canvas');
-			if (
-				!canvas ||
-				JSON.stringify(pipeline.needsOf(canvas.body)) !== JSON.stringify(['test-hs', 'e2e-hs'])
-			) {
-				problems.push(`${rel} tooltip-canvas must need exactly test-hs and e2e-hs`);
-			}
-			if (canvas && pipeline.field(canvas.body, 'if') !== null) {
-				problems.push(`${rel} tooltip-canvas must run on every profile without a job condition`);
-			}
-		}
+		if (rel === MACOS_BOX) problems.push(...macStageProblems(entry.text));
 		const needsOfJob = new Map(
 			jobs.map((candidate) => [candidate.id, pipeline.needsOf(candidate.body)])
 		);
@@ -1318,37 +3028,10 @@ function graphProblems(files) {
 		const exits = jobs
 			.filter((candidate) => !needed.has(candidate.id))
 			.map((candidate) => candidate.id);
-		if (rel === MACOS_BOX) {
-			const expectedEntries = [
-				'item36-native',
-				'lease-silence-native',
-				'managed-ollama-native',
-				'test-hs',
-				'e2e-hs',
-				'cold-bootstrap-native'
-			];
-			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries)) {
-				problems.push(
-					`${rel} must have exactly the five declared entries [${expectedEntries.join(', ')}]; got [${entries.join(', ')}]`
-				);
-			}
-		} else {
-			const expectedEntries =
-				rel === WINDOWS_BOX ? ['test-ahk', 'e2e-ahk'] : ['test-linux', 'e2e-linux'];
-			if (JSON.stringify(entries) !== JSON.stringify(expectedEntries))
-				problems.push(`${rel} must retain exactly the independent unit and E2E entries`);
-		}
-		const expectedExits =
-			rel === MACOS_BOX ? ['item36-native', 'lease-silence-native', 'macos-ok'] : [sequence[4]];
-		if (
-			rel === MACOS_BOX
-				? JSON.stringify(exits) !== JSON.stringify(expectedExits)
-				: exits.length !== 1
-		) {
-			problems.push(
-				`${rel} must preserve exactly its declared verdict and scoped diagnostic exits; got [${exits.join(', ')}]`
-			);
-		}
+		if (JSON.stringify(entries) !== JSON.stringify([sequence[0]]))
+			problems.push(rel + ' must retain exactly its unit entry.');
+		if (JSON.stringify(exits) !== JSON.stringify([sequence[4]]))
+			problems.push(rel + ' must retain exactly its final verdict exit.');
 		for (const [id, needs] of needsOfJob) {
 			for (const need of needs) {
 				if (!needsOfJob.has(need))
@@ -1359,133 +3042,103 @@ function graphProblems(files) {
 	return problems;
 }
 
-for (const [what, from, to] of [
-	['missing mandatory canvas graph node', '  tooltip-canvas:\n', '  omitted-tooltip-canvas:\n'],
-	['canvas bypassed by the macOS verdict', '      - tooltip-canvas\n', ''],
-	[
-		'canvas depends on packaging instead of native E2E',
-		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: [test-hs, e2e-hs]\n",
-		"  tooltip-canvas:\n    name: 'Native tooltip canvas · 12 captures'\n    needs: package-macos\n"
-	],
-	['conditional native canvas job', '  tooltip-canvas:\n', '  tooltip-canvas:\n    if: false\n']
+for (const role of [
+	'tooltip-canvas',
+	'managed-ollama-native',
+	'cold-bootstrap-native',
+	'item36-native',
+	'lease-silence-native'
 ]) {
-	mustCatch(what, MACOS_BOX, from, to, graphProblems);
+	const source = pipeline.file(MACOS_BOX);
+	const stage = macRole.stage[role];
+	const job = pipeline.jobsOfText(source, MACOS_BOX).find((job) => job.id === stage);
+	const steps = macRole.selected(job.body, role);
+	const first = steps[0].body;
+	const predicate = pipeline.stepField(first, 'if');
+	for (const [label, altered] of [
+		['missing role', ''],
+		['duplicate role', first + '\n' + first],
+		[
+			'reassigned role',
+			first.replace("env.MACOS_STAGE_ROLE == '" + role + "'", "env.MACOS_STAGE_ROLE == 'foreign'")
+		],
+		['conditional role', first.replace(predicate, 'false')],
+		['forgiven role', first + '\n        continue-on-error: true'],
+		['broad manual admission', first.replace(predicate, 'always()')]
+	])
+		mustCatch(role + ': ' + label, MACOS_BOX, first, altered, graphProblems);
+	for (const [label, property] of [
+		['cross-lane prerequisite', '    needs: test-linux\n'],
+		['cycle', '    needs: ' + stage + '\n'],
+		['release output', '    outputs:\n      assets: fake\n'],
+		['inherited secret', '    secrets: inherit\n']
+	])
+		mustCatch(
+			role + ': ' + label,
+			MACOS_BOX,
+			'  ' + stage + ':\n',
+			'  ' + stage + ':\n' + property,
+			graphProblems
+		);
 }
-
-mustCatch(
-	'native producer omitted from application packaging',
-	MACOS_BOX,
-	'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
-	'    needs: [test-hs, e2e-hs]\n',
-	graphProblems
-);
-
-// Both independent native entries must feed the verdict and must never become optional.
-for (const id of MACOS_NATIVE_ENTRIES) {
-	for (const [what, from, to] of [
-		['missing native graph node', `  ${id}:\n`, `  omitted-${id}:\n`],
-		['native job bypassed by verdict', `      - ${id}\n`, ''],
-		['conditional native job', `  ${id}:\n`, `  ${id}:\n    if: false\n`],
-		['forgiven native job', `  ${id}:\n`, `  ${id}:\n    continue-on-error: true\n`],
-		['native job coupled to packaging', `  ${id}:\n`, `  ${id}:\n    needs: package-macos\n`]
-	]) {
-		mustCatch(`${id}: ${what}`, MACOS_BOX, from, to, graphProblems);
-	}
-}
-for (const [what, from, to] of [
-	['missing scoped item36 node', '  item36-native:\n', '  omitted-item36-native:\n'],
-	[
-		'coupled scoped item36 entry',
-		'  item36-native:\n',
-		'  item36-native:\n    needs: package-macos\n'
-	],
-	[
-		'forgiven scoped item36 failure',
-		'  item36-native:\n',
-		'  item36-native:\n    continue-on-error: true\n'
-	],
-	[
-		'broad scoped item36 admission',
-		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
-		"  item36-native:\n    name: 'Item 36 native archive qualification'\n    if: always()\n"
-	],
-	[
-		'unqualified scoped item36 release output',
-		'  item36-native:\n',
-		'  item36-native:\n    outputs:\n      assets: fake\n'
-	]
-])
-	mustCatch(what, MACOS_BOX, from, to, graphProblems);
-
-// Independently frozen additive lease-silence job mutations; old graph and NumberRow controls stay whole.
 for (const [label, before, after] of [
-	['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
 	[
-		'job duplicate',
-		'  lease-silence-native:\n',
-		"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
-	],
-	[
-		'job coupled',
-		'  lease-silence-native:\n',
-		'  lease-silence-native:\n    needs: package-macos\n'
-	],
-	[
-		'job forgiven',
-		'  lease-silence-native:\n',
-		'  lease-silence-native:\n    continue-on-error: true\n'
-	],
-	[
-		'release output',
-		'  lease-silence-native:\n',
-		'  lease-silence-native:\n    outputs:\n      assets: fake\n'
-	],
-	[
-		'secret inherited',
-		'  lease-silence-native:\n',
-		'  lease-silence-native:\n    secrets: inherit\n'
-	],
-	[
-		'automatic/release admission',
-		"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
-		'    if: always()\n'
-	],
-	['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
-	['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
-	[
-		'source runner wrong',
+		'lease source runner wrong',
 		'tools/diagnostics/run_lease_silence_native.sh',
 		'tools/diagnostics/foreign_native.sh'
 	],
 	[
-		'closed parser control omitted',
+		'lease closed parser omitted',
 		'node tools/test/test-lease-silence-xctest-evidence.cjs',
 		'echo omitted'
 	],
 	[
-		'artifact missing status',
+		'lease status absent',
 		'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
 		''
 	],
-	['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
-	['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
-]) {
-	const whole = '  lease-silence-native:\n' + LEASE_SILENCE_NATIVE_BODY + '\n';
-	assert.equal(whole.split(before).length, 2, label + ': exact new owner seam');
-	const changed = whole.replace(before, () => after);
-	mustCatch('lease silence: ' + label, MACOS_BOX, whole, changed, graphProblems);
-}
+	[
+		'native runner authority',
+		pipeline.job('e2e-hs'),
+		pipeline
+			.job('e2e-hs')
+			.replace(
+				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ubuntu-latest'
+			)
+	],
+	[
+		'native timeout authority',
+		pipeline.job('e2e-hs'),
+		pipeline
+			.job('e2e-hs')
+			.replace(
+				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: 360'
+			)
+	]
+])
+	mustCatch(label, MACOS_BOX, before, after, graphProblems);
 
 // Independent Linux suites still gate packaging and the mandatory verdict.
+// Ordered Linux suites still gate packaging and the mandatory verdict.
 for (const [what, from, to] of [
 	[
-		'Linux E2E is coupled to units again',
-		"  e2e-linux:\n    name: 'E2E tests'\n",
-		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n"
+		'Linux E2E omits its unit prerequisite',
+		"  e2e-linux:\n    name: 'E2E tests'\n    needs: [test-linux]\n",
+		"  e2e-linux:\n    name: 'E2E tests'\n"
 	],
-	['Linux package omits units', '    needs: [test-linux, e2e-linux]\n', '    needs: [e2e-linux]\n'],
-	['Linux package omits E2E', '    needs: [test-linux, e2e-linux]\n', '    needs: [test-linux]\n'],
-	['Linux package forgives failed units', "needs.test-linux.result == 'success' && ", ''],
+	[
+		'Linux package omits units',
+		'      ci_unit_result: ${{ needs.test-linux.result }}\n',
+		'      ci_unit_result: success\n'
+	],
+	['Linux package omits E2E', '    needs: [e2e-linux]\n', '    needs: []\n'],
+	[
+		'Linux package forgives failed units',
+		"needs.e2e-linux.outputs.ci_unit_result == 'success' && ",
+		''
+	],
 	[
 		'Linux package drops manual failed-E2E diagnostics',
 		" || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
@@ -1500,6 +3153,26 @@ for (const [what, from, to] of [
 	mustCatch(what, LINUX_BOX, from, to, graphProblems);
 }
 
+// Unit completion precedes E2E, and neither conditions nor forgiveness may
+// turn any required phase into a silent success.
+for (const [rel, id, unit] of [
+	[WINDOWS_BOX, 'e2e-ahk', 'test-ahk'],
+	[MACOS_BOX, 'e2e-hs', 'test-hs'],
+	[LINUX_BOX, 'e2e-linux', 'test-linux']
+]) {
+	const prerequisite =
+		rel === MACOS_BOX ? `    needs:\n      - ${unit}\n` : `    needs: [${unit}]\n`;
+	for (const suffix of ['    if: false\n', '    continue-on-error: true\n']) {
+		mustCatch(
+			`${id} must remain mandatory`,
+			rel,
+			prerequisite,
+			prerequisite + suffix,
+			graphProblems
+		);
+	}
+}
+
 errors.push(...graphProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
 	[
@@ -1511,93 +3184,88 @@ for (const [what, rel, from, to] of [
 	[
 		'a caller that no longer needs the root',
 		ENTRY,
-		"    name: 'Linux'\n    needs: [validate]\n",
+		"    name: 'Linux'\n    needs: [validate, prepare-common]\n",
 		"    name: 'Linux'\n"
 	],
 	[
 		'a caller that also needs another lane',
 		ENTRY,
-		"    name: 'Windows'\n    needs: [validate]\n",
+		"    name: 'Windows'\n    needs: [validate, prepare-common]\n",
 		"    name: 'Windows'\n    needs: [validate, macos]\n"
 	],
 	[
 		'release that no longer waits for a lane',
 		ENTRY,
-		'    needs: [validate, core, macos, windows, linux]\n',
-		'    needs: [validate, macos, windows]\n'
+		'    needs:\n      - macos\n      - windows\n      - linux\n      - core\n',
+		'    needs: [core, macos, windows]\n'
 	],
 	[
 		'release that stops reading the plan from the root',
 		ENTRY,
-		'    needs: [validate, core, macos, windows, linux]\n',
+		'    needs: [publication-plan]\n',
 		'    needs: [macos, windows, linux]\n'
 	],
-	['a sixth entry in the macOS lane', MACOS_BOX, '    needs: [test-hs, e2e-hs]\n', ''],
+	['a sixth entry in the macOS lane', MACOS_BOX, '    needs:\n      - test-hs\n', ''],
 	[
 		'macOS packaging stops waiting for units',
 		MACOS_BOX,
-		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
-		'    needs: [e2e-hs, managed-ollama-native]\n'
+		'    needs:\n      - e2e-hs\n',
+		'    needs: []\n'
 	],
 	[
 		'macOS packaging stops waiting for E2E',
 		MACOS_BOX,
-		'    needs: [test-hs, e2e-hs, managed-ollama-native]\n',
-		'    needs: [test-hs, managed-ollama-native]\n'
+		'    needs:\n      - e2e-hs\n',
+		'    needs:\n      - test-hs\n'
 	],
 	[
 		'native canvas stops waiting for units',
 		MACOS_BOX,
-		'    needs: [test-hs, e2e-hs]\n',
-		'    needs: e2e-hs\n'
+		'    needs:\n      - test-hs\n',
+		'    needs: []\n'
 	],
 	[
 		'native canvas stops waiting for E2E',
 		MACOS_BOX,
-		'    needs: [test-hs, e2e-hs]\n',
-		'    needs: test-hs\n'
+		'    needs:\n      - test-hs\n',
+		'    needs:\n      - package-macos\n'
 	],
-	[
-		'macOS E2E is coupled to units again',
-		MACOS_BOX,
-		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n",
-		"  e2e-hs:\n    name: 'E2E tests (stubbed)'\n    needs: test-hs\n"
-	],
+	['macOS E2E omits its unit prerequisite', MACOS_BOX, '    needs:\n      - test-hs\n', ''],
 	[
 		'a third entry in the Linux lane',
 		LINUX_BOX,
-		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
-		"    name: 'Install and launch · ${{ matrix.label }}'\n    runs-on: ubuntu-latest\n"
+		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n    needs: [package-linux]\n",
+		"    name: 'Install and launch'\n    runs-on: ubuntu-latest\n"
 	],
-	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [test-ahk, e2e-ahk]\n', ''],
+	['a third entry in the Windows lane', WINDOWS_BOX, '    needs: [e2e-ahk]\n', ''],
 	[
 		'Windows packaging stops waiting for unit tests',
 		WINDOWS_BOX,
-		'    needs: [test-ahk, e2e-ahk]\n',
-		'    needs: [e2e-ahk]\n'
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: ${{ toJSON(needs) }}\n",
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n    runs-on: windows-latest\n    outputs:\n      ci_predecessors: success\n"
 	],
 	[
 		'Windows packaging stops waiting for E2E tests',
 		WINDOWS_BOX,
-		'    needs: [test-ahk, e2e-ahk]\n',
+		'    needs: [e2e-ahk]\n',
 		'    needs: [test-ahk]\n'
 	],
 	[
-		'Windows E2E is coupled to unit tests again',
+		'Windows E2E omits its unit prerequisite',
 		WINDOWS_BOX,
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n",
-		"  e2e-ahk:\n    name: 'E2E tests (engine)'\n    needs: [test-ahk]\n"
+		"  e2e-ahk:\n    name: 'E2E tests'\n    needs: [test-ahk]\n",
+		"  e2e-ahk:\n    name: 'E2E tests'\n"
 	],
 	[
 		'a second exit in the macOS lane',
 		MACOS_BOX,
-		'    needs: package-macos\n',
-		'    needs: test-hs\n'
+		'    needs:\n      - package-macos\n',
+		'    needs:\n      - test-hs\n'
 	],
 	[
 		'a second exit in the Linux lane',
 		LINUX_BOX,
-		'      - install-linux\n    if: always()\n',
+		'    needs: [install-linux]\n    if: always()\n',
 		'    if: always()\n'
 	]
 ]) {
@@ -1624,7 +3292,7 @@ function topJobProblems(files) {
 		const expected =
 			candidate.id === 'release'
 				? RELEASE_IF
-				: candidate.id === 'manual-verdict'
+				: candidate.id === 'publication-plan'
 					? MANUAL_VERDICT_IF
 					: ['windows', 'macos', 'linux'].includes(candidate.id)
 						? LANE_IF(candidate.id)
@@ -1650,14 +3318,18 @@ function topJobProblems(files) {
 }
 
 /**
- * Lists every permission beyond `contents: read`: each pipeline file reads
- * contents only, and release alone may write, to create the tag, the release
- * and the feed.
+ * Rejects permissions outside each exact role: three Common custody jobs
+ * may read Actions evidence, and release alone may write repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
 function permissionProblems(files) {
 	const problems = [];
+	const evidenceReaders = new Set([
+		`${ENTRY}:core`,
+		`${COMMON_BOX}:common-e2e`,
+		`${COMMON_BOX}:common-unit-verdict`
+	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');
 		const at = lines.findIndex((line) => /^permissions:/.test(line));
@@ -1678,7 +3350,12 @@ function permissionProblems(files) {
 		}
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const value = pipeline.field(candidate.body, 'permissions');
-			const expected = entry.rel === ENTRY && candidate.id === 'release' ? 'contents: write' : null;
+			const expected =
+				entry.rel === ENTRY && candidate.id === 'release'
+					? 'contents: write'
+					: evidenceReaders.has(`${entry.rel}:${candidate.id}`)
+						? 'contents: read actions: read'
+						: null;
 			if (value !== expected) {
 				problems.push(
 					`${entry.rel} job ${candidate.id} must ${expected ? `grant exactly ${expected}` : 'not widen the permissions'}, got: ${value}`
@@ -1745,6 +3422,56 @@ for (const [what, rel, from, to] of [
 	]
 ]) {
 	mustCatch(what, rel, from, to, permissionProblems);
+}
+
+assert.deepEqual(
+	permissionProblems([...pipeline.files(), benchmarkWorkflow]),
+	[],
+	'Only exact Common evidence readers and release may override workflow permissions.'
+);
+for (const [rel, id] of [
+	[ENTRY, 'core'],
+	[COMMON_BOX, 'common-e2e'],
+	[COMMON_BOX, 'common-unit-verdict']
+]) {
+	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
+	assert.equal(matches.length, 1, id + ' has one actual permission owner');
+	const body = matches[0].body;
+	const grant = '    permissions:\n      contents: read\n      actions: read\n';
+	assert.equal(body.split(grant).length, 2, id + ' has one exact evidence grant');
+	for (const [label, replacement] of [
+		['missing evidence permission', ''],
+		['repository write permission', grant.replace('contents: read', 'contents: write')],
+		['Actions write permission', grant.replace('actions: read', 'actions: write')],
+		['extra permission', grant + '      checks: read\n'],
+		['all write permissions', '    permissions: write-all\n'],
+		['duplicate permission', grant + grant]
+	])
+		mustCatch(id + ' ' + label, rel, body, body.replace(grant, replacement), permissionProblems);
+}
+for (const [rel, id] of [
+	[ENTRY, 'validate'],
+	[ENTRY, 'prepare-common'],
+	[ENTRY, 'windows'],
+	[ENTRY, 'macos'],
+	[ENTRY, 'linux'],
+	[COMMON_BOX, 'shared-validation'],
+	[COMMON_BOX, 'common-build'],
+	[COMMON_BOX, 'common-testbuild'],
+	[WINDOWS_BOX, 'launch-windows'],
+	[MACOS_BOX, 'launch'],
+	[LINUX_BOX, 'install-linux']
+]) {
+	const matches = pipeline.jobsOfText(pipeline.file(rel), rel).filter((job) => job.id === id);
+	assert.equal(matches.length, 1, id + ' has one actual unrelated job');
+	const body = matches[0].body;
+	mustCatch(
+		id + ' cannot inherit a Common evidence grant',
+		rel,
+		body,
+		'    permissions:\n      contents: read\n      actions: read\n' + body,
+		permissionProblems
+	);
 }
 
 // ============================================
@@ -1853,6 +3580,12 @@ const CONDITIONS = new Map(
 	STEP_CONDITIONS.map(([rel, job, name, condition]) => [conditionKey(rel, job, name), condition])
 );
 if (CONDITIONS.size !== STEP_CONDITIONS.length) errors.push('STEP_CONDITIONS names one step twice');
+for (const job of macContract.jobs)
+	for (const [index, step] of job.steps.entries()) {
+		const key = conditionKey(MACOS_BOX, job.id, step.name || '@' + index);
+		if (CONDITIONS.has(key)) assert.equal(CONDITIONS.get(key), step.if ?? null);
+		CONDITIONS.set(key, step.if ?? null);
+	}
 
 /**
  * Lists every step of the pipeline that could be skipped, or whose gate could
@@ -1865,8 +3598,12 @@ function stepProblems(files) {
 	const unseen = new Set(CONDITIONS.keys());
 	for (const entry of files) {
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
-			for (const found of pipeline.steps(candidate.body)) {
-				const where = conditionKey(entry.rel, candidate.id, found.name);
+			for (const [index, found] of pipeline.steps(candidate.body).entries()) {
+				const where = conditionKey(
+					entry.rel,
+					candidate.id,
+					entry.rel === MACOS_BOX ? found.name || '@' + index : found.name
+				);
 				unseen.delete(where);
 				const condition = pipeline.stepField(found.body, 'if');
 				const expected = CONDITIONS.get(where) ?? null;
@@ -1894,7 +3631,7 @@ function stepProblems(files) {
 					where ===
 					conditionKey(
 						MACOS_BOX,
-						'item36-native',
+						'e2e-hs',
 						'Observe the actual no-prompt SDK permission API independently'
 					)
 				) {
@@ -2067,14 +3804,14 @@ for (const condition of [
 	'',
 	'false',
 	'always()',
-	"matrix.kind == 'first'",
-	"matrix.kind == 'deb'"
+	"env.INSTALL_KIND == 'first'",
+	"env.INSTALL_KIND == 'deb'"
 ]) {
 	const head = '      - name: Verify source compiler and checkout\n';
 	mustCatch(
 		'source compiler condition ' + condition,
 		LINUX_BOX,
-		head + "        if: matrix.kind == 'install'\n",
+		head + "        if: env.INSTALL_KIND == 'install'\n",
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -2092,15 +3829,15 @@ for (const condition of [
 	'',
 	'false',
 	'success()',
-	"matrix.kind == 'install'",
+	"env.INSTALL_KIND == 'install'",
 	'always()',
-	"always() && matrix.kind == 'install'"
+	"always() && env.INSTALL_KIND == 'install'"
 ]) {
 	const head = '      - name: Upload the native distro unit log\n';
 	mustCatch(
 		'distro native unit raw log condition ' + condition,
 		LINUX_BOX,
-		head + "        if: ${{ !cancelled() && matrix.kind == 'install' }}\n",
+		head + "        if: ${{ !cancelled() && env.INSTALL_KIND == 'install' }}\n",
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -2135,10 +3872,13 @@ mustCatch(
 // Passive diagnostics never authorize a receiving gate or forgive its failure.
 {
 	const name = 'Retain passive security service logs after native receiving failure';
-	const condition =
-		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}";
-	assert.equal(CONDITIONS.get(conditionKey(MACOS_BOX, 'managed-ollama-native', name)), condition);
-	const head = `      - name: ${name}\n`;
+	const condition = macRole.condition(
+		'managed-ollama-native',
+		"${{ !cancelled() && failure() && (steps.managed-ollama-pac-receiving.outcome == 'failure' || steps.native_http_clock.outcome == 'failure' || steps.managed-ollama-model-receiving.outcome == 'failure') }}"
+	);
+	assert.equal(CONDITIONS.get(conditionKey(MACOS_BOX, 'e2e-hs', name)), condition);
+	const realStep = pipeline.step(pipeline.job('e2e-hs'), name);
+	const head = realStep.slice(0, realStep.indexOf('        if:'));
 	const changedConditions = [
 		'',
 		'always()',
@@ -2183,7 +3923,8 @@ mustCatch(
 
 // Each new native evidence condition is exact, scoped to its job and source-owned step.
 for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
-	const head = `      - name: ${name}\n`;
+	const realStep = pipeline.step(pipeline.job(job), name);
+	const head = realStep.slice(0, realStep.indexOf('        if:'));
 	const from = head + `        if: ${condition}\n`;
 	for (const changed of ['', 'false', 'success()']) {
 		mustCatch(
@@ -2196,7 +3937,7 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	}
 	const scopedAcquisition =
 		rel === MACOS_BOX &&
-		job === 'managed-ollama-native' &&
+		job === 'e2e-hs' &&
 		name === 'Acquire and verify genuine pinned upstream inputs';
 	mustCatch(
 		`${job} ${name}: missing native evidence step`,
@@ -2209,8 +3950,8 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 // A narrowly admitted SDK condition must never migrate to another job or selector.
 {
 	const name = 'Observe the actual no-prompt SDK permission API independently';
-	const key = conditionKey(MACOS_BOX, 'item36-native', name);
-	assert.equal(CONDITIONS.get(key), '${{ !cancelled() }}');
+	const key = conditionKey(MACOS_BOX, 'e2e-hs', name);
+	assert.equal(CONDITIONS.get(key), macRole.condition('item36-native', '${{ !cancelled() }}'));
 	for (const [rel, job, changed] of [
 		[MACOS_BOX, 'package-macos', name],
 		[MACOS_BOX, 'managed-ollama-native', name],
@@ -2224,7 +3965,7 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 		mustCatch(
 			`SDK observation replaced condition ${changed}`,
 			MACOS_BOX,
-			head + '        if: ${{ !cancelled() }}\n',
+			macConditionalPrefix(head),
 			head + `        if: ${changed}\n`,
 			stepProblems
 		);
@@ -2258,10 +3999,8 @@ for (const [rel, job, name, condition] of MACOS_NATIVE_STEP_CONDITIONS) {
 	const moved = mac
 		.replace(step, '')
 		.replace(
-			'  managed-ollama-native:\n',
-			'  unknown-sdk-job:\n    runs-on: macos-latest\n    steps:\n' +
-				step +
-				'\n  managed-ollama-native:\n'
+			'  e2e-hs:\n',
+			'  unknown-sdk-job:\n    runs-on: macos-latest\n    steps:\n' + step + '\n  e2e-hs:\n'
 		);
 	const problems = stepProblems(
 		pipeline
@@ -2283,7 +4022,7 @@ for (const condition of [
 	mustCatch(
 		'official cold runtime receiver broadened admission ' + condition,
 		MACOS_BOX,
-		officialColdHead + "        if: ${{ !cancelled() && steps.cold-app.outcome == 'success' }}\n",
+		macConditionalPrefix(officialColdHead),
 		officialColdHead + `        if: ${condition}\n`,
 		stepProblems
 	);
@@ -2324,7 +4063,7 @@ function nativeInventoryArtifactProblems(files) {
 			'native inventory artifact must whitelist only summary and per-scenario closed receipts'
 		);
 	if (
-		pipeline.stepField(body, 'if') !== '${{ always() }}' ||
+		pipeline.stepField(body, 'if') !== macRole.condition('package-macos', '${{ always() }}') ||
 		pipeline.stepField(body, 'uses') !== 'actions/upload-artifact@v4' ||
 		!/^ {10}if-no-files-found: error$/m.test(body)
 	)
@@ -2421,7 +4160,7 @@ function nativeActionProbeProblems(files) {
 		}
 		const body = runs[0].body;
 		if (
-			pipeline.stepField(body, 'if') !== '${{ always() }}' ||
+			pipeline.stepField(body, 'if') !== macRole.condition('package-macos', '${{ always() }}') ||
 			pipeline.stepField(body, 'timeout-minutes') !== '5' ||
 			!spec.commands.every((command) => (pipeline.runOf(body) ?? []).join('\n').includes(command))
 		)
@@ -2441,7 +4180,8 @@ function nativeActionProbeProblems(files) {
 		expected.push(...(spec.extraPaths ?? []));
 		if (
 			JSON.stringify(paths) !== JSON.stringify(expected) ||
-			pipeline.stepField(artifact, 'if') !== '${{ always() }}' ||
+			pipeline.stepField(artifact, 'if') !==
+				macRole.condition('package-macos', '${{ always() }}') ||
 			pipeline.stepField(artifact, 'uses') !== 'actions/upload-artifact@v4' ||
 			!/^ {10}if-no-files-found: error$/m.test(artifact)
 		)
@@ -2511,7 +4251,7 @@ for (const condition of ['', 'false', 'success()']) {
 	mustCatch(
 		'canvas retained evidence condition ' + condition,
 		MACOS_BOX,
-		head + '        if: always()\n',
+		macConditionalPrefix(head),
 		head + (condition ? '        if: ' + condition + '\n' : ''),
 		stepProblems
 	);
@@ -2570,7 +4310,7 @@ for (const name of [
 		mustCatch(
 			`native provider ${name} condition ${condition}`,
 			MACOS_BOX,
-			head + '        if: ${{ always() }}\n',
+			macConditionalPrefix(head),
 			head + (condition ? `        if: ${condition}\n` : ''),
 			stepProblems
 		);
@@ -2585,9 +4325,7 @@ for (const name of [
 }
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain archive diagnostic session\n';
-	const from =
-		head +
-		"        if: ${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}\n";
+	const from = macConditionalPrefix(head);
 	mustCatch(
 		'archive retained evidence condition ' + condition,
 		MACOS_BOX,
@@ -2606,9 +4344,7 @@ mustCatch(
 
 for (const condition of ['', 'false', 'success()']) {
 	const head = '      - name: Retain closed TIS diagnostic session\n';
-	const from =
-		head +
-		"        if: ${{ always() && steps.swift-launcher-tests.outcome != 'skipped' && steps.swift-launcher-tests.outputs.tis_session_dir != '' }}\n";
+	const from = macConditionalPrefix(head);
 	mustCatch(
 		'TIS retained evidence condition ' + condition,
 		MACOS_BOX,
@@ -2624,11 +4360,11 @@ mustCatch(
 	'      - name: Omitted TIS evidence upload\n',
 	stepProblems
 );
-for (const condition of ['false', "matrix.kind == 'deb'"]) {
+for (const condition of ['false', "env.INSTALL_KIND == 'deb'"]) {
 	mustCatch(
 		`an AppImage launch routed through ${condition}`,
 		LINUX_BOX,
-		"      - name: Launch it\n        if: matrix.kind == 'appimage'\n",
+		"      - name: Launch it\n        if: env.INSTALL_KIND == 'appimage'\n",
 		`      - name: Launch it\n        if: ${condition}\n`,
 		stepProblems
 	);
@@ -2804,9 +4540,127 @@ for (const line of [
 	}
 }
 
-/** Checks the names GitHub renders after flattening each OS workflow. */
+/** Exercise the real workflow fields; unknown source reads must never inherit admission. */
+function assertLotTransportControls() {
+	let count = 0;
+	for (const [rel, producer, consumer, matrix, metadata] of [
+		[COMMON_BOX, null, 'shared-validation', 'matrix', 'metadata'],
+		[COMMON_BOX, 'common-e2e', 'common-build', 'site_matrix', 'site_metadata'],
+		[COMMON_BOX, 'common-build', 'common-testbuild', 'site_matrix', 'site_metadata'],
+		[MACOS_BOX, 'test-hs', 'e2e-hs', 'e2e_matrix', 'e2e_metadata'],
+		[MACOS_BOX, 'package-macos', 'launch', 'testbuild_matrix', 'testbuild_metadata'],
+		[LINUX_BOX, 'package-linux', 'install-linux', 'install_matrix', 'install_metadata']
+	]) {
+		const source = pipeline.file(rel);
+		const job = pipeline.jobsOfText(source, rel).find((item) => item.id === consumer);
+		assert.ok(job, 'Actual human-lot consumer exists');
+		const matrixLine =
+			producer === null
+				? '      matrix: ' + COMMON_MATRIX + '\n'
+				: '      matrix: ${{ fromJSON(needs.' + producer + '.outputs.' + matrix + ') }}\n';
+		const metadataRef =
+			producer === null ? 'inputs.common_plan' : 'needs.' + producer + '.outputs.' + metadata;
+		const metadataLine = job.body.split('\n').find((line) => line.includes(metadataRef));
+		assert.ok(metadataLine, 'Actual metadata owner read exists');
+		for (const [label, before, after] of [
+			['missing matrix', matrixLine, ''],
+			[
+				'foreign matrix producer',
+				matrixLine,
+				producer === null
+					? matrixLine.replace('inputs.common_plan', 'inputs.foreign')
+					: matrixLine.replace(producer, 'foreign')
+			],
+			[
+				'foreign matrix key',
+				matrixLine,
+				producer === null
+					? matrixLine.replace(').matrix', ').foreign')
+					: matrixLine.replace('.outputs.' + matrix, '.outputs.foreign')
+			],
+			[
+				'foreign metadata producer',
+				metadataLine,
+				metadataLine.replace(metadataRef, 'needs.foreign.outputs.' + metadata)
+			],
+			[
+				'foreign metadata key',
+				metadataLine,
+				metadataLine.replace(metadataRef, 'needs.' + producer + '.outputs.foreign')
+			],
+			[
+				'unknown lot selector',
+				metadataLine,
+				metadataLine.includes('[matrix.lot]')
+					? metadataLine.replace('[matrix.lot]', '[matrix.foreign]')
+					: metadataLine.replace(metadataRef, metadataRef + '-foreign')
+			],
+			[
+				'extra script reader',
+				'    steps:\n',
+				'    steps:\n      - name: Foreign metadata reader\n        run: echo "${{ ' +
+					metadataRef +
+					' }}"\n'
+			]
+		]) {
+			assert.equal(job.body.split(before).length, 2, label + ' has exactly one real consumer seam');
+			const altered = source.replace(job.body, job.body.replace(before, after));
+			assert.notEqual(altered, source);
+			const files = pipeline
+				.files()
+				.map((entry) => (entry.rel === rel ? { ...entry, text: altered } : entry));
+			assert.ok(planReferenceProblems(files).length > 0, consumer + ': ' + label);
+			count++;
+		}
+	}
+	const common = pipeline.file(COMMON_BOX);
+	const formatter = pipeline.step(pipeline.job('shared-validation'), COMMON_FORMAT_CHECKS[0][0]);
+	for (const [label, changed] of [
+		['missing mandatory TOML', ''],
+		['duplicate mandatory TOML', formatter + '\n' + formatter],
+		[
+			'forgiven mandatory TOML',
+			formatter.replace('        if:', '        continue-on-error: true\n        if:')
+		],
+		['JS-only TOML row', formatter.replace("'hotstrings-format'", "'js'")]
+	]) {
+		const files = pipeline
+			.files()
+			.map((entry) =>
+				entry.rel === COMMON_BOX ? { ...entry, text: common.replace(formatter, changed) } : entry
+			);
+		assert.ok(rootProblems(files).length > 0, label);
+		count++;
+	}
+	for (const owner of LUA_TIMING_RETENTION) {
+		const source = pipeline.file(owner.file);
+		const uploader = pipeline.step(pipeline.job(owner.job), owner.step);
+		for (const changed of [
+			uploader.replace(owner.path, '${{ runner.temp }}/foreign.json'),
+			uploader.replace('if: ${{ !cancelled() }}', 'if: always()')
+		]) {
+			assert.notEqual(changed, uploader);
+			const files = pipeline
+				.files()
+				.map((entry) =>
+					entry.rel === owner.file ? { ...entry, text: source.replace(uploader, changed) } : entry
+				);
+			assert.ok(
+				namingProblems(files).some((problem) => problem.includes(owner.step)),
+				'Timing names cannot authorize altered evidence'
+			);
+			count++;
+		}
+	}
+	assert.equal(count, 50, 'Closed human-lot and mandatory-format source refusal census');
+	return count;
+}
+assertLotTransportControls();
+
+/** Checks the names GitHub renders after flattening all four workflows. */
 function namingProblems(files) {
 	const problems = [];
+	const admittedTiming = luaTimingRetentionProblems(files).length === 0;
 	for (const entry of files) {
 		for (const candidate of pipeline.jobsOfText(entry.text, entry.rel)) {
 			const name = (pipeline.field(candidate.body, 'name') ?? '').replace(/^(['"])(.*)\1$/, '$2');
@@ -2814,10 +4668,43 @@ function namingProblems(files) {
 			const valid =
 				entry.rel === ENTRY
 					? caller
-						? ['macOS', 'Windows', 'Linux'].includes(name)
-						: name === 'Core / ${{ matrix.suite }}' ||
-							/^(Validate|Release) \/ [A-Z][^/]+$/.test(name)
-					: /^[A-Z]/.test(name) && !name.includes(' / ');
+						? {
+								core: 'YAML, shared code & web',
+								macos: 'macOS',
+								windows: 'Windows',
+								linux: 'Linux'
+							}[candidate.id] === name
+						: {
+								'prepare-common': 'Check formatting and plan unit tests',
+								validate: 'Release plan',
+								'publication-plan': 'Release / Verify all lanes and original plan',
+								release: 'Release / Publish'
+							}[candidate.id] === name
+					: entry.rel === COMMON_BOX
+						? {
+								'shared-validation': 'Unit tests',
+								'common-unit-verdict': 'Verdict',
+								'common-e2e': 'E2E tests',
+								'common-build': 'Build',
+								'common-testbuild': 'Install and launch'
+							}[candidate.id] === name
+						: {
+								'test-hs': 'Unit tests',
+								'test-ahk': 'Unit tests',
+								'test-linux': 'Unit tests',
+								'e2e-hs': 'E2E tests',
+								'e2e-ahk': 'E2E tests',
+								'e2e-linux': 'E2E tests',
+								'package-macos': 'Build',
+								'package-windows': 'Build',
+								'package-linux': 'Build',
+								launch: 'Install and launch',
+								'launch-windows': 'Install and launch',
+								'install-linux': 'Install and launch',
+								'macos-ok': 'Verdict',
+								'windows-ok': 'Verdict',
+								'linux-ok': 'Verdict'
+							}[candidate.id] === name;
 			if (!valid)
 				problems.push(`${entry.rel} job ${candidate.id} has an invalid display name: ${name}`);
 			for (const found of pipeline.steps(candidate.body)) {
@@ -2827,7 +4714,14 @@ function namingProblems(files) {
 				if (
 					entry.rel !== ENTRY &&
 					/\b(?:macOS|Linux|Windows(?! Defender))\b/.test(found.name) &&
-					!isRetainedQualification(entry, candidate, found)
+					!isRetainedQualification(entry, candidate, found) &&
+					!(
+						admittedTiming &&
+						LUA_TIMING_RETENTION.some(
+							(owner) =>
+								owner.file === entry.rel && owner.job === candidate.id && owner.step === found.name
+						)
+					)
 				) {
 					problems.push(
 						`${entry.rel} job ${candidate.id} repeats its zone in a step: ${found.name}`
@@ -2871,16 +4765,29 @@ for (const [before, after] of [
 	mustCatch('qualification owner ' + before, ENTRY, before, after, rootProblems);
 errors.push(...namingProblems(pipeline.files()));
 for (const [what, rel, from, to] of [
-	['an unqualified root name', ENTRY, "name: 'Validate / Checks and plan'", "name: 'Validate'"],
-	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
-	['a repeated lane prefix', MACOS_BOX, "name: 'Package'", "name: 'macOS / Package'"],
-	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
+	['an incorrect Common caller name', ENTRY, "name: 'YAML, shared code & web'", "name: 'Linux'"],
 	[
-		'an extra root separator',
-		ENTRY,
-		"name: 'Validate / Checks and plan'",
-		"name: 'Validate / Checks / Plan'"
+		'an incorrect Common matrix name',
+		COMMON_BOX,
+		"name: 'Unit tests'",
+		"name: '${{ matrix.unknown }}'"
 	],
+	[
+		'a matrix display name on an unknown Common job',
+		COMMON_BOX,
+		'  shared-validation:\n',
+		'  unknown-validation:\n'
+	],
+	['an unqualified root name', ENTRY, "name: 'Release plan'", "name: 'Validate'"],
+	['a lowercase lane job', WINDOWS_BOX, "name: 'Unit tests'", "name: 'unit tests'"],
+	[
+		'a repeated lane prefix',
+		MACOS_BOX,
+		'  package-macos:\n    name: Build\n',
+		"  package-macos:\n    name: 'macOS / Build'\n"
+	],
+	['a lowercase step', WINDOWS_BOX, 'name: Run AHK test suite', 'name: run AHK test suite'],
+	['an extra root separator', ENTRY, "name: 'Release plan'", "name: 'Validate / Checks / Plan'"],
 	[
 		'a repeated step zone',
 		LINUX_BOX,
@@ -3076,17 +4983,76 @@ function reporterLifecycleProblems(files) {
 			);
 			continue;
 		}
+		const condition =
+			rel === MACOS_BOX ? "${{ steps.stage-admission.outcome == 'success' }}" : null;
+		if (rel === MACOS_BOX) {
+			const admissions = steps.filter(
+				(step) => pipeline.stepField(step.body, 'id') === 'stage-admission'
+			);
+			const downloads = steps.filter((step) => step.name === 'Download exact prior stage receipts');
+			const admission = admissions[0],
+				download = downloads[0];
+			const admissionAt = steps.indexOf(admission),
+				downloadAt = steps.indexOf(download);
+			if (
+				JSON.stringify(pipeline.needsOf(job.body)) !== JSON.stringify(['e2e-hs']) ||
+				pipeline.field(job.body, 'if') !== null ||
+				pipeline.field(job.body, 'continue-on-error') !== null ||
+				admissions.length !== 1 ||
+				steps.filter((step) => step.name === 'Admit complete successful predecessor stage')
+					.length !== 1 ||
+				downloads.length !== 1 ||
+				!(downloadAt >= 0 && downloadAt < admissionAt && admissionAt < steps.indexOf(node))
+			) {
+				problems.push(
+					rel +
+						' ' +
+						id +
+						' must admit its exact adjacent predecessor before Node, reporter and product'
+				);
+				continue;
+			}
+			if (
+				admission.name !== 'Admit complete successful predecessor stage' ||
+				(pipeline.runOf(admission.body) ?? []).join('\n').trim() !==
+					'node tools/ci/macos-stage-roles.cjs admit e2e "$RUNNER_TEMP/macos-stage-inputs" "$RUNNER_TEMP/macos-stage-prior.json"' ||
+				!/^        env:\n          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}\n        run:/m.test(
+					admission.body
+				) ||
+				['if', 'continue-on-error', 'shell', 'working-directory'].some(
+					(key) => pipeline.stepField(admission.body, key) !== null
+				) ||
+				pipeline.stepField(download.body, 'uses') !== 'actions/download-artifact@v4' ||
+				['if', 'continue-on-error'].some(
+					(key) => pipeline.stepField(download.body, key) !== null
+				) ||
+				!/^          pattern: macos-stage-e2e-\*-\$\{\{ github\.run_id \}\}$/m.test(
+					download.body
+				) ||
+				!/^          path: \$\{\{ runner\.temp \}\}\/macos-stage-inputs$/m.test(download.body) ||
+				pipeline.stepField(steps[unit].body, 'if') !== condition ||
+				pipeline.stepField(steps[unit].body, 'continue-on-error') !== null
+			)
+				problems.push(
+					rel +
+						' ' +
+						id +
+						' reporter admission must retain the exact unconditional receipt gate and guarded product'
+				);
+		}
 		if (
 			!node.body.includes("          node-version-file: '.node-version'") ||
-			pipeline.stepField(node.body, 'if') !== null ||
+			pipeline.stepField(node.body, 'if') !== condition ||
 			pipeline.stepField(node.body, 'continue-on-error') !== null
 		) {
-			problems.push(`${rel} ${id} must unconditionally prepare the repository Node runtime`);
+			problems.push(
+				`${rel} ${id} must prepare the repository Node runtime under its exact native-stage condition`
+			);
 		}
 		const test = matches[0];
 		if (
 			(pipeline.runOf(test.body) ?? []).join('\n').trim() !== REPORTER_COMMAND ||
-			pipeline.stepField(test.body, 'if') !== null ||
+			pipeline.stepField(test.body, 'if') !== condition ||
 			pipeline.stepField(test.body, 'continue-on-error') !== null ||
 			pipeline.stepField(test.body, 'shell') !== shell ||
 			pipeline.stepField(test.body, 'working-directory') !== null
@@ -3106,19 +5072,21 @@ for (const [rel, shell] of [
 	[WINDOWS_BOX, '        shell: pwsh\n'],
 	[MACOS_BOX, '']
 ]) {
-	const block = `      - name: ${REPORTER_STEP}\n${shell}        run: ${REPORTER_COMMAND}\n`;
+	const condition =
+		rel === MACOS_BOX ? "        if: ${{ steps.stage-admission.outcome == 'success' }}\n" : '';
+	const block = `      - name: ${REPORTER_STEP}\n${shell}${condition}        run: ${REPORTER_COMMAND}\n`;
 	for (const [what, replacement] of [
 		['missing native reporter self-test', ''],
 		[
 			'manual-only native reporter self-test',
 			block.replace(
-				`${shell}        run:`,
+				`${shell}${condition}        run:`,
 				`${shell}        if: github.event_name == 'workflow_dispatch'\n        run:`
 			)
 		],
 		[
 			'forgiven native reporter self-test',
-			block.replace(`${shell}        run:`, `${shell}        continue-on-error: true\n        run:`)
+			block.replace('        run:', '        continue-on-error: true\n        run:')
 		],
 		[
 			'swallowed native reporter exit',
@@ -3150,13 +5118,320 @@ for (const [rel, shell] of [
 	);
 }
 
+// Mac reporter predicates are valid only behind the actual adjacent-stage receipt gate.
+{
+	const job = pipeline
+		.jobsOfText(pipeline.file(MACOS_BOX), MACOS_BOX)
+		.find((entry) => entry.id === 'package-macos');
+	const admission = pipeline.step(job.body, 'Admit complete successful predecessor stage');
+	const download = pipeline.step(job.body, 'Download exact prior stage receipts');
+	const node = pipeline.step(
+		job.body,
+		'Prepare Node for native policy fixtures and XCTest evidence'
+	);
+	const product = pipeline.step(job.body, 'Build release launcher');
+	const condition = "        if: ${{ steps.stage-admission.outcome == 'success' }}\n";
+	for (const [what, mutate] of [
+		['missing reporter admission', (body) => body.replace(admission, '')],
+		[
+			'duplicate reporter admission',
+			(body) => body.replace(admission, admission + '\n' + admission)
+		],
+		[
+			'duplicate reporter admission with foreign id',
+			(body) =>
+				body.replace(
+					admission,
+					admission + '\n' + admission.replace('id: stage-admission', 'id: foreign-admission')
+				)
+		],
+		[
+			'unknown reporter admission command',
+			(body) => body.replace(admission, admission.replace(' admit e2e ', ' admit unit '))
+		],
+		[
+			'manual-only reporter admission',
+			(body) =>
+				body.replace(
+					admission,
+					admission.replace(
+						'        id:',
+						"        if: github.event_name == 'workflow_dispatch'\n        id:"
+					)
+				)
+		],
+		[
+			'forgiven reporter admission',
+			(body) =>
+				body.replace(
+					admission,
+					admission.replace('        id:', '        continue-on-error: true\n        id:')
+				)
+		],
+		[
+			'foreign reporter admission id',
+			(body) =>
+				body.replace(admission, admission.replace('id: stage-admission', 'id: foreign-admission'))
+		],
+		[
+			'wrong reporter predecessor',
+			(body) => body.replace('    needs:\n      - e2e-hs', '    needs:\n      - test-hs')
+		],
+		[
+			'transitive reporter predecessor',
+			(body) =>
+				body.replace('    needs:\n      - e2e-hs', '    needs:\n      - e2e-hs\n      - test-hs')
+		],
+		[
+			'missing reporter predecessor metadata',
+			(body) => body.replace(admission, admission.replace('toJSON(needs)', 'toJSON(matrix)'))
+		],
+		['missing reporter receipt download', (body) => body.replace(download, '')],
+		[
+			'foreign reporter receipt download',
+			(body) => body.replace(download, download.replace('macos-stage-e2e-*', 'macos-stage-unit-*'))
+		],
+		[
+			'forgiven reporter receipt download',
+			(body) =>
+				body.replace(
+					download,
+					download.replace('        uses:', '        continue-on-error: true\n        uses:')
+				)
+		],
+		[
+			'reporter admission after Node',
+			(body) => body.replace(admission, '').replace(node, node + '\n' + admission)
+		],
+		['unconditional Mac reporter Node', (body) => body.replace(node, node.replace(condition, ''))],
+		[
+			'unknown Mac reporter Node predicate',
+			(body) => body.replace(node, node.replace(condition, '        if: always()\n'))
+		],
+		[
+			'unconditional Mac reporter product',
+			(body) => body.replace(product, product.replace(condition, ''))
+		],
+		[
+			'forgiven Mac reporter product',
+			(body) =>
+				body.replace(
+					product,
+					product.replace('        shell:', '        continue-on-error: true\n        shell:')
+				)
+		],
+		[
+			'unknown Mac reporter product predicate',
+			(body) => body.replace(product, product.replace(condition, '        if: always()\n'))
+		],
+		[
+			'manual-only Mac reporter job',
+			(body) => "    if: github.event_name == 'workflow_dispatch'\n" + body
+		],
+		['forgiven Mac reporter job', (body) => '    continue-on-error: true\n' + body]
+	]) {
+		const changed = mutate(job.body);
+		assert.notEqual(changed, job.body, 'reporter admission inverse must alter its real owner');
+		mustCatch(what, MACOS_BOX, job.body, changed, reporterLifecycleProblems);
+	}
+}
+
+// Diagnostic timing JSON is retained separately from all qualification and role receipts.
+
+/** Binds each timing upload to its actual reporter file without granting qualification. */
+function luaTimingRetentionProblems(files) {
+	const problems = [];
+	for (const owner of LUA_TIMING_RETENTION) {
+		try {
+			const entries = files.filter((entry) => entry.rel === owner.file);
+			assert.equal(entries.length, 1, 'One timing source workflow.');
+			const workflow = YAML.parse(entries[0].text, { uniqueKeys: true });
+			const jobs = Object.entries(workflow.jobs);
+			const uploads = jobs.flatMap(([id, job]) =>
+				(job.steps ?? []).filter((step) => step.name === owner.step).map((step) => ({ id, step }))
+			);
+			assert.equal(uploads.length, 1, 'One timing diagnostic uploader.');
+			assert.equal(uploads[0].id, owner.job, 'Timing bytes stay on their producer host.');
+			const steps = workflow.jobs[owner.job].steps;
+			const producers = steps.filter((step) => step.name === owner.producer);
+			assert.equal(producers.length, 1, 'One actual Lua timing producer.');
+			assert.equal(producers[0]['working-directory'], owner.directory);
+			assert.equal(
+				producers[0].run.split('\n').filter((line) => line.trim() === owner.command).length,
+				1,
+				'The real reporter writes the exact retained JSON.'
+			);
+			const preceding = steps.filter((step) => step.name === owner.after);
+			assert.equal(preceding.length, 1, 'One exact diagnostic placement anchor.');
+			assert.ok(steps.indexOf(preceding[0]) >= steps.indexOf(producers[0]));
+			assert.equal(steps.indexOf(uploads[0].step), steps.indexOf(preceding[0]) + 1);
+			assert.deepEqual(uploads[0].step, {
+				name: owner.step,
+				if: '${{ !cancelled() }}',
+				uses: 'actions/upload-artifact@v4',
+				with: {
+					name: owner.artifact,
+					path: owner.path,
+					'if-no-files-found': 'warn',
+					'retention-days': 7
+				}
+			});
+		} catch (error) {
+			problems.push(owner.file + ' Lua timing retention refused: ' + error.message);
+		}
+	}
+	return problems;
+}
+errors.push(...luaTimingRetentionProblems(pipeline.files()));
+for (const owner of LUA_TIMING_RETENTION) {
+	const source = pipeline.file(owner.file);
+	const job = pipeline.jobsOfText(source, owner.file).find((entry) => entry.id === owner.job);
+	const upload = pipeline.step(job.body, owner.step);
+	const producer = pipeline.step(job.body, owner.producer);
+	for (const [what, mutate] of [
+		['missing upload', (text) => text.replace(upload, '')],
+		[
+			'cancelled-run upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: always()'))
+		],
+		[
+			'foreign predicate',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('if: ${{ !cancelled() }}', 'if: ${{ !cancelled() && env.FOREIGN }}')
+				)
+		],
+		['duplicate upload', (text) => text.replace(upload, upload + '\n' + upload)],
+		[
+			'success-only upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: success()'))
+		],
+		[
+			'failure-only upload',
+			(text) => text.replace(upload, upload.replace('if: ${{ !cancelled() }}', 'if: failure()'))
+		],
+		[
+			'manual-only upload',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('if: ${{ !cancelled() }}', "if: github.event_name == 'workflow_dispatch'")
+				)
+		],
+		[
+			'default-success upload',
+			(text) => text.replace(upload, upload.replace('        if: ${{ !cancelled() }}\n', ''))
+		],
+		[
+			'forgiven upload',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace('        uses:', '        continue-on-error: true\n        uses:')
+				)
+		],
+		[
+			'wrong uploader',
+			(text) => text.replace(upload, upload.replace('upload-artifact@v4', 'download-artifact@v4'))
+		],
+		[
+			'broad path',
+			(text) => text.replace(upload, upload.replace(owner.path, '${{ runner.temp }}/*.json'))
+		],
+		[
+			'extra member',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(
+						'path: ' + owner.path,
+						'path: |\n            ' + owner.path + '\n            ${{ runner.temp }}/foreign.json'
+					)
+				)
+		],
+		[
+			'role receipt directory',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(owner.path, '${{ runner.temp }}/macos-stage-output/receipt.json')
+				)
+		],
+		[
+			'mandatory evidence directory',
+			(text) =>
+				text.replace(
+					upload,
+					upload.replace(owner.path, '${{ runner.temp }}/linux-ci-evidence/test-linux.json')
+				)
+		],
+		[
+			'qualification artifact namespace',
+			(text) => text.replace(upload, upload.replace(owner.artifact, 'assets-qualification-lua'))
+		],
+		[
+			'missing source identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.sha }}', ''))
+		],
+		[
+			'missing run identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.run_id }}', ''))
+		],
+		[
+			'missing attempt identity',
+			(text) => text.replace(upload, upload.replace('-${{ github.run_attempt }}', ''))
+		],
+		[
+			'silent missing files',
+			(text) =>
+				text.replace(upload, upload.replace('if-no-files-found: warn', 'if-no-files-found: ignore'))
+		],
+		[
+			'missing member promoted to requirement',
+			(text) =>
+				text.replace(upload, upload.replace('if-no-files-found: warn', 'if-no-files-found: error'))
+		],
+		[
+			'missing retention',
+			(text) => text.replace(upload, upload.replace('          retention-days: 7', ''))
+		],
+		[
+			'upload before producer',
+			(text) => text.replace(upload, '').replace(producer, upload + '\n' + producer)
+		],
+		[
+			'wrong producer path',
+			(text) =>
+				text.replace(producer, producer.replace(owner.path, '${{ runner.temp }}/foreign.json'))
+		],
+		[
+			'comment-only producer',
+			(text) => text.replace(producer, producer.replace(owner.command, '# ' + owner.command))
+		],
+		['missing producer', (text) => text.replace(producer, '')],
+		['duplicate producer', (text) => text.replace(producer, producer + '\n' + producer)],
+		['wrong owner', (text) => text.replace('  ' + owner.job + ':\n', '  foreign-lua-owner:\n')]
+	]) {
+		const changed = mutate(source);
+		assert.ok(changed !== source, 'Timing retention inverse must change actual source: ' + what);
+		mustCatch(
+			owner.job + ' timing ' + what,
+			owner.file,
+			source,
+			changed,
+			luaTimingRetentionProblems
+		);
+	}
+}
+
 /** Pins the real workflow ports of the callable manual selector. */
 function manualLaneProblems(files) {
 	const problems = [];
 	const text = files.find((entry) => entry.rel === ENTRY).text;
 	const jobs = pipeline.jobsOfText(text, ENTRY);
 	const root = jobs.find((job) => job.id === ROOT);
-	const verdict = jobs.find((job) => job.id === 'manual-verdict');
+	const verdict = jobs.find((job) => job.id === 'publication-plan');
 	const expectedInput = `  workflow_dispatch:
     inputs:
       os_lanes:
@@ -3191,7 +5466,7 @@ function manualLaneProblems(files) {
 	const steps = root ? pipeline.steps(root.body) : [];
 	const selectedAt = steps.findIndex((step) => step.name === 'Select native OS lanes');
 	const preparedAt = steps.findIndex((step) => step.name === VALIDATE_SETUP);
-	const checkedAt = steps.findIndex((step) => step.name === VALIDATE_CHECKS[0][0]);
+	const checkedAt = steps.findIndex((step) => step.name === DEEPEN_STEP);
 	if (!(preparedAt >= 0 && selectedAt === preparedAt + 1 && checkedAt === selectedAt + 1)) {
 		problems.push(
 			'selection must run after the checked-out Node setup and before the existing checks'
@@ -3210,13 +5485,16 @@ function manualLaneProblems(files) {
 	}
 	const check =
 		verdict &&
-		pipeline.steps(verdict.body).filter((step) => step.name === 'Assert selected lanes completed');
+		pipeline
+			.steps(verdict.body)
+			.filter((step) => step.name === 'Assert every required lane and the original plan');
 	if (
 		!check ||
 		check.length !== 1 ||
-		pipeline.stepField(check[0].body, 'run') !== 'node tools/ci/manual-ci-lanes.cjs verdict' ||
+		pipeline.stepField(check[0].body, 'run') !==
+			'node tools/ci/publication-plan.cjs receive publication-plan/ci-publication-plan.json' ||
 		pipeline.stepField(check[0].body, 'env') !==
-			'CI_EVENT: ${{ github.event_name }} CI_OS_SELECTION: ${{ inputs.os_lanes }} CI_JOB_RESULTS: ${{ toJSON(needs) }}'
+			"CI_OS_SELECTION: ${{ inputs.os_lanes || 'all' }} CI_JOB_RESULTS: ${{ toJSON(needs) }}"
 	) {
 		problems.push(
 			'the manual verdict must pass the actual complete needs receipt to the same selector owner'
@@ -3390,7 +5668,7 @@ function sparkleToolProblems(files) {
 	if (tools.length !== 1 || toolAt < 0 || nativeAt <= toolAt) {
 		problems.push('the actual pinned Sparkle tool installer must precede native XCTest');
 	} else if (
-		pipeline.stepField(tools[0].body, 'if') !== null ||
+		pipeline.stepField(tools[0].body, 'if') !== macRole.condition('package-macos') ||
 		pipeline.stepField(tools[0].body, 'continue-on-error') !== null ||
 		/\bsecrets\.|SPARKLE_ED_PRIVATE_KEY/.test(codeOf(tools[0].body))
 	) {
@@ -3453,7 +5731,7 @@ assert.ok(
 
 // This qualifies the shared renderer and recorded bridge, not physical input.
 const DISTRO_UNIT_COMMAND =
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}"';
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}"';
 const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
@@ -3465,11 +5743,11 @@ const DISTRO_UNIT_SUITE =
 // Pin its shell ownership envelope separately from the existing direct form;
 // a comment, unreachable call or extra helper cannot satisfy this contract.
 const DISTRO_DIAGNOSTIC_COMMAND =
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'';
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'';
 const DISTRO_DIAGNOSTIC_SHA256 = '2788cc3783304c8424e34de365bff105acd60068ca892a802ae6a273251da9dc';
 const DISTRO_LOGGED_ENVELOPE = [
 	'set -euo pipefail',
-	'case "${{ matrix.distro }}" in',
+	'case "${{ env.INSTALL_DISTRO }}" in',
 	'debian) apt-get install -y --no-install-recommends curl ;;',
 	'fedora) dnf install -y curl ;;',
 	'arch) pacman -Sy --noconfirm curl ;;',
@@ -3486,15 +5764,15 @@ const DISTRO_LOGGED_ENVELOPE = [
 	'chown -R ergopti-ci:ergopti-ci "$unit_root"',
 	'unit_log_dir="$RUNNER_TEMP/linux-distro-unit-logs"',
 	'mkdir -p "$unit_log_dir"',
-	'unit_log="$unit_log_dir/${{ matrix.distro }}.log"',
+	'unit_log="$unit_log_dir/${{ env.INSTALL_DISTRO }}.log"',
 	'set +e',
 	'(cd "$unit_root/static/ergopti_plus/linux" &&',
-	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ matrix.distro }}") 2>&1 | tee "$unit_log"',
+	'bash "$GITHUB_WORKSPACE/tools/test/prepare-linux-distro-unit.sh" "${{ env.INSTALL_DISTRO }}") 2>&1 | tee "$unit_log"',
 	'unit_pipeline_status=("${PIPESTATUS[@]}")',
 	'set -e',
 	'native_status="${unit_pipeline_status[0]}"',
 	'set +e',
-	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ matrix.distro }}\' "$native_status" <<\'PYTHON\'',
+	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'',
 	'PYTHON',
 	'diagnostic_status=$?',
 	'set -e',
@@ -3508,7 +5786,7 @@ function distroUnitDiagnostic(body) {
 	const script = pipeline.runOf(body) ?? [];
 	const opening = script
 		.map((line, index) =>
-			line.trim() === "'${{ matrix.distro }}' \"$native_status\" <<'PYTHON'" ? index : -1
+			line.trim() === "'${{ env.INSTALL_DISTRO }}' \"$native_status\" <<'PYTHON'" ? index : -1
 		)
 		.filter((index) => index >= 0);
 	const closing = script
@@ -3768,7 +6046,7 @@ assert.ok(
 // Preserve the incoming direct-command contract as a separately valid form.
 const directDistroUnitStep =
 	"      - name: The unit suite on this distribution's LuaJIT\n" +
-	"        if: matrix.kind == 'install'\n" +
+	"        if: env.INSTALL_KIND == 'install'\n" +
 	'        working-directory: static/ergopti_plus/linux\n' +
 	'        shell: bash\n        run: |\n          ' +
 	DISTRO_UNIT_COMMAND +
@@ -3952,7 +6230,7 @@ try {
 	const pipe = lines
 		.slice(start, end + 1)
 		.join('\n')
-		.replaceAll('${{ matrix.distro }}', '__guard_unsupported__');
+		.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__');
 	const quote = (value) => "'" + value.replaceAll("'", "'\"'\"'") + "'";
 	const script =
 		'set -euo pipefail\nunit_root=' +
@@ -3998,7 +6276,7 @@ try {
 	const refusedLog = path.join(distroControlRoot, 'refused-log');
 	fs.mkdirSync(refusedLog);
 	const teePipe = pipe.replace(
-		DISTRO_UNIT_COMMAND.replaceAll('${{ matrix.distro }}', '__guard_unsupported__'),
+		DISTRO_UNIT_COMMAND.replaceAll('${{ env.INSTALL_DISTRO }}', '__guard_unsupported__'),
 		'printf "%s\\n" "controlled transport"'
 	);
 	assert.notEqual(teePipe, pipe, 'the transport-only producer replacement must be exact');
@@ -4046,8 +6324,9 @@ const PHYSICAL_BROWSER_SCRIPTS = require('../../package.json').scripts;
 /** Requires the recorded-bridge browser gate immediately after layer rendering. */
 function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	const problems = [];
-	const entry = files.find((file) => file.rel === ENTRY);
-	const core = entry && pipeline.jobsOfText(entry.text, ENTRY).find((job) => job.id === 'core');
+	const entry = files.find((file) => file.rel === COMMON_BOX);
+	const core =
+		entry && pipeline.jobsOfText(entry.text, COMMON_BOX).find((job) => job.id === 'common-e2e');
 	const steps = core ? pipeline.steps(core.body) : [];
 	const physical = steps.filter((step) => step.name === PHYSICAL_BROWSER_STEP);
 	const at = steps.findIndex((step) => step.name === PHYSICAL_BROWSER_STEP);
@@ -4064,7 +6343,7 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 			'physical shortcut renderer needs one gate immediately after layer rendering and browser installation'
 		);
 	} else if (
-		pipeline.stepField(physical[0].body, 'if') !== "matrix.suite == 'js'" ||
+		pipeline.stepField(physical[0].body, 'if') !== null ||
 		pipeline.stepField(physical[0].body, 'run') !== `npm run ${PHYSICAL_BROWSER_ALIAS}`
 	) {
 		problems.push('physical shortcut renderer must run its exact command on the shared JS lane');
@@ -4077,20 +6356,26 @@ function physicalBrowserProblems(files, scripts = PHYSICAL_BROWSER_SCRIPTS) {
 	return problems;
 }
 errors.push(...physicalBrowserProblems(pipeline.files()));
-const physicalBrowserBody = pipeline.step(pipeline.job('core'), PHYSICAL_BROWSER_STEP);
+const physicalBrowserBody = pipeline.step(pipeline.job('common-e2e'), PHYSICAL_BROWSER_STEP);
 for (const [what, changed] of [
 	['missing physical browser step', ''],
 	[
-		'missing physical browser condition',
-		physicalBrowserBody.replace("        if: matrix.suite == 'js'\n", '')
+		'disabled formerly conditional physical browser gate',
+		physicalBrowserBody.replace('        run:', '        if: false\n        run:')
 	],
 	[
 		'disabled physical browser condition',
-		physicalBrowserBody.replace("matrix.suite == 'js'", 'false')
+		physicalBrowserBody.replace(
+			'        run:',
+			"        if: steps.common-lot.outputs.suite == 'never'\n        run:"
+		)
 	],
 	[
 		'wrong physical browser lane',
-		physicalBrowserBody.replace("matrix.suite == 'js'", "matrix.suite == 'properties'")
+		physicalBrowserBody.replace(
+			'        run:',
+			"        if: steps.common-lot.outputs.suite == 'properties'\n        run:"
+		)
 	],
 	[
 		'wrong physical browser command',
@@ -4100,11 +6385,14 @@ for (const [what, changed] of [
 		)
 	]
 ]) {
-	mustCatch(what, ENTRY, physicalBrowserBody, changed, physicalBrowserProblems);
+	mustCatch(what, COMMON_BOX, physicalBrowserBody, changed, physicalBrowserProblems);
 }
-const layerBrowserBody = pipeline.step(pipeline.job('core'), 'Test shared layer editor rendering');
+const layerBrowserBody = pipeline.step(
+	pipeline.job('common-e2e'),
+	'Test shared layer editor rendering'
+);
 const misplacedPhysicalBrowser = pipeline.files().map((entry) =>
-	entry.rel === ENTRY
+	entry.rel === COMMON_BOX
 		? {
 				...entry,
 				text: entry.text
@@ -4241,13 +6529,12 @@ for (const [what, from, to] of [
 }
 
 // A disjoint mandatory cohort; literal ownership is narrower than a generic Swift filter.
-const PAC_SOURCE_STEP =
-	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n';
+const PAC_SOURCE_STEP = retainedManagedStep(
+	'      - name: Qualify actual native PAC source ownership XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          test -n "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -x "$ERGOPTI_NATIVE_HTTP_PYTHON"\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"\n          transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-xctest.log"\n          source_receipt="$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-inputs.json"\n          node tools/diagnostics/native_pac_source_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])ManagedPACSourceTests([/.]|$)\' 2>&1 | tee "$transcript"\n          source_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#source_statuses[@]}" -eq 2\n          node tools/diagnostics/native_pac_source_evidence.cjs judge "$transcript" "${source_statuses[0]}" "${source_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$source_receipt" "$ERGOPTI_OLLAMA_BUILD_ROOT/native-pac-source-verdict.json"\n        timeout-minutes: 10\n'
+);
 function nativePacSourceProblems(files) {
 	const mac = files.find((file) => file.rel === MACOS_BOX)?.text ?? '';
-	const jobs = [
-		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
-	];
+	const jobs = [[macRole.body(mac, 'managed-ollama-native')]];
 	const problems = [];
 	if (jobs.length !== 1) return ['native-source-job'];
 	const job = jobs[0][0];
@@ -4285,11 +6572,17 @@ for (const [replacement, error] of [
 		/\[ci-pipeline\] step 'Qualify actual native PAC source ownership XCTest controls' appears 2 times in one job/
 	],
 	[
-		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: false'),
+		rawSourceStep.replace(
+			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: false'
+		),
 		/\[ci-full-default\].*full step condition/
 	],
 	[
-		rawSourceStep.replace('if: ${{ !cancelled() }}', 'if: ${{ success() }}'),
+		rawSourceStep.replace(
+			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: ${{ success() }}'
+		),
 		/\[ci-full-default\].*full step condition/
 	]
 ]) {
@@ -4303,7 +6596,13 @@ console.log('PASS: exact Source10 raw condition controls=5; native execution unq
 for (const [name, changed] of [
 	['missing source step', ''],
 	['duplicate source step', PAC_SOURCE_STEP + PAC_SOURCE_STEP],
-	['skipped source step', PAC_SOURCE_STEP.replace('if: ${{ !cancelled() }}', 'if: false')],
+	[
+		'skipped source step',
+		PAC_SOURCE_STEP.replace(
+			'if: ' + macRole.condition('managed-ollama-native', '${{ !cancelled() }}'),
+			'if: false'
+		)
+	],
 	['ignored source child status', PAC_SOURCE_STEP.replace('"${source_statuses[0]}"', '"0"')],
 	['ignored source capture status', PAC_SOURCE_STEP.replace('"${source_statuses[1]}"', '"0"')],
 	['foreign source run', PAC_SOURCE_STEP.replace('"$GITHUB_RUN_ID"', '"foreign"')],
@@ -4862,7 +7161,7 @@ for (const [name, from, to] of [
 }
 
 // The temporary Mac exception still requires closed context and retained gates.
-require('./test-macos-dev-qualification-deferral.cjs');
+require('./test-macos-dev-qualification-deferral.cjs').run({ includeLeafControls: false });
 
 // GitHub Pages reads the domain from the deployed root after each replacement.
 const siteRoot = path.resolve(__dirname, '../..');
@@ -4871,30 +7170,46 @@ const siteWorkflow = fs.readFileSync(
 	path.join(siteRoot, '.github/workflows/deploy-site.yml'),
 	'utf8'
 );
-assert.match(siteWorkflow, /^      - 'static\/CNAME'$/m, 'a domain-only change must deploy');
-assert.match(
-	siteWorkflow,
-	/        run: \|\n          npm run build\n          cmp -- static\/CNAME build\/CNAME\n/,
-	'the exact built domain must be verified before destructive deployment'
+assert.deepEqual(
+	siteDeploymentProblems(siteWorkflow),
+	[],
+	'only tested production bytes reach Pages'
 );
-assert.ok(
-	siteWorkflow.indexOf('cmp -- static/CNAME build/CNAME') <
-		siteWorkflow.indexOf('- name: Deploy to GitHub Pages'),
-	'the domain guard precedes the deployment step'
-);
-assert.match(siteWorkflow, /cp -r build\/\. "\$GHP"\//, 'main deploy retains built static assets');
-assert.match(siteWorkflow, /cp -r build\/\. "\$GHP\/\$DEPLOY_DIR\/"/, 'dev deploy remains scoped');
+// actions/download-artifact v4/src/download-artifact.ts:42,162–165.
+// ID selection does not set the named single-artifact flag.
+for (const job of Object.values(YAML.parse(siteWorkflow).jobs)) {
+	for (const step of job.steps.filter((row) => row.with?.['artifact-ids'])) {
+		const inputs = { name: step.with.name, mergeMultiple: step.with['merge-multiple'] };
+		const resolvedPath = step.with.path;
+		const artifact = { name: 'selected-artifact' };
+		const isSingleArtifactDownload = !!inputs.name;
+		const destination =
+			isSingleArtifactDownload || inputs.mergeMultiple
+				? resolvedPath
+				: path.join(resolvedPath, artifact.name);
+		assert.equal(
+			destination,
+			resolvedPath,
+			'one admitted ID must extract exactly where verify reads'
+		);
+		assert.notEqual(path.join(resolvedPath, artifact.name), resolvedPath);
+	}
+}
+for (const [label, from, to] of SITE_DEPLOY_REFUSALS) {
+	assert.equal(siteWorkflow.split(from).length, 2, label + ' has one real source seam');
+	assert.ok(siteDeploymentProblems(siteWorkflow.replace(from, () => to)).length > 0, label);
+}
 
 // Current read-only number-row cohort is mandatory independently of full package prerequisites.
-const NUMBER_ROW_NATIVE_STEP =
-	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n';
-const NUMBER_ROW_NATIVE_RETENTION =
-	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n';
+const NUMBER_ROW_NATIVE_STEP = retainedManagedStep(
+	'      - name: Qualify actual selected number-row Carbon XCTest controls\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          evidence="$RUNNER_TEMP/number-row-source-evidence"\n          mkdir "$evidence"\n          transcript="$evidence/number-row-xctest.log"\n          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift"\n          producer="static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift"\n          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"\n          git show "$GITHUB_SHA:$source" | cmp - "$source"\n          git show "$GITHUB_SHA:$producer" | cmp - "$producer"\n          cp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"\n          export ERGOPTI_TIS_EVIDENCE_DIR="$(mktemp -d "$evidence/tis-session.XXXXXX")"\n          export ERGOPTI_TIS_EVIDENCE_SESSION="$(node -e \'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))\')"\n          set +e\n          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])NumberRowSourceProbeTests([/.]|$)\' 2>&1 | tee "$transcript"\n          number_row_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#number_row_statuses[@]}" -eq 2\n          set +e\n          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\\n            --class NumberRowSourceProbeTests --source "$evidence/NumberRowSourceProbeTests.swift" \\\n            --log "$transcript" --receipt "$evidence/number-row-verdict.json" \\\n            --test-exit "${number_row_statuses[0]}" --capture-exit "${number_row_statuses[1]}"\n          number_row_receipt_status=$?\n          node - "$evidence/number-row-verdict.json" "$ERGOPTI_TIS_EVIDENCE_DIR" "$ERGOPTI_TIS_EVIDENCE_SESSION" <<\'NODE\'\n          const fs = require(\'node:fs\');\n          const transport = require(\'./tools/diagnostics/tis_evidence_transport.cjs\');\n          const receipt = JSON.parse(fs.readFileSync(process.argv[2], \'utf8\'));\n          if (!receipt.passed || receipt.scope !== \'NumberRowSourceProbeTests\' || receipt.expected_count !== 12 || receipt.received_count !== 12) throw new Error(\'exact twelve-case number-row receiving refused\');\n          const session = transport.validate(process.argv[3], process.argv[4]);\n          const expectedSources = {\n            testActualSelectedUSPlainAndShiftUseUnchangedIndependentExpectations: \'com.apple.keylayout.US\',\n            testActualFrenchDeadStateDoesNotLeakIntoNextPositionOrSuccessor: \'com.apple.keylayout.French\',\n            testFrozenNativeLayoutIsAlignedDetachedFromControlledMutableStorage: \'com.apple.keylayout.US\',\n            testActualUSCapsMaskChangesAnIndependentLetterExpectation: \'com.apple.keylayout.US\',\n            testActualCarbonCapsDomainsPreserveNativeModifierAndDeadStateABI: \'com.apple.keylayout.French\',\n            testActualLayoutRefusesChangedSourceTypeDataOrUnavailableFinalRead: \'com.apple.keylayout.US\',\n            testActualFrozenProbeRefusesChangedFinalBytesOnSamePrivateDataObject: \'com.apple.keylayout.US\'\n          };\n          const expected = Object.keys(expectedSources).sort();\n          const observed = session.receipts.map((row) => {\n            if (row.test.state !== \'present\' || row.omittedEvents !== 0) throw new Error(\'native diagnostic identity refused\');\n            const match = /^(?:(?:\\w+\\.)?NumberRowSourceProbeTests\\.|-\\[(?:\\w+\\.)?NumberRowSourceProbeTests )(test\\w+)(?:\\])?:(com\\.apple\\.keylayout\\.(?:US|French))$/.exec(row.test.value);\n            if (!match || !Object.hasOwn(expectedSources, match[1]) || match[2] !== expectedSources[match[1]]) throw new Error(\'foreign native method fixture\');\n            const captures = row.events.filter((event) => event.phase === \'original.capture\');\n            if (captures.length !== 1 || captures[0].original?.id?.state !== \'present\' || typeof captures[0].original.id.value !== \'string\' || captures[0].original.id.value.length === 0) throw new Error(\'captured original source unavailable\');\n            const originalID = captures[0].original.id.value;\n            for (const phase of [\'restore.inner.after\', \'restore.outer.after\']) {\n              const events = row.events.filter((event) => event.phase === phase);\n              if (events.length !== 1 || events[0].status !== 0) throw new Error(\'native source restoration refused\');\n              if (events[0].original?.id?.state !== \'present\' || events[0].original.id.value !== originalID || events[0].current?.id?.state !== \'present\' || events[0].current.id.value !== originalID) throw new Error(\'sampled selected source restoration refused\');\n            }\n            return match[1];\n          }).sort();\n          if (!session.complete || JSON.stringify(observed) !== JSON.stringify(expected)) throw new Error(\'exact seven native diagnostic closures refused\');\n          NODE\n          number_row_tis_status=$?\n          set -e\n          cmp "$source" "$evidence/NumberRowSourceProbeTests.swift"\n          cmp "$producer" "$evidence/NumberRowSourceProbe.swift"\n          test "$number_row_receipt_status" -eq 0\n          test "$number_row_tis_status" -eq 0\n        timeout-minutes: 10\n'
+);
+const NUMBER_ROW_NATIVE_RETENTION = retainedManagedStep(
+	'      - name: Retain selected number-row Carbon XCTest diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n            ${{ runner.temp }}/number-row-source-evidence/number-row-verdict.json\n            ${{ runner.temp }}/number-row-source-evidence/tested-sha.txt\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbe.swift\n            ${{ runner.temp }}/number-row-source-evidence/NumberRowSourceProbeTests.swift\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/start.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/manifest.json\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/record-*.dat\n            ${{ runner.temp }}/number-row-source-evidence/tis-session.*/refusal.json\n'
+);
 function numberRowNativeReceivingProblems(files) {
 	const mac = files.find((entry) => entry.rel === MACOS_BOX)?.text ?? '';
-	const jobs = [
-		...mac.matchAll(/^  managed-ollama-native:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)
-	];
+	const jobs = [[macRole.body(mac, 'managed-ollama-native')]];
 	if (jobs.length !== 1) return ['number-row native owner job missing or duplicated'];
 	const job = jobs[0][0];
 	const problems = [];
@@ -4957,7 +7272,11 @@ for (const [label, before, after] of [
 	);
 }
 for (const [label, before, after] of [
-	['skipped retention', 'if: always()', 'if: false'],
+	[
+		'skipped retention',
+		'if: ' + macRole.condition('managed-ollama-native', 'always()'),
+		'if: false'
+	],
 	[
 		'missing native raw log retention',
 		'            ${{ runner.temp }}/number-row-source-evidence/number-row-xctest.log\n',
@@ -4978,8 +7297,8 @@ for (const [label, before, after] of [
 	const files = require('./ci-pipeline.cjs').files();
 	const name = 'Receive selected-release shell corpus and native guardian cancellation';
 	const head = `      - name: ${name}\n`;
-	const body = pipeline.step(pipeline.job('managed-ollama-native'), name);
-	assert.equal(pipeline.stepField(body, 'if'), null);
+	const body = pipeline.step(macRole.body(pipeline.file(MACOS_BOX), 'managed-ollama-native'), name);
+	assert.equal(pipeline.stepField(body, 'if'), macRole.condition('managed-ollama-native'));
 	assert.doesNotThrow(() => pipeline.validateRaw(files));
 	const mutants = [
 		['deleted receiver', '', /no step named/],
@@ -5025,7 +7344,10 @@ for (const [label, before, after] of [
 	])
 		mutants.push([
 			`conditional receiver ${condition}`,
-			body.replace(head, head + `        if: ${condition}\n`),
+			body.replace(
+				'        if: ' + macRole.condition('managed-ollama-native') + '\n',
+				`        if: ${condition}\n`
+			),
 			/full step condition/
 		]);
 	for (const [label, replacement, error] of mutants) {
@@ -5041,7 +7363,7 @@ for (const [label, before, after] of [
 	mustCatch(
 		'selected-release artifact condition spelling remains exact',
 		MACOS_BOX,
-		'      - name: Retain selected-release native ownership receiving\n        if: always()\n',
+		macConditionalPrefix('      - name: Retain selected-release native ownership receiving\n'),
 		'      - name: Retain selected-release native ownership receiving\n        if: ${{ always() }}\n',
 		stepProblems
 	);
@@ -5069,12 +7391,12 @@ for (const name of [
 		mustCatch(
 			`native producer diagnostic ${name}: invalid condition ${changed}`,
 			MACOS_BOX,
-			head + '        if: ${{ !cancelled() }}\n',
+			macConditionalPrefix(head, 'e2e-hs'),
 			head + `        if: ${changed}\n`,
 			stepProblems
 		);
 	}
-	const from = head + '        if: ${{ !cancelled() }}\n';
+	const from = macConditionalPrefix(head, 'e2e-hs');
 	const source = rawSourceFiles.find((file) => file.rel === MACOS_BOX).text;
 	assert.equal(source.split(from).length - 1, 1, 'one exact native producer diagnostic step');
 	const swallowed = rawSourceFiles.map((file) =>
@@ -5093,9 +7415,7 @@ for (const name of [
 {
 	const files = pipeline.rawFiles();
 	const source = files.find((file) => file.rel === MACOS_BOX);
-	const jobs = pipeline
-		.jobsOfText(source.text, MACOS_BOX)
-		.filter((job) => job.id === 'managed-ollama-native');
+	const jobs = pipeline.jobsOfText(source.text, MACOS_BOX).filter((job) => job.id === 'e2e-hs');
 	assert.equal(jobs.length, 1, 'one current native model receiving job');
 	const owner = jobs[0];
 	const buildName = 'Build and admit the actual native source asset';
@@ -5104,7 +7424,12 @@ for (const name of [
 	const model = pipeline.step(owner.body, modelName);
 	const id = '        id: ollama-native-build\n';
 	const condition =
-		"        if: ${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}\n";
+		'        if: ' +
+		macRole.condition(
+			'managed-ollama-native',
+			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+		) +
+		'\n';
 	assert.doesNotThrow(() => pipeline.validateRaw(files));
 	function refuses(label, before, after, pattern) {
 		assert.equal(owner.body.split(before).length - 1, 1, label + ': exact current owner span');
@@ -5157,7 +7482,7 @@ for (const name of [
 		"${{ !cancelled() && steps.ollama-native-build.outcome != 'failure' }}",
 		"${{ !cancelled() && steps.ollama-native-build.conclusion == 'success' }}",
 		"${{ !cancelled() && steps.unrelated-native-build.outcome == 'success' }}",
-		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.architecture == 'arm64' }}"
+		"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && env.MACOS_STAGE_ARCHITECTURE == 'arm64' }}"
 	])
 		refuses(
 			`model dependency condition ${changed || '(missing)'}`,
@@ -5246,11 +7571,15 @@ mustCatch(
 	'          true\n          evidence=',
 	numberRowCausalEnrollmentProblems
 );
+const numberRowCausalArtifact = pipeline.step(
+	macRole.body(pipeline.file(MACOS_BOX), 'managed-ollama-native'),
+	'Retain native final-byte number-row causal diagnostics'
+);
 mustCatch(
 	'artifact missing evidence fatal',
 	MACOS_BOX,
-	'      - name: Retain native final-byte number-row causal diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: error\n',
-	'      - name: Retain native final-byte number-row causal diagnostics\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: number-row-causal-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          if-no-files-found: warn\n',
+	numberRowCausalArtifact,
+	numberRowCausalArtifact.replace('if-no-files-found: error', 'if-no-files-found: warn'),
 	numberRowCausalEnrollmentProblems
 );
 mustCatch(
@@ -5361,34 +7690,38 @@ for (const [label, before, after] of numberRowCompositionSourceMutations)
 	);
 
 // The final manual SDK diagnostic cannot suppress any earlier native script.
-const SHORTCUTS_INDEPENDENT_OBSERVER = [
-	'      - name: Observe independent native Apple Shortcuts SDK preflight and discovery',
-	"        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
-	'        shell: bash',
-	'        run: |',
-	'          set -euo pipefail',
-	'          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \\',
-	'            --source-root "$GITHUB_WORKSPACE" \\',
-	'            --source-sha "$GITHUB_SHA" \\',
-	'            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}"',
-	'        timeout-minutes: 2'
-].join('\n');
-const SHORTCUTS_INDEPENDENT_RETENTION = [
-	'      - name: Retain independent native Apple Shortcuts SDK observation',
-	"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
-	'        uses: actions/upload-artifact@v4',
-	'        with:',
-	'          name: native-apple-shortcuts-independent-${{ matrix.architecture }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
-	'          retention-days: 7',
-	'          if-no-files-found: error',
-	'          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ matrix.architecture }}'
-].join('\n');
+const SHORTCUTS_INDEPENDENT_OBSERVER = retainedManagedStep(
+	[
+		'      - name: Observe independent native Apple Shortcuts SDK preflight and discovery',
+		"        if: ${{ !cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'        shell: bash',
+		'        run: |',
+		'          set -euo pipefail',
+		'          python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py \\',
+		'            --source-root "$GITHUB_WORKSPACE" \\',
+		'            --source-sha "$GITHUB_SHA" \\',
+		'            --output "$RUNNER_TEMP/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}"',
+		'        timeout-minutes: 2'
+	].join('\n')
+);
+const SHORTCUTS_INDEPENDENT_RETENTION = retainedManagedStep(
+	[
+		'      - name: Retain independent native Apple Shortcuts SDK observation',
+		"        if: ${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}",
+		'        uses: actions/upload-artifact@v4',
+		'        with:',
+		'          name: native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+		'          retention-days: 7',
+		'          if-no-files-found: error',
+		'          path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}'
+	].join('\n')
+);
 function shortcutsIndependentReceivingProblems(files) {
 	const jobs = files.flatMap((file) => pipeline.jobsOfText(file.text, file.rel));
-	const owners = jobs.filter((job) => job.file === MACOS_BOX && job.id === 'managed-ollama-native');
+	const owners = jobs.filter((job) => job.file === MACOS_BOX && job.id === 'e2e-hs');
 	if (owners.length !== 1) return ['independent Shortcuts owner job missing or duplicated'];
 	const owned = owners[0];
-	const members = pipeline.steps(owned.body);
+	const members = macRole.selected(owned.body, 'managed-ollama-native');
 	const problems = [];
 	for (const [name, expected] of [
 		[
@@ -5540,7 +7873,7 @@ const shortcutsIndependentMutations = [
 		'unbound artifact architecture',
 		SHORTCUTS_INDEPENDENT_RETENTION,
 		SHORTCUTS_INDEPENDENT_RETENTION.replace(
-			'native-apple-shortcuts-independent-${{ matrix.architecture }}-',
+			'native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-',
 			'native-apple-shortcuts-independent-'
 		)
 	],
@@ -5578,12 +7911,21 @@ for (const [label, before, after] of shortcutsIndependentMutations) {
 }
 const shortcutsIndependentPair =
 	SHORTCUTS_INDEPENDENT_OBSERVER + '\n\n' + SHORTCUTS_INDEPENDENT_RETENTION;
-const shortcutsIndependentGuardJob = pipeline.job('managed-ollama-native');
+const shortcutsIndependentGuardJob = macRole.body(
+	pipeline.file(MACOS_BOX),
+	'managed-ollama-native'
+);
 const shortcutsIndependentGuardian = pipeline.step(
 	shortcutsIndependentGuardJob,
 	'Receive selected-release shell corpus and native guardian cancellation'
 );
 const shortcutsIndependentPackage = '      - name: Observe native Apple Shortcuts discovery\n';
+const shortcutsIndependentFixtureCondition =
+	'        if: ' + macRole.condition('managed-ollama-native') + '\n';
+const shortcutsIndependentLaterFixture =
+	'      - name: Later gate fixture\n' +
+	shortcutsIndependentFixtureCondition +
+	'        run: echo later';
 for (const [label, transform] of [
 	[
 		'observer moved after native guardian',
@@ -5610,7 +7952,7 @@ for (const [label, transform] of [
 		(text) =>
 			text.replace(
 				shortcutsIndependentPair,
-				shortcutsIndependentPair + '\n\n      - name: Later gate fixture\n        run: echo later'
+				shortcutsIndependentPair + '\n\n' + shortcutsIndependentLaterFixture
 			)
 	]
 ]) {
@@ -5618,10 +7960,31 @@ for (const [label, transform] of [
 		file.rel === MACOS_BOX ? { ...file, text: transform(file.text) } : file
 	);
 	assert.notDeepEqual(mutated, shortcutsIndependentFiles, label + ' changes actual source');
+	if (label === 'later original-style gate after observer')
+		assert.ok(
+			macRole
+				.body(mutated.find((file) => file.rel === MACOS_BOX).text, 'managed-ollama-native')
+				.includes(shortcutsIndependentLaterFixture),
+			'the later fixture must reach the actual role member guard'
+		);
 	assert.ok(shortcutsIndependentReceivingProblems(mutated).length > 0, label + ' refuses');
 }
+// An unguarded later step is refused by the closed stage contract, outside any role.
+const shortcutsIndependentUnguarded = pipeline
+	.file(MACOS_BOX)
+	.replace(
+		shortcutsIndependentPair,
+		shortcutsIndependentPair + '\n\n      - name: Later gate fixture\n        run: echo later'
+	);
+assert.notEqual(shortcutsIndependentUnguarded, pipeline.file(MACOS_BOX));
+assert.ok(
+	macStageProblems(shortcutsIndependentUnguarded).length > 0,
+	'an unguarded later gate remains refused by the actual stage contract'
+);
 const shortcutsIndependentHarmless =
-	'      - name: Independent SDK guard harmless fixture\n        run: echo harmless';
+	'      - name: Independent SDK guard harmless fixture\n' +
+	shortcutsIndependentFixtureCondition +
+	'        run: echo harmless';
 for (const name of [
 	'Independent SDK guard harmless fixture',
 	'Independent SDK guard renamed harmless fixture'
@@ -5640,13 +8003,21 @@ for (const name of [
 			: file
 	);
 	assert.notDeepEqual(positive, shortcutsIndependentFiles, 'positive changes actual source');
+	assert.ok(
+		macRole
+			.body(positive.find((file) => file.rel === MACOS_BOX).text, 'managed-ollama-native')
+			.includes(
+				shortcutsIndependentHarmless.replace('Independent SDK guard harmless fixture', name)
+			),
+		'the positive fixture must reach the actual role member guard: ' + name
+	);
 	assert.deepEqual(
 		shortcutsIndependentReceivingProblems(positive),
 		[],
 		'unrelated own fixture remains editable: ' + name
 	);
 }
-console.log('PASS: independent Shortcuts SDK source controls=3 positive/27 refusal; native UNRUN.');
+console.log('PASS: independent Shortcuts SDK source controls=3 positive/28 refusal; native UNRUN.');
 
 if (errors.length > 0) {
 	console.error(

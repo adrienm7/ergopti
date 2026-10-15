@@ -95,8 +95,14 @@ _LICS_CoalescingClearsBeforeItFires() {
 		Body := _DriverFuncBody(Fn)
 		Assert(Body != "", Fn . " must exist in the driver source")
 
+		CaptureAt := InStr(Body, "displaced := _LLM_Ollama_Pending", true)
 		ClearAt := InStr(Body, "_LLM_Ollama_Pending :=")
-		FireAt  := InStr(Body, "_LLM_InvokeCallback")
+		FireNeedle := '_LLM_InvokeCallback(displaced, "on_fail")'
+		FireAt := InStr(Body, FireNeedle, true)
+		Assert(CaptureAt > 0 && CaptureAt < ClearAt,
+			Fn . " must capture the original pending callback before reassigning its slot")
+		Assert(InStr(Body, FireNeedle, true, FireAt + StrLen(FireNeedle)) == 0,
+			Fn . " must invoke that exact displaced callback only once")
 		Assert(ClearAt > 0, Fn . " must still reassign the pending slot")
 		Assert(FireAt > 0,
 			Fn . " must fail the displaced job through the wrapper — a job that is dropped without its on_fail leaves the engine's slot state machine waiting for a callback that will never arrive")

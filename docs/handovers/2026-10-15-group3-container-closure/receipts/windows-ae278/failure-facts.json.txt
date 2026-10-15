@@ -1,0 +1,251 @@
+{
+  "failures": [
+    {
+      "line": 36849,
+      "bytes_hex": "6e6f74206f6b2037373338202d206d616e616765642072656d6f7465206e61746976653a2061637475616c2073797374656d20434120616e64207374617469632f504143207472616e73706f72742070726573657276652073747269637420544c5320616e6420657861637420636c65616e757020972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7738 - managed remote native: actual system CA and static/PAC transport preserve strict TLS and exact cleanup \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37061,
+      "bytes_hex": "6e6f74206f6b2037383031202d2075706461746572206e61746976653a2061637475616c2067656e6572617465642073746167696e672043412f50414320696e7465677269747920616e64207265667573616c73207072657365727665206f6c642061707020972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7801 - updater native: actual generated staging CA/PAC integrity and refusals preserve old app \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37071,
+      "bytes_hex": "6e6f74206f6b2037383032202d2075706461746572206e61746976653a2061637475616c206f726967696e616c20646561646c696e652f63616e63656c6c6174696f6e20726574697265206f776e6564204a6f6220616e64207061727469616c20737461676520972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7802 - updater native: actual original deadline/cancellation retire owned Job and partial stage \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37122,
+      "bytes_hex": "6e6f74206f6b2037383136202d206172746966616374206375726c3a2061637475616c20536368616e6e656c2073746167696e6720616e6420535350492062617265204e544c4d20434f4e4e4543542077697468206e6f204e65676f746961746520646f776e677261646520972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7816 - artifact curl: actual Schannel staging and SSPI bare NTLM CONNECT with no Negotiate downgrade \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37177,
+      "bytes_hex": "6e6f74206f6b2037383332202d2075706461746572206375726c20636170747572653a2061637475616c2070726f6772657373696e67206e617469766520626f647920726574697265732061667465722063616e63656c6c6174696f6e20616e64206f726967696e616c20646561646c696e6520972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7832 - updater curl capture: actual progressing native body retires after cancellation and original deadline \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37273,
+      "bytes_hex": "6e6f74206f6b2037383535202d206d616e616765642072656d6f74653a2061637475616c20627566666572656420504f535420736861726573206e61746976652053535049204e544c4d206375726c206f776e65727368697020972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7855 - managed remote: actual buffered POST shares native SSPI NTLM curl ownership \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    },
+    {
+      "line": 37283,
+      "bytes_hex": "6e6f74206f6b2037383536202d206d616e616765642072656d6f74653a2061637475616c2066756c6c2d55524c20504143206b65657073206f72646572656420636c6f7365642d70726f78792c20535350492072656c617920616e64204449524543542066616c6c6261636b20972041637475616c206d616e616765642d6e6574776f726b2066697874757265207265706f72746564206e6174697665206661696c7572652e205b746573745f6d616e616765645f72656d6f74655f7472616e73706f72742e61686b3a3739355d",
+      "display": "not ok 7856 - managed remote: actual full-URL PAC keeps ordered closed-proxy, SSPI relay and DIRECT fallback \ufffd Actual managed-network fixture reported native failure. [test_managed_remote_transport.ahk:795]"
+    }
+  ],
+  "notices": [
+    {
+      "case_index": 7738,
+      "line": 36843,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7738,
+      "line": 36844,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7738,
+      "line": 36845,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7738,
+      "line": 36846,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7738,
+      "line": 36847,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7738,
+      "line": 36848,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7801,
+      "line": 37055,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7801,
+      "line": 37056,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7801,
+      "line": 37057,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7801,
+      "line": 37058,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7801,
+      "line": 37059,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7801,
+      "line": 37060,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7802,
+      "line": 37065,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7802,
+      "line": 37066,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7802,
+      "line": 37067,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7802,
+      "line": 37068,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7802,
+      "line": 37069,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7802,
+      "line": 37070,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7816,
+      "line": 37116,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7816,
+      "line": 37117,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7816,
+      "line": 37118,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7816,
+      "line": 37119,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7816,
+      "line": 37120,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7816,
+      "line": 37121,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7832,
+      "line": 37171,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7832,
+      "line": 37172,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7832,
+      "line": 37173,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7832,
+      "line": 37174,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7832,
+      "line": 37175,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7832,
+      "line": 37176,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7855,
+      "line": 37267,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7855,
+      "line": 37268,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7855,
+      "line": 37269,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7855,
+      "line": 37270,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7855,
+      "line": 37271,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7855,
+      "line": 37272,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    },
+    {
+      "case_index": 7856,
+      "line": 37277,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7856,
+      "line": 37278,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7856,
+      "line": 37279,
+      "fact": "::notice title=Windows native service diagnostic::stage=fixture_boundary kind=other hresult=-2146233087"
+    },
+    {
+      "case_index": 7856,
+      "line": 37280,
+      "fact": "::notice title=Windows native startup diagnostic::startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+    },
+    {
+      "case_index": 7856,
+      "line": 37281,
+      "fact": "::notice title=Windows native cleanup receipt::state=failed root_install_stage=none root_removed=0 service_stopped=0 server_tls_source_unchanged=-1 ServiceFailures=-1 server_tls_owned_streams=-1 server_tls_owned_modules=-1 server_tls_owned_source_fences=-1 completions=1 exit=1 marker=mismatch"
+    },
+    {
+      "case_index": 7856,
+      "line": 37282,
+      "fact": "::notice title=Windows native fixture cleanup diagnostic::cleanup_gate=exit receipt_read=not_read completion=true exit=false marker=false stderr=true receipt=false state=unknown root_removed=unknown service_stopped=unknown tls_streams=unknown tls_modules=unknown tls_fences=unknown tls_sources=unknown root_scope=false"
+    }
+  ]
+}

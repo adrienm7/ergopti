@@ -1,0 +1,257 @@
+{
+	"schema_version": 1,
+	"feature": "shared-ui",
+	"checks": [
+		{
+			"id": "js-0002",
+			"ordinal": 14,
+			"name": "web text decoding and icon demo preserve literal input with bounded parsing",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-web-text-admission.cjs"],
+			"repro": "npm run test:web-text-admission"
+		},
+		{
+			"id": "js-0094",
+			"ordinal": 106,
+			"name": "every app window keeps the shared frame on macOS, Windows and Linux (no edgeless window)",
+			"cmd": "node",
+			"args": ["tools/test/test-app-windows-keep-their-frame.cjs"],
+			"repro": "node tools/test/test-app-windows-keep-their-frame.cjs"
+		},
+		{
+			"id": "js-0104",
+			"ordinal": 116,
+			"name": "Linux tray icons mirror the Ergopti logo byte for byte",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-tray-icon-assets.cjs"],
+			"repro": "node tools/test/test-linux-tray-icon-assets.cjs"
+		},
+		{
+			"id": "js-0106",
+			"ordinal": 118,
+			"name": "shared pages only call translators that exist",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-ui-translators-defined.cjs"],
+			"repro": "node tools/test/test-shared-ui-translators-defined.cjs"
+		},
+		{
+			"id": "js-0147",
+			"ordinal": 159,
+			"name": "webview i18n fallback cascade (a failed locale fetch must not blank the page)",
+			"cmd": "node",
+			"args": ["tools/test/test-webview-i18n-cascade.cjs"],
+			"repro": "node tools/test/test-webview-i18n-cascade.cjs"
+		},
+		{
+			"id": "js-0148",
+			"ordinal": 160,
+			"name": "webview host strings survive the page locale fetch (no raw keys on macOS pages)",
+			"cmd": "node",
+			"args": ["tools/test/test-webview-host-strings-survive-failed-fetch.cjs"],
+			"repro": "npm run test:webview-host-strings-survive-failed-fetch"
+		},
+		{
+			"id": "js-0149",
+			"ordinal": 161,
+			"name": "shared pages never show a raw locale key (keys in en.json, catalogue delivered and shipped)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-pages-never-show-raw-keys.cjs"],
+			"repro": "npm run test:shared-pages-never-show-raw-keys"
+		},
+		{
+			"id": "js-0161",
+			"ordinal": 173,
+			"name": "webview geometry single source (macOS defers to manifest; Windows literals match; P0-A)",
+			"cmd": "node",
+			"args": ["tools/test/test-webview-geometry-single-source.cjs"],
+			"repro": "node tools/test/test-webview-geometry-single-source.cjs"
+		},
+		{
+			"id": "js-0172",
+			"ordinal": 184,
+			"name": "UI windows are focused, never kept on top (macOS, Windows, Linux) + no raw blockAlert",
+			"cmd": "node",
+			"args": ["tools/test/test-ui-focus-fix.cjs"],
+			"repro": "node tools/test/test-ui-focus-fix.cjs"
+		},
+		{
+			"id": "js-0173",
+			"ordinal": 185,
+			"name": "click-lock fix (non-consuming watcher + keystroke release, both drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-click-lock-fix.cjs"],
+			"repro": "node tools/test/test-click-lock-fix.cjs"
+		},
+		{
+			"id": "js-0175",
+			"ordinal": 187,
+			"name": "section-title decoration parity (single \"— … —\" source per driver, no re-inlining)",
+			"cmd": "node",
+			"args": ["tools/test/test-section-decoration-parity.cjs"],
+			"repro": "node tools/test/test-section-decoration-parity.cjs"
+		},
+		{
+			"id": "js-0195",
+			"ordinal": 207,
+			"name": "macOS canvas job admission and pure Python ownership remain mandatory",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-tooltip-canvas-admission.cjs"],
+			"repro": "npm run test:macos-tooltip-canvas-admission"
+		},
+		{
+			"id": "js-0196",
+			"ordinal": 208,
+			"name": "Linux WebViews use pinned offline code and one bridge per page",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-webview-security.cjs"],
+			"repro": "npm run test:linux-webview-security"
+		},
+		{
+			"id": "js-0256",
+			"ordinal": 269,
+			"name": "tooltip lifecycle phases (the shared four-phase contract vs the AutoHotkey renderer)",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-lifecycle-phases.cjs"],
+			"repro": "node tools/test/test-tooltip-lifecycle-phases.cjs"
+		},
+		{
+			"id": "js-0266",
+			"ordinal": 279,
+			"name": "tooltip [positioning] constant reach (which driver reads which value)",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-positioning-reach.cjs"],
+			"repro": "node tools/test/test-tooltip-positioning-reach.cjs"
+		},
+		{
+			"id": "js-0267",
+			"ordinal": 280,
+			"name": "tooltip style single source (both drivers read constants.toml; hex companions match macOS)",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-style-single-source.cjs"],
+			"repro": "node tools/test/test-tooltip-style-single-source.cjs"
+		},
+		{
+			"id": "js-0274",
+			"ordinal": 287,
+			"name": "WebView2 host teardown order (closing a window must not quit AHK)",
+			"cmd": "node",
+			"args": ["tools/test/test-webview-teardown-order.cjs"],
+			"repro": "node tools/test/test-webview-teardown-order.cjs"
+		},
+		{
+			"id": "js-0307",
+			"ordinal": 320,
+			"name": "App Cloner shortcuts preserve maximize intent",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-shortcut-maximize.cjs"],
+			"repro": "npm run test:app-cloner-shortcut-maximize"
+		},
+		{
+			"id": "js-0308",
+			"ordinal": 321,
+			"name": "App Cloner launchers isolate runtime arguments",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-run-isolation.cjs"],
+			"repro": "npm run test:app-cloner-run-isolation"
+		},
+		{
+			"id": "js-0309",
+			"ordinal": 322,
+			"name": "App Cloner logging stays isolated from generated launchers",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-log-isolation.cjs"],
+			"repro": "npm run test:app-cloner-log-isolation"
+		},
+		{
+			"id": "js-0310",
+			"ordinal": 323,
+			"name": "App Cloner generated literals survive hostile values",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-generated-literals.cjs"],
+			"repro": "npm run test:app-cloner-generated-literals"
+		},
+		{
+			"id": "js-0311",
+			"ordinal": 324,
+			"name": "App Cloner Dock URLs remain canonical",
+			"cmd": "node",
+			"args": ["tools/test/test-app-cloner-dock-url.cjs"],
+			"repro": "npm run test:app-cloner-dock-url"
+		},
+		{
+			"id": "js-0333",
+			"ordinal": 348,
+			"name": "hotstring colour presets identical on macOS and Linux",
+			"cmd": "node",
+			"args": ["tools/test/test-color-presets-parity.cjs"],
+			"repro": "node tools/test/test-color-presets-parity.cjs"
+		},
+		{
+			"id": "js-0353",
+			"ordinal": 368,
+			"name": "app and window switching actions carry one explicit label each and migrate the ids macOS merged",
+			"cmd": "node",
+			"args": ["tools/test/test-app-switch-labels.cjs"],
+			"repro": "npm run test:app-switch-labels"
+		},
+		{
+			"id": "js-0358",
+			"ordinal": 374,
+			"name": "window title audit mutations",
+			"cmd": "node",
+			"args": ["tools/test/test-gui-title-audit.cjs"],
+			"repro": "node tools/test/test-gui-title-audit.cjs"
+		},
+		{
+			"id": "js-0359",
+			"ordinal": 375,
+			"name": "window titles (Gui/windowTitle carry the \"ErgoptiPlus\" prefix)",
+			"cmd": "node",
+			"args": ["tools/lint/audit-gui-titles.cjs"],
+			"repro": "node tools/lint/audit-gui-titles.cjs"
+		},
+		{
+			"id": "js-0363",
+			"ordinal": 379,
+			"name": "shared UI JavaScript syntax (every browser script parses before WebView injection)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-ui-js-syntax.cjs"],
+			"repro": "node tools/test/test-shared-ui-js-syntax.cjs"
+		},
+		{
+			"id": "js-0373",
+			"ordinal": 389,
+			"name": "Linux document bridge challenges retain intrinsic page nonce and exact lease",
+			"cmd": "node",
+			"args": [
+				"tools/test/test-linux-document-lease.cjs",
+				"static/ergopti_plus/_shared/ui/host_bridge.js"
+			],
+			"repro": "npm run test:linux-document-lease"
+		},
+		{
+			"id": "js-0377",
+			"ordinal": 393,
+			"name": "download actions retain their operation session across native reuse",
+			"cmd": "node",
+			"args": ["tools/test/test-download-window-session.cjs"],
+			"repro": "npm run test:download-window-session"
+		},
+		{
+			"id": "js-0381",
+			"ordinal": 397,
+			"name": "onboarding wizard asks one No-first page per scope and emits manifest paths only",
+			"cmd": "node",
+			"args": ["tools/test/test-onboarding-wizard-page.cjs"],
+			"repro": "npm run test:onboarding-wizard-page"
+		},
+		{
+			"id": "js-0396",
+			"ordinal": 412,
+			"name": "tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors)",
+			"cmd": "node",
+			"args": ["tools/test/test-tooltip-corpus-parity.cjs"],
+			"repro": "node tools/test/test-tooltip-corpus-parity.cjs"
+		}
+	]
+}

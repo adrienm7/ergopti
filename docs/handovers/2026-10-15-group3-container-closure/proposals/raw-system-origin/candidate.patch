@@ -1,0 +1,212 @@
+--- a/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c
+@@ -21,6 +21,11 @@
+ #include "nav_event_owner.h"
+ #include "editor_replace.h"
+ #include "hook_trace.h"
++#include "raw_hook_origin.h"
++
++_Static_assert(LLKHF_EXTENDED == 1 && LLKHF_LOWER_IL_INJECTED == 2
++	&& LLKHF_INJECTED == 0x10 && LLKHF_ALTDOWN == 0x20 && LLKHF_UP == 0x80,
++	"SDK raw hook flag values changed.");
+ 
+ /* A genuine Windows build pins the pure x64/ARM64 wire shape to its own SDK. */
+ _Static_assert(sizeof(INPUT) == sizeof(ErgoptiOutput_Win32Input), "SDK INPUT size changed.");
+@@ -904,7 +909,10 @@
+ 	incoming.scan = (uint16_t)(event->scanCode & 0xFFu);
+ 	if ((event->flags & LLKHF_EXTENDED) != 0 && incoming.scan != 0)
+ 		incoming.scan |= 0x100u;
+-	incoming.origin = ERGOPTI_REPLAY_PHYSICAL;
++	/* Classify the complete raw tuple before its compressed scan can alias a
++	 * driver's synthetic Ctrl/Shift UP to a retained real user's modifier. */
++	incoming.origin = ErgoptiReplay_RawHookOrigin(
++		event->vkCode, event->scanCode, event->flags);
+ 	incoming.source_id = 1;
+ 	incoming.key_up = key_up ? 1 : 0;
+ 	clock_valid = NavLiftTerminalClockLocked(state, event->time, &incoming.timestamp);
+--- /dev/null
++++ b/static/ergopti_plus/windows/native/nav_event_owner/raw_hook_origin.h
+@@ -0,0 +1,38 @@
++// static/ergopti_plus/windows/native/nav_event_owner/raw_hook_origin.h
++/**
++ * @file raw_hook_origin.h
++ * @brief Downgrades unproven original-hook metadata before scan normalization.
++ *
++ * Non-injected keyboard-driver synthetic events can have raw scan codes such
++ * as 0x21D (AltGr Ctrl) or 0x22A/0x236 (numpad Shift). Masking to eight bits
++ * first aliases them to the user's retained Ctrl/Shift source. They must not
++ * acquire or retire a physical replay recipe. Unknown raw bits stay diagnostic.
++ *
++ * The legacy PHYSICAL category is retained only for previously modeled raw
++ * tuples. It proves no RawInput device, original press, pair eligibility or
++ * output authority. This helper installs no hook and never reclassifies replay
++ * or injected input as physical, including input with an owned replay marker.
++ */
++
++#ifndef ERGOPTI_RAW_HOOK_ORIGIN_H
++#define ERGOPTI_RAW_HOOK_ORIGIN_H
++
++#include "replay_route_core.h"
++
++/** Full KBDLLHOOKSTRUCT values, before the producer's eight-bit projection. */
++static inline uint8_t ErgoptiReplay_RawHookOrigin(
++	uint32_t vk, uint32_t raw_scan, uint32_t flags)
++{
++	/* SDK LLKHF: extended=1, lower integrity=2, injected=0x10,
++	 * Alt down=0x20 and key up=0x80. The native caller pins these values. */
++	if ((flags & 0x02u) != 0)
++		return ERGOPTI_REPLAY_LOWER_INTEGRITY;
++	if ((flags & 0x10u) != 0)
++		return ERGOPTI_REPLAY_EXTERNAL_INJECTION;
++	if (vk == 0 || vk > 0xFFu || raw_scan == 0 || raw_scan > 0xFFu
++			|| (flags & ~0xB3u) != 0)
++		return ERGOPTI_REPLAY_UNPROVEN_SYSTEM;
++	return ERGOPTI_REPLAY_PHYSICAL;
++}
++
++#endif
+--- a/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c
+@@ -271,7 +271,7 @@
+ 			|| event->key_up > 1 || event->repeat > 1
+ 			|| (event->key_up && event->repeat)
+ 			|| event->origin < ERGOPTI_REPLAY_PHYSICAL
+-			|| event->origin > ERGOPTI_REPLAY_LOWER_INTEGRITY)
++			|| event->origin > ERGOPTI_REPLAY_UNPROVEN_SYSTEM)
+ 		return Result(snapshot, ERGOPTI_REPLAY_INVALID_EVENT);
+ 	snapshot->owner = owner;
+ 	snapshot->event = *event;
+@@ -285,7 +285,8 @@
+ 	if (state->has_timestamp && event->timestamp < state->last_timestamp)
+ 		return Result(snapshot, ERGOPTI_REPLAY_STALE_EVENT);
+ 	if (event->origin == ERGOPTI_REPLAY_EXTERNAL_INJECTION
+-			|| event->origin == ERGOPTI_REPLAY_LOWER_INTEGRITY)
++			|| event->origin == ERGOPTI_REPLAY_LOWER_INTEGRITY
++			|| event->origin == ERGOPTI_REPLAY_UNPROVEN_SYSTEM)
+ 		return Result(snapshot, ERGOPTI_REPLAY_UNSUPPORTED);
+ 	for (index = 0; index < ERGOPTI_REPLAY_MAX_HELD_KEYS; ++index) {
+ 		if (SameKey(&state->holds[index], event))
+--- a/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h
++++ b/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h
+@@ -42,7 +42,9 @@
+ 	ERGOPTI_REPLAY_PHYSICAL = 1,
+ 	ERGOPTI_REPLAY_OWNED_REPLAY = 2,
+ 	ERGOPTI_REPLAY_EXTERNAL_INJECTION = 3,
+-	ERGOPTI_REPLAY_LOWER_INTEGRITY = 4
++	ERGOPTI_REPLAY_LOWER_INTEGRITY = 4,
++	/* Driver-generated or unmodeled raw hook identity, never a physical recipe. */
++	ERGOPTI_REPLAY_UNPROVEN_SYSTEM = 5
+ };
+ 
+ enum ErgoptiReplay_Axis {
+--- a/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c
++++ b/static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include "replay_route_core.h"
++#include "raw_hook_origin.h"
+ 
+ #include <assert.h>
+ #include <stdio.h>
+@@ -581,6 +582,91 @@
+ 	puts("PASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.");
+ }
+ 
++/** Original native scan projection, with origin chosen from the full tuple. */
++static ErgoptiReplay_Event RawEdge(
++	uint32_t vk, uint32_t raw_scan, uint32_t flags, uint64_t timestamp)
++{
++	ErgoptiReplay_Event event = {0};
++	event.timestamp = timestamp;
++	event.source_id = 1;
++	event.vk = (uint16_t)vk;
++	event.scan = (uint16_t)(raw_scan & 0xFFu);
++	if ((flags & 1u) != 0)
++		event.scan |= 0x100u;
++	event.key_up = (flags & 0x80u) != 0;
++	event.origin = ErgoptiReplay_RawHookOrigin(vk, raw_scan, flags);
++	return event;
++}
++
++/** Literal real-modifier holds must survive each driver's synthetic UP. */
++static void TestRawSystemOriginDoesNotRetireUserHold(void)
++{
++	static const struct {
++		uint32_t vk;
++		uint32_t real_scan;
++		uint32_t synthetic_scan;
++		uint8_t effective_mask;
++	} cases[] = {
++		{0xA2, 0x1D, 0x21D, 0x04},
++		{0xA0, 0x2A, 0x22A, 0x10},
++		{0xA1, 0x36, 0x236, 0x20}
++	};
++	size_t i;
++	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i) {
++		ErgoptiReplay_State state, retained;
++		ErgoptiReplay_Snapshot snapshot;
++		ErgoptiReplay_Event event;
++		int32_t status;
++		Start(&state);
++		event = RawEdge(cases[i].vk, cases[i].real_scan, 0, 1);
++		assert(ErgoptiReplay_Step(&state, OWNER, &event, &snapshot) == ERGOPTI_REPLAY_OK);
++		assert(snapshot.modifiers_lr_after == cases[i].effective_mask);
++		retained = state;
++		event = RawEdge(cases[i].vk, cases[i].synthetic_scan, 0x80, 2);
++		/* These two raw identities really do collide after the old projection. */
++		assert(event.scan == cases[i].real_scan);
++		status = ErgoptiReplay_Step(&state, OWNER, &event, &snapshot);
++		/* Check the real state before status, so legacy code fails on actual
++		 * lost ownership rather than an absent new enum/API assertion. */
++		assert(memcmp(&retained, &state, sizeof(state)) == 0);
++		assert(status == ERGOPTI_REPLAY_UNSUPPORTED);
++		assert(snapshot.modifiers_lr_before == cases[i].effective_mask);
++		assert(snapshot.modifiers_lr_after == cases[i].effective_mask);
++		event = RawEdge(cases[i].vk, cases[i].synthetic_scan, 0, 3);
++		assert(ErgoptiReplay_Step(&state, OWNER, &event, &snapshot) == ERGOPTI_REPLAY_UNSUPPORTED);
++		assert(memcmp(&retained, &state, sizeof(state)) == 0);
++		event = RawEdge(cases[i].vk, cases[i].real_scan, 0x80, 4);
++		assert(ErgoptiReplay_Step(&state, OWNER, &event, &snapshot) == ERGOPTI_REPLAY_OK);
++		assert(snapshot.modifiers_lr_before == cases[i].effective_mask);
++		assert(snapshot.modifiers_lr_after == 0);
++	}
++	puts("PASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.");
++}
++
++/** Known injection and unmodeled raw bits never become physical recipes. */
++static void TestRawOriginDowngradesOnly(void)
++{
++	static const struct {
++		uint32_t vk, scan, flags;
++		uint8_t expected;
++	} cases[] = {
++		{0xA2, 0x1D, 0, ERGOPTI_REPLAY_PHYSICAL},
++		{0xA3, 0x1D, 1, ERGOPTI_REPLAY_PHYSICAL},
++		{0xA2, 0x21D, 0x10, ERGOPTI_REPLAY_EXTERNAL_INJECTION},
++		{0xA2, 0x21D, 0x12, ERGOPTI_REPLAY_LOWER_INTEGRITY},
++		{0xA2, 0x1D, 0x02, ERGOPTI_REPLAY_LOWER_INTEGRITY},
++		{0xA2, 0xE01D, 0, 5},
++		{0xA2, 0x1D, 0x80000000u, 5},
++		{0x1A2, 0x1D, 0, 5},
++		{0xA2, 0, 0, 5},
++		{0, 0x1D, 0, 5}
++	};
++	size_t i;
++	for (i = 0; i < sizeof(cases) / sizeof(cases[0]); ++i)
++		assert(ErgoptiReplay_RawHookOrigin(cases[i].vk, cases[i].scan, cases[i].flags) == cases[i].expected);
++	puts("PASS full raw scan/flag classification preserves injection refusal and conservative unknowns.");
++}
++
+ int main(void)
+ {
+ 	TestEventVectors();
+@@ -592,6 +678,8 @@
+ 	TestRecipeValidation();
+ 	TestSourceIdsAndDeadTransitions();
+ 	puts("Portable replay-route core tests passed: 8/8 matrices.");
++	TestRawSystemOriginDoesNotRetireUserHold();
++	TestRawOriginDowngradesOnly();
+ 	puts("Windows native registration, replay delivery and physical qualification remain untested.");
+ 	return 0;
+ }

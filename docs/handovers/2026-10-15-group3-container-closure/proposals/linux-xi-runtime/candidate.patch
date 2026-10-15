@@ -1,0 +1,712 @@
+diff --git a/static/ergopti_plus/_shared/data/linux_native_runtime.json b/static/ergopti_plus/_shared/data/linux_native_runtime.json
+--- a/static/ergopti_plus/_shared/data/linux_native_runtime.json
++++ b/static/ergopti_plus/_shared/data/linux_native_runtime.json
+@@ -57,6 +57,20 @@
+ 				"apk": "libx11"
+ 			},
+ 			"nix_package": "xorg.libX11"
++		},
++		"xi": {
++			"soname": "libXi.so.6",
++			"packages": {
++				"apt": "libxi6",
++				"dnf": "libXi",
++				"zypper": "libXi6",
++				"pacman": "libxi",
++				"xbps": "libXi",
++				"apk": "libxi"
++			},
++			"nix_package": "libxi",
++			"pkg_config": "xi",
++			"portable_dlopen_roots": ["libXi.so.6"]
+ 		}
+ 	},
+ 	"package_requirements": {
+diff --git a/static/ergopti_plus/linux/_generated/native_runtime.lua b/static/ergopti_plus/linux/_generated/native_runtime.lua
+--- a/static/ergopti_plus/linux/_generated/native_runtime.lua
++++ b/static/ergopti_plus/linux/_generated/native_runtime.lua
+@@ -7,6 +7,7 @@
+ 	xkbcommon_x11 = "libxkbcommon-x11.so.0",
+ 	x11 = "libX11.so.6",
+ 	x11_xcb = "libX11-xcb.so.1",
++	xi = "libXi.so.6",
+ 	network_runtime = {
+ 		libraries = {
+ 			gio = "libgio-2.0.so.0",
+diff --git a/static/ergopti_plus/linux/install.sh b/static/ergopti_plus/linux/install.sh
+--- a/static/ergopti_plus/linux/install.sh
++++ b/static/ergopti_plus/linux/install.sh
+@@ -266,26 +266,32 @@
+ 		apt:libxkbcommon-x11.so.0) echo "libxkbcommon-x11-0" ;;
+ 		apt:libX11.so.6) echo "libx11-6" ;;
+ 		apt:libX11-xcb.so.1) echo "libx11-xcb1" ;;
++		apt:libXi.so.6) echo "libxi6" ;;
+ 		dnf:libxkbcommon.so.0) echo "libxkbcommon" ;;
+ 		dnf:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+ 		dnf:libX11.so.6) echo "libX11" ;;
+ 		dnf:libX11-xcb.so.1) echo "libX11-xcb" ;;
++		dnf:libXi.so.6) echo "libXi" ;;
+ 		zypper:libxkbcommon.so.0) echo "libxkbcommon0" ;;
+ 		zypper:libxkbcommon-x11.so.0) echo "libxkbcommon-x11-0" ;;
+ 		zypper:libX11.so.6) echo "libX11-6" ;;
+ 		zypper:libX11-xcb.so.1) echo "libX11-xcb1" ;;
++		zypper:libXi.so.6) echo "libXi6" ;;
+ 		pacman:libxkbcommon.so.0) echo "libxkbcommon" ;;
+ 		pacman:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+ 		pacman:libX11.so.6) echo "libx11" ;;
+ 		pacman:libX11-xcb.so.1) echo "libx11" ;;
++		pacman:libXi.so.6) echo "libxi" ;;
+ 		xbps:libxkbcommon.so.0) echo "libxkbcommon" ;;
+ 		xbps:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+ 		xbps:libX11.so.6) echo "libX11" ;;
+ 		xbps:libX11-xcb.so.1) echo "libX11" ;;
++		xbps:libXi.so.6) echo "libXi" ;;
+ 		apk:libxkbcommon.so.0) echo "libxkbcommon" ;;
+ 		apk:libxkbcommon-x11.so.0) echo "libxkbcommon-x11" ;;
+ 		apk:libX11.so.6) echo "libx11" ;;
+ 		apk:libX11-xcb.so.1) echo "libx11" ;;
++		apk:libXi.so.6) echo "libxi" ;;
+ 		apt:curl) echo "curl" ;;
+ 		dnf:curl) echo "curl" ;;
+ 		zypper:curl) echo "curl" ;;
+@@ -564,6 +570,7 @@
+ _check_or_install_library libxkbcommon-x11.so.0
+ _check_or_install_library libX11.so.6
+ _check_or_install_library libX11-xcb.so.1
++_check_or_install_library libXi.so.6
+ _check_or_install curl
+ # END GENERATED LINUX NATIVE CAPABILITIES
+ 
+diff --git a/tools/build/PKGBUILD b/tools/build/PKGBUILD
+--- a/tools/build/PKGBUILD
++++ b/tools/build/PKGBUILD
+@@ -12,7 +12,7 @@
+ url="https://github.com/adrienm7/ergopti"
+ license=('MIT')
+ # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
+-depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'libxkbcommon-x11' 'libx11' 'glib-networking' 'gsettings-desktop-schemas' 'lua51-luv')
++depends=('luajit' 'xclip' 'libnotify' 'curl' 'libxkbcommon' 'at-spi2-core' 'libxkbcommon-x11' 'libx11' 'libxi' 'glib-networking' 'gsettings-desktop-schemas' 'lua51-luv')
+ # END GENERATED LINUX NATIVE REQUIREMENTS
+ optdepends=('lua-luv: async I/O for timers and HTTP'
+             'lua-filesystem: faster file discovery'
+diff --git a/tools/build/build-linux-deb.sh b/tools/build/build-linux-deb.sh
+--- a/tools/build/build-linux-deb.sh
++++ b/tools/build/build-linux-deb.sh
+@@ -159,7 +159,7 @@
+ Version: $VERSION
+ Architecture: $ARCH
+ Maintainer: Ergopti Contributors <ergopti@example.com>
+-Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, lua-luv, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libssl3t64 | libssl3
++Depends: luajit (>= 2.1), xclip, libnotify-bin, curl, libxkbcommon0, libxkbcommon-tools, at-spi2-core, pkexec, kmod, udev, libayatana-appindicator3-1, zenity, login, passwd, util-linux, lua-lgi, gir1.2-webkit2-4.1, glib-networking, gsettings-desktop-schemas, lua-luv, libxkbcommon-x11-0, libx11-6, libx11-xcb1, libxi6, libssl3t64 | libssl3
+ Recommends: lua-luv, lua-filesystem, openssl, xdotool, wl-clipboard
+ Section: utils
+ Priority: optional
+diff --git a/tools/build/build-linux-rpm.sh b/tools/build/build-linux-rpm.sh
+--- a/tools/build/build-linux-rpm.sh
++++ b/tools/build/build-linux-rpm.sh
+@@ -174,6 +174,7 @@
+ Requires:       libxkbcommon-x11
+ Requires:       libX11
+ Requires:       libX11-xcb
++Requires:       libXi
+ # END GENERATED LINUX NATIVE REQUIREMENTS
+ Recommends:     lua-luv
+ Recommends:     lua-filesystem
+diff --git a/tools/build/nix/flake.nix b/tools/build/nix/flake.nix
+--- a/tools/build/nix/flake.nix
++++ b/tools/build/nix/flake.nix
+@@ -85,7 +85,7 @@
+                 ])} \
+                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
+                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS
+-                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf openssl xorg.libX11
++                  libayatana-appindicator gtk3 glib libxkbcommon at-spi2-core glib-networking libproxy dconf openssl xorg.libX11 libxi
+                   # END GENERATED LINUX NATIVE REQUIREMENTS
+                 ])}
+ 
+diff --git a/tools/build/stage-linux-network-runtime.py b/tools/build/stage-linux-network-runtime.py
+--- a/tools/build/stage-linux-network-runtime.py
++++ b/tools/build/stage-linux-network-runtime.py
+@@ -720,6 +720,30 @@
+     return sources
+ 
+ 
++def explicit_xi_sources(catalogue):
++    """Resolve the direct Xi dlopen root from actual xi.pc and ELF metadata."""
++    libraries = catalogue.get("libraries")
++    descriptor = libraries.get("xi") if isinstance(libraries, dict) else None
++    if (
++        not isinstance(descriptor, dict)
++        or descriptor.get("soname") != "libXi.so.6"
++        or descriptor.get("pkg_config") != "xi"
++        or descriptor.get("portable_dlopen_roots") != ["libXi.so.6"]
++    ):
++        raise RuntimeRefused("Explicit Xi staging descriptor unavailable.")
++    # xi.pc selects the actual build library directory; no incidental curl or
++    # GTK dependency, hardcoded architecture directory or SONAME fallback.
++    directory = Path(run(["pkg-config", "--variable=libdir", "xi"]).strip())
++    if not directory.is_absolute():
++        raise RuntimeRefused("Actual Xi build library directory unavailable.")
++    source = regular_source(directory / descriptor["soname"])
++    observed = run(["readelf", "--dynamic", "--", str(source)], env={**os.environ, "LC_ALL": "C"})
++    identities = re.findall(r"\(SONAME\)[^\n]*Library soname: \[([^\]\n]+)\]", observed)
++    if identities != [descriptor["soname"]]:
++        raise RuntimeRefused("Actual Xi ELF SONAME refused.")
++    return [source]
++
++
+ def stage(appdir, catalogue, template):
+     global _STAGE_DEADLINE
+     _STAGE_DEADLINE = time.monotonic() + 180
+@@ -773,7 +797,14 @@
+             copy_unique(
+                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
+             )
+-        copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
++        xi_sources = explicit_xi_sources(catalogue_data)
++        for source in xi_sources:
++            copy_unique(
++                source, prefix / "lib" / catalogue_data["libraries"]["xi"]["soname"], owners
++            )
++        copy_elf_closure(
++            [*binaries, luv_source, *modules, *digest_sources, *xi_sources], prefix / "lib", owners
++        )
+         # 0.5's backend is linked and therefore relocatable through package lib.
+         # 0.4's separate runtime plugin search needs another qualification owner.
+         if not any(destination.name == "libpxbackend-1.0.so" for destination in owners):
+diff --git a/tools/codegen/codegen-linux-native-runtime.cjs b/tools/codegen/codegen-linux-native-runtime.cjs
+--- a/tools/codegen/codegen-linux-native-runtime.cjs
++++ b/tools/codegen/codegen-linux-native-runtime.cjs
+@@ -8,7 +8,7 @@
+ const SOURCE = 'static/ergopti_plus/_shared/data/linux_native_runtime.json';
+ const LUA_OUTPUT = 'static/ergopti_plus/linux/_generated/native_runtime.lua';
+ const MANAGERS = ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk'];
+-const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb'];
++const KEYS = ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb', 'xi'];
+ const NETWORK_KEYS = ['gio', 'gobject', 'glib'];
+ const LUV_CMAKE_OPTIONS = [
+ 	'-DLUA_BUILD_TYPE=System',
+@@ -32,7 +32,7 @@
+ 				throw new TypeError('Invalid source archive build package identity.');
+ 	}
+ 	if (data?.version !== 1 || Object.keys(data.libraries || {}).join(',') !== KEYS.join(','))
+-		throw new TypeError('Linux runtime catalogue requires its four ordered library identities.');
++		throw new TypeError('Linux runtime catalogue requires its five ordered library identities.');
+ 	for (const [key, library] of Object.entries(data.libraries)) {
+ 		if (!/^lib[A-Za-z0-9_-]+\.so\.[0-9]+$/.test(library.soname))
+ 			throw new TypeError(`Invalid runtime SONAME for ${key}.`);
+@@ -44,6 +44,17 @@
+ 		if (!/^[A-Za-z][A-Za-z0-9_.-]*$/.test(library.nix_package))
+ 			throw new TypeError(`Invalid Nix native package for ${key}.`);
+ 	}
++	const xi = data.libraries.xi;
++	if (
++		xi.soname !== 'libXi.so.6' ||
++		Object.values(xi.packages).join(',') !== 'libxi6,libXi,libXi6,libxi,libXi,libxi' ||
++		xi.nix_package !== 'libxi' ||
++		xi.pkg_config !== 'xi' ||
++		!Array.isArray(xi.portable_dlopen_roots) ||
++		xi.portable_dlopen_roots.length !== 1 ||
++		xi.portable_dlopen_roots[0] !== xi.soname
++	)
++		throw new TypeError('Missing or invalid explicit Xi runtime/staging identity.');
+ 	for (const name of ['deb', 'rpm', 'arch', 'nix_library_path']) {
+ 		const values = data.package_requirements?.[name];
+ 		if (!Array.isArray(values) || !values.length || new Set(values).size !== values.length)
+diff --git a/tools/test/fixtures/validation-curl/PINS.json b/tools/test/fixtures/validation-curl/PINS.json
+--- a/tools/test/fixtures/validation-curl/PINS.json
++++ b/tools/test/fixtures/validation-curl/PINS.json
+@@ -1,6 +1,6 @@
+ {
+ 	"schema_version": 1,
+-	"command_owner_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
++	"command_owner_sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5",
+ 	"modern": {
+ 		"authority": "official_upstream_github_release_asset_digest",
+ 		"api_url": "https://api.github.com/repos/curl/curl/releases/tags/curl-8_14_1",
+diff --git a/tools/test/test-linux-crypto-runtime.cjs b/tools/test/test-linux-crypto-runtime.cjs
+--- a/tools/test/test-linux-crypto-runtime.cjs
++++ b/tools/test/test-linux-crypto-runtime.cjs
+@@ -33,7 +33,8 @@
+ 	assert.deepEqual(data.archive_digest_runtime.portable_dlopen_roots, ['libcrypto.so.3']);
+ });
+ check('original identities/providers retained and Nix OpenSSL appears once', () => {
+-	assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
++	assert.deepEqual(generator.KEYS.slice(0, 4), ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
++	assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb', 'xi']);
+ 	assert.equal(data.network_runtime.providers.dnf, null);
+ 	assert.equal(data.network_runtime.providers.xbps, null);
+ 	assert.equal(
+diff --git a/tools/test/test-linux-launcher-deps.cjs b/tools/test/test-linux-launcher-deps.cjs
+--- a/tools/test/test-linux-launcher-deps.cjs
++++ b/tools/test/test-linux-launcher-deps.cjs
+@@ -185,6 +185,21 @@
+ 			errors.push(`the installer never admits the native capability ${soname}`);
+ 	}
+ }
++// Independent source-received Xi runtime packages; original four rows stay intact.
++const xiPackages = {
++	apt: 'libxi6',
++	dnf: 'libXi',
++	zypper: 'libXi6',
++	pacman: 'libxi',
++	xbps: 'libXi',
++	apk: 'libxi'
++};
++for (const [manager, expected] of Object.entries(xiPackages)) {
++	if (packageTable.get(`${manager}:libXi.so.6`) !== expected)
++		errors.push(`Xi runtime ${manager} must map to the independently received ${expected}`);
++}
++if (!installerCode.includes('_check_or_install_library libXi.so.6\n'))
++	errors.push('the installer never admits the declared Xi runtime capability');
+ if (packageRows.length !== packageTable.size) {
+ 	errors.push('the required dependency table contains a duplicate manager/capability row');
+ }
+@@ -320,7 +335,7 @@
+ 		);
+ 		fs.chmodSync(path.join(nativeFixture, 'luajit'), 0o755);
+ 		for (const manager of packageManagers) {
+-			for (const [index, soname] of nativeSonames.entries()) {
++			for (const [index, soname] of [...nativeSonames, 'libXi.so.6'].entries()) {
+ 				for (const provide of [false, true]) {
+ 					const present = path.join(nativeFixture, 'present');
+ 					const log = path.join(nativeFixture, 'probes');
+@@ -335,7 +350,10 @@
+ 						env: {
+ 							...process.env,
+ 							PATH: toPosix(nativeFixture),
+-							ERGOPTI_EXPECTED_PACKAGE: nativePackages[manager][index],
++							ERGOPTI_EXPECTED_PACKAGE:
++								index === nativeSonames.length
++									? xiPackages[manager]
++									: nativePackages[manager][index],
+ 							ERGOPTI_EXPECTED_SONAME: soname,
+ 							ERGOPTI_FAKE_PRESENT: toPosix(present),
+ 							ERGOPTI_PROBE_LOG: toPosix(log),
+@@ -541,6 +559,20 @@
+ 			if (!actual.includes(pkg))
+ 				errors.push(`${format} metadata does not require native package ${pkg}`);
+ 	}
++	for (const [format, expected] of [
++		['deb', 'libxi6'],
++		['rpm', 'libXi'],
++		['arch', 'libxi'],
++		['nix_library_path', 'libxi']
++	]) {
++		if (
++			nativeRuntimeGenerator.requirements(data, format).filter((pkg) => pkg === expected).length !==
++			1
++		)
++			errors.push(`${format} must expose exactly one independently received Xi runtime package`);
++	}
++	if (!nixLibraryPath.includes('libxi'))
++		errors.push('Nix does not expose the current libxi runtime');
+ 	if (!nixLibraryPath.includes('xorg.libX11'))
+ 		errors.push('Nix does not expose both native X11 libraries through LD_LIBRARY_PATH');
+ 	const changed = structuredClone(data);
+@@ -606,5 +638,5 @@
+ console.log(
+ 	`\x1b[32m[OK] launcher hard-requires ${launcherDeps.length} command(s), all installed by install.sh; ` +
+ 		`${referenced.length} exported LUA_PATH root(s) resolve to real directories; ` +
+-		`4 package recipe(s) hard-provide live XKB; 24 native mappings and 48 library admission trials pass.\x1b[0m`
++		`4 package recipe(s) hard-provide live XKB; 30 native mappings and 60 library admission trials pass (original 24/48 retained).\x1b[0m`
+ );
+diff --git a/tools/test/test-linux-network-runtime.cjs b/tools/test/test-linux-network-runtime.cjs
+--- a/tools/test/test-linux-network-runtime.cjs
++++ b/tools/test/test-linux-network-runtime.cjs
+@@ -288,7 +288,8 @@
+ 		}
+ 	);
+ 	check('original library identities and all historical package requirements survive', () => {
+-		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
++		assert.deepEqual(generator.KEYS.slice(0, 4), ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb']);
++		assert.deepEqual(generator.KEYS, ['xkbcommon', 'xkbcommon_x11', 'x11', 'x11_xcb', 'xi']);
+ 		for (const [format, old] of Object.entries({
+ 			deb: ['luajit (>= 2.1)', 'xclip', 'libnotify-bin', 'curl', 'at-spi2-core'],
+ 			rpm: ['luajit >= 2.1', 'xclip', 'libnotify', 'curl', 'at-spi2-core'],
+@@ -299,6 +300,71 @@
+ 				assert.ok(generator.requirements(source, format).includes(requirement));
+ 		}
+ 	});
++	check('independent Xi runtime providers and direct staging metadata are explicit', () => {
++		assert.deepEqual(source.libraries.xi, {
++			soname: 'libXi.so.6',
++			packages: {
++				apt: 'libxi6',
++				dnf: 'libXi',
++				zypper: 'libXi6',
++				pacman: 'libxi',
++				xbps: 'libXi',
++				apk: 'libxi'
++			},
++			nix_package: 'libxi',
++			pkg_config: 'xi',
++			portable_dlopen_roots: ['libXi.so.6']
++		});
++		for (const [format, expected] of [
++			['deb', 'libxi6'],
++			['rpm', 'libXi'],
++			['arch', 'libxi'],
++			['nix_library_path', 'libxi']
++		])
++			assert.equal(
++				generator.requirements(source, format).filter((pkg) => pkg === expected).length,
++				1
++			);
++		assert.match(outputs[generator.LUA_OUTPUT], /\txi = "libXi\.so\.6",/);
++	});
++	for (const [name, mutate] of [
++		['missing Xi', (data) => delete data.libraries.xi],
++		[
++			'wrong Xi order',
++			(data) => {
++				const xi = data.libraries.xi;
++				delete data.libraries.xi;
++				data.libraries = { xi, ...data.libraries };
++			}
++		],
++		['wrong Xi SONAME', (data) => (data.libraries.xi.soname = 'libXi.so.7')],
++		['missing Xi provider', (data) => delete data.libraries.xi.packages.apk],
++		['invented Xi provider', (data) => (data.libraries.xi.packages.dnf = 'invented-Xi')],
++		['deprecated Xi Nix namespace', (data) => (data.libraries.xi.nix_package = 'xorg.libXi')],
++		['missing Xi pkg-config', (data) => delete data.libraries.xi.pkg_config],
++		['foreign Xi pkg-config', (data) => (data.libraries.xi.pkg_config = 'x11')],
++		['missing Xi roots', (data) => delete data.libraries.xi.portable_dlopen_roots],
++		['empty Xi roots', (data) => (data.libraries.xi.portable_dlopen_roots = [])],
++		[
++			'duplicate Xi roots',
++			(data) => (data.libraries.xi.portable_dlopen_roots = ['libXi.so.6', 'libXi.so.6'])
++		],
++		['wrong Xi root', (data) => (data.libraries.xi.portable_dlopen_roots = ['libXi.so.7'])]
++	])
++		check(name + ' refuses before any projection read', () => {
++			const invalid = structuredClone(source);
++			mutate(invalid);
++			let reads = 0;
++			assert.throws(
++				() =>
++					generator.render(invalid, () => {
++						reads++;
++						return '';
++					}),
++				TypeError
++			);
++			assert.equal(reads, 0);
++		});
+ 	check('independent provider inventory rejects fabricated Void and unsupported providers', () => {
+ 		assert.deepEqual(source.network_runtime.providers, {
+ 			apt: ['glib-networking', 'gsettings-desktop-schemas', 'lua-luv'],
+diff --git a/tools/test/test-linux-portable-network-runtime.cjs b/tools/test/test-linux-portable-network-runtime.cjs
+--- a/tools/test/test-linux-portable-network-runtime.cjs
++++ b/tools/test/test-linux-portable-network-runtime.cjs
+@@ -11,6 +11,7 @@
+ const root = path.resolve(__dirname, '../..');
+ const generator = require('../codegen/codegen-linux-native-runtime.cjs');
+ const catalogue = JSON.parse(fs.readFileSync(path.join(root, generator.SOURCE), 'utf8'));
++const Pipeline = require('./ci-pipeline.cjs');
+ const environmentTemplate = 'tools/build/templates/linux-portable-runtime-env.sh';
+ const source = (name) => fs.readFileSync(path.join(root, name), 'utf8');
+ // Keep native producer diagnostics private. The original assertion remains
+@@ -103,8 +104,48 @@
+ 	'/usr/local/share/certs/ca-root-nss.crt',
+ 	'/etc/ssl/cert.pem'
+ ]);
+-assert.equal(Object.keys(catalogue.libraries).join(','), 'xkbcommon,xkbcommon_x11,x11,x11_xcb');
++assert.equal(
++	Object.keys(catalogue.libraries).slice(0, 4).join(','),
++	'xkbcommon,xkbcommon_x11,x11,x11_xcb'
++);
++assert.equal(Object.keys(catalogue.libraries).join(','), 'xkbcommon,xkbcommon_x11,x11,x11_xcb,xi');
++assert.deepEqual(catalogue.libraries.xi, {
++	soname: 'libXi.so.6',
++	packages: {
++		apt: 'libxi6',
++		dnf: 'libXi',
++		zypper: 'libXi6',
++		pacman: 'libxi',
++		xbps: 'libXi',
++		apk: 'libxi'
++	},
++	nix_package: 'libxi',
++	pkg_config: 'xi',
++	portable_dlopen_roots: ['libXi.so.6']
++});
+ passed++;
++// xi.pc is a build-host prerequisite in each actual receiving job, separately
++// from the E2E diagnostic's installed library and end-user runtime packages.
++const pipeline = Pipeline.open(root);
++for (const [job, stepName] of [
++	['e2e-linux', 'Install portable network staging prerequisites'],
++	['package-linux', 'Install LuaJIT']
++]) {
++	const run = Pipeline.runOf(Pipeline.step(pipeline.job(job), stepName)).join('\n');
++	const calls = run
++		.replace(/\\\n/g, ' ')
++		.split('\n')
++		.filter((line) =>
++			line.trim().startsWith('sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y ')
++		);
++	assert.equal(calls.length, 1, `Expected one original APT prerequisite owner in ${job}`);
++	assert.equal(
++		calls[0].split(/\s+/).filter((word) => word === 'libxi-dev').length,
++		1,
++		`${job} must install the build metadata carrying xi.pc exactly once`
++	);
++	passed++;
++}
+ const allModules = generator
+ 	.flatpakModules(catalogue)
+ 	.split('\n')
+@@ -732,15 +773,15 @@
+ class BoundaryReached(Exception):pass
+ with tempfile.TemporaryDirectory(prefix='ergopti-gio-metadata-') as temporary:
+  root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
+- for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']:(sources/name).write_bytes(b'independent query control only')
++ for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3','libXi.so.6']:(sources/name).write_bytes(b'independent query control only')
+  schema=root/'runtime schemas';schema.mkdir();(schema/'gschemas.compiled').write_bytes(b'independent schema acquisition control only')
+- catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}}))
++ catalogue=root/'catalogue.json';catalogue.write_text(json.dumps({'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']},'libraries':{'xi':{'soname':'libXi.so.6','pkg_config':'xi','portable_dlopen_roots':['libXi.so.6']}}}))
+  real_uname=m.os.uname;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64')
+  m.shutil.which=lambda name:str(sources/name)
+  try:
+   for index,value in enumerate([str(schema),'','relative/untrusted-schemas']):
+    appdir=root/('package'+str(index));driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True);(driver/'platform/network/runtime_probe.lua').write_bytes(b'no execution in query witness')
+-   queries=[];copies=[];closure=[];crypto_queries=[]
++   queries=[];copies=[];closure=[];crypto_queries=[];xi_queries=[];copy_owners=[]
+    def controlled_run(arguments,**options):
+     if arguments[0]==str(sources/'luajit'):return str(sources/'luv.so')
+     # Separate explicit crypto command-contract model; dummy bytes/SONAME output
+@@ -751,15 +792,24 @@
+      assert options['env']['LC_ALL']=='C','Explicit SONAME observation must use fixed locale'
+      crypto_queries.append(arguments)
+      return ' 0x000000000000000e (SONAME) Library soname: [libcrypto.so.3]\\n'
++    if arguments==['pkg-config','--variable=libdir','xi']:
++     xi_queries.append(arguments);return str(sources)
++    if arguments==['readelf','--dynamic','--',str(sources/'libXi.so.6')]:
++     assert options['env']['LC_ALL']=='C','Explicit Xi SONAME requires fixed locale'
++     xi_queries.append(arguments);return ' (SONAME) Library soname: [libXi.so.6]\\n'
+     assert arguments[0]=='pkg-config' and len(arguments)==3,'Unexpected native command or schema factory'
+     queries.append(arguments)
+     if arguments==['pkg-config','--variable=giomoduledir','gio-2.0']:return str(sources)
+     assert arguments==['pkg-config','--variable=schemasdir','gio-2.0'],'Desktop development metadata must not be required'
+     return value
+    def boundary(*arguments):
+-    assert [pathlib.Path(item) for item in arguments[0]]==[sources/name for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the unchanged closure seeds'
++    assert [pathlib.Path(item) for item in arguments[0][:7]]==[sources/name for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3']],'Explicit crypto source must join the unchanged closure seeds'
++    assert pathlib.Path(arguments[0][-1])==sources/'libXi.so.6','Explicit Xi root must seed the same ELF closure after all original sources'
++    assert copy_owners and all(owner is arguments[2] for owner in copy_owners),'Xi must share the original copy/closure owner'
+     closure.append(True);raise BoundaryReached()
+-   m.run=controlled_run;m.copy_unique=lambda source,destination,owners:copies.append((pathlib.Path(source),pathlib.Path(destination)));m.copy_elf_closure=boundary
++   def observed_copy(source,destination,owners):
++    copies.append((pathlib.Path(source),pathlib.Path(destination)));copy_owners.append(owners)
++   m.run=controlled_run;m.copy_unique=observed_copy;m.copy_elf_closure=boundary
+    try:m.stage(str(appdir),str(catalogue),'unused owned template')
+    except BoundaryReached:assert index==0
+    except m.RuntimeRefused as refusal:
+@@ -772,6 +822,9 @@
+    assert crypto_queries==([['pkg-config','--variable=libdir','libcrypto'],['readelf','--dynamic','--',str(sources/'libcrypto.so.3')]] if index==0 else [])
+    crypto_copies=[source for source,destination in copies if destination.name=='libcrypto.so.3']
+    assert crypto_copies==([sources/'libcrypto.so.3'] if index==0 else [])
++   assert xi_queries==([['pkg-config','--variable=libdir','xi'],['readelf','--dynamic','--',str(sources/'libXi.so.6')]] if index==0 else [])
++   xi_copies=[source for source,destination in copies if destination.name=='libXi.so.6']
++   assert xi_copies==([sources/'libXi.so.6'] if index==0 else [])
+    assert closure==([True] if index==0 else []) and m._DESTINATION_ROOT is None
+  finally:m.os.uname=real_uname
+ with tempfile.TemporaryDirectory(prefix='ergopti-gio-cache-tool-') as temporary:
+@@ -1077,6 +1130,196 @@
+ 	console.log('PPID owner/view controls: 12 passed; 0 skipped.');
+ }
+ 
++// These actual stager/filesystem controls use independent command replies and
++// ordinary sample files; they grant no installed ELF, library or native credit.
++if (process.platform === 'linux') {
++	const xiControls = spawnSync(
++		'python3',
++		[
++			'-B',
++			'-c',
++			String.raw`
++import copy,importlib.util,json,pathlib,sys,tempfile,types
++spec=importlib.util.spec_from_file_location('owned_xi_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
++passed=0
++with tempfile.TemporaryDirectory(prefix='ergopti-xi-staging-') as temporary:
++ root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
++ for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3','libXi.so.6','libX11.so.6','libxcb.so.1']:
++  (sources/name).write_bytes(('independent controlled bytes '+name).encode())
++ schema=sources/'gschemas.compiled';schema.write_bytes(b'independent schema bytes')
++ descriptor={'soname':'libXi.so.6','pkg_config':'xi','portable_dlopen_roots':['libXi.so.6']}
++ valid={'libraries':{'xi':descriptor}}
++ real_run=m.run;real_closure=m.copy_elf_closure;real_uname=m.os.uname;real_which=m.shutil.which
++ def check(name,body):
++  global passed
++  body();passed+=1;print('PASS controlled Xi '+name)
++ def resolve(data,directory=str(sources),elf=' (SONAME) Library soname: [libXi.so.6]\n',failed=None):
++  calls=[]
++  def command(arguments,**options):
++   calls.append(arguments)
++   if arguments==['pkg-config','--variable=libdir','xi']:
++    if failed=='pkg-config':raise m.RuntimeRefused('Controlled Xi metadata refused.')
++    return directory
++   assert arguments==['readelf','--dynamic','--',str((pathlib.Path(directory)/'libXi.so.6').resolve())]
++   assert options['env']['LC_ALL']=='C'
++   if failed=='readelf':raise m.RuntimeRefused('Controlled Xi inspection refused.')
++   return elf
++  m.run=command
++  try:observed=m.explicit_xi_sources(data)
++  finally:m.run=real_run
++  assert calls==[['pkg-config','--variable=libdir','xi'],['readelf','--dynamic','--',str(sources/'libXi.so.6')]]
++  assert observed==[sources/'libXi.so.6']
++ def refuses(data,**options):
++  try:resolve(data,**options)
++  except (m.RuntimeRefused,OSError):return
++  raise AssertionError('Malformed or unavailable Xi source was admitted')
++ check('actual resolver positive',lambda:resolve(valid))
++ variants=[
++  ('missing libraries',{}),('malformed libraries',{'libraries':[]}),
++  ('missing descriptor',{'libraries':{}}),('nonmapping descriptor',{'libraries':{'xi':[]}}),
++ ]
++ for name,key,value in [
++  ('wrong SONAME','soname','libXi.so.7'),('missing pkg-config','pkg_config',None),
++  ('foreign pkg-config','pkg_config','x11'),('missing roots','portable_dlopen_roots',None),
++  ('empty roots','portable_dlopen_roots',[]),('duplicate roots','portable_dlopen_roots',['libXi.so.6','libXi.so.6']),
++  ('wrong root','portable_dlopen_roots',['libXi.so.7'])
++ ]:
++  data=copy.deepcopy(valid)
++  if value is None:del data['libraries']['xi'][key]
++  else:data['libraries']['xi'][key]=value
++  variants.append((name,data))
++ for name,data in variants:check(name,lambda data=data:refuses(data))
++ for name,options in [
++  ('empty libdir',{'directory':''}),('relative libdir',{'directory':'relative/lib'}),
++  ('missing regular source',{'directory':str(root/'missing')}),
++  ('missing ELF SONAME',{'elf':''}),('wrong ELF SONAME',{'elf':' (SONAME) Library soname: [libXi.so.7]\n'}),
++  ('duplicate ELF SONAME',{'elf':' (SONAME) Library soname: [libXi.so.6]\n (SONAME) Library soname: [libXi.so.6]\n'}),
++  ('pkg-config refusal',{'failed':'pkg-config'}),('readelf refusal',{'failed':'readelf'})
++ ]:check(name,lambda options=options:refuses(valid,**options))
++ nonregular=root/'nonregular';nonregular.mkdir();(nonregular/'libXi.so.6').mkdir()
++ check('nonregular source',lambda:refuses(valid,directory=str(nonregular)))
++ class BoundaryReached(Exception):pass
++ def actual_stage():
++  appdir=root/'actual-stage';driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True)
++  (driver/'platform/network/runtime_probe.lua').write_bytes(b'never executed by controlled stage')
++  catalogue=root/'stage-catalogue.json';catalogue.write_text(json.dumps({
++   'libraries':{'xi':descriptor},'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},
++   'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}
++  }))
++  commands=[];received=[]
++  def command(arguments,**options):
++   commands.append(arguments)
++   if arguments[0]==str(sources/'luajit'):return str(sources/'luv.so')
++   if arguments in [['pkg-config','--variable=libdir','libcrypto'],['pkg-config','--variable=libdir','xi'],['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]:return str(sources)
++   if arguments[0]=='readelf':
++    assert options['env']['LC_ALL']=='C'
++    assert arguments in [['readelf','--dynamic','--',str(sources/'libcrypto.so.3')],['readelf','--dynamic','--',str(sources/'libXi.so.6')]]
++    return ' (SONAME) Library soname: ['+pathlib.Path(arguments[-1]).name+']\n'
++   assert arguments[0]=='ldd' and len(arguments)==2
++   if arguments[1]==str(sources/'libXi.so.6'):
++    return 'libX11.so.6 => '+str(sources/'libX11.so.6')+' (0x1)\nlibc.so.6 => /controlled-external/libc.so.6 (0x2)\n'
++   if arguments[1]==str(sources/'libX11.so.6'):
++    return 'libxcb.so.1 => '+str(sources/'libxcb.so.1')+' (0x3)\n'
++   return ''
++  def closure(seeds,directory,owners):
++   assert seeds==[str(sources/'luajit'),str(sources/'curl'),*[sources/name for name in ['luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3','libXi.so.6']]]
++   xi=directory/'libXi.so.6'
++   assert xi in owners and owners[xi]['complete'],'Explicit Xi root was not copied by the original owner before closure'
++   before=owners[xi]
++   real_closure(seeds,directory,owners)
++   assert owners[xi] is before
++   for name in ['libXi.so.6','libX11.so.6','libxcb.so.1']:
++    assert owners[directory/name]['complete']
++    assert (directory/name).read_bytes()==(sources/name).read_bytes()
++   assert directory/'libc.so.6' not in owners
++   assert ['ldd',str(sources/'libXi.so.6')] in commands and ['ldd',str(sources/'libX11.so.6')] in commands
++   received.append(True);raise BoundaryReached()
++  m.run=command;m.copy_elf_closure=closure;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64');m.shutil.which=lambda name:str(sources/name)
++  try:
++   try:m.stage(str(appdir),str(catalogue),'unused template')
++   except BoundaryReached:pass
++   else:raise AssertionError('Controlled boundary was not reached')
++  finally:m.run=real_run;m.copy_elf_closure=real_closure;m.os.uname=real_uname;m.shutil.which=real_which
++  assert received==[True] and m._DESTINATION_ROOT is None
++ check('same owner explicit root and transitive closure',actual_stage)
++ def repeat_copy():
++  appdir=root/'repeat-copy';appdir.mkdir()
++  with m.owned_root(appdir):
++   directory=m.destination_directory(appdir/'usr/lib');destination=directory/'libXi.so.6';owners={}
++   m.copy_unique(sources/'libXi.so.6',destination,owners)
++   original=owners[destination];identity=destination.stat()
++   m.copy_unique(sources/'libXi.so.6',destination,owners)
++   current=destination.stat()
++   assert owners[destination] is original and original['complete']
++   assert (current.st_dev,current.st_ino)==(identity.st_dev,identity.st_ino)
++   assert destination.read_bytes()==(sources/'libXi.so.6').read_bytes()
++  assert m._DESTINATION_ROOT is None
++ check('same original root copy idempotence',repeat_copy)
++ def copy_conflict():
++  appdir=root/'copy-conflict';appdir.mkdir()
++  with m.owned_root(appdir):
++   directory=m.destination_directory(appdir/'usr/lib');owners={};destination=directory/'libXi.so.6'
++   m.copy_unique(sources/'libXi.so.6',destination,owners)
++   retained=destination.read_bytes();other=root/'other-Xi';other.write_bytes(b'foreign independent replacement')
++   try:m.copy_unique(other,destination,owners)
++   except m.RuntimeRefused:pass
++   else:raise AssertionError('Conflicting Xi destination admitted')
++   assert destination.read_bytes()==retained and owners[destination]['complete']
++  assert m._DESTINATION_ROOT is None
++ check('conflicting copied Xi root',copy_conflict)
++ def copy_write_refusal():
++  appdir=root/'copy-write-refusal';appdir.mkdir();real_open=m.os.open;real_write=m.os.write;outputs=[]
++  def observed_open(*args,**options):
++   fd=real_open(*args,**options)
++   if args[1]&m.os.O_WRONLY:outputs.append(fd)
++   return fd
++  def refused_write(fd,block):raise m.RuntimeRefused('Controlled Xi output refused.')
++  with m.owned_root(appdir):
++   directory=m.destination_directory(appdir/'usr/lib');destination=directory/'libXi.so.6';owners={}
++   m.os.open=observed_open;m.os.write=refused_write
++   try:
++    try:m.copy_unique(sources/'libXi.so.6',destination,owners)
++    except m.RuntimeRefused as refusal:assert str(refusal)=='Controlled Xi output refused.'
++    else:raise AssertionError('Refused Xi write was admitted')
++   finally:m.os.open=real_open;m.os.write=real_write
++   assert len(outputs)==1 and not owners[destination]['complete']
++   try:m.os.fstat(outputs[0])
++   except OSError:pass
++   else:raise AssertionError('Xi output descriptor was not retired')
++  assert m._DESTINATION_ROOT is None
++ check('refused root write and actual descriptor retirement',copy_write_refusal)
++assert passed==25
++print('Controlled Xi staging: 25 passed; 0 skipped; installed/native ABI unqualified.')
++`,
++			path.join(root, 'tools/build/stage-linux-network-runtime.py')
++		],
++		{
++			cwd: '/',
++			encoding: 'utf8',
++			timeout: 20000,
++			env: { ...process.env, PYTHONDONTWRITEBYTECODE: '1' }
++		}
++	);
++	assert.ifError(xiControls.error);
++	assert.equal(xiControls.signal, null);
++	assert.equal(
++		xiControls.status,
++		0,
++		'Controlled Xi source/copy/closure refused: ' + xiControls.stderr
++	);
++	assert.equal(xiControls.stderr, '');
++	assert.equal(
++		xiControls.stdout.split('\n').filter((line) => line.startsWith('PASS controlled Xi ')).length,
++		25
++	);
++	assert.ok(
++		xiControls.stdout.endsWith(
++			'Controlled Xi staging: 25 passed; 0 skipped; installed/native ABI unqualified.\n'
++		)
++	);
++	process.stdout.write(xiControls.stdout);
++}
++
+ if (process.argv.includes('--native')) {
+ 	assert.equal(process.platform, 'linux', 'Native package qualification requires Linux');
+ 	const appdir = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-appdir-'));

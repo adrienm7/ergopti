@@ -1,0 +1,26 @@
+PASS controlled Xi actual resolver positive
+PASS controlled Xi missing libraries
+PASS controlled Xi malformed libraries
+PASS controlled Xi missing descriptor
+PASS controlled Xi nonmapping descriptor
+PASS controlled Xi wrong SONAME
+PASS controlled Xi missing pkg-config
+PASS controlled Xi foreign pkg-config
+PASS controlled Xi missing roots
+PASS controlled Xi empty roots
+PASS controlled Xi duplicate roots
+PASS controlled Xi wrong root
+PASS controlled Xi empty libdir
+PASS controlled Xi relative libdir
+PASS controlled Xi missing regular source
+PASS controlled Xi missing ELF SONAME
+PASS controlled Xi wrong ELF SONAME
+PASS controlled Xi duplicate ELF SONAME
+PASS controlled Xi pkg-config refusal
+PASS controlled Xi readelf refusal
+PASS controlled Xi nonregular source
+PASS controlled Xi same owner explicit root and transitive closure
+PASS controlled Xi same original root copy idempotence
+PASS controlled Xi conflicting copied Xi root
+PASS controlled Xi refused root write and actual descriptor retirement
+Controlled Xi staging: 25 passed; 0 skipped; installed/native ABI unqualified.

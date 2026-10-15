@@ -2,7 +2,7 @@
 'use strict';
 
 /** Constructed transcript and actual CLI controls; native Darwin remains unexecuted. */
-module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) {
+module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER, PAC_STEP_GUARD }) {
 	const assert = require('node:assert/strict');
 	const fs = require('node:fs');
 	const os = require('node:os');
@@ -14,6 +14,7 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	const classes = ['ManagedHTTPWorkerTests', 'ManagedHTTPWireTests', 'ManagedHTTPWPADWireTests'];
 	const counts = [12, 1, 1];
 	let passed = 0;
+	const stageSource = require('./fixtures/macos-stage-source.cjs');
 	const check = (label, action) => {
 		action();
 		passed++;
@@ -321,17 +322,13 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 	check('exact-selector-admitted', () => assert.ok(admitNativePacSelector(workflow)));
 	for (const [label, token, replacement] of [
 		['wrong-filter', PAC_FILTER, "--filter 'ManagedHTTPWorkerTests'"],
-		['foreign-job', '  managed-ollama-native:\n', '  unrelated-native:\n'],
+		['foreign-job', '  e2e-hs:\n', '  unrelated-native:\n'],
 		[
 			'foreign-step',
 			'      - name: Qualify actual native PAC and WPAD XCTest controls\n',
 			'      - name: Foreign controls\n'
 		],
-		[
-			'implicit-success-gate',
-			'      - name: Qualify actual native PAC and WPAD XCTest controls\n        if: ${{ !cancelled() }}\n',
-			'      - name: Qualify actual native PAC and WPAD XCTest controls\n'
-		],
+		['implicit-success-gate', PAC_STEP_GUARD, PAC_STEP_GUARD.replace(/        if: [^\n]+\n/, '')],
 		[
 			'forgiven-step',
 			'      - name: Qualify actual native PAC and WPAD XCTest controls\n',
@@ -409,9 +406,9 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER }) 
 		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
 	);
 };
-// A normal suite entry executes the complete owning source guard, which invokes
-// this module after defining its exact selector. There is no import-only waiver.
-if (require.main === module) require('./test-macos-dev-qualification-deferral.cjs');
+// The standalone CLI executes its exported owner with the shared exact selector.
+if (require.main === module)
+	module.exports(require('./test-macos-dev-qualification-deferral.cjs').pacContext());
 
 /** Independently discovered Worker12 remains mandatory under the exact v1.0.1 scope. */
 function stableV101PacCollectorControls(repository) {

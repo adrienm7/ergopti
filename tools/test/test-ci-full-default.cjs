@@ -11,6 +11,8 @@ const Full = require('./ci-full-default.cjs');
 const Raw = require('./ci-pipeline.cjs');
 const Policy = require('../ci/dev-release-qualification.cjs');
 const Scoped = require('./fixtures/ci-scoped-full-branches.cjs');
+const macRole = require('./fixtures/macos-stage-source.cjs');
+const Publication = require('../ci/publication-plan.cjs');
 const source = Raw.files();
 const MAC = '.github/workflows/ci-macos.yml';
 const ENTRY = '.github/workflows/ci.yml';
@@ -27,7 +29,7 @@ function changed(rel, before, after) {
 	});
 }
 function assertNativeHTTPClockWorkflow(workflow, expected) {
-	const job = workflow.jobs['managed-ollama-native'];
+	const job = workflow.jobs['e2e-hs'];
 	assert.ok(job && Array.isArray(job.steps), 'Actual managed native clock owner must exist.');
 	const owners = job.steps.filter(
 		(step) => step.name === 'Receive actual independent managed HTTP native clients'
@@ -42,7 +44,23 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 	const index = job.steps.indexOf(owners[0]);
 	assert.deepEqual(
 		job.steps.slice(index, index + 2),
-		expected.jobs['managed-ollama-native'].steps,
+		expected.jobs['managed-ollama-native'].steps.map((step) =>
+			macRole.metadata(
+				{
+					...step,
+					if: macRole.condition('managed-ollama-native', step.if),
+					env: {
+						GOTOOLCHAIN: 'local',
+						ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}",
+						ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}',
+						ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}',
+						ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}',
+						ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ matrix.architecture }}'
+					}
+				},
+				'managed-ollama-native'
+			)
+		),
 		'Actual two clock steps must equal the fixed reviewed producer input.'
 	);
 	assert.equal(
@@ -58,6 +76,7 @@ function assertNativeHTTPClockWorkflow(workflow, expected) {
 		[
 			{
 				name: 'Receive actual managed HTTP native clients',
+				if: macRole.condition('package-macos'),
 				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
 				'timeout-minutes': 5
 			}
@@ -96,7 +115,7 @@ for (const [name, before, after] of [
 	],
 	[
 		'clock deferred artifact must remain skipped',
-		"        if: ${{ always() && steps.native_http_clock.outputs.clock_expected == 'true' }}\n",
+		"        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}\n",
 		'        if: always()\n'
 	],
 	[
@@ -106,8 +125,8 @@ for (const [name, before, after] of [
 	],
 	[
 		'clock artifact attempt binding',
-		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
-		'          name: native-http-clock-${{ matrix.architecture }}-${{ github.run_id }}\n'
+		'          name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}\n',
+		'          name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}\n'
 	],
 	[
 		'clock capture status remains independently fatal',
@@ -121,8 +140,8 @@ for (const [name, before, after] of [
 	],
 	[
 		'Package first-two commands remain outside duplicate wire deferral',
-		'      - name: Receive actual managed HTTP native clients\n        run: |\n          set -euo pipefail\n          status=0\n          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
-		'      - name: Receive actual managed HTTP native clients\n        run: |\n          set -euo pipefail\n          status=0\n          true omitted_package_owned_process\n'
+		'      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == \'success\' }}\n        run: |\n          set -euo pipefail\n          status=0\n          "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n',
+		"      - name: Receive actual managed HTTP native clients\n        if: ${{ steps.stage-admission.outcome == 'success' }}\n        run: |\n          set -euo pipefail\n          status=0\n          true omitted_package_owned_process\n"
 	]
 ]) {
 	check(name + ' is refused by actual live equality', () => {
@@ -154,11 +173,16 @@ check('profile wrapper retains the original immutable full clock body byte for b
 			return line.slice(4);
 		})
 		.join('\n');
-	const full = Scoped.unwrap(profile.trimEnd(), Scoped.contract.protocols[2]) + '\n';
+	const full =
+		Scoped.unwrap(
+			macRole.metadata(profile.trimEnd(), 'managed-ollama-native'),
+			Scoped.contract.protocols[2]
+		) + '\n';
+	const expectedBody = macRole.metadata(originalBody, 'managed-ollama-native');
 	assert.equal(
 		full,
-		originalBody,
-		'profile publication cannot rewrite the reviewed full clock body'
+		expectedBody,
+		'profile publication retains every reviewed clock byte after metadata projection'
 	);
 	assert.notEqual(full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'), full);
 	assert.notEqual(full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true'), full);
@@ -166,7 +190,7 @@ check('profile wrapper retains the original immutable full clock body byte for b
 		full.replace('client_status=("${PIPESTATUS[@]}")', 'client_status=(0 0)'),
 		full.replace('if [ "$clock_status" -ne 0 ]; then status=1; fi', 'true')
 	])
-		assert.throws(() => assert.equal(mutant, originalBody));
+		assert.throws(() => assert.equal(mutant, expectedBody));
 });
 check('raw loader and full view retain every exact source byte', () => {
 	const view = Full.fromFiles(source);
@@ -184,7 +208,8 @@ check('raw loader and full view retain every exact source byte', () => {
 	);
 	assert.deepEqual(view.calls(), Raw.calls());
 	assert.equal(Raw.field(Raw.job('core'), 'if'), null);
-	assert.equal(Raw.field(Raw.job('tooltip-canvas'), 'if'), null);
+	assert.equal(Raw.field(Raw.job('shared-validation'), 'if'), null);
+	assert.equal(Raw.field(Raw.job('e2e-hs'), 'if'), null);
 });
 check('every scoped full body remains owned; all other product scripts remain exact', () => {
 	let jobs = 0,
@@ -219,12 +244,24 @@ check('every scoped full body remains owned; all other product scripts remain ex
 				assert.equal(Full.stepField(step.body, 'run'), Raw.stepField(step.body, 'run'));
 			}
 		}
-	assert.equal(jobs - 1, 26);
-	assert.equal(jobs, 27);
+	assert.deepEqual(
+		Raw.jobsOfText(
+			source.find((entry) => entry.rel === '.github/workflows/ci-common.yml').text,
+			'.github/workflows/ci-common.yml'
+		).map((job) => job.id),
+		['shared-validation', 'common-e2e', 'common-build', 'common-testbuild', 'common-unit-verdict'],
+		'Common preserves every unit lot and browser E2E before production Build and Testbuild'
+	);
+	assert.equal(jobs, 28);
 	assert.equal(
 		source
 			.flatMap((entry) => Raw.jobsOfText(entry.text, entry.rel))
-			.filter((job) => job.file === MAC && job.id === 'lease-silence-native').length,
+			.filter(
+				(job) =>
+					job.file === MAC &&
+					job.id === 'e2e-hs' &&
+					macRole.selected(job.body, 'lease-silence-native').length === 5
+			).length,
 		1
 	);
 	assert.ok(steps > 150, 'the full retained script inventory is nonvacuous');
@@ -310,32 +347,101 @@ check('native custody scope preserves the complete original full block', () => {
 });
 check('mandatory default predicates are the actual workflow predicates', () => {
 	assert.equal(Full.field(Full.job('core'), 'if'), null);
-	assert.equal(Full.field(Full.job('tooltip-canvas'), 'if'), null);
+	assert.equal(Full.field(Full.job('shared-validation'), 'if'), null);
+	assert.equal(Full.field(Full.job('e2e-hs'), 'if'), null);
 	assert.equal(
 		Full.field(Full.job('release'), 'if'),
-		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
 	assert.equal(
 		Full.stepField(
 			Full.step(
-				Full.job('managed-ollama-native'),
+				Full.job('e2e-hs'),
 				'Qualify actual SDK accepted-owner and deadline XCTest controls'
 			),
 			'if'
 		),
-		null
+		macRole.condition('managed-ollama-native')
 	);
 	assert.equal(
 		Full.stepField(
-			Full.step(
-				Full.job('managed-ollama-native'),
-				'Qualify actual native PAC and WPAD XCTest controls'
-			),
+			Full.step(Full.job('e2e-hs'), 'Qualify actual native PAC and WPAD XCTest controls'),
 			'if'
 		),
-		'${{ !cancelled() }}'
+		macRole.condition('managed-ollama-native', '${{ !cancelled() }}')
 	);
 });
+check('Common TOML receiving retains its owned step, identity and check command', () => {
+	const rel = '.github/workflows/ci-common.yml';
+	const original = source.find((entry) => entry.rel === rel);
+	const job = Raw.jobsOfText(original.text, rel).find((entry) => entry.id === 'shared-validation');
+	const step = Raw.step(job.body, 'Check hotstring TOML files are sorted and formatted');
+	for (const mutant of [
+		'',
+		step.replace('id: hotstrings-format', 'id: foreign-format'),
+		step.replace('--hotstrings --all --check', '--hotstrings --all')
+	]) {
+		assert.notEqual(mutant, step, 'each TOML control changes the actual registered step');
+		assert.throws(() => Full.fromFiles(changed(rel, step, mutant)));
+	}
+});
+check('Unit refuses withdrawn, deferred, foreign or late human-lot selection', () => {
+	const original = source.find((entry) => entry.rel === MAC);
+	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'test-hs');
+	const step = Raw.step(job.body, 'Admit the authored unit lot');
+	for (const mutant of [
+		'',
+		step + '\n' + step,
+		step.replace('select unit', 'select e2e'),
+		step.replace('id: stage-selection', 'id: foreign-selection'),
+		step.replace('id: stage-selection', 'id: stage-selection\n        if: false'),
+		step.replace('id: stage-selection', 'id: stage-selection\n        continue-on-error: true'),
+		'      - run: echo premature product work\n' + step
+	]) {
+		assert.notEqual(mutant, step, 'each Unit selection control changes the actual step');
+		assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+	}
+	const record = Raw.step(job.body, 'Record actual stage role outcome');
+	const foreign = record.replace('steps.stage-selection.outputs.cell', 'matrix.lot');
+	assert.notEqual(foreign, record);
+	assert.throws(() => Full.fromFiles(changed(MAC, record, foreign)));
+});
+for (const [id, prior, predecessor, output] of [
+	['e2e-hs', 'unit', 'test-hs', 'e2e'],
+	['package-macos', 'e2e', null, null],
+	['launch', 'build', 'package-macos', 'testbuild']
+]) {
+	check(`${id} preserves the genuine receiver admission before products`, () => {
+		const original = source.find((entry) => entry.rel === MAC);
+		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === id);
+		const step = Raw.step(job.body, 'Admit complete successful predecessor stage');
+		for (const mutant of [
+			'',
+			step + '\n' + step,
+			step.replace(`admit ${prior}`, 'admit foreign'),
+			step.replace('${{ toJSON(needs) }}', '${{ toJSON(github) }}'),
+			step.replace('id: stage-admission', 'id: stage-admission\n        if: false'),
+			step.replace('id: stage-admission', 'id: stage-admission\n        continue-on-error: true'),
+			'      - run: echo premature product work\n' + step
+		]) {
+			assert.notEqual(mutant, step, 'each predecessor control changes the actual step');
+			assert.throws(() => Full.fromFiles(changed(MAC, step, mutant)));
+		}
+		if (predecessor) {
+			const binding = `      MACOS_STAGE_METADATA: \${{ needs.${predecessor}.outputs.${output}_metadata }}`;
+			for (const replacement of [
+				'',
+				binding.replace(predecessor, 'foreign'),
+				binding.replace(`${output}_metadata`, `${output}_matrix`),
+				binding.replace(' }}', '[matrix.lot] }}')
+			]) {
+				const mutant = job.body.replace(binding, replacement);
+				assert.notEqual(mutant, job.body, 'the whole-map binding mutation is effective');
+				assert.throws(() => Full.fromFiles(changed(MAC, job.body, mutant)));
+			}
+		}
+	});
+}
 for (const entry of source) {
 	for (const [name, fragment] of [
 		['public input', '      fast_prerelease: true\n'],
@@ -408,13 +514,28 @@ for (const lane of ['macos', 'windows', 'linux']) {
 		});
 }
 for (const [rel, id, name] of [
-	[MAC, 'managed-ollama-native', 'Qualify actual selected number-row Carbon XCTest controls'],
-	[MAC, 'managed-ollama-native', 'Retain selected number-row Carbon XCTest diagnostics'],
-	[MAC, 'managed-ollama-native', 'Receive native final-byte number-row causal refusal'],
-	[MAC, 'managed-ollama-native', 'Retain native final-byte number-row causal diagnostics'],
-	[MAC, 'item36-native', 'Observe the actual no-prompt SDK permission API independently'],
-	[MAC, 'managed-ollama-native', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
-	[MAC, 'managed-ollama-native', 'Qualify actual native PAC and WPAD XCTest controls'],
+	[
+		'.github/workflows/ci-common.yml',
+		'shared-validation',
+		'Check hotstring TOML files are sorted and formatted'
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-build',
+		'Build and seal production site — ${{ matrix.lot }}'
+	],
+	[
+		'.github/workflows/ci-common.yml',
+		'common-testbuild',
+		'Test received production site — ${{ matrix.lot }}'
+	],
+	[MAC, 'e2e-hs', 'Qualify actual selected number-row Carbon XCTest controls'],
+	[MAC, 'e2e-hs', 'Retain selected number-row Carbon XCTest diagnostics'],
+	[MAC, 'e2e-hs', 'Receive native final-byte number-row causal refusal'],
+	[MAC, 'e2e-hs', 'Retain native final-byte number-row causal diagnostics'],
+	[MAC, 'e2e-hs', 'Observe the actual no-prompt SDK permission API independently'],
+	[MAC, 'e2e-hs', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
+	[MAC, 'e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls'],
 	[MAC, 'macos-ok', 'Verify mandatory jobs and launch scenarios'],
 	['.github/workflows/ci-windows.yml', 'windows-ok', 'Verify mandatory jobs and launch scenarios'],
 	['.github/workflows/ci-linux.yml', 'linux-ok', 'Assert all mandatory subjects ran and passed']
@@ -446,12 +567,12 @@ check(
 	() => {
 		const name = 'Observe the actual no-prompt SDK permission API independently';
 		const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
-			(entry) => entry.id === 'item36-native'
+			(entry) => entry.id === 'e2e-hs'
 		);
 		const body = Raw.step(job.body, name);
 		assert.equal(
-			Full.stepField(Full.step(Full.job('item36-native'), name), 'if'),
-			'${{ !cancelled() }}'
+			Full.stepField(Full.step(Full.job('e2e-hs'), name), 'if'),
+			macRole.condition('item36-native', '${{ !cancelled() }}')
 		);
 		assert.ok(
 			body.includes('sdk_permission_xctest_evidence.cjs judge'),
@@ -463,23 +584,15 @@ check(
 	}
 );
 check('unknown step conditions stay visible to existing mandatory guards', () => {
-	const view = Full.fromFiles(
-		changed(
-			MAC,
-			'      - name: Admit the canonical native toolchain and public inputs\n',
-			'      - name: Admit the canonical native toolchain and public inputs\n        if: false\n'
-		)
+	const name = 'Admit the canonical native toolchain and public inputs';
+	const before = Raw.step(Raw.job('e2e-hs'), name);
+	const after = before.replace(
+		'        if: ' + macRole.condition('managed-ollama-native'),
+		'        if: false'
 	);
-	assert.equal(
-		view.stepField(
-			view.step(
-				view.job('managed-ollama-native'),
-				'Admit the canonical native toolchain and public inputs'
-			),
-			'if'
-		),
-		'false'
-	);
+	assert.notEqual(after, before);
+	const view = Full.fromFiles(changed(MAC, before, after));
+	assert.equal(view.stepField(view.step(view.job('e2e-hs'), name), 'if'), 'false');
 });
 check('retired exported grants are absent', () => {
 	for (const name of ['fastPrerelease', 'validateFastPrerelease', 'fastPrereleaseReceipt'])
@@ -535,29 +648,66 @@ check('release keeps real full predicates and implicit successful dependency adm
 	const expression = Raw.field(Raw.job('release'), 'if');
 	assert.equal(
 		expression,
-		"github.event_name == 'push' && needs.validate.outputs.release == 'true'"
+		"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'"
 	);
-	const evaluate = new Function('needs', 'github', `return (${expression});`);
+	const evaluate = new Function(
+		'needs',
+		'github',
+		'return (' + expression.replaceAll('needs.publication-plan', "needs['publication-plan']") + ');'
+	);
+	const preflight = Raw.job('publication-plan');
+	assert.equal(Raw.field(preflight, 'if'), 'always() && !cancelled()');
+	assert.deepEqual(Raw.needsOf(preflight), ['macos', 'windows', 'linux', 'core']);
+	assert.deepEqual(Raw.needsOf(Raw.job('release')), ['publication-plan']);
 	const names = ['validate', 'core', 'macos', 'windows', 'linux'];
-	assert.deepEqual(Raw.needsOf(Raw.job('release')), names);
 	let cases = 0;
 	for (const failure of names)
 		for (const status of ['success', 'failure', 'cancelled', 'skipped', 'unknown', null])
 			for (const event of ['push', 'workflow_dispatch'])
 				for (const release of ['true', 'false'])
 					for (const cancelled of [false, true]) {
-						const needs = Object.fromEntries(
+						const jobs = Object.fromEntries(
 							names.map((name) => [name, { result: name === failure ? status : 'success' }])
 						);
-						needs.validate.outputs = { release };
-						const implicitSuccess =
-							!cancelled && names.every((name) => needs[name].result === 'success');
+						const env = {
+							GITHUB_REPOSITORY: 'Test/ergopti',
+							GITHUB_SHA: 'a'.repeat(40),
+							GITHUB_RUN_ID: '123',
+							GITHUB_RUN_ATTEMPT: '1',
+							GITHUB_EVENT_NAME: event,
+							GITHUB_REF: 'refs/heads/dev',
+							CI_OS_SELECTION: 'all',
+							CI_PLAN_RELEASE: release,
+							CI_PLAN_CHANNEL: 'dev',
+							CI_PLAN_LINUX_BUNDLE: 'ergopti-linux.tar.gz',
+							CI_PLAN_NATIVE_QUALIFICATION_PROFILE: '',
+							CI_PLAN_LANE_WINDOWS: 'true',
+							CI_PLAN_LANE_MACOS: 'true',
+							CI_PLAN_LANE_LINUX: 'true',
+							CI_PLAN_VERSION: release === 'true' ? '0.0.0-dev.200' : '',
+							CI_PLAN_TAG: release === 'true' ? 'v0.0.0-dev.200' : '',
+							CI_PLAN_TITLE: release === 'true' ? 'Ergopti v0.0.0-dev.200' : '',
+							CI_PLAN_PRERELEASE: release === 'true' ? 'true' : ''
+						};
+						let admission = { result: cancelled ? 'cancelled' : 'failure', outputs: {} };
+						if (!cancelled) {
+							try {
+								// A failed Validate cannot produce its terminal retained artifact.
+								const record =
+									jobs.validate.result === 'success' ? Publication.create(env) : undefined;
+								const lanes = Object.fromEntries(names.slice(1).map((name) => [name, jobs[name]]));
+								admission = { result: 'success', outputs: Publication.receive(record, env, lanes) };
+							} catch (error) {
+								assert.ok(error instanceof Error);
+							}
+						}
 						assert.equal(
-							implicitSuccess && evaluate(needs, { event_name: event }),
+							admission.result === 'success' &&
+								evaluate({ 'publication-plan': admission }, { event_name: event }),
 							!cancelled &&
 								event === 'push' &&
 								release === 'true' &&
-								names.every((name) => needs[name].result === 'success')
+								names.every((name) => jobs[name].result === 'success')
 						);
 						cases++;
 					}
@@ -566,7 +716,10 @@ check('release keeps real full predicates and implicit successful dependency adm
 check('full Linux package retains cancellation and manual receiving allowance', () => {
 	const expression = Raw.field(Raw.job('package-linux'), 'if')
 		.slice(3, -2)
-		.replaceAll('needs.test-linux.result', "needs['test-linux'].result")
+		.replaceAll(
+			'needs.e2e-linux.outputs.ci_unit_result',
+			"needs['e2e-linux'].outputs.ci_unit_result"
+		)
 		.replaceAll('needs.e2e-linux.result', "needs['e2e-linux'].result");
 	const evaluate = new Function('needs', 'github', 'cancelled', `return (${expression});`);
 	const accepted = new Set([
@@ -585,7 +738,7 @@ check('full Linux package retains cancellation and manual receiving allowance', 
 				for (const cancelled of [false, true]) {
 					assert.equal(
 						evaluate(
-							{ 'test-linux': { result: unitResult }, 'e2e-linux': { result } },
+							{ 'e2e-linux': { result, outputs: { ci_unit_result: unitResult } } },
 							{ event_name: event },
 							() => cancelled
 						),
@@ -637,7 +790,10 @@ check('package duplicate keeps both mandatory failure acknowledgments', () => {
 		uploader.includes('${{ runner.temp }}/dev-release-qualification/macos-brew-archive.json')
 	);
 	assert.ok(uploader.includes('${{ runner.temp }}/stable-macos-native-http-package.json'));
-	assert.equal(Raw.stepField(uploader, 'if'), '${{ always() }}');
+	assert.equal(
+		Raw.stepField(uploader, 'if'),
+		macRole.condition('package-macos', '${{ always() }}')
+	);
 	assert.match(uploader, /^ {10}if-no-files-found: error$/m);
 });
 check(
@@ -728,7 +884,10 @@ check(
 				'${{ runner.temp }}/swift-launcher-evidence/native-pac-package-qualification.json'
 			)
 		);
-		assert.equal(Raw.stepField(retained, 'if'), '${{ always() }}');
+		assert.equal(
+			Raw.stepField(retained, 'if'),
+			macRole.condition('package-macos', '${{ always() }}')
+		);
 	}
 );
 check('embedded Swift admission refuses omitted collector binding or changed source gate', () => {
@@ -790,79 +949,73 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 	assert.throws(() => Full.fromFiles(changed(MAC, safe, '"${pac_skip_args[@]}"')), /binding/);
 });
 
-// New manual receiver is a closed additive owner, never an optional full-job exception.
+// The same closed manual receiver now owns two real matrix cells in E2E.
 {
-	const job = Raw.jobsOfText(source.find((entry) => entry.rel === MAC).text, MAC).find(
-		(job) => job.id === 'lease-silence-native'
-	);
-	const whole = '  lease-silence-native:\n' + job.body + '\n';
+	const sourceMac = source.find((entry) => entry.rel === MAC).text;
+	const job = Raw.jobsOfText(sourceMac, MAC).find((job) => job.id === 'e2e-hs');
+	const lease = macRole.selected(job.body, 'lease-silence-native');
+	const first = lease[0].body;
+	const command = Raw.step(job.body, 'Execute the actual paired native silence control');
+	const parser = Raw.step(job.body, 'Receive closed lease silence transcript controls');
+	const retained = Raw.step(job.body, 'Retain exact paired-process native receiving');
 	for (const [label, before, after] of [
-		['job absent', '  lease-silence-native:\n', '  omitted-lease-silence-native:\n'],
-		[
-			'job duplicate',
-			'  lease-silence-native:\n',
-			"  lease-silence-native:\n    name: 'Native paired lease silence · ${{ matrix.architecture }}'\n    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n    runs-on: ${{ matrix.runner }}\n    timeout-minutes: 20\n    strategy:\n      fail-fast: false\n      matrix:\n        include:\n          - runner: macos-15\n            architecture: arm64\n          - runner: macos-15-intel\n            architecture: amd64\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version-file: '.node-version'\n      - name: Receive closed lease silence transcript controls\n        run: node tools/test/test-lease-silence-xctest-evidence.cjs\n      - name: Execute the actual paired native silence control\n        shell: bash\n        run: bash tools/diagnostics/run_lease_silence_native.sh '${{ matrix.architecture }}'\n      - name: Retain exact paired-process native receiving\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: lease-silence-native-${{ github.sha }}-${{ matrix.architecture }}-${{ github.run_id }}-${{ github.run_attempt }}\n          retention-days: 7\n          if-no-files-found: error\n          path: |\n            ${{ runner.temp }}/lease-silence-native/source.json\n            ${{ runner.temp }}/lease-silence-native/verdict.json\n            ${{ runner.temp }}/lease-silence-native/xctest.log\n            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n            ${{ runner.temp }}/lease-silence-native/script-status.txt\n            ${{ runner.temp }}/lease-silence-native/capture-status.txt\n\n  lease-silence-native:\n"
-		],
-		[
-			'job coupled',
-			'  lease-silence-native:\n',
-			'  lease-silence-native:\n    needs: package-macos\n'
-		],
-		[
-			'job forgiven',
-			'  lease-silence-native:\n',
-			'  lease-silence-native:\n    continue-on-error: true\n'
-		],
-		[
-			'release output',
-			'  lease-silence-native:\n',
-			'  lease-silence-native:\n    outputs:\n      assets: fake\n'
-		],
-		[
-			'secret inherited',
-			'  lease-silence-native:\n',
-			'  lease-silence-native:\n    secrets: inherit\n'
-		],
+		['role absent', first, ''],
+		['role duplicate', first, first + '\n' + first],
+		['role coupled', '    needs:\n      - test-hs\n', '    needs:\n      - package-macos\n'],
+		['role forgiven', '  e2e-hs:\n', '  e2e-hs:\n    continue-on-error: true\n'],
+		['release output', '  e2e-hs:\n', '  e2e-hs:\n    outputs:\n      assets: fake\n'],
+		['secret inherited', '  e2e-hs:\n', '  e2e-hs:\n    secrets: inherit\n'],
 		[
 			'automatic/release admission',
-			"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}\n",
-			'    if: always()\n'
+			first,
+			first.replace(macRole.condition('lease-silence-native'), 'always()')
 		],
-		['ARM host wrong', 'runner: macos-15\n', 'runner: ubuntu-latest\n'],
-		['Intel absent', 'runner: macos-15-intel\n', 'runner: macos-15\n'],
+		[
+			'ARM host authority wrong',
+			job.body,
+			job.body.replace(
+				'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+				'runs-on: ubuntu-latest'
+			)
+		],
+		[
+			'Intel plan absent',
+			job.body,
+			job.body.replace('needs.test-hs.outputs.e2e_matrix', 'inputs.foreign')
+		],
 		[
 			'source runner wrong',
-			'tools/diagnostics/run_lease_silence_native.sh',
-			'tools/diagnostics/foreign_native.sh'
+			command,
+			command.replace('run_lease_silence_native.sh', 'foreign_native.sh')
 		],
 		[
 			'closed parser control omitted',
-			'node tools/test/test-lease-silence-xctest-evidence.cjs',
-			'echo omitted'
+			parser,
+			parser.replace('node tools/test/test-lease-silence-xctest-evidence.cjs', 'echo omitted')
 		],
 		[
 			'artifact missing status',
-			'            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n',
-			''
+			retained,
+			retained.replace('            ${{ runner.temp }}/lease-silence-native/swift-status.txt\n', '')
 		],
-		['artifact missing forbidden', 'if-no-files-found: error', 'if-no-files-found: ignore'],
-		['native budget widened', 'timeout-minutes: 20', 'timeout-minutes: 21']
-	]) {
+		[
+			'artifact missing forbidden',
+			retained,
+			retained.replace('if-no-files-found: error', 'if-no-files-found: ignore')
+		],
+		[
+			'native budget widened',
+			job.body,
+			job.body.replace(
+				'timeout-minutes: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}',
+				'timeout-minutes: 360'
+			)
+		]
+	])
 		check('lease silence: ' + label, () => {
-			assert.equal(whole.split(before).length, 2, 'one new owner mutation seam');
-			assert.throws(
-				() =>
-					Full.fromFiles(
-						changed(
-							MAC,
-							whole,
-							whole.replace(before, () => after)
-						)
-					),
-				/job inventory|missing job|job condition|failure must remain fatal|lease silence native/
-			);
+			assert.notEqual(after, before, 'one real source mutation');
+			assert.throws(() => Full.fromFiles(changed(MAC, before, after)));
 		});
-	}
 }
 
 check(
@@ -920,10 +1073,13 @@ check(
 );
 check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt', () => {
 	const entry = source.find((file) => file.rel === MAC);
-	const item = Raw.jobsOfText(entry.text, MAC).find((job) => job.id === 'item36-native');
+	const item = Raw.jobsOfText(entry.text, MAC).find((job) => job.id === 'e2e-hs');
 	assert.equal(
-		Raw.field(item.body, 'if'),
-		"${{ github.event_name == 'workflow_dispatch' && !inputs.release }}"
+		Raw.stepField(
+			Raw.step(item.body, 'Qualify scoped item 36 native archive XCTest controls'),
+			'if'
+		),
+		macRole.condition('item36-native')
 	);
 	const itemCode = Raw.runOf(
 		Raw.step(item.body, 'Qualify scoped item 36 native archive XCTest controls')
@@ -941,14 +1097,14 @@ check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt
 		)
 	);
 	const retain = Raw.step(job.body, 'Retain source-bound package native qualification receipt');
-	assert.equal(Raw.stepField(retain, 'if'), 'always()');
+	assert.equal(Raw.stepField(retain, 'if'), macRole.condition('package-macos', 'always()'));
 	assert.ok(retain.includes('name: assets-qualification-package-macos'));
 	assert.ok(retain.includes('path: ${{ runner.temp }}/stable-macos-brew-archive.json'));
 	assert.match(retain, /^ {10}if-no-files-found: error$/m);
 });
 check('v101 managed PAC admission retains Worker filter and exact collector authority', () => {
 	const entry = source.find((file) => file.rel === MAC);
-	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'managed-ollama-native');
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'e2e-hs');
 	const step = Raw.step(job.body, 'Qualify actual native PAC and WPAD XCTest controls');
 	const code = Raw.runOf(step).join('\n');
 	assert.ok(code.includes('--validate-scope-receipt-profile "$receipt"'));
@@ -970,7 +1126,7 @@ check('v101 managed PAC admission retains Worker filter and exact collector auth
 	assert.equal(code.split(marker).length, 2);
 	const admission = code
 		.slice(0, code.indexOf(marker))
-		.replaceAll('${{ matrix.architecture }}', 'arm64');
+		.replaceAll('${{ env.MACOS_STAGE_ARCHITECTURE }}', 'arm64');
 	for (const mode of ['full', 'deferred']) {
 		const shell =
 			`set -euo pipefail
@@ -1009,14 +1165,14 @@ node() {
 check('v101 HTTP receiver defers only wire and preserves both mandatory statuses', () => {
 	const entry = source.find((file) => file.rel === MAC);
 	for (const [id, name] of [
-		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
+		['e2e-hs', 'Receive actual independent managed HTTP native clients'],
 		['package-macos', 'Receive actual managed HTTP native clients']
 	]) {
 		const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === id);
 		const step = Raw.step(job.body, name);
 		const code = Raw.runOf(step)
 			.join('\n')
-			.replaceAll('${{ matrix.architecture }}', 'arm64')
+			.replaceAll('${{ env.MACOS_STAGE_ARCHITECTURE }}', 'arm64')
 			.replaceAll('${{ github.sha }}', 'a'.repeat(40))
 			.replaceAll('${{ github.run_id }}', '123')
 			.replaceAll('${{ github.run_attempt }}', '2');
@@ -1041,6 +1197,24 @@ set -euo pipefail
 RUNNER_TEMP="$1"
 GITHUB_OUTPUT="$RUNNER_TEMP/github-output"
 ERGOPTI_NATIVE_HTTP_PYTHON=owned_python
+mkdir() {
+    if [ "$#" -eq 2 ] && [ "$1" = -p ] && [ "$2" = "$RUNNER_TEMP" ]; then
+        printf '%s\\0' "$@" >> "$RUNNER_TEMP/mkdir-requests"
+        command mkdir "$@"
+    elif [ "$#" -eq 4 ] && [ "$1" = -m ] && [ "$2" = 700 ] &&
+        [ "$3" = "$RUNNER_TEMP/native-http-clock-arm64-123-2" ] &&
+        [ "$4" = "$3/private-cache" ]; then
+        printf '%s\\0' "$@" >> "$RUNNER_TEMP/mkdir-requests"
+        # Windows records the requested POSIX mode; native hosts still apply it.
+        if [ "$ERGOPTI_HTTP_FIXTURE_HOST" = win32 ]; then
+            command mkdir "$3" "$4"
+        else
+            command mkdir "$@"
+        fi
+    else
+        return 91
+    fi
+}
 tee() {
     command tee "$@" || return $?
     case "$*" in
@@ -1066,7 +1240,7 @@ owned_python() {
     esac
 }
 ` + code;
-			const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-http-profile-'));
+			const owned = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-http-profile with space-'));
 			let result;
 			try {
 				result = spawnSync(
@@ -1076,6 +1250,7 @@ owned_python() {
 						encoding: 'utf8',
 						env: {
 							...process.env,
+							ERGOPTI_HTTP_FIXTURE_HOST: process.platform,
 							MODE: mode,
 							PROFILE: profile,
 							REFUSED: String(refused),
@@ -1083,6 +1258,29 @@ owned_python() {
 						}
 					}
 				);
+				if (result.status === expected) {
+					const clockRoot = owned + '/native-http-clock-arm64-123-2';
+					const expectedRequests = ['-p', owned];
+					if (id === 'e2e-hs' && mode === 'full' && !refused) {
+						expectedRequests.push('-m', '700', clockRoot, clockRoot + '/private-cache');
+						for (const [file, text] of [
+							['owned-process.log', 'owned\n'],
+							['public-native.log', 'client\n'],
+							['independent-client.log', 'wire\n']
+						]) {
+							assert.equal(
+								fs.readFileSync(path.join(clockRoot, file), 'utf8'),
+								text,
+								'recorded command output remains in the actual owned directory'
+							);
+						}
+					}
+					assert.deepEqual(
+						fs.readFileSync(path.join(owned, 'mkdir-requests'), 'utf8').split('\0'),
+						[...expectedRequests, ''],
+						'only the intended setup paths and mode are requested'
+					);
+				}
 			} finally {
 				fs.rmSync(owned, { recursive: true, force: true });
 			}
@@ -1092,11 +1290,11 @@ owned_python() {
 			const lines = result.stdout.split('\n');
 			assert.equal(
 				lines.filter((line) => line === 'owned').length,
-				refused && id === 'managed-ollama-native' ? 0 : 1
+				refused && id === 'e2e-hs' ? 0 : 1
 			);
 			assert.equal(
 				lines.filter((line) => line === 'client').length,
-				refused && id === 'managed-ollama-native' ? 0 : 1
+				refused && id === 'e2e-hs' ? 0 : 1
 			);
 			assert.equal(
 				lines.filter((line) => line === 'wire').length,
@@ -1159,7 +1357,7 @@ check('v101 Shortcuts keeps portable/full work and publishes its validated exact
 	assert(code.includes("{ flag: 'wx' }"));
 	assert(code.includes('python3 tools/diagnostics/apple_shortcuts_probe/run_probe.py'));
 	const upload = Raw.step(job.body, 'Retain source-bound Shortcuts native qualification receipt');
-	assert.equal(Raw.stepField(upload, 'if'), null);
+	assert.equal(Raw.stepField(upload, 'if'), macRole.condition('package-macos'));
 	assert(upload.includes('name: assets-qualification-shortcuts-macos'));
 	assert(upload.includes('path: ${{ runner.temp }}/stable-macos-shortcuts-discovery.json'));
 	assert(upload.includes('if-no-files-found: error'));
@@ -1181,11 +1379,14 @@ check('v101 AppleEvents records only exact transport rows and preserves installe
 	const upload = Raw.step(job.body, 'Retain source-bound AppleEvent launch qualification receipt');
 	assert.equal(
 		Raw.stepField(upload, 'if'),
-		"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+		macRole.condition(
+			'launch',
+			"${{ matrix.scenario == 'clean' || matrix.scenario == 'karabiner_config' }}"
+		)
 	);
 	assert(
 		upload.includes(
-			'name: assets-qualification-launch-macos-${{ matrix.runner }}-${{ matrix.scenario }}'
+			'name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}'
 		)
 	);
 	assert(upload.includes('if-no-files-found: error'));

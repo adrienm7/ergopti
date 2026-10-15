@@ -9,6 +9,8 @@ local function with_owner(body, options)
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local parameters, action = { retained = "unrelated" }, "none"
 	local controls, observations = options or {}, { sets = 0, saves = 0, logs = {} }
+	local selected = controls.action == nil and "run_program" or controls.action
+	local scalar = controls.scalar == nil and SCALAR or controls.scalar
 	local function copy(source) local result = {}; for key, value in pairs(source) do result[key] = value end; return result end
 	local function receipt(mode)
 		if mode == "throw" then error(SCALAR) end
@@ -26,10 +28,17 @@ local function with_owner(body, options)
 		package.loaded["infra.logger"] = logger
 		local gestures = {
 			is_assignable = function() return true end,
+			get_action_parameter_spec = function(name)
+				if controls.spec_changed then return "changed-kind" end
+				local row = require("_generated.action_catalogue").actions[name]
+				return row and row.parameter
+			end,
+			validate_action_parameter = function(_, value) return value == scalar end,
 			get_all_action_parameters = function() return copy(parameters) end,
 			set_action_parameter = function(binding, name, value)
 				observations.sets = observations.sets + 1
 				parameters[binding .. "__" .. name] = value
+				if controls.change_spec_on_parameter then controls.spec_changed = true end
 				return receipt(controls.parameter)
 			end,
 			replace_action_parameters = function(snapshot)
@@ -54,7 +63,7 @@ local function with_owner(body, options)
 		local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "cmd_1",
 			read = function() return action end,
 			apply = function(on_error)
-				action = "run_program"
+				action = selected
 				if publish(action, on_error) ~= true then return false end
 				return receipt(controls.assign)
 			end,
@@ -80,10 +89,10 @@ local function with_owner(body, options)
 			end
 		end
 		local function apply()
-			return owner.apply("keyboard__cmd_1", "run_program", SCALAR, mutation)
+			return owner.apply("keyboard__cmd_1", selected, scalar, mutation)
 		end
-		controls.reinstate_action = function() action = "run_program" end
-		controls.reinstate_parameters = function() parameters.keyboard__cmd_1__run_program = SCALAR end
+		controls.reinstate_action = function() action = selected end
+		controls.reinstate_parameters = function() parameters["keyboard__cmd_1__" .. selected] = scalar end
 		controls.restore_action = function() action = "none" end
 		controls.restore_parameters_exact = function() parameters = { retained = "unrelated" } end
 		local function inspect()
@@ -389,4 +398,99 @@ helpers.describe("private program retained compensation owner", function()
 			end
 		end
 	end)
+end)
+
+
+helpers.describe("parameterized assignment uses the retained owner", function()
+	for _, stage in ipairs({ "parameter", "assign", "save" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("(action-parameter-atomicity) restores open_url after " .. stage .. " " .. mode, function()
+				with_owner(function(owner, apply, inspect, _, _, global, _, original)
+					helpers.assert_eq(apply(), false)
+					helpers.assert_eq(inspect(), { parameters = { retained = "unrelated" }, action = "none", content = original })
+					helpers.assert_eq(owner.pending(), false)
+					helpers.assert_eq(global.is_pending(), false)
+				end, { action = "open_url", scalar = "https://example.com", [stage] = mode })
+			end)
+		end
+	end
+	helpers.it("(action-parameter-atomicity) publishes a non-program scalar and exact assignment", function()
+		with_owner(function(owner, apply, inspect, _, observations, global)
+			helpers.assert_eq(apply(), true)
+			helpers.assert_eq(inspect().action, "open_url")
+			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__cmd_1__open_url = "https://example.com" })
+			helpers.assert_eq(observations.saves, 1)
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(global.is_pending(), false)
+		end, { action = "open_url", scalar = "https://example.com" })
+	end)
+	helpers.it("(action-parameter-atomicity) does not grant parameter ownership to an unparameterized action", function()
+		with_owner(function(_, apply, inspect, _, observations, _, _, original)
+			helpers.assert_eq(apply(), false)
+			helpers.assert_eq(inspect(), { parameters = { retained = "unrelated" }, action = "none", content = original })
+			helpers.assert_eq(observations.sets, 0)
+		end, { action = "copy_selection", scalar = "https://example.com" })
+	end)
+	helpers.it("(action-parameter-atomicity) retains compensation when the original catalogue observation changes", function()
+		with_owner(function(owner, apply, inspect, controls, observations, global, _, original)
+			helpers.assert_eq(apply(), false)
+			helpers.assert_eq(inspect().action, "none")
+			helpers.assert_eq(observations.saves, 0)
+			helpers.assert_eq(owner.pending(), true)
+			helpers.assert_eq(global.is_pending(), true)
+			controls.spec_changed = false
+			helpers.assert_eq(owner.retry_restore(), true)
+			helpers.assert_eq(inspect(), { parameters = { retained = "unrelated" }, action = "none", content = original })
+		end, { action = "open_url", scalar = "https://example.com", change_spec_on_parameter = true })
+	end)
+end)
+
+
+helpers.describe("parameter transaction keeps physical assignments with their scope owner", function()
+	helpers.it("(action-parameter-physical-scope) recognizes the original shared namespace including malformed slots", function()
+		local physical = require("shortcuts.physical_slots")
+		helpers.assert_eq(physical.is_namespace("physical_none_KeyA"), true)
+		helpers.assert_eq(physical.is_namespace("physical_broken"), true)
+		helpers.assert_eq(physical.is_namespace("cmd_1"), false)
+		helpers.assert_eq(physical.is_namespace(nil), false)
+	end)
+	for _, action in ipairs({ "run_program", "open_url" }) do
+		for _, slot in ipairs({ "physical_none_KeyA", "physical_broken" }) do
+			for _, route in ipairs({ "binding", "mutation" }) do
+				helpers.it("(action-parameter-physical-scope) refuses " .. action .. " physical " .. route .. " " .. slot .. " before transaction ports", function()
+					helpers.with_stub_scope({ "infra.logger", "ui.menu.program_parameter_transaction" }, function()
+						package.loaded["infra.logger"] = helpers.make_logger_stub()
+						package.loaded["ui.menu.program_parameter_transaction"] = nil
+						local calls = { admission = 0, parameter = 0, assignment = 0, save = 0, source = 0 }
+						local function port(name)
+							return function()
+								calls[name] = calls[name] + 1
+								error("unsupported physical transaction reached " .. name)
+							end
+						end
+						local owner = require("ui.menu.program_parameter_transaction").new({
+							path = "unsupported-physical-config",
+							admission = port("admission"), paused = port("source"),
+							current_path = port("source"), capture_checkpoint_candidate = port("source"),
+							save_prefs = port("save"), checkpoint = { capture = port("source") },
+							preferences = { source_snapshot = port("source") },
+							files = { read_with_status = port("source") },
+							gestures = { set_action_parameter = port("parameter"), get_all_action_parameters = port("source") },
+						})
+						local binding = route == "binding" and "keyboard__" .. slot or "keyboard__cmd_1"
+						local key = route == "mutation" and slot or "cmd_1"
+						local called, committed = pcall(owner.apply, binding, action,
+							action == "run_program" and SCALAR or "https://example.com", {
+								section = "shortcuts.keyboard", key = key,
+								read = port("source"), apply = port("assignment"), restore = port("assignment"),
+							})
+						helpers.assert_eq(called, true, "unsupported domains return refusal before entering any transaction port")
+						helpers.assert_eq(committed, false)
+						helpers.assert_eq(calls, { admission = 0, parameter = 0, assignment = 0, save = 0, source = 0 })
+						helpers.assert_eq(owner.pending(), false)
+					end)
+				end)
+			end
+		end
+	end
 end)

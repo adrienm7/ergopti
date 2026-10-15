@@ -1,0 +1,77 @@
+{
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "paths": {
+    ".github/workflows/ci-linux.yml": {
+      "sha256": "987e99fc4a6f35beaac34daff281af41db29fd51b68b8e4162b42c5ff4c4ca83",
+      "git_blob": "5956983cf8c44828a87a1fe51ba7594f2916bbcc"
+    },
+    ".github/workflows/ci-common.yml": {
+      "sha256": "1a16c21ed2982699a7b85a20119510651db2900cc0cae8715598228a26e425f6",
+      "git_blob": "28213ec3c5f2a88d0e1f6d3a46d6d2cb906356e0"
+    },
+    "tools/ci/validate-js-feature-results.cjs": {
+      "sha256": "beb015464637609e4c34a9b5713512368d0c075f27954e03d41881c57a09c3dc",
+      "git_blob": "8cdc60251505ac35dabb324eb6a4b974fdc1022c"
+    },
+    "tools/test/linux-ci-evidence.cjs": {
+      "sha256": "0d333681895ee12f5eeaac3c5eb0967d5da78ee2b5760587ccfbcb266a35fc3f",
+      "git_blob": "731f78b1b402cbd2cf990bc59e312218552862e0"
+    },
+    "tools/ci/dev-release-qualification.cjs": {
+      "sha256": "f300cc10378707359bce239cacbb2ee790a026fb0f9463f58636f725e3857bc8",
+      "git_blob": "2b1abb91928a9d8520cd670deebeac69b71066c9"
+    },
+    "tools/test/lib/js-feature-results.cjs": {
+      "sha256": "dd65261a637d4704afbdbcb4f47a1d6dcf6f938f6ec32a8f02ea26462edbdb1d",
+      "git_blob": "cd26049a102e19eb92da7dc6f3b093904f5515fe"
+    },
+    "tools/test/lib/js-feature-inventory.cjs": {
+      "sha256": "5733ca28ba0446adb08ea77e6eedb023a9f240ad39db7b51d3f75b10b8c2ae3f",
+      "git_blob": "df6b0855a32226a854238cf324e6e257d3973416"
+    },
+    "tools/ci/js-feature-matrix.cjs": {
+      "sha256": "1180652d76943c4cf8a040a6502879749b64b51fd3469823a0eb5815d4b71aa7",
+      "git_blob": "f093931d898162b0ba1a5b431e83462566d64d12"
+    },
+    "tools/test/features/ai-and-network/suite.json": {
+      "sha256": "7370b3a79a9e7e8ec1cbb7df353ccb908f608d7e443c34258190bdd9c0a01db9",
+      "git_blob": "5f63becf39f943f28ac5c9099027e7d5e19d51df"
+    },
+    "tools/test/features/data-and-source-contracts/suite.json": {
+      "sha256": "ecfd4fe3dafbf687bea752d2097f87d628246249e438100dcfcd0a26371353e0",
+      "git_blob": "dd29aa245f8267160151fdae8a0bb38be50ad935"
+    },
+    "tools/test/features/diagnostics-and-metrics/suite.json": {
+      "sha256": "9b4983aefa104c2d3e9fd604bfc61c15aa74fd78fab801071f58a9a2cd191c1d",
+      "git_blob": "87e8a60f4f079c4e573799835b32a0ded65bf1d6"
+    },
+    "tools/test/features/distribution-and-updates/suite.json": {
+      "sha256": "486eebfc88f0e9bf489f26f2c8413a4564098d3fad0171b1d511019aa101f55e",
+      "git_blob": "040e3ef73ca292e8c635946eace1f4ef2d90a160"
+    },
+    "tools/test/features/input-and-actions/suite.json": {
+      "sha256": "fc481dd7439bdb503ff223d5234861a6adde3bebd67e068d5fe4134848e5a903",
+      "git_blob": "71a540a11a344ae11af6187c96e72decb296a9d5"
+    },
+    "tools/test/features/menus/suite.json": {
+      "sha256": "ae58718cc0ced536040496e14e6591ef251abf74dd34f3e02c0118a11dc1be45",
+      "git_blob": "9526910ab8a14d0c46bc88fb1512d121c3580cf5"
+    },
+    "tools/test/features/release-ci/suite.json": {
+      "sha256": "4750ffcc9594ed0b828a3224ef5c453d9e63cbf0afd4798b1cc8a9a033b9bc70",
+      "git_blob": "09ca95add4390ce991ff15ef8e17f401cfbdae21"
+    },
+    "tools/test/features/shared-ui/suite.json": {
+      "sha256": "83e45dfa6e40bbd4bb219a79ed4ee356a02d6ecef46fd8c2805e59f83e1e8550",
+      "git_blob": "e09ce446bcdb5d5d95f6169362712df0055b5bc0"
+    },
+    "tools/test/features/test-infrastructure/suite.json": {
+      "sha256": "0d446b184c1a8eb81aa2d19ba06541c3f426346d4aecfec9679fecf1c79772d6",
+      "git_blob": "6982385f04cdb1f792d4af2940b62e7d2a23ed56"
+    },
+    ".github/linux-ci-coverage.json": {
+      "sha256": "3b478af190072522c64b7e62e0523cf12d7157d5a14600d01a086d53e2295fd4",
+      "git_blob": "c3bb2ec4a7777354e9572fff0dff49ba2fe2ff80"
+    }
+  }
+}

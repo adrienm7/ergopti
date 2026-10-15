@@ -3,7 +3,6 @@ import { get } from 'svelte/store';
 import { Keyboard } from '$lib/keyboard/Keyboard.js';
 import { base } from '$app/paths';
 import { getMagicKeyUrls } from '$lib/js/hotstringDataUrls.js';
-let magic = {};
 
 function unescapeTomlString(s) {
 	if (!s && s !== '') return s;
@@ -68,28 +67,39 @@ function parseTomlMagic(toml) {
 	return result;
 }
 
-// Load magic dynamically via HTTP request (public static directory)
-if (typeof window !== 'undefined') {
-	Promise.all(getMagicKeyUrls(base).map((url) => fetch(url).then((response) => response.text())))
-		.then((texts) => {
-			const parsed = Object.assign({}, ...texts.map(parseTomlMagic));
-			// Normalize keys: remove ★ and store as lowercase for lookup
-			magic = {};
-			for (const [k, v] of Object.entries(parsed)) {
-				const cleanKey = k.replace(/★/g, '');
-				// Ignore entries containing a backslash (problematic escapes like /!\\★)
-				if (cleanKey.indexOf('\\') !== -1) continue;
-				magic[cleanKey.toLowerCase()] = v;
-			}
+/** Load both authored catalogues only for an explicitly owned initialization. */
+async function loadMagicData(signal) {
+	const texts = await Promise.all(
+		getMagicKeyUrls(base).map(async (url) => {
+			const response = await fetch(url, { signal });
+			if (!response.ok)
+				throw new Error('Keyboard emulation catalogue refused: ' + response.status + ' ' + url);
+			return response.text();
 		})
-		.catch(() => {
-			// swallow fetch errors silently
-		});
+	);
+	const catalogues = texts.map(parseTomlMagic);
+	if (
+		catalogues.some((catalogue) => !Object.keys(catalogue).some((key) => key.indexOf('\\') === -1))
+	)
+		throw new Error('Keyboard emulation catalogue has no usable entries');
+	const parsed = Object.assign({}, ...catalogues);
+	// Normalize keys: remove ★ and store as lowercase for lookup
+	const magic = {};
+	for (const [k, v] of Object.entries(parsed)) {
+		const cleanKey = k.replace(/★/g, '');
+		// Ignore entries containing a backslash (problematic escapes like /!\\★)
+		if (cleanKey.indexOf('\\') !== -1) continue;
+		magic[cleanKey.toLowerCase()] = v;
+	}
+	return magic;
 }
 
 export class KeyboardEmulation extends Keyboard {
 	constructor(id) {
 		super(id);
+		this.magic = null;
+		this.magicState = 'idle';
+		this.magicController = null;
 
 		this['layer'] = 'Primary'; // Default layer
 		this['modifiers'] = {
@@ -110,6 +120,46 @@ export class KeyboardEmulation extends Keyboard {
 		// We use bind here is because otherwise the scope of "this" is changed in the text input and this["name"] becomes undefined
 		this.emulateKey = this.emulateKey.bind(this);
 		this.releaseKey = this.releaseKey.bind(this);
+	}
+
+	/** Keep catalogue ownership separate from the base keyboard's mounted subscriptions. */
+	async loadMagic() {
+		if (this.magicState !== 'idle' || this.state !== 'new')
+			throw new Error('Keyboard emulation is already initialized');
+		const controller = new AbortController();
+		this.magicController = controller;
+		this.magicState = 'loading';
+		try {
+			const magic = await loadMagicData(controller.signal);
+			if (controller.signal.aborted || this.magicState === 'disposed')
+				throw new Error('Keyboard emulation initialization was cancelled');
+			this.magic = magic;
+			this.magicState = 'ready';
+			return magic;
+		} catch (error) {
+			if (this.magicState !== 'disposed') this.magicState = 'error';
+			controller.abort();
+			throw error;
+		} finally {
+			if (this.magicController === controller) this.magicController = null;
+		}
+	}
+
+	mount() {
+		if (this.magicState !== 'ready') throw new Error('Keyboard emulation data is not ready');
+		super.mount();
+	}
+
+	/** Cancel pending data before retiring any mounted store subscriptions. */
+	destroy() {
+		if (this.magicState === 'idle' || this.magicState === 'disposed')
+			throw new Error('Keyboard emulation has no active initialization');
+		this.magicState = 'disposed';
+		this.magic = null;
+		this.magicController?.abort();
+		this.magicController = null;
+		this.textarea = null;
+		if (this.state !== 'new') super.destroy();
 	}
 
 	layerUpdate() {
@@ -151,6 +201,7 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	emulateKey(event) {
+		if (this.magicState !== 'ready' || this.state !== 'mounted') return;
 		const layoutData = get(stores_infos['layoutData']);
 		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 		const type = get(stores_infos[this.id])['type'];
@@ -333,6 +384,7 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	sendResult(resultToSend, charactersToDelete = 0) {
+		if (this.magicState !== 'ready' || this.state !== 'mounted') return;
 		const plus = get(stores_infos[this.id])['plus'] === 'yes';
 		let newTextAreaValue = this.textarea.value;
 		if (charactersToDelete > 0) {
@@ -373,8 +425,8 @@ export class KeyboardEmulation extends Keyboard {
 			newTextAreaValue = textBeforeCursor + '\t' + textAfterCursor;
 		} else if (resultToSend === '★') {
 			const currentWord = textBeforeCursor.split(/\s+/).slice(-1)[0];
-			if (currentWord.toLowerCase() in magic) {
-				let replacement = magic[currentWord.toLowerCase()];
+			if (currentWord.toLowerCase() in this.magic) {
+				let replacement = this.magic[currentWord.toLowerCase()];
 
 				if (currentWord === currentWord.toUpperCase() && currentWord.length > 1) {
 					replacement = replacement.toUpperCase();
@@ -506,6 +558,7 @@ export class KeyboardEmulation extends Keyboard {
 	}
 
 	releaseKey(event) {
+		if (this.magicState !== 'ready' || this.state !== 'mounted') return;
 		const modifier = this.determineActiveModifier(event);
 		if (modifier) {
 			this['modifiers'][modifier] = false;

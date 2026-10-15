@@ -39,6 +39,14 @@ local function with_scope(body, source, chord_j_identity)
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
 			package.loaded["infra.config_paths"] = { config = function() return path end }
+			-- Complete the actual prediction construction for this enabled software
+			-- intake fixture; no provider, overlay or native runtime is started.
+			for name in pairs(package.loaded) do
+				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+			end
+			local prediction = require("modules.llm.prediction_engine")
+			prediction.init({ scheduler = require("tests.fakes").timer_scheduler() })
+			assert(prediction.shutdown_runtime() == true, "the idle original AI owner must actually close")
 			package.loaded["adapters.storage"] = {
 				get = function(_, default) return default end,
 				set = function() error("shortcut scope must not write legacy storage") end,

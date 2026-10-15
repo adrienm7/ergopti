@@ -1,0 +1,34 @@
+{
+  "status": "PASS",
+  "authority": "authentic exported render; explicit manifest/read; private writes only",
+  "outputs": [
+    {
+      "path": "tools/build/templates/linux-portable-runtime-env.sh",
+      "changed": false
+    },
+    {
+      "path": "static/ergopti_plus/linux/install.sh",
+      "changed": true
+    },
+    {
+      "path": "static/ergopti_plus/linux/_generated/native_runtime.lua",
+      "changed": true
+    },
+    {
+      "path": "tools/build/build-linux-deb.sh",
+      "changed": true
+    },
+    {
+      "path": "tools/build/build-linux-rpm.sh",
+      "changed": true
+    },
+    {
+      "path": "tools/build/PKGBUILD",
+      "changed": true
+    },
+    {
+      "path": "tools/build/nix/flake.nix",
+      "changed": true
+    }
+  ]
+}

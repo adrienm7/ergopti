@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "scope": "TODO109 proposed owned-thread SetWindowSubclass / WM_WINDOWPOSCHANGING visibility veto only",
+  "verdict": "NO_SUPPORTED_ACTIVATION_GUARANTEE_FOR_THIS_MECHANISM",
+  "sources": [
+    {
+      "supplier": "AutoHotkey v2.0.26",
+      "commit": "542510fe0eee2358820a1864ec8b4c9d61b39e0b",
+      "original_retained_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/main-altgr-release-blocker-source-review-v1/upstream/source/script2.cpp",
+      "packet_path": "sources/autohotkey/script2.cpp",
+      "url": "https://raw.githubusercontent.com/AutoHotkey/AutoHotkey/542510fe0eee2358820a1864ec8b4c9d61b39e0b/source/script2.cpp",
+      "bytes": 152369,
+      "sha256": "5978c012a69f7451182776a1fd3bb8400997e74179e786202430c10c13173d7b",
+      "source_not_binary_qualification": true,
+      "excerpts": [
+        {
+          "first_line": 779,
+          "last_line": 799,
+          "text": "\n\tif (aMode != MAIN_MODE_REFRESH && aMode != MAIN_MODE_NO_CHANGE)\n\t\tcurrent_mode = aMode;\n\n\t// Update the text before displaying the window, since it might be a little less disruptive\n\t// and might also be quicker if the window is hidden or non-foreground.\n\t// Unlike SetWindowText(), this method seems to expand tab characters:\n\tif (aMode != MAIN_MODE_NO_CHANGE)\n\t\tSendMessage(g_hWndEdit, WM_SETTEXT, 0, (LPARAM)buf_temp);\n\n\tif (!IsWindowVisible(g_hWnd))\n\t{\n\t\tShowWindow(g_hWnd, SW_SHOW);\n\t\tif (IsIconic(g_hWnd)) // This happens whenever the window was last hidden via the minimize button.\n\t\t\tShowWindow(g_hWnd, SW_RESTORE);\n\t}\n\tif (g_hWnd != GetForegroundWindow())\n\t\tif (!SetForegroundWindow(g_hWnd))\n\t\t\tSetForegroundWindowEx(g_hWnd);  // Only as a last resort, since it uses AttachThreadInput()\n\n\tif (jump_to_bottom)"
+        }
+      ]
+    },
+    {
+      "supplier": "AutoHotkey v2.0.26",
+      "commit": "542510fe0eee2358820a1864ec8b4c9d61b39e0b",
+      "original_retained_path": "/workspace/.ergopti-cloud/continuation-2026-10-11/main-altgr-release-blocker-source-review-v1/upstream/source/window.cpp",
+      "packet_path": "sources/autohotkey/window.cpp",
+      "url": "https://raw.githubusercontent.com/AutoHotkey/AutoHotkey/542510fe0eee2358820a1864ec8b4c9d61b39e0b/source/window.cpp",
+      "bytes": 91550,
+      "sha256": "132bb6ef24773e95f367ce54bf549d126bf1934264976cf2c9d22f7aba009681",
+      "source_not_binary_qualification": true,
+      "excerpts": [
+        {
+          "first_line": 66,
+          "last_line": 80,
+          "text": "\t// performance of the ABORT-IF-HUNG method used with SendMessageTimeout.\n\t// UPDATE for v1.0.42.03: To avoid a very rare crashing issue, IsWindowHung() is no longer called\n\t// here, but instead by our caller.  Search on \"v1.0.42.03\" for more comments.\n\tBOOL result = SetForegroundWindow(aTargetWindow);\n\t// Note: Increasing the sleep time below did not help with occurrences of \"indicated success\n\t// even though it failed\", at least with metapad.exe being activated while command prompt\n\t// and/or AutoIt2's InputBox were active or present on the screen:\n\tSLEEP_WITHOUT_INTERRUPTION(SLEEP_INTERVAL); // Specify param so that it will try to specifically sleep that long.\n\tHWND new_fore_window = GetForegroundWindow();\n\tif (new_fore_window == aTargetWindow)\n\t\treturn aTargetWindow;\n\tif (new_fore_window != aForeWindow && aTargetWindow == GetWindow(new_fore_window, GW_OWNER))\n\t\t// The window we're trying to get to the foreground is the owner of the new foreground window.\n\t\t// This is considered to be a success because a window that owns other windows can never be\n\t\t// made the foreground window, at least if the windows it owns are visible."
+        },
+        {
+          "first_line": 118,
+          "last_line": 129,
+          "text": "\t\t// This might never return if aTargetWindow is a hung window.  But it seems better\n\t\t// to do it this way than to use the PostMessage() method, which might not work\n\t\t// reliably with apps that don't handle such messages in a standard way.\n\t\t// A minimized window must be restored or else SetForegroundWindow() always(?)\n\t\t// won't work on it.  UPDATE: ShowWindowAsync() would prevent a hang, but\n\t\t// probably shouldn't use it because we rely on the fact that the message\n\t\t// has been acted on prior to trying to activate the window (and all Async()\n\t\t// does is post a message to its queue):\n\t\tShowWindow(aTargetWindow, SW_RESTORE);\n\n\tif (aTargetWindow == orig_foreground_wnd) // It's already the active window.\n\t\treturn aTargetWindow;"
+        },
+        {
+          "first_line": 188,
+          "last_line": 195,
+          "text": "\t\t// using it for now:\n\t\t//if (g_MainThreadID != target_thread) // Don't attempt the call otherwise.\n\t\t//\tAttachThreadInput(g_MainThreadID, target_thread, TRUE);\n\t\tif (fore_thread && g_MainThreadID != fore_thread && !IsWindowHung(orig_foreground_wnd))\n\t\t\tis_attached_my_to_fore = AttachThreadInput(g_MainThreadID, fore_thread, TRUE) != 0;\n\t\tif (fore_thread && target_thread && fore_thread != target_thread) // IsWindowHung(aTargetWindow) was called earlier.\n\t\t\tis_attached_fore_to_target = AttachThreadInput(fore_thread, target_thread, TRUE) != 0;\n\t}"
+        },
+        {
+          "first_line": 199,
+          "last_line": 226,
+          "text": "\t// The log showed that it never seemed to need more than two tries.  But there's\n\t// not much harm in trying a few extra times.  The number of tries needed might\n\t// vary depending on how fast the CPU is:\n\tfor (int i = 0; i < 5; ++i)\n\t{\n\t\tif (i == (int)g_WinActivateForce && !sTriedKeyUp) // At least one attempt failed this time, and Alt-up hasn't been tried since the process started.\n\t\t{\n\t\t\tsTriedKeyUp = true;\n\t\t\t// Lexikos: Recent testing on Windows 10.0.19555 indicated that sending Alt-up was just as effective\n\t\t\t// as sending double-Alt (the second Alt was probably just to counter the first one), but it should\n\t\t\t// have lower risk of side-effects since there's no key-down.  One observable side-effect is that\n\t\t\t// if the user happens to be holding Alt (and it wasn't suppressed due to being part of a hotkey),\n\t\t\t// the window menu might light up for an instant before the window loses focus.  However, this also\n\t\t\t// means that if the system is set to hide the menu mnemonics (underlines), that actually happens\n\t\t\t// whereas they would normally be left visible because the window didn't catch Alt-up.\n\t\t\t// The Alt-up seems to be effective at allowing ALL subsequent SetForegroundWindow() calls to succeed\n\t\t\t// even without AttachThreadInput(), and even if Alt-up is just sent at program startup, so it's only\n\t\t\t// done once per process.  In other words, this should stop subsequent calls from causing taskbar\n\t\t\t// buttons to flash.  This doesn't seem to be necessary if AttachThreadInput() is used, so it's not\n\t\t\t// done for #WinActivateForce unless there's been one failed attempt.\n\t\t\t// KEY_BLOCK_THIS is used so that if this or any other scripts (running on v1.1.27+) have a hook\n\t\t\t// installed, the Alt-up will be suppressed to further reduce the risk of side-effects.  Testing\n\t\t\t// showed that the suppressed event worked just as well (in theory, because the system's handling\n\t\t\t// of it isn't and can't be suppressed).\n\t\t\tKeyEvent(KEYUP, VK_MENU, 0, NULL, false, KEY_BLOCK_THIS);\n\t\t}\n\t\tIF_ATTEMPT_SET_FORE\n\t\t\tbreak;"
+        },
+        {
+          "first_line": 258,
+          "last_line": 262,
+          "text": "\t\t// caused by the fact that the user has keys held down (logically or physically?)\n\t\t// Releasing those keys with a key-up event might help, so try that sometime:\n\t\tKeyEvent(KEYDOWNANDUP, VK_MENU);\n\t\tKeyEvent(KEYDOWNANDUP, VK_MENU);\n\t\t//KeyEvent(KEYDOWN, VK_LWIN);"
+        },
+        {
+          "first_line": 304,
+          "last_line": 311,
+          "text": "\t\t// even be functionally identical.  UPDATE: This may no longer be needed\n\t\t// now that the first BringWindowToTop(), above, has been disabled due to\n\t\t// its causing more trouble than it's worth.  But seems safer to leave\n\t\t// this one enabled in case it does resolve IE 5.5 related issues and\n\t\t// possible other issues:\n\t\tBringWindowToTop(aTargetWindow);\n\t\t//SetWindowPos(aTargetWindow, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);\n\t}"
+        }
+      ]
+    },
+    {
+      "supplier": "MicrosoftDocs authoritative documentation snapshot",
+      "packet_path": "sources/microsoft/wm-windowposchanging.md",
+      "url": "https://raw.githubusercontent.com/MicrosoftDocs/win32/docs/desktop-src/winmsg/wm-windowposchanging.md",
+      "http_status": 200,
+      "retrieved_utc": "2026-10-15T16:15:52.255558+00:00",
+      "branch_snapshot_not_commit_pinned": true,
+      "bytes": 3430,
+      "sha256": "a4729c9f5d2a7d12a2d71f39a9d58540775270ba72e1703b58ad205c54b56982",
+      "excerpts": [
+        {
+          "first_line": 46,
+          "last_line": 53,
+          "text": "## Remarks\n\nFor a window with the [**WS\\_OVERLAPPED**](window-styles.md) or **WS\\_THICKFRAME** style, the [**DefWindowProc**](/windows/desktop/api/winuser/nf-winuser-defwindowproca) function sends the [**WM\\_GETMINMAXINFO**](wm-getminmaxinfo.md) message to the window. This is done to validate the new size and position of the window and to enforce the [CS\\_BYTEALIGNCLIENT](about-window-classes.md) and CS\\_BYTEALIGNWINDOW client styles. By not passing the **WM\\_WINDOWPOSCHANGING** message to the **DefWindowProc** function, an application can override these defaults.\n\nWhile this message is being processed, modifying any of the values in [**WINDOWPOS**](/windows/win32/api/winuser/ns-winuser-windowpos) affects the window's new size, position, or place in the Z order. An application can prevent changes to the window by setting or clearing the appropriate bits in the **flags** member of **WINDOWPOS**.\n\n> [!NOTE]\n> Changes to some SWP flags, including SWP_NOACTIVATE and SWP_NOOWNERZORDER, are ignored when they are modified during WM_WINDOWPOSCHANGING."
+        }
+      ]
+    },
+    {
+      "supplier": "MicrosoftDocs authoritative documentation snapshot",
+      "packet_path": "sources/microsoft/setwindowsubclass.md",
+      "url": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/docs/sdk-api-src/content/commctrl/nf-commctrl-setwindowsubclass.md",
+      "http_status": 200,
+      "retrieved_utc": "2026-10-15T16:15:52.255766+00:00",
+      "branch_snapshot_not_commit_pinned": true,
+      "bytes": 3874,
+      "sha256": "05ba26124d39e33d8b5e063cfd50c7b477156d814f51df1b38ed5fbc0ba896b2",
+      "excerpts": [
+        {
+          "first_line": 88,
+          "last_line": 94,
+          "text": "## -remarks\n\nSubclass callbacks are identified by the combination of the callback address and the caller-defined subclass ID. If the callback address and ID pair have not yet been installed, then this function installs the subclass. If the pair has already been installed, then this function just updates the reference data.\n\nEach callback can store a single <b>DWORD_PTR</b> of reference data, which is passed to the callback function when it is called to filter messages. No reference counting is performed for the callback; it may repeatedly call <b>SetWindowSubclass</b> to alter the value of its reference data element.\n\n<div class=\"alert\"><b>Warning</b>  You cannot use the subclassing helper functions to subclass a window across threads.</div>"
+        }
+      ]
+    },
+    {
+      "supplier": "MicrosoftDocs authoritative documentation snapshot",
+      "packet_path": "sources/microsoft/setforegroundwindow.md",
+      "url": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/docs/sdk-api-src/content/winuser/nf-winuser-setforegroundwindow.md",
+      "http_status": 200,
+      "retrieved_utc": "2026-10-15T16:15:52.256719+00:00",
+      "branch_snapshot_not_commit_pinned": true,
+      "bytes": 6312,
+      "sha256": "62a721124faa430daa13e244f3810b8510315ea76f4b92ac4da592b974e0d3d0",
+      "excerpts": [
+        {
+          "first_line": 65,
+          "last_line": 83,
+          "text": "## -description\n\nBrings the thread that created the specified window into the foreground and activates the window. Keyboard input is directed to the window, and various visual cues are changed for the user. The system assigns a slightly higher priority to the thread that created the foreground window than it does to other threads.\n\n## -parameters\n\n### -param hWnd [in]\n\nType: <b>HWND</b>\n\nA handle to the window that should be activated and brought to the foreground.\n\n## -returns\n\nType: <b>BOOL</b>\n\nIf the window was brought to the foreground, the return value is nonzero.\n\nIf the window was not brought to the foreground, the return value is zero."
+        }
+      ]
+    },
+    {
+      "supplier": "MicrosoftDocs authoritative documentation snapshot",
+      "packet_path": "sources/microsoft/showwindow.md",
+      "url": "https://raw.githubusercontent.com/MicrosoftDocs/sdk-api/docs/sdk-api-src/content/winuser/nf-winuser-showwindow.md",
+      "http_status": 200,
+      "retrieved_utc": "2026-10-15T16:15:52.256912+00:00",
+      "branch_snapshot_not_commit_pinned": true,
+      "bytes": 8159,
+      "sha256": "90efa5d2f7e434be4d97c1ba48592d0a2c30b5e229568eca8e13730513b138ed",
+      "excerpts": [
+        {
+          "first_line": 86,
+          "last_line": 95,
+          "text": "| **SW\\_HIDE**<br>0 | Hides the window and activates another window. |\n| **SW\\_SHOWNORMAL**<br>**SW\\_NORMAL**<br>1 | Activates and displays a window. If the window is minimized, maximized, or arranged, the system restores it to its original size and position. An application should specify this flag when displaying the window for the first time. |\n| **SW\\_SHOWMINIMIZED**<br>2 | Activates the window and displays it as a minimized window. |\n| **SW\\_SHOWMAXIMIZED**<br>**SW\\_MAXIMIZE**<br>3 | Activates the window and displays it as a maximized window. |\n| **SW\\_SHOWNOACTIVATE**<br>4 | Displays a window in its most recent size and position. This value is similar to **SW_SHOWNORMAL**, except that the window is not activated. |\n| **SW\\_SHOW**<br>5 | Activates the window and displays it in its current size and position. |\n| **SW\\_MINIMIZE**<br>6 | Minimizes the specified window and activates the next top-level window in the Z order. |\n| **SW\\_SHOWMINNOACTIVE**<br>7 | Displays the window as a minimized window. This value is similar to **SW_SHOWMINIMIZED**, except the window is not activated. |\n| **SW\\_SHOWNA**<br>8 | Displays the window in its current size and position. This value is similar to **SW\\_SHOW**, except that the window is not activated. |\n| **SW\\_RESTORE**<br>9 | Activates and displays the window. If the window is minimized, maximized, or arranged, the system restores it to its original size and position. An application should specify this flag when restoring a minimized window. |"
+        }
+      ]
+    }
+  ],
+  "findings": [
+    "AHK refreshes genuine Edit data before attempting to show the identity window.",
+    "Microsoft explicitly documents ignored SWP_NOACTIVATE modification during WM_WINDOWPOSCHANGING.",
+    "AHK separately calls SetForegroundWindow after ShowWindow; a window-position edit does not interpose this API call.",
+    "AHK foreground fallback can attach input threads and synthesize Alt input, beyond an owned window-position flags edit.",
+    "SetWindowSubclass must run on the owning thread and has no callback reference counting; it is not API interception."
+  ],
+  "limits": [
+    "No claim that every possible native acquisition mechanism is impossible.",
+    "No actual intercepted Windows execution or visibility/foreground observation.",
+    "Pinned upstream source has not been joined to the currently shipped interpreted or compiled binary.",
+    "Documentation bodies are current authoritative snapshots, not Windows implementation or release-pinned runtime proof.",
+    "No source, checkout, index, refs, workflow, native actor or test mutation/execution."
+  ],
+  "native_executions": 0,
+  "tests_run": 0,
+  "product_changes": 0
+}

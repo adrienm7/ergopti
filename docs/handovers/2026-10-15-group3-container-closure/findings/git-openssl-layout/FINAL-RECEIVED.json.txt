@@ -1,0 +1,301 @@
+{
+  "kind": "official-distribution-PE-static-receiving-only",
+  "source_commit": "46d6388d29f854f529985fcc43cded73b325c890",
+  "source_path": "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1",
+  "source_full_sha256": "2d18da079e95068323e7d0a278b3e12987f9d0735fef50f6821e2806370a29ac",
+  "exact_openssl_class_bytes": 36573,
+  "exact_openssl_class_sha256": "763eaf881ffd5fe98cb961c9b1f7114f0cc3f690878558e6c59a450b3388afd2",
+  "metadata": [
+    {
+      "tag": "2.55.0.windows.5",
+      "release_id": 373873197,
+      "api_body_sha256": "85c64477281164b10ca6bf42752b927074b59fb5b18c6319ba20c5d62f29a5bf"
+    },
+    {
+      "tag": "2.56.0.windows.2",
+      "release_id": 404111703,
+      "api_body_sha256": "b2adaeec39167f602fe929bc43a6597de7b7dafffb0496a8d32e3c188906c12e"
+    }
+  ],
+  "verified_assets": [
+    {
+      "tag": "2.55.0.windows.5",
+      "name": "MinGit-2.55.0.5-64-bit.zip",
+      "bytes": 38989688,
+      "sha256": "56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e",
+      "official_api_digest_and_release_body_both_verified": true,
+      "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-64-bit.zip",
+      "download_host": "release-assets.githubusercontent.com"
+    },
+    {
+      "tag": "2.56.0.windows.2",
+      "name": "MinGit-2.56.0.2-64-bit.zip",
+      "bytes": 39806486,
+      "sha256": "da35e72aa21c005a5a0d298cfbae110bc1609a815730ea0dde84b01a1b3cd3be",
+      "official_api_digest_and_release_body_both_verified": true,
+      "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-64-bit.zip",
+      "download_host": "release-assets.githubusercontent.com"
+    }
+  ],
+  "zip_paths": [
+    {
+      "archive": "MinGit-2.55.0.5-64-bit.zip",
+      "all_regular_paths_at_old_mingw64_ssl_or_crypto": [
+        "mingw64/bin/libcrypto-3-x64.dll",
+        "mingw64/bin/libssl-3-x64.dll"
+      ],
+      "all_regular_paths_at_new_ucrt64_ssl_or_crypto": []
+    },
+    {
+      "archive": "MinGit-2.56.0.2-64-bit.zip",
+      "all_regular_paths_at_old_mingw64_ssl_or_crypto": [],
+      "all_regular_paths_at_new_ucrt64_ssl_or_crypto": [
+        "ucrt64/bin/libcrypto-3-x64.dll",
+        "ucrt64/bin/libssl-3-x64.dll"
+      ]
+    }
+  ],
+  "images": [
+    {
+      "path": "images/MinGit-2.55.0.5-64-bit/mingw64/bin/libcrypto-3-x64.dll",
+      "bytes": 5805212,
+      "sha256": "0330b5f558996f297d687e1a2b2fcc2cacf883b16baef74aaef35285d7c1231c",
+      "imports": [
+        "ADVAPI32.dll",
+        "CRYPT32.dll",
+        "KERNEL32.dll",
+        "msvcrt.dll",
+        "USER32.dll",
+        "WS2_32.dll"
+      ],
+      "export_count": 5883,
+      "required_exports": [
+        "BIO_free",
+        "BIO_new",
+        "BIO_read",
+        "BIO_s_mem",
+        "BIO_write",
+        "ERR_clear_error",
+        "ERR_peek_last_error",
+        "OPENSSL_version_major",
+        "OpenSSL_version_num"
+      ],
+      "missing_required_exports": [],
+      "OpenSSL_ascii_strings": [
+        "OpenSSL 3.5.7 9 Jun 2026"
+      ],
+      "objdump_sha256": "cf3886b07d4753073ae9924cb1c4b4062316ef36d5112cf2af45bb652d0a7c52",
+      "export_census_sha256": "bc73a2a6f7d485481ae2537075b2ccf37455013a822ed5fc99cfa90056f1662a",
+      "static_PE": {
+        "machine": "0x8664",
+        "coff_characteristics": "0x2026",
+        "optional_magic": "0x20b",
+        "size_ceiling_32MiB": true
+      }
+    },
+    {
+      "path": "images/MinGit-2.55.0.5-64-bit/mingw64/bin/libssl-3-x64.dll",
+      "bytes": 1026716,
+      "sha256": "feb5b300e0b3a021fed481178f3d66896426576d4d13b85a304d2a3809b25bfd",
+      "imports": [
+        "libcrypto-3-x64.dll",
+        "KERNEL32.dll",
+        "msvcrt.dll",
+        "WS2_32.dll"
+      ],
+      "export_count": 603,
+      "required_exports": [
+        "OPENSSL_init_ssl",
+        "SSL_CTX_check_private_key",
+        "SSL_CTX_ctrl",
+        "SSL_CTX_free",
+        "SSL_CTX_new",
+        "SSL_CTX_use_PrivateKey_ASN1",
+        "SSL_CTX_use_certificate_ASN1",
+        "SSL_do_handshake",
+        "SSL_free",
+        "SSL_get_error",
+        "SSL_new",
+        "SSL_read",
+        "SSL_set_accept_state",
+        "SSL_set_bio",
+        "SSL_shutdown",
+        "SSL_write",
+        "TLS_server_method"
+      ],
+      "missing_required_exports": [],
+      "OpenSSL_ascii_strings": [],
+      "objdump_sha256": "373c288b85f4dc7a577f1a69d569834e177272d318e7b186217e19fc816437a8",
+      "export_census_sha256": "73617578cef6fb34d4902e103aa3969ef1b80d7033aef584b09ad33817d3b617",
+      "static_PE": {
+        "machine": "0x8664",
+        "coff_characteristics": "0x2026",
+        "optional_magic": "0x20b",
+        "size_ceiling_32MiB": true
+      }
+    },
+    {
+      "path": "images/MinGit-2.56.0.2-64-bit/ucrt64/bin/libcrypto-3-x64.dll",
+      "bytes": 5399196,
+      "sha256": "f8839fd7d5b5e7b1763c88705538c5762a2f97df17f37092e37de3c663f30b1e",
+      "imports": [
+        "ADVAPI32.dll",
+        "CRYPT32.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "USER32.dll",
+        "WS2_32.dll"
+      ],
+      "export_count": 5883,
+      "required_exports": [
+        "BIO_free",
+        "BIO_new",
+        "BIO_read",
+        "BIO_s_mem",
+        "BIO_write",
+        "ERR_clear_error",
+        "ERR_peek_last_error",
+        "OPENSSL_version_major",
+        "OpenSSL_version_num"
+      ],
+      "missing_required_exports": [],
+      "OpenSSL_ascii_strings": [
+        "OpenSSL 3.5.9 29 Sep 2026"
+      ],
+      "objdump_sha256": "95dd42fb4f83740dfdb538d2996904c83e41ec2b836d41cb83de387cb5f7f1bf",
+      "export_census_sha256": "bc73a2a6f7d485481ae2537075b2ccf37455013a822ed5fc99cfa90056f1662a",
+      "static_PE": {
+        "machine": "0x8664",
+        "coff_characteristics": "0x2026",
+        "optional_magic": "0x20b",
+        "size_ceiling_32MiB": true
+      }
+    },
+    {
+      "path": "images/MinGit-2.56.0.2-64-bit/ucrt64/bin/libssl-3-x64.dll",
+      "bytes": 966300,
+      "sha256": "6af55a4d522e2cc29ff0833cad4f6f7560f8ba2d107b97990d9415c590a4224a",
+      "imports": [
+        "libcrypto-3-x64.dll",
+        "KERNEL32.dll",
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll",
+        "WS2_32.dll"
+      ],
+      "export_count": 603,
+      "required_exports": [
+        "OPENSSL_init_ssl",
+        "SSL_CTX_check_private_key",
+        "SSL_CTX_ctrl",
+        "SSL_CTX_free",
+        "SSL_CTX_new",
+        "SSL_CTX_use_PrivateKey_ASN1",
+        "SSL_CTX_use_certificate_ASN1",
+        "SSL_do_handshake",
+        "SSL_free",
+        "SSL_get_error",
+        "SSL_new",
+        "SSL_read",
+        "SSL_set_accept_state",
+        "SSL_set_bio",
+        "SSL_shutdown",
+        "SSL_write",
+        "TLS_server_method"
+      ],
+      "missing_required_exports": [],
+      "OpenSSL_ascii_strings": [],
+      "objdump_sha256": "f5f2cad718e5836123fb26f3aed75938593d11db7c1d5803cd9bf7046509193f",
+      "export_census_sha256": "73617578cef6fb34d4902e103aa3969ef1b80d7033aef584b09ad33817d3b617",
+      "static_PE": {
+        "machine": "0x8664",
+        "coff_characteristics": "0x2026",
+        "optional_magic": "0x20b",
+        "size_ceiling_32MiB": true
+      }
+    }
+  ],
+  "comparisons": [
+    {
+      "image": "crypto",
+      "old_sha256": "0330b5f558996f297d687e1a2b2fcc2cacf883b16baef74aaef35285d7c1231c",
+      "new_sha256": "f8839fd7d5b5e7b1763c88705538c5762a2f97df17f37092e37de3c663f30b1e",
+      "named_exports_identical": true,
+      "new_import_names": [
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-locale-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "removed_import_names": [
+        "msvcrt.dll"
+      ],
+      "new_non_ApiSet_package_imports": [],
+      "missing_fixture_exports": []
+    },
+    {
+      "image": "ssl",
+      "old_sha256": "feb5b300e0b3a021fed481178f3d66896426576d4d13b85a304d2a3809b25bfd",
+      "new_sha256": "6af55a4d522e2cc29ff0833cad4f6f7560f8ba2d107b97990d9415c590a4224a",
+      "named_exports_identical": true,
+      "new_import_names": [
+        "api-ms-win-crt-convert-l1-1-0.dll",
+        "api-ms-win-crt-environment-l1-1-0.dll",
+        "api-ms-win-crt-filesystem-l1-1-0.dll",
+        "api-ms-win-crt-heap-l1-1-0.dll",
+        "api-ms-win-crt-private-l1-1-0.dll",
+        "api-ms-win-crt-runtime-l1-1-0.dll",
+        "api-ms-win-crt-stdio-l1-1-0.dll",
+        "api-ms-win-crt-string-l1-1-0.dll",
+        "api-ms-win-crt-time-l1-1-0.dll",
+        "api-ms-win-crt-utility-l1-1-0.dll"
+      ],
+      "removed_import_names": [
+        "msvcrt.dll"
+      ],
+      "new_non_ApiSet_package_imports": [],
+      "missing_fixture_exports": []
+    }
+  ],
+  "objdump": {
+    "path": "/usr/bin/objdump",
+    "sha256": "96afb8521834982d0e711b5d6e9785252bf82129fb0106b93a6bd54d83fae11f",
+    "version": "GNU objdump (GNU Binutils for Debian) 2.44"
+  },
+  "first_export_parser_draft_superseded": "primary-pe-census.json",
+  "authoritative_PE_census": "final-pe-census.json",
+  "static_findings": [
+    "official MinGit paths move mingw64/bin to ucrt64/bin; original fixture hardcodes former",
+    "named required export set unchanged",
+    "new declared UCRT API-set imports replace msvcrt and fall under original ApiSet predicate"
+  ],
+  "hosted_image_equality_proved": false,
+  "historical_failure_cause_proved": false,
+  "downloaded_code_executed_or_loaded": false,
+  "native_or_tests_or_checkout_or_refs_or_truststore_changed": false,
+  "report_sha256": "1eceffeaf4b2541f15b97a7c5e00a9de9d79eaceb56360d3be66f3aeab5f2d06"
+}

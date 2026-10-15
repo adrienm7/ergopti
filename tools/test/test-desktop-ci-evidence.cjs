@@ -26,6 +26,96 @@ const crypto = require('node:crypto');
 const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
 const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
 const pipeline = require('./ci-full-default.cjs');
+const Mac = require('./fixtures/macos-stage-source.cjs');
+const MacRoles = require('../ci/macos-stage-roles.cjs');
+
+/** Checks actual stage metadata and the typed matrix producer used by that stage. */
+function macRoleBody(body, role, expectedCount) {
+	const parent = role === 'cold-bootstrap-native' ? 'package-macos' : 'test-hs';
+	const matrix = role === 'cold-bootstrap-native' ? 'testbuild_matrix' : 'e2e_matrix';
+	const metadata = role === 'cold-bootstrap-native' ? 'testbuild_metadata' : 'e2e_metadata';
+	const selected = `fromJSON(needs.${parent}.outputs.${metadata})[matrix.lot]`;
+	assert.equal(pipeline.field(body, 'needs'), '- ' + parent);
+	assert.deepEqual(pipeline.needsOf(body), [parent]);
+	assert.equal(pipeline.field(body, 'runs-on'), '${{ ' + selected + '.runner }}');
+	assert.equal(pipeline.field(body, 'timeout-minutes'), '${{ ' + selected + '.timeout_minutes }}');
+	assert.equal(pipeline.field(body, 'if'), null);
+	assert.equal(pipeline.field(body, 'continue-on-error'), null);
+	assert.equal(
+		pipeline.field(body, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(needs.' + parent + '.outputs.' + matrix + ') }}'
+	);
+	assert.equal(
+		pipeline.field(body, 'env'),
+		[
+			'MACOS_STAGE_LOT: ${{ matrix.lot }}',
+			'MACOS_STAGE_METADATA: ${{ needs.' + parent + '.outputs.' + metadata + ' }}',
+			'MACOS_STAGE_CELL: ${{ toJSON(' + selected + ') }}',
+			...['role', 'runner', 'architecture', 'scenario'].map(
+				(key) => 'MACOS_STAGE_' + key.toUpperCase() + ': ${{ ' + selected + '.' + key + ' }}'
+			)
+		].join(' ')
+	);
+	const stage = role === 'cold-bootstrap-native' ? 'testbuild' : 'e2e';
+	const producer = pipeline.job(parent);
+	for (const output of [matrix, metadata])
+		assert.ok(
+			pipeline
+				.field(producer, 'outputs')
+				.includes(output + ': ${{ steps.stage-plan.outputs.' + output + ' }}')
+		);
+	const planners = pipeline
+		.steps(producer)
+		.filter((step) => pipeline.stepField(step.body, 'id') === 'stage-plan');
+	assert.equal(planners.length, 1);
+	assert.equal(
+		pipeline.stepField(planners[0].body, 'run'),
+		'node tools/ci/macos-stage-roles.cjs plan ' + stage
+	);
+	assert.equal(pipeline.stepField(planners[0].body, 'if'), null);
+	assert.equal(pipeline.stepField(planners[0].body, 'continue-on-error'), null);
+	const admission = pipeline.step(body, 'Admit complete successful predecessor stage');
+	assert.match(admission, /^          MACOS_STAGE_NEEDS: \$\{\{ toJSON\(needs\) \}\}$/m);
+	assert.ok(
+		pipeline
+			.stepField(admission, 'run')
+			.startsWith(
+				'node tools/ci/macos-stage-roles.cjs admit ' + (stage === 'e2e' ? 'unit' : 'build') + ' '
+			)
+	);
+	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
+	const record = pipeline.step(body, 'Record actual stage role outcome — ${{ matrix.lot }}');
+	assert.equal(pipeline.stepField(record, 'if'), 'always()');
+	assert.ok(
+		pipeline
+			.stepField(record, 'run')
+			.startsWith('node tools/ci/macos-stage-roles.cjs record ' + stage + ' ')
+	);
+	const rows = MacRoles.plan(role === 'cold-bootstrap-native' ? 'testbuild' : 'e2e', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: true,
+		scenarios: ['clean']
+	}).filter((row) => row.role === role);
+	const expected =
+		role === 'cold-bootstrap-native'
+			? [['macos-15', 'arm64', 90]]
+			: [
+					['macos-15', 'arm64', 60],
+					['macos-15-intel', 'amd64', 60]
+				];
+	assert.deepEqual(
+		rows.map((row) => [row.runner, row.architecture, row.timeout_minutes]),
+		expected
+	);
+	const steps = Mac.selected(body, role);
+	assert.equal(steps.length, expectedCount, 'Every original role step retains admission');
+	return '    steps:\n' + steps.map((step) => step.body).join('\n');
+}
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const { displayPlan } = require('../ci/js-feature-matrix.cjs');
 const {
 	healthyUpgrade,
 	runContractCases,
@@ -572,16 +662,45 @@ try {
 	fs.rmSync(startupEvidenceRoot, { recursive: true, force: true });
 }
 
-/** Pins a fresh shallow checkout and the exact independently gated core suites. */
-function checkCore(body) {
-	assert.deepEqual(pipeline.needsOf(body), ['validate']);
+/** Pin fresh feature runners and the exact independently gated additional suites. */
+function checkCore(caller, body, prepare, browser, planner = displayPlan) {
+	assert.deepEqual(pipeline.needsOf(caller), ['validate', 'prepare-common']);
+	assert.equal(pipeline.field(caller, 'if'), null);
+	assert.equal(pipeline.field(caller, 'uses'), './.github/workflows/ci-common.yml');
+	assert.match(caller, /^      common_plan: \$\{\{ needs\.prepare-common\.outputs\.plan \}\}$/m);
+	assert.deepEqual(pipeline.needsOf(body), []);
 	assert.equal(pipeline.field(body, 'if'), null);
 	assert.match(body, /^      fail-fast: false$/m);
-	assert.ok(
-		body.includes(
-			`        suite: \${{ fromJSON(github.ref == 'refs/heads/main' && '["js","properties","mutation"]' || '["js","properties"]') }}`
-		)
+	assert.equal(
+		pipeline.field(body, 'strategy'),
+		'fail-fast: false matrix: ${{ fromJSON(inputs.common_plan).matrix }}'
 	);
+	assert.deepEqual(pipeline.needsOf(prepare), []);
+	assert.equal(pipeline.field(prepare, 'if'), null);
+	assert.equal(pipeline.field(prepare, 'outputs'), 'plan: ${{ steps.plan.outputs.plan }}');
+	assert.equal(
+		pipeline.stepField(
+			pipeline.step(prepare, 'Plan every canonical feature and additional suite'),
+			'id'
+		),
+		'plan'
+	);
+	assert.deepEqual(
+		pipeline.runOf(pipeline.step(prepare, 'Plan every canonical feature and additional suite')),
+		['set -euo pipefail', 'node tools/ci/js-feature-matrix.cjs plan']
+	);
+	const inventory = loadInventory(path.resolve(__dirname, '../..'));
+	for (const ref of ['refs/heads/main', 'refs/heads/dev']) {
+		const planned = planner(inventory, ref);
+		assert.deepEqual(planned.matrix, { lot: Object.keys(planned.metadata) });
+		const rows = Object.values(planned.metadata);
+		assert.deepEqual(rows, [
+			...inventory.features.map((feature) => ({ suite: 'js', feature })),
+			{ suite: 'properties', feature: 'properties' },
+			{ suite: 'hotstrings-format', feature: 'hotstrings-format' },
+			...(ref === 'refs/heads/main' ? [{ suite: 'mutation', feature: 'mutation' }] : [])
+		]);
+	}
 	const steps = pipeline.steps(body);
 	const checkout = steps.filter(
 		(step) => pipeline.stepField(step.body, 'uses') === 'actions/checkout@v4'
@@ -589,44 +708,114 @@ function checkCore(body) {
 	assert.equal(checkout.length, 1);
 	assert.equal(pipeline.stepField(checkout[0].body, 'with'), null);
 	assert.doesNotMatch(body, /\bgit (?:fetch|pull|clone)\b/);
-	assert.equal(
-		pipeline.stepField(pipeline.step(body, 'Run shared validation suite'), 'run'),
-		'npm run test:${{ matrix.suite }}'
+	assert.match(body, /^      COMMON_LOT: \$\{\{ matrix\.lot \}\}$/m);
+	assert.match(body, /^      COMMON_PLAN: \$\{\{ inputs\.common_plan \}\}$/m);
+	const admission = pipeline.step(body, 'Admit the complete Common lot map');
+	assert.equal(pipeline.stepField(admission, 'id'), 'common-lot');
+	assert.equal(pipeline.stepField(admission, 'if'), null);
+	assert.equal(pipeline.stepField(admission, 'continue-on-error'), null);
+	assert.deepEqual(pipeline.runOf(admission), ['node tools/ci/js-feature-matrix.cjs select']);
+	assert.ok(
+		body.indexOf(admission) < body.indexOf(pipeline.step(body, 'Install native validation tools'))
 	);
+	const hotstrings = pipeline.step(body, 'Check hotstring TOML files are sorted and formatted');
+	assert.equal(pipeline.stepField(hotstrings, 'id'), 'hotstrings-format');
+	assert.equal(
+		pipeline.stepField(hotstrings, 'if'),
+		"${{ !cancelled() && steps.common-lot.outputs.suite == 'hotstrings-format' }}"
+	);
+	assert.equal(pipeline.stepField(hotstrings, 'continue-on-error'), null);
+	assert.deepEqual(pipeline.runOf(hotstrings), [
+		'python tools/format_toml.py --hotstrings --all --check'
+	]);
+	assert.ok(
+		body.indexOf(hotstrings) < body.indexOf(pipeline.step(body, 'Run shared validation suite'))
+	);
+	assert.equal(
+		pipeline.stepField(pipeline.step(body, 'Run shared validation suite'), 'env'),
+		'SUITE: ${{ steps.common-lot.outputs.suite }} FEATURE: ${{ steps.common-lot.outputs.feature }}'
+	);
+	assert.deepEqual(pipeline.runOf(pipeline.step(body, 'Run shared validation suite')), [
+		'case "$SUITE" in',
+		'    js) npm run test:js -- --feature "$FEATURE" ;;',
+		'    properties) npm run test:properties ;;',
+		'    mutation) npm run test:mutation ;;',
+		'    hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
+		'    *) exit 1 ;;',
+		'esac'
+	]);
 	assert.ok(steps.some((step) => pipeline.stepField(step.body, 'run') === 'npm ci'));
 	assert.match(
 		body,
 		/sudo python3 "\$GITHUB_WORKSPACE\/tools\/ci\/ubuntu_apt\.py" -y lua5\.4 lua-luv libxml2-utils/
 	);
+	assert.deepEqual(pipeline.needsOf(browser), ['shared-validation']);
+	assert.equal(pipeline.field(browser, 'if'), null);
 	for (const [name, command] of [
 		['Install shared UI browsers', 'node tools/ci/install-playwright.cjs chromium webkit'],
 		['Test shared layer editor rendering', 'npm run test:browser:layer-editor'],
 		['Test shared Versions installation rendering', 'npm run test:browser:changelog-install']
 	]) {
-		const step = pipeline.step(body, name);
-		assert.equal(pipeline.stepField(step, 'if'), "matrix.suite == 'js'");
+		const step = pipeline.step(browser, name);
+		assert.equal(pipeline.stepField(step, 'if'), null);
 		assert.equal(pipeline.stepField(step, 'run'), command);
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	}
 }
 
-const core = pipeline.job('core');
-checkCore(core);
+const coreCaller = pipeline.job('core');
+const core = pipeline.job('shared-validation');
+const corePrepare = pipeline.job('prepare-common');
+const coreBrowser = pipeline.job('common-e2e');
+assert.equal(pipeline.locate('shared-validation').file, '.github/workflows/ci-common.yml');
+checkCore(coreCaller, core, corePrepare, coreBrowser);
 for (const [from, to] of [
-	['refs/heads/main', 'refs/heads/never'],
-	['"js","properties","mutation"', '"js","properties"'],
-	['"js","properties"', '"js"'],
+	['needs: [validate, prepare-common]', 'needs: [macos]'],
+	['./.github/workflows/ci-common.yml', './.github/workflows/foreign.yml']
+]) {
+	const changed = coreCaller.replace(from, to);
+	assert.notEqual(changed, coreCaller, from + ' must mutate the actual Common caller');
+	assert.throws(() => checkCore(changed, core, corePrepare, coreBrowser), from);
+}
+for (const drop of ['mutation', 'properties', 'hotstrings-format']) {
+	assert.throws(
+		() =>
+			checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory, ref) => {
+				const metadata = Object.fromEntries(
+					Object.entries(displayPlan(inventory, ref).metadata).filter(
+						([, row]) => row.suite !== drop
+					)
+				);
+				return { matrix: { lot: Object.keys(metadata) }, metadata };
+			}),
+		'dropping the actual ' + drop + ' row'
+	);
+}
+assert.throws(
+	() =>
+		checkCore(coreCaller, core, corePrepare, coreBrowser, (inventory) =>
+			displayPlan(inventory, 'refs/heads/dev')
+		),
+	'main must retain its actual mutation row'
+);
+for (const [from, to] of [
 	['fail-fast: false', 'fail-fast: true'],
-	['needs: [validate]', 'needs: [macos]'],
-	['run: npm run test:${{ matrix.suite }}', 'run: npm run test:${{ matrix.suite }} -- --only lint'],
-	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
-	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
+	['js) npm run test:js -- --feature "$FEATURE" ;;', 'js) npm run test:js -- --only lint ;;'],
+	["name: 'Unit tests'", "name: 'Unit tests'\n    needs: [prepare-common]"],
+	['FEATURE: ${{ steps.common-lot.outputs.feature }}', 'FEATURE: foreign'],
+	['COMMON_LOT: ${{ matrix.lot }}', 'COMMON_LOT: foreign'],
+	['COMMON_PLAN: ${{ inputs.common_plan }}', 'COMMON_PLAN: {}'],
+	['id: common-lot', 'id: common-lot\n        if: false'],
+	['node tools/ci/js-feature-matrix.cjs select', 'node tools/ci/js-feature-matrix.cjs plan'],
+	['id: hotstrings-format', 'id: foreign-format'],
 	[
-		'run: npm run test:browser:changelog-install',
-		'continue-on-error: true\n        run: npm run test:browser:changelog-install'
+		'python tools/format_toml.py --hotstrings --all --check',
+		'python tools/format_toml.py --hotstrings --all'
 	],
-	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
-	["if: matrix.suite == 'js'", "if: matrix.suite == 'never'"],
+	[
+		'hotstrings-format) test "${{ steps.hotstrings-format.outcome }}" = success ;;',
+		'hotstrings-format) true ;;'
+	],
 	[
 		'- uses: actions/checkout@v4',
 		'- uses: actions/checkout@v4\n        with:\n          fetch-depth: 0'
@@ -634,7 +823,32 @@ for (const [from, to] of [
 ]) {
 	const changed = core.replace(from, to);
 	assert.notEqual(changed, core, from + ' must actually mutate the shared gate');
-	assert.throws(() => checkCore(changed), from);
+	assert.throws(() => checkCore(coreCaller, changed, corePrepare, coreBrowser), from);
+}
+for (const [from, to] of [
+	['plan: ${{ steps.plan.outputs.plan }}', 'plan: ${{ steps.plan.outputs.matrix }}'],
+	['node tools/ci/js-feature-matrix.cjs plan', 'node tools/ci/js-feature-matrix.cjs select']
+]) {
+	const changed = corePrepare.replace(from, to);
+	assert.notEqual(changed, corePrepare, 'one actual Common producer mutation');
+	assert.throws(() => checkCore(coreCaller, core, changed, coreBrowser));
+}
+for (const [from, to] of [
+	['run: npm run test:browser:layer-editor', 'run: echo skipped browser gate'],
+	['run: npm run test:browser:changelog-install', 'run: echo skipped Versions browser gate'],
+	[
+		'run: npm run test:browser:changelog-install',
+		'continue-on-error: true\n        run: npm run test:browser:changelog-install'
+	],
+	['node tools/ci/install-playwright.cjs chromium webkit', 'npx playwright install chromium'],
+	[
+		'run: npm run test:browser:layer-editor',
+		"if: matrix.suite == 'never'\n        run: npm run test:browser:layer-editor"
+	]
+]) {
+	const changed = coreBrowser.replace(from, to);
+	assert.notEqual(changed, coreBrowser, from + ' must actually mutate the browser gate');
+	assert.throws(() => checkCore(coreCaller, core, corePrepare, changed), from);
 }
 
 for (const [job, platform] of [
@@ -647,23 +861,37 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	assert.equal(pipeline.field(body, 'needs'), null);
-	assert.equal(pipeline.field(body, 'if'), null);
-	assert.equal(pipeline.field(body, 'continue-on-error'), null);
-	assert.equal(pipeline.field(body, 'runs-on'), '${{ matrix.runner }}');
-	assert.match(body, /fail-fast: false/);
-	assert.match(body, /runner: macos-15\n\s+architecture: arm64/);
-	assert.match(body, /runner: macos-15-intel\n\s+architecture: amd64/);
-	assert.match(body, /ERGOPTI_RELEASE_TAG: \$\{\{ inputs\.tag \}\}/);
-	assert.match(body, /GOTOOLCHAIN: local/);
-	const acquire = pipeline.step(body, 'Acquire and verify genuine pinned upstream inputs');
+	const role = macRoleBody(body, 'managed-ollama-native', 36);
+	for (const step of Mac.selected(body, 'managed-ollama-native')) {
+		assert.match(step.body, /^          GOTOOLCHAIN: 'local'$/m);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_TAG: '\$\{\{ inputs\.tag \}\}'$/m);
+		assert.match(
+			step.body,
+			/^          ERGOPTI_RELEASE: "\$\{\{ inputs\.release && 'true' \|\| 'false' \}\}"$/m
+		);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_VERSION: '\$\{\{ inputs\.version \}\}'$/m);
+		assert.match(step.body, /^          ERGOPTI_RELEASE_CHANNEL: '\$\{\{ inputs\.channel \}\}'$/m);
+		assert.match(
+			step.body,
+			/^          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '\$\{\{ env\.MACOS_STAGE_ARCHITECTURE \}\}'$/m
+		);
+	}
+	const acquire = pipeline.step(role, 'Acquire and verify genuine pinned upstream inputs');
+	assert.equal(
+		pipeline.stepField(acquire, 'if'),
+		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+	);
 	assert.match(
 		acquire,
 		/git -C "\$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "\$ERGOPTI_OLLAMA_SOURCE_COMMIT"/
 	);
 	assert.match(acquire, /actual == identity\['sha256'\]/);
 	assert.match(acquire, /archive\.stat\(\)\.st_size == identity\['bytes'\]/);
-	const build = pipeline.step(body, 'Build and admit the actual native source asset');
+	const build = pipeline.step(role, 'Build and admit the actual native source asset');
+	assert.equal(
+		pipeline.stepField(build, 'if'),
+		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+	);
 	for (const command of [
 		'tools/build/build-macos-managed-ollama.py',
 		'tools/test/macos_managed_ollama_catalogue_test.py --native',
@@ -672,7 +900,7 @@ function checkManagedOllamaNative(body) {
 		assert.ok(build.includes(command));
 	assert.match(build, /--release "\$ERGOPTI_RELEASE" --release-tag "\$ERGOPTI_RELEASE_TAG"/);
 	const listener = pipeline.step(
-		body,
+		role,
 		'Qualify actual SDK accepted-owner and deadline XCTest controls'
 	);
 	assert.match(
@@ -689,8 +917,9 @@ function checkManagedOllamaNative(body) {
 	assert.match(listener, /ManagedNetworkBootstrapTests/);
 	assert.match(listener, /Executed 49 tests, with 0 failures/);
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
+	assert.equal(pipeline.stepField(listener, 'if'), Mac.condition('managed-ollama-native'));
 	const receive = pipeline.step(
-		body,
+		role,
 		'Receive actual native model create, pull, inference and retirement'
 	);
 	assert.match(receive, /for profile in pac-inline pac-url explicit-proxy/);
@@ -700,43 +929,58 @@ function checkManagedOllamaNative(body) {
 		/--archive "\$ERGOPTI_OLLAMA_ASSET" --catalogue "\$ERGOPTI_OLLAMA_CATALOGUE"/
 	);
 	assert.equal(pipeline.stepField(receive, 'continue-on-error'), null);
-	assert.doesNotMatch(body, /gh release|softprops\/action-gh-release|createRelease|--cross/);
+	assert.equal(
+		pipeline.stepField(receive, 'if'),
+		Mac.condition(
+			'managed-ollama-native',
+			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+		)
+	);
+	assert.doesNotMatch(role, /gh release|softprops\/action-gh-release|createRelease|--cross/);
 }
-const managedOllamaNative = pipeline.job('managed-ollama-native');
+const managedOllamaNative = pipeline.job(Mac.stage['managed-ollama-native']);
 checkManagedOllamaNative(managedOllamaNative);
-assert.deepEqual(
-	pipeline.needsOf(pipeline.job('macos-ok')).sort(),
-	[
-		'test-hs',
-		'e2e-hs',
-		'package-macos',
-		'launch',
-		'tooltip-canvas',
-		'managed-ollama-native',
-		'cold-bootstrap-native'
-	].sort()
+assert.deepEqual(pipeline.needsOf(pipeline.job('macos-ok')), ['launch']);
+assert.match(
+	pipeline.step(pipeline.job('macos-ok'), 'Require the complete source-bound stage chain'),
+	/node tools\/ci\/macos-stage-roles\.cjs verdict/
 );
 assert.ok(pipeline.job('macos').includes('tag: ${{ needs.validate.outputs.tag }}'));
 for (const [from, to] of [
-	['runs-on: ${{ matrix.runner }}', 'runs-on: ubuntu-latest'],
+	['    needs:\n      - test-hs\n', ''],
+	['    needs:\n      - test-hs', 'needs: []'],
+	[
+		'matrix: ${{ fromJSON(needs.test-hs.outputs.e2e_matrix) }}',
+		'matrix: ${{ fromJSON(needs.test-hs.outputs.foreign_matrix) }}'
+	],
+	['    needs:\n      - test-hs', 'needs: [e2e-hs]'],
+	['    needs:\n      - test-hs', 'needs: [e2e-hs, test-linux]'],
+	['    needs:\n      - test-hs', 'needs: [package-macos]'],
+	[
+		'runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}',
+		'runs-on: ubuntu-latest'
+	],
 	['fail-fast: false', 'fail-fast: true'],
-	['runner: macos-15-intel', 'runner: macos-15'],
-	['architecture: amd64', 'architecture: arm64'],
-	['GOTOOLCHAIN: local', 'GOTOOLCHAIN: auto'],
+	[
+		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_metadata }}',
+		'MACOS_STAGE_METADATA: ${{ needs.test-hs.outputs.e2e_matrix }}'
+	],
+	['[matrix.lot].role', '[matrix.lot].runner'],
+	['Record actual stage role outcome — ${{ matrix.lot }}', 'Record actual stage role outcome'],
+	[
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'",
+		"ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_RUNNER }}'"
+	],
+	["env.MACOS_STAGE_ROLE == 'managed-ollama-native'", "env.MACOS_STAGE_ROLE == 'tooltip-canvas'"],
+	["GOTOOLCHAIN: 'local'", "GOTOOLCHAIN: 'auto'"],
 	['fetch --depth=1 --no-tags origin', 'fetch --depth=1 --no-tags other'],
 	["actual == identity['sha256']", 'actual == actual'],
 	['macos_managed_ollama_catalogue_test.py --native', 'macos_managed_ollama_catalogue_test.py'],
 	['for profile in pac-inline pac-url explicit-proxy', 'for profile in pac-inline'],
 	['Executed 12 tests, with 0 failures', 'Executed 0 tests, with 0 failures'],
-	[
-		"    name: 'Managed Ollama native",
-		"    needs: package-macos\n    name: 'Managed Ollama native"
-	],
-	["    name: 'Managed Ollama native", "    if: inputs.release\n    name: 'Managed Ollama native"],
-	[
-		"    name: 'Managed Ollama native",
-		"    continue-on-error: true\n    name: 'Managed Ollama native"
-	]
+	['    name: E2E tests', '    needs: package-macos\n    name: E2E tests'],
+	['    name: E2E tests', '    if: inputs.release\n    name: E2E tests'],
+	['    name: E2E tests', '    continue-on-error: true\n    name: E2E tests']
 ]) {
 	const changed = managedOllamaNative.replace(from, to);
 	assert.notEqual(changed, managedOllamaNative, from);
@@ -2034,20 +2278,16 @@ for (const field of ['device', 'inode']) {
 }
 console.log('Cold exact uint64 identity controls: 8 admissions, 60 refusals');
 
-/** Pins a native arm64 full application job without unrelated dependencies or publication. */
+/** Pins a native arm64 full application job after packaging and without publication. */
 function checkColdJob(body) {
-	assert.equal(pipeline.field(body, 'needs'), null);
-	assert.equal(pipeline.field(body, 'runs-on'), 'macos-15');
-	assert.equal(pipeline.field(body, 'if'), null);
-	assert.equal(pipeline.field(body, 'continue-on-error'), null);
-	assert.ok(Number(pipeline.field(body, 'timeout-minutes')) >= 40);
-	const prerequisites = pipeline.step(body, 'Require actual arm64 cold runtime prerequisites');
+	const role = macRoleBody(body, 'cold-bootstrap-native', 9);
+	const prerequisites = pipeline.step(role, 'Require actual arm64 cold runtime prerequisites');
 	assert.match(prerequisites, /test -x \/usr\/bin\/sandbox-exec/);
 	assert.match(prerequisites, /test \"\$\(uname -m\)\" = arm64/);
-	const build = pipeline.step(body, 'Build independent signed cold application');
-	const receive = pipeline.step(body, 'Receive actual isolated cold native MLX bootstrap');
+	const build = pipeline.step(role, 'Build independent signed cold application');
+	const receive = pipeline.step(role, 'Receive actual isolated cold native MLX bootstrap');
 	for (const step of [prerequisites, build, receive]) {
-		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'if'), Mac.condition('cold-bootstrap-native'));
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(pipeline.stepField(step, 'shell'), 'bash');
 	}
@@ -2057,32 +2297,52 @@ function checkColdJob(body) {
 	assert.match(build, /bash tools\/build\/build_macos_app.sh/);
 	assert.match(build, /codesign --verify --deep --strict build\/macos\/ErgoptiPlus.app/);
 	assert.doesNotMatch(
-		body,
+		role,
 		/--native-helper-only|brew install|gh release|TCC\.db|tccutil|continue-on-error|sudo rm|rm -rf.*(?:uv|python)/
 	);
 	assert.match(receive, /python3 tools\/diagnostics\/macos_cold_bootstrap.py/);
 	assert.match(receive, /--app "\$PWD\/build\/macos\/ErgoptiPlus.app"/);
 	assert.match(receive, /record-cold-macos/);
-	const officialUpload = pipeline.step(body, 'Retain official cold Ollama receipt only');
-	assert.equal(pipeline.stepField(officialUpload, 'if'), 'always()');
+	const officialUpload = pipeline.step(role, 'Retain official cold Ollama receipt only');
+	assert.equal(
+		pipeline.stepField(officialUpload, 'if'),
+		Mac.condition('cold-bootstrap-native', 'always()')
+	);
 	assert.match(officialUpload, /if-no-files-found: error/);
 	assert.match(officialUpload, /overwrite: true/);
 	assert.match(
 		officialUpload,
 		/path: \$\{\{ runner.temp \}\}\/native-cold-ollama-bootstrap\/receipt.json$/m
 	);
-	const upload = pipeline.step(body, 'Retain native cold bootstrap evidence');
-	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+	const upload = pipeline.step(role, 'Retain native cold bootstrap evidence');
+	assert.equal(
+		pipeline.stepField(upload, 'if'),
+		Mac.condition('cold-bootstrap-native', 'always()')
+	);
 	assert.match(upload, /if-no-files-found: error/);
 	assert.match(upload, /overwrite: true/);
 	assert.match(upload, /cold-bootstrap-evidence\.json/);
 }
-const coldJob = pipeline.job('cold-bootstrap-native');
+const coldJob = pipeline.job(Mac.stage['cold-bootstrap-native']);
 checkColdJob(coldJob);
 for (const [from, to] of [
-	['runs-on: macos-15', 'runs-on: ubuntu-latest'],
-	['timeout-minutes: 90', 'timeout-minutes: 5'],
-	['runs-on: macos-15', 'needs: package-macos\n    runs-on: macos-15'],
+	['    needs:\n      - package-macos\n', ''],
+	['    needs:\n      - package-macos', 'needs: []'],
+	['    needs:\n      - package-macos', 'needs: [test-linux]'],
+	['    needs:\n      - package-macos', 'needs: [e2e-hs]'],
+	['    needs:\n      - package-macos', 'needs: [cold-bootstrap-native]'],
+	[
+		'runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}',
+		'runs-on: ubuntu-latest'
+	],
+	[
+		'timeout-minutes: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].timeout_minutes }}',
+		'timeout-minutes: 5'
+	],
+	[
+		'runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}',
+		'needs: package-macos\n    runs-on: ${{ fromJSON(needs.package-macos.outputs.testbuild_metadata)[matrix.lot].runner }}'
+	],
 	["ERGOPTI_RELEASE: 'false'", "ERGOPTI_RELEASE: 'true'"],
 	[
 		'bash tools/build/build_macos_app.sh',
@@ -2091,20 +2351,34 @@ for (const [from, to] of [
 	['python3 tools/diagnostics/macos_cold_bootstrap.py', 'echo skipped cold receiving'],
 	['record-cold-macos', 'record-macos'],
 	['if-no-files-found: error', 'if-no-files-found: warn'],
-	['if: always()', 'if: success()'],
+	['if: ' + Mac.condition('cold-bootstrap-native', 'always()'), 'if: success()'],
 	['shell: bash', 'if: false\n        shell: bash']
 ]) {
-	const changed = coldJob.replace(from, to);
+	const metadata = /^(?:    )?(?:needs:|runs-on:|timeout-minutes:)/.test(from);
+	const owner = metadata
+		? coldJob
+		: Mac.selected(coldJob, 'cold-bootstrap-native').find((step) => step.body.includes(from))?.body;
+	assert.ok(owner, 'one real cold role source mutation owner');
+	const changed = coldJob.replace(owner, () => owner.replace(from, to));
 	assert.notEqual(changed, coldJob);
 	assert.throws(() => checkColdJob(changed), from);
 }
-assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('cold-bootstrap-native'));
+assert.ok(pipeline.needsOf(pipeline.job('macos-ok')).includes('launch'));
+assert.ok(
+	MacRoles.plan('testbuild', {
+		source_sha: 'a'.repeat(40),
+		run_id: '1',
+		event_name: 'push',
+		release: true,
+		scenarios: ['clean']
+	}).some((row) => row.role === 'cold-bootstrap-native')
+);
 assert.match(
 	pipeline.step(pipeline.job('macos-ok'), 'Download native cold bootstrap evidence'),
 	/cold-bootstrap-native-/
 );
 console.log(
-	`[OK] Cold native verdict retained existing launch/job assertions and rejected ${coldRejections} independent receipt mutations plus 10 workflow mutations.`
+	`[OK] Cold native verdict retained existing launch/job assertions and rejected ${coldRejections} independent receipt mutations plus 15 workflow mutations.`
 );
 
 // A compiler failure must retain its actual transcript before unrelated tests.
@@ -2140,19 +2414,21 @@ for (const [job, buildName, uploadName, transcript] of [
 		'managed-ollama-producer-build.log'
 	]
 ]) {
-	const body = pipeline.job(job);
+	const body = pipeline.job(Mac.stage[job]);
 	const build = pipeline.step(body, buildName);
 	const upload = pipeline.step(body, uploadName);
 	const check = (step, artifact) => {
 		assert.match(step, /set -euo pipefail/);
 		assert.ok(step.includes('2>&1 | tee "$RUNNER_TEMP/' + transcript + '"'));
-		assert.equal(pipeline.stepField(artifact, 'if'), 'always()');
+		assert.equal(pipeline.stepField(artifact, 'if'), Mac.condition(job, 'always()'));
 		assert.ok(artifact.includes('${{ runner.temp }}/' + transcript));
 	};
 	check(build, upload);
 	assert.throws(() => check(build.replace('2>&1 | tee', '| tee'), upload));
 	assert.throws(() => check(build.replace('set -euo pipefail', 'set -eu'), upload));
-	assert.throws(() => check(build, upload.replace('if: always()', 'if: success()')));
+	assert.throws(() =>
+		check(build, upload.replace('if: ' + Mac.condition(job, 'always()'), 'if: success()'))
+	);
 	assert.throws(() =>
 		check(
 			build,
@@ -2212,7 +2488,7 @@ console.log(
 
 // Surface actual SDK compiler/test refusal before fetching and building Go.
 {
-	const body = pipeline.job('managed-ollama-native');
+	const body = Mac.body(pipeline.file('.github/workflows/ci-macos.yml'), 'managed-ollama-native');
 	const compile = pipeline.step(body, 'Build the actual launcher native transport roles');
 	const listener = pipeline.step(
 		body,
@@ -2227,7 +2503,10 @@ console.log(
 		'Retain independent native SDK XCTest diagnostics'
 	]) {
 		const upload = pipeline.step(body, name);
-		assert.equal(pipeline.stepField(upload, 'if'), 'always()');
+		assert.equal(
+			pipeline.stepField(upload, 'if'),
+			Mac.condition('managed-ollama-native', 'always()')
+		);
 		assert.ok(body.indexOf(upload) < body.indexOf(producer));
 	}
 }
@@ -2370,3 +2649,5 @@ console.log(
 		'an early fresh-profile edit cannot stand in for the installed upgrade boundary'
 	);
 }
+
+require('./test-macos-stage-roles.cjs');

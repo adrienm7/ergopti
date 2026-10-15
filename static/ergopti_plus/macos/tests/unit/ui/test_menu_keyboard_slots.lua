@@ -28,6 +28,7 @@ local MODULES = {
 	"modules.shortcuts.tap_keys", "modules.shortcuts.script_control", "modules.gestures.actions",
 	"ui.action_picker", "ui.menu.menu_keyboard_slots", "ui.menu.shortcut_utils",
 	"tests.support.keyboard_config_fixture", "infra.manifest_menu", "menu.renderer", "infra.i18n",
+	"ui.menu.preferences_transaction", "ui.menu.program_parameter_transaction", "ui.menu.global_actions_transaction",
 }
 
 --- Owns the real facade and its canonical persistence boundary for one UI case.
@@ -391,7 +392,12 @@ end)
 --- @return table ctx, table stored
 local function parameter_ctx()
 	local ctx = make_ctx()
-	local stored = {}
+	local stored, parameters = {}, {}
+	local function copy(source)
+		local result = {}
+		for key, value in pairs(source) do result[key] = value end
+		return result
+	end
 	ctx.gestures.get_sg_names = function()
 		return { "#header", "lookup", "select_line", "send_key", "wrap_selection", "llm_prompt_prediction",
 			"llm_screen_region", "llm_translate_selection" }
@@ -402,7 +408,8 @@ local function parameter_ctx()
 			llm_screen_region = "llm_vision", llm_translate_selection = "llm_language",
 		})[id]
 	end
-	ctx.gestures.get_action_parameter = function(_, action)
+	ctx.gestures.get_action_parameter = function(binding, action)
+		if parameters[binding .. "__" .. action] ~= nil then return parameters[binding .. "__" .. action] end
 		return ({
 			wrap_selection = "(", llm_prompt_prediction = "rewrite|2", llm_screen_region = "openai|gpt-4.1-mini",
 			llm_translate_selection = "ja",
@@ -425,9 +432,49 @@ local function parameter_ctx()
 	ctx.gestures.parameter_prompt = function() return "prompt" end
 	ctx.gestures.parameter_error = function() return "refused" end
 	ctx.gestures.set_action_parameter = function(binding, action, value)
+		parameters[binding .. "__" .. action] = value
 		stored[#stored + 1] = { binding = binding, action = action, value = value }
 		return true
 	end
+	ctx.gestures.get_all_action_parameters = function() return copy(parameters) end
+	ctx.gestures.replace_action_parameters = function(snapshot) parameters = copy(snapshot); return true end
+	ctx.gestures.is_assignable = require("modules.gestures.actions").is_assignable
+
+	-- Keep the retained transaction on the same real keyboard publisher and
+	-- canonical conditional file port installed by fresh().
+	local preferences = require("infra.preferences")
+	local files = package.loaded["adapters.file_system"]
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	preferences.load(path)
+	local state, noop = {}, function() return true end
+	local core = { gestures = ctx.gestures }
+	local snapshot = function() return preferences.snapshot(state, {}, core) end
+	local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+		path = path, state = state, hotfiles = {}, core_modules = core,
+		initial_state = state, initial_preferences = snapshot(), restore_runtime = noop,
+	})
+	local shortcuts = require("modules.shortcuts")
+	local global = assert(require("ui.menu.global_actions_transaction").create({
+		state = state, capture_preferences = snapshot, sync_runtime = noop, restore_state = noop,
+		settings = { get = function() end, set = noop, get_keys = function() return {} end },
+		file_mover = { capture = function() return {} end, move = noop, restore = noop },
+		reset_journal = { prepare = noop, mark_commit = noop, mark_prepared = noop, clear = noop },
+		gestures = { get_action = function() return "none" end, set_action = noop, enable_all = noop, disable_all = noop },
+		shortcuts = { set_shortcut_action = noop, get_keyboard_action = shortcuts.get_keyboard_action,
+			set_keyboard_action = shortcuts.set_keyboard_action, get_keyboard_assignments = shortcuts.get_keyboard_assignments },
+		karabiner = { snapshot_settings = function() return {} end, reset_to_defaults = noop, restore_settings = noop },
+		request_reload = noop, terminal_pending = function() return false end,
+	}))
+	local owner = require("ui.menu.program_parameter_transaction").new({
+		path = path, files = files, gestures = ctx.gestures, preferences = preferences, checkpoint = checkpoint,
+		paused = function() return false end, admission = global.run_exclusive,
+		current_path = function() return require("infra.config_paths").get("ConfigTomlPath") end,
+		save_prefs = save,
+		capture_checkpoint_candidate = function()
+			return { state = require("ui.menu.preferences_transaction").clone(state), preferences = snapshot() }
+		end,
+	})
+	ctx.commit_program_parameter = owner.apply
 	return ctx, stored
 end
 

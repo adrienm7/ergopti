@@ -515,3 +515,126 @@ helpers.describe("Linux program picker transaction", function()
 		end)
 	end)
 end)
+
+
+--- Opens the genuine rendered picker for this fixture's one configured program.
+local function parameterized_confirmation(gestures, path)
+	-- The existing reduced fixture omits the post-commit desktop notice port.
+	-- Its genuine signature is show({ key, slot }) -> queued; never open a UI here.
+	local notices = {}
+	package.loaded["ui.gesture_conflicts"].show = function(group)
+		notices[#notices + 1] = { key = group.key, slot = group.slot }
+		return true
+	end
+	local selected, opened = nil, 0
+	package.loaded["ui.action_picker.bridge"] = { open = function(options, confirm)
+		if options.current == "run_program" then selected, opened = confirm, opened + 1 end
+		return true
+	end }
+	local rows = menu_rows(gestures, path)
+	local picker_label = require("infra.i18n").get("dialog.action_picker.label") .. "…"
+	local function visit(tree)
+		for _, row in ipairs(tree) do
+			if row.title == picker_label and type(row.fn) == "function" then row.fn() end
+			if row.menu then visit(row.menu) end
+		end
+	end
+	visit(rows)
+	helpers.assert_eq(opened, 1, "the actual configured row owns the confirmation")
+	helpers.assert_type(selected, "function")
+	return selected, notices
+end
+
+helpers.describe("Linux parameterized assignment transaction", function()
+	for _, spec in ipairs(CASES) do
+		helpers.it("(parameterized-picker) refuses " .. spec.binding .. " without retaining a new URL parameter", function()
+			with_case(spec, function(_, gestures, provider, controls, path)
+				local prior, candidate = "https://prior.example/path", "https://next.example/path"
+				helpers.assert_true(gestures.set_action_parameter(spec.binding, "open_url", prior))
+				local source = Sandbox.read_bytes(path)
+				local confirm, notices = parameterized_confirmation(gestures, path)
+				local original = Writer.batch_write
+				Writer.batch_write = function(target, updates, ...)
+					for _, row in ipairs(updates) do
+						if target == path and row.section == spec.section and row.key == spec.slot then
+							return false, "controlled assignment publication refusal"
+						end
+					end
+					return original(target, updates, ...)
+				end
+				controls.refuse_publish = true
+				local accepted = confirm("open_url", nil, candidate)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(#notices, 0, "refused assignment cannot announce success")
+				helpers.assert_eq(Sandbox.read_bytes(path), source, "a refused selection preserves the exact complete source")
+				helpers.assert_eq(gestures.get_action_parameter(spec.binding, "open_url"), prior,
+					"assignment refusal cannot publish its parameter independently")
+				helpers.assert_eq(provider.get_action(spec.slot), "run_program")
+				helpers.assert_eq(gestures.get_action_parameter(spec.binding, "run_program"), PRIOR)
+			end)
+		end)
+		helpers.it("(parameterized-picker) commits " .. spec.binding .. " text and assignment in one publication", function()
+			with_case(spec, function(_, gestures, provider, controls, path)
+				local candidate = "literal text % and é"
+				local confirm, notices = parameterized_confirmation(gestures, path)
+				local before = controls.publications
+				helpers.assert_eq(confirm("send_text", nil, candidate), true)
+				helpers.assert_eq(#notices, spec.binding == "tap_3" and 1 or 0)
+				if #notices > 0 then helpers.assert_eq(notices[1], { key = "tap_3", slot = "tap_3" }) end
+				helpers.assert_eq(controls.publications - before, 1, "one conditional publication contains both fields")
+				local document = Codec.decode(Sandbox.read_bytes(path))
+				local assignment = document
+				for part in spec.section:gmatch("[^.]+") do assignment = assignment[part] end
+				helpers.assert_eq(assignment[spec.slot], "send_text")
+				helpers.assert_eq(document.gesture_parameters[spec.binding .. "__send_text"], candidate)
+				helpers.assert_eq(gestures.get_action_parameter(spec.binding, "send_text"), candidate)
+				helpers.assert_eq(provider.get_action(spec.slot), "send_text")
+				helpers.assert_eq(document.unrelated.keep, 42)
+				helpers.assert_eq(gestures.get_action_parameter(spec.binding, "run_program"), PRIOR)
+			end)
+		end)
+	end
+	helpers.it("(parameterized-picker) leaves unparameterized None on its original assignment path", function()
+		with_case(CASES[2], function(_, gestures, provider, controls, path)
+			local confirm, notices = parameterized_confirmation(gestures, path)
+			helpers.assert_eq(confirm("none"), true)
+			helpers.assert_eq(#notices, 0)
+			helpers.assert_eq(provider.get_action("ctrl_j"), "none")
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard.ctrl_j, "none")
+			helpers.assert_eq(gestures.get_action_parameter("keyboard__ctrl_j", "run_program"), PRIOR)
+			helpers.assert_eq(controls.publications, 0, "None does not construct a parameter transaction")
+		end)
+	end)
+end)
+
+
+helpers.describe("parameter transaction physical boundary", function()
+	for _, selected in ipairs({
+		{ label = "default program", action = nil, scalar = NEXT },
+		{ label = "URL", action = "open_url", scalar = "https://next.example/path" },
+		{ label = "literal text", action = "send_text", scalar = "not physical output" },
+	}) do
+		helpers.it("(parameterized-physical-boundary) refuses recognized physical " .. selected.label .. " before acquiring logical leases", function()
+			local spec = { binding = "keyboard__physical_none_KeyJ", section = "shortcuts.keyboard",
+				slot = "physical_none_KeyJ", module = "modules.shortcuts.keyboard_shortcuts" }
+			with_case(spec, function(_, gestures, provider, controls, path, source)
+				helpers.assert_eq(provider.configuration_domain(spec.binding), "keyboard", "the genuine provider recognizes this physical registry slot")
+				helpers.assert_type(gestures.action_parameter_update(spec.binding, selected.action or "run_program", selected.scalar), "table",
+					"the actual central parameter constructor accepts this binding and scalar")
+				helpers.assert_eq(provider.physical_delivery_available(), false, "public physical delivery remains genuinely unavailable")
+				local prior_parameters = gestures.get_all_action_parameters()
+				local stopped, original_stop = 0, gestures.stop_programs
+				gestures.stop_programs = function() stopped = stopped + 1; return original_stop() end
+				helpers.assert_eq(controls.token, nil)
+				helpers.assert_eq(require("infra.program_binding_transaction").apply(spec.binding, selected.scalar,
+					function() return false end, selected.action), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), source)
+				helpers.assert_eq(gestures.get_all_action_parameters(), prior_parameters)
+				helpers.assert_eq(provider.get_action(spec.slot), "run_program")
+				helpers.assert_eq(controls.publications, 0)
+				helpers.assert_eq(controls.token, nil, "no parameter lease was acquired")
+				helpers.assert_eq(stopped, 0, "refusal precedes native program retirement")
+			end)
+		end)
+	end
+end)

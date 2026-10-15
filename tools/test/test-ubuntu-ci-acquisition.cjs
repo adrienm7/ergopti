@@ -13,7 +13,7 @@ const root = path.resolve(__dirname, '../..');
 const scopes = new Map([
 	['ci-linux.yml', 38],
 	['ci-macos.yml', 2],
-	['ci.yml', 1],
+	['ci-common.yml', 1],
 	['linux-layout.yml', 2],
 	['metrics-reader-bench.yml', 1]
 ]);
@@ -46,9 +46,32 @@ function problems(text, rel, floor) {
 }
 
 const browserCommand = 'node tools/ci/install-playwright.cjs chromium webkit';
-const coreWorkflow = fs.readFileSync(path.join(root, '.github/workflows/ci.yml'), 'utf8');
+const coreOwner = pipeline.locate('shared-validation');
+assert.equal(coreOwner.file, '.github/workflows/ci-common.yml');
+assert.equal(pipeline.field(pipeline.job('core'), 'uses'), './.github/workflows/ci-common.yml');
+const coreWorkflow = pipeline.file(coreOwner.file);
+
+// The root still owns host source admission even after its acquisition moved.
+const rootWorkflow = pipeline.file(pipeline.ENTRY_REL);
+assert.deepEqual(problems(rootWorkflow, pipeline.ENTRY_REL, 0), [], pipeline.ENTRY_REL);
+const rootStep = pipeline.step(pipeline.job('validate'), 'Compute tag and version');
+for (const [invocation, expected] of [
+	['sudo apt-get update', 'unscoped host acquisition'],
+	[
+		'npx playwright install --with-deps chromium',
+		'delegated host acquisition escapes the signed owner'
+	]
+]) {
+	const changed = rootWorkflow.replace(rootStep, () => rootStep + '\n          ' + invocation);
+	assert.notEqual(changed, rootWorkflow, 'the root acquisition mutation changes its actual owner');
+	assert.ok(problems(changed, pipeline.ENTRY_REL, 0).includes(expected));
+}
+
 assert.equal(
-	pipeline.stepField(pipeline.step(pipeline.job('core'), 'Install shared UI browsers'), 'run'),
+	pipeline.stepField(
+		pipeline.step(pipeline.job('common-e2e'), 'Install shared UI browsers'),
+		'run'
+	),
 	browserCommand
 );
 const unscopedBrowser = coreWorkflow.replace(
@@ -56,7 +79,7 @@ const unscopedBrowser = coreWorkflow.replace(
 	'npx playwright install --with-deps chromium webkit'
 );
 assert.notEqual(unscopedBrowser, coreWorkflow);
-assert.ok(problems(unscopedBrowser, '.github/workflows/ci.yml', 1).length);
+assert.ok(problems(unscopedBrowser, coreOwner.file, 1).length);
 
 const catalogue = {
 	'ubuntu24.04-x64': {

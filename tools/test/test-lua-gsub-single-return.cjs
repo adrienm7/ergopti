@@ -136,6 +136,34 @@ const controls = [
 ];
 for (const [line, expected] of controls) assert.equal(gsubReturnKind(line), expected, line);
 
+// Retain both independent vector sets through the single upstream classifier.
+const returnVectors = [
+	['return path:gsub("/+$", "")', true],
+	['return path:gsub("(", ")")', true],
+	['return (path):gsub("a", "b")', true],
+	['return other, path:gsub("a", "b")', true],
+	['return get_path():gsub("a", "b"); -- final count', true],
+	['return object.path:gsub("a", "b")', true],
+	['return object["and"]:gsub("a", "b")', true],
+	['return (prefix .. path):gsub("a", "b")', true],
+	['return path:gsub("a", "b"):gsub("b", "c")', true],
+	['return (path:gsub("/+$", ""))', false],
+	['return scheme .. ":" .. tostring(number) .. (path:gsub("/+$", ""))', false],
+	['return prefix .. path:gsub("a", "b")', false],
+	['return prefix .. get_path():gsub("a", "b")', false],
+	['return enabled and path:gsub("a", "b")', false],
+	['return path:gsub("a", "b"), other', false],
+	['return tostring(path:gsub("a", "b"))', false],
+	['return not path:gsub("a", "b")', false],
+	['return #path:gsub("a", "b")', false],
+	['return path:gsub("a", "b") == "b"', false],
+	['-- return path:gsub("a", "b")', false],
+	['return "return path:gsub(a, b)"', false],
+	['return path:gsub(', false]
+];
+for (const [line, expected] of returnVectors)
+	assert.equal(gsubReturnKind(line) === 'bare', expected, `gsub return boundary: ${line}`);
+
 for (const abs of walk(SP)) {
 	scanned++;
 	const rel = path.relative(SP, abs).split(path.sep).join('/');

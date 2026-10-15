@@ -1,0 +1,358 @@
+{
+	"schema_version": 1,
+	"feature": "diagnostics-and-metrics",
+	"checks": [
+		{
+			"id": "js-0425",
+			"ordinal": 10,
+			"name": "Windows bounded hook trace core retains exact ownership and loss receipts",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/run-windows-hook-trace-core.cjs"],
+			"repro": "npm run test:windows-hook-trace-core"
+		},
+		{
+			"id": "js-0426",
+			"ordinal": 11,
+			"name": "Windows native callback trace reader refuses missing or malformed observations",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/diagnostics/test_windows_group7_trace.cjs"],
+			"repro": "npm run test:windows-hook-trace-protocol"
+		},
+		{
+			"id": "js-0427",
+			"ordinal": 12,
+			"name": "Windows hook tracing remains opt-in, isolated and bound to native source inputs",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-hook-trace-source.cjs"],
+			"repro": "npm run test:windows-hook-trace-source"
+		},
+		{
+			"id": "js-0041",
+			"ordinal": 53,
+			"name": "fast repeating timers are inventoried (no silent poller)",
+			"cmd": "node",
+			"args": ["tools/test/test-fast-timer-inventory.cjs"],
+			"repro": "node tools/test/test-fast-timer-inventory.cjs"
+		},
+		{
+			"id": "js-0042",
+			"ordinal": 54,
+			"name": "metrics categories are id-keyed (colours survive a language switch)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-category-ids.cjs"],
+			"repro": "node tools/test/test-metrics-category-ids.cjs"
+		},
+		{
+			"id": "js-0043",
+			"ordinal": 55,
+			"name": "metrics apps revision-aware publication ordering",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-apps-publication-order.cjs"],
+			"repro": "npm run test:metrics-apps-publication-order"
+		},
+		{
+			"id": "js-0044",
+			"ordinal": 56,
+			"name": "metrics filter projection caches and native invalidation",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-filter-cache.cjs"],
+			"repro": "npm run test:metrics-filter-cache"
+		},
+		{
+			"id": "js-0046",
+			"ordinal": 58,
+			"name": "typing metrics mailbox ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-typing-metrics-mailbox-ownership.cjs"],
+			"repro": "npm run test:typing-metrics-mailbox"
+		},
+		{
+			"id": "js-0047",
+			"ordinal": 59,
+			"name": "typing metrics revision-aware publication ordering",
+			"cmd": "node",
+			"args": ["tools/test/test-typing-metrics-publication-ordering.cjs"],
+			"repro": "npm run test:typing-metrics-publication-order"
+		},
+		{
+			"id": "js-0048",
+			"ordinal": 60,
+			"name": "typing metrics range selection supersession",
+			"cmd": "node",
+			"args": ["tools/test/test-typing-metrics-range-supersession.cjs"],
+			"repro": "npm run test:typing-metrics-range-supersession"
+		},
+		{
+			"id": "js-0049",
+			"ordinal": 61,
+			"name": "typing metrics reset transaction ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-typing-metrics-reset-transaction.cjs"],
+			"repro": "npm run test:typing-metrics-reset"
+		},
+		{
+			"id": "js-0090",
+			"ordinal": 102,
+			"name": "WPM divisor single source (Lua drivers use the shared constant; WebView copies frozen at 5)",
+			"cmd": "node",
+			"args": ["tools/test/test-wpm-chars-per-word-single-source.cjs"],
+			"repro": "node tools/test/test-wpm-chars-per-word-single-source.cjs"
+		},
+		{
+			"id": "js-0105",
+			"ordinal": 117,
+			"name": "the apps metrics window keeps its state across the Linux poll",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-apps-linux-poll.cjs"],
+			"repro": "node tools/test/test-metrics-apps-linux-poll.cjs"
+		},
+		{
+			"id": "js-0136",
+			"ordinal": 148,
+			"name": "unified reporter parses TAP + Lua output (report.cjs)",
+			"cmd": "node",
+			"args": ["tools/test/test-report.cjs"],
+			"repro": "node tools/test/test-report.cjs"
+		},
+		{
+			"id": "js-0151",
+			"ordinal": 163,
+			"name": "diagnostic snapshot fields, vectors and boot emission agree across the three drivers",
+			"cmd": "node",
+			"args": ["tools/test/test-diagnostic-snapshot-parity.cjs"],
+			"repro": "npm run test:diagnostic-snapshot-parity"
+		},
+		{
+			"id": "js-0162",
+			"ordinal": 174,
+			"name": "diagnostic UI integrity (macOS + Windows healthcheck render path)",
+			"cmd": "node",
+			"args": ["tools/test/test-diagnostic-ui-integrity.cjs"],
+			"repro": "node tools/test/test-diagnostic-ui-integrity.cjs"
+		},
+		{
+			"id": "js-0163",
+			"ordinal": 175,
+			"name": "GitHub issue link builder replays its vectors (bounded, UTF-8 percent-encoded prefill)",
+			"cmd": "node",
+			"args": ["tools/test/test-issue-link-vectors.cjs"],
+			"repro": "node tools/test/test-issue-link-vectors.cjs"
+		},
+		{
+			"id": "js-0164",
+			"ordinal": 176,
+			"name": "diagnostics page redactor replays the Lua and AHK redaction vectors",
+			"cmd": "node",
+			"args": ["tools/test/test-diagnostics-redaction-vectors.cjs"],
+			"repro": "node tools/test/test-diagnostics-redaction-vectors.cjs"
+		},
+		{
+			"id": "js-0165",
+			"ordinal": 177,
+			"name": "diagnostics page model renders, summarises and exports the v2 schema on every driver, in 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-healthcheck-model.cjs"],
+			"repro": "node tools/test/test-healthcheck-model.cjs"
+		},
+		{
+			"id": "js-0166",
+			"ordinal": 178,
+			"name": "diagnostics page behaviour (ready, preview of what is shared, buttons by id, details, probes, report mode)",
+			"cmd": "node",
+			"args": ["tools/test/test-healthcheck-page.cjs"],
+			"repro": "node tools/test/test-healthcheck-page.cjs"
+		},
+		{
+			"id": "js-0167",
+			"ordinal": 179,
+			"name": "error window page behaviour (ready, report shown as sent, crash notice, buttons by name, folds, results, 21 locales)",
+			"cmd": "node",
+			"args": ["tools/test/test-error-dialog-page.cjs"],
+			"repro": "npm run test:error-dialog-page"
+		},
+		{
+			"id": "js-0170",
+			"ordinal": 182,
+			"name": "GitHub issue forms declare every field the app prefills, and a worst-case prefill fits the URL budget",
+			"cmd": "node",
+			"args": ["tools/test/test-issue-templates.cjs"],
+			"repro": "node tools/test/test-issue-templates.cjs"
+		},
+		{
+			"id": "js-0197",
+			"ordinal": 209,
+			"name": "Linux metrics polling follows native and document visibility lifecycles",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-metrics-webview-lifecycle.cjs"],
+			"repro": "npm run test:linux-metrics-webview-lifecycle"
+		},
+		{
+			"id": "js-0219",
+			"ordinal": 232,
+			"name": "the preview bubble is rendered from the shared masking corpus (ratchet: which drivers carry it)",
+			"cmd": "node",
+			"args": ["tools/test/test-preview-masking-cross-driver.cjs"],
+			"repro": "node tools/test/test-preview-masking-cross-driver.cjs"
+		},
+		{
+			"id": "js-0222",
+			"ordinal": 235,
+			"name": "metrics privacy defaults single-sourced (one id per filter; no driver keeps a hardcoded copy)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-privacy-single-source.cjs"],
+			"repro": "node tools/test/test-metrics-privacy-single-source.cjs"
+		},
+		{
+			"id": "js-0223",
+			"ordinal": 236,
+			"name": "every log/persist sink that can carry a hotstring trigger is redacted or judged (derived list, not a written one)",
+			"cmd": "node",
+			"args": ["tools/test/test-personal-info-log-sinks-are-judged.cjs"],
+			"repro": "node tools/test/test-personal-info-log-sinks-are-judged.cjs"
+		},
+		{
+			"id": "js-0233",
+			"ordinal": 246,
+			"name": "logger scalars single-source (retention/ring/dedup/flush vs the timing registry)",
+			"cmd": "node",
+			"args": ["tools/test/test-logger-scalars-single-source.cjs"],
+			"repro": "node tools/test/test-logger-scalars-single-source.cjs"
+		},
+		{
+			"id": "js-0234",
+			"ordinal": 247,
+			"name": "log file names single-source (only the generated app_dirs data spells a log prefix)",
+			"cmd": "node",
+			"args": ["tools/test/test-log-file-names-single-source.cjs"],
+			"repro": "npm run test:log-file-names-single-source"
+		},
+		{
+			"id": "js-0252",
+			"ordinal": 265,
+			"name": "keylogger walker constants single source (bucket edges and caps: shared helpers vs both walkers)",
+			"cmd": "node",
+			"args": ["tools/test/test-walker-constants-single-source.cjs"],
+			"repro": "node tools/test/test-walker-constants-single-source.cjs"
+		},
+		{
+			"id": "js-0254",
+			"ordinal": 267,
+			"name": "HotPath segment inventory (every measured hot path declared with what it covers)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotpath-segments-declared.cjs"],
+			"repro": "node tools/test/test-hotpath-segments-declared.cjs"
+		},
+		{
+			"id": "js-0286",
+			"ordinal": 299,
+			"name": "metrics heatmap translation coverage",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-heatmap-translation.cjs"],
+			"repro": "node tools/test/test-metrics-heatmap-translation.cjs"
+		},
+		{
+			"id": "js-0287",
+			"ordinal": 300,
+			"name": "metrics rebuild banner (partial snapshots are labelled)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-rebuild-banner.cjs"],
+			"repro": "npm run test:metrics-rebuild-banner"
+		},
+		{
+			"id": "js-0288",
+			"ordinal": 301,
+			"name": "metrics freshness banner (cached snapshots carry their date)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-freshness-banner.cjs"],
+			"repro": "npm run test:metrics-freshness-banner"
+		},
+		{
+			"id": "js-0330",
+			"ordinal": 345,
+			"name": "metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-open-rows-wording.cjs"],
+			"repro": "npm run test:metrics-open-rows-wording"
+		},
+		{
+			"id": "js-0331",
+			"ordinal": 346,
+			"name": "report button is white on blue with enough contrast in both appearances (diagnostics and error windows)",
+			"cmd": "node",
+			"args": ["tools/test/test-report-button-contrast.cjs"],
+			"repro": "npm run test:report-button-contrast"
+		},
+		{
+			"id": "js-0382",
+			"ordinal": 398,
+			"name": "metrics manifest payload contract (reader vocabulary reaches real consumers)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-manifest-contract.cjs"],
+			"repro": "node tools/test/test-metrics-manifest-contract.cjs"
+		},
+		{
+			"id": "js-0383",
+			"ordinal": 399,
+			"name": "typing-speed source toggles (net expansion gain and filter semantics)",
+			"cmd": "node",
+			"args": ["tools/test/test-metrics-speed-source-filters.cjs"],
+			"repro": "node tools/test/test-metrics-speed-source-filters.cjs"
+		},
+		{
+			"id": "js-0384",
+			"ordinal": 400,
+			"name": "Linux metrics SQLite bridge (persistent manifest + selected-range refresh)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-metrics-sqlite-bridge.cjs"],
+			"repro": "node tools/test/test-linux-metrics-sqlite-bridge.cjs"
+		},
+		{
+			"id": "js-0385",
+			"ordinal": 401,
+			"name": "Windows metrics range bridge (native selected date/app refresh)",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-metrics-range-bridge.cjs"],
+			"repro": "node tools/test/test-windows-metrics-range-bridge.cjs"
+		},
+		{
+			"id": "js-0403",
+			"ordinal": 419,
+			"name": "keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)",
+			"cmd": "node",
+			"args": ["tools/test/test-keylogger-timings-single-source.cjs"],
+			"repro": "node tools/test/test-keylogger-timings-single-source.cjs"
+		},
+		{
+			"id": "js-0404",
+			"ordinal": 420,
+			"name": "SQLite event cursor numeric policy single source",
+			"cmd": "node",
+			"args": ["tools/test/test-sqlite-event-id-single-source.cjs"],
+			"repro": "node tools/test/test-sqlite-event-id-single-source.cjs"
+		},
+		{
+			"id": "js-0406",
+			"ordinal": 422,
+			"name": "WPM readout constants single source (every canon key read by a driver, none restated)",
+			"cmd": "node",
+			"args": ["tools/test/test-wpm-constants-single-source.cjs"],
+			"repro": "node tools/test/test-wpm-constants-single-source.cjs"
+		},
+		{
+			"id": "js-0407",
+			"ordinal": 423,
+			"name": "WPM strip darkening cross-driver drift (Lua model and AHK round-half-up on the canon factor; golden vectors)",
+			"cmd": "node",
+			"args": ["tools/test/test-wpm-color-normalisation-single-source.cjs"],
+			"repro": "node tools/test/test-wpm-color-normalisation-single-source.cjs"
+		},
+		{
+			"id": "js-0413",
+			"ordinal": 429,
+			"name": "every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)",
+			"cmd": "node",
+			"args": ["tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"],
+			"repro": "node tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"
+		}
+	]
+}

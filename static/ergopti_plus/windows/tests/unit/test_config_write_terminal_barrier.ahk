@@ -707,3 +707,277 @@ _CWTB_IssuerOnlyArrayObserver(Name) {
 for Name in ["__Enum", "Length"]
 	Test("config issuer only: original token array observer refuses before invocation " . Name,
 		_CWTB_IssuerOnlyArrayObserver.Bind(Name))
+
+
+; ==============================================================================
+; Direct native selector guards
+; ==============================================================================
+; The optimized scan must preserve the original fallback and whole-bundle
+; authority. These controls use genuine memory-only issuance and exact release;
+; late-boundary fault instrumentation remains separate receiving evidence.
+
+_CWTS_Bundle() {
+	return _ConfigWriteTerminalTryAcquire([A_Temp . "\sop-first.toml",
+		A_Temp . "\sop-middle.toml", A_Temp . "\sop-last.toml"])
+}
+_CWTS_Positions() {
+	CWTSBundle := _CWTS_Bundle()
+	AssertTrue(CWTSBundle is Object)
+	try {
+		for CWTSToken in CWTSBundle.tokens
+			AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSToken.key) == CWTSToken,
+				"each real first/middle/last member preserves exact identity")
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, A_Temp . "\sop-missing.toml"))
+		CWTSToken := CWTSBundle.tokens[3]
+		AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSToken, CWTSToken.key) == CWTSToken,
+			"a genuine member stays an original fallback target, not a bundle")
+	} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSToken.key))
+	CWTSOrdinary := _ConfigWriteLeaseTryAcquire(A_Temp . "\sop-ordinary.toml", "actual ordinary fallback")
+	AssertTrue(CWTSOrdinary is Object)
+	try AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSOrdinary, A_Temp . "\sop-ordinary.toml") == CWTSOrdinary)
+	finally AssertTrue(_ConfigWriteLeaseRelease(CWTSOrdinary))
+}
+_CWTS_Sibling(CWTSField) {
+	CWTSBundle := _CWTS_Bundle(), CWTSHits := {count: 0}
+	AssertTrue(CWTSBundle is Object)
+	CWTSSibling := false, CWTSTarget := false, CWTSKey := "", CWTSDescriptor := false, CWTSChanged := false
+	try {
+		CWTSSibling := CWTSBundle.tokens[1], CWTSTarget := CWTSBundle.tokens[3], CWTSKey := CWTSSibling.key
+		if CWTSField != "owners" && CWTSField != "extra"
+			CWTSDescriptor := Object.Prototype.GetOwnPropDesc.Call(CWTSSibling, CWTSField)
+		if CWTSField == "owners"
+			_ConfigWriteLeaseState().owners.Delete(CWTSKey)
+		else if CWTSField == "extra"
+			CWTSSibling.extra := true
+		else
+			CWTSSibling.DefineProp(CWTSField, {Get: (*) => (CWTSHits.count += 1, "foreign observed value")})
+		CWTSChanged := true
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key),
+			"a nonmatching sibling withdraws the entire actual bundle")
+		AssertEqual(0, CWTSHits.count, "descriptor rejection precedes every untrusted sibling getter")
+	} finally {
+		try {
+			if CWTSChanged {
+				if CWTSField == "owners"
+					_ConfigWriteLeaseState().owners[CWTSKey] := CWTSSibling
+				else if CWTSField == "extra"
+					CWTSSibling.DeleteProp("extra")
+				else
+					CWTSSibling.DefineProp(CWTSField, CWTSDescriptor)
+				AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget,
+					"exact sibling repair restores this same original bundle")
+			}
+		} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	}
+}
+_CWTS_Array(CWTSMode) {
+	CWTSBundle := _CWTS_Bundle(), CWTSHits := {count: 0}
+	AssertTrue(CWTSBundle is Object)
+	CWTSOriginal := false, CWTSTarget := false, CWTSChanged := false
+	try {
+		CWTSOriginal := CWTSBundle.tokens, CWTSTarget := CWTSOriginal[3]
+		if CWTSMode == "clone"
+			CWTSBundle.tokens := CWTSOriginal.Clone()
+		else if CWTSMode == "Length"
+			CWTSOriginal.DefineProp("Length", {Get: (*) => (CWTSHits.count += 1, 3)})
+		else
+			CWTSOriginal.DefineProp("__Enum", {Call: (*) => (CWTSHits.count += 1, false)})
+		CWTSChanged := true
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key),
+			"equal contents do not replace the privately issued array or its intrinsic interface")
+		AssertEqual(0, CWTSHits.count, "array rejection invokes no observer")
+	} finally {
+		try {
+			if CWTSChanged {
+				if CWTSMode != "clone"
+					CWTSOriginal.DeleteProp(CWTSMode)
+				CWTSBundle.tokens := CWTSOriginal
+				AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget)
+			}
+		} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	}
+}
+_CWTS_ObjectPath() {
+	CWTSBundle := _CWTS_Bundle(), CWTSHits := {count: 0}
+	AssertTrue(CWTSBundle is Object)
+	try {
+		CWTSTarget := CWTSBundle.tokens[3], CWTSPath := {}
+		CWTSPath.DefineProp("ToString", {Call: (*) => (CWTSHits.count += 1, CWTSTarget.key)})
+		AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath) == CWTSTarget)
+		AssertEqual(3, CWTSHits.count,
+			"object conversion preserves the original per-candidate order and count")
+		CWTSPath.DefineProp("ToString", {Call: (*) => (CWTSHits.count += 1, _CWTS_ConversionThrow())})
+		AssertThrows(() => _ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath))
+		AssertEqual(4, CWTSHits.count, "the original first conversion exception propagates")
+	} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+}
+_CWTS_ConversionThrow() {
+	throw Error("Owned object path conversion refused.")
+}
+_CWTS_Critical(CWTSSetting) {
+	CWTSBundle := _CWTS_Bundle()
+	AssertTrue(CWTSBundle is Object)
+	CWTSOldCritical := A_IsCritical
+	try {
+		Critical(CWTSSetting)
+		CWTSTarget := CWTSBundle.tokens[3]
+		CWTSIncoming := A_IsCritical
+		AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget)
+		AssertEqual(CWTSIncoming, A_IsCritical, "success preserves incoming Critical")
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, A_Temp . "\sop-no-match.toml"))
+		AssertEqual(CWTSIncoming, A_IsCritical, "no match preserves incoming Critical")
+		CWTSSavedId := CWTSBundle.tokens[1].id
+		CWTSBundle.tokens[1].id += 1
+		try {
+			AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key))
+			AssertEqual(CWTSIncoming, A_IsCritical, "refusal preserves incoming Critical")
+		} finally CWTSBundle.tokens[1].id := CWTSSavedId
+		CWTSPath := {}
+		CWTSPath.DefineProp("ToString", {Call: (*) => _CWTS_ConversionThrow()})
+		AssertThrows(() => _ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath))
+		AssertEqual(CWTSIncoming, A_IsCritical, "throw preserves incoming Critical")
+	} finally {
+		try AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+		finally Critical(CWTSOldCritical)
+	}
+}
+Test("Select actual issuer: first middle last missing and ordinary member retired fallback", _CWTS_Positions)
+Test("Select actual issuer: nonmatching key getter refuses without invocation", _CWTS_Sibling.Bind("key"))
+Test("Select actual issuer: nonmatching id getter refuses without invocation", _CWTS_Sibling.Bind("id"))
+Test("Select actual issuer: nonmatching kind getter refuses without invocation", _CWTS_Sibling.Bind("kind"))
+Test("Select actual issuer: nonmatching extra metadata refuses", _CWTS_Sibling.Bind("extra"))
+Test("Select actual issuer: nonmatching owner membership withdrawal refuses", _CWTS_Sibling.Bind("owners"))
+Test("Select actual issuer: equal-content token array replacement refuses", _CWTS_Array.Bind("clone"))
+Test("Select actual issuer: token array Length observer refuses without invocation", _CWTS_Array.Bind("Length"))
+Test("Select actual issuer: token array enumeration observer refuses without invocation", _CWTS_Array.Bind("__Enum"))
+Test("Select actual issuer: object path fallback preserves conversion count and exception", _CWTS_ObjectPath)
+Test("Select actual issuer: Critical off restoration on success miss refusal and throw", _CWTS_Critical.Bind(0))
+Test("Select actual issuer: Critical nonzero restoration on success miss refusal and throw", _CWTS_Critical.Bind(10))
+
+_CWTS_SiblingScalar(CWTSField, CWTSValue) {
+	CWTSBundle := _CWTS_Bundle()
+	AssertTrue(CWTSBundle is Object)
+	CWTSSibling := false, CWTSTarget := false, CWTSDescriptor := false, CWTSChanged := false
+	try {
+		CWTSSibling := CWTSBundle.tokens[1], CWTSTarget := CWTSBundle.tokens[3]
+		CWTSDescriptor := Object.Prototype.GetOwnPropDesc.Call(CWTSSibling, CWTSField)
+		CWTSSibling.DefineProp(CWTSField, {Value: CWTSValue})
+		CWTSChanged := true
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key),
+			"nonmatching scalar mutation or type substitution invalidates complete private custody")
+	} finally {
+		try {
+			if CWTSChanged {
+				CWTSSibling.DefineProp(CWTSField, CWTSDescriptor)
+				AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget)
+			}
+		} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	}
+}
+_CWTS_SiblingCase() {
+	CWTSBundle := _CWTS_Bundle()
+	AssertTrue(CWTSBundle is Object)
+	CWTSSibling := false, CWTSTarget := false, CWTSBefore := "", CWTSChanged := false
+	try {
+		CWTSSibling := CWTSBundle.tokens[1], CWTSTarget := CWTSBundle.tokens[3], CWTSBefore := CWTSSibling.key
+		AssertTrue(!(StrUpper(CWTSBefore) == CWTSBefore), "the real key has a distinct uppercase spelling")
+		CWTSSibling.key := StrUpper(CWTSBefore)
+		CWTSChanged := true
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key),
+			"receipt case identity stays strict even when normalized aliases match")
+	} finally {
+		try {
+			if CWTSChanged {
+				CWTSSibling.key := CWTSBefore
+				AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget)
+			}
+		} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	}
+}
+_CWTS_ForgedShape() {
+	CWTSBundle := _CWTS_Bundle()
+	AssertTrue(CWTSBundle is Object)
+	try {
+		CWTSTarget := CWTSBundle.tokens[3]
+		CWTSClone := {id: CWTSBundle.id, kind: CWTSBundle.kind, tokens: CWTSBundle.tokens,
+			authorized: CWTSBundle.authorized, shutdown_claimed: CWTSBundle.shutdown_claimed}
+		AssertTrue(_ConfigWriteLeaseDataObject(CWTSClone,
+			["id", "kind", "tokens", "authorized", "shutdown_claimed"]))
+		AssertFalse(_ConfigWriteLeaseSelectOwner(CWTSClone, CWTSTarget.key),
+			"pure five-field eligibility never grants the original issuer's authority")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSTarget.key) == CWTSTarget)
+	} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+}
+_CWTS_Ledger() {
+	CWTSState := _ConfigWriteLeaseState(), CWTSReads := _FileReadActivityState()
+	AssertFalse(_ConfigWriteTerminalTryAcquire([], 0), "the genuine private terminal issuer is naturally retired")
+	AssertFalse(_ConfigWriteLeaseTryAcquire("", "", 0), "the genuine private ordinary issuer is naturally retired")
+	AssertEqual(0, CWTSState.owners.Count, "no public owner remains after actual release")
+	AssertFalse(CWTSState.terminal is Object)
+	AssertEqual(0, CWTSReads.owners.Count)
+	AssertEqual(0, CWTSReads.paths.Count)
+}
+Test("Select actual issuer: nonmatching key scalar mutation refuses", _CWTS_SiblingScalar.Bind("key", "foreign-key"))
+Test("Select actual issuer: nonmatching id scalar mutation refuses", _CWTS_SiblingScalar.Bind("id", 0))
+Test("Select actual issuer: nonmatching kind scalar mutation refuses", _CWTS_SiblingScalar.Bind("kind", "ordinary"))
+Test("Select actual issuer: nonmatching key object type refuses", _CWTS_SiblingScalar.Bind("key", {}))
+Test("Select actual issuer: nonmatching id string type refuses", _CWTS_SiblingScalar.Bind("id", "1"))
+Test("Select actual issuer: nonmatching kind integer type refuses", _CWTS_SiblingScalar.Bind("kind", 0))
+Test("Select actual issuer: nonmatching key case mutation refuses", _CWTS_SiblingCase)
+Test("Select actual issuer: forged five-field shape cannot manufacture native issuance", _CWTS_ForgedShape)
+
+
+_CWTS_Producer(CWTSProducer, CWTSExpectedCalls, CWTSReturnsOriginal) {
+	CWTSBundle := _CWTS_Bundle(), CWTSHits := {count: 0}
+	AssertTrue(CWTSBundle is Object)
+	CWTSTarget := false, CWTSPath := "", CWTSHadCall := false, CWTSSavedCall := false, CWTSChanged := false
+	try {
+		CWTSTarget := CWTSBundle.tokens[3], CWTSPath := CWTSTarget.key
+		AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath) == CWTSTarget,
+			"every producer control starts with genuine native authority")
+		CWTSIncoming := A_IsCritical
+		CWTSHadCall := Object.Prototype.HasOwnProp.Call(CWTSProducer, "Call")
+		CWTSSavedCall := CWTSHadCall ? Object.Prototype.GetOwnPropDesc.Call(CWTSProducer, "Call") : false
+		CWTSProducer.DefineProp("Call", {Call: (*) => (CWTSHits.count += 1, false)})
+		CWTSChanged := true
+		CWTSReturned := _ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath)
+		AssertEqual(CWTSExpectedCalls, CWTSHits.count,
+			"pre-call withdrawal preserves the original fallback dispatch count")
+		if CWTSReturnsOriginal
+			AssertTrue(CWTSReturned == CWTSTarget, "an unused ordinary issuer preserves this terminal owner")
+		else
+			AssertFalse(CWTSReturned, "a used producer refuses without inventing an owner")
+		AssertEqual(CWTSIncoming, A_IsCritical, "producer fallback preserves incoming Critical")
+	} finally {
+		try {
+			if CWTSChanged {
+				if CWTSHadCall
+					CWTSProducer.DefineProp("Call", CWTSSavedCall)
+				else
+					CWTSProducer.DeleteProp("Call")
+				AssertTrue(_ConfigWriteLeaseSelectOwner(CWTSBundle, CWTSPath) == CWTSTarget,
+					"exact producer repair restores the same native authority")
+			}
+		} finally AssertTrue(_ConfigWriteTerminalRelease(CWTSBundle))
+	}
+}
+Test("Select actual producer: eligibility own Call owns",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseOwns, 3, false))
+Test("Select actual producer: eligibility own Call issuer",
+	_CWTS_Producer.Bind(_ConfigWriteTerminalTryAcquire, 1, false))
+Test("Select actual producer: eligibility own Call target",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseTryAcquire, 0, true))
+Test("Select actual producer: eligibility own Call state",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseState, 1, false))
+Test("Select actual producer: eligibility own Call data",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseDataObject, 2, false))
+Test("Select actual producer: eligibility own Call container",
+	_CWTS_Producer.Bind(_ConfigWriteLeasePlainContainer, 1, false))
+Test("Select actual producer: eligibility own Call state_data",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseStateIsData, 1, false))
+Test("Select actual producer: eligibility own Call key",
+	_CWTS_Producer.Bind(_ConfigWriteLeaseKey, 3, false))
+Test("Select actual producer: eligibility own Call read_key",
+	_CWTS_Producer.Bind(FileReadActivityKey, 3, false))
+Test("Select actual issuer: genuine release naturally retires all lease and read state", _CWTS_Ledger)

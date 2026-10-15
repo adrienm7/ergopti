@@ -1,6 +1,19 @@
 // tools/test/test-linux-xi2-cookie-ci-contract.cjs
 // Source controls for the isolated non-input native receiving cut; no native runs.
 'use strict';
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+/** Admit exactly one literal Node owner, retaining the declared command token. */
+function ownsCheck(inventory, file, command = 'node') {
+	const checks = inventory.checks.filter((check) => check.args.includes(file));
+	return (
+		checks.length === 1 &&
+		checks[0].cmd === command &&
+		checks[0].args.length === 1 &&
+		checks[0].args[0] === file &&
+		!checks[0].platforms
+	);
+}
+
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
@@ -76,21 +89,58 @@ function verify(subject) {
 	assert.strictEqual(pipeline.field(owner.body, 'runs-on'), 'ubuntu-latest');
 	assert.strictEqual(pipeline.field(owner.body, 'if'), null, 'ordinary mandatory owner admission');
 	assert.strictEqual(pipeline.field(owner.body, 'continue-on-error'), null);
-	assert.deepStrictEqual(pipeline.needsOf(owner.body), [], 'unit and E2E are independent entries');
+	assert.deepStrictEqual(
+		pipeline.needsOf(owner.body),
+		['test-linux'],
+		'the full unit prerequisite must finish before E2E'
+	);
 	const build = jobs.find((job) => job.id === 'package-linux');
 	assert.deepStrictEqual(
 		pipeline.needsOf(build.body),
-		['test-linux', 'e2e-linux'],
-		'both original suites remain package prerequisites'
+		['e2e-linux'],
+		'the package directly waits for E2E with genuine carried unit admission'
 	);
 	assert.strictEqual(
 		pipeline.field(build.body, 'if'),
-		"${{ !cancelled() && needs.test-linux.result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
+		"${{ !cancelled() && needs.e2e-linux.outputs.ci_unit_result == 'success' && (needs.e2e-linux.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')) }}",
 		'unit success stays mandatory; failed E2E admits package diagnostics only on manual dispatch'
 	);
 	assert.strictEqual(pipeline.field(gate.body, 'if'), 'always()');
-	for (const id of required.filter((id) => id !== 'linux-ok'))
-		assert(pipeline.needsOf(gate.body).includes(id), 'original Linux verdict waits for ' + id);
+	assert.deepStrictEqual(
+		pipeline.needsOf(gate.body),
+		['install-linux'],
+		'the verdict waits for the latest aggregate testbuild'
+	);
+	for (const [id, prior] of [
+		['e2e-linux', 'test-linux'],
+		['package-linux', 'e2e-linux'],
+		['install-linux', 'package-linux']
+	]) {
+		const stage = jobs.find((job) => job.id === id);
+		assert.deepStrictEqual(pipeline.needsOf(stage.body), [prior]);
+		for (const [key, value] of Object.entries({
+			ci_predecessors: '${{ toJSON(needs) }}',
+			ci_source_sha: '${{ github.sha }}',
+			ci_run_id: '${{ github.run_id }}',
+			ci_attempt: '${{ github.run_attempt }}'
+		}))
+			assert.strictEqual(
+				stage.body.split('      ' + key + ': ' + value + '\n').length,
+				2,
+				'genuine source-bound custody ' + id + ':' + key
+			);
+	}
+	assert.strictEqual(
+		owner.body.split('      ci_unit_result: ${{ needs.test-linux.result }}\n').length,
+		2,
+		'unit predicate is the real scheduler result'
+	);
+	assert.strictEqual(
+		pipeline
+			.runOf(pipeline.step(build.body, 'Admit genuine preceding scheduler results'))
+			.join('\n'),
+		'node tools/ci/ci-stage-status.cjs admit-build linux'
+	);
 	const verdict = pipeline.step(gate.body, 'Assert all mandatory subjects ran and passed');
 	assert.strictEqual(
 		pipeline.stepField(verdict, 'if'),
@@ -107,8 +157,8 @@ function verify(subject) {
 		'verdict consumes the actual complete predecessor results'
 	);
 	assert.strictEqual(
-		pipeline.runOf(verdict).slice(0, 6).join('\n'),
-		'set -euo pipefail\nnode tools/test/linux-ci-evidence.cjs verify \\\n    --manifest .github/linux-ci-coverage.json \\\n    --needs "$NEEDS" \\\n    --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \\\n    --sha "$GITHUB_SHA"',
+		pipeline.runOf(verdict).slice(0, 7).join('\n'),
+		'set -euo pipefail\nNEEDS="$(node tools/ci/ci-stage-status.cjs complete linux)"\nnode tools/test/linux-ci-evidence.cjs verify \\\n    --manifest .github/linux-ci-coverage.json \\\n    --needs "$NEEDS" \\\n    --evidence-dir "$RUNNER_TEMP/linux-ci-evidence" \\\n    --sha "$GITHUB_SHA"',
 		'same strict source-bound verdict rejects failed manual diagnostics'
 	);
 	assert(owner.body.includes(BLOCK), 'owned block must remain inside the E2E job');
@@ -155,7 +205,11 @@ function verify(subject) {
 	for (const literal of DISPLAY_NEED)
 		assert(subject.display.includes(literal), 'original server fence: ' + literal);
 	assert(
-		subject.suite.includes("args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs']"),
+		ownsCheck(
+			subject.suite,
+			'tools/test/test-linux-xi2-cookie-ci-contract.cjs',
+			'$NODE_EXECUTABLE'
+		),
 		'registered guard'
 	);
 }
@@ -166,7 +220,7 @@ const subject = {
 	family: fs.readFileSync(path.join(ROOT, HARDWARE + 'native_fixture_family.py'), 'utf8'),
 	runner: fs.readFileSync(path.join(ROOT, HARDWARE + 'run_xi2_property_cookies.py'), 'utf8'),
 	display: fs.readFileSync(path.join(ROOT, HARDWARE + 'xi2_property_display.py'), 'utf8'),
-	suite: fs.readFileSync(path.join(ROOT, 'tools/test/run-js-suite.cjs'), 'utf8')
+	suite: loadInventory(ROOT)
 };
 verify(subject);
 const mutations = [
@@ -233,14 +287,22 @@ const mutations = [
 	[
 		'guard enrollment omitted',
 		'suite',
-		"args: ['tools/test/test-linux-xi2-cookie-ci-contract.cjs']",
-		'args: []'
+		'tools/test/test-linux-xi2-cookie-ci-contract.cjs',
+		'missing'
 	]
 ];
 for (const [name, role, before, after] of mutations) {
 	const altered = { ...subject };
-	assert(altered[role].includes(before), 'control must change actual source: ' + name);
-	altered[role] = altered[role].replace(before, after);
+	if (role === 'suite') {
+		const checks = structuredClone(subject.suite.checks);
+		const selected = checks.filter((check) => check.args[0] === before);
+		assert.equal(selected.length, 1, 'control must change the actual feature owner: ' + name);
+		selected[0].args = [after];
+		altered.suite = { ...subject.suite, checks };
+	} else {
+		assert(altered[role].includes(before), 'control must change actual source: ' + name);
+		altered[role] = altered[role].replace(before, after);
+	}
 	assert.throws(() => verify(altered), undefined, name);
 }
 console.log(
@@ -541,37 +603,52 @@ console.log(
 	'PASS additive LuaJIT XI2 enrollment: portable15/source refusals22/placement refusals4; ABI29/cookies3 native UNRUN'
 );
 
-// The parallel suites converge before packaging; a manual diagnostic never qualifies release.
+// The ordered suites converge before packaging; a manual diagnostic never qualifies release.
 for (const [name, before, replacement] of [
-	['package omits unit', '    needs: [test-linux, e2e-linux]', '    needs: [e2e-linux]'],
-	['package omits E2E', '    needs: [test-linux, e2e-linux]', '    needs: [test-linux]'],
-	['unit success omitted', "needs.test-linux.result == 'success' && ", ''],
+	[
+		'package omits unit',
+		'      ci_unit_result: ${{ needs.test-linux.result }}',
+		'      ci_unit_result: success'
+	],
+	['package omits E2E', '    needs: [e2e-linux]', '    needs: []'],
+	['unit success omitted', "needs.e2e-linux.outputs.ci_unit_result == 'success' && ", ''],
 	[
 		'automatic failed E2E admitted',
 		"(github.event_name == 'workflow_dispatch' && needs.e2e-linux.result == 'failure')",
 		"(needs.e2e-linux.result == 'failure')"
 	],
 	['E2E success omitted', "needs.e2e-linux.result == 'success' || ", ''],
-	['serial entry restored', '  e2e-linux:\n', '  e2e-linux:\n    needs: [test-linux]\n'],
-	['verdict omits unit', '      - test-linux\n', ''],
-	['verdict omits E2E', '      - e2e-linux\n', ''],
+	['unit prerequisite omitted', '    needs: [test-linux]\n', ''],
+	[
+		'verdict omits unit',
+		'      ci_predecessors: ${{ toJSON(needs) }}',
+		'      ci_predecessors: success'
+	],
+	['verdict omits E2E', '    needs: [package-linux]\n', '    needs: []\n'],
 	[
 		'verdict ignores actual results',
 		'          NEEDS: ${{ toJSON(needs) }}',
 		'          NEEDS: success'
 	]
 ]) {
-	assert.strictEqual(
-		subject.workflow.split(before).length,
-		2,
-		'unique prerequisite mutation: ' + name
-	);
-	assert.throws(
-		() => verify({ ...subject, workflow: subject.workflow.replace(before, replacement) }),
-		undefined,
-		name
-	);
+	let workflow = subject.workflow;
+	if (name === 'verdict omits unit' || name === 'verdict ignores actual results') {
+		const owner = name === 'verdict omits unit' ? 'install-linux' : 'linux-ok';
+		const body = pipeline
+			.jobsOfText(workflow, '.github/workflows/ci-linux.yml')
+			.find((job) => job.id === owner).body;
+		assert.strictEqual(
+			body.split(before).length,
+			2,
+			'unique scoped prerequisite mutation: ' + name
+		);
+		workflow = workflow.replace(body, body.replace(before, replacement));
+	} else {
+		assert.strictEqual(workflow.split(before).length, 2, 'unique prerequisite mutation: ' + name);
+		workflow = workflow.replace(before, replacement);
+	}
+	assert.throws(() => verify({ ...subject, workflow }), undefined, name);
 }
 console.log(
-	'PASS parallel XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
+	'PASS ordered XI2 prerequisites: 9 causal graph/status/consumer refusals; existing Linux-evidence truth tables remain authoritative; native UNRUN'
 );

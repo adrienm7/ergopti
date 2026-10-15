@@ -1,0 +1,38 @@
+// static/ergopti_plus/windows/native/nav_event_owner/raw_hook_origin.h
+/**
+ * @file raw_hook_origin.h
+ * @brief Downgrades unproven original-hook metadata before scan normalization.
+ *
+ * Non-injected keyboard-driver synthetic events can have raw scan codes such
+ * as 0x21D (AltGr Ctrl) or 0x22A/0x236 (numpad Shift). Masking to eight bits
+ * first aliases them to the user's retained Ctrl/Shift source. They must not
+ * acquire or retire a physical replay recipe. Unknown raw bits stay diagnostic.
+ *
+ * The legacy PHYSICAL category is retained only for previously modeled raw
+ * tuples. It proves no RawInput device, original press, pair eligibility or
+ * output authority. This helper installs no hook and never reclassifies replay
+ * or injected input as physical, including input with an owned replay marker.
+ */
+
+#ifndef ERGOPTI_RAW_HOOK_ORIGIN_H
+#define ERGOPTI_RAW_HOOK_ORIGIN_H
+
+#include "replay_route_core.h"
+
+/** Full KBDLLHOOKSTRUCT values, before the producer's eight-bit projection. */
+static inline uint8_t ErgoptiReplay_RawHookOrigin(
+	uint32_t vk, uint32_t raw_scan, uint32_t flags)
+{
+	/* SDK LLKHF: extended=1, lower integrity=2, injected=0x10,
+	 * Alt down=0x20 and key up=0x80. The native caller pins these values. */
+	if ((flags & 0x02u) != 0)
+		return ERGOPTI_REPLAY_LOWER_INTEGRITY;
+	if ((flags & 0x10u) != 0)
+		return ERGOPTI_REPLAY_EXTERNAL_INJECTION;
+	if (vk == 0 || vk > 0xFFu || raw_scan == 0 || raw_scan > 0xFFu
+			|| (flags & ~0xB3u) != 0)
+		return ERGOPTI_REPLAY_PHYSICAL;
+	return ERGOPTI_REPLAY_PHYSICAL;
+}
+
+#endif

@@ -67,7 +67,7 @@ _PBSS_LlmDepsFailRestoresBaseline() {
 	Body := _DriverFuncBody("LLM_Deps_Fail")
 	Assert(Body != "", "the real dependency failure caller must remain source-visible")
 	Assert(InStr(Body,
-		"return _LLM_Deps_PublishFailure(msg, on_failed, captured_epoch, ProcessSetPriority)", true) > 0,
+		"return _LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch, ProcessSetPriority)", true) > 0,
 		"failure must pass its actual process-priority capability to the publication owner")
 	Assert(InStr(Body, 'ProcessSetPriority("Normal")', true) = 0,
 		"the failure caller cannot reset a hardcoded priority before delegation")

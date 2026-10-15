@@ -1,0 +1,494 @@
+{
+	"schema_version": 1,
+	"feature": "data-and-source-contracts",
+	"checks": [
+		{
+			"id": "js-0031",
+			"ordinal": 43,
+			"name": "domain pipeline (manifest, parity, ports, schema, read-sites, drift)",
+			"cmd": "npm",
+			"args": ["run", "--silent", "build:domain"],
+			"repro": "npm run build:domain"
+		},
+		{
+			"id": "js-0033",
+			"ordinal": 45,
+			"name": "translation key consistency audit",
+			"cmd": "node",
+			"args": ["tools/lint/audit-translations.cjs"],
+			"repro": "node tools/lint/audit-translations.cjs"
+		},
+		{
+			"id": "js-0037",
+			"ordinal": 49,
+			"name": "locale display order single source (locale_order.json ↔ macOS + Windows + Linux + site)",
+			"cmd": "node",
+			"args": ["tools/test/test-locale-order-single-source.cjs"],
+			"repro": "node tools/test/test-locale-order-single-source.cjs"
+		},
+		{
+			"id": "js-0038",
+			"ordinal": 50,
+			"name": "no generator stamps the current date into its output (drift must mean drift)",
+			"cmd": "node",
+			"args": ["tools/test/test-generated-output-is-time-independent.cjs"],
+			"repro": "node tools/test/test-generated-output-is-time-independent.cjs"
+		},
+		{
+			"id": "js-0039",
+			"ordinal": 51,
+			"name": "architecture diagram (ports resolve + architecture.md in sync)",
+			"cmd": "node",
+			"args": ["tools/test/test-architecture-diagram.cjs"],
+			"repro": "node tools/test/test-architecture-diagram.cjs"
+		},
+		{
+			"id": "js-0040",
+			"ordinal": 52,
+			"name": "dev-tool paths (private-AHK workflow points at live paths)",
+			"cmd": "node",
+			"args": ["tools/test/test-dev-tool-paths.cjs"],
+			"repro": "node tools/test/test-dev-tool-paths.cjs"
+		},
+		{
+			"id": "js-0078",
+			"ordinal": 90,
+			"name": "no Lua 5.2+ constructs where LuaJIT has to load them (the interpreter CI and the daemon actually run)",
+			"cmd": "node",
+			"args": ["tools/test/test-luajit-52-isms.cjs"],
+			"repro": "node tools/test/test-luajit-52-isms.cjs"
+		},
+		{
+			"id": "js-0080",
+			"ordinal": 92,
+			"name": "every script a git hook invokes exists (a moved script breaks the next commit that trips it)",
+			"cmd": "node",
+			"args": ["tools/test/test-hook-scripts-exist.cjs"],
+			"repro": "node tools/test/test-hook-scripts-exist.cjs"
+		},
+		{
+			"id": "js-0081",
+			"ordinal": 93,
+			"name": "shared .lua/.toml/.json use LF (the AHK half is covered by test:ahk-encoding)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-sources-are-lf.cjs"],
+			"repro": "node tools/test/test-shared-sources-are-lf.cjs"
+		},
+		{
+			"id": "js-0082",
+			"ordinal": 94,
+			"name": "no driver-namespaced manifest table (I2 — a feature lives at its semantic path, never under a driver)",
+			"cmd": "node",
+			"args": ["tools/test/test-feature-namespace-ratchet.cjs"],
+			"repro": "node tools/test/test-feature-namespace-ratchet.cjs"
+		},
+		{
+			"id": "js-0083",
+			"ordinal": 95,
+			"name": "single-driver features reach only their own driver (platforms inherit from the section — pin them)",
+			"cmd": "node",
+			"args": ["tools/test/test-driver-scoped-features-stay-scoped.cjs"],
+			"repro": "node tools/test/test-driver-scoped-features-stay-scoped.cjs"
+		},
+		{
+			"id": "js-0084",
+			"ordinal": 96,
+			"name": "platform-restriction reasons reach a reader (absences shipped, translated, consumed)",
+			"cmd": "node",
+			"args": ["tools/test/test-reason-keys-are-readable.cjs"],
+			"repro": "node tools/test/test-reason-keys-are-readable.cjs"
+		},
+		{
+			"id": "js-0085",
+			"ordinal": 97,
+			"name": "no new unexplained platform restriction (I2 ratchet — 138 today; run with --report for the inventory)",
+			"cmd": "node",
+			"args": ["tools/test/test-platform-restrictions-explained.cjs"],
+			"repro": "node tools/test/test-platform-restrictions-explained.cjs --report"
+		},
+		{
+			"id": "js-0092",
+			"ordinal": 104,
+			"name": "every corpus field is read by a replay or documented as descriptive",
+			"cmd": "node",
+			"args": ["tools/test/test-corpus-fields-are-read.cjs"],
+			"repro": "node tools/test/test-corpus-fields-are-read.cjs"
+		},
+		{
+			"id": "js-0109",
+			"ordinal": 121,
+			"name": "driver-doc paths (no stale static/drivers in docs)",
+			"cmd": "node",
+			"args": ["tools/test/test-doc-paths.cjs"],
+			"repro": "node tools/test/test-doc-paths.cjs"
+		},
+		{
+			"id": "js-0121",
+			"ordinal": 133,
+			"name": "generated outputs have one execution owner without aggregate duplication",
+			"cmd": "node",
+			"args": ["tools/test/test-generator-output-ownership.cjs"],
+			"repro": "npm run test:generator-output-ownership"
+		},
+		{
+			"id": "js-0131",
+			"ordinal": 143,
+			"name": "Lua closure-binds-nil-global (ratchet against the fourth recurrence of the hs.task GC-pin trap)",
+			"cmd": "node",
+			"args": ["tools/test/test-lua-closure-before-local.cjs"],
+			"repro": "node tools/test/test-lua-closure-before-local.cjs"
+		},
+		{
+			"id": "js-0132",
+			"ordinal": 144,
+			"name": "glossaries match the code (port count + names derived from _shared/core/ports, no retired driver dirs)",
+			"cmd": "node",
+			"args": ["tools/test/test-glossary-matches-code.cjs"],
+			"repro": "node tools/test/test-glossary-matches-code.cjs"
+		},
+		{
+			"id": "js-0135",
+			"ordinal": 147,
+			"name": "AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-v2-syntax-antipatterns.cjs"],
+			"repro": "node tools/test/test-ahk-v2-syntax-antipatterns.cjs"
+		},
+		{
+			"id": "js-0145",
+			"ordinal": 157,
+			"name": "locale resolution single source (macOS+Linux wrappers delegate to shared locale.core)",
+			"cmd": "node",
+			"args": ["tools/test/test-locale-resolution-single-source.cjs"],
+			"repro": "node tools/test/test-locale-resolution-single-source.cjs"
+		},
+		{
+			"id": "js-0146",
+			"ordinal": 158,
+			"name": "webview i18n browser-fallback path (bridge-less locale fetch resolves)",
+			"cmd": "node",
+			"args": ["tools/test/test-i18n-fallback-path.cjs"],
+			"repro": "node tools/test/test-i18n-fallback-path.cjs"
+		},
+		{
+			"id": "js-0158",
+			"ordinal": 170,
+			"name": "shared TOML codec purity (no hard driver requires — loads on every Lua runtime)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-toml-codec-purity.cjs"],
+			"repro": "node tools/test/test-shared-toml-codec-purity.cjs"
+		},
+		{
+			"id": "js-0159",
+			"ordinal": 171,
+			"name": "no fallback literals (LLM defaults read from JSON, never a deleted mirror)",
+			"cmd": "node",
+			"args": ["tools/test/test-no-fallback-literals.cjs"],
+			"repro": "node tools/test/test-no-fallback-literals.cjs"
+		},
+		{
+			"id": "js-0160",
+			"ordinal": 172,
+			"name": "cross-driver manifest equivalence (resolved values identical across drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-manifest-equivalence.cjs"],
+			"repro": "node tools/test/test-manifest-equivalence.cjs"
+		},
+		{
+			"id": "js-0169",
+			"ordinal": 181,
+			"name": "configuration cleanup page (long lists, literal values, session actions, 21 locales)",
+			"cmd": "node",
+			"args": ["tools/test/test-config-cleanup-page.cjs"],
+			"repro": "npm run test:config-cleanup-page"
+		},
+		{
+			"id": "js-0171",
+			"ordinal": 183,
+			"name": "repository URL single source (every GitHub link derives from the updater defaults)",
+			"cmd": "node",
+			"args": ["tools/test/test-repo-url-single-source.cjs"],
+			"repro": "node tools/test/test-repo-url-single-source.cjs"
+		},
+		{
+			"id": "js-0226",
+			"ordinal": 239,
+			"name": "features manifest no-drift (every committed _generated/ file matches the live generator)",
+			"cmd": "node",
+			"args": ["tools/test/test-features-manifest-no-drift.cjs"],
+			"repro": "node tools/test/test-features-manifest-no-drift.cjs"
+		},
+		{
+			"id": "js-0227",
+			"ordinal": 240,
+			"name": "drift guard detects targeted output changes and preserves exact edits",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-covers-every-output.cjs"],
+			"repro": "node tools/test/test-drift-guard-covers-every-output.cjs"
+		},
+		{
+			"id": "js-0228",
+			"ordinal": 241,
+			"name": "drift coverage rejects invalid receipts and restores damaged targets",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-guard-coverage-oracle.cjs"],
+			"repro": "node tools/test/test-drift-guard-coverage-oracle.cjs"
+		},
+		{
+			"id": "js-0229",
+			"ordinal": 242,
+			"name": "drift restoration preserves healthy siblings after filesystem refusals",
+			"cmd": "node",
+			"args": ["tools/test/test-drift-restore-refusal.cjs"],
+			"repro": "node tools/test/test-drift-restore-refusal.cjs"
+		},
+		{
+			"id": "js-0236",
+			"ordinal": 249,
+			"name": "locale native names single-source (every ordered locale is named, no driver copy)",
+			"cmd": "node",
+			"args": ["tools/test/test-locale-names-single-source.cjs"],
+			"repro": "node tools/test/test-locale-names-single-source.cjs"
+		},
+		{
+			"id": "js-0237",
+			"ordinal": 250,
+			"name": "locale catalogue completeness (all 21 carry en.json key-for-key, nothing renders blank)",
+			"cmd": "node",
+			"args": ["tools/test/test-locale-catalogue-complete.cjs"],
+			"repro": "node tools/test/test-locale-catalogue-complete.cjs"
+		},
+		{
+			"id": "js-0238",
+			"ordinal": 251,
+			"name": "a hint that names a menu row quotes the label the tray draws, in every locale",
+			"cmd": "node",
+			"args": ["tools/test/test-locale-hints-quote-live-labels.cjs"],
+			"repro": "node tools/test/test-locale-hints-quote-live-labels.cjs"
+		},
+		{
+			"id": "js-0239",
+			"ordinal": 252,
+			"name": "generator registry runs (npm run gen: every declared output is produced)",
+			"cmd": "node",
+			"args": ["tools/build/gen-all.cjs"],
+			"repro": "npm run gen"
+		},
+		{
+			"id": "js-0240",
+			"ordinal": 253,
+			"name": "new-driver scaffold emits one adapter per port spec (not zero)",
+			"cmd": "node",
+			"args": ["tools/test/test-new-driver-scaffold.cjs"],
+			"repro": "node tools/test/test-new-driver-scaffold.cjs"
+		},
+		{
+			"id": "js-0241",
+			"ordinal": 254,
+			"name": "driver tree parity I1 (shared directory ratio, ratcheted)",
+			"cmd": "node",
+			"args": ["tools/test/test-driver-tree-parity.cjs"],
+			"repro": "node tools/test/test-driver-tree-parity.cjs --measure"
+		},
+		{
+			"id": "js-0246",
+			"ordinal": 259,
+			"name": "port contract single source (contracts.json fresh from the spec.js files; every AHK ADAPTER_ map matches its contract)",
+			"cmd": "node",
+			"args": ["tools/test/test-port-compliance.cjs"],
+			"repro": "node tools/test/test-port-compliance.cjs"
+		},
+		{
+			"id": "js-0248",
+			"ordinal": 261,
+			"name": "feature manifest parity (Windows, macOS, and Linux projections agree)",
+			"cmd": "node",
+			"args": ["tools/test/test-manifest-parity.cjs"],
+			"repro": "node tools/test/test-manifest-parity.cjs"
+		},
+		{
+			"id": "js-0249",
+			"ordinal": 262,
+			"name": "neutral defaults and explicit recommended scopes",
+			"cmd": "node",
+			"args": ["tools/test/test-defaults-single-source.cjs"],
+			"repro": "node tools/test/test-defaults-single-source.cjs"
+		},
+		{
+			"id": "js-0250",
+			"ordinal": 263,
+			"name": "Linux feature parity status (canonical rows with explicit ownership and proof tiers)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-feature-parity.cjs"],
+			"repro": "npm run test:linux-feature-parity"
+		},
+		{
+			"id": "js-0253",
+			"ordinal": 266,
+			"name": "port × driver adapter matrix (cross-tree presence; every absence declared with a reason)",
+			"cmd": "node",
+			"args": ["tools/test/test-port-adapter-matrix.cjs"],
+			"repro": "node tools/test/test-port-adapter-matrix.cjs"
+		},
+		{
+			"id": "js-0255",
+			"ordinal": 268,
+			"name": "shared JS reachability (every _shared module is runtime-mirrored, an oracle, or declared with a reason)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-js-is-reachable.cjs"],
+			"repro": "node tools/test/test-shared-js-is-reachable.cjs"
+		},
+		{
+			"id": "js-0261",
+			"ordinal": 274,
+			"name": "adapter reachability (an adapter nothing requires is a port claimed, not wired)",
+			"cmd": "node",
+			"args": ["tools/test/test-adapter-reachability.cjs"],
+			"repro": "node tools/test/test-adapter-reachability.cjs"
+		},
+		{
+			"id": "js-0263",
+			"ordinal": 276,
+			"name": "feature-state boot smoke (4 fixtures, real include graph, own process)",
+			"cmd": "node",
+			"args": ["tools/test/test-feature-state-boot-smoke.cjs"],
+			"repro": "node tools/test/test-feature-state-boot-smoke.cjs"
+		},
+		{
+			"id": "js-0264",
+			"ordinal": 277,
+			"name": "port contract vector traceability (ratchet: ids linked to the macOS mirror)",
+			"cmd": "node",
+			"args": ["tools/test/test-port-vector-traceability.cjs"],
+			"repro": "node tools/test/test-port-vector-traceability.cjs --measure"
+		},
+		{
+			"id": "js-0265",
+			"ordinal": 278,
+			"name": "lua gsub returns one value (bare return leaks the replacement count)",
+			"cmd": "node",
+			"args": ["tools/test/test-lua-gsub-single-return.cjs"],
+			"repro": "node tools/test/test-lua-gsub-single-return.cjs"
+		},
+		{
+			"id": "js-0272",
+			"ordinal": 285,
+			"name": "shared JS is loadable (module.exports in an ESM package exports nothing)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-js-is-loadable.cjs"],
+			"repro": "node tools/test/test-shared-js-is-loadable.cjs"
+		},
+		{
+			"id": "js-0277",
+			"ordinal": 290,
+			"name": "feature read sites resolve against the manifest (UnsetItemError crash class)",
+			"cmd": "node",
+			"args": ["tools/test/test-feature-read-sites.js"],
+			"repro": "node tools/test/test-feature-read-sites.js"
+		},
+		{
+			"id": "js-0279",
+			"ordinal": 292,
+			"name": "Convention P (platform/ is the only OS-specific word; symmetrical across drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-convention-p-platform-only.cjs"],
+			"repro": "node tools/test/test-convention-p-platform-only.cjs"
+		},
+		{
+			"id": "js-0282",
+			"ordinal": 295,
+			"name": "driver config surface is declared in the manifest (ratchet)",
+			"cmd": "node",
+			"args": ["tools/test/test-driver-config-surface-is-declared.cjs"],
+			"repro": "node tools/test/test-driver-config-surface-is-declared.cjs"
+		},
+		{
+			"id": "js-0283",
+			"ordinal": 296,
+			"name": "config schema (v2 TOML shape)",
+			"cmd": "node",
+			"args": ["tools/test/test-config-schema.cjs"],
+			"repro": "node tools/test/test-config-schema.cjs"
+		},
+		{
+			"id": "js-0284",
+			"ordinal": 297,
+			"name": "config migrations (registry chain, closed op set, corpus replay)",
+			"cmd": "node",
+			"args": ["tools/test/test-config-migrations.cjs"],
+			"repro": "node tools/test/test-config-migrations.cjs"
+		},
+		{
+			"id": "js-0299",
+			"ordinal": 312,
+			"name": "Windows Format(t(...)) strings carry numbered placeholders only, in all 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-format-placeholders.cjs"],
+			"repro": "npm run test:ahk-format-placeholders"
+		},
+		{
+			"id": "js-0361",
+			"ordinal": 377,
+			"name": "name parity (text_utils + action_picker + manifest_menu symmetric across drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-name-parity.cjs"],
+			"repro": "node tools/test/test-name-parity.cjs"
+		},
+		{
+			"id": "js-0397",
+			"ordinal": 413,
+			"name": "TOML coercion parity (corpus cross-driver gate)",
+			"cmd": "node",
+			"args": ["tools/test/test-toml-coercion-parity.cjs"],
+			"repro": "node tools/test/test-toml-coercion-parity.cjs"
+		},
+		{
+			"id": "js-0398",
+			"ordinal": 414,
+			"name": "shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-test-format.cjs"],
+			"repro": "node tools/test/test-shared-test-format.cjs"
+		},
+		{
+			"id": "js-0399",
+			"ordinal": 415,
+			"name": "file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS infra/file_watchers.lua)",
+			"cmd": "node",
+			"args": ["tools/test/test-file-watchers-constants-single-source.cjs"],
+			"repro": "node tools/test/test-file-watchers-constants-single-source.cjs"
+		},
+		{
+			"id": "js-0400",
+			"ordinal": 416,
+			"name": "format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)",
+			"cmd": "node",
+			"args": ["tools/test/test-format-toml-importable.cjs"],
+			"repro": "node tools/test/test-format-toml-importable.cjs"
+		},
+		{
+			"id": "js-0405",
+			"ordinal": 421,
+			"name": "no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)",
+			"cmd": "node",
+			"args": ["tools/test/test-no-plan-refs-in-source.cjs"],
+			"repro": "node tools/test/test-no-plan-refs-in-source.cjs"
+		},
+		{
+			"id": "js-0409",
+			"ordinal": 425,
+			"name": "every Hammerspoon deadline keeps 2 s over the native worker budget it waits for (hardening-d)",
+			"cmd": "node",
+			"args": ["tools/test/test-hardening-d-native-timeout-contract.cjs"],
+			"repro": "node tools/test/test-hardening-d-native-timeout-contract.cjs"
+		},
+		{
+			"id": "js-0411",
+			"ordinal": 427,
+			"name": "no macOS or Linux module builds a user-data path inside the installed driver folder (hardening-b)",
+			"cmd": "node",
+			"args": ["tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs"],
+			"repro": "node tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs"
+		}
+	]
+}

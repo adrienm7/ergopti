@@ -409,13 +409,21 @@ for (const [key, owners] of [
 	}
 }
 const ciText = pipeline.file(pipeline.ENTRY_REL);
-const chainMutated = ciText.replace(CALLER_VERSION, "      version: ''");
-if (chainMutated === ciText) {
-	errors.push(`${pipeline.ENTRY_REL} passes the plan's version to no lane at all`);
-} else if (checkVersionChain(chainMutated).length === 0) {
-	errors.push(
-		"self-check: dropping the plan's version from an OS caller went unnoticed — this guard cannot fail"
-	);
+// Common now also forwards version, so mutate each actual OS caller rather
+// than the first version literal in the complete root workflow.
+for (const box of VERSIONED_BOXES) {
+	const caller = pipeline.jobsOfText(ciText, pipeline.ENTRY_REL).find((job) => job.id === box);
+	if (!caller || !CALLER_VERSION.test(caller.body)) {
+		errors.push(`${pipeline.ENTRY_REL} passes the plan's version to no ${box} lane`);
+		continue;
+	}
+	const changedCaller = caller.body.replace(CALLER_VERSION, "      version: ''");
+	const chainMutated = ciText.replace(caller.body, () => changedCaller);
+	if (chainMutated === ciText || checkVersionChain(chainMutated).length === 0) {
+		errors.push(
+			`self-check: dropping the plan's version from the ${box} caller went unnoticed — this guard cannot fail`
+		);
+	}
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.

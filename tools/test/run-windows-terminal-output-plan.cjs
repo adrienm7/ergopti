@@ -16,6 +16,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { compilePortable } = require('./lib/portable-c-compiler.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const SOURCE = path.join(ROOT, 'static/ergopti_plus/windows/native/nav_event_owner');
@@ -46,26 +47,20 @@ function run(args) {
 	assert.ok(args.length === 0 || (args.length === 1 && args[0] === '--sanitize'));
 	const temporary = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-output-plan-'));
 	try {
-		const compiler = process.env.CC || 'cc';
 		const binary = path.join(
 			temporary,
 			process.platform === 'win32' ? 'output-test.exe' : 'output-test'
 		);
-		execute(compiler, ['--version']);
-		execute(compiler, [
-			'-std=c11',
-			'-Wall',
-			'-Wextra',
-			'-Werror',
-			'-pedantic',
-			'-UNDEBUG',
-			...(args.length ? ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'] : []),
-			path.join(SOURCE, 'replay_route_core.c'),
-			path.join(SOURCE, 'terminal_output_plan.c'),
-			path.join(SOURCE, 'terminal_output_plan_test.c'),
-			'-o',
-			binary
-		]);
+		compilePortable({
+			sources: [
+				path.join(SOURCE, 'replay_route_core.c'),
+				path.join(SOURCE, 'terminal_output_plan.c'),
+				path.join(SOURCE, 'terminal_output_plan_test.c')
+			],
+			binary,
+			sanitize: args.length !== 0,
+			cwd: ROOT
+		});
 		execute(binary, []);
 		console.log(
 			`Portable terminal-output-plan execution target: ${process.platform}/${process.arch}.`

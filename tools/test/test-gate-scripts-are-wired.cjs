@@ -39,6 +39,8 @@
 
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 const fs = require('fs');
 const path = require('path');
 
@@ -78,6 +80,7 @@ console.log('='.repeat(50));
 
 const pkg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'));
 const suiteSrc = readIfPresent(SUITE);
+const suiteChecks = loadInventory(REPO_ROOT).checks;
 check(
 	'the umbrella runner is readable',
 	suiteSrc.length > 1000,
@@ -102,7 +105,17 @@ const hookSrc = readIfPresent(HOOK);
 
 // npm script names each runner invokes.
 const suiteScripts = new Set(
-	[...suiteSrc.matchAll(/['"](test:[a-z0-9:_-]+)['"]/g)].map((m) => m[1])
+	[
+		...suiteChecks
+			.filter((check) => check.cmd === 'npm' && check.args[0] === 'run')
+			.map((check) => check.args.at(-1)),
+		...suiteSrc.matchAll(/['"](test:[a-z0-9:_-]+)['"]/g)
+	].map((entry) => (typeof entry === 'string' ? entry : entry[1]))
+);
+const suitePaths = new Set(
+	suiteChecks
+		.filter((check) => ['node', '$NODE_EXECUTABLE'].includes(check.cmd))
+		.map((check) => check.args[0])
 );
 const ciScripts = new Set([...workflowSrc.matchAll(/npm run ([a-z0-9:_-]+)/g)].map((m) => m[1]));
 const hookScripts = new Set([...hookSrc.matchAll(/npm run ([a-z0-9:_-]+)/g)].map((m) => m[1]));
@@ -127,7 +140,7 @@ function npmScriptsNaming(file) {
 function reachability(file) {
 	const scripts = npmScriptsNaming(file);
 	const via = [];
-	if (suiteSrc.includes(file)) via.push('run-js-suite (direct)');
+	if (suitePaths.has('tools/test/' + file)) via.push('feature inventory (direct)');
 	if (scripts.some((s) => suiteScripts.has(s))) via.push('run-js-suite (npm script)');
 	if (workflowSrc.includes(file)) via.push('CI workflow (direct)');
 	if (scripts.some((s) => ciScripts.has(s))) via.push('CI workflow (npm script)');
@@ -148,7 +161,7 @@ check(
 	unexpected.length
 		? `these scripts are invoked by NOTHING — not run-js-suite.cjs, not any CI workflow, not the pre-commit hook: ${unexpected.join(
 				', '
-			)}. Add an entry to run-js-suite.cjs's CHECKS list. An npm alias alone is local repro, not coverage. If a script genuinely must stay unwired, add it to ALLOWED_UNWIRED with the reason.`
+			)}. Add an entry to the canonical feature inventory. An npm alias alone is local repro, not coverage. If a script genuinely must stay unwired, add it to ALLOWED_UNWIRED with the reason.`
 		: ''
 );
 
@@ -171,8 +184,8 @@ for (const [file, why] of Object.entries(ALLOWED_UNWIRED)) {
 // This guard must itself be wired, or it is the very thing it warns about.
 check(
 	'this guard is itself wired into the umbrella',
-	suiteSrc.includes('test-gate-scripts-are-wired.cjs'),
-	'add test-gate-scripts-are-wired.cjs to run-js-suite.cjs — an unwired reachability guard cannot report its own absence'
+	suitePaths.has('tools/test/test-gate-scripts-are-wired.cjs'),
+	'add test-gate-scripts-are-wired.cjs to its feature inventory — an unwired reachability guard cannot report its own absence'
 );
 
 console.log('='.repeat(50));

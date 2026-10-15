@@ -762,6 +762,10 @@ local function start_watchers()
 		-- Handling Tab presses during LLM execution
 		if keycode == Keycodes.TAB then
 			if flags.shift then
+				if flags.cmd or flags.alt or flags.ctrl then
+					defer_dismiss("modified Tab")
+					return finish(false)
+				end
 				local preds_count = type(_state.raw_predictions) == "table" and #_state.raw_predictions or 0
 				if preds_count > 1 then
 					-- Left shift → back (-1), right shift → forward (+1)

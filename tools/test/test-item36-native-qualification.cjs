@@ -9,6 +9,7 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	const path = require('node:path');
 	const { execFileSync } = require('node:child_process');
 	const reader = require('../diagnostics/item36_xctest_evidence.cjs');
+	const stageSource = require('./fixtures/macos-stage-source.cjs');
 	const full = require('../diagnostics/swift_xctest_evidence.cjs');
 	const repository = path.resolve(__dirname, '../..');
 	const classes = [
@@ -164,28 +165,44 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	check('status-range', () => assert.throws(() => reader.evaluate(valid, 256, 0)));
 	check('scoped-filter-admitted', () => assert.ok(admitItem36Selector(workflow)));
 	for (const [label, token, replacement] of [
+		['missing-locked-dependencies', '          npm ci --ignore-scripts\n', ''],
+		[
+			'unlocked-dependencies',
+			'          npm ci --ignore-scripts\n',
+			'          npm install --ignore-scripts\n'
+		],
+		[
+			'forgiven-dependencies',
+			'          npm ci --ignore-scripts\n',
+			'          npm ci --ignore-scripts || true\n'
+		],
+		[
+			'late-dependencies',
+			'          npm ci --ignore-scripts\n          node tools/test/test-macos-dev-qualification-deferral.cjs\n',
+			'          node tools/test/test-macos-dev-qualification-deferral.cjs\n          npm ci --ignore-scripts\n'
+		],
 		['wrong-filter', ITEM36_FILTER, "--filter 'HomebrewArchiveAcceptanceTests'"],
-		['foreign-job', '  item36-native:\n', '  unrelated-native:\n'],
+		['foreign-job', '  e2e-hs:\n', '  unrelated-native:\n'],
 		[
 			'foreign-step',
 			'      - name: Qualify scoped item 36 native archive XCTest controls\n',
 			'      - name: Unrelated native tests\n'
 		],
-		['coupled-job', '  item36-native:\n', '  item36-native:\n    needs: package-macos\n'],
+		['coupled-job', '  e2e-hs:\n', '  e2e-hs:\n    needs: package-macos\n'],
 		[
 			'release-admission',
-			"    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release }}",
-			'    if: always()'
+			'        if: ' + stageSource.condition('item36-native'),
+			'        if: always()'
 		],
-		['forgiven-job', '  item36-native:\n', '  item36-native:\n    continue-on-error: true\n'],
-		[
-			'publish-output',
-			'  item36-native:\n',
-			'  item36-native:\n    outputs:\n      assets: foreign\n'
-		],
+		['forgiven-job', '  e2e-hs:\n', '  e2e-hs:\n    continue-on-error: true\n'],
+		['publish-output', '  e2e-hs:\n', '  e2e-hs:\n    outputs:\n      assets: foreign\n'],
 		['lost-source-begin', 'item36_xctest_evidence.cjs begin', 'item36_xctest_evidence.cjs fake'],
 		['lost-tee-status', '"${item36_statuses[1]}"', '"0"'],
-		['reset-source', 'begin "$GITHUB_SHA"', 'begin "fake"'],
+		[
+			'reset-source',
+			'item36_xctest_evidence.cjs begin "$GITHUB_SHA"',
+			'item36_xctest_evidence.cjs begin "fake"'
+		],
 		[
 			'lost-consent',
 			"ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'",
@@ -382,6 +399,6 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	);
 };
 
-// The registered CLI loads the existing qualification owner, which receives
-// this cached export and runs every scoped control exactly once.
-if (require.main === module) require('./test-macos-dev-qualification-deferral.cjs');
+// The standalone CLI executes its exported owner with the shared exact selector.
+if (require.main === module)
+	module.exports(require('./test-macos-dev-qualification-deferral.cjs').item36Context());

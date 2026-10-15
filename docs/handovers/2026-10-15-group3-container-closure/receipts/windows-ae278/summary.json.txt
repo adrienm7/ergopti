@@ -1,0 +1,136 @@
+{
+  "schema": 1,
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "run": 38766625752,
+  "attempt": 1,
+  "job": 116532179116,
+  "job_status": "completed_failure",
+  "counts": {
+    "complete": true,
+    "planned": 12729,
+    "executed_count": 12729,
+    "timed_count": 12729,
+    "passed": 12722,
+    "failed": 7
+  },
+  "failures": [
+    {
+      "index": 7738,
+      "name": "managed remote native: actual system CA and static/PAC transport preserve strict TLS and exact cleanup",
+      "status": "not ok",
+      "duration_ms": 892.009
+    },
+    {
+      "index": 7801,
+      "name": "updater native: actual generated staging CA/PAC integrity and refusals preserve old app",
+      "status": "not ok",
+      "duration_ms": 822.209
+    },
+    {
+      "index": 7802,
+      "name": "updater native: actual original deadline/cancellation retire owned Job and partial stage",
+      "status": "not ok",
+      "duration_ms": 824.688
+    },
+    {
+      "index": 7816,
+      "name": "artifact curl: actual Schannel staging and SSPI bare NTLM CONNECT with no Negotiate downgrade",
+      "status": "not ok",
+      "duration_ms": 837.985
+    },
+    {
+      "index": 7832,
+      "name": "updater curl capture: actual progressing native body retires after cancellation and original deadline",
+      "status": "not ok",
+      "duration_ms": 851.327
+    },
+    {
+      "index": 7855,
+      "name": "managed remote: actual buffered POST shares native SSPI NTLM curl ownership",
+      "status": "not ok",
+      "duration_ms": 797.578
+    },
+    {
+      "index": 7856,
+      "name": "managed remote: actual full-URL PAC keeps ordered closed-proxy, SSPI relay and DIRECT fallback",
+      "status": "not ok",
+      "duration_ms": 839.844
+    }
+  ],
+  "failure_duration_ms": 5865.64,
+  "all_case_duration_ms": 5429163.52,
+  "unique_raw_case_ids": 12729,
+  "prior073_failures_current": {
+    "pass": 696,
+    "fail": 7
+  },
+  "prior677_picker_case_current": {
+    "index": 4074,
+    "name": "layout selection: genuine scope completion commits the selected Ergopti+ source (todo96-picker-handoff)",
+    "status": "ok",
+    "duration_ms": 4585.444
+  },
+  "new_diagnostic_owner_tests_actual": [
+    {
+      "index": 7793,
+      "name": "managed remote native: startup exception projection keeps closed ordered bounded facts",
+      "status": "ok",
+      "duration_ms": 0.174
+    },
+    {
+      "index": 7794,
+      "name": "managed remote native: actual failed state consumes startup facts and preserves refusal",
+      "status": "ok",
+      "duration_ms": 6.281
+    }
+  ],
+  "diagnostic": {
+    "startup_phase": "constructor",
+    "constructor_phase": "native_tls",
+    "outer_type": "method_invocation",
+    "outer_hresult": -2146233087,
+    "outer_hex": "0x80131501",
+    "inner_type": "invalid_operation",
+    "inner_hresult": -2146233079,
+    "inner_hex": "0x80131509",
+    "truncated": false,
+    "per_case_duplicates": 2,
+    "state_wait_timeout_observed": false
+  },
+  "unknown": "Which OpenSsl constructor/owner guard or its catch-disposal path threw; no raw exception message or native status retained. No production transport fix established.",
+  "skipped_job_steps": [
+    {
+      "name": "Download AutoHotkey v2 runtime",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Run isolated AHK LLM suites",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Check for AHK compiler warnings",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Run the full-driver startup smoke",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Test fresh Git clone bootstrap and warm startup",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Post Run actions/setup-node@v4",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Post Cache AutoHotkey runtime",
+      "conclusion": "skipped"
+    },
+    {
+      "name": "Post Prepare native PAC source generator",
+      "conclusion": "skipped"
+    }
+  ],
+  "reviewer_tests_or_native": false
+}

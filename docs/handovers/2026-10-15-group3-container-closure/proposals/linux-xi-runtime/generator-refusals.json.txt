@@ -1,0 +1,68 @@
+{
+  "scope": "literal twelve existing source corpus variants; no behavioral expectations generated",
+  "passed": 12,
+  "failed": 0,
+  "skipped": 0,
+  "results": [
+    {
+      "name": "missing Xi",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "wrong Xi order",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "wrong Xi SONAME",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "missing Xi provider",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "invented Xi provider",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "deprecated Xi Nix namespace",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "missing Xi pkg-config",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "foreign Xi pkg-config",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "missing Xi roots",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "empty Xi roots",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "duplicate Xi roots",
+      "status": "PASS",
+      "projection_reads": 0
+    },
+    {
+      "name": "wrong Xi root",
+      "status": "PASS",
+      "projection_reads": 0
+    }
+  ]
+}

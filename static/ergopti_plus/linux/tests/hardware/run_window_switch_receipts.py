@@ -87,12 +87,131 @@ def _discover_owned_xmessage(title, wait, query):
         raise
 
 
+def _window_failure_snapshot(query, now=time.monotonic):
+    """Observe only the failed owned display; no result can admit a window."""
+    budget_seconds = 3.0
+    query_timeout_seconds = 0.5
+    max_clients = 6
+    deadline = now() + budget_seconds
+    output_limit = 65536
+    records = []
+
+    def observe(role, *argv):
+        remaining = deadline - now()
+        record = {"role": role, "argv": list(argv)}
+        records.append(record)
+        if remaining <= 0:
+            record["state"] = "budget-exhausted"
+            return ""
+        try:
+            result = query(argv, min(remaining, query_timeout_seconds))
+            if (
+                type(result) is not subprocess.CompletedProcess
+                or result.args != argv
+                or type(result.returncode) is not int
+                or type(result.stdout) is not bytes
+                or type(result.stderr) is not bytes
+            ):
+                raise ValueError("invalid diagnostic query receipt")
+            record.update(state="completed", status=result.returncode)
+            streams = (result.stdout, result.stderr)
+        except subprocess.TimeoutExpired as error:
+            record["state"] = "timeout"
+            streams = (error.stdout or b"", error.stderr or b"")
+        except Exception as error:
+            record.update(state="query-error", error=type(error).__name__)
+            return ""
+        for name, value in zip(("stdout", "stderr"), streams):
+            if type(value) is not bytes:
+                record.update(state="query-error", error="invalid-output-type")
+                return ""
+            record[name + "_bytes"] = len(value)
+            record[name + "_truncated"] = len(value) > output_limit
+            record[name] = value[:output_limit].decode("utf-8", errors="replace")
+        if record["state"] != "completed" or record["status"] != 0:
+            return ""
+        return record["stdout"]
+
+    wm = observe("wm-root", "xprop", "-root", "_NET_SUPPORTING_WM_CHECK")
+    wm_id = re.search(
+        r"^_NET_SUPPORTING_WM_CHECK\(WINDOW\): window id # (0x[0-9a-fA-F]+)\s*$",
+        wm,
+        re.MULTILINE,
+    )
+    if wm_id is not None and int(wm_id.group(1), 16) != 0:
+        observe(
+            "wm-reciprocal",
+            "xprop",
+            "-id",
+            wm_id.group(1),
+            "_NET_SUPPORTING_WM_CHECK",
+            "_NET_WM_NAME",
+            "_NET_WM_PID",
+        )
+    clients = observe(
+        "client-lists", "xprop", "-root", "_NET_CLIENT_LIST_STACKING", "_NET_CLIENT_LIST"
+    )
+    tree = observe("root-tree", "xwininfo", "-root", "-tree")
+    # Title-bearing tree rows also expose an unmapped client absent from EWMH.
+    # Other advertised client IDs are observations only, never ownership proof.
+    ids = re.findall(
+        r'^\s*(0x[0-9a-fA-F]+)\s+"owned111_(?:active|right|left)":',
+        tree,
+        re.MULTILINE,
+    )
+    for row in clients.splitlines():
+        if re.match(r"^_NET_CLIENT_LIST(?:_STACKING)?\(WINDOW\): window id #", row):
+            ids.extend(re.findall(r"0x[0-9a-fA-F]+", row))
+    selected = list(dict.fromkeys(value.lower() for value in ids if int(value, 16)))
+    for window_id in selected[:max_clients]:
+        observe("client-map", "xwininfo", "-id", window_id)
+        observe(
+            "client-properties",
+            "xprop",
+            "-id",
+            window_id,
+            "WM_NAME",
+            "WM_CLASS",
+            "WM_STATE",
+            "WM_CLIENT_MACHINE",
+            "_NET_WM_NAME",
+            "_NET_WM_PID",
+            "_NET_WM_DESKTOP",
+        )
+    return {
+        "version": 1,
+        "phase": "owned-x11-setup-failure",
+        "query_budget_seconds": budget_seconds,
+        "query_timeout_seconds": query_timeout_seconds,
+        "retained_bytes_per_stream": output_limit,
+        "observed_client_ids": len(selected),
+        "omitted_client_ids": max(0, len(selected) - max_clients),
+        "queries": records,
+    }
+
+
+def _emit_complete_child_log(path, write):
+    """Emit every retained child log byte after cleanup, without decoding or slicing."""
+    with path.open("rb") as source:
+        while True:
+            chunk = source.read(65536)
+            if not chunk:
+                return
+            written = write(chunk)
+            if type(written) is not int or written != len(chunk):
+                raise OSError("incomplete child-log write")
+
+
 def main():
     with tempfile.TemporaryDirectory(prefix="ergopti111-native-") as directory:
         root = pathlib.Path(directory)
         children = []
         reader, writer = os.pipe()
         wm = None
+        env = None
+        log = None
+        failure = None
+        observations = None
         try:
             log = (root / "native.log").open("wb")
             server = subprocess.Popen(
@@ -436,26 +555,97 @@ def main():
             for receipt in receipts:
                 print(json.dumps(receipt))
             print("Native window receipts: " + str(len(receipts)) + " passed, 0 failed, 0 skipped")
-        except Exception:
-            log.flush()
-            print((root / "native.log").read_text())
-            print("owned child statuses", [(p.pid, p.poll()) for p in children])
-            print(command("xprop", "-root", "_NET_CLIENT_LIST_STACKING", check=False).stdout)
+        except Exception as error:
+            failure = error
+            try:
+                observations = {"phase": "display-not-established", "queries": []}
+                if env is not None:
+                    observations = _window_failure_snapshot(
+                        lambda argv, timeout: subprocess.run(
+                            argv,
+                            env=env,
+                            stdin=subprocess.DEVNULL,
+                            capture_output=True,
+                            timeout=timeout,
+                        )
+                    )
+                observations["children_before_cleanup"] = [
+                    {"pid": child.pid, "status": child.poll()} for child in children
+                ]
+            except Exception as diagnostic_error:
+                observations = {
+                    "phase": "diagnostic-capture-refused",
+                    "error": type(diagnostic_error).__name__,
+                }
             raise
         finally:
-            os.close(reader)
-            if writer is not None:
-                os.close(writer)
-            if wm is not None and wm.poll() is None:
-                os.kill(wm.pid, signal.SIGCONT)
-            for child in reversed(children):
-                if child.poll() is None:
-                    child.terminate()
+            active_exception = sys.exc_info()[1]
+            cleanup_errors = []
+
+            def retain_cleanup_error(phase, error):
+                cleanup_errors.append((phase, error))
+
+            for descriptor in (reader, writer):
+                if descriptor is not None:
                     try:
-                        child.wait(timeout=3)
-                    except subprocess.TimeoutExpired:
-                        child.kill()
-                        child.wait(timeout=3)
+                        os.close(descriptor)
+                    except Exception as error:
+                        retain_cleanup_error("display-pipe-close", error)
+            try:
+                if wm is not None and wm.poll() is None:
+                    os.kill(wm.pid, signal.SIGCONT)
+            except Exception as error:
+                retain_cleanup_error("wm-continue", error)
+            for child in reversed(children):
+                try:
+                    if child.poll() is None:
+                        child.terminate()
+                        try:
+                            child.wait(timeout=3)
+                        except subprocess.TimeoutExpired:
+                            child.kill()
+                            child.wait(timeout=3)
+                except Exception as error:
+                    retain_cleanup_error("owned-child-retirement", error)
+            if log is not None:
+                try:
+                    log.close()
+                except Exception as error:
+                    retain_cleanup_error("child-log-close", error)
+            if failure is not None or cleanup_errors:
+                try:
+                    print(
+                        "# native_window_setup_failure "
+                        + json.dumps(
+                            {
+                                "observations": observations,
+                                "cleanup_errors": [
+                                    {"phase": phase, "error": type(error).__name__}
+                                    for phase, error in cleanup_errors
+                                ],
+                                "children_after_cleanup": [
+                                    {"pid": child.pid, "status": child.poll()} for child in children
+                                ],
+                            },
+                            sort_keys=True,
+                        ),
+                        flush=True,
+                    )
+                except Exception:
+                    # A metadata sink refusal must not suppress the complete child log.
+                    pass
+                if log is not None:
+                    try:
+                        print("# native_window_child_log_begin", flush=True)
+                        _emit_complete_child_log(root / "native.log", sys.stdout.buffer.write)
+                        sys.stdout.buffer.flush()
+                        print("\n# native_window_child_log_end", flush=True)
+                    except Exception:
+                        # Optional reporting cannot replace the original failure.
+                        # Control-plane BaseExceptions still propagate to the family owner.
+                        pass
+            if active_exception is None and cleanup_errors:
+                raise cleanup_errors[0][1]
 
 
 if __name__ == "__main__":

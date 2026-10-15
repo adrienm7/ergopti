@@ -42,7 +42,7 @@ _LNTR_WithState(Fn) {
 		; through the original protocol before returning the borrowed globals.
 		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown) {
 			try {
-				AssertTrue(LLM_NavEventOwner_Stop(), "owned metadata fixture cleanup must acknowledge Stop")
+				AssertTrue(_LNTR_StopFixtureState(), "owned metadata fixture cleanup must acknowledge Stop")
 				AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
 			} catch as Err {
 				CleanupFailure := Err
@@ -66,6 +66,21 @@ _LNTR_WithState(Fn) {
 		if IsObject(CleanupFailure) && !IsObject(Primary)
 			throw CleanupFailure
 	}
+}
+
+_LNTR_StopFixtureState() {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerPort
+	; A preceding real ABI case leaves its DLL intentionally process-resident.
+	; Its retained frame requires the unchanged genuine native Stop receipt;
+	; the fixture's custom ACK cannot retire that C lifetime.
+	Port := _LLM_NavEventOwnerPort
+	if !(_LLM_NavEventOwnerModule is Integer) || _LLM_NavEventOwnerModule <= 0
+			|| !(Port is Map) || !Port.Has("stop")
+		return LLM_NavEventOwner_Stop()
+	Stop := Port["stop"]
+	Port.Delete("stop")
+	try return LLM_NavEventOwner_Stop()
+	finally Port["stop"] := Stop
 }
 
 _LNTR_LoadFixture(Base) {
@@ -177,17 +192,25 @@ _LNTR_MarshalCase() {
 
 _LNTR_RefusalCase() {
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteUnknown
-	State := _LNTR_PortState()
+	State := _LNTR_PortState(), KnownFailure := 0
 	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
 	State.Status := -11
 	AssertEqual(false, LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count, "busy candidates are not published")
 	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+	; A known refusal must reach its registration port before unknown custody
+	; intentionally blocks every successor until the fixture acknowledges Stop.
 	InvalidCalls := State.Calls.Length
 	State.Status := -5
-	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "invalid native registrations stay errors")
+	Calls := State.Calls.Length
+	AssertThrows(CaptureKnownFailure, "invalid native registrations stay errors")
+	AssertEqual(Calls + 1, State.Calls.Length, "The known refusal reaches its actual registration callback.")
 	AssertEqual(InvalidCalls + 1, State.Calls.Length, "the invalid ACK must reach its selected registration boundary")
+	AssertTrue(IsObject(KnownFailure) && KnownFailure.HasOwnProp("NativeStatus"),
+		"An unrelated admission failure cannot stand in for the known native refusal.")
+	AssertEqual(-5, KnownFailure.NativeStatus)
+	AssertEqual(0, KnownFailure.NativeErrorCode)
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
 	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
 	State.Status := "0"
@@ -196,8 +219,17 @@ _LNTR_RefusalCase() {
 	Calls := State.Calls.Length
 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "Unknown custody prevents another registration.")
 	AssertEqual(Calls, State.Calls.Length, "The retry never reaches a successor/native callback.")
+
 	; Keep the original unknown frame visible so _LNTR_WithState retires its
 	; private source lease through Stop before the next fixture can register.
+
+	CaptureKnownFailure() {
+		try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+		catch as Err {
+			KnownFailure := Err
+			throw Err
+		}
+	}
 }
 
 _LNTR_RetainedRecipeCase() {
@@ -1652,3 +1684,37 @@ if _LNTR_NativeRetirementChildKind == "positive" {
 		Test("terminal-native-retirement: authority refusal in distinct child " . CaseName,
 			_LNTR_ReceiveActualChild.Bind(CaseName))
 }
+
+; Repeat the original failing adjacency in one process. Public globals alone
+; cannot prove that the original issuer retired its private retained frame.
+_LNTR_RefusalSuccessorCase() {
+	_LNTR_WithState(_LNTR_RefusalCase)
+	_LNTR_WithState(_LNTR_RetainedRecipeCase)
+}
+
+Test("terminal route metadata: acknowledged refusal cleanup admits the original successor (todo49-route-adapter)",
+	_LNTR_RefusalSuccessorCase)
+
+; The resident DLL lifetime survives the original no-hook ABI case. Its later
+; controlled fixture must retire retained references through the real protocol.
+_LNTR_ResidentAbiBeforeControlledRetirement() {
+	_LNEO_RealNativeAbiRoundTripDoesNotStartHook()
+	_LNEO_RealNativeAbiBareDigitValidation()
+	Targets := [_LLM_NavEventOwnerPortFn, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationRetain,
+		_LLM_NavEventOwnerTerminalRegistrationUnknown]
+	Received := 0
+	for Target in Targets {
+		_LNTR_V3_AfterSourceCallableWithdrawal(Target)
+		Received += 1
+	}
+	for Boundary in ["register", "held"] {
+		for Target in Targets {
+			_LNTR_V3_AfterRegistrationFacade(Target, Boundary)
+			Received += 1
+		}
+	}
+	AssertEqual(15, Received, "every original source/register/held facade keeps its cleanup obligation")
+}
+Test("terminal route metadata: resident ABI precedes controlled retirement (terminal-resident-cleanup)",
+	_LNTR_ResidentAbiBeforeControlledRetirement)

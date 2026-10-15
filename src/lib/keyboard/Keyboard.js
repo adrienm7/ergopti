@@ -13,16 +13,38 @@ function logarithmicTransformation(value, scaleFactor) {
 export class Keyboard {
 	constructor(id) {
 		this.id = id;
+		this.state = 'new';
+		this.subscriptions = [];
+	}
 
-		// Automatically update the keyboard as soon as layoutData changes
-		stores_infos['layoutData'].subscribe((value) => {
+	/** Own reactive subscriptions only after Svelte has mounted the keyboard element. */
+	mount() {
+		if (this.state !== 'new') throw new Error('Keyboard is already initialized');
+		this.state = 'mounting';
+		try {
+			this.location = this.getKeyboardLocation();
+			if (!this.location) throw new Error('Cannot mount keyboard without its DOM element');
+			const update = () => {
+				if (this.state === 'mounted') this.updateKeyboard();
+			};
+			this.subscriptions.push(stores_infos.layoutData.subscribe(update));
+			this.subscriptions.push(stores_infos[this.id].subscribe(update));
+			this.state = 'mounted';
 			this.updateKeyboard();
-		});
+		} catch (error) {
+			this.destroy();
+			throw error;
+		}
+	}
 
-		// Automatically update the keyboard as soon as the keyboard configuration changes
-		stores_infos[this.id].subscribe((value) => {
-			this.updateKeyboard();
-		});
+	/** Retire store observers before Svelte removes their DOM owner. */
+	destroy() {
+		if (!['mounting', 'mounted'].includes(this.state))
+			throw new Error('Keyboard has no active initialization');
+		this.state = 'destroyed';
+		for (const unsubscribe of this.subscriptions) unsubscribe();
+		this.subscriptions = [];
+		this.location = null;
 	}
 
 	getKeyboardLocation() {

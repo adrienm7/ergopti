@@ -51,11 +51,48 @@ _ManagedRemoteFixtureDiagnostic(State) {
 	return "stage=" . Stage . " kind=" . Kind . " hresult=" . Format("{:d}", Code)
 }
 
+; Independent startup facts supplement, never replace, the original service fact.
+_ManagedRemoteFixtureStartupDiagnostic(StartupState) {
+	if !(StartupState is Map) || Type(StartupState.Get("version", "")) != "Integer" || StartupState["version"] != 1
+		return ""
+	StartupPhase := StartupState.Get("startup_phase", "")
+	StartupConstructor := StartupState.Get("startup_constructor_phase", "")
+	StartupRows := StartupState.Get("startup_errors", 0)
+	StartupTruncated := StartupState.Get("startup_errors_truncated", "")
+	if Type(StartupPhase) != "String" || !RegExMatch(StartupPhase, "\A(?:admission|curl_preflight|add_type|constructor|open_events|initial_publish|event_loop)\z")
+		return ""
+	if Type(StartupConstructor) != "String" || !RegExMatch(StartupConstructor, "\A(?:not_entered|listeners|keys|root_certificate|leaf_certificate|crl|native_tls|listener_threads)\z")
+		return ""
+	if !(StartupRows is Array) || StartupRows.Length < 1 || StartupRows.Length > 4
+			|| Type(StartupTruncated) != "Integer" || (StartupTruncated != 0 && StartupTruncated != 1)
+		return ""
+	StartupFact := "startup_phase=" . StartupPhase . " constructor_phase=" . StartupConstructor
+	for StartupIndex, StartupRow in StartupRows {
+		if !(StartupRow is Map)
+			return ""
+		StartupKind := StartupRow.Get("kind", "")
+		StartupCode := StartupRow.Get("hresult", "")
+		if Type(StartupKind) != "String" || !RegExMatch(StartupKind, "\A(?:runtime|method_invocation|parse|target_invocation|type_initialization|invalid_operation|cryptographic|win32|io|invalid_data|disposed|type_load|dll_not_found|entry_point_not_found|missing_method|security|argument|other)\z")
+			return ""
+		if Type(StartupCode) != "Integer" || StartupCode < -2147483648 || StartupCode > 2147483647
+			return ""
+		StartupFact .= " exception" . (StartupIndex - 1) . "=" . StartupKind . ":" . Format("{:d}", StartupCode)
+	}
+	return StartupFact . " truncated=" . (StartupTruncated ? "true" : "false")
+}
+
 _ManagedRemoteFixtureEmitDiagnostic(State) {
 	try {
 		Fact := _ManagedRemoteFixtureDiagnostic(State)
 		if Fact != ""
 			_TestPrint("::notice title=Windows native service diagnostic::" . Fact)
+	}
+	try {
+		StartupFact := _ManagedRemoteFixtureStartupDiagnostic(State)
+		if StartupFact != ""
+			_TestPrint("::notice title=Windows native startup diagnostic::" . StartupFact)
+	} catch Any {
+		; Optional startup reporting cannot replace the original refusal.
 	}
 }
 
@@ -2561,3 +2598,58 @@ _ManagedRemoteTimingReadinessRegistryChange() {
 }
 Test("managed remote native: readiness loader consumes changed canonical request timing (ready-canonical-budget)",
 	_ManagedRemoteTimingReadinessRegistryChange)
+
+
+_ManagedRemoteStartupClosedProjection() {
+	StartupState := Map("version", 1, "startup_phase", "constructor", "startup_constructor_phase", "native_tls",
+		"startup_errors", [Map("kind", "method_invocation", "hresult", -2146233087),
+			Map("kind", "invalid_operation", "hresult", -2146233079)], "startup_errors_truncated", false,
+		"private", "PRIVATE_MESSAGE_AND_PATH")
+	StartupExpected := "startup_phase=constructor constructor_phase=native_tls exception0=method_invocation:-2146233087 exception1=invalid_operation:-2146233079 truncated=false"
+	AssertEqual(StartupExpected, _ManagedRemoteFixtureStartupDiagnostic(StartupState))
+	AssertFalse(InStr(_ManagedRemoteFixtureStartupDiagnostic(StartupState), "PRIVATE_"))
+	for StartupPair in [["startup_phase", "PRIVATE_PHASE"], ["startup_constructor_phase", "native_tls`nPRIVATE"],
+		["startup_errors", []], ["startup_errors_truncated", "false"],
+		["startup_errors", [Map("kind", "PRIVATE_TYPE", "hresult", 0)]],
+		["startup_errors", [Map("kind", "other", "hresult", "0")]],
+		["startup_errors", [Map("kind", "other", "hresult", 2147483648)]],
+		["startup_errors", [Map("kind", "other", "hresult", -2147483649)]],
+		["startup_errors", [Map(), Map(), Map(), Map(), Map()]]] {
+		StartupInvalid := StartupState.Clone()
+		StartupInvalid[StartupPair[1]] := StartupPair[2]
+		AssertEqual("", _ManagedRemoteFixtureStartupDiagnostic(StartupInvalid), "unknown/private/oversized facts refuse before output")
+	}
+	StartupState["startup_errors"] := [Map("kind", "other", "hresult", -2147483648), Map("kind", "other", "hresult", 2147483647)]
+	StartupState["startup_errors_truncated"] := true
+	AssertContains(_ManagedRemoteFixtureStartupDiagnostic(StartupState), "exception0=other:-2147483648 exception1=other:2147483647 truncated=true")
+}
+Test("managed remote native: startup exception projection keeps closed ordered bounded facts", _ManagedRemoteStartupClosedProjection)
+
+_ManagedRemoteStartupFailedStateRoute() {
+	global TEST_RESULTS_FILE
+	StartupFixture := _ManagedRemoteFixtureOwner()
+	StartupDirectory := _SR_AcquireCaptureDirectory()
+	StartupFixture.Capture := Map("TmpFile", StartupDirectory . "output.tmp", "CaptureDir", StartupDirectory)
+	StartupState := '{"version":1,"state":"failed","root_store_scope":"CurrentUser","service_failure_stage":"fixture_boundary","service_failure_kind":"other","service_failure_hresult":-2146233087,"startup_phase":"constructor","startup_constructor_phase":"keys","startup_errors":[{"kind":"method_invocation","hresult":-2146233087},{"kind":"cryptographic","hresult":-2146893802}],"startup_errors_truncated":false,"private":"PRIVATE_MESSAGE_AND_PATH"}'
+	FileAppend(StartupState, StartupFixture.Capture["TmpFile"], "UTF-8-RAW")
+	StartupOffset := FileGetSize(TEST_RESULTS_FILE)
+	StartupCaught := 0
+	try {
+		try StartupFixture.ReadState()
+		catch as StartupFailure
+			StartupCaught := StartupFailure
+		AssertTrue(IsObject(StartupCaught), "actual failed receipt must retain its original refusal")
+		AssertEqual("Actual managed-network fixture reported native failure.", StartupCaught.Message)
+		StartupTranscript := FileOpen(TEST_RESULTS_FILE, "r", "UTF-8")
+		try {
+			StartupTranscript.Seek(StartupOffset, 0)
+			StartupOutput := StartupTranscript.Read()
+		} finally StartupTranscript.Close()
+		AssertContains(StartupOutput, "stage=fixture_boundary kind=other hresult=-2146233087")
+		AssertContains(StartupOutput, "startup_phase=constructor constructor_phase=keys exception0=method_invocation:-2146233087 exception1=cryptographic:-2146893802 truncated=false")
+		AssertFalse(InStr(StartupOutput, "PRIVATE_"))
+		AssertFalse(StartupFixture.GracefulReceiptVerified, "diagnostics cannot acknowledge native retirement")
+	} finally AssertTrue(StartupFixture.Close(), "only the controlled capture is retired")
+}
+Test("managed remote native: actual failed state consumes startup facts and preserves refusal",
+	_ManagedRemoteScopeWithEnvironment.Bind("CurrentUser", "", "", _ManagedRemoteStartupFailedStateRoute))

@@ -1,0 +1,11 @@
+# Linux physical callback metadata boundary
+
+Source review on exact `51eec199f573fe720b848aa9a1a973b84b1be0e9` is complete. The genuine Reader already retains the original descriptor/open generation and original event read epoch. Its native source lease and event/source-current checks are useful existing ownership facts. They do not supply the requested admitted decimal device identity.
+
+`evdev_reader.lua:133` decodes only type/code/value and event timestamps. Its native backend at 212 onwards opens, reads, polls, grabs and closes the descriptor; it does not observe a descriptor-bound native device number. Its event view at 858 returns path/slot/generation/read_epoch, while the original source lease at 584 retains the exact descriptor lifetime privately. DeviceFinder parses kernel names, sysfs paths, handlers and physical classification, with no decimal identity field. Hook at 1556 publishes the original four callback values; a fifth metadata argument is not present.
+
+The shared MediaStore implementation and definition of decimal device/capture identity are absent from the current source tree. This prevents choosing a correct producer representation. Neither collector UUID nor digits parsed from an event-node path can silently stand in for an independently admitted native device identity.
+
+The finite missing native step is to observe the required kernel identity from the already owned descriptor, retain it with that exact open lifetime, and join it to the original source/event capabilities. Only then can Hook publish a useful fifth metadata value without exposing a path, replacing the first four values, fabricating native custody or enabling physical delivery. Stale, reopened, unsynchronized, ungrabbed, replaced-provider and remapped events must not acquire this new native source admission. Exact policy is required before deciding its device-number format and how the consumer validates the retained capture.
+
+No implementation or unused getter was prepared. Root has sent the actual policy question directly to Group 5. Physical availability stays false; no source, checkout/index/ref, actor, test, suite, generator, runner or workflow changed. The source hashes are recorded in FINDING.json. This finding concerns the existing acquisition surface, not proof that a later native implementation is impossible.
