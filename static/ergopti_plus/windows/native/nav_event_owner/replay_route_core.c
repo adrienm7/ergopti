@@ -52,7 +52,7 @@ static bool RouteValid(const ErgoptiReplay_Route *route)
 {
 	if (route->recipe_id == 0 || route->route_id == 0 || route->code == 0
 			|| route->kind < ERGOPTI_REPLAY_CHARACTER
-			|| route->kind > ERGOPTI_REPLAY_PREFIX
+			|| route->kind > ERGOPTI_REPLAY_DIRECT_DIGIT
 			|| route->required_modifiers > 0x0Fu
 			|| route->target_vk > 0xFFu || route->target_scan > 0x1FFu
 			|| (route->target_vk != 0 && route->target_scan != 0))
@@ -65,6 +65,16 @@ static bool RouteValid(const ErgoptiReplay_Route *route)
 			return false;
 	} else {
 		return false;
+	}
+	if (route->kind == ERGOPTI_REPLAY_DIRECT_DIGIT) {
+		/* The producer supplies literal intent later; registration cannot guess
+		 * a host target or borrow KLE's Unicode-digit interpretation. */
+		return route->axis == ERGOPTI_REPLAY_SCAN
+			&& route->code >= 0x02u && route->code <= 0x0Bu
+			&& route->target_vk == 0 && route->target_scan == 0
+			&& route->required_modifiers == 0 && route->required_prefixes == 0
+			&& route->prefix_bit == 0 && route->effective_modifiers_lr == 0
+			&& route->required_dead_key_id == 0 && route->next_dead_key_id == 0;
 	}
 	if (route->kind == ERGOPTI_REPLAY_MODIFIER
 			|| route->kind == ERGOPTI_REPLAY_PREFIX) {

@@ -76,7 +76,8 @@ static int SnapshotValid(
 			|| (s->event.origin != ERGOPTI_REPLAY_PHYSICAL
 				&& s->event.origin != ERGOPTI_REPLAY_OWNED_REPLAY)
 			|| s->route.recipe_id == 0 || s->route.route_id == 0
-			|| s->route.kind < 1 || s->route.kind > 5
+			|| s->route.kind < ERGOPTI_REPLAY_CHARACTER
+			|| s->route.kind > ERGOPTI_REPLAY_DIRECT_DIGIT
 			|| s->route.required_modifiers > 15
 			|| s->route.target_vk > 255 || s->route.target_scan > 511
 			|| (s->route.target_vk && s->route.target_scan))

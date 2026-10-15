@@ -35,8 +35,57 @@ static ErgoptiReplay_Snapshot Snapshot(void)
 	return s;
 }
 
+/** The existing KLE digit kind emits Unicode, including a zero-unit matching Up. */
+static void TestKleDigitFromActualReplay(void)
+{
+	ErgoptiOutput_State output = ERGOPTI_OUTPUT_STATE_INIT;
+	ErgoptiReplay_State routes = ERGOPTI_REPLAY_STATE_INIT;
+	ErgoptiReplay_Route digit = {
+		.recipe_id = 19, .route_id = 2, .code = 0x1E,
+		.axis = ERGOPTI_REPLAY_SCAN, .kind = ERGOPTI_REPLAY_DIGIT
+	};
+	assert(ErgoptiOutput_Initialize(&output, OWNER) == 0);
+	assert(ErgoptiReplay_Initialize(&routes, OWNER) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 1, 2, &digit, 1) == 0);
+	for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+		ErgoptiReplay_Event event = { .timestamp = edge_index + 1, .source_id = 1,
+			.vk = 0x41, .scan = 0x1E, .origin = ERGOPTI_REPLAY_PHYSICAL,
+			.repeat = edge_index == 1, .key_up = edge_index == 2 };
+		ErgoptiReplay_Snapshot snapshot;
+		ErgoptiOutput_Key key;
+		uint16_t text = 0x31;
+		assert(ErgoptiReplay_Step(&routes, OWNER, &event, &snapshot) == 0);
+		assert(snapshot.route.kind == ERGOPTI_REPLAY_DIGIT);
+		assert(ErgoptiOutput_Plan(&output, OWNER, 10, edge_index + 1, &routes,
+			&snapshot, event.key_up ? NULL : &text, event.key_up ? 0 : 1, 1, &key) == 0);
+		ErgoptiOutput_Unit units[2];
+		uint32_t count = 99, dispatchable = 0;
+		assert(ErgoptiOutput_Inspect(&output, OWNER, &key, units, 2,
+			&count, &dispatchable) == 0);
+		assert(dispatchable == 1 && count == (event.key_up ? 0u : 2u));
+		if (!event.key_up) {
+			uint64_t attempt;
+			ErgoptiOutput_Win32Input packets[2];
+			assert(units[0].kind == ERGOPTI_OUTPUT_UNICODE && units[0].utf16 == 0x31);
+			assert(units[1].kind == ERGOPTI_OUTPUT_UNICODE && units[1].utf16 == 0x31);
+			assert(units[0].key_up == 0 && units[1].key_up == 1);
+			assert(ErgoptiOutput_BeginAttempt(&output, OWNER, &key,
+				units, 2, &count, &attempt) == 0 && count == 2);
+			assert(ErgoptiOutput_SerializeAttempt(&output, OWNER, &key,
+				attempt, packets, 2, &count) == 0 && count == 2);
+			assert(packets[0].vk == 0 && packets[0].scan == 0x31 && packets[0].flags == 4);
+			assert(packets[1].vk == 0 && packets[1].scan == 0x31 && packets[1].flags == 6);
+			assert(ErgoptiOutput_Acknowledge(&output, OWNER, &key, attempt, 2) == 0);
+		}
+		ErgoptiReplay_Event consumed;
+		assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == 0);
+		assert(consumed.key_up == event.key_up && consumed.repeat == event.repeat);
+	}
+}
+
 static void TestLiteralVectors(void)
 {
+	TestKleDigitFromActualReplay();
 	/* ASCII, accented BMP, decomposed BMP, emoji surrogate, literal NUL, empty. */
 	static const struct {
 		uint16_t text[3]; uint32_t length;
@@ -103,8 +152,67 @@ static void TestSuffixAndFailure(void)
 	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == -6);
 }
 
+/** Direct digit source metadata cannot borrow KLE's Unicode output authority. */
+static void TestDirectDigitDiagnostics(void)
+{
+	for (uint32_t digit_index = 0; digit_index < 10; ++digit_index) {
+		for (uint32_t complete = 0; complete < 2; ++complete) {
+			ErgoptiOutput_State output = ERGOPTI_OUTPUT_STATE_INIT;
+			ErgoptiReplay_State routes = ERGOPTI_REPLAY_STATE_INIT;
+			ErgoptiReplay_Route digit = {
+				.recipe_id = 2000 + digit_index, .route_id = digit_index + 1,
+				.code = (uint16_t)(0x02 + digit_index), .axis = ERGOPTI_REPLAY_SCAN,
+				.kind = ERGOPTI_REPLAY_DIRECT_DIGIT
+			};
+			assert(ErgoptiOutput_Initialize(&output, OWNER) == 0);
+			assert(ErgoptiReplay_Initialize(&routes, OWNER) == 0);
+			assert(ErgoptiReplay_Register(&routes, OWNER, 1, 2, &digit, 1) == 0);
+			for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+				ErgoptiReplay_Event event = {
+					.timestamp = edge_index + 1, .source_id = 1,
+					.vk = (uint16_t)(0x30 + (digit_index + 1) % 10), .scan = digit.code,
+					.origin = ERGOPTI_REPLAY_PHYSICAL,
+					.repeat = edge_index == 1, .key_up = edge_index == 2
+				};
+				ErgoptiReplay_Snapshot snapshot;
+				ErgoptiOutput_Key key;
+				uint16_t text = (uint16_t)(0x30 + (digit_index + 1) % 10);
+				assert(ErgoptiReplay_Step(&routes, OWNER, &event, &snapshot) == 0);
+				assert(snapshot.route.kind == ERGOPTI_REPLAY_DIRECT_DIGIT);
+				assert(snapshot.route_generation == 1 && snapshot.route_layout_id == 2);
+				assert(ErgoptiOutput_Plan(&output, OWNER, 10, edge_index + 1, &routes,
+					&snapshot, event.key_up ? NULL : &text, event.key_up ? 0 : 1,
+					(uint8_t)complete, &key) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+				uint32_t count = 99, dispatchable = 99;
+				assert(ErgoptiOutput_Inspect(&output, OWNER, &key, NULL, 0,
+					&count, &dispatchable) == 0);
+				assert(count == 0 && dispatchable == 0);
+				assert(memcmp(&output.snapshot, &snapshot, sizeof(snapshot)) == 0);
+				ErgoptiOutput_State before = output;
+				ErgoptiOutput_Unit units[1];
+				ErgoptiOutput_Win32Input packets[1];
+				ErgoptiReplay_Event consumed;
+				uint64_t attempt = 99;
+				assert(ErgoptiOutput_BeginAttempt(&output, OWNER, &key,
+					units, 1, &count, &attempt) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+				assert(ErgoptiOutput_SerializeAttempt(&output, OWNER, &key,
+					attempt, packets, 1, &count) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+				assert(ErgoptiOutput_Acknowledge(&output, OWNER, &key,
+					attempt, 0) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+				assert(ErgoptiOutput_Consume(&output, OWNER, &key,
+					&consumed) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+				assert(memcmp(&before, &output, sizeof(output)) == 0);
+				assert(ErgoptiOutput_Cancel(&output, OWNER, &key) == 0);
+				if (edge_index == 0)
+					assert(ErgoptiReplay_Register(&routes, OWNER, 2, 3, NULL, 0) == 0);
+			}
+		}
+	}
+}
+
 static void TestEdgesAndGuard(void)
 {
+	TestDirectDigitDiagnostics();
 	ErgoptiOutput_State o; ErgoptiReplay_State r; Start(&o, &r);
 	ErgoptiReplay_Snapshot s = Snapshot(); ErgoptiOutput_Key key;
 	ErgoptiReplay_Event edge; ErgoptiOutput_Unit units[2]; uint32_t count; uint64_t a;
