@@ -134,7 +134,11 @@ async function run() {
 		foreignNavigation = false,
 		reload = false,
 		wrongDownload = false,
-		missingDownload = false
+		missingDownload = false,
+		emulationState = 'ready',
+		emulationDisabled = false,
+		emulationBusy = 'false',
+		readinessGate = Promise.resolve()
 	} = {}) {
 		let visible = false,
 			url,
@@ -145,10 +149,17 @@ async function run() {
 			clicks = [],
 			heads = [];
 		let disposed = 0;
+		const readinessWaits = [];
+		let entered;
+		const readinessEntered = new Promise((resolve) => {
+			entered = resolve;
+		});
 		return {
 			routes,
 			clicks,
 			heads,
+			readinessWaits,
+			readinessEntered,
 			get disposed() {
 				return disposed;
 			},
@@ -195,12 +206,34 @@ async function run() {
 							navigationWait();
 						} else if (!unhydrated) visible = !visible;
 					},
-					async getAttribute() {
+					async getAttribute(name) {
+						if (selector === '#input-text') {
+							assert.ok(['data-emulation-state', 'aria-busy'].includes(name));
+							return name === 'data-emulation-state' ? emulationState : emulationBusy;
+						}
 						if (selector.startsWith('header'))
 							return foreignNavigation ? '/foreign' : 'utilisation';
 						return wrongDownload ? '#' : selector.match(/href="([^"]+)"/)[1];
 					},
+					async isEnabled() {
+						assert.equal(selector, '#input-text');
+						return !emulationDisabled;
+					},
 					async waitFor({ state }) {
+						if (selector.startsWith('#input-text[')) {
+							assert.equal(
+								selector,
+								'#input-text[data-emulation-state="ready"]:not(:disabled)[aria-busy="false"]'
+							);
+							assert.equal(state, 'visible');
+							readinessWaits.push(url);
+							entered();
+							await readinessGate;
+							assert.equal(emulationState, 'ready', 'Emulation is not ready');
+							assert.equal(emulationDisabled, false, 'Emulation is disabled');
+							assert.equal(emulationBusy, 'false', 'Emulation is busy');
+							return;
+						}
 						if (selector === '#clavier-ref') assert.equal(visible, state === 'visible');
 						else assert.equal(invisible, false);
 					}
@@ -233,6 +266,54 @@ async function run() {
 			await assert.rejects(() => smoke.exerciseNavigation(page, 'http://127.0.0.1:1', '/dev'));
 		}
 	});
+	await check(
+		'emulation readiness precedes hard navigation and refuses incomplete owners',
+		async () => {
+			for (const base of ['', '/dev']) {
+				let release;
+				const readinessGate = new Promise((resolve) => {
+					release = resolve;
+				});
+				const page = pagePort({ readinessGate });
+				let completed = false;
+				const visit = smoke
+					.exercisePage(page, 'http://127.0.0.1:1', base, { local: [], page: [] })
+					.then(() => {
+						completed = true;
+					});
+				await Promise.race([
+					page.readinessEntered,
+					visit.then(() => {
+						throw new Error('Readiness was bypassed before document retirement');
+					})
+				]);
+				assert.equal(completed, false);
+				assert.deepEqual(page.routes, ['http://127.0.0.1:1' + base + '/']);
+				release();
+				await visit;
+				assert.equal(
+					page.readinessWaits.length,
+					2,
+					'SPA and direct utilisation both await readiness'
+				);
+				assert.equal(completed, true);
+			}
+			for (const options of [
+				{ emulationState: 'loading' },
+				{ emulationState: 'error' },
+				{ emulationState: null },
+				{ emulationDisabled: true },
+				{ emulationBusy: 'true' }
+			]) {
+				const page = pagePort(options);
+				await page.goto('http://127.0.0.1:1/');
+				await assert.rejects(
+					() => smoke.exerciseNavigation(page, 'http://127.0.0.1:1', ''),
+					/Emulation/
+				);
+			}
+		}
+	);
 	await check('rendered fixture downloads and local HEAD refusals remain distinct', async () => {
 		for (const base of ['', '/dev']) {
 			const page = pagePort();

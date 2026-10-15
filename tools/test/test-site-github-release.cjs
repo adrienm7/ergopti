@@ -1011,7 +1011,7 @@ async function main() {
 		}
 	);
 	await check('production output browser assertions reject inert causal failures', async () => {
-		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 15);
+		assert.equal(await require('./fixtures/site-artifact-smoke-controls.cjs').run(), 16);
 	});
 	await check('final shared Verdict receives both exact Build and browser proofs', async () => {
 		assert.equal((await require('./fixtures/site-verdict-controls.cjs').run()).controls, 49);

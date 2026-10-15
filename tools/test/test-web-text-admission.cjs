@@ -12,11 +12,18 @@ const { parse: parseToml } = require('smol-toml');
 
 const root = path.resolve(__dirname, '../..');
 const keyboard = fs.readFileSync(path.join(root, 'src/lib/keyboard/KeyboardEmulation.js'), 'utf8');
-const start = keyboard.indexOf('function unescapeTomlString(');
-const end = keyboard.indexOf('\nif (typeof window', start);
-assert.ok(start >= 0 && end > start, 'the actual TOML decoding and parsing owners are present');
+const keyboardProgram = parse(keyboard, { ecmaVersion: 'latest', sourceType: 'module' });
+const parserOwners = keyboardProgram.body.filter(
+	(node) =>
+		node.type === 'FunctionDeclaration' &&
+		['unescapeTomlString', 'parseTomlMagic'].includes(node.id.name)
+);
+assert.equal(parserOwners.length, 2, 'the actual TOML decoding and parsing owners are present');
 const context = vm.createContext({});
-vm.runInContext(keyboard.slice(start, end), context);
+vm.runInContext(
+	parserOwners.map((node) => keyboard.slice(node.start, node.end)).join('\n'),
+	context
+);
 
 async function checkDecoding() {
 	for (const [source, expected] of [
@@ -87,24 +94,17 @@ async function checkHotstringSources() {
 		'utf8'
 	);
 	const script = page.slice(page.indexOf('<script>') + 8, page.indexOf('</script>'));
-	const keyboardProgram = parse(keyboard, { ecmaVersion: 'latest', sourceType: 'module' });
 	const browserLoads = keyboardProgram.body.filter((node) => node.type === 'IfStatement');
-	assert.equal(browserLoads.length, 1, 'execute the one actual keyboard browser load');
-	const browserLoad = browserLoads[0];
-	assert.equal(
-		browserLoad.consequent.body.length,
-		1,
-		'the actual keyboard load is one promise chain'
+	assert.equal(browserLoads.length, 0, 'keyboard import does not start a browser load');
+	const loaders = keyboardProgram.body.filter(
+		(node) => node.type === 'FunctionDeclaration' && node.id.name === 'loadMagicData'
 	);
-	assert.equal(browserLoad.consequent.body[0].type, 'ExpressionStatement');
+	assert.equal(loaders.length, 1, 'execute the one explicit keyboard catalogue loader');
+	assert.equal(loaders[0].async, true, 'the actual loader exposes its completion and failure');
 	const keyboardDeclarations = keyboardProgram.body
-		.filter((node) => node.type !== 'ImportDeclaration' && node.end <= browserLoad.start)
+		.filter((node) => node.type === 'FunctionDeclaration')
 		.map((node) => keyboard.slice(node.start, node.end))
 		.join('\n');
-	const keyboardLoad = keyboard.slice(
-		browserLoad.consequent.body[0].expression.start,
-		browserLoad.consequent.body[0].expression.end
-	);
 	const pageProgram = parse(script, { ecmaVersion: 'latest', sourceType: 'module' });
 	const pageScript = pageProgram.body
 		.filter((node) => node.type !== 'ImportDeclaration')
@@ -119,13 +119,25 @@ async function checkHotstringSources() {
 			const pathname = url.startsWith(`${base}/`) ? url.slice(base.length) : '';
 			const file = pathname ? path.join(root, 'static', pathname) : '';
 			const text = file && fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '<html>404</html>';
-			return Promise.resolve({ text: async () => text });
+			return Promise.resolve({
+				ok: !!file && fs.existsSync(file),
+				status: file && fs.existsSync(file) ? 200 : 404,
+				text: async () => text
+			});
 		}
-		const keyboardContext = vm.createContext({ base, window: {}, fetch: fetchStatic });
+		const keyboardContext = vm.createContext({
+			base,
+			window: {},
+			fetch: fetchStatic,
+			AbortController
+		});
 		vm.runInContext(urlOwner.replace(/^export /gm, ''), keyboardContext);
 		vm.runInContext(keyboardDeclarations, keyboardContext);
-		await vm.runInContext(keyboardLoad, keyboardContext);
-		const loadedMagic = vm.runInContext('magic', keyboardContext);
+		assert.deepEqual(requests, [], 'declaring the actual loader performs no request');
+		const loadedMagic = await vm.runInContext(
+			'loadMagicData(new AbortController().signal)',
+			keyboardContext
+		);
 		for (const [key, expected] of [
 			['c', 'c’est'],
 			['gt', 'j’étais'],
@@ -374,11 +386,301 @@ function checkLiteralDemo() {
 	assert.equal(drive.style.fontSize, '64px');
 }
 
+/** Compile the actual class and base owner with finite stores, DOM and request ports. */
+function emulationRealm(fetchPort, base = '') {
+	const baseSource = fs.readFileSync(path.join(root, 'src/lib/keyboard/Keyboard.js'), 'utf8');
+	const baseOwner = parse(baseSource, { ecmaVersion: 'latest', sourceType: 'module' }).body.find(
+		(node) => node.type === 'ExportNamedDeclaration' && node.declaration?.id?.name === 'Keyboard'
+	);
+	assert.ok(baseOwner, 'the actual inherited lifecycle owner is present');
+	const requests = [],
+		errors = [],
+		listeners = new Set();
+	const observations = { lookups: 0, renders: 0, available: true };
+	const textarea = { value: 'c', selectionStart: 1, setSelectionRange() {} };
+	const store = (value) => ({
+		value,
+		subscribe(callback) {
+			const subscription = () => callback();
+			listeners.add(subscription);
+			callback();
+			return () => listeners.delete(subscription);
+		}
+	});
+	const realm = vm.createContext({
+		base,
+		window: {},
+		AbortController,
+		get: (value) => value.value,
+		stores_infos: {
+			layoutData: store({ fixture: [], keys: [] }),
+			emulation: store({ plus: 'no', type: 'fixture' }),
+			other: store({ plus: 'no', type: 'fixture' })
+		},
+		fetch(url, options) {
+			requests.push({ url, options });
+			return fetchPort(url, options, requests.length - 1);
+		},
+		console: { info() {}, error: (...values) => errors.push(values) },
+		document: {
+			getElementById(id) {
+				observations.lookups += 1;
+				return id === 'input-text' ? textarea : observations.available ? {} : null;
+			}
+		}
+	});
+	const urls = fs.readFileSync(path.join(root, 'src/lib/js/hotstringDataUrls.js'), 'utf8');
+	vm.runInContext(urls.replace(/^export /gm, ''), realm);
+	vm.runInContext(baseSource.slice(baseOwner.declaration.start, baseOwner.declaration.end), realm);
+	const executable = keyboardProgram.body
+		.filter((node) => node.type !== 'ImportDeclaration')
+		.map((node) => {
+			const declaration = node.type === 'ExportNamedDeclaration' ? node.declaration : node;
+			return keyboard.slice(declaration.start, declaration.end);
+		})
+		.join('\n');
+	vm.runInContext(executable + '\nthis.Subject = KeyboardEmulation;', realm);
+	assert.equal(requests.length, 0, 'evaluating the complete keyboard module performs zero fetches');
+	for (const name of ['updateKeys', 'updateKeyboardConfiguration', 'pressCurrentLayerModifiers'])
+		realm.Subject.prototype[name] = () => observations.renders++;
+	return { realm, requests, errors, listeners, observations, textarea };
+}
+
+function deferredResponse() {
+	let resolve, reject;
+	const promise = new Promise((done, fail) => {
+		resolve = done;
+		reject = fail;
+	});
+	return { promise, resolve, reject };
+}
+
+function magicResponse(index) {
+	return {
+		ok: true,
+		status: 200,
+		text: async () => (index % 2 ? 'c = "c’est"\n' : 'symbol = "✓"\n')
+	};
+}
+
+/** Receive actual pending, failed, successful and retired owners without network or browser work. */
+async function checkEmulationLoading() {
+	const pending = [deferredResponse(), deferredResponse()];
+	const first = emulationRealm((_url, _options, index) => pending[index].promise, '/dev');
+	const owner = new first.realm.Subject('emulation');
+	owner.textarea = first.textarea;
+	assert.equal(first.requests.length, 0, 'construction performs zero fetches');
+	assert.equal(first.listeners.size, 0);
+	assert.equal(first.observations.lookups, 0);
+	assert.equal(owner.state, 'new');
+	assert.throws(() => owner.mount(), /not ready/);
+	const loading = owner.loadMagic();
+	assert.equal(owner.magicState, 'loading');
+	assert.equal(owner.magic, null);
+	assert.equal(owner.state, 'new', 'pending data does not consume the base mount transition');
+	assert.equal(first.listeners.size, 0);
+	assert.deepEqual(
+		first.requests.map((request) => request.url),
+		[
+			'/dev/ergopti_plus/_shared/modules/hotstrings/magickey.toml',
+			'/dev/ergopti_plus/_shared/modules/hotstrings/french/magickey.toml'
+		]
+	);
+	assert.equal(first.requests[0].options.signal, first.requests[1].options.signal);
+	const forbiddenEvent = new Proxy(
+		{},
+		{ get: () => assert.fail('pending or retired emulation must not inspect a key event') }
+	);
+	owner.emulateKey(forbiddenEvent);
+	owner.releaseKey(forbiddenEvent);
+	owner.sendResult('★');
+	assert.equal(first.textarea.value, 'c');
+	await assert.rejects(() => owner.loadMagic(), /already initialized/);
+	assert.equal(
+		first.requests.length,
+		2,
+		'duplicate initialization creates no second request owner'
+	);
+	pending[0].resolve(magicResponse(0));
+	await Promise.resolve();
+	assert.equal(owner.magic, null, 'one catalogue cannot publish partial readiness');
+	owner.destroy();
+	assert.equal(first.requests[0].options.signal.aborted, true);
+	assert.equal(owner.magicState, 'disposed');
+	pending[1].resolve(magicResponse(1));
+	await assert.rejects(loading, /cancelled/);
+	assert.equal(owner.magic, null, 'late completion cannot publish into a retired owner');
+	assert.equal(first.listeners.size, 0);
+	assert.equal(first.observations.renders, 0);
+	owner.emulateKey(forbiddenEvent);
+	owner.releaseKey(forbiddenEvent);
+	owner.sendResult('★');
+	assert.throws(() => owner.mount(), /not ready/);
+	assert.throws(() => owner.destroy(), /no active initialization/);
+
+	const success = emulationRealm((_url, _options, index) => Promise.resolve(magicResponse(index)));
+	const a = new success.realm.Subject('emulation');
+	const b = new success.realm.Subject('other');
+	a.textarea = success.textarea;
+	await a.loadMagic();
+	assert.equal(a.state, 'new');
+	assert.equal(b.magic, null, 'another instance does not inherit a published dictionary');
+	a.mount();
+	assert.equal(a.magicState, 'ready');
+	assert.equal(success.listeners.size, 2);
+	a.sendResult('★');
+	assert.equal(
+		success.textarea.value,
+		'c’est',
+		'the actual per-instance lookup retains magic expansion'
+	);
+	await b.loadMagic();
+	assert.notEqual(a.magic, b.magic, 'each initialization owns its complete dictionary');
+	assert.equal(b.magic.c, 'c’est');
+	a.magic.c = 'changed only in first owner';
+	assert.equal(b.magic.c, 'c’est');
+	await assert.rejects(() => a.loadMagic(), /already initialized/);
+	assert.throws(() => a.mount(), /already initialized/);
+	const queued = [...success.listeners];
+	const rendered = success.observations.renders;
+	a.destroy();
+	for (const callback of queued) callback();
+	assert.equal(success.observations.renders, rendered);
+	assert.equal(success.listeners.size, 0);
+	assert.equal(a.magic, null);
+	b.destroy();
+
+	for (const [failure, failedIndex] of ['http', 'network', 'text', 'empty', 'ignored'].flatMap(
+		(failure) => [0, 1].map((index) => [failure, index])
+	)) {
+		const sentinel = new Error('controlled ' + failure + ' failure');
+		let refusedBodyReads = 0;
+		const failed = emulationRealm((_url, _options, index) => {
+			if (index !== failedIndex) return Promise.resolve(magicResponse(index));
+			if (failure === 'network') return Promise.reject(sentinel);
+			return Promise.resolve({
+				ok: failure !== 'http',
+				status: failure === 'http' ? 503 : 200,
+				text: async () => {
+					refusedBodyReads += 1;
+					if (failure === 'text') throw sentinel;
+					if (failure === 'ignored') return '"ignore\\\\★" = { output = "unused" }\n';
+					return '';
+				}
+			});
+		});
+		const subject = new failed.realm.Subject('emulation');
+		await assert.rejects(
+			() => subject.loadMagic(),
+			(error) => error === sentinel || /catalogue/.test(error.message)
+		);
+		assert.equal(subject.magicState, 'error', failure + ' cannot become empty-data success');
+		assert.equal(subject.magic, null);
+		assert.equal(subject.state, 'new');
+		assert.equal(failed.listeners.size, 0);
+		assert.ok(failed.requests.every(({ options }) => options.signal.aborted));
+		if (failure === 'http') assert.equal(refusedBodyReads, 0, 'HTTP failure body is not admitted');
+		assert.throws(() => subject.mount(), /not ready/);
+		subject.emulateKey(forbiddenEvent);
+		subject.releaseKey(forbiddenEvent);
+		subject.sendResult('★');
+		subject.destroy();
+	}
+	await checkEmulationComponent();
+}
+
+async function checkEmulationComponent() {
+	const component = fs.readFileSync(
+		path.join(root, 'src/lib/keyboard/KeyboardEmulation.svelte'),
+		'utf8'
+	);
+	const script = component.slice(component.indexOf('<script>') + 8, component.indexOf('</script>'));
+	const program = parse(script, { ecmaVersion: 'latest', sourceType: 'module' });
+	const executable = program.body
+		.filter((node) => node.type !== 'ImportDeclaration')
+		.map((node) => script.slice(node.start, node.end))
+		.join('\n');
+	assert.match(component, /data-emulation-state=\{readiness\}/);
+	assert.match(component, /disabled=\{readiness !== 'ready'\}/);
+	assert.match(component, /aria-busy=\{readiness === 'loading'\}/);
+	for (const mode of ['ready', 'cancel', 'cancel-error', 'abort', 'http', 'mount-failure']) {
+		const pending = [deferredResponse(), deferredResponse()];
+		const ports = emulationRealm((_url, options, index) => {
+			if (mode === 'abort')
+				options.signal.addEventListener('abort', () =>
+					pending[index].reject(new Error('controlled owned abort'))
+				);
+			return pending[index].promise;
+		});
+		const mounts = [];
+		ports.realm.onMount = (callback) => mounts.push(callback);
+		let loading;
+		const actualLoad = ports.realm.Subject.prototype.loadMagic;
+		ports.realm.Subject.prototype.loadMagic = function () {
+			loading = actualLoad.call(this);
+			return loading;
+		};
+		vm.runInContext(executable, ports.realm);
+		assert.equal(
+			ports.requests.length,
+			0,
+			'component construction leaves request ownership unstarted'
+		);
+		assert.equal(mounts.length, 1);
+		const cleanup = mounts[0]();
+		assert.equal(
+			typeof cleanup,
+			'function',
+			'onMount returns cleanup synchronously while data waits'
+		);
+		assert.equal(vm.runInContext('readiness', ports.realm), 'loading');
+		assert.equal(ports.listeners.size, 0);
+		const cancelled = ['cancel', 'cancel-error', 'abort'].includes(mode);
+		if (cancelled) cleanup();
+		if (mode === 'mount-failure') ports.observations.available = false;
+		if (mode === 'cancel-error') pending[0].reject(new Error('controlled late response failure'));
+		else pending[0].resolve(mode === 'http' ? { ok: false, status: 503 } : magicResponse(0));
+		pending[1].resolve(magicResponse(1));
+		if (cancelled || mode === 'http') await assert.rejects(loading);
+		else await loading;
+		await Promise.resolve();
+		await Promise.resolve();
+		const subject = vm.runInContext('keyboard', ports.realm);
+		if (mode === 'ready') {
+			assert.equal(vm.runInContext('readiness', ports.realm), 'ready');
+			assert.equal(ports.listeners.size, 2);
+			assert.deepEqual(ports.errors, []);
+		} else if (cancelled) {
+			assert.equal(
+				vm.runInContext('readiness', ports.realm),
+				'loading',
+				'late completion cannot publish'
+			);
+			assert.equal(subject.magicState, 'disposed');
+			assert.equal(subject.magic, null);
+			assert.equal(ports.listeners.size, 0);
+			assert.deepEqual(ports.errors, [], 'owned cancellation does not become an active load error');
+			assert.ok(ports.requests.every(({ options }) => options.signal.aborted));
+		} else {
+			assert.equal(vm.runInContext('readiness', ports.realm), 'error');
+			assert.equal(ports.listeners.size, 0);
+			assert.ok(
+				ports.errors.some(([message]) => message === '[KeyboardEmulation] Initialization failed'),
+				'active HTTP and mount failures remain observable'
+			);
+		}
+		if (!cancelled) cleanup();
+		assert.equal(ports.listeners.size, 0);
+		assert.equal(subject.magicState, 'disposed');
+	}
+}
+
 const controls = {
 	decode: checkDecoding,
 	simple: () => checkQuotedParsing(`plain = "${'\\!'.repeat(65536)}`),
 	object: () => checkQuotedParsing(`"object" = { output = "${'\\!'.repeat(65536)} }`),
-	dom: checkLiteralDemo
+	dom: checkLiteralDemo,
+	emulation: checkEmulationLoading
 };
 const requested = process.argv.slice(2);
 const selected = requested.length ? requested : Object.keys(controls);
