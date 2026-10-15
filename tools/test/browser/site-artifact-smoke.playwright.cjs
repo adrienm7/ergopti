@@ -156,6 +156,19 @@ async function exerciseNavigation(page, origin, basePath) {
 		timeOrigin,
 		'Navigation must retain the hydrated document'
 	);
+	await exerciseEmulationReadiness(page);
+}
+
+/** Observe the mounted emulator's declared completion before retiring its document. */
+async function exerciseEmulationReadiness(page) {
+	const input = page.locator('#input-text');
+	await input.waitFor({ state: 'visible' });
+	await page
+		.locator('#input-text[data-emulation-state="ready"]:not(:disabled)[aria-busy="false"]')
+		.waitFor({ state: 'visible' });
+	assert.equal(await input.getAttribute('data-emulation-state'), 'ready');
+	assert.equal(await input.getAttribute('aria-busy'), 'false');
+	assert.equal(await input.isEnabled(), true, 'Emulation remains disabled until its data is ready');
 }
 
 /** Inspect live rendered release URLs; only local authored downloads receive real HTTP HEAD. */
@@ -195,6 +208,7 @@ async function exercisePage(page, origin, basePath, errors) {
 		const response = await page.goto(origin + basePath + route, { waitUntil: 'networkidle' });
 		assert.ok(response?.ok(), 'Authored artifact route refused: ' + route);
 		await page.locator('main').first().waitFor({ state: 'visible' });
+		if (route === '/utilisation') await exerciseEmulationReadiness(page);
 		const toggle = page.locator('#afficher-clavier-reference');
 		const keyboard = page.locator('#clavier-ref');
 		await toggle.waitFor({ state: 'visible' });
@@ -365,6 +379,7 @@ module.exports = {
 	authoredExternalFixture,
 	fixtureDownload,
 	exerciseNavigation,
+	exerciseEmulationReadiness,
 	exerciseDownloads,
 	exercisePage,
 	withBrowser,

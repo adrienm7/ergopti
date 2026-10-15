@@ -4,10 +4,26 @@
 	import { onMount } from 'svelte';
 
 	const keyboard = new KeyboardEmulation('emulation');
+	let readiness = 'loading';
 	onMount(() => {
+		let active = true;
 		keyboard.textarea = document.getElementById('input-text');
-		keyboard.mount();
-		return () => keyboard.destroy();
+		keyboard
+			.loadMagic()
+			.then(() => {
+				if (!active) return;
+				keyboard.mount();
+				readiness = 'ready';
+			})
+			.catch((error) => {
+				if (!active) return;
+				readiness = 'error';
+				console.error('[KeyboardEmulation] Initialization failed', error);
+			});
+		return () => {
+			active = false;
+			if (keyboard.magicState !== 'disposed') keyboard.destroy();
+		};
 	});
 </script>
 
@@ -18,6 +34,9 @@
 <div class="main">
 	<textarea
 		id="input-text"
+		data-emulation-state={readiness}
+		disabled={readiness !== 'ready'}
+		aria-busy={readiness === 'loading'}
 		placeholder="Tapez ici"
 		on:keydown={keyboard.emulateKey}
 		on:keyup={keyboard.releaseKey}
