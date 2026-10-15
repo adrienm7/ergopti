@@ -157,11 +157,21 @@ local function present(guide)
 	return true
 end
 
---- Runs one poll: closes the steps once the guardian no longer needs them,
---- shows steps that waited behind Accessibility, and stops at the deadline.
+--- Runs one poll: closes steps when Tap-Holds are off or the guardian no longer
+--- needs them, shows queued steps after Accessibility, and stops at the deadline.
 --- @param guide table The running guide.
 local function tick(guide)
 	if _guide ~= guide then return end
+	local readable, tap_holds_enabled = pcall(guide.remap.get_tap_holds_enabled)
+	if not readable or tap_holds_enabled ~= true then
+		if readable then
+			Logger.info(LOG, "Tap-Holds are off; the Login Items steps closed.")
+		else
+			Logger.warn(LOG, "Tap-Holds state is unreadable; the Login Items steps closed.")
+		end
+		finish(guide, true)
+		return
+	end
 	guide.elapsed = guide.elapsed + M.POLL_SECONDS
 	local state = read_state(guide.remap)
 	if state == READY then

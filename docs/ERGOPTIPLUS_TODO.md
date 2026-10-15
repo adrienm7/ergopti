@@ -4178,10 +4178,14 @@ installation and device acceptance remain pending; items 7, 16 and 38 stay open.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
-  registry values through one owner. Remaining: turning the switch off or «
-  Retirer Ergopti de Karabiner » does not unregister a guardian LaunchAgent
-  registered while it was on (needs a headless unregister role in the launcher,
-  verified on a Mac). Legend: `[x]` implemented, reviewed and integrated on
+  registry values through one owner. The headless unregister role and the
+  OFF/removal transaction are implemented (also tracked in item 35). Remaining:
+  qualify the signed helper's real ServiceManagement registration, wrong-inode
+  refusal, unregistration, idempotence and final job absence on both macOS
+  architectures. The current main CI does not enroll that complete acceptance
+  collector. Windows PC acceptance must also verify exact registry restoration
+  after OFF/removal and preserved prior values after an authorization refusal.
+  Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
   the precise remainder recorded in the item or in the overnight handoff.
 - [~] **16.** Publish final corrective commits, verify CI and release assets,
@@ -4572,7 +4576,12 @@ Windows PC acceptance, delegated to the maintainer:
   automatic; a requires_approval answer now opens numbered Login Items steps in
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
-  banner stays). Integrated; verify on a Mac.
+  banner stays). The guide now also closes and retires its poll if Tap-Holds
+  turn off while the steps are visible or queued behind Accessibility. This
+  leaves the Accessibility dialog and guardian state untouched; a failed
+  preference read also retires this guide. The 13 original portable Lua cases
+  and four new regressions pass; the original implementation fails all four
+  new cases. Native window and Login Items approval acceptance remain open.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
