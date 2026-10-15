@@ -1134,7 +1134,8 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 				chord_sources = function(requests)
 					controls.source_reads = controls.source_reads + 1
 					local token, rows = {}, {}
-					local identities = { [15] = "tab", [36] = controls.chord_j_identity or "j", [37] = "k", [41] = "grave", [58] = "caps_lock" }
+					local identities = { [2] = "1", [3] = "2", [15] = "tab", [36] = controls.chord_j_identity or "j", [37] = "k", [41] = "grave", [58] = "caps_lock",
+						[103] = "up", [105] = "left", [106] = "right", [108] = "down" }
 					for _, request in ipairs(requests) do
 						for _, caps in ipairs({ false, true }) do
 							rows[#rows + 1] = { code = request.code, mods = request.mods, caps = caps,
@@ -1552,4 +1553,89 @@ helpers.describe("Linux configured wrap-symbol physical collision preflight", fu
 			helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
 		end, WRAP_BASE)
 	end)
+end)
+
+--- Uses the same actual file/runtime intake, with no UI/provider/service actors.
+local function with_prediction_preflight(source, body)
+	with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
+		local ok, failure = pcall(function()
+			for name in pairs(package.loaded) do
+				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+			end
+			local prediction = require("modules.llm.prediction_engine")
+			prediction.init({ scheduler = require("tests.fakes").timer_scheduler(), overlay = {
+				move = function() return true end,
+				hide = function() return true end,
+				is_showing = function() error("configured preflight must not query an offer or UI") end,
+			} })
+			owners.prediction = prediction
+			body(scope, owners, controls, path)
+		end)
+		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		if not ok then error(failure, 0) end
+	end)
+end
+
+helpers.describe("Linux genuine configured prediction collision preflight", function()
+	local PREDICTION_BASE = COLLISION_BASE .. '[llm]\nenabled = true\n[llm.navigation]\nnav_modifiers = ["ctrl"]\nval_modifiers = ["shift"]\n'
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	for _, case in ipairs({
+		{ name = "original native navigation role", key = "physical_ctrl_ArrowUp" },
+		{ name = "original native digit role", key = "physical_shift_Digit2" },
+		{ name = "either-side Shift Tab", key = "physical_shift_Tab" },
+		{ name = "possible live or agent Tab", key = "physical_none_Tab" },
+		{ name = "actual native source typing a digit", key = "physical_shift_KeyJ", identity = "2" },
+	}) do
+		helpers.it("(prediction-configured-preflight) refuses " .. case.name .. " before publication", function()
+			with_prediction_preflight(PREDICTION_BASE, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = case.identity
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key,
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, known in ipairs({ false, true }) do
+		helpers.it("(prediction-configured-preflight) unknown disabled AI plus " .. (known and "known collision" or "otherwise free input"), function()
+			local source = COLLISION_BASE .. (known and 'ctrl_j = "copy"\n' or "") .. '[llm]\nenabled = false\n'
+			with_prediction_preflight(source, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				helpers.assert_eq(owners.prediction.capture_collision_inventory(), nil)
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_ctrl_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, known and "collision" or "unavailable")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, seam in ipairs({ "original factory", "actual request cancellation" }) do
+		helpers.it("(prediction-configured-preflight) " .. seam .. " change revokes the source join", function()
+			with_prediction_preflight(PREDICTION_BASE, function(scope, owners, controls, path)
+				local before, changed = Sandbox.read_bytes(path), false
+				local factory = owners.prediction.capture_collision_inventory
+				controls.on_source = function()
+					if changed then return end; changed = true
+					if seam == "original factory" then owners.prediction.capture_collision_inventory = function() return nil end
+					else owners.prediction.cancel() end
+				end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_shift_Digit2",
+					value = "copy", intent = "keyboard_assignment" } })
+				owners.prediction.capture_collision_inventory = factory
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
 end)

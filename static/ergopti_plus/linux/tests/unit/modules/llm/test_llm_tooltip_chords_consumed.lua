@@ -588,3 +588,220 @@ helpers.describe("prediction tooltip: canonical progressive display", function()
 		end
 	end)
 end)
+
+--- Original AI owners over acknowledged files; external effects are recording ports.
+local function with_configured_prediction(source, body, options)
+	options = options or {}
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
+	local open = io.open
+	local ok, failure = pcall(function()
+		Sandbox.with_config(source, function(path)
+			for name in pairs(package.loaded) do
+				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+			end
+			package.loaded["infra.config_paths"] = { config = function() return path end }
+			local observations = { polls = 0, requests = 0, applied = {}, visible = false, path = path }
+			local overlay = {
+				show = function() observations.visible = true; return true end,
+				hide = function() observations.visible = false; return true end,
+				is_showing = function() observations.polls = observations.polls + 1; return observations.visible end,
+				active_index = function() return 1 end,
+			}
+			if options.move ~= false then overlay.move = function() return true end end
+			if options.explicit_request then
+				package.loaded["modules.llm.api_ollama"] = {
+					chat = function(_, _, _, _, chunk, done)
+						observations.requests = observations.requests + 1
+						chunk(" est bien faite"); done(" est bien faite", nil)
+					end,
+					cancel = function() return true end,
+				}
+			end
+			local scheduler = Fakes.timer_scheduler()
+			local engine = require("modules.llm.prediction_engine")
+			local init = { overlay = overlay, scheduler = scheduler,
+				clock_ms = function() return scheduler.now * 1000 end,
+				apply_prediction = function(candidate) observations.applied[#observations.applied + 1] = candidate.to_type; return true end }
+			engine.init(init)
+			body(engine, require("modules.llm.navigation_settings"), observations, Sandbox, init)
+		end)
+	end)
+	io.open = open
+	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+	for name, value in pairs(loaded) do package.loaded[name] = value end
+	if not ok then error(failure, 0) end
+end
+
+local CONFIGURED_PREDICTION = '[llm]\nenabled = true\n[llm.navigation]\nnav_modifiers = ["ctrl"]\nval_modifiers = ["shift"]\n'
+
+helpers.describe("Configured prediction shortcut collision reservations", function()
+	helpers.it("(prediction-configured-reservation) captures the genuine configured finite union without polling an offer", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, observed)
+			local frame = assert(engine.capture_collision_inventory())
+			local native_digits, arrows, shift_tab, plain_tab, logical_digit = 0, 0, false, false, false
+			for _, claim in ipairs(frame.claims) do
+				if claim.binding:match("^prediction__digit_") then native_digits = native_digits + 1; helpers.assert_eq(claim.mods, { shift = true }) end
+				if claim.binding == "prediction__navigation" then arrows = arrows + 1; helpers.assert_eq(claim.mods, { ctrl = true }) end
+				if claim.binding == "prediction__shift_tab" then shift_tab = claim.code == EvdevCodes.KEY_TAB and claim.mods.shift == true end
+				if claim.binding == "prediction__live_agent_tab" then plain_tab = claim.code == EvdevCodes.KEY_TAB and next(claim.mods) == nil end
+				if claim.kind == "logical" and claim.key == "2" then logical_digit = true end
+			end
+			helpers.assert_eq(native_digits, 10); helpers.assert_eq(arrows, 4)
+			helpers.assert_true(shift_tab and plain_tab and logical_digit)
+			helpers.assert_eq(frame.current(), true); helpers.assert_eq(frame.sealed(), true)
+			helpers.assert_eq(observed.polls, 0); helpers.assert_eq(observed.requests, 0)
+		end)
+	end)
+
+	helpers.it("(prediction-configured-reservation) original overlay without move cannot authorize navigation claims", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine)
+			local frame = assert(engine.capture_collision_inventory())
+			for _, claim in ipairs(frame.claims) do
+				helpers.assert_eq(claim.binding == "prediction__navigation" or claim.binding == "prediction__shift_tab", false)
+			end
+		end, { move = false })
+	end)
+
+	helpers.it("(prediction-configured-reservation) real modifier writes revoke old frames and bind the new actual source", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, navigation)
+			local frame = assert(engine.capture_collision_inventory())
+			helpers.assert_eq(navigation.set({ "alt" }), true)
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(frame.sealed(), false)
+			local current = assert(engine.capture_collision_inventory())
+			for _, claim in ipairs(current.claims) do
+				if claim.binding == "prediction__digit_2" then helpers.assert_eq(claim.mods, { alt = true }) end
+			end
+		end)
+	end)
+
+	helpers.it("(prediction-configured-reservation) foreign configured modifiers cannot borrow cached old chords", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, observed, Sandbox)
+			local frame = assert(engine.capture_collision_inventory())
+			Sandbox.write_bytes(observed.path, CONFIGURED_PREDICTION:gsub('val_modifiers = %["shift"%]', 'val_modifiers = ["alt"]'))
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(engine.capture_collision_inventory(), nil)
+		end)
+	end)
+
+	helpers.it("(prediction-configured-reservation) mutable exported modifier arrays are not a new source", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, navigation)
+			local frame = assert(engine.capture_collision_inventory())
+			navigation.get()[1] = "alt"
+			helpers.assert_eq(frame.sealed(), false); helpers.assert_eq(engine.capture_collision_inventory(), nil)
+		end)
+	end)
+
+	for _, ack in ipairs({ { name = "false", value = false }, { name = "nil" } }) do
+		helpers.it("(prediction-configured-reservation) actual canonical source read refuses a " .. ack.name .. " close ACK", function()
+			with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, observed)
+				local open = io.open
+				io.open = function(path, mode)
+					local file, detail, code = open(path, mode)
+					if path ~= observed.path or not file then return file, detail, code end
+					return { read = function(_, ...) return file:read(...) end,
+						close = function() assert(file:close() == true); return ack.value end }
+				end
+				local captured, frame = pcall(engine.capture_collision_inventory)
+				io.open = open
+				helpers.assert_eq(captured, true); helpers.assert_eq(frame, nil)
+			end)
+		end)
+	end
+
+	helpers.it("(prediction-configured-reservation) genuine reinitialization and configuration ownership revoke old frames", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, _, _, init)
+			local frame = assert(engine.capture_collision_inventory())
+			engine.init(init)
+			helpers.assert_eq(frame.sealed(), false)
+			frame = assert(engine.capture_collision_inventory())
+			local owner = { pending = function() return false end }
+			helpers.assert_true(engine.acquire_configuration(owner)); helpers.assert_eq(frame.current(), false)
+			helpers.assert_eq(engine.capture_collision_inventory(), nil)
+			helpers.assert_true(engine.release_configuration(owner)); helpers.assert_eq(frame.sealed(), false)
+		end)
+	end)
+
+	helpers.it("(prediction-configured-reservation) actual original digit roles cannot be rebound after source capture", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine)
+			local frame = assert(engine.capture_collision_inventory())
+			local original = EvdevCodes.DIGIT_ROW_SLOT[3]
+			EvdevCodes.DIGIT_ROW_SLOT[3] = 9
+			local current = frame.sealed()
+			EvdevCodes.DIGIT_ROW_SLOT[3] = original
+			helpers.assert_eq(current, false)
+		end)
+	end)
+
+	helpers.it("(prediction-configured-reservation) disabled explicit predict can still reach original acceptance and is never called free", function()
+		local source = CONFIGURED_PREDICTION:gsub("enabled = true", "enabled = false")
+			.. '[llm.trigger]\nsecure_filter_enabled = false\nurl_bar_filter_enabled = false\n[llm.generation]\nmin_words = 1\n'
+		with_configured_prediction(source, function(engine, _, observed)
+			helpers.assert_eq(engine.is_enabled(), false)
+			helpers.assert_eq(engine.capture_collision_inventory(), nil)
+			local profile
+			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			helpers.assert_true(profile ~= nil, "use the actual shared raw profile")
+			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
+			helpers.assert_eq(observed.requests, 1, "controlled external provider receives the original direct request")
+			helpers.assert_true(engine.has_suggestions(), "the original direct request can create an offer while UI master is off")
+			helpers.assert_eq(engine.handle_shortcut({ code = 2, key = "!", mods = { shift = true } }), true)
+			helpers.assert_eq(#observed.applied, 1)
+			helpers.assert_eq(engine.capture_collision_inventory(), nil)
+		end, { explicit_request = true })
+	end)
+end)
+
+
+helpers.describe("Original prediction construction port custody", function()
+	helpers.it("(prediction-configured-reservation) later option callbacks cannot replace originally captured overlay capabilities", function()
+		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, _, _, init)
+			local options = { overlay = init.overlay, apply_prediction = init.apply_prediction,
+				scheduler = init.scheduler, clock_ms = init.clock_ms }
+			local changed = false
+			setmetatable(options, { __index = function(_, key)
+				if key == "on_output" and not changed then
+					changed = true; init.overlay.move = function() return false end
+				end
+				return nil
+			end })
+			engine.init(options)
+			helpers.assert_eq(changed, true)
+			helpers.assert_eq(engine.capture_collision_inventory(), nil, "a later compatible port is not original construction")
+		end)
+	end)
+end)
+
+
+helpers.describe("Prediction collision source admission controls", function()
+	helpers.it("(prediction-configured-reservation) original disabled direct request still reaches original acceptance independently of the new API", function()
+		local source = CONFIGURED_PREDICTION:gsub("enabled = true", "enabled = false")
+			.. '[llm.trigger]\nsecure_filter_enabled = false\nurl_bar_filter_enabled = false\n[llm.generation]\nmin_words = 1\n'
+		with_configured_prediction(source, function(engine, _, observed)
+			helpers.assert_eq(engine.is_enabled(), false)
+			local profile
+			for _, item in ipairs(require("llm.profile_selector").load_built_in_profiles()) do if item.id == "raw" then profile = item end end
+			helpers.assert_true(profile ~= nil)
+			engine.predict("Bonjour //", { app_id = "editor", input_chars = 2 }, { profile = profile, num_predictions = 1 })
+			helpers.assert_eq(observed.requests, 1)
+			helpers.assert_true(engine.has_suggestions())
+			helpers.assert_eq(engine.handle_shortcut({ code = 2, key = "!", mods = { shift = true } }), true)
+			helpers.assert_eq(#observed.applied, 1)
+		end, { explicit_request = true })
+	end)
+
+	helpers.it("(prediction-configured-reservation) missing preference owner retains ordinary default loading but cannot issue a collision frame", function()
+		local name, navigation_name = "infra.llm_preferences", "modules.llm.navigation_settings"
+		local stored, preload, old_navigation = package.loaded[name], package.preload[name], package.loaded[navigation_name]
+		package.loaded[name] = nil
+		package.preload[name] = function() error("literal absent preference owner") end
+		local loaded, navigation = pcall(helpers.load_module, navigation_name)
+		local read, value, captured, frame
+		if loaded then
+			read, value = pcall(navigation.get)
+			captured, frame = pcall(navigation.capture_collision_configuration)
+		end
+		package.loaded[name], package.preload[name], package.loaded[navigation_name] = stored, preload, old_navigation
+		helpers.assert_eq(loaded, true); helpers.assert_eq(read, true); helpers.assert_type(value, "table")
+		helpers.assert_eq(captured, true); helpers.assert_eq(frame, nil)
+	end)
+end)
