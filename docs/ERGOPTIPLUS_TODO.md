@@ -6938,6 +6938,19 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
 
+  A further October 15 correction covers the daemon's existing explicit
+  `--config FILE.toml` mode, which previously admitted no reload observer.
+  The selected file and its immediate parent retain exact lexical/native
+  ownership across replacement and repair, without scanning neighboring files
+  or a substituted directory. All original watcher test bytes remain; sixteen
+  independent additions pass on both Lua engines and fail against the literal
+  original producer. Feature atom `bfa604bab` passes complete default selected
+  receiving: 13,865 units across 521 modules and 193 E2E cases, with zero
+  failures, plus strict conventions. Its exact boundary is retained in the
+  [dated preparation boundary](handovers/2026-10-12-config-menus/2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md).
+  Installed source activation and the transaction/startup qualification below
+  remain required; item 42 stays partial.
+
   Later October 15 atoms `02713ee47` and `2990b16e1` restore Personal-root
   coverage through its stable immediate parent and count that genuine parent
   handle in startup diagnostics. All 83 previous watcher subjects remain;
@@ -15252,6 +15265,25 @@ test precondition failure, not a Lua defect or a successful permission grant.
   distinguishes that source work, its dated receiving and remaining installed
   acceptance. Full daily logs still need a shared privacy/collection contract
   and three native collectors; the bounded recent-error tail remains separate.
+
+  The macOS follow-up now receives diagnostic path/reveal task completion
+  instead of acknowledging native task admission. A literal real-child
+  reproduction receives exit 23 while the old report still returns success;
+  another control observes browser dispatch before reveal completion. Current
+  caller ownership, native deadlines and cancellation joins pass all 88 focused
+  Lua 5.4 cases, including 55 original subjects, and independent source review.
+  The
+  [dated receiving boundary](handovers/2026-10-12-config-menus/2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md)
+  keeps full suites, hosted source qualification and installed acceptance
+  separate. The existing native HTTP-URL acknowledgment does not qualify
+  browser rendering. Complete export, daily logs and GitHub editability remain
+  open, and item 138 is not closed. A further literal recent-error reader
+  control exposes read and close refusals incorrectly acknowledged as a valid
+  file. The bounded shared Lua reader correction passes 17 focused cases per
+  host, including all three original subjects; its sealed predecessor passes
+  five and fails twelve. Independent review accepts the correction. Complete
+  composed gates and hosted receiving remain pending at this dated boundary;
+  unreadable-file and initial-absence source policies remain authoritative.
 
 - [ ] **139.** Remove personal identities from daily and shared error logs.
 
