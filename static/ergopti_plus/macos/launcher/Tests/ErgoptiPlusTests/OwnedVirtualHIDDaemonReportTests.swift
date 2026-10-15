@@ -1,4 +1,5 @@
 // Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift
+import Darwin
 import Foundation
 import XCTest
 @testable import ErgoptiPlus
@@ -114,4 +115,16 @@ final class OwnedVirtualHIDDaemonReportTests: XCTestCase {
 		XCTAssertTrue(owner.retired())
 		XCTAssertTrue(owner.retire())
 	}
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	func testChangedFileRefusesObservationButRetiresOnlyItsOriginalDescriptor() throws {
+		let result = try OwnedVirtualHIDDaemonReportObserver.fixtureChangedFileRetirement()
+		XCTAssertTrue(result.wasCurrent)
+		XCTAssertTrue(result.rejectedMutation)
+		XCTAssertEqual(result.failure, ESTALE)
+		XCTAssertTrue(result.firstClose)
+		XCTAssertTrue(result.originalClosed)
+		XCTAssertTrue(result.repeatedClose)
+		XCTAssertTrue(result.replacementCurrent)
+	}
+	#endif
 }

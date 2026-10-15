@@ -4722,9 +4722,13 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   19 product controls and 14 route controls in normal and optimized modes; the
   original caller fails the new route regression. Both-architecture native
   compilation/linking, the distinct 17-command helper build, signed query and
-  retirement, all 32 Swift cases and daemon/staging cleanup remain pending.
-  The current CI's architecture filters do not execute these 32 cases or that
+  retirement, all 33 Swift cases and daemon/staging cleanup remain pending.
+  The current CI's architecture filters do not execute these 33 cases or that
   distinct helper build; enrollment is coordinated with the CI owner.
+  A changed observed file now keeps its observation refusal while permitting
+  checked closure of its original descriptor. The additional real-FD XCTest
+  is authored, not executed off Darwin; close failure retains separate debt
+  and never retries an ambiguously consumed descriptor.
   No numeric ABI, resident
   readiness, remote cleanup, physical accounting or lease fix is qualified;
   item 31 stays open.
