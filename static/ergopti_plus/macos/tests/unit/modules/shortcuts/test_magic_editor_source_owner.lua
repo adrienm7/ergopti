@@ -835,3 +835,57 @@ helpers.describe("conditional editor shortcut: receipt-bound keyboard geometry",
 		end
 	end)
 end)
+
+helpers.describe("conditional editor shortcut: parent executor source rejoin", function()
+	for _, field in ipairs({ "source_id", "trigger", "magic_source", "replace_active", "paused", "inhibited", "current" }) do
+		helpers.it("fences " .. field .. " changes before parent executor entry", function()
+			with_fixture(function(subject, registrar, native, state, spec, respond)
+				local entered, rejoined, accepted = 0, 0, nil
+				spec.execute = function(_, _, delivery_current)
+					entered = entered + 1
+					if field == "source_id" then state.source_id = "source.second"
+					elseif field == "trigger" then state.trigger = ";"
+					elseif field == "magic_source" then state.magic_source = "KeyJ"
+					elseif field == "replace_active" then state.replace_active = true
+					elseif field == "current" then state.current = false
+					else state[field] = true end
+					if type(delivery_current) ~= "function" then
+						accepted = true
+						return true
+					end
+					rejoined = rejoined + 1
+					accepted = delivery_current()
+					return accepted
+				end
+				helpers.assert_eq(subject.start(spec), true)
+				respond()
+				local callback = native.hotkey._bound[1].pressed_fn
+				callback()
+				helpers.assert_eq(subject.stop(), true)
+				helpers.assert_eq(entered, 1, "the original callback reaches its parent's handoff boundary")
+				helpers.assert_eq(rejoined, 1, "the real owner supplies its retained source-decision rejoin")
+				helpers.assert_eq(accepted, false, "a changed effective source must refuse the old action")
+				helpers.assert_eq(registrar.live_count(), 0)
+			end)
+		end)
+	end
+
+	helpers.it("allows the unchanged decision at parent executor entry", function()
+		with_fixture(function(subject, registrar, native, _, spec, respond)
+			local rejoined, accepted = 0, false
+			spec.execute = function(_, _, delivery_current)
+				if type(delivery_current) ~= "function" then return false end
+				rejoined = rejoined + 1
+				accepted = delivery_current()
+				return accepted
+			end
+			helpers.assert_eq(subject.start(spec), true)
+			respond()
+			native.hotkey._bound[1].pressed_fn()
+			helpers.assert_eq(subject.stop(), true)
+			helpers.assert_eq(rejoined, 1)
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(registrar.live_count(), 0)
+		end)
+	end)
+end)

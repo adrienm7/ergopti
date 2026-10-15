@@ -13978,6 +13978,18 @@ collision coverage, Windows/macOS qualification or real device acceptance.
 Windows strict Snapshot receiving remains blocked by load-time test warnings;
 item 108 remains partial.
 
+The macOS conditional editor now rejoins its exact original effective-source
+and context decision inside the parent's real Logger callback, immediately
+before executor entry. A final parent lifecycle check denies reentrant retirement.
+Source, trigger, replacement, pause and inhibition changes cannot dispatch the
+old action; stable input still executes once. Both existing test modules retain
+all original assertions and add eleven cases. Focused Lua 5.4 receiving gives
+original 49/0, original with additions 49/11, candidate 60/0, withdrawal 49/11
+and restoration 60/0. These are portable software controls; native TIS/GUI and
+final composed qualification remain open. See
+[the retargeting handoff](handovers/2026-10-15-group3-magic-retarget/README.md).
+Item 108 remains partial; no physical availability is enabled.
+
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:
   generated AHK/Lua/Swift composers, translated bare captions and live retitles

@@ -147,4 +147,55 @@ helpers.describe("contextual keyboard slot: ordinary persistence owner", functio
 	end)
 end)
 
+
+helpers.describe("contextual keyboard slot: logger-bound source rejoin", function()
+	helpers.it("refuses a source revoked inside the actual parent logger callback", function()
+		with_subject({}, function(_, observed)
+			local logger = package.loaded["infra.logger"]
+			local original_callback, source_current, logger_entries, rechecks = logger.callback, true, 0, 0
+			logger.callback = function(log, name, callback, ...)
+				logger_entries = logger_entries + 1
+				source_current = false
+				return original_callback(log, name, callback, ...)
+			end
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+				rechecks = rechecks + 1
+				return source_current
+			end)
+			logger.callback = original_callback
+			helpers.assert_eq(logger_entries, 1, "the actual parent's logging boundary must execute")
+			helpers.assert_eq(rechecks, 1, "source admission is observed after that callback")
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(observed.actions, {}, "a stale conditional action must never enter the executor")
+		end)
+	end)
+
+	helpers.it("delivers an unchanged live source exactly once after logging", function()
+		with_subject({}, function(_, observed)
+			local rechecks = 0
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+				rechecks = rechecks + 1
+				return true
+			end)
+			helpers.assert_eq(rechecks, 1)
+			helpers.assert_eq(accepted, true)
+			helpers.assert_eq(observed.actions, { "open_hotstrings_editor" })
+		end)
+	end)
+
+	helpers.it("rejoins parent lifecycle after the source recheck callback", function()
+		with_subject({}, function(subject, observed)
+			local rechecks = 0
+			local accepted = observed.latest.execute("open_hotstrings_editor", "keyboard__magic_editor", function()
+				rechecks = rechecks + 1
+				subject.stop()
+				return true
+			end)
+			helpers.assert_eq(rechecks, 1)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(observed.actions, {})
+		end)
+	end)
+end)
+
 return true
