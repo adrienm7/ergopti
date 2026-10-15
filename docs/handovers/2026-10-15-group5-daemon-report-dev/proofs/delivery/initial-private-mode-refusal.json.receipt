@@ -1,0 +1,87 @@
+{
+  "stage": "private postimage physical-mode check after successful strict Git apply",
+  "assertion": "physical mode ==0644",
+  "finding": "Git patch logical100644 is non-executable regular; parent-inherited private umask made new physical leaves0600. No source hash mismatch. Next validation explicitly uses task-local022 and retains this receipt/view.",
+  "modes": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "tools/build/fixtures/vhd-daemon-report-reference-source.swift.txt",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "tools/build/generate_vhd_daemon_report_reference.py",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "tools/build/owned-runtime-installer/InstallerMain.swift",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build.py",
+      "physical_mode": "0o600"
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build_test.py",
+      "physical_mode": "0o600"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "state": "PORTABLE_RECEIVING_COMPLETED",
+  "source_manifest": "7105a9d239772237e531d1c3643f26a60ca8f6b86aa4f6b1f8fcdf856ddc36b8",
+  "subjects": 9,
+  "census_sha256": "47cd7864c0eb1d84bb13c2b14c614eeddf468e721e3520a8741fe8521a35ea9b",
+  "tests": {
+    "normal": {
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    },
+    "optimized": {
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0
+    }
+  },
+  "sources_whole": true,
+  "temporary_children_after": [],
+  "limits": "Actual portable POSIX filesystem + command planning. No compiler invoked; no nativeSDK/Swift/Darwin/admin/daemon receiving. Source peer pending."
+}

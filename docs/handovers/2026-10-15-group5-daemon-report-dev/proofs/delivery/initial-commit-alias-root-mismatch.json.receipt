@@ -1,0 +1,6 @@
+{
+  "endpoint": "git/trees/a549...?recursive=1",
+  "response_sha": "a549c14f8aa158072e6ccc0b2ae57427e3195f8e",
+  "commit_binding_actual_tree": "f4a9b7d85c82564f9b42a359cce42135bc256523",
+  "qualification": "Cannot label commit-alias response root as actual tree. Fetch exact tree id read-only and compare selected rows before current-compatibility acceptance."
+}
