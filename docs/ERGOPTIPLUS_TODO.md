@@ -12246,6 +12246,15 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   Root contract/budget prefix is byte-exact. This receiver correction grants no
   simultaneous-input, physical AltGr, output or whole-suite qualification.
 
+Integrated receiving on d60ad231ae41c7391c1012c5feb9fc5723bbcca4 is terminal:
+manual CI 38661916914 passes all 426 Common controls and Windows engine E2E
+70/70, but its first actual Snapshot dry child refuses AHK load warnings before
+TAP under the unchanged exact-output contract. The native run of the 17 cases,
+full AHK suite, Windows package and installation remain unrun. The source-only
+registration-loop repair is independently reviewed and shared with Root, not
+adopted or natively qualified. Keep the strict stdout/TAP assertion and all
+original budgets. See the Snapshot17 handover; item 91 remains partial.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -12691,6 +12700,15 @@ joins, Unicode/dead keys, Windows/macOS integration and native/installed/physica
 acceptance remain open. Public physical delivery stays unavailable; item 97
 remains partial.
 
+Subsequent integrated CI 38661916914 on d60ad231a passes all 426 Common
+controls, Linux units 13,752/0, E2E 193/193, actual X11/XKB 65/65, package,
+all 17 installations and Linux Verdict. The unchanged luv case passes on that
+runner; the earlier local 13,751/1 observation remains separate and unexplained.
+Windows engine E2E passes 70/70, but the strict Snapshot warning refusal blocks
+Windows units/package/install. macOS is unselected. These Linux results qualify
+the tested virtual/native and installed scope, not public physical delivery,
+other-owner completeness or actual device acceptance; item 97 remains partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12747,6 +12765,11 @@ None/removal remains unchanged. This does not supply chosen-key output or an
 acknowledged star-setting migration. Other input/output owners, dead keys,
 Windows/macOS replacement integration and native/installed/physical acceptance
 remain open; public delivery stays unavailable and item 98 remains partial.
+
+The same integrated Linux chain from item 97 now passes through package,
+17 installations and its verdict on d60ad231a. Chosen-output ownership,
+acknowledged star migration, other consumers and Windows/macOS receiving remain
+unfinished; no public physical mapping is enabled and item 98 remains partial.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -13844,6 +13867,14 @@ and installation remain pending.
 Complete other-owner collisions, live source/modifier/output joins,
 Windows/macOS integration and native/installed/physical delivery remain open;
 item 108 stays partial.
+
+Integrated d60ad231a receiving passes Common 426, Linux units 13,752,
+E2E 193 and actual X11/XKB 65, then package/all 17 installations/Linux Verdict.
+This qualifies the tested map/group renewal and consumer plans on the virtual
+native hosts. It grants no physical editor-key delivery, complete other-owner
+collision coverage, Windows/macOS qualification or real device acceptance.
+Windows strict Snapshot receiving remains blocked by load-time test warnings;
+item 108 remains partial.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:

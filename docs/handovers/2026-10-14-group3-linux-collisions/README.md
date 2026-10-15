@@ -98,3 +98,19 @@ Unicode and dead-key composition remain unfinished. Windows/macOS integration,
 native source/input/output, complete selected gates, packaging, installation
 and physical acceptance remain separate requirements. Items 97, 98 and 108 stay
 partial; transversal items 16 and 38 retain their validation requirements.
+
+The subsequent exact integrated manual CI
+[38661916914](https://github.com/adrienm7/ergopti/actions/runs/38661916914)
+is terminal on `d60ad231ae41c7391c1012c5feb9fc5723bbcca4`. All 426 Common
+checks and properties pass. Linux passes 13,752 unit cases, all 193 E2E cases,
+the actual X11/XKB 65-case cohort and the remaining native E2E steps, then its
+package, all 17 installation jobs and verdict. The original luv case passes
+on the runner; that does not establish the cause of the separate local failure.
+
+Windows engine E2E passes 70/70. The strict Snapshot dry-output refusal prevents
+the 17-case native run, full Windows units, package and installation. The whole
+manual run remains failed (25 successful jobs, three failed dependent jobs and
+four skipped jobs); Release is skipped. macOS is intentionally unselected.
+The Snapshot17 handover records the source-only repair and its pending owner
+adoption. No entire TODO item, public physical capability or device acceptance
+is completed by this partial integration; requirements 16 and 38 remain.
