@@ -7205,6 +7205,14 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   Registered macOS tests pass 12908 cases, and private eager-acquisition and
   consumer-refusal mutations are rejected. Native macOS qualification and
   manual hardware acceptance remain pending.
+  CapsWord probe teardown now retains each exact native task until its own
+  completion callback. False/nil termination results and accepted signals
+  without completion cannot acknowledge watcher retirement; abandoned probes
+  retain the same cleanup owner for retry. The 21 original focused case bodies
+  remain unchanged; four additive regressions fail against the original
+  production source and pass after correction. Focused portable receiving
+  passes 25 lifecycle cases and seven pointer/signal cases. Actual native child
+  exit, pointer input and installed application acceptance remain unqualified.
 - [~] **46.** **Partial: local model admission and download offers.** Windows,
   macOS and Linux share model-presence policy for chat, agents and screen
   reading. Missing, removed, unavailable and malformed model lists remain
