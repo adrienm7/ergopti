@@ -78,10 +78,12 @@ local _pump_entries = {}
 
 -- Personal coverage is an independent owner even when another root overlaps it.
 local _personal_root, _personal_dirty, _personal_retry_at = nil, false, nil
+local _personal_file = false
 local _personal_epoch, _personal_revision = 0, 0
 local _personal_entries, _personal_retiring = {}, {}
 local _personal_anchor, _personal_rebind = nil, false
 local _reconcile_personal
+local _personal_metadata
 
 -- Callback invoked on debounced change detection.
 local _on_reload = nil
@@ -131,6 +133,13 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-b
 local function _directory_path(path)
 	local normalized = path:gsub("/+$", "")
 	return normalized == "" and "/" or normalized
+end
+
+--- Recognizes regular files from the supported POSIX, luv and GNU stat ports.
+local function _personal_regular_file(attributes)
+	if not attributes then return false end
+	return attributes.kind == "regular" or attributes.kind == "file"
+		or attributes.kind == "regular file" or attributes.kind == "regular empty file"
 end
 
 --- Returns the mtime of a path as a number (epoch seconds), or nil on error.
@@ -420,7 +429,8 @@ local function _pump_check_all()
 		end
 	end
 	for _, entry in pairs(_personal_entries) do
-		local mtime = _mtime(entry.path)
+		local observed = not _personal_file or _personal_regular_file(_personal_metadata(entry.path))
+		local mtime = observed and _mtime(entry.path) or nil
 		if mtime ~= entry.last_mtime then
 			entry.last_mtime = mtime
 			changed[#changed + 1] = entry.path
@@ -455,7 +465,7 @@ local function _personal_command(command)
 end
 
 --- Keeps the existing POSIX no-follow / shell-follow directory policy.
-local function _personal_metadata(path)
+_personal_metadata = function(path)
 	if posix and type(posix.stat) == "function" then
 		local called, attributes = pcall(posix.stat, path)
 		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
@@ -572,7 +582,8 @@ local function _personal_event(entry, err, filename, events)
 		if entry.staging then
 			_personal_revision = _personal_revision + 1
 			if not err then
-				local changed = type(filename) == "string" and filename ~= "" and entry.path .. "/" .. filename or entry.path
+				local changed = entry.path
+				if entry.kind == "directory" and type(filename) == "string" and filename ~= "" then changed = entry.path .. "/" .. filename end
 				_schedule_reload("personal staging activity: " .. changed, { changed })
 			end
 		end
@@ -672,7 +683,6 @@ local function _personal_census(path, depth, desired, staged, previous, epoch)
 	end
 	local attributes, detail = _personal_metadata(path)
 	if not attributes then return false, detail end
-	if attributes.kind ~= "directory" then return false, "personal directory is unavailable: " .. path end
 	local function admit(target, image)
 		local entry = previous[target]
 		if not _same_personal_binding(entry, image) then
@@ -683,6 +693,16 @@ local function _personal_census(path, depth, desired, staged, previous, epoch)
 		desired[target] = entry
 		return true
 	end
+	if _personal_file then
+		-- A selected file never authorizes its siblings or a replacement directory.
+		if path ~= _personal_root or not _personal_regular_file(attributes) then return false, "selected TOML file is unavailable: " .. path end
+		if not admit(path, attributes) then return false, detail end
+		local after
+		after, detail = _personal_metadata(path)
+		if not after or not _same_personal_binding(desired[path], after) then return false, detail or "selected TOML file changed during admission" end
+		return true
+	end
+	if attributes.kind ~= "directory" then return false, "personal directory is unavailable: " .. path end
 	if not admit(path, attributes) then return false, detail end
 	local entries
 	entries, detail = _personal_list(path)
@@ -758,7 +778,7 @@ end
 --- @param opts table
 ---   .hotstrings_dir  string  Absolute path to the main hotstrings TOML directory.
 ---   .base_dir        string  Absolute path to the project root (for .lua watching).
----   .personal_dir    string  Absolute path to personal hotstrings (recursive .toml scan).
+---   .personal_dir    string  Personal hotstrings directory or an existing selected TOML file.
 ---   .on_reload       function()  Called after the debounce window when a change is detected.
 ---   .now_ms          function() → number  Optional wall-clock source (ms) for tests.
 function M.start(opts)
@@ -807,9 +827,12 @@ function M.start(opts)
 	-- ── 9.2) Personal hotstrings (recursive .toml scan) ──
 	if personal_dir ~= "" then
 		local clean_dir = _directory_path(personal_dir)
-		if _is_dir(clean_dir) then
+		local is_directory = _is_dir(clean_dir)
+		local is_file = not is_directory and _is_toml(clean_dir) and _personal_regular_file(_personal_metadata(clean_dir))
+		if is_directory or is_file then
 			_personal_epoch = _personal_epoch + 1
 			_personal_root, _personal_dirty = clean_dir, true
+			_personal_file = is_file == true
 			local epoch = _personal_epoch
 			local reconciled = _reconcile_personal()
 			if epoch ~= _personal_epoch then return false end
@@ -872,6 +895,7 @@ end
 function M.stop()
 	_personal_epoch = _personal_epoch + 1
 	_personal_root, _personal_dirty, _personal_retry_at, _personal_rebind = nil, false, nil, false
+	_personal_file = false
 	if _personal_anchor then _retire_personal(_personal_anchor); _personal_anchor = nil end
 	for _, entry in pairs(_personal_entries) do _retire_personal(entry) end
 	_personal_entries = {}
