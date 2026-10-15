@@ -1,0 +1,42 @@
+{
+	"ruby_version": "ruby 3.3.8 (2025-04-09 revision b200bad6cd) [x86_64-linux-gnu]",
+	"source_sha256": "a9d55fb4207e2154aaabb4603cb753efa39efc4cde1bf5a518f11973c466d32d",
+	"cases": [
+		{
+			"tag": "v1.2.3",
+			"format": "tar.xz",
+			"file": "v1.2.3-tar-xz.rb",
+			"sha256": "ad490d23821260be57d1c42c8410334458e7573cc8aad1320d1664af5267ba54",
+			"status": 0,
+			"stdout": "Syntax OK\n"
+		},
+		{
+			"tag": "v1.2.3",
+			"format": "zip",
+			"file": "v1.2.3-zip.rb",
+			"sha256": "e0a312b94b9cd1350ab4e171809fbb040c4261855864914a8a0ddf46d7f0ad1d",
+			"status": 0,
+			"stdout": "Syntax OK\n"
+		},
+		{
+			"tag": "v0.0.0-dev.142",
+			"format": "tar.xz",
+			"file": "v0.0.0-dev.142-tar-xz.rb",
+			"sha256": "43cedcf2ee2ae2d14b13e342367f1df8110f3d59415c9fe3e25b02b4d628548e",
+			"status": 0,
+			"stdout": "Syntax OK\n"
+		},
+		{
+			"tag": "v0.0.0-dev.142",
+			"format": "zip",
+			"file": "v0.0.0-dev.142-zip.rb",
+			"sha256": "4091baf91e5cbdd8744352e28f5ae938c2edca9fc03958a0ab512530c830ae75",
+			"status": 0,
+			"stdout": "Syntax OK\n"
+		}
+	],
+	"source_unchanged": true,
+	"native_macos": "UNRUN",
+	"brew": "UNRUN",
+	"pgrep": "UNRUN"
+}

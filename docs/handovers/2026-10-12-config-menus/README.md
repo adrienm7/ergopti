@@ -2,6 +2,42 @@
 
 # Configuration and menus: inactive personal-menu proposal
 
+## Container retirement checkpoint
+
+The maintainer explicitly requested Dev delivery and deletion of Group 1's
+feature, private and CI branches before this container is removed. The global
+[ErgoptiPlus TODO](../../ERGOPTIPLUS_TODO.md) is the sole current checklist:
+items 5, 7, 33, 42, 54, 81 and 138 remain partial; 16/38 remain required and 22
+stays withdrawn. No Group 1-specific TODO file is retained. Other groups' TODO
+files are outside this cleanup.
+
+The [retirement capsule](container-retirement/README.md) preserves unique
+private/CI history and portable continuation inputs. Earlier sections below are
+dated evidence, including their original failed and pending states; their
+branch names and container paths are historical references, not prerequisites.
+Fresh continuation starts from actual current Dev and the global TODO.
+
+Published runtime atoms `bfa604bab`, `57bcca233` and `313b0ef7c` and proof
+`c90aab103` are preserved by this delivery. The
+[final receiving packet](2026-10-15-RELOAD-AND-DIAGNOSTICS-RECEIVING.tar.gz)
+has SHA-256 `26e326a2701ef257b2639a4ab091e91ec537d255027dc10415321a91586c05ae`.
+Actual CI2 `ee2bba328` / run
+[38776110277](https://github.com/adrienm7/ergopti/actions/runs/38776110277)
+tested source tree `e7992152329049e0953ca8de057e7d33ba6ed55a`: 19 jobs,
+9 successful, 5 failed and 5 skipped. Its raw receiving confirms 19,894 macOS
+unit passes / zero failures / 1,604 modules and all 426 JS checks passed;
+those footers provide no skipped counter. Archive and both Managed Ollama jobs
+and their verdicts failed. Release/Publish was skipped.
+
+Original C1/T1 remains failed: 39 jobs, 28 successful, 6 failed and 5 skipped,
+including the owned stub-isolation regression subsequently repaired by the
+one-fixture T2 change. All 17 Linux installed-launch scenarios passed on T1.
+Local T1 receives 426 JS checks, 13,879 Linux units / 193 E2E, and 101 macOS
+E2E passes plus one explicit skip. Corrected T2 full HS passes 19,894 / zero.
+These source captures do not qualify this later retirement composition or
+installed reports, browser rendering, GitHub field editing or Windows behavior.
+The new composition's separate local verification receipt is in the capsule.
+
 The [diagnostics opener follow-up](2026-10-15-DIAGNOSTIC-OPENER.md) records the
 real Linux child-failure reproduction, asynchronous completion across the
 actual report callers, and the remaining installed export and log-collection
