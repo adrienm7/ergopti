@@ -12319,7 +12319,9 @@ resolver/logging callbacks or delayed tap retirement cannot execute the newly
 published assignment; an observed revocation remains until a new key-down.
 Completed native hold results and original release debt stay unchanged. All
 317 prior assertion starts and 39 literal registrations remain, with twelve
-additional registered assignment cases. This source repair is reviewed but
+additional registered assignment cases. The fixture saves and restores actual
+presence of the new per-press map, so old-production causal execution can
+reach the behavioral assertions rather than fail setup on an absent global. This source repair is reviewed but
 actual AHK parser/unit/E2E, original/candidate causal execution, final native
 package/install/startup and physical receiving remain NOT_RUN. It does not
 enable simultaneous input or establish genuine raw AltGr provenance.
