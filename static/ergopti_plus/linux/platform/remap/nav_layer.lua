@@ -13,7 +13,7 @@ local M = {}
 local Layers = require("keymap.layers")
 local Json = require("json")
 local Toml = require("toml_codec")
-local Files = require("keymap.layer_editor")
+local Writer = require("toml_codec.writer")
 local Outdated = require("config_outdated")
 local Logger = require("logger.shim")
 
@@ -28,6 +28,22 @@ local WHOLE_FILE_ERRORS = {
 	file_unreadable = true, toml_invalid = true,
 	schema_version_missing = true, schema_version_unsupported = true,
 }
+
+--- Returns original-load bytes only after the shared reader acknowledges close.
+--- A genuine ENOENT remains absence; a failed read/close is never an empty layer.
+local function read_file(path)
+	local content, status, detail = Writer.read_classified(path)
+	if status == "ok" and type(content) == "string" then return content end
+	if status == "absent" and content == nil then return nil end
+	error(tostring(detail or "navigation source read did not commit"), 0)
+end
+
+--- Shipped registry/vocabulary failure is fatal, including proven absence.
+local function read_shipped(path)
+	local content = read_file(path)
+	if content == nil then error("navigation shipped file missing: " .. path, 0) end
+	return content
+end
 
 --- Resolves a keyboard key through the canonical physical registry.
 local function key_code(registry, name)
@@ -100,11 +116,11 @@ end
 function M.load(opts)
 	local ctx = Layers.load_context({
 		shared_root = opts.shared_root, json_decode = Json.decode,
-		toml_decode = Toml.decode, read_file = Files.read_shipped,
+		toml_decode = Toml.decode, read_file = read_shipped,
 	})
 	local result = Layers.load_user_file({
 		config_dir = opts.config_dir, os = "linux", ctx = ctx,
-		toml_decode = Toml.decode, read_file = Files.read_file,
+		toml_decode = Toml.decode, read_file = read_file,
 	})
 	for _, item in ipairs(result.errors) do
 		if rejects_whole_file(item) then
