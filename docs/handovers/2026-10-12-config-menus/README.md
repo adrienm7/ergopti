@@ -2,6 +2,13 @@
 
 # Configuration and menus: inactive personal-menu proposal
 
+The [later configuration receiving](2026-10-15-CONFIG-FOLLOWUP.md) records
+stable-immediate-parent Personal-root recovery, its corrected handle diagnostic,
+complete sparse-fact receiving and the separate inactive four-constructor
+proposal. Exact hosted outcomes and remaining owner/installed acceptance are
+kept distinct; neither source review nor an archive activates the proposal.
+The earlier report below retains its dated pending claims.
+
 The [October 15 path follow-up](2026-10-15-PATH-RECEIVING.md) records the
 published Linux watcher fix, its separate CI source, and the inactive shared
 paths-editor proposal. Root's current release boundary queues new Dev
