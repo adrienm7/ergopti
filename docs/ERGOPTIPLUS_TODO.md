@@ -12,6 +12,73 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 pending warmup ownership correction
+
+The published156e58d9ff Windows build starts against the authorized isolated
+Ollama0.40.4 server and eventually reaches actual model readiness. Its startup
+also records refused request retirement and retries before readiness; this is
+not a clean startup qualification. The observer sends no substitute warmup.
+Its new actual Diagnostics archive remains pending the maintainer opening the
+tray application's Diagnostics window. The earlier verified f1b archive remains
+retained; no later archive is inferred from it.
+
+The source correction retains a genuinely pending warmup and its original
+absolute timeout instead of cancelling it at each retry. Windows checks exact
+request, generation, model, source custody and deadline; stale constructor
+publication cannot overwrite a successor. macOS retains the original POST
+through the actual API/core/controller composition, preserving retry backoff
+only for an explicit retained observation. Explicit acquisition still needs a
+fresh POST. Synchronous observers cannot grant acquisition to a withdrawn
+request, and on-stack acquisition cannot claim completed retirement.
+Linux has no corresponding warmup retry loop; its inference cancellation is
+unchanged. Native macOS/Linux and physical Windows receiving remain OPEN.
+
+Private causal receiving passes7/7 Windows cases and12/12 Lua cases on Windows,
+all with natural exit0 and unchanged tracked source. Original pending retry,
+stale completion, constructor replacement, deadline and synchronous-origin
+controls fail on their respective preimages. The final origin-read activity
+control tightens the pending observation; it is not native qualification.
+Canonical targeted receiving passes7/7 new Windows cases and38/38 warmup
+selections (overlapping),71/71 Ollama Lua module cases, Windows E2E70/70 with no
+skips, and portable Lua E2E67PASS with two explicit driver/host exclusions.
+Whole-entry compilation separates good0/bad17/entry0. Format, strict conventions,
+1,918-file AHK encoding and the unchanged380/380 source-read ratchet pass.
+After the measured local-variable warning is removed, final Windows warmup38/38,
+E2E70/70, compilation, format, strict conventions and encoding pass again. The
+source/detail warning multiset stays6,630 against6,630, with no added entry.
+
+The frozen complete Lua command on Windows finishes naturally with exit1:
+18899 passes and856 failures across1604 attempted modules, including
+4 module-load failures. All twelve new warmup
+cases pass within that composition; source, HEAD and tracked diff stay unchanged.
+One file-publication assertion and three daemon-launch assertions independently
+fail with identical values against the published three-file Lua preimage. This
+attributes those four controls only; the other failures stay unresolved. It is
+not a green full Lua gate or native macOS qualification.
+
+The retained native Windows file-filter failure takes29,952.603ms for its whole
+case; restored|elapsed_ms=17109 is the entry to restoration, not its duration.
+Restricted TXT/BIN behavior and All Files/index2 are confirmed. Return from
+ControlChooseIndex restoring index1 and the following restoration queries are
+not individually traced.
+No production forwarding defect is established; this remains a native FAIL,
+not merely missing physical qualification. A private per-call trace on an idle
+desktop is the next receiving step; assertions and budgets stay unchanged.
+
+Default JS receiving executes424 original checks: 410PASS,14FAIL,
+with exactly one full-startup check UNRUN while the retained compiled app is
+active. Every executed check has its original command and natural outcome;
+source, HEAD and tracked diff stay unchanged. This is a PARTIAL425-entry default
+inventory, excluding SLOW_CHECKS, and not a complete or green canonical gate.
+Actual full Windows units and single-driver startup remain OPEN. Earlier
+complete JS411/425 and incomplete Windows-unit results remain failed or
+incomplete. Failures retain the actual Linux-only/native archive refusals,
+missing sandbox service file, Windows symlink/permission refusals, unavailable
+CF/AX compiler prerequisites and refused unsupported SDK receipt. No assertion
+or native qualification is waived. The exact committed application build and
+its actual startup and Diagnostics receiving remain separate from these source
+results.
+
 ### October 15 complete local source receiving
 
 The complete canonical JS gate receives the frozen local candidate on base
