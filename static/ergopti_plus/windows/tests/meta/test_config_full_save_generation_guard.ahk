@@ -20,7 +20,13 @@ _CFGFM_OwnerSpansCollectionAndAcknowledgement() {
 	Body := _DriverFuncBody("SaveFullConfig")
 	Assert(Body != "", "SaveFullConfig must exist")
 	BoundPos := InStr(Body, "BoundPath := _ConfigFullSaveBoundPath()")
-	MatchPos := InStr(Body, "_ConfigFullSavePathMatches(ConfigurationFile)")
+	MatchPos := InStr(Body, "_ConfigFullSavePathMatches(SelectedPath)")
+	if MatchPos {
+		SelectedPos := InStr(Body, "SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0")
+		Assert(SelectedPos > BoundPos && SelectedPos < MatchPos,
+			"the path match must consume the detached selected-path snapshot")
+	} else
+		MatchPos := InStr(Body, "_ConfigFullSavePathMatches(ConfigurationFile)")
 	OwnerPos := InStr(Body, "_ConfigWriteLeaseTryAcquire")
 	CapturePos := InStr(Body, "TargetGeneration := _ConfigFullSaveCapture()")
 	SourcePos := InStr(Body, "SourceImage := TOML_BuildConfigUpdatedContent(BoundPath, [])")
@@ -194,7 +200,11 @@ RunTests()
 	return Header StrReplace(Harness, "BOOT_BLOCK", Block)
 }
 
-_CFGFM_ReceiveRecordedBoot(Block) {
+_CFGFM_ReceiveRecordedBoot(Block, BuildFn := unset, CaseNames := unset) {
+	if IsSet(BuildFn) && !HasMethod(BuildFn, "Call")
+		throw TypeError("The source-projected child builder must be callable.")
+	if IsSet(CaseNames) && (!(CaseNames is Array) || CaseNames.Length == 0)
+		throw TypeError("Source-projected child case names must be nonempty.")
 	static Retained := []
 	Directory := A_Temp "\ergopti-optional-boot-" A_ScriptHwnd "-" A_TickCount "-" Random(100000, 999999)
 	AssertTrue(DllCall("Kernel32\CreateDirectoryW", "Str", Directory, "Ptr", 0, "Int"),
@@ -208,7 +218,9 @@ _CFGFM_ReceiveRecordedBoot(Block) {
 	}
 	try {
 		Script := Directory "\recorded.ahk", Receipt := Directory "\results.tap"
-		Source := _CFGFM_RecordedBootScript(Block, A_ScriptDir "\test_framework.ahk", Receipt)
+		Source := IsSet(BuildFn)
+			? BuildFn.Call(Block, A_ScriptDir "\test_framework.ahk", Receipt)
+			: _CFGFM_RecordedBootScript(Block, A_ScriptDir "\test_framework.ahk", Receipt)
 		AssertTrue(FSWriteCreateDurable(Script, Source), "the exact recording script must be durably created")
 		Task := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], Completed,
 			, , 65536)
@@ -218,12 +230,15 @@ _CFGFM_ReceiveRecordedBoot(Block) {
 		while !State["done"] && ((A_TickCount - Started) & 0xFFFFFFFF) < 5000
 			Sleep(10)
 		AssertTrue(State["done"], "the six recording states must finish within their bounded child budget")
-		AssertEqual(0, State["code"], State["output"])
+		AssertEqual(0, State["code"], RegExReplace(State["output"], "m)^", "# child "))
 		AssertTrue(FileExist(Receipt) != "", "the actual registered child must retain its receipt")
 		Result := FileRead(Receipt, "UTF-8")
-		AssertContains(Result, "# 6 passed, 0 failed.", "all six behavior controls must execute")
-		for Name in ["initially terminal", "during admission", "during queue refusal",
-			"live genuine queue failure", "nominal queue", "existing schema refusal"]
+		Names := IsSet(CaseNames) ? CaseNames
+			: ["initially terminal", "during admission", "during queue refusal",
+				"live genuine queue failure", "nominal queue", "existing schema refusal"]
+		AssertContains(Result, "# " . Names.Length . " passed, 0 failed.",
+			"all separately named source-projected controls must execute")
+		for Name in Names
 			AssertContains(Result, Name, "the child must reach every distinct refusal/positive path")
 	} finally {
 		if IsObject(Task) {
@@ -240,3 +255,272 @@ _CFGFM_ReceiveRecordedBoot(Block) {
 		}
 	}
 }
+
+; Read only the genuine production pending/path-admission block. Its predicates
+; remain intact in a source-projected child; only one declared scheduler seam is
+; inserted after the original Critical release in both preimage and candidate.
+_CFGFM_PendingSnapshotBlock(Terminal := false) {
+	Body := _DriverFuncBody(Terminal ? "_ConfigFullSaveSettleTerminal" : "SaveFullConfig")
+	StartText := "State := _ConfigFullSaveCoordinator()"
+	EndText := Terminal ? "Result := _ConfigDrainFullSave" : "if PublicationDebt {"
+	Start := InStr(Body, StartText, true)
+	AssertTrue(Start > 0 && !InStr(Body, StartText, true, Start + StrLen(StartText)),
+		"one genuine pending-generation admission block must exist")
+	End := InStr(Body, EndText, true, Start)
+	AssertTrue(End > Start, "the projected block stops before collection or native writes")
+	Block := SubStr(Body, Start, End - Start)
+	Release := "} finally Critical(PreviousCritical)"
+	Position := InStr(Block, Release, true)
+	AssertTrue(Position > 0, "the first genuine pending-check Critical release defines the interruption seam")
+	Block := StrReplace(Block, Release, Release . "`n`t`t_CFGFM_PendingReleaseGap()", true, , 1)
+	if !Terminal {
+		FinallyStart := InStr(Body, "} finally {`n`t`t`tif !BorrowedOwner", true, End)
+		FinallyEnd := InStr(Body, "`n`t`tif _ConfigFullSaveHasPending()", true, FinallyStart)
+		AssertTrue(FinallyStart > End && FinallyEnd > FinallyStart,
+			"the actual lease release remains the projected continuation owner")
+		Block .= "`n`t`t`treturn CONFIG_SAVE_OK`n`t`t" . SubStr(Body, FinallyStart, FinallyEnd - FinallyStart)
+	}
+	return Block
+}
+
+_CFGFM_PendingSnapshotScript(Block, Framework, Receipt) {
+	Quote(Value) {
+		return Chr(34) StrReplace(StrReplace(Value, Chr(96), Chr(96) Chr(96)),
+			Chr(34), Chr(96) Chr(34)) Chr(34)
+	}
+	Header := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
+		. 'EnvSet("ERGOPTI_AHK_RESULTS_FILE", ' Quote(Receipt) ')`n'
+		. "#Include " Framework "`n"
+	; These are the actual source bodies, not copied generation models. Their
+	; only external ports below describe selected-path/debt and error recording.
+	for Name in ["_ConfigFullSaveCoordinatorDataAdmitted", "_ConfigFullSaveCoordinator",
+		"_ConfigFullSaveRequest", "_ConfigFullSaveBoundPath", "_ConfigFullSavePathMatches",
+		"_ConfigFullSaveReleaseBindingIfSettled", "_ConfigFullSaveAcknowledge",
+		"_ConfigFullSaveCapture", "_ConfigFullSaveAbandonThrough", "_ConfigWriteLeaseDataObject", "_ConfigWriteLeaseKey",
+		"FileReadActivityKey"]
+		Header .= _DriverFuncBody(Name) . "`n"
+	Harness := '
+(
+global CONFIG_SAVE_OK := 1, CONFIG_SAVE_FAILED := 0, CONFIG_SAVE_DEFERRED := 2
+global CONFIG_FULL_SAVE_RETRY_DELAY_MS := -100
+global ConfigurationFile := "C:\inert-full-save\config.toml"
+global _CFGFM_SnapshotRecord := 0
+global _DriverReady := true
+_ConfigSchemaEntrySelected(Path) {
+	return true
+}
+_ConfigPublicationHasRecoveryDebt(Path) {
+	return false
+}
+_ConfigWriteTerminalIsActive() {
+	return false
+}
+FileReadActivityBusy(Path) {
+	return false
+}
+_ConfigArmFullSaveRetry(Delay, TimerFn) {
+	global _CFGFM_SnapshotRecord
+	AssertEqual(-100, Delay, "the preserved branch uses its actual retry constant")
+	_CFGFM_SnapshotRecord["retry_arms"] += 1
+	return true
+}
+_ConfigWriteLeaseTryAcquire(Path, Kind) {
+	global _CFGFM_SnapshotRecord
+	_CFGFM_PendingLeaseGap()
+	if _CFGFM_SnapshotRecord["mode"] == "lease_refused"
+			|| _CFGFM_SnapshotRecord["mode"] == "relocate_at_release_lease_refused"
+		return false
+	return {key: Path}
+}
+_ConfigWriteLeaseSelectOwner(Bundle, Path) {
+	global _CFGFM_SnapshotRecord
+	_CFGFM_PendingLeaseGap()
+	if _CFGFM_SnapshotRecord["mode"] == "lease_refused"
+			|| _CFGFM_SnapshotRecord["mode"] == "relocate_at_release_lease_refused"
+		return false
+	return {key: Path}
+}
+_ConfigWriteLeaseOwns(Token, Path) {
+	return true
+}
+_ConfigWriteLeaseRelease(Token) {
+	global _CFGFM_SnapshotRecord
+	_CFGFM_SnapshotRecord["lease_releases"] += 1
+	return true
+}
+LoggerError(Args*) {
+	global _CFGFM_SnapshotRecord
+	_CFGFM_SnapshotRecord["errors"] += 1
+	_CFGFM_SnapshotRecord["last_error"] := Args
+}
+class _CFGFM_ObjectSelectedPath {
+	ToString() {
+		global _CFGFM_SnapshotRecord
+		_CFGFM_SnapshotRecord["conversions"] += 1
+		return "C:\inert-full-save\config.toml"
+	}
+}
+_CFGFM_PendingReleaseGap() {
+	global _CFGFM_SnapshotRecord, ConfigurationFile
+	AssertEqual(0, A_IsCritical, "the declared scheduler seam follows the genuine Critical release")
+	_CFGFM_SnapshotRecord["release_visits"] += 1
+	; A completed sibling writer would acknowledge here. Invoke the genuine
+	; generation owner and its genuine binding clear, without claiming disk I/O.
+	if _CFGFM_SnapshotRecord["mode"] == "settle_at_release"
+			|| _CFGFM_SnapshotRecord["mode"] == "settle_then_relocate_at_release" {
+		AssertTrue(_ConfigFullSaveAcknowledge(_ConfigFullSaveCapture()))
+		AssertEqual("", _ConfigFullSaveBoundPath())
+		_CFGFM_SnapshotRecord["settlements"] += 1
+	}
+	if _CFGFM_SnapshotRecord["mode"] == "relocate_at_release"
+			|| _CFGFM_SnapshotRecord["mode"] == "settle_then_relocate_at_release"
+			|| _CFGFM_SnapshotRecord["mode"] == "relocate_at_release_unready"
+			|| _CFGFM_SnapshotRecord["mode"] == "relocate_at_release_lease_refused"
+		ConfigurationFile := "C:\other-selected-config\config.toml"
+}
+_CFGFM_PendingLeaseGap() {
+	global _CFGFM_SnapshotRecord, ConfigurationFile
+	_CFGFM_SnapshotRecord["lease_acquires"] += 1
+	if _CFGFM_SnapshotRecord["mode"] == "relocate_at_acquire"
+		ConfigurationFile := "C:\other-selected-config\config.toml"
+}
+_CFGFM_ActualPendingSnapshot() {
+	global ConfigurationFile, CONFIG_SAVE_OK, CONFIG_SAVE_FAILED, _DriverReady
+	global CONFIG_SAVE_DEFERRED, CONFIG_FULL_SAVE_RETRY_DELAY_MS
+	ExistingOwner := 0, PublicationDebt := false, TimerFn := 0
+PENDING_BLOCK
+	return CONFIG_SAVE_OK
+}
+_CFGFM_ActualTerminalSnapshot() {
+	global ConfigurationFile, CONFIG_SAVE_OK, CONFIG_SAVE_FAILED
+	OwnerBundle := 0
+TERMINAL_BLOCK
+	return true
+}
+_CFGFM_PendingSnapshotCase(Mode, Expected, Errors, ReleaseVisits, Settlements, Terminal := false) {
+	global ConfigurationFile, _CFGFM_SnapshotRecord, CONFIG_SAVE_OK, _DriverReady
+	State := {requested_generation: 0, committed_generation: 0, settled_generation: 0,
+		terminal_required_generation: 0, bound_path: "", bound_path_key: "",
+		reload_required: false, timer_armed: false, reported_failure_generation: 0}
+	_ConfigFullSaveCoordinator(State)
+	ConfigurationFile := "C:\inert-full-save\config.toml"
+	_DriverReady := Mode != "unready_same_path" && Mode != "relocate_at_release_unready"
+	Generation := _ConfigFullSaveRequest(Terminal && Mode != "optional_unset")
+	AssertEqual(1, Generation, "the actual request owner records the controlled obligation")
+	if Mode == "relocated"
+		ConfigurationFile := "C:\other-selected-config\config.toml"
+	if Mode == "settled_before"
+		AssertTrue(_ConfigFullSaveAcknowledge(Generation))
+	if Mode == "optional_unset"
+		ConfigurationFile := unset
+	if Mode == "invalid_selected"
+		ConfigurationFile := _CFGFM_ObjectSelectedPath()
+	_CFGFM_SnapshotRecord := Map("mode", Mode, "errors", 0,
+		"release_visits", 0, "settlements", 0, "conversions", 0, "last_error", [],
+		"lease_acquires", 0, "lease_releases", 0, "retry_arms", 0)
+	if Mode == "invalid_selected" {
+		AssertEqual("C:\inert-full-save\config.toml", String(ConfigurationFile),
+			"the independent object conversion witness must actually be callable")
+		AssertEqual(1, _CFGFM_SnapshotRecord["conversions"])
+		_CFGFM_SnapshotRecord["conversions"] := 0
+	}
+	Before := A_IsCritical
+	Result := Terminal ? _CFGFM_ActualTerminalSnapshot() : _CFGFM_ActualPendingSnapshot()
+	AssertEqual(Before, A_IsCritical, "every return restores the actual previous Critical state")
+	if Mode == "settle_at_release" && Result != Expected {
+		AssertEqual(1, _CFGFM_SnapshotRecord["errors"], "the original failure is its real path-refusal branch")
+		AssertEqual(Generation, State.committed_generation, "the interrupted request was genuinely acknowledged")
+		if !Terminal
+			AssertEqual("", _CFGFM_SnapshotRecord["last_error"][3], "the original ordinary refusal observes the cleared binding")
+		else
+			AssertContains(_CFGFM_SnapshotRecord["last_error"][2], "active configuration path no longer matches",
+				"the original terminal refusal rereads the cleared live matching key")
+	}
+	AssertEqual(Expected, Result, "settling the observed generation cannot become a false relocation refusal")
+	AssertEqual(Errors, _CFGFM_SnapshotRecord["errors"])
+	AssertEqual(ReleaseVisits, _CFGFM_SnapshotRecord["release_visits"])
+	AssertEqual(Settlements, _CFGFM_SnapshotRecord["settlements"])
+	AssertEqual(0, _CFGFM_SnapshotRecord["conversions"], "the native-data snapshot never invokes an invalid selected-path conversion")
+	AssertEqual(Generation, State.requested_generation, "inspection never creates a fresh generation")
+	Committed := Mode == "settle_at_release" || Mode == "settled_before"
+		|| Mode == "settle_then_relocate_at_release" ? Generation : 0
+	AssertEqual(Committed, State.committed_generation)
+	AssertEqual(Mode == "optional_unset" ? Generation : Committed, State.settled_generation)
+	if Mode == "relocated"
+		AssertEqual("C:\inert-full-save\config.toml", State.bound_path,
+			"a genuine old-path pending obligation remains retained")
+	if Mode == "relocate_at_acquire" || Mode == "relocate_at_release"
+			|| Mode == "settle_then_relocate_at_release" {
+		AssertEqual("C:\other-selected-config\config.toml", ConfigurationFile,
+			"the declared interruption actually changes the selected path")
+		if Mode == "relocate_at_acquire"
+			AssertEqual(1, _CFGFM_SnapshotRecord["lease_acquires"],
+				"post-acquisition admission must execute, not a synthetic early refusal")
+		AssertEqual(Terminal ? 0 : _CFGFM_SnapshotRecord["lease_acquires"], _CFGFM_SnapshotRecord["lease_releases"],
+			"ordinary acquired tokens retire through the actual finally on refusal")
+	}
+	if Mode == "unready_same_path" || (Mode == "lease_refused" && !Terminal)
+		AssertEqual(1, _CFGFM_SnapshotRecord["retry_arms"],
+			"same-path deferral must actually exercise the original retry branch")
+	if Mode == "lease_refused"
+		AssertEqual(1, _CFGFM_SnapshotRecord["lease_acquires"],
+			"the refusal-configured lease port must be reached in its same-path control")
+	if Mode == "relocate_at_release_unready" || Mode == "relocate_at_release_lease_refused" {
+		AssertEqual("C:\other-selected-config\config.toml", ConfigurationFile)
+		AssertEqual(0, _CFGFM_SnapshotRecord["retry_arms"],
+			"a known relocation remains a failure instead of scheduling a retry")
+		AssertEqual(0, _CFGFM_SnapshotRecord["lease_acquires"],
+			"a known relocation is refused before any lease retry or refusal")
+		AssertEqual("C:\inert-full-save\config.toml", State.bound_path)
+	}
+}
+SNAPSHOT_REGISTRATIONS
+RunTests()
+)'
+	; Registrations belong to the isolated child, not the running parent registry.
+	Registrations := 'Test("pending snapshot: nominal same-path admission", _CFGFM_PendingSnapshotCase.Bind("normal", 1, 0, 1, 0))'
+		. "`n" 'Test("pending snapshot: settlement at original release preserves captured binding", _CFGFM_PendingSnapshotCase.Bind("settle_at_release", 1, 0, 1, 1))'
+		. "`n" 'Test("pending snapshot: genuine relocation remains refused", _CFGFM_PendingSnapshotCase.Bind("relocated", 0, 1, 1, 0))'
+		. "`n" 'Test("pending snapshot: already acknowledged generation succeeds", _CFGFM_PendingSnapshotCase.Bind("settled_before", 1, 0, 0, 0))'
+		. "`n" 'Test("terminal snapshot: nominal same-path admission", _CFGFM_PendingSnapshotCase.Bind("normal", 1, 0, 1, 0, true))'
+		. "`n" 'Test("terminal snapshot: settlement at original release preserves captured binding", _CFGFM_PendingSnapshotCase.Bind("settle_at_release", 1, 0, 1, 1, true))'
+		. "`n" 'Test("terminal snapshot: genuine relocation remains refused", _CFGFM_PendingSnapshotCase.Bind("relocated", 0, 1, 1, 0, true))'
+		. "`n" 'Test("terminal snapshot: already acknowledged generation succeeds", _CFGFM_PendingSnapshotCase.Bind("settled_before", 1, 0, 1, 0, true))'
+		. "`n" 'Test("terminal snapshot: optional abandonment never reads unset selected path", _CFGFM_PendingSnapshotCase.Bind("optional_unset", 1, 0, 1, 0, true))'
+		. "`n" 'Test("pending snapshot: object selected path refuses before conversion", _CFGFM_PendingSnapshotCase.Bind("invalid_selected", 0, 1, 1, 0))'
+		. "`n" 'Test("terminal snapshot: object selected path refuses before conversion", _CFGFM_PendingSnapshotCase.Bind("invalid_selected", 0, 1, 1, 0, true))'
+		. "`n" 'Test("pending snapshot: relocation at release remains refused", _CFGFM_PendingSnapshotCase.Bind("relocate_at_release", 0, 1, 1, 0))'
+		. "`n" 'Test("terminal snapshot: relocation at release remains refused", _CFGFM_PendingSnapshotCase.Bind("relocate_at_release", 0, 1, 1, 0, true))'
+		. "`n" 'Test("pending snapshot: settlement then relocation remains refused", _CFGFM_PendingSnapshotCase.Bind("settle_then_relocate_at_release", 0, 1, 1, 1))'
+		. "`n" 'Test("terminal snapshot: settlement then relocation remains refused", _CFGFM_PendingSnapshotCase.Bind("settle_then_relocate_at_release", 0, 1, 1, 1, true))'
+		. "`n" 'Test("pending snapshot: relocation during acquisition remains refused", _CFGFM_PendingSnapshotCase.Bind("relocate_at_acquire", 0, 1, 1, 0))'
+		. "`n" 'Test("terminal snapshot: relocation during acquisition remains refused", _CFGFM_PendingSnapshotCase.Bind("relocate_at_acquire", 0, 1, 1, 0, true))'
+		. "`n" 'Test("pending snapshot: same-path unready genuinely defers", _CFGFM_PendingSnapshotCase.Bind("unready_same_path", 2, 0, 1, 0))'
+		. "`n" 'Test("pending snapshot: relocated unready fails before retry", _CFGFM_PendingSnapshotCase.Bind("relocate_at_release_unready", 0, 1, 1, 0))'
+		. "`n" 'Test("pending snapshot: same-path refused lease genuinely defers", _CFGFM_PendingSnapshotCase.Bind("lease_refused", 2, 0, 1, 0))'
+		. "`n" 'Test("pending snapshot: relocation fails before refused lease", _CFGFM_PendingSnapshotCase.Bind("relocate_at_release_lease_refused", 0, 1, 1, 0))'
+		. "`n" 'Test("terminal snapshot: same-path refused owner fails", _CFGFM_PendingSnapshotCase.Bind("lease_refused", 0, 1, 1, 0, true))'
+		. "`n" 'Test("terminal snapshot: relocation fails before refused owner", _CFGFM_PendingSnapshotCase.Bind("relocate_at_release_lease_refused", 0, 1, 1, 0, true))'
+	Harness := StrReplace(Harness, "SNAPSHOT_REGISTRATIONS", Registrations)
+	Harness := StrReplace(Harness, "PENDING_BLOCK", Block)
+	return Header . StrReplace(Harness, "TERMINAL_BLOCK", _CFGFM_PendingSnapshotBlock(true))
+}
+
+_CFGFM_PendingSnapshotReceivesReleaseInterruption() {
+	_CFGFM_ReceiveRecordedBoot(_CFGFM_PendingSnapshotBlock(), _CFGFM_PendingSnapshotScript,
+		["pending snapshot: nominal same-path admission", "pending snapshot: settlement at original release",
+			"pending snapshot: genuine relocation remains refused", "pending snapshot: already acknowledged generation",
+			"terminal snapshot: nominal same-path admission", "terminal snapshot: settlement at original release",
+			"terminal snapshot: genuine relocation remains refused", "terminal snapshot: already acknowledged generation",
+			"terminal snapshot: optional abandonment", "pending snapshot: object selected path",
+			"terminal snapshot: object selected path", "pending snapshot: relocation at release",
+			"terminal snapshot: relocation at release", "pending snapshot: settlement then relocation",
+			"terminal snapshot: settlement then relocation", "pending snapshot: relocation during acquisition",
+			"terminal snapshot: relocation during acquisition", "pending snapshot: same-path unready",
+			"pending snapshot: relocated unready", "pending snapshot: same-path refused lease",
+			"pending snapshot: relocation fails before refused lease", "terminal snapshot: same-path refused owner",
+			"terminal snapshot: relocation fails before refused owner"])
+}
+
+Test("config full save meta: pending/path snapshot survives same-gap settlement "
+	. "(config-full-save-snapshot-interruption)", _CFGFM_PendingSnapshotReceivesReleaseInterruption)
