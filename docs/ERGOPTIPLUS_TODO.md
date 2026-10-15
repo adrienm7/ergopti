@@ -4980,6 +4980,18 @@ The dormant provider selected gate completed with all sources, HEAD and index in
   and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
   qualification remains pending;
   this bounded source-publication correction does not complete item 33.
+  October 15 native picker corrections are published on the feature branch:
+  macOS `5bc47ca57` refuses failed OSA diagnostics before either path parser;
+  Linux `b6f0cbd86` accepts dialog stdout only after a checked successful child
+  exit; Linux `ab2ca83d2` preserves explicit filesystem-root selection through
+  bootstrap storage and resolution. All original assertions remain. Selected
+  gates pass 19,830 portable macOS units and 101 E2E cases with one explicit
+  skip; Linux corrected gates pass 13,810 and then 13,814 units with 193 E2E
+  cases. The first Linux picker gate's two positive bridge-port fixture failures
+  are retained, then repaired without weakening assertions. The
+  [batched receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  distinguishes failed predecessors, portable gates and pending exact-source
+  hosted/installed acceptance. These bounded corrections do not close item 33.
   A separate October 15 paths-editor proposal preserves each folder field's
   user intent across repeated native initialization. It remains inactive:
   Root must enroll its new independent JS test and npm alias together with
@@ -6621,6 +6633,31 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+
+  A second October 15 Linux follow-up repairs Personal watcher coverage when
+  directories are created, moved or replaced after startup. Existing accepted
+  reload callbacks remain active during coverage refusal; bounded repair and
+  exact entry/session fences preserve healthy registrations and retire actual
+  native handles through close acknowledgment. All original 49 test bytes and
+  assertions remain intact; 34 independent additions execute under both Lua
+  engines, including when optional lua-posix is absent. Exact final receiving
+  is 83 passed/zero failed with POSIX and 82/zero with global absence; one
+  unchanged original POSIX integration is then unavailable, not passed. The
+  prior producer fails 28 cases in both contexts. Final selected canonical
+  verification passes 13,802 units across 521 modules and 193 scripted E2E
+  cases. An earlier exact-source gate fails at an unchanged Unix-socket fixture
+  under a long temporary path; baseline reproduction and the complete short,
+  unique-path rerun are retained separately. Feature atom `7523f4b19` remains
+  queued for Root's release integration boundary. The
+  [topology receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  pins all source, causal, portability and complete gate packets. Its Linux
+  manual 38717729588 finishes failed: the unit API annotation reports
+  13,799 passes/two failures; package/install are skipped. Local reproduction
+  identifies two new base-source fixture paths inside the unchanged intentional
+  `/tmp/` exclusion. Fixture-only `3011ea7ef` admits those two sessions under
+  `/var/tmp`, retaining every assertion; full Linux units pass 13,802/zero.
+  The failed hosted run remains failed, with corrected-source CI pending. Root recreation/parent anchors, installed source activation,
+  transaction/startup and physical acceptance remain open; item 42 stays partial.
 
   October 15 follow-up fixes Linux personal-directory watcher identity:
   recursive scans retain case and literal backslashes, including a configured
@@ -14847,6 +14884,19 @@ test precondition failure, not a Lua defect or a successful permission grant.
   raw messages, private paths and unknown entries remain excluded. This uses
   the existing bounded recent tail, not a complete day-log attachment. Integrated
   native receiving and the complete daily-log collection remain open.
+
+  October 15 feature atom `280174ee2` corrects shared Lua fact retention for
+  sparse and mixed-key tables: actual contiguous keys determine list traversal,
+  preserving admitted numeric and keyed facts. The report format, independent
+  corpus and caller redaction policy remain unchanged. Both Lua engines pass
+  nine focused cases; strict conventions, 426 JS checks and 101 portable macOS
+  E2E cases pass, with one E2E scenario explicitly skipped. Full macOS units
+  and selected Linux receiving remain running at this dated checkpoint;
+  corrected-source hosted and installed flows remain pending. This narrow
+  correction does not close the complete English export, attachment, generation
+  binding, daily-log or GitHub field-editability requirements above. The
+  [batched receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  retains the source and remaining acceptance. No automatic upload is added.
 
 - [ ] **139.** Remove personal identities from daily and shared error logs.
 
