@@ -1271,7 +1271,7 @@ function M.warmup_model(model_name, profile)
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
-	local ok, accepted_or_err = pcall(function()
+	local ok, accepted_or_err, acquired = pcall(function()
 		return get_api().warmup(model_name, resolved_profile)
 	end)
 	if not ok or accepted_or_err ~= true then
@@ -1279,7 +1279,7 @@ function M.warmup_model(model_name, profile)
 			tostring(accepted_or_err))
 		return false
 	end
-	return true
+	return true, acquired
 end
 
 --- Returns true when the active backend has confirmed it can answer inference

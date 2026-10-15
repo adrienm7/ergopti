@@ -1,0 +1,11 @@
+--- a/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWPADWireTests.swift
++++ b/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWPADWireTests.swift
+@@ -25,7 +25,7 @@
+ 
+ 	static func format(_ frames: [(UInt8, Data)]) -> String {
+ 		let fact = project(frames)
+-		return "# native_http_wpad_failure reason=\(fact.reason) stage=\(fact.stage)"
++		return "# native_http_wpad_failure reason=\(fact.reason)"
+ 	}
+ }
+ 

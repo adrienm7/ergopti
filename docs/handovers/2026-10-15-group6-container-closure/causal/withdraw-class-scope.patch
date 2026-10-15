@@ -1,0 +1,125 @@
+--- a/tools/test/test-macos-native-pac-qualification.cjs
++++ b/tools/test/test-macos-native-pac-qualification.cjs
+@@ -6,121 +6,7 @@
+  * Unknown literal/signature forms refuse instead of producing a partial oracle.
+  */
+ function swiftClassTestMethods(source, suite) {
+-	if (typeof source !== 'string' || typeof suite !== 'string' || !/^[A-Za-z_]\w*$/.test(suite))
+-		throw new TypeError('Invalid Swift class source selector.');
+-	const refused = () => {
+-		throw new Error('Unsupported or incomplete Swift class source.');
+-	};
+-	function comment(at) {
+-		if (source.startsWith('//', at)) {
+-			const end = source.indexOf('\n', at + 2);
+-			return end < 0 ? source.length : end;
+-		}
+-		if (!source.startsWith('/*', at)) return null;
+-		let depth = 1;
+-		at += 2;
+-		while (at < source.length) {
+-			if (source.startsWith('/*', at)) {
+-				depth++;
+-				at += 2;
+-			} else if (source.startsWith('*/', at)) {
+-				depth--;
+-				at += 2;
+-				if (!depth) return at;
+-			} else at++;
+-		}
+-		return refused();
+-	}
+-	function quoted(at) {
+-		const start = at;
+-		while (source[at] === '#') at++;
+-		if (source[at] !== '"') return null;
+-		const hashes = source.slice(start, at);
+-		const quote = source.startsWith('"""', at) ? '"""' : '"';
+-		const close = quote + hashes;
+-		const escape = '\\' + hashes;
+-		at += quote.length;
+-		while (at < source.length) {
+-			if (source.startsWith(close, at)) return at + close.length;
+-			if (source.startsWith(escape, at)) {
+-				at += escape.length;
+-				if (source[at] === '(') at = interpolation(at + 1);
+-				else {
+-					if (at >= source.length) return refused();
+-					at++;
+-				}
+-			} else at++;
+-		}
+-		return refused();
+-	}
+-	function interpolation(at) {
+-		let depth = 1;
+-		while (at < source.length) {
+-			const end = comment(at) ?? quoted(at);
+-			if (end !== null) {
+-				at = end;
+-				continue;
+-			}
+-			if (source[at] === '(') depth++;
+-			if (source[at] === ')' && --depth === 0) return at + 1;
+-			at++;
+-		}
+-		return refused();
+-	}
+-	let masked = '';
+-	for (let at = 0; at < source.length; ) {
+-		const end = comment(at) ?? quoted(at);
+-		if (end !== null) {
+-			masked += source.slice(at, end).replace(/[^\r\n]/g, ' ');
+-			at = end;
+-		} else {
+-			// The current source cohort uses only numeric unquoted division.
+-			// Unsupported regex/escaped-identifier forms cannot forge a member.
+-			if (
+-				source[at] === '`' ||
+-				(source[at] === '/' &&
+-					(!/^\/\s*[0-9]/.test(source.slice(at)) || !/[A-Za-z0-9_)\]]$/.test(masked.trimEnd())))
+-			)
+-				return refused();
+-			masked += source[at++];
+-		}
+-	}
+-	const tokens = masked.match(/[A-Za-z_]\w*|[^\s]/g) ?? [];
+-	let depth = 0;
+-	let owners = 0;
+-	let active = false;
+-	const methods = [];
+-	for (let index = 0; index < tokens.length; index++) {
+-		const token = tokens[index];
+-		if (depth === 0 && token === 'extension' && tokens[index + 1] === suite) return refused();
+-		if (depth === 0 && token === 'class' && tokens[index + 1] === suite) {
+-			if (
+-				tokens[index + 2] !== ':' ||
+-				tokens[index + 3] !== 'XCTestCase' ||
+-				tokens[index + 4] !== '{'
+-			)
+-				return refused();
+-			owners++;
+-			active = true;
+-		}
+-		if (active && depth === 1 && token === 'func' && /^test\w+$/.test(tokens[index + 1] ?? '')) {
+-			if (tokens[index + 2] !== '(' || tokens[index + 3] !== ')') return refused();
+-			methods.push(tokens[index + 1]);
+-		}
+-		if (token === '{') depth++;
+-		if (token === '}') {
+-			if (active && depth === 1) active = false;
+-			if (--depth < 0) return refused();
+-		}
+-	}
+-	if (
+-		depth !== 0 ||
+-		owners !== 1 ||
+-		methods.length === 0 ||
+-		new Set(methods).size !== methods.length
+-	)
+-		return refused();
+-	return methods;
++	return [...source.matchAll(/\bfunc (test\w+)\(/g)].map((match) => match[1]);
+ }
+ 
+ /** Independent literal source controls; no Swift or native code is executed. */
