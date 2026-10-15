@@ -1,0 +1,260 @@
+
+Ergopti+ JS validation suite
+==================================================
+Timing journal: /var/tmp/ergopti-cloud-validation/ergopti-js-suite-Il5bO4/timings.ndjson
+
+  RUNNING 1/76 — Windows navigation portable census retains every native and portable case
+  PASS 1/76 — Windows navigation portable census retains every native and portable case
+    duration: 108.100 ms (1/76)
+  RUNNING 2/76 — Windows navigation executes every portable production C case
+  PASS 2/76 — Windows navigation executes every portable production C case
+    duration: 2115.793 ms (2/76)
+  RUNNING 3/76 — Windows captured-event route core executes independent event vectors
+  PASS 3/76 — Windows captured-event route core executes independent event vectors
+    duration: 349.243 ms (3/76)
+  RUNNING 4/76 — Windows canonical output planner executes independent custody matrices
+  PASS 4/76 — Windows canonical output planner executes independent custody matrices
+    duration: 343.816 ms (4/76)
+  RUNNING 5/76 — Windows terminal output custody adapter preserves exact native bindings and closed admission
+  PASS 5/76 — Windows terminal output custody adapter preserves exact native bindings and closed admission
+    duration: 266.681 ms (5/76)
+  RUNNING 6/76 — Windows ordered-pair cohort receiving retains original publisher and retirement
+  PASS 6/76 — Windows ordered-pair cohort receiving retains original publisher and retirement
+    duration: 138.631 ms (6/76)
+  RUNNING 7/76 — native typing consumer retains actual selection and KPI dependencies
+  PASS 7/76 — native typing consumer retains actual selection and KPI dependencies
+    duration: 66.742 ms (7/76)
+  RUNNING 8/76 — Windows range stages acknowledge completed reads and failures
+  PASS 8/76 — Windows range stages acknowledge completed reads and failures
+    duration: 49.314 ms (8/76)
+  RUNNING 9/76 — native WebView receives ranges through a private HTTPS mount
+  PASS 9/76 — native WebView receives ranges through a private HTTPS mount
+    duration: 39.215 ms (9/76)
+  RUNNING 10/76 — hotstring priority parity (shared JSON ↔ AHK + Lua)
+  PASS 10/76 — hotstring priority parity (shared JSON ↔ AHK + Lua)
+    duration: 515.195 ms (10/76)
+  RUNNING 11/76 — one hold picker: the same options in the same order on every driver, from one shared table
+  PASS 11/76 — one hold picker: the same options in the same order on every driver, from one shared table
+    duration: 57.315 ms (11/76)
+  RUNNING 12/76 — one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray
+  PASS 12/76 — one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray
+    duration: 280.475 ms (12/76)
+  RUNNING 13/76 — one table for what the one-shot Shift types, read by Windows and Linux
+  PASS 13/76 — one table for what the one-shot Shift types, read by Windows and Linux
+    duration: 53.507 ms (13/76)
+  RUNNING 14/76 — hotstring language packs are complete data and every section ships disabled
+  PASS 14/76 — hotstring language packs are complete data and every section ships disabled
+    duration: 198.083 ms (14/76)
+  RUNNING 15/76 — the hotstrings windows are one shared UI, and every driver bridge answers every action it sends
+  PASS 15/76 — the hotstrings windows are one shared UI, and every driver bridge answers every action it sends
+    duration: 47.710 ms (15/76)
+  RUNNING 16/76 — every declared action chord is well formed (I4 — an unknown modifier fires the wrong shortcut silently)
+  PASS 16/76 — every declared action chord is well formed (I4 — an unknown modifier fires the wrong shortcut silently)
+    duration: 44.823 ms (16/76)
+  RUNNING 17/76 — one generated action catalogue per driver (strict schema, pruned headings, localized keys in 21 locales, runtime parity test in every driver suite)
+  PASS 17/76 — one generated action catalogue per driver (strict schema, pruned headings, localized keys in 21 locales, runtime parity test in every driver suite)
+    duration: 162.936 ms (17/76)
+  RUNNING 18/76 — the Karabiner and gesture action namespaces are one (54 tappable reachable, 19 hold-only out, no doubled keystroke)
+  PASS 18/76 — the Karabiner and gesture action namespaces are one (54 tappable reachable, 19 hold-only out, no doubled keystroke)
+    duration: 52.965 ms (18/76)
+  RUNNING 19/76 — Karabiner binary paths declared once (a v16-style rename must not reach 3 of 4 copies)
+  PASS 19/76 — Karabiner binary paths declared once (a v16-style rename must not reach 3 of 4 copies)
+    duration: 82.135 ms (19/76)
+  RUNNING 20/76 — every registered action resolves a label in all 21 locales
+  PASS 20/76 — every registered action resolves a label in all 21 locales
+    duration: 146.234 ms (20/76)
+  RUNNING 21/76 — macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent
+  PASS 21/76 — macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent
+    duration: 551.660 ms (21/76)
+  RUNNING 22/76 — hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)
+  PASS 22/76 — hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)
+    duration: 40.264 ms (22/76)
+  RUNNING 23/76 — showcase page lists each catalogue action on exactly its declared drivers
+  PASS 23/76 — showcase page lists each catalogue action on exactly its declared drivers
+    duration: 67.829 ms (23/76)
+  RUNNING 24/76 — at-rest encryption envelope parity (marker/cipher/PBKDF2 identical across the three drivers)
+  PASS 24/76 — at-rest encryption envelope parity (marker/cipher/PBKDF2 identical across the three drivers)
+    duration: 42.512 ms (24/76)
+  RUNNING 25/76 — hotstring corpus backspace_count is a logical count, not emitted keystrokes
+  PASS 25/76 — hotstring corpus backspace_count is a logical count, not emitted keystrokes
+    duration: 58.262 ms (25/76)
+  RUNNING 26/76 — is_word means the same thing on all three drivers (no trigger asks for a boundary it carries)
+  PASS 26/76 — is_word means the same thing on all three drivers (no trigger asks for a boundary it carries)
+    duration: 63.107 ms (26/76)
+  RUNNING 27/76 — tap-hold shared defaults lifecycle (docs match what the three loaders do)
+  PASS 27/76 — tap-hold shared defaults lifecycle (docs match what the three loaders do)
+    duration: 55.095 ms (27/76)
+  RUNNING 28/76 — action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)
+  PASS 28/76 — action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)
+    duration: 54.727 ms (28/76)
+  RUNNING 29/76 — macOS keyboard-slot config surface is reachable (readers called, writer binds, list entry has a provider)
+  PASS 29/76 — macOS keyboard-slot config surface is reachable (readers called, writer binds, list entry has a provider)
+    duration: 164.924 ms (29/76)
+  RUNNING 30/76 — chord native mappings single source (adapter prefixes/key spellings + both slot vocabularies pinned to modifier_chords.json)
+  PASS 30/76 — chord native mappings single source (adapter prefixes/key spellings + both slot vocabularies pinned to modifier_chords.json)
+    duration: 44.973 ms (30/76)
+  RUNNING 31/76 — hotstring priority parity (priority.json honoured identically by the drivers)
+  PASS 31/76 — hotstring priority parity (priority.json honoured identically by the drivers)
+    duration: 394.863 ms (31/76)
+  RUNNING 32/76 — tap-hold namespace correspondence ([tap_hold.keys.*] vs [hs_tap_hold] paired by position, divergences named)
+  PASS 32/76 — tap-hold namespace correspondence ([tap_hold.keys.*] vs [hs_tap_hold] paired by position, divergences named)
+    duration: 38.566 ms (32/76)
+  RUNNING 33/76 — hotstring flag support per driver (every corpus flag honoured by all three)
+  PASS 33/76 — hotstring flag support per driver (every corpus flag honoured by all three)
+    duration: 191.518 ms (33/76)
+  RUNNING 34/76 — magic key single source (declared once in the feature manifest, no driver copy)
+  PASS 34/76 — magic key single source (declared once in the feature manifest, no driver copy)
+    duration: 281.450 ms (34/76)
+  RUNNING 35/76 — tap-hold threshold parity (macOS global sits inside the per-key range)
+  PASS 35/76 — tap-hold threshold parity (macOS global sits inside the per-key range)
+    duration: 65.401 ms (35/76)
+  RUNNING 36/76 — hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)
+  PASS 36/76 — hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)
+    duration: 85.741 ms (36/76)
+  RUNNING 37/76 — keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)
+  PASS 37/76 — keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)
+    duration: 251.978 ms (37/76)
+  RUNNING 38/76 — keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)
+  PASS 38/76 — keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)
+    duration: 1881.885 ms (38/76)
+  RUNNING 39/76 — layout features an emulated layout supersedes (declared in the manifest, reason translated, read by the gate and the menu)
+  PASS 39/76 — layout features an emulated layout supersedes (declared in the manifest, reason translated, read by the gate and the menu)
+    duration: 161.384 ms (39/76)
+  RUNNING 40/76 — Linux package ships the .keylayout converter (every data file it reads; packaged and source paths)
+  PASS 40/76 — Linux package ships the .keylayout converter (every data file it reads; packaged and source paths)
+    duration: 42.872 ms (40/76)
+  RUNNING 41/76 — hotstring editor confirm dialog wiring (delete actually fires)
+  PASS 41/76 — hotstring editor confirm dialog wiring (delete actually fires)
+    duration: 42.624 ms (41/76)
+  RUNNING 42/76 — physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)
+  PASS 42/76 — physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)
+    duration: 107.724 ms (42/76)
+  RUNNING 43/76 — hotstring editor preserves strict-case state across the shared bridge
+  PASS 43/76 — hotstring editor preserves strict-case state across the shared bridge
+    duration: 47.435 ms (43/76)
+  RUNNING 44/76 — input-source Python supervisor enforces one bounded process group
+  PASS 44/76 — input-source Python supervisor enforces one bounded process group
+    duration: 761.806 ms (44/76)
+  RUNNING 45/76 — input-source list edit adds and removes exactly the named layout
+  PASS 45/76 — input-source list edit adds and removes exactly the named layout
+    duration: 346.427 ms (45/76)
+  RUNNING 46/76 — layout manager page decides its rows and posts only allowlisted actions
+  PASS 46/76 — layout manager page decides its rows and posts only allowlisted actions
+    duration: 192.795 ms (46/76)
+  RUNNING 47/76 — hotstrings config window bridge (shared frontend ↔ Windows host)
+  PASS 47/76 — hotstrings config window bridge (shared frontend ↔ Windows host)
+    duration: 113.303 ms (47/76)
+  RUNNING 48/76 — hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)
+  PASS 48/76 — hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)
+    duration: 229.195 ms (48/76)
+  RUNNING 49/76 — action picker bridge (shared frontend ↔ both hosts)
+  PASS 49/76 — action picker bridge (shared frontend ↔ both hosts)
+    duration: 74.390 ms (49/76)
+  RUNNING 50/76 — the selection case actions share one text-case corpus that every driver suite replays
+  PASS 50/76 — the selection case actions share one text-case corpus that every driver suite replays
+    duration: 43.585 ms (50/76)
+  RUNNING 51/76 — the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays
+  PASS 51/76 — the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays
+    duration: 45.839 ms (51/76)
+  RUNNING 52/76 — the wrap_selection parameter rule is one shared corpus every driver suite replays
+  PASS 52/76 — the wrap_selection parameter rule is one shared corpus every driver suite replays
+    duration: 89.774 ms (52/76)
+  RUNNING 53/76 — Windows script chords belong to the driver only while their slot runs an action
+  PASS 53/76 — Windows script chords belong to the driver only while their slot runs an action
+    duration: 499.102 ms (53/76)
+  RUNNING 54/76 — the three drivers share the script chords, their presets, their defaults and their submenu
+  PASS 54/76 — the three drivers share the script chords, their presets, their defaults and their submenu
+    duration: 421.045 ms (54/76)
+  RUNNING 55/76 — Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation
+  PASS 55/76 — Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation
+    duration: 337.039 ms (55/76)
+  RUNNING 56/76 — the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays
+  PASS 56/76 — the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays
+    duration: 66.190 ms (56/76)
+  RUNNING 57/76 — the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys
+  PASS 57/76 — the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys
+    duration: 131.578 ms (57/76)
+  RUNNING 58/76 — keyboard slots keep neutral defaults and independent manifest recommendations across drivers
+  PASS 58/76 — keyboard slots keep neutral defaults and independent manifest recommendations across drivers
+    duration: 255.668 ms (58/76)
+  RUNNING 59/76 — the number-row key left of 1 recommends an instant capture of every screen on every driver
+  PASS 59/76 — the number-row key left of 1 recommends an instant capture of every screen on every driver
+    duration: 435.862 ms (59/76)
+  RUNNING 60/76 — action picker greys a host-disabled row with its reason and never confirms it
+  PASS 60/76 — action picker greys a host-disabled row with its reason and never confirms it
+    duration: 65.624 ms (60/76)
+  RUNNING 61/76 — action picker edits a text, a key or a shortcut and validates it as the drivers do
+  PASS 61/76 — action picker edits a text, a key or a shortcut and validates it as the drivers do
+    duration: 1411.988 ms (61/76)
+  RUNNING 62/76 — Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider
+  PASS 62/76 — Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider
+    duration: 306.617 ms (62/76)
+  RUNNING 63/76 — installed Shortcuts target keeps 34 filesystem controls separate from native admission
+  PASS 63/76 — installed Shortcuts target keeps 34 filesystem controls separate from native admission
+    duration: 543.975 ms (63/76)
+  RUNNING 64/76 — Windows touchpad registry: one data file, both writers through one backing-up owner, restore row
+  PASS 64/76 — Windows touchpad registry: one data file, both writers through one backing-up owner, restore row
+    duration: 364.828 ms (64/76)
+  RUNNING 65/76 — keycode data single source (generated JS matches azerty.json, DC-1)
+  PASS 65/76 — keycode data single source (generated JS matches azerty.json, DC-1)
+    duration: 44.693 ms (65/76)
+  RUNNING 66/76 — physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)
+  PASS 66/76 — physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)
+    duration: 58.834 ms (66/76)
+  RUNNING 67/76 — layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends
+  PASS 67/76 — layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends
+    duration: 164.560 ms (67/76)
+  RUNNING 68/76 — layer editor data is generated from the registry, the vocabulary and the preset, with every label translated
+  PASS 68/76 — layer editor data is generated from the registry, the vocabulary and the preset, with every label translated
+    duration: 158.233 ms (68/76)
+  RUNNING 69/76 — layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS
+  PASS 69/76 — layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS
+    duration: 1718.988 ms (69/76)
+  RUNNING 70/76 — layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol
+  PASS 70/76 — layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol
+    duration: 524.915 ms (70/76)
+  RUNNING 71/76 — layer editor legends: the hosts send the current layout and the layer key by one contract
+  PASS 71/76 — layer editor legends: the hosts send the current layout and the layer key by one contract
+    duration: 61.452 ms (71/76)
+  RUNNING 72/76 — recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS
+  PASS 72/76 — recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS
+    duration: 78.461 ms (72/76)
+  RUNNING 73/76 — layer-file schema corpus replays through the JS loader (every error code, OS and binding form)
+  PASS 73/76 — layer-file schema corpus replays through the JS loader (every error code, OS and binding form)
+    duration: 65.964 ms (73/76)
+  RUNNING 74/76 — gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)
+  PASS 74/76 — gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)
+    duration: 110.865 ms (74/76)
+  RUNNING 75/76 — gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)
+  PASS 75/76 — gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)
+    duration: 140.895 ms (75/76)
+  RUNNING 76/76 — no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)
+  PASS 76/76 — no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)
+    duration: 743.094 ms (76/76)
+
+Slowest JS checks (child wall time):
+  2115.793 ms — Windows navigation executes every portable production C case
+    reproduce: node tools/test/run-nav-event-owner-portable.cjs
+  1881.885 ms — keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)
+    reproduce: npm run test:layouts-defaults-single-source
+  1718.988 ms — layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS
+    reproduce: npm run test:layer-editor-model
+  1411.988 ms — action picker edits a text, a key or a shortcut and validates it as the drivers do
+    reproduce: npm run test:action-picker-parameter-editor
+  761.806 ms — input-source Python supervisor enforces one bounded process group
+    reproduce: npm run test:input-source-python-supervisor
+  743.094 ms — no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)
+    reproduce: node tools/test/test-hardening-c-ahk-scan-code-precedence.cjs
+  551.660 ms — macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent
+    reproduce: npm run test:macos-remap-launchagent
+  543.975 ms — installed Shortcuts target keeps 34 filesystem controls separate from native admission
+    reproduce: npm run test:apple-shortcuts-installed-target
+  524.915 ms — layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol
+    reproduce: npm run test:layer-editor-page
+  515.195 ms — hotstring priority parity (shared JSON ↔ AHK + Lua)
+    reproduce: npm run test:priority-parity
+
+--------------------------------------------------
+✅  All 76 JS check(s) passed.
+   (run "npm run test:js -- --full" to also run property + mutation tests)
+
