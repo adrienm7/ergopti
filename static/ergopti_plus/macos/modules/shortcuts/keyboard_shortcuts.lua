@@ -561,7 +561,7 @@ function M.validate_physical_edits(rows, claim)
 		return called and accepted == true and current()
 	end
 	for _, row in ipairs(rows) do
-		if row.section == "shortcuts.keyboard" and row.delete ~= true and row.value ~= "none" then
+		if row.section == "shortcuts.keyboard" and row.delete ~= true then
 			local descriptor = M.physical_slot_descriptor(row.key)
 			if not current() then return false, "source_changed" end
 			if not descriptor then return false, "unavailable" end
@@ -574,22 +574,24 @@ function M.validate_physical_edits(rows, claim)
 			if not current() then return false, "source_changed" end
 			if not called or type(conflict) ~= "boolean" then return false, "unavailable" end
 			if conflict then return false, "collision" end
-			if not navigation_checked then
-				navigation_checked = true
-				remap = package.loaded["platform.remap"]
-				if type(remap) ~= "table" or getmetatable(remap) ~= nil
-					or type(rawget(remap, "capture_configured_navigation_inventory")) ~= "function" then return false, "unavailable" end
-				local read, captured = pcall(remap.capture_configured_navigation_inventory)
-				if not current() then return false, "source_changed" end
-				if not read or type(captured) ~= "table" or type(captured.codes) ~= "table"
-					or type(captured.current) ~= "function" then return false, "unavailable" end
-				navigation = captured
-			end
-			if not navigation_current() then return false, "source_changed" end
-			for _, reserved in ipairs(navigation.codes) do
-				if type(reserved) ~= "number" then return false, "unavailable" end
-				-- Navigation consumes optional any modifiers, including its None.
-				if reserved == native then return false, "collision" end
+			if row.value ~= "none" then
+				if not navigation_checked then
+					navigation_checked = true
+					remap = package.loaded["platform.remap"]
+					if type(remap) ~= "table" or getmetatable(remap) ~= nil
+						or type(rawget(remap, "capture_configured_navigation_inventory")) ~= "function" then return false, "unavailable" end
+					local read, captured = pcall(remap.capture_configured_navigation_inventory)
+					if not current() then return false, "source_changed" end
+					if not read or type(captured) ~= "table" or type(captured.codes) ~= "table"
+						or type(captured.current) ~= "function" then return false, "unavailable" end
+					navigation = captured
+				end
+				if not navigation_current() then return false, "source_changed" end
+				for _, reserved in ipairs(navigation.codes) do
+					if type(reserved) ~= "number" then return false, "unavailable" end
+					-- Navigation consumes optional any modifiers, including its None.
+					if reserved == native then return false, "collision" end
+				end
 			end
 		end
 	end
