@@ -801,6 +801,8 @@ helpers.describe("Prediction collision source admission controls", function()
 			captured, frame = pcall(navigation.capture_collision_configuration)
 		end
 		package.loaded[name], package.preload[name], package.loaded[navigation_name] = stored, preload, old_navigation
+		helpers.assert_type(navigation, "table", "the optional-owner load still returns the actual Navigation module")
+		helpers.assert_type(navigation.capture_collision_configuration, "function")
 		helpers.assert_eq(loaded, true); helpers.assert_eq(read, true); helpers.assert_type(value, "table")
 		helpers.assert_eq(captured, true); helpers.assert_eq(frame, nil)
 	end)
