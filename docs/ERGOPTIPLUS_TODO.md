@@ -8892,6 +8892,24 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
 
+2026-10-15 explicit HTTPX relay header acquisition now stays under the same
+existing lock as shutdown, matching native-child construction. Previously an
+admitted relay could originate its HTTPX connection after close returned.
+The relay now also uses the existing idle bound for otherwise unlimited
+operation timeouts and checks the caller deadline after acquiring admission;
+positive caller limits and the original timeout map are preserved. Native
+acquisition likewise receives only the budget remaining after lock admission,
+rather than renewing the time spent waiting. Thirteen additive controls cover
+causal ordering, deadline/timeout refusal and actual HTTPX/httpcore body bytes
+with inert peers or boundary observers. These portable client/source controls
+do not qualify Apple networking, an explicit-relay absolute body budget or
+native corporate-proxy acceptance; item62 and16/38 stay open.
+
+An earlier full JS batch retained an unexplained Python repeated-signal
+retirement failure. The unchanged isolated case and the complete45-case
+portable owner subsequently passed with retained stream/child closure.
+The cause remains unknown; no causal runtime or native fix is claimed.
+
 2026-10-13 the managed Go receiving policy now enrolls all17 original
 failure-stage subtests from committed e94153e87b, retaining every57 earlier
 identity and all original bounds. Both official89d architecture transcripts
