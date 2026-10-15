@@ -11903,6 +11903,16 @@ is committed; one request is one commit with its regression test.
   ordered whole-suite join remain unrun on this source until final Windows CI;
   no product writer is changed and this does not complete item71.
 
+  Current owner correction: receive the published full-save timer repair
+  043fcd6b and its generated-child registration successor f282a494. Ordinary
+  and terminal drains retain the admitted path even when the timer acknowledges
+  and clears pending state, while genuine relocation and refused leases still
+  fail. All23 isolated child cases and their original generated program remain
+  intact. Regenerate the21-input updater source seal through its unchanged
+  official owner against immutable23b81dca; independent behavior expectations
+  and native qualification remain unchanged. Current composed native acceptance
+  is still open; the hosted ae278 run predates this correction.
+
 - [ ] **73.** Use translated physical-key catalogue labels for every
       combination family/pair on all drivers, preserving the complete 182-entry
       matrix, action IDs, press order, setter refusals and three hidden

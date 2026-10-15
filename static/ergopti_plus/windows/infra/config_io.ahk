@@ -1538,15 +1538,33 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				return CONFIG_SAVE_FAILED
 			if State.requested_generation <= State.settled_generation
 				return CONFIG_SAVE_OK
+			; A timer may acknowledge and clear the binding as soon as Critical
+			; ends. Capture the path admission with the pending observation.
+			; Both helpers inspect native data and lexical path keys only.
+			BoundPath := _ConfigFullSaveBoundPath()
+			BoundPathKey := State.bound_path_key
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			BoundPathMatches := BoundPath != "" && (SelectedPath is String)
+				&& _ConfigFullSavePathMatches(SelectedPath)
 		} finally Critical(PreviousCritical)
-		BoundPath := _ConfigFullSaveBoundPath()
 		; A deferred generation belongs to the path that accepted it. Re-reading
 		; ConfigurationFile here used to silently rebase old-path work onto a newly
 		; selected config directory. Refuse before collecting live state: that state
 		; may already describe the new path and must never overwrite the old file.
-		if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+		if (BoundPath = "" || !BoundPathMatches) {
 			try LoggerError("ConfigIO", "Refusing to rebase a pending full save from '{1}' onto '{2}'. Settle the original path before publishing a config relocation.",
-				BoundPath, ConfigurationFile)
+				BoundPath, (SelectedPath is String) ? SelectedPath : "<invalid configuration path>")
+			return CONFIG_SAVE_FAILED
+		}
+		; Preserve live relocation refusal before any readiness or lease retry.
+		PreviousCritical := Critical("On")
+		try {
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			SelectedPathMatches := (SelectedPath is String)
+				&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+		} finally Critical(PreviousCritical)
+		if !SelectedPathMatches {
+			try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
 			return CONFIG_SAVE_FAILED
 		}
 		if !_DriverReady {
@@ -1575,9 +1593,21 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				? CONFIG_SAVE_DEFERRED
 				: CONFIG_SAVE_FAILED
 		}
-		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
+				; The binding may have settled while this caller acquired its lease.
+				; Compare the selected path independently of that cleared binding.
+				PreviousCritical := Critical("On")
+				try {
+					SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+					SelectedPathMatches := (SelectedPath is String)
+						&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+				} finally Critical(PreviousCritical)
+				if !SelectedPathMatches {
+					try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
+					return CONFIG_SAVE_FAILED
+				}
+				TargetGeneration := _ConfigFullSaveCapture()
 				if PublicationDebt {
 					Reconciled := _ConfigPublicationReconcileFullSave(BoundPath, OwnerToken)
 					if !Reconciled
@@ -1689,6 +1719,13 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 		Settled := State.settled_generation
 		Required := State.terminal_required_generation
 		BoundPath := State.bound_path
+		BoundPathKey := State.bound_path_key
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		; The live binding may clear when this native-data snapshot ends.
+		; Optional or settled work must not inspect an unused selected path.
+		BoundPathMatches := Requested > Settled && Required > Settled
+			&& BoundPath != "" && (SelectedPath is String)
+			&& _ConfigFullSavePathMatches(SelectedPath)
 		if ActualMandatoryDebt && (Requested <= Settled || Required <= Settled)
 			return false
 	} finally Critical(PreviousCritical)
@@ -1701,13 +1738,34 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	; required generation pending, which correctly refuses process death.
 	if Required <= Settled
 		return _ConfigFullSaveAbandonThrough(Requested)
-	if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+	if (BoundPath = "" || !BoundPathMatches) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused because the active configuration path no longer matches the accepted generation path.")
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	OwnerToken := _ConfigWriteLeaseSelectOwner(OwnerBundle, BoundPath)
 	if !(OwnerToken is Object) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused a bundle that did not own config.toml.")
+		return false
+	}
+	; The admitted terminal owner prevents a subsequent real relocation.
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	Result := _ConfigDrainFullSave(WriterFn, TimerFn, OwnerToken, CollectFn)
