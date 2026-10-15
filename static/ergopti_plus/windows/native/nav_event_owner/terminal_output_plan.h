@@ -86,7 +86,10 @@ int32_t ErgoptiOutput_Initialize(ErgoptiOutput_State *state, uint64_t owner);
  * PrepareNativeEdge only when their source-owned effective bit changes. A
  * repeated or crossed-source modifier edge with no effective transition plans
  * zero units and still requires original-edge consumption. Remapped modifiers,
- * prefix/dead/uncertain metadata are diagnostic only. This API never computes or guesses the canonical string.
+ * prefix/dead/uncertain metadata are diagnostic only. Direct-digit source
+ * metadata stays diagnostic even with cohort_complete: its native host mapping
+ * and accepted-effect owner are not implemented. It never enters the KLE
+ * Unicode branch. This API never computes or guesses the canonical string.
  */
 int32_t ErgoptiOutput_Plan(
 	ErgoptiOutput_State *state, uint64_t owner, uint64_t token, uint64_t sequence,

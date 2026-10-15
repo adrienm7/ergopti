@@ -12,6 +12,38 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 direct-digit diagnostic source prerequisite
+
+The native routing core now distinguishes direct number-row sources (kind6,
+scan02..0B) from KLE Unicode digits (kind2). Registration refuses supplied host
+targets, modifiers, prefixes and composition transforms. Down/repeat/Up retain
+the original source recipe after registration withdrawal. Native-edge preparation
+still refuses this targetless family, and output planning retains zero-unit,
+nondispatchable diagnostic metadata even with the cohort-complete argument.
+The actual native FIFO/public preview and output refusal are also exercised
+for all ten digits; the test-only cohort opt-in grants no kind6 output.
+
+The two official Windows reconstruction commands pass with all original
+8 replay, 11 output and 6 trace matrices plus 44 hook-free native owner cases.
+New controls execute inside these existing registered matrices and cases;
+their counts are not additional full suites. The hardened x64 DLL retains
+41 exports and is rebuilt with its source manifest, SHA256
+`216EE28F8233F6C429D2D73EB0013137891CDBC7A0786F5EC90E0EAFF9067BFD`,
+source/recipe fingerprint
+`0FC6DCCCED3102FE4A541AAEFA49CC6BFACEA85CB197F5556EF40618D5B9EDF6`.
+The original registration probe fails before the new source kind is supported;
+the new diagnostic assertion also fails before its output snapshot recognizer
+is updated. Existing KLE digit Unicode Down/repeat and zero-unit Up receiving
+remain covered. Five selected JS source/receipt checks pass; the required
+complete JS run remains OPEN while the old installed test driver is active.
+
+This is an inactive native prerequisite, not direct-digit cohort completion.
+AHK deliberately still refuses kind6 and publishes no such production recipe.
+The genuine AHK binding owner, authenticated foreground/HKL resolution, accepted
+output and modifier lifetime accounting, native dispatch and remaining cohorts
+remain software work. Production qualification stays false. Physical Windows,
+native macOS and native Linux receiving remain OPEN or UNRUN.
+
 ### October 15 compiled collection failure and native query budget correction
 
 The official compiled build at `6818cd94eba5966c26308f8e8dd30d0b8514023e`
