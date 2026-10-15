@@ -57,11 +57,11 @@ local function recording(calls)
 			calls.save[#calls.save + 1] = { dir = dir, name = name, text = text }
 			return dir .. "/" .. name
 		end,
-		reveal = function(path) calls.reveal[#calls.reveal + 1] = path; return true end,
+		reveal = function(path, done) calls.reveal[#calls.reveal + 1] = path; done({ ok = true, code = 0 }) end,
 		make_dir = function(dir) calls.make_dir[#calls.make_dir + 1] = dir; return true end,
 		exists = function() return true end,
-		open = function(target) calls.open[#calls.open + 1] = target; return true end,
-		open_url = function(url) calls.open_url[#calls.open_url + 1] = url; return true end,
+		open = function(target, done) calls.open[#calls.open + 1] = target; done({ ok = true, code = 0 }) end,
+		open_url = function(url, done) calls.open_url[#calls.open_url + 1] = url; done({ ok = true, code = 0 }) end,
 		notify = function(_, _, level) calls.notify[#calls.notify + 1] = level; return true end,
 	}
 end
@@ -110,6 +110,16 @@ local function approved_text(long)
 		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
 end
 
+--- Receives the explicit completion from these deliberately inline effect ports.
+local function completed(Report, action, paths, config, context, overrides, snapshot)
+	local answer
+	Report.perform(action, paths, config, context, overrides, snapshot, {
+		current = function() return true end, complete = function(result) answer = result end,
+	})
+	assert(answer ~= nil, "the inline fixture must deliver its completion")
+	return answer
+end
+
 --- Performs one action as the bridge does.
 --- @param action table
 --- @param adjust function|nil Changes the recorded side effects.
@@ -128,7 +138,7 @@ local function perform(action, adjust)
 		request.text = approved_text(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
 		action = request
 	end
-	return Report.perform(action, paths, documents(), Report.redaction_context(overrides), overrides, snapshot), calls
+	return completed(Report, action, paths, documents(), Report.redaction_context(overrides), overrides, snapshot), calls
 end
 
 helpers.describe("healthcheck page actions (linux)", function()
@@ -214,7 +224,7 @@ helpers.describe("healthcheck page actions (linux)", function()
 			local recorded = {}
 			local overrides = recording(recorded)
 			overrides.exists = function() return false end
-			return Report.perform({ action = "open_path", id = "errors_today" },
+			return completed(Report, { action = "open_path", id = "errors_today" },
 				{ errors_today = LOGS_DIR .. "/ergopti_plus_errors_2026-09-24.log" }, documents(),
 				Report.redaction_context(overrides), overrides), recorded
 		end)
@@ -256,7 +266,11 @@ helpers.describe("healthcheck debug menu reports (linux)", function()
 		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
 			build_snapshot = function() return host_snapshot(false) end }
 		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
-		local ok, result = pcall(Report.suggest_feature, recording(calls))
+		local ok, result = pcall(function()
+			local outcome
+			Report.suggest_feature(recording(calls), function(value) outcome = value end)
+			return outcome
+		end)
 		package.loaded["ui.healthcheck.bridge"] = previous_bridge
 		package.loaded["ui.webview_manager"] = previous_manager
 		helpers.assert_true(ok, tostring(result))
@@ -289,7 +303,7 @@ helpers.describe("healthcheck checked save receipts (linux)", function()
 		local ok, result, calls = pcall(function()
 			return perform({ action = "save", text = REPORT, name = NAME }, function(overrides)
 				overrides.save = nil
-				if reveal_ok == false then overrides.reveal = function() return false end end
+				if reveal_ok == false then overrides.reveal = function(_, done) done({ ok = false, code = 23 }) end end
 			end)
 		end)
 		package.loaded["adapters.file_system"] = saved_fs
@@ -381,7 +395,7 @@ helpers.describe("English attachment export boundaries", function()
 	end)
 	helpers.it("browser refusal never claims successful report after saving attachment", function()
 		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
-			function(overrides) overrides.open_url = function() return false end end)
+			function(overrides) overrides.open_url = function(_, done) done({ ok = false, code = 23 }) end end)
 		helpers.assert_eq(result.ok, false)
 		helpers.assert_eq(#calls.save, 1)
 		helpers.assert_eq(calls.save[1].text, calls.copy[1])
@@ -445,7 +459,7 @@ helpers.describe("closed recent error facts", function()
 				local calls = {}
 				local overrides = recording(calls)
 				ordered(calls, overrides)
-				local outcome = Report.perform({ action = action, text = doc.text, name = doc.name, fields = {} },
+				local outcome = completed(Report, { action = action, text = doc.text, name = doc.name, fields = {} },
 					{ logs_dir = LOGS_DIR, diagnostics_dir = LOGS_DIR .. "/diagnostics" }, config,
 					Report.redaction_context(overrides), overrides, vector.snapshot)
 				helpers.assert_eq(outcome.ok, true, "the real report sink receives the retained fact snapshot")
@@ -460,5 +474,142 @@ helpers.describe("closed recent error facts", function()
 			end
 			helpers.assert_eq(Json.encode(vector.snapshot), original)
 		end
+	end)
+end)
+
+
+--- Real private launcher children; the only substituted boundary maps the
+--- production argv executable to an owned file, never to a desktop handler.
+local function with_native_opener(script, controls, body)
+	local uv = require("luv")
+	local old_shell = package.loaded["adapters.shell_runner"]
+	local timer = require("infra.native_timer")
+	local timer_port = {}
+	for key, value in pairs(timer) do timer_port[key] = value end
+	function timer_port.start(loop, handle, ms, interval, callback)
+		helpers.assert_eq(ms, require("infra.timings").ms("ui", "desktop_open_timeout_ms"))
+		return timer.start(loop, handle, controls.timeout and 1 or ms, interval, callback)
+	end
+	local shell = helpers.load_module_with_dependency("adapters.shell_runner", "infra.native_timer", timer_port)
+	local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/diagnostic_opener_XXXXXX"))
+	local executable, target = root .. "/private-opener", root .. "/report.md"
+	local function write(path, text)
+		local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
+	end
+	write(executable, "#!/bin/sh\n" .. script); assert(uv.fs_chmod(executable, 448)); write(target, "synthetic report\n")
+	local state = { outcomes = {}, requests = 0, current = true, root = root, target = target }
+	local port = {}
+	for key, value in pairs(shell) do port[key] = value end
+	function port.run_async(program, args, options, done)
+		helpers.assert_eq(program, "xdg-open"); helpers.assert_eq(args, { target })
+		state.requests = state.requests + 1
+		if controls.refuse then return nil, "controlled opener admission refused" end
+		return shell.run_async(executable, args, options, done)
+	end
+	package.loaded["adapters.shell_runner"] = port
+	local Report = helpers.load_module("ui.healthcheck.report")
+	function state.start()
+		state.operation = Report.perform({ action = "open_path", id = "log_today" }, { log_today = target }, {}, {}, nil, nil, {
+			current = function() return state.current end,
+			complete = function(result) state.outcomes[#state.outcomes + 1] = result end,
+		})
+	end
+	function state.drain(until_result)
+		local deadline = uv.hrtime() + (until_result and 2000000000 or 50000000)
+		repeat uv.run("nowait"); uv.sleep(1) until (until_result and #state.outcomes > 0) or uv.hrtime() >= deadline
+	end
+	function state.release() write(target .. ".release", "release\n") end
+	local ok, detail = xpcall(function() body(state) end, debug.traceback)
+	if state.operation then state.operation.cancel() end
+	state.drain(false)
+	package.loaded["adapters.shell_runner"] = old_shell
+	for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
+	assert(uv.fs_rmdir(root))
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("diagnostic opener actual child completion", function()
+	for _, status in ipairs({ 0, 23 }) do
+		helpers.it("(diagnostic-opener-native) receives private child exit " .. status, function()
+			with_native_opener("exit " .. status .. "\n", {}, function(s)
+				s.start(); helpers.assert_eq(#s.outcomes, 0, "admission cannot acknowledge completion")
+				s.drain(true); helpers.assert_eq(#s.outcomes, 1)
+				helpers.assert_eq(s.outcomes[1].ok, status == 0); helpers.assert_eq(s.outcomes[1].exit_code, status)
+			end)
+		end)
+	end
+	local held = 'while [ ! -f "$1.release" ]; do /bin/sleep 0.01; done\nexit 23\n'
+	helpers.it("(diagnostic-opener-native) keeps the loop live while awaiting the owned child", function()
+		with_native_opener(held, {}, function(s)
+			s.start(); s.drain(false); helpers.assert_eq(#s.outcomes, 0)
+			local heartbeat = false; local uv = require("luv"); local tick = assert(uv.new_timer())
+			assert(uv.timer_start(tick, 1, 0, function() heartbeat = true; uv.close(tick) end))
+			s.drain(false); helpers.assert_true(heartbeat, "other native work runs while the launcher waits")
+			s.release(); s.drain(true); helpers.assert_eq(s.outcomes[1].ok, false); helpers.assert_eq(s.outcomes[1].exit_code, 23)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) receives the controlled native deadline without a blocking fallback", function()
+		with_native_opener(held, { timeout = true }, function(s)
+			s.start(); s.drain(true); helpers.assert_eq(#s.outcomes, 1); helpers.assert_eq(s.outcomes[1].ok, false)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) cancellation retires the child without a completion", function()
+		with_native_opener(held, {}, function(s)
+			s.start(); s.operation.cancel(); s.drain(false); helpers.assert_eq(#s.outcomes, 0)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) refuses unavailable spawn without inventing a child result", function()
+		with_native_opener("exit 0\n", { refuse = true }, function(s)
+			s.start(); helpers.assert_eq(#s.outcomes, 1); helpers.assert_eq(s.outcomes[1].ok, false)
+			helpers.assert_nil(s.outcomes[1].exit_code); helpers.assert_eq(s.requests, 1)
+		end)
+	end)
+end)
+
+helpers.describe("feature opener cancellation ownership", function()
+	helpers.it("(feature-opener-cancel) a nested request survives cancellation of its predecessor", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"]
+		package.loaded["ui.healthcheck.bridge"] = { config = documents, build_snapshot = function() return host_snapshot(false) end }
+		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		local calls, outcomes, cancellations, reenter = {}, {}, 0, true
+		local effects = recording({})
+		effects.open_url = function(_, done)
+			calls[#calls + 1] = done
+			return { cancel = function()
+				cancellations = cancellations + 1
+				if reenter then reenter = false; Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end) end
+			end }
+		end
+		local ok, detail = xpcall(function()
+			Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end)
+			Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end)
+			helpers.assert_eq(#calls, 2); helpers.assert_eq(cancellations, 1)
+			calls[1]({ ok = true, code = 0 }); helpers.assert_eq(#outcomes, 0)
+			calls[2]({ ok = false, code = 23, error = "private opener refused" })
+			helpers.assert_eq(outcomes, { false })
+		end, debug.traceback)
+		package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"] = old_bridge, old_manager
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+helpers.describe("diagnostic opener late port failure", function()
+	helpers.it("(diagnostic-opener-late) logs an exception after inline completion without a second outcome", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local Logger = require("logger.shim")
+		local held, errors, results = Logger.error, {}, {}
+		Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+		local ok, detail = xpcall(function()
+			Report.perform({ action = "open_path", id = "log_today" }, { log_today = "/controlled/log" }, {}, {}, {
+				exists = function() return true end,
+				open = function(_, done) done({ ok = true, code = 0 }); error("independent late opener failure") end,
+			}, nil, { current = function() return true end, complete = function(value) results[#results + 1] = value end })
+		end, debug.traceback)
+		Logger.error = held
+		if not ok then error(detail, 0) end
+		helpers.assert_eq(#results, 1); helpers.assert_eq(results[1].ok, true)
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_true(errors[1]:find("independent late opener failure", 1, true) ~= nil)
 	end)
 end)

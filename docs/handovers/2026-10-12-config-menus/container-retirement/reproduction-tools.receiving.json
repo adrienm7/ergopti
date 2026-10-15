@@ -1,0 +1,35 @@
+{
+	"state": "SEALED_AND_INDEPENDENTLY_REOPENED",
+	"archive": "/workspace/.ergopti-cloud/retirement-reproduction-tools.tar.gz",
+	"sha256": "88996db1b71b5e269db9c882df6a30ee08c39bfd3abc0e2e85560ccbdaf41962",
+	"bytes": 15119,
+	"regular_members_checked": 5,
+	"checksum_entries": 4,
+	"members": {
+		"README.md": {
+			"sha256": "36924d123fa102f0ef4933d470d46bcd7f6fcd9a0e7444c8ac72242b5b16e325",
+			"bytes": 5645
+		},
+		"SHA256SUMS": {
+			"sha256": "cccc0f992a056b53a1b1f9ebb234ea4288d1479f00ceb2fd109c3eb4139ad610",
+			"bytes": 337
+		},
+		"activate.sh": {
+			"sha256": "f87f55475a1b2549c42e5aae36cd799b1af0326cc034ad2fda5097a36f2ca5d1",
+			"bytes": 508
+		},
+		"install-with-gtk.sh": {
+			"sha256": "d0001f511181bf5c7c527fb5dd9ca2e2aede5c6209d8d6ecc60a6c3a3a7bd68c",
+			"bytes": 18605
+		},
+		"native-http-replay-20261015.py": {
+			"sha256": "1b9e36ce3cbda426ee064b813fc17e4a9e85441a70869a37abad4209ab7a270a",
+			"bytes": 21299
+		}
+	},
+	"scope": "Exactly three reviewed historical source scripts, English README and SHA256SUMS; no SDK/binaries/keys/credentials/user logs.",
+	"deterministic_metadata": "USTAR regular entries sorted by name; uid/gid/mtime=0, names empty, mode0644; gzip mtime0 and empty filename.",
+	"qualification": "Installer actually executed exit0 in original container. Replay readmit verified; create reviewed/unexecuted. No fresh restoration success inferred.",
+	"repository_write_stage_commit": "NOT PERFORMED",
+	"created_utc": "2026-10-15T19:23:47.030042+00:00"
+}

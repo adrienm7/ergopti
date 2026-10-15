@@ -20,7 +20,9 @@ function M.normalize(config_paths, value)
 	end
 	if value == nil or value == "" then return config_paths.default_config_dir() end
 	if type(value) ~= "string" then return nil end
-	local normalized = value:match("^%s*(.-)%s*$"):gsub("/+$", "")
+	local normalized = value:match("^%s*(.-)%s*$")
+	if normalized:match("^/+$") then return "/" end
+	normalized = normalized:gsub("/+$", "")
 	if normalized == "" then return config_paths.default_config_dir() end
 	if normalized:sub(1, 1) ~= "/" then return nil end
 	return normalized
@@ -35,7 +37,7 @@ end
 --- @return string|nil error_message
 function M.pick(shell, config_paths, i18n, current)
 	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
-		or type(shell.exec_line) ~= "function" or type(shell.quote) ~= "function" then
+		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
 	local seed = M.normalize(config_paths, current)
@@ -57,8 +59,11 @@ function M.pick(shell, config_paths, i18n, current)
 	else
 		return nil, "neither zenity nor kdialog is available"
 	end
-	local chosen = require("ui.modal").run(function() return shell.exec_line(command) end)
-	local normalized = chosen and M.normalize(config_paths, chosen) or nil
+	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
+	-- Partial stdout cannot turn native cancellation or command failure into a selection.
+	if completed ~= true or type(output) ~= "string" then return nil, "folder selection was cancelled or refused" end
+	local chosen = output:match("^([^\r\n]*)")
+	local normalized = chosen ~= "" and M.normalize(config_paths, chosen) or nil
 	if not normalized then return nil, "folder selection was cancelled" end
 	return normalized
 end

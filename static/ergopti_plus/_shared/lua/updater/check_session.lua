@@ -54,8 +54,9 @@ local PORTS = {
 ---   set_channel function(id): boolean The channel owner's set.
 ---   install function(result): boolean Hands the offered release to the installer.
 ---   open_changelog function(channel): boolean Opens the Versions window.
----   report function(result): boolean, boolean|nil Reports a failed check
----     (ok, missing).
+---   report function(result, complete, current): cancellable request|nil.
+---     Complete(ok, missing) receives the report outcome; nil is valid after
+---     inline completion. A return value never acknowledges the action.
 ---   open_log function(): boolean, boolean|nil Opens today's log (ok, missing).
 ---   close function() Closes the window.
 ---   log_path function(): string Today's log file.
@@ -71,8 +72,23 @@ function M.new(opts)
 	local session = {}
 	local generation = 0
 	local retired = false
+	local report_request = nil
+	local action_revision = 0
 	local result = nil     -- the last answer, nil while checking
 	local message = nil    -- the page's current state message
+
+	--- Revokes the receipt before cancellation can reenter this session.
+	local function cancel_report()
+		action_revision = action_revision + 1
+		local expected = action_revision
+		local prior = report_request
+		report_request = nil
+		if prior and prior.handle then
+			local ok, detail = pcall(prior.handle.cancel)
+			if not ok then opts.log("error", "The report request could not be cancelled: %s.", tostring(detail)) end
+		end
+		return expected
+	end
 
 	--- Sends the current phase to the page.
 	local function publish()
@@ -132,6 +148,8 @@ function M.new(opts)
 				answer = CheckResult.failure({ channel = message and message.channel, current = message and message.current },
 					"unexpected", "the check answered without a known phase")
 			end
+			local revision = cancel_report()
+			if retired or expected ~= generation or revision ~= action_revision then return end
 			result = answer
 			message = state_message(answer)
 			opts.log("info", "Update check window: %s (channel %s).", answer.state, tostring(answer.channel))
@@ -146,6 +164,8 @@ function M.new(opts)
 			opts.log("warn", "Refused to start a check in a retired update-check session.")
 			return false
 		end
+		local revision = cancel_report()
+		if retired or revision ~= action_revision then return false end
 		generation = generation + 1
 		local expected = generation
 		result = nil
@@ -193,8 +213,27 @@ function M.new(opts)
 				acknowledge(name, false)
 			end
 		elseif name == "report" then
-			local ok, missing = opts.report(result)
-			acknowledge(name, ok, missing)
+			local token = { result = result, generation = generation, done = false }
+			report_request = token
+			local function current()
+				return not retired and report_request == token and generation == token.generation and result == token.result
+			end
+			local function complete(ok, missing)
+				if not current() or token.done then return end
+				token.done = true
+				acknowledge(name, ok, missing)
+			end
+			local called, handle, detail = pcall(opts.report, token.result, complete, current)
+			if not called and token.done then opts.log("error", "The completed report port failed: %s.", tostring(handle)) end
+			if current() and not token.done then
+				if called and type(handle) == "table" and type(handle.cancel) == "function" then token.handle = handle
+				else
+					opts.log("error", "The report could not be dispatched: %s.", tostring(called and detail or handle))
+					complete(false)
+				end
+			elseif called and type(handle) == "table" and type(handle.cancel) == "function" then
+				handle.cancel()
+			end
 		elseif name == "open_log" then
 			local ok, missing = opts.open_log()
 			acknowledge(name, ok, missing)
@@ -218,6 +257,8 @@ function M.new(opts)
 			opts.log("warn", "Refused an update-check window message that is not one of its actions.")
 			return
 		end
+		local revision = cancel_report()
+		if retired or revision ~= action_revision then return end
 		if needs ~= true and (result == nil or result.state ~= needs) then
 			opts.log("warn", "Refused the update-check action '%s' outside the '%s' phase.", name, needs)
 			acknowledge(name, false)
@@ -234,6 +275,7 @@ function M.new(opts)
 	--- Retires the session: its pending answer and its page are ignored from now.
 	function session.retire()
 		retired = true
+		cancel_report()
 		generation = generation + 1
 	end
 
