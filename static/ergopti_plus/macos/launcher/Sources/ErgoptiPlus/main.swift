@@ -36,6 +36,7 @@ import Sparkle
 
 
 
+
 // ==================================
 // ==================================
 // ======= 1/ App-Level State =======
@@ -1128,6 +1129,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // Branch before touching NSApplication, CFPreferences or Sparkle so a helper
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 installPrivateProcessUmask()
+
+// Explicit diagnostic only. The genuine signed helper query refuses unavailable profiles before admin staging.
+if OwnedVirtualHIDDaemonReportMainOperation.handles(arguments: CommandLine.arguments) {
+	let reportResult = DispatchSemaphore(value: 0)
+	DispatchQueue.global(qos: .userInitiated).async {
+		Darwin.exit(OwnedVirtualHIDDaemonReportMainOperation.run(arguments: CommandLine.arguments))
+		reportResult.signal()
+	}
+	while reportResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
+}
+
 
 if OwnedSuspendedImageGuardian.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedSuspendedImageGuardian.run(arguments: CommandLine.arguments))

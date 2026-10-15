@@ -387,6 +387,15 @@ function M.init(ports)
 	local on_verdict = rawget(ports, "on_verdict")
 	assert(on_verdict == nil or type(on_verdict) == "function", "Invalid physical verdict observer")
 	snapshot.on_verdict = on_verdict
+	local media = rawget(ports, "media")
+	if media ~= nil then
+		assert(type(media) == "table", "Invalid physical capture media capability")
+		snapshot.media = {}
+		for _, name in ipairs({ "resolve", "is_known", "emit", "emit_release" }) do
+			assert(type(media[name]) == "function", "Missing physical capture media port: " .. name)
+			snapshot.media[name] = media[name]
+		end
+	end
 	Logger.start(LOG, "Initializing dormant physical capture owner…")
 	dependencies = snapshot
 	Logger.success(LOG, "Dormant physical capture owner initialized.")
@@ -403,6 +412,22 @@ local function start_session(options, source)
 		or session.verdict_publishing or session.stop_publishing) then return false end
 	local candidate = { state = "verifying", options = snapshot_options(options), acquiring = true,
 		token = {}, managed = source }
+	local media
+	if dependencies.media ~= nil then
+		local supplied = dependencies.media
+		media = { resolve = supplied.resolve, is_known = supplied.is_known,
+			emit = function(press)
+				assert(current(candidate) and candidate.state == "capturing"
+					and Accounting.admitted_capture() == press.capture, "Physical capture publication was revoked")
+				return supplied.emit(press)
+			end,
+			emit_release = function(release)
+				assert(current(candidate) and candidate.state == "capturing"
+					and Accounting.admitted_capture() == release.capture, "Physical release publication was revoked")
+				return supplied.emit_release(release)
+			end,
+		}
+	end
 	if source then source.last_session, source.unavailable_reason = candidate, nil end
 	candidate.receiver = Delivery.new({ batch_limit = candidate.options.batch_limit,
 		admit = function(frame)
@@ -449,6 +474,7 @@ local function start_session(options, source)
 			return accepted
 		end,
 		context = dependencies.context, keycode = dependencies.keycode,
+		media = media,
 		emit = function(press)
 			assert(current(candidate) and candidate.state == "capturing"
 				and Accounting.admitted_capture() == press.capture, "Physical capture publication was revoked")

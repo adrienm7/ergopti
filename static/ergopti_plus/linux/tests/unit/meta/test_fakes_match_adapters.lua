@@ -355,3 +355,97 @@ helpers.describe("fakes: exact controlled output and unsupported native origin",
 		helpers.assert_true(reader.close(reader.KEYBOARD))
 	end)
 end)
+
+-- Behavioral media model only: these assertions execute no native SQL/capture.
+helpers.describe("fakes: semantic media writer contract", function()
+	local function event(action, id, duration)
+		return { action = action, media_id = id or "media.play_pause", capture = "capture-7",
+			device = "41", app = "editor", timestamp = "2026-10-15 12:00:00", hold_ms = duration }
+	end
+	local function projection(writer, path, device)
+		return writer.media_projections[path][device]
+	end
+	local function row(bucket)
+		local _, value = next(bucket)
+		return value
+	end
+
+	helpers.it("snapshots valid media events and models only separate semantic aggregates", function()
+		local writer = Fakes.sqlite_writer()
+		writer.open_db("media-a")
+		local press, release = event("physical_media_press"), event("physical_media_release", nil, 150)
+		helpers.assert_true(writer.insert_media_events("device-a", { press, release }, 100))
+		helpers.assert_eq(#writer.media_events, 2)
+		helpers.assert_eq(writer.revision, 1)
+		helpers.assert_eq(#writer.typing, 0)
+		helpers.assert_eq(#writer.scancodes, 0)
+		local batch = projection(writer, "media-a", "device-a")
+		helpers.assert_eq(row(batch.media_ngram).count, 1)
+		helpers.assert_eq(row(batch.media_hold).sum_ms, 150)
+		helpers.assert_eq(row(batch.media_hold).hold_count, 1)
+		press.app, release.hold_ms = "changed", 999
+		helpers.assert_eq(writer.media_events[1].row.app, "editor")
+		helpers.assert_eq(writer.media_events[2].row.hold_ms, 150)
+		helpers.assert_eq(row(batch.media_hold).sum_ms, 150)
+	end)
+
+	helpers.it("refuses invalid batches atomically without media or revision publication", function()
+		local writer = Fakes.sqlite_writer(); writer.open_db("media-a")
+		local invalid = {
+			{ event("physical_media_press"), event("physical_media_press", "media.foreign") },
+			{ event("physical_media_press", 205) },
+			{}, { [2] = event("physical_media_press") },
+		}
+		local keycode = event("physical_media_press"); keycode.keycode = 205
+		local scancode = event("physical_media_press"); scancode.scancode = 164
+		invalid[#invalid + 1] = { keycode }; invalid[#invalid + 1] = { scancode }
+		for _, events in ipairs(invalid) do
+			helpers.assert_eq(writer.insert_media_events("device-a", events, 100), false)
+		end
+		helpers.assert_eq(writer.insert_media_events("device-a", { event("physical_media_press") }, -1), false)
+		helpers.assert_eq(#writer.media_events, 0)
+		helpers.assert_eq(writer.revision, 0)
+		helpers.assert_nil(next(writer.media_projections))
+	end)
+
+	helpers.it("refuses closed unavailable and explicitly failed modeled commits", function()
+		for _, model in ipairs({ { writer = Fakes.sqlite_writer(), open = false },
+			{ writer = Fakes.sqlite_writer({ available = false }), open = true },
+			{ writer = Fakes.sqlite_writer({ media_commit = false }), open = true } }) do
+			local writer = model.writer
+			if model.open then writer.open_db("media-a") end
+			helpers.assert_eq(writer.insert_media_events("device-a", { event("physical_media_press") }, 100), false)
+			helpers.assert_eq(writer.rebuild_media("device-a", 100), false)
+			helpers.assert_eq(#writer.media_events, 0)
+			helpers.assert_eq(writer.revision, 0)
+		end
+	end)
+
+	helpers.it("rebuilds only the exact database and device with the new tap threshold", function()
+		local writer = Fakes.sqlite_writer(); writer.open_db("media-a")
+		helpers.assert_true(writer.insert_media_events("device-a", { event("physical_media_release", nil, 150) }, 100))
+		helpers.assert_true(writer.insert_media_events("device-b", { event("physical_media_release", "media.next_track", 250) }, 100))
+		writer.close_db(); writer.open_db("media-b")
+		helpers.assert_true(writer.insert_media_events("device-a", { event("physical_media_release", nil, 450) }, 100))
+		writer.close_db(); writer.open_db("media-a")
+		helpers.assert_true(writer.rebuild_media("device-a", 200))
+		helpers.assert_eq(row(projection(writer, "media-a", "device-a").media_hold).tap_count, 1)
+		helpers.assert_eq(row(projection(writer, "media-a", "device-a").media_hold).hold_count, 0)
+		helpers.assert_eq(row(projection(writer, "media-a", "device-b").media_hold).hold_count, 1)
+		helpers.assert_eq(row(projection(writer, "media-b", "device-a").media_hold).sum_ms, 450)
+		helpers.assert_eq(#writer.media_events, 3)
+		helpers.assert_eq(#writer.media_rebuilds, 1)
+		helpers.assert_eq(writer.revision, 4)
+	end)
+
+	helpers.it("rejects invalid rebuild arguments without replacing the prior projection", function()
+		local writer = Fakes.sqlite_writer(); writer.open_db("media-a")
+		helpers.assert_true(writer.insert_media_events("device-a", { event("physical_media_release", nil, 150) }, 100))
+		local before = projection(writer, "media-a", "device-a")
+		helpers.assert_eq(writer.rebuild_media("device-a", -1), false)
+		helpers.assert_eq(writer.rebuild_media("", 100), false)
+		helpers.assert_true(rawequal(projection(writer, "media-a", "device-a"), before))
+		helpers.assert_eq(#writer.media_rebuilds, 0)
+		helpers.assert_eq(writer.revision, 1)
+	end)
+end)

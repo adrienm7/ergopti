@@ -328,6 +328,24 @@ local function settle_physical_modifiers()
 	return true
 end
 
+-- Effective denial cancels a whole hold, even without a physical transition.
+-- A refused swap remains debt; ordinary focus cannot restore its old duration.
+local _modifier_context_allowed, _modifier_context_pending = true, false
+
+--- Settles the exact shared modifier owner on effective exclusion or retry.
+--- @return boolean settled True only after the owned in-memory swap succeeds.
+local function settle_context_modifiers()
+	local allowed = PrivacyContext.allows_logging(CoreState)
+	if _modifier_context_pending or (_modifier_context_allowed and not allowed) then
+		_modifier_context_pending = true
+		local called, settled = pcall(settle_physical_modifiers)
+		if not called or settled ~= true then return false end
+		_modifier_context_pending = false
+	end
+	_modifier_context_allowed = allowed
+	return true
+end
+
 if AccountingMode.bind_settlement(CoreState, settle_physical_modifiers) ~= true then
 	error("Physical accounting refused its keylogger settlement owner")
 end
@@ -566,7 +584,7 @@ end
 --- @return boolean True when the context is loggable.
 function M.context_allows_logging()
 	if _system_auth_modifier_settlement_pending then return false end
-	return PrivacyContext.allows_logging(CoreState)
+	return not _modifier_context_pending and PrivacyContext.allows_logging(CoreState)
 end
 
 --- Reports whether any public keylogger sink may persist data right now.
@@ -652,6 +670,9 @@ local function handle_key(event_obj)
 			return
 		end
 
+		-- Refused settlement retains malformed debt until its actual owner retries.
+		if _modifier_context_pending then return end
+
 		-- A known physical crossing release must retire its marker even while
 		-- pause/privacy excludes telemetry. It emits no press or hold and cannot
 		-- borrow a timestamp from the source that observed its original press.
@@ -672,6 +693,21 @@ local function handle_key(event_obj)
 		and type(_script_control.is_paused) == "function"
 		and _script_control.is_paused()
 		then
+			-- Observed physical releases retire their old hold even while telemetry
+			-- is paused. A new paused press has no usable timestamp: retain only
+			-- its crossing-release marker until that exact key releases.
+			if evt_type == hs.eventtap.event.types.flagsChanged then
+				local keycode = event_obj:getKeyCode()
+				local flags = event_obj:getFlags() or {}
+				if MODIFIER_KEYCODES[keycode] then
+					if CoreState.modifier_down_at[keycode] ~= nil then
+						CoreState.modifier_down_at[keycode] = nil
+					else
+						CoreState.modifier_suppressed_releases[keycode] = true
+					end
+				end
+				CoreState.prev_flags = flags
+			end
 			LogManager.flush_buffer()
 			return
 		end
@@ -680,7 +716,21 @@ local function handle_key(event_obj)
 		-- predicate so the physical path and the SYNTHETIC path cannot answer this
 		-- question differently — they used to, and notify_synthetic persisted
 		-- expansions this branch would have refused.
-		if not M.context_allows_logging() then return end
+		if not M.context_allows_logging() then
+			-- Retain observed per-key release state, never an excluded duration.
+			if evt_type == hs.eventtap.event.types.flagsChanged then
+				local keycode = event_obj:getKeyCode()
+				if MODIFIER_KEYCODES[keycode] then
+					if CoreState.modifier_down_at[keycode] ~= nil then
+						CoreState.modifier_down_at[keycode] = nil
+					else
+						CoreState.modifier_suppressed_releases[keycode] = true
+					end
+				end
+				CoreState.prev_flags = event_obj:getFlags() or {}
+			end
+			return
+		end
 
 		local now      = hs.timer.absoluteTime() / 1000000
 
@@ -1185,6 +1235,7 @@ function M.apply_configuration(config)
 	CoreState.private_filter_enabled = config.private_filter_enabled
 	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
 	CoreState.system_auth_filter_enabled = config.system_auth_filter_enabled
+	assert(settle_context_modifiers(), "Configuration modifier settlement remains pending")
 	publish_physical_configuration()
 	return true
 end
@@ -1195,6 +1246,7 @@ function M.set_disabled_apps(apps)
 	local assigned = type(apps) == "table" and apps or {}
 	CoreState.disabled_apps = _physical_configuration_binding
 		and require("keylogger.physical_configuration_observation").own_apps(assigned) or assigned
+	assert(settle_context_modifiers(), "Disabled apps modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
 end
@@ -1204,6 +1256,7 @@ end
 --- @param v boolean
 function M.set_private_filter_enabled(v)
 	CoreState.private_filter_enabled = (v ~= false)
+	assert(settle_context_modifiers(), "Private filter modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Private window filter: %s.", CoreState.private_filter_enabled and "on" or "off")
 end
@@ -1213,6 +1266,7 @@ end
 --- @param v boolean
 function M.set_secure_field_filter_enabled(v)
 	CoreState.secure_field_filter_enabled = (v ~= false)
+	assert(settle_context_modifiers(), "Secure filter modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Secure field filter: %s.", CoreState.secure_field_filter_enabled and "on" or "off")
 end
@@ -1234,6 +1288,9 @@ function M.set_system_auth_filter_enabled(v)
 			"System auth filter modifier settlement remains pending")
 		_system_auth_modifier_settlement_pending = false
 	end
+	-- Keep the shared policy cache current for the next private/secure/app writer.
+	-- Neither this successful observation nor publication clears context debt.
+	_modifier_context_allowed = allowed_after
 	publish_physical_configuration()
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end
@@ -2003,7 +2060,7 @@ function M.start(script_control)
 			end
 			-- The context tracker owns three OS watchers that pause does NOT tear down,
 			-- so it needs the same pause predicate as the watcher layer below.
-			if ContextTracker.init(CoreState, LogManager, _is_paused) ~= true then
+			if ContextTracker.init(CoreState, LogManager, _is_paused, settle_context_modifiers) ~= true then
 				error("keylogger context tracker initialization failed")
 			end
 			-- The watcher layer needs the shared state and the pause predicate; both
@@ -2241,12 +2298,10 @@ end
 --- @return boolean True when the context was re-synchronised.
 function M.resync_context()
 	return _physical_lifecycle.run("resync", function()
-		-- A modifier held across the pause never received its release: handle_key returns
-		-- at the pause guard, so the keyUp that would clear modifier_down_at never ran.
-		-- The stale down-timestamp would then be misread as a fresh press on the next
-		-- flagsChanged, inverting press/release and logging a hold that never happened.
-		-- An unmatched down carries no usable duration, so discard it.
-		CoreState.modifier_down_at = {}
+		-- Paused releases already retired their own timestamps. Only keys still
+		-- held cross this boundary; cancel their entire duration and suppress the
+		-- next release without swallowing a later fresh press.
+		if settle_physical_modifiers() ~= true then return false end
 		local ok, res = pcall(ContextTracker.resync_context)
 		if not ok then
 			Logger.error(LOG, "resync_context() failed: %s.", tostring(res))

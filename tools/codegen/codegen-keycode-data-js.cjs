@@ -39,6 +39,8 @@ const OUT_PATH = path.resolve(
 );
 const AZERTY_JSON_PATH = shared('data/keycodes/azerty.json');
 const AZERTY_JSON_REL = sharedRel('data/keycodes/azerty.json');
+const MEDIA_JSON_PATH = shared('data/keycodes/metrics_media_keys.json');
+const MEDIA_JSON_REL = sharedRel('data/keycodes/metrics_media_keys.json');
 
 // ==================================================
 // ==================================================
@@ -66,6 +68,37 @@ function loadKeys() {
 	return parsed.keys;
 }
 
+/**
+ * Loads the reviewed five-key media label catalogue without granting observation.
+ * @returns {Array<{id:string,label_key:string}>} Unpositioned label records.
+ */
+function loadMediaKeys() {
+	const parsed = JSON.parse(fs.readFileSync(MEDIA_JSON_PATH, 'utf8'));
+	const ids = new Set([
+		'media.play_pause',
+		'media.next_track',
+		'media.previous_track',
+		'media.brightness_up',
+		'media.brightness_down'
+	]);
+	if (parsed.schema_version !== 1 || !Array.isArray(parsed.keys) || parsed.keys.length !== 5) {
+		throw new Error(`${MEDIA_JSON_REL} must contain the reviewed five media records`);
+	}
+	const seen = new Set();
+	for (const entry of parsed.keys) {
+		if (
+			!ids.has(entry.id) ||
+			seen.has(entry.id) ||
+			typeof entry.label_key !== 'string' ||
+			!/^sg_actions\.[a-z][a-z_]+$/.test(entry.label_key)
+		) {
+			throw new Error(`${MEDIA_JSON_REL} has an invalid or duplicate media label record`);
+		}
+		seen.add(entry.id);
+	}
+	return parsed.keys;
+}
+
 // ==================================================
 // ==================================================
 // ======= 2/ JS Source Builder =======
@@ -75,9 +108,10 @@ function loadKeys() {
 /**
  * Builds the full JS source for the generated keycode data file.
  * @param {Array<{kc:number, finger:string, home?:boolean}>} keys
+ * @param {Array<{id:string,label_key:string}>} mediaKeys Unpositioned media labels.
  * @returns {string} JS source text with bare LF newlines (normalised later).
  */
-function buildJsSource(keys) {
+function buildJsSource(keys, mediaKeys) {
 	const lines = [];
 
 	lines.push('// _shared/ui/metrics_typing/_generated/keycode_data.js');
@@ -96,6 +130,13 @@ function buildJsSource(keys) {
 		lines.push(`\t{ kc: ${kc}, finger: '${finger}'${homePart} },`);
 	}
 	lines.push('];');
+	lines.push('');
+	lines.push(`// Semantic media labels from ${MEDIA_JSON_REL}; no keyboard positions.`);
+	lines.push('const METRICS_MEDIA_KEYS = Object.freeze([');
+	for (const { id, label_key } of mediaKeys) {
+		lines.push(`\tObject.freeze(${JSON.stringify({ id, label_key })}),`);
+	}
+	lines.push(']);');
 
 	return lines.join('\n');
 }
@@ -131,7 +172,7 @@ function main() {
 	console.log('codegen:keycode-data:js — generating keycode data JS adapter…');
 
 	const keys = loadKeys();
-	const source = buildJsSource(keys);
+	const source = buildJsSource(keys, loadMediaKeys());
 	writeWithCrlf(OUT_PATH, source);
 
 	const relOut = path.relative(ROOT, OUT_PATH);

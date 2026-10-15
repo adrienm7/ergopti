@@ -298,3 +298,155 @@ helpers.describe("the Login Items poll ends with a reload (guardian-approval-ste
 		end)
 	end)
 end)
+
+helpers.describe("Login Items guide follows Tap-Holds eligibility (guardian-approval-feature-off)", function()
+	helpers.it("closes visible steps and retires the poll when Tap-Holds turn off", function()
+		with_guide(function(h)
+			helpers.assert_true(h.guide.offer(h.remap))
+			local late_tick = h.timers[1].fn
+			h.remap.tap_holds = false
+			h.tick()
+			helpers.assert_nil(h.open, "approval still pending does not keep disabled-feature steps open")
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_true(h.timers[1].cancelled)
+			helpers.assert_eq(h.remap.state, "requires_approval", "closing the guide is not guardian approval")
+			helpers.assert_eq(h.count("success"), 0)
+			h.remap.tap_holds = true
+			late_tick()
+			helpers.assert_eq(#h.shows, 1, "a retired callback cannot reopen this guide")
+		end)
+	end)
+
+	helpers.it("retires queued steps without closing Accessibility when Tap-Holds turn off", function()
+		with_guide(function(h)
+			h.accessibility_open = true
+			helpers.assert_true(h.guide.offer(h.remap))
+			local close = package.loaded["ui.permission_dialog"].close
+			local kinds = {}
+			package.loaded["ui.permission_dialog"].close = function(kind)
+				kinds[#kinds + 1] = kind
+				return close(kind)
+			end
+			h.remap.tap_holds = false
+			h.tick()
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_true(h.timers[1].cancelled)
+			helpers.assert_true(h.accessibility_open, "this guide cannot close another permission's steps")
+			helpers.assert_true(helpers.deep_equal(kinds, { "login_items" }))
+			h.accessibility_open = false
+			h.tick()
+			helpers.assert_eq(#h.shows, 0, "the cancelled queue cannot present later")
+		end)
+	end)
+
+	helpers.it("retires the real scheduler entry after the feature-off callback unwinds", function()
+		helpers.with_stub_scope(MODULES, function()
+			local h = {}
+			install_doubles(h)
+			package.loaded["adapters.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			local guide = require("ui.permission_dialog.login_items_guide")
+			helpers.assert_true(guide.offer(h.remap))
+			local natives = hs.timer.__timers
+			local native = natives[#natives]
+			helpers.assert_eq(Scheduler.activeCount(), 1)
+			h.remap.tap_holds = false
+			native:fire()
+			helpers.assert_eq(native.running, false)
+			helpers.assert_eq(Scheduler.activeCount(), 0)
+			helpers.assert_eq(guide.is_active(), false)
+			helpers.assert_nil(h.open)
+		end)
+	end)
+
+	helpers.it("retires steps instead of throwing from a poll when feature observation fails", function()
+		with_guide(function(h)
+			helpers.assert_true(h.guide.offer(h.remap))
+			h.remap.get_tap_holds_enabled = function() error("independent feature observation refusal") end
+			local completed = pcall(h.tick)
+			helpers.assert_true(completed and h.timers[1].cancelled == true, "a failed state read must retire its timer without throwing")
+			helpers.assert_nil(h.open)
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_true(h.timers[1].cancelled)
+		end)
+	end)
+end)
+
+helpers.describe("Login Items cleanup keeps its original owners (guardian-approval-cleanup)", function()
+	helpers.it("keeps the real poll until a refused dialog close can be retried", function()
+		helpers.with_stub_scope(MODULES, function()
+			local h = {}
+			install_doubles(h)
+			package.loaded["adapters.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			local guide = require("ui.permission_dialog.login_items_guide")
+			local dialog = package.loaded["ui.permission_dialog"]
+			local close, attempts = dialog.close, 0
+			dialog.close = function(kind)
+				attempts = attempts + 1
+				if attempts == 1 then return false end
+				return close(kind)
+			end
+			helpers.assert_true(guide.offer(h.remap))
+			local native = hs.timer.__timers[#hs.timer.__timers]
+			h.remap.tap_holds = false
+			native:fire()
+			helpers.assert_true(guide.is_active(), "the unclosed window retains its original guide")
+			helpers.assert_true(native.running, "the original poll retains the close retry")
+			helpers.assert_eq(Scheduler.activeCount(), 1)
+			helpers.assert_eq(#h.shows, 1)
+			native:fire()
+			helpers.assert_nil(h.open)
+			helpers.assert_eq(guide.is_active(), false)
+			helpers.assert_eq(native.running, false)
+			helpers.assert_eq(Scheduler.activeCount(), 0)
+			h.remap.tap_holds = true
+			helpers.assert_eq(guide.offer(h.remap), false, "cleanup does not restore the automatic offer")
+		end)
+	end)
+
+	helpers.it("does not present new steps while a throwing close remains pending", function()
+		with_guide(function(h)
+			helpers.assert_true(h.guide.offer(h.remap))
+			local dialog = package.loaded["ui.permission_dialog"]
+			local close = dialog.close
+			dialog.close = function() error("independent original window deletion refusal") end
+			h.remap.tap_holds = false
+			local completed = pcall(h.tick)
+			helpers.assert_true(completed and h.guide.is_active(), "close refusal retains the guide without escaping its callback")
+			helpers.assert_eq(h.timers[1].cancelled, false)
+			h.remap.tap_holds = true
+			helpers.assert_eq(h.guide.reopen(h.remap), false, "a closing guide cannot be raised or replaced")
+			helpers.assert_eq(#h.shows, 1)
+			dialog.close = close
+			h.tick()
+			helpers.assert_nil(h.open)
+			helpers.assert_eq(h.guide.is_active(), false)
+			helpers.assert_true(h.timers[1].cancelled)
+		end)
+	end)
+
+	helpers.it("retains a refused native stop until its actual scheduler settlement", function()
+		helpers.with_stub_scope(MODULES, function()
+			local h = {}
+			install_doubles(h)
+			package.loaded["adapters.timer_scheduler"] = nil
+			local Scheduler = helpers.load_with_stubs("adapters.timer_scheduler")
+			local guide = require("ui.permission_dialog.login_items_guide")
+			helpers.assert_true(guide.offer(h.remap))
+			local native = hs.timer.__timers[#hs.timer.__timers]
+			local stop = native.stop
+			native.stop = function() return false end
+			h.remap.tap_holds = false
+			native:fire()
+			helpers.assert_nil(h.open, "the window really closed before timer retirement")
+			helpers.assert_true(guide.is_active(), "the original timer debt still has an owner")
+			helpers.assert_eq(Scheduler.activeCount(), 1)
+			native.stop = stop
+			helpers.assert_true(Scheduler.retryCleanup())
+			helpers.assert_eq(guide.is_active(), false)
+			helpers.assert_eq(Scheduler.activeCount(), 0)
+			helpers.assert_eq(native.running, false)
+		end)
+	end)
+end)

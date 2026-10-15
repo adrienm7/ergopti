@@ -186,3 +186,52 @@ helpers.describe("sqlite_reader — read_range_split_today survives a throwing d
 	end)
 
 end)
+
+
+helpers.describe("sqlite_reader: semantic media projections and honest query acknowledgement", function()
+	local function media_stub(id, refuse)
+		return { OK = 0, open = function()
+			return { exec = function() return 0 end, close = function() end,
+				nrows = function(_, sql)
+					local rows = {}
+					if sql:find("FROM ngram_media_keys", 1, true) then
+						if refuse then error("declared media read refusal") end
+						rows = { { date = "2026-10-13", app = "media-editor", media_id = id, c = 2 } }
+					elseif sql:find("FROM agg_app_day_media_hold", 1, true) then
+						rows = { { date = "2026-10-13", app = "media-editor", media_id = id,
+							sum_ms = 535, count = 3, max_ms = 300, tap_count = 2, hold_count = 1 } }
+					end
+					local index = 0
+					return function() index = index + 1; return rows[index] end
+				end }
+		end }
+	end
+	helpers.it("projects media-only application days without numeric or typing credit", function()
+		local reader = load_reader_with(media_stub("media.play_pause"))
+		local manifest, complete = reader.read_manifest("/declared/db.sqlite", "2026-10-13", "2026-10-13")
+		helpers.assert_true(complete)
+		local app = manifest["2026-10-13"]["media-editor"]
+		helpers.assert_eq(app.media_keys["media.play_pause"], 2)
+		helpers.assert_eq(app.media_hold["media.play_pause"], { s = 535, n = 3, m = 300, tap = 2, hold = 1 })
+		helpers.assert_eq(next(app.kc_hold), nil)
+		helpers.assert_eq(app.chars, 0)
+	end)
+	helpers.it("returns failed acknowledgement for a refused media query while preserving accepted holds", function()
+		local reader, errors = load_reader_with(media_stub("media.play_pause", true))
+		local manifest, complete = reader.read_manifest("/declared/db.sqlite", "2026-10-13", "2026-10-13")
+		helpers.assert_eq(complete, false)
+		helpers.assert_eq(manifest["2026-10-13"]["media-editor"].media_hold["media.play_pause"].n, 3)
+		helpers.assert_true(#errors > 0)
+	end)
+	helpers.it("rejects unknown stored media IDs instead of granting projection success", function()
+		local reader, errors = load_reader_with(media_stub("media.unknown"))
+		local manifest, complete = reader.read_manifest("/declared/db.sqlite", "2026-10-13", "2026-10-13")
+		helpers.assert_eq(complete, false)
+		local app = manifest["2026-10-13"]["media-editor"]
+		if app then
+			helpers.assert_eq(next(app.media_keys), nil)
+			helpers.assert_eq(next(app.media_hold), nil)
+		end
+		helpers.assert_true(#errors > 0)
+	end)
+end)
