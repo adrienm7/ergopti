@@ -2919,10 +2919,83 @@ static bool TestTerminalRouteSnapshotsRetainExactSuffix(void)
 
 
 
+/** Controlled native FIFO metadata never promotes direct digits to output. */
+static bool TestTerminalDirectDigitDiagnostics(const char *name)
+{
+	for (uint32_t digit_index = 0; digit_index < 10; ++digit_index) {
+		ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+		ErgoptiReplay_Route route = {
+			.recipe_id = 2000 + digit_index, .route_id = digit_index + 1,
+			.code = (uint16_t)(0x02 + digit_index), .axis = ERGOPTI_REPLAY_SCAN,
+			.kind = ERGOPTI_REPLAY_DIRECT_DIGIT
+		};
+		uint64_t generation = 0;
+		uint8_t mask = 0, passed = 0, ordered = 0;
+		ErgoptiNav_DispatchResult result;
+		ErgoptiNav_TerminalRouteSnapshot head;
+		ErgoptiNav_TerminalCaptureSnapshot before, after;
+		uint16_t text = (uint16_t)(0x30 + (digit_index + 1) % 10);
+		TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+		TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == 0);
+		TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == 0);
+		TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11,
+			&route, 1) == 0);
+		TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == 0);
+		for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+			TEST_ASSERT(name, TestHookFlow(name, text, route.code,
+				edge_index == 2 ? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN,
+				ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+			TEST_ASSERT(name, result.disposition == ERGOPTI_NAV_DISPOSITION_SUPPRESS);
+		}
+		TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &before) == 0);
+		TEST_ASSERT(name, before.queued == 3 && before.replayed == 0);
+		for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+			ErgoptiNav_TerminalOutputPreview preview;
+			TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, edge_index, &head) == 0);
+			TEST_ASSERT(name, head.route.status == ERGOPTI_REPLAY_OK);
+			TEST_ASSERT(name, head.route.route.kind == ERGOPTI_REPLAY_DIRECT_DIGIT);
+			TEST_ASSERT(name, head.route.route.recipe_id == route.recipe_id);
+			TEST_ASSERT(name, head.route.event.repeat == (edge_index == 1));
+			TEST_ASSERT(name, head.route.event.key_up == (edge_index == 2));
+			TEST_ASSERT(name, ErgoptiNav_PreviewTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+				head.sequence, edge_index, edge_index == 2 ? NULL : &text,
+				edge_index == 2 ? 0 : 1, &preview, NULL, 0) == 0);
+			TEST_ASSERT(name, preview.planner_status == ERGOPTI_OUTPUT_DIAGNOSTIC);
+			TEST_ASSERT(name, preview.unit_count == 0 && preview.dispatchable == 0);
+		}
+		TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+		for (uint8_t admitted = 0; admitted < 2; ++admitted) {
+			ErgoptiOutput_Key key, retained;
+			memset(&key, 0xA5, sizeof(key));
+			memcpy(&retained, &key, sizeof(key));
+			TEST_ASSERT(name, ErgoptiNav_TestAdmitTerminalOutput(admitted) == 0);
+			TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+				head.sequence, &text, 1, &key) == ERGOPTI_NAV_STATUS_INVALID_STATE);
+			TEST_ASSERT(name, memcmp(&key, &retained, sizeof(key)) == 0);
+			TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
+			TEST_ASSERT(name, memcmp(&before, &after, sizeof(before)) == 0);
+		}
+		ErgoptiNav_TestEvent replayed[3];
+		uint32_t count = 99;
+		TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+			ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, replayed, 3, &count) == 0);
+		TEST_ASSERT(name, count == 3);
+		for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+			TEST_ASSERT(name, replayed[edge_index].vk == 0 && replayed[edge_index].sc == route.code);
+			TEST_ASSERT(name, replayed[edge_index].kind
+				== (edge_index == 2 ? ERGOPTI_NAV_EVENT_UP : ERGOPTI_NAV_EVENT_DOWN));
+		}
+		TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &after) == 0);
+		TEST_ASSERT(name, after.queued == 0 && after.phase == ERGOPTI_NAV_TERMINAL_IDLE);
+	}
+	return true;
+}
+
 /** Authenticates canonical previews without acknowledging or sending any edge. */
 static bool TestTerminalOutputPreviewIsAuthenticatedAndGuarded(void)
 {
 	const char *name = "terminal output preview is authenticated and guarded (todo49-output-preview)";
+	TEST_ASSERT(name, TestTerminalDirectDigitDiagnostics(name));
 	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
 	ErgoptiNav_DispatchResult result;
 	ErgoptiNav_TerminalCaptureSnapshot before, after;
