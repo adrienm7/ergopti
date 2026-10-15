@@ -1,0 +1,84 @@
+{
+  "base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+  "paths": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+      "preimage": {
+        "bytes": 933,
+        "sha256": "869f3cdf291924c94b677931ccab70a026a9c41e0e5c58704018f91e3a25ac76"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "preimage": {
+        "bytes": 47673,
+        "sha256": "c4cdc51ace44b6124ec6a5ed5284ab8ecb96668f0b92071cbe7ee071086f2c14"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+      "preimage": null
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "preimage": null
+    },
+    {
+      "path": "tools/build/owned-runtime-installer/InstallerMain.swift",
+      "preimage": {
+        "bytes": 850,
+        "sha256": "1bc1eafe132ef6c4592c6c51d160c6f8e28bdf30aeaf190ec3972e2d1e77a8cb"
+      }
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build.py",
+      "preimage": {
+        "bytes": 54943,
+        "sha256": "fc62979a9177ec775514f366df12f0865099e51f54fb11d01f8c93310c2a3141"
+      }
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build_test.py",
+      "preimage": {
+        "bytes": 7506,
+        "sha256": "7011b525ba9836b5777709ff39ade58e07e9dc63119db32c4da15e56b9a4310f"
+      }
+    }
+  ]
+}

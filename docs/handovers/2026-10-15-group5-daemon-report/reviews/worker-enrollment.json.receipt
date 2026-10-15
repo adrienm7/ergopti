@@ -1,0 +1,47 @@
+{
+  "state": "SOURCE_CLEAR_PRIVATE_WORKER_TRUE_INSTALLER_ENTRY_AND_SDK_ONLY_ENROLLMENT",
+  "current_manifest": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-worker-private-20261015/CURRENT-SOURCE-MANIFEST.json",
+    "sha256": "545f4a1ca61e9b1a16137f1b361cf83f899b1d82f3c4638c60f53cbd4d0a1a8e",
+    "all9_subject_hash_size_bindings_authenticated": true
+  },
+  "component_dependency": {
+    "manifest_sha256": "ed762f1654d9d95fa4584f577cbe49d2c64c5c3ddcf5bfd21557a7432c06ce63",
+    "independent_review_sha256": "bc4ed0ba5887fc791267d456b11d70cf7cdb408130fe78b61be728a4abb5ec71",
+    "native": "UNRUN"
+  },
+  "exact_current_sources": {
+    "Worker": "dea3c7b0dc9564fce91cbd128cbe2175cbf06d788c5eeb4e30eac0de917c5109",
+    "WorkerTests": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a",
+    "InstallerMain_PRE": "3ef17872340f01377baebc690f379a7467df6c2f32baa395420824cc54cfbfe6",
+    "InstallerMain_POST": "9c8c79b590a736899f7eafeb99090be22adc1608c9a991b6f903d4e3ee829b9c",
+    "product_builder_PRE": "dc14141df1630b7d43e0b443a7bf6eb76b76902bda7818710367f76139288f12",
+    "product_builder_POST": "fabeb5c77275565eea7071e8538794d17438b1dd068b48999bf8a5d474fcfaa3"
+  },
+  "genuine_PRE_source_base": "c5ed928a88b4fca0e3329a86cc3676b4da9f8e96",
+  "findings": [
+    "Exactargc2 flag routing, actual root real/effective UID guard precede asynchronous observer acquisition; these strings alone confer no authority, independently guarded staged publisher/native identity remains in Observer.",
+    "Real DispatchQueue.async executes acquire/observe off the caller main thread; no sync-to-background fiction. Locked Completion retains SAME original observer; timeout records stop even before delayed acquisition, then withdraws that observer when delivered.",
+    "Completion.finish stores result before deferred semaphore signal.3s wait timeout always publishes cleanupPending/deadline and negative stop; late result cannot change that output or imply local retirement. Process may still have unacknowledged background work when timed out, explicitly not historical success.",
+    "Historical positive output accepts only private-created Observer.Historical, with exactfive named booleans and remoteCleanupunobserved. Negative outputs contain only closed state/category/remoteCleanup; no rawPID/path/token/argv/version/registry/free text.",
+    "Ordinary stdout writes are intentionally not authenticated or deadline-bounded Main/root IPC; no product-facing readiness or full retirement inference from exit/output.",
+    "Current true protected entry tools/build/owned-runtime-installer/InstallerMain.swift contains only one added report dispatch inside original ERGOPTI_INSTALLED_SDK guard; deleting exact three-line span recovers genuine PRE bytewhole. Existing publication and first-install behavior preserved.",
+    "SDK-only builder data appends exactly3Swift sources +1C +1header. Exact deletion of five source stems recovers whole genuine builder PRE; all original SDK order/defaulthelper9/defaultvalidator6/defaultsource+dependency vectors remain unchanged.",
+    "All original top-level22 declarations have identical ASTs, including complete37function/3class nested nodes; no capture/signing/compilation function or guard altered."
+  ],
+  "superseded_drafts": "Ordinary launcher main.after and unguarded InstallerMain draft explicitly excluded from current manifest and this clearance; no actual Root product grant transferred to them.",
+  "tests_and_checks": {
+    "worker_XCTest_methods": 3,
+    "executed": 0,
+    "Swift_C_Darwin_Security_endpoint": "UNRUN",
+    "parent_Python_roster_import_and_Ruff": "Parent reports PASS; reviewer independently read exact literal differences/ASTs, did not import or format candidate.",
+    "independent_source_inverse": "Exact InstallerMain dispatch deletion and exact five builder source-stem deletions recover full genuine PREs without canonical mutation."
+  },
+  "remaining_software_and_adoption_limits": [
+    "Distinct normal signed Main request purpose, actual authenticated Root stage/channel and exact stage retirement remain required separate software block.",
+    "Current sourceapproval/G3 SDK source input/compiler custody and real build/signing/native receiving are not issued or waived by this private source review.",
+    "No B/publication/initial2-ticket authority reuse, numericABI/live/READY/update/service/HID grant.",
+    "Reviewer ran no target/native/kernel/generator/formatter, imported no candidate, mutated no canonical/source/index/refs."
+  ],
+  "concrete_blockers_in_current_reviewed_private_scope": []
+}

@@ -1,0 +1,53 @@
+{
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "--whitespace=error-all",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/SOURCE.patch"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--whitespace=error-all",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/SOURCE.patch"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "-R",
+        "--check",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/SOURCE.patch"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "-R",
+        "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/SOURCE.patch"
+      ],
+      "status": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "all20_posts_exact": true,
+  "all_pres_and_absences_restored": true,
+  "native": "UNEXECUTED"
+}

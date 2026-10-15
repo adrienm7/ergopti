@@ -1,0 +1,212 @@
+[
+  {
+    "path": "AUTHENTIC-DONOR-GIT-PINS.json",
+    "bytes": 1130,
+    "sha256": "126845db1185b359d986e0e802814deaf9250f4487cbab70fc7e6a84e178c7dc"
+  },
+  {
+    "path": "AUTHENTIC-SUPPLIER-PINS.json",
+    "bytes": 299,
+    "sha256": "5d8ecdd69557cc292f148f740b8ad2e39f0d47da90b9312cb13788fd2dddccaa"
+  },
+  {
+    "path": "CONSERVATION.json",
+    "bytes": 1035,
+    "sha256": "39342b53c92b7b0e77ff9b7eff1e9eed7677ba5b72d657dd8efd2c9242776f03"
+  },
+  {
+    "path": "COUNT-ERRATUM.json",
+    "bytes": 407,
+    "sha256": "1fcce65b790d3052f1816894b5c1003efc3c834f389ee4d4c619ffe27cf95129"
+  },
+  {
+    "path": "FAST-EXIT-NATIVE-RECEIPT-REFINEMENT.json",
+    "bytes": 563,
+    "sha256": "4d2510d09d2394eba4637e772d822af383df10d7fcfeeda0811625a81cd42506"
+  },
+  {
+    "path": "FINAL-PATHS.json",
+    "bytes": 6659,
+    "sha256": "b95b3d251ffe4755097422aa08805bdcc8a7a2d62fdec3a86716a63ba97f4ef9"
+  },
+  {
+    "path": "FROZEN-ADDITIONAL-INTENT.json",
+    "bytes": 1449,
+    "sha256": "05110821a12736ef4c6df9a8d9233835c5dd744bc9aa5843d965bdd17ea49a82"
+  },
+  {
+    "path": "FROZEN-QUERY-FAST-EXIT.json",
+    "bytes": 536,
+    "sha256": "7fc560628e704e576bf26369c67ae245bb47e0393898d93c79fe6e94d34924f1"
+  },
+  {
+    "path": "FROZEN-QUERY-SESSION-CORRECTION.json",
+    "bytes": 855,
+    "sha256": "3ed29d7ab9acb445a3532ad9d472c3312a2818352599c6083ebab85c05877c4b"
+  },
+  {
+    "path": "GENUINE-DEV-COMPILE-DEPENDENCIES.json",
+    "bytes": 8991,
+    "sha256": "0041bbf91334986a36ed0460f182eb0cf671f9c8d0226c4381a564f7fa2da625"
+  },
+  {
+    "path": "INITIAL-PATCH-WHITESPACE-REFUSAL.json",
+    "bytes": 306,
+    "sha256": "75df3d9f5a05f076573d156b7698a98cc5ee584a62dc602f8e357987f6430c78"
+  },
+  {
+    "path": "PATCH-RECEIPT.json",
+    "bytes": 1178,
+    "sha256": "348e795848410764651d11dcee3f0b788d2ca53947b69afbc40c55f164459512"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+    "bytes": 6613,
+    "sha256": "7ffaf33a12188f049087a1c12efbb68f7953859863835cb10322ca9a8f0007d2"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+    "bytes": 975,
+    "sha256": "a99adf39f75bf83b9f934d9a19559e5f20c9d18652bc61a14bf7c4a1cb1fdb56"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+    "bytes": 1342,
+    "sha256": "91360676a4144f09132dd809737bd4cc98a8169bb66bd8968b36ff4a20bde509"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+    "bytes": 688,
+    "sha256": "05ccd19a9ec3f7ef5a717e5a07a02c8f47253e1b4dff3029cc652a69cf640e08"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+    "bytes": 33151,
+    "sha256": "59ebbcbf4575b4d10d6e24f6ab479648009bbf237ec057a758b219bea546c354"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+    "bytes": 20656,
+    "sha256": "01e3375cce49dbde653068a9a243d405ffba18f6893c8f64b60eead79826b424"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+    "bytes": 1480,
+    "sha256": "7537c3802872dd1aa08cf3ca899ab9bd43b0381c4028c30fc0024146d4ef75af"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+    "bytes": 1170,
+    "sha256": "408cd3fab2d98f7096ca93e15af27ed634d1893c83305d1e665f86d0a1e2e83c"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+    "bytes": 16022,
+    "sha256": "4eb1b70c037195cfe1d733a385593279b5a8fedd17f2b8ef27323601be6ce7e6"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+    "bytes": 12990,
+    "sha256": "7fd7faa1c7d6f0367dc8a0b374d81b76702caf860addeffd7e1834fa8f7801cf"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+    "bytes": 6608,
+    "sha256": "5d74b6da01b5132bae0b6a04cc972eb2c6fc8a4146a45f879b5cd2c012a9fa74"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+    "bytes": 48223,
+    "sha256": "ece423dd420af84eec1df9a18a3f4f0eb2998811bdca7fbd34bc6104ab8d4f56"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+    "bytes": 8043,
+    "sha256": "c7b52afe1adcf27e87b944dba4dcd61a81565d61eaa0c4c7f0d6289787875b63"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+    "bytes": 5554,
+    "sha256": "32d83a2345d39f34adabaf28a7f630f8baf527cfe7f85747210873518debc236"
+  },
+  {
+    "path": "POST/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+    "bytes": 1884,
+    "sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+  },
+  {
+    "path": "POST/tools/build/fixtures/vhd-daemon-report-reference-source.swift.txt",
+    "bytes": 7646,
+    "sha256": "224f9583a53ee5c08681f1814737e69203b699092663030e5e05b06feabf65b4"
+  },
+  {
+    "path": "POST/tools/build/generate_vhd_daemon_report_reference.py",
+    "bytes": 1871,
+    "sha256": "5dcd494a74e7be28abc7d43e73a8f9b8c186ae7bf7d82d39bbd62c407d210621"
+  },
+  {
+    "path": "POST/tools/build/owned-runtime-installer/InstallerMain.swift",
+    "bytes": 1348,
+    "sha256": "af6c43af09f1af468c388bf29af0be7beefef61394cadfb55093577caa2bd29e"
+  },
+  {
+    "path": "POST/tools/build/owned_runtime_product_build.py",
+    "bytes": 60346,
+    "sha256": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
+  },
+  {
+    "path": "POST/tools/build/owned_runtime_product_build_test.py",
+    "bytes": 13538,
+    "sha256": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f"
+  },
+  {
+    "path": "PRE/static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+    "bytes": 933,
+    "sha256": "869f3cdf291924c94b677931ccab70a026a9c41e0e5c58704018f91e3a25ac76"
+  },
+  {
+    "path": "PRE/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+    "bytes": 47673,
+    "sha256": "c4cdc51ace44b6124ec6a5ed5284ab8ecb96668f0b92071cbe7ee071086f2c14"
+  },
+  {
+    "path": "PRE/tools/build/owned-runtime-installer/InstallerMain.swift",
+    "bytes": 850,
+    "sha256": "1bc1eafe132ef6c4592c6c51d160c6f8e28bdf30aeaf190ec3972e2d1e77a8cb"
+  },
+  {
+    "path": "PRE/tools/build/owned_runtime_product_build.py",
+    "bytes": 54943,
+    "sha256": "fc62979a9177ec775514f366df12f0865099e51f54fb11d01f8c93310c2a3141"
+  },
+  {
+    "path": "PRE/tools/build/owned_runtime_product_build_test.py",
+    "bytes": 7506,
+    "sha256": "7011b525ba9836b5777709ff39ade58e07e9dc63119db32c4da15e56b9a4310f"
+  },
+  {
+    "path": "PREIMAGES.json",
+    "bytes": 2892,
+    "sha256": "54a4486a4ff73af41b74f29893b8f7db0d7feef903b88627c268402b6e4153e2"
+  },
+  {
+    "path": "SOURCE-REVIEW-LIMITS.json",
+    "bytes": 2597,
+    "sha256": "4a6c550d344442d9c05d3e1820646250e71327924f86a42cbc2bc375c7d24539"
+  },
+  {
+    "path": "SOURCE.patch",
+    "bytes": 153662,
+    "sha256": "d8a2bb5521fd6336a19e895b644e4913ea1b8815b66b61be5bb01d05cd74deea"
+  },
+  {
+    "path": "STATIC-RUFF-RECEIPTS.json",
+    "bytes": 1350,
+    "sha256": "ad3d14f50be6a0df273880118426e97ab4b786f00efd7b277d58d0d7e51d9865"
+  },
+  {
+    "path": "VERIFY-CHANGE-PLAN.json",
+    "bytes": 3932,
+    "sha256": "5789704b7bcead0e4767a546dfc10dbf612c51617f425252738483ee75e2f987"
+  }
+]

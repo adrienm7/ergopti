@@ -1,0 +1,24 @@
+test_default_source_rosters_are_exact_and_report_is_additive (__main__.DaemonReportBuildControls.test_default_source_rosters_are_exact_and_report_is_additive) ... ok
+test_full_repository_header_closure_is_held_in_report_profile (__main__.DaemonReportBuildControls.test_full_repository_header_closure_is_held_in_report_profile) ... ok
+test_module_map_is_exact_owned_umbrella_and_no_caller_declarations (__main__.DaemonReportBuildControls.test_module_map_is_exact_owned_umbrella_and_no_caller_declarations) ... ok
+test_nonboolean_profile_refuses_without_creating_compile_files (__main__.DaemonReportBuildControls.test_nonboolean_profile_refuses_without_creating_compile_files) ... ok
+test_report_has_exact_native_objects_for_both_architectures (__main__.DaemonReportBuildControls.test_report_has_exact_native_objects_for_both_architectures) ... ok
+test_validator_module_lifecycle_and_lipo_commands_are_unchanged (__main__.DaemonReportBuildControls.test_validator_module_lifecycle_and_lipo_commands_are_unchanged) ... ok
+test_compiled_copy_hash_mismatch_refuses (__main__.ProductionBuildControls.test_compiled_copy_hash_mismatch_refuses) ... ok
+test_exact_both_architecture_compile_rosters (__main__.ProductionBuildControls.test_exact_both_architecture_compile_rosters) ... ok
+test_existing_destination_refuses (__main__.ProductionBuildControls.test_existing_destination_refuses) ... ok
+test_expired_copy_deadline_refuses (__main__.ProductionBuildControls.test_expired_copy_deadline_refuses) ... ok
+test_held_content_mutation_refuses (__main__.ProductionBuildControls.test_held_content_mutation_refuses) ... ok
+test_held_read_and_atime_only_stay_current (__main__.ProductionBuildControls.test_held_read_and_atime_only_stay_current) ... ok
+test_lifecycle_object_links_only_installer_once (__main__.ProductionBuildControls.test_lifecycle_object_links_only_installer_once) ... ok
+test_module_uses_only_fixed_repository_and_hs_headers (__main__.ProductionBuildControls.test_module_uses_only_fixed_repository_and_hs_headers) ... ok
+test_named_inode_replacement_refuses (__main__.ProductionBuildControls.test_named_inode_replacement_refuses) ... ok
+test_product_directory_symlink_refuses (__main__.ProductionBuildControls.test_product_directory_symlink_refuses) ... ok
+test_product_hardlink_refuses (__main__.ProductionBuildControls.test_product_hardlink_refuses) ... ok
+test_signature_header_reaches_both_native_swift_products (__main__.ProductionBuildControls.test_signature_header_reaches_both_native_swift_products) ... ok
+test_source_mode_change_refuses (__main__.ProductionBuildControls.test_source_mode_change_refuses) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 0.008s
+
+OK
