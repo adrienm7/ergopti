@@ -294,6 +294,11 @@ final class OwnedVirtualHIDDaemonReportObserver {
 	/// Checked local rights only; neither EOF nor successful close acknowledges the daemon's IOKit cleanup.
 	func retire() -> Bool { operation.lock(); defer { operation.unlock() }; stop(); return retireOriginalRights() }
 	func retired() -> Bool { operation.lock(); defer { operation.unlock() }; return settled }
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	static func fixtureChangedFileRetirement() throws -> (wasCurrent: Bool, rejectedMutation: Bool, failure: Int32, firstClose: Bool, originalClosed: Bool, repeatedClose: Bool, replacementCurrent: Bool) {
+		try Descriptor.fixtureChangedFileRetirement()
+	}
+	#endif
 	private func retireOriginalRights() -> Bool {
 		if settled { return true }
 		var complete = true
@@ -320,7 +325,7 @@ final class OwnedVirtualHIDDaemonReportObserver {
 
 	private final class Descriptor {
 		let number: Int32, socket: Bool
-		private(set) var stamp: stat?, error: Int32 = 0
+		private(set) var stamp: stat?, error: Int32 = 0, closeError: Int32 = 0
 		private var identity = ergopti_vhd_report_socket_identity(), captured = false, closeAttempted = false, closed = false
 		init(_ number: Int32, socket: Bool) { self.number = number; self.socket = socket }
 		func capture() -> Bool {
@@ -351,12 +356,52 @@ final class OwnedVirtualHIDDaemonReportObserver {
 		}
 		func close() -> Bool {
 			if closeAttempted { return closed }
-			guard current() else { return false }
+			// Content changes refuse observation, but cannot keep our same original FD open forever.
+			guard captured, let stamp else { return false }
+			var value = stat()
+			let observed = fstat(number, &value), observedError = errno
+			guard observed == 0, value.st_dev == stamp.st_dev, value.st_ino == stamp.st_ino,
+				value.st_mode & mode_t(S_IFMT) == stamp.st_mode & mode_t(S_IFMT) else {
+				if error == 0 { error = observed == 0 ? ESTALE : observedError }; return false
+			}
+			if socket {
+				let result = ergopti_vhd_report_socket_matches(number, &identity)
+				guard result == 0 else { if error == 0 { error = result }; return false }
+			}
 			closeAttempted = true
 			let status = Darwin.close(number), saved = errno
-			closed = status == 0; if !closed { error = saved }
+			closed = status == 0
+			if !closed { closeError = saved; if error == 0 { error = saved } }
 			return closed
 		}
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		static func fixtureChangedFileRetirement() throws -> (wasCurrent: Bool, rejectedMutation: Bool, failure: Int32, firstClose: Bool, originalClosed: Bool, repeatedClose: Bool, replacementCurrent: Bool) {
+			let path = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).path
+			let raw = Darwin.open(path, O_RDWR | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, mode_t(0o600))
+			guard raw >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			let held = Descriptor(raw, socket: false); var replacement: Int32 = -1
+			defer {
+				if replacement >= 0 { Darwin.close(replacement) }
+				// An omitted production close still leaves this fixture's unchanged original FD to release.
+				if !held.closeAttempted, let stamp = held.stamp {
+					var value = stat()
+					if fstat(raw, &value) == 0, value.st_dev == stamp.st_dev, value.st_ino == stamp.st_ino { Darwin.close(raw) }
+				}
+				unlink(path)
+			}
+			guard held.capture() else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(held.error)) }
+			let wasCurrent = held.current(); var byte: UInt8 = 1
+			guard Darwin.write(raw, &byte, 1) == 1 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			let rejectedMutation = !held.current()
+			let firstClose = held.close()
+			errno = 0; let originalClosed = fcntl(raw, F_GETFD) == -1 && errno == EBADF
+			replacement = Darwin.open(path, O_RDONLY | O_NOFOLLOW | O_CLOEXEC)
+			guard replacement >= 0 else { throw NSError(domain: NSPOSIXErrorDomain, code: Int(errno)) }
+			// The kernel may choose a different number; this fixture makes no forced-reuse claim.
+			let repeatedClose = held.close(), replacementCurrent = fcntl(replacement, F_GETFD) >= 0
+			return (wasCurrent, rejectedMutation, held.error, firstClose, originalClosed, repeatedClose, replacementCurrent)
+		}
+		#endif
 		static func same(_ a: stat, _ b: stat) -> Bool {
 			a.st_dev == b.st_dev && a.st_ino == b.st_ino && a.st_mode == b.st_mode && a.st_uid == b.st_uid
 				&& a.st_gid == b.st_gid && a.st_nlink == b.st_nlink && a.st_size == b.st_size
