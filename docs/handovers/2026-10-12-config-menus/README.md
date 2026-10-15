@@ -2,6 +2,12 @@
 
 # Configuration and menus: inactive personal-menu proposal
 
+The [October 15 path follow-up](2026-10-15-PATH-RECEIVING.md) records the
+published Linux watcher fix, its separate CI source, and the inactive shared
+paths-editor proposal. Root's current release boundary queues new Dev
+integration; neither the proposal archive nor a passing focused test closes
+the remaining Group 1 items.
+
 The [saved proposal](personal-default-inactive-proposal.tar.gz) preserves nine
 reviewed patches, four independent control inputs and nine receiving receipts.
 Its SHA-256 is `d363f5f18be730371977064c72fccafecc17de774ab780337397eca07f610302`. Extract into an owned temporary directory and verify
