@@ -12834,6 +12834,15 @@ remain; full driver and native/installed qualification are still required.
 Remaining owner collisions, source/modifier/output and physical availability
 remain separate; item97 and transverse16/38 stay open.
 
+A concrete prediction-consumer mismatch found during collision inventory work is
+also corrected: macOS now forwards Ctrl/Alt/Cmd+Shift+Tab using its existing
+modified-Tab dismissal, matching the independent shared exact-chord contract and
+Windows/Linux. Plain Shift+Tab keeps both directions regardless of arrow
+preferences. All10 original watcher tests remain; seven extra-modifier cases
+fail before the guard and the complete18 pass after it, with a causal guard
+withdrawal. This does not qualify native taps, CR/LF submit projection or complete
+AI collision coverage; those ownership requirements remain open.
+
 The selected local Mac software run receives 19,863/0 units and 101/0 E2E
 checks with one explicit skip. Common remains 433 PASS/two subprocess timeout
 FAIL; both unchanged checks later pass focused replay with original budgets,
