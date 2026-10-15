@@ -1007,6 +1007,12 @@ document.getElementById('btn-back').addEventListener('click', function () {
 	if (_stepIndex > 0) _go(_stepIndex - 1);
 });
 
+document.getElementById('config-input').addEventListener('input', function () {
+	// A delayed locale preview can re-render this step before navigation.
+	// Keep raw edits in the page state; leaving the step owns their admission.
+	_configDir = document.getElementById('config-input').value;
+});
+
 document.getElementById('config-browse').addEventListener('click', function () {
 	_post({ action: 'pickConfigDir', current: document.getElementById('config-input').value || '' });
 });
