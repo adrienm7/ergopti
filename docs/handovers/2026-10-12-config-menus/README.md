@@ -176,3 +176,21 @@ Personal archive remains inactive; no item is closed from source inspection
 or portable native-port doubles. Root's receiving and shared-helper ownership
 remain unchanged. Additional diagnostics still require the full unavailable
 `Texte collé.txt` attachment.
+
+## Folder intent and native GTK receiving, 2026-10-15
+
+Dev retains atomic fixes `0261dc2a8` and `7cf0c151a`: each host names its actual
+empty-folder destination, and delayed locale replies preserve typed/cleared
+folder intent. The [current receiving](2026-10-15-RECEIVING.md) seals the exact
+code/CI trees, independent predecessor failures, full local gates, real Chromium
+and genuine GTK/WebKit source sessions. The GTK dependency installation is
+repeated without changing the base toolchain or host packages.
+
+Manual [38658948881](https://github.com/adrienm7/ergopti/actions/runs/38658948881)
+finishes globally failed: 31 successful, seven failed and five skipped jobs.
+All 17 Linux installation/launch variants succeed; Release is skipped. That
+run predates Group 3's subsequently preserved seventeen-case Snapshot receiver
+correction. Native Windows general receiving, macOS Managed/archive qualification,
+installed wizard/device acceptance and the complete `Texte collé.txt` remain
+open. All six Group 1 items and transversal 16/38 stay partial; the feature and
+inactive Personal proposal are retained.
