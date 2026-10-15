@@ -12812,8 +12812,18 @@ restoration 22/0 through the genuine Lua 5.4 runner. Each targeted source is
 really read and physically closed once before the controlled ACK. These are
 portable software receipts, not native macOS or physical delivery. See
 [the Mac Nav handoff](handovers/2026-10-15-group3-macos-nav/README.md).
-Original-load provenance, remaining owner collisions and physical availability
-remain separate; item 97 and transverse 16/38 remain open.
+Configured macOS Navigation reservations now retain the original load, actual
+Karabiner input and successful remap compilation/publication observations. The
+consumer refuses an absent owner or stale settings rather than assuming free
+input. Callback reentry cannot erase a successor reservation. Normal off-to-on
+activation transfers only the original acknowledged enabled-setting save from
+the same transaction; external source changes still refuse. The focused pure
+suite receives102/0, with original assertions preserved and causal source
+withdrawals failing. These fixtures exercise real Nav rule compilation and
+Remap transaction fences, while the existing full Generator/deploy/lease doubles
+remain; full driver and native/installed qualification are still required.
+Remaining owner collisions, source/modifier/output and physical availability
+remain separate; item97 and transverse16/38 stay open.
 
 The selected local Mac software run receives 19,863/0 units and 101/0 E2E
 checks with one explicit skip. Common remains 433 PASS/two subprocess timeout
