@@ -4708,12 +4708,19 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
 
   The Dev-based successor is preserved in
   `docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
-  review clears a finite 20-path source proposal; actual Python controls pass
-  19 normal and 19 optimized cases. Exact preimages and dependencies match
-  observed Dev a549c14f, but production sources remain unapplied. The normal
-  build runner does not select this report profile. Both-architecture native
-  compilation/linking, signed helper query and retirement, all 32 Swift cases
-  and daemon/staging cleanup receiving remain pending. No numeric ABI, resident
+  review clears the finite 20-path source implementation. The real production
+  packaging continuation now selects its report helper for the current VHD
+  profile, while the separate installed-SDK route remains unchanged. The report
+  dispatch follows the launcher's private umask installation. Independently
+  reviewed source bindings preserve the original signing/image checks; frozen
+  native approvals and SDK evidence are not refreshed. Python receiving passes
+  19 product controls and 14 route controls in normal and optimized modes; the
+  original caller fails the new route regression. Both-architecture native
+  compilation/linking, the distinct 17-command helper build, signed query and
+  retirement, all 32 Swift cases and daemon/staging cleanup remain pending.
+  The current CI's architecture filters do not execute these 32 cases or that
+  distinct helper build; enrollment is coordinated with the CI owner.
+  No numeric ABI, resident
   readiness, remote cleanup, physical accounting or lease fix is qualified;
   item 31 stays open.
 
