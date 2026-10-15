@@ -12778,6 +12778,25 @@ Windows units/package/install. macOS is unselected. These Linux results qualify
 the tested virtual/native and installed scope, not public physical delivery,
 other-owner completeness or actual device acceptance; item 97 remains partial.
 
+The macOS original-load callbacks now delegate to the same unchanged shared
+classified reader. Failed reads and false/nil close acknowledgements cannot
+supply user bindings or shipped context; genuine user absence and existing
+whole-file isolation remain unchanged. All 18 original Nav cases remain an
+exact prefix, with four real-file/controlled-ACK regressions. Original source
+receives 18 PASS/4 FAIL; the correction receives 22/0, withdrawal 18/4 and
+restoration 22/0 through the genuine Lua 5.4 runner. Each targeted source is
+really read and physically closed once before the controlled ACK. These are
+portable software receipts, not native macOS or physical delivery. See
+[the Mac Nav handoff](handovers/2026-10-15-group3-macos-nav/README.md).
+Original-load provenance, remaining owner collisions and physical availability
+remain separate; item 97 and transverse 16/38 remain open.
+
+The selected local Mac software run receives 19,863/0 units and 101/0 E2E
+checks with one explicit skip. Common remains 433 PASS/two subprocess timeout
+FAIL; both unchanged checks later pass focused replay with original budgets,
+without establishing the first failure causes or a full-suite PASS. Broad native
+and installed qualification remains required at the integration checkpoint.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -14101,6 +14120,17 @@ kernel child-census entry is absent; no guard is bypassed. This does not prove
 a product regression or native/physical acceptance. Exact source/failure and
 recoverable receiving limits are preserved in
 [the current-default handoff](handovers/2026-10-15-group3-current-default-source/README.md).
+
+Subsequent independent receiving of Root manual
+[38679366175](https://github.com/adrienm7/ergopti/actions/runs/38679366175)
+at exact published `5b0664a64e6d023506563ee822631f42369df229` confirms its
+entire Linux lane succeeds: 13,786/0 unit cases across 521 modules, actual
+family 5/recovery 1/window 34 checks, build and all 17 installation variants.
+The earlier dev0ba failure remains recorded and its cause is unknown; a later
+success does not establish that cause. The global run fails Windows units,
+Windows downstream stages are skipped, macOS is unselected and Release is
+skipped. This qualifies that tested Linux source and virtual-host chain, not
+physical multiple displays or the newly changed Mac source. Item 111 stays open.
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
