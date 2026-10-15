@@ -84,6 +84,8 @@ local _deps = nil
 -- The capture waiting for a key, nil when none: { handlers }.
 local _capture = nil
 local _capture_epoch = 0
+-- Accepted deferred choices still own a possible preference publication.
+local _pending_choices = {}
 
 -- The magic key character last reported as untypable on the session layout.
 local _untypable_reported = nil
@@ -355,6 +357,7 @@ end
 function M.cancel_capture()
 	_capture_epoch = _capture_epoch + 1
 	_capture = nil
+	_pending_choices = {}
 end
 
 --- Captures the next grabbed key-down as the physical magic key. Escape or the
@@ -386,6 +389,7 @@ function M.capture(handlers)
 	end
 	-- Only a genuinely admitted request supersedes queued predecessor choices.
 	_capture_epoch = live.epoch
+	_pending_choices = {}
 	Logger.info(LOG, "Waiting for the physical magic key…")
 	return true
 end
@@ -459,12 +463,16 @@ function M.on_key(detail)
 			if _capture == live then M.cancel_capture() end
 			return false
 		end
-		local admitted, premature = false, false
+		local admitted, premature, pending = false, false, _pending_choices
 		local called, queued = pcall(_deps.defer, function()
 			if admitted ~= true then premature = true return end
-			local allowed = M.can_capture()
-			if live.epoch ~= _capture_epoch or not allowed then return end
-			settle(live, evdev)
+			local settled, failure = pcall(function()
+				local allowed = M.can_capture()
+				if live.epoch ~= _capture_epoch or not allowed then return end
+				settle(live, evdev)
+			end)
+			pending[live] = nil
+			if not settled then error(failure, 0) end
 		end, 0)
 		if not called or queued ~= true or premature then
 			Logger.error(LOG, "The captured key could not be settled — nothing changed.")
@@ -476,6 +484,7 @@ function M.on_key(detail)
 			return false
 		end
 		admitted = true
+		pending[live] = true
 		_capture = nil
 		return true
 	end
@@ -521,5 +530,101 @@ function M._reset_for_test()
 	_code, _code_generation = nil, nil
 	_untypable_reported = nil
 end
+
+
+-- These source observers are captured by the same original replacement owner.
+local CollisionRoutes = require("infra.config_paths")
+local CollisionCodec = require("toml_codec")
+local collision_route, collision_read, collision_decode = CollisionRoutes.config, FileSystem.read_with_status, CollisionCodec.decode
+local preference_ports = { get = Preferences.get, generation = Preferences.generation,
+	snapshot = Preferences.snapshot, is_acquired = Preferences.is_acquired }
+local collision_methods = { get = M.get, evdev_code = M.evdev_code, resolver = M.resolver,
+	on_key = M.on_key, capture = M.capture, cancel_capture = M.cancel_capture, init = M.init,
+	_reset_for_test = M._reset_for_test }
+local collision_callback_names = { "is_active", "replace_on", "magic_key", "can_type", "type_text",
+	"dispatch_char", "end_selection", "can_capture", "key_text", "defer",
+	"input_source_receipt", "typing_plan", "direct_source_admitted" }
+local collision_factory
+
+--- Captures a configured replacement reservation, not a conditional editor recommendation.
+--- No output, capture, preference write or native input authority is acquired.
+--- @return table|nil frame Exact source and private lifetime observation.
+collision_factory = function()
+	local deps, capture_epoch, pending = _deps, _capture_epoch, _pending_choices
+	if _capture ~= nil or next(pending) ~= nil or preference_ports.is_acquired() then return nil end
+	if deps ~= nil and (type(deps) ~= "table" or getmetatable(deps) ~= nil) then return nil end
+	local callbacks = {}
+	for _, name in ipairs(collision_callback_names) do callbacks[name] = deps and rawget(deps, name) end
+	local path = collision_route("config.toml")
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" or path:find("%z") then return nil end
+	local bytes, status = collision_read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	if status == "ok" and type(bytes) ~= "string" then return nil end
+	local function observe()
+		if deps == nil then return {} end -- Original on_key cannot consume before init.
+		local facts = { value = collision_methods.get(), code = collision_methods.evdev_code() }
+		if facts.code == nil then return facts end
+		if type(facts.code) ~= "number" then return nil end
+		facts.active = callbacks.is_active()
+		if facts.active ~= true then return facts.active == false and facts or nil end
+		facts.replace = callbacks.replace_on()
+		if facts.replace ~= true then return facts.replace == false and facts or nil end
+		facts.admitted = callbacks.direct_source_admitted == nil or callbacks.direct_source_admitted(facts.code, true) == true
+		if not facts.admitted then return facts end
+		facts.magic = callbacks.magic_key()
+		if type(facts.magic) ~= "string" or facts.magic == "" then return nil end
+		facts.typable = callbacks.can_type(facts.magic)
+		if type(facts.typable) ~= "boolean" then return nil end
+		return facts
+	end
+	local facts = observe()
+	if facts == nil then return nil end
+	local preference_epoch, cached_code, cached_generation = preference_ports.generation(), _code, _code_generation
+	-- Cached preferences may be stale after a foreign writer. Compare the exact
+	-- owned source leaf, using the original reader's effective value unchanged.
+	if deps ~= nil then
+		local snapshot = preference_ports.snapshot()
+		local document = collision_decode(bytes or "")
+		if type(snapshot) ~= "table" or type(snapshot.document) ~= "table" or type(document) ~= "table" then return nil end
+		local stored, cached = document.hotstrings, snapshot.document.hotstrings
+		if stored ~= nil and type(stored) ~= "table" or cached ~= nil and type(cached) ~= "table" then return nil end
+		local value, prior = stored and stored.magic_key_source, cached and cached.magic_key_source
+		if value ~= prior or value ~= nil and type(value) ~= "string" then return nil end
+	end
+	local function private_current()
+		if not rawequal(package.loaded["modules.hotstrings.magic_key_source"], M)
+			or M.PATH ~= "hotstrings.magic_key_source" or M.capture_collision_inventory ~= collision_factory
+			or _deps ~= deps or _capture ~= nil or _capture_epoch ~= capture_epoch
+			or _pending_choices ~= pending or next(pending) ~= nil
+			or preference_ports.generation() ~= preference_epoch or preference_ports.is_acquired()
+			or _code ~= cached_code or _code_generation ~= cached_generation then return false end
+		for name, method in pairs(collision_methods) do if rawget(M, name) ~= method then return false end end
+		for name, method in pairs(preference_ports) do if rawget(Preferences, name) ~= method then return false end end
+		if deps then for _, name in ipairs(collision_callback_names) do
+			if rawget(deps, name) ~= callbacks[name] then return false end
+		end end
+		return rawequal(package.loaded["infra.hotstring_preferences"], Preferences)
+			and rawequal(package.loaded["infra.config_paths"], CollisionRoutes) and CollisionRoutes.config == collision_route
+			and rawequal(package.loaded["adapters.file_system"], FileSystem) and FileSystem.read_with_status == collision_read
+			and rawequal(package.loaded["toml_codec"], CollisionCodec) and CollisionCodec.decode == collision_decode
+	end
+	local function current()
+		if not private_current() or collision_route("config.toml") ~= path then return false end
+		local observed = observe()
+		if type(observed) ~= "table" then return false end
+		for _, name in ipairs({ "value", "code", "active", "replace", "admitted", "magic", "typable" }) do
+			if observed[name] ~= facts[name] then return false end
+		end
+		local content, classification = collision_read(path)
+		return classification == status and content == bytes and collision_route("config.toml") == path and private_current()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if facts.code ~= nil and facts.active and facts.replace and facts.admitted and facts.typable then
+		claims[1] = { kind = "chord", binding = "magic_key_source__replacement", code = facts.code, mods = {} }
+	end
+	return { path = path, content = bytes, status = status, claims = claims, current = current, sealed = private_current }
+end
+M.capture_collision_inventory = collision_factory
 
 return M

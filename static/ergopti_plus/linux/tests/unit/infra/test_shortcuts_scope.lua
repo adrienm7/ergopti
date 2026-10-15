@@ -1080,7 +1080,8 @@ end)
 --- Real configuration/claim owners; only the native map observation is modeled.
 local function with_collision_scope(source, tap_config, body)
 	with_scope(function(scope, owners, controls, path)
-		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions" }
+		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 		local Manager, tap_path, hook
 		local ok, why = pcall(function()
@@ -1262,6 +1263,129 @@ helpers.describe("conditional Magic Editor yields during collision preflight", f
 				end)
 				for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 				if not ok then error(why, 0) end
+			end)
+		end)
+	end
+end)
+local magic_collision_file_read = require("adapters.file_system").read
+
+--- Uses the real replacement owner and its actual cached preference document.
+local function with_magic_source(scope, owners, controls, path, state, body)
+	local names = { "modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
+	local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+	local Source, choices, typed = nil, {}, {}
+	local prior_read = controls.files.read
+	controls.files.read = magic_collision_file_read
+	local ok, why = pcall(function()
+		local Preferences = require("infra.hotstring_preferences")
+		helpers.assert_true(Preferences._set_file_for_test(path))
+		Source = require("modules.hotstrings.magic_key_source")
+		Source.init({
+			is_active = function() return state.active ~= false end,
+			replace_on = function() return state.replace ~= false end,
+			magic_key = function() return "★" end,
+			can_type = function() return state.typable ~= false end,
+			type_text = function(text) typed[#typed + 1] = text; return true end,
+			dispatch_char = function() error("preflight cannot dispatch a character") end,
+			end_selection = function() error("preflight cannot change a selection") end,
+			can_capture = function() return true end, key_text = function() return "j" end,
+			defer = function(callback, delay) choices[#choices + 1] = { callback = callback, delay = delay }; return true end,
+		})
+		body(scope, owners, controls, path, Source, Preferences, choices)
+		helpers.assert_eq(typed, {}, "claim capture and preflight never type output")
+	end)
+	if Source then Source._reset_for_test() end
+	controls.files.read = prior_read
+	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+	if not ok then error(why, 0) end
+end
+
+--- Refusal scenarios retain their exact no-native-ownership-change guard.
+local function with_magic_collision_scope(source, state, body)
+	with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+		with_magic_source(scope, owners, controls, path, state, body)
+	end)
+end
+
+--- None/removal use the original full publisher without readiness or map grants.
+local function with_magic_publication_scope(source, body)
+	with_scope(function(scope, owners, controls, path)
+		with_magic_source(scope, owners, controls, path, {}, body)
+	end, source)
+end
+local MAGIC_COLLISION_SOURCE = COLLISION_BASE .. '[hotstrings]\nmagic_key_source = "KeyJ"\n'
+helpers.describe("physical preflight joins the original Magic Key replacement", function()
+	for _, case in ipairs({
+		{ name = "plain chosen source", key = "physical_none_KeyJ", reason = "collision" },
+		{ name = "Shift source is not replaced", key = "physical_shift_KeyJ", reason = "unavailable" },
+		{ name = "Super editor chord is not the plain replacement", key = "physical_super_KeyJ", reason = "unavailable" },
+	}) do
+		helpers.it("(magic-collision-scope) " .. case.name, function()
+			with_magic_collision_scope(MAGIC_COLLISION_SOURCE, {}, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+					-- V5 requires initial readiness before observing a collision-free input.
+					if case.reason == "unavailable" then
+						controls.on_source = function() controls.delivery_available = false end
+					end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key, value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, case.reason)
+				helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(#controls.executed, 0)
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+			end)
+		end)
+	end
+	for _, case in ipairs({
+		{ name = "automatic", source = COLLISION_BASE .. '[hotstrings]\nmagic_key_source = "auto"\n', state = {} },
+		{ name = "replacement off", source = MAGIC_COLLISION_SOURCE, state = { replace = false } },
+		{ name = "untypable", source = MAGIC_COLLISION_SOURCE, state = { typable = false } },
+	}) do
+		helpers.it("(magic-collision-scope) " .. case.name .. " adds no replacement collision or readiness", function()
+			with_magic_collision_scope(case.source, case.state, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+					-- The original V5 final readiness fence remains decisive after observation.
+					controls.on_source = function() controls.delivery_available = false end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+				helpers.assert_eq(Sandbox.read_bytes(path), before); helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+			end)
+		end)
+	end
+	helpers.it("(magic-collision-scope) accepted queued capture refuses configuration before acquisition", function()
+		with_magic_collision_scope(MAGIC_COLLISION_SOURCE, {}, function(scope, _, controls, path, Source)
+			local chosen, before = {}, Sandbox.read_bytes(path)
+			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() error("no capture result before settlement") end }))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+			helpers.assert_eq(chosen, {}); helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(controls.device_calls, 0)
+		end)
+	end)
+	for _, removing in ipairs({ false, true }) do
+		helpers.it("(magic-collision-scope) preserves native " .. (removing and "removal" or "None") .. " without invoking replacement admission", function()
+			local source = removing and MAGIC_COLLISION_SOURCE:gsub('magic_editor = "none"\n', 'magic_editor = "none"\nphysical_none_KeyJ = "copy"\n', 1) or MAGIC_COLLISION_SOURCE
+			with_magic_publication_scope(source, function(scope, owners, controls, path, Source)
+				-- Both legitimate native-intent writes must publish while actual readiness is false.
+				helpers.assert_eq(scope.physical_delivery_available(), false)
+				local observations = 0
+				Source.capture_collision_inventory = function() observations = observations + 1; error("native intent must not acquire an output collision frame") end
+				local update = { section = "shortcuts.keyboard", key = "physical_none_KeyJ" }
+				if removing then update.delete = true
+				else update.value, update.intent = "none", "keyboard_assignment" end
+				local accepted, detail = scope.edit({ update })
+				helpers.assert_eq(accepted, true, detail); helpers.assert_eq(observations, 0)
+				helpers.assert_eq(scope.physical_delivery_available(), false)
+				local document = Codec.decode(Sandbox.read_bytes(path))
+				local expected
+				if not removing then expected = "none" end
+				helpers.assert_eq(document.shortcuts.keyboard.physical_none_KeyJ, expected)
+				helpers.assert_eq(document.hotstrings.magic_key_source, "KeyJ")
+				helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
 			end)
 		end)
 	end
