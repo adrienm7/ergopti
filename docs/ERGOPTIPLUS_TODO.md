@@ -4948,6 +4948,15 @@ The dormant provider selected gate completed with all sources, HEAD and index in
   and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
   qualification remains pending;
   this bounded source-publication correction does not complete item 33.
+  A separate October 15 paths-editor proposal preserves each folder field's
+  user intent across repeated native initialization. It remains inactive:
+  Root must enroll its new independent JS test and npm alias together with
+  the two shared page assets. Portable causal receiving is six cases
+  passed/103 failed on the original page and 109/zero corrected; genuine GTK
+  receiving is 174/zero, original 71/five, restored 174/zero. The exact
+  [proposal and receiving](handovers/2026-10-12-config-menus/2026-10-15-PATH-RECEIVING.md)
+  retain native Browse, Cocoa/WebView2, installed logger and device acceptance
+  as outstanding requirements; no configuration-policy closure is inferred.
   October 15 ownership review keeps the remaining Linux keyboard-layout
   participant and number-row/direct-access runtime producer join open. Compose
   with Group 3's real producer before adding clear/restore, external-conflict,
@@ -6580,6 +6589,19 @@ The packaged macOS launch matrix now contains a Karabiner configuration scenario
 The signed native checkpoint 37116923472 reached the actual independent JSON codec and production build/merge owners, then refused its first variant because the canonical French action registry gives distinct Cmd+Tab and Option+F17 outputs the same localized label. Legacy reconstruction now keeps validated action-label candidates: unused descriptive ambiguity cannot block foreign profiles, while a complete historical block referencing distinct candidates remains unowned and refuses publication. The eight real-catalogue default/recommended switch vectors prove merge, exact-source publication and unchanged confirmation locally. Signed native qualification of all eight variants remains pending; the original AppleEvent controls and deadlines remain mandatory.
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
+
+  October 15 follow-up fixes Linux personal-directory watcher identity:
+  recursive scans retain case and literal backslashes, including a configured
+  root ending in backslash. Original 39 cases remain byte-for-byte; ten new
+  real-file controls pass in Lua 5.4 and LuaJIT. With the original producer,
+  the same controls report 43 passes/six failures; corrected receiving is
+  49/zero. Selected local verification passes 13,768 units across 521 modules
+  and 193 E2E cases. Feature atom `b666a22f7` is queued for Root's current
+  release integration boundary; it is not a new Dev delivery. See the
+  [path receiving checkpoint](handovers/2026-10-12-config-menus/2026-10-15-PATH-RECEIVING.md)
+  for the exact Linux-only CI source and retained evidence. This corrects
+  reload observation; transaction, installed-startup and device qualification
+  remain required.
 
   Refreshed Linux receiving prerequisite (2026-10-14): the polling backend
   now sends scalar/incomplete luaposix timestamps through the existing
