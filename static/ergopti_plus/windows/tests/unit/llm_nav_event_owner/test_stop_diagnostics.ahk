@@ -169,6 +169,43 @@ _LNEO_StartErrorBeforeCleanupCase(Status, MissingStop) {
 			CallbackFree(Pointer)
 	}
 }
+/** Admit exactly the original three ordered child results and finite timings. */
+_LNEO_StartCustodyReceiptValid(Tap) {
+	Lines := StrSplit(StrReplace(Tap, "`r`n", "`n"), "`n")
+	if InStr(StrReplace(Tap, "`r`n", ""), "`r") || Lines.Length == 0 || Lines[Lines.Length] != ""
+		return false
+	Lines.Pop()
+	Position := 1
+	Boots := Map()
+	while Position <= Lines.Length && RegExMatch(Lines[Position], "^# \[boot\] .+$") {
+		if Boots.Has(Lines[Position])
+			return false
+		Boots[Lines[Position]] := true
+		Position += 1
+	}
+	; Plan, selection, three RUNNING/result/timing triples, and final summary.
+	if Lines.Length - Position + 1 != 12 || Lines[Position] !== "1..3"
+		return false
+	Position += 1
+	if !RegExMatch(Lines[Position], "^# --only native-start-error-custody: - 3 of [1-9][0-9]* test\(s\) selected\.$")
+		return false
+	Position += 1
+	Names := [
+		"OS error survives actual adapter cleanup",
+		"non-OS refusal still runs cleanup without an OS read",
+		"cleanup lookup failure retains both errors"
+	]
+	for Index, Name in Names {
+		Expected := "native-start-error-custody: " . Name
+		if Lines[Position] !== "RUNNING " . Index . "/3 - " . Expected
+			|| Lines[Position + 1] !== "ok " . Index . " - " . Expected
+			|| !RegExMatch(Lines[Position + 2], "^# duration_ms " . Index . " [0-9]+(?:\.[0-9]+)?$")
+			return false
+		Position += 3
+	}
+	return Lines[Position] == "# 3 passed, 0 failed."
+}
+
 /** Receive the original controlled callbacks in a fresh native issuance realm. */
 _LNEO_ReceiveStartErrorCase(Status, MissingStop) {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports
@@ -210,19 +247,8 @@ _LNEO_ReceiveStartErrorCase(Status, MissingStop) {
 		AssertTrue(FileExist(TapPath) && FileExist(OutPath) && FileExist(ErrPath))
 		AssertEqual(0, FileGetSize(ErrPath), "child startup/parse diagnostics must refuse receiving")
 		Tap := FileRead(TapPath, "UTF-8")
-		AssertTrue(RegExMatch(Tap, "m)^1\.\.3\r?$"), "the exact original three-case plan is required")
-		Names := [
-			"OS error survives actual adapter cleanup",
-			"non-OS refusal still runs cleanup without an OS read",
-			"cleanup lookup failure retains both errors"
-		]
-		for Index, Name in Names {
-			Expected := "native-start-error-custody: " . Name
-			AssertTrue(InStr(Tap, "RUNNING " . Index . "/3 - " . Expected . "`r`n"))
-			AssertTrue(InStr(Tap, "ok " . Index . " - " . Expected . "`r`n"))
-		}
-		AssertFalse(RegExMatch(Tap, "m)^not ok|# SKIP|FATAL STARTUP|WATCHDOG"))
-		AssertTrue(RegExMatch(Tap, "m)^# 3 passed, 0 failed\.\r?$"))
+		AssertTrue(_LNEO_StartCustodyReceiptValid(Tap),
+			"require exactly three ordered original RUNNING/result/timing pairs and one plan/summary")
 		AssertEqual(ParentModule, _LLM_NavEventOwnerModule)
 		AssertTrue(ParentExports == _LLM_NavEventOwnerExports)
 		AssertEqual(Canonical, FileRead(CanonicalPath, "UTF-8"))
@@ -246,3 +272,52 @@ Test("native-start-error-custody: non-OS refusal still runs cleanup without an O
 	_LNEO_ReceiveStartErrorCase.Bind(5, false))
 Test("native-start-error-custody: cleanup lookup failure retains both errors",
 	_LNEO_ReceiveStartErrorCase.Bind(6, true))
+
+
+/** Keep foreign, duplicated, reordered and case-only child records observable. */
+_LNEO_StartCustodyReceiptControls() {
+	ReceiptNames := [
+		"OS error survives actual adapter cleanup",
+		"non-OS refusal still runs cleanup without an OS read",
+		"cleanup lookup failure retains both errors"
+	]
+	GoodReceipt := "1..3`n# --only native-start-error-custody: - 3 of 3 test(s) selected.`n"
+	for ReceiptIndex, ReceiptName in ReceiptNames {
+		GoodReceipt .= "RUNNING " . ReceiptIndex . "/3 - native-start-error-custody: " . ReceiptName . "`n"
+		GoodReceipt .= "ok " . ReceiptIndex . " - native-start-error-custody: " . ReceiptName . "`n"
+		GoodReceipt .= "# duration_ms " . ReceiptIndex . " 0.001`n"
+	}
+	GoodReceipt .= "# 3 passed, 0 failed.`n"
+	AssertTrue(_LNEO_StartCustodyReceiptValid(GoodReceipt))
+	AssertTrue(_LNEO_StartCustodyReceiptValid(StrReplace(GoodReceipt, "`n", "`r`n")))
+	ReceiptLines := StrSplit(GoodReceipt, "`n")
+	FirstBlock := ReceiptLines[3] . "`n" . ReceiptLines[4] . "`n" . ReceiptLines[5] . "`n"
+	SecondBlock := ReceiptLines[6] . "`n" . ReceiptLines[7] . "`n" . ReceiptLines[8] . "`n"
+	AssertTrue(InStr(GoodReceipt, FirstBlock . SecondBlock) > 0)
+	BadReceipts := [
+		StrReplace(GoodReceipt, FirstBlock . SecondBlock, SecondBlock . FirstBlock),
+		StrReplace(GoodReceipt, ReceiptLines[4] . "`n", ReceiptLines[4] . "`n" . ReceiptLines[4] . "`n"),
+		StrReplace(GoodReceipt, FirstBlock, ""),
+		GoodReceipt . "ok 4 - foreign case`n",
+		GoodReceipt . "1..3`n",
+		GoodReceipt . "# 3 passed, 0 failed.`n",
+		GoodReceipt . "RUNNING 4/3 - foreign case`n",
+		StrReplace(GoodReceipt, "ok 1 -", "not ok 1 -"),
+		StrReplace(GoodReceipt, "RUNNING 1/3", "RUNNING 2/3"),
+		StrReplace(GoodReceipt, "ok 1 -", "ok 2 -"),
+		StrReplace(GoodReceipt, "RUNNING 1/3", "running 1/3"),
+		StrReplace(GoodReceipt, "ok 1 -", "OK 1 -"),
+		StrReplace(GoodReceipt, "OS error survives", "os error survives"),
+		StrReplace(GoodReceipt, "# duration_ms 1 0.001", "# duration_ms 1 -1"),
+		StrReplace(GoodReceipt, "# duration_ms 1 0.001", "# duration_ms 2 0.001"),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "# 2 passed, 0 failed."),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "# SKIP`n# 3 passed, 0 failed."),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "UNASSIGNED_DIAGNOSTIC`n# 3 passed, 0 failed."),
+		SubStr(GoodReceipt, 1, StrLen(GoodReceipt) - 1)
+	]
+	for MalformedReceipt in BadReceipts
+		AssertFalse(_LNEO_StartCustodyReceiptValid(MalformedReceipt),
+			"a complete transcript cannot admit a foreign, missing or malformed record")
+}
+Test("native-start-error-receipt: complete child census refuses malformed records",
+	_LNEO_StartCustodyReceiptControls)
