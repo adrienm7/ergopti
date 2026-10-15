@@ -12889,6 +12889,11 @@ owner cannot authorize a free mapping. Both Lua ABIs receive25 owner and9
 consumer controls, including genuine original-source failures and three source
 withdrawals. All original assertions remain. Full joined driver/installed and
 native qualification remain required; item97 and transverse16/38 stay open.
+The optional-preference regression additionally asserts the actual returned
+Navigation module and callable collision API, retaining its successful-load,
+ordinary-value and unavailable-frame assertions. This strengthens the received
+result beyond the load status and satisfies the original false-green ratchet;
+no baseline, original assertion or product refusal is changed.
 
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
