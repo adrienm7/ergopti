@@ -12,6 +12,73 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 pending warmup ownership correction
+
+The published156e58d9ff Windows build starts against the authorized isolated
+Ollama0.40.4 server and eventually reaches actual model readiness. Its startup
+also records refused request retirement and retries before readiness; this is
+not a clean startup qualification. The observer sends no substitute warmup.
+Its new actual Diagnostics archive remains pending the maintainer opening the
+tray application's Diagnostics window. The earlier verified f1b archive remains
+retained; no later archive is inferred from it.
+
+The source correction retains a genuinely pending warmup and its original
+absolute timeout instead of cancelling it at each retry. Windows checks exact
+request, generation, model, source custody and deadline; stale constructor
+publication cannot overwrite a successor. macOS retains the original POST
+through the actual API/core/controller composition, preserving retry backoff
+only for an explicit retained observation. Explicit acquisition still needs a
+fresh POST. Synchronous observers cannot grant acquisition to a withdrawn
+request, and on-stack acquisition cannot claim completed retirement.
+Linux has no corresponding warmup retry loop; its inference cancellation is
+unchanged. Native macOS/Linux and physical Windows receiving remain OPEN.
+
+Private causal receiving passes7/7 Windows cases and12/12 Lua cases on Windows,
+all with natural exit0 and unchanged tracked source. Original pending retry,
+stale completion, constructor replacement, deadline and synchronous-origin
+controls fail on their respective preimages. The final origin-read activity
+control tightens the pending observation; it is not native qualification.
+Canonical targeted receiving passes7/7 new Windows cases and38/38 warmup
+selections (overlapping),71/71 Ollama Lua module cases, Windows E2E70/70 with no
+skips, and portable Lua E2E67PASS with two explicit driver/host exclusions.
+Whole-entry compilation separates good0/bad17/entry0. Format, strict conventions,
+1,918-file AHK encoding and the unchanged380/380 source-read ratchet pass.
+After the measured local-variable warning is removed, final Windows warmup38/38,
+E2E70/70, compilation, format, strict conventions and encoding pass again. The
+source/detail warning multiset stays6,630 against6,630, with no added entry.
+
+The frozen complete Lua command on Windows finishes naturally with exit1:
+18899 passes and856 failures across1604 attempted modules, including
+4 module-load failures. All twelve new warmup
+cases pass within that composition; source, HEAD and tracked diff stay unchanged.
+One file-publication assertion and three daemon-launch assertions independently
+fail with identical values against the published three-file Lua preimage. This
+attributes those four controls only; the other failures stay unresolved. It is
+not a green full Lua gate or native macOS qualification.
+
+The retained native Windows file-filter failure takes29,952.603ms for its whole
+case; restored|elapsed_ms=17109 is the entry to restoration, not its duration.
+Restricted TXT/BIN behavior and All Files/index2 are confirmed. Return from
+ControlChooseIndex restoring index1 and the following restoration queries are
+not individually traced.
+No production forwarding defect is established; this remains a native FAIL,
+not merely missing physical qualification. A private per-call trace on an idle
+desktop is the next receiving step; assertions and budgets stay unchanged.
+
+Default JS receiving executes424 original checks: 410PASS,14FAIL,
+with exactly one full-startup check UNRUN while the retained compiled app is
+active. Every executed check has its original command and natural outcome;
+source, HEAD and tracked diff stay unchanged. This is a PARTIAL425-entry default
+inventory, excluding SLOW_CHECKS, and not a complete or green canonical gate.
+Actual full Windows units and single-driver startup remain OPEN. Earlier
+complete JS411/425 and incomplete Windows-unit results remain failed or
+incomplete. Failures retain the actual Linux-only/native archive refusals,
+missing sandbox service file, Windows symlink/permission refusals, unavailable
+CF/AX compiler prerequisites and refused unsupported SDK receipt. No assertion
+or native qualification is waived. The exact committed application build and
+its actual startup and Diagnostics receiving remain separate from these source
+results.
+
 ### October 15 complete local source receiving
 
 The complete canonical JS gate receives the frozen local candidate on base
@@ -165,8 +232,9 @@ The warmup correction is published normally on dev as7a61e3f211, preserving
 atomic history and main. Its clean-source official build succeeds with pinned
 AutoHotkey2.0.26:ErgoptiPlus-7a61e3f211.exe,11,083,264bytes, SHA256
 `83969dd2d47f8fd428ccaf4e9d58f124e29642d4ba7b2f6ac1b6bea24535c2ce`.
-Build stamps are restored and the source stays clean. The prior f1b test
-application remains active, so the new build is not started alongside it.
+Build stamps are restored and the source stays clean. The maintainer has now
+quit the prior f1b test application. The new build has not yet been started;
+the single-driver window is receiving the KLE registration prerequisite first.
 The earlier f1b Diagnostics archive remains verified; a new installed archive
 and actual corrected warmup are not yet received. Personal configuration and
 the unrelated UIA worker remain preserved.
@@ -180,6 +248,64 @@ and a checked dialer. The existing native wrapper replaces that transport;
 retaining only CheckRedirect would not preserve those connection checks. A
 reviewed source port must account for that veto before changing the shared
 runtime pins. Source acquisition is not compilation or native qualification.
+
+### October 15 KLE AltGr binding-source receiving
+
+The Windows prerequisite now retains the original AltGr callbacks at their
+original registration positions, independently of layout loading. Native source
+issuance requires the original functions, exact SC138/I2 declarations and the
+complete ordered physical inventory read from the retained original shared root.
+Injected ports retain their ordinary controlled behavior but never issue native
+custody. Observed function, callback, factory or registration withdrawal retires
+the source permanently. Captured Maps are detached metadata, not event or output
+authority. The original effectful body is lexically enclosed; its original lines
+remain after one nesting tab, with an additional explicit local Count declaration.
+
+Actual fresh Windows children return the original448 registration count, which
+includes48 Win-broker fallback declarations, and retain all49 genuine AltGr
+callbacks without loading a layout or emitting input. The matched original-body
+control returns the same448 count but fails on factory0, natural
+exit1; the corrected child passes1/1, natural exit0. Seventeen fresh refusal and
+lifetime controls also pass, each1/1 with natural exit0 and a complete manifest:
+prefix/level, truncated/reordered cache, retained root, injected restoration,
+partial native registration, model independence, public registration withdrawal,
+and Call/Bind withdrawal for the function, reader, callback and factory. Four new
+registered pure cases pass against the same private afterimages before applying
+them. The canonical composition then passes all four new pure cases,91 reset
+cases,10 layout cases,25 producer cases,802 terminal cases,8 warmup cases and70
+E2E cases. Each selection has a complete manifest, natural exit0 and no skips;
+these overlapping selections are not additive totals. Encoding1918, pinned
+source reads380/380, strict conventions, the full format check and whole-entry
+compilation pass. Compiler controls retain good0/bad17 separation. Actual
+single-driver startup also passes fresh/reloaded/independent, suspend-marker,
+extension opt-in, script-chord, retired-Metrics, neutral-default and older-release
+boots, reaching readiness without errors and with every expected script chord.
+The frozen complete JS command finishes naturally with exit1:411/425 PASS,
+14 FAIL, with source images, HEAD and tracked diff unchanged. Its failures retain
+the actual Linux-host/archive and sandbox requirements, Windows symlink and
+POSIX permission refusals, unsupported SDK filesystem controls, and the CI,
+Homebrew, ordered-cohort and managed-runtime fixture failures. No failed check
+is waived or converted to native success. The final build and installed
+receiving follow separately; this is not a globally green composition.
+
+The first candidate fails actual issuance because the enclosed body captures
+parent Prefix/Key locals, changing its retained closure identity between calls.
+Distinct owner locals fix the measured failure; both independent source reviews
+find no remaining overlap. Earlier failed receipts remain retained. Warning
+qualification compares source/detail multisets against the unchanged canonical
+dry-run:6631 existing warnings versus6630 on the final candidate, with no added
+warning. A set-only comparison missed two duplicate warnings and is not accepted
+as that proof. The initial retained-root fixture also fails because the separate
+Win broker needs its own physical registry; its successor supplies that unchanged
+registry while still withholding the KLE file, preserving the original assertion.
+
+This receives Windows registration metadata only. Actual winning-variant/event
+provenance, held modifier custody, authenticated foreground/HKL mapping, accepted
+output and the remaining cohort conversion are still software work. macOS and
+Linux use their own layout/input owners; this AHK-specific callback prerequisite
+changes neither sibling's typing policy and grants no native qualification.
+Physical Windows keyboard/hook-order/ISO/display acceptance remains OPEN; native
+macOS and Linux remain UNRUN. Existing complete unit and JS failures stay open.
 
 ### October 15 AHK direct-digit registration receiving
 
@@ -5972,6 +6098,50 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+### Current remaining work after Group 6 container retirement
+
+The maintainer requested the useful Group 6 sources and preparations on Dev,
+then removal of this container's feature/CI branches. The dated
+[retirement custody](handovers/2026-10-15-group6-container-closure/README.md)
+contains the finite inactive source packets and source-bound receipts; this
+item and item 62 are the authoritative work tracker, not private TODO files.
+
+Still required for item 36:
+
+- Qualify the final macOS `.tar.xz` artifact through archive/signature/notarization,
+  Sparkle selection, Homebrew and CI install/launch, preserving actual package
+  and installed-build receiving. The four Ruby syntax checks and portable Cask
+  cases do not qualify native pgrep, Automation consent or installation.
+- Receive all six original Brew scenarios, archive25 and the remaining package,
+  installation and recovery cases on the final exact source/artifact. Retain
+  failed, skipped and unrun results separately. Earlier Automation deadlines
+  remain unresolved; no timeout increase or stopped permission experiment is
+  authorized by this retirement.
+- Complete the actual original23 updater/interpreted-AHK production coupling
+  and native acceptance with Root's current genuine role/runtime/caller/source,
+  acquisition, READY, capture and retirement contract. The saved inert native
+  API and pure 20-control launch planner are references, not production authority
+  or native23 qualification. Preserve original diagnostic pins and all refusal,
+  error and cleanup assertions.
+
+The integrated source atoms are the literal Cask matcher `2d85848e`, transport
+admission `0cce22b6` and failure-only signal diagnostics `37c71f97`. The last
+feature source checkpoint `9a2430ab` includes Dev `156e58d9`: format, AHK encoding
+and JS426/426 pass; actual AHK unit/parse/E2E are skipped on Linux. Earlier
+own-source portableMac19827, locked-client15 and Ruby4 results retain their exact
+source scope. No whole native lane or release is qualified. Item36 and
+transversal16/38 remain open; item22 remains excluded. Historical receiving
+below supplies provenance rather than final-source qualification.
+
+2026-10-15 the generated Homebrew process matcher now treats the application
+bundle dot literally. The prior ERE also matched foreign ErgoptiPlusXapp,
+ErgoptiPlus-app and ErgoptiPlusZapp processes and could request an erroneous
+relaunch. The existing cask guard covers both channels and both archive formats
+with independent real/foreign path fixtures; original source fails causally.
+This portable generator correction does not qualify native pgrep, consent,
+Brew install/upgrade/recovery or archive/signature receiving. Item36 and16/38
+remain open.
+
 2026-10-12 producer and publication archive readers share one-close receiving
 that preserves exact read/validation and secondary close failures, including
 thrown falsy values. Nonblocking open precedes the original regular-file checks;
@@ -9308,6 +9478,72 @@ The shortcut extension owner now reports its genuinely observed missing, failed,
       native per-request adapters; system-trust/PAC and installed qualification
       remains incomplete. A manual context without admitted native capabilities
       refuses automatic proxy routing instead of bypassing it.
+
+### Current remaining work after Group 6 container retirement
+
+Use this item and item 36 as the single work tracker. The
+[retirement custody](handovers/2026-10-15-group6-container-closure/README.md)
+saves the prepared sources and exact receipts before container deletion.
+
+Still required for item 62:
+
+- Review and adopt the inactive six-path macOS diagnostic/enrollment successor
+  against current preimages, then actually compile/discover/run its seven pure
+  XCTest methods using the real module enum/helper. Preserve the original WPAD
+  case/filter/count and native14, commands, requests, clocks, trust domains and
+  cleanup/refusal obligations. Complete portable owner176 and seven enrollment
+  controls pass; this is not native acceptance or canonical source adoption.
+- Diagnose the retained macOS default-trust/PAC/WPAD/HTTP and owned private-
+  keychain restoration failures using their exact CA epoch. The first settled
+  trust-install0 precedes native-default URL-1202/SSL-9813 and request0; the
+  evaluated chain and effective owned-CA visibility remain unobserved. Later
+  owned-status-25300 belongs to a different CA epoch. No concrete TLS cause or
+  CA/search-list workaround is established; stopped experiments remain stopped.
+- Receive the final native Ollama installation/server/pull/model, updater and
+  rollback, remote-AI, enterprise-proxy/CA/PAC/WPAD and useful recovery paths on
+  the affected platforms. Keep all21 translations and actual process/stream/
+  trust restoration proofs. The Windows production coupling described in item36
+  is still software work requiring Root's real contract, not just a device test.
+- Reconcile the Root-owned full-source gate: the private Root305d composition
+  completed433PASS/2FAIL of435. Its real 172/176 enrollment omission is corrected
+  in the saved six-path proposal and the complete owner subsequently passes;
+  whole435 was not rerun. The other 23 Windows full-save scanner findings are
+  reproduced byte-identically on exact Root305d baseline. No scanner baseline,
+  assertion, native threshold or result is waived.
+
+The integrated HTTPX shutdown/deadline admission and failure-only Go-fixture
+error diagnostics retain all original clocks/assertions and cleanup custody.
+The earlier once-observed signal failure remains causally unknown; later45PASS
+is not a native runtime fix. Final feature-source portable JS426/426 passes,
+with historical portableMac19827/client15/Ruby4 receiving separately scoped.
+Native macOS and Windows acceptance remain open. Item62 and transversal16/38
+are retained; item22 stays excluded. Historical receiving below must not be
+carried forward as qualification of a new source/artifact.
+
+2026-10-15 explicit HTTPX relay header acquisition now stays under the same
+existing lock as shutdown, matching native-child construction. Previously an
+admitted relay could originate its HTTPX connection after close returned.
+The relay now also uses the existing idle bound for otherwise unlimited
+operation timeouts and checks the caller deadline after acquiring admission;
+positive caller limits and the original timeout map are preserved. Native
+acquisition likewise receives only the budget remaining after lock admission,
+rather than renewing the time spent waiting. Thirteen additive controls cover
+causal ordering, deadline/timeout refusal and actual HTTPX/httpcore body bytes
+with inert peers or boundary observers. These portable client/source controls
+do not qualify Apple networking, an explicit-relay absolute body budget or
+native corporate-proxy acceptance; item62 and16/38 stay open.
+
+An earlier full JS batch retained an unexplained Python repeated-signal
+retirement failure. The unchanged isolated case and the complete45-case
+portable owner subsequently passed with retained stream/child closure.
+The cause remains unknown; no causal runtime or native fix is claimed.
+
+Failure-only diagnostics now read the original owned stderr with nonblocking,
+nofollow and exact file identity admission, projecting bounded closed exception
+and frame tokens without raw values. An initial assertion remains primary if
+cleanup also refuses. All45 existing methods and original assertions/clocks
+remain; actual-helper formatter, primary-custody and nonblocking withdrawals
+fail causally. This improves receiving only and does not fix the unknown cause.
 
 2026-10-13 the managed Go receiving policy now enrolls all17 original
 failure-stage subtests from committed e94153e87b, retaining every57 earlier

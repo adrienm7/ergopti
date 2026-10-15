@@ -113,6 +113,8 @@ local _ready_origin       = nil
 -- api_mlx _warmup_gen invariant (F-L4).
 local _warmup_gen         = 0
 local _warmup_active      = false
+local _warmup_request     = nil
+local _warmup_acquisition_depth = 0
 local _warmup_last_model  = nil
 local _warmup_resume_pending = false
 local _warmup_explicitly_stopped = false
@@ -615,6 +617,10 @@ local function quiesce_warmup()
 	if not client_settled then
 		Logger.error(LOG, "stop_warmup() could not retire its HTTP owner: %s.", tostring(result))
 	end
+	if _warmup_acquisition_depth > 0 then
+		Logger.error(LOG, "stop_warmup() is waiting for the original POST acquisition to unwind.")
+		return false
+	end
 	if not timer_settled or not client_settled then return false end
 	Logger.debug(LOG, "stop_warmup() — gen bumped to %d, in-flight warmup invalidated.", _warmup_gen)
 	return true
@@ -911,7 +917,7 @@ end
 --- Every original HTTP, stream, resume and daemon owner must already be idle.
 --- @return boolean idle
 function M.migration_idle()
-	if M.startup_idle() ~= true or _ollama_serve_task ~= nil or _ollama_started == true
+	if _warmup_acquisition_depth > 0 or M.startup_idle() ~= true or _ollama_serve_task ~= nil or _ollama_started == true
 		or _active_stream_task ~= nil or _warmup_active == true
 		or _warmup_resume_pending == true or _warmup_resume_timer ~= nil
 		or next(_warmup_resume_observers) ~= nil or _warmup_client_recovery_token ~= nil then return false end
@@ -923,7 +929,7 @@ function M.migration_idle()
 	end
 	-- An external predicate can reenter a caller. Recheck local retained slots
 	-- after observing all original client settlement ports.
-	return M.startup_idle() == true and _ollama_serve_task == nil and _ollama_started ~= true
+	return _warmup_acquisition_depth == 0 and M.startup_idle() == true and _ollama_serve_task == nil and _ollama_started ~= true
 		and _active_stream_task == nil and _warmup_active ~= true
 		and _warmup_resume_pending ~= true and _warmup_resume_timer == nil
 		and next(_warmup_resume_observers) == nil and _warmup_client_recovery_token == nil
@@ -956,96 +962,154 @@ function M.warmup(model_name, on_acquired)
 		acquisition_reported = true
 		if type(on_acquired) ~= "function" then return end
 		local ok, err = xpcall(function() on_acquired(committed == true) end, debug.traceback)
-		if not ok then
-			Logger.error(LOG, "Ollama warmup acquisition callback raised: %s.", tostring(err))
-		end
+		if not ok then Logger.error(LOG, "Ollama warmup acquisition callback raised: %s.", tostring(err)) end
 	end
 	if type(model_name) ~= "string" or model_name == "" then
 		report_acquisition(false)
-		return false
+		return false, false
 	end
+	if _warmup_acquisition_depth > 0 then
+		Logger.error(LOG, "Warmup acquisition refused while the original transaction remains on-stack.")
+		report_acquisition(false)
+		return false, false
+	end
+	local entry_generation, previous_request = _warmup_gen, _warmup_request
+	local service_current = M.capture_service_owner()
+	local origin = M.get_base_url()
+	local function entry_current()
+		return entry_generation == _warmup_gen and previous_request == _warmup_request
+			and service_current()
+	end
+	if not entry_current() then report_acquisition(false); return false, false end
+	local function entry_origin_current()
+		if not entry_current() then return false end
+		local current_origin = M.get_base_url()
+		return entry_current() and current_origin == origin
+	end
+	-- Reuse is an ordinary pending observation, never a fresh resume acquisition.
+	if type(on_acquired) ~= "function" and type(previous_request) == "table"
+		and previous_request.committed == true and _warmup_active == true
+		and previous_request.model == model_name and previous_request.origin == origin
+		and previous_request.generation == entry_generation and previous_request.service_current()
+		and _warmup_client.isActive() == true then
+		local observed_origin = M.get_base_url()
+		if not entry_current() then report_acquisition(false); return false, false end
+		if observed_origin == origin and previous_request.service_current() then
+			Logger.debug(LOG, "Warmup retry retains the pending request for '%s'.", model_name)
+			if not entry_origin_current() or _warmup_active ~= true
+				or _warmup_client.isActive() ~= true then return false, false end
+			return true, false
+		end
+	end
+	if not entry_current() then report_acquisition(false); return false, false end
 	_warmup_explicitly_stopped = false
 	_warmup_last_model = model_name
 	Logger.debug(LOG, "Warming up model '%s'…", model_name)
 	local encoded, enc_err = JsonCodec.encode({
-		model      = model_name,
-		messages   = { { role = "user", content = " " } },
-		stream     = false,
+		model = model_name,
+		messages = { { role = "user", content = " " } },
+		stream = false,
 		keep_alive = ApiCommon.OLLAMA_KEEP_ALIVE,
-		options    = { num_predict = 1, temperature = 0 },
+		options = { num_predict = 1, temperature = 0 },
 	})
 	if not encoded then
 		report_acquisition(false)
 		Logger.error(LOG, "warmup: encode failed — %s", tostring(enc_err))
-		return false
+		return false, false
 	end
-	-- Snapshot the warmup generation: if reset_ready() bumps it while this POST is
-	-- in flight, the response describes a now-stale server/model and its callback
-	-- must not touch _is_ready (see reset_ready for the self-termination scenario).
-	local my_warmup_gen = _warmup_gen
-	local origin = M.get_base_url()
+	local observed_origin = M.get_base_url()
+	if not entry_current() or observed_origin ~= origin then report_acquisition(false); return false, false end
+	local my_warmup_gen = entry_generation
+	local request = { model = model_name, origin = origin, generation = my_warmup_gen,
+		service_current = service_current, committed = false }
+	_warmup_request = request
 	_warmup_active = true
-	local dispatch_committed = false
-	local pending_response = nil
-	local dispatch_ok, accepted_or_err = xpcall(function()
-		return _warmup_client.post(
-		origin .. "/api/chat",
-		{ ["Content-Type"] = "application/json" },
-		encoded,
-		function(r)
-			local function apply_response()
-			if my_warmup_gen ~= _warmup_gen then
-				Logger.debug(LOG, "Discarding stale Ollama warmup response (gen %d != %d) — it describes a server/model that is no longer current.",
-					my_warmup_gen, _warmup_gen)
-				return
-			end
+	_warmup_acquisition_depth = _warmup_acquisition_depth + 1
+	local function request_owner_current()
+		return _warmup_request == request and my_warmup_gen == _warmup_gen and service_current()
+	end
+	local function request_current()
+		if not request_owner_current() then return false end
+		local current_origin = M.get_base_url()
+		return request_owner_current() and current_origin == origin
+	end
+	local function retire_request()
+		if _warmup_request ~= request then return false end
+		local settled = _warmup_client.cancel()
+		if settled == true and _warmup_request == request then
 			_warmup_active = false
-			if origin ~= M.get_base_url() then
-				Logger.debug(LOG, "Discarding Ollama warmup response from a superseded endpoint.")
-				return
-			end
-			if r.status == 200 then
-				local became_ready = (_is_ready ~= true)
-				_is_ready = true
-				_ready_origin = origin
-				Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
-				if became_ready then
-					Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_ollama_ready_body"), "success")
-				end
-			else
-				_is_ready = false
-				Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(r.status))
-			end
-			end
-			if dispatch_committed ~= true then
-				pending_response = apply_response
-				return
-			end
-			apply_response()
-		end)
-	end, debug.traceback)
-	if not dispatch_ok or accepted_or_err ~= true then
-		pending_response = nil
-		_warmup_active = false
-		Logger.error(LOG, "Ollama warmup POST acquisition failed: %s.",
-			tostring(accepted_or_err))
-		report_acquisition(false)
+			_warmup_request = nil
+			return true
+		end
+		Logger.error(LOG, "Withdrawn warmup retains its original HTTP cleanup debt.")
 		return false
 	end
-	dispatch_committed = true
-	if pending_response ~= nil then
-		local apply_response = pending_response
-		pending_response = nil
-		apply_response()
+	local acquisition_ok, accepted_or_err = xpcall(function()
+		local dispatch_committed = false
+		local pending_response = nil
+		local posted = _warmup_client.post(
+			origin .. "/api/chat",
+			{ ["Content-Type"] = "application/json" },
+			encoded,
+			function(response)
+				local function apply_response()
+					if not request_current() then
+						Logger.debug(LOG, "Discarding withdrawn Ollama warmup response.")
+						return
+					end
+					local response_origin = M.get_base_url()
+					if not request_current() then return end
+					_warmup_active = false
+					if origin ~= response_origin then
+						Logger.debug(LOG, "Discarding Ollama warmup response from a superseded endpoint.")
+						return
+					end
+					if response.status == 200 then
+						local became_ready = _is_ready ~= true
+						_is_ready = true
+						_ready_origin = origin
+						Logger.info(LOG, "Model '%s' warmed up — GPU cache ready.", model_name)
+						if became_ready and request_current() then
+							Notifications.notify(i18n.get("llm.server_ready_title"), i18n.get("llm.server_ollama_ready_body"), "success")
+						end
+					else
+						_is_ready = false
+						Logger.debug(LOG, "Warmup request returned %s — model may not be loaded yet.", tostring(response.status))
+					end
+				end
+				if dispatch_committed ~= true then pending_response = apply_response; return end
+				apply_response()
+			end)
+		if posted ~= true then
+			Logger.error(LOG, "Ollama warmup POST acquisition failed: %s.", tostring(posted))
+			return false
+		end
+		if not request_current() then return false end
+		request.committed = true
+		dispatch_committed = true
+		if pending_response ~= nil then pending_response() end
+		-- Synchronous completion can notify observers which revoke this request.
+		return request_current()
+	end, debug.traceback)
+	local accepted = acquisition_ok == true and accepted_or_err == true
+	local cleanup_ok, cleanup_error = true, nil
+	if not accepted then
+		cleanup_ok, cleanup_error = xpcall(retire_request, debug.traceback)
 	end
-	report_acquisition(true)
-	return true
+	_warmup_acquisition_depth = _warmup_acquisition_depth - 1
+	if not acquisition_ok then Logger.error(LOG, "Ollama warmup acquisition failed: %s.", tostring(accepted_or_err)) end
+	if not cleanup_ok then Logger.error(LOG, "Ollama warmup rollback failed: %s.", tostring(cleanup_error)) end
+	-- Recovery observers may synchronously acquire another POST only after the
+	-- old frame and its exact rollback have released their acquisition fence.
+	report_acquisition(accepted)
+	return accepted, accepted
 end
+
 
 --- Restarts only the exact warmup that pause_warmup() invalidated.
 --- @return boolean committed
 function M.resume_warmup()
-	if _ollama_start_acquisition_depth > 0 then return false end
+	if _ollama_start_acquisition_depth > 0 or _warmup_acquisition_depth > 0 then return false end
 	local timer_settled = cancel_warmup_resume_timer() == true
 	local ok_cancel, cancel_result = xpcall(function()
 		return _warmup_client.cancel()
