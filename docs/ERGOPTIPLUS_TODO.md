@@ -119,11 +119,40 @@ Actual f1b application receiving detects the isolated0.40.4 server and starts
 its bridge, but the model remains unloaded without a warmup terminal/retry log.
 The exact production continuation is causally reproduced: bridge1/warmup0,
 natural exit1. A private deferred-intent correction reaches bridge1/warmup1
-and passes six stale/absent controls with natural exit0. It is not yet applied
-or received in the installed application. Shared runtime compatibility also
-remains software work: the macOS producer and stager require synchronized
-official/custom versions, and0.40.4 changes transfer and pull-handler seams.
-Native macOS/Linux receiving remains OPEN or UNRUN.
+and passes six stale/absent controls with natural exit0. The canonical correction
+now retains the original readiness intent and port through the first async
+model-cache result. Invalidation, disabling, backend/model replacement and
+reentrant bridge publication cannot borrow that continuation. Both automatic
+installed-model corrections now enter the existing committed-model lifecycle;
+an exact original-source child fails both callers naturally, and its corrected
+counterpart passes both. No network request or native input is inferred from
+these controlled ports.
+
+All eight new registered warmup cases pass naturally with a complete manifest,
+no skips and unchanged source. The separate isolation guard passes while
+replaying all twenty backend lifecycle cases; the updated nonblocking tags
+contract also passes. These overlapping selections are not additive case totals.
+The same source passes all70 E2E cases, whole-entry compilation and the compiler's
+good0/bad17 controls. Encoding checks1,918 AHK files; the source-read ratchet
+remains380/380 and strict conventions pass. The first registered attempt fails
+all eight cases because its fixture wrongly treats an empty cache as absent and
+double-wraps a complete source function; that failed receipt remains retained.
+Correcting those preconditions preserves the production assertions.
+The six original handover selections also pass on this composition:35 offer,
+17 origin,25 requester,6 app-picker,5 auxiliary and8 personal-metadata cases,
+each with a complete canonical manifest, natural exit0 and no skips. Existing
+activation2/readiness1/transaction3 cases pass separately. macOS uses its own
+model-switch/warmup lifecycle; Linux's owned model-presence preflight resumes
+its originating inference request. Neither has this Windows menu-cache bridge
+continuation. This source comparison grants no native macOS/Linux qualification.
+
+Actual receiving of the corrected installed application and a startup with only
+one active driver remain OPEN. The earlier incomplete complete-unit attempt and
+the407/425 complete JS result remain failed; these targeted receipts do not turn
+either into a green gate. Shared runtime compatibility also remains software
+work: the macOS producer and stager require synchronized official/custom
+versions, and0.40.4 changes transfer and pull-handler seams. Native macOS/Linux
+receiving remains OPEN or UNRUN.
 
 ### October 15 AHK direct-digit registration receiving
 
