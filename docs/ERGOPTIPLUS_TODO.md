@@ -12326,6 +12326,16 @@ actual AHK parser/unit/E2E, original/candidate causal execution, final native
 package/install/startup and physical receiving remain NOT_RUN. It does not
 enable simultaneous input or establish genuine raw AltGr provenance.
 
+Hosted Windows receiving at 073800ed reports a real boot-safety class-guard
+failure: the new ownership route reaches the tap accessor before its two
+global owners are guaranteed. The accessor now refuses either absent owner
+with the same empty result as the existing hold accessor; two independent
+unset controls retain and restore actual prior global presence. All 349 prior
+assertion starts and 51 registrations remain. Source review and encoding pass;
+the unchanged native meta guard, new AHK cases and complete native successor
+remain UNRUN. The hosted 11,976-pass/703-failure result is retained; the other
+failures are not exonerated by this repair or by different file ownership.
+
 A finite inactive Windows simultaneous arbitration core is preserved in the
 [prepared source capsule](handovers/2026-10-15-group3-windows-pair-core/README.md).
 Its detached C plans retain inclusive delay, canonical symmetry/None, first-down
