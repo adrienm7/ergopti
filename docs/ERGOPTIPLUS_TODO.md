@@ -5110,118 +5110,185 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   with an explanation and offer a driver-only update requiring explicit
   confirmation. About 30-40 agent-days plus maintainer hardware time.
 
-  A passive VirtualHID daemon-report proposal is preserved in
-  `docs/handovers/2026-10-15-group5-daemon-report/`. Its 15 prepared
-  production/test paths have independent source review and exact forward/inverse
-  evidence, but remain unapplied. The 28 authored XCTest methods have not run;
-  real SDK compilation, current source approval/shared-file handoff, ARM64 and
-  Intel execution, and privileged endpoint/retirement receiving remain required.
-  Historical five-Boolean data grants no numeric ABI, READY, installation or
-  remote-cleanup authority and does not establish the lease incident's cause.
+### Group 5 container retirement — 2026-10-15
 
-  The Dev-based successor is preserved in
-  `docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
-  review clears the finite 20-path source implementation. The real production
-  packaging continuation now selects its report helper for the current VHD
-  profile, while the separate installed-SDK route remains unchanged. The report
-  dispatch follows the launcher's private umask installation. Independently
-  reviewed source bindings preserve the original signing/image checks; frozen
-  native approvals and SDK evidence are not refreshed. Python receiving passes
-  19 product controls and 14 route controls in normal and optimized modes; the
-  original caller fails the new route regression. Both-architecture native
-  compilation/linking, the distinct 17-command helper build, signed query and
-  retirement, all 33 Swift cases and daemon/staging cleanup remain pending.
-  The current CI's architecture filters do not execute these 33 cases or that
-  distinct helper build; enrollment is coordinated with the CI owner.
-  A changed observed file now keeps its observation refusal while permitting
-  checked closure of its original descriptor. The additional real-FD XCTest
-  is authored, not executed off Darwin; close failure retains separate debt
-  and never retries an ambiguously consumed descriptor.
-  A dedicated `tools/diagnostics/vhd_daemon_report_xctest_receiver.py`
-  receives the frozen 32 original cases plus that additional descriptor case
-  on one explicitly selected native architecture. It requires Debug SwiftPM,
-  exact started/passed pairs, unchanged committed compiler inputs (including
-  external quoted headers), complete capture and retirement of every original
-  process owner before source-after checks or a terminal verdict. Portable
-  receiver controls pass all 24 cases, including cached-code refusal; they do
-  not execute Swift. ARM64 and
-  Intel enrollment and execution remain pending with the CI owner, separately
-  from the distinct 17-command helper build and signed query acceptance.
-  No numeric ABI, resident
-  readiness, remote cleanup, physical accounting or lease fix is qualified;
-  item 31 stays open.
+The maintainer requested preservation on Dev and deletion of this container's
+owned branches. This is a partial delivery checkpoint, not completion of the
+whole group. The [self-contained source handover](handovers/2026-10-15-group5-container-closure/README.md)
+retains needed preparations, original reviews, exact source bodies, historical
+variants and actual failures. No separate private Group 5 TODO file is retained.
+Items 13, 24, 30, 31, 35, 40, 43 and 44 and transversal 16/38 remain open.
 
-  The diagnostic producer, CLI baseline admission and current Python reader
-  now agree on baseline version 2, retaining keyboard type per device and HID
-  usage page per key. Live readers require complete version-2 coverage;
-  immutable version-1 evidence is decoded only through explicit historical
-  replay. All four declaration boundaries are checked, including CLI-only
-  mismatch and missing/ambiguous declarations. Portable receiving passes 75
-  Python methods and four actual C++20 builds/runs; the new version-2 producer
-  control executes 43 independent assertions. Original native evidence and
-  JSON fixture expectations are unchanged. Current production callers retain
-  strict live admission. This supplies the WP4 diagnostic protocol dependency,
-  not an installed headless producer, signed runtime, native SDK, package or
-  physical acceptance; WP3-WP10 and customer lease recovery remain open.
+Delivered source: the reviewed SDK dependency chain and separate five-key media
+history/storage/dashboard are committed. The selected local gate passes 426 JS,
+20,037 macOS Lua and 13,792 Linux Lua cases; modeled macOS E2E passes 101 with one
+explicit skip, Linux E2E passes 193. The 48 executable/test/data paths are fenced
+by the retained exact-input receipt. Native macOS/Swift, native AHK, packages,
+installation and physical acceptance remain unexecuted by that checkpoint.
 
-  The dormant factory/build source lane now retains authentic upstream input
-  custody for the original 65 replacements and the explicit installed-SDK
-  opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
-  preparation preserves the original claim and packaging checks; default boot
-  and the legacy factory route remain unchanged. The dependency-closed source
-  includes the original build/control suppliers rather than detached staging
-  facades. Canonical portable receiving passes 81 methods with no skips:
-  original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
-  routing 12. A genuine private factory materialization received 4,557 files,
-  four links, its version generator and 12 generated outputs; that private
-  source receipt is not acceptance of this installed product.
+Remaining group requirements:
 
-  Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
-  software actors and their source-authenticated receiver. Canonical receiving
-  passes all 22 controls without rewriting independent expectations.
-  Original 60-second compile, 10-second execution and whole 300-second budgets
-  remain; Darwin uses the existing 330-second owned-process guardian. Real
-  macOS SDK/IOKit compilation, signing, packaging, installation, activation and
-  physical acceptance remain unqualified. Native shipping/Foundation suppliers,
-  correlated retained history, media persistence and the confirmed driver-only
-  update transaction are still software work; this does not solve customer
-  lease PONG/READY/exit73 or complete item 31.
+- **13 and35:** qualify final actual STOPPED, exact guardian unregistration,
+  preference OFF and removal of owned rules, including failed/recovery phases,
+  retained native debt and actual signed installed-helper acceptance. Do not
+  infer retirement from a signal, missing handle or hidden dialog.
+- **24:** complete native window/Login Items approval and retirement acceptance
+  for the already-corrected guide and guardian behavior.
+- **30:** complete physical magic-key acceptance on Windows, macOS ANSI/ISO and
+  Linux; receive the remaining magic-source/tap-action collision and lifecycle
+  composition with its actual owner. Preserve acknowledged queue, native-source,
+  pause, release and repeat behavior; do not repeat already-qualified repairs.
+- **31, owned runtime:** receive the inactive VHD/source packets against current
+  Dev without changing frozen approvals or inventing ABI/READY. Actual default
+  and SDK compilation, signed packaging, official resource metadata/CMS checks,
+  helper/client lifecycle and the authored native suites remain required. The
+  StockQuery attempted-capture debt fix is source-reviewed; a genuine privileged
+  behavioral regression still requires its real signed Root harness.
+- **31, coexistence:** the active-stock stop/retirement operation remains missing
+  software owned with the existing Karabiner lifecycle session. Negative stock
+  observation and an explicit preference/confirmation are not stop authority.
+  The reviewed menu/cold-scope and guardian preparations remain inactive. Root
+  must receive its proof helpers; the full parity historical/recovery matrix
+  still fails at assertion 8210. The tiny follow-up fixture proposal is
+  unreviewed/unexecuted. Preserve every original cohort and refusal control.
+- **31, Linux statistics:** receive the eight-path pre-remap native-source/media
+  proposal with G3 ownership, then qualify final composition and actual native
+  input. Portable supplier 92 and consumer 32 cases per Lua runtime are separate;
+  the pause bug is corrected. FIFO/C-fstat and modeled transports do not prove
+  actual evdev, grab, injection, hotplug or a physical device.
+- **31, Windows PC:** run all nine authored semantic-reader native cases,
+  prepared-statement BUSY/finalize/OK, both old read-only-cache upgrades, durable
+  publication, worker lifetime/memory/exit, parse/unit/meta/E2E/build. Implement
+  and qualify original event-local RawInput device provenance before claiming
+  equivalent physical-device capture; keyboard-hook vk/sc alone is insufficient.
+- **40:** complete all eight signed, packaged real-Hammerspoon configuration
+  build/merge/restoration variants. Preserve AppleEvent consent, original
+  deadlines, personal rules and independent JSON expectations.
+- **43:** the original ambiguous historical configuration is unavailable; its
+  exact failure cannot be diagnosed from an invented replacement. Keep the
+  confirmed, backed-up cleanup path and qualify it on a real upgrade/profile.
+- **44:** qualify actual native child completion, owned CapsWord signals and
+  pointer cancellation on the final installed Mac source.
 
-  The dormant physical consumer now retains subscription and verifier startup,
-  cancellation and accounting ownership through the exact outstanding native
-  invocation. Version refusal gives one unavailable warning without retries;
-  event sinks must explicitly acknowledge admission, and holds crossing an
-  excluded interval are cancelled in full. Legacy boot remains unchanged and
-  does not enable an owned runtime. Focused receiving passes 210/0 across 13
-  modules, retaining the newer admission-settlement and original baseline and
-  transport controls. Four original primitives with the forward owner retain
-  177 passes and 28 failures; the exact original verifier-start implementation
-  retains all 205 earlier controls and fails four of five new lifecycle cases.
-  This is software receiving over modeled native ports, not installed runtime,
-  hardware, packaging or customer lease qualification. Full selected and native
-  acceptance remain required; item 31 stays open.
+The customer lease PONG/READY/RESUMED/exit73 cause remains open with the existing
+lifecycle owner. Reload, the statistics changes and archived source diagnostics
+are not a proved repair. Hardware tests are not the only remaining work: the
+software ownership, proof/profile reception and native CI requirements above
+must also be completed. All unrelated group blocks and transversal validation
+requirements are preserved.
 
-  The actual context tracker now issues an explicitly bound observation
-  subscription through the native clock adapter. Secure-field completion comes
-  from the real writer and matching app PID; failed or reentrant observations
-  deny publication, and exact callback frames survive detach until unwinding.
-  Legacy three-argument initialization and nil-observer detector behavior are
-  preserved. Focused receiving passes 341 declared controls and two direct
-  assertion modules, including 29 observation controls (original composition:
-  1 pass and 28 failures), 125 wiring controls and 28 healthcheck controls.
-  Correlated sampling, complete retained-history ownership, native acceptance
-  and production activation remain required; this is a dormant software slice.
+A passive VirtualHID daemon-report proposal is preserved in
+`docs/handovers/2026-10-15-group5-daemon-report/`. Its 15 prepared
+production/test paths have independent source review and exact forward/inverse
+evidence, but remain unapplied. The 28 authored XCTest methods have not run;
+real SDK compilation, current source approval/shared-file handoff, ARM64 and
+Intel execution, and privileged endpoint/retirement receiving remain required.
+Historical five-Boolean data grants no numeric ABI, READY, installation or
+remote-cleanup authority and does not establish the lease incident's cause.
 
-  FileSystem transaction receipts now retain their original private issuer,
-  publication chain and current source view; replacement after admission is
-  refused, including an unchanged-byte publication. The six independent
-  software controls receive 0 PASS / 6 FAIL on the original issuer, 6 / 0 on
-  the correction, and the same 0 / 6 after restoration. The cold fixture sets
-  its existing logger stub before resolving its Hammerspoon stub. Real I/O,
-  held descriptors and restoration are observed; HS metadata remains modeled.
-  This narrow slice does not qualify Config bindings, the production runtime,
-  native macOS installation or the customer lease failure. Those requirements
-  remain open under this item.
+The Dev-based successor is preserved in
+`docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
+review clears the finite 20-path source implementation. The real production
+packaging continuation now selects its report helper for the current VHD
+profile, while the separate installed-SDK route remains unchanged. The report
+dispatch follows the launcher's private umask installation. Independently
+reviewed source bindings preserve the original signing/image checks; frozen
+native approvals and SDK evidence are not refreshed. Python receiving passes
+19 product controls and 14 route controls in normal and optimized modes; the
+original caller fails the new route regression. Both-architecture native
+compilation/linking, the distinct 17-command helper build, signed query and
+retirement, all 33 Swift cases and daemon/staging cleanup remain pending.
+The current CI's architecture filters do not execute these 33 cases or that
+distinct helper build; enrollment is coordinated with the CI owner.
+A changed observed file now keeps its observation refusal while permitting
+checked closure of its original descriptor. The additional real-FD XCTest
+is authored, not executed off Darwin; close failure retains separate debt
+and never retries an ambiguously consumed descriptor.
+A dedicated `tools/diagnostics/vhd_daemon_report_xctest_receiver.py`
+receives the frozen 32 original cases plus that additional descriptor case
+on one explicitly selected native architecture. It requires Debug SwiftPM,
+exact started/passed pairs, unchanged committed compiler inputs (including
+external quoted headers), complete capture and retirement of every original
+process owner before source-after checks or a terminal verdict. Portable
+receiver controls pass all 24 cases, including cached-code refusal; they do
+not execute Swift. ARM64 and
+Intel enrollment and execution remain pending with the CI owner, separately
+from the distinct 17-command helper build and signed query acceptance.
+No numeric ABI, resident
+readiness, remote cleanup, physical accounting or lease fix is qualified;
+item 31 stays open.
+
+The diagnostic producer, CLI baseline admission and current Python reader
+now agree on baseline version 2, retaining keyboard type per device and HID
+usage page per key. Live readers require complete version-2 coverage;
+immutable version-1 evidence is decoded only through explicit historical
+replay. All four declaration boundaries are checked, including CLI-only
+mismatch and missing/ambiguous declarations. Portable receiving passes 75
+Python methods and four actual C++20 builds/runs; the new version-2 producer
+control executes 43 independent assertions. Original native evidence and
+JSON fixture expectations are unchanged. Current production callers retain
+strict live admission. This supplies the WP4 diagnostic protocol dependency,
+not an installed headless producer, signed runtime, native SDK, package or
+physical acceptance; WP3-WP10 and customer lease recovery remain open.
+
+The dormant factory/build source lane now retains authentic upstream input
+custody for the original 65 replacements and the explicit installed-SDK
+opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
+preparation preserves the original claim and packaging checks; default boot
+and the legacy factory route remain unchanged. The dependency-closed source
+includes the original build/control suppliers rather than detached staging
+facades. Canonical portable receiving passes 81 methods with no skips:
+original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
+routing 12. A genuine private factory materialization received 4,557 files,
+four links, its version generator and 12 generated outputs; that private
+source receipt is not acceptance of this installed product.
+
+Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
+software actors and their source-authenticated receiver. Canonical receiving
+passes all 22 controls without rewriting independent expectations.
+Original 60-second compile, 10-second execution and whole 300-second budgets
+remain; Darwin uses the existing 330-second owned-process guardian. Real
+macOS SDK/IOKit compilation, signing, packaging, installation, activation and
+physical acceptance remain unqualified. Native shipping/Foundation suppliers,
+correlated retained history, media persistence and the confirmed driver-only
+update transaction are still software work; this does not solve customer
+lease PONG/READY/exit73 or complete item 31.
+
+The dormant physical consumer now retains subscription and verifier startup,
+cancellation and accounting ownership through the exact outstanding native
+invocation. Version refusal gives one unavailable warning without retries;
+event sinks must explicitly acknowledge admission, and holds crossing an
+excluded interval are cancelled in full. Legacy boot remains unchanged and
+does not enable an owned runtime. Focused receiving passes 210/0 across 13
+modules, retaining the newer admission-settlement and original baseline and
+transport controls. Four original primitives with the forward owner retain
+177 passes and 28 failures; the exact original verifier-start implementation
+retains all 205 earlier controls and fails four of five new lifecycle cases.
+This is software receiving over modeled native ports, not installed runtime,
+hardware, packaging or customer lease qualification. Full selected and native
+acceptance remain required; item 31 stays open.
+
+The actual context tracker now issues an explicitly bound observation
+subscription through the native clock adapter. Secure-field completion comes
+from the real writer and matching app PID; failed or reentrant observations
+deny publication, and exact callback frames survive detach until unwinding.
+Legacy three-argument initialization and nil-observer detector behavior are
+preserved. Focused receiving passes 341 declared controls and two direct
+assertion modules, including 29 observation controls (original composition:
+1 pass and 28 failures), 125 wiring controls and 28 healthcheck controls.
+Correlated sampling, complete retained-history ownership, native acceptance
+and production activation remain required; this is a dormant software slice.
+
+FileSystem transaction receipts now retain their original private issuer,
+publication chain and current source view; replacement after admission is
+refused, including an unchanged-byte publication. The six independent
+software controls receive 0 PASS / 6 FAIL on the original issuer, 6 / 0 on
+the correction, and the same 0 / 6 after restoration. The cold fixture sets
+its existing logger stub before resolving its Hammerspoon stub. Real I/O,
+held descriptors and restoration are observed; HS metadata remains modeled.
+This narrow slice does not qualify Config bindings, the production runtime,
+native macOS installation or the customer lease failure. Those requirements
+remain open under this item.
 
 WP3 delivery/transport captures its original admission ports, requires literal
 completion of an optional original baseline observer, and keeps task settlement

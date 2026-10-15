@@ -1,0 +1,125 @@
+{
+	"status": "CONTAINER_RETIREMENT_SOURCE_CUSTODY_NO_NATIVE_QUALIFICATION",
+	"files": {
+		"README.md": {
+			"sha256": "957f4dc8f76345d7c64d8c8e7f14b3004e2fd44af558df879c1e5bba502f5dbd",
+			"bytes": 5343,
+			"mode": "100644"
+		},
+		"branch-retirement-plan.json": {
+			"sha256": "bb24dc706f734eef228bffb3509048d999020196d38de7dadf6fec9715797040",
+			"bytes": 9352,
+			"mode": "100644"
+		},
+		"history/owned-unintegrated-history.bundle": {
+			"sha256": "17bf555cf8b8a3b275a0a4a3b8983ef8b36aa6daac0840f8a413cb856c904e6e",
+			"bytes": 13525720,
+			"mode": "100644"
+		},
+		"proposals/coexistence-historical-matrix-wip.tar.gz": {
+			"sha256": "9e55dbf163b816626ee64c7ba0cfbe50f980e18f276ce95c4efa01e847bc5ad0",
+			"bytes": 193250,
+			"mode": "100644"
+		},
+		"proposals/coexistence-menu-and-proof-source.tar.gz": {
+			"sha256": "56321da8b691683199e290c653f0ffeb5a26ce4a07334eed89332d46fa8ac7f9",
+			"bytes": 5454699,
+			"mode": "100644"
+		},
+		"proposals/linux-physical-media-source.tar.gz": {
+			"sha256": "99f1d47eb02a8a6be3fa2b67bdb575af989011826d8a6c80f74cfb6bbce24ae3",
+			"bytes": 573153,
+			"mode": "100644"
+		},
+		"proposals/owned-vhd-runtime-source.tar.gz": {
+			"sha256": "1082d21fa31ebcfadfab496a34e46a3cee8821f66811af3f3558c5107a558daf",
+			"bytes": 14129088,
+			"mode": "100644"
+		},
+		"receipts/branch-inventory-before-retirement.json.receipt": {
+			"sha256": "27569549a09389c5ceac462b4bb2d107b863aa82aa61b2307a9e49a5e336a272",
+			"bytes": 99587,
+			"mode": "100644"
+		},
+		"receipts/coexistence-manifest.json.receipt": {
+			"sha256": "428852339ddafddb483fb5925198019e3098abe6a3d477d058d808ed431774d3",
+			"bytes": 277,
+			"mode": "100644"
+		},
+		"receipts/coexistence-receipt.json.receipt": {
+			"sha256": "055849fe8d95c73f8d3b6247fcf51d765866cd6a2949ea4f938c839d17e0533f",
+			"bytes": 2863,
+			"mode": "100644"
+		},
+		"receipts/coexistence-wip-addon-receipt.json.receipt": {
+			"sha256": "c09dd2af7608268847efb841cf272484c49da116a93d46450696678521824dee",
+			"bytes": 367,
+			"mode": "100644"
+		},
+		"receipts/exact-owned-history-refs.json.receipt": {
+			"sha256": "9d44f3efed26e9930fc7b24b92244b62cc103d31ef1ede2115f9a5e33b49c4ad",
+			"bytes": 9184,
+			"mode": "100644"
+		},
+		"receipts/final-owned-source-conservation.json": {
+			"sha256": "2200cdd6f8f496404e50336d72f1736cbf31566a5bbe3c3f98455162b0deb7f4",
+			"bytes": 7044,
+			"mode": "100644"
+		},
+		"receipts/independent-history-restore.json.receipt": {
+			"sha256": "5dd3ec49a916bf09959b5a98d4d6a16f69102593d1d91c0fb5c130323dee39e2",
+			"bytes": 9598,
+			"mode": "100644"
+		},
+		"receipts/linux-parent-source-readback.json.receipt": {
+			"sha256": "43847b5b6855583aad73aadf7e8282c11fbc792171dbf0d18d1b66acd801c4d2",
+			"bytes": 584,
+			"mode": "100644"
+		},
+		"receipts/media-sdk-exit.json.receipt": {
+			"sha256": "b8b65afdaafa97781ba6cd040c19e73acea6dc841ccbe05c7c39bf0a6a57acf5",
+			"bytes": 115,
+			"mode": "100644"
+		},
+		"receipts/media-sdk-input-49.json.receipt": {
+			"sha256": "e49cdc33286db014b4b082b020ca1088532598d08bf47e7fea023660c42ff8a1",
+			"bytes": 7511,
+			"mode": "100644"
+		},
+		"receipts/media-sdk-result.json.receipt": {
+			"sha256": "d02e0d278b4298ac3a23e663bf4c502a7a9007a317c5724ad9130a5846d6fd0d",
+			"bytes": 741,
+			"mode": "100644"
+		},
+		"receipts/media-sdk-runtime.json.receipt": {
+			"sha256": "9fb94a28ed26bfc31ee2c926b10331f32eb27fb76977b32cf51ed915c4c3feab",
+			"bytes": 372,
+			"mode": "100644"
+		},
+		"receipts/stock-query-behavioral-harness.json.receipt": {
+			"sha256": "886b8e25e47ef7943b618f9e5939a385cf73615d47065a33748e9222b86016a7",
+			"bytes": 8276,
+			"mode": "100644"
+		},
+		"receipts/vhd-manifest.json.receipt": {
+			"sha256": "dc30b745e8853f669f85ec6e5d9942f0030166e684b6448663f355798c2d5437",
+			"bytes": 1010,
+			"mode": "100644"
+		},
+		"receipts/vhd-parent-receiving.json.receipt": {
+			"sha256": "d72ea03153763c4eba3d655a43d08890bef4ff9ac37567a4c25c85f1e7ee244f",
+			"bytes": 569,
+			"mode": "100644"
+		},
+		"receipts/vhd-receipt.json.receipt": {
+			"sha256": "18f13188cc70ff23f457b0cbd6eeb3ae3001ad8c980d8115861c7b8017a1d2ea",
+			"bytes": 5680,
+			"mode": "100644"
+		}
+	},
+	"original_input_gate": "receipts/media-sdk-result.json.receipt",
+	"history_bundle": "history/owned-unintegrated-history.bundle",
+	"all_refs_and_inactive_index_independently_restored": 42,
+	"native_acceptance": "NOT_QUALIFIED; see global TODO31 and individual group requirements",
+	"private_operational_group5_TODO_files_retained": 0
+}
