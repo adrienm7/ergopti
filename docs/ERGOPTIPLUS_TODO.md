@@ -12569,20 +12569,20 @@ compiled or enrolled by production and cannot complete item91.
   installed-runtime and final-source hosted qualification remain required;
   item93 and transverse16/38 remain open.
 
-- [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
-      selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
-      the old public checkbox is removed; an internal closed variant preserves
-      legacy partial overlays, wrapping, configurable spacing and shifted-symbol
-      behavior without another public gate. Its default is inactive none. Built-in
-      selection (empty emulated_layout) uses acknowledged lifecycle/WAL handoff;
-      launch or source refusal restores the prior image. Schema12 migration validates
-      all five typed semantic/flat/physical participants before deleting the old
-      setting and refuses malformed, occupied or conflicting records. Unsupported
-      Windows intent stays opaque on Lua drivers, with an accurate 21-locale reason.
-      Generated artifacts come from their real owners. The original 75 vectors,
-      six AltGr descriptors and eight SC012 roll cases remain independent; authored
-      extensions retain their order. Source scans keep nonempty subjects, native-port
-      identity and registration floors rather than waiving old assertions.
+- [~] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
+  selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
+  the old public checkbox is removed; an internal closed variant preserves
+  legacy partial overlays, wrapping, configurable spacing and shifted-symbol
+  behavior without another public gate. Its default is inactive none. Built-in
+  selection (empty emulated_layout) uses acknowledged lifecycle/WAL handoff;
+  launch or source refusal restores the prior image. Schema12 migration validates
+  all five typed semantic/flat/physical participants before deleting the old
+  setting and refuses malformed, occupied or conflicting records. Unsupported
+  Windows intent stays opaque on Lua drivers, with an accurate 21-locale reason.
+  Generated artifacts come from their real owners. The original 75 vectors,
+  six AltGr descriptors and eight SC012 roll cases remain independent; authored
+  extensions retain their order. Source scans keep nonempty subjects, native-port
+  identity and registration floors rather than waiving old assertions.
 
   Remaining software/native qualification: preserve this picker-only contract
   and repair only demonstrated migration, helper or handoff regressions. Qualify
@@ -12600,6 +12600,18 @@ compiled or enrolled by production and cannot complete item91.
   additive source-reviewed coverage, not a production fix or an executed native
   successor. The new case is Windows UNRUN until the next grouped CI; the
   earlier073800ed run cannot qualify it. Installed and device work remains open.
+
+Manual Windows run 38738856943 at 677cef50 completes all 12,683 planned,
+executed and timed cases: 12,682 pass and one fails. Its sole failure is the new
+positive picker fixture indexing layout.emulated_layout even though the genuine
+sparse writer deliberately deletes that neutral empty leaf. The fixture now
+asserts raw absence explicitly and retains the effective empty-value assertion;
+every other assertion and production source remains unchanged. Independent
+review follows the real writer, fresh parser, detached loader and completion
+owners. Targeted native receiving through the existing --only runner is still
+required; this source correction does not turn the failed whole run green.
+Windows E2E, build and installation were skipped after the unit failure. Item96
+remains partial.
 
 - [~] **97.** Replace the fixed accent/direct-symbol submenu with shared
   user-owned entries, empty by default with + Add. Support a catalogue action or
@@ -13771,8 +13783,10 @@ exception chain or change the original failed-state/cleanup path. All 323 parent
 assertion sites and 40 registrations remain, with two additive AHK cases. Eight
 actual pure PowerShell 7 controls pass with causal withdrawals; Windows
 PowerShell 5, the two new AHK cases and native fixture receiving remain unrun.
-The active manual run 38738856943 is pinned to 677cef50 and predates this
-fixture-only successor. Item 106 remains partial.
+Manual run 38738856943 is pinned to 677cef50 and predates this fixture-only
+successor. Its seven original network cases now pass with the same fixture
+source; the earlier failure cause remains unknown. The complete run still fails
+on the separate picker assertion recorded under item96. Item106 remains partial.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data
