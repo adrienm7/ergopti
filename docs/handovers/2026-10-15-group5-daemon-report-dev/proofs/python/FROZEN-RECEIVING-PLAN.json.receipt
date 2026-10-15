@@ -1,0 +1,38 @@
+{
+  "sealed_manifest_sha256": "7105a9d239772237e531d1c3643f26a60ca8f6b86aa4f6b1f8fcdf856ddc36b8",
+  "sources": [
+    {
+      "path": "tools/build/owned_runtime_product_build.py",
+      "bytes": 60346,
+      "sha256": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0",
+      "modeled_native": "compile command planning only; never executed"
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build_test.py",
+      "bytes": 13538,
+      "sha256": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f",
+      "modeled_native": "compile command planning only; never executed"
+    }
+  ],
+  "commands": [
+    [
+      "python3",
+      "owned_runtime_product_build_test.py"
+    ],
+    [
+      "python3",
+      "-O",
+      "owned_runtime_product_build_test.py"
+    ]
+  ],
+  "each_timeout_seconds": 30,
+  "environment": {
+    "HOME": "/workspace/ergopti-group5-work/vhd-daemon-report-dev-python-receiving-20261015/home",
+    "TMPDIR": "/workspace/ergopti-group5-work/vhd-daemon-report-dev-python-receiving-20261015/tmp",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "original_tests": 13,
+  "new_tests": 6,
+  "required_dependency_finding": "Actual test file imports only standard library and adjacent product module. No source read from26 Dev files is performed by these selected pure/filesystem controls; none copied or substituted.",
+  "limits": "not native compilation/SDK availability, packaging or runtime receiving"
+}

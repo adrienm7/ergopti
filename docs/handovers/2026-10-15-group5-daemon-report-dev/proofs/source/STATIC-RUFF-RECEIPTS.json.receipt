@@ -1,0 +1,31 @@
+[
+  {
+    "argv": [
+      "/workspace/ergopti-tools/python-packages/bin/ruff",
+      "check",
+      "--config",
+      "/workspace/ergopti/pyproject.toml",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/owned_runtime_product_build.py",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/owned_runtime_product_build_test.py",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/generate_vhd_daemon_report_reference.py"
+    ],
+    "status": 0,
+    "stdout": "All checks passed!\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "/workspace/ergopti-tools/python-packages/bin/ruff",
+      "format",
+      "--check",
+      "--config",
+      "/workspace/ergopti/pyproject.toml",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/owned_runtime_product_build.py",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/owned_runtime_product_build_test.py",
+      "/workspace/ergopti-group5-work/vhd-daemon-report-dev-successor-private-20261015/POST/tools/build/generate_vhd_daemon_report_reference.py"
+    ],
+    "status": 0,
+    "stdout": "3 files already formatted\n",
+    "stderr": ""
+  }
+]

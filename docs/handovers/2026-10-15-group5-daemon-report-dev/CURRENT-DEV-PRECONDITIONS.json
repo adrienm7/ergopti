@@ -1,0 +1,18 @@
+{
+	"patch_base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+	"compatible_current_commit": "a549c14f8aa158072e6ccc0b2ae57427e3195f8e",
+	"actual_current_tree": "f4a9b7d85c82564f9b42a359cce42135bc256523",
+	"current_dev_state": "EXACT_TUPLES_COMPATIBLE",
+	"proof": "CURRENT-DEV-API-TUPLES.json",
+	"checks": {
+		"preimages_equal": 5,
+		"new_paths_absent": 15,
+		"dependency_tuples_equal": 26,
+		"changed_dependencies": 0,
+		"API_tree_complete": true
+	},
+	"local_objects": "current commit absent locally; authenticated read-only GitHub commit and exact-tree API used; no shared/private fetch or refs",
+	"required_before_application": "Repeat current Dev exact5 preimages+15 absences+26 tuple comparison at coordinated application; mismatches require reviewed successor. No ancestor blanket approval.",
+	"canonical_apply": false,
+	"native_receiving": "UNEXECUTED"
+}

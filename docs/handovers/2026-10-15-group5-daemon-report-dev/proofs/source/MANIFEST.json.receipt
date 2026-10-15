@@ -1,0 +1,10 @@
+{
+  "state": "SEALED_SOURCE_ONLY_REVIEW_READY",
+  "base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+  "owned_paths": 20,
+  "subjects": 42,
+  "census_sha256": "38352fdea5d1c03e531914c56f7fa88e5513472917dc8c62633ad94c803f2256",
+  "patch_sha256": "d8a2bb5521fd6336a19e895b644e4913ea1b8815b66b61be5bb01d05cd74deea",
+  "limits": "Original28+4new Swift methods and original13+6new Python tests UNEXECUTED. Static Ruff and strict forward/inverse only. Profile not selected by unchanged normal runner; defaulthelper64 unavailable before admin. No native/ABI/READY grant.",
+  "historical_subset_manifest": "1356bd2add82700546bb84d31ee3b9d679e5e5daa0b7814f539a9273c013afdf"
+}

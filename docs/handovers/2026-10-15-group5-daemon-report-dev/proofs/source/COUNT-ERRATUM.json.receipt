@@ -1,0 +1,12 @@
+{
+  "immutable_before_intent_says": {
+    "original_python": 14
+  },
+  "genuine_dev_d60_source_actual": {
+    "ProductionBuildControls_test_methods": 13,
+    "other_helper_method": "commands, held, setUp are not Test methods"
+  },
+  "retained": "all13 original method texts/assertions plus original entire prefix/footer exact; no original was removed",
+  "swift_original": 28,
+  "swift_new_query_pure": 4
+}
