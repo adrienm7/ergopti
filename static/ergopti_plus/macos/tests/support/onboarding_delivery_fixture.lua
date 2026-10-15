@@ -125,8 +125,8 @@ local function with_delivery(callback, native_timers)
 					helpers.assert_eq(mode, "r", "fixture must never authorize config writes")
 					return { read = function() return "fixture" end, close = function() return true end }
 				end
-				local function open()
-					helpers.assert_true(onboarding.run("/virtual/config.toml"))
+				local function open(config_path)
+					helpers.assert_true(onboarding.run(config_path or "/virtual/config.toml"))
 					state.view.evaluateJavaScript = function(self, code, done)
 						local arguments = code:match("^window%.[%w_]+%((.*)%)$")
 						if arguments then state.payload = Json.decode(arguments) end

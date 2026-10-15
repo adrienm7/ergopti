@@ -990,6 +990,28 @@ helpers.describe("ui.bridge_handlers", function()
 			helpers.assert_contains(captured.pushes[1].code, "window.initData")
 		end)
 
+		for _, current_dir in ipairs({ "/virtual/default-A", "/virtual/custom-B" }) do
+			helpers.it("(onboarding-empty-folder) ready names the default destination from " .. current_dir, function()
+				local state, values, captured = onboarding_state()
+				values.config_dir = current_dir
+				state.config_paths.default_config_dir = function() return "/virtual/default-A" end
+				local result = handler.on_message({ action = "ready" }, state)
+				helpers.assert_true(result.pushed)
+				helpers.assert_eq(#captured.pushes, 1)
+				local arguments = captured.pushes[1].code:match("window%.initData%((.*)%)$")
+				helpers.assert_type(arguments, "string", "the actual ready producer must publish its payload")
+				local delivered = require("json").decode(arguments)
+				helpers.assert_eq(delivered.empty_config_dir, "/virtual/default-A",
+					"clearing a Linux field selects the OS default, even from a custom folder")
+				helpers.assert_eq(result.data.empty_config_dir, "/virtual/default-A")
+				helpers.assert_eq(delivered.default_config_dir, "/virtual/default-A")
+				helpers.assert_eq(delivered.config_dir, current_dir == "/virtual/default-A" and "" or "/virtual/custom-B",
+					"the displayed custom choice retains its original contract")
+				helpers.assert_eq(#captured.writes, 0, "initial presentation cannot write configuration")
+				helpers.assert_eq(#captured.prepared, 0, "initial presentation cannot prepare a destination")
+			end)
+		end
+
 		helpers.it("(onboarding-rerun) initData shows the values config.toml holds", function()
 			local state = onboarding_state()
 			local folder = scratch_dir()
