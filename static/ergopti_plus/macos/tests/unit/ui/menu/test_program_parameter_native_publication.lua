@@ -9,6 +9,10 @@ local SCALAR = '{"version":1,"executable":"/private/probe-tool","arguments":["pr
 local function copy(value) local result = {}; for key, child in pairs(value) do result[key] = child end; return result end
 
 local function with_subject(stage, body, options)
+	local selected = "run_program"
+	if options and options.action ~= nil then selected = options.action end
+	local scalar = SCALAR
+	if options and options.scalar ~= nil then scalar = options.scalar end
 	local saved, prior_hs = {}, _G.hs
 	for key, value in pairs(package.loaded) do saved[key] = value end
 	local ok, failure = xpcall(function()
@@ -75,6 +79,11 @@ local function with_subject(stage, body, options)
 				local parameters, state = { retained = "unrelated" }, {}
 				local gestures = {
 					is_assignable = function() return true end,
+					get_action_parameter_spec = function(name)
+						local row = require("_generated.action_catalogue").actions[name]
+						return row and row.parameter
+					end,
+					validate_action_parameter = function(_, value) return value == scalar end,
 					get_all_action_parameters = function() return copy(parameters) end,
 					set_action_parameter = function(binding, action, value) parameters[binding .. "__" .. action] = value; return true end,
 					replace_action_parameters = function(snapshot) parameters = copy(snapshot); return true end,
@@ -101,11 +110,11 @@ local function with_subject(stage, body, options)
 				local mutation = { publishes_assignment = true, section = "shortcuts.keyboard", key = "cmd_1",
 					read = function() return keyboard.get_action("cmd_1") end,
 					-- Keep actual provider boolean coercion: the observer must survive it.
-					apply = function(reporter, observer) return keyboard.set_action("cmd_1", "run_program", reporter, observer) == true end,
+					apply = function(reporter, observer) return keyboard.set_action("cmd_1", selected, reporter, observer) == true end,
 					restore = function(previous, reporter, observer) return keyboard.set_action("cmd_1", previous, reporter, observer) == true end,
 				}
 				local function apply()
-					local result = owner.apply("keyboard__cmd_1", "run_program", SCALAR, mutation)
+					local result = owner.apply("keyboard__cmd_1", selected, scalar, mutation)
 					if stage ~= "healthy" and not (options and options.fail_before_publication) then
 						helpers.assert_eq(type(control.published_candidate), "string",
 							"postpublication control must observe its actual native rename")
@@ -276,5 +285,40 @@ helpers.describe("actual private native publication ownership", function()
 			helpers.assert_eq(select("#", writer.publish_if_unchanged(path, prior, adapter, { status = "ok", content = prior })), 1)
 			helpers.assert_eq(select("#", writer.batch_write(path, {}, adapter, { status = "ok", content = prior })), 3)
 		end)
+	end)
+end)
+
+
+helpers.describe("non-program actual file publication ownership", function()
+	for _, stage in ipairs({ "assignment", "fullsave" }) do
+		helpers.it("(action-parameter-atomicity) restores actual files and runtime after " .. stage .. " release refusal", function()
+			with_subject(stage, function(owner, apply, inspect, control, global, preferences, checkpoint, original, _, path)
+				helpers.assert_eq(apply(), false)
+				helpers.assert_eq(owner.pending(), true)
+				helpers.assert_eq(global.is_pending(), true)
+				helpers.assert_eq(preferences.source_snapshot(path).content, inspect().content)
+				control.refusal = false
+				helpers.assert_eq(owner.retry_restore(), true)
+				helpers.assert_eq(inspect(), { content = original, parameters = { retained = "unrelated" }, action = "none" })
+				helpers.assert_eq(preferences.publication_receipt(path), { id = 0 })
+				helpers.assert_eq(checkpoint.capture().revision, 0)
+				helpers.assert_eq(owner.pending(), false)
+				helpers.assert_eq(global.is_pending(), false)
+			end, { action = "open_url", scalar = "https://example.com" })
+		end)
+	end
+	helpers.it("(action-parameter-atomicity) publishes the genuine non-program file and checkpoint", function()
+		with_subject("healthy", function(owner, apply, inspect, _, global, preferences, checkpoint, _, _, path)
+			helpers.assert_eq(apply(), true)
+			helpers.assert_eq(inspect().action, "open_url")
+			helpers.assert_eq(inspect().parameters, { retained = "unrelated", keyboard__cmd_1__open_url = "https://example.com" })
+			local decoded = require("toml_codec").decode(inspect().content)
+			helpers.assert_eq(decoded.shortcuts.keyboard.cmd_1, "open_url")
+			helpers.assert_eq(decoded.gestures.action_parameters.keyboard__cmd_1__open_url, "https://example.com")
+			helpers.assert_eq(preferences.source_snapshot(path).content, inspect().content)
+			helpers.assert_eq(checkpoint.capture().revision, 1)
+			helpers.assert_eq(owner.pending(), false)
+			helpers.assert_eq(global.is_pending(), false)
+		end, { action = "open_url", scalar = "https://example.com" })
 	end)
 end)

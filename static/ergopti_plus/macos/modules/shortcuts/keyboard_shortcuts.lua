@@ -554,6 +554,12 @@ function M.validate_physical_edits(rows, claim)
 		return _physical_publication == claim and _physical_publication_epoch == publication_epoch
 			and _lifecycle_epoch == lifecycle and _configuration_generation == config and _explicit_actions == assignments
 	end
+	local navigation, remap, navigation_checked = nil, nil, false
+	local function navigation_current()
+		if not navigation_checked or navigation == nil or package.loaded["platform.remap"] ~= remap then return false end
+		local called, accepted = pcall(navigation.current)
+		return called and accepted == true and current()
+	end
 	for _, row in ipairs(rows) do
 		if row.section == "shortcuts.keyboard" and row.delete ~= true then
 			local descriptor = M.physical_slot_descriptor(row.key)
@@ -562,13 +568,34 @@ function M.validate_physical_edits(rows, claim)
 			local native = physical_model().stable_native_code(row.key, "hs")
 			if not current() then return false, "source_changed" end
 			if not native or physical_model().key_group(row.key) == "media" then return false, "unavailable" end
+			-- A definite current ordinary/native collision remains authoritative
+			-- even when another owner's configured inventory is unavailable.
 			local called, conflict = pcall(physical_conflict, row.key, descriptor.mods, native)
 			if not current() then return false, "source_changed" end
 			if not called or type(conflict) ~= "boolean" then return false, "unavailable" end
 			if conflict then return false, "collision" end
+			if row.value ~= "none" then
+				if not navigation_checked then
+					navigation_checked = true
+					remap = package.loaded["platform.remap"]
+					if type(remap) ~= "table" or getmetatable(remap) ~= nil
+						or type(rawget(remap, "capture_configured_navigation_inventory")) ~= "function" then return false, "unavailable" end
+					local read, captured = pcall(remap.capture_configured_navigation_inventory)
+					if not current() then return false, "source_changed" end
+					if not read or type(captured) ~= "table" or type(captured.codes) ~= "table"
+						or type(captured.current) ~= "function" then return false, "unavailable" end
+					navigation = captured
+				end
+				if not navigation_current() then return false, "source_changed" end
+				for _, reserved in ipairs(navigation.codes) do
+					if type(reserved) ~= "number" then return false, "unavailable" end
+					-- Navigation consumes optional any modifiers, including its None.
+					if reserved == native then return false, "collision" end
+				end
+			end
 		end
 	end
-	if not current() then return false, "source_changed" end
+	if not current() or navigation_checked and not navigation_current() then return false, "source_changed" end
 	return true
 end
 

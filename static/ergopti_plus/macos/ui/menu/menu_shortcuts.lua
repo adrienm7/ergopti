@@ -670,7 +670,7 @@ function M.build(ctx)
 									return
 								end
 								DeferredWork.after(0.05, function()
-									local mutation = spec == "program" and {
+									local mutation = {
 										section = "shortcuts.script_control", key = slot_id,
 										read = function()
 											if type(script_control.get_shortcut_actions) ~= "function" then return nil end
@@ -688,10 +688,10 @@ function M.build(ctx)
 											state.script_control_shortcuts[slot_id] = previous
 											return script_control.set_shortcut_action(slot_id, previous) == true
 										end,
-									} or nil
+									}
 									local transaction = ctx.commit_program_parameter
 									if ShortcutUtils.prompt_action_parameter(gestures, prefix .. slot_id, a, spec, nil, mutation, transaction) then
-										assign()
+										ctx.updateMenu()
 									end
 								end, "menu_shortcuts.action_parameter")
 								return

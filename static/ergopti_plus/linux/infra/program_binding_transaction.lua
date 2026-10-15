@@ -1,9 +1,10 @@
 --- infra/program_binding_transaction.lua
 
---- Publishes an executable parameter and its binding under exact runtime ownership.
+--- Publishes an action parameter and its binding under exact runtime ownership.
 local M = {}
 local Transaction = require("config_scope_transaction")
 local Writer = require("toml_codec.writer")
+local PhysicalSlots = require("shortcuts.physical_slots")
 local Logger = require("logger.shim")
 local LOG = "infra.program_binding_transaction"
 local _current, _sequence = nil, 0
@@ -24,12 +25,13 @@ local function equal(left, right)
 end
 
 --- Builds a conditional publication using existing preference and dispatch owners.
---- @param options table Exact binding, scalar, path, backup, pause and native file ports.
+--- @param options table Exact binding, scalar, optional action (default run_program), path, backup, pause and native file ports.
 --- @return table owner Apply, retained debt and explicit compensation retry.
 function M.new(options)
 	assert(type(options) == "table" and type(options.is_paused) == "function", "program binding requires live pause ownership")
 	local parameters = options.parameters or require("modules.gestures.manager")
 	local binding, slot, section, provider = options.binding
+	local action = options.action == nil and "run_program" or options.action
 	local families = {
 		{ "keyboard__", "shortcuts.keyboard", "modules.shortcuts.keyboard_shortcuts" },
 		{ "tap_key__", "shortcuts.tap_keys", "modules.shortcuts.tap_keys" },
@@ -47,8 +49,18 @@ function M.new(options)
 			end
 		end
 	end
-	assert(type(slot) == "string" and parameters.validate_action_parameter("run_program", options.scalar) == true,
-		"program binding model is invalid")
+	-- These leases own logical configuration, not physical source/capture/output.
+	assert(section ~= "shortcuts.keyboard" or not PhysicalSlots.is_namespace(slot),
+		"physical assignments require their physical publication owner")
+	assert(type(slot) == "string" and type(action) == "string"
+		and type(parameters.get_action_parameter_spec(action)) == "string"
+		and parameters.validate_action_parameter(action, options.scalar) == true,
+		"parameterized binding model is invalid")
+	local parameter = parameters.action_parameter_update(binding, action, options.scalar)
+	assert(type(parameter) == "table" and parameter.section == "gesture_parameters"
+		and parameter.key == binding .. "__" .. action and parameter.value == options.scalar,
+		"parameterized binding update is invalid")
+	parameter = { section = parameter.section, key = parameter.key, value = parameter.value }
 	local owner, held, retiring, busy = {}, {}, false, false
 	local files = options.files or require("adapters.file_system")
 	local checkpoint, reconcile_pending, inverse_source = nil, false, nil
@@ -122,8 +134,8 @@ function M.new(options)
 		return parameters.apply_parameter_configuration_actions(owner, state.assignments) == true
 	end
 	local updates = {
-		{ section = "gesture_parameters", key = binding .. "__run_program", value = options.scalar },
-		{ section = section, key = slot, value = "run_program" },
+		parameter,
+		{ section = section, key = slot, value = action },
 	}
 	local transaction = Transaction.new({ path = options.path, backup_path = options.backup_path,
 		files = files,
@@ -139,10 +151,10 @@ function M.new(options)
 			local scalar_state = parameters.parameter_configuration_snapshot(owner)
 			local assignments = assignment_snapshot()
 			if type(scalar_state) ~= "table" or type(assignments) ~= "table" then return false end
-			scalar_state[binding .. "__run_program"] = options.scalar
+			scalar_state[parameter.key] = parameter.value
 			assignments = copy(assignments)
-			assignments.assignments[slot] = "run_program"
-			if assignments.explicit_assignments then assignments.explicit_assignments[slot] = "run_program" end
+			assignments.assignments[slot] = action
+			if assignments.explicit_assignments then assignments.explicit_assignments[slot] = action end
 			return parameters.apply_parameter_configuration(owner, scalar_state) == true and apply_assignments(assignments)
 		end,
 		restore = function(snapshot)
@@ -206,8 +218,9 @@ end
 --- @param binding string Canonical binding identity.
 --- @param scalar string Validated executable parameter.
 --- @param is_paused function Live pause getter.
+--- @param action string|nil Declared parameter-bearing action; defaults to run_program.
 --- @return boolean committed
-function M.apply(binding, scalar, is_paused)
+function M.apply(binding, scalar, is_paused, action)
 	if type(is_paused) ~= "function" or _constructing then return false end
 	_constructing = true
 	local ok, accepted = pcall(function()
@@ -215,12 +228,12 @@ function M.apply(binding, scalar, is_paused)
 		_sequence = _sequence + 1
 		local path = require("infra.config_paths").config("config.toml")
 		_current = M.new({ path = path, backup_path = path .. ".program-binding-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
-			binding = binding, scalar = scalar, is_paused = is_paused })
+			binding = binding, scalar = scalar, is_paused = is_paused, action = action })
 		return _current.apply()
 	end)
 	_constructing = false
 	if not ok or accepted ~= true then
-		Logger.error(LOG, "Private user program binding publication did not commit.")
+		Logger.error(LOG, "Parameterized action binding publication did not commit.")
 		return false
 	end
 	return true

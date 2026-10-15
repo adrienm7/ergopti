@@ -454,3 +454,70 @@ _LMH_VariantSourceRefusalCase() {
 }
 Test("layout selection: typed joint source refusal precedes picker publication or successor launch (todo96-helper-variant)",
 	_LMH_VariantSourceRefusalCase)
+
+
+; The genuine scope callback acknowledges completion; accepting launch alone cannot.
+_LMH_SelectionCommittedCase() {
+	global Features
+	Fixture := _LMH_SelectionFixture()
+	Before := LayoutManager_ActiveId()
+	RuntimeLayout := _LayMgrWeb_Json(Features.Get("layout", Map()))
+	DesiredLayout := _LayMgrWeb_Json(MasterGateDesiredFeatures(Features).Get("layout", Map()))
+	Cached := ParseTomlFile(Fixture.path)
+	Bundle := 0, Succeeded := 0, Launches := 0
+	Launch(Complete, Borrowed, _Refused) {
+		Launches += 1
+		Succeeded := Complete
+		Bundle := Borrowed
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Receipt := LayoutManager_SelectTransition("ergopti_plus", Fixture.options)
+		AssertEqual(1, Launches)
+		AssertEqual("pending", Receipt["status"], "accepted launch alone cannot commit the selection")
+		AssertEqual("keyboard_layout", Receipt["scope"])
+		AssertEqual("select", Receipt["mode"])
+		AssertTrue(Succeeded is Func, "the real scope supplies its completion callback")
+		AssertTrue(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object)
+		Candidate := FSReadUtf8Exact(Fixture.path)
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		AssertFalse(Parsed["layout"].Has("emulated_layout"), "the neutral empty source is omitted by the real sparse writer")
+		AssertEqual("", Parsed["layout"].Get("emulated_layout", ""))
+		AssertEqual(true, Parsed["layout"]["ergopti_base"])
+		AssertEqual("ergopti_plus", Parsed["layout"]["ergopti_variant"])
+		AssertEqual(false, Parsed["layout"]["ergopti_alt_gr"])
+		AssertEqual("symbols", Parsed["layout"]["direct_access_digits"])
+		AssertEqual("retain", Parsed["layout"]["future_owner"])
+		AssertEqual(false, Parsed["category_enabled"]["layout"])
+		AssertEqual("unchanged", Parsed["private"]["value"])
+		Loaded := Map("layout", Map("emulated_layout", "", "ergopti_base", false, "ergopti_variant", "ergopti"))
+		SuccessorPath := Fixture.directory . "\successor-config.toml"
+		AssertTrue(FSWriteCreateDurable(SuccessorPath, Candidate))
+		SuccessorPreparation := ConfigSchemaPrepareSource(SuccessorPath)
+		AssertEqual("current", SuccessorPreparation["status"])
+		AssertEqual(1, SuccessorPreparation["read_only"])
+		AssertFalse(ConfigSchemaCanPrepareWrite(SuccessorPath))
+		AssertTrue(ApplyConfigToml(Loaded, SuccessorPath) >= 1, "the real detached native loader admits the selected source")
+		AssertEqual("ergopti_plus", LayoutManager_ActiveId(Loaded))
+		AssertEqual("pending", Receipt["status"], "loading detached bytes cannot acknowledge replacement completion")
+		AssertEqual(Before, LayoutManager_ActiveId())
+		AssertEqual(RuntimeLayout, _LayMgrWeb_Json(Features.Get("layout", Map())))
+		AssertEqual(DesiredLayout, _LayMgrWeb_Json(MasterGateDesiredFeatures(Features).Get("layout", Map())))
+		Succeeded.Call()
+		AssertEqual("committed", Receipt["status"], "the supplied success callback commits the pending receipt")
+		AssertEqual(1, Launches, "completion does not launch a second successor")
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Candidate), "successful completion retains the exact candidate source")
+		AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]), "completion preserves the exclusive original backup")
+		AssertEqual(Before, LayoutManager_ActiveId(), "a controlled completion cannot mutate the old resident runtime")
+		AssertEqual(RuntimeLayout, _LayMgrWeb_Json(Features.Get("layout", Map())))
+		AssertEqual(DesiredLayout, _LayMgrWeb_Json(MasterGateDesiredFeatures(Features).Get("layout", Map())))
+		AssertTrue(ObjPtr(ParseTomlFile(Fixture.path)) == ObjPtr(Cached), "detached successor loading never replaces the resident cache")
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("layout selection: genuine scope completion commits the selected Ergopti+ source (todo96-picker-handoff)",
+	_LMH_SelectionCommittedCase)

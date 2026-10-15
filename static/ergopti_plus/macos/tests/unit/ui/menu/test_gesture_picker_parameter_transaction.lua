@@ -4,6 +4,8 @@
 local helpers = require("tests.helpers")
 
 local function with_picker(options, callback)
+	local selected = options.action == nil and "run_program" or options.action
+	local scalar = options.scalar == nil and "new scalar" or options.scalar
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local fixture = { assigned = "none", parameters = { retained = "unrelated" },
@@ -23,10 +25,10 @@ local function with_picker(options, callback)
 		set_action = function(_, value)
 			fixture.assignments = fixture.assignments + 1
 			fixture.assigned = value
-			if value == "run_program" then return result(options.assign) end
+			if value == selected then return result(options.assign) end
 			return true
 		end,
-		get_action_parameter = function() return fixture.parameters.tap_3__run_program or "" end,
+		get_action_parameter = function() return fixture.parameters["tap_3__" .. selected] or "" end,
 		get_all_action_parameters = function() return copy(fixture.parameters) end,
 		replace_action_parameters = function(snapshot)
 			fixture.parameters = copy(snapshot)
@@ -36,10 +38,13 @@ local function with_picker(options, callback)
 			fixture.parameters[binding .. "__" .. action] = value
 			return result(options.parameter)
 		end,
-		validate_action_parameter = function(_, value) return value == "new scalar" end,
-		get_action_parameter_spec = function(action) return action == "run_program" and "program" or nil end,
+		validate_action_parameter = function(_, value) return value == scalar end,
+		get_action_parameter_spec = function(action)
+			local row = require("_generated.action_catalogue").actions[action]
+			return row and row.parameter
+		end,
 		get_action_label = function(action) return action end,
-		get_sg_names = function() return { "none", "run_program" } end,
+		get_sg_names = function() return { "none", selected } end,
 		parameter_prompt = function() return "prompt" end,
 		parameter_error = function() return "error" end,
 		on_action_changed = function() fixture.conflicts = fixture.conflicts + 1 end,
@@ -55,7 +60,7 @@ local function with_picker(options, callback)
 		package.loaded["infra.dialog_util"] = {
 			text_prompt = function(_, _, _, confirm, cancel)
 				if options.cancel then return cancel end
-				return confirm, "new scalar"
+				return confirm, scalar
 			end,
 		}
 		package.loaded["infra.deferred_work"] = { after = function(_, work) work(); return true end }
@@ -91,8 +96,8 @@ local function with_picker(options, callback)
 		rows[1].items[1].action()
 		helpers.assert_type(picker_callback, "function")
 		callback(fixture, function()
-			if options.cancel then return picker_callback("run_program") end
-			return picker_callback("run_program", "new scalar")
+			if options.cancel then return picker_callback(selected) end
+			return picker_callback(selected, scalar)
 		end)
 	end, debug.traceback)
 	for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
@@ -150,6 +155,33 @@ helpers.describe("gesture picker acknowledged parameter transaction", function()
 			helpers.assert_eq(fixture.assignments, 0)
 			helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
 			helpers.assert_eq(fixture.saves, 0)
+		end)
+	end)
+end)
+
+
+helpers.describe("non-program gesture picker transaction", function()
+	for _, stage in ipairs({ "parameter", "assign", "save" }) do
+		for _, mode in ipairs({ "false", "nil", "throw" }) do
+			helpers.it("(action-parameter-atomicity) gesture preserves both owners after " .. stage .. " " .. mode, function()
+				with_picker({ action = "open_url", scalar = "https://example.com", [stage] = mode }, function(fixture, pick)
+					pick()
+					helpers.assert_eq(fixture.assigned, "none")
+					helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
+					helpers.assert_eq(fixture.updates, 0)
+					helpers.assert_eq(fixture.conflicts, 0)
+				end)
+			end)
+		end
+	end
+	helpers.it("(action-parameter-atomicity) gesture publishes once and reports the committed choice", function()
+		with_picker({ action = "open_url", scalar = "https://example.com" }, function(fixture, pick)
+			pick()
+			helpers.assert_eq(fixture.assigned, "open_url")
+			helpers.assert_eq(fixture.parameters, { retained = "unrelated", tap_3__open_url = "https://example.com" })
+			helpers.assert_eq(fixture.saves, 1)
+			helpers.assert_eq(fixture.updates, 1)
+			helpers.assert_eq(fixture.conflicts, 1)
 		end)
 	end)
 end)

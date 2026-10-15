@@ -6,6 +6,8 @@ local ProgramParameter = require("program_parameter")
 local SCALAR = '{"version":1,"executable":"/private/tool","arguments":["two words",""]}'
 
 local function with_provider(kind, options, body)
+	local selected = options.action == nil and "run_program" or options.action
+	local scalar = options.scalar == nil and SCALAR or options.scalar
 	local saved = {}
 	for name, value in pairs(package.loaded) do saved[name] = value end
 	local fixture = { action = options.foreign_native or "none", canonical_action = "none", parameters = { retained = "unrelated" },
@@ -24,7 +26,7 @@ local function with_provider(kind, options, body)
 	local function set_action(_, value)
 		fixture.sets = fixture.sets + 1
 		fixture.action = value
-		if value == "run_program" then
+		if value == selected then
 			local committed = receipt(options.assign)
 			if committed ~= true then return committed end
 		end
@@ -42,9 +44,12 @@ local function with_provider(kind, options, body)
 			if options.readiness == "nil" then return nil end
 			return options.readiness ~= "false"
 		end,
-		get_sg_names = function() return { "none", "run_program" } end,
+		get_sg_names = function() return { "none", selected } end,
 		get_action_label = function(value) return value end,
-		get_action_parameter_spec = function(action) return action == "run_program" and "program" or nil end,
+		get_action_parameter_spec = function(action)
+			local row = require("_generated.action_catalogue").actions[action]
+			return row and row.parameter
+		end,
 		get_action_parameter = function(binding, action) return fixture.parameters[binding .. "__" .. action] or "" end,
 		get_all_action_parameters = function() return copy(fixture.parameters) end,
 		replace_action_parameters = function(snapshot) fixture.parameters = copy(snapshot); return true end,
@@ -52,7 +57,10 @@ local function with_provider(kind, options, body)
 			fixture.parameters[binding .. "__" .. action] = value
 			return receipt(options.parameter)
 		end,
-		validate_action_parameter = function(_, value) return ProgramParameter.parse(value, "hs") ~= nil end,
+		validate_action_parameter = function(_, value)
+			if selected == "run_program" then return ProgramParameter.parse(value, "hs") ~= nil end
+			return value == scalar
+		end,
 		parameter_prompt = function() return "Program" end,
 		parameter_error = function() return "Invalid program" end,
 		send_vocabulary = function() return {} end,
@@ -70,7 +78,7 @@ local function with_provider(kind, options, body)
 		logger.error = function(_, message, ...) fixture.errors = fixture.errors + 1; fixture.last_error = string.format(message, ...); if message:find("did not commit", 1, true) then fixture.transaction_error = string.format(message, ...) end end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.dialog_util"] = { text_prompt = function(_, _, _, confirm, cancel)
-			return options.cancel and cancel or confirm, SCALAR
+			return options.cancel and cancel or confirm, scalar
 		end }
 		local original_prompt = package.loaded["infra.dialog_util"].text_prompt
 		package.loaded["infra.dialog_util"].text_prompt = function(...)
@@ -82,7 +90,7 @@ local function with_provider(kind, options, body)
 		package.loaded["adapters.apple_shortcuts_native"] = nil
 		package.loaded["infra.deferred_work"] = { after = function(_, callback) callback(); return true end }
 		package.loaded["ui.action_picker"] = { open = function(settings, callback)
-			helpers.assert_eq(settings.items[1].id, "run_program")
+			helpers.assert_eq(settings.items[1].id, selected)
 			helpers.assert_eq(settings.items[1].disabled, options.unavailable and true or nil, "program selection must follow registration readiness")
 			if options.unavailable then helpers.assert_eq(settings.items[1].hint, "platform_reason.program_runner_unavailable") end
 			picker_callback = callback
@@ -92,7 +100,7 @@ local function with_provider(kind, options, body)
 		package.loaded["adapters.shell_runner"] = {}
 		package.loaded["adapters.input_source_broker"] = { subscribe = function() return true end }
 		package.loaded["modules.shortcuts.bindings"] = { reconcile_tap_keys = function()
-			if fixture.action == "run_program" then return receipt(options.reconcile) end
+			if fixture.action == selected then return receipt(options.reconcile) end
 			return true
 		end }
 		package.loaded["modules.shortcuts.tap_keys"] = {
@@ -142,7 +150,7 @@ local function with_provider(kind, options, body)
 				rows = providers.script_control_shortcuts()
 				return rows
 			end }
-			ctx.script_control = { ACTIONS = { "run_program" }, SCRIPT_BINDING_PREFIX = "script__",
+			ctx.script_control = { ACTIONS = { selected }, SCRIPT_BINDING_PREFIX = "script__",
 				script_chord_slots = function() return { { id = "script_altgr_enter" } } end,
 				set_shortcut_action = set_action,
 				get_shortcut_actions = function() return { script_altgr_enter = fixture.action } end,
@@ -157,8 +165,8 @@ local function with_provider(kind, options, body)
 		body(fixture, function()
 			if kind ~= "script" then
 				helpers.assert_type(picker_callback, "function")
-				if options.cancel then return picker_callback("run_program") end
-				picker_callback("run_program", SCALAR)
+				if options.cancel then return picker_callback(selected) end
+				picker_callback(selected, scalar)
 			end
 		end, state)
 	end, debug.traceback)
@@ -307,3 +315,54 @@ for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 		end)
 	end)
 end
+
+
+for _, kind in ipairs({ "keyboard", "tap", "script" }) do
+	local binding = kind == "keyboard" and "keyboard__cmd_1" or kind == "tap" and "tap_key__number_row_left" or "script__script_altgr_enter"
+	helpers.describe("non-program transaction through actual " .. kind .. " provider", function()
+		for _, stage in ipairs({ "parameter", "assign", "save" }) do
+			for _, mode in ipairs({ "false", "nil", "throw" }) do
+				helpers.it("(action-parameter-atomicity) " .. kind .. " preserves both owners after " .. stage .. " " .. mode, function()
+					with_provider(kind, { action = "open_url", scalar = "https://example.com", [stage] = mode }, function(fixture, pick, state)
+						pick()
+						helpers.assert_eq(fixture.action, "none")
+						helpers.assert_eq(fixture.canonical_action, "none")
+						helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
+						helpers.assert_eq(fixture.canonical_parameters, { retained = "unrelated" })
+						helpers.assert_eq(fixture.updates, 0)
+						if kind == "script" then helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none") end
+					end)
+				end)
+			end
+		end
+		helpers.it("(action-parameter-atomicity) " .. kind .. " publishes parameter and assignment exactly once", function()
+			with_provider(kind, { action = "open_url", scalar = "https://example.com" }, function(fixture, pick, state)
+				pick()
+				helpers.assert_eq(fixture.action, "open_url", fixture.transaction_error or fixture.last_error)
+				helpers.assert_eq(fixture.canonical_action, "open_url")
+				helpers.assert_eq(fixture.parameters, { retained = "unrelated", [binding .. "__open_url"] = "https://example.com" })
+				helpers.assert_eq(fixture.canonical_parameters, fixture.parameters)
+				helpers.assert_eq(fixture.saves, 1, "the transaction must not run a second ordinary save")
+				helpers.assert_eq(fixture.updates, 1)
+				if kind == "script" then helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "open_url") end
+			end)
+		end)
+	end)
+end
+
+
+helpers.describe("script prompt cancellation preserves the predecessor binding", function()
+	helpers.it("(script-prompt-cancel-predecessor) declined prompt keeps the actual existing native slot", function()
+		with_provider("script", { cancel = true, foreign_native = "copy" }, function(fixture, pick, state)
+			pick()
+			helpers.assert_eq(fixture.action, "copy", "cancellation cannot replace the retained native binding")
+			helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none", "the prior independent menu value stays unchanged")
+			helpers.assert_eq(fixture.canonical_action, "none")
+			helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
+			helpers.assert_eq(fixture.canonical_parameters, { retained = "unrelated" })
+			helpers.assert_eq(fixture.sets, 0, "a cancelled prompt never enters assignment mutation")
+			helpers.assert_eq(fixture.saves, 0)
+			helpers.assert_eq(fixture.updates, 0)
+		end)
+	end)
+end)

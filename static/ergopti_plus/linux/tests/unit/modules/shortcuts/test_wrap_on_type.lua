@@ -385,3 +385,158 @@ helpers.describe("wrap feature callback ownership", function()
 		end)
 	end)
 end)
+
+--- Keeps the real source readers/decoder and controls only private file routing.
+local function with_wrap_inventory(body, options)
+	options = options or {}
+	local Sandbox = require("test.config_unused_keys_contract").sandbox
+	local Routes, Paths = require("infra.config_paths"), require("infra.paths")
+	local name = "modules.shortcuts.manager"
+	local prior, route, shared, open = package.loaded[name], Routes.config, Paths.shared, io.open
+	local catalogue_path = os.tmpname()
+	local original = assert(open(shared("modules/wrap_symbols/wrap_symbols.json"), "rb"))
+	local original_bytes = assert(original:read("*a")); assert(original:close() == true)
+	Sandbox.write_bytes(catalogue_path, original_bytes)
+	local passed, failure = pcall(function()
+		Sandbox.with_config(options.source or '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n', function(path)
+			Routes.config = function(file) assert(file == "config.toml"); return path end
+			Paths.shared = function(relative)
+				if relative == "modules/wrap_symbols/wrap_symbols.json" then return catalogue_path end
+				return shared(relative)
+			end
+			if options.close_target then
+				local target = options.close_target == "catalogue" and catalogue_path or path
+				io.open = function(file, mode)
+					local handle, detail, code = open(file, mode)
+					if file ~= target or not handle then return handle, detail, code end
+					return {
+						read = function(_, ...) return handle:read(...) end,
+						close = function() assert(handle:close() == true); return options.close_ack end,
+					}
+				end
+			end
+			local manager = helpers.load_module(name)
+			manager.init({ persist = true, config_path = path })
+			io.open = open
+			body(manager, path, catalogue_path, Sandbox)
+		end)
+	end)
+	io.open, Routes.config, Paths.shared, package.loaded[name] = open, route, shared, prior
+	local removed, detail = os.remove(catalogue_path)
+	helpers.assert_eq(removed, true, "owned catalogue cleanup: " .. tostring(detail))
+	if not passed then error(failure, 0) end
+end
+
+helpers.describe("configured wrap-symbol collision reservations", function()
+	helpers.it("(wrap-configured-reservation) emits genuine plain/Shift trigger claims without reading PRIMARY", function()
+		with_wrap_inventory(function(manager)
+			local frame = assert(manager.capture_collision_inventory())
+			local observed = {}
+			for _, claim in ipairs(frame.claims) do
+				helpers.assert_eq(claim.kind, "logical")
+				helpers.assert_eq(claim.mods.ctrl, nil); helpers.assert_eq(claim.mods.alt, nil)
+				helpers.assert_eq(claim.mods.super, nil); helpers.assert_eq(claim.mods.altgr, nil)
+				if claim.key == "(" then observed[claim.mods.shift] = true end
+			end
+			helpers.assert_eq(observed, { [false] = true, [true] = true })
+			helpers.assert_eq(frame.current(), true); helpers.assert_eq(frame.sealed(), true)
+			local controller, log, state = controller_with({ primary = "before" })
+			helpers.assert_eq(controller.on_key(symbol("(", {})), false)
+			helpers.assert_eq(log.reads, 0, "configured eligibility does not assert an active selection")
+			controller.on_pointer_down(); state.primary = "selection"
+			helpers.assert_eq(controller.on_key(symbol("(", {})), true)
+		end)
+	end)
+
+	for _, setting in ipairs({ "enabled", "wrap_text_if_selected" }) do
+		helpers.it("(wrap-configured-reservation) proves empty configured claims when " .. setting .. " is off", function()
+			with_wrap_inventory(function(manager)
+				local frame = assert(manager.capture_collision_inventory())
+				helpers.assert_eq(frame.claims, {}); helpers.assert_eq(frame.current(), true)
+			end, { source = ('[shortcuts]\nenabled = true\nwrap_text_if_selected = true\n'):gsub(setting .. ' = true', setting .. ' = false') })
+		end)
+	end
+
+	helpers.it("(wrap-configured-reservation) invalidates an old frame after a real switch round trip", function()
+		with_wrap_inventory(function(manager)
+			local frame = assert(manager.capture_collision_inventory())
+			helpers.assert_eq(manager.set_wrap_on_type_enabled(false), true)
+			helpers.assert_eq(manager.set_wrap_on_type_enabled(true), true)
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(frame.sealed(), false)
+			helpers.assert_true(manager.capture_collision_inventory() ~= nil)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-reservation) refuses changed genuine catalogue bytes without adopting a new baseline", function()
+		with_wrap_inventory(function(manager, _, catalogue_path, Sandbox)
+			local frame = assert(manager.capture_collision_inventory())
+			Sandbox.write_bytes(catalogue_path, '{"groups":[]}')
+			helpers.assert_eq(frame.current(), false)
+			helpers.assert_eq(manager.capture_collision_inventory(), nil)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-reservation) refuses a changed actual map or replaced dispatch getter", function()
+		with_wrap_inventory(function(manager)
+			local frame = assert(manager.capture_collision_inventory())
+			local pair = manager.get_wrap_pairs()["("]
+			local right = pair.right; pair.right = "changed"
+			helpers.assert_eq(frame.sealed(), false)
+			helpers.assert_eq(manager.capture_collision_inventory(), nil)
+			pair.right = right
+			local getter = manager.get_wrap_pair
+			manager.get_wrap_pair = function() return nil end
+			helpers.assert_eq(frame.current(), false)
+			manager.get_wrap_pair = getter
+		end)
+	end)
+
+	helpers.it("(wrap-configured-reservation) refuses stale configured switches rather than rereading them as runtime", function()
+		with_wrap_inventory(function(manager, path, _, Sandbox)
+			local frame = assert(manager.capture_collision_inventory())
+			Sandbox.write_bytes(path, '[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n')
+			helpers.assert_eq(manager.is_wrap_on_type_enabled(), true)
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(manager.capture_collision_inventory(), nil)
+		end)
+	end)
+
+	for _, target in ipairs({ "catalogue", "configuration" }) do
+		for _, ack in ipairs({ { name = "false", value = false }, { name = "nil" } }) do
+			helpers.it("(wrap-configured-reservation) original " .. target .. " load refuses a " .. ack.name .. " close ACK", function()
+				with_wrap_inventory(function(manager)
+					if target == "catalogue" then
+						helpers.assert_eq(manager.get_wrap_pair("("), nil, "unacknowledged catalogue must not become active")
+					else
+						helpers.assert_eq(manager.is_enabled(), false)
+						helpers.assert_eq(manager.is_wrap_on_type_enabled(), false)
+					end
+					helpers.assert_eq(manager.capture_collision_inventory(), nil, "a later valid read cannot authorize the refused original load")
+				end, { close_target = target, close_ack = ack.value })
+			end)
+		end
+	end
+
+	helpers.it("(wrap-configured-reservation) configuration ownership revokes a previously captured frame", function()
+		with_wrap_inventory(function(manager)
+			local frame, owner = assert(manager.capture_collision_inventory()), {}
+			helpers.assert_eq(manager.acquire_configuration(owner), true)
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(manager.capture_collision_inventory(), nil)
+			helpers.assert_eq(manager.release_configuration(owner), true)
+			helpers.assert_eq(frame.sealed(), false)
+		end)
+	end)
+end)
+
+
+helpers.describe("Corrupt wrap reservation configuration refusal", function()
+	helpers.it("(wrap-configured-reservation) corrupt actual config refuses rather than manufacturing empty claims", function()
+		with_wrap_inventory(function(manager, path, _, Sandbox)
+			local original = assert(manager.capture_collision_inventory())
+			Sandbox.write_bytes(path, "[shortcuts\n")
+			helpers.assert_eq(original.current(), false)
+			local acknowledged, frame = pcall(manager.capture_collision_inventory)
+			helpers.assert_eq(acknowledged, true, "public capture must classify corrupt-source refusal")
+			helpers.assert_eq(frame, nil, "corrupt source is never an empty free inventory")
+		end)
+	end)
+end)
