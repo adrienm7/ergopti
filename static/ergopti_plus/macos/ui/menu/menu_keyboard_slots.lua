@@ -181,24 +181,18 @@ local function choose_action_for(slot_id, ctx)
 			and gestures.get_action_parameter_spec(action_id) or nil
 		if not spec then return bind() end
 		DeferredWork.after(0.05, function()
-			if spec == "program" then
-				local committed = ShortcutUtils.prompt_action_parameter(gestures,
-					KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
-						publishes_assignment = true, section = "shortcuts.keyboard", key = slot_id,
-						read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
-						apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
-						restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,
-					}, ctx.commit_program_parameter)
-				if committed then
-					if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
-					M.warn_if_input_source_conflict(slot_id)
-				end
-				return committed
+			local committed = ShortcutUtils.prompt_action_parameter(gestures,
+				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked, {
+					publishes_assignment = true, section = "shortcuts.keyboard", key = slot_id,
+					read = function() return KbShortcuts.get_keyboard_action(slot_id) end,
+					apply = function(on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, action_id, on_error, publication_observer) == true end,
+					restore = function(previous, on_error, publication_observer) return KbShortcuts.set_keyboard_action(slot_id, previous, on_error, publication_observer) == true end,
+				}, ctx.commit_program_parameter)
+			if committed then
+				if type(ctx.updateMenu) == "function" then ctx.updateMenu() end
+				M.warn_if_input_source_conflict(slot_id)
 			end
-			if ShortcutUtils.prompt_action_parameter(gestures,
-				KbShortcuts.keyboard_binding_id(slot_id), action_id, spec, picked) then
-				bind()
-			end
+			return committed
 		end, "menu_keyboard_slots.action_parameter")
 		return true
 	end)

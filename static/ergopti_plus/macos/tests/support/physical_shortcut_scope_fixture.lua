@@ -4,6 +4,58 @@
 local helpers = require("tests.helpers")
 local M = {}
 
+--- Receives a real original compiled empty Navigation owner for the scope fixture.
+--- Nav loading/rule projection and remap transaction fences are genuine.
+--- Full Generator, deploy and lease boundaries retain the existing doubles.
+local function with_compiled_navigation(body, controls, files)
+	local lfs = require("lfs")
+	local directory = helpers.temp_dir() .. "/physical-scope-nav-" .. tostring(os.time()) .. "-" .. tostring(math.random(100000, 999999))
+	assert(lfs.mkdir(directory))
+	local path = directory .. "/config_karabiner.toml"
+	local stream = assert(io.open(path, "wb"))
+	assert(stream:write('[karabiner]\nintegration_enabled = true\n[tap_holds]\nenabled = false\n'))
+	assert(stream:close())
+	controls.navigation_source_path = path
+	local saved, original_hs = {}, _G.hs
+	for name, value in pairs(package.loaded) do saved[name] = value end
+	local outcome = table.pack(xpcall(function()
+		return helpers.with_stub_scope({ "platform.remap.nav_layer" }, function()
+			package.loaded["platform.remap.nav_layer"] = nil
+			return require("tests.support.remap_transaction_fixture")(function(fixture)
+				local remap, observations = fixture.load_enabled_remap({ real_user_config_path = path, initially_enabled = false })
+				local paths = package.loaded["infra.config_paths"]
+				paths.get = function(key) if key == "KarabinerConfigPath" then return path end; return "config" end
+				paths.get_config_dir = function() return directory end
+				local terminal, reason
+				local accepted = remap.regenerate(function(ok, detail) terminal, reason = ok, detail end)
+				if observations.start_paused_callback ~= nil then observations.deliver_ready(true, "owned-fixture-ready") end
+				if #observations.resume_callbacks > 0 then observations.deliver_resumed(true, "owned-fixture-resumed") end
+				assert(accepted == true and terminal == true, "original Navigation compilation must actually publish: " .. tostring(reason))
+				local inventory = assert(remap.capture_configured_navigation_inventory(), "original compiled Navigation receipt is required")
+				assert(#inventory.codes == 0 and inventory.current() == true, "only a genuine empty compiled layer admits this fixture")
+				local retained = { ["platform.remap"] = true, ["platform.remap.config"] = true,
+					["platform.remap.nav_layer"] = true, ["infra.config_paths"] = true,
+					["adapters.file_system"] = true, ["json"] = true, ["toml_codec"] = true,
+					["toml_codec.writer"] = true, ["keymap.layers"] = true }
+				-- The scope's own recorded native/port identities stay unchanged.
+				-- Retain only the exact dependencies the compiled producer rejoins.
+				for name in pairs(package.loaded) do if not retained[name] and saved[name] == nil then package.loaded[name] = nil end end
+				for name, value in pairs(saved) do if not retained[name] then package.loaded[name] = value end end
+				_G.hs = original_hs
+				assert(inventory.current() == true, "restoring unrelated scope ports must preserve the original producer")
+				controls.navigation_owner = remap
+				return body()
+			end, { files = files })
+		end)
+	end, debug.traceback))
+	_G.hs = original_hs
+	controls.navigation_source_path = nil
+	assert(os.remove(path)); assert(lfs.rmdir(directory))
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
+end
+
+
 local function run_fixture(body, source)
 	local root = helpers.driver_root()
 	require("tests.support.module_isolation").purge(root, root:gsub("[/\\]macos$", "/_shared/lua"))
@@ -46,7 +98,10 @@ local function run_fixture(body, source)
 			local file = assert(io.open(path, "rb"))
 			local content = file:read("*a"); file:close(); return content
 		end,
-		read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+		read_with_status = function(path)
+			if path == controls.navigation_source_path then return require("toml_codec.writer").read_classified(path) end
+			return files[path], files[path] and "ok" or "absent"
+		end,
 		write = function() error("scope requires conditional publication") end,
 		write_if_unchanged = function(path, value, expected)
 			if controls.refuse_write and path == "config" then return false end
@@ -58,7 +113,7 @@ local function run_fixture(body, source)
 	}
 	package.loaded["adapters.file_system"] = file_port
 	package.loaded["infra.config_paths"] = { get = function() return "config" end }
-	package.loaded["infra.paths"] = { shared = helpers.shared }
+	package.loaded["infra.paths"] = { shared = helpers.shared, shared_root = function() return helpers.shared() end }
 	local logger = helpers.make_logger_stub()
 	controls.errors = {}
 	logger.error = function(_, message, ...) controls.errors[#controls.errors + 1] = string.format(message, ...) end
@@ -275,9 +330,13 @@ local function run_fixture(body, source)
 			return result, detail
 		end,
 	})
-	local ok, detail = pcall(body, { owner = owner, state = state, files = files, controls = controls,
-		gestures = gestures, bindings = bindings, keyboard = keyboard, taps = taps, script = script,
-		shortcuts = shortcuts, prefs = prefs, save = save, demotions = demotions, checkpoint = checkpoint })
+	local ok, detail = pcall(function()
+		return with_compiled_navigation(function()
+			return body({ owner = owner, state = state, files = files, controls = controls,
+				gestures = gestures, bindings = bindings, keyboard = keyboard, taps = taps, script = script,
+				shortcuts = shortcuts, prefs = prefs, save = save, demotions = demotions, checkpoint = checkpoint })
+		end, controls, file_port)
+	end)
 	controls.refuse_stop, controls.refuse_script_stop = nil, false
 	shortcuts.pause_bindings("feature_toggle"); script.stop()
 	if not ok then error(detail, 0) end

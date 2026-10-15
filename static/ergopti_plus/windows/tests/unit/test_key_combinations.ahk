@@ -38,8 +38,11 @@
 _KCT_With(Taps, Holds, Body, GateOn := true) {
 	global KeyCombinationTaps, KeyCombinationHolds, _KeyCombinationFirstKeys
 	global _KeyCombinationTaken, _KeyCombinationHandled, CategoryEnabled, _OB_ALTGR_PASSTHROUGH
+	global _KeyCombinationPressAssignments
 	Saved := { Taps: KeyCombinationTaps, Holds: KeyCombinationHolds, Index: _KeyCombinationFirstKeys,
 		Taken: _KeyCombinationTaken, Handled: _KeyCombinationHandled,
+		HadAssignments: IsSet(_KeyCombinationPressAssignments),
+		Assignments: IsSet(_KeyCombinationPressAssignments) ? _KeyCombinationPressAssignments : 0,
 		HadGate: CategoryEnabled.Has("KeyCombinations"), Gate: CategoryEnabled.Get("KeyCombinations", true),
 		Onboarding: IsSet(_OB_ALTGR_PASSTHROUGH) ? _OB_ALTGR_PASSTHROUGH : false }
 	KeyCombinationTaps := Taps
@@ -47,6 +50,7 @@ _KCT_With(Taps, Holds, Body, GateOn := true) {
 	_KeyCombinationFirstKeys := _KeyCombinationIndexFirstKeys(Taps, Holds)
 	_KeyCombinationTaken := Map()
 	_KeyCombinationHandled := Map()
+	_KeyCombinationPressAssignments := Map()
 	CategoryEnabled["KeyCombinations"] := GateOn
 	_OB_ALTGR_PASSTHROUGH := false
 	try Body.Call()
@@ -56,6 +60,10 @@ _KCT_With(Taps, Holds, Body, GateOn := true) {
 		_KeyCombinationFirstKeys := Saved.Index
 		_KeyCombinationTaken := Saved.Taken
 		_KeyCombinationHandled := Saved.Handled
+		if Saved.HadAssignments
+			_KeyCombinationPressAssignments := Saved.Assignments
+		else
+			_KeyCombinationPressAssignments := unset
 		if Saved.HadGate
 			CategoryEnabled["KeyCombinations"] := Saved.Gate
 		else
@@ -1441,3 +1449,210 @@ _KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix() {
 }
 Test("key combinations: the hook probe ordinary owner admits only its asserted suffix (altgr-probe-ordinary-owner)",
 	_KCT_AltGrOrdinaryOwnerIsOnlyItsAssertedSuffix)
+
+; The criterion selects a particular assignment, not a license to execute a
+; different assignment subsequently published beneath the same physical press.
+_KCT_AssignmentChangedBeforeHandler(Change) {
+	Body() {
+		global KeyCombinationTaps, KeyCombinationHolds, _KeyCombinationTaken, _KeyCombinationHandled
+		Events := []
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		if Change == "tap"
+			KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
+		else if Change == "hold"
+			KeyCombinationHolds["left_alt_then_caps_lock"] := "ctrl"
+		else if Change == "tap_owner"
+			KeyCombinationTaps := KeyCombinationTaps.Clone()
+		else
+			KeyCombinationHolds := KeyCombinationHolds.Clone()
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", _KCT_Ports(Events)),
+			"a changed slot or published replacement owner cannot substitute its assignment")
+		AssertEqual(0, Events.Length, "refusal precedes first-key cancellation and native effects")
+		AssertEqual("left_alt", _KeyCombinationTaken["caps_lock"], "the original press remains suppressed")
+		AssertFalse(_KeyCombinationHandled.Has("caps_lock"), "no effect was performed")
+	}
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+}
+Test("key combinations: a changed tap cannot replace the admitted press action (pair-assignment-revocation)",
+	_KCT_AssignmentChangedBeforeHandler.Bind("tap"))
+Test("key combinations: a changed hold cannot acquire a different native owner (pair-assignment-revocation)",
+	_KCT_AssignmentChangedBeforeHandler.Bind("hold"))
+Test("key combinations: an equal replacement tap owner does not inherit an admitted press (pair-assignment-revocation)",
+	_KCT_AssignmentChangedBeforeHandler.Bind("tap_owner"))
+Test("key combinations: an equal replacement hold owner does not inherit an admitted press (pair-assignment-revocation)",
+	_KCT_AssignmentChangedBeforeHandler.Bind("hold_owner"))
+
+_KCT_AssignmentRevokedOnRepeat() {
+	Body() {
+		global KeyCombinationTaps
+		Events := []
+		Ports := _KCT_Ports(Events)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("tap", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(2, Events.Length)
+		KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["caps_lock"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", Ports))
+		KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_word"
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", Ports),
+			"restoring a slot does not resurrect an observed revoked physical press")
+		AssertEqual(2, Events.Length, "neither the replacement nor the restored repeat ran")
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("tap", KeyCombinationFire("caps_lock", Ports), "a new key-down admits its own current assignment")
+		AssertEqual(4, Events.Length)
+	}
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+}
+Test("key combinations: slot withdrawal stops repeats until a newly admitted press (pair-assignment-revocation)",
+	_KCT_AssignmentRevokedOnRepeat)
+
+_KCT_AssignmentChangesDuringFirstKey() {
+	Body() {
+		global KeyCombinationTaps, _KeyCombinationHandled
+		Events := []
+		Ports := _KCT_Ports(Events)
+		Take(First, Second) {
+			Events.Push("take:" . First)
+			KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
+		}
+		Ports["take_first"] := Take
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", Ports))
+		AssertEqual(1, Events.Length, "the original first-key effect is retained but its following action is refused")
+		AssertEqual("take:left_alt", Events[1])
+		AssertTrue(_KeyCombinationHandled.Has("caps_lock"), "completed first-key ownership is not undone")
+	}
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map(), Body)
+}
+Test("key combinations: first-key callback publication cannot change the following action (pair-assignment-revocation)",
+	_KCT_AssignmentChangesDuringFirstKey)
+
+_KCT_AssignmentChangesAtOwnerReturn(Hold, OwnerTap) {
+	Body() {
+		global KeyCombinationTaps
+		Events := []
+		Ports := _KCT_Ports(Events)
+		Outcome := Map("tap", OwnerTap, "activated", true, "released", true)
+		Modifier(Second, ModKey, Seconds) {
+			Events.Push("modifier-return:" . Second)
+			KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
+			return Outcome
+		}
+		Layer(Second, Seconds) {
+			Events.Push("layer-return:" . Second)
+			KeyCombinationTaps["left_alt_then_caps_lock"] := "caps_lock"
+			return Outcome
+		}
+		Ports["own_modifier"] := Modifier
+		Ports["own_layer"] := Layer
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual(OwnerTap ? "swallowed" : "hold", KeyCombinationFire("caps_lock", Ports),
+			"only a newly emitted tap is refused; the already completed hold result stays a hold")
+		AssertEqual(2, Events.Length)
+		AssertEqual("take:left_alt", Events[1])
+		AssertEqual((Hold == "nav" ? "layer-return:" : "modifier-return:") . "caps_lock", Events[2])
+		AssertTrue(Outcome["tap"] == OwnerTap && Outcome["activated"] && Outcome["released"],
+			"the original acknowledged native result and retirement remain untouched")
+		AssertEqual(3, Outcome.Count)
+	}
+	_KCT_With(Map("left_alt_then_caps_lock", "caps_word"), Map("left_alt_then_caps_lock", Hold), Body)
+}
+Test("key combinations: modifier return rejoins the admitted slot before its delayed tap (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtOwnerReturn.Bind("ctrl", true))
+Test("key combinations: layer return rejoins the admitted slot before its delayed tap (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtOwnerReturn.Bind("nav", true))
+Test("key combinations: a completed hold survives assignment publication at retirement (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtOwnerReturn.Bind("ctrl", false))
+
+; Exercise the original logging/resolver/duration callbacks before native owner
+; acquisition. Source publication there must refuse without rewriting debt.
+_KCT_AssignmentChangesAtAdmissionLog(Hold) {
+	global TapHold, _LOGGER_TEST_SINK, _LOGGER_DEBUG_ENABLED, _LOGGER_WARN_ENABLED, _LOGGER_MIN_SEVERITY
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT, _LastErrTime, _LOGGER_REPEAT_ENABLED
+	Saved := { TapHold: TapHold, Sink: _LOGGER_TEST_SINK, Debug: _LOGGER_DEBUG_ENABLED,
+		Warn: _LOGGER_WARN_ENABLED, Severity: _LOGGER_MIN_SEVERITY, Dedup: _LOGGER_DEDUP_KEY, DedupLevel: _LOGGER_DEDUP_LEVEL,
+		DedupCount: _LOGGER_DEDUP_COUNT, LastTime: _LastErrTime, Repeat: _LOGGER_REPEAT_ENABLED }
+	Body() {
+		global KeyCombinationHolds
+		Events := []
+		Observed := []
+		Observe(Line) {
+			Expected := Hold == "none" ? "[KeyCombinations] Pair '"
+				: Hold == "nav" ? "[TapHoldLoader] Invalid time_activation_seconds "
+				: "[TapHoldLoader] Resolved hold_modifier "
+			if !InStr(Line, Expected)
+				return
+			Observed.Push(Line)
+			KeyCombinationHolds["left_alt_then_caps_lock"] := Hold == "nav" ? "shift" : "nav"
+		}
+		LoggerSetTestSink(Observe)
+		AssertTrue(KeyCombinationOwns("caps_lock", _KCT_Keys(["left_alt"])))
+		AssertEqual("swallowed", KeyCombinationFire("caps_lock", _KCT_Ports(Events)))
+		AssertEqual(1, Observed.Length, "the actual selected production callback was reached")
+		AssertEqual(1, Events.Length, "publication permits no later action or native owner")
+		AssertEqual("take:left_alt", Events[1])
+	}
+	try {
+		_LOGGER_MIN_SEVERITY := 10
+		_LOGGER_DEBUG_ENABLED := true
+		_LOGGER_WARN_ENABLED := true
+		_LOGGER_DEDUP_KEY := ""
+		_LOGGER_REPEAT_ENABLED := false
+		if Hold == "nav"
+			TapHold := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0)))
+		_KCT_With(Map("left_alt_then_caps_lock", "caps_word"),
+			Hold == "none" ? Map() : Map("left_alt_then_caps_lock", Hold), Body)
+	} finally {
+		TapHold := Saved.TapHold
+		_LOGGER_TEST_SINK := Saved.Sink
+		_LOGGER_DEBUG_ENABLED := Saved.Debug
+		_LOGGER_WARN_ENABLED := Saved.Warn
+		_LOGGER_MIN_SEVERITY := Saved.Severity
+		_LOGGER_DEDUP_KEY := Saved.Dedup
+		_LOGGER_DEDUP_LEVEL := Saved.DedupLevel
+		_LOGGER_DEDUP_COUNT := Saved.DedupCount
+		_LastErrTime := Saved.LastTime
+		_LOGGER_REPEAT_ENABLED := Saved.Repeat
+	}
+}
+Test("key combinations: actual pair log rejoins its slot before tap admission (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtAdmissionLog.Bind("none"))
+Test("key combinations: actual modifier resolver rejoins its slot before ownership (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtAdmissionLog.Bind("ctrl"))
+Test("key combinations: actual layer duration rejoins its slot before ownership (pair-assignment-revocation)",
+	_KCT_AssignmentChangesAtAdmissionLog.Bind("nav"))
+
+; Pair assignment capture is reachable through parse-time #HotIf. Its tap
+; accessor must refuse its own absent map/sentinel, like the hold accessor.
+_KCT_TapSlotUnsetAtBoot(Missing) {
+	global KeyCombinationTaps, KEY_COMBINATION_NONE
+	Saved := { HadTaps: IsSet(KeyCombinationTaps),
+		Taps: IsSet(KeyCombinationTaps) ? KeyCombinationTaps : 0,
+		HadNone: IsSet(KEY_COMBINATION_NONE),
+		None: IsSet(KEY_COMBINATION_NONE) ? KEY_COMBINATION_NONE : 0 }
+	try {
+		AssertTrue(IsSet(KeyCombinationTaps) && IsSet(KEY_COMBINATION_NONE),
+			"the ordinary runner has both original owners before independently unsetting one")
+		if Missing == "taps"
+			KeyCombinationTaps := unset
+		else if Missing == "none"
+			KEY_COMBINATION_NONE := unset
+		else
+			throw ValueError("Unknown pair tap accessor boot control", -1, Missing)
+		AssertEqual("", KeyCombinationTapOf("left_alt_then_caps_lock"),
+			"an absent tap slot owner or canonical empty value refuses without an unset read")
+	} finally {
+		if Saved.HadTaps
+			KeyCombinationTaps := Saved.Taps
+		else
+			KeyCombinationTaps := unset
+		if Saved.HadNone
+			KEY_COMBINATION_NONE := Saved.None
+		else
+			KEY_COMBINATION_NONE := unset
+	}
+}
+Test("key combinations: unset tap assignments refuse the parse-time tap accessor (pair-tap-slot-boot)",
+	_KCT_TapSlotUnsetAtBoot.Bind("taps"))
+Test("key combinations: unset empty sentinel refuses the parse-time tap accessor (pair-tap-slot-boot)",
+	_KCT_TapSlotUnsetAtBoot.Bind("none"))

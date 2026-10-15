@@ -493,3 +493,61 @@ helpers.describe("keymap tap: a tooltip chord after an idle pause (llm-tooltip-c
 		if not ok then error(err, 0) end
 	end)
 end)
+
+
+helpers.describe("prediction tooltip watcher: exact Shift+Tab (llm-nav-left-right-windows)", function()
+	--- Exercises the original modifier watcher before the original key watcher.
+	--- Native eventtap, renderer and scheduler ports use the existing controlled fixture.
+	--- @param side string Shift side.
+	--- @param extra_modifiers table Additional held modifiers.
+	--- @param nav table Configured arrow navigation modifiers.
+	--- @return boolean consumed, number index, table accepted
+	local function press_shift_tab(side, extra_modifiers, nav)
+		return with_fixture(function(fixture)
+			local context = fixture.load_tooltip(CASES[1])
+			local accepted = {}
+			context.tooltip.set_accept_callback(function(index)
+				accepted[#accepted + 1] = index
+				return true
+			end)
+			helpers.assert_eq(context.tooltip.show_predictions({ "first", "second", "third" },
+				2, true, nil, EMPTY_CHORD_SHORTCUT, nil, nav, nil, nil, 3), true)
+			local flags = { shift = true }
+			for _, name in ipairs(extra_modifiers) do flags[name] = true end
+			local shift_code = side == "right" and 60 or 56
+			helpers.assert_eq(context.created[2].fn(hardware_key_event(shift_code, flags)), false,
+				"the modifier watcher only observes the Shift side")
+			local consumed = context.created[CASES[1].watcher_count].fn(hardware_key_event(48, flags, "\t"))
+			local index = context.tooltip.get_current_index()
+			drain_deferred_actions(context.timers)
+			return consumed, index, accepted
+		end)
+	end
+
+	helpers.it("(llm-nav-left-right-windows) Shift alone navigates by side independently of arrow modifiers", function()
+		for _, nav in ipairs({ {}, { "ctrl" }, { "alt", "cmd" }, { "none" } }) do
+			for _, side in ipairs({ "left", "right" }) do
+				local consumed, index, accepted = press_shift_tab(side, {}, nav)
+				helpers.assert_eq(consumed, true, side .. " Shift+Tab is the advertised navigation chord")
+				helpers.assert_eq(index, side == "right" and 3 or 1, side .. " Shift chooses the advertised direction")
+				helpers.assert_eq(accepted, {}, "Shift+Tab navigates without accepting a prediction")
+			end
+		end
+	end)
+
+	for _, modifiers in ipairs({
+		{ "ctrl" }, { "alt" }, { "cmd" }, { "ctrl", "alt" },
+		{ "ctrl", "cmd" }, { "alt", "cmd" }, { "ctrl", "alt", "cmd" },
+	}) do
+		helpers.it("(llm-nav-left-right-windows) Shift+Tab with " .. table.concat(modifiers, "+") .. " reaches the application", function()
+			for _, nav in ipairs({ {}, modifiers }) do
+				for _, side in ipairs({ "left", "right" }) do
+					local consumed, index, accepted = press_shift_tab(side, modifiers, nav)
+					helpers.assert_eq(consumed, false, "an additional modifier keeps Shift+Tab in the application")
+					helpers.assert_eq(index, 2, "an application chord does not navigate predictions")
+					helpers.assert_eq(accepted, {}, "an application chord does not accept a prediction")
+				end
+			end
+		end)
+	end
+end)

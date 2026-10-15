@@ -580,3 +580,117 @@ helpers.describe("navigation source close acknowledgement", function()
 		assert_shipped_refused(receive_close_refusal("shipped", "nil"))
 	end)
 end)
+
+helpers.describe("navigation configured input observations", function()
+	local sequence = 0
+	local text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "none"\n'
+	local function with_source(callback)
+		local lfs = require("lfs")
+		sequence = sequence + 1
+		local directory = helpers.temp_dir() .. "/mac-nav-configured-" .. tostring(os.time()) .. "-" .. tostring(sequence)
+		assert(lfs.mkdir(directory))
+		local path = directory .. "/layers.toml"
+		local function write(value)
+			local stream = assert(io.open(path, "wb")); assert(stream:write(value)); assert(stream:close())
+		end
+		write(text)
+		local called, detail = xpcall(function()
+			helpers.with_stub_scope({ "platform.remap.nav_layer", "infra.logger" }, function()
+				package.loaded["infra.logger"] = helpers.make_logger_stub()
+				package.loaded["platform.remap.nav_layer"] = nil
+				local subject = require("platform.remap.nav_layer")
+				callback(subject, { shared_root = helpers.shared(), config_dir = directory }, write, path)
+			end)
+		end, debug.traceback)
+		assert(os.remove(path)); assert(lfs.rmdir(directory))
+		if not called then error(detail, 0) end
+	end
+
+	helpers.it("nav-configured captures explicit None as the genuine physical input", function()
+		with_source(function(subject, options)
+			local layer, observation = subject.load(options)
+			local capture = subject.capture_configured_inputs(layer, observation)
+			helpers.assert_type(capture, "table")
+			helpers.assert_eq(capture.codes, { 38 }, "KeyJ's actual registry input is reserved even for None")
+			helpers.assert_eq(capture.current(), true)
+			helpers.assert_nil(subject.capture_configured_inputs({ bindings = layer.bindings, registry = layer.registry }, observation))
+		end)
+	end)
+
+	helpers.it("nav-configured never admits later source bytes as an original-load baseline", function()
+		with_source(function(subject, options, write)
+			local layer, observation = subject.load(options)
+			write(text:gsub("KeyJ", "KeyG"))
+			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))
+		end)
+	end)
+
+	helpers.it("nav-configured refuses map mutation before the first capture", function()
+		with_source(function(subject, options)
+			local layer, observation = subject.load(options)
+			layer.bindings.KeyG, layer.bindings.KeyJ = layer.bindings.KeyJ, nil
+			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))
+		end)
+	end)
+
+	helpers.it("nav-configured detached code edits cannot change a subsequent capture", function()
+		with_source(function(subject, options)
+			local layer, observation = subject.load(options)
+			local capture = subject.capture_configured_inputs(layer, observation)
+			helpers.assert_type(capture, "table")
+			capture.codes[1] = 5
+			local second = subject.capture_configured_inputs(layer, observation)
+			helpers.assert_type(second, "table")
+			helpers.assert_eq(second.codes, { 38 })
+			helpers.assert_eq(second.current(), true)
+		end)
+	end)
+
+	helpers.it("nav-configured currency refuses an observed user source replacement", function()
+		with_source(function(subject, options, write)
+			local layer, observation = subject.load(options)
+			local capture = subject.capture_configured_inputs(layer, observation)
+			helpers.assert_type(capture, "table")
+			write(text .. "# independent successor\n")
+			helpers.assert_eq(capture.current(), false)
+		end)
+	end)
+
+	helpers.it("nav-configured source exports cannot supply replacement observations", function()
+		with_source(function(subject, options)
+			local layer, observation = subject.load(options)
+			local writer = require("toml_codec.writer")
+			local original, reads = writer.read_classified, 0
+			writer.read_classified = function(...) reads = reads + 1; return original(...) end
+			local called, capture = pcall(subject.capture_configured_inputs, layer, observation)
+			writer.read_classified = original
+			helpers.assert_eq(called, true)
+			helpers.assert_nil(capture)
+			helpers.assert_eq(reads, 0, "an unowned replacement must not create a new read baseline")
+		end)
+	end)
+
+	helpers.it("nav-configured rejoins original source bytes after the load logger callback", function()
+		with_source(function(subject, options, write)
+			local logger = package.loaded["infra.logger"]
+			logger.success = function() write(text .. "# logger successor\n") end
+			local layer, observation = subject.load(options)
+			helpers.assert_nil(subject.capture_configured_inputs(layer, observation))
+		end)
+	end)
+	for _, override in ipairs({ false, true }) do
+		helpers.it("nav-configured refuses actual compiled input mutation " .. tostring(override), function()
+			with_source(function(subject, options)
+				local layer, observation = subject.load(options)
+				local entry = layer.registry.keys.KeyJ
+				if override then entry.macos_iso = { hs = 38, karabiner = { key_code = "g" } }
+				else entry.karabiner.key_code = "g" end
+				local actual = subject.build_rule(layer.bindings, layer.registry)
+				helpers.assert_eq(actual.manipulators[1].from.key_code, "g", "the real compiler consumes the changed input")
+				helpers.assert_eq(entry.hs, 38, "HS input alone cannot authenticate the compiled map")
+				helpers.assert_nil(subject.capture_configured_inputs(layer, observation))
+			end)
+		end)
+	end
+
+end)

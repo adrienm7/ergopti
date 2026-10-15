@@ -12345,6 +12345,40 @@ registration-loop repair is independently reviewed and shared with Root, not
 adopted or natively qualified. Keep the strict stdout/TAP assertion and all
 original budgets. See the Snapshot17 handover; item 91 remains partial.
 
+The retained Windows pair press now also captures its selected tap/hold values
+and exact slot Map owners at admission. Replacement before dispatch, repeat,
+resolver/logging callbacks or delayed tap retirement cannot execute the newly
+published assignment; an observed revocation remains until a new key-down.
+Completed native hold results and original release debt stay unchanged. All
+317 prior assertion starts and 39 literal registrations remain, with twelve
+additional registered assignment cases. The fixture saves and restores actual
+presence of the new per-press map, so old-production causal execution can
+reach the behavioral assertions rather than fail setup on an absent global. This source repair is reviewed but
+actual AHK parser/unit/E2E, original/candidate causal execution, final native
+package/install/startup and physical receiving remain NOT_RUN. It does not
+enable simultaneous input or establish genuine raw AltGr provenance.
+
+Hosted Windows receiving at 073800ed reports a real boot-safety class-guard
+failure: the new ownership route reaches the tap accessor before its two
+global owners are guaranteed. The accessor now refuses either absent owner
+with the same empty result as the existing hold accessor; two independent
+unset controls retain and restore actual prior global presence. All 349 prior
+assertion starts and 51 registrations remain. Source review and encoding pass;
+the unchanged native meta guard, new AHK cases and complete native successor
+remain UNRUN. The hosted 11,976-pass/703-failure result is retained; the other
+failures are not exonerated by this repair or by different file ownership.
+
+A finite inactive Windows simultaneous arbitration core is preserved in the
+[prepared source capsule](handovers/2026-10-15-group3-windows-pair-core/README.md).
+Its detached C plans retain inclusive delay, canonical symmetry/None, first-down
+identity/time, ordered fallback, repeat/Up and latched retirement. Linux GCC
+executes640 handwritten assertions in15 functions, also with ASan/UBSan; nine
+omissions fail the unchanged expectations. This is not a native input engine:
+the genuine single-hook/RawInput provenance, shared-policy/action bridge,
+Windows MSVC/test enrollment, real native delivery and physical acceptance
+remain absent or UNRUN. Existing menus stay unavailable. The archive is not
+compiled or enrolled by production and cannot complete item91.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -12567,20 +12601,20 @@ original budgets. See the Snapshot17 handover; item 91 remains partial.
   installed-runtime and final-source hosted qualification remain required;
   item93 and transverse16/38 remain open.
 
-- [ ] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
-      selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
-      the old public checkbox is removed; an internal closed variant preserves
-      legacy partial overlays, wrapping, configurable spacing and shifted-symbol
-      behavior without another public gate. Its default is inactive none. Built-in
-      selection (empty emulated_layout) uses acknowledged lifecycle/WAL handoff;
-      launch or source refusal restores the prior image. Schema12 migration validates
-      all five typed semantic/flat/physical participants before deleting the old
-      setting and refuses malformed, occupied or conflicting records. Unsupported
-      Windows intent stays opaque on Lua drivers, with an accurate 21-locale reason.
-      Generated artifacts come from their real owners. The original 75 vectors,
-      six AltGr descriptors and eight SC012 roll cases remain independent; authored
-      extensions retain their order. Source scans keep nonempty subjects, native-port
-      identity and registration floors rather than waiving old assertions.
+- [~] **96.** Remove the separate Ergopti+ AltGr-adjustments option:
+  selecting Ergopti+ in the existing emulation picker must suffice. Implemented:
+  the old public checkbox is removed; an internal closed variant preserves
+  legacy partial overlays, wrapping, configurable spacing and shifted-symbol
+  behavior without another public gate. Its default is inactive none. Built-in
+  selection (empty emulated_layout) uses acknowledged lifecycle/WAL handoff;
+  launch or source refusal restores the prior image. Schema12 migration validates
+  all five typed semantic/flat/physical participants before deleting the old
+  setting and refuses malformed, occupied or conflicting records. Unsupported
+  Windows intent stays opaque on Lua drivers, with an accurate 21-locale reason.
+  Generated artifacts come from their real owners. The original 75 vectors,
+  six AltGr descriptors and eight SC012 roll cases remain independent; authored
+  extensions retain their order. Source scans keep nonempty subjects, native-port
+  identity and registration floors rather than waiving old assertions.
 
   Remaining software/native qualification: preserve this picker-only contract
   and repair only demonstrated migration, helper or handoff regressions. Qualify
@@ -12589,6 +12623,27 @@ original budgets. See the Snapshot17 handover; item 91 remains partial.
   native Windows tests and joined three-OS package/install acceptance. Device
   work: genuine hotkey precedence, recent-chevron timing and emitted layout/dead
   states. Raw layout previews cannot replace actual picker/runtime ownership.
+
+  The existing enrolled Layout Manager test now adds the missing positive
+  selection-to-completion case: real owned TOML/WAL publication and detached
+  loading remain pending until the genuine scope-supplied success callback
+  commits the receipt. Original bytes, assertions and registration stay intact;
+  resident runtime/cache isolation and original backup are checked. This is
+  additive source-reviewed coverage, not a production fix or an executed native
+  successor. The new case is Windows UNRUN until the next grouped CI; the
+  earlier073800ed run cannot qualify it. Installed and device work remains open.
+
+Manual Windows run 38738856943 at 677cef50 completes all 12,683 planned,
+executed and timed cases: 12,682 pass and one fails. Its sole failure is the new
+positive picker fixture indexing layout.emulated_layout even though the genuine
+sparse writer deliberately deletes that neutral empty leaf. The fixture now
+asserts raw absence explicitly and retains the effective empty-value assertion;
+every other assertion and production source remains unchanged. Independent
+review follows the real writer, fresh parser, detached loader and completion
+owners. Targeted native receiving through the existing --only runner is still
+required; this source correction does not turn the failed whole run green.
+Windows E2E, build and installation were skipped after the unit failure. Item96
+remains partial.
 
 - [~] **97.** Replace the fixed accent/direct-symbol submenu with shared
   user-owned entries, empty by default with + Add. Support a catalogue action or
@@ -12600,6 +12655,17 @@ original budgets. See the Snapshot17 handover; item 91 remains partial.
   prevent callback substitution. Linux XKB observations and output/modifier custody
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
+
+  The joined macOS scope run exposed ten regressions in the configured
+  Navigation reservation change: nine fixtures lacked the genuine compiled
+  inventory, and None incorrectly bypassed ordinary collision admission.
+  The fixture now receives the real Nav/remap compilation receipt; only the
+  new Navigation acquisition is bypassed for None. All 27 original cases
+  remain, with three additive boundaries: original 17/10, fixed 30/0,
+  production withdrawal 27/3, fixture withdrawal 21/9 and restoration 30/0.
+  The existing adjacent preflight passes 23/0. These controlled components
+  preserve explicit Generator/deploy/lease doubles; complete final-source
+  macOS and native receiving remain required.
 
   Linux navigation now admits original-load bytes only after the unchanged
   shared classified reader acknowledges close. Actual absence remains absence;
@@ -12820,8 +12886,27 @@ restoration 22/0 through the genuine Lua 5.4 runner. Each targeted source is
 really read and physically closed once before the controlled ACK. These are
 portable software receipts, not native macOS or physical delivery. See
 [the Mac Nav handoff](handovers/2026-10-15-group3-macos-nav/README.md).
-Original-load provenance, remaining owner collisions and physical availability
-remain separate; item 97 and transverse 16/38 remain open.
+Configured macOS Navigation reservations now retain the original load, actual
+Karabiner input and successful remap compilation/publication observations. The
+consumer refuses an absent owner or stale settings rather than assuming free
+input. Callback reentry cannot erase a successor reservation. Normal off-to-on
+activation transfers only the original acknowledged enabled-setting save from
+the same transaction; external source changes still refuse. The focused pure
+suite receives102/0, with original assertions preserved and causal source
+withdrawals failing. These fixtures exercise real Nav rule compilation and
+Remap transaction fences, while the existing full Generator/deploy/lease doubles
+remain; full driver and native/installed qualification are still required.
+Remaining owner collisions, source/modifier/output and physical availability
+remain separate; item97 and transverse16/38 stay open.
+
+A concrete prediction-consumer mismatch found during collision inventory work is
+also corrected: macOS now forwards Ctrl/Alt/Cmd+Shift+Tab using its existing
+modified-Tab dismissal, matching the independent shared exact-chord contract and
+Windows/Linux. Plain Shift+Tab keeps both directions regardless of arrow
+preferences. All10 original watcher tests remain; seven extra-modifier cases
+fail before the guard and the complete18 pass after it, with a causal guard
+withdrawal. This does not qualify native taps, CR/LF submit projection or complete
+AI collision coverage; those ownership requirements remain open.
 
 The selected local Mac software run receives 19,863/0 units and 101/0 E2E
 checks with one explicit skip. Common remains 433 PASS/two subprocess timeout
@@ -12840,6 +12925,40 @@ API and new-fixture write-return errors are preserved and corrected. See
 [the Linux Nav handoff](handovers/2026-10-15-group3-linux-nav/README.md).
 Other-owner completeness, native/source/modifier/output and physical joins remain
 open; no public delivery or native installation is enabled.
+
+Batched Linux CI 38721306107 on ebff35a8 records 13,799 unit passes
+and three failures; E2E/build/install are skipped. Its actual fixture order
+retained Navigation after replacing the shared Writer. The Manager fixture
+now reconstructs the genuine Nav dependency before its genuine Manager.
+All original assertions remain: both Lua ABIs give original-parent47/0,
+published44/3, corrected47/0, withdrawn44/3 and restored47/0. No production
+source guard is relaxed; final joined hosted receiving remains required.
+
+Configured Linux wrap symbols now join physical-shortcut collision preflight
+through their genuine Shortcuts Manager. Original acknowledged catalogue/config
+reads, exact live preferences and a mutation generation reserve possible plain
+or Shift consumers; Ctrl/Alt/Super and the separate Script AltGr namespace stay
+disjoint. No PRIMARY polling, selection or native delivery is inferred. Both
+Lua ABIs pass36 owner and121 complete shortcut-scope cases; the focused
+original consumer5/3 becomes8/0,
+with malformed-source refusal retained. Full source/input/output ownership remains open, and public physical delivery
+stays unavailable.
+
+Configured Linux prediction inputs now join collision preflight through the
+original navigation preferences and initialized handler capabilities. The finite
+may-consume inventory includes actual native arrow/digit roles, Shift+Tab and
+live/agent Tab without polling predictions. Disabled AI remains unavailable:
+the original explicit prediction API can still consume an offer. Only the
+original permanently closed runtime permits an empty inventory; an unknown AI
+owner cannot authorize a free mapping. Both Lua ABIs receive25 owner and9
+consumer controls, including genuine original-source failures and three source
+withdrawals. All original assertions remain. Full joined driver/installed and
+native qualification remain required; item97 and transverse16/38 stay open.
+The optional-preference regression additionally asserts the actual returned
+Navigation module and callable collision API, retaining its successful-load,
+ordinary-value and unavailable-frame assertions. This strengthens the received
+result beyond the load status and satisfies the original false-green ratchet;
+no baseline, original assertion or product refusal is changed.
 
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
@@ -13340,6 +13459,46 @@ and installation qualification are still required.
   success does not prove invocation, atomic locking or every consumer. Apple
   Shortcuts remains a read-only observer with unresolved bounded discovery/invocation.
 
+  macOS now publishes every parameterized menu selection through the existing
+  retained parameter/assignment transaction across gestures, keyboard, tap
+  keys and script chords. Assignment/save/native-release refusal restores the
+  complete original source and runtime; script confirmation no longer assigns
+  twice. The generic API refuses physical bindings and keys before admission,
+  retaining their separate publication owner. All 100 original controlled
+  cases remain: original plus regressions 111/44, final 164/0; withdrawing the
+  physical guard gives 1/8 and restoration 9/0. Disposable-file Writer tests
+  cover real source compensation with explicit native/advisory doubles.
+  Complete final-source and actual macOS qualification remain required.
+
+  The 9ed7 selected batch receives 19,987 modeled macOS unit passes and three
+  failures in old parameter-menu fixtures, alongside 435 shared JS passes and
+  101 modeled E2E passes with one original skip. The keyboard fixture now
+  composes the genuine retained owner on its original conditional file port;
+  all original assertions remain and focused receiving changes from 34/2 to
+  36/0. The script cancellation source guard keeps its original assertion and
+  includes the actual conditional prefix. A real provider regression also
+  preserves an existing native binding and all parameters when the prompt is
+  declined: scanner 11/0, provider 79/0. Moving assignment before the unchanged
+  prompt guard yields 57/22 and restoration 79/0. These focused test repairs do
+  not claim a new complete macOS/native or installed qualification.
+
+  Linux now joins parameter and assignment publication for all four menu
+  invokers through the existing retained transaction. Refused publication
+  preserves the complete prior source, parameter and assignment; successful
+  selection publishes both fields once. The generic owner refuses physical
+  slots before acquiring leases. All 44 original cases remain: the logical
+  regression cohort changes from 45/8 to 53/0, and final coverage passes 56/0
+  on LuaJIT and Lua 5.4 with causal physical-boundary withdrawals. The existing
+  config-surface guard recognizes the central parameter-row constructor and
+  keeps its historical controls plus executable-token and quoted-data refusal
+  cases. The existing dispatch fixture now retains genuine configuration,
+  Manager, Keyboard and transaction owners through confirmation; all 73
+  cases pass on both Lua ABIs with original assertions and additional exact
+  disk/runtime and one-publication checks. Its existing uninstalled-startup
+  diagnostics remain recorded. Whole final-source suites and native
+  qualification are still pending; this does not implement Apple Shortcuts
+  or complete item 106.
+
   The read-only JXA diagnostic attempts a fixed same-process preflight with
   the SDK-owned Apple-event descriptor and Shortcuts read event with
   prompting disabled. It starts no target and executes no shortcut. Optional
@@ -13658,6 +13817,20 @@ new closed annotation supplies no native status or permission grant. Removing
 only its optional-write containment reproduces an interrupted original refusal.
 Canonical adoption requires the two Root-owned census/source-hash spans; current
 workflows do not enable the new opt-in and its native receiving is unrun.
+
+The Windows managed-network fixture now separately reports closed startup and
+constructor stages plus at most four exception kinds/HRESULTs. This addresses the
+seven native startup failures received on 073800ed, whose original service fact
+exposed only fixture_boundary/other/0x80131501. It does not repair or explain the
+underlying native failure. Optional CLR observation cannot discard the original
+exception chain or change the original failed-state/cleanup path. All 323 parent
+assertion sites and 40 registrations remain, with two additive AHK cases. Eight
+actual pure PowerShell 7 controls pass with causal withdrawals; Windows
+PowerShell 5, the two new AHK cases and native fixture receiving remain unrun.
+Manual run 38738856943 is pinned to 677cef50 and predates this fixture-only
+successor. Its seven original network cases now pass with the same fixture
+source; the earlier failure cause remains unknown. The complete run still fails
+on the separate picker assertion recorded under item96. Item106 remains partial.
 
 - [~] **107.** Expose native, digits-direct and symbols-direct number-row
   policy, with acknowledged legacy Windows-Boolean migration and unrelated data

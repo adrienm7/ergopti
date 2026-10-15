@@ -46,6 +46,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { parse: parseToml } = require('smol-toml');
 const { normalizeScopes } = require('../lib/configuration-scopes.cjs');
+const { stripComments, scriptTokens } = require('../lib/script-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const DRIVERS_DIR = path.join(ROOT, 'static', 'ergopti_plus');
@@ -297,6 +298,51 @@ assert.equal(
 	false
 );
 
+/** Keeps offsets stable while comments and multiline/long literal data stay opaque. */
+function executableLua(source) {
+	let result = stripComments(source, '.lua');
+	for (const token of scriptTokens(source, '.lua')) {
+		if (token.kind !== 'string') continue;
+		const raw = source.slice(token.start, token.end);
+		if (!raw.startsWith('[') && !raw.includes('\n')) continue;
+		result = result.slice(0, token.start) + raw.replace(/[^\n]/g, ' ') + result.slice(token.end);
+	}
+	return result;
+}
+
+/** Returns only matches whose first token is executable code, preserving literal arguments. */
+function executableMatches(pattern, source) {
+	const starts = new Set(
+		scriptTokens(source, '.lua')
+			.filter((token) => token.kind !== 'string')
+			.map((token) => token.start)
+	);
+	const flags = pattern.flags.includes('g') ? pattern.flags : pattern.flags + 'g';
+	return [...source.matchAll(new RegExp(pattern.source, flags))].filter((match) =>
+		starts.has(match.index)
+	);
+}
+
+/** Returns one lexical code fact; this is not a flow or native-authority proof. */
+function executableMatch(pattern, source) {
+	return executableMatches(pattern, source)[0] || null;
+}
+
+/** Checks each fact inside the actual central constructor, rather than later quoted data. */
+function canonicalParameterBuilder(source) {
+	const constructor = executableMatch(
+		/^function M\.action_parameter_update\(binding, action_name, value\)\r?\n[\s\S]*?^end\b/m,
+		source
+	);
+	if (!constructor) return false;
+	return [
+		/M\.action_parameter_binding_fits\(binding\) == false/,
+		/M\.get_action_parameter_spec\(action_name\) == nil/,
+		/M\.validate_action_parameter\(action_name, value\) ~= true/,
+		/return \{ section = CONFIG_SECTION_PARAMS, key = parameter_key\(binding, action_name\), value = value \}/
+	].every((pattern) => executableMatch(pattern, constructor[0]));
+}
+
 /**
  * Projects one binding owner's physical transport onto typed scope policy.
  * Other writers and neighbouring keys do not inherit this ownership proof.
@@ -326,6 +372,8 @@ function isCanonicalParameterWrite(
 		surface !== 'gesture_parameters'
 	)
 		return false;
+	source = executableLua(source);
+	storageOwner = executableLua(storageOwner);
 	const action = actions?.run_program;
 	if (action?.parameter !== 'program' || !['all', 'linux'].includes(action.platform)) return false;
 	const owned = (scope, domain) =>
@@ -337,18 +385,53 @@ function isCanonicalParameterWrite(
 		!['keyboard', 'script', 'tap_key'].every((domain) => owned('shortcuts', domain))
 	)
 		return false;
-	const constructor = /^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m.exec(source);
+	const constructor = executableMatch(/^function M\.new\(options\)\r?\n[\s\S]*?^end\b/m, source);
 	if (!constructor) return false;
 	const body = constructor[0];
-	const row =
-		/section\s*=\s*"gesture_parameters"\s*,\s*key\s*=\s*binding\s*\.\.\s*"__run_program"\s*,\s*value\s*=\s*options\.scalar/.exec(
-			body
-		);
+	const legacyRow = executableMatch(
+		/section\s*=\s*"gesture_parameters"\s*,\s*key\s*=\s*binding\s*\.\.\s*"__run_program"\s*,\s*value\s*=\s*options\.scalar/,
+		body
+	);
+	const selectedRow = executableMatch(
+		/local parameter = parameters\.action_parameter_update\(binding, action, options\.scalar\)/,
+		body
+	);
+	const row = legacyRow || selectedRow;
 	if (!row || constructor.index + row.index !== offset) return false;
-	const families = /local families = \{([\s\S]*?)\n\t\}/.exec(body);
+	const selected = legacyRow === null;
+	if (
+		selected &&
+		![
+			/local action = options\.action == nil and "run_program" or options\.action/,
+			/type\(action\) == "string"/,
+			/type\(parameters\.get_action_parameter_spec\(action\)\) == "string"/,
+			/parameters\.validate_action_parameter\(action, options\.scalar\) == true/,
+			/type\(parameter\) == "table" and parameter\.section == "gesture_parameters"/,
+			/parameter\.key == binding \.\. "__" \.\. action and parameter\.value == options\.scalar/,
+			/parameter = \{ section = parameter\.section, key = parameter\.key, value = parameter\.value \}/,
+			/local updates = \{\s*parameter,\s*\{ section = section, key = slot, value = action \}/,
+			/scalar_state\[parameter\.key\] = parameter\.value/,
+			/assignments\.assignments\[slot\] = action/,
+			/assignments\.explicit_assignments\[slot\] = action/,
+			/assert\(section ~= "shortcuts\.keyboard" or not PhysicalSlots\.is_namespace\(slot\)/
+		].every((pattern) => executableMatch(pattern, body))
+	)
+		return false;
+	if (
+		selected &&
+		(!executableMatch(/local PhysicalSlots = require\("shortcuts\.physical_slots"\)/, source) ||
+			!executableMatch(/function M\.apply\(binding, scalar, is_paused, action\)/, source) ||
+			!executableMatch(
+				/binding = binding, scalar = scalar, is_paused = is_paused, action = action/,
+				source
+			) ||
+			!canonicalParameterBuilder(storageOwner))
+	)
+		return false;
+	const families = executableMatch(/local families = \{([\s\S]*?)\n\t\}/, body);
 	const declaredFamilies =
 		families &&
-		[...families[1].matchAll(/\{ "([a-z_]+)__", "([a-z_.]+)", "([a-z_.]+)" \}/g)]
+		executableMatches(/\{ "([a-z_]+)__", "([a-z_.]+)", "([a-z_.]+)" \}/g, families[1])
 			.map((match) => match.slice(1).join(':'))
 			.sort();
 	if (
@@ -361,24 +444,32 @@ function isCanonicalParameterWrite(
 			])
 	)
 		return false;
-	return (
-		/local parameters = options\.parameters or require\("modules\.gestures\.manager"\)/.test(
+	return Boolean(
+		executableMatch(
+			/local parameters = options\.parameters or require\("modules\.gestures\.manager"\)/,
 			body
 		) &&
-		/parameters\.DEFAULT_GESTURES\[binding\] ~= nil/.test(body) &&
-		/provider\.configuration_domain\(binding\) == nil/.test(body) &&
-		/parameters\.validate_action_parameter\("run_program", options\.scalar\) == true/.test(body) &&
-		/Transaction\.new\(\{ path = options\.path/.test(body) &&
-		/operations = updates, presets = \{\}/.test(body) &&
-		/transaction\.apply\("program_binding", "configured"\)/.test(body) &&
-		/require\("infra\.config_paths"\)\.config\("config\.toml"\)/.test(source) &&
-		/_current = M\.new\(\{ path = path,/.test(source) &&
-		/local CONFIG_SECTION_PARAMS = "gesture_parameters"/.test(storageOwner) &&
-		/section = CONFIG_SECTION_PARAMS, key = key, value = value/.test(storageOwner) &&
-		/walk_params\(CONFIG_SECTION_PARAMS, config\[CONFIG_SECTION_PARAMS\]\)/.test(storageOwner) &&
-		/for action_name in pairs\(M\.ACTION_PARAMETER_SPECS\)/.test(storageOwner) &&
-		/for action_name, meta in pairs\(Catalogue\.actions\)/.test(storageOwner) &&
-		/M\.ACTION_PARAMETER_SPECS\[action_name\] = meta\.parameter/.test(storageOwner)
+			executableMatch(/parameters\.DEFAULT_GESTURES\[binding\] ~= nil/, body) &&
+			executableMatch(/provider\.configuration_domain\(binding\) == nil/, body) &&
+			(selected ||
+				executableMatch(
+					/parameters\.validate_action_parameter\("run_program", options\.scalar\) == true/,
+					body
+				)) &&
+			executableMatch(/Transaction\.new\(\{ path = options\.path/, body) &&
+			executableMatch(/operations = updates, presets = \{\}/, body) &&
+			executableMatch(/transaction\.apply\("program_binding", "configured"\)/, body) &&
+			executableMatch(/require\("infra\.config_paths"\)\.config\("config\.toml"\)/, source) &&
+			executableMatch(/_current = M\.new\(\{ path = path,/, source) &&
+			executableMatch(/local CONFIG_SECTION_PARAMS = "gesture_parameters"/, storageOwner) &&
+			executableMatch(/section = CONFIG_SECTION_PARAMS, key = key, value = value/, storageOwner) &&
+			executableMatch(
+				/walk_params\(CONFIG_SECTION_PARAMS, config\[CONFIG_SECTION_PARAMS\]\)/,
+				storageOwner
+			) &&
+			executableMatch(/for action_name in pairs\(M\.ACTION_PARAMETER_SPECS\)/, storageOwner) &&
+			executableMatch(/for action_name, meta in pairs\(Catalogue\.actions\)/, storageOwner) &&
+			executableMatch(/M\.ACTION_PARAMETER_SPECS\[action_name\] = meta\.parameter/, storageOwner)
 	);
 }
 
@@ -724,7 +815,248 @@ const parameterStorageOwner = fs.readFileSync(
 	'utf8'
 );
 const parameterWriterPath = 'infra/program_binding_transaction.lua';
-const parameterWriter = fs.readFileSync(
+// Retain the genuine e525 producer as literal historical morphology, not current authority.
+// Its original assertion/mutation block below remains byte-exact and meaningful.
+const parameterWriter = String.raw`--- infra/program_binding_transaction.lua
+
+--- Publishes an executable parameter and its binding under exact runtime ownership.
+local M = {}
+local Transaction = require("config_scope_transaction")
+local Writer = require("toml_codec.writer")
+local Logger = require("logger.shim")
+local LOG = "infra.program_binding_transaction"
+local _current, _sequence = nil, 0
+local _constructing = false
+
+local function copy(value)
+	if type(value) ~= "table" then return value end
+	local out = {}; for key, child in pairs(value) do out[key] = copy(child) end
+	return out
+end
+
+local function equal(left, right)
+	if type(left) ~= type(right) then return false end
+	if type(left) ~= "table" then return left == right end
+	for key, value in pairs(left) do if not equal(value, right[key]) then return false end end
+	for key in pairs(right) do if left[key] == nil then return false end end
+	return true
+end
+
+--- Builds a conditional publication using existing preference and dispatch owners.
+--- @param options table Exact binding, scalar, path, backup, pause and native file ports.
+--- @return table owner Apply, retained debt and explicit compensation retry.
+function M.new(options)
+	assert(type(options) == "table" and type(options.is_paused) == "function", "program binding requires live pause ownership")
+	local parameters = options.parameters or require("modules.gestures.manager")
+	local binding, slot, section, provider = options.binding
+	local families = {
+		{ "keyboard__", "shortcuts.keyboard", "modules.shortcuts.keyboard_shortcuts" },
+		{ "tap_key__", "shortcuts.tap_keys", "modules.shortcuts.tap_keys" },
+		{ "script__", "shortcuts.script_control", "modules.shortcuts.script_chords" },
+	}
+	if type(binding) == "string" and parameters.DEFAULT_GESTURES[binding] ~= nil then
+		slot, section = binding, "gestures"
+	else
+		for _, family in ipairs(families) do
+			if type(binding) == "string" and binding:sub(1, #family[1]) == family[1] then
+				provider = require(family[3])
+				if provider.configuration_domain(binding) == nil then break end
+				slot, section = binding:sub(#family[1] + 1), family[2]
+				break
+			end
+		end
+	end
+	assert(type(slot) == "string" and parameters.validate_action_parameter("run_program", options.scalar) == true,
+		"program binding model is invalid")
+	local owner, held, retiring, busy = {}, {}, false, false
+	local files = options.files or require("adapters.file_system")
+	local checkpoint, reconcile_pending, inverse_source = nil, false, nil
+	local ports = { { acquire = parameters.acquire_parameter_configuration, release = parameters.release_parameter_configuration,
+		snapshot = function()
+			local values = parameters.parameter_configuration_snapshot(owner)
+			local actions = parameters.parameter_configuration_actions_snapshot(owner)
+			if type(values) ~= "table" or type(actions) ~= "table" then return nil end
+			return { parameters = values, actions = actions }
+		end } }
+	if provider then ports[#ports + 1] = { acquire = provider.acquire_configuration, release = provider.release_configuration,
+		snapshot = function() return provider.configuration_snapshot(owner) end } end
+	local function read_source()
+		local content, status = Writer.read_classified(options.path, files)
+		if status ~= "ok" and status ~= "absent" then return nil end
+		return { status = status, content = status == "ok" and content or nil }
+	end
+	local function capture_release()
+		if checkpoint ~= nil then return true end
+		local source = read_source()
+		if source == nil or (inverse_source ~= nil and not equal(source, inverse_source)) then return false end
+		local snapshots = {}
+		for index, port in ipairs(held) do
+			local called, state = pcall(port.snapshot)
+			if not called or type(state) ~= "table" then return false end
+			snapshots[index] = state
+		end
+		checkpoint = { source = source, snapshots = snapshots }
+		return true
+	end
+	--- A refused release can mutate ownership before returning. Reacquire only
+	--- the missing lease while exact canonical and full runtime checkpoints hold.
+	local function reconcile()
+		if not capture_release() or not equal(read_source(), checkpoint.source) then return false end
+		for index, port in ipairs(held) do
+			local called, state = pcall(port.snapshot)
+			if not called then return false end
+			if state == nil then
+				if not equal(read_source(), checkpoint.source) then return false end
+				local acquired, receipt = pcall(port.acquire, owner)
+				if not acquired or receipt ~= true then return false end
+				called, state = pcall(port.snapshot)
+			end
+			if not called or not equal(state, checkpoint.snapshots[index]) then return false end
+		end
+		if not equal(read_source(), checkpoint.source) then return false end
+		reconcile_pending = false
+		return true
+	end
+	local function release()
+		if #held == 0 then return true end
+		reconcile_pending = true
+		if not capture_release() then return false end
+		local paused = options.is_paused()
+		if type(paused) ~= "boolean" or parameters.set_program_paused(paused) ~= true
+			or not equal(read_source(), checkpoint.source) then return false end
+		for index = #held, 1, -1 do
+			local called, receipt = pcall(held[index].release, owner)
+			if not called or receipt ~= true then return false end
+		end
+		held, checkpoint, reconcile_pending = {}, nil, false
+		return true
+	end
+	local function assignment_snapshot()
+		if provider then return provider.configuration_snapshot(owner) end
+		local actions = parameters.parameter_configuration_actions_snapshot(owner)
+		return type(actions) == "table" and { assignments = actions } or nil
+	end
+	local function apply_assignments(state)
+		if provider then return provider.apply_configuration(owner, state) == true end
+		return parameters.apply_parameter_configuration_actions(owner, state.assignments) == true
+	end
+	local updates = {
+		{ section = "gesture_parameters", key = binding .. "__run_program", value = options.scalar },
+		{ section = section, key = slot, value = "run_program" },
+	}
+	local transaction = Transaction.new({ path = options.path, backup_path = options.backup_path,
+		files = files,
+		manifest = { scope_plan = function() return { operations = updates, presets = {} } end },
+		capture = function()
+			local scalar_state = parameters.parameter_configuration_snapshot(owner)
+			local assignments = assignment_snapshot()
+			if type(scalar_state) ~= "table" or type(assignments) ~= "table" then return nil end
+			return { parameters = scalar_state, assignments = assignments }
+		end,
+		apply = function()
+			if options.is_paused() then return false end
+			local scalar_state = parameters.parameter_configuration_snapshot(owner)
+			local assignments = assignment_snapshot()
+			if type(scalar_state) ~= "table" or type(assignments) ~= "table" then return false end
+			scalar_state[binding .. "__run_program"] = options.scalar
+			assignments = copy(assignments)
+			assignments.assignments[slot] = "run_program"
+			if assignments.explicit_assignments then assignments.explicit_assignments[slot] = "run_program" end
+			return parameters.apply_parameter_configuration(owner, scalar_state) == true and apply_assignments(assignments)
+		end,
+		restore = function(snapshot)
+			return parameters.apply_parameter_configuration(owner, snapshot.parameters) == true
+				and apply_assignments(snapshot.assignments)
+		end,
+	})
+	function owner.pending() return #held > 0 or transaction.pending() or retiring or busy end
+	local function recover()
+		if retiring then
+			if parameters.stop_programs() ~= true then return false end
+			retiring = false
+		end
+		if reconcile_pending and not reconcile() then return false end
+		if transaction.committed() then
+			if transaction.revert() ~= true then return false end
+		elseif transaction.retry_restore() ~= true then return false end
+		-- A refused eager inverse becomes shared transaction debt. Once its
+		-- retry restores the original source, that source replaces the candidate
+		-- checkpoint just as it does after an immediately accepted inverse.
+		inverse_source = nil
+		checkpoint = nil
+		if release() ~= true then return false end
+		transaction.release()
+		return true
+	end
+	local function apply()
+		if options.is_paused() then return false end
+		for _, port in ipairs(ports) do
+			local ok, receipt = pcall(port.acquire, owner)
+			if not ok or receipt ~= true then release(); return false end
+			held[#held + 1] = port
+		end
+		retiring = true
+		if parameters.stop_programs() ~= true then return false end
+		retiring = false
+		local accepted, _, candidate = transaction.apply("program_binding", "configured")
+		if transaction.pending() then return false end
+		if accepted == true then inverse_source = { status = "ok", content = candidate } end
+		if release() ~= true then recover(); return false end
+		transaction.release()
+		return accepted == true
+	end
+	local function guarded(operation)
+		if busy then return false end
+		busy = true
+		local called, receipt = pcall(operation)
+		busy = false
+		return called and receipt == true
+	end
+	function owner.apply()
+		if owner.pending() then return false end
+		return guarded(apply)
+	end
+	function owner.retry_restore() return guarded(recover) end
+	function owner.claimed() return busy end
+	return owner
+end
+
+--- Commits one picker confirmation while retaining any refused native inverse.
+--- @param binding string Canonical binding identity.
+--- @param scalar string Validated executable parameter.
+--- @param is_paused function Live pause getter.
+--- @return boolean committed
+function M.apply(binding, scalar, is_paused)
+	if type(is_paused) ~= "function" or _constructing then return false end
+	_constructing = true
+	local ok, accepted = pcall(function()
+		if _current and _current.pending() and _current.retry_restore() ~= true then return false end
+		_sequence = _sequence + 1
+		local path = require("infra.config_paths").config("config.toml")
+		_current = M.new({ path = path, backup_path = path .. ".program-binding-" .. os.date("%Y%m%d-%H%M%S") .. "-" .. _sequence .. ".bak",
+			binding = binding, scalar = scalar, is_paused = is_paused })
+		return _current.apply()
+	end)
+	_constructing = false
+	if not ok or accepted ~= true then
+		Logger.error(LOG, "Private user program binding publication did not commit.")
+		return false
+	end
+	return true
+end
+
+--- Reports logical debt even when a refused release removed its physical lease.
+--- @return boolean pending
+function M.pending() return _constructing or (_current ~= nil and _current.pending()) end
+
+--- Identifies the exact journal token allowed to reconcile its missing lease.
+--- @param owner table Exact transaction token, never a caller-provided substitute.
+--- @return boolean owned
+function M.owns(owner) return owner ~= nil and _current == owner and _current.claimed() end
+
+return M
+`;
+const currentParameterWriter = fs.readFileSync(
 	path.join(DRIVERS_DIR, 'linux', parameterWriterPath),
 	'utf8'
 );
@@ -816,6 +1148,156 @@ for (const [scope, domain] of [
 	wrongPolicy[scope].action_parameters.restore = 'retain';
 	assert.equal(parameterDeclared({ scopes: wrongPolicy }), false, `${scope} policy is required`);
 }
+// Current selected-action transport has a separate positive and handwritten refusals.
+const currentParameterRow =
+	/local parameter = parameters\.action_parameter_update\(binding, action, options\.scalar\)/.exec(
+		currentParameterWriter
+	);
+assert.ok(currentParameterRow, 'the actual selected-action canonical constructor must exist');
+const selectedParameterDeclared = (overrides = {}) => {
+	const source = overrides.source ?? currentParameterWriter;
+	const row =
+		/local parameter = parameters\.action_parameter_update\(binding, action, options\.scalar\)/.exec(
+			source
+		);
+	return isCanonicalParameterWrite(
+		overrides.driver ?? 'linux',
+		overrides.relative ?? parameterWriterPath,
+		source,
+		overrides.surface ?? 'gesture_parameters',
+		overrides.offset ?? row?.index ?? currentParameterRow.index,
+		overrides.scopes ?? scopes,
+		overrides.actions ?? actions,
+		overrides.storageOwner ?? parameterStorageOwner
+	);
+};
+assert.equal(
+	selectedParameterDeclared(),
+	true,
+	'the actual central selected-action transport remains owned'
+);
+for (const [before, after] of [
+	[
+		'parameters.action_parameter_update(binding, action, options.scalar)',
+		'parameters.action_parameter_update(binding, "run_program", options.scalar)'
+	],
+	['type(parameters.get_action_parameter_spec(action)) == "string"', 'true'],
+	['parameters.validate_action_parameter(action, options.scalar) == true', 'true'],
+	['parameter.section == "gesture_parameters"', 'parameter.section == "unowned_parameters"'],
+	['parameter.key == binding .. "__" .. action', 'true'],
+	['parameter.value == options.scalar', 'true'],
+	[
+		'parameter = { section = parameter.section, key = parameter.key, value = parameter.value }',
+		'parameter = parameter'
+	],
+	[
+		'{ section = section, key = slot, value = action }',
+		'{ section = section, key = slot, value = "run_program" }'
+	],
+	['scalar_state[parameter.key] = parameter.value', 'scalar_state[parameter.key] = options.other'],
+	['assignments.assignments[slot] = action', 'assignments.assignments[slot] = "run_program"'],
+	[
+		'assignments.explicit_assignments[slot] = action',
+		'assignments.explicit_assignments[slot] = "run_program"'
+	],
+	['action = action })', 'action = "run_program" })'],
+	['not PhysicalSlots.is_namespace(slot)', 'true'],
+	['provider.configuration_domain(binding) == nil', 'false'],
+	['config("config.toml")', 'config("other.toml")']
+]) {
+	assert.ok(
+		currentParameterWriter.includes(before),
+		'each current mutation must target actual source'
+	);
+	const changed = currentParameterWriter.replace(before, after);
+	assert.notEqual(changed, currentParameterWriter, 'the current source mutation must change bytes');
+	assert.equal(
+		selectedParameterDeclared({ source: changed }),
+		false,
+		'unowned selected-action transport is refused'
+	);
+}
+for (const replacement of [
+	'-- local parameter = parameters.action_parameter_update(binding, action, options.scalar)',
+	'local decoy = [[\nlocal parameter = parameters.action_parameter_update(binding, action, options.scalar)\n]]'
+]) {
+	const changed = currentParameterWriter.replace(currentParameterRow[0], replacement);
+	assert.notEqual(changed, currentParameterWriter);
+	assert.equal(
+		selectedParameterDeclared({ source: changed }),
+		false,
+		'comment/literal constructor text grants no transport'
+	);
+}
+for (const [before, after] of [
+	['M.validate_action_parameter(action_name, value) ~= true', 'false'],
+	['M.action_parameter_binding_fits(binding) == false', 'false'],
+	['key = parameter_key(binding, action_name)', 'key = parameter_key(binding, "run_program")']
+]) {
+	assert.ok(parameterStorageOwner.includes(before));
+	const changed = parameterStorageOwner.replace(before, after);
+	assert.notEqual(changed, parameterStorageOwner);
+	assert.equal(
+		selectedParameterDeclared({ storageOwner: changed }),
+		false,
+		'the actual canonical row constructor remains required'
+	);
+}
+for (const overrides of [
+	{ driver: 'macos' },
+	{ relative: 'infra/another_writer.lua' },
+	{ offset: 0 },
+	{ surface: 'unowned_parameters' },
+	{ actions: {} }
+])
+	assert.equal(selectedParameterDeclared(overrides), false);
+for (const [scope, domain] of [
+	['gestures', 'gesture'],
+	['shortcuts', 'keyboard'],
+	['shortcuts', 'script'],
+	['shortcuts', 'tap_key']
+]) {
+	const changed = structuredClone(scopes);
+	changed[scope].action_parameters.domains = changed[scope].action_parameters.domains.filter(
+		(entry) => entry !== domain
+	);
+	assert.equal(
+		selectedParameterDeclared({ scopes: changed }),
+		false,
+		'every selected-action domain remains required'
+	);
+}
+
+// Ordinary quoted values also cannot replace executable validation facts.
+for (const quote of ["'", '"']) {
+	const fact = 'parameters.validate_action_parameter(action, options.scalar) == true';
+	const changed = currentParameterWriter
+		.replace(fact, 'true')
+		.replace(
+			'local parameter = parameters.action_parameter_update',
+			`local spoof = ${quote}${fact}${quote}\n	local parameter = parameters.action_parameter_update`
+		);
+	assert.notEqual(changed, currentParameterWriter);
+	assert.equal(
+		selectedParameterDeclared({ source: changed }),
+		false,
+		'single-line quoted producer facts grant no transport'
+	);
+	const builderFact = 'M.validate_action_parameter(action_name, value) ~= true';
+	const changedBuilder = parameterStorageOwner
+		.replace(builderFact, 'false')
+		.replace(
+			'return { section = CONFIG_SECTION_PARAMS, key = parameter_key(binding, action_name), value = value }',
+			`local spoof = ${quote}${builderFact}${quote}\n	return { section = CONFIG_SECTION_PARAMS, key = parameter_key(binding, action_name), value = value }`
+		);
+	assert.notEqual(changedBuilder, parameterStorageOwner);
+	assert.equal(
+		selectedParameterDeclared({ storageOwner: changedBuilder }),
+		false,
+		'central constructor facts cannot come from quoted data'
+	);
+}
+
 const DRIVERS = Object.keys(PLATFORM_OF_DRIVER).filter((d) =>
 	fs.existsSync(path.join(DRIVERS_DIR, d, 'adapters'))
 );
