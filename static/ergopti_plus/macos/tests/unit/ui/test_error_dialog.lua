@@ -105,9 +105,10 @@ local function load_dialog(controls)
 	}
 	package.loaded["ui.healthcheck.report"] = {
 		redaction_context = function() return { home = HOME, user = "jdoe", case_insensitive = true } end,
-		perform = function(action, paths)
+		perform = function(action, paths, _, _, _, _, owner)
 			context.performed[#context.performed + 1] = { action = action, paths = paths }
-			return { ok = true }
+			owner.complete({ ok = true })
+			return { cancel = function() end }
 		end,
 	}
 
@@ -115,23 +116,24 @@ local function load_dialog(controls)
 	if controls.real_report then
 		package.loaded["ui.healthcheck.report"] = nil
 		local actual = require("ui.healthcheck.report")
-		package.loaded["ui.healthcheck.report"] = {
-			redaction_context = function() return actual.redaction_context({ identity = function() return { home = HOME, user = "synthetic" } end }) end,
-			perform = function(action, paths, documents, context_value, _, snapshot)
-				return actual.perform(action, paths, documents, context_value, {
-					copy = function(text)
-						context.copied = text
-						return controls.copy ~= false
-					end,
-					save = function(dir, name, text)
-						context.saved = { dir = dir, name = name, text = text }
-						return dir .. "/" .. name
-					end,
-					reveal = function(path) context.revealed = path; return true end,
-					open_url = function(url) context.opened = url; return true end,
-				}, snapshot)
-			end,
-		}
+		local native_perform, native_context = actual.perform, actual.redaction_context
+		actual.redaction_context = function()
+			return native_context({ identity = function() return { home = HOME, user = "synthetic" } end })
+		end
+		actual.perform = function(action, paths, documents, context_value, _, snapshot, owner)
+			return native_perform(action, paths, documents, context_value, {
+				copy = function(text)
+					context.copied = text
+					return controls.copy ~= false
+				end,
+				save = function(dir, name, text)
+					context.saved = { dir = dir, name = name, text = text }
+					return dir .. "/" .. name
+				end,
+				reveal = function(path, done) context.revealed = path; done({ ok = true }); return { cancel = function() end } end,
+				open_url = function(url, done) context.opened = url; done({ ok = true }); return { cancel = function() end } end,
+			}, snapshot, owner)
+		end
 	end
 
 	local webview = {}
@@ -162,6 +164,14 @@ local function load_dialog(controls)
 
 	local dialog = require("ui.error_dialog")
 	return dialog, context
+end
+
+--- Receives the inline completion supplied by synchronous report fixtures.
+local function completed_report(dialog, record)
+	local result
+	dialog.report(record, function(ok) result = ok end, function() return true end)
+	assert(result ~= nil, "The synchronous report fixture must complete inline")
+	return result
 end
 
 --- Fires every armed timer once, in order.
@@ -369,7 +379,7 @@ end)
 helpers.describe("error window sharing uses the real report sink", function()
 	helpers.it("retains the host snapshot and excludes the local error from the issue (error-sharing-owner)", function()
 		local dialog, context = load_dialog({ real_report = true })
-		helpers.assert_true(dialog.report({ kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
+		helpers.assert_true(completed_report(dialog, { kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
 		helpers.assert_type(context.copied, "string")
 		helpers.assert_type(context.opened, "string")
 		helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
@@ -379,7 +389,7 @@ helpers.describe("error window sharing uses the real report sink", function()
 		helpers.assert_eq(context.revealed, context.saved.dir .. "/" .. context.saved.name)
 		helpers.assert_contains(context.saved.text, "# ErgoptiPlus diagnostics")
 		local refusing, refusal = load_dialog({ real_report = true, copy = false })
-		helpers.assert_eq(refusing.report({ kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
+		helpers.assert_eq(completed_report(refusing, { kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
 		helpers.assert_nil(refusal.opened, "clipboard refusal must prevent the browser")
 		helpers.assert_nil(refusal.saved, "clipboard refusal must prevent attachment publication")
 	end)
@@ -402,4 +412,29 @@ helpers.describe("error window retains its captured sharing identity", function(
 		helpers.assert_true(context.copied:find("9.9.9", 1, true) == nil)
 		helpers.assert_true(context.copied:find("-1744", 1, true) ~= nil, "admitted technical status remains useful")
 	end)
+end)
+
+
+helpers.describe("error dialog asynchronous action ownership", function()
+	for _, change in ipairs({ "close", "module", "replacement" }) do
+		helpers.it("does not acknowledge a pending opener after " .. change, function()
+			local dialog, context = load_dialog()
+			dialog.init()
+			dialog.on_error("synthetic", "failure", "failure")
+			fire_timers(context)
+			local owners = {}
+			package.loaded["ui.healthcheck.report"].perform = function(_, _, _, _, _, _, owner)
+				owners[#owners + 1] = owner
+				return { cancel = function() end }
+			end
+			context.page({ body = { action = "open_log" } })
+			if change == "module" then package.loaded["ui.error_dialog"] = {}
+			elseif change == "replacement" then context.page({ body = { action = "copy" } })
+			else context.page({ body = { action = "close" } }) end
+			local scripts = #context.scripts
+			owners[1].complete({ ok = true })
+			helpers.assert_eq(#context.scripts, scripts)
+			helpers.assert_eq(owners[1].current(), false)
+		end)
+	end
 end)

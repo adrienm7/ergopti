@@ -34,7 +34,7 @@ local function load_host()
 		open = function(opts) ctx.changelogs[#ctx.changelogs + 1] = opts.channel end,
 	}
 	package.loaded["ui.error_dialog"] = {
-		report = function(record) ctx.reports[#ctx.reports + 1] = record; return true end,
+		report = function(record, complete) ctx.reports[#ctx.reports + 1] = record; complete(true); return { cancel = function() end } end,
 	}
 	package.loaded["ui.log_openers"] = { open_today_log = function() return true end }
 	package.loaded["ui.ui_builder"] = { force_focus = function() ctx.focused = (ctx.focused or 0) + 1 end }
@@ -196,6 +196,159 @@ helpers.describe("update-check window (macOS host)", function()
 			local shown = view.messages[#view.messages]
 			helpers.assert_eq(shown.state, "error")
 			helpers.assert_eq(shown.reason_key, "update_check.error_unexpected")
+		end)
+	end)
+end)
+
+
+helpers.describe("update-check native report completion", function()
+	for _, reported in ipairs({ true, false }) do
+		helpers.it("completes the native report receipt inline, accepted=" .. tostring(reported), function()
+			scenario(function(ctx)
+				local owners = fake_owners(function(channel)
+					return { state = "error", channel = channel, detail = "HTTP 503", others = {} }
+				end)
+				local view = fake_view()
+				local session = ctx.Host._session_for(view, owners)
+				ctx.Host._set_window(view, session)
+				session.start()
+				local native_records = {}
+				package.loaded["ui.error_dialog"].report = function(record, complete)
+					native_records[#native_records + 1] = record
+					complete(reported)
+					return { cancel = function() end }
+				end
+				session.on_message({ action = "report" })
+				helpers.assert_eq(#native_records, 1, "the synchronous native report owner must run exactly once")
+				helpers.assert_eq(native_records[1].module, "updater")
+				local acknowledgement = view.messages[#view.messages]
+				helpers.assert_eq(acknowledgement.type, "action", "completion reaches the page before dispatch returns")
+				helpers.assert_eq(acknowledgement.action, "report")
+				helpers.assert_eq(acknowledgement.ok, reported, "the page receives the actual native boolean receipt")
+				helpers.assert_eq(acknowledgement.missing, false)
+			end)
+		end)
+	end
+
+	helpers.it("a synchronous native report cannot acknowledge into its replacement session", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel)
+				return { state = "error", channel = channel, detail = "HTTP 503", others = {} }
+			end)
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, owners)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local replacement, replacement_messages, reopened
+			package.loaded["ui.error_dialog"].report = function(_, complete)
+				reopened = ctx.Host.open(owners)
+				replacement = ctx.Host._session()
+				replacement_messages = #view.messages
+				complete(true)
+				return { cancel = function() end }
+			end
+			session.on_message({ action = "report" })
+			helpers.assert_true(reopened, "native report reentry may replace the same window's session")
+			helpers.assert_true(replacement ~= nil and replacement ~= session)
+			helpers.assert_eq(#view.messages, replacement_messages, "the retired report cannot append an acknowledgement")
+			helpers.assert_eq(view.messages[#view.messages].state, "error", "the replacement check's own answer remains current")
+			ctx.Host._set_window(nil, nil)
+		end)
+	end)
+end)
+
+
+helpers.describe("update report asynchronous native receipt", function()
+	for _, change in ipairs({ "complete", "restart", "retire" }) do
+		helpers.it("retains the exact error result while native reporting is pending: " .. change, function()
+			scenario(function(ctx)
+				local owners = fake_owners(function(channel) return { state = "error", channel = channel, detail = "HTTP 503", others = {} } end)
+				local view = fake_view()
+				local session = ctx.Host._session_for(view, owners)
+				ctx.Host._set_window(view, session)
+				session.start()
+				local complete, current, cancelled
+				package.loaded["ui.error_dialog"].report = function(_, callback, predicate)
+					complete, current = callback, predicate
+					return { cancel = function() cancelled = true end }
+				end
+				local before = #view.messages
+				session.on_message({ action = "report" })
+				helpers.assert_eq(#view.messages, before, "native admission cannot acknowledge success")
+				if change == "restart" then session.start() elseif change == "retire" then session.retire() end
+				local after = #view.messages
+				complete(true)
+				if change == "complete" then
+					helpers.assert_true(current())
+					helpers.assert_eq(#view.messages, after + 1)
+					helpers.assert_eq(view.messages[#view.messages].ok, true)
+				else
+					helpers.assert_eq(current(), false)
+					helpers.assert_true(cancelled)
+					helpers.assert_eq(#view.messages, after)
+				end
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("update host report cancellation reentry", function()
+	helpers.it("native close retires the current report session after reusing its view", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel) return { state = "error", channel = channel, detail = "HTTP 503", others = {} } end)
+			local view, native_options = fake_view(), nil
+			hs.webview.windowMasks = { titled = 1, closable = 2 }
+			local builder = package.loaded["ui.ui_builder"]
+			builder.get_app_geometry = function() return { width = 500, height = 500 } end
+			builder.get_centered_frame = function() return {} end
+			builder.show_webview = function(options)
+				native_options = options
+				options.on_webview_created(view)
+				return view
+			end
+			helpers.assert_true(ctx.Host.open(owners))
+			local first = ctx.Host._session()
+			helpers.assert_true(ctx.Host.open(owners))
+			local second = ctx.Host._session()
+			helpers.assert_true(second ~= first)
+			local complete, current, cancelled
+			package.loaded["ui.error_dialog"].report = function(_, callback, predicate)
+				complete, current = callback, predicate
+				return { cancel = function() cancelled = true end }
+			end
+			second.on_message({ action = "report" })
+			native_options.on_close()
+			helpers.assert_true(cancelled, "native close cancels the report of the reused view's current session")
+			helpers.assert_eq(current(), false)
+			local messages = #view.messages
+			complete(true)
+			helpers.assert_eq(#view.messages, messages)
+			helpers.assert_nil(ctx.Host._session())
+		end)
+	end)
+
+	helpers.it("reopening from cancelled report retains the newly published session", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel) return { state = "error", channel = channel, detail = "HTTP 503", others = {} } end)
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, owners)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local replacement, reentered
+			package.loaded["ui.error_dialog"].report = function()
+				return { cancel = function()
+					if not reentered then
+						reentered = true
+						ctx.Host.open(owners)
+						replacement = ctx.Host._session()
+					end
+				end }
+			end
+			session.on_message({ action = "report" })
+			ctx.Host.open(owners)
+			helpers.assert_true(replacement ~= nil and replacement ~= session)
+			helpers.assert_true(ctx.Host._session() == replacement, "outer retirement cannot overwrite the reentrant session")
 		end)
 	end)
 end)

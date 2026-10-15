@@ -212,6 +212,11 @@ local function pick_dir(current, prompt)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "Folder picker completed (ok=%s, result_type=%s).", tostring(ok), type(r2))
+	-- A refused native script returns its diagnostic in raw, not a directory.
+	if ok ~= true then
+		Logger.error(LOG, "Native configuration-folder picker failed; diagnostic content withheld.")
+		return nil
+	end
 
 	if type(r2) == "string" and r2 ~= "" then
 		local p = r2:match("^(.-)%s*$")

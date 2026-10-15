@@ -97,7 +97,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 		end)
 		h.it("(linux-native-titles) the directory picker keeps its backend and normalized result: " .. backend, function()
 			scenario(function(observed, shell)
-				observed.backend, observed.answer = backend, "/owned/chosen/"
+				observed.backend, observed.answer, observed.status = backend, "/owned/chosen/", 0
 				local paths = { default_config_dir = function() return "/owned/default" end }
 				local value = require("ui.config_dir_picker").pick(shell, paths, require("infra.i18n"), "/owned/current")
 				h.assert_eq(value, "/owned/chosen")
@@ -315,4 +315,78 @@ h.describe("native caption consumer inventory", function()
 		local _, count = source:gsub("%-%-title", "")
 		h.assert_eq(count, 1, "the independent removal worker has exactly one caption supplied by its tested GUI handoff")
 	end)
+end)
+
+--- Receives an original picker through a private executable's real exit status.
+--- @param backend string Native chooser name.
+--- @param status number Independent child exit code.
+--- @param output string Independent child stdout.
+--- @return string receipt
+local function picker_exit_receipt(backend, status, output)
+	local created, directory = Shell.exec_checked("mktemp -d")
+	assert(created)
+	directory = directory:gsub("[\r\n]+$", "")
+	local executable, worker = directory .. "/" .. backend, directory .. "/worker.lua"
+	local function write(path, content)
+		local file = assert(io.open(path, "wb"))
+		assert(file:write(content)); assert(file:close())
+	end
+	local ok, receipt = xpcall(function()
+		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
+		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
+		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
+			.. "local shell = require('adapters.shell_runner')\n"
+			.. "local has_command = shell.has_command\n"
+			.. "shell.has_command = function(name) return name == " .. string.format("%q", backend) .. " and has_command(name) end\n"
+			.. "local modals = 0\n"
+			.. "package.loaded['ui.modal'] = { run = function(fn) modals = modals + 1; return fn() end }\n"
+			.. "local paths = { default_config_dir = function() return '/owned/default' end }\n"
+			.. "local value = require('ui.config_dir_picker').pick(shell, paths, nil, '/owned/current')\n"
+			.. "io.write(value == nil and 'refused' or 'accepted|' .. value)\n"
+			.. "io.write('|modal:' .. modals)\n")
+		local command = "env PATH=" .. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
+			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker)
+		local executed, result, reason = Shell.exec_checked(command)
+		assert(executed, tostring(reason))
+		return result
+	end, debug.traceback)
+	os.remove(executable); os.remove(worker)
+	local removed = Shell.run("rmdir " .. Shell.quote(directory))
+	assert(removed, "private picker fixture must retire")
+	assert(ok, receipt)
+	return receipt
+end
+
+h.describe("native configuration picker exit receipts", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("linux-config-picker-exit: " .. backend .. " accepts successful normalized selection", function()
+			h.assert_eq(picker_exit_receipt(backend, 0, "/owned/chosen/\n"), "accepted|/owned/chosen|modal:1")
+		end)
+		for _, status in ipairs({ 1, 7 }) do
+			h.it("linux-config-picker-exit: " .. backend .. " refuses absolute stdout after exit " .. status, function()
+				h.assert_eq(picker_exit_receipt(backend, status, "/untrusted/selection\n"), "refused|modal:1")
+			end)
+		end
+		h.it("linux-config-picker-exit: " .. backend .. " refuses successful empty stdout", function()
+			h.assert_eq(picker_exit_receipt(backend, 0, ""), "refused|modal:1")
+		end)
+	end
+end)
+
+
+h.describe("configuration filesystem root", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("linux-config-root: picker preserves a successful root selection: " .. backend, function()
+			scenario(function(observed, shell)
+				observed.backend, observed.answer, observed.status = backend, "/\n", 0
+				local paths = { default_config_dir = function() return "/owned/default" end }
+				local picker = require("ui.config_dir_picker")
+				h.assert_eq(picker.pick(shell, paths, require("infra.i18n"), "/"), "/")
+				h.assert_eq(picker.normalize(paths, "///"), "/")
+				h.assert_eq(picker.normalize(paths, ""), "/owned/default")
+				h.assert_eq(picker.normalize(paths, nil), "/owned/default")
+				h.assert_eq(picker.normalize(paths, "relative"), nil)
+			end)
+		end)
+	end
 end)

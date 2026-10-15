@@ -45,11 +45,12 @@ assert(not document.text:find("/private-owner",1,true) and not document.text:fin
 if #raw>=8192 then assert(#document.text>=8192,"immediate-write corpus lost its large native write") end
 local name=document.name
 local revealed = 0
-local result = Report.perform({action="save", name=name, text=document.text},
+local result
+Report.perform({action="save", name=name, text=document.text},
  {diagnostics_dir=directory}, {redaction=rules,schema=schema}, {home="/private-owner",user="privateowner"},
- {reveal=function(path)
-  assert(path==directory.."/"..name);revealed=revealed+1;return true
- end},snapshot)
+ {reveal=function(path,done)
+  assert(path==directory.."/"..name);revealed=revealed+1;done({ok=true,code=0})
+ end},snapshot,{current=function()return true end,complete=function(value)result=value end})
 print(Json.encode({ok=result.ok, revealed=revealed, path=result.path, expected=document.text,name=name}))
 """
 
