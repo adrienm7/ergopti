@@ -20,7 +20,9 @@ function M.normalize(config_paths, value)
 	end
 	if value == nil or value == "" then return config_paths.default_config_dir() end
 	if type(value) ~= "string" then return nil end
-	local normalized = value:match("^%s*(.-)%s*$"):gsub("/+$", "")
+	local normalized = value:match("^%s*(.-)%s*$")
+	if normalized:match("^/+$") then return "/" end
+	normalized = normalized:gsub("/+$", "")
 	if normalized == "" then return config_paths.default_config_dir() end
 	if normalized:sub(1, 1) ~= "/" then return nil end
 	return normalized

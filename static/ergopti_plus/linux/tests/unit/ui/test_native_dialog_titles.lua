@@ -372,3 +372,21 @@ h.describe("native configuration picker exit receipts", function()
 		end)
 	end
 end)
+
+
+h.describe("configuration filesystem root", function()
+	for _, backend in ipairs({ "zenity", "kdialog" }) do
+		h.it("linux-config-root: picker preserves a successful root selection: " .. backend, function()
+			scenario(function(observed, shell)
+				observed.backend, observed.answer, observed.status = backend, "/\n", 0
+				local paths = { default_config_dir = function() return "/owned/default" end }
+				local picker = require("ui.config_dir_picker")
+				h.assert_eq(picker.pick(shell, paths, require("infra.i18n"), "/"), "/")
+				h.assert_eq(picker.normalize(paths, "///"), "/")
+				h.assert_eq(picker.normalize(paths, ""), "/owned/default")
+				h.assert_eq(picker.normalize(paths, nil), "/owned/default")
+				h.assert_eq(picker.normalize(paths, "relative"), nil)
+			end)
+		end)
+	end
+end)
