@@ -12,6 +12,165 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 complete local source receiving
+
+The complete canonical JS gate receives the frozen local candidate on base
+`b39433b647903bfcf71495de992e1954afa4ccf8`: 408 of 425 checks pass, 17 fail,
+natural exit1. All ten frozen source images and the tracked diff remain
+unchanged. This includes unpublished AHK drafts, so it is not an exact-commit
+or globally green qualification. Whole-entry compilation, actual isolated AHK
+startup and complete menu parity pass. The seventeen failures remain failures:
+Linux-only execution/archive output; unavailable cc; denied symlink operations;
+POSIX/SDK/compiler dependencies; a Git Bash permission refusal; and the Windows
+unsupported SDK-case receipt refused by its caller. The previously truncated
+signed-query pipe failure does not reproduce on current `1b1e3f1300`: its exact
+controlled case passes, then all ten permission/pipe controls pass with natural
+exit0 and unchanged source. This receives Windows controlled metadata and pipe
+lifecycle only; native macOS signing, SDK, TCC and service receiving stay OPEN.
+The historical complete JS result remains408/425, exit1. CI policy, native
+qualification flags and tests are not weakened.
+
+The exact clean `1b1e3f1300` E2E composition passes70/70 with natural exit0,
+no skips and a complete canonical manifest. Its complete unit attempt reaches
+4,717PASS and one native file-filter UIA FAIL before the unchanged120-minute
+watchdog exits2. Of12,640 planned cases,7,922 have no terminal result; there is
+no terminal footer and no complete-suite qualification. The observed UIA
+failure and watchdog transcript remain retained. Selected follow-up receiving
+cannot turn this incomplete attempt into a successful full run.
+
+The maintainer quit the old6818 build. The verified f1b collector replacement
+now reaches actual readiness, with the personal locator restored byte-identically.
+Its actual Diagnostics menu collection now creates a reviewed 7,960-byte ZIP
+with six PASS, six functional UNRUN and two explicit physical SKIP results.
+CRC, closed entry names, redaction and all six exact-source component hashes
+pass. The independent exact worker handle observes exit0; the application
+displays archive creation after retirement. No cancel control remains. This
+receives the installed collector software, without functional or device claims.
+The separate corrected-AHK unit/E2E and remaining cohort,
+managed-AI, physical Windows and native macOS/Linux receiving remain OPEN.
+
+The maintainer authorizes the named runtime/model downloads onto isolated D:
+storage. Official Ollama0.24.0 is received with the exact2,069,313,829-byte pin;
+the unchanged production ZIP reader accepts its namespace and3,661,563,960
+expanded bytes. The first300-second transfer expires and remains failed; its
+separate artifact recovery succeeds without changing application deadlines.
+An actual isolated0.24.0 server starts with an empty model inventory, but its
+official `pull qwen3.5:0.8b` exits1 because the registry requires a newer runtime.
+No model blob or inference is qualified. The maintainer separately authorizes
+official0.40.4; its1,469,916,992-byte Windows archive verifies against GitHub's
+published SHA256. Its receiving is separate from the unchanged product0.24.0
+catalogue. Actual managed publication remains OPEN: the native helper rejects
+the D: test root because it requires the real LocalApplicationData folder.
+The original0.24.0 extraction also exceeds the measured C: free space; the
+new0.40.4 archive has87 admitted entries and1,944,244,083 expanded bytes.
+No root policy is bypassed and no native installation is inferred from these
+standalone artifact receipts.
+
+The isolated official0.40.4 CLI subsequently pulls `qwen3.5:0.8b` with natural
+exit0. The first verifier refuses its two additional manifest metadata layers;
+the corrected verifier requires unchanged original seven components, exact
+parent-to-observed-child linkage, all nine complete sizes/SHA256 values and
+the runtime's exact selected-child digest. All checks pass. Direct native
+external-server API receiving then passes one-token warmup HTTP200, a nonempty
+NDJSON stream with one terminal response, and observed weight unloading.
+These are controlled Windows server/API receipts. Application UI, genuine
+managed consent/publication and source/requester replacement remain OPEN.
+The shared official catalogue and the separate macOS native-HTTP build recipe
+still pin0.24.0; updating one alone is not a completed cross-driver compatibility
+correction. Preserve the actual0.24.0 refusal and native macOS/Linux UNRUN status.
+
+### October 15 composed Windows receiving follow-up
+
+The producer composition's complete JS attempt finishes naturally with exit1:
+407/425 checks pass and18 fail, with its six frozen images and tracked diff
+unchanged. One new failure is its pinned production-source read. The fixture
+now discovers the exact twenty slots through the common whole-driver reader;
+the unchanged ratchet passes380/380 literals, and all25 registered producer
+cases pass again with natural exit0, complete manifest and no skips. This
+targeted correction does not rewrite the complete attempt into a green result.
+Three previously unavailable C controls separately pass using the existing
+GCC through their supported CC setting: replay8/output11/trace6 matrices.
+The repository format check passes with pinned Ruff0.15.8. The domain pipeline
+separately passes12/13 steps and exits1 because native archive output requires
+Linux. Denied symlinks/permissions, native SDK/POSIX requirements and refused
+unsupported SDK receipts remain failures; no gate or qualification is weakened.
+
+The composed JS startup smoke overlaps the retained compiled AI test build.
+Even its reported success cannot qualify the single-active-driver prerequisite;
+that actual startup receiving must be repeated alone. The earlier full Windows
+unit attempt first lacks a result at the cached gesture-status captions case.
+That exact case passes alone1/1 in13.5seconds with unchanged source. The full
+run's order/state/load stall and its separate file-filter UIA failure remain OPEN.
+
+The official Windows builder again receives8 replay/11 output/6 trace matrices,
+all44 owner cases and the existing41-export hardened x64 DLL with exact source
+provenance. Both Group7 idle installation sequences then receive18 exact owned
+Edit samples each, with natural exit0 and unchanged source bindings. Their
+latencies vary substantially in this active desktop session. These36 synthetic
+primitive observations do not qualify production output, simultaneous physical
+typing or physical hook order; no backend policy changes. The compact reviewed
+results archive has13,529bytes, seven closed entries and SHA256
+`9ae37aba820f0a4b20da33b20e28dad6ffb69473b1597c3b902135c13079aa84`.
+It retains the original f1b Diagnostics ZIP and both separate Group7 receipts;
+its manifest keeps their source boundaries and open failures explicit. CRC and
+exact payload checks pass. No upload or publication follows from this packaging.
+
+Actual f1b application receiving detects the isolated0.40.4 server and starts
+its bridge, but the model remains unloaded without a warmup terminal/retry log.
+The exact production continuation is causally reproduced: bridge1/warmup0,
+natural exit1. A private deferred-intent correction reaches bridge1/warmup1
+and passes six stale/absent controls with natural exit0. It is not yet applied
+or received in the installed application. Shared runtime compatibility also
+remains software work: the macOS producer and stager require synchronized
+official/custom versions, and0.40.4 changes transfer and pull-handler seams.
+Native macOS/Linux receiving remains OPEN or UNRUN.
+
+### October 15 AHK direct-digit registration receiving
+
+The received AHK binding owner retains all twenty original static digit
+variants and their priority. Genuine noncreating Hotkey preflight precedes
+callback updates; only complete registration and HotIf cleanup can publish a
+private metadata factory. Caller receipts and registrars grant no authority.
+Observed callback, primitive or factory withdrawal permanently retires that
+source. No native output or cohort qualification follows from this metadata.
+
+Review found that Map is a Class, so the draft's function-only owner roster
+refused genuine startup. An actual pinned AHK language probe confirms Map.Call
+is the Func to retain; both rosters now use it without weakening their checks.
+The six closed-source tests pass through the canonical runner, natural exit0,
+without skips. Encoding checks all 1,917 AHK files; strict conventions and the
+actual whole-entry compilation pass. These refusal and compilation controls
+also passed before the constructor correction and cannot prove admission.
+After the maintainer quit build6818, all nine genuine HotIf/Hotkey fixture
+children pass, each natural exit0 with unchanged source. They cover complete
+registration, duplicate/foreign authority, missing Down/Up slots and primitive,
+callback and factory withdrawal. All twenty retained source callbacks produce
+the expected literal digit/edge at a controlled SendEvent boundary, without
+native emission. The initial fixture failures are preserved: BoundFunc.Name
+is empty on pinned AHK, and a Call-property observer receives an implicit
+receiver argument. Pure language probes establish both corrections; production
+was unchanged during this receiving. Native hotkey dispatch, physical priority,
+C kind6 source registration, full units/E2E and composition gates remain OPEN.
+
+The local AHK transport also recognizes the exact C kind6 descriptor: scan02..0B,
+zero targets, modifiers, prefixes and composition fields. Four actual canonical
+ABI controls pass, including all ten scans, Down/repeat/Up and a matched retained
+KLE digit which still cannot authorize Unicode reinterpretation. Before the
+transport correction, the original three controls give one PASS and two FAIL
+because the adapter refuses kind6. This is metadata transport only; the native
+producer, authenticated host mapping and accepted output remain unimplemented.
+
+The original nine-case route-adapter selection exposed pre-existing fixture
+contamination: a malformed mock ACK retained a private source lease, but its
+public Unknown was cleared before cleanup. The following invalid-ACK assertion
+passed without reaching its intended callback. A new exact callback-count
+assertion fails on that source (expected4, actual3). The known-error vector now
+runs before the malformed ACK; all original assertions remain, and the existing
+finally obtains Stop before restoring fixture globals. All nine cases then pass,
+natural exit0. The six existing output-preview cases and two selected JS guards
+also pass. The previous four-PASS/five-FAIL selection is retained. Full-suite
+and genuine native receiving remain OPEN.
+
 ### October 15 direct-digit diagnostic source prerequisite
 
 The native routing core now distinguishes direct number-row sources (kind6,
@@ -35,11 +194,37 @@ The original registration probe fails before the new source kind is supported;
 the new diagnostic assertion also fails before its output snapshot recognizer
 is updated. Existing KLE digit Unicode Down/repeat and zero-unit Up receiving
 remain covered. Five selected JS source/receipt checks pass; the required
-complete JS run remains OPEN while the old installed test driver is active.
+complete JS run is received above as 408/425, exit1; it supplies no global qualification.
 
 This is an inactive native prerequisite, not direct-digit cohort completion.
-AHK deliberately still refuses kind6 and publishes no such production recipe.
-The genuine AHK binding owner, authenticated foreground/HKL resolution, accepted
+The AHK producer retains the genuine binding source before
+borrowed callbacks and seals pending route/admission/binding fields before
+registration observers. It appends all ten targetless kind6 sources alongside
+eligible KLE routes. Source withdrawal prevents new admission while held
+historical recipes survive until the original held query permits retirement.
+All27 private receiving children finish with their exact expected exits,
+including the genuine20-binding original causal refusal (zero direct sources)
+and corrected26-route/ten-source result. The first registered canonical positive
+also passes1/1 with natural exit0, complete manifest and unchanged source.
+The full25-case registered selection passes with natural exit0, complete
+manifest and no skips, then passes again after replacing the fixture's arbitrary
+include-count threshold with strict directive parsing. The existing canonical
+`todo49` selection independently passes802/802, with its exact802-case dry-run
+plan, complete actual manifest, natural exit0 and no selected skips. Interactive
+fixtures are not requested and receive no credit. Current E2E passes70/70;
+the pinned compiler separates valid0/invalid17 fixtures and compiles the whole
+entry with exit0 without executing it. These receipts retain unchanged source
+images; overlapping selections are not added into a fabricated suite total.
+The complete JS attempt remains failed as recorded above, and the full Windows
+suite remains incomplete. No replacement whole-suite success is claimed.
+Earlier fixture attempts are retained as failed or externally canceled: a child
+inherited its parent's TAP path, and launching the full graph from a profile
+temporary folder did not complete bootstrap. The corrected fixture selects its
+own TAP before importing the framework and preserves the canonical script
+directory; canceled children grant no qualification. These are source-custody
+tests with a controlled C-registration boundary, not native C issuance, output,
+event-time winning-variant or physical qualification.
+The AHK binding owner has controlled receiving. Authenticated foreground/HKL resolution, accepted
 output and modifier lifetime accounting, native dispatch and remaining cohorts
 remain software work. Production qualification stays false. Physical Windows,
 native macOS and native Linux receiving remain OPEN or UNRUN.
@@ -64,8 +249,12 @@ cancellation and exact child retirement remain enforced. Actual delayed UIA
 and rendering pass on the correction, while the blocked-query control retains
 its expected FAIL. The complete actual PowerShell control fixture passes all
 31 cases, natural exit0, retaining all thirty original controls. Installed
-receiving of the corrected collector remains OPEN
-until a new exact-source build replaces the currently running 6818 build.
+receiving of the corrected collector now succeeds at exact source
+`f1b1d0b208bf6d24f5cd923718c7b0ca6f2fcaf7`: actual synthetic UIA and rendering
+both PASS. Its reviewed archive is 7,960 bytes, SHA256
+`4d4f7f79d9e8fd727e1a5cc4110c6d347dfef213f48392ed8f6444f864c0c2ee`.
+The predecessor's two failed probes remain preserved. Six functional scenarios
+remain UNRUN; two physical observations were explicitly skipped.
 
 At source 6818, all six formerly failing unit cases pass separately. Their
 complete selected families also pass through the canonical runner: 3, 22, 16,
