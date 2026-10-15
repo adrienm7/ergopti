@@ -184,19 +184,20 @@ _LNTR_RefusalCase() {
 	AssertEqual(false, LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count, "busy candidates are not published")
 	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+	InvalidCalls := State.Calls.Length
+	State.Status := -5
+	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "invalid native registrations stay errors")
+	AssertEqual(InvalidCalls + 1, State.Calls.Length, "the invalid ACK must reach its selected registration boundary")
+	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
+	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
 	State.Status := "0"
 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "a string ACK cannot certify native publication")
 	AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map, "The malformed ACK retains its exact candidate.")
 	Calls := State.Calls.Length
 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "Unknown custody prevents another registration.")
 	AssertEqual(Calls, State.Calls.Length, "The retry never reaches a successor/native callback.")
-	; Isolate the following original known-error vector after this explicit mock
-	; boundary. This is not a production settlement/reset mechanism.
-	_LLM_NavEventOwnerTerminalRouteUnknown := 0
-	State.Status := -5
-	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "invalid native registrations stay errors")
-	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
-	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+	; Keep the original unknown frame visible so _LNTR_WithState retires its
+	; private source lease through Stop before the next fixture can register.
 }
 
 _LNTR_RetainedRecipeCase() {
