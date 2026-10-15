@@ -265,13 +265,16 @@ helpers.describe("the script-control picker configures before it binds", functio
 
 	helpers.it("does not assign when the prompt is declined", function()
 		local src = helpers.read_driver_source("local function script_control_group")
+		helpers.assert_true(type(src) == "string" and src ~= "", "the actual script-control owner source must be locatable")
 		if not src then return end
 
 		local at = src:find("prompt_action_parameter")
 		helpers.assert_true(at ~= nil, "the prompt call must be locatable")
 		if not at then return end
 
-		local window = src:sub(at, at + 200)
+		-- Include the actual if-prefix: the current owner commits assignment
+		-- inside the prompt transaction instead of a later local assign() call.
+		local window = src:sub(math.max(1, at - #"if ShortcutUtils."), at + 200)
 		helpers.assert_true(window:find("if ShortcutUtils%.prompt_action_parameter") ~= nil
 			or window:find("then%s*\n?%s*assign") ~= nil,
 			"the assignment must sit INSIDE the prompt's success branch — assigning first "

@@ -13438,6 +13438,18 @@ and installation qualification are still required.
   cover real source compensation with explicit native/advisory doubles.
   Complete final-source and actual macOS qualification remain required.
 
+  The 9ed7 selected batch receives 19,987 modeled macOS unit passes and three
+  failures in old parameter-menu fixtures, alongside 435 shared JS passes and
+  101 modeled E2E passes with one original skip. The keyboard fixture now
+  composes the genuine retained owner on its original conditional file port;
+  all original assertions remain and focused receiving changes from 34/2 to
+  36/0. The script cancellation source guard keeps its original assertion and
+  includes the actual conditional prefix. A real provider regression also
+  preserves an existing native binding and all parameters when the prompt is
+  declined: scanner 11/0, provider 79/0. Moving assignment before the unchanged
+  prompt guard yields 57/22 and restoration 79/0. These focused test repairs do
+  not claim a new complete macOS/native or installed qualification.
+
   Linux now joins parameter and assignment publication for all four menu
   invokers through the existing retained transaction. Refused publication
   preserves the complete prior source, parameter and assignment; successful
