@@ -1721,7 +1721,7 @@ class _SigningSink(_PreparationSink):
 
 
 PRODUCTION_RELATIVE = "tools/build/owned_runtime_product_build.py"
-PRODUCTION_SHA256 = "fc62979a9177ec775514f366df12f0865099e51f54fb11d01f8c93310c2a3141"
+PRODUCTION_SHA256 = "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
 
 
 @dataclass(frozen=True, slots=True)
@@ -1895,6 +1895,7 @@ class _ProductionSink(_SigningSink):
                 driver_payload_current=driver_payload_current
                 if driver_payload is not None
                 else None,
+                daemon_report=record["source_profile"] == LIVE_OWNED_SOURCE_PROFILE,
             )
             source_current()
         except (

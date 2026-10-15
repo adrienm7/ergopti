@@ -340,11 +340,102 @@ class SDKRouteControls(unittest.TestCase):
         )
         self.assertEqual(sink.packaged.code, "handoff_required")
 
+    def report_package_route(self, *, sdk=False, refuse_source=False):
+        """Exercise the real continuation with finite claims, never native authority."""
+        sink = object.__new__(BUILD._ProductionSink)
+        record = self.record(sdk=sdk, production=True)
+        repository = Path(__file__).resolve().parents[2]
+        inputs = SimpleNamespace(root=Path("/finite/source"))
+
+        class FiniteImage:
+            root = inputs.root
+            projection = SimpleNamespace(repository=repository, sdk_dependencies=sdk)
+
+        image = FiniteImage()
+        directories, files, events = {}, {}, []
+        claim = SimpleNamespace(
+            current=lambda: events.append("claim"),
+            members=lambda: (directories, files),
+            inputs=lambda: (record, inputs, image),
+        )
+        payload = SimpleNamespace(image=image)
+
+        def source_current(actual, deadline):
+            self.assertIs(actual, image)
+            if refuse_source:
+                raise BUILD.BASE.NativeBuildError("source_identity", "Finite source retired")
+            events.append("source")
+
+        def package(*args, **kwargs):
+            self.assertIs(args[3], record)
+            self.assertIs(args[4], directories)
+            self.assertIs(args[5], files)
+            self.assertIs(kwargs["daemon_report"], not sdk)
+            self.assertIs(kwargs["staged_source"], image if sdk else None)
+            self.assertIs(kwargs["driver_payload"], payload if sdk else None)
+            args[9]()
+            kwargs["source_current"]()
+            if sdk:
+                kwargs["driver_payload_current"]()
+            events.append("package")
+            return "finite package boundary only"
+
+        factory = SimpleNamespace(
+            StagedSource=FiniteImage,
+            SourceRefusal=RuntimeError,
+            current_staged_source=source_current,
+            capture_virtual_hid_driver_payload=lambda actual, deadline: payload,
+            current_virtual_hid_driver_payload=lambda actual, deadline: self.assertIs(
+                actual, payload
+            ),
+        )
+        sink._distribution_claim = claim
+        sink.current = lambda deadline: None
+        sink.source = SimpleNamespace(root=repository)
+        sink.owner = SimpleNamespace(path=Path("/finite/owner"))
+        sink.lua_build = Path("/finite/lua")
+        sink.credentials = ("identity", Path("/finite/keychain"))
+        sink.production_module = SimpleNamespace(
+            ProductBuildRefusal=RuntimeError, _package_live=package
+        )
+        # Authenticate the real metadata before replacing the source issuer with
+        # a finite model. The existing detached-claim refusal stays independent.
+        BUILD.validate_current_owned_record(record)
+        with patch.object(BUILD, "_source_factory", return_value=factory):
+            sink.export_signed(
+                record,
+                inputs,
+                image,
+                directories,
+                files,
+                b"leaf",
+                "identity",
+                claim,
+                time.monotonic() + 10,
+            )
+        if refuse_source:
+            self.assertEqual(sink.packaged.code, "source_identity")
+            self.assertNotIn("package", events)
+        else:
+            self.assertEqual(sink.packaged, "finite package boundary only")
+            self.assertIn("package", events)
+            self.assertGreater(events.count("source"), 1)
+
+    def test_live_vhd_report_and_sdk_routes_keep_original_claim_scope(self):
+        for sdk in (False, True):
+            with self.subTest(sdk=sdk):
+                self.report_package_route(sdk=sdk)
+
+    def test_retired_source_never_reaches_either_report_package_route(self):
+        for sdk in (False, True):
+            with self.subTest(sdk=sdk):
+                self.report_package_route(sdk=sdk, refuse_source=True)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(SDKRouteControls)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     print("SDK portable route controls", result.testsRun, "native/signing/packaging unqualified")
     raise SystemExit(
-        0 if result.wasSuccessful() and result.testsRun == 12 and not result.skipped else 1
+        0 if result.wasSuccessful() and result.testsRun == 14 and not result.skipped else 1
     )

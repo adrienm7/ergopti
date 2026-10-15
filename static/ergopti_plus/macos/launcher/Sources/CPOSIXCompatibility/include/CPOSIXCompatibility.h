@@ -27,4 +27,5 @@ int ergopti_process_exit_monitor_read(
 	int *error_code
 );
 
+#include "OwnedVHDReportSocketIdentity.h"
 #endif
