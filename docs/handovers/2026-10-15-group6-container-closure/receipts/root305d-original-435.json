@@ -1,0 +1,129 @@
+{
+	"source": "305d88ae1e311c5ec68cf97759f7a458913b8e19",
+	"command": "tools/rtk/rtk.sh npm run test:js",
+	"outer_exit": 1,
+	"mode": "actual default Root JS union, no --full",
+	"versions": {
+		"node": "22.22.2",
+		"CPython": "3.12.14",
+		"PowerShell": "7.4.11",
+		"Ruby": "3.3.8",
+		"RTK": "0.43.0"
+	},
+	"inventory": {
+		"type": "suite",
+		"schema_version": 1,
+		"suite": "js",
+		"mode": "default",
+		"feature": null,
+		"inventory_sha256": "b0d71426916eaaad4fc613d17658cd2620e5ded7093c7b803a0c488980faed33",
+		"planned_count": 435,
+		"platform": "linux",
+		"architecture": "x64",
+		"node_version": "v22.22.2",
+		"ci_source_sha": null,
+		"ci_run_id": null,
+		"ci_run_attempt": null
+	},
+	"outcome": {
+		"type": "complete",
+		"executed_count": 435,
+		"passed": 433,
+		"failed": 2,
+		"child_duration_ms": 457045.482,
+		"duration_ms": 457130.255
+	},
+	"selected_commands_skipped": 0,
+	"internal_platform_skips": "not numerically aggregated by original runner; no native credit inferred",
+	"failed": [
+		{
+			"type": "result",
+			"ordinal": 333,
+			"check_id": "js-0320",
+			"global_ordinal": 333,
+			"name": "managed Ollama portable admission and operation retirement",
+			"reproduce": "node tools/test/test-managed-ollama-protocol.cjs",
+			"status": "FAIL",
+			"exit_code": 1,
+			"signal": null,
+			"error_code": null,
+			"duration_ms": 34778.562
+		},
+		{
+			"type": "result",
+			"ordinal": 430,
+			"check_id": "js-0414",
+			"global_ordinal": 430,
+			"name": "tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only \u2014 ratchet against a growing false green)",
+			"reproduce": "node tools/test/find-false-greens.cjs",
+			"status": "FAIL",
+			"exit_code": 1,
+			"signal": null,
+			"error_code": null,
+			"duration_ms": 1799.613
+		}
+	],
+	"failure_diagnosis": {
+		"js-0320": {
+			"kind": "candidate enrollment gap",
+			"expected_receiver_tests": 172,
+			"actual_receiver_tests": 176,
+			"child_python_status": 0,
+			"child_python_result": "OK",
+			"added_class": "NativeKeychainRestorationStageTests",
+			"added_methods": [
+				"test85OriginalKeychainFailuresKeepRefusalAndDistinctStages",
+				"test86OriginalSuccessfulKeychainClosureHasNoDiagnosticOrExtraCommand",
+				"test87UnknownStageNeverLeaksOrChangesTheOriginalCommandFact",
+				"test88FailedDiagnosticSinkCannotPayOriginalKeychainDebt"
+			],
+			"correction": "coordinate third owning guard count with exact original172 plus4new; no change applied"
+		},
+		"js-0414": {
+			"kind": "23 findings in unchanged Root Windows fixture; baseline execution not independently rerun",
+			"path": "static/ergopti_plus/windows/tests/meta/test_config_full_save_generation_guard.ahk",
+			"lines": "477-499",
+			"owner": "_CFGFM_PendingSnapshotScript",
+			"category": "dead-test",
+			"other_categories": 0,
+			"ratchet_updated": false,
+			"candidate_paths_flagged": false
+		}
+	},
+	"complete_source_and_mode_fence_equal": true,
+	"tracked_inputs": 10305,
+	"five_exact_sealed_postimages": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWPADWireTests.swift",
+			"sha256": "909f07da8c95c660e09a0ea341265a6c7510929d3a9fb0ce3f6ad90fd5ae0d85"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py",
+			"sha256": "9cba433377ef892cc993129970509da5f96381c4c36376b028c66c3fe4f707ec"
+		},
+		{
+			"path": "tools/test/macos_native_http_receiving_facts_test.py",
+			"sha256": "2fd9fe16ade62b4eacb8c9167a92082c0ecccceeb7cfca5ea4fe995819f64887"
+		},
+		{
+			"path": "tools/test/test-macos-native-pac-qualification.cjs",
+			"sha256": "3004620784e1caad4efe01964a4aa0d2386e8d94af78d33d1865173f2674dfb3"
+		},
+		{
+			"path": "tools/test/test-swift-xctest-evidence.cjs",
+			"sha256": "4e0da1a174827df7da4f69dce6ae78fc3cd9a2c9bd73a158fa4f45a4be8a162f"
+		}
+	],
+	"retries": 0,
+	"canonical_mutated": false,
+	"sealed_packets_modified": false,
+	"new_ci_jobs_or_roles": false,
+	"source_adoption": "UNRUN",
+	"Swift_compiler": "UNRUN",
+	"native_Darwin14": "UNRUN",
+	"Worker12_native": "UNRUN",
+	"real_Brew_PAC_trust_account_network_experiment": "UNRUN",
+	"property_mutation_slow_flag": "UNRUN",
+	"original_receipt_sha256": "29a8d42db963577caf8ff9f76246fbbf3d5441be9e5cfacbe8fa114da97f4e3d",
+	"subsequent_correction": "The six-path capsule contains the corrected complete protocol owner176PASS and the independent byte-identical Root305d scanner baseline; whole435 was not rerun."
+}

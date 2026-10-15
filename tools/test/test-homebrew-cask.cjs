@@ -159,6 +159,34 @@ check(
 	}
 );
 
+check('running-app detection treats the application bundle name literally', () => {
+	for (const tag of ['v1.2.3', 'v0.0.0-dev.142']) {
+		for (const archive of require(
+			path.join(ROOT, 'tools/build/macos-release-publication.cjs')
+		).bindings()) {
+			const cask = Cask.renderCask(tag, SHA, archive.name);
+			const match = cask.text.match(
+				/system_command\("\/usr\/bin\/pgrep", args: \["-f", ("[^"\n]*")\]/
+			);
+			assert.ok(match, 'The actual generated pgrep argument is present');
+			// These literals and character classes have the same meaning in pgrep's ERE.
+			const running = new RegExp(JSON.parse(match[1]));
+			for (const command of [
+				'/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus',
+				'/Volumes/Owned/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon'
+			])
+				assert.equal(running.test(command), true, 'An actual app requests relaunch');
+			for (const command of [
+				'/Applications/ErgoptiPlusXapp/Contents/MacOS/Foreign',
+				'/Applications/ErgoptiPlus-app/Contents/MacOS/Foreign',
+				'/Applications/ErgoptiPlusZapp/Contents/MacOS/Foreign',
+				'/Applications/ErgoptiPlus.app.backup/Contents/MacOS/Foreign'
+			])
+				assert.equal(running.test(command), false, 'A foreign app cannot request relaunch');
+		}
+	}
+});
+
 check('bundle names match build_macos_app.sh', () => {
 	assert.ok(BUILD_SCRIPT.includes(`BUNDLE_ID="${Cask.BUNDLE_ID}"`));
 	assert.ok(BUILD_SCRIPT.includes(`APP_PATH="$BUILD_DIR/${Cask.APP_NAME}"`));

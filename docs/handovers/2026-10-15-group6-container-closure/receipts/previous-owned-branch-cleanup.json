@@ -1,0 +1,59 @@
+{
+	"created_utc": "2026-10-12T06:40:49.168010+00:00",
+	"canonical_retained": "feat/release-network",
+	"canonical_sha": "9afde08df5408dcca32a69dd148b963f46547ce3",
+	"deleted": [
+		{
+			"branch": "codex/ci-release-network",
+			"sha": "12fb210c447aa0c05a924b8b17117287f1d5b56f",
+			"remote_deleted": true,
+			"integrated_dev": "9ad6fd159568edd11fba3a6baa0578cb2391421c",
+			"preserved_in_canonical": true,
+			"open_PRs": 0,
+			"active_CI": 0,
+			"ownership": "Group6 legacy release-network CI namespace; primary owned branch documented in group6 recovery"
+		},
+		{
+			"branch": "codex/ci-release-network-baseline",
+			"sha": "689d30293704093feab2e3caa077604e88560eb6",
+			"remote_deleted": true,
+			"integrated_dev": "9ad6fd159568edd11fba3a6baa0578cb2391421c",
+			"preserved_in_canonical": true,
+			"open_PRs": 0,
+			"active_CI": 0,
+			"ownership": "Group6 legacy release-network CI namespace; primary owned branch documented in group6 recovery"
+		},
+		{
+			"branch": "codex/ci-release-network-dev-20261007",
+			"sha": "ebe0a241f44e7d54930e3071299fce49c3f1a43b",
+			"remote_deleted": true,
+			"integrated_dev": "9ad6fd159568edd11fba3a6baa0578cb2391421c",
+			"preserved_in_canonical": true,
+			"open_PRs": 0,
+			"active_CI": 0,
+			"ownership": "Group6 legacy release-network CI namespace; primary owned branch documented in group6 recovery"
+		},
+		{
+			"branch": "work",
+			"sha": "2a8864ae33b3f7ab51fcf8978038c427c5a17104",
+			"local_deleted": true,
+			"integrated_main": "63cf3d005d371edb4e4093a906da276ced487182",
+			"registered_worktrees": 0,
+			"open_PRs": 0,
+			"remote_branch_absent": true,
+			"ownership": "Own cloud checkout bootstrap ref, current sole worktree now on canonical Group6 branch"
+		}
+	],
+	"protected_untouched": [
+		"main",
+		"dev",
+		"sparkle-appcasts",
+		"gh-pages",
+		"codex/ci-test-performance-20261012",
+		"codex/cloud-native-qualification-20261007",
+		"codex/ci-validation"
+	],
+	"other_group_branches_untouched": true,
+	"workflow_stopped_or_modified": false,
+	"worktree_and_index_changes": ""
+}

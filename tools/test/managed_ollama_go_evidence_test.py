@@ -5,6 +5,8 @@ import ast
 import importlib.util
 import json
 import os
+import re
+import stat
 import signal
 import subprocess
 import sys
@@ -599,6 +601,196 @@ def signal_control_caller(root, mode):
 SIGNAL_CONTROL_OWNER = []
 
 
+SIGNAL_FAILURE_EXCEPTIONS = frozenset(
+    (
+        "AssertionError",
+        "BrokenPipeError",
+        "FileNotFoundError",
+        "KeyboardInterrupt",
+        "NativeGoCancelled",
+        "NativeGoRetirementDebt",
+        "OSError",
+        "PermissionError",
+        "ProcessLookupError",
+        "RuntimeError",
+        "SystemExit",
+        "TimeoutExpired",
+        "TypeError",
+        "ValueError",
+    )
+)
+
+
+def owned_signal_failure_diagnostic(root, original_stderr):
+    """Project bounded existing bytes from the exact owned capture, never text."""
+    prefix = "OWNED_SIGNAL_CALLER"
+    try:
+        expected = os.fstat(original_stderr.fileno())
+        nonblocking = getattr(os, "O_NONBLOCK", None)
+        nofollow = getattr(os, "O_NOFOLLOW", None)
+        if (
+            not isinstance(nonblocking, int)
+            or nonblocking == 0
+            or not isinstance(nofollow, int)
+            or nofollow == 0
+        ):
+            return prefix + " stderr=capability_refused"
+        descriptor = os.open(root / "caller.stderr", os.O_RDONLY | nonblocking | nofollow)
+    except (OSError, ValueError):
+        return prefix + " stderr=read_refused"
+    outcome = "identity_refused"
+    close_refused = False
+    try:
+        observed = os.fstat(descriptor)
+        if stat.S_ISREG(observed.st_mode) and (observed.st_dev, observed.st_ino) == (
+            expected.st_dev,
+            expected.st_ino,
+        ):
+            data = os.read(descriptor, 8193)
+            outcome = None
+    except (OSError, ValueError):
+        outcome = "read_refused"
+    finally:
+        try:
+            os.close(descriptor)
+        except OSError:
+            close_refused = True
+    if close_refused:
+        return prefix + " stderr=close_refused"
+    if outcome is not None:
+        return prefix + " stderr=" + outcome
+    if len(data) > 8192:
+        return prefix + " stderr=oversized"
+    try:
+        text = data.decode("utf-8", "strict")
+    except UnicodeError:
+        return prefix + " stderr=encoding_refused"
+    lines = text.splitlines()
+    category = "unknown"
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        candidate = line.partition(":")[0]
+        if candidate in SIGNAL_FAILURE_EXCEPTIONS:
+            category = candidate
+        break
+    frame, number = "unknown", 0
+    allowed = {
+        "managed_ollama_go_evidence_test.py": "control",
+        "build-macos-managed-ollama.py": "producer",
+        "macos_owned_process.py": "owned_port",
+        "subprocess.py": "subprocess",
+    }
+    for line in lines:
+        matched = re.fullmatch(
+            r'  File "([^"\n]+)", line ([1-9][0-9]{0,5})(?:, in [A-Za-z_][A-Za-z0-9_]*)?', line
+        )
+        if matched:
+            token = allowed.get(Path(matched.group(1)).name)
+            if token is not None:
+                frame, number = token, int(matched.group(2))
+    return f"{prefix} stderr=received bytes={len(data)} exception={category} frame={frame} line={number}"
+
+
+def annotate_owned_signal_failure(error, root, original_stderr, secondary=None):
+    """Optional closed diagnostics cannot replace the exact original error."""
+    try:
+        note = owned_signal_failure_diagnostic(root, original_stderr)
+        if secondary is not None:
+            kind = type(secondary).__name__
+            note += " cleanup=" + (kind if kind in SIGNAL_FAILURE_EXCEPTIONS else "unknown")
+        if callable(getattr(error, "add_note", None)):
+            error.add_note(note)
+        else:
+            sys.stderr.write(note + "\n")
+    except BaseException:
+        # Original assertion and original cleanup remain authoritative.
+        pass
+
+
+def receive_owned_signal_failure_diagnostic_controls(test):
+    """Keep the actual failure formatter exercised even when the child passes."""
+    with tempfile.TemporaryDirectory(prefix="signal-diagnostic-controls-") as temporary:
+        root = Path(temporary)
+        path = root / "caller.stderr"
+        with path.open("wb") as original_stderr:
+            payload = b'  File "/private/SECRET/macOS/macos_owned_process.py", line 37, in settle\nRuntimeError: PRIVATE_VALUE\n'
+            original_stderr.write(payload)
+            original_stderr.flush()
+            fact = owned_signal_failure_diagnostic(root, original_stderr)
+            test.assertEqual(
+                fact,
+                f"OWNED_SIGNAL_CALLER stderr=received bytes={len(payload)} exception=RuntimeError frame=owned_port line=37",
+            )
+            test.assertNotIn("PRIVATE_VALUE", fact)
+            test.assertNotIn("SECRET", fact)
+            primary = AssertionError("primary")
+            secondary = AssertionError("secondary")
+            annotate_owned_signal_failure(primary, root, original_stderr, secondary)
+            if hasattr(primary, "__notes__"):
+                test.assertEqual(primary.__notes__, [fact + " cleanup=AssertionError"])
+            test.assertEqual(primary.args, ("primary",))
+        for data, expected in (
+            (b"ForeignException: PRIVATE_VALUE\n", "exception=unknown frame=unknown line=0"),
+            (b"\xff", "stderr=encoding_refused"),
+            (b"x" * 8193, "stderr=oversized"),
+        ):
+            with path.open("wb") as original_stderr:
+                original_stderr.write(data)
+                original_stderr.flush()
+                fact = owned_signal_failure_diagnostic(root, original_stderr)
+                test.assertIn(expected, fact)
+                test.assertNotIn("PRIVATE_VALUE", fact)
+        with path.open("wb") as original_stderr:
+            path.rename(root / "original.stderr")
+            path.write_bytes(b"RuntimeError: FOREIGN_PRIVATE_VALUE\n")
+            test.assertEqual(
+                owned_signal_failure_diagnostic(root, original_stderr),
+                "OWNED_SIGNAL_CALLER stderr=identity_refused",
+            )
+            path.unlink()
+            path.symlink_to(root / "original.stderr")
+            test.assertEqual(
+                owned_signal_failure_diagnostic(root, original_stderr),
+                "OWNED_SIGNAL_CALLER stderr=read_refused",
+            )
+            path.unlink()
+            os.mkfifo(path)
+            test.assertEqual(
+                owned_signal_failure_diagnostic(root, original_stderr),
+                "OWNED_SIGNAL_CALLER stderr=identity_refused",
+            )
+        test.assertEqual(
+            owned_signal_failure_diagnostic(root, original_stderr),
+            "OWNED_SIGNAL_CALLER stderr=read_refused",
+        )
+
+        path.unlink()
+        with path.open("wb") as original_stderr:
+            actual_close = os.close
+            closes = []
+
+            def refused_close(descriptor):
+                closes.append(descriptor)
+                actual_close(descriptor)
+                raise OSError("controlled close refusal after physical close")
+
+            with unittest.mock.patch.object(os, "close", side_effect=refused_close):
+                test.assertEqual(
+                    owned_signal_failure_diagnostic(root, original_stderr),
+                    "OWNED_SIGNAL_CALLER stderr=close_refused",
+                )
+            test.assertEqual(len(closes), 1)
+
+        class RefusedNote(AssertionError):
+            def add_note(self, note):
+                raise RuntimeError("controlled diagnostic sink refusal")
+
+        primary = RefusedNote("primary")
+        annotate_owned_signal_failure(primary, root, original_stderr)
+        test.assertEqual(primary.args, ("primary",))
+
+
 class NativeGoSignalOwnershipTests(unittest.TestCase):
     def run_control(self, signum, mode="normal", repeated=False):
         with tempfile.TemporaryDirectory(prefix="managed-go-signal-") as temporary:
@@ -627,6 +819,7 @@ class NativeGoSignalOwnershipTests(unittest.TestCase):
                     stdout=subprocess.DEVNULL,
                     stderr=errors,
                 )
+                primary = None
                 try:
                     deadline = time.monotonic() + 5
                     marker = root / ("result.json" if mode in ("before", "acquisition") else "pid")
@@ -658,10 +851,23 @@ class NativeGoSignalOwnershipTests(unittest.TestCase):
                         self.assertEqual(fact["outcome"], "NativeGoCancelled")
                         self.assertFalse(fact["child_alive"])
                         self.assertEqual(fact["settled"], mode != "before")
+                except BaseException as error:
+                    primary = error
+                    raise
                 finally:
-                    (root / "rescue").touch()
-                    process.wait(timeout=5)
-                    self.assertEqual(process.returncode, 0)
+                    try:
+                        (root / "rescue").touch()
+                        process.wait(timeout=5)
+                        self.assertEqual(process.returncode, 0)
+                    except BaseException as cleanup_error:
+                        if primary is not None:
+                            annotate_owned_signal_failure(primary, root, errors, cleanup_error)
+                            raise primary from cleanup_error
+                        annotate_owned_signal_failure(cleanup_error, root, errors)
+                        raise
+                    else:
+                        if primary is not None:
+                            annotate_owned_signal_failure(primary, root, errors)
 
     def testActualSigintSettlesAndRestoresHandlers(self):
         self.run_control(signal.SIGINT)
@@ -677,6 +883,7 @@ class NativeGoSignalOwnershipTests(unittest.TestCase):
 
     def testRepeatedSignalsCannotInterruptPhysicalRetirement(self):
         self.run_control(signal.SIGTERM, repeated=True)
+        receive_owned_signal_failure_diagnostic_controls(self)
 
     def testRefusedRetirementPreservesDebtWithoutProof(self):
         self.run_control(signal.SIGTERM, "refuse")
