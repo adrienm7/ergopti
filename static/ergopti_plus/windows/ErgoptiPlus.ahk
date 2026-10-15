@@ -1433,6 +1433,7 @@ if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+HealthCheck_StartWindowControl()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()

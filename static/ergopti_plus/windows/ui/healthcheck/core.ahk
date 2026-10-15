@@ -36,6 +36,164 @@ global _HealthCheckStartMs   := A_TickCount
 global _HealthCheckLastError := ""
 global _HealthCheckWarnCount := 0
 global _HealthCheckErrCount  := 0
+global _HealthCheckWindowControl := 0
+
+/** Returns the session-local Win32 message for opening the diagnostics window. */
+HealthCheck_ControlMessage() {
+	static Message := DllCall("User32\RegisterWindowMessageW",
+		"Str", "Ergopti.Diagnostics.Open.v1", "UInt")
+	if !Message
+		throw OSError(A_LastError, -1, "The diagnostics control message could not be registered.")
+	return Message
+}
+
+/** Returns this process lifetime independently of any caller-owned window handle. */
+HealthCheck_ControlCreationTime() {
+	Times := Buffer(32, 0)
+	if !DllCall("Kernel32\GetProcessTimes", "Ptr", DllCall("Kernel32\GetCurrentProcess", "Ptr"),
+			"Ptr", Times, "Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int")
+		throw OSError(A_LastError, -1, "The diagnostics control process lifetime could not be read.")
+	return NumGet(Times, 0, "UInt64")
+}
+
+/** Owns one listener and its coalesced deferred window request. */
+class HealthCheckWindowControl {
+	__New(MessageFn, ListenFn, TimerFn, ShowFn, ReadyFn, HostWindow, OwnerPid, OwnerCreation) {
+		for Fn in [MessageFn, ListenFn, TimerFn, ShowFn, ReadyFn]
+			if !HasMethod(Fn, "Call")
+				throw TypeError("Diagnostics control requires callable collaborators.")
+		if !(HostWindow is Integer) || HostWindow <= 0
+			throw ValueError("Diagnostics control requires its exact host window.")
+		if !(OwnerPid is Integer) || OwnerPid <= 0 || !(OwnerCreation is Integer) || OwnerCreation <= 0
+			throw ValueError("Diagnostics control requires its own process lifetime.")
+		this.OwnerPid := OwnerPid, this.OwnerCreation := OwnerCreation
+		this.MessageFn := MessageFn, this.ListenFn := ListenFn, this.TimerFn := TimerFn
+		this.ShowFn := ShowFn, this.ReadyFn := ReadyFn, this.HostWindow := HostWindow
+		this.Message := 0, this.Started := false, this.Active := false
+		this.Closed := false, this.Listening := false, this.Pending := false, this.Opening := false
+		this.Listener := ObjBindMethod(this, "OnMessage")
+		this.Callback := ObjBindMethod(this, "Open")
+	}
+
+	/** Publishes the listener only after native registration returns. */
+	Start() {
+		if this.Started || this.Closed
+			throw Error("Diagnostics control cannot be initialized twice or after retirement.")
+		this.Started := true
+		Message := this.MessageFn.Call()
+		if this.Closed
+			throw Error("Diagnostics control was withdrawn during message resolution.")
+		if !(Message is Integer) || Message < 0xC000 || Message > 0xFFFF
+			throw ValueError("Diagnostics control returned an invalid registered message.")
+		this.Message := Message, this.Listening := true
+		this.ListenFn.Call(Message, this.Listener, 1)
+		if this.Closed
+			throw Error("Diagnostics control was withdrawn during registration.")
+		this.Active := true
+	}
+
+	/** Invalidates callbacks before attempting both native retirement boundaries. */
+	Stop() {
+		this.Active := false, this.Closed := true
+		Failure := 0
+		if this.Pending {
+			try {
+				this.TimerFn.Call(this.Callback, 0)
+				this.Pending := false
+			} catch as Err
+				Failure := Err
+		}
+		if this.Listening {
+			try {
+				this.ListenFn.Call(this.Message, this.Listener, 0)
+				this.Listening := false
+			} catch as Err {
+				if IsObject(Failure)
+					Failure.ListenerRetirementError := Err
+				else
+					Failure := Err
+			}
+		}
+		if IsObject(Failure)
+			throw Failure
+	}
+
+	/** Acknowledges a queued request; it never runs WebView2 inside SendMessage. */
+	OnMessage(wParam, lParam, Message, Window) {
+		if !this.Active || Window != this.HostWindow || Message != this.Message
+				|| wParam != this.OwnerPid || lParam != this.OwnerCreation
+			return 0
+		if !this.ReadyFn.Call() || !this.Active
+			return 0
+		if this.Pending || this.Opening
+			return 1
+		this.Pending := true
+		try this.TimerFn.Call(this.Callback, -1)
+		catch as Err {
+			; A throwing timer may already have acquired the callback.
+			this.Active := false
+			LoggerError("DiagnosticsControl", "Window request scheduling failed; callback retirement remains owned: {1}.", Err.Message)
+			return 0
+		}
+		return this.Active ? 1 : 0
+	}
+
+	/** Opens only while the same listener still owns this deferred request. */
+	Open() {
+		if !this.Active || !this.Pending
+			return false
+		this.Pending := false
+		if !this.ReadyFn.Call() || !this.Active
+			return false
+		this.Opening := true
+		try {
+			this.ShowFn.Call()
+			return true
+		} finally {
+			this.Opening := false
+		}
+	}
+}
+
+/** Activates the read-only control endpoint after the actual driver is ready. */
+HealthCheck_StartWindowControl() {
+	global _HealthCheckWindowControl
+	if IsObject(_HealthCheckWindowControl)
+		throw Error("The diagnostics window control already has an owner.")
+	LoggerStart("DiagnosticsControl", "Registering the diagnostics window control…")
+	try {
+		Control := HealthCheckWindowControl(HealthCheck_ControlMessage,
+			(Message, Callback, Threads) => OnMessage(Message, Callback, Threads),
+			(Callback, Period) => SetTimer(Callback, Period), HealthCheck_ShowWindow,
+			_HealthCheck_WindowControlReady, A_ScriptHwnd, ProcessExist(), HealthCheck_ControlCreationTime())
+		_HealthCheckWindowControl := Control
+		Control.Start()
+	}
+	catch as FirstError {
+		try HealthCheck_StopWindowControl()
+		catch as CleanupError
+			FirstError.ControlRetirementError := CleanupError
+		LoggerError("DiagnosticsControl", "Window control registration failed: {1}.", FirstError.Message)
+		throw FirstError
+	}
+	LoggerSuccess("DiagnosticsControl", "Diagnostics window control registered.")
+}
+
+/** Retires the listener without relinquishing a callback whose cancellation failed. */
+HealthCheck_StopWindowControl() {
+	global _HealthCheckWindowControl
+	if !IsObject(_HealthCheckWindowControl)
+		return
+	_HealthCheckWindowControl.Stop()
+	_HealthCheckWindowControl := 0
+	LoggerInfo("DiagnosticsControl", "Diagnostics window control retired.")
+}
+
+_HealthCheck_WindowControlReady() {
+	global _DriverReady, _DriverBootPhase, _DriverIsDetachedWorker
+	return IsSet(_DriverReady) && _DriverReady && IsSet(_DriverBootPhase)
+		&& _DriverBootPhase == "ready" && IsSet(_DriverIsDetachedWorker) && !_DriverIsDetachedWorker
+}
 
 
 
