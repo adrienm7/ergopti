@@ -363,7 +363,7 @@ local function prompt_action_parameter(gestures, binding, action, spec, picked, 
 		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
-			if spec == "program" then
+			if spec == "program" or mutation ~= nil or transaction ~= nil then
 				return M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
 			end
 			return apply_prompt_update(gestures.set_action_parameter,

@@ -13415,6 +13415,17 @@ and installation qualification are still required.
   success does not prove invocation, atomic locking or every consumer. Apple
   Shortcuts remains a read-only observer with unresolved bounded discovery/invocation.
 
+  macOS now publishes every parameterized menu selection through the existing
+  retained parameter/assignment transaction across gestures, keyboard, tap
+  keys and script chords. Assignment/save/native-release refusal restores the
+  complete original source and runtime; script confirmation no longer assigns
+  twice. The generic API refuses physical bindings and keys before admission,
+  retaining their separate publication owner. All 100 original controlled
+  cases remain: original plus regressions 111/44, final 164/0; withdrawing the
+  physical guard gives 1/8 and restoration 9/0. Disposable-file Writer tests
+  cover real source compensation with explicit native/advisory doubles.
+  Complete final-source and actual macOS qualification remain required.
+
   The read-only JXA diagnostic attempts a fixed same-process preflight with
   the SDK-owned Apple-event descriptor and Shortcuts read event with
   prompting disabled. It starts no target and executes no shortcut. Optional
