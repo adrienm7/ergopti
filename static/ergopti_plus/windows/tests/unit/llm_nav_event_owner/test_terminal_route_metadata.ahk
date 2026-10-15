@@ -177,12 +177,24 @@ _LNTR_MarshalCase() {
 
 _LNTR_RefusalCase() {
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteUnknown
-	State := _LNTR_PortState()
+	State := _LNTR_PortState(), KnownFailure := 0
 	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
 	State.Status := -11
 	AssertEqual(false, LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
 	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count, "busy candidates are not published")
+	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+	; A known refusal must reach its registration port before unknown custody
+	; intentionally blocks every successor until the fixture acknowledges Stop.
+	State.Status := -5
+	Calls := State.Calls.Length
+	AssertThrows(CaptureKnownFailure, "invalid native registrations stay errors")
+	AssertEqual(Calls + 1, State.Calls.Length, "The known refusal reaches its actual registration callback.")
+	AssertTrue(IsObject(KnownFailure) && KnownFailure.HasOwnProp("NativeStatus"),
+		"An unrelated admission failure cannot stand in for the known native refusal.")
+	AssertEqual(-5, KnownFailure.NativeStatus)
+	AssertEqual(0, KnownFailure.NativeErrorCode)
+	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
 	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
 	State.Status := "0"
 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "a string ACK cannot certify native publication")
@@ -190,13 +202,14 @@ _LNTR_RefusalCase() {
 	Calls := State.Calls.Length
 	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "Unknown custody prevents another registration.")
 	AssertEqual(Calls, State.Calls.Length, "The retry never reaches a successor/native callback.")
-	; Isolate the following original known-error vector after this explicit mock
-	; boundary. This is not a production settlement/reset mechanism.
-	_LLM_NavEventOwnerTerminalRouteUnknown := 0
-	State.Status := -5
-	AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "invalid native registrations stay errors")
-	AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
-	AssertEqual(1, LLM_NavEventOwner_TerminalRouteCoverage()["generation"])
+
+	CaptureKnownFailure() {
+		try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+		catch as Err {
+			KnownFailure := Err
+			throw Err
+		}
+	}
 }
 
 _LNTR_RetainedRecipeCase() {
@@ -1561,3 +1574,13 @@ if _LNTR_NativeRetirementChildKind == "positive" {
 		Test("terminal-native-retirement: authority refusal in distinct child " . CaseName,
 			_LNTR_ReceiveActualChild.Bind(CaseName))
 }
+
+; Repeat the original failing adjacency in one process. Public globals alone
+; cannot prove that the original issuer retired its private retained frame.
+_LNTR_RefusalSuccessorCase() {
+	_LNTR_WithState(_LNTR_RefusalCase)
+	_LNTR_WithState(_LNTR_RetainedRecipeCase)
+}
+
+Test("terminal route metadata: acknowledged refusal cleanup admits the original successor (todo49-route-adapter)",
+	_LNTR_RefusalSuccessorCase)
