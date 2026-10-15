@@ -12820,6 +12820,14 @@ API and new-fixture write-return errors are preserved and corrected. See
 Other-owner completeness, native/source/modifier/output and physical joins remain
 open; no public delivery or native installation is enabled.
 
+Batched Linux CI 38721306107 on ebff35a8 records 13,799 unit passes
+and three failures; E2E/build/install are skipped. Its actual fixture order
+retained Navigation after replacing the shared Writer. The Manager fixture
+now reconstructs the genuine Nav dependency before its genuine Manager.
+All original assertions remain: both Lua ABIs give original-parent47/0,
+published44/3, corrected47/0, withdrawn44/3 and restored47/0. No production
+source guard is relaxed; final joined hosted receiving remains required.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
