@@ -165,8 +165,9 @@ The warmup correction is published normally on dev as7a61e3f211, preserving
 atomic history and main. Its clean-source official build succeeds with pinned
 AutoHotkey2.0.26:ErgoptiPlus-7a61e3f211.exe,11,083,264bytes, SHA256
 `83969dd2d47f8fd428ccaf4e9d58f124e29642d4ba7b2f6ac1b6bea24535c2ce`.
-Build stamps are restored and the source stays clean. The prior f1b test
-application remains active, so the new build is not started alongside it.
+Build stamps are restored and the source stays clean. The maintainer has now
+quit the prior f1b test application. The new build has not yet been started;
+the single-driver window is receiving the KLE registration prerequisite first.
 The earlier f1b Diagnostics archive remains verified; a new installed archive
 and actual corrected warmup are not yet received. Personal configuration and
 the unrelated UIA worker remain preserved.
@@ -180,6 +181,64 @@ and a checked dialer. The existing native wrapper replaces that transport;
 retaining only CheckRedirect would not preserve those connection checks. A
 reviewed source port must account for that veto before changing the shared
 runtime pins. Source acquisition is not compilation or native qualification.
+
+### October 15 KLE AltGr binding-source receiving
+
+The Windows prerequisite now retains the original AltGr callbacks at their
+original registration positions, independently of layout loading. Native source
+issuance requires the original functions, exact SC138/I2 declarations and the
+complete ordered physical inventory read from the retained original shared root.
+Injected ports retain their ordinary controlled behavior but never issue native
+custody. Observed function, callback, factory or registration withdrawal retires
+the source permanently. Captured Maps are detached metadata, not event or output
+authority. The original effectful body is lexically enclosed; its original lines
+remain after one nesting tab, with an additional explicit local Count declaration.
+
+Actual fresh Windows children return the original448 registration count, which
+includes48 Win-broker fallback declarations, and retain all49 genuine AltGr
+callbacks without loading a layout or emitting input. The matched original-body
+control returns the same448 count but fails on factory0, natural
+exit1; the corrected child passes1/1, natural exit0. Seventeen fresh refusal and
+lifetime controls also pass, each1/1 with natural exit0 and a complete manifest:
+prefix/level, truncated/reordered cache, retained root, injected restoration,
+partial native registration, model independence, public registration withdrawal,
+and Call/Bind withdrawal for the function, reader, callback and factory. Four new
+registered pure cases pass against the same private afterimages before applying
+them. The canonical composition then passes all four new pure cases,91 reset
+cases,10 layout cases,25 producer cases,802 terminal cases,8 warmup cases and70
+E2E cases. Each selection has a complete manifest, natural exit0 and no skips;
+these overlapping selections are not additive totals. Encoding1918, pinned
+source reads380/380, strict conventions, the full format check and whole-entry
+compilation pass. Compiler controls retain good0/bad17 separation. Actual
+single-driver startup also passes fresh/reloaded/independent, suspend-marker,
+extension opt-in, script-chord, retired-Metrics, neutral-default and older-release
+boots, reaching readiness without errors and with every expected script chord.
+The frozen complete JS command finishes naturally with exit1:411/425 PASS,
+14 FAIL, with source images, HEAD and tracked diff unchanged. Its failures retain
+the actual Linux-host/archive and sandbox requirements, Windows symlink and
+POSIX permission refusals, unsupported SDK filesystem controls, and the CI,
+Homebrew, ordered-cohort and managed-runtime fixture failures. No failed check
+is waived or converted to native success. The final build and installed
+receiving follow separately; this is not a globally green composition.
+
+The first candidate fails actual issuance because the enclosed body captures
+parent Prefix/Key locals, changing its retained closure identity between calls.
+Distinct owner locals fix the measured failure; both independent source reviews
+find no remaining overlap. Earlier failed receipts remain retained. Warning
+qualification compares source/detail multisets against the unchanged canonical
+dry-run:6631 existing warnings versus6630 on the final candidate, with no added
+warning. A set-only comparison missed two duplicate warnings and is not accepted
+as that proof. The initial retained-root fixture also fails because the separate
+Win broker needs its own physical registry; its successor supplies that unchanged
+registry while still withholding the KLE file, preserving the original assertion.
+
+This receives Windows registration metadata only. Actual winning-variant/event
+provenance, held modifier custody, authenticated foreground/HKL mapping, accepted
+output and the remaining cohort conversion are still software work. macOS and
+Linux use their own layout/input owners; this AHK-specific callback prerequisite
+changes neither sibling's typing policy and grants no native qualification.
+Physical Windows keyboard/hook-order/ISO/display acceptance remains OPEN; native
+macOS and Linux remain UNRUN. Existing complete unit and JS failures stay open.
 
 ### October 15 AHK direct-digit registration receiving
 

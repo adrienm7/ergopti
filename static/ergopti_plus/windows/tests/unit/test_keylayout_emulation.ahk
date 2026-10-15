@@ -1129,3 +1129,82 @@ for Mutation in ["cohort_replaced", "binding_replaced", "model", "layout", "stat
 }
 Test("KLE captured reset: original registration return convention (kle-reset-observer)",
 	_KLTR_WithObserver.Bind(_KLTR_ReturnConvention))
+
+
+; Genuine binding issuance is received separately on an idle Windows desktop.
+; These controlled registrations must never manufacture that native authority.
+_KAB_UnissuedSource() {
+	global KLE_Registered
+	AssertEqual(0, KeylayoutEmulation_AltGrBindingSource())
+	for ProbeSource in [0, Map("complete", true), {}, ((*) => 0).Bind()]
+		for ProbeScan in ["SC010", "SC002", "", 0, {}]
+			AssertEqual(0, KeylayoutEmulation_CaptureAltGrBinding(ProbeSource, ProbeScan),
+				"caller descriptions cannot issue original native binding custody")
+	ProbeSaved := KLE_Registered
+	try {
+		KLE_Registered := true
+		AssertEqual(0, KeylayoutEmulation_AltGrBindingSource(), "a public completion flag grants no source")
+	} finally KLE_Registered := ProbeSaved
+}
+
+_KAB_NoPublicIssuer() {
+	AssertFalse(IsSet(_KLE_RegisterBindings), "the effectful original body has no alternate public entry")
+	for ProbeRequest in ["issue", "ready", "reset", "complete", {}, 0]
+		AssertThrows(_KLE_AltGrBindingOwner.Bind(ProbeRequest))
+	AssertThrows(_KLE_AltGrBindingOwner.Bind("initialize"), "initialization has exactly one owner")
+	AssertEqual(0, KeylayoutEmulation_AltGrBindingSource())
+}
+
+_KAB_FreshRegistryRead() {
+	global _LayoutRegistryKeycodes
+	ProbeSaved := _LayoutRegistryKeycodes
+	try {
+		ProbeOriginal := _LayoutRegistryReadKeycodes()
+		AssertTrue(ProbeOriginal["keys"].Length > 1, "the real physical-key inventory must be nonempty")
+		_LayoutRegistryKeycodes := ProbeOriginal.Clone()
+		_LayoutRegistryKeycodes["keys"] := [ProbeOriginal["keys"][1]]
+		AssertEqual(1, LayoutRegistry_Keycodes()["keys"].Length,
+			"the legacy public cache still retains its original ordinary behavior")
+		ProbeFresh := _LayoutRegistryReadKeycodes()
+		AssertEqual(ProbeOriginal["keys"].Length, ProbeFresh["keys"].Length,
+			"native preflight reads the real file rather than trusting a replaced cache")
+		for ProbeIndex, ProbeKey in ProbeOriginal["keys"]
+			AssertEqual(ProbeKey["ahk"], ProbeFresh["keys"][ProbeIndex]["ahk"])
+	} finally _LayoutRegistryKeycodes := ProbeSaved
+}
+
+_KAB_InjectedRegistration() {
+	global KLE_Registered, KLE_DEAD_RESET_KEYS, _KLE_ResetObserverRegistering
+	global _KLE_ResetObserverCohort, _KLE_ResetObserverCapture, _KLE_ResetObserverGeneration
+	ProbeSaved := [KLE_Registered, _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort,
+		_KLE_ResetObserverCapture, _KLE_ResetObserverGeneration]
+	try {
+		KLE_Registered := false
+		_KLE_ResetObserverRegistering := 0
+		ProbeRows := [], ProbeContexts := []
+		ProbeTable := LayoutRegistry_Keycodes()
+		ProbeCount := KeylayoutEmulation_Register(ProbeTable,
+			(ProbeName, *) => (ProbeRows.Push(ProbeName), AssertEqual(0, KeylayoutEmulation_AltGrBindingSource())),
+			(ProbeArgs*) => ProbeContexts.Push(ProbeArgs.Length), 0,
+			(ProbeScan, *) => ProbeRows.Push("#" . ProbeScan))
+		ProbeExpected := ProbeTable["keys"].Length * 3 + (ProbeTable["keys"].Length - 1) * 6 + KLE_DEAD_RESET_KEYS.Length
+		AssertEqual(ProbeExpected, ProbeCount)
+		AssertEqual(ProbeExpected, ProbeRows.Length)
+		AssertEqual(0, ProbeContexts[ProbeContexts.Length], "the original process-wide criterion is released")
+		AssertEqual(0, KeylayoutEmulation_AltGrBindingSource(), "injected ports grant no native source")
+		AssertThrows(KeylayoutEmulation_Register.Bind(ProbeTable, (*) => 0, (*) => 0),
+			"the original duplicate-registration refusal remains effective")
+		KLE_Registered := false
+		KeylayoutEmulation_Register(ProbeTable, (*) => 0, (*) => 0, 0, (*) => 0)
+		AssertEqual(0, KeylayoutEmulation_AltGrBindingSource(), "restoring public state cannot revive issuance")
+	} finally {
+		KLE_Registered := ProbeSaved[1], _KLE_ResetObserverRegistering := ProbeSaved[2]
+		_KLE_ResetObserverCohort := ProbeSaved[3], _KLE_ResetObserverCapture := ProbeSaved[4]
+		_KLE_ResetObserverGeneration := ProbeSaved[5]
+	}
+}
+
+Test("kle-altgr-binding-source: unissued factories grant no binding custody", _KAB_UnissuedSource)
+Test("kle-altgr-binding-source: no public initialization or issuance bypass", _KAB_NoPublicIssuer)
+Test("kle-altgr-binding-source: canonical inventory ignores the public registry cache", _KAB_FreshRegistryRead)
+Test("kle-altgr-binding-source: controlled registration preserves legacy behavior without native issuance", _KAB_InjectedRegistration)
