@@ -38,6 +38,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const pipeline = require('./ci-full-default.cjs');
+const Mac = require('./fixtures/macos-stage-source.cjs');
 
 const root = path.resolve(__dirname, '..', '..');
 const WINDOWS_BOX = '.github/workflows/ci-windows.yml';
@@ -118,14 +119,29 @@ if (windowsUpload !== null && !/^\s+name:\s*assets-windows\s*$/m.test(windowsUpl
 	);
 }
 const packageWindows = pipeline.job(PACKAGE_JOB[WINDOWS_BOX]);
-if (!pipeline.needsOf(packageWindows).includes('test-ahk')) {
-	errors.push(
-		`${PACKAGE_JOB[WINDOWS_BOX]} must need test-ahk: independent suites must both pass before a release exe is built`
-	);
+if (JSON.stringify(pipeline.needsOf(packageWindows)) !== JSON.stringify(['e2e-ahk'])) {
+	errors.push(`${PACKAGE_JOB[WINDOWS_BOX]} must directly await its mandatory E2E predecessor`);
 }
-if (!pipeline.needsOf(packageWindows).includes('e2e-ahk')) {
+const windowsE2E = pipeline.job('e2e-ahk');
+if (
+	JSON.stringify(pipeline.needsOf(windowsE2E)) !== JSON.stringify(['test-ahk']) ||
+	!windowsE2E.includes('      ci_predecessors: ${{ toJSON(needs) }}') ||
+	!windowsE2E.includes('      ci_source_sha: ${{ github.sha }}') ||
+	!windowsE2E.includes('      ci_run_id: ${{ github.run_id }}') ||
+	!windowsE2E.includes('      ci_attempt: ${{ github.run_attempt }}')
+) {
+	errors.push('Windows E2E must retain the genuine source-bound Unit result');
+}
+const buildAdmission = pipeline.step(packageWindows, 'Admit genuine preceding scheduler results');
+if (
+	pipeline.runOf(buildAdmission)?.join('\n') !==
+		'node tools/ci/ci-stage-status.cjs admit-build windows' ||
+	!buildAdmission.includes('          NEEDS: ${{ toJSON(needs) }}') ||
+	pipeline.stepField(buildAdmission, 'if') !== null ||
+	pipeline.stepField(buildAdmission, 'continue-on-error') !== null
+) {
 	errors.push(
-		`${PACKAGE_JOB[WINDOWS_BOX]} must need e2e-ahk: a release exe is built only after the suites passed`
+		'Windows packaging must admit both genuine prior suite statuses before native builds'
 	);
 }
 const codeOf = (body) =>
@@ -1041,11 +1057,11 @@ function nativeSparkleFixtureProblems(steps, fixture) {
 		problems.push('The native Sparkle fixture needs exactly one installer before XCTest.');
 	if (install.length === 1) {
 		if (
-			pipeline.stepField(install[0].body, 'if') !== null ||
+			pipeline.stepField(install[0].body, 'if') !== Mac.condition('package-macos') ||
 			pipeline.stepField(install[0].body, 'continue-on-error') !== null
 		)
 			problems.push(
-				'The public native signing tool must be installed unconditionally and strictly.'
+				'The public native signing tool must be installed unconditionally after package admission and strictly.'
 			);
 		for (const token of [
 			"SPARKLE_VERSION: '2.9.2'",
@@ -1226,24 +1242,57 @@ if (
 // must run on every release: the smoke is the only macOS 26 launch, and a
 // skipped keylayout step drops Ergopti_macOS.zip without any upload error. The
 // startup evidence is kept even when the smoke fails, which is when it matters.
-for (const [name, condition] of [
+const MACOS_RELEASE_CONDITIONS = [
 	['Smoke test built ErgoptiPlus.app (crash-on-launch guard)', 'inputs.release'],
 	['Retain packaged application startup evidence', 'always() && inputs.release'],
 	['Install Sparkle signing tool', null],
 	['Sign declared archives with Sparkle EdDSA key', 'inputs.release'],
 	['Generate Sparkle appcast', 'inputs.release'],
 	['Package latest keylayout bundle', 'inputs.release']
-]) {
+];
+
+/** Preserves each intrinsic release condition inside genuine package stage admission. */
+function macosReleaseConditionProblems(name, body, condition) {
+	const problems = [];
+	const expected = Mac.condition('package-macos', condition);
+	const actual = pipeline.stepField(body, 'if');
+	if (actual !== expected)
+		problems.push(
+			`the macOS release step '${name}' must run exactly if: ${expected}, got: ${actual}`
+		);
+	if (pipeline.stepField(body, 'continue-on-error') !== null)
+		problems.push(`the macOS release step '${name}' must not set continue-on-error`);
+	return problems;
+}
+
+for (const [name, condition] of MACOS_RELEASE_CONDITIONS) {
 	const body = releaseStep(name, MACOS_BOX);
 	if (body === null) continue;
-	const actual = pipeline.stepField(body, 'if');
-	if (actual !== condition) {
-		errors.push(
-			`the macOS release step '${name}' must run exactly if: ${condition}, got: ${actual}`
-		);
+	errors.push(...macosReleaseConditionProblems(name, body, condition));
+}
+
+// Mutate the actual owned step: a sibling's conditional text supplies no credit.
+for (const [name, condition] of MACOS_RELEASE_CONDITIONS) {
+	const body = releaseStep(name, MACOS_BOX);
+	const guard = '        if: ' + Mac.condition('package-macos', condition) + '\n';
+	if (body === null || body.split(guard).length !== 2) {
+		errors.push(`The exact macOS release predicate control cannot locate ${name}`);
+		continue;
 	}
-	if (pipeline.stepField(body, 'continue-on-error') !== null) {
-		errors.push(`the macOS release step '${name}' must not set continue-on-error`);
+	const variants = [
+		['missing stage admission', condition === null ? '' : '        if: ' + condition + '\n'],
+		['disabled owner', '        if: false\n'],
+		['forgiven owner', guard + '        continue-on-error: true\n']
+	];
+	if (condition !== null)
+		variants.push([
+			'lost intrinsic release condition',
+			'        if: ' + Mac.condition('package-macos') + '\n'
+		]);
+	for (const [fault, replacement] of variants) {
+		const changed = body.replace(guard, replacement);
+		if (changed === body || macosReleaseConditionProblems(name, changed, condition).length === 0)
+			errors.push(`The macOS release predicate guard missed ${name}: ${fault}`);
 	}
 }
 
@@ -1701,6 +1750,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 {
 	const assert = require('node:assert/strict');
 	const ownerPipeline = require('./ci-full-default.cjs');
+	const Mac = require('./fixtures/macos-stage-source.cjs');
 	/** Require the consumed CI policy, separate source authority and installed evidence. */
 	function ciArchiveWorkflowProblems(text) {
 		const problems = [];
@@ -1732,7 +1782,7 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			problems.push('source_order');
 		const source = step(packageJob, 'Record signed CI archive source');
 		if (
-			ownerPipeline.stepField(source, 'if') !== null ||
+			ownerPipeline.stepField(source, 'if') !== Mac.condition('package-macos') ||
 			ownerPipeline.stepField(source, 'continue-on-error') !== null ||
 			!script(packageJob, 'Record signed CI archive source')
 				.replace(/\s+/g, ' ')
@@ -1822,7 +1872,22 @@ if (windowsSmokeStep !== null && windowsLaunchUpload !== null) {
 			expected
 		);
 	}
-	console.log(`CI installed-archive workflow cases: ${faults.length + 1}`);
+	const sourceJob = ownerPipeline.jobsOfText(workflow).filter((job) => job.id === 'package-macos');
+	assert.equal(sourceJob.length, 1);
+	const sourceOwner = ownerPipeline.step(sourceJob[0].body, 'Record signed CI archive source');
+	const sourceGuard = '        if: ' + Mac.condition('package-macos') + '\n';
+	assert.equal(sourceOwner.split(sourceGuard).length, 2);
+	for (const replacement of ['', '        if: false\n', '        if: always()\n']) {
+		const changed = workflow.replace(sourceOwner, () =>
+			sourceOwner.replace(sourceGuard, replacement)
+		);
+		assert.notEqual(changed, workflow, 'The exact source owner admission must change');
+		assert.ok(
+			ciArchiveWorkflowProblems(changed).includes('source_owner'),
+			'Missing/disabled/unfenced source owner admission must refuse'
+		);
+	}
+	console.log(`CI installed-archive workflow cases: ${faults.length + 4}`);
 }
 // CI_ARCHIVE_WORKFLOW_TESTS_END
 

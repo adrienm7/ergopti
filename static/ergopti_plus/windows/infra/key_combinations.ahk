@@ -65,6 +65,8 @@ global _KeyCombinationFirstKeys := Map()
 ; second key id -> true once that press was handled (its repeats follow).
 global _KeyCombinationTaken := Map()
 global _KeyCombinationHandled := Map()
+; A retained key press keeps its admitted slot owners and scalar assignments.
+global _KeyCombinationPressAssignments := Map()
 ; Tap-hold key id -> the name of its scan code ("SC03A"), and back: read once
 ; with the slots, so the criterion of the pair hotkeys only looks a key up.
 global _KeyCombinationScanNames := Map()
@@ -214,6 +216,9 @@ _KeyCombinationIndexFirstKeys(Taps, Holds) {
 ; The action a pair runs on a tap of its second key, or "none".
 KeyCombinationTapOf(PairId) {
 	global KeyCombinationTaps, KEY_COMBINATION_NONE
+	; Parse-time criteria can reach this accessor before its slot owners exist.
+	if !IsSet(KeyCombinationTaps) || !IsSet(KEY_COMBINATION_NONE)
+		return ""
 	return KeyCombinationTaps.Get(PairId, KEY_COMBINATION_NONE)
 }
 
@@ -332,10 +337,13 @@ KeyCombinationHeldFirstKey(Second, IsDownFn := 0) {
 ; @returns {Boolean}
 KeyCombinationOwns(Second, IsDownFn := 0) {
 	global _KeyCombinationFirstKeys, _KeyCombinationTaken, _KeyCombinationHandled
+	global _KeyCombinationPressAssignments, KeyCombinationTaps, KeyCombinationHolds
 	; A key no pair ends on costs one lookup, on every press of that key.
 	if !IsSet(_KeyCombinationFirstKeys) || !_KeyCombinationFirstKeys.Has(Second)
 		return false
 	if !IsSet(_KeyCombinationTaken) || !IsSet(_KeyCombinationHandled)
+		|| !IsSet(_KeyCombinationPressAssignments) || !IsSet(KeyCombinationTaps)
+		|| !IsSet(KeyCombinationHolds)
 		return false
 	if !IsObject(IsDownFn)
 		IsDownFn := _KeyCombinationKeyIsDown
@@ -346,13 +354,40 @@ KeyCombinationOwns(Second, IsDownFn := 0) {
 		_KeyCombinationTaken.Delete(Second)
 	if _KeyCombinationHandled.Has(Second)
 		_KeyCombinationHandled.Delete(Second)
+	if _KeyCombinationPressAssignments.Has(Second)
+		_KeyCombinationPressAssignments.Delete(Second)
 	if !KeyCombinationsAreOn()
 		return false
 	First := KeyCombinationHeldFirstKey(Second, IsDownFn)
 	if (First == "")
 		return false
+	PairId := KeyCombinationPairId(First, Second)
 	_KeyCombinationTaken[Second] := First
+	_KeyCombinationPressAssignments[Second] := { Taken: _KeyCombinationTaken, First: First,
+		Taps: KeyCombinationTaps, Holds: KeyCombinationHolds,
+		Tap: KeyCombinationTapOf(PairId), Hold: KeyCombinationHoldOf(PairId), Revoked: false }
 	return true
+}
+
+; Publication may replace a pair's slot while its original press remains held.
+; Keep that press suppressed, but never run the replacement assignment. An
+; observed withdrawal remains revoked until the next real key-down admission.
+_KeyCombinationPressAssignmentCurrent(Second) {
+	global _KeyCombinationPressAssignments, _KeyCombinationTaken
+	global KeyCombinationTaps, KeyCombinationHolds
+	if !IsSet(_KeyCombinationPressAssignments) || !_KeyCombinationPressAssignments.Has(Second)
+		return false
+	Record := _KeyCombinationPressAssignments[Second]
+	if Record.Revoked
+		return false
+	PairId := KeyCombinationPairId(Record.First, Second)
+	Current := Record.Taken == _KeyCombinationTaken && _KeyCombinationTaken.Has(Second)
+		&& _KeyCombinationTaken[Second] == Record.First
+		&& Record.Taps == KeyCombinationTaps && Record.Holds == KeyCombinationHolds
+		&& Record.Tap == KeyCombinationTapOf(PairId) && Record.Hold == KeyCombinationHoldOf(PairId)
+	if !Current
+		Record.Revoked := true
+	return Current
 }
 
 ; The production effects of the handler, replaced by recorders in the unit
@@ -380,7 +415,7 @@ KeyCombinationFire(Second, Ports := 0) {
 	if !_KeyCombinationTaken.Has(Second)
 		return ""
 	; Keep the acquired press suppressed; a disabled category grants no new effect.
-	if !KeyCombinationsAreOn()
+	if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 		return "swallowed"
 	First := _KeyCombinationTaken[Second]
 	PairId := KeyCombinationPairId(First, Second)
@@ -398,7 +433,7 @@ KeyCombinationFire(Second, Ports := 0) {
 	Ports["take_first"].Call(First, Second)
 	LoggerDebug("KeyCombinations", "Pair '{1}' fired (tap='{2}', hold='{3}').", PairId, Tap, Hold)
 	; First-key ownership and logging may yield to a category publication.
-	if !KeyCombinationsAreOn()
+	if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 		return "swallowed"
 	if (Hold == KEY_COMBINATION_NONE) {
 		if (Tap == KEY_COMBINATION_NONE)
@@ -409,7 +444,7 @@ KeyCombinationFire(Second, Ports := 0) {
 	Seconds := TapHoldDuration(TapHold, Second)
 	if _KeyCombinationHoldIsLayer(Hold) {
 		; Duration lookup may log before this original native acquisition.
-		if !KeyCombinationsAreOn()
+		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"
 		Result := Ports["own_layer"].Call(Second, Seconds)
 	} else {
@@ -419,7 +454,7 @@ KeyCombinationFire(Second, Ports := 0) {
 			return ""
 		}
 		; The real modifier resolver logs before returning its native key(s).
-		if !KeyCombinationsAreOn()
+		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"
 		Result := Ports["own_modifier"].Call(Second, ModKey, Seconds)
 	}
@@ -427,7 +462,7 @@ KeyCombinationFire(Second, Ports := 0) {
 	; it; a release inside the second key's threshold makes the press a tap.
 	if (Result["tap"] && Tap != KEY_COMBINATION_NONE) {
 		; The original owner has already retired; deny only a newly emitted tap.
-		if !KeyCombinationsAreOn()
+		if !KeyCombinationsAreOn() || !_KeyCombinationPressAssignmentCurrent(Second)
 			return "swallowed"
 		Ports["run_tap"].Call(First, Second, Tap)
 		return "tap"

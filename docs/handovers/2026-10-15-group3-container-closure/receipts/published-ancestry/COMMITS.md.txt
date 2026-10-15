@@ -1,0 +1,40 @@
+# Published Group3 atoms versus fixed Dev156
+
+Dev basis: `156e58d9ff0e1df337712cc48593343757d01034`. Published feature basis: `51eec199f573fe720b848aa9a1a973b84b1be0e9`. Actual Git ancestor checks only; no fetch or remote freshness inference.
+
+Integrated by ancestry: 0. Feature-only pending: 27.
+
+## Already integrated into Dev156
+
+
+## Published on feature51e, absent from Dev156 ancestry
+
+- `5e70e6ef464c1003a005d75cadc29a8878df803d` — docs(actions): preserve current macOS source admission handoff
+- `9b61f41549d95d7a749a92795974a588e73ad3f6` — fix(actions): require acknowledged macOS navigation reads
+- `0a6533e8b0651f2959a0cac1efae0d9ad5a0dda2` — fix(actions): rejoin editor source after logging
+- `ebff35a8889faaba7ab5315dc24c0246e15f1385` — fix(actions): reserve configured Linux navigation inputs
+- `9fb24e7353e92d5baa36fde1eb8ea6ef5d2b0b74` — fix(actions): retain admitted Windows pair assignments
+- `b43586afb169125603a731fc70388370775ac677` — test(actions): refresh navigation with manager fixtures
+- `786081ee14a3a167beabbe49ed99e48b4136aa11` — test(actions): preserve absent pair assignment state
+- `a56c737b3649688265f01dca3465ad16ece62b64` — fix(actions): reserve configured Linux wrap inputs
+- `073800ed8a1912c27808666033c9739644251cdd` — docs(actions): preserve native pair arbitration preparation
+- `e2349e0b12b37518f561869755f20b94e6ea7e65` — fix(actions): reserve configured Linux prediction inputs
+- `6045b428218edea077f2a8c0ca9da75313c79c59` — fix(actions): retain compiled macOS navigation reservations
+- `3e43a5d901d1e6a1a20d9523955defb7248fb39b` — test(actions): cover acknowledged Ergopti+ picker completion
+- `6c5460788e986da0c88d38acdd62dca81a62e568` — fix(actions): pass modified Shift+Tab through macOS predictions
+- `dde85ae5c98a7c1e11e6c3778f49a094051690cf` — test(actions): assert the returned prediction navigation owner
+- `e5259fd3d94ae00b40d21b5001675c339f9f79e3` — fix(actions): guard pair tap slots before boot initialization
+- `677cef50b7749fabbe713ea0ed648fa2bfadf2d3` — test(windows): retire resident fixture frames with native receipts
+- `a1c2455e0eea290f997c4b781e06834054d1cdba` — fix(actions): preserve macOS physical scope collision checks
+- `7048c23b4fd27933aa2debfcfb3b789e029b9d1b` — fix(actions): publish macOS action parameters atomically
+- `5700b7ad4abd906220a2cf52d6a08dac99c2f591` — test(actions): receive parameter transactions in gesture dialogs
+- `9ed7b2a7ae9c1527121244634f00a0002e96d19e` — fix(actions): publish Linux action parameters atomically
+- `cead28496a071171e516d9dd3e61d42316a3572a` — test(windows): retain bounded native startup exception facts
+- `e93502cd475bf8471a123cd572566fda29508240` — test(actions): match picker receipt to sparse neutral storage
+- `4b1e7d4d4a09af500e7dcc34c96fd6cc0a066da6` — test(actions): receive menu parameters through retained owners
+- `f496c8f0428873d3e9908442a6ad488f3556b826` — Merge dev native updates into feat/actions
+- `0656e063cbe8e84901114ea46251b05a91cde9a3` — Merge published action fixes into feat/actions
+- `d2866366879b571c62f75caf89c58d39f52a0518` — Merge latest dev changes into feat/actions
+- `ae27870cc98bdeb903eeca7a3ff1a2061bb15836` — docs(actions): record merged source and remaining native work
+
+The new RootConfig four-path dirty work is not committed or in Dev and is excluded. No squash equivalence, current native success, item closure or new integration authorization is claimed. Root HOLD remains.

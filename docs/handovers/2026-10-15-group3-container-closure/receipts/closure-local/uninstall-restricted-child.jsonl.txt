@@ -1,0 +1,1 @@
+{"argv":["/workspace/ergopti/static/ergopti_plus/linux/uninstall.sh","--prefix","/tmp/ergopti-g3/ergopti-uninstall-XiTRJB/home/prefix with spaces","--check"],"status":1,"signal":null,"stdout":"","stderr":"Refusing to remove files inside a source checkout.\n"}

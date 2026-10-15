@@ -266,17 +266,8 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
 	end
-	if spec == "program" then
-		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
-	end
-	if type(gestures.set_action_parameter) ~= "function"
-		or not gestures.set_action_parameter(binding, action, value)
-	then
-		Logger.error(LOG, "Action parameter for binding '%s' was not persisted.",
-			tostring(binding))
-		return false
-	end
-	return assign() == true
+	-- A rejected assignment cannot leave its parameter durably changed.
+	return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused, action)
 end
 
 --- Opens the shared searchable action catalogue for one current assignment.

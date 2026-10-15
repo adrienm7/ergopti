@@ -15,7 +15,8 @@
 ; The fix: on catch, log an ERROR (not a Warn) and add a visible disabled error
 ; row to the extension submenu; additionally, after a non-throwing call, count
 ; the items the builder actually added (via _ExtMenuItemCount) and show the same
-; marker when it populated nothing. This test asserts those guards are present.
+; marker when it populated nothing. This test receives the caller, observer and declared construction owner as
+; one physical control-flow closure; refactoring cannot detach their proof.
 ;
 ; Meta-static because ui/tray_menu.ahk registers top-level menu hooks and is not
 ; part of the headless run_all include graph; it cannot be #Included by the
@@ -62,21 +63,37 @@ _EBFD_HasCodeLine(Seg, Text) {
 	return _EBFD_CodeLinePosition(Seg, Text) > 0
 }
 
+; Receive the physical caller, observation port and construction owner together.
+; A marker token in a detached helper cannot prove the native handoff.
+_EBFD_SourceClosure() {
+	Parts := []
+	for Name in ["_SC_ExtensionRows", "_SC_ObserveExtensionMenu", "MenuRenderer_ConstructObservedMenu"] {
+		Part := _DriverFuncBody(Name)
+		Assert(Part != "", Name . " must exist in the physical extension construction closure")
+		Parts.Push(Part)
+	}
+	return Parts[1] . "`n" . Parts[2] . "`n" . Parts[3]
+}
+
 ; The real owner supplies observed facts; shared includes select its native marker.
 _EBFD_ErrorFramePublication(Seg) {
 	return _EBFD_ActiveBuilderErrorBranch(Seg)
+		&& _EBFD_HasCodeLine(Seg, 'ConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu')
+		&& _EBFD_HasCodeLine(Seg, 'ExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)')
+		&& _EBFD_HasCodeLine(Seg, 'static NativeObserver := _SC_ObserveExtensionMenu')
+		&& _EBFD_HasCodeLine(Seg, 'static Admission := _MR_AppendTemplateRowsAdmitted, Append := MenuRenderer_AppendTemplate')
 		&& _EBFD_HasCodeLine(Seg, 'BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")')
 		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := "populated"')
-		&& _EBFD_HasCodeLine(Seg, 'MarkerState := Map("shortcut_extension_name", (*) => ExtId,')
-		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_failed", (*) => MarkerOutcome == "failed",')
-		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_empty", (*) => MarkerOutcome == "empty",')
-		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_missing", (*) => MarkerOutcome == "missing")')
-		&& _EBFD_HasCodeLine(Seg, 'ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())')
+		&& _EBFD_HasCodeLine(Seg, 'State := Map("shortcut_extension_name", (*) => ExtId,')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_failed", (*) => Observed == "failed",')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_empty", (*) => Observed == "empty",')
+		&& _EBFD_HasCodeLine(Seg, '"shortcut_extension_builder_missing", (*) => Observed == "missing")')
+		&& _EBFD_HasCodeLine(Seg, 'ErrorRows := TemplateOwner.Call("shortcut_extension_error_frame", Map(), State, Map())')
 		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := BuildFailed ? "failed" : "empty"')
 		&& _EBFD_HasCodeLine(Seg, 'MarkerOutcome := "missing"')
-		&& _EBFD_HasCodeLine(Seg, 'if MarkerOutcome != "populated" {')
+		&& _EBFD_HasCodeLine(Seg, 'if Eligible.Has(Observed) {')
 		&& _EBFD_HasCodeLine(Seg, "if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {")
-		&& _EBFD_HasCodeLine(Seg, 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0')
+		&& _EBFD_HasCodeLine(Seg, 'if Append.Call(Native, Recipe["result_frame"], Map(), State, Map()) == 0')
 }
 
 ; Conservative physical receipt of the genuine published native provider.
@@ -129,23 +146,25 @@ _EBFD_ActiveBuilderErrorBranch(Seg) {
 		'ExtName := NM[1]',
 		'}',
 		'}',
+		'ConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu',
+		'if !(ConstructorOwner is Func) || !(ObserverOwner is Func)',
+		'|| Object.Prototype.HasOwnProp.Call(ConstructorOwner, )',
+		'|| Object.Prototype.HasOwnProp.Call(ObserverOwner, )',
+		'return []',
+		'ExtMenu := ConstructorOwner.Call( , ExtId, ExtName, ObserverOwner, OwnedMenus)',
+		'if !(ExtMenu is Menu)',
+		'return []',
+		'Rows.Push(Map( , ExtName, , ExtMenu))',
+		'}',
+		'Completed := true',
+		'} finally {',
+		'if !Completed',
+		'_SC_ExtensionDisposeOwnedMenus(OwnedMenus)',
+		'}',
+		'return Rows',
+		'}',
+		'_SC_ObserveExtensionMenu(ExtId, ExtName, ExtMenu) {',
 		'MarkerOutcome :=',
-		'MarkerState := Map( , (*) => ExtId,',
-		', (*) => MarkerOutcome == ,',
-		', (*) => MarkerOutcome == ,',
-		', (*) => MarkerOutcome == )',
-		'ErrorRows := MenuRenderer_TemplateRows( , Map(), MarkerState, Map())',
-		'EmptyRows := MenuRenderer_TemplateRows( , Map(), Map(), Map())',
-		'if !(ErrorRows is Array) || ErrorRows.Length == 0',
-		'|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())',
-		'|| !(EmptyRows is Array) || EmptyRows.Length == 0',
-		'|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())',
-		'return []',
-		'ResultRows := MenuRenderer_TemplateRows( , Map(), MarkerState, Map())',
-		'if !(ResultRows is Array) || ResultRows.Length != 0',
-		'return []',
-		'ExtMenu := Menu()',
-		'OwnedMenus.Push(ExtMenu)',
 		'BuilderFn := . StrReplace(ExtId, , )',
 		'if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {',
 		'BuildFailed := false',
@@ -164,20 +183,138 @@ _EBFD_ActiveBuilderErrorBranch(Seg) {
 		'LoggerWarn( , , StrReplace(ExtId, , ))',
 		'MarkerOutcome :=',
 		'}',
-		'if MarkerOutcome != {',
-		'if MenuRenderer_AppendTemplate(ExtMenu, , Map(), MarkerState, Map()) == 0',
-		'throw Error(MarkerOutcome ==',
+		'return MarkerOutcome',
+		'}',
+		'MenuRenderer_ConstructObservedMenu(RecipeKey, ExtId, ExtName, ObserveNative, OwnedMenus) {',
+		'static Entry := MenuRenderer_ConstructObservedMenu, Guard := _MR_DeclaredParentCallable',
+		'static RootReader := _MR_GetManifestRoot, Loader := _MM_GetManifestRoot, Snapshot := _MR_ReasonedGroupSnapshot',
+		'static SourceCurrent := _MR_ReasonedGroupCurrent, TemplateOwner := MenuRenderer_TemplateRows',
+		'static Admission := _MR_AppendTemplateRowsAdmitted, Append := MenuRenderer_AppendTemplate',
+		'static Constructor := Menu, ConstructorOwner := _MR_FrameNativeConstructorCurrent',
+		'static NativeObserver := _SC_ObserveExtensionMenu',
+		'if RecipeKey != || !(OwnedMenus is Array)',
+		'|| ObserveNative != NativeObserver || NativeObserver != _SC_ObserveExtensionMenu',
+		'|| Object.Prototype.HasOwnProp.Call(Guard, ) || !_MR_DeclaredParentCallable(ObserveNative)',
+		'return false',
+		'OwnersLive() {',
+		'if Guard != _MR_DeclaredParentCallable || Object.Prototype.HasOwnProp.Call(Guard, )',
+		'return false',
+		'for Pair in [[Entry, MenuRenderer_ConstructObservedMenu], [RootReader, _MR_GetManifestRoot], [Loader, _MM_GetManifestRoot],',
+		'[Snapshot, _MR_ReasonedGroupSnapshot], [SourceCurrent, _MR_ReasonedGroupCurrent],',
+		'[ConstructorOwner, _MR_FrameNativeConstructorCurrent]]',
+		'if Pair[1] != Pair[2] || !Guard.Call(Pair[1])',
+		'return false',
+		'return ObserveNative == NativeObserver && NativeObserver == _SC_ObserveExtensionMenu && Guard.Call(ObserveNative)',
+		'}',
+		'if !OwnersLive()',
+		'return false',
+		'Root := RootReader.Call()',
+		'if !(Root is Map) || ObjGetBase(Root) != Map.Prototype',
+		'return false',
+		'for Name in ObjOwnProps(Root)',
+		'return false',
+		'if !Root.Has(RecipeKey)',
+		'return false',
+		'Recipe := Root[RecipeKey]',
+		'if !(Recipe is Map) || ObjGetBase(Recipe) != Map.Prototype',
+		'return false',
+		'for Name in ObjOwnProps(Recipe)',
+		'return false',
+		'if Recipe.Count != 5 || Recipe.Get( , ) !=',
+		'|| Recipe.Get( , ) != || !(Recipe.Get( , false) is Array)',
+		'|| Type(Recipe.Get( , false)) != || Recipe[ ] ==',
+		'|| !(Recipe.Get( , false) is Array)',
+		'return false',
+		'Program := Recipe[ ], Outcomes := Recipe[ ]',
+		'if ObjGetBase(Program) != Array.Prototype || ObjGetBase(Outcomes) != Array.Prototype',
+		'|| ObjGetBase(OwnedMenus) != Array.Prototype',
+		'return false',
+		'for Container in [Program, Outcomes, OwnedMenus]',
+		'for Name in ObjOwnProps(Container)',
+		'return false',
+		'if Program.Length != 4',
+		'return false',
+		'Fields := Map( , true, , true, , true, , true, , true)',
+		'for Field in Recipe',
+		'if !Fields.Has(Field)',
+		'return false',
+		'Steps := Map( , true, , true, , true, , true)',
+		'Results := Map( , true, , true, , true, , true)',
+		'Positions := Map()',
+		'for Index, Step in Program {',
+		'if Type(Step) != || !Steps.Has(Step) || Positions.Has(Step)',
+		'return false',
+		'Positions[Step] := Index',
+		'}',
+		'if Positions.Count != 4 || Positions[ ] > Positions[ ]',
+		'|| Positions[ ] > Positions[ ]',
+		'|| Positions[ ] > Positions[ ]',
+		'return false',
+		'Eligible := Map()',
+		'for Outcome in Outcomes {',
+		'if Type(Outcome) != || !Results.Has(Outcome) || Outcome == || Eligible.Has(Outcome)',
+		'return false',
+		'Eligible[Outcome] := true',
+		'}',
+		'RecipeSource := Snapshot.Call(Recipe)',
+		'if !RecipeSource || !OwnersLive()',
+		'return false',
+		'Current() {',
+		'if !OwnersLive() || RootReader.Call() != Root || ObjGetBase(Root) != Map.Prototype',
+		'return false',
+		'for Name in ObjOwnProps(Root)',
+		'return false',
+		'return Root.Has(RecipeKey) && Root[RecipeKey] == Recipe && SourceCurrent.Call(RecipeSource)',
+		'}',
+		'Observed := , Native := false',
+		'State := Map( , (*) => ExtId,',
+		', (*) => Observed == ,',
+		', (*) => Observed == ,',
+		', (*) => Observed == )',
+		'for Step in Program {',
+		'if !Current()',
+		'throw Error( )',
+		'switch Step {',
+		'case :',
+		'if TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted',
+		'|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)',
+		'return false',
+		'ErrorRows := TemplateOwner.Call( , Map(), State, Map())',
+		'if !Current() || !Guard.Call(TemplateOwner) || !Guard.Call(Admission)',
+		'return false',
+		'EmptyRows := TemplateOwner.Call( , Map(), Map(), Map())',
+		'if !Current() || TemplateOwner != MenuRenderer_TemplateRows || Admission != _MR_AppendTemplateRowsAdmitted',
+		'|| !Guard.Call(TemplateOwner) || !Guard.Call(Admission)',
+		'return false',
+		'if !(ErrorRows is Array) || ErrorRows.Length == 0 || !Admission.Call(ErrorRows, 1, Map())',
+		'|| !(EmptyRows is Array) || EmptyRows.Length == 0 || !Admission.Call(EmptyRows, 1, Map())',
+		'return false',
+		'if !Current() || TemplateOwner != MenuRenderer_TemplateRows || !Guard.Call(TemplateOwner)',
+		'return false',
+		'ResultRows := TemplateOwner.Call(Recipe[ ], Map(), State, Map())',
+		'if !(ResultRows is Array) || ResultRows.Length != 0 || !Current()',
+		'return false',
+		'case :',
+		'if !ConstructorOwner.Call(Constructor)',
+		'return false',
+		'Native := Constructor.Call()',
+		'OwnedMenus.Push(Native)',
+		'case :',
+		'Observed := ObserveNative.Call(ExtId, ExtName, Native)',
+		'if Type(Observed) != || !Results.Has(Observed)',
+		'throw Error( )',
+		'case :',
+		'if Eligible.Has(Observed) {',
+		'if Append != MenuRenderer_AppendTemplate || !Guard.Call(Append)',
+		'throw Error( )',
+		'if Append.Call(Native, Recipe[ ], Map(), State, Map()) == 0',
+		'throw Error(Observed ==',
 		'?',
 		': )',
 		'}',
-		'Rows.Push(Map( , ExtName, , ExtMenu))',
 		'}',
-		'Completed := true',
-		'} finally {',
-		'if !Completed',
-		'_SC_ExtensionDisposeOwnedMenus(OwnedMenus)',
 		'}',
-		'return Rows',
+		'return Native',
 		'}']
 	if Actual.Length != Expected.Length
 		return false
@@ -188,7 +325,7 @@ _EBFD_ActiveBuilderErrorBranch(Seg) {
 }
 
 _EBFD_CatchFailsLoud() {
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Seg := _EBFD_SourceClosure()
 	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; The thrown-builder branch must log an ERROR, not merely a Warn the user
 	; never reads.
@@ -198,7 +335,7 @@ _EBFD_CatchFailsLoud() {
 Test("tray_menu: extension builder failure logs an ERROR (ext-builder-fn-dynamic-call-swallow)", _EBFD_CatchFailsLoud)
 
 _EBFD_RendersVisibleErrorRow() {
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Seg := _EBFD_SourceClosure()
 	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; A failed/empty builder must produce a visible disabled marker built from a
 	; localised error prefix plus the ExtId, so it is not mistaken for an absent
@@ -210,7 +347,7 @@ Test("tray_menu: extension builder failure shows a visible disabled row (ext-bui
 
 _EBFD_ValidatesItemsPopulated() {
 	Src := _DriverSourceConcat()
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Seg := _EBFD_SourceClosure()
 	Assert(Seg != "", "_SC_ExtensionRows declaration must exist in the driver source")
 	; A builder may return without throwing yet populate nothing; the fix counts
 	; the items added and treats zero as a failure.
@@ -239,14 +376,14 @@ _EBFD_DeclaredErrorMarker() {
 Test("tray_menu: declared extension error marker preserves caption and inertness", _EBFD_DeclaredErrorMarker)
 
 _EBFD_ErrorPublicationSourceControls() {
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Seg := _EBFD_SourceClosure()
 	AssertTrue(_EBFD_ErrorFramePublication(Seg))
-	Call := 'if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_result_frame", Map(), MarkerState, Map()) == 0'
+	Call := 'if Append.Call(Native, Recipe["result_frame"], Map(), State, Map()) == 0'
 	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, Call, "; " . Call)),
 		"a commented publication cannot keep the error marker guard green")
 	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, Call, 'Text := ' . Chr(34) . Call . Chr(34))),
 		"quoted publication text is not a renderer call")
-	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, "MenuRenderer_AppendTemplate(ExtMenu", "Foreign.MenuRenderer_AppendTemplate(ExtMenu")),
+	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, "Append.Call(Native", "Foreign.Append.Call(Native")),
 		"a foreign renderer cannot publish the native owner marker")
 	AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, '"shortcut_extension_error_frame"', '"shortcut_extension_empty_frame"')),
 		"the empty marker cannot substitute for the failure marker")
@@ -257,7 +394,7 @@ Test("tray_menu: error marker guard rejects withdrawn and decorative source call
 
 
 _EBFD_DormantErrorBranchRefused() {
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
+	Seg := _EBFD_SourceClosure()
 	Branch := "if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {"
 	Code := _DriverMaskNonCode(&Seg)
 	Start := InStr(Seg, Branch, true), Open := Start + StrLen(Branch) - 1
@@ -289,8 +426,10 @@ Test("tray_menu: dormant native error branches cannot satisfy the publication pr
 
 
 _EBFD_StatementAndOwnerBoundaries() {
-	Seg := _DriverFuncBody("_SC_ExtensionRows")
-	Joined := StrReplace(Seg, "if !BuildFailed`n`t`t`t`t`t`tLoggerError(", "if !BuildFailedLoggerError(")
+	Seg := _EBFD_SourceClosure()
+	JoinedNeedle := "if !BuildFailed`n`t`t`t`tLoggerError("
+	Assert(InStr(Seg, JoinedNeedle, true) > 0, "the original distinct condition and logger statements must exist before withdrawal")
+	Joined := StrReplace(Seg, JoinedNeedle, "if !BuildFailedLoggerError(")
 	AssertFalse(_EBFD_ErrorFramePublication(Joined), "joining a distinct native condition and logger statement must refuse")
 	LoopLine := 'Loop Files ExtShortcutsBaseDir . "*", "D" {'
 	DormantOwner := StrReplace(Seg, LoopLine, "if false {")
@@ -300,3 +439,20 @@ _EBFD_StatementAndOwnerBoundaries() {
 	AssertTrue(_EBFD_ErrorFramePublication(Seg), "genuine original physical statement boundaries restore admission")
 }
 Test("tray_menu: error publication retains native statement and loop boundaries", _EBFD_StatementAndOwnerBoundaries)
+
+; Removing any actual handoff must fail even when the detached observer still logs.
+_EBFD_ConstructionCustodyControls() {
+	Seg := _EBFD_SourceClosure()
+	for Call in [
+		'ConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu',
+		'ExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)',
+		'static NativeObserver := _SC_ObserveExtensionMenu',
+		'static Admission := _MR_AppendTemplateRowsAdmitted, Append := MenuRenderer_AppendTemplate',
+		'Observed := ObserveNative.Call(ExtId, ExtName, Native)'] {
+		Assert(_EBFD_HasCodeLine(Seg, Call), "each original handoff is physically present before withdrawal")
+		AssertFalse(_EBFD_ErrorFramePublication(StrReplace(Seg, Call, "; " . Call)),
+			"a detached construction owner cannot publish the actual extension marker")
+	}
+	AssertTrue(_EBFD_ErrorFramePublication(Seg), "restoring all three physical owners repairs admission")
+}
+Test("tray_menu: extension construction custody cannot detach native error publication", _EBFD_ConstructionCustodyControls)

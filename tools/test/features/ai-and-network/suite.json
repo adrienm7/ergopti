@@ -1,0 +1,366 @@
+{
+	"schema_version": 1,
+	"feature": "ai-and-network",
+	"checks": [
+		{
+			"id": "js-0417",
+			"ordinal": 2,
+			"name": "Windows API form retains modal source authority and durable publication",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-api-add-production.cjs"],
+			"repro": "npm run test:windows-api-add-production"
+		},
+		{
+			"id": "js-0418",
+			"ordinal": 3,
+			"name": "Windows managed Ollama production uses owned per-user ports and separate consent",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-managed-bootstrap.cjs"],
+			"repro": "node tools/test/test-windows-managed-bootstrap.cjs"
+		},
+		{
+			"id": "js-0036",
+			"ordinal": 48,
+			"name": "LLM legacy_ids + BASIC_PROMPT single source",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-legacy-basic-prompt-single-source.cjs"],
+			"repro": "node tools/test/test-llm-legacy-basic-prompt-single-source.cjs"
+		},
+		{
+			"id": "js-0091",
+			"ordinal": 103,
+			"name": "prompt-builder constants agree across Lua, JS and the generated AHK (all 10)",
+			"cmd": "node",
+			"args": ["tools/test/test-prompt-builder-constants-parity.cjs"],
+			"repro": "node tools/test/test-prompt-builder-constants-parity.cjs"
+		},
+		{
+			"id": "js-0137",
+			"ordinal": 149,
+			"name": "max_tokens single source (no literal default in backend adapters)",
+			"cmd": "node",
+			"args": ["tools/test/test-max-tokens-single-source.cjs"],
+			"repro": "node tools/test/test-max-tokens-single-source.cjs"
+		},
+		{
+			"id": "js-0138",
+			"ordinal": 150,
+			"name": "model-identity normaliser single source (one rule for active + installed)",
+			"cmd": "node",
+			"args": ["tools/test/test-model-identity-single-source.cjs"],
+			"repro": "node tools/test/test-model-identity-single-source.cjs"
+		},
+		{
+			"id": "js-0140",
+			"ordinal": 152,
+			"name": "temperature single source (no literal 0.1 default in macOS adapters)",
+			"cmd": "node",
+			"args": ["tools/test/test-temperature-single-source.cjs"],
+			"repro": "node tools/test/test-temperature-single-source.cjs"
+		},
+		{
+			"id": "js-0141",
+			"ordinal": 153,
+			"name": "ollama port single source (no hardcoded port literal in AHK LLM files)",
+			"cmd": "node",
+			"args": ["tools/test/test-ollama-port-single-source.cjs"],
+			"repro": "node tools/test/test-ollama-port-single-source.cjs"
+		},
+		{
+			"id": "js-0142",
+			"ordinal": 154,
+			"name": "Linux LLM defaults single source (temp/port/context/keep_alive from _shared canonicals)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-llm-defaults-single-source.cjs"],
+			"repro": "node tools/test/test-linux-llm-defaults-single-source.cjs"
+		},
+		{
+			"id": "js-0143",
+			"ordinal": 155,
+			"name": "API test-request single source (probe text lives in api_providers.json only)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-test-request-single-source.cjs"],
+			"repro": "node tools/test/test-llm-test-request-single-source.cjs"
+		},
+		{
+			"id": "js-0144",
+			"ordinal": 156,
+			"name": "API model-extras single source (per-model body fields live in api_providers.json only)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-model-extras-single-source.cjs"],
+			"repro": "node tools/test/test-llm-model-extras-single-source.cjs"
+		},
+		{
+			"id": "js-0154",
+			"ordinal": 166,
+			"name": "LLM model + GPT link single source (no re-typed default literals in AHK)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-model-single-source.cjs"],
+			"repro": "node tools/test/test-llm-model-single-source.cjs"
+		},
+		{
+			"id": "js-0157",
+			"ordinal": 169,
+			"name": "LLM stop-sequences single source (no re-inlined literals in backends)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-stop-sequences-single-source.cjs"],
+			"repro": "node tools/test/test-llm-stop-sequences-single-source.cjs"
+		},
+		{
+			"id": "js-0185",
+			"ordinal": 197,
+			"name": "Linux portable network packages retain native ABI and command ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-portable-network-runtime.cjs"],
+			"repro": "npm run test:linux-portable-network-runtime"
+		},
+		{
+			"id": "js-0186",
+			"ordinal": 198,
+			"name": "Linux portable native admission rejects incomplete and skipped receipts",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-portable-network-registration.cjs"],
+			"repro": "npm run test:linux-portable-network-registration"
+		},
+		{
+			"id": "js-0207",
+			"ordinal": 220,
+			"name": "Linux managed networking admits actual runtime after package repair",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-network-runtime.cjs"],
+			"repro": "npm run test:linux-network-runtime"
+		},
+		{
+			"id": "js-0209",
+			"ordinal": 222,
+			"name": "Managed native HTTP phase owners preserve original modeled closure protocol",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-managed-http-phase-protocol.cjs"],
+			"repro": "npm run test:linux-managed-http-phase-protocol"
+		},
+		{
+			"id": "js-0218",
+			"ordinal": 231,
+			"name": "LLM logs carry no typed text (context length only, never a slice of the buffer)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-no-prompt-content-in-logs.cjs"],
+			"repro": "node tools/test/test-llm-no-prompt-content-in-logs.cjs"
+		},
+		{
+			"id": "js-0220",
+			"ordinal": 233,
+			"name": "LLM privacy defaults single-sourced (secure fields blocked, URL bars allowed, all three drivers)",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-privacy-defaults-cross-driver.cjs"],
+			"repro": "node tools/test/test-llm-privacy-defaults-cross-driver.cjs"
+		},
+		{
+			"id": "js-0306",
+			"ordinal": 319,
+			"name": "MLX dependency bootstrap fingerprints both dependency manifests",
+			"cmd": "node",
+			"args": ["tools/test/test-mlx-deps-lock-fingerprint.cjs"],
+			"repro": "npm run test:mlx-deps-lock-fingerprint"
+		},
+		{
+			"id": "js-0312",
+			"ordinal": 325,
+			"name": "Ollama bootstrap bounds and authenticates network acquisition",
+			"cmd": "node",
+			"args": ["tools/test/test-ollama-bootstrap-network-hardening.cjs"],
+			"repro": "npm run test:ollama-bootstrap-network-hardening"
+		},
+		{
+			"id": "js-0313",
+			"ordinal": 326,
+			"name": "MLX emitted downloader refuses failed system trust activation",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-mlx-download-trust-activation.cjs"],
+			"repro": "node tools/test/test-mlx-download-trust-activation.cjs"
+		},
+		{
+			"id": "js-0314",
+			"ordinal": 327,
+			"name": "managed native HTTP receives actual pipe closure and shared routing",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-native-http-receiving.cjs"],
+			"repro": "node tools/test/test-macos-native-http-receiving.cjs"
+		},
+		{
+			"id": "js-0315",
+			"ordinal": 328,
+			"name": "managed bootstrap admits pinned bytes before offline installation",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-managed-bootstrap-http.cjs"],
+			"repro": "node tools/test/test-macos-managed-bootstrap-http.cjs"
+		},
+		{
+			"id": "js-0316",
+			"ordinal": 329,
+			"name": "managed Python release projections retain the independent official pin",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-python-release.cjs"],
+			"repro": "node tools/test/test-managed-python-release.cjs"
+		},
+		{
+			"id": "js-0317",
+			"ordinal": 330,
+			"name": "managed bootstrap shared policy and generated Swift remain source-qualified",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-bootstrap-policy.cjs"],
+			"repro": "node tools/test/test-managed-bootstrap-policy.cjs"
+		},
+		{
+			"id": "js-0319",
+			"ordinal": 332,
+			"name": "bootstrap retry canonical data preserves original shell and generated Lua",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-bootstrap-retry-projection.cjs"],
+			"repro": "node tools/test/test-bootstrap-retry-projection.cjs"
+		},
+		{
+			"id": "js-0320",
+			"ordinal": 333,
+			"name": "managed Ollama portable admission and operation retirement",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-managed-ollama-protocol.cjs"],
+			"repro": "node tools/test/test-managed-ollama-protocol.cjs"
+		},
+		{
+			"id": "js-0321",
+			"ordinal": 336,
+			"name": "managed Ollama catalogue preserves native source and publication admission",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-managed-ollama-catalogue.cjs"],
+			"repro": "node tools/test/test-macos-managed-ollama-catalogue.cjs"
+		},
+		{
+			"id": "js-0322",
+			"ordinal": 337,
+			"name": "native PAC source contract preserves ownership and exact full-URL binding",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-native-pac-source-contract.cjs"],
+			"repro": "node tools/test/test-native-pac-source-contract.cjs"
+		},
+		{
+			"id": "js-0323",
+			"ordinal": 338,
+			"name": "native PAC helpers preserve independent standard function vectors",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-network-pac-helpers.cjs"],
+			"repro": "node tools/test/test-network-pac-helpers.cjs"
+		},
+		{
+			"id": "js-0324",
+			"ordinal": 339,
+			"name": "macOS opaque clients refuse unsupported automatic proxy routing",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-opaque-network-admission.cjs"],
+			"repro": "node tools/test/test-macos-opaque-network-admission.cjs"
+		},
+		{
+			"id": "js-0327",
+			"ordinal": 342,
+			"name": "Ollama server command preserves exact process ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-ollama-server-command.cjs"],
+			"repro": "npm run test:ollama-server-command"
+		},
+		{
+			"id": "js-0334",
+			"ordinal": 349,
+			"name": "prompt editor bridge (shared frontend ↔ Windows host)",
+			"cmd": "node",
+			"args": ["tools/test/test-prompt-editor-bridge.cjs"],
+			"repro": "node tools/test/test-prompt-editor-bridge.cjs"
+		},
+		{
+			"id": "js-0339",
+			"ordinal": 354,
+			"name": "one ready-made prompt action per built-in prompt profile",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-prompt-actions-single-source.cjs"],
+			"repro": "npm run test:llm-prompt-actions-single-source"
+		},
+		{
+			"id": "js-0340",
+			"ordinal": 355,
+			"name": "Windows rewrite prompt and prompt action ports are included, ordered and wired",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-rewrite-prompt-wiring.cjs"],
+			"repro": "npm run test:windows-rewrite-prompt-wiring"
+		},
+		{
+			"id": "js-0341",
+			"ordinal": 356,
+			"name": "Windows types an accepted prediction as one exact Text-mode batch at TextSender SendLevel",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-llm-accept-injection.cjs"],
+			"repro": "npm run test:windows-llm-accept-injection"
+		},
+		{
+			"id": "js-0343",
+			"ordinal": 358,
+			"name": "Windows cycles a visible prediction once per navigation chord in either keyboard-hook order",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-llm-nav-cycle.cjs"],
+			"repro": "npm run test:windows-llm-nav-cycle"
+		},
+		{
+			"id": "js-0344",
+			"ordinal": 359,
+			"name": "every driver cycles a visible prediction on each chord its tooltip advertises: the arrows and either Shift+Tab",
+			"cmd": "node",
+			"args": ["tools/test/test-llm-nav-chord-contract.cjs"],
+			"repro": "npm run test:llm-nav-chord-contract"
+		},
+		{
+			"id": "js-0350",
+			"ordinal": 365,
+			"name": "a manual prediction is refused for the same four reasons, with the same notices, on every driver",
+			"cmd": "node",
+			"args": ["tools/test/test-manual-prediction-refusals-single-source.cjs"],
+			"repro": "npm run test:manual-prediction-refusals"
+		},
+		{
+			"id": "js-0366",
+			"ordinal": 382,
+			"name": "changelog loads are bounded and fall back to the releases Atom feed",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-network-resilience.cjs"],
+			"repro": "npm run test:changelog-network-resilience"
+		},
+		{
+			"id": "js-0372",
+			"ordinal": 388,
+			"name": "Versions managed failures retain safe report and exact action ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-managed-failure.cjs"],
+			"repro": "npm run test:changelog-managed-failure"
+		},
+		{
+			"id": "js-0378",
+			"ordinal": 394,
+			"name": "managed download failures render safe translated actions with captured owners",
+			"cmd": "node",
+			"args": ["tools/test/test-managed-network-failure-ui.cjs"],
+			"repro": "npm run test:managed-network-failure-ui"
+		},
+		{
+			"id": "js-0379",
+			"ordinal": 395,
+			"name": "managed fixture late accepted clients retain exact retirement ownership",
+			"cmd": "node",
+			"args": ["tools/test/test-managed-remote-retirement.cjs"],
+			"repro": "npm run test:managed-remote-retirement"
+		},
+		{
+			"id": "js-0380",
+			"ordinal": 396,
+			"name": "model browser actions retain their operation session across native reuse",
+			"cmd": "node",
+			"args": ["tools/test/test-model-browser-session.cjs"],
+			"repro": "npm run test:model-browser-session"
+		}
+	]
+}

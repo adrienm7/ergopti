@@ -1,0 +1,254 @@
+{
+	"schema_version": 1,
+	"feature": "menus",
+	"checks": [
+		{
+			"id": "js-0045",
+			"ordinal": 57,
+			"name": "native menu flags preserve authoritative PNG pixels",
+			"cmd": "node",
+			"args": ["tools/test/test-native-menu-flags.cjs"],
+			"repro": "npm run test:native-menu-flags"
+		},
+		{
+			"id": "js-0050",
+			"ordinal": 62,
+			"name": "shared menu delegation follows reachable methods and refuses dormant or removed providers",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-shared-delegation.cjs"],
+			"repro": "node tools/test/test-menu-shared-delegation.cjs"
+		},
+		{
+			"id": "js-0051",
+			"ordinal": 63,
+			"name": "menu reader captured line snapshot preserves lexical semantics and bounded work",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-reader-line-snapshot.cjs"],
+			"repro": "node tools/test/test-menu-reader-line-snapshot.cjs"
+		},
+		{
+			"id": "js-0052",
+			"ordinal": 64,
+			"name": "menu lexical queries retain exact semantics and bounded per-unit repeat work",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-lex-unit-query-reuse.cjs"],
+			"repro": "node tools/test/test-menu-lex-unit-query-reuse.cjs"
+		},
+		{
+			"id": "js-0053",
+			"ordinal": 65,
+			"name": "every menu-manifest field and section has a driver that reads it (no decorative declarations)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-manifest-keys-have-readers.cjs"],
+			"repro": "node tools/test/test-menu-manifest-keys-have-readers.cjs"
+		},
+		{
+			"id": "js-0054",
+			"ordinal": 66,
+			"name": "no new menu row built outside the renderer (I3 ratchet — windows 220, macos 301, linux 3)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-rows-outside-renderer.cjs"],
+			"repro": "node tools/test/test-menu-rows-outside-renderer.cjs"
+		},
+		{
+			"id": "js-0055",
+			"ordinal": 67,
+			"name": "every declared menu row has a handler in its driver (I3 ratchet — ahk 0, hs 5, linux 0)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-action-handler-bijection.cjs"],
+			"repro": "node tools/test/test-menu-action-handler-bijection.cjs"
+		},
+		{
+			"id": "js-0056",
+			"ordinal": 68,
+			"name": "every registered menu row matches its declared type (handler slot vs provider slot)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-provider-kind-matches-type.cjs"],
+			"repro": "node tools/test/test-menu-provider-kind-matches-type.cjs"
+		},
+		{
+			"id": "js-0057",
+			"ordinal": 69,
+			"name": "top-level menu shape agrees across the three drivers (I3 — the manifest finally has a Linux dimension)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-top-level-parity.cjs"],
+			"repro": "node tools/test/test-menu-top-level-parity.cjs"
+		},
+		{
+			"id": "js-0058",
+			"ordinal": 70,
+			"name": "the whole menu tree agrees across the three drivers, submenus included (I3 — no empty submenu, no orphaned header, no unread getter)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-parity.cjs"],
+			"repro": "node tools/test/test-menu-parity.cjs"
+		},
+		{
+			"id": "js-0059",
+			"ordinal": 71,
+			"name": "every top-level menu title reads ONE shared key on every driver that has it",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-titles-single-key.cjs"],
+			"repro": "node tools/test/test-menu-titles-single-key.cjs"
+		},
+		{
+			"id": "js-0060",
+			"ordinal": 72,
+			"name": "every declared menu is answered by every driver that shows it (per-category coverage)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-category-coverage.cjs"],
+			"repro": "node tools/test/test-menu-category-coverage.cjs"
+		},
+		{
+			"id": "js-0061",
+			"ordinal": 73,
+			"name": "every feature submenu opens with its category switch, registered by every driver that shows it",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-toggle-registered.cjs"],
+			"repro": "node tools/test/test-menu-toggle-registered.cjs"
+		},
+		{
+			"id": "js-0062",
+			"ordinal": 74,
+			"name": "Enable all / Disable all stay retired on every driver (manifest rows, locale keys, handlers)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-enable-disable-all-retired.cjs"],
+			"repro": "node tools/test/test-menu-enable-disable-all-retired.cjs"
+		},
+		{
+			"id": "js-0063",
+			"ordinal": 75,
+			"name": "the circular Spaces toggle stays retired (no setting, row, label or handler; existing data survives until cleanup)",
+			"cmd": "node",
+			"args": ["tools/test/test-space-wrap-toggle-retired.cjs"],
+			"repro": "npm run test:space-wrap-retired"
+		},
+		{
+			"id": "js-0064",
+			"ordinal": 76,
+			"name": "every restore / clear row reads the two shared labels (restore recommended, clear to system)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-reset-terminology.cjs"],
+			"repro": "node tools/test/test-menu-reset-terminology.cjs"
+		},
+		{
+			"id": "js-0065",
+			"ordinal": 77,
+			"name": "every settings menu opens with its switch, restore and clear, then a separator (menu-first-group)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-first-group.cjs"],
+			"repro": "npm run test:menu-first-group"
+		},
+		{
+			"id": "js-0066",
+			"ordinal": 78,
+			"name": "the wrap toggle and its symbols form one group, named without AltGr (shortcuts-wrap-group)",
+			"cmd": "node",
+			"args": ["tools/test/test-shortcuts-wrap-group.cjs"],
+			"repro": "npm run test:shortcuts-wrap-group"
+		},
+		{
+			"id": "js-0067",
+			"ordinal": 79,
+			"name": "a row a platform lacks is declared hidden (not applicable) or greyed with its reason (not yet ported)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-unavailable-rows.cjs"],
+			"repro": "npm run test:menu-unavailable-rows"
+		},
+		{
+			"id": "js-0068",
+			"ordinal": 80,
+			"name": "no driver builds more menu rows outside the shared manifest than its baseline (native-menu-rows ratchet)",
+			"cmd": "node",
+			"args": ["tools/test/test-native-menu-rows.cjs"],
+			"repro": "npm run test:native-menu-rows"
+		},
+		{
+			"id": "js-0069",
+			"ordinal": 81,
+			"name": "native-menu census admits migration to zero only with intact legacy detection and complete source coverage",
+			"cmd": "node",
+			"args": ["tools/test/test-native-menu-census-admission.cjs"],
+			"repro": "node tools/test/test-native-menu-census-admission.cjs"
+		},
+		{
+			"id": "js-0070",
+			"ordinal": 82,
+			"name": "no restore or clear row asks a question on any driver (restore-recommended-no-confirm)",
+			"cmd": "node",
+			"args": ["tools/test/test-restore-recommended-no-confirm.cjs"],
+			"repro": "npm run test:restore-recommended-no-confirm"
+		},
+		{
+			"id": "js-0071",
+			"ordinal": 83,
+			"name": "approved menu labels keep their wording and are translated in every locale",
+			"cmd": "node",
+			"args": ["tools/test/test-approved-menu-labels.cjs"],
+			"repro": "node tools/test/test-approved-menu-labels.cjs"
+		},
+		{
+			"id": "js-0075",
+			"ordinal": 87,
+			"name": "the hotstring category submenus agree across the three drivers (same controls, same order)",
+			"cmd": "node",
+			"args": ["tools/test/test-hotstring-category-submenu-order.cjs"],
+			"repro": "node tools/test/test-hotstring-category-submenu-order.cjs"
+		},
+		{
+			"id": "js-0133",
+			"ordinal": 145,
+			"name": "Linux menu i18n keys exist (every i18n_safe key is defined in en.json)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-menu-keys-exist.cjs"],
+			"repro": "node tools/test/test-linux-menu-keys-exist.cjs"
+		},
+		{
+			"id": "js-0150",
+			"ordinal": 162,
+			"name": "menu labels single source (shared labels.lua consumed by macOS)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-labels-single-source.cjs"],
+			"repro": "node tools/test/test-menu-labels-single-source.cjs"
+		},
+		{
+			"id": "js-0225",
+			"ordinal": 238,
+			"name": "menu manifest drift (feature paths + i18n keys resolve against manifest.toml)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-manifest.cjs"],
+			"repro": "node tools/test/test-menu-manifest.cjs"
+		},
+		{
+			"id": "js-0231",
+			"ordinal": 244,
+			"name": "one menu_manifest.json reader per driver (macOS parsed it three times, two of them caches of the same file)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-manifest-single-reader.cjs"],
+			"repro": "node tools/test/test-menu-manifest-single-reader.cjs"
+		},
+		{
+			"id": "js-0275",
+			"ordinal": 288,
+			"name": "dynamic hotstrings menu labels (resolver bridge + locale keys)",
+			"cmd": "node",
+			"args": ["tools/test/test-dynamic-hotstrings-menu-labels.cjs"],
+			"repro": "node tools/test/test-dynamic-hotstrings-menu-labels.cjs"
+		},
+		{
+			"id": "js-0276",
+			"ordinal": 289,
+			"name": "manifest menu labels resolve (whole class, not a sample)",
+			"cmd": "node",
+			"args": ["tools/test/test-manifest-menu-labels-resolve.cjs"],
+			"repro": "node tools/test/test-manifest-menu-labels-resolve.cjs"
+		},
+		{
+			"id": "js-0278",
+			"ordinal": 291,
+			"name": "manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)",
+			"cmd": "node",
+			"args": ["tools/test/test-menu-labels-resolve.cjs"],
+			"repro": "node tools/test/test-menu-labels-resolve.cjs"
+		}
+	]
+}

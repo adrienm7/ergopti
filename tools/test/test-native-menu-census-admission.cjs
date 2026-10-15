@@ -14,6 +14,8 @@
 
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
@@ -29,13 +31,17 @@ const BASELINE = 'tools/test/native-menu-rows-baseline.json';
 const tool = fs.readFileSync(path.join(ROOT, TOOL), 'utf8');
 const corpusBytes = fs.readFileSync(path.join(ROOT, CORPUS));
 const legacy = JSON.parse(corpusBytes);
-const registry = fs.readFileSync(path.join(ROOT, 'tools/test/run-js-suite.cjs'), 'utf8');
+const registry = loadInventory(ROOT).checks;
 for (const name of ['test-native-menu-rows.cjs', 'test-native-menu-census-admission.cjs']) {
-	assert.equal(
-		registry.split(`args: ['tools/test/${name}']`).length - 1,
-		1,
-		`${name}: exactly one normal JS-suite registration`
+	const entries = registry.filter((check) => check.args.includes('tools/test/' + name));
+	assert.equal(entries.length, 1, `${name}: exactly one normal JS-suite registration`);
+	assert.equal(entries[0].cmd, 'node', 'the exact command owner remains mandatory');
+	assert.deepEqual(
+		entries[0].args,
+		['tools/test/' + name],
+		'the exact argument vector remains mandatory'
 	);
+	assert.equal(entries[0].platforms, undefined, 'the mandatory model cannot become conditional');
 }
 
 const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-native-census-admission-'));

@@ -1,0 +1,494 @@
+{
+	"schema_version": 1,
+	"feature": "distribution-and-updates",
+	"checks": [
+		{
+			"id": "js-0015",
+			"ordinal": 27,
+			"name": "Windows packaging stamp preserves exact AHK source encoding",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-bundle-stamp-encoding.cjs"],
+			"repro": "npm run test:windows-bundle-stamp-encoding"
+		},
+		{
+			"id": "js-0093",
+			"ordinal": 105,
+			"name": "every source path a packaging script copies exists (no suite runs a build)",
+			"cmd": "node",
+			"args": ["tools/test/test-packaging-paths-exist.cjs"],
+			"repro": "node tools/test/test-packaging-paths-exist.cjs"
+		},
+		{
+			"id": "js-0095",
+			"ordinal": 107,
+			"name": "website stable downloads survive a page of newer prereleases",
+			"cmd": "node",
+			"args": ["tools/test/test-site-github-release.cjs"],
+			"repro": "node tools/test/test-site-github-release.cjs"
+		},
+		{
+			"id": "js-0096",
+			"ordinal": 108,
+			"name": "every asset the release notes link to is uploaded by a build job (no dead download button)",
+			"cmd": "node",
+			"args": ["tools/test/test-release-notes-assets-are-uploaded.cjs"],
+			"repro": "node tools/test/test-release-notes-assets-are-uploaded.cjs"
+		},
+		{
+			"id": "js-0097",
+			"ordinal": 109,
+			"name": "every macOS/Linux package build stamps the commit its diagnostics report (no \"unknown\" in a release)",
+			"cmd": "node",
+			"args": ["tools/test/test-package-builds-stamp-commit.cjs"],
+			"repro": "node tools/test/test-package-builds-stamp-commit.cjs"
+		},
+		{
+			"id": "js-0099",
+			"ordinal": 111,
+			"name": "Linux install.sh leaves a working first install (sandboxed real run)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-install-sandbox.cjs"],
+			"repro": "node tools/test/test-linux-install-sandbox.cjs"
+		},
+		{
+			"id": "js-0100",
+			"ordinal": 112,
+			"name": "Linux native packages provision graphical input access",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-package-setup.cjs"],
+			"repro": "npm run test:linux-package-setup"
+		},
+		{
+			"id": "js-0101",
+			"ordinal": 113,
+			"name": "Linux login startup preserves explicit user choices",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-start-at-login.cjs"],
+			"repro": "npm run test:linux-start-at-login"
+		},
+		{
+			"id": "js-0102",
+			"ordinal": 114,
+			"name": "Linux uninstall preserves personal data and rejects unrelated installations",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-uninstall-sandbox.cjs"],
+			"repro": "npm run test:linux-uninstall-sandbox"
+		},
+		{
+			"id": "js-0103",
+			"ordinal": 115,
+			"name": "Windows uninstall requires terminal authorization and preserves replaced files",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-uninstall.cjs"],
+			"repro": "npm run test:windows-uninstall"
+		},
+		{
+			"id": "js-0107",
+			"ordinal": 119,
+			"name": "Linux modules resolve _shared through infra/paths.lua",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-shared-path-resolver.cjs"],
+			"repro": "node tools/test/test-linux-shared-path-resolver.cjs"
+		},
+		{
+			"id": "js-0108",
+			"ordinal": 120,
+			"name": "every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)",
+			"cmd": "node",
+			"args": ["tools/test/test-shared-root-resolvers.cjs"],
+			"repro": "node tools/test/test-shared-root-resolvers.cjs"
+		},
+		{
+			"id": "js-0123",
+			"ordinal": 135,
+			"name": "AHK startup contract (early globals + actionable fatal diagnostics)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-startup-contract.cjs"],
+			"repro": "node tools/test/test-ahk-startup-contract.cjs"
+		},
+		{
+			"id": "js-0124",
+			"ordinal": 136,
+			"name": "AHK startup smoke requires fresh process-bound warm readiness (inert admission)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-startup-smoke-readiness.cjs"],
+			"repro": "node tools/test/test-ahk-startup-smoke-readiness.cjs"
+		},
+		{
+			"id": "js-0125",
+			"ordinal": 137,
+			"name": "full AHK startup smoke (real auto-execute to ready, isolated config)",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-full-startup-smoke.cjs"],
+			"repro": "node tools/test/test-ahk-full-startup-smoke.cjs"
+		},
+		{
+			"id": "js-0152",
+			"ordinal": 164,
+			"name": "Linux version single source (one BUNDLE_VERSION-style source, no re-typed 3.0.0; P0-E)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-version-single-source.cjs"],
+			"repro": "node tools/test/test-linux-version-single-source.cjs"
+		},
+		{
+			"id": "js-0155",
+			"ordinal": 167,
+			"name": "version compare parity (JS over shared vectors; AHK+macOS suites read the same table)",
+			"cmd": "node",
+			"args": ["tools/test/test-version-compare-contract.cjs"],
+			"repro": "node tools/test/test-version-compare-contract.cjs"
+		},
+		{
+			"id": "js-0168",
+			"ordinal": 180,
+			"name": "update-check page (checking, up to date, new release, no release, failure, other channels, 21 locales, centered)",
+			"cmd": "node",
+			"args": ["tools/test/test-update-check-dialog.cjs"],
+			"repro": "npm run test:update-check-dialog"
+		},
+		{
+			"id": "js-0174",
+			"ordinal": 186,
+			"name": "Hammerspoon integrity (no global leaks, M.stop present, shutdown wired)",
+			"cmd": "node",
+			"args": ["tools/test/test-hammerspoon-integrity.cjs"],
+			"repro": "node tools/test/test-hammerspoon-integrity.cjs"
+		},
+		{
+			"id": "js-0176",
+			"ordinal": 188,
+			"name": "macOS bundle layout (build script + launcher mirror the repo)",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-bundle-layout.cjs"],
+			"repro": "node tools/test/test-macos-bundle-layout.cjs"
+		},
+		{
+			"id": "js-0177",
+			"ordinal": 189,
+			"name": "macOS bundle payload ships every path the runtime reads and no excluded group",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-bundle-payload.cjs"],
+			"repro": "npm run test:macos-bundle-payload"
+		},
+		{
+			"id": "js-0178",
+			"ordinal": 190,
+			"name": "macOS app ships the keyboard layout bundle its menu resolves (no \"No Ergopti bundle found\")",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-keyboard-layout-bundle.cjs"],
+			"repro": "npm run test:macos-keyboard-layout-bundle"
+		},
+		{
+			"id": "js-0179",
+			"ordinal": 191,
+			"name": "macOS launcher universal binary (arm64 + x86_64 verified)",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-launcher-universal.cjs"],
+			"repro": "node tools/test/test-macos-launcher-universal.cjs"
+		},
+		{
+			"id": "js-0180",
+			"ordinal": 192,
+			"name": "macOS native launcher CI (release build + XCTest + success-only aggregate)",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-swift-launcher-ci.cjs"],
+			"repro": "npm run test:macos-swift-launcher-ci"
+		},
+		{
+			"id": "js-0182",
+			"ordinal": 194,
+			"name": "macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)",
+			"cmd": "node",
+			"args": ["tools/test/run-macos-swift-launcher.cjs"],
+			"repro": "npm run test:macos-swift-launcher"
+		},
+		{
+			"id": "js-0183",
+			"ordinal": 195,
+			"name": "Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-package-layout.cjs"],
+			"repro": "node tools/test/test-linux-package-layout.cjs"
+		},
+		{
+			"id": "js-0184",
+			"ordinal": 196,
+			"name": "Linux bundle copies tracked bytes without per-file shell processes",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-tracked-copy.cjs"],
+			"repro": "node tools/test/test-linux-tracked-copy.cjs"
+		},
+		{
+			"id": "js-0194",
+			"ordinal": 206,
+			"name": "Compiled upgrade admission requires actual prior-package and committed full-save evidence",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-compiled-save-upgrade.cjs"],
+			"repro": "node tools/test/test-compiled-save-upgrade.cjs"
+		},
+		{
+			"id": "js-0198",
+			"ordinal": 210,
+			"name": "Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-canonical-pack-upgrade.cjs"],
+			"repro": "npm run test:linux-canonical-pack-upgrade"
+		},
+		{
+			"id": "js-0199",
+			"ordinal": 211,
+			"name": "Linux checkout installs ship the layout registry and its Ergopti extension hotstrings",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-install-layout-registry.cjs"],
+			"repro": "npm run test:linux-install-layout-registry"
+		},
+		{
+			"id": "js-0201",
+			"ordinal": 213,
+			"name": "release packaging workflow (live Windows stamp path + no Linux pipefail/SIGPIPE trap)",
+			"cmd": "node",
+			"args": ["tools/test/test-release-packaging-workflow.cjs"],
+			"repro": "node tools/test/test-release-packaging-workflow.cjs"
+		},
+		{
+			"id": "js-0206",
+			"ordinal": 219,
+			"name": "Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-launcher-deps.cjs"],
+			"repro": "node tools/test/test-linux-launcher-deps.cjs"
+		},
+		{
+			"id": "js-0211",
+			"ordinal": 224,
+			"name": "test:linux-updater-temp-receipt",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-updater-temp-native.cjs"],
+			"repro": "npm run test:linux-updater-temp-receipt"
+		},
+		{
+			"id": "js-0213",
+			"ordinal": 226,
+			"name": "test:linux-updater-archive-receipt",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-updater-archive-receipt.cjs"],
+			"repro": "npm run test:linux-updater-archive-receipt"
+		},
+		{
+			"id": "js-0215",
+			"ordinal": 228,
+			"name": "Linux native digest runtime preserves exact OpenSSL 3 projection and build owners",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-crypto-runtime.cjs"],
+			"repro": "npm run test:linux-crypto-runtime"
+		},
+		{
+			"id": "js-0216",
+			"ordinal": 229,
+			"name": "extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)",
+			"cmd": "node",
+			"args": ["tools/test/test-extensions-path-resolves.cjs"],
+			"repro": "node tools/test/test-extensions-path-resolves.cjs"
+		},
+		{
+			"id": "js-0217",
+			"ordinal": 230,
+			"name": "Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-bundle-manifest.cjs"],
+			"repro": "npm run test:windows-bundle-manifest"
+		},
+		{
+			"id": "js-0224",
+			"ordinal": 237,
+			"name": "launcher single-instance guard (LSMultipleInstancesProhibited in Info.plist)",
+			"cmd": "node",
+			"args": ["tools/test/test-launcher-single-instance.cjs"],
+			"repro": "node tools/test/test-launcher-single-instance.cjs"
+		},
+		{
+			"id": "js-0291",
+			"ordinal": 304,
+			"name": "macOS Sparkle feed, URL command, and sole-owner cadence",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-sparkle-feed.cjs"],
+			"repro": "node tools/test/test-macos-sparkle-feed.cjs"
+		},
+		{
+			"id": "js-0292",
+			"ordinal": 305,
+			"name": "macOS launcher declares every driver language so Sparkle windows follow it",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-launcher-localizations.cjs"],
+			"repro": "npm run test:macos-launcher-localizations"
+		},
+		{
+			"id": "js-0293",
+			"ordinal": 306,
+			"name": "macOS embedded Hammerspoon and native helper cannot update themselves",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-sparkle-disarmed-bundles.cjs"],
+			"repro": "npm run test:macos-sparkle-disarmed-bundles"
+		},
+		{
+			"id": "js-0294",
+			"ordinal": 307,
+			"name": "macOS app signed with the stable certificate when set, ad hoc loudly otherwise, identity never overwritten",
+			"cmd": "node",
+			"args": ["tools/test/test-macos-stable-signing-identity.cjs"],
+			"repro": "npm run test:macos-stable-signing-identity"
+		},
+		{
+			"id": "js-0295",
+			"ordinal": 308,
+			"name": "Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published",
+			"cmd": "node",
+			"args": ["tools/test/test-homebrew-cask.cjs"],
+			"repro": "npm run test:homebrew-cask"
+		},
+		{
+			"id": "js-0297",
+			"ordinal": 310,
+			"name": "updater copy shown before consent claims no download, in all 21 locales",
+			"cmd": "node",
+			"args": ["tools/test/test-updater-copy-before-consent.cjs"],
+			"repro": "npm run test:updater-copy-before-consent"
+		},
+		{
+			"id": "js-0298",
+			"ordinal": 311,
+			"name": "every updater catalogue string is shown by a driver",
+			"cmd": "node",
+			"args": ["tools/test/test-updater-copy-is-shown.cjs"],
+			"repro": "npm run test:updater-copy-is-shown"
+		},
+		{
+			"id": "js-0301",
+			"ordinal": 314,
+			"name": "Karabiner package identity is shared and cached bytes are verified",
+			"cmd": "node",
+			"args": ["tools/test/test-karabiner-package-manifest.cjs"],
+			"repro": "node tools/test/test-karabiner-package-manifest.cjs"
+		},
+		{
+			"id": "js-0305",
+			"ordinal": 318,
+			"name": "PTY process groups escalate and reap bounded descendants",
+			"cmd": "node",
+			"args": ["tools/test/test-pty-process-group-escalation.cjs"],
+			"repro": "npm run test:pty-process-group-escalation"
+		},
+		{
+			"id": "js-0318",
+			"ordinal": 331,
+			"name": "macOS guardian preserves public strict and offline signature flags",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-guardian-signature-flags.cjs"],
+			"repro": "node tools/test/test-macos-guardian-signature-flags.cjs"
+		},
+		{
+			"id": "js-0431",
+			"ordinal": 335,
+			"name": "Windows original updater Source and local context retain frozen native diagnostics",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-updater-original-source.cjs"],
+			"repro": "npm run test:windows-updater-original-source"
+		},
+		{
+			"id": "js-0342",
+			"ordinal": 357,
+			"name": "Windows children inherit only their own streams and a held capture is retried, not an error",
+			"cmd": "node",
+			"args": ["tools/test/test-windows-child-handle-inheritance.cjs"],
+			"repro": "npm run test:windows-child-handle-inheritance"
+		},
+		{
+			"id": "js-0360",
+			"ordinal": 376,
+			"name": "updater constants single source (owner/repo/timing literals match defaults.json)",
+			"cmd": "node",
+			"args": ["tools/test/test-updater-constants-single-source.cjs"],
+			"repro": "node tools/test/test-updater-constants-single-source.cjs"
+		},
+		{
+			"id": "js-0364",
+			"ordinal": 380,
+			"name": "changelog remote content and native bridge stay inside their authenticated boundary",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-security.cjs"],
+			"repro": "npm run test:changelog-security"
+		},
+		{
+			"id": "js-0365",
+			"ordinal": 381,
+			"name": "changelog release notes render as sanitized Markdown (DOM-only, repository links only)",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-markdown.cjs"],
+			"repro": "npm run test:changelog-markdown"
+		},
+		{
+			"id": "js-0367",
+			"ordinal": 383,
+			"name": "release bodies split into changelog, downloads, intro and footer (CI markers, legacy and feed bodies)",
+			"cmd": "node",
+			"args": ["tools/test/test-release-body-sections.cjs"],
+			"repro": "npm run test:release-body-sections"
+		},
+		{
+			"id": "js-0368",
+			"ordinal": 384,
+			"name": "update channel registry: shared vectors, locales, generated data and release tag families agree",
+			"cmd": "node",
+			"args": ["tools/test/test-update-channels-contract.cjs"],
+			"repro": "npm run test:update-channels-contract"
+		},
+		{
+			"id": "js-0369",
+			"ordinal": 385,
+			"name": "update-check schedule: shared vectors, presets, locales and generated Windows data agree",
+			"cmd": "node",
+			"args": ["tools/test/test-update-schedule-contract.cjs"],
+			"repro": "npm run test:update-schedule-contract"
+		},
+		{
+			"id": "js-0371",
+			"ordinal": 387,
+			"name": "Versions page: tabs change the view, the banner subscribes through the host",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-channel-sync.cjs"],
+			"repro": "npm run test:changelog-channel-sync"
+		},
+		{
+			"id": "js-0374",
+			"ordinal": 390,
+			"name": "Versions page: one click installs a chosen release through the host, restore banner",
+			"cmd": "node",
+			"args": ["tools/test/test-changelog-release-install.cjs"],
+			"repro": "npm run test:changelog-release-install"
+		},
+		{
+			"id": "js-0375",
+			"ordinal": 391,
+			"name": "release install: only clicks install on every driver, one set of install reasons",
+			"cmd": "node",
+			"args": ["tools/test/test-release-install-contract.cjs"],
+			"repro": "npm run test:release-install-contract"
+		},
+		{
+			"id": "js-0376",
+			"ordinal": 392,
+			"name": "one installed-build-or-source-run owner per driver; Uninstall greyed on a source run",
+			"cmd": "node",
+			"args": ["tools/test/test-source-run-single-owner.cjs"],
+			"repro": "npm run test:source-run-single-owner"
+		},
+		{
+			"id": "js-0388",
+			"ordinal": 404,
+			"name": "HS-274 native run refuses a Hammerspoon consumer on Linux while the producer and consumer baseline versions differ",
+			"cmd": "node",
+			"args": ["tools/test/test-hs274-baseline-contract.cjs"],
+			"repro": "npm run test:hs274-baseline-contract"
+		}
+	]
+}

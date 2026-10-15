@@ -3,15 +3,14 @@
 /** Source admission only; never executes a native test or treats its result as green. */
 module.exports = function causalEnrollment(pipeline) {
 	const MACOS_BOX = '.github/workflows/ci-macos.yml';
-	const NOT_CANCELLED = '${{ !cancelled() }}';
+	const stageSource = require('./macos-stage-source.cjs');
+	const NOT_CANCELLED = stageSource.condition('managed-ollama-native', '${{ !cancelled() }}');
 	// Prospective native causal enrollment: parse owned steps, not whole implementation strings.
 	const NUMBER_ROW_CAUSAL_NAME = 'Receive native final-byte number-row causal refusal';
 	const NUMBER_ROW_CAUSAL_KEEP = 'Retain native final-byte number-row causal diagnostics';
 	function problems(files) {
 		const mac = files.find((entry) => entry.rel === MACOS_BOX)?.text ?? '';
-		const jobs = pipeline
-			.jobsOfText(mac, MACOS_BOX)
-			.filter((job) => job.id === 'managed-ollama-native');
+		const jobs = pipeline.jobsOfText(mac, MACOS_BOX).filter((job) => job.id === 'e2e-hs');
 		if (jobs.length !== 1) return ['one causal native owner job required'];
 		const steps = pipeline.steps(jobs[0].body);
 		const cohort = pipeline.step(jobs[0].body, NUMBER_ROW_CAUSAL_NAME);
@@ -21,7 +20,11 @@ module.exports = function causalEnrollment(pipeline) {
 			if (!ok) problems.push(label);
 		};
 		require(pipeline.stepField(cohort, 'if') === NOT_CANCELLED, 'causal cohort remains mandatory');
-		require(pipeline.stepField(keep, 'if') === 'always()', 'causal retention remains mandatory');
+		require(pipeline.stepField(keep, 'if') ===
+			stageSource.condition(
+				'managed-ollama-native',
+				'always()'
+			), 'causal retention remains mandatory');
 		for (const body of [cohort, keep])
 			require(pipeline.stepField(body, 'continue-on-error') ===
 				null, 'causal failure remains fatal');
@@ -232,9 +235,7 @@ module.exports = function causalEnrollment(pipeline) {
 	function admit(mac) {
 		try {
 			if (problems([{ rel: MACOS_BOX, text: mac }]).length !== 0) return null;
-			const job = pipeline
-				.jobsOfText(mac, MACOS_BOX)
-				.find((job) => job.id === 'managed-ollama-native');
+			const job = pipeline.jobsOfText(mac, MACOS_BOX).find((job) => job.id === 'e2e-hs');
 			const owned = pipeline.step(job.body, NUMBER_ROW_CAUSAL_NAME);
 			const filter = "--filter '(^|[.])NumberRowSourceProbeTests($|[/.])'";
 			// Remove only this strict independently received selector, not a foreign filter.

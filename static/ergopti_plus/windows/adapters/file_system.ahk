@@ -1082,3 +1082,22 @@ FSConfigDeleteStrict(Path, AdmissionFn := 0) {
 		return Delete.Call(Path)
 	} finally Critical(PreviousCritical)
 }
+
+
+/** Writes a strict UTF-8 stage and retains the original close-before-move order. */
+FSWriteUtf8ReplaceStrict(Path, Text) {
+	Utf8ReplacementStream := FileOpen(Path . ".tmp", "w", "UTF-8-RAW")
+	try Utf8ReplacementStream.Write(Text)
+	finally Utf8ReplacementStream.Close()
+	FileMove(Path . ".tmp", Path, true)
+}
+
+/** Encodes the complete UTF-8 image without its additional terminator byte. */
+FSUtf8Bytes(Content) {
+	Size := StrPut(Content, "UTF-8") - 1
+	Bytes := Buffer(Size, 0)
+	Encoded := Buffer(Size + 1, 0)
+	StrPut(Content, Encoded, "UTF-8")
+	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
+	return Bytes
+}

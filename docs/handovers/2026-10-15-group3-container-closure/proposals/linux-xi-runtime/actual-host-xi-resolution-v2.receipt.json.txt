@@ -1,0 +1,16 @@
+{
+  "scope": "Actual Linux pkg-config and ELF SONAME resolution only; no runtime staging/build/install/Xorg delivery claim",
+  "source_sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5",
+  "initial_direct_children": [],
+  "pkg_config_path": "/workspace/.ergopti-cloud/runtime/usr/lib/x86_64-linux-gnu/pkgconfig:/workspace/.ergopti-cloud/runtime/usr/share/pkgconfig",
+  "status": "PASS",
+  "actual_sources": [
+    "/usr/lib/x86_64-linux-gnu/libXi.so.6.1.0"
+  ],
+  "resolved_elf_sha256": [
+    "8ca60a4e6a90bba494e601e03e792b2d440cced9985deca64431abbd78613adb"
+  ],
+  "terminal_direct_children": [],
+  "elapsed_seconds": 1.8871994950459339,
+  "source_unchanged": true
+}

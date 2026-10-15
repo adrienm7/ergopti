@@ -12,6 +12,8 @@
 
 'use strict';
 
+const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -237,9 +239,15 @@ for (const file of [
 }
 assert.deepEqual(failures, [], 'explicit full verification cannot omit declared suites');
 assert.equal(GATE_COMMANDS['report-style'].npm, 'lint:conventions:strict');
-assert.match(
-	fs.readFileSync(path.join(__dirname, 'run-js-suite.cjs'), 'utf8'),
-	/args: \['run', '--silent', 'lint:conventions:strict'\]/,
+assert.equal(
+	loadInventory(path.resolve(__dirname, '../..')).checks.filter(
+		(check) =>
+			check.cmd === 'npm' &&
+			JSON.stringify(check.args) ===
+				JSON.stringify(['run', '--silent', 'lint:conventions:strict']) &&
+			!check.platforms
+	).length,
+	1,
 	'the JS suite must retain the exact command that subsumes report-style'
 );
 console.log(

@@ -81,6 +81,7 @@ local _runtime_closed = false
 local _runtime_owner, _runtime_request = nil, nil
 local retire_runtime_request, stop_runtime_app
 local _request_epoch = 0
+local Collision = { navigation = NavigationSettings.capture_collision_configuration }
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
 -- tells the user it was refused (a desktop notification in the daemon).
@@ -468,17 +469,25 @@ end
 --- @param opts table|nil
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
+	Collision.construction = nil
 	if stop_runtime_app and not stop_runtime_app() then return false end
 	if _runtime_closed or _scope_owner then return false end
 	_runtime_owner, _runtime_response_ports = nil, nil
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _runtime_closed or _scope_owner then return false end
 	_enable_generation = _enable_generation + 1
+	local collision_revision, collision_construction = _enable_generation
 	local options = type(opts) == "table" and opts or {}
 	_engine = options.engine
 	_keyboard_hook = options.keyboard_hook
 	_overlay = type(options.overlay) == "table" and options.overlay or nil
 	_apply_prediction = type(options.apply_prediction) == "function" and options.apply_prediction or nil
+	-- Capture actual capabilities before later constructor collaborators run.
+	if _overlay == nil or getmetatable(_overlay) == nil then
+		collision_construction = { overlay = _overlay, apply = _apply_prediction,
+			move = _overlay and rawget(_overlay, "move"), showing = _overlay and rawget(_overlay, "is_showing"),
+			active = _overlay and rawget(_overlay, "active_index") }
+	end
 	_on_output = type(options.on_output) == "function" and options.on_output or nil
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
@@ -527,6 +536,8 @@ function M.init(opts)
 	end
 	Logger.success(LOG, "Prediction engine initialised (triggers=%d, max_context=%d).",
 		#_triggers, max_context_chars())
+	-- A nested initialization cannot lend its revision to the interrupted caller.
+	Collision.construction = collision_revision == _enable_generation and collision_construction or nil
 end
 
 --- Processes one physical character after the hotstring buffer recorded it.
@@ -3363,5 +3374,92 @@ function M.apply_configuration(owner, snapshot)
 	if not _enabled then M.stop_live("AI switched off", false) end
 	return _enabled == snapshot.enabled
 end
+
+-- Isolate observer locals from this large original engine chunk.
+(function()
+
+	local collision_init, collision_handle, collision_accept = M.init, M.handle_shortcut, M.accept
+	local collision_tab, collision_digit_table = EvdevCodes.KEY_TAB, EvdevCodes.DIGIT_ROW_SLOT
+	local collision_digits = {}
+	for code, slot in pairs(collision_digit_table) do collision_digits[code] = slot end
+	local collision_arrows = {}
+	for code, step in pairs(ARROW_NAVIGATION_DELTA) do collision_arrows[code] = step end
+
+	local function collision_modifiers(chord)
+		local result = {}
+		for _, role in ipairs(chord) do result[role == "cmd" and "super" or role] = true end
+		return result
+	end
+
+	local function collision_roles_current()
+		if not rawequal(package.loaded["infra.evdev_codes"], EvdevCodes) or EvdevCodes.KEY_TAB ~= collision_tab
+			or not rawequal(EvdevCodes.DIGIT_ROW_SLOT, collision_digit_table)
+			or getmetatable(collision_digit_table) ~= nil then return false end
+		for code, slot in pairs(collision_digit_table) do if collision_digits[code] ~= slot then return false end end
+		for code, slot in pairs(collision_digits) do if collision_digit_table[code] ~= slot then return false end end
+		for code, step in pairs(ARROW_NAVIGATION_DELTA) do if collision_arrows[code] ~= step then return false end end
+		for code, step in pairs(collision_arrows) do if ARROW_NAVIGATION_DELTA[code] ~= step then return false end end
+		return true
+	end
+
+	--- Captures the genuine configured tooltip input domain, without polling an offer.
+	--- This observes original construction/preferences; it grants no native/output rights.
+	--- @return table|nil frame Detached configured claims and original lifetime guards.
+	function M.capture_collision_inventory()
+		local construction = Collision.construction
+		if type(construction) ~= "table" or _scope_owner or not _runtime_closed and _enabled ~= true
+			or type(Collision.navigation) ~= "function" then return nil end
+		local captured, navigation = pcall(Collision.navigation)
+		if not captured or type(navigation) ~= "table" or type(navigation.current) ~= "function"
+			or type(navigation.sealed) ~= "function" or navigation.current() ~= true
+			or type(_enabled) ~= "boolean" or navigation.enabled ~= _enabled then return nil end
+		local enabled, closed, revision, request, app = _enabled, _runtime_closed, _enable_generation, _request_epoch, _runtime_app_epoch
+		local overlay, pause = _overlay, _is_paused
+		local function runtime()
+			if not rawequal(package.loaded["modules.llm.prediction_engine"], M) or getmetatable(M) ~= nil
+				or M.init ~= collision_init or M.handle_shortcut ~= collision_handle or M.accept ~= collision_accept
+				or M.capture_collision_inventory ~= Collision.factory or not rawequal(Collision.construction, construction)
+				or _runtime_closed ~= closed or _scope_owner or _enabled ~= enabled or _enable_generation ~= revision
+				or _request_epoch ~= request or _runtime_app_epoch ~= app
+				or _is_paused ~= pause or not rawequal(_overlay, overlay) or not rawequal(overlay, construction.overlay)
+				or _apply_prediction ~= construction.apply or not collision_roles_current()
+				or not rawequal(package.loaded["modules.llm.navigation_settings"], NavigationSettings)
+				or NavigationSettings.capture_collision_configuration ~= Collision.navigation
+				or navigation.sealed() ~= true then return false end
+			return overlay == nil or getmetatable(overlay) == nil and rawget(overlay, "move") == construction.move
+				and rawget(overlay, "is_showing") == construction.showing and rawget(overlay, "active_index") == construction.active
+		end
+		local function current()
+			return runtime() and navigation.current() == true and runtime()
+		end
+		if not current() then return nil end
+		local claims = {}
+		if not closed then
+			local validation_mods, navigation_mods = collision_modifiers(navigation.validation), collision_modifiers(navigation.navigation)
+			if type(construction.move) == "function" then
+				for code in pairs(collision_arrows) do
+					claims[#claims + 1] = { kind = "chord", binding = "prediction__navigation", code = code, mods = navigation_mods }
+				end
+				claims[#claims + 1] = { kind = "chord", binding = "prediction__shift_tab", code = collision_tab, mods = { shift = true } }
+			end
+			for code, slot in pairs(collision_digits) do
+				claims[#claims + 1] = { kind = "chord", binding = "prediction__digit_" .. slot, code = code, mods = validation_mods }
+			end
+			for digit = 0, 9 do
+				for _, prefix in ipairs({ "", "kp", "kp_" }) do
+					claims[#claims + 1] = { kind = "logical", binding = "prediction__logical_digit_" .. digit,
+						key = prefix .. digit, mods = validation_mods }
+				end
+			end
+			-- A live/agent request can legitimately create a future plain-Tab offer.
+			claims[#claims + 1] = { kind = "chord", binding = "prediction__live_agent_tab", code = collision_tab, mods = {} }
+		end
+		if not current() then return nil end
+		return { path = navigation.path, content = navigation.content, status = navigation.status,
+			claims = claims, current = current, sealed = runtime }
+	end
+	Collision.factory = M.capture_collision_inventory
+
+end)()
 
 return M

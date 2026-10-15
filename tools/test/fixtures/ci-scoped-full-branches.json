@@ -17,14 +17,14 @@
 	"protocols": [
 		{
 			"scope": "core-js-suite",
-			"prefix": "set -euo pipefail\nmode=full\nif [ \"${{ matrix.suite }}\" = js ]; then\n    receipt=\"$RUNNER_TEMP/stable-core-js-suite.json\"\n    node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt \"$receipt\"\n    mode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt \"$receipt\")\"\nfi\nif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'\nelif [ \"$mode\" = full ]; then\n",
+			"prefix": "set -euo pipefail\nmode=full\nif [ \"${{ steps.common-lot.outputs.suite }}\" = js ]; then\n    receipt=\"$RUNNER_TEMP/stable-core-js-suite.json\"\n    node tools/ci/dev-release-qualification.cjs --scope core-js-suite --receipt \"$receipt\"\n    mode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt \"$receipt\")\"\nfi\nif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] core-js-suite: qualified=false; properties and mutation unchanged.'\nelif [ \"$mode\" = full ]; then\n",
 			"suffix": "\nelse\n    exit 1\nfi",
 			"strip": 4,
 			"format": "bash"
 		},
 		{
 			"scope": "macos-native-pac",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-pac-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile \"$receipt\")\"\nnative_pac_skip_args=()\npac_evidence_args=()\nif [ \"$mode\" = deferred ]; then\n    if [ \"$profile\" = stable-v1-0-1-20261011-four-macos-native-scopes ]; then\n        native_pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$receipt\")\")\n        pac_evidence_args=(--pac-qualification-receipt \"$receipt\")\n        echo \"[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false.\"\n    elif [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n        echo \"[DEFERRED] macos-native-pac: legacy cohort not executed; qualified=false.\"\n        exit 0\n    else\n        exit 1\n    fi\nelif [ \"$mode\" = full ]; then\n    test -z \"$profile\"\nelse\n    exit 1\nfi\n",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-pac-${{ env.MACOS_STAGE_ARCHITECTURE }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --validate-scope-receipt-profile \"$receipt\")\"\nnative_pac_skip_args=()\npac_evidence_args=()\nif [ \"$mode\" = deferred ]; then\n    if [ \"$profile\" = stable-v1-0-1-20261011-four-macos-native-scopes ]; then\n        native_pac_skip_args=(--skip \"$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern \"$receipt\")\")\n        pac_evidence_args=(--pac-qualification-receipt \"$receipt\")\n        echo \"[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false.\"\n    elif [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n        echo \"[DEFERRED] macos-native-pac: legacy cohort not executed; qualified=false.\"\n        exit 0\n    else\n        exit 1\n    fi\nelif [ \"$mode\" = full ]; then\n    test -z \"$profile\"\nelse\n    exit 1\nfi\n",
 			"suffix": "",
 			"strip": 0,
 			"format": "bash",
@@ -49,14 +49,14 @@
 		},
 		{
 			"scope": "macos-native-http",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile \"$receipt\")\"\nif [ \"$mode\" = deferred ] && [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n    echo \"[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false.\"\n    exit 0\nfi\nstatus=0\nif [ \"$mode\" = deferred ]; then\n    test \"$profile\" = stable-v1-0-1-20261011-four-macos-native-scopes\n    \"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    \"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n    echo \"[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-http-${{ env.MACOS_STAGE_ARCHITECTURE }}.json\"\nmkdir -p \"$(dirname \"$receipt\")\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt \"$receipt\")\"\nprofile=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt-profile \"$receipt\")\"\nif [ \"$mode\" = deferred ] && [ \"$profile\" = stable-v1-20261009-macos-native-deferred ]; then\n    echo \"[DEFERRED] macos-native-http: legacy cohort not executed; qualified=false.\"\n    exit 0\nfi\nstatus=0\nif [ \"$mode\" = deferred ]; then\n    test \"$profile\" = stable-v1-0-1-20261011-four-macos-native-scopes\n    \"$ERGOPTI_NATIVE_HTTP_PYTHON\" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    \"$ERGOPTI_NATIVE_HTTP_PYTHON\" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n    echo \"[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false.\"\nelif [ \"$mode\" = full ]; then\n",
 			"suffix": "\nelse\n    echo \"Invalid command qualification disposition\" >&2\n    exit 1\nfi\nexit \"$status\"",
 			"strip": 4,
 			"format": "bash"
 		},
 		{
 			"scope": "macos-native-model-receiving",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-model-receiving-${{ matrix.architecture }}.json\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] macos-native-model-receiving: qualified=false; producer/catalogue/assets still mandatory.'\nelif [ \"$mode\" = full ]; then\n",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-macos-native-model-receiving-${{ env.MACOS_STAGE_ARCHITECTURE }}.json\"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope macos-native-model-receiving --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo '[DEFERRED] macos-native-model-receiving: qualified=false; producer/catalogue/assets still mandatory.'\nelif [ \"$mode\" = full ]; then\n",
 			"suffix": "\nelse\n    exit 1\nfi",
 			"strip": 0,
 			"format": "bash"
@@ -159,26 +159,26 @@
 	],
 	"slots": [
 		{
-			"file": ".github/workflows/ci.yml",
-			"job": "core",
+			"file": ".github/workflows/ci-common.yml",
+			"job": "shared-validation",
 			"step": "Run shared validation suite",
 			"protocol": 0
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Qualify actual native PAC and WPAD XCTest controls",
 			"protocol": 1
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Receive actual independent managed HTTP native clients",
 			"protocol": 2
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"step": "Receive actual native model create, pull, inference and retirement",
 			"protocol": 3
 		},
@@ -1123,7 +1123,7 @@
 			"job": "package-macos",
 			"step": "Receive actual managed HTTP native clients",
 			"protocol": 12,
-			"owner_job": "managed-ollama-native",
+			"owner_job": "e2e-hs",
 			"owner_step": "Receive actual independent managed HTTP native clients"
 		},
 		{
@@ -1131,7 +1131,7 @@
 			"job": "package-macos",
 			"step": "Run Swift launcher tests",
 			"protocol": 13,
-			"owner_job": "managed-ollama-native",
+			"owner_job": "e2e-hs",
 			"owner_step": "Qualify actual native PAC and WPAD XCTest controls"
 		}
 	],
@@ -1141,32 +1141,39 @@
 	},
 	"retained_steps": [
 		{
-			"file": ".github/workflows/ci.yml",
-			"job": "core",
+			"file": ".github/workflows/ci-common.yml",
+			"job": "shared-validation",
+			"name": "Retain shared validation timings, including interrupted runs",
+			"condition": "always() && steps.common-lot.outputs.suite == 'js'",
+			"body": "      - name: Retain shared validation timings, including interrupted runs\n        if: always() && steps.common-lot.outputs.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: core-js-timings-${{ steps.common-lot.outputs.feature }}\n          path: ${{ runner.temp }}/ergopti-js-suite-*/timings.ndjson\n          if-no-files-found: warn\n          overwrite: true"
+		},
+		{
+			"file": ".github/workflows/ci-common.yml",
+			"job": "shared-validation",
 			"name": "Retain the source-bound Core JavaScript qualification",
-			"condition": "always() && matrix.suite == 'js'",
-			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && matrix.suite == 'js'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn"
+			"condition": "always() && steps.common-lot.outputs.suite == 'js' && steps.common-lot.outputs.feature == 'test-infrastructure'",
+			"body": "      - name: Retain the source-bound Core JavaScript qualification\n        if: always() && steps.common-lot.outputs.suite == 'js' && steps.common-lot.outputs.feature == 'test-infrastructure'\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-core-js\n          path: ${{ runner.temp }}/stable-core-js-suite.json\n          if-no-files-found: warn\n          overwrite: true"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
-			"job": "managed-ollama-native",
+			"job": "e2e-hs",
 			"name": "Retain source-bound managed-ollama-native qualification receipts",
-			"condition": "always()",
-			"body": "      - name: Retain source-bound managed-ollama-native qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-managed-ollama-native-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"condition": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}",
+			"body": "      - name: Retain source-bound managed-ollama-native qualification receipts\n        env:\n          GOTOOLCHAIN: 'local'\n          ERGOPTI_RELEASE: \"${{ inputs.release && 'true' || 'false' }}\"\n          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'\n          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'\n          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'\n          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "test-hs",
 			"name": "Retain source-bound test-hs qualification receipts",
 			"condition": "always()",
-			"body": "      - name: Retain source-bound test-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-test-hs-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"body": "      - name: Retain source-bound test-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "e2e-hs",
 			"name": "Retain source-bound e2e-hs qualification receipts",
-			"condition": "always()",
-			"body": "      - name: Retain source-bound e2e-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-e2e-hs-${{ matrix.architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"condition": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}",
+			"body": "      - name: Retain source-bound e2e-hs qualification receipts\n        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'e2e-hs' && (always()) }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-e2e-hs-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-windows.yml",
@@ -1195,6 +1202,18 @@
 			"name": "Retain the contained simultaneous qualification",
 			"condition": "always()",
 			"body": "      - name: Retain the contained simultaneous qualification\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-simultaneous-contained\n          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json\n          if-no-files-found: warn"
+		}
+	],
+	"receipt_consumers": [
+		{
+			"file": ".github/workflows/ci-common.yml",
+			"job": "common-e2e",
+			"step": "Require every declared check exactly once",
+			"scope": "core-js-suite",
+			"issuer_job": "shared-validation",
+			"issuer_step": "Run shared validation suite",
+			"body": "set -euo pipefail\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope core-js-suite --validate-scope-receipt qualification/stable-core-js-suite.json)\"\nif [ \"$mode\" = full ]; then\n    node tools/ci/validate-js-feature-results.cjs feature-timings\nelif [ \"$mode\" = deferred ]; then\n    node tools/ci/validate-js-feature-results.cjs --admit-jobs\n    echo '[DEFERRED] core-js-suite: qualified=false; no complete unit qualification claimed.'\nelse\n    exit 1\nfi",
+			"issuer_command": "npm run test:js"
 		}
 	]
 }

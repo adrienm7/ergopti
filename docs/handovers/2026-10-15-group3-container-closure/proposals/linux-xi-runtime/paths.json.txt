@@ -1,0 +1,114 @@
+[
+  {
+    "path": "static/ergopti_plus/_shared/data/linux_native_runtime.json",
+    "before_sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195",
+    "after_sha256": "972e25b015254fb8cbbe8f47d152a4defade5d1581cedc2f85852a5ecb58ab4b",
+    "postimage_git_blob": "6af0c57b5a2f4981b7a150e1073341cfda616d47",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "static/ergopti_plus/linux/_generated/native_runtime.lua",
+    "before_sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2",
+    "after_sha256": "9afad06eb92d8052cc2a4c120d24b07bb75b8a1354cd0a351cbb506b3edb8ecb",
+    "postimage_git_blob": "d6c11a7805730e17a57ab864b83c6caea14fe71c",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "static/ergopti_plus/linux/install.sh",
+    "before_sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c",
+    "after_sha256": "e3eff9cdc07478d8f19904eb07e3a811f2372d4ef5e72c098076d6dc90005873",
+    "postimage_git_blob": "876ecce34f31357c5dc53b6026331b04e9ccc9e8",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "tools/build/PKGBUILD",
+    "before_sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4",
+    "after_sha256": "aa82576efe787fc6fc3823a6a43b09e4d50507bb352b8f4d4fa6c39c1a8d0a52",
+    "postimage_git_blob": "f9f9cca4bea51979f49e8e85628695c8d0e421bc",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "tools/build/build-linux-deb.sh",
+    "before_sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989",
+    "after_sha256": "9ed45e868343b06c520ce8992b3f8f7b1fd5bc77ca68a8b4cf2176a57fef4394",
+    "postimage_git_blob": "71a8df399c52e6861ecd15a6166d271220ee9dc1",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "tools/build/build-linux-rpm.sh",
+    "before_sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd",
+    "after_sha256": "f0b35991fe9fde307950320d93e43f625dac6b8c632c29c908d75851b641dd32",
+    "postimage_git_blob": "b986d2b82f22eca6337bc40bf9d940468d9bb23b",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "tools/build/nix/flake.nix",
+    "before_sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e",
+    "after_sha256": "b49dd7469e1f6afc0b867114adca6de4ec596e7c869bdbaa88032c4538fec08d",
+    "postimage_git_blob": "0090cc201f203570ac321a1fe5d9cf733c96b7ec",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "authentic generator"
+  },
+  {
+    "path": "tools/build/stage-linux-network-runtime.py",
+    "before_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
+    "after_sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5",
+    "postimage_git_blob": "81ea10db8d8ff378982640d086c527e3a2aaefc9",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/codegen/codegen-linux-native-runtime.cjs",
+    "before_sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1",
+    "after_sha256": "16fcecd2052945b71fc75d4363d629063625d4b3f26669060c6afb70e307b0b0",
+    "postimage_git_blob": "186458247f38fd240b4ad04772a9851d87250cc9",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/test/fixtures/validation-curl/PINS.json",
+    "before_sha256": "e46c8011cf4a8da400dff797c3f09d34ac5cdc91fb04bbebbd4b44466432c8de",
+    "after_sha256": "56306512de94e8ba37ce55f841fc495ccffbc750f40a03dd6695eb23a09dc307",
+    "postimage_git_blob": "c1d358d472e9e9a41a1577b38b55fad6bb0a2e99",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/test/test-linux-crypto-runtime.cjs",
+    "before_sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf",
+    "after_sha256": "e2b7884ebed73d50a205ac9b6131cd60dfcf0c827c501619bc8e2640f944c388",
+    "postimage_git_blob": "a60871ec25568e9433cc14f82ff1812c28ec6c64",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/test/test-linux-launcher-deps.cjs",
+    "before_sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411",
+    "after_sha256": "8e919b2cbb4e3a6a47961bd833485a2f338f2fde9813f3c40a67ce9fb60fd713",
+    "postimage_git_blob": "6a4bb796194835d709ba99fa0d679e80df0b0965",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/test/test-linux-network-runtime.cjs",
+    "before_sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e",
+    "after_sha256": "29a278278f5fdc448cdbdc0e82ec0ac13486dec6327b919f468b09ccccbf532c",
+    "postimage_git_blob": "d87102b5b4f3fd5acdd609e9f289d44bb87a2df1",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  },
+  {
+    "path": "tools/test/test-linux-portable-network-runtime.cjs",
+    "before_sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a",
+    "after_sha256": "eadd092dc896c3aa491aaea4d9048d30ca40d60068ea2f7d716a92ea8eb1fc0e",
+    "postimage_git_blob": "47efdce0dd59037fcf3ed3f8c16a872327c05938",
+    "same_authentic_historical_postimage": true,
+    "artifact_owner": "source recovery"
+  }
+]

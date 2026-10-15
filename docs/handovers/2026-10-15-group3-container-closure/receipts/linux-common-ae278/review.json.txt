@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "verdict": "SOURCE_BOUND_ACTUAL_LINUX_COMMON_ARTIFACTS_RECEIVED",
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "run": "38766625752",
+  "attempt": "1",
+  "summary_sha256": "67281a585cdbe1b860ea9d6f0ed6f1ad0f59c663c91d03be7fa104e173ad2ef6",
+  "report_sha256": "080e330761375a6a6432fd87051da6ee1ca0339c58c255dfe81e7e706f4108ce",
+  "source_pins_sha256": "1a3efeb4ea8d3e21f4fa1e0f2104d6c9c169a171b3f2aa83dad4d1356017565d",
+  "common_exact_once_passed": 435,
+  "common_actual_producer_jobs": 11,
+  "linux_unit_passed": 13857,
+  "linux_unit_failed": 0,
+  "linux_e2e_passed": 193,
+  "linux_e2e_total": 193,
+  "linux_stage_documents": 20,
+  "linux_install_instances": 17,
+  "native_model_passed": true,
+  "xi2_scope": "CONTROLLED_ABI29_COOKIES3_NO_INPUT_EPOCH_GRANT",
+  "windows_current_status": "not re-queried; saved checkpoint in_progress",
+  "reviewer_test_or_native_actor_execution": false
+}

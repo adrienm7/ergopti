@@ -1,0 +1,271 @@
+{
+	"schema_version": 1,
+	"feature": "release-ci",
+	"checks": [
+		{
+			"id": "js-0424",
+			"ordinal": 9,
+			"name": "Windows Group 7 receipt parser refuses incomplete and malformed native evidence",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/diagnostics/test_windows_group7_receipt.cjs"],
+			"repro": "node tools/diagnostics/test_windows_group7_receipt.cjs"
+		},
+		{
+			"id": "js-0003",
+			"ordinal": 15,
+			"name": "native XI2 three-cookie CI preserves original family and source receipts",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-xi2-cookie-ci-contract.cjs"],
+			"repro": "npm run test:linux-xi2-cookie-ci-contract"
+		},
+		{
+			"id": "js-0004",
+			"ordinal": 16,
+			"name": "macOS native PAC and WPAD qualification requires all twelve original cases",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-native-pac-qualification.cjs"],
+			"repro": "npm run test:macos-native-pac-qualification"
+		},
+		{
+			"id": "js-0005",
+			"ordinal": 17,
+			"name": "macOS archive qualification requires exact native cases and compiler inputs",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-item36-native-qualification.cjs"],
+			"repro": "node tools/test/test-item36-native-qualification.cjs"
+		},
+		{
+			"id": "js-0006",
+			"ordinal": 18,
+			"name": "Signed native query CI publisher retains compiler and nested-signature provenance",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-automation-query-ci-publisher.cjs"],
+			"repro": "npm run test:automation-query-ci-publisher"
+		},
+		{
+			"id": "js-0007",
+			"ordinal": 19,
+			"name": "dev156 qualification deferrals retain full default execution and strict accounting",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-dev-release-qualification.cjs"],
+			"repro": "npm run test:dev-release-qualification"
+		},
+		{
+			"id": "js-0008",
+			"ordinal": 20,
+			"name": "macOS launch qualification retains strict source and lifecycle evidence",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-launch-qualification.cjs"],
+			"repro": "node tools/test/test-macos-launch-qualification.cjs"
+		},
+		{
+			"id": "js-0009",
+			"ordinal": 21,
+			"name": "macOS launch qualification models restore environment and owned resources",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-launch-qualification-lifetime.cjs"],
+			"repro": "node tools/test/test-macos-launch-qualification-lifetime.cjs"
+		},
+		{
+			"id": "js-0010",
+			"ordinal": 22,
+			"name": "source toolchain admission preserves genuine compiler, headers and checkout",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-source-toolchain.cjs"],
+			"repro": "npm run test:linux-source-toolchain"
+		},
+		{
+			"id": "js-0011",
+			"ordinal": 23,
+			"name": "openSUSE first-install prep and requested-capability diagnostics retain native refusal",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-opensuse-first-install-tooling.cjs"],
+			"repro": "npm run test:opensuse-first-install-tooling"
+		},
+		{
+			"id": "js-0012",
+			"ordinal": 24,
+			"name": "Nix runtime receipts and hosted registration preserve native admission",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-linux-nix-native.cjs"],
+			"repro": "node tools/test/test-linux-nix-native.cjs"
+		},
+		{
+			"id": "js-0013",
+			"ordinal": 25,
+			"name": "Ubuntu CI dependencies retain signed archive scope and native failure status",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-ubuntu-ci-acquisition.cjs"],
+			"repro": "npm run test:ubuntu-ci-acquisition"
+		},
+		{
+			"id": "js-0126",
+			"ordinal": 138,
+			"name": "Kana installer refuses local execution and owns its native helper",
+			"cmd": "node",
+			"args": ["tools/test/test-ci-kana-install.cjs"],
+			"repro": "node tools/test/test-ci-kana-install.cjs"
+		},
+		{
+			"id": "js-0181",
+			"ordinal": 193,
+			"name": "native Swift XCTest evidence preserves failures and original pipeline statuses",
+			"cmd": "node",
+			"args": ["tools/test/test-swift-xctest-evidence.cjs"],
+			"repro": "npm run test:swift-xctest-evidence"
+		},
+		{
+			"id": "js-0187",
+			"ordinal": 199,
+			"name": "Linux native FD digest admission requires completed physical receipts",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-fd-sha256-native-gate.cjs"],
+			"repro": "npm run test:linux-fd-sha256-native-gate"
+		},
+		{
+			"id": "js-0188",
+			"ordinal": 200,
+			"name": "Linux CI requires successful mandatory jobs and assertion evidence",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-ci-evidence.cjs"],
+			"repro": "npm run test:linux-ci-evidence"
+		},
+		{
+			"id": "js-0189",
+			"ordinal": 201,
+			"name": "Linux native window receipts retain mandatory npm, planner and CI owners",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-window-switch-registration.cjs"],
+			"repro": "npm run test:linux-window-switch-registration"
+		},
+		{
+			"id": "js-0190",
+			"ordinal": 202,
+			"name": "Linux native streaming receipts retain mandatory npm, planner and CI owners",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-http-stream-registration.cjs"],
+			"repro": "npm run test:linux-http-stream-registration"
+		},
+		{
+			"id": "js-0191",
+			"ordinal": 203,
+			"name": "Linux native runtime prerequisite gate retains both ABIs and mandatory receipts",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-runtime-native-registration.cjs"],
+			"repro": "npm run test:linux-runtime-native-registration"
+		},
+		{
+			"id": "js-0192",
+			"ordinal": 204,
+			"name": "Desktop verdicts and parallel shared-core gates",
+			"cmd": "node",
+			"args": ["tools/test/test-desktop-ci-evidence.cjs"],
+			"repro": "npm run test:desktop-ci-evidence"
+		},
+		{
+			"id": "js-0193",
+			"ordinal": 205,
+			"name": "Windows native desktop cohorts require exact native completion and mandatory evidence",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-windows-native-desktop.cjs"],
+			"repro": "npm run test:windows-native-desktop"
+		},
+		{
+			"id": "js-0200",
+			"ordinal": 212,
+			"name": "openSUSE CI package installs use the coherent origin instead of a redirecting mirror",
+			"cmd": "node",
+			"args": ["tools/test/test-opensuse-ci-origin.cjs"],
+			"repro": "node tools/test/test-opensuse-ci-origin.cjs"
+		},
+		{
+			"id": "js-0202",
+			"ordinal": 214,
+			"name": "CI pipeline loader refuses every missing lookup and unreadable layout (fixture self-test)",
+			"cmd": "node",
+			"args": ["tools/test/test-ci-pipeline.cjs"],
+			"repro": "npm run test:ci-pipeline"
+		},
+		{
+			"id": "js-0429",
+			"ordinal": 215,
+			"name": "Paired lease silence receiving retains exact native case and child statuses",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-lease-silence-xctest-evidence.cjs"],
+			"repro": "npm run test:lease-silence-xctest-evidence"
+		},
+		{
+			"id": "js-0203",
+			"ordinal": 216,
+			"name": "Full default CI source admission preserves mandatory gates and bounded diagnostic policy",
+			"cmd": "node",
+			"args": ["tools/test/test-ci-full-default.cjs"],
+			"repro": "node tools/test/test-ci-full-default.cjs"
+		},
+		{
+			"id": "js-0204",
+			"ordinal": 217,
+			"name": "CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)",
+			"cmd": "node",
+			"args": ["tools/test/test-ci-pipeline-wiring.cjs"],
+			"repro": "npm run test:ci-pipeline-wiring"
+		},
+		{
+			"id": "js-0205",
+			"ordinal": 218,
+			"name": "CI release re-runs (plan never republishes a tagged commit and bumps from every subject; the preflight resumes a half-published release or stops; the release and its feed publish what was gated)",
+			"cmd": "node",
+			"args": ["tools/test/test-ci-release-reruns.cjs"],
+			"repro": "npm run test:ci-release-reruns"
+		},
+		{
+			"id": "js-0208",
+			"ordinal": 221,
+			"name": "Linux native network runtime is registered and refuses omitted receipts",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-network-runtime-registration.cjs"],
+			"repro": "npm run test:linux-network-runtime-registration"
+		},
+		{
+			"id": "js-0210",
+			"ordinal": 223,
+			"name": "Managed native HTTP CI admits authenticated tools and complete source-bound receipts",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-managed-http-ci-registration.cjs"],
+			"repro": "npm run test:linux-managed-http-ci-registration"
+		},
+		{
+			"id": "js-0212",
+			"ordinal": 225,
+			"name": "test:linux-updater-temp-registration",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-updater-temp-registration.cjs"],
+			"repro": "npm run test:linux-updater-temp-registration"
+		},
+		{
+			"id": "js-0214",
+			"ordinal": 227,
+			"name": "test:linux-updater-archive-registration",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-updater-archive-registration.cjs"],
+			"repro": "npm run test:linux-updater-archive-registration"
+		},
+		{
+			"id": "js-0430",
+			"ordinal": 334,
+			"name": "Native HTTP clock evidence retains source and command receiving boundaries",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-native-http-clock-evidence.cjs"],
+			"repro": "npm run test:native-http-clock-evidence"
+		},
+		{
+			"id": "js-0326",
+			"ordinal": 341,
+			"name": "Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-macos-release-stage-native-receiving.cjs"],
+			"repro": "npm run test:macos-release-stage-native-receiving-controls",
+			"platforms": ["linux"]
+		}
+	]
+}

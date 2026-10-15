@@ -33,6 +33,7 @@ const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const macRole = require('./fixtures/macos-stage-source.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const Cask = require(path.join(ROOT, 'tools', 'build', 'homebrew-cask.cjs'));
@@ -775,7 +776,7 @@ check('native macOS CI admits the pinned Python nonreaping prerequisites', () =>
 	assert.equal(pipeline.stepField(setup, 'uses'), 'actions/setup-python@v5');
 	assert.match(setup, /python-version: '3\.13'/);
 	for (const step of [setup, admission]) {
-		assert.equal(pipeline.stepField(step, 'if'), null);
+		assert.equal(pipeline.stepField(step, 'if'), macRole.condition('package-macos'));
 		assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	}
 	const order = pipeline.steps(job).map((step) => step.name);
@@ -836,7 +837,10 @@ check('archive artifacts bind only this step session independently of TIS', () =
 	const upload = pipeline.step(job, 'Retain archive diagnostic session');
 	assert.equal(
 		pipeline.stepField(upload, 'if'),
-		"${{ always() && steps.swift-launcher-tests.outputs.archive_session_dir != '' }}"
+		macRole.condition(
+			'package-macos',
+			"always() && steps.swift-launcher-tests.outputs.archive_session_dir != ''"
+		)
 	);
 	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
 	const pathBlock = /^ {10}path: \|\n((?: {12}.+\n?)+)/m.exec(upload)?.[1];
@@ -876,7 +880,8 @@ check('archive owners publish bounded typed phase evidence before native work', 
 });
 
 // Bind the approved wrapper before checking the original mandatory native body.
-function nativeHttpFullBody(script) {
+function nativeHttpFullBody(script, actualSource = false) {
+	assert.strictEqual(typeof actualSource, 'boolean', 'Native HTTP source kind is explicit.');
 	if (script.includes('--validate-scope-receipt-profile')) {
 		const { contract, unwrap } = require('./fixtures/ci-scoped-full-branches.cjs');
 		const protocol = contract.protocols[2];
@@ -887,17 +892,23 @@ function nativeHttpFullBody(script) {
 				'utf8'
 			)
 		).jobs['managed-ollama-native'].steps[0].run;
-		assert.strictEqual(script, expected, 'native HTTP requires its exact profile-bound wrapper');
-		const full = unwrap(script.trimEnd(), protocol) + '\n';
+		assert.strictEqual(
+			script,
+			actualSource ? macRole.metadata(expected, 'managed-ollama-native') : expected,
+			'native HTTP requires its exact profile-bound wrapper'
+		);
+		const full =
+			unwrap(macRole.metadata(script, 'managed-ollama-native').trimEnd(), protocol) + '\n';
 		const original = require('yaml').parse(
 			fs.readFileSync(path.join(ROOT, 'tools/test/fixtures/native_http_clock_workflow.yml'), 'utf8')
 		).jobs['managed-ollama-native'].steps[0].run;
+		const originalFull = nativeHttpFullBody(original);
 		assert.strictEqual(
 			full,
-			nativeHttpFullBody(original),
-			'original full clock body remains byte-identical'
+			macRole.metadata(originalFull, 'managed-ollama-native'),
+			'original full clock body remains byte-identical after metadata projection'
 		);
-		return full;
+		return actualSource ? full : originalFull;
 	}
 	const prefix = [
 		'set -euo pipefail',
@@ -911,11 +922,15 @@ function nativeHttpFullBody(script) {
 		''
 	].join('\n');
 	const suffix = 'else\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
-	assert.ok(script.startsWith(prefix), 'native HTTP requires the exact approved receipt prefix');
+	const ownedPrefix = actualSource ? macRole.metadata(prefix, 'managed-ollama-native') : prefix;
+	assert.ok(
+		script.startsWith(ownedPrefix),
+		'native HTTP requires the exact approved receipt prefix'
+	);
 	assert.ok(script.endsWith(suffix), 'unknown native HTTP dispositions remain fatal');
-	assert.strictEqual(script.split(prefix).length, 2);
+	assert.strictEqual(script.split(ownedPrefix).length, 2);
 	assert.strictEqual(script.split(suffix).length, 2);
-	const body = script.slice(prefix.length, -suffix.length);
+	const body = script.slice(ownedPrefix.length, -suffix.length);
 	assert.ok(body.length > 100, 'the full native command body is nonempty');
 	return body
 		.split('\n')
@@ -928,7 +943,7 @@ function nativeHttpFullBody(script) {
 }
 
 function nativeHttpClockPipeline(workflow, expected) {
-	const job = workflow.jobs['managed-ollama-native'];
+	const job = workflow.jobs[macRole.stage['managed-ollama-native']];
 	assert.ok(job && Array.isArray(job.steps), 'Actual managed native clock owner must exist.');
 	const owners = job.steps.filter(
 		(step) => step.name === 'Receive actual independent managed HTTP native clients'
@@ -947,7 +962,18 @@ function nativeHttpClockPipeline(workflow, expected) {
 	const index = job.steps.indexOf(owners[0]);
 	assert.deepStrictEqual(
 		job.steps.slice(index, index + 2),
-		expected.jobs['managed-ollama-native'].steps,
+		expected.jobs['managed-ollama-native'].steps.map((step) => ({
+			...macRole.metadata(step, 'managed-ollama-native'),
+			if: macRole.condition('managed-ollama-native', step.if),
+			env: {
+				GOTOOLCHAIN: 'local',
+				ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}",
+				ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}',
+				ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}',
+				ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}',
+				ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+			}
+		})),
 		'Actual two clock steps must equal the fixed reviewed producer input.'
 	);
 	assert.strictEqual(
@@ -963,17 +989,18 @@ function nativeHttpClockPipeline(workflow, expected) {
 		[
 			{
 				name: 'Receive actual managed HTTP native clients',
+				if: macRole.condition('package-macos'),
 				run: 'set -euo pipefail\nstatus=0\n"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\nreceipt="$RUNNER_TEMP/stable-macos-native-http-package.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; duplicate native wire receiving not executed; owned-process and client-only controls remain mandatory."\nelif [ "$mode" = full ]; then\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\nexit "$status"\n',
 				'timeout-minutes': 5
 			}
 		],
 		'Package original first-two mandatory controls and duplicate deferral must stay exact.'
 	);
-	assert.strictEqual(owners[0].if, '${{ !cancelled() }}');
+	assert.strictEqual(owners[0].if, macRole.condition('managed-ollama-native', '!cancelled()'));
 	assert.strictEqual(owners[0].shell, 'bash');
 	assert.strictEqual(owners[0]['timeout-minutes'], 5);
 	assert.notStrictEqual(owners[0]['continue-on-error'], true);
-	const script = nativeHttpFullBody(owners[0].run);
+	const script = nativeHttpFullBody(owners[0].run, true);
 	const command =
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py';
 	assert.ok(script.startsWith('set -euo pipefail\nstatus=0\n'));
@@ -984,7 +1011,7 @@ function nativeHttpClockPipeline(workflow, expected) {
 		'ERGOPTI_NATIVE_CLOCK_EVIDENCE="$clock_root/payload" "$ERGOPTI_NATIVE_HTTP_PYTHON" -I -B -X "pycache_prefix=$clock_root/private-cache" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py 2>&1 | tee "$clock_root/independent-client.log"\nclient_status=("${PIPESTATUS[@]}")\n',
 		'for code in "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}"; do\n    if [ "$code" -ne 0 ]; then status=1; fi\ndone\n',
 		' - "$clock_root/native-statuses.json" "${owned_status[@]}" "${public_status[@]}" "${client_status[@]}" || clock_status=1\n',
-		'node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ matrix.architecture }}" "$clock_root/clock-verdict.json" || clock_status=1\n',
+		'node tools/ci/native_http_clock_evidence.cjs judge "$clock_root/source-before.json" "$clock_root/payload" "$clock_root/native-statuses.json" "${{ github.sha }}" "${{ github.run_id }}" "${{ github.run_attempt }}" "${{ env.MACOS_STAGE_ARCHITECTURE }}" "$clock_root/clock-verdict.json" || clock_status=1\n',
 		'if [ "$clock_status" -ne 0 ]; then status=1; fi\n'
 	]) {
 		assert.strictEqual(
@@ -1029,10 +1056,11 @@ check('shared native process ownership controls remain registered and mandatory'
 		['managed-ollama-native', 'Receive actual independent managed HTTP native clients'],
 		['package-macos', 'Receive actual managed HTTP native clients']
 	]) {
-		const steps = workflow.jobs[job].steps.filter((step) => step.name === name);
+		const steps = workflow.jobs[macRole.stage[job]].steps.filter((step) => step.name === name);
 		assert.strictEqual(steps.length, 1, `${job} needs one actual native receiving owner`);
 		const rawScript = steps[0].run;
-		const script = job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript) : rawScript;
+		const script =
+			job === 'managed-ollama-native' ? nativeHttpFullBody(rawScript, true) : rawScript;
 		if (job === 'managed-ollama-native') {
 			const legacyScript =
 				'set -euo pipefail\nreceipt="$RUNNER_TEMP/stable-macos-native-http-${{ matrix.architecture }}.json"\nmkdir -p "$(dirname "$receipt")"\nnode tools/ci/dev-release-qualification.cjs --scope macos-native-http --receipt "$receipt"\nmode="$(node tools/ci/dev-release-qualification.cjs --scope macos-native-http --validate-scope-receipt "$receipt")"\nif [ "$mode" = deferred ]; then\n    echo "[DEFERRED] macos-native-http: qualified=false; original command not executed."\nelif [ "$mode" = full ]; then\n    set -euo pipefail\n    status=0\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1\n    "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py || status=1\n    exit "$status"\nelse\n    echo "Invalid command qualification disposition" >&2\n    exit 1\nfi\n';
@@ -1101,7 +1129,7 @@ check('shared native process ownership controls remain registered and mandatory'
 	]) {
 		const actual = clone(workflow);
 		const expected = clone(expectedClockSteps);
-		const owner = actual.jobs['managed-ollama-native'].steps.find(
+		const owner = actual.jobs[macRole.stage['managed-ollama-native']].steps.find(
 			(step) => step.id === 'native_http_clock'
 		);
 		assert.ok(owner.run.includes(before));
@@ -1110,7 +1138,7 @@ check('shared native process ownership controls remain registered and mandatory'
 		assert.throws(() => nativeHttpClockPipeline(actual, expected), assert.AssertionError);
 	}
 	const harmless = clone(workflow);
-	harmless.jobs['managed-ollama-native'].steps.unshift({
+	harmless.jobs[macRole.stage['managed-ollama-native']].steps.unshift({
 		name: 'Unrelated source owner',
 		run: 'true'
 	});
@@ -1121,7 +1149,7 @@ check('shared native process ownership controls remain registered and mandatory'
 	};
 	nativeHttpClockPipeline(foreign, expectedClockSteps);
 	const duplicate = clone(workflow);
-	duplicate.jobs['managed-ollama-native'].steps.push(
+	duplicate.jobs[macRole.stage['managed-ollama-native']].steps.push(
 		clone(expectedClockSteps.jobs['managed-ollama-native'].steps[0])
 	);
 	assert.throws(
@@ -1129,8 +1157,8 @@ check('shared native process ownership controls remain registered and mandatory'
 		assert.AssertionError
 	);
 	const missingUpload = clone(workflow);
-	missingUpload.jobs['managed-ollama-native'].steps = missingUpload.jobs[
-		'managed-ollama-native'
+	missingUpload.jobs[macRole.stage['managed-ollama-native']].steps = missingUpload.jobs[
+		macRole.stage['managed-ollama-native']
 	].steps.filter((step) => step.name !== 'Retain independent native HTTP clock receiving');
 	assert.throws(
 		() => nativeHttpClockPipeline(missingUpload, expectedClockSteps),
@@ -1138,15 +1166,32 @@ check('shared native process ownership controls remain registered and mandatory'
 	);
 	const cancellation = clone(workflow);
 	const cancelledExpected = clone(expectedClockSteps);
-	const cancellationOwner = cancellation.jobs['managed-ollama-native'].steps.find(
+	const cancellationOwner = cancellation.jobs[macRole.stage['managed-ollama-native']].steps.find(
 		(step) => step.id === 'native_http_clock'
 	);
-	cancellationOwner.if = '${{ always() }}';
-	cancelledExpected.jobs['managed-ollama-native'].steps[0].if = cancellationOwner.if;
+	cancellationOwner.if = macRole.condition('managed-ollama-native', 'always()');
+	cancelledExpected.jobs['managed-ollama-native'].steps[0].if = '${{ always() }}';
 	assert.throws(
 		() => nativeHttpClockPipeline(cancellation, cancelledExpected),
 		assert.AssertionError
 	);
+	for (const [from, to] of [
+		["steps.stage-admission.outcome == 'success'", 'true'],
+		["env.MACOS_STAGE_ROLE == 'managed-ollama-native'", "env.MACOS_STAGE_ROLE == 'foreign'"],
+		['${{ inputs.channel }}', '${{ inputs.foreign }}']
+	]) {
+		const changed = clone(workflow);
+		const step = changed.jobs[macRole.stage['managed-ollama-native']].steps.find(
+			(row) => row.id === 'native_http_clock'
+		);
+		const encoded = JSON.stringify(step);
+		assert.ok(encoded.includes(from), 'actual role or environment mutation must be nonvacuous');
+		Object.assign(step, JSON.parse(encoded.replace(from, to)));
+		assert.throws(
+			() => nativeHttpClockPipeline(changed, expectedClockSteps),
+			assert.AssertionError
+		);
+	}
 	const packageCorruption = clone(workflow);
 	const packageOwner = packageCorruption.jobs['package-macos'].steps.find(
 		(step) => step.name === 'Receive actual managed HTTP native clients'
@@ -1919,10 +1964,10 @@ check('profile-bound native HTTP routing preserves mandatory owners and closed r
 	const workflow = require('yaml').parse(
 		fs.readFileSync(path.join(ROOT, '.github/workflows/ci-macos.yml'), 'utf8')
 	);
-	const script = workflow.jobs['managed-ollama-native'].steps.find(
+	const script = workflow.jobs[macRole.stage['managed-ollama-native']].steps.find(
 		(step) => step.name === 'Receive actual independent managed HTTP native clients'
 	).run;
-	const full = nativeHttpFullBody(script);
+	const full = nativeHttpFullBody(script, true);
 	for (const command of [
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py 2>&1 | tee "$clock_root/owned-process.log"',
 		'"$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only 2>&1 | tee "$clock_root/public-native.log"',
@@ -1949,7 +1994,7 @@ check('profile-bound native HTTP routing preserves mandatory owners and closed r
 		['    exit 1\nfi\nexit "$status"', '    exit 0\nfi\nexit "$status"']
 	]) {
 		assert.ok(script.includes(before));
-		assert.throws(() => nativeHttpFullBody(script.replace(before, after)));
+		assert.throws(() => nativeHttpFullBody(script.replace(before, after), true));
 	}
 });
 

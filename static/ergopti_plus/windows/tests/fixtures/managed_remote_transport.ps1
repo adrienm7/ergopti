@@ -186,7 +186,38 @@ $Fixture = $null
 $Events = @()
 $RootInstalled = $false
 $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0;
-    root_store_scope = $OwnedRootStoreScope; root_install_stage = 'none'; root_removed = $false; service_stopped = $false }
+    root_store_scope = $OwnedRootStoreScope; root_install_stage = 'none'; root_removed = $false; service_stopped = $false;
+    startup_phase = 'admission'; startup_constructor_phase = 'not_entered' }
+# Observe only real exception identity domains; never exception messages or stacks.
+function Get-OwnedStartupExceptionChain {
+    param([Exception]$Failure)
+    $Rows = @()
+    for ($Index = 0; $Index -lt 4 -and $null -ne $Failure; $Index++) {
+        $Kind = switch -CaseSensitive ($Failure.GetType().FullName) {
+            'System.Management.Automation.RuntimeException' { 'runtime' }
+            'System.Management.Automation.MethodInvocationException' { 'method_invocation' }
+            'System.Management.Automation.ParseException' { 'parse' }
+            'System.Reflection.TargetInvocationException' { 'target_invocation' }
+            'System.TypeInitializationException' { 'type_initialization' }
+            'System.InvalidOperationException' { 'invalid_operation' }
+            'System.Security.Cryptography.CryptographicException' { 'cryptographic' }
+            'System.ComponentModel.Win32Exception' { 'win32' }
+            'System.IO.IOException' { 'io' }
+            'System.IO.InvalidDataException' { 'invalid_data' }
+            'System.ObjectDisposedException' { 'disposed' }
+            'System.TypeLoadException' { 'type_load' }
+            'System.DllNotFoundException' { 'dll_not_found' }
+            'System.EntryPointNotFoundException' { 'entry_point_not_found' }
+            'System.MissingMethodException' { 'missing_method' }
+            'System.Security.SecurityException' { 'security' }
+            'System.ArgumentException' { 'argument' }
+            default { 'other' }
+        }
+        $Rows += @{ kind = $Kind; hresult = [int]$Failure.HResult }
+        $Failure = $Failure.InnerException
+    }
+    return @{ rows = @($Rows); truncated = ($null -ne $Failure) }
+}
 function Publish-State {
     param([string]$TrustStep = '')
     if ($TrustStep -ne '') {
@@ -235,12 +266,14 @@ try {
     if ($EventPrefix -cnotmatch '^Local\\ErgoptiPlus\.ManagedNetworkFixture\.[0-9a-f]{32}$') {
         throw 'Invalid owned fixture event prefix.'
     }
+    $State.startup_phase = 'curl_preflight'
     $CurlPath = Join-Path $env:WINDIR 'System32\curl.exe'
     $CurlVersion = & $CurlPath --version
     if ($LASTEXITCODE -ne 0 -or (($CurlVersion -join "`n") -notmatch '\bSchannel\b')) {
         throw 'The actual shipped curl does not use Schannel.'
     }
     $State.curl_schannel = $true
+    $State.startup_phase = 'add_type'
     Add-Type -TypeDefinition @'
 using System;
 using System.Collections.Generic;
@@ -923,6 +956,8 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
 
 public sealed class ErgoptiManagedRemoteFixture : IDisposable
 {
+    // Last entered constructor operation only; this is not a completion receipt.
+    public static string StartupPhase = "not_entered";
     private readonly List<TcpListener> listeners = new List<TcpListener>();
     private readonly List<Thread> listenersThreads = new List<Thread>();
     private readonly List<Thread> workers = new List<Thread>();
@@ -1000,6 +1035,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     public ErgoptiManagedRemoteFixture(string identity) : this(identity, false) { }
     public ErgoptiManagedRemoteFixture(string identity, bool enableUpdater)
     {
+        StartupPhase = "listeners";
         updater = enableUpdater;
         TcpListener tls = Listen(IPAddress.Loopback);
         TcpListener proxy = Listen(IPAddress.Loopback);
@@ -1007,10 +1043,12 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         TlsPort = ((IPEndPoint)tls.LocalEndpoint).Port;
         ProxyPort = ((IPEndPoint)proxy.LocalEndpoint).Port;
         HttpPort = ((IPEndPoint)http.LocalEndpoint).Port;
+        StartupPhase = "keys";
         rootKey = new RSACng(2048);
         leafKey = new RSACng(2048);
         if (!((RSACng)rootKey).Key.IsEphemeral || !((RSACng)leafKey).Key.IsEphemeral)
             throw new InvalidOperationException("Fixture key lifetime must remain process owned.");
+        StartupPhase = "root_certificate";
         CertificateRequest rootRequest = new CertificateRequest(
             "CN=ErgoptiPlus managed-network fixture " + identity,
             rootKey, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
@@ -1020,6 +1058,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         DateTimeOffset from = DateTimeOffset.UtcNow.AddMinutes(-5);
         DateTimeOffset until = DateTimeOffset.UtcNow.AddDays(1);
         Root = rootRequest.CreateSelfSigned(from, until);
+        StartupPhase = "leaf_certificate";
         CertificateRequest leafRequest = new CertificateRequest("CN=managed-fixture.invalid", leafKey,
             HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         leafRequest.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, true));
@@ -1039,8 +1078,11 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
         serial[0] &= 0x7f; serial[15] |= 1;
         using (X509Certificate2 issued = leafRequest.Create(Root, from, until, serial))
             leaf = RSACertificateExtensions.CopyWithPrivateKey(issued, leafKey);
+        StartupPhase = "crl";
         crl = CreateCrl(Root.SubjectName.RawData, rootKey);
+        StartupPhase = "native_tls";
         NativeTls = new ErgoptiFixtureOpenSsl(leaf, (RSACng)leafKey);
+        StartupPhase = "listener_threads";
         Start(tls, Tls);
         Start(proxy, Proxy);
         Start(http, Http);
@@ -1297,7 +1339,10 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
 }
 '@
     $Identity = $EventPrefix.Substring($EventPrefix.LastIndexOf('.') + 1)
+    $State.startup_phase = 'constructor'
     $Fixture = [ErgoptiManagedRemoteFixture]::new($Identity, ($Mode -ceq 'ServeUpdater'))
+    $State.startup_constructor_phase = [ErgoptiManagedRemoteFixture]::StartupPhase
+    $State.startup_phase = 'open_events'
     $State.root_thumbprint = $Fixture.Root.Thumbprint
     $State.root_subject = $Fixture.Root.Subject
     $State.tls_port = $Fixture.TlsPort
@@ -1311,8 +1356,10 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     foreach ($Name in @('InstallRoot', 'RemoveRoot', 'Observe', 'Shutdown')) {
         $Events += [Threading.EventWaitHandle]::OpenExisting($EventPrefix + '.' + $Name)
     }
+    $State.startup_phase = 'initial_publish'
     Publish-State
     $Deadline = [DateTime]::UtcNow.AddSeconds(90)
+    $State.startup_phase = 'event_loop'
     while ([DateTime]::UtcNow -lt $Deadline) {
         $Choice = [Threading.WaitHandle]::WaitAny([Threading.WaitHandle[]]$Events, 1000)
         if ($Choice -eq 0) {
@@ -1371,6 +1418,18 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     $State.service_failure_stage = 'fixture_boundary'
     $State.service_failure_kind = 'other'
     $State.service_failure_hresult = $_.Exception.HResult
+    # Optional diagnostics must never replace the original failed-state/cleanup path.
+    $StartupFailure = $_.Exception
+    try {
+        $Chain = Get-OwnedStartupExceptionChain $StartupFailure
+        $State.startup_errors = @($Chain.rows)
+        $State.startup_errors_truncated = $Chain.truncated
+    } catch { }
+    try {
+        if ($State.startup_phase -ceq 'constructor') {
+            $State.startup_constructor_phase = [ErgoptiManagedRemoteFixture]::StartupPhase
+        }
+    } catch { }
 } finally {
     try {
         if ($null -ne $Fixture) { $Fixture.Dispose(); $State.service_stopped = $true }

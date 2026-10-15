@@ -24,5 +24,14 @@ final class OwnedRuntimeLifecycleInitializerCustodyTests: XCTestCase {
   let successor = try OwnedRuntimeServiceLifecycleLock.fixtureAcquire(parent: parent, exclusive: true)
   XCTAssertTrue(successor.current()); XCTAssertTrue(successor.retire())
  }
+ func testBootstrapStageLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt() throws {
+  let parent = try fixture(); defer { try? FileManager.default.removeItem(at: parent) }
+  let stage = parent.appendingPathComponent("stage", isDirectory: true)
+  try FileManager.default.createDirectory(at: stage, withIntermediateDirectories: false)
+  XCTAssertNil(try OwnedRuntimeBootstrapStageOwner.fixtureRejectedInitializerRetirement(stage: stage.appendingPathComponent("missing")))
+  let closed = try XCTUnwrap(OwnedRuntimeBootstrapStageOwner.fixtureRejectedInitializerRetirement(stage: stage))
+  XCTAssertEqual(closed, [.init(status: 0, error: 0)], "The initialized parent descriptor must close once; duplicate closure reports EBADF")
+  XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: stage.path), [])
+ }
 #endif
 }

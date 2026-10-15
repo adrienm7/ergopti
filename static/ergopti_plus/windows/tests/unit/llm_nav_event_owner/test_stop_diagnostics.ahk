@@ -169,9 +169,161 @@ _LNEO_StartErrorBeforeCleanupCase(Status, MissingStop) {
 			CallbackFree(Pointer)
 	}
 }
+/** Admit exactly the original three ordered child results and finite timings. */
+_LNEO_StartCustodyReceiptValid(Tap) {
+	Lines := StrSplit(StrReplace(Tap, "`r`n", "`n"), "`n")
+	if InStr(StrReplace(Tap, "`r`n", ""), "`r") || Lines.Length == 0 || Lines[Lines.Length] != ""
+		return false
+	Lines.Pop()
+	Position := 1
+	Boots := Map()
+	; Boot records are optional runtime frames; the exact mandatory census follows.
+	while Position <= Lines.Length {
+		if !RegExMatch(Lines[Position], "^# \[boot\] .+$")
+			break
+		if Boots.Has(Lines[Position])
+			return false
+		Boots[Lines[Position]] := true
+		Position += 1
+	}
+	; Plan, selection, three RUNNING/result/timing triples, and final summary.
+	if Lines.Length - Position + 1 != 12 || Lines[Position] !== "1..3"
+		return false
+	Position += 1
+	if !RegExMatch(Lines[Position], "^# --only native-start-error-custody: - 3 of [1-9][0-9]* test\(s\) selected\.$")
+		return false
+	Position += 1
+	Names := [
+		"OS error survives actual adapter cleanup",
+		"non-OS refusal still runs cleanup without an OS read",
+		"cleanup lookup failure retains both errors"
+	]
+	for Index, Name in Names {
+		Expected := "native-start-error-custody: " . Name
+		if Lines[Position] !== "RUNNING " . Index . "/3 - " . Expected
+			|| Lines[Position + 1] !== "ok " . Index . " - " . Expected
+			|| !RegExMatch(Lines[Position + 2], "^# duration_ms " . Index . " [0-9]+(?:\.[0-9]+)?$")
+			return false
+		Position += 3
+	}
+	return Lines[Position] == "# 3 passed, 0 failed."
+}
+
+/** Receive the original controlled callbacks in a fresh native issuance realm. */
+_LNEO_ReceiveStartErrorCase(Status, MissingStop) {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports
+	static Received := false
+	; A real DLL issuance cannot be replaced by a callback table later in the
+	; same process. Keep that production fence and isolate the original cases.
+	if EnvGet("ERGOPTI_START_CUSTODY_CHILD") == A_ScriptFullPath
+		&& InStr(A_ScriptName, ".ergopti_start_custody_child_") == 1
+		return _LNEO_StartErrorBeforeCleanupCase(Status, MissingStop)
+	if Received
+		return
+	ParentModule := _LLM_NavEventOwnerModule
+	ParentExports := _LLM_NavEventOwnerExports
+	TestsRoot := A_ScriptDir
+	CanonicalPath := TestsRoot . "\run_all.ahk"
+	Canonical := FileRead(CanonicalPath, "UTF-8")
+	Id := DllCall("Kernel32\GetCurrentProcessId", "UInt") . "_" . A_TickCount . "_" . Random(1, 0x7FFFFFFF)
+	ChildName := ".ergopti_start_custody_child_" . Id . ".ahk"
+	ChildPath := TestsRoot . "\" . ChildName
+	ReceiptRoot := A_Temp . "\ergopti_start_custody_" . Id
+	DirCreate(ReceiptRoot)
+	TapPath := ReceiptRoot . "\child.tap"
+	OutPath := ReceiptRoot . "\child.stdout.log"
+	ErrPath := ReceiptRoot . "\child.stderr.log"
+	SavedChild := EnvGet("ERGOPTI_START_CUSTODY_CHILD")
+	SavedReceipt := EnvGet("ERGOPTI_AHK_RESULTS_FILE")
+	AssertFalse(FileExist(ChildPath), "never replace an existing runner")
+	try {
+		; Preserve the entire canonical include graph, argument parser and watchdog.
+		FileAppend(Canonical, ChildPath, "UTF-8")
+		EnvSet("ERGOPTI_START_CUSTODY_CHILD", ChildPath)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", TapPath)
+		Quote := Chr(34)
+		ChildCommand := Quote . A_AhkPath . Quote . " /ErrorStdOut=UTF-8 " . Quote . ChildPath . Quote
+			. " --only=native-start-error-custody: 1>" . Quote . OutPath . Quote
+			. " 2>" . Quote . ErrPath . Quote
+		Code := RunWait(Quote . A_ComSpec . Quote . " /D /C " . Quote . ChildCommand . Quote, TestsRoot, "Hide")
+		AssertEqual(0, Code, "all original custody assertions must pass in the child; captures: " . ReceiptRoot)
+		AssertTrue(FileExist(TapPath) && FileExist(OutPath) && FileExist(ErrPath))
+		AssertEqual(0, FileGetSize(ErrPath), "child startup/parse diagnostics must refuse receiving")
+		Tap := FileRead(TapPath, "UTF-8")
+		AssertTrue(_LNEO_StartCustodyReceiptValid(Tap),
+			"require exactly three ordered original RUNNING/result/timing pairs and one plan/summary")
+		AssertEqual(ParentModule, _LLM_NavEventOwnerModule)
+		AssertTrue(ParentExports == _LLM_NavEventOwnerExports)
+		AssertEqual(Canonical, FileRead(CanonicalPath, "UTF-8"))
+		Received := true
+	} finally {
+		EnvSet("ERGOPTI_START_CUSTODY_CHILD", SavedChild)
+		EnvSet("ERGOPTI_AHK_RESULTS_FILE", SavedReceipt)
+		SplitPath(ChildPath, &ActualName, &ActualDirectory)
+		if ActualDirectory != TestsRoot || ActualName != ChildName
+			throw Error("Refuse custody child cleanup outside its exact owned path.")
+		if FileExist(ChildPath)
+			FileDelete(ChildPath)
+		; Keep complete raw streams and TAP after both success and refusal.
+		FileAppend("# native-start-error-custody captures: " . ReceiptRoot . "`n", "*")
+	}
+}
+
 Test("native-start-error-custody: OS error survives actual adapter cleanup",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(6, false))
+	_LNEO_ReceiveStartErrorCase.Bind(6, false))
 Test("native-start-error-custody: non-OS refusal still runs cleanup without an OS read",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(5, false))
+	_LNEO_ReceiveStartErrorCase.Bind(5, false))
 Test("native-start-error-custody: cleanup lookup failure retains both errors",
-	_LNEO_StartErrorBeforeCleanupCase.Bind(6, true))
+	_LNEO_ReceiveStartErrorCase.Bind(6, true))
+
+
+/** Keep foreign, duplicated, reordered and case-only child records observable. */
+_LNEO_StartCustodyReceiptControls() {
+	ReceiptNames := [
+		"OS error survives actual adapter cleanup",
+		"non-OS refusal still runs cleanup without an OS read",
+		"cleanup lookup failure retains both errors"
+	]
+	GoodReceipt := "1..3`n# --only native-start-error-custody: - 3 of 3 test(s) selected.`n"
+	for ReceiptIndex, ReceiptName in ReceiptNames {
+		GoodReceipt .= "RUNNING " . ReceiptIndex . "/3 - native-start-error-custody: " . ReceiptName . "`n"
+		GoodReceipt .= "ok " . ReceiptIndex . " - native-start-error-custody: " . ReceiptName . "`n"
+		GoodReceipt .= "# duration_ms " . ReceiptIndex . " 0.001`n"
+	}
+	GoodReceipt .= "# 3 passed, 0 failed.`n"
+	AssertTrue(_LNEO_StartCustodyReceiptValid(GoodReceipt))
+	AssertTrue(_LNEO_StartCustodyReceiptValid(StrReplace(GoodReceipt, "`n", "`r`n")))
+	AssertTrue(_LNEO_StartCustodyReceiptValid("# [boot] controlled startup`n" . GoodReceipt))
+	ReceiptLines := StrSplit(GoodReceipt, "`n")
+	FirstBlock := ReceiptLines[3] . "`n" . ReceiptLines[4] . "`n" . ReceiptLines[5] . "`n"
+	SecondBlock := ReceiptLines[6] . "`n" . ReceiptLines[7] . "`n" . ReceiptLines[8] . "`n"
+	AssertTrue(InStr(GoodReceipt, FirstBlock . SecondBlock) > 0)
+	BadReceipts := [
+		"# [boot] repeated`n# [boot] repeated`n" . GoodReceipt,
+		"# [boot]`n" . GoodReceipt,
+		StrReplace(GoodReceipt, FirstBlock . SecondBlock, SecondBlock . FirstBlock),
+		StrReplace(GoodReceipt, ReceiptLines[4] . "`n", ReceiptLines[4] . "`n" . ReceiptLines[4] . "`n"),
+		StrReplace(GoodReceipt, FirstBlock, ""),
+		GoodReceipt . "ok 4 - foreign case`n",
+		GoodReceipt . "1..3`n",
+		GoodReceipt . "# 3 passed, 0 failed.`n",
+		GoodReceipt . "RUNNING 4/3 - foreign case`n",
+		StrReplace(GoodReceipt, "ok 1 -", "not ok 1 -"),
+		StrReplace(GoodReceipt, "RUNNING 1/3", "RUNNING 2/3"),
+		StrReplace(GoodReceipt, "ok 1 -", "ok 2 -"),
+		StrReplace(GoodReceipt, "RUNNING 1/3", "running 1/3"),
+		StrReplace(GoodReceipt, "ok 1 -", "OK 1 -"),
+		StrReplace(GoodReceipt, "OS error survives", "os error survives"),
+		StrReplace(GoodReceipt, "# duration_ms 1 0.001", "# duration_ms 1 -1"),
+		StrReplace(GoodReceipt, "# duration_ms 1 0.001", "# duration_ms 2 0.001"),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "# 2 passed, 0 failed."),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "# SKIP`n# 3 passed, 0 failed."),
+		StrReplace(GoodReceipt, "# 3 passed, 0 failed.", "UNASSIGNED_DIAGNOSTIC`n# 3 passed, 0 failed."),
+		SubStr(GoodReceipt, 1, StrLen(GoodReceipt) - 1)
+	]
+	for MalformedReceipt in BadReceipts
+		AssertFalse(_LNEO_StartCustodyReceiptValid(MalformedReceipt),
+			"a complete transcript cannot admit a foreign, missing or malformed record")
+}
+Test("native-start-error-receipt: complete child census refuses malformed records",
+	_LNEO_StartCustodyReceiptControls)

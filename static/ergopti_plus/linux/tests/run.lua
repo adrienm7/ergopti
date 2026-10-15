@@ -79,6 +79,8 @@ local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+local shell_quote = require("text_utils").shell_quote
+helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")
 local TEST_MANIFEST = require("tests.test_manifest")
 
@@ -214,11 +216,16 @@ end
 
 local total_modules, load_errors = RunnerContract.load_modules(TEST_MANIFEST, function(mod_name)
 	print(string.format("\n>>> Loading %s", mod_name))
-	require(mod_name)
+	local ok, load_error = helpers.measure_module(mod_name, function() require(mod_name) end)
+	if not ok then error(load_error, 0) end
 end)
 for _, failure in ipairs(load_errors) do
 	print(string.format("  ! load error in %s: %s", failure.module, failure.error))
 	helpers.get_results().failed = helpers.get_results().failed + 1
+	local failures = helpers.get_results().failures
+	failures[#failures + 1] = {
+		name = failure.module, err = failure.error, kind = "module", module = failure.module,
+	}
 end
 
 local r = helpers.get_results()
@@ -240,8 +247,15 @@ end
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
-		print(string.format("  - %s : %s\n    replay: luajit tests/run.lua --only %q", f.name, f.err, f.name))
+		local replay = "luajit tests/run.lua"
+		if f.kind == "case" then replay = replay .. " --only " .. shell_quote(f.name) end
+		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
+		print(string.format("  - %s : %s\n    replay: %s", f.name, f.err, replay))
 	end
+	os.exit(1)
+end
+if helpers.timing_failed() then
+	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
 end
 os.exit(0)

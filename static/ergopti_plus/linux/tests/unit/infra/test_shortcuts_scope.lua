@@ -1078,14 +1078,32 @@ helpers.describe("Linux merged shortcut acquisition custody", function()
 end)
 
 --- Real configuration/claim owners; only the native map observation is modeled.
-local function with_collision_scope(source, tap_config, body)
+local function with_collision_scope(source, tap_config, body, navigation_text)
 	with_scope(function(scope, owners, controls, path)
 		local names = { "platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
 			"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }
 		local saved = {}; for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
-		local Manager, tap_path, hook
+		local Manager, tap_path, hook, navigation_dir, navigation_made
 		local ok, why = pcall(function()
-			tap_path = os.tmpname()
+			if navigation_text ~= nil then
+				navigation_dir = os.tmpname()
+				assert(os.remove(navigation_dir))
+				local made = os.execute("mkdir " .. require("text_utils").shell_quote(navigation_dir))
+				assert(made == true or made == 0)
+				navigation_made = true
+				tap_path = navigation_dir .. "/tap_hold.toml"
+				controls.navigation_path = navigation_dir .. "/layers.toml"
+				local handle = assert(io.open(controls.navigation_path, "wb"))
+				local wrote, result = pcall(handle.write, handle, navigation_text)
+				local closed, acknowledged = pcall(handle.close, handle)
+				assert(wrote and result ~= nil and result ~= false); assert(closed and acknowledged == true)
+				local verification = assert(io.open(controls.navigation_path, "rb"))
+				local read_ok, bytes = pcall(verification.read, verification, "*a")
+				local close_ok, verified_closed = pcall(verification.close, verification)
+				assert(read_ok and bytes == navigation_text); assert(close_ok and verified_closed == true)
+			else
+				tap_path = os.tmpname()
+			end
 			Sandbox.write_bytes(tap_path, require("tests.support.tap_hold_fixture").with_preset(tap_config))
 			hook = { calls = 0 }
 			function hook.set_remapper(engine) hook.calls = hook.calls + 1; hook.engine = engine; return true end
@@ -1116,7 +1134,8 @@ local function with_collision_scope(source, tap_config, body)
 				chord_sources = function(requests)
 					controls.source_reads = controls.source_reads + 1
 					local token, rows = {}, {}
-					local identities = { [15] = "tab", [36] = "j", [37] = "k", [41] = "grave", [58] = "caps_lock" }
+					local identities = { [2] = "1", [3] = "2", [15] = "tab", [36] = controls.chord_j_identity or "j", [37] = "k", [41] = "grave", [58] = "caps_lock",
+						[103] = "up", [105] = "left", [106] = "right", [108] = "down" }
 					for _, request in ipairs(requests) do
 						for _, caps in ipairs({ false, true }) do
 							rows[#rows + 1] = { code = request.code, mods = request.mods, caps = caps,
@@ -1136,7 +1155,18 @@ local function with_collision_scope(source, tap_config, body)
 			helpers.assert_eq(hook.calls, before + controls.intentional_hook_changes, "validation adds no native ownership change beyond the controlled fault injection")
 		end)
 		if Manager then Manager._reset_for_test() end
-		if tap_path then os.remove(tap_path) end
+		if tap_path then
+			local removed, detail = os.remove(tap_path)
+			if navigation_made and removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Tap fixture cleanup refused: " .. tostring(detail) end
+		end
+		if navigation_made then
+			local removed, detail = os.remove(navigation_dir .. "/layers.toml")
+			if removed ~= true then ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused: " .. tostring(detail) end
+			local removed = os.execute("rmdir " .. require("text_utils").shell_quote(navigation_dir))
+			if removed ~= true and removed ~= 0 then
+				ok, why = false, (ok and "" or tostring(why) .. "; ") .. "Navigation fixture cleanup refused"
+			end
+		end
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(why, 0) end
 	end, source)
@@ -1386,6 +1416,225 @@ helpers.describe("physical preflight joins the original Magic Key replacement", 
 				helpers.assert_eq(document.hotstrings.magic_key_source, "KeyJ")
 				helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
 				helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+			end)
+		end)
+	end
+end)
+
+
+helpers.describe("Linux configured Navigation physical collision preflight", function()
+	local NAV_NONE = '[_meta]\nschema_version = 1\n[layers.nav.all]\nKeyJ = "none"\n'
+	local TAP_NAV = '[tap_hold]\nenabled = true\ninherit_defaults = false\n[tap_hold.keys.left_alt]\n'
+		.. 'tap_action = "enter"\nhold_modifier = ""\nhold_layer = "nav"\ntime_activation_seconds = 0.2\n'
+
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	helpers.it("(nav-configured-reservation) actual preflight refuses reachable Navigation None before configuration acquisition", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
+
+	helpers.it("(nav-configured-reservation) unknown modified Navigation overlap remains unavailable before any write", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_shift_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
+
+	helpers.it("(nav-configured-reservation) real changed layer bytes cannot borrow the installed Manager baseline at preflight", function()
+		with_collision_scope(COLLISION_BASE, TAP_NAV, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			local handle = assert(io.open(controls.navigation_path, "wb"))
+			local wrote, result = pcall(handle.write, handle, "[broken")
+			local closed, acknowledged = pcall(handle.close, handle)
+			helpers.assert_true(wrote and result ~= nil and result ~= false); helpers.assert_true(closed and acknowledged == true)
+			local verification = assert(io.open(controls.navigation_path, "rb"))
+			local read_ok, bytes = pcall(verification.read, verification, "*a")
+			local close_ok, verified_closed = pcall(verification.close, verification)
+			helpers.assert_true(read_ok and bytes == "[broken"); helpers.assert_true(close_ok and verified_closed == true)
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+			unchanged(owners, controls, path, before)
+		end, NAV_NONE)
+	end)
+end)
+
+
+helpers.describe("Linux configured wrap-symbol physical collision preflight", function()
+	local WRAP_BASE = COLLISION_BASE:gsub("enabled = true", "enabled = true\nwrap_text_if_selected = true")
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	for _, modifier in ipairs({ "none", "shift" }) do
+		helpers.it("(wrap-configured-preflight) refuses an enabled " .. modifier .. " wrap trigger before any publication", function()
+			with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = "("
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_" .. modifier .. "_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, modifier in ipairs({ "ctrl", "alt", "super" }) do
+		helpers.it("(wrap-configured-preflight) " .. modifier .. " bypasses wrapping but gains no native delivery rights", function()
+			with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = "("
+				controls.on_source = function() controls.delivery_available = false end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_" .. modifier .. "_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+				helpers.assert_eq(controls.source_reads, 1)
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	helpers.it("(wrap-configured-preflight) disabled wrapping is not a guessed collision or native readiness", function()
+		local source = '[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+		with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			controls.chord_j_identity = "("
+			controls.on_source = function() controls.delivery_available = false end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			unchanged(owners, controls, path, before)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-preflight) a real switch round trip during XKB observation revokes old claims", function()
+		with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+			local before, changed = Sandbox.read_bytes(path), false
+			controls.chord_j_identity = "("
+			controls.on_source = function()
+				if changed then return end; changed = true
+				local token = {}
+				helpers.assert_true(owners.manager.acquire_configuration(token))
+				helpers.assert_true(owners.manager.release_configuration(token))
+			end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+			unchanged(owners, controls, path, before)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-preflight) explicit physical None preserves native intent without observing wrap reservations", function()
+		with_scope(function(scope, owners, controls, path)
+			local original, calls = owners.manager.capture_collision_inventory, 0
+			owners.manager.capture_collision_inventory = function() calls = calls + 1; error("None does not acquire wrapping") end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "none", intent = "keyboard_assignment" } })
+			owners.manager.capture_collision_inventory = original
+			helpers.assert_eq(accepted, true, tostring(reason)); helpers.assert_eq(calls, 0)
+			helpers.assert_eq(Sandbox.read_bytes(path):find('physical_none_KeyJ', 1, true) ~= nil, true)
+			helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+		end, WRAP_BASE)
+	end)
+end)
+
+--- Uses the same actual file/runtime intake, with no UI/provider/service actors.
+local function with_prediction_preflight(source, body)
+	with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
+		local ok, failure = pcall(function()
+			for name in pairs(package.loaded) do
+				if name:match("^modules%.llm%.") or name == "infra.llm_preferences" then package.loaded[name] = nil end
+			end
+			local prediction = require("modules.llm.prediction_engine")
+			prediction.init({ scheduler = require("tests.fakes").timer_scheduler(), overlay = {
+				move = function() return true end,
+				hide = function() return true end,
+				is_showing = function() error("configured preflight must not query an offer or UI") end,
+			} })
+			owners.prediction = prediction
+			body(scope, owners, controls, path)
+		end)
+		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		if not ok then error(failure, 0) end
+	end)
+end
+
+helpers.describe("Linux genuine configured prediction collision preflight", function()
+	local PREDICTION_BASE = COLLISION_BASE .. '[llm]\nenabled = true\n[llm.navigation]\nnav_modifiers = ["ctrl"]\nval_modifiers = ["shift"]\n'
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	for _, case in ipairs({
+		{ name = "original native navigation role", key = "physical_ctrl_ArrowUp" },
+		{ name = "original native digit role", key = "physical_shift_Digit2" },
+		{ name = "either-side Shift Tab", key = "physical_shift_Tab" },
+		{ name = "possible live or agent Tab", key = "physical_none_Tab" },
+		{ name = "actual native source typing a digit", key = "physical_shift_KeyJ", identity = "2" },
+	}) do
+		helpers.it("(prediction-configured-preflight) refuses " .. case.name .. " before publication", function()
+			with_prediction_preflight(PREDICTION_BASE, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = case.identity
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = case.key,
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, known in ipairs({ false, true }) do
+		helpers.it("(prediction-configured-preflight) unknown disabled AI plus " .. (known and "known collision" or "otherwise free input"), function()
+			local source = COLLISION_BASE .. (known and 'ctrl_j = "copy"\n' or "") .. '[llm]\nenabled = false\n'
+			with_prediction_preflight(source, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				helpers.assert_eq(owners.prediction.capture_collision_inventory(), nil)
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_ctrl_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, known and "collision" or "unavailable")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, seam in ipairs({ "original factory", "actual request cancellation" }) do
+		helpers.it("(prediction-configured-preflight) " .. seam .. " change revokes the source join", function()
+			with_prediction_preflight(PREDICTION_BASE, function(scope, owners, controls, path)
+				local before, changed = Sandbox.read_bytes(path), false
+				local factory = owners.prediction.capture_collision_inventory
+				controls.on_source = function()
+					if changed then return end; changed = true
+					if seam == "original factory" then owners.prediction.capture_collision_inventory = function() return nil end
+					else owners.prediction.cancel() end
+				end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_shift_Digit2",
+					value = "copy", intent = "keyboard_assignment" } })
+				owners.prediction.capture_collision_inventory = factory
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+				unchanged(owners, controls, path, before)
 			end)
 		end)
 	end

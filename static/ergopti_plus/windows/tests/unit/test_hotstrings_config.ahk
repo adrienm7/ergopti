@@ -36,12 +36,29 @@ HotstringsConfigLoadLlmPredictionColor()
 ; delay/color into the resolution cascade, breaking the "falls back to
 ; defaults" assertions. Tests that DO want to exercise toml metadata seed
 ; their own values via _HCfgTestSeedToml, which overwrites these entries.
+global _HCfgTestFixtureRoot := ""
+
+; Registration owns no disk state. Acquire this process/window namespace only
+; when a callback needs it, and never adopt a pre-existing directory.
 _HCfgTestOverridePath() {
-	return A_Temp . "\ergopti_hotstrings_config_unit_overrides.toml"
+	global _HCfgTestFixtureRoot
+	if _HCfgTestFixtureRoot == "" {
+		Candidate := A_Temp . "\ergopti_hotstrings_config_unit_"
+			. DllCall("GetCurrentProcessId", "UInt") . "_" . A_ScriptHwnd
+		FSCreateDirectoryExclusiveStrict(Candidate)
+		_HCfgTestFixtureRoot := Candidate
+	}
+	return _HCfgTestFixtureRoot . "\overrides.toml"
 }
 
+; Exit without an acquired fixture is inert. A failed deletion retains the
+; exact owner for retry instead of converting cleanup refusal to success.
 _HCfgTestCleanup(*) {
-	try FileDelete(_HCfgTestOverridePath())
+	global _HCfgTestFixtureRoot
+	if _HCfgTestFixtureRoot == ""
+		return
+	DirDelete(_HCfgTestFixtureRoot, true)
+	_HCfgTestFixtureRoot := ""
 }
 OnExit(_HCfgTestCleanup)
 
@@ -1338,3 +1355,78 @@ _HCOL_FullLineComments() {
 	AssertEqual(".", Read.Word, "the actual delimiter value remains readable after comments")
 }
 Test("HotstringsConfig: full-line comments never create owners (hotstrings-override-lexical)", _HCOL_FullLineComments)
+
+
+; Native ownership checks keep every destructive operation inside a directory
+; this callback acquired. The former shared TEMP path must fail before deletion.
+_HCfgTestFixtureIsolation() {
+	global _HCfgTestFixtureRoot
+	Path := _HCfgTestOverridePath()
+	SplitPath(Path, , &Root)
+	Assert(Root != A_Temp && InStr(Root, A_Temp . "\") == 1,
+		"the override fixture must own a private directory beneath TEMP")
+	AssertEqual(Path, _HCfgTestOverridePath(), "the acquired fixture path must remain stable")
+	Sibling := Root . "_sibling", SiblingOwned := false, ForeignOwned := false
+	try {
+		FSCreateDirectoryExclusiveStrict(Sibling)
+		SiblingOwned := true
+		FileAppend("sibling owner", Sibling . "\sentinel.txt", "UTF-8-RAW")
+		FileAppend("owned override", Path, "UTF-8-RAW")
+		_HCfgTestCleanup()
+		AssertEqual("", _HCfgTestFixtureRoot, "successful cleanup releases ownership")
+		AssertFalse(DirExist(Root), "cleanup must retire the acquired directory")
+		_HCfgTestCleanup()
+		AssertFalse(DirExist(Root), "empty cleanup must not allocate a fixture")
+		AssertEqual("sibling owner", FileRead(Sibling . "\sentinel.txt", "UTF-8"))
+
+		FSCreateDirectoryExclusiveStrict(Root)
+		ForeignOwned := true
+		FileAppend("foreign owner", Root . "\sentinel.txt", "UTF-8-RAW")
+		Failure := 0
+		try _HCfgTestOverridePath()
+		catch OSError as Caught
+			Failure := Caught
+		Assert(Failure is OSError, "exclusive acquisition must refuse an occupied candidate")
+		AssertEqual("", _HCfgTestFixtureRoot, "failed acquisition must not publish ownership")
+		_HCfgTestCleanup()
+		AssertEqual("foreign owner", FileRead(Root . "\sentinel.txt", "UTF-8"),
+			"cleanup must preserve a candidate whose acquisition was refused")
+		AssertEqual("sibling owner", FileRead(Sibling . "\sentinel.txt", "UTF-8"))
+	} finally {
+		if ForeignOwned && DirExist(Root)
+			DirDelete(Root, true)
+		if SiblingOwned
+			DirDelete(Sibling, true)
+	}
+}
+Test("HotstringsConfig: fixture acquisition and cleanup preserve foreign owners (hotstrings-fixture-ownership)",
+	_HCfgTestFixtureIsolation)
+
+_HCfgTestFixtureCleanupRefusal() {
+	global _HCfgTestFixtureRoot
+	Path := _HCfgTestOverridePath()
+	SplitPath(Path, , &Root)
+	Assert(Root != A_Temp && InStr(Root, A_Temp . "\") == 1,
+		"the cleanup refusal fixture must own a private directory beneath TEMP")
+	Handle := -1
+	try {
+		Handle := DllCall("Kernel32\CreateFileW", "Str", Path, "UInt", 0xC0000000,
+			"UInt", 0, "Ptr", 0, "UInt", 1, "UInt", 0x80, "Ptr", 0, "Ptr")
+		Assert(Handle != -1, "the fixture must acquire an actual exclusive writer")
+		Failure := 0
+		try _HCfgTestCleanup()
+		catch Error as Caught
+			Failure := Caught
+		Assert(Failure is Error, "a real native deletion refusal must propagate")
+		AssertEqual(Root, _HCfgTestFixtureRoot, "refused cleanup retains the exact owner")
+		AssertTrue(DirExist(Root), "the locked fixture cannot be reported retired")
+	} finally {
+		if Handle != -1
+			Assert(DllCall("Kernel32\CloseHandle", "Ptr", Handle, "Int"), "release the exact native writer")
+		_HCfgTestCleanup()
+	}
+	AssertEqual("", _HCfgTestFixtureRoot, "successful cleanup retry releases ownership")
+	AssertFalse(DirExist(Root), "successful cleanup retry retires the directory")
+}
+Test("HotstringsConfig: refused fixture cleanup retains ownership until retry (hotstrings-fixture-ownership)",
+	_HCfgTestFixtureCleanupRefusal)

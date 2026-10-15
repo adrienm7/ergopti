@@ -1,0 +1,1431 @@
+verify-change: 64 changed file(s).
+verify-change: silent-failure pre-checks passed.
+
+  Gates required by this change:
+   - format  (CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files)
+       e.g. docs/ERGOPTIPLUS_TODO.md, docs/handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md, docs/handovers/2026-10-04-parallel-containers/GROUP3-PHYSICAL-PARTIAL.md
+   - js  (port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only)
+       e.g. docs/ERGOPTIPLUS_TODO.md, docs/handovers/2026-10-04-parallel-containers/GROUP3-CURRENT-CHECKPOINT.md, docs/handovers/2026-10-04-parallel-containers/GROUP3-PHYSICAL-PARTIAL.md
+
+
+=== format ===
+
+> svelte-static@3.0.0 format:check
+> node ./tools/lint/format.cjs --check
+
+432 files already formatted
+
+=== js ===
+
+> svelte-static@3.0.0 test:js
+> node ./tools/test/run-js-suite.cjs
+
+
+Ergopti+ JS validation suite
+==================================================
+Timing journal: /tmp/ergopti-g3/ergopti-js-suite-iHK4tl/timings.ndjson
+
+  RUNNING 1/435 — native qualification JS controls have one default/full and direct CLI owner
+  PASS 1/435 — native qualification JS controls have one default/full and direct CLI owner
+    duration: 1484.979 ms (1/435)
+  RUNNING 2/435 — Windows API form retains modal source authority and durable publication
+  PASS 2/435 — Windows API form retains modal source authority and durable publication
+    duration: 83.695 ms (2/435)
+  RUNNING 3/435 — Windows managed Ollama production uses owned per-user ports and separate consent
+  PASS 3/435 — Windows managed Ollama production uses owned per-user ports and separate consent
+    duration: 119.583 ms (3/435)
+  RUNNING 4/435 — Windows navigation portable census retains every native and portable case
+  PASS 4/435 — Windows navigation portable census retains every native and portable case
+    duration: 95.542 ms (4/435)
+  RUNNING 5/435 — Windows navigation executes every portable production C case
+  PASS 5/435 — Windows navigation executes every portable production C case
+    duration: 1877.557 ms (5/435)
+  RUNNING 6/435 — Windows captured-event route core executes independent event vectors
+  PASS 6/435 — Windows captured-event route core executes independent event vectors
+    duration: 649.661 ms (6/435)
+  RUNNING 7/435 — Windows canonical output planner executes independent custody matrices
+  PASS 7/435 — Windows canonical output planner executes independent custody matrices
+    duration: 498.924 ms (7/435)
+  RUNNING 8/435 — Windows terminal output custody adapter preserves exact native bindings and closed admission
+  PASS 8/435 — Windows terminal output custody adapter preserves exact native bindings and closed admission
+    duration: 415.051 ms (8/435)
+  RUNNING 9/435 — Windows Group 7 receipt parser refuses incomplete and malformed native evidence
+  PASS 9/435 — Windows Group 7 receipt parser refuses incomplete and malformed native evidence
+    duration: 81.858 ms (9/435)
+  RUNNING 10/435 — Windows bounded hook trace core retains exact ownership and loss receipts
+  PASS 10/435 — Windows bounded hook trace core retains exact ownership and loss receipts
+    duration: 253.711 ms (10/435)
+  RUNNING 11/435 — Windows native callback trace reader refuses missing or malformed observations
+  PASS 11/435 — Windows native callback trace reader refuses missing or malformed observations
+    duration: 216.248 ms (11/435)
+  RUNNING 12/435 — Windows hook tracing remains opt-in, isolated and bound to native source inputs
+  PASS 12/435 — Windows hook tracing remains opt-in, isolated and bound to native source inputs
+    duration: 130.400 ms (12/435)
+  RUNNING 13/435 — Windows ordered-pair cohort receiving retains original publisher and retirement
+  PASS 13/435 — Windows ordered-pair cohort receiving retains original publisher and retirement
+    duration: 152.486 ms (13/435)
+  RUNNING 14/435 — web text decoding and icon demo preserve literal input with bounded parsing
+  PASS 14/435 — web text decoding and icon demo preserve literal input with bounded parsing
+    duration: 481.213 ms (14/435)
+  RUNNING 15/435 — native XI2 three-cookie CI preserves original family and source receipts
+  PASS 15/435 — native XI2 three-cookie CI preserves original family and source receipts
+    duration: 666.508 ms (15/435)
+  RUNNING 16/435 — macOS native PAC and WPAD qualification requires all twelve original cases
+  PASS 16/435 — macOS native PAC and WPAD qualification requires all twelve original cases
+    duration: 2551.331 ms (16/435)
+  RUNNING 17/435 — macOS archive qualification requires exact native cases and compiler inputs
+  PASS 17/435 — macOS archive qualification requires exact native cases and compiler inputs
+    duration: 1707.044 ms (17/435)
+  RUNNING 18/435 — Signed native query CI publisher retains compiler and nested-signature provenance
+  PASS 18/435 — Signed native query CI publisher retains compiler and nested-signature provenance
+    duration: 2852.476 ms (18/435)
+  RUNNING 19/435 — dev156 qualification deferrals retain full default execution and strict accounting
+  PASS 19/435 — dev156 qualification deferrals retain full default execution and strict accounting
+    duration: 1805.777 ms (19/435)
+  RUNNING 20/435 — macOS launch qualification retains strict source and lifecycle evidence
+  PASS 20/435 — macOS launch qualification retains strict source and lifecycle evidence
+    duration: 406.038 ms (20/435)
+  RUNNING 21/435 — macOS launch qualification models restore environment and owned resources
+  PASS 21/435 — macOS launch qualification models restore environment and owned resources
+    duration: 789.827 ms (21/435)
+  RUNNING 22/435 — source toolchain admission preserves genuine compiler, headers and checkout
+  PASS 22/435 — source toolchain admission preserves genuine compiler, headers and checkout
+    duration: 15796.773 ms (22/435)
+  RUNNING 23/435 — openSUSE first-install prep and requested-capability diagnostics retain native refusal
+  PASS 23/435 — openSUSE first-install prep and requested-capability diagnostics retain native refusal
+    duration: 1197.764 ms (23/435)
+  RUNNING 24/435 — Nix runtime receipts and hosted registration preserve native admission
+  PASS 24/435 — Nix runtime receipts and hosted registration preserve native admission
+    duration: 167.885 ms (24/435)
+  RUNNING 25/435 — Ubuntu CI dependencies retain signed archive scope and native failure status
+  PASS 25/435 — Ubuntu CI dependencies retain signed archive scope and native failure status
+    duration: 803.862 ms (25/435)
+  RUNNING 26/435 — native typing consumer retains actual selection and KPI dependencies
+  PASS 26/435 — native typing consumer retains actual selection and KPI dependencies
+    duration: 92.487 ms (26/435)
+  RUNNING 27/435 — Windows packaging stamp preserves exact AHK source encoding
+  PASS 27/435 — Windows packaging stamp preserves exact AHK source encoding
+    duration: 105.431 ms (27/435)
+  RUNNING 28/435 — JS suite failures preserve error headlines and process status
+  PASS 28/435 — JS suite failures preserve error headlines and process status
+    duration: 698.466 ms (28/435)
+  RUNNING 29/435 — Agent Skills canonical tree matches the generated Claude mirror
+  PASS 29/435 — Agent Skills canonical tree matches the generated Claude mirror
+    duration: 521.901 ms (29/435)
+  RUNNING 30/435 — audit manifests and dedicated worktrees obey the portable workflow contract
+  PASS 30/435 — audit manifests and dedicated worktrees obey the portable workflow contract
+    duration: 2869.459 ms (30/435)
+  RUNNING 31/435 — verify-change distinguishes current regressions, historical debt, and environment failures
+  PASS 31/435 — verify-change distinguishes current regressions, historical debt, and environment failures
+    duration: 105.331 ms (31/435)
+  RUNNING 32/435 — native AHK gates report parse failures without dialogs
+  PASS 32/435 — native AHK gates report parse failures without dialogs
+    duration: 109.665 ms (32/435)
+  RUNNING 33/435 — Windows range stages acknowledge completed reads and failures
+  PASS 33/435 — Windows range stages acknowledge completed reads and failures
+    duration: 57.190 ms (33/435)
+  RUNNING 34/435 — native WebView receives ranges through a private HTTPS mount
+  PASS 34/435 — native WebView receives ranges through a private HTTPS mount
+    duration: 61.663 ms (34/435)
+  RUNNING 35/435 — AHK E2E admission requires every pure and native Edit corpus result
+  PASS 35/435 — AHK E2E admission requires every pure and native Edit corpus result
+    duration: 1082.369 ms (35/435)
+  RUNNING 36/435 — AHK live TAP follower preserves UTF-8 and native receipt authority
+  PASS 36/435 — AHK live TAP follower preserves UTF-8 and native receipt authority
+    duration: 4025.879 ms (36/435)
+  RUNNING 37/435 — AHK suite manifest rejects early completion before the slow tail
+  PASS 37/435 — AHK suite manifest rejects early completion before the slow tail
+    duration: 2487.432 ms (37/435)
+  RUNNING 38/435 — repository text resolves to LF on every platform
+  PASS 38/435 — repository text resolves to LF on every platform
+    duration: 97.130 ms (38/435)
+  RUNNING 39/435 — project RTK bootstrap stays pinned and network-free in CI
+  PASS 39/435 — project RTK bootstrap stays pinned and network-free in CI
+    duration: 168.126 ms (39/435)
+  RUNNING 40/435 — tools spawn the Git for Windows bash through one resolver, never the WSL launcher
+  PASS 40/435 — tools spawn the Git for Windows bash through one resolver, never the WSL launcher
+    duration: 351.279 ms (40/435)
+  RUNNING 41/435 — Node runtime is exact and single-sourced across CI and Unicode generation
+  PASS 41/435 — Node runtime is exact and single-sourced across CI and Unicode generation
+    duration: 61.976 ms (41/435)
+  RUNNING 42/435 — VS Code and Zed format on save with the repository Prettier only
+  PASS 42/435 — VS Code and Zed format on save with the repository Prettier only
+    duration: 65.294 ms (42/435)
+  RUNNING 43/435 — domain pipeline (manifest, parity, ports, schema, read-sites, drift)
+  PASS 43/435 — domain pipeline (manifest, parity, ports, schema, read-sites, drift)
+    duration: 8188.710 ms (43/435)
+  RUNNING 44/435 — hotstring priority parity (shared JSON ↔ AHK + Lua)
+  PASS 44/435 — hotstring priority parity (shared JSON ↔ AHK + Lua)
+    duration: 846.296 ms (44/435)
+  RUNNING 45/435 — translation key consistency audit
+  PASS 45/435 — translation key consistency audit
+    duration: 333.172 ms (45/435)
+  RUNNING 46/435 — convention lint (banners, spacing, section headers — strict)
+  PASS 46/435 — convention lint (banners, spacing, section headers — strict)
+    duration: 3274.756 ms (46/435)
+  RUNNING 47/435 — lint banner-marker safety (no hardcoded-prefix corruption of "--"-marker Lua banners)
+  PASS 47/435 — lint banner-marker safety (no hardcoded-prefix corruption of "--"-marker Lua banners)
+    duration: 627.640 ms (47/435)
+  RUNNING 48/435 — LLM legacy_ids + BASIC_PROMPT single source
+  PASS 48/435 — LLM legacy_ids + BASIC_PROMPT single source
+    duration: 64.108 ms (48/435)
+  RUNNING 49/435 — locale display order single source (locale_order.json ↔ macOS + Windows + Linux + site)
+  PASS 49/435 — locale display order single source (locale_order.json ↔ macOS + Windows + Linux + site)
+    duration: 74.092 ms (49/435)
+  RUNNING 50/435 — no generator stamps the current date into its output (drift must mean drift)
+  PASS 50/435 — no generator stamps the current date into its output (drift must mean drift)
+    duration: 70.503 ms (50/435)
+  RUNNING 51/435 — architecture diagram (ports resolve + architecture.md in sync)
+  PASS 51/435 — architecture diagram (ports resolve + architecture.md in sync)
+    duration: 60.048 ms (51/435)
+  RUNNING 52/435 — dev-tool paths (private-AHK workflow points at live paths)
+  PASS 52/435 — dev-tool paths (private-AHK workflow points at live paths)
+    duration: 310.819 ms (52/435)
+  RUNNING 53/435 — fast repeating timers are inventoried (no silent poller)
+  PASS 53/435 — fast repeating timers are inventoried (no silent poller)
+    duration: 198.761 ms (53/435)
+  RUNNING 54/435 — metrics categories are id-keyed (colours survive a language switch)
+  PASS 54/435 — metrics categories are id-keyed (colours survive a language switch)
+    duration: 180.433 ms (54/435)
+  RUNNING 55/435 — metrics apps revision-aware publication ordering
+  PASS 55/435 — metrics apps revision-aware publication ordering
+    duration: 211.885 ms (55/435)
+  RUNNING 56/435 — metrics filter projection caches and native invalidation
+  PASS 56/435 — metrics filter projection caches and native invalidation
+    duration: 205.716 ms (56/435)
+  RUNNING 57/435 — native menu flags preserve authoritative PNG pixels
+  PASS 57/435 — native menu flags preserve authoritative PNG pixels
+    duration: 127.579 ms (57/435)
+  RUNNING 58/435 — typing metrics mailbox ownership
+  PASS 58/435 — typing metrics mailbox ownership
+    duration: 386.072 ms (58/435)
+  RUNNING 59/435 — typing metrics revision-aware publication ordering
+  PASS 59/435 — typing metrics revision-aware publication ordering
+    duration: 206.857 ms (59/435)
+  RUNNING 60/435 — typing metrics range selection supersession
+  PASS 60/435 — typing metrics range selection supersession
+    duration: 127.612 ms (60/435)
+  RUNNING 61/435 — typing metrics reset transaction ownership
+  PASS 61/435 — typing metrics reset transaction ownership
+    duration: 208.784 ms (61/435)
+  RUNNING 62/435 — shared menu delegation follows reachable methods and refuses dormant or removed providers
+  PASS 62/435 — shared menu delegation follows reachable methods and refuses dormant or removed providers
+    duration: 326.073 ms (62/435)
+  RUNNING 63/435 — menu reader captured line snapshot preserves lexical semantics and bounded work
+  PASS 63/435 — menu reader captured line snapshot preserves lexical semantics and bounded work
+    duration: 127.346 ms (63/435)
+  RUNNING 64/435 — menu lexical queries retain exact semantics and bounded per-unit repeat work
+  PASS 64/435 — menu lexical queries retain exact semantics and bounded per-unit repeat work
+    duration: 270.533 ms (64/435)
+  RUNNING 65/435 — every menu-manifest field and section has a driver that reads it (no decorative declarations)
+  PASS 65/435 — every menu-manifest field and section has a driver that reads it (no decorative declarations)
+    duration: 68609.777 ms (65/435)
+  RUNNING 66/435 — no new menu row built outside the renderer (I3 ratchet — windows 220, macos 301, linux 3)
+  PASS 66/435 — no new menu row built outside the renderer (I3 ratchet — windows 220, macos 301, linux 3)
+    duration: 1712.105 ms (66/435)
+  RUNNING 67/435 — every declared menu row has a handler in its driver (I3 ratchet — ahk 0, hs 5, linux 0)
+  PASS 67/435 — every declared menu row has a handler in its driver (I3 ratchet — ahk 0, hs 5, linux 0)
+    duration: 11161.511 ms (67/435)
+  RUNNING 68/435 — every registered menu row matches its declared type (handler slot vs provider slot)
+  PASS 68/435 — every registered menu row matches its declared type (handler slot vs provider slot)
+    duration: 85.591 ms (68/435)
+  RUNNING 69/435 — top-level menu shape agrees across the three drivers (I3 — the manifest finally has a Linux dimension)
+  PASS 69/435 — top-level menu shape agrees across the three drivers (I3 — the manifest finally has a Linux dimension)
+    duration: 122.896 ms (69/435)
+  RUNNING 70/435 — the whole menu tree agrees across the three drivers, submenus included (I3 — no empty submenu, no orphaned header, no unread getter)
+  PASS 70/435 — the whole menu tree agrees across the three drivers, submenus included (I3 — no empty submenu, no orphaned header, no unread getter)
+    duration: 286369.607 ms (70/435)
+  RUNNING 71/435 — every top-level menu title reads ONE shared key on every driver that has it
+  PASS 71/435 — every top-level menu title reads ONE shared key on every driver that has it
+    duration: 664.097 ms (71/435)
+  RUNNING 72/435 — every declared menu is answered by every driver that shows it (per-category coverage)
+  PASS 72/435 — every declared menu is answered by every driver that shows it (per-category coverage)
+    duration: 42629.430 ms (72/435)
+  RUNNING 73/435 — every feature submenu opens with its category switch, registered by every driver that shows it
+  PASS 73/435 — every feature submenu opens with its category switch, registered by every driver that shows it
+    duration: 4410.113 ms (73/435)
+  RUNNING 74/435 — Enable all / Disable all stay retired on every driver (manifest rows, locale keys, handlers)
+  PASS 74/435 — Enable all / Disable all stay retired on every driver (manifest rows, locale keys, handlers)
+    duration: 4043.942 ms (74/435)
+  RUNNING 75/435 — the circular Spaces toggle stays retired (no setting, row, label or handler; existing data survives until cleanup)
+  PASS 75/435 — the circular Spaces toggle stays retired (no setting, row, label or handler; existing data survives until cleanup)
+    duration: 911.913 ms (75/435)
+  RUNNING 76/435 — every restore / clear row reads the two shared labels (restore recommended, clear to system)
+  PASS 76/435 — every restore / clear row reads the two shared labels (restore recommended, clear to system)
+    duration: 686.661 ms (76/435)
+  RUNNING 77/435 — every settings menu opens with its switch, restore and clear, then a separator (menu-first-group)
+  PASS 77/435 — every settings menu opens with its switch, restore and clear, then a separator (menu-first-group)
+    duration: 58.161 ms (77/435)
+  RUNNING 78/435 — the wrap toggle and its symbols form one group, named without AltGr (shortcuts-wrap-group)
+  PASS 78/435 — the wrap toggle and its symbols form one group, named without AltGr (shortcuts-wrap-group)
+    duration: 509.550 ms (78/435)
+  RUNNING 79/435 — a row a platform lacks is declared hidden (not applicable) or greyed with its reason (not yet ported)
+  PASS 79/435 — a row a platform lacks is declared hidden (not applicable) or greyed with its reason (not yet ported)
+    duration: 612.768 ms (79/435)
+  RUNNING 80/435 — no driver builds more menu rows outside the shared manifest than its baseline (native-menu-rows ratchet)
+  PASS 80/435 — no driver builds more menu rows outside the shared manifest than its baseline (native-menu-rows ratchet)
+    duration: 1626.863 ms (80/435)
+  RUNNING 81/435 — native-menu census admits migration to zero only with intact legacy detection and complete source coverage
+  PASS 81/435 — native-menu census admits migration to zero only with intact legacy detection and complete source coverage
+    duration: 43591.781 ms (81/435)
+  RUNNING 82/435 — no restore or clear row asks a question on any driver (restore-recommended-no-confirm)
+  PASS 82/435 — no restore or clear row asks a question on any driver (restore-recommended-no-confirm)
+    duration: 3240.151 ms (82/435)
+  RUNNING 83/435 — approved menu labels keep their wording and are translated in every locale
+  PASS 83/435 — approved menu labels keep their wording and are translated in every locale
+    duration: 134.220 ms (83/435)
+  RUNNING 84/435 — one hold picker: the same options in the same order on every driver, from one shared table
+  PASS 84/435 — one hold picker: the same options in the same order on every driver, from one shared table
+    duration: 51.870 ms (84/435)
+  RUNNING 85/435 — one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray
+  PASS 85/435 — one tap-hold key catalogue: order, hands and labels shared, each column its engine, read by every tray
+    duration: 243.430 ms (85/435)
+  RUNNING 86/435 — one table for what the one-shot Shift types, read by Windows and Linux
+  PASS 86/435 — one table for what the one-shot Shift types, read by Windows and Linux
+    duration: 44.124 ms (86/435)
+  RUNNING 87/435 — the hotstring category submenus agree across the three drivers (same controls, same order)
+  PASS 87/435 — the hotstring category submenus agree across the three drivers (same controls, same order)
+    duration: 44458.089 ms (87/435)
+  RUNNING 88/435 — hotstring language packs are complete data and every section ships disabled
+  PASS 88/435 — hotstring language packs are complete data and every section ships disabled
+    duration: 1555.737 ms (88/435)
+  RUNNING 89/435 — the hotstrings windows are one shared UI, and every driver bridge answers every action it sends
+  PASS 89/435 — the hotstrings windows are one shared UI, and every driver bridge answers every action it sends
+    duration: 74.905 ms (89/435)
+  RUNNING 90/435 — no Lua 5.2+ constructs where LuaJIT has to load them (the interpreter CI and the daemon actually run)
+  PASS 90/435 — no Lua 5.2+ constructs where LuaJIT has to load them (the interpreter CI and the daemon actually run)
+    duration: 975.807 ms (90/435)
+  RUNNING 91/435 — every skipped conformance case names a ledger row (skips are data, not prose)
+  PASS 91/435 — every skipped conformance case names a ledger row (skips are data, not prose)
+    duration: 631.842 ms (91/435)
+  RUNNING 92/435 — every script a git hook invokes exists (a moved script breaks the next commit that trips it)
+  PASS 92/435 — every script a git hook invokes exists (a moved script breaks the next commit that trips it)
+    duration: 69.894 ms (92/435)
+  RUNNING 93/435 — shared .lua/.toml/.json use LF (the AHK half is covered by test:ahk-encoding)
+  PASS 93/435 — shared .lua/.toml/.json use LF (the AHK half is covered by test:ahk-encoding)
+    duration: 1590.071 ms (93/435)
+  RUNNING 94/435 — no driver-namespaced manifest table (I2 — a feature lives at its semantic path, never under a driver)
+  PASS 94/435 — no driver-namespaced manifest table (I2 — a feature lives at its semantic path, never under a driver)
+    duration: 880.215 ms (94/435)
+  RUNNING 95/435 — single-driver features reach only their own driver (platforms inherit from the section — pin them)
+  PASS 95/435 — single-driver features reach only their own driver (platforms inherit from the section — pin them)
+    duration: 308.139 ms (95/435)
+  RUNNING 96/435 — platform-restriction reasons reach a reader (absences shipped, translated, consumed)
+  PASS 96/435 — platform-restriction reasons reach a reader (absences shipped, translated, consumed)
+    duration: 11870.240 ms (96/435)
+  RUNNING 97/435 — no new unexplained platform restriction (I2 ratchet — 138 today; run with --report for the inventory)
+  PASS 97/435 — no new unexplained platform restriction (I2 ratchet — 138 today; run with --report for the inventory)
+    duration: 135.999 ms (97/435)
+  RUNNING 98/435 — every declared action chord is well formed (I4 — an unknown modifier fires the wrong shortcut silently)
+  PASS 98/435 — every declared action chord is well formed (I4 — an unknown modifier fires the wrong shortcut silently)
+    duration: 53.102 ms (98/435)
+  RUNNING 99/435 — one generated action catalogue per driver (strict schema, pruned headings, localized keys in 21 locales, runtime parity test in every driver suite)
+  PASS 99/435 — one generated action catalogue per driver (strict schema, pruned headings, localized keys in 21 locales, runtime parity test in every driver suite)
+    duration: 196.635 ms (99/435)
+  RUNNING 100/435 — the Karabiner and gesture action namespaces are one (54 tappable reachable, 19 hold-only out, no doubled keystroke)
+  PASS 100/435 — the Karabiner and gesture action namespaces are one (54 tappable reachable, 19 hold-only out, no doubled keystroke)
+    duration: 135.082 ms (100/435)
+  RUNNING 101/435 — Karabiner binary paths declared once (a v16-style rename must not reach 3 of 4 copies)
+  PASS 101/435 — Karabiner binary paths declared once (a v16-style rename must not reach 3 of 4 copies)
+    duration: 317.594 ms (101/435)
+  RUNNING 102/435 — WPM divisor single source (Lua drivers use the shared constant; WebView copies frozen at 5)
+  PASS 102/435 — WPM divisor single source (Lua drivers use the shared constant; WebView copies frozen at 5)
+    duration: 289.851 ms (102/435)
+  RUNNING 103/435 — prompt-builder constants agree across Lua, JS and the generated AHK (all 10)
+  PASS 103/435 — prompt-builder constants agree across Lua, JS and the generated AHK (all 10)
+    duration: 41.553 ms (103/435)
+  RUNNING 104/435 — every corpus field is read by a replay or documented as descriptive
+  PASS 104/435 — every corpus field is read by a replay or documented as descriptive
+    duration: 18038.736 ms (104/435)
+  RUNNING 105/435 — every source path a packaging script copies exists (no suite runs a build)
+  PASS 105/435 — every source path a packaging script copies exists (no suite runs a build)
+    duration: 89.066 ms (105/435)
+  RUNNING 106/435 — every app window keeps the shared frame on macOS, Windows and Linux (no edgeless window)
+  PASS 106/435 — every app window keeps the shared frame on macOS, Windows and Linux (no edgeless window)
+    duration: 306.544 ms (106/435)
+  RUNNING 107/435 — website stable downloads survive a page of newer prereleases
+  PASS 107/435 — website stable downloads survive a page of newer prereleases
+    duration: 1491.186 ms (107/435)
+  RUNNING 108/435 — every asset the release notes link to is uploaded by a build job (no dead download button)
+  PASS 108/435 — every asset the release notes link to is uploaded by a build job (no dead download button)
+    duration: 91.607 ms (108/435)
+  RUNNING 109/435 — every macOS/Linux package build stamps the commit its diagnostics report (no "unknown" in a release)
+  PASS 109/435 — every macOS/Linux package build stamps the commit its diagnostics report (no "unknown" in a release)
+    duration: 157.943 ms (109/435)
+  RUNNING 110/435 — every registered action resolves a label in all 21 locales
+  PASS 110/435 — every registered action resolves a label in all 21 locales
+    duration: 135.483 ms (110/435)
+  RUNNING 111/435 — Linux install.sh leaves a working first install (sandboxed real run)
+  PASS 111/435 — Linux install.sh leaves a working first install (sandboxed real run)
+    duration: 6349.607 ms (111/435)
+  RUNNING 112/435 — Linux native packages provision graphical input access
+  PASS 112/435 — Linux native packages provision graphical input access
+    duration: 390.049 ms (112/435)
+  RUNNING 113/435 — Linux login startup preserves explicit user choices
+  PASS 113/435 — Linux login startup preserves explicit user choices
+    duration: 302.061 ms (113/435)
+  RUNNING 114/435 — Linux uninstall preserves personal data and rejects unrelated installations
+  FAIL 114/435 — Linux uninstall preserves personal data and rejects unrelated installations
+    duration: 259.285 ms (114/435)
+  ✗ Linux uninstall preserves personal data and rejects unrelated installations
+    reproduce: npm run test:linux-uninstall-sandbox
+    process: status=1 signal=none error=none
+    stderr:
+    node:assert:150
+      throw new AssertionError(obj);
+      ^
+    
+    AssertionError [ERR_ASSERTION]: preflight validates without removing files
+    
+    1 !== 0
+    
+        at Object.<anonymous> (/workspace/ergopti/tools/test/test-linux-uninstall-sandbox.cjs:114:9)
+        at Module._compile (node:internal/modules/cjs/loader:1705:14)
+        at Object..js (node:internal/modules/cjs/loader:1838:10)
+        at Module.load (node:internal/modules/cjs/loader:1441:32)
+    ... 2 lines omitted ...
+        at wrapModuleLoad (node:internal/modules/cjs/loader:237:24)
+        at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:171:5)
+        at node:internal/main/run_main_module:36:49 {
+      generatedMessage: false,
+      code: 'ERR_ASSERTION',
+      actual: 1,
+      expected: 0,
+      operator: 'strictEqual',
+      diff: 'simple'
+    }
+    
+    Node.js v22.22.2
+
+    Captured failure output: /tmp/ergopti-g3/ergopti-js-suite-iHK4tl/failures/js-0102
+    Retained returned UTF-8 text or thrown spawn diagnostics only; maxBuffer=1048576 bytes. Uncaptured or child-truncated output is unknown.
+  RUNNING 115/435 — Windows uninstall requires terminal authorization and preserves replaced files
+  PASS 115/435 — Windows uninstall requires terminal authorization and preserves replaced files
+    duration: 39.147 ms (115/435)
+  RUNNING 116/435 — Linux tray icons mirror the Ergopti logo byte for byte
+  PASS 116/435 — Linux tray icons mirror the Ergopti logo byte for byte
+    duration: 67.840 ms (116/435)
+  RUNNING 117/435 — the apps metrics window keeps its state across the Linux poll
+  PASS 117/435 — the apps metrics window keeps its state across the Linux poll
+    duration: 36.964 ms (117/435)
+  RUNNING 118/435 — shared pages only call translators that exist
+  PASS 118/435 — shared pages only call translators that exist
+    duration: 64.678 ms (118/435)
+  RUNNING 119/435 — Linux modules resolve _shared through infra/paths.lua
+  PASS 119/435 — Linux modules resolve _shared through infra/paths.lua
+    duration: 141.259 ms (119/435)
+  RUNNING 120/435 — every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)
+  PASS 120/435 — every _shared resolver executes and lands on a real file (Linux + macOS, and the unset-HOME fallback)
+    duration: 812.796 ms (120/435)
+  RUNNING 121/435 — driver-doc paths (no stale static/drivers in docs)
+  PASS 121/435 — driver-doc paths (no stale static/drivers in docs)
+    duration: 95.678 ms (121/435)
+  RUNNING 122/435 — no new location-pinned source reads in AHK tests (ratchet)
+  PASS 122/435 — no new location-pinned source reads in AHK tests (ratchet)
+    duration: 276.651 ms (122/435)
+  RUNNING 123/435 — no new location-pinned source reads in macOS tests (ratchet)
+  PASS 123/435 — no new location-pinned source reads in macOS tests (ratchet)
+    duration: 189.649 ms (123/435)
+  RUNNING 124/435 — macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent
+  PASS 124/435 — macOS remap lease survives private-process SIGKILL through an exact-token LaunchAgent
+    duration: 707.292 ms (124/435)
+  RUNNING 125/435 — AHK test coverage (every test_*.ahk reachable from run_all)
+  PASS 125/435 — AHK test coverage (every test_*.ahk reachable from run_all)
+    duration: 340.190 ms (125/435)
+  RUNNING 126/435 — AHK changed tests require transitive registration at every depth
+  PASS 126/435 — AHK changed tests require transitive registration at every depth
+    duration: 53.385 ms (126/435)
+  RUNNING 127/435 — e2e gate symmetry (every driver e2e runner is selected by verify-change)
+  PASS 127/435 — e2e gate symmetry (every driver e2e runner is selected by verify-change)
+    duration: 46.348 ms (127/435)
+  RUNNING 128/435 — verify-change recognizes multiline AHK definitions without accepting call sites
+  PASS 128/435 — verify-change recognizes multiline AHK definitions without accepting call sites
+    duration: 73.102 ms (128/435)
+  RUNNING 129/435 — shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)
+  PASS 129/435 — shared-contract gate coverage (_shared/core + _shared/tests select all three driver suites)
+    duration: 79.661 ms (129/435)
+  RUNNING 130/435 — shared Lua sources select both consumer unit and E2E gates
+  PASS 130/435 — shared Lua sources select both consumer unit and E2E gates
+    duration: 90.095 ms (130/435)
+  RUNNING 131/435 — Git change paths preserve filenames and both renamed drivers
+  PASS 131/435 — Git change paths preserve filenames and both renamed drivers
+    duration: 243.001 ms (131/435)
+  RUNNING 132/435 — explicit full verification includes every declared gate
+  PASS 132/435 — explicit full verification includes every declared gate
+    duration: 310.226 ms (132/435)
+  RUNNING 133/435 — generated outputs have one execution owner without aggregate duplication
+  PASS 133/435 — generated outputs have one execution owner without aggregate duplication
+    duration: 57.155 ms (133/435)
+  RUNNING 134/435 — AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)
+  PASS 134/435 — AHK parse coverage (Ahk2Exe compiles the whole #Include graph — Windows only, self-validating)
+    duration: 75.428 ms (134/435)
+  RUNNING 135/435 — AHK startup contract (early globals + actionable fatal diagnostics)
+  PASS 135/435 — AHK startup contract (early globals + actionable fatal diagnostics)
+    duration: 59.131 ms (135/435)
+  RUNNING 136/435 — AHK startup smoke requires fresh process-bound warm readiness (inert admission)
+  PASS 136/435 — AHK startup smoke requires fresh process-bound warm readiness (inert admission)
+    duration: 8388.947 ms (136/435)
+  RUNNING 137/435 — full AHK startup smoke (real auto-execute to ready, isolated config)
+  PASS 137/435 — full AHK startup smoke (real auto-execute to ready, isolated config)
+    duration: 100.631 ms (137/435)
+  RUNNING 138/435 — Kana installer refuses local execution and owns its native helper
+  PASS 138/435 — Kana installer refuses local execution and owns its native helper
+    duration: 55.535 ms (138/435)
+  RUNNING 139/435 — AHK runners are invoked (no run_*/bench_* file referenced by nothing)
+  PASS 139/435 — AHK runners are invoked (no run_*/bench_* file referenced by nothing)
+    duration: 530.799 ms (139/435)
+  RUNNING 140/435 — AHK runner references stream without retaining the full text corpus
+  PASS 140/435 — AHK runner references stream without retaining the full text corpus
+    duration: 53.964 ms (140/435)
+  RUNNING 141/435 — AHK runner rejects malformed filters before loading tests
+  PASS 141/435 — AHK runner rejects malformed filters before loading tests
+    duration: 156.858 ms (141/435)
+  RUNNING 142/435 — AHK loop capture (no closure over a for-loop variable, no looped Test registration closing over the loop)
+  PASS 142/435 — AHK loop capture (no closure over a for-loop variable, no looped Test registration closing over the loop)
+    duration: 1095.650 ms (142/435)
+  RUNNING 143/435 — Lua closure-binds-nil-global (ratchet against the fourth recurrence of the hs.task GC-pin trap)
+  PASS 143/435 — Lua closure-binds-nil-global (ratchet against the fourth recurrence of the hs.task GC-pin trap)
+    duration: 488.415 ms (143/435)
+  RUNNING 144/435 — glossaries match the code (port count + names derived from _shared/core/ports, no retired driver dirs)
+  PASS 144/435 — glossaries match the code (port count + names derived from _shared/core/ports, no retired driver dirs)
+    duration: 41.422 ms (144/435)
+  RUNNING 145/435 — Linux menu i18n keys exist (every i18n_safe key is defined in en.json)
+  PASS 145/435 — Linux menu i18n keys exist (every i18n_safe key is defined in en.json)
+    duration: 49.891 ms (145/435)
+  RUNNING 146/435 — source encoding (no double-encoded UTF-8, no repeated BOM, valid UTF-8 — every driver)
+  PASS 146/435 — source encoding (no double-encoded UTF-8, no repeated BOM, valid UTF-8 — every driver)
+    duration: 960.082 ms (146/435)
+  RUNNING 147/435 — AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)
+  PASS 147/435 — AHK v2.0 parse-breakers (v1 quotes / block-body arrows that abort the whole suite)
+    duration: 2711.812 ms (147/435)
+  RUNNING 148/435 — unified reporter parses TAP + Lua output (report.cjs)
+  PASS 148/435 — unified reporter parses TAP + Lua output (report.cjs)
+    duration: 4855.288 ms (148/435)
+  RUNNING 149/435 — max_tokens single source (no literal default in backend adapters)
+  PASS 149/435 — max_tokens single source (no literal default in backend adapters)
+    duration: 75.383 ms (149/435)
+  RUNNING 150/435 — model-identity normaliser single source (one rule for active + installed)
+  PASS 150/435 — model-identity normaliser single source (one rule for active + installed)
+    duration: 474.005 ms (150/435)
+  RUNNING 151/435 — Lua test fixtures stay out of the repository (no working-directory fallback)
+  PASS 151/435 — Lua test fixtures stay out of the repository (no working-directory fallback)
+    duration: 573.701 ms (151/435)
+  RUNNING 152/435 — temperature single source (no literal 0.1 default in macOS adapters)
+  PASS 152/435 — temperature single source (no literal 0.1 default in macOS adapters)
+    duration: 55.482 ms (152/435)
+  RUNNING 153/435 — ollama port single source (no hardcoded port literal in AHK LLM files)
+  PASS 153/435 — ollama port single source (no hardcoded port literal in AHK LLM files)
+    duration: 48.515 ms (153/435)
+  RUNNING 154/435 — Linux LLM defaults single source (temp/port/context/keep_alive from _shared canonicals)
+  PASS 154/435 — Linux LLM defaults single source (temp/port/context/keep_alive from _shared canonicals)
+    duration: 47.574 ms (154/435)
+  RUNNING 155/435 — API test-request single source (probe text lives in api_providers.json only)
+  PASS 155/435 — API test-request single source (probe text lives in api_providers.json only)
+    duration: 57.215 ms (155/435)
+  RUNNING 156/435 — API model-extras single source (per-model body fields live in api_providers.json only)
+  PASS 156/435 — API model-extras single source (per-model body fields live in api_providers.json only)
+    duration: 42.802 ms (156/435)
+  RUNNING 157/435 — locale resolution single source (macOS+Linux wrappers delegate to shared locale.core)
+  PASS 157/435 — locale resolution single source (macOS+Linux wrappers delegate to shared locale.core)
+    duration: 44.369 ms (157/435)
+  RUNNING 158/435 — webview i18n browser-fallback path (bridge-less locale fetch resolves)
+  PASS 158/435 — webview i18n browser-fallback path (bridge-less locale fetch resolves)
+    duration: 147.013 ms (158/435)
+  RUNNING 159/435 — webview i18n fallback cascade (a failed locale fetch must not blank the page)
+  PASS 159/435 — webview i18n fallback cascade (a failed locale fetch must not blank the page)
+    duration: 78.980 ms (159/435)
+  RUNNING 160/435 — webview host strings survive the page locale fetch (no raw keys on macOS pages)
+  PASS 160/435 — webview host strings survive the page locale fetch (no raw keys on macOS pages)
+    duration: 457.491 ms (160/435)
+  RUNNING 161/435 — shared pages never show a raw locale key (keys in en.json, catalogue delivered and shipped)
+  PASS 161/435 — shared pages never show a raw locale key (keys in en.json, catalogue delivered and shipped)
+    duration: 112.388 ms (161/435)
+  RUNNING 162/435 — menu labels single source (shared labels.lua consumed by macOS)
+  PASS 162/435 — menu labels single source (shared labels.lua consumed by macOS)
+    duration: 318.616 ms (162/435)
+  RUNNING 163/435 — diagnostic snapshot fields, vectors and boot emission agree across the three drivers
+  PASS 163/435 — diagnostic snapshot fields, vectors and boot emission agree across the three drivers
+    duration: 49.944 ms (163/435)
+  RUNNING 164/435 — Linux version single source (one BUNDLE_VERSION-style source, no re-typed 3.0.0; P0-E)
+  PASS 164/435 — Linux version single source (one BUNDLE_VERSION-style source, no re-typed 3.0.0; P0-E)
+    duration: 41.277 ms (164/435)
+  RUNNING 165/435 — hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)
+  PASS 165/435 — hotstring buffer-cap parity (shared BUFFER_MAX_CHARS == both Windows mirrors; P0-F)
+    duration: 37.266 ms (165/435)
+  RUNNING 166/435 — LLM model + GPT link single source (no re-typed default literals in AHK)
+  PASS 166/435 — LLM model + GPT link single source (no re-typed default literals in AHK)
+    duration: 171.331 ms (166/435)
+  RUNNING 167/435 — version compare parity (JS over shared vectors; AHK+macOS suites read the same table)
+  PASS 167/435 — version compare parity (JS over shared vectors; AHK+macOS suites read the same table)
+    duration: 414.914 ms (167/435)
+  RUNNING 168/435 — showcase page lists each catalogue action on exactly its declared drivers
+  PASS 168/435 — showcase page lists each catalogue action on exactly its declared drivers
+    duration: 59.932 ms (168/435)
+  RUNNING 169/435 — LLM stop-sequences single source (no re-inlined literals in backends)
+  PASS 169/435 — LLM stop-sequences single source (no re-inlined literals in backends)
+    duration: 42.367 ms (169/435)
+  RUNNING 170/435 — shared TOML codec purity (no hard driver requires — loads on every Lua runtime)
+  PASS 170/435 — shared TOML codec purity (no hard driver requires — loads on every Lua runtime)
+    duration: 38.210 ms (170/435)
+  RUNNING 171/435 — no fallback literals (LLM defaults read from JSON, never a deleted mirror)
+  PASS 171/435 — no fallback literals (LLM defaults read from JSON, never a deleted mirror)
+    duration: 41.626 ms (171/435)
+  RUNNING 172/435 — cross-driver manifest equivalence (resolved values identical across drivers)
+  PASS 172/435 — cross-driver manifest equivalence (resolved values identical across drivers)
+    duration: 78.389 ms (172/435)
+  RUNNING 173/435 — webview geometry single source (macOS defers to manifest; Windows literals match; P0-A)
+  PASS 173/435 — webview geometry single source (macOS defers to manifest; Windows literals match; P0-A)
+    duration: 488.250 ms (173/435)
+  RUNNING 174/435 — diagnostic UI integrity (macOS + Windows healthcheck render path)
+  PASS 174/435 — diagnostic UI integrity (macOS + Windows healthcheck render path)
+    duration: 65.016 ms (174/435)
+  RUNNING 175/435 — GitHub issue link builder replays its vectors (bounded, UTF-8 percent-encoded prefill)
+  PASS 175/435 — GitHub issue link builder replays its vectors (bounded, UTF-8 percent-encoded prefill)
+    duration: 37.912 ms (175/435)
+  RUNNING 176/435 — diagnostics page redactor replays the Lua and AHK redaction vectors
+  PASS 176/435 — diagnostics page redactor replays the Lua and AHK redaction vectors
+    duration: 45.005 ms (176/435)
+  RUNNING 177/435 — diagnostics page model renders, summarises and exports the v2 schema on every driver, in 21 locales
+  PASS 177/435 — diagnostics page model renders, summarises and exports the v2 schema on every driver, in 21 locales
+    duration: 290.973 ms (177/435)
+  RUNNING 178/435 — diagnostics page behaviour (ready, preview of what is shared, buttons by id, details, probes, report mode)
+  PASS 178/435 — diagnostics page behaviour (ready, preview of what is shared, buttons by id, details, probes, report mode)
+    duration: 480.496 ms (178/435)
+  RUNNING 179/435 — error window page behaviour (ready, report shown as sent, crash notice, buttons by name, folds, results, 21 locales)
+  PASS 179/435 — error window page behaviour (ready, report shown as sent, crash notice, buttons by name, folds, results, 21 locales)
+    duration: 169.131 ms (179/435)
+  RUNNING 180/435 — update-check page (checking, up to date, new release, no release, failure, other channels, 21 locales, centered)
+  PASS 180/435 — update-check page (checking, up to date, new release, no release, failure, other channels, 21 locales, centered)
+    duration: 171.238 ms (180/435)
+  RUNNING 181/435 — configuration cleanup page (long lists, literal values, session actions, 21 locales)
+  PASS 181/435 — configuration cleanup page (long lists, literal values, session actions, 21 locales)
+    duration: 127.608 ms (181/435)
+  RUNNING 182/435 — GitHub issue forms declare every field the app prefills, and a worst-case prefill fits the URL budget
+  PASS 182/435 — GitHub issue forms declare every field the app prefills, and a worst-case prefill fits the URL budget
+    duration: 54.548 ms (182/435)
+  RUNNING 183/435 — repository URL single source (every GitHub link derives from the updater defaults)
+  PASS 183/435 — repository URL single source (every GitHub link derives from the updater defaults)
+    duration: 1421.420 ms (183/435)
+  RUNNING 184/435 — UI windows are focused, never kept on top (macOS, Windows, Linux) + no raw blockAlert
+  PASS 184/435 — UI windows are focused, never kept on top (macOS, Windows, Linux) + no raw blockAlert
+    duration: 1293.540 ms (184/435)
+  RUNNING 185/435 — click-lock fix (non-consuming watcher + keystroke release, both drivers)
+  PASS 185/435 — click-lock fix (non-consuming watcher + keystroke release, both drivers)
+    duration: 41.873 ms (185/435)
+  RUNNING 186/435 — Hammerspoon integrity (no global leaks, M.stop present, shutdown wired)
+  PASS 186/435 — Hammerspoon integrity (no global leaks, M.stop present, shutdown wired)
+    duration: 48.450 ms (186/435)
+  RUNNING 187/435 — section-title decoration parity (single "— … —" source per driver, no re-inlining)
+  PASS 187/435 — section-title decoration parity (single "— … —" source per driver, no re-inlining)
+    duration: 207.438 ms (187/435)
+  RUNNING 188/435 — macOS bundle layout (build script + launcher mirror the repo)
+  PASS 188/435 — macOS bundle layout (build script + launcher mirror the repo)
+    duration: 120.555 ms (188/435)
+  RUNNING 189/435 — macOS bundle payload ships every path the runtime reads and no excluded group
+  PASS 189/435 — macOS bundle payload ships every path the runtime reads and no excluded group
+    duration: 5678.274 ms (189/435)
+  RUNNING 190/435 — macOS app ships the keyboard layout bundle its menu resolves (no "No Ergopti bundle found")
+  PASS 190/435 — macOS app ships the keyboard layout bundle its menu resolves (no "No Ergopti bundle found")
+    duration: 84.674 ms (190/435)
+  RUNNING 191/435 — macOS launcher universal binary (arm64 + x86_64 verified)
+  PASS 191/435 — macOS launcher universal binary (arm64 + x86_64 verified)
+    duration: 65.782 ms (191/435)
+  RUNNING 192/435 — macOS native launcher CI (release build + XCTest + success-only aggregate)
+  PASS 192/435 — macOS native launcher CI (release build + XCTest + success-only aggregate)
+    duration: 780.803 ms (192/435)
+  RUNNING 193/435 — native Swift XCTest evidence preserves failures and original pipeline statuses
+  PASS 193/435 — native Swift XCTest evidence preserves failures and original pipeline statuses
+    duration: 3755.013 ms (193/435)
+  RUNNING 194/435 — macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)
+  PASS 194/435 — macOS native launcher local gate (plist + release build + XCTest, deferred off macOS)
+    duration: 42.260 ms (194/435)
+  RUNNING 195/435 — Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)
+  PASS 195/435 — Linux package layout (.deb/.rpm install into /usr/lib/ergopti; wrapper boots the same bundle entry)
+    duration: 76.191 ms (195/435)
+  RUNNING 196/435 — Linux bundle copies tracked bytes without per-file shell processes
+  PASS 196/435 — Linux bundle copies tracked bytes without per-file shell processes
+    duration: 302.027 ms (196/435)
+  RUNNING 197/435 — Linux portable network packages retain native ABI and command ownership
+  PASS 197/435 — Linux portable network packages retain native ABI and command ownership
+    duration: 365.825 ms (197/435)
+  RUNNING 198/435 — Linux portable native admission rejects incomplete and skipped receipts
+  PASS 198/435 — Linux portable native admission rejects incomplete and skipped receipts
+    duration: 86.414 ms (198/435)
+  RUNNING 199/435 — Linux native FD digest admission requires completed physical receipts
+  PASS 199/435 — Linux native FD digest admission requires completed physical receipts
+    duration: 96.267 ms (199/435)
+  RUNNING 200/435 — Linux CI requires successful mandatory jobs and assertion evidence
+  PASS 200/435 — Linux CI requires successful mandatory jobs and assertion evidence
+    duration: 2060.042 ms (200/435)
+  RUNNING 201/435 — Linux native window receipts retain mandatory npm, planner and CI owners
+  PASS 201/435 — Linux native window receipts retain mandatory npm, planner and CI owners
+    duration: 1388.507 ms (201/435)
+  RUNNING 202/435 — Linux native streaming receipts retain mandatory npm, planner and CI owners
+  PASS 202/435 — Linux native streaming receipts retain mandatory npm, planner and CI owners
+    duration: 235.907 ms (202/435)
+  RUNNING 203/435 — Linux native runtime prerequisite gate retains both ABIs and mandatory receipts
+  PASS 203/435 — Linux native runtime prerequisite gate retains both ABIs and mandatory receipts
+    duration: 714.317 ms (203/435)
+  RUNNING 204/435 — Desktop verdicts and parallel shared-core gates
+  PASS 204/435 — Desktop verdicts and parallel shared-core gates
+    duration: 3191.645 ms (204/435)
+  RUNNING 205/435 — Windows native desktop cohorts require exact native completion and mandatory evidence
+  PASS 205/435 — Windows native desktop cohorts require exact native completion and mandatory evidence
+    duration: 608.413 ms (205/435)
+  RUNNING 206/435 — Compiled upgrade admission requires actual prior-package and committed full-save evidence
+  PASS 206/435 — Compiled upgrade admission requires actual prior-package and committed full-save evidence
+    duration: 165.513 ms (206/435)
+  RUNNING 207/435 — macOS canvas job admission and pure Python ownership remain mandatory
+  PASS 207/435 — macOS canvas job admission and pure Python ownership remain mandatory
+    duration: 356.885 ms (207/435)
+  RUNNING 208/435 — Linux WebViews use pinned offline code and one bridge per page
+  PASS 208/435 — Linux WebViews use pinned offline code and one bridge per page
+    duration: 72.765 ms (208/435)
+  RUNNING 209/435 — Linux metrics polling follows native and document visibility lifecycles
+  PASS 209/435 — Linux metrics polling follows native and document visibility lifecycles
+    duration: 52.013 ms (209/435)
+  RUNNING 210/435 — Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides
+  PASS 210/435 — Linux standalone upgrades refresh intact canonical packs and preserve explicit overrides
+    duration: 196.448 ms (210/435)
+  RUNNING 211/435 — Linux checkout installs ship the layout registry and its Ergopti extension hotstrings
+  PASS 211/435 — Linux checkout installs ship the layout registry and its Ergopti extension hotstrings
+    duration: 975.099 ms (211/435)
+  RUNNING 212/435 — openSUSE CI package installs use the coherent origin instead of a redirecting mirror
+  PASS 212/435 — openSUSE CI package installs use the coherent origin instead of a redirecting mirror
+    duration: 1636.503 ms (212/435)
+  RUNNING 213/435 — release packaging workflow (live Windows stamp path + no Linux pipefail/SIGPIPE trap)
+  PASS 213/435 — release packaging workflow (live Windows stamp path + no Linux pipefail/SIGPIPE trap)
+    duration: 999.986 ms (213/435)
+  RUNNING 214/435 — CI pipeline loader refuses every missing lookup and unreadable layout (fixture self-test)
+  PASS 214/435 — CI pipeline loader refuses every missing lookup and unreadable layout (fixture self-test)
+    duration: 90.616 ms (214/435)
+  RUNNING 215/435 — Paired lease silence receiving retains exact native case and child statuses
+  PASS 215/435 — Paired lease silence receiving retains exact native case and child statuses
+    duration: 80.512 ms (215/435)
+  RUNNING 216/435 — Full default CI source admission preserves mandatory gates and bounded diagnostic policy
+  PASS 216/435 — Full default CI source admission preserves mandatory gates and bounded diagnostic policy
+    duration: 53547.256 ms (216/435)
+  RUNNING 217/435 — CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)
+  PASS 217/435 — CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)
+    duration: 48704.594 ms (217/435)
+  RUNNING 218/435 — CI release re-runs (plan never republishes a tagged commit and bumps from every subject; the preflight resumes a half-published release or stops; the release and its feed publish what was gated)
+  PASS 218/435 — CI release re-runs (plan never republishes a tagged commit and bumps from every subject; the preflight resumes a half-published release or stops; the release and its feed publish what was gated)
+    duration: 41013.561 ms (218/435)
+  RUNNING 219/435 — Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)
+  PASS 219/435 — Linux launcher starts where install.sh leaves a machine (no hard dep the installer skips; every exported shared path exists)
+    duration: 1083.031 ms (219/435)
+  RUNNING 220/435 — Linux managed networking admits actual runtime after package repair
+  PASS 220/435 — Linux managed networking admits actual runtime after package repair
+    duration: 514.755 ms (220/435)
+  RUNNING 221/435 — Linux native network runtime is registered and refuses omitted receipts
+  PASS 221/435 — Linux native network runtime is registered and refuses omitted receipts
+    duration: 211.245 ms (221/435)
+  RUNNING 222/435 — Managed native HTTP phase owners preserve original modeled closure protocol
+  PASS 222/435 — Managed native HTTP phase owners preserve original modeled closure protocol
+    duration: 137.102 ms (222/435)
+  RUNNING 223/435 — Managed native HTTP CI admits authenticated tools and complete source-bound receipts
+  PASS 223/435 — Managed native HTTP CI admits authenticated tools and complete source-bound receipts
+    duration: 479.284 ms (223/435)
+  RUNNING 224/435 — test:linux-updater-temp-receipt
+  PASS 224/435 — test:linux-updater-temp-receipt
+    duration: 58.729 ms (224/435)
+  RUNNING 225/435 — test:linux-updater-temp-registration
+  PASS 225/435 — test:linux-updater-temp-registration
+    duration: 356.065 ms (225/435)
+  RUNNING 226/435 — test:linux-updater-archive-receipt
+  PASS 226/435 — test:linux-updater-archive-receipt
+    duration: 90.313 ms (226/435)
+  RUNNING 227/435 — test:linux-updater-archive-registration
+  PASS 227/435 — test:linux-updater-archive-registration
+    duration: 350.332 ms (227/435)
+  RUNNING 228/435 — Linux native digest runtime preserves exact OpenSSL 3 projection and build owners
+  PASS 228/435 — Linux native digest runtime preserves exact OpenSSL 3 projection and build owners
+    duration: 158.445 ms (228/435)
+  RUNNING 229/435 — extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)
+  PASS 229/435 — extension-pack paths resolve (every read site lands on a real pack; pre-reorg prefix ratcheted out)
+    duration: 831.590 ms (229/435)
+  RUNNING 230/435 — Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group
+  PASS 230/435 — Windows exe bundle ships every file the driver and its pages read, and no test, Lua, doc or dev-only group
+    duration: 11089.020 ms (230/435)
+  RUNNING 231/435 — LLM logs carry no typed text (context length only, never a slice of the buffer)
+  PASS 231/435 — LLM logs carry no typed text (context length only, never a slice of the buffer)
+    duration: 109.868 ms (231/435)
+  RUNNING 232/435 — the preview bubble is rendered from the shared masking corpus (ratchet: which drivers carry it)
+  PASS 232/435 — the preview bubble is rendered from the shared masking corpus (ratchet: which drivers carry it)
+    duration: 334.155 ms (232/435)
+  RUNNING 233/435 — LLM privacy defaults single-sourced (secure fields blocked, URL bars allowed, all three drivers)
+  PASS 233/435 — LLM privacy defaults single-sourced (secure fields blocked, URL bars allowed, all three drivers)
+    duration: 52.687 ms (233/435)
+  RUNNING 234/435 — at-rest encryption envelope parity (marker/cipher/PBKDF2 identical across the three drivers)
+  PASS 234/435 — at-rest encryption envelope parity (marker/cipher/PBKDF2 identical across the three drivers)
+    duration: 72.375 ms (234/435)
+  RUNNING 235/435 — metrics privacy defaults single-sourced (one id per filter; no driver keeps a hardcoded copy)
+  PASS 235/435 — metrics privacy defaults single-sourced (one id per filter; no driver keeps a hardcoded copy)
+    duration: 45.991 ms (235/435)
+  RUNNING 236/435 — every log/persist sink that can carry a hotstring trigger is redacted or judged (derived list, not a written one)
+  PASS 236/435 — every log/persist sink that can carry a hotstring trigger is redacted or judged (derived list, not a written one)
+    duration: 171.320 ms (236/435)
+  RUNNING 237/435 — launcher single-instance guard (LSMultipleInstancesProhibited in Info.plist)
+  PASS 237/435 — launcher single-instance guard (LSMultipleInstancesProhibited in Info.plist)
+    duration: 41.324 ms (237/435)
+  RUNNING 238/435 — menu manifest drift (feature paths + i18n keys resolve against manifest.toml)
+  PASS 238/435 — menu manifest drift (feature paths + i18n keys resolve against manifest.toml)
+    duration: 110773.633 ms (238/435)
+  RUNNING 239/435 — features manifest no-drift (every committed _generated/ file matches the live generator)
+  PASS 239/435 — features manifest no-drift (every committed _generated/ file matches the live generator)
+    duration: 2951.827 ms (239/435)
+  RUNNING 240/435 — drift guard detects targeted output changes and preserves exact edits
+  PASS 240/435 — drift guard detects targeted output changes and preserves exact edits
+    duration: 18583.894 ms (240/435)
+  RUNNING 241/435 — drift coverage rejects invalid receipts and restores damaged targets
+  PASS 241/435 — drift coverage rejects invalid receipts and restores damaged targets
+    duration: 85.058 ms (241/435)
+  RUNNING 242/435 — drift restoration preserves healthy siblings after filesystem refusals
+  PASS 242/435 — drift restoration preserves healthy siblings after filesystem refusals
+    duration: 139.631 ms (242/435)
+  RUNNING 243/435 — hotstring corpus backspace_count is a logical count, not emitted keystrokes
+  PASS 243/435 — hotstring corpus backspace_count is a logical count, not emitted keystrokes
+    duration: 65.647 ms (243/435)
+  RUNNING 244/435 — one menu_manifest.json reader per driver (macOS parsed it three times, two of them caches of the same file)
+  PASS 244/435 — one menu_manifest.json reader per driver (macOS parsed it three times, two of them caches of the same file)
+    duration: 216.498 ms (244/435)
+  RUNNING 245/435 — is_word means the same thing on all three drivers (no trigger asks for a boundary it carries)
+  PASS 245/435 — is_word means the same thing on all three drivers (no trigger asks for a boundary it carries)
+    duration: 57.142 ms (245/435)
+  RUNNING 246/435 — logger scalars single-source (retention/ring/dedup/flush vs the timing registry)
+  PASS 246/435 — logger scalars single-source (retention/ring/dedup/flush vs the timing registry)
+    duration: 67.819 ms (246/435)
+  RUNNING 247/435 — log file names single-source (only the generated app_dirs data spells a log prefix)
+  PASS 247/435 — log file names single-source (only the generated app_dirs data spells a log prefix)
+    duration: 786.432 ms (247/435)
+  RUNNING 248/435 — tap-hold shared defaults lifecycle (docs match what the three loaders do)
+  PASS 248/435 — tap-hold shared defaults lifecycle (docs match what the three loaders do)
+    duration: 57.096 ms (248/435)
+  RUNNING 249/435 — locale native names single-source (every ordered locale is named, no driver copy)
+  PASS 249/435 — locale native names single-source (every ordered locale is named, no driver copy)
+    duration: 212.837 ms (249/435)
+  RUNNING 250/435 — locale catalogue completeness (all 21 carry en.json key-for-key, nothing renders blank)
+  PASS 250/435 — locale catalogue completeness (all 21 carry en.json key-for-key, nothing renders blank)
+    duration: 301.502 ms (250/435)
+  RUNNING 251/435 — a hint that names a menu row quotes the label the tray draws, in every locale
+  PASS 251/435 — a hint that names a menu row quotes the label the tray draws, in every locale
+    duration: 123.954 ms (251/435)
+  RUNNING 252/435 — generator registry runs (npm run gen: every declared output is produced)
+  PASS 252/435 — generator registry runs (npm run gen: every declared output is produced)
+    duration: 3216.127 ms (252/435)
+  RUNNING 253/435 — new-driver scaffold emits one adapter per port spec (not zero)
+  PASS 253/435 — new-driver scaffold emits one adapter per port spec (not zero)
+    duration: 308.067 ms (253/435)
+  RUNNING 254/435 — driver tree parity I1 (shared directory ratio, ratcheted)
+  PASS 254/435 — driver tree parity I1 (shared directory ratio, ratcheted)
+    duration: 234.944 ms (254/435)
+  RUNNING 255/435 — stubs intercept something (no package.loaded key naming a missing module)
+  PASS 255/435 — stubs intercept something (no package.loaded key naming a missing module)
+    duration: 502.093 ms (255/435)
+  RUNNING 256/435 — action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)
+  PASS 256/435 — action emit rows stay per-OS (13 of 24 keystrokes genuinely differ)
+    duration: 64.529 ms (256/435)
+  RUNNING 257/435 — macOS keyboard-slot config surface is reachable (readers called, writer binds, list entry has a provider)
+  PASS 257/435 — macOS keyboard-slot config surface is reachable (readers called, writer binds, list entry has a provider)
+    duration: 164.953 ms (257/435)
+  RUNNING 258/435 — chord native mappings single source (adapter prefixes/key spellings + both slot vocabularies pinned to modifier_chords.json)
+  PASS 258/435 — chord native mappings single source (adapter prefixes/key spellings + both slot vocabularies pinned to modifier_chords.json)
+    duration: 78.057 ms (258/435)
+  RUNNING 259/435 — port contract single source (contracts.json fresh from the spec.js files; every AHK ADAPTER_ map matches its contract)
+  PASS 259/435 — port contract single source (contracts.json fresh from the spec.js files; every AHK ADAPTER_ map matches its contract)
+    duration: 161.708 ms (259/435)
+  RUNNING 260/435 — hotstring priority parity (priority.json honoured identically by the drivers)
+  PASS 260/435 — hotstring priority parity (priority.json honoured identically by the drivers)
+    duration: 841.909 ms (260/435)
+  RUNNING 261/435 — feature manifest parity (Windows, macOS, and Linux projections agree)
+  PASS 261/435 — feature manifest parity (Windows, macOS, and Linux projections agree)
+    duration: 107.377 ms (261/435)
+  RUNNING 262/435 — neutral defaults and explicit recommended scopes
+  PASS 262/435 — neutral defaults and explicit recommended scopes
+    duration: 127.875 ms (262/435)
+  RUNNING 263/435 — Linux feature parity status (canonical rows with explicit ownership and proof tiers)
+  PASS 263/435 — Linux feature parity status (canonical rows with explicit ownership and proof tiers)
+    duration: 97.921 ms (263/435)
+  RUNNING 264/435 — npm alias ⇄ suite parity (no alias names a gate the suite does not run; the aliasless count only falls)
+  PASS 264/435 — npm alias ⇄ suite parity (no alias names a gate the suite does not run; the aliasless count only falls)
+    duration: 62.621 ms (264/435)
+  RUNNING 265/435 — keylogger walker constants single source (bucket edges and caps: shared helpers vs both walkers)
+  PASS 265/435 — keylogger walker constants single source (bucket edges and caps: shared helpers vs both walkers)
+    duration: 55.335 ms (265/435)
+  RUNNING 266/435 — port × driver adapter matrix (cross-tree presence; every absence declared with a reason)
+  PASS 266/435 — port × driver adapter matrix (cross-tree presence; every absence declared with a reason)
+    duration: 51.339 ms (266/435)
+  RUNNING 267/435 — HotPath segment inventory (every measured hot path declared with what it covers)
+  PASS 267/435 — HotPath segment inventory (every measured hot path declared with what it covers)
+    duration: 99.763 ms (267/435)
+  RUNNING 268/435 — shared JS reachability (every _shared module is runtime-mirrored, an oracle, or declared with a reason)
+  PASS 268/435 — shared JS reachability (every _shared module is runtime-mirrored, an oracle, or declared with a reason)
+    duration: 861.121 ms (268/435)
+  RUNNING 269/435 — tooltip lifecycle phases (the shared four-phase contract vs the AutoHotkey renderer)
+  PASS 269/435 — tooltip lifecycle phases (the shared four-phase contract vs the AutoHotkey renderer)
+    duration: 45.230 ms (269/435)
+  RUNNING 270/435 — tap-hold namespace correspondence ([tap_hold.keys.*] vs [hs_tap_hold] paired by position, divergences named)
+  PASS 270/435 — tap-hold namespace correspondence ([tap_hold.keys.*] vs [hs_tap_hold] paired by position, divergences named)
+    duration: 43.797 ms (270/435)
+  RUNNING 271/435 — hotstring flag support per driver (every corpus flag honoured by all three)
+  PASS 271/435 — hotstring flag support per driver (every corpus flag honoured by all three)
+    duration: 191.227 ms (271/435)
+  RUNNING 272/435 — magic key single source (declared once in the feature manifest, no driver copy)
+  PASS 272/435 — magic key single source (declared once in the feature manifest, no driver copy)
+    duration: 308.203 ms (272/435)
+  RUNNING 273/435 — tap-hold threshold parity (macOS global sits inside the per-key range)
+  PASS 273/435 — tap-hold threshold parity (macOS global sits inside the per-key range)
+    duration: 51.298 ms (273/435)
+  RUNNING 274/435 — adapter reachability (an adapter nothing requires is a port claimed, not wired)
+  PASS 274/435 — adapter reachability (an adapter nothing requires is a port claimed, not wired)
+    duration: 594.337 ms (274/435)
+  RUNNING 275/435 — hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)
+  PASS 275/435 — hotstring telemetry is deferred (no open/write/flush inside the keyDown tap)
+    duration: 56.594 ms (275/435)
+  RUNNING 276/435 — feature-state boot smoke (4 fixtures, real include graph, own process)
+  PASS 276/435 — feature-state boot smoke (4 fixtures, real include graph, own process)
+    duration: 53.666 ms (276/435)
+  RUNNING 277/435 — port contract vector traceability (ratchet: ids linked to the macOS mirror)
+  PASS 277/435 — port contract vector traceability (ratchet: ids linked to the macOS mirror)
+    duration: 49.663 ms (277/435)
+  RUNNING 278/435 — lua gsub returns one value (bare return leaks the replacement count)
+  PASS 278/435 — lua gsub returns one value (bare return leaks the replacement count)
+    duration: 2737.096 ms (278/435)
+  RUNNING 279/435 — tooltip [positioning] constant reach (which driver reads which value)
+  PASS 279/435 — tooltip [positioning] constant reach (which driver reads which value)
+    duration: 590.696 ms (279/435)
+  RUNNING 280/435 — tooltip style single source (both drivers read constants.toml; hex companions match macOS)
+  PASS 280/435 — tooltip style single source (both drivers read constants.toml; hex companions match macOS)
+    duration: 63.846 ms (280/435)
+  RUNNING 281/435 — keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)
+  PASS 281/435 — keyboard-layout registry (index.json in sync, checksums, schema, vendored digests)
+    duration: 320.567 ms (281/435)
+  RUNNING 282/435 — keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)
+  PASS 282/435 — keyboard-layout registry location single source (defaults.json folder; no driver retypes the URL)
+    duration: 2753.433 ms (282/435)
+  RUNNING 283/435 — layout features an emulated layout supersedes (declared in the manifest, reason translated, read by the gate and the menu)
+  PASS 283/435 — layout features an emulated layout supersedes (declared in the manifest, reason translated, read by the gate and the menu)
+    duration: 137.628 ms (283/435)
+  RUNNING 284/435 — Linux package ships the .keylayout converter (every data file it reads; packaged and source paths)
+  PASS 284/435 — Linux package ships the .keylayout converter (every data file it reads; packaged and source paths)
+    duration: 554.634 ms (284/435)
+  RUNNING 285/435 — shared JS is loadable (module.exports in an ESM package exports nothing)
+  PASS 285/435 — shared JS is loadable (module.exports in an ESM package exports nothing)
+    duration: 264.919 ms (285/435)
+  RUNNING 286/435 — hotstring editor confirm dialog wiring (delete actually fires)
+  PASS 286/435 — hotstring editor confirm dialog wiring (delete actually fires)
+    duration: 51.842 ms (286/435)
+  RUNNING 287/435 — WebView2 host teardown order (closing a window must not quit AHK)
+  PASS 287/435 — WebView2 host teardown order (closing a window must not quit AHK)
+    duration: 385.291 ms (287/435)
+  RUNNING 288/435 — dynamic hotstrings menu labels (resolver bridge + locale keys)
+  PASS 288/435 — dynamic hotstrings menu labels (resolver bridge + locale keys)
+    duration: 44.520 ms (288/435)
+  RUNNING 289/435 — manifest menu labels resolve (whole class, not a sample)
+  PASS 289/435 — manifest menu labels resolve (whole class, not a sample)
+    duration: 73.208 ms (289/435)
+  RUNNING 290/435 — feature read sites resolve against the manifest (UnsetItemError crash class)
+  PASS 290/435 — feature read sites resolve against the manifest (UnsetItemError crash class)
+    duration: 253.273 ms (290/435)
+  RUNNING 291/435 — manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)
+  PASS 291/435 — manifest menu labels (no driver-namespaced description_key; untranslated-label ratchet)
+    duration: 55.616 ms (291/435)
+  RUNNING 292/435 — Convention P (platform/ is the only OS-specific word; symmetrical across drivers)
+  PASS 292/435 — Convention P (platform/ is the only OS-specific word; symmetrical across drivers)
+    duration: 95.857 ms (292/435)
+  RUNNING 293/435 — source-tree scan coverage (no scanner list forgets platform/)
+  PASS 293/435 — source-tree scan coverage (no scanner list forgets platform/)
+    duration: 864.274 ms (293/435)
+  RUNNING 294/435 — untracked driver artifacts cannot contaminate commit-candidate gates
+  PASS 294/435 — untracked driver artifacts cannot contaminate commit-candidate gates
+    duration: 1581.669 ms (294/435)
+  RUNNING 295/435 — driver config surface is declared in the manifest (ratchet)
+  PASS 295/435 — driver config surface is declared in the manifest (ratchet)
+    duration: 1546.325 ms (295/435)
+  RUNNING 296/435 — config schema (v2 TOML shape)
+  PASS 296/435 — config schema (v2 TOML shape)
+    duration: 125.317 ms (296/435)
+  RUNNING 297/435 — config migrations (registry chain, closed op set, corpus replay)
+  PASS 297/435 — config migrations (registry chain, closed op set, corpus replay)
+    duration: 129.999 ms (297/435)
+  RUNNING 298/435 — physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)
+  PASS 298/435 — physical magic key single source (manifest candidates, key tables, v5 migration, Ergopti declaration)
+    duration: 92.517 ms (298/435)
+  RUNNING 299/435 — metrics heatmap translation coverage
+  PASS 299/435 — metrics heatmap translation coverage
+    duration: 51.339 ms (299/435)
+  RUNNING 300/435 — metrics rebuild banner (partial snapshots are labelled)
+  PASS 300/435 — metrics rebuild banner (partial snapshots are labelled)
+    duration: 142.507 ms (300/435)
+  RUNNING 301/435 — metrics freshness banner (cached snapshots carry their date)
+  PASS 301/435 — metrics freshness banner (cached snapshots carry their date)
+    duration: 217.648 ms (301/435)
+  RUNNING 302/435 — AHK source encoding (UTF-8 BOM + LF)
+  PASS 302/435 — AHK source encoding (UTF-8 BOM + LF)
+    duration: 368.163 ms (302/435)
+  RUNNING 303/435 — mutation-test harness passes un-mutated (Stryker precondition)
+  PASS 303/435 — mutation-test harness passes un-mutated (Stryker precondition)
+    duration: 47.214 ms (303/435)
+  RUNNING 304/435 — macOS Sparkle feed, URL command, and sole-owner cadence
+  PASS 304/435 — macOS Sparkle feed, URL command, and sole-owner cadence
+    duration: 4873.770 ms (304/435)
+  RUNNING 305/435 — macOS launcher declares every driver language so Sparkle windows follow it
+  PASS 305/435 — macOS launcher declares every driver language so Sparkle windows follow it
+    duration: 107.249 ms (305/435)
+  RUNNING 306/435 — macOS embedded Hammerspoon and native helper cannot update themselves
+  PASS 306/435 — macOS embedded Hammerspoon and native helper cannot update themselves
+    duration: 289.083 ms (306/435)
+  RUNNING 307/435 — macOS app signed with the stable certificate when set, ad hoc loudly otherwise, identity never overwritten
+  PASS 307/435 — macOS app signed with the stable certificate when set, ad hoc loudly otherwise, identity never overwritten
+    duration: 1862.316 ms (307/435)
+  RUNNING 308/435 — Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published
+  PASS 308/435 — Homebrew casks follow the release channel, let brew upgrade quit, replace and relaunch the app, and name what the release published
+    duration: 4811.005 ms (308/435)
+  RUNNING 309/435 — formatting gate (hook formats staged files, CI checks the tree with the pinned Ruff, generated files ignored)
+  PASS 309/435 — formatting gate (hook formats staged files, CI checks the tree with the pinned Ruff, generated files ignored)
+    duration: 1039.875 ms (309/435)
+  RUNNING 310/435 — updater copy shown before consent claims no download, in all 21 locales
+  PASS 310/435 — updater copy shown before consent claims no download, in all 21 locales
+    duration: 604.629 ms (310/435)
+  RUNNING 311/435 — every updater catalogue string is shown by a driver
+  PASS 311/435 — every updater catalogue string is shown by a driver
+    duration: 16471.388 ms (311/435)
+  RUNNING 312/435 — Windows Format(t(...)) strings carry numbered placeholders only, in all 21 locales
+  PASS 312/435 — Windows Format(t(...)) strings carry numbered placeholders only, in all 21 locales
+    duration: 368.263 ms (312/435)
+  RUNNING 313/435 — hotstring editor preserves strict-case state across the shared bridge
+  PASS 313/435 — hotstring editor preserves strict-case state across the shared bridge
+    duration: 69.373 ms (313/435)
+  RUNNING 314/435 — Karabiner package identity is shared and cached bytes are verified
+  PASS 314/435 — Karabiner package identity is shared and cached bytes are verified
+    duration: 916.508 ms (314/435)
+  RUNNING 315/435 — input-source Python supervisor enforces one bounded process group
+  PASS 315/435 — input-source Python supervisor enforces one bounded process group
+    duration: 863.116 ms (315/435)
+  RUNNING 316/435 — input-source list edit adds and removes exactly the named layout
+  PASS 316/435 — input-source list edit adds and removes exactly the named layout
+    duration: 512.935 ms (316/435)
+  RUNNING 317/435 — layout manager page decides its rows and posts only allowlisted actions
+  PASS 317/435 — layout manager page decides its rows and posts only allowlisted actions
+    duration: 181.794 ms (317/435)
+  RUNNING 318/435 — PTY process groups escalate and reap bounded descendants
+  PASS 318/435 — PTY process groups escalate and reap bounded descendants
+    duration: 928.314 ms (318/435)
+  RUNNING 319/435 — MLX dependency bootstrap fingerprints both dependency manifests
+  PASS 319/435 — MLX dependency bootstrap fingerprints both dependency manifests
+    duration: 738.977 ms (319/435)
+  RUNNING 320/435 — App Cloner shortcuts preserve maximize intent
+  PASS 320/435 — App Cloner shortcuts preserve maximize intent
+    duration: 255.000 ms (320/435)
+  RUNNING 321/435 — App Cloner launchers isolate runtime arguments
+  PASS 321/435 — App Cloner launchers isolate runtime arguments
+    duration: 74.224 ms (321/435)
+  RUNNING 322/435 — App Cloner logging stays isolated from generated launchers
+  PASS 322/435 — App Cloner logging stays isolated from generated launchers
+    duration: 97.451 ms (322/435)
+  RUNNING 323/435 — App Cloner generated literals survive hostile values
+  PASS 323/435 — App Cloner generated literals survive hostile values
+    duration: 915.888 ms (323/435)
+  RUNNING 324/435 — App Cloner Dock URLs remain canonical
+  PASS 324/435 — App Cloner Dock URLs remain canonical
+    duration: 231.089 ms (324/435)
+  RUNNING 325/435 — Ollama bootstrap bounds and authenticates network acquisition
+  PASS 325/435 — Ollama bootstrap bounds and authenticates network acquisition
+    duration: 1054.494 ms (325/435)
+  RUNNING 326/435 — MLX emitted downloader refuses failed system trust activation
+  PASS 326/435 — MLX emitted downloader refuses failed system trust activation
+    duration: 316.317 ms (326/435)
+  RUNNING 327/435 — managed native HTTP receives actual pipe closure and shared routing
+  PASS 327/435 — managed native HTTP receives actual pipe closure and shared routing
+    duration: 2554.880 ms (327/435)
+  RUNNING 328/435 — managed bootstrap admits pinned bytes before offline installation
+  PASS 328/435 — managed bootstrap admits pinned bytes before offline installation
+    duration: 2765.276 ms (328/435)
+  RUNNING 329/435 — managed Python release projections retain the independent official pin
+  PASS 329/435 — managed Python release projections retain the independent official pin
+    duration: 79.369 ms (329/435)
+  RUNNING 330/435 — managed bootstrap shared policy and generated Swift remain source-qualified
+  PASS 330/435 — managed bootstrap shared policy and generated Swift remain source-qualified
+    duration: 340.130 ms (330/435)
+  RUNNING 331/435 — macOS guardian preserves public strict and offline signature flags
+  PASS 331/435 — macOS guardian preserves public strict and offline signature flags
+    duration: 92.416 ms (331/435)
+  RUNNING 332/435 — bootstrap retry canonical data preserves original shell and generated Lua
+  PASS 332/435 — bootstrap retry canonical data preserves original shell and generated Lua
+    duration: 63.819 ms (332/435)
+  RUNNING 333/435 — managed Ollama portable admission and operation retirement
+  FAIL 333/435 — managed Ollama portable admission and operation retirement
+    duration: 60325.064 ms (333/435)
+  ✗ managed Ollama portable admission and operation retirement
+    reproduce: node tools/test/test-managed-ollama-protocol.cjs
+    process: status=1 signal=none error=none
+    stdout:
+    CLOCK_WORKFLOW live_steps=2 native=false official=false
+    WINDOWS-FILE-FIXTURES generated=16 byte_exact=true native=false
+
+    stderr:
+    node:assert:150
+      throw new AssertionError(obj);
+      ^
+    
+    AssertionError [ERR_ASSERTION]: The independent clock receiver controls must start.
+    + actual - expected
+    
+    + Error: spawnSync /workspace/.ergopti-cloud/node-v22.22.2-linux-x64/bin/node ETIMEDOUT
+    +     at Object.spawnSync (node:internal/child_process:1120:20)
+    +     at spawnSync (node:child_process:902:24)
+    +     at Object.<anonymous> (/workspace/ergopti/tools/test/test-managed-ollama-protocol.cjs:373:22)
+    +     at Module._compile (node:internal/modules/cjs/loader:1705:14)
+    ... 40 lines omitted ...
+        syscall: 'spawnSync /workspace/.ergopti-cloud/node-v22.22.2-linux-x64/bin/node',
+        path: '/workspace/.ergopti-cloud/node-v22.22.2-linux-x64/bin/node',
+        spawnargs: [
+          '/workspace/ergopti/tools/test/test-native-http-clock-evidence.cjs'
+        ]
+      },
+      expected: undefined,
+      operator: 'strictEqual',
+      diff: 'simple'
+    }
+    
+    Node.js v22.22.2
+
+    Captured failure output: /tmp/ergopti-g3/ergopti-js-suite-iHK4tl/failures/js-0320
+    Retained returned UTF-8 text or thrown spawn diagnostics only; maxBuffer=1048576 bytes. Uncaptured or child-truncated output is unknown.
+  RUNNING 334/435 — Native HTTP clock evidence retains source and command receiving boundaries
+  PASS 334/435 — Native HTTP clock evidence retains source and command receiving boundaries
+    duration: 42018.311 ms (334/435)
+  RUNNING 335/435 — Windows original updater Source and local context retain frozen native diagnostics
+  PASS 335/435 — Windows original updater Source and local context retain frozen native diagnostics
+    duration: 14597.489 ms (335/435)
+  RUNNING 336/435 — managed Ollama catalogue preserves native source and publication admission
+  PASS 336/435 — managed Ollama catalogue preserves native source and publication admission
+    duration: 2163.082 ms (336/435)
+  RUNNING 337/435 — native PAC source contract preserves ownership and exact full-URL binding
+  PASS 337/435 — native PAC source contract preserves ownership and exact full-URL binding
+    duration: 2688.976 ms (337/435)
+  RUNNING 338/435 — native PAC helpers preserve independent standard function vectors
+  PASS 338/435 — native PAC helpers preserve independent standard function vectors
+    duration: 57.973 ms (338/435)
+  RUNNING 339/435 — macOS opaque clients refuse unsupported automatic proxy routing
+  PASS 339/435 — macOS opaque clients refuse unsupported automatic proxy routing
+    duration: 35303.944 ms (339/435)
+  RUNNING 340/435 — CPython resolution refuses configured interpreter substitution
+  PASS 340/435 — CPython resolution refuses configured interpreter substitution
+    duration: 56.174 ms (340/435)
+  RUNNING 341/435 — Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted
+  PASS 341/435 — Darwin receiver controlled refusal contracts; actual Darwin remains unexecuted
+    duration: 1410.480 ms (341/435)
+  RUNNING 342/435 — Ollama server command preserves exact process ownership
+  PASS 342/435 — Ollama server command preserves exact process ownership
+    duration: 117.250 ms (342/435)
+  RUNNING 343/435 — every gate script is actually wired into a runner
+  PASS 343/435 — every gate script is actually wired into a runner
+    duration: 253.748 ms (343/435)
+  RUNNING 344/435 — hotstrings config window bridge (shared frontend ↔ Windows host)
+  PASS 344/435 — hotstrings config window bridge (shared frontend ↔ Windows host)
+    duration: 54.347 ms (344/435)
+  RUNNING 345/435 — metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales
+  PASS 345/435 — metrics menu: the two dashboard rows start with the same word and carry no verb in the 21 locales
+    duration: 308.537 ms (345/435)
+  RUNNING 346/435 — report button is white on blue with enough contrast in both appearances (diagnostics and error windows)
+  PASS 346/435 — report button is white on blue with enough contrast in both appearances (diagnostics and error windows)
+    duration: 48.186 ms (346/435)
+  RUNNING 347/435 — hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)
+  PASS 347/435 — hotstrings config window folds (hidden honoured, caret and title, fold kept across a host push)
+    duration: 70.320 ms (347/435)
+  RUNNING 348/435 — hotstring colour presets identical on macOS and Linux
+  PASS 348/435 — hotstring colour presets identical on macOS and Linux
+    duration: 40.624 ms (348/435)
+  RUNNING 349/435 — prompt editor bridge (shared frontend ↔ Windows host)
+  PASS 349/435 — prompt editor bridge (shared frontend ↔ Windows host)
+    duration: 44.089 ms (349/435)
+  RUNNING 350/435 — action picker bridge (shared frontend ↔ both hosts)
+  PASS 350/435 — action picker bridge (shared frontend ↔ both hosts)
+    duration: 47.262 ms (350/435)
+  RUNNING 351/435 — the selection case actions share one text-case corpus that every driver suite replays
+  PASS 351/435 — the selection case actions share one text-case corpus that every driver suite replays
+    duration: 52.725 ms (351/435)
+  RUNNING 352/435 — the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays
+  PASS 352/435 — the previous/next desktop actions share one desktop-navigation corpus that every driver suite replays
+    duration: 41.785 ms (352/435)
+  RUNNING 353/435 — the wrap_selection parameter rule is one shared corpus every driver suite replays
+  PASS 353/435 — the wrap_selection parameter rule is one shared corpus every driver suite replays
+    duration: 39.572 ms (353/435)
+  RUNNING 354/435 — one ready-made prompt action per built-in prompt profile
+  PASS 354/435 — one ready-made prompt action per built-in prompt profile
+    duration: 123.888 ms (354/435)
+  RUNNING 355/435 — Windows rewrite prompt and prompt action ports are included, ordered and wired
+  PASS 355/435 — Windows rewrite prompt and prompt action ports are included, ordered and wired
+    duration: 108.054 ms (355/435)
+  RUNNING 356/435 — Windows types an accepted prediction as one exact Text-mode batch at TextSender SendLevel
+  PASS 356/435 — Windows types an accepted prediction as one exact Text-mode batch at TextSender SendLevel
+    duration: 41.370 ms (356/435)
+  RUNNING 357/435 — Windows children inherit only their own streams and a held capture is retried, not an error
+  PASS 357/435 — Windows children inherit only their own streams and a held capture is retried, not an error
+    duration: 200.529 ms (357/435)
+  RUNNING 358/435 — Windows cycles a visible prediction once per navigation chord in either keyboard-hook order
+  PASS 358/435 — Windows cycles a visible prediction once per navigation chord in either keyboard-hook order
+    duration: 52.060 ms (358/435)
+  RUNNING 359/435 — every driver cycles a visible prediction on each chord its tooltip advertises: the arrows and either Shift+Tab
+  PASS 359/435 — every driver cycles a visible prediction on each chord its tooltip advertises: the arrows and either Shift+Tab
+    duration: 98.705 ms (359/435)
+  RUNNING 360/435 — Windows script chords belong to the driver only while their slot runs an action
+  PASS 360/435 — Windows script chords belong to the driver only while their slot runs an action
+    duration: 235.213 ms (360/435)
+  RUNNING 361/435 — the three drivers share the script chords, their presets, their defaults and their submenu
+  PASS 361/435 — the three drivers share the script chords, their presets, their defaults and their submenu
+    duration: 102.604 ms (361/435)
+  RUNNING 362/435 — Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation
+  PASS 362/435 — Windows times every observed character, so the hotstring preview bubble and the delayed expansions work without the layout emulation
+    duration: 201.348 ms (362/435)
+  RUNNING 363/435 — the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays
+  PASS 363/435 — the send_text, send_key and send_shortcut parameter rules are one shared corpus every driver suite replays
+    duration: 41.730 ms (363/435)
+  RUNNING 364/435 — the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys
+  PASS 364/435 — the number-row tap keys are one list, pinned to the manifest defaults and the Windows hotkeys
+    duration: 77.449 ms (364/435)
+  RUNNING 365/435 — a manual prediction is refused for the same four reasons, with the same notices, on every driver
+  PASS 365/435 — a manual prediction is refused for the same four reasons, with the same notices, on every driver
+    duration: 46.992 ms (365/435)
+  RUNNING 366/435 — keyboard slots keep neutral defaults and independent manifest recommendations across drivers
+  PASS 366/435 — keyboard slots keep neutral defaults and independent manifest recommendations across drivers
+    duration: 218.850 ms (366/435)
+  RUNNING 367/435 — the number-row key left of 1 recommends an instant capture of every screen on every driver
+  PASS 367/435 — the number-row key left of 1 recommends an instant capture of every screen on every driver
+    duration: 311.871 ms (367/435)
+  RUNNING 368/435 — app and window switching actions carry one explicit label each and migrate the ids macOS merged
+  PASS 368/435 — app and window switching actions carry one explicit label each and migrate the ids macOS merged
+    duration: 703.485 ms (368/435)
+  RUNNING 369/435 — action picker greys a host-disabled row with its reason and never confirms it
+  PASS 369/435 — action picker greys a host-disabled row with its reason and never confirms it
+    duration: 58.135 ms (369/435)
+  RUNNING 370/435 — action picker edits a text, a key or a shortcut and validates it as the drivers do
+  PASS 370/435 — action picker edits a text, a key or a shortcut and validates it as the drivers do
+    duration: 1442.777 ms (370/435)
+  RUNNING 371/435 — Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider
+  PASS 371/435 — Apple Shortcuts cold CLI diagnostic preserves ownership and never admits a provider
+    duration: 276.005 ms (371/435)
+  RUNNING 372/435 — installed Shortcuts target keeps 34 filesystem controls separate from native admission
+  PASS 372/435 — installed Shortcuts target keeps 34 filesystem controls separate from native admission
+    duration: 438.476 ms (372/435)
+  RUNNING 373/435 — file-path headers (convention 3, every source file names itself)
+  PASS 373/435 — file-path headers (convention 3, every source file names itself)
+    duration: 346.174 ms (373/435)
+  RUNNING 374/435 — window title audit mutations
+  PASS 374/435 — window title audit mutations
+    duration: 3261.993 ms (374/435)
+  RUNNING 375/435 — window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)
+  PASS 375/435 — window titles (Gui/windowTitle carry the "ErgoptiPlus" prefix)
+    duration: 1412.785 ms (375/435)
+  RUNNING 376/435 — updater constants single source (owner/repo/timing literals match defaults.json)
+  PASS 376/435 — updater constants single source (owner/repo/timing literals match defaults.json)
+    duration: 56.108 ms (376/435)
+  RUNNING 377/435 — name parity (text_utils + action_picker + manifest_menu symmetric across drivers)
+  PASS 377/435 — name parity (text_utils + action_picker + manifest_menu symmetric across drivers)
+    duration: 43.740 ms (377/435)
+  RUNNING 378/435 — git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)
+  PASS 378/435 — git-mv resilience (every path pin in the three suites resolves — macOS + Linux files, AHK dirs)
+    duration: 511.693 ms (378/435)
+  RUNNING 379/435 — shared UI JavaScript syntax (every browser script parses before WebView injection)
+  PASS 379/435 — shared UI JavaScript syntax (every browser script parses before WebView injection)
+    duration: 2233.034 ms (379/435)
+  RUNNING 380/435 — changelog remote content and native bridge stay inside their authenticated boundary
+  PASS 380/435 — changelog remote content and native bridge stay inside their authenticated boundary
+    duration: 90.303 ms (380/435)
+  RUNNING 381/435 — changelog release notes render as sanitized Markdown (DOM-only, repository links only)
+  PASS 381/435 — changelog release notes render as sanitized Markdown (DOM-only, repository links only)
+    duration: 83.362 ms (381/435)
+  RUNNING 382/435 — changelog loads are bounded and fall back to the releases Atom feed
+  PASS 382/435 — changelog loads are bounded and fall back to the releases Atom feed
+    duration: 145.022 ms (382/435)
+  RUNNING 383/435 — release bodies split into changelog, downloads, intro and footer (CI markers, legacy and feed bodies)
+  PASS 383/435 — release bodies split into changelog, downloads, intro and footer (CI markers, legacy and feed bodies)
+    duration: 1389.307 ms (383/435)
+  RUNNING 384/435 — update channel registry: shared vectors, locales, generated data and release tag families agree
+  PASS 384/435 — update channel registry: shared vectors, locales, generated data and release tag families agree
+    duration: 650.654 ms (384/435)
+  RUNNING 385/435 — update-check schedule: shared vectors, presets, locales and generated Windows data agree
+  PASS 385/435 — update-check schedule: shared vectors, presets, locales and generated Windows data agree
+    duration: 167.492 ms (385/435)
+  RUNNING 386/435 — Windows touchpad registry: one data file, both writers through one backing-up owner, restore row
+  PASS 386/435 — Windows touchpad registry: one data file, both writers through one backing-up owner, restore row
+    duration: 295.231 ms (386/435)
+  RUNNING 387/435 — Versions page: tabs change the view, the banner subscribes through the host
+  PASS 387/435 — Versions page: tabs change the view, the banner subscribes through the host
+    duration: 75.189 ms (387/435)
+  RUNNING 388/435 — Versions managed failures retain safe report and exact action ownership
+  PASS 388/435 — Versions managed failures retain safe report and exact action ownership
+    duration: 104.295 ms (388/435)
+  RUNNING 389/435 — Linux document bridge challenges retain intrinsic page nonce and exact lease
+  PASS 389/435 — Linux document bridge challenges retain intrinsic page nonce and exact lease
+    duration: 75.772 ms (389/435)
+  RUNNING 390/435 — Versions page: one click installs a chosen release through the host, restore banner
+  PASS 390/435 — Versions page: one click installs a chosen release through the host, restore banner
+    duration: 96.983 ms (390/435)
+  RUNNING 391/435 — release install: only clicks install on every driver, one set of install reasons
+  PASS 391/435 — release install: only clicks install on every driver, one set of install reasons
+    duration: 526.540 ms (391/435)
+  RUNNING 392/435 — one installed-build-or-source-run owner per driver; Uninstall greyed on a source run
+  PASS 392/435 — one installed-build-or-source-run owner per driver; Uninstall greyed on a source run
+    duration: 285.916 ms (392/435)
+  RUNNING 393/435 — download actions retain their operation session across native reuse
+  PASS 393/435 — download actions retain their operation session across native reuse
+    duration: 66.825 ms (393/435)
+  RUNNING 394/435 — managed download failures render safe translated actions with captured owners
+  PASS 394/435 — managed download failures render safe translated actions with captured owners
+    duration: 76.276 ms (394/435)
+  RUNNING 395/435 — managed fixture late accepted clients retain exact retirement ownership
+  PASS 395/435 — managed fixture late accepted clients retain exact retirement ownership
+    duration: 74.388 ms (395/435)
+  RUNNING 396/435 — model browser actions retain their operation session across native reuse
+  PASS 396/435 — model browser actions retain their operation session across native reuse
+    duration: 76.009 ms (396/435)
+  RUNNING 397/435 — onboarding wizard asks one No-first page per scope and emits manifest paths only
+  PASS 397/435 — onboarding wizard asks one No-first page per scope and emits manifest paths only
+    duration: 6605.090 ms (397/435)
+  RUNNING 398/435 — metrics manifest payload contract (reader vocabulary reaches real consumers)
+  PASS 398/435 — metrics manifest payload contract (reader vocabulary reaches real consumers)
+    duration: 82.699 ms (398/435)
+  RUNNING 399/435 — typing-speed source toggles (net expansion gain and filter semantics)
+  PASS 399/435 — typing-speed source toggles (net expansion gain and filter semantics)
+    duration: 44.526 ms (399/435)
+  RUNNING 400/435 — Linux metrics SQLite bridge (persistent manifest + selected-range refresh)
+  PASS 400/435 — Linux metrics SQLite bridge (persistent manifest + selected-range refresh)
+    duration: 59.572 ms (400/435)
+  RUNNING 401/435 — Windows metrics range bridge (native selected date/app refresh)
+  PASS 401/435 — Windows metrics range bridge (native selected date/app refresh)
+    duration: 105.196 ms (401/435)
+  RUNNING 402/435 — keycode data single source (generated JS matches azerty.json, DC-1)
+  PASS 402/435 — keycode data single source (generated JS matches azerty.json, DC-1)
+    duration: 53.213 ms (402/435)
+  RUNNING 403/435 — physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)
+  PASS 403/435 — physical-key registry is complete, unique per driver and agrees with every hand copy (evdev, kVK, SC, Karabiner, kanata)
+    duration: 62.579 ms (403/435)
+  RUNNING 404/435 — HS-274 native run refuses a Hammerspoon consumer on Linux while the producer and consumer baseline versions differ
+  PASS 404/435 — HS-274 native run refuses a Hammerspoon consumer on Linux while the producer and consumer baseline versions differ
+    duration: 563.281 ms (404/435)
+  RUNNING 405/435 — layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends
+  PASS 405/435 — layer-action vocabulary resolves on every OS or says why, and sends what the action catalogue sends
+    duration: 167.161 ms (405/435)
+  RUNNING 406/435 — layer editor data is generated from the registry, the vocabulary and the preset, with every label translated
+  PASS 406/435 — layer editor data is generated from the registry, the vocabulary and the preset, with every label translated
+    duration: 167.972 ms (406/435)
+  RUNNING 407/435 — layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS
+  PASS 407/435 — layer editor model reads and writes what the loaders read, and an edit on one OS changes no other OS
+    duration: 1565.457 ms (407/435)
+  RUNNING 408/435 — layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol
+  PASS 408/435 — layer editor page renders, picks and saves a layers.toml every OS loads, through the host protocol
+    duration: 933.471 ms (408/435)
+  RUNNING 409/435 — layer editor legends: the hosts send the current layout and the layer key by one contract
+  PASS 409/435 — layer editor legends: the hosts send the current layout and the layer key by one contract
+    duration: 105.933 ms (409/435)
+  RUNNING 410/435 — recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS
+  PASS 410/435 — recommended navigation layer reproduces the Windows nav_layer.ahk key for key (golden) and resolves on every OS
+    duration: 76.091 ms (410/435)
+  RUNNING 411/435 — layer-file schema corpus replays through the JS loader (every error code, OS and binding form)
+  PASS 411/435 — layer-file schema corpus replays through the JS loader (every error code, OS and binding form)
+    duration: 71.561 ms (411/435)
+  RUNNING 412/435 — tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors)
+  PASS 412/435 — tooltip corpus parity (JSON corpus matches JS layoutTestVectors + dequeueTestVectors)
+    duration: 53.947 ms (412/435)
+  RUNNING 413/435 — TOML coercion parity (corpus cross-driver gate)
+  PASS 413/435 — TOML coercion parity (corpus cross-driver gate)
+    duration: 52.759 ms (413/435)
+  RUNNING 414/435 — shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies)
+  PASS 414/435 — shared test.format single source (inspect/deep_equal/fail_msg_for consumed from _shared, no local copies)
+    duration: 58.630 ms (414/435)
+  RUNNING 415/435 — file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS infra/file_watchers.lua)
+  PASS 415/435 — file watchers constants single source (SCAN_MAX_DEPTH=16 + debounce=0.5s match across Linux + macOS infra/file_watchers.lua)
+    duration: 50.974 ms (415/435)
+  RUNNING 416/435 — format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)
+  PASS 416/435 — format_toml CLI behavioral test (bare invocation exits 1 = usage; --preview sorts sections/keys + styles headers, file untouched)
+    duration: 825.875 ms (416/435)
+  RUNNING 417/435 — gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)
+  PASS 417/435 — gesture slot-space single source (Linux derives from actions.toml [slots]; macOS literals + DEFAULT_GESTURES key-space pinned to it)
+    duration: 101.601 ms (417/435)
+  RUNNING 418/435 — gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)
+  PASS 418/435 — gesture recommended actions single source (macOS DEFAULT_GESTURES and Windows GESTURE_FACTORY_DEFAULTS built from the manifest)
+    duration: 157.889 ms (418/435)
+  RUNNING 419/435 — keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)
+  PASS 419/435 — keylogger timing constants single source (CONTEXT_TTL_MS / PARK_CHECK_MS / TOPO_TICK_MS match the shared timing registry)
+    duration: 64.641 ms (419/435)
+  RUNNING 420/435 — SQLite event cursor numeric policy single source
+  PASS 420/435 — SQLite event cursor numeric policy single source
+    duration: 83.054 ms (420/435)
+  RUNNING 421/435 — no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)
+  PASS 421/435 — no plan-item references in tracked source (refactor/delivery tokens purged; algorithmic Phase-N allowlisted)
+    duration: 2355.117 ms (421/435)
+  RUNNING 422/435 — WPM readout constants single source (every canon key read by a driver, none restated)
+  PASS 422/435 — WPM readout constants single source (every canon key read by a driver, none restated)
+    duration: 45.108 ms (422/435)
+  RUNNING 423/435 — WPM strip darkening cross-driver drift (Lua model and AHK round-half-up on the canon factor; golden vectors)
+  PASS 423/435 — WPM strip darkening cross-driver drift (Lua model and AHK round-half-up on the canon factor; golden vectors)
+    duration: 41.671 ms (423/435)
+  RUNNING 424/435 — expected pcall rejection stays distinct from weak success assertions
+  PASS 424/435 — expected pcall rejection stays distinct from weak success assertions
+    duration: 51.832 ms (424/435)
+  RUNNING 425/435 — every Hammerspoon deadline keeps 2 s over the native worker budget it waits for (hardening-d)
+  PASS 425/435 — every Hammerspoon deadline keeps 2 s over the native worker budget it waits for (hardening-d)
+    duration: 45.632 ms (425/435)
+  RUNNING 426/435 — no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)
+  PASS 426/435 — no AHK name or VK hotkey targets a key another hotkey declares by scan code (hardening-c)
+    duration: 1278.101 ms (426/435)
+  RUNNING 427/435 — no macOS or Linux module builds a user-data path inside the installed driver folder (hardening-b)
+  PASS 427/435 — no macOS or Linux module builds a user-data path inside the installed driver folder (hardening-b)
+    duration: 903.374 ms (427/435)
+  RUNNING 428/435 — every Windows meta test census the Linux lane can recompute matches the driver source (hardening-f)
+  PASS 428/435 — every Windows meta test census the Linux lane can recompute matches the driver source (hardening-f)
+    duration: 5938.023 ms (428/435)
+  RUNNING 429/435 — every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)
+  PASS 429/435 — every dialog or notice that reports a fixable state offers its fix as an action (hardening-g)
+    duration: 1408.987 ms (429/435)
+  RUNNING 430/435 — tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)
+  PASS 430/435 — tests that cannot fail (tautologies, vacuous absence assertions, dead tests, pcall-only — ratchet against a growing false green)
+    duration: 4948.301 ms (430/435)
+  RUNNING 431/435 — literal JS feature inventory preserves ordered default projections and refuses invalid plans
+  PASS 431/435 — literal JS feature inventory preserves ordered default projections and refuses invalid plans
+    duration: 96.386 ms (431/435)
+  RUNNING 432/435 — JS feature journals require a complete source-bound successful exact union
+  PASS 432/435 — JS feature journals require a complete source-bound successful exact union
+    duration: 83.815 ms (432/435)
+  RUNNING 433/435 — Retained publication plans require every selected lane and exact source/run identity
+  PASS 433/435 — Retained publication plans require every selected lane and exact source/run identity
+    duration: 391.332 ms (433/435)
+  RUNNING 434/435 — Adjacent OS scheduler custody preserves strict original verdicts
+  PASS 434/435 — Adjacent OS scheduler custody preserves strict original verdicts
+    duration: 360.263 ms (434/435)
+  RUNNING 435/435 — Mac matrix stage roles preserve complete native qualification custody
+  PASS 435/435 — Mac matrix stage roles preserve complete native qualification custody
+    duration: 1822.443 ms (435/435)
+
+Slowest JS checks (child wall time):
+  286369.607 ms — the whole menu tree agrees across the three drivers, submenus included (I3 — no empty submenu, no orphaned header, no unread getter)
+    reproduce: node tools/test/test-menu-parity.cjs
+  110773.633 ms — menu manifest drift (feature paths + i18n keys resolve against manifest.toml)
+    reproduce: node tools/test/test-menu-manifest.cjs
+  68609.777 ms — every menu-manifest field and section has a driver that reads it (no decorative declarations)
+    reproduce: node tools/test/test-menu-manifest-keys-have-readers.cjs
+  60325.064 ms — managed Ollama portable admission and operation retirement
+    reproduce: node tools/test/test-managed-ollama-protocol.cjs
+  53547.256 ms — Full default CI source admission preserves mandatory gates and bounded diagnostic policy
+    reproduce: node tools/test/test-ci-full-default.cjs
+  48704.594 ms — CI pipeline wiring (one root, plan outputs, lane callers, secrets and permissions, no skippable job or gate step, release preflight before any side effect)
+    reproduce: npm run test:ci-pipeline-wiring
+  44458.089 ms — the hotstring category submenus agree across the three drivers (same controls, same order)
+    reproduce: node tools/test/test-hotstring-category-submenu-order.cjs
+  43591.781 ms — native-menu census admits migration to zero only with intact legacy detection and complete source coverage
+    reproduce: node tools/test/test-native-menu-census-admission.cjs
+  42629.430 ms — every declared menu is answered by every driver that shows it (per-category coverage)
+    reproduce: node tools/test/test-menu-category-coverage.cjs
+  42018.311 ms — Native HTTP clock evidence retains source and command receiving boundaries
+    reproduce: npm run test:native-http-clock-evidence
+
+--------------------------------------------------
+❌  2/435 JS check(s) FAILED:
+
+  ✗ Linux uninstall preserves personal data and rejects unrelated installations
+    reproduce: npm run test:linux-uninstall-sandbox
+  ✗ managed Ollama portable admission and operation retirement
+    reproduce: node tools/test/test-managed-ollama-protocol.cjs
+

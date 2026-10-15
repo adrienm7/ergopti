@@ -1,0 +1,39 @@
+# Official Git for Windows OpenSSL static receiving
+
+Both exact official releases and x64 MinGit ZIPs were received over authenticated HTTPS metadata/official release asset URLs. Download bytes independently match BOTH each GitHub published `digest` and the SHA256 table in that official release's literal body. No installer, Git.exe, downloaded code, DLL, SSL/context/native SDK or trust store was executed/imported/loaded. Only existing GNU objdump and bounded raw byte/ZIP readers inspected four PE DLLs. No checkout/ref/source, workflow or oracle change.
+
+## Definite static finding
+
+Official2.55.0.windows.5 ZIP places both DLLs in `mingw64/bin`. Official2.56.0.windows.2 places both in `ucrt64/bin` and contains neither old `mingw64/bin` DLL. Its official release notes explicitly describe the MINGW64→UCRT64 migration (and a credential-manager compatibility shim, not a promise of old DLL directory compatibility).
+
+The exact current fixture C# OpenSSL class is36573B, SHA256763eaf881ffd5fe98cb961c9b1f7114f0cc3f690878558e6c59a450b3388afd2, matching the unchanged body identified by parent. `managed_remote_transport.ps1:654` hardcodes `ProgramFiles/Git/mingw64/bin`; line656 calls VerifyDirectory, which refuses absence or a reparse point in any ancestor (486–495). Thus this literal source cannot receive the new official MinGit distribution at its actual location. This is a concrete **source/path compatibility candidate**, not yet a proven cause of the old/current GHA case failures.
+
+Actual hosted full Git installation directory inventory, DLL hashes and loader error were NOT retained/received. The runner-image Git version correlation alone cannot prove that its installed DLL bytes equal this official MinGit pair, that old directories are absent on the runner, or that execution reached this refusal. A future actual native owner observation of original directory/loader stage would establish that fact before changing behavior. No speculative path fallback or hash refresh is supplied.
+
+## Verified assets
+
+| Exact release | Official asset | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+|v2.55.0.windows.5|MinGit-2.55.0.5-64-bit.zip|38989688|56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e|
+|v2.56.0.windows.2|MinGit-2.56.0.2-64-bit.zip|39806486|da35e72aa21c005a5a0d298cfbae110bc1609a815730ea0dde84b01a1b3cd3be|
+
+Literal full release API bodies, selected asset IDs/URLs/digests, download receipts and ZIP name censuses are retained. Total ZIP payload78,796,174B, below200MB cap. Only the two original DLLs per package were extracted; none of their other direct imports names another package DLL (SSL imports its already selected crypto sibling); no unrelated executable/dependency was extracted.
+
+## PE/export/dependency comparison
+
+| Image | OpenSSL compiled text | Bytes | SHA256 |
+| --- | --- | ---: | --- |
+|2.55 crypto|OpenSSL3.5.7 9 Jun2026|5805212|0330b5f558996f297d687e1a2b2fcc2cacf883b16baef74aaef35285d7c1231c|
+|2.55 SSL|No version text used|1026716|feb5b300e0b3a021fed481178f3d66896426576d4d13b85a304d2a3809b25bfd|
+|2.56 crypto|OpenSSL3.5.9 29 Sep2026|5399196|f8839fd7d5b5e7b1763c88705538c5762a2f97df17f37092e37de3c663f30b1e|
+|2.56 SSL|No version text used|966300|6af55a4d522e2cc29ff0833cad4f6f7560f8ba2d107b97990d9415c590a4224a|
+
+All4 are AMD64 PE32+ DLLs and below the original32MiB image ceiling. All9 required crypto exports and17 SSL exports exist on both pairs. Entire named export censuses are identical,5883 crypto/603 SSL. This supplies no evidence of a removed required ABI symbol or an OpenSSL-major guard regression; actual version-return functions were NOT called. Compiled version strings are data observations only.
+
+The new pair removes `msvcrt.dll` and declares `api-ms-win-crt-*` names. Crypto gains convert/environment/filesystem/heap/locale/private/runtime/stdio/string/time/utility UCRT API sets; SSL gains the same except locale. Existing ApiSet() explicitly classifies those names and VerifyLoadedImports admits only system-directory resolutions. No new private direct dependency or MSYS DLL is declared; the source's16-image ceiling is not statically exceeded by these two package images. Actual system alias resolution/module-path equality/loader behavior remains unobserved. No conclusion about TLS alerts, context initialization, shutdown or certificate trust follows from static imports.
+
+`final-pe-census.json` is authoritative for the corrected export parsing. The retained first `primary-pe-census.json` draft incorrectly recognized zero names because this host objdump includes `+base[...]` and hint fields; it is superseded, not evidence of missing exports. Raw objdump text and complete corrected name lists are preserved for independent checking. No DLL/runtime load occurred while correcting that data parser.
+
+## Required next boundary
+
+Send this exact source/path/import evidence to the Root fixture owner. A minimal subsequent diagnostic must observe original hosted Git directory/library/loader stage without bypassing VerifyDirectory/ImageFence/import/export/currentness/retirement. Any supported directory selection must remain original owner code and explicitly reviewed; neither this packet nor version metadata grants a fallback or alternate trust backend. No actor or code correction was launched here.

@@ -9,6 +9,7 @@ const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { validateAhkSuiteManifest } = require('./validate-ahk-suite-manifest.cjs');
 const pipeline = require('./ci-pipeline.cjs');
+const { partitionLocalShadowOutput } = require('./support/ahk-local-shadow-output.cjs');
 
 // Hosted logs may be unavailable independently of check-run annotations.
 // A source-contract or fixture assertion must remain diagnosable as well.
@@ -26,8 +27,8 @@ process.on('uncaughtException', (error) => {
 
 // A completed TAP receipt cannot compensate for a missing native exit receipt.
 // Start-Process without -Wait must retain its handle before the child exits.
-// Reading the live receipt conflicts with AutoHotkey's exclusive FileAppend.
-// Require the actual workflow to retire its child before any transcript reader.
+// The shared TAP writer permits the explicit incremental follower. Raw readers
+// remain prohibited while it is alive; only final decoder drain waits for exit.
 function assertPostExitTranscript(script, name) {
 	const code = script.replace(/^\s*#.*$/gm, '');
 	const launch = code.indexOf('$proc = Start-Process');
@@ -40,8 +41,17 @@ function assertPostExitTranscript(script, name) {
 	);
 	assert.match(
 		code.slice(joined),
-		/Get-Content -LiteralPath \$resultsFile -Encoding utf8 \| ForEach-Object \{ Write-Host \$_ \}/,
-		`${name}: publish the complete UTF-8 transcript after native exit`
+		/try \{ \$tapFollower\.Finish\(\) \| ForEach-Object \{ Write-Host \$_ \} \}/,
+		`${name}: drain the remaining UTF-8 transcript after native exit`
+	);
+	assert.equal(code.split('$tapFollower.Finish()').length, 2, `${name}: drain exactly once`);
+	assert.ok(code.indexOf('$tapFollower.Finish()') > joined, `${name}: no premature final drain`);
+	assert.match(code, /New-AhkTapFollower -Path \$resultsFile/, `${name}: follow the original TAP`);
+	assert.match(code, /try \{ \$tapFollower\.Poll\(\) \| ForEach-Object \{ Write-Host \$_ \} \}/);
+	assert.match(
+		code,
+		/if \(\$null -ne \$tapFailure\) \{[\s\S]*?exit 2\n\}/,
+		`${name}: progress read failures remain fatal after native evidence`
 	);
 }
 
@@ -119,6 +129,72 @@ for (const [job, name] of [
 	processReceipts.push({ name, start: start[0], finish: finish[0] });
 }
 
+// Supplemental capture debt cannot bypass the mandatory full suite or lose failed bytes.
+function assertSnapshot16Retention(jobBody) {
+	const script = pipeline.runOf(pipeline.step(jobBody, 'Run AHK test suite')).join('\n');
+	const supplemental =
+		'node "${{ github.workspace }}\\tools\\test\\test-ahk-suite-manifest.cjs" --ahk $ahk';
+	assert.ok(script.includes(supplemental), 'Snapshot16: the actual preflight remains mandatory');
+	assert.ok(
+		script.includes(supplemental + '\nif ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }'),
+		'Snapshot16: a supplemental refusal stops the native suite'
+	);
+	assert.ok(
+		script.indexOf('$proc = Start-Process') > script.indexOf(supplemental),
+		'Snapshot16: supplemental evidence never replaces the full native suite'
+	);
+	const artifact = pipeline.step(jobBody, 'Publish AHK execution manifest');
+	assert.equal(pipeline.stepField(artifact, 'if'), 'always()', 'Snapshot16: retain early failures');
+	assert.equal(pipeline.stepField(artifact, 'uses'), 'actions/upload-artifact@v4');
+	assert.match(artifact, /^ {10}overwrite: true$/m);
+	assert.match(artifact, /^ {10}if-no-files-found: warn$/m);
+	const paths = /^ {10}path: \|\n((?: {12}[^\n]*\n?)*)/m.exec(artifact);
+	assert.ok(paths, 'Snapshot16: retention belongs to the real upload path scalar');
+	assert.equal(
+		paths[1]
+			.split('\n')
+			.filter((line) => line === '            ${{ runner.temp }}/ergopti-snapshot16-*/**').length,
+		1,
+		'Snapshot16: retain all owned TAP, stdout, stderr, prefix and receipt files'
+	);
+}
+
+{
+	const jobBody = pipeline.job('test-ahk');
+	assertSnapshot16Retention(jobBody);
+	const changes = [
+		['            ${{ runner.temp }}/ergopti-snapshot16-*/**\n', ''],
+		[
+			'${{ runner.temp }}/ergopti-snapshot16-*/**',
+			'${{ github.workspace }}/ergopti-snapshot16-*/**'
+		],
+		['${{ runner.temp }}/ergopti-snapshot16-*/**', '${{ runner.temp }}/foreign-snapshot16-*/**'],
+		[
+			'      - name: Publish AHK execution manifest\n        if: always()\n',
+			'      - name: Publish AHK execution manifest\n'
+		],
+		[
+			'      - name: Publish AHK execution manifest\n        if: always()',
+			'      - name: Publish AHK execution manifest\n        if: success()'
+		],
+		['      - name: Publish AHK execution manifest', '      - name: Foreign execution manifest'],
+		['test-ahk-suite-manifest.cjs" --ahk $ahk', 'foreign-manifest.cjs" --ahk $ahk'],
+		[
+			'test-ahk-suite-manifest.cjs" --ahk $ahk\n          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }',
+			'test-ahk-suite-manifest.cjs" --ahk $ahk'
+		]
+	];
+	for (const [before, after] of changes) {
+		const changed = jobBody.replace(before, after);
+		assert.notEqual(changed, jobBody, 'Snapshot16 retention inverse must alter the actual owner');
+		assert.throws(() => assertSnapshot16Retention(changed));
+	}
+	assertSnapshot16Retention(jobBody);
+	console.log(
+		'Snapshot16 retention: same-job capture and mandatory-suite guards passed; 8 withdrawals refused.'
+	);
+}
+
 // Isolated runners must not overwrite the main suite's canonical TAP receipt.
 const isolatedScript = pipeline
 	.runOf(pipeline.step(pipeline.job('test-ahk'), 'Run isolated AHK LLM suites'))
@@ -158,12 +234,8 @@ for (const [job, name] of [
 		}
 	}
 	assert.throws(
-		() =>
-			assertPostExitTranscript(
-				script.replace('Get-Content -LiteralPath $resultsFile', 'Write-Host $resultsFile'),
-				name
-			),
-		/publish the complete UTF-8 transcript/,
+		() => assertPostExitTranscript(script.replace('$tapFollower.Finish()', '$null'), name),
+		/drain the remaining UTF-8 transcript/,
 		'retiring the writer cannot silently drop its transcript'
 	);
 }
@@ -642,7 +714,9 @@ const streamProgram = [
 ].join('\n');
 try {
 	// Causal predecessor: the actual default pipe transport refuses this output.
-	const buffered = spawnSync(process.execPath, ['-e', streamProgram], { timeout: 10000 });
+	const buffered = spawnSync(process.execPath, ['-e', streamProgram], {
+		timeout: 10000
+	});
 	assert.equal(buffered.error && buffered.error.code, 'ENOBUFS');
 
 	const directory = transportCase('large-complete');
@@ -892,9 +966,22 @@ const SNAPSHOT16_NAMES = [
 	'windows91 snapshots: original recursive helper own Call replacement refuses without invocation',
 	'windows91 snapshots: original generated function own Call replacement refuses without invocation'
 ];
+const SNAPSHOT16_CASE_COUNT = SNAPSHOT16_NAMES.length;
 
 /** Capture values before callbacks so a mutable returned frame cannot borrow currency. */
-function snapshot16SourceSeal(frame) {
+function snapshot16SourceSeal(frame, stage) {
+	assert.ok(
+		[
+			'initial admission',
+			'before dry launch',
+			'before run launch',
+			'after dry child',
+			'after run child',
+			'after dry receiving',
+			'after run receiving'
+		].includes(stage),
+		'snapshot source admission requires its exact receiving stage'
+	);
 	assert.match(frame.head, /^[a-f0-9]{40}$/, 'snapshot16 requires an actual commit');
 	assert.match(frame.ahk_sha256, /^[a-f0-9]{64}$/, 'snapshot16 pins the actual interpreter');
 	assert.ok(Array.isArray(frame.inputs) && frame.inputs.length > 0);
@@ -908,7 +995,7 @@ function snapshot16SourceSeal(frame) {
 			assert.equal(
 				input.sha256,
 				SNAPSHOT16_FIXED_IMAGES[input.path],
-				'snapshot16 exact reviewed data cases'
+				`Snapshot reviewed-source admission refused (${stage}; ${SNAPSHOT16_CASE_COUNT} reviewed cases): ${input.path}. Review the changed original cases and obtain a new source receipt before retrying; do not update the SHA-256 pin alone.`
 			);
 		}
 	}
@@ -928,7 +1015,7 @@ function snapshot16ExitSeal(result) {
 }
 
 /** Receive full closed bytes, including the framework's disk-only BOM. */
-function snapshot16Receive(bytes, mode) {
+function snapshot16Receive(bytes, mode, source) {
 	for (const key of ['tap', 'stdout', 'stderr']) {
 		assert.ok(Buffer.isBuffer(bytes[key]), `snapshot16 missing ${key} capture`);
 	}
@@ -938,7 +1025,11 @@ function snapshot16Receive(bytes, mode) {
 	);
 	const text = bytes.tap.toString('utf8');
 	assert.ok(Buffer.from(text, 'utf8').equals(bytes.tap), 'snapshot16 malformed UTF-8');
-	assert.ok(bytes.stdout.equals(bytes.tap.subarray(3)), 'snapshot16 complete stdout differs');
+	const advisory = partitionLocalShadowOutput(bytes.stdout, bytes.tap, source);
+	assert.ok(
+		bytes.stdout.equals(Buffer.concat([advisory.prefix, bytes.tap.subarray(3)])),
+		'snapshot16 complete stdout differs'
+	);
 	assert.equal(bytes.stderr.length, 0, 'snapshot16 stderr is not empty');
 	const lines = text
 		.replace(/^\uFEFF/, '')
@@ -946,62 +1037,79 @@ function snapshot16Receive(bytes, mode) {
 		.filter(Boolean);
 	const selected = lines.filter((line) => line.startsWith('# --only '));
 	assert.equal(selected.length, 1, 'snapshot16 requires one actual selection');
-	const selection = /^# --only windows91 snapshots: - 17 of ([1-9]\d*) test\(s\) selected\.$/.exec(
-		selected[0]
+	const selection =
+		/^# --only windows91 snapshots: - ([1-9]\d*) of ([1-9]\d*) test\(s\) selected\.$/.exec(
+			selected[0]
+		);
+	assert.ok(
+		selection &&
+			Number(selection[1]) === SNAPSHOT16_CASE_COUNT &&
+			Number(selection[2]) >= SNAPSHOT16_CASE_COUNT,
+		'snapshot17 exact reviewed selected census'
 	);
-	assert.ok(selection && Number(selection[1]) >= 17, 'snapshot16 wrong selected census');
 	assert.doesNotMatch(
 		text,
 		/^# (?:DEFERRED|QUALIFICATION_ELIGIBLE)/m,
 		'snapshot16 no profile substitution'
 	);
 	if (mode === 'dry') {
-		assert.equal(lines.filter((line) => /^1\.\./.test(line)).join('\n'), '1..17');
+		assert.equal(
+			lines.filter((line) => /^1\.\./.test(line)).join('\n'),
+			`1..${SNAPSHOT16_CASE_COUNT}`
+		);
 		assert.equal(lines.filter((line) => line === '# dry-run - skipping execution.').length, 1);
 		assert.doesNotMatch(text, /^(?:RUNNING |ok |not ok |# duration_ms|# \d+ passed,)/m);
-		return { registered_total: Number(selection[1]), dry_loaded: true };
+		return {
+			registered_total: Number(selection[2]),
+			dry_loaded: true,
+			advisory_output: advisory.manifest
+		};
 	}
 	assert.equal(mode, 'run');
 	assert.doesNotMatch(text, /^# dry-run/m);
 	const manifest = validateAhkSuiteManifest(text);
 	assert.equal(manifest.complete, true, manifest.errors.join('; '));
-	assert.equal(manifest.planned, 17);
-	assert.equal(manifest.executed_count, 17);
-	assert.equal(manifest.timed_count, 17);
-	assert.equal(manifest.passed, 17);
+	assert.equal(manifest.planned, SNAPSHOT16_CASE_COUNT);
+	assert.equal(manifest.executed_count, SNAPSHOT16_CASE_COUNT);
+	assert.equal(manifest.timed_count, SNAPSHOT16_CASE_COUNT);
+	assert.equal(manifest.passed, SNAPSHOT16_CASE_COUNT);
 	assert.equal(manifest.failed, 0);
 	assert.deepEqual(
 		manifest.executed.map((entry) => entry.name),
 		SNAPSHOT16_NAMES
 	);
-	return { registered_total: Number(selection[1]), manifest };
+	return { registered_total: Number(selection[2]), manifest, advisory_output: advisory.manifest };
 }
 
 /** Ports are controlled in JS; only the Windows host below can issue native evidence. */
 function receiveSnapshot16(ports) {
-	const source = snapshot16SourceSeal(ports.source());
+	const source = snapshot16SourceSeal(ports.source(), 'initial admission');
 	const phases = [];
 	for (const mode of ['dry', 'run']) {
 		assert.equal(
-			snapshot16SourceSeal(ports.source()),
+			snapshot16SourceSeal(ports.source(), `before ${mode} launch`),
 			source,
 			'snapshot16 source changed before launch'
 		);
 		const packet = ports.run(mode);
 		const exit = snapshot16ExitSeal(packet.result);
 		assert.equal(
-			snapshot16SourceSeal(ports.source()),
+			snapshot16SourceSeal(ports.source(), `after ${mode} child`),
 			source,
 			'snapshot16 source changed during child'
 		);
-		const received = snapshot16Receive(ports.read(packet), mode);
+		const received = snapshot16Receive(
+			ports.read(packet, JSON.parse(source)),
+			mode,
+			JSON.parse(source)
+		);
 		assert.equal(
 			snapshot16ExitSeal(packet.result),
 			exit,
 			'snapshot16 exit changed during receiving'
 		);
 		assert.equal(
-			snapshot16SourceSeal(ports.source()),
+			snapshot16SourceSeal(ports.source(), `after ${mode} receiving`),
 			source,
 			'snapshot16 source changed during receiving'
 		);
@@ -1017,15 +1125,14 @@ function receiveSnapshot16(ports) {
 
 // Handwritten execution observations exercise the same receiver, not an AHK
 // source scanner. These ports never create a native qualification receipt.
-const snapshot16Dry =
-	'1..17\r\n# --only windows91 snapshots: - 17 of 200 test(s) selected.\r\n# dry-run - skipping execution.\r\n';
+const snapshot16Dry = `1..${SNAPSHOT16_CASE_COUNT}\r\n# --only windows91 snapshots: - ${SNAPSHOT16_CASE_COUNT} of 200 test(s) selected.\r\n# dry-run - skipping execution.\r\n`;
 const snapshot16Tap =
-	'1..17\r\n# --only windows91 snapshots: - 17 of 200 test(s) selected.\r\n' +
+	`1..${SNAPSHOT16_CASE_COUNT}\r\n# --only windows91 snapshots: - ${SNAPSHOT16_CASE_COUNT} of 200 test(s) selected.\r\n` +
 	SNAPSHOT16_NAMES.map(
 		(name, index) =>
-			`RUNNING ${index + 1}/17 - ${name}\r\nok ${index + 1} - ${name}\r\n# duration_ms ${index + 1} 1\r\n`
+			`RUNNING ${index + 1}/${SNAPSHOT16_CASE_COUNT} - ${name}\r\nok ${index + 1} - ${name}\r\n# duration_ms ${index + 1} 1\r\n`
 	).join('') +
-	'# 17 passed, 0 failed.\r\n';
+	`# ${SNAPSHOT16_CASE_COUNT} passed, 0 failed.\r\n`;
 function snapshot16Controlled(change = () => {}) {
 	const state = {
 		frame: {
@@ -1060,7 +1167,8 @@ let snapshot16Controls = 0;
 function snapshot16Control(name, change, refused = true, expectedLaunches) {
 	const { ports, state } = snapshot16Controlled(change);
 	if (refused) assert.throws(() => receiveSnapshot16(ports), undefined, name);
-	else assert.equal(receiveSnapshot16(ports).phases[1].manifest.passed, 17, name);
+	else
+		assert.equal(receiveSnapshot16(ports).phases[1].manifest.passed, SNAPSHOT16_CASE_COUNT, name);
 	if (expectedLaunches !== undefined) assert.equal(state.launches.length, expectedLaunches, name);
 	snapshot16Controls += 1;
 }
@@ -1081,35 +1189,41 @@ function snapshot16ChangeText(edit) {
 }
 snapshot16Control(
 	'omitted terminal result',
-	snapshot16ChangeText((text) => text.replace(`ok 17 - ${SNAPSHOT16_NAMES[16]}\r\n`, ''))
+	snapshot16ChangeText((text) =>
+		text.replace(`ok ${SNAPSHOT16_CASE_COUNT} - ${SNAPSHOT16_NAMES.at(-1)}\r\n`, '')
+	)
 );
 snapshot16Control(
 	'duplicate terminal result',
-	snapshot16ChangeText((text) => text + `ok 17 - ${SNAPSHOT16_NAMES[16]}\r\n`)
+	snapshot16ChangeText(
+		(text) => text + `ok ${SNAPSHOT16_CASE_COUNT} - ${SNAPSHOT16_NAMES.at(-1)}\r\n`
+	)
 );
 snapshot16Control(
-	'extra complete test cannot replace exact seventeen',
+	'extra complete test cannot replace exact reviewed seventeen',
 	snapshot16ChangeText((text) =>
 		text
-			.replace('1..17', '1..18')
-			.replaceAll('/17 -', '/18 -')
+			.replace(`1..${SNAPSHOT16_CASE_COUNT}`, `1..${SNAPSHOT16_CASE_COUNT + 1}`)
+			.replaceAll(`/${SNAPSHOT16_CASE_COUNT} -`, `/${SNAPSHOT16_CASE_COUNT + 1} -`)
 			.replace(
-				'# 17 passed, 0 failed.',
-				'RUNNING 18/18 - extra\r\nok 18 - extra\r\n# duration_ms 18 1\r\n# 18 passed, 0 failed.'
+				`# ${SNAPSHOT16_CASE_COUNT} passed, 0 failed.`,
+				`RUNNING ${SNAPSHOT16_CASE_COUNT + 1}/${SNAPSHOT16_CASE_COUNT + 1} - extra\r\nok ${SNAPSHOT16_CASE_COUNT + 1} - extra\r\n# duration_ms ${SNAPSHOT16_CASE_COUNT + 1} 1\r\n# ${SNAPSHOT16_CASE_COUNT + 1} passed, 0 failed.`
 			)
 	)
 );
 snapshot16Control(
 	'running is not a terminal result',
-	snapshot16ChangeText((text) => text.slice(0, text.indexOf(`ok 17 - ${SNAPSHOT16_NAMES[16]}`)))
+	snapshot16ChangeText((text) =>
+		text.slice(0, text.indexOf(`ok ${SNAPSHOT16_CASE_COUNT} - ${SNAPSHOT16_NAMES.at(-1)}`))
+	)
 );
 snapshot16Control(
-	'different seventeen names cannot borrow the selection',
+	'different reviewed names cannot borrow the selection',
 	snapshot16ChangeText((text) => text.replaceAll(SNAPSHOT16_NAMES[4], 'different genuine test'))
 );
 snapshot16Control(
 	'missing timing',
-	snapshot16ChangeText((text) => text.replace('# duration_ms 17 1\r\n', ''))
+	snapshot16ChangeText((text) => text.replace(`# duration_ms ${SNAPSHOT16_CASE_COUNT} 1\r\n`, ''))
 );
 for (const [name, field, value] of [
 	['failed exit', 'status', 7],
@@ -1216,6 +1330,71 @@ snapshot16Control('green bytes cannot revise native exit during receiving', (por
 		return bytes;
 	};
 });
+for (const file of [SNAPSHOT16_OWNER, SNAPSHOT16_TEST]) {
+	for (const [sourceCall, stage, launches] of [
+		[1, 'initial admission', 0],
+		[2, 'before dry launch', 0],
+		[3, 'after dry child', 1],
+		[4, 'after dry receiving', 1],
+		[5, 'before run launch', 1],
+		[6, 'after run child', 2],
+		[7, 'after run receiving', 2]
+	]) {
+		const packet = snapshot16Controlled();
+		const input = packet.state.frame.inputs.find((row) => row.path === file);
+		assert.ok(input, 'The diagnostic regression must exercise a real enrolled source');
+		const expected = input.sha256;
+		const originalSource = packet.ports.source;
+		let calls = 0;
+		packet.ports.source = () => {
+			calls += 1;
+			if (calls === sourceCall) input.sha256 = 'f'.repeat(64);
+			return originalSource();
+		};
+		assert.throws(
+			() => receiveSnapshot16(packet.ports),
+			(error) => {
+				assert.equal(error.code, 'ERR_ASSERTION');
+				assert.ok(
+					error.message.includes(`Snapshot reviewed-source admission refused (${stage};`),
+					'A source refusal must identify its actual receiving stage'
+				);
+				assert.ok(
+					error.message.includes(`${SNAPSHOT16_CASE_COUNT} reviewed cases`),
+					'A source refusal must identify its exact reviewed case count'
+				);
+				assert.ok(
+					error.message.includes(file),
+					'A source refusal must identify its original owner file'
+				);
+				assert.ok(
+					error.message.includes(
+						'Review the changed original cases and obtain a new source receipt before retrying'
+					),
+					'A source refusal must explain the receiving needed before a retry'
+				);
+				assert.ok(
+					error.message.includes('do not update the SHA-256 pin alone'),
+					'A source refusal must not suggest bypassing source review'
+				);
+				assert.equal(error.actual, input.sha256);
+				assert.equal(error.expected, expected);
+				return true;
+			}
+		);
+		assert.equal(
+			calls,
+			sourceCall,
+			'Each diagnostic must come from the intended source observation'
+		);
+		assert.equal(
+			packet.state.launches.length,
+			launches,
+			'Each diagnostic must retain the actual controlled launch history'
+		);
+		snapshot16Controls += 1;
+	}
+}
 // The published prototype-data regression is mandatory and remains first.
 snapshot16Control(
 	'published prototype-data regression cannot be omitted from seventeen results',
@@ -1257,12 +1436,147 @@ for (const [file, oldHash] of [
 		0
 	);
 }
-assert.equal(
-	snapshot16Controls,
-	26,
-	'all twenty-two original and four successor controls remain enrolled'
-);
+assert.equal(snapshot16Controls, 40, 'retain original22, source-stage14 and successor4 controls');
 console.log(`Snapshot17 receiving: ${snapshot16Controls} controlled non-native cases passed.`);
+
+// Advisory output is retained raw debt, never discarded or full-suite qualification.
+{
+	const source = {
+		head: 'a'.repeat(40),
+		source_root: String.raw`C:\fixtures\snapshot16`,
+		inputs: [{ path: SNAPSHOT16_TEST, sha256: SNAPSHOT16_FIXED_IMAGES[SNAPSHOT16_TEST] }]
+	};
+	const reported = path.win32.join(source.source_root, SNAPSHOT16_TEST);
+	const warning =
+		`${reported} (8) : ==> Warning: This local variable has the same name as a global variable.\n` +
+		'     Specifically: Source  (in function _B91S_UnchangedComposite)\n';
+	const second = warning.replace('Specifically: Source', 'Specifically: État');
+	const prefix = Buffer.from(warning + second);
+	let controls = 0;
+	for (const [mode, text] of [
+		['dry', snapshot16Dry],
+		['run', snapshot16Tap]
+	]) {
+		const bytes = {
+			tap: Buffer.from('\uFEFF' + text),
+			stdout: Buffer.concat([prefix, Buffer.from(text)]),
+			stderr: Buffer.alloc(0)
+		};
+		const observed = snapshot16Receive(bytes, mode, source);
+		assert.equal(observed.advisory_output.count, 2);
+		assert.equal(observed.advisory_output.prefix_bytes, prefix.length);
+		assert.equal(observed.advisory_output.original_relation_observed, false);
+		assert.equal(observed.advisory_output.full_suite_qualified, false);
+		assert.equal(observed.advisory_output.source_head, source.head);
+		assert.deepEqual(
+			observed.advisory_output.records.map((record) => record.source_ref),
+			[SNAPSHOT16_TEST, SNAPSHOT16_TEST]
+		);
+		const partition = partitionLocalShadowOutput(bytes.stdout, bytes.tap, source);
+		assert.ok(partition.prefix.equals(prefix));
+		assert.ok(bytes.stdout.equals(Buffer.concat([partition.prefix, bytes.tap.subarray(3)])));
+		assert.equal(partition.manifest.records[0].byte_start, 0);
+		assert.equal(partition.manifest.records[0].byte_end, Buffer.byteLength(warning));
+		assert.equal(partition.manifest.records[1].byte_start, Buffer.byteLength(warning));
+		assert.equal(partition.manifest.records[1].byte_end, prefix.length);
+		assert.equal(snapshot16CaptureFacts(bytes, mode).original_relation_observed, false);
+		controls += 1;
+	}
+	const receivedPorts = snapshot16Controlled((ports, state) => {
+		state.frame.source_root = source.source_root;
+		const read = ports.read;
+		ports.read = (packet) => {
+			const bytes = read(packet);
+			bytes.stdout = Buffer.concat([prefix, bytes.stdout]);
+			return bytes;
+		};
+	});
+	const received = receiveSnapshot16(receivedPorts.ports);
+	assert.equal(received.full_suite_qualified, false);
+	assert.equal(received.phases.length, 2);
+	assert.equal(received.phases[1].manifest.passed, SNAPSHOT16_CASE_COUNT);
+	assert(received.phases.every((phase) => phase.advisory_output.count === 2));
+	controls += 1;
+	const tap = Buffer.from('\uFEFF' + snapshot16Tap);
+	const stdout = Buffer.concat([prefix, tap.subarray(3)]);
+	for (const changed of [
+		warning.replace('same name as a global variable', 'appears to never be assigned a value'),
+		warning.replace('Warning:', 'Error:'),
+		warning.replace(reported, String.raw`C:\foreign\test_buffered_data_snapshot_owner.ahk`),
+		warning.replace(reported, path.win32.join(source.source_root, 'static/unknown.ahk')),
+		warning.replace(reported, 'test_buffered_data_snapshot_owner.ahk'),
+		warning.replace('(8)', '(0)'),
+		warning.replace('(8)', '(9007199254740992)'),
+		warning.replace('     Specifically:', '    Specifically:'),
+		warning.slice(0, -1),
+		warning.replace('  (in function _B91S_UnchangedComposite)', ''),
+		warning.replace('_B91S_UnchangedComposite', '_B91S\0UnchangedComposite'),
+		warning.replace('_B91S_UnchangedComposite', ' '),
+		'garbage\n' + warning,
+		warning + 'unassigned bytes\n',
+		warning.split('\n')[1] + '\n'
+	]) {
+		assert.throws(() =>
+			partitionLocalShadowOutput(
+				Buffer.concat([Buffer.from(changed), tap.subarray(3)]),
+				tap,
+				source
+			)
+		);
+		controls += 1;
+	}
+	for (const changed of [
+		Buffer.concat([tap.subarray(3), prefix]),
+		Buffer.concat([prefix, tap.subarray(3, -1)]),
+		Buffer.concat([prefix, tap.subarray(3), Buffer.from('late\n')]),
+		Buffer.concat([Buffer.from([255]), prefix, tap.subarray(3)])
+	]) {
+		assert.throws(() => partitionLocalShadowOutput(changed, tap, source));
+		controls += 1;
+	}
+	for (const changed of [
+		null,
+		{ ...source, source_root: 'relative' },
+		{ ...source, head: 'foreign' },
+		{ ...source, inputs: [] },
+		{ ...source, inputs: [{ ...source.inputs[0], sha256: 'unsealed' }] },
+		{ ...source, inputs: [...source.inputs, { ...source.inputs[0] }] }
+	]) {
+		assert.throws(() => partitionLocalShadowOutput(stdout, tap, changed));
+		controls += 1;
+	}
+	assert.throws(() =>
+		snapshot16Receive({ tap, stdout, stderr: Buffer.from('warning\n') }, 'run', source)
+	);
+	controls += 1;
+	const first = partitionLocalShadowOutput(stdout, tap, source);
+	first.prefix[0] = 0;
+	first.manifest.records[0].source_ref = 'foreign';
+	const final = partitionLocalShadowOutput(stdout, tap, source);
+	assert.ok(final.prefix.equals(prefix));
+	assert.equal(final.manifest.records[0].source_ref, SNAPSHOT16_TEST);
+	assert.throws(() =>
+		partitionLocalShadowOutput(
+			Buffer.concat([prefix, Buffer.from('bad'), tap.subarray(3)]),
+			tap,
+			source
+		)
+	);
+	assert.ok(partitionLocalShadowOutput(stdout, tap, source).prefix.equals(prefix));
+	controls += 1;
+	const changed = Buffer.concat([
+		Buffer.from(warning.replace('Specifically: Source', 'Specifically: Other')),
+		tap.subarray(3)
+	]);
+	const changedPartition = partitionLocalShadowOutput(changed, tap, source);
+	assert.equal(changedPartition.manifest.records[0].reported_variable, 'Other');
+	assert.notEqual(changedPartition.manifest.prefix_sha256, final.manifest.prefix_sha256);
+	assert.ok(changed.equals(Buffer.concat([changedPartition.prefix, tap.subarray(3)])));
+	controls += 1;
+	console.log(
+		`Snapshot16 advisory output: ${controls} complete-byte partition/refusal controls passed; warnings retained as debt.`
+	);
+}
 
 /** These facts observe closed bytes; they never normalize or admit a transcript. */
 function snapshot16CaptureFacts(bytes, mode) {
@@ -1423,6 +1737,7 @@ if (ahkIndex !== -1) {
 			'static/ergopti_plus/_shared/',
 			'tools/test/test-ahk-suite-manifest.cjs',
 			'tools/test/support/file-backed-native-runner.cjs',
+			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs'
 		]);
@@ -1442,6 +1757,7 @@ if (ahkIndex !== -1) {
 		for (const file of [
 			'tools/test/test-ahk-suite-manifest.cjs',
 			'tools/test/support/file-backed-native-runner.cjs',
+			'tools/test/support/ahk-local-shadow-output.cjs',
 			'tools/test/validate-ahk-suite-manifest.cjs',
 			'tools/test/test-ahk-test-coverage.cjs'
 		])
@@ -1475,7 +1791,7 @@ if (ahkIndex !== -1) {
 			);
 			return { path: file, sha256: digest(bytes) };
 		});
-		return { head, ahk_sha256: digest(fs.readFileSync(ahk)), inputs };
+		return { head, source_root: root, ahk_sha256: digest(fs.readFileSync(ahk)), inputs };
 	}
 	// These closed, data-only children have no process-spawning cases. The
 	// synchronous transport owns the exact direct child and capture descriptors;
@@ -1505,7 +1821,7 @@ if (ahkIndex !== -1) {
 				launches.push(packet);
 				return packet;
 			},
-			read: (packet) => {
+			read: (packet, frame) => {
 				const bytes = {
 					tap: fs.readFileSync(packet.tap),
 					stdout: fs.readFileSync(packet.captures.stdout),
@@ -1516,19 +1832,27 @@ if (ahkIndex !== -1) {
 				} catch (error) {
 					packet.capture_observation = { observation_error: String(error.message) };
 				}
+				const advisory = partitionLocalShadowOutput(bytes.stdout, bytes.tap, frame);
+				packet.advisory_output = advisory.manifest;
+				packet.advisory_prefix = path.join(path.dirname(packet.tap), 'advisory-prefix.bin');
+				fs.writeFileSync(packet.advisory_prefix, advisory.prefix, { flag: 'wx' });
 				return bytes;
 			}
 		});
 		receipt = {
 			schema: 1,
-			qualified: true,
+			qualified: observed.phases.every((phase) => phase.advisory_output.count === 0),
+			capture_contract_complete: true,
+			data_cases_complete: true,
 			official_ci: process.env.GITHUB_ACTIONS === 'true',
 			...observed,
+			qualification_scope: 'SNAPSHOT16_DATA_CASES_ONLY_NOT_FULL_SUITE_OR_NATIVE_ACTIONS',
+			advisory_warning_debt: observed.phases.some((phase) => phase.advisory_output.advisory_debt),
 			direct_child_exit_and_capture_closed: true,
 			native_actions_qualified: false
 		};
 		console.log(
-			'Snapshot16 native: exact original enrolled runner dry-loaded; 17/17 terminal cases passed; both direct children exited and capture descriptors closed; full suite remains unqualified.'
+			`Snapshot17 native: exact original enrolled runner dry-loaded; ${SNAPSHOT16_CASE_COUNT}/${SNAPSHOT16_CASE_COUNT} terminal cases passed; both direct children exited and capture descriptors closed; full suite remains unqualified.`
 		);
 	} catch (error) {
 		receipt = {
@@ -1549,13 +1873,17 @@ if (ahkIndex !== -1) {
 			tap: packet.tap,
 			tap_capture: snapshot16OptionalCapture(packet.tap, describeNativeCapture),
 			capture_observation: packet.capture_observation,
+			advisory_output: packet.advisory_output,
+			advisory_prefix: packet.advisory_prefix
+				? describeNativeCapture(packet.advisory_prefix)
+				: null,
 			stdout: describeNativeCapture(packet.captures.stdout),
 			stderr: describeNativeCapture(packet.captures.stderr)
 		}));
 		fs.writeFileSync(path.join(evidence, 'receipt.json'), JSON.stringify(receipt, null, 2) + '\n', {
 			flag: 'wx'
 		});
-		if (receipt.qualified === false)
+		if (receipt.error !== undefined)
 			snapshot16EmitCaptureFailure(receipt, (line) => process.stderr.write(line));
 		console.log(`Snapshot16 closed supplemental evidence: ${evidence}`);
 	}

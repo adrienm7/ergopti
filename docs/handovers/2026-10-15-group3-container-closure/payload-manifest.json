@@ -1,0 +1,608 @@
+{
+	"kind": "inactive-source-and-historical-evidence-archive",
+	"source_basis": "46d6388d29f854f529985fcc43cded73b325c890",
+	"closure_dev_basis": "c8a7b1f6e19f508dee1f1e132d4ca1c77f6ec95d",
+	"qualification": "not a production adoption or final-source native qualification",
+	"payload_count": 66,
+	"payload_bytes": 478015,
+	"files": [
+		{
+			"path": "findings/debug-window/FINDING.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/todo109-windowpos-subclass-finding-v1/FINDING.json",
+			"bytes": 16210,
+			"sha256": "40250b128aa60a710420df68d608bd4c29d9b7b630d4861eff96f6e94d7bc5c8",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/debug-window/FINDING.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/todo109-windowpos-subclass-finding-v1/FINDING.md",
+			"bytes": 2693,
+			"sha256": "07ac8d7da97ac66df32b9c2b344fdf36133795aa7f05767703dba5dcc83df163",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/2.55.0.windows.5.release.api.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/2.55.0.windows.5.release.api.json",
+			"bytes": 28760,
+			"sha256": "85c64477281164b10ca6bf42752b927074b59fb5b18c6319ba20c5d62f29a5bf",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/2.56.0.windows.2.release.api.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/2.56.0.windows.2.release.api.json",
+			"bytes": 28895,
+			"sha256": "b2adaeec39167f602fe929bc43a6597de7b7dafffb0496a8d32e3c188906c12e",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/FINAL-RECEIVED.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/FINAL-RECEIVED.json",
+			"bytes": 10678,
+			"sha256": "a79ef5b5a66069f5a7d67a02a03bbf5ac0d8a49459317ce955e0743bbe9a9eda",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/MinGit-2.55.0.5-64-bit.dll-census.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/MinGit-2.55.0.5-64-bit.dll-census.json",
+			"bytes": 3756,
+			"sha256": "09ce1351c4b368a419ddfb50f45e3e51bdf4fbac36f035ac3bb00ee1bc2cefdf",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/MinGit-2.56.0.2-64-bit.dll-census.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/MinGit-2.56.0.2-64-bit.dll-census.json",
+			"bytes": 3687,
+			"sha256": "22264acf5651333d2764fc7ba5f1d89b6263fa89d0e551d5d948b3d7e422b64f",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/REPORT.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/REPORT.md",
+			"bytes": 5299,
+			"sha256": "1eceffeaf4b2541f15b97a7c5e00a9de9d79eaceb56360d3be66f3aeab5f2d06",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/final-pe-census.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/final-pe-census.json",
+			"bytes": 5349,
+			"sha256": "bac53dbefe68a656192f5029fa1b30778d502b42722010a09fdc1a9f70bf2544",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/git-openssl-layout/release-acquisition.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/git-for-windows-openssl-official-static-255-256-v1/release-acquisition.json",
+			"bytes": 17015,
+			"sha256": "a456b2cc5db33212ad4356b4b631d978fcbe394ce1ff11127d2211f48257b14e",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/linux-device-identity/FINDING.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-physical-callback-metadata-finding-v1/FINDING.json",
+			"bytes": 1846,
+			"sha256": "e1e968696392a367005b5f834a8064d4d8ae51c94a125a18ac725c8cc4a12b57",
+			"byte_exact": true
+		},
+		{
+			"path": "findings/linux-device-identity/FINDING.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-physical-callback-metadata-finding-v1/FINDING.md",
+			"bytes": 2342,
+			"sha256": "241e932c31402f539d2ccdebca5e07f32cd512181e16f51891281a305779a2b1",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/README.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/README.md",
+			"bytes": 4903,
+			"sha256": "484ae940cc18443ccbcd09f0e24ef4758a93f594e388b6927182466350ac8b64",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/ROOT-WORKFLOW-SEAM-dev-bdec.patch.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/ROOT-WORKFLOW-SEAM-dev-bdec.patch.txt",
+			"bytes": 1068,
+			"sha256": "8f381f719dd4eaa639540dfd22d28006cb2cb4159e5a68f3128f9e85a20dfb2e",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/ROOT-WORKFLOW-SEAM-dev-bdec.receipt.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/ROOT-WORKFLOW-SEAM-dev-bdec.receipt.json",
+			"bytes": 523,
+			"sha256": "91b055498bf81333828f5339b25edb968abc387c5ee96072237cd711489e9b4e",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/actual-host-xi-resolution-v2.receipt.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/actual-host-xi-resolution-v2/receipt.json",
+			"bytes": 693,
+			"sha256": "ce8027cec16cef2a07ade6ef6cf6d5ddaa919d3aa9104a6e3ad9e99fde6f59d0",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/actual-host-xi-resolution.receipt.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/actual-host-xi-resolution/receipt.json",
+			"bytes": 458,
+			"sha256": "9e01247642af12daffa9086895f99bb530c36b29ffb0fff9db24e06cf34d5d2b",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/candidate.patch",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/candidate.patch",
+			"bytes": 36793,
+			"sha256": "981a4e45d3815a6ff02a35b2aef1cec1b92c10c1be6b98ee0ddcbe4b5e9574d6",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/currency.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/currency.json",
+			"bytes": 5444,
+			"sha256": "72a58413d4bcac69d08776917bcc1a0818ea03590dacd3121ac7189703d7294c",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/fresh-currency-cead-bdec-root995.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/fresh-currency-cead-bdec-root995.json",
+			"bytes": 633,
+			"sha256": "73825928213f4db965ffd932902cd0fee84583d7681e46f0452868fb52d46de0",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/generator-receiving.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/generator-receiving.json",
+			"bytes": 750,
+			"sha256": "1eda56b26ef1eb4b0d3edb771929fbcf9ec01056fd0be6a0933c41a03fded3e3",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/generator-refusals.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/generator-refusals.json",
+			"bytes": 1372,
+			"sha256": "c2f637ac9862186ad03ea0ad16735e77a865775c9520505d88fec30c9021066a",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/owned-xi-controls.py.source",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/owned-xi-controls.py",
+			"bytes": 9181,
+			"sha256": "9d6492007edb7b92ed414f225f77bdd5165af690d863369f68f579fa4afa7c20",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/paths.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/paths.json",
+			"bytes": 5638,
+			"sha256": "cdc802da5eb62ac882c144a98e3fdef844c632df534b10042a72d7affb930d41",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-original.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-original.json",
+			"bytes": 185,
+			"sha256": "364b6a2064eff7f5550eeef2063f5354def3a63e3fe6385e8d790557ff8b047d",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-original.stderr.raw",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-original.stderr.raw",
+			"bytes": 978,
+			"sha256": "fc93cbb08d255f8c465e45e39d35bee0701ef54b3ed723149c4821681f5a794d",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-original.stdout.raw",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-original.stdout.raw",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-receiving.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-receiving.json",
+			"bytes": 146,
+			"sha256": "86be4396418fe23c2cf0d540c2b27145f2f80fbc4fb4968be8cbe4d2e71c0078",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-restored.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-restored.json",
+			"bytes": 55,
+			"sha256": "0423e934e7541dfe9e5e1a24c4f13053ac5aff3bbef3c90695e25dd852d02a03",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-restored.stderr.raw",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-restored.stderr.raw",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/linux-xi-runtime/xi-controls-restored.stdout.raw",
+			"source": "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/xi-controls-restored.stdout.raw",
+			"bytes": 1087,
+			"sha256": "af30a2ca6a152f5bfe3df7c2822e8450a059ccb9537cb2bfc930b75f1ad8d34c",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/README.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/README.md",
+			"bytes": 6596,
+			"sha256": "0063324c38dbe0904f18738986f74c54ceb04cddcace0e8802f8434f1018e4c2",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/candidate.patch",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/candidate.patch",
+			"bytes": 8804,
+			"sha256": "a666f85dd2318633c76b412128d9189028d53ad81facbcfa4c068d995ee62a57",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/causal-receiving.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/causal-receiving.json",
+			"bytes": 6674,
+			"sha256": "bfa7adc4c666141bf20423d8ac961bb55aee682b30219e1c81a7975710747883",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/final-receiving.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/final-receiving.json",
+			"bytes": 5481,
+			"sha256": "2f4b58e0e250354a8367841f2d4b73dd32c67d4f8175799ebe0892d9b6d38dc8",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/original-producer-projection.h.source",
+			"source": "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/raw_hook_origin.h",
+			"bytes": 460,
+			"sha256": "660fca61a9240972a7072a99009c94740fae1df270cc8c05f1e8b6ac9669182b",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/paths.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/paths.json",
+			"bytes": 1796,
+			"sha256": "68f2a1a6cd1d20c3935c23f6fbcfdd01c74e4bfc20527b3314649ad0d78521b5",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/raw-domain-source-receiving.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/raw-domain-source-receiving.json",
+			"bytes": 620,
+			"sha256": "12d16971fa1a2add1d46d5d6563a73bce8d535e517f84a6147cbfd5861fea6c3",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/raw-domain-source.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-raw-system-origin-v1/raw-domain-source.txt",
+			"bytes": 1417,
+			"sha256": "3b102e6ebbc5114209836ead87c015e10f8ba7b792e9da63e7081bbfab0123c0",
+			"byte_exact": true
+		},
+		{
+			"path": "proposals/raw-system-origin/withdrawn-origin-guard.h.source",
+			"source": "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/raw_hook_origin.h",
+			"bytes": 1549,
+			"sha256": "20bf5dc554b13901650dd9e9264f7b4332c50138d68135fd127938b32f81c091",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/managed-protocol-targeted.stderr.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/managed-protocol-actual.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/managed-protocol-targeted.stdout.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/managed-protocol-actual.stdout",
+			"bytes": 15782,
+			"sha256": "d35092d805657d5067569157e17422a7d723ec2cfbecd53afcf8d2324e62e742",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/uninstall-original-root-child.jsonl.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/var-tmp-child.jsonl",
+			"bytes": 678,
+			"sha256": "a93368f04d97c0d5d05707357a8731db16d19c32aaf85f24be9852aa5a47333b",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/uninstall-restricted-child.jsonl.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/tmp-child.jsonl",
+			"bytes": 260,
+			"sha256": "9d4cde408bb11229f7ca049e7e4918dbc1ed02699af178c2da4fce35d6b69ab1",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/verification.json.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/closure-verification.json",
+			"bytes": 2256,
+			"sha256": "f32227ebae869c170304bab003de516a7d4d2d51645bf1168c85709317a2f925",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/whole-verify.stderr.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-writabletmp-final-gate/stderr.log",
+			"bytes": 152,
+			"sha256": "0fe37ab60ae3861b29e55f86741580c5eb88058ac3b88adf08138a13b316e2c1",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/closure-local/whole-verify.stdout.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-writabletmp-final-gate/stdout.log",
+			"bytes": 108138,
+			"sha256": "20da7c22547178d2739c419458e37e340b31ca69424c1061e53f751324c2a395",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/input-actions.stderr.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-input-actions.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/input-actions.stdout.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-input-actions.stdout",
+			"bytes": 20619,
+			"sha256": "c768289342b775f5f1924be1bf6f43c201727f1a0a3a921f766e3c155aa67bc4",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/verification.json.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-composition.json",
+			"bytes": 1015,
+			"sha256": "85148419310a0fd092c430edb473ed85ab71bc03bfe38be02e1943b3ec1b4f27",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/fullsave-owner-verify-change/command.json.txt",
+			"source": "/workspace/.ergopti-cloud/continuation-2026-10-15/fullsave-owner-verify-change/command.json",
+			"bytes": 110,
+			"sha256": "285b2662a518fa73fb7f2bc37e5a39f43594b4ebb8b6189059181b56c650fdea",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/fullsave-owner-verify-change/status.json.txt",
+			"source": "/workspace/.ergopti-cloud/continuation-2026-10-15/fullsave-owner-verify-change/status.json",
+			"bytes": 149,
+			"sha256": "138aff6bd5faef4dc42e0d3223581d1b1cf3edb1cb96ef7abd88a5bd881a49a2",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/linux-common-ae278/REPORT.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/ae278-linux-common-terminal-artifact-receiving-v3/REPORT.md",
+			"bytes": 6205,
+			"sha256": "080e330761375a6a6432fd87051da6ee1ca0339c58c255dfe81e7e706f4108ce",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/linux-common-ae278/SEAL.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/ae278-linux-common-terminal-artifact-receiving-v3/SEAL.json",
+			"bytes": 26009,
+			"sha256": "6262e733ad9d726471bd59f430768ebb67b461fa9c8716f8a4083b88f60e3b3d",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/linux-common-ae278/review.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/ae278-linux-common-terminal-artifact-receiving-v3/review.json",
+			"bytes": 920,
+			"sha256": "e1254ccf630969c53a4490303f3b509a8caef6dd566137691c32ebbd6090ddfe",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/linux-common-ae278/source-pins.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/ae278-linux-common-terminal-artifact-receiving-v3/source-pins.json",
+			"bytes": 3724,
+			"sha256": "1a3efeb4ea8d3e21f4fa1e0f2104d6c9c169a171b3f2aa83dad4d1356017565d",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/linux-common-ae278/verified-summary.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/ae278-linux-common-terminal-artifact-receiving-v3/verified-summary.json",
+			"bytes": 18603,
+			"sha256": "67281a585cdbe1b860ea9d6f0ed6f1ad0f59c663c91d03be7fa104e173ad2ef6",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/published-ancestry/ANCESTRY.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/group3-published-atom-dev156-ancestry-final-v1/ANCESTRY.json",
+			"bytes": 9028,
+			"sha256": "f88d7eff4c7e066ad91e135510a7e092b66cbb3596d69c4d83f33acc1f6ecbf7",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/published-ancestry/COMMITS.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/group3-published-atom-dev156-ancestry-final-v1/COMMITS.md",
+			"bytes": 3480,
+			"sha256": "8c784aab3853ba0f5309d33f6f74a47e997696daef04b07e3247914d032b4036",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/published-ancestry/HISTORICAL-INTEGRATION-ADDENDUM.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/group3-published-atom-dev156-ancestry-final-v1/HISTORICAL-INTEGRATION-ADDENDUM.json",
+			"bytes": 1098,
+			"sha256": "5dc6f90c06965c3a06d4f9945aad2c1e3822b2209f1f9d58adbbec9ac7f9f169",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/REPORT.md.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/REPORT.md",
+			"bytes": 5086,
+			"sha256": "5a39351c1325525269d25ca2b0acf59333ef801106cfd9644ea737a43ec17f97",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/SEAL.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/SEAL.json",
+			"bytes": 2863,
+			"sha256": "ee58547eb402e44d66b9a228557c854bf0267f951bb640caa720258d2339277d",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/failure-facts.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/failure-facts.json",
+			"bytes": 16669,
+			"sha256": "54a0a677b63497baa0a1d2f300d2f408865d460f2fc4c4c000b915c58c6e8fb4",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/review.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/review.json",
+			"bytes": 606,
+			"sha256": "a5ebf9b3b9c06e387325ad50b124001337816a6cfdc3f5270882e6fd406b9f69",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/source-pins.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/source-pins.json",
+			"bytes": 772,
+			"sha256": "688f6de795f2cf31655866feca326e086efeea4fcc3ad02aece97aa46a4c0ed6",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/windows-ae278/summary.json.txt",
+			"source": "/workspace/.ergopti-cloud/reviews/windows-ae278-unit-exact-failure-receiving-v1/summary.json",
+			"bytes": 3959,
+			"sha256": "eabd6b3333c405bb225a73d8d1739f4dc96858daa537745848b9b5500a2782a0",
+			"byte_exact": true
+		}
+	],
+	"patch_preimages": [
+		{
+			"proposal": "raw-system-origin",
+			"path": "static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "7d495b256c34766cfa9f3630d4b7ad86fc862d49940223116df50f93d3553a66",
+			"verified": true
+		},
+		{
+			"proposal": "raw-system-origin",
+			"path": "static/ergopti_plus/windows/native/nav_event_owner/raw_hook_origin.h",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": null,
+			"verified": true
+		},
+		{
+			"proposal": "raw-system-origin",
+			"path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "95a789c11e970df103d3e52fe4475deb8db64ecf45690a1e5436df75c662748a",
+			"verified": true
+		},
+		{
+			"proposal": "raw-system-origin",
+			"path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "8b146f67b82ef09e122534754ab5cb080bd9ed4a0276b3197608c7ba0470f297",
+			"verified": true
+		},
+		{
+			"proposal": "raw-system-origin",
+			"path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "aa1fd4bc56c21c8da2333d91ddfe394a09e3f498e2b5b070a2235ee52092ddf9",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "static/ergopti_plus/_shared/data/linux_native_runtime.json",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "static/ergopti_plus/linux/_generated/native_runtime.lua",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "static/ergopti_plus/linux/install.sh",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/build/PKGBUILD",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/build/build-linux-deb.sh",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/build/build-linux-rpm.sh",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/build/nix/flake.nix",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/build/stage-linux-network-runtime.py",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/codegen/codegen-linux-native-runtime.cjs",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/test/fixtures/validation-curl/PINS.json",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "e46c8011cf4a8da400dff797c3f09d34ac5cdc91fb04bbebbd4b44466432c8de",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/test/test-linux-crypto-runtime.cjs",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/test/test-linux-launcher-deps.cjs",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/test/test-linux-network-runtime.cjs",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e",
+			"verified": true
+		},
+		{
+			"proposal": "linux-xi-runtime",
+			"path": "tools/test/test-linux-portable-network-runtime.cjs",
+			"source_ref": "46d6388d29f854f529985fcc43cded73b325c890",
+			"before_sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a",
+			"verified": true
+		}
+	],
+	"historical_context": "Compact extracts. Original seals can reference large logs or archives intentionally omitted here. Patches are dormant and have not been applied. Original metadata filenames gain .txt; executable control/header names gain .source."
+}

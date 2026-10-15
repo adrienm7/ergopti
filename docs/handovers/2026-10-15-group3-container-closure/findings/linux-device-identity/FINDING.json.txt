@@ -1,0 +1,28 @@
+{
+  "status": "SOURCE_CLEAR_FINITE_ABSENCE_FINDING_IMPLEMENTATION_HELD_FOR_POLICY",
+  "basis": "51eec199f573fe720b848aa9a1a973b84b1be0e9",
+  "source_sha256": {
+    "static/ergopti_plus/linux/adapters/keyboard_hook.lua": "747618881c989f2b514dd16c82bf5903b945a98047e3d342d20f5b63ae3dcd27",
+    "static/ergopti_plus/linux/adapters/evdev_reader.lua": "f1550ef74642f0e50edcfa22bc89ec940631a2e48198a4a181fdd31517d2fb33",
+    "static/ergopti_plus/linux/modules/hotstrings/device_finder.lua": "69bacca0028a76a1838859a52f894e939b1d7f27c74d0461761c51053720ec5e"
+  },
+  "observed_supplier": [
+    "Reader584 original per-open source lease includes st.generation",
+    "Reader858 current original event exposes path, slot, generation, read_epoch and exact wire facts",
+    "Hook1556 physical callback retains code,key_name,char,value",
+    "Reader133 wire excludes source device identity",
+    "Reader212 native ports omit descriptor device-number acquisition",
+    "Finder106/247 kernel descriptor projection contains name,sysfs,handlers,physical classification, not native decimal identity"
+  ],
+  "remaining_requirements": [
+    "Literal shared MediaStore body defining decimal device and capture identity representation; absent on current51e",
+    "A native device identity observation tied to the already owned descriptor, not path/UUID inference",
+    "Retain identity with exact descriptor/open-generation/source capability; expose detached metadata only while original currency admits it",
+    "Hook additive fifth argument preserving all four original callback values, without granting physical assignment/output authority"
+  ],
+  "implementation": "NOT_PREPARED: required policy and original native device acquisition are absent",
+  "tests_run": 0,
+  "native_actors": 0,
+  "checkout_index_ref_changes": 0,
+  "physical_availability_change": false
+}

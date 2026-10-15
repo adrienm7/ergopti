@@ -185,3 +185,51 @@ _SSRT_FullSaveGeneration() {
 	}
 }
 Test("startup full save acknowledges the existing native collector/WAL generation (compiled-full-save-receipt)", _SSRT_FullSaveGeneration)
+
+
+; The timer publishes before occupying the resumed polling boundary. Its real
+; elapsed time proves the deadline was crossed without replacing the wait clock.
+_SSRT_ObserverBusyTimer(SSRTBusyPath, SSRTBusyNonce, SSRTBusyState, SSRTBusyMode) {
+	SSRTBusyState.fired := true
+	if SSRTBusyMode != "missing"
+		FileAppend(SSRTBusyMode == "foreign" ? "0123456789abcdef0123456789abcdef" : SSRTBusyNonce,
+			SSRTBusyPath, "UTF-8-RAW")
+	SSRTBusyStarted := A_TickCount
+	while !TickExpired(SSRTBusyStarted, 120)
+		Sleep(1)
+	SSRTBusyState.elapsed := TickElapsed(SSRTBusyStarted)
+}
+
+_SSRT_ObserverResumedBoundary(SSRTBoundaryMode) {
+	SSRTBoundaryRoot := A_Temp . "\ergopti_observer_boundary_" . DllCall("GetCurrentProcessId")
+		. "_" . Random(100000, 999999)
+	DirCreate(SSRTBoundaryRoot)
+	SSRTBoundaryNonce := "abcdef0123456789abcdef0123456789"
+	SSRTBoundaryState := {fired: false, elapsed: 0}
+	SSRTBoundaryTimer := _SSRT_ObserverBusyTimer.Bind(SSRTBoundaryRoot . "\ack.txt",
+		SSRTBoundaryNonce, SSRTBoundaryState, SSRTBoundaryMode)
+	try {
+		SetTimer(SSRTBoundaryTimer, -1)
+		SSRTBoundaryCaught := 0, SSRTBoundaryAccepted := false
+		try SSRTBoundaryAccepted := StartupSmokeAwaitObserver(SSRTBoundaryRoot, SSRTBoundaryNonce, 80, 1)
+		catch as SSRTBoundaryError
+			SSRTBoundaryCaught := SSRTBoundaryError
+		AssertTrue(SSRTBoundaryState.fired, "the actual owned timer must interrupt the polling wait")
+		AssertTrue(SSRTBoundaryState.elapsed >= 120, "the owned timer spans the original wait deadline")
+		if SSRTBoundaryMode == "exact" {
+			AssertFalse(IsObject(SSRTBoundaryCaught), "a published exact ACK survives the resumed deadline boundary")
+			AssertTrue(SSRTBoundaryAccepted, "the actual wait accepts its observer's exact nonce")
+		} else {
+			AssertTrue(IsObject(SSRTBoundaryCaught), "the resumed boundary preserves strict observer refusal")
+			SSRTBoundaryExpected := SSRTBoundaryMode == "foreign" ? "another run" : "before the timeout"
+			AssertTrue(InStr(SSRTBoundaryCaught.Message, SSRTBoundaryExpected),
+				"the intended nonce or deadline guard must refuse the resumed boundary")
+		}
+	} finally {
+		SetTimer(SSRTBoundaryTimer, 0)
+		DirDelete(SSRTBoundaryRoot, true)
+	}
+}
+Test("source observer: exact ACK survives a timer spanning the polling deadline", _SSRT_ObserverResumedBoundary.Bind("exact"))
+Test("source observer: foreign ACK remains refused after a timer spans the deadline", _SSRT_ObserverResumedBoundary.Bind("foreign"))
+Test("source observer: missing ACK remains refused after a timer spans the deadline", _SSRT_ObserverResumedBoundary.Bind("missing"))
