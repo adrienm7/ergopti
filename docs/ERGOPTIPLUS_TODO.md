@@ -4633,7 +4633,24 @@ The captured macOS magic-key choice now belongs to the exact live script-control
 Linux capture now requires the actual deferred answer queue acknowledgement before consuming the physical key. A committed pause, loss of capture eligibility or a newer admitted request fences stale replies; a refused newer timeout keeps the older queued choice eligible. Synchronous, refused and throwing answer queues do not publish preferences. Throwing initial timeout submission releases only its own candidate and preserves a reentrant successor. The 107 focused controls pass under Lua 5.4 and LuaJIT with unchanged original assertions and red old-source inverses; whole-source, native X11/Wayland, installation and physical acceptance remain separate gates. Windows-PC pause/capture acceptance remains explicitly deferred.
 
 - [~] **31.** HS-274 exact physical key accounting with an Ergopti-owned
-  background Karabiner runtime (no Karabiner-Elements app). Plan, decisions and
+  background Karabiner runtime (no Karabiner-Elements app). The existing
+  program-action diagnostic fixtures now use native Windows pipe readiness,
+  a retained child-process handle and explicit LF output for their disposable
+  Python helpers. All 34 original cases and 112 assertion lines are preserved;
+  Linux receiving passes with no skips. Windows qualification remains open:
+  run the same 34 cases with Python 3.12 or later on a real Windows runner;
+  the current Windows CI lane does not enroll these Python tests. This fixture
+  correction grants no Darwin consent or resolution of the lease incident.
+  Actual Windows Python 3.13 receiving of that first fixture checkpoint runs
+  all 34 cases without skips: 27 pass, six fail before Main admission and one
+  cannot create its real leaf symlink (WinError1314). The four real pipe and
+  retirement controls pass. The six synthetic-helper metadata fixtures now
+  scope an explicit executable-bit projection to that exact Windows helper,
+  reusing the unchanged production identity predicate and fresh native fields.
+  Source review, six counterfactual Main models and six metadata schedules pass;
+  actual receiving of this successor remains required. The real symlink case
+  is unchanged and needs a host with legitimate symlink-creation permission.
+  Plan, decisions and
   ADR 011 in the overnight handoff and `static/ergopti_plus/docs/adr/`. WP0-WP2
   are published (decision record, one accounting policy whose default `legacy`
   mode is byte-identical to dev.147, HID usages with aliases in
@@ -12172,6 +12189,19 @@ See [execution handover](handovers/2026-10-11-groups-247/README.md).
   oracle are retained. This supplies no native Snapshot, whole-suite or
   updater outcome; the later Group 3 handover retains exact receiving.
 
+  Current published snapshot receiving now joins the actual `b6e132afe`
+  prototype-data correction and requires all seventeen original data cases:
+  the new first regression plus the sixteen retained names, order and assertions.
+  Exact owner/test source pins replace the obsolete images; selection, result,
+  timing, native exit, full stdout/TAP equality and the thirty-second budget
+  stay mandatory. All26 portable receiver controls, seven closed diagnostic
+  controls and five real-child output controls pass on Linux. Three controlled
+  old-receiver counterexamples fail as expected. Hosted Windows run38631963788
+  refused the obsolete pin before any child launch; current native seventeen,
+  full-unit, E2E, compiled and installed receiving remain required. The existing
+  Root contract/budget prefix is byte-exact. This receiver correction grants no
+  simultaneous-input, physical AltGr, output or whole-suite qualification.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
@@ -12583,6 +12613,40 @@ producer is now integrated and Source-identical to the reviewed prerequisite;
 real producer/GUI/input/output and installed qualification remain required. This
 optional capture path grants no public physical assignment or delivery.
 
+A Linux physical-edit preflight joins four claim families before
+configuration acquisition: personal keyboard bindings, plain tap keys,
+ordered/simultaneous combinations and TapHold input prefixes. Shared pure
+matching preserves native None/removal and refuses known collisions or stale
+configuration/source/owner receipts without writes or native ownership changes.
+Both Lua ABIs pass 519/0 across six existing modules (491 preceding cases
+plus 28 additions); all original assertions remain intact. Strict unavailable
+capability refuses before observers, and parameter-only edits keep the original
+typed publisher. Sixteen causal children preserve three preceding-code failures
+and the post-observer revocation guard before the corrected cases pass. The
+first complete selected run's thirteen Linux unit failures remain recorded;
+the corrected complete rerun now passes 13,725/0 across 521 modules and all
+193 E2E cases. Final Common, native packaging and installation remain separate.
+This is controlled software receiving with modeled map ports. Public delivery stays false: Script/Navigation/hotstring/other
+consumers, cross-device source/modifier/output and real dead-key joins remain
+open, as do Windows/macOS, native/installed and physical qualification.
+
+The Linux physical-edit preflight now joins the actual configured Magic Key
+replacement as a fifth claim family. Stale source/cache observations and waiting
+or accepted deferred choices refuse before configuration acquisition. Every
+deferred callback exit clears only its exact pending observation while preserving
+original errors and an accepted reentrant successor. None/removal and yielding
+Magic Editor recommendations retain their original behavior. Targeted receiving
+passes 272/0 on each Lua ABI, including 25 additions; 22 causal children produce
+the expected twelve failures and ten passes across three omissions and the
+old/corrected exception cases. The final composition records 13,751 unit passes
+and one failed unchanged native luv child-state check; its single unchanged
+replay passes. Linux E2E passes 193/193 and real X11/XKB passes 65/65. The full
+unit result remains red; final Common, packaging and installation stay pending.
+Other owners, Script/Navigation and other hotstring paths, source/modifier/output
+joins, Unicode/dead keys, Windows/macOS integration and native/installed/physical
+acceptance remain open. Public physical delivery stays unavailable; item 97
+remains partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12620,6 +12684,25 @@ optional capture path grants no public physical assignment or delivery.
   physical observation. No foreign replacement can settle its original token;
   refusal retries retain that exact capability. This does not grant a physical J
   identity, star migration, collision admission or native output authority.
+
+  The Linux four-family collision preflight also protects this
+  editor's active physical-assignment path before its configuration transaction.
+  Known personal reservations refuse; None/removal preserves native intent
+  rather than acquiring another output. Controlled original and additive cases
+  pass 519/0 across six modules on both Lua ABIs. The corrected preflight
+  preserves the original strict capability ordering and parameter-only publisher;
+  the complete rerun passes 13,725 unit cases and all 193 E2E cases. Final
+  Common/native receiving remains separate. No chosen-key output, star-setting migration or
+  public physical delivery is enabled; other input owners, native output,
+  three-OS integration and installed/device acceptance remain unfinished.
+
+Item 97's fifth-family preflight now protects edits against the actual configured
+Linux Magic Key replacement, including stale/cache and pending-choice refusals
+before the transaction. Exact exception cleanup preserves reentrant successors;
+None/removal remains unchanged. This does not supply chosen-key output or an
+acknowledged star-setting migration. Other input/output owners, dead keys,
+Windows/macOS replacement integration and native/installed/physical acceptance
+remain open; public delivery stays unavailable and item 98 remains partial.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -13690,6 +13773,33 @@ producer and native65 consumer assertions while joining original map, group,
 queue and output issuers. Its optional native dependency remains undeclared;
 this partial software adoption grants no physical editor-key delivery. Live
 retargeting, complete collisions, native and installed acceptance stay open.
+
+The Linux collision preflight preserves conditional-editor
+priority: default and custom Magic Editor recommendations yield to a personal
+physical source instead of becoming hard reservations. The unchanged genuine
+shared policy is exercised by two real-policy regressions; V1 fails both and
+the successor passes them on both Lua ABIs, while personal logical/None
+collision controls remain. All 519 focused cases pass, including 491 preceding
+cases and 28 additions across six existing modules. The readiness-order and
+parameter-only regressions are causally checked without relaxing the original
+post-observer revocation guard. The complete corrected rerun passes 13,725/0
+unit cases and 193/193 E2E cases; final Common/native receiving stays separate.
+This partial four-family inventory grants no public
+delivery and does not complete Script/Navigation/hotstring/other consumers or
+native input/output joins, Windows/macOS or installed/physical qualification.
+
+The Linux preflight now includes the actual configured Magic Key replacement,
+without turning its conditional editor recommendation into a hard reservation.
+Default/custom recommendations still yield to personal physical/logical claims;
+explicit None retains priority. Stale/cache and pending-choice observations
+refuse before transaction acquisition. The targeted and causal receiving in
+item 97 is controlled software evidence. The final whole Linux unit result
+retains one unchanged native luv child-state failure, while its single replay,
+all 193 E2E cases and all 65 X11/XKB checks pass. Final Common/native packaging
+and installation remain pending.
+Complete other-owner collisions, live source/modifier/output joins,
+Windows/macOS integration and native/installed/physical delivery remain open;
+item 108 stays partial.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:

@@ -23,14 +23,18 @@ local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatg
 --- Uses real state owners and only controlled native/file publication ports.
 --- @param body function Test body.
 --- @param source string|nil config.toml content; SOURCE by default.
-local function with_scope(body, source)
+--- @param chord_j_identity string|nil Fixed modeled XKB identity for native code 36.
+local function with_scope(body, source, chord_j_identity)
 	local loaded = {}
+	local tap_manager, tap_path, magic_owner
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
-				"infra.shortcuts_scope", "ui.menu.menu_builder" }) do
+				"infra.shortcuts_scope", "ui.menu.menu_builder", "modules.shortcuts.key_combinations",
+				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
@@ -98,6 +102,11 @@ local function with_scope(body, source)
 				end,
 			}
 			package.loaded["adapters.file_system"] = files
+			-- Keep this fixture's genuine pre-Magic-init phase while binding the
+			-- new observer to the same actual route, file ports and preference owner.
+			local magic_preferences = require("infra.hotstring_preferences")
+			assert(magic_preferences._set_file_for_test(path))
+			magic_owner = require("modules.hotstrings.magic_key_source")
 			local apply_keyboard = keyboard.apply_configuration
 			keyboard.apply_configuration = function(token, state)
 				controls.runtime_calls = controls.runtime_calls + 1
@@ -113,14 +122,48 @@ local function with_scope(body, source)
 			local chords = require("modules.shortcuts.script_chords")
 			chords.init({ is_paused = function() return controls.paused end,
 				defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
-			-- The now-supported ordered-pair owner is initialized under this exact source.
-			package.loaded["modules.shortcuts.key_combinations"] = nil
+			-- The actual Manager issues the same-source Pair catalogue and disabled
+			-- tap-hold inventory; only native installation/chord facts are modeled.
+			tap_path = os.tmpname()
+			Sandbox.write_bytes(tap_path, '[tap_hold]\nenabled = false\ninherit_defaults = false\n')
+			local hook = {}
+			function hook.set_remapper() return true end
+			function hook.key_text() return nil end
+			function hook.held_modifiers() return {} end
+			function hook.held_text_modifier_codes() return {} end
+			function hook.held_shortcut_modifier_codes() return {} end
+			tap_manager = require("platform.remap.tap_hold_manager")
+			assert(tap_manager.init({ keyboard_hook = hook,
+				execute_action = function() error("no output during edit admission") end,
+				action_names = gestures.get_executable_action_names,
+				on_text_injected = function() error("no text during edit admission") end,
+				defaults_path = require("infra.paths").shared("tap_hold/defaults.toml"), user_path = tap_path }))
 			local Pair = require("modules.shortcuts.key_combinations")
-			local pair_owner = Pair.new({ keys = {{id="caps_lock",key="caps_lock"},{id="tab",key="tab"}},
-				hold_picker={modifiers={"shift","alt"},layers={"nav"}}, files=files, route=function() return path end,
-				is_paused=function() return controls.paused end, actions={is_assignable=gestures.is_assignable},
-				changed=function() return true end })
+			local pair_owner = tap_manager.configuration_snapshot().combinations
 			assert(Pair.set_instance(pair_owner))
+			controls.source_reads = 0
+			local tokens = setmetatable({}, { __mode = "k" })
+			controls.capture = {
+				source_generation = function() return 1 end,
+				chord_sources = function(requests)
+					controls.source_reads = controls.source_reads + 1
+					local token, rows = {}, {}
+					local identities = { [15] = "tab", [30] = "a", [36] = chord_j_identity or "j", [37] = "k", [41] = "grave" }
+					for _, request in ipairs(requests) do
+						for _, caps in ipairs({ false, true }) do
+							rows[#rows + 1] = { code = request.code, mods = request.mods, caps = caps,
+								identity = identities[request.code], dead = false }
+						end
+					end
+					tokens[token] = rows; return token
+				end,
+				chord_source_view = function(token) return tokens[token] and { generation = 1, chords = tokens[token] } or nil end,
+				chord_source_current = function(token)
+					if controls.on_chord_source then controls.on_chord_source() end
+					return tokens[token] ~= nil and not controls.source_refused
+				end,
+			}
+			package.loaded["adapters.xkb_capture"] = controls.capture
 			local backup = path .. ".shortcuts-test-backup"
 			local scope = require("infra.shortcuts_scope").new({ path = path, backup_path = backup,
 				files = files, is_paused = function() return controls.paused end })
@@ -133,6 +176,9 @@ local function with_scope(body, source)
 			if not passed then error(failure, 0) end
 		end)
 	end)
+	if magic_owner then magic_owner._reset_for_test() end
+	if tap_manager then tap_manager._reset_for_test() end
+	if tap_path then os.remove(tap_path) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
 	for name, value in pairs(loaded) do package.loaded[name] = value end
 	if not ok then error(err, 0) end
@@ -147,7 +193,8 @@ helpers.describe("Linux actual physical edit scope", function()
 	}
 	local function event() return {physical=true,code=36,key="logical-x",mods={}} end
 	local function ports(owners,controls)
-		package.loaded["adapters.xkb_capture"]={source_generation=function() return 1 end}
+		-- Retain the exact modeled issuer used by the real collision owner.
+		controls.capture.source_generation = function() return 1 end
 		return {defer=function(fn) controls.queued[#controls.queued+1]=fn;return true end,
 			admission=function() return {master=owners.manager.is_enabled(),paused=controls.paused,inhibited=false} end}
 	end
@@ -358,7 +405,7 @@ helpers.describe('Actual shared physical editor to Linux native scope',function(
    local outcome=editor.save(selected.token);helpers.assert_eq(outcome.committed,true);helpers.assert_eq(outcome.refreshed,true)
    local config=Codec.decode(Writer.read_classified(path));helpers.assert_eq(config.shortcuts.keyboard.physical_ctrl_KeyJ,'send_text');helpers.assert_eq(config.gesture_parameters.keyboard__physical_ctrl_KeyJ__send_text,'★');helpers.assert_eq(config.shortcuts.keyboard.foreign_slot,'keep');helpers.assert_eq(config.gesture_parameters.unknown,'keep')
    helpers.assert_eq(editor.remove('physical_ctrl_KeyJ').committed,true);config=Codec.decode(Writer.read_classified(path));helpers.assert_eq(config.shortcuts.keyboard.physical_ctrl_KeyJ,nil);helpers.assert_eq(config.gesture_parameters.keyboard__physical_ctrl_KeyJ__send_text,nil);helpers.assert_eq(config.gesture_parameters.unknown,'keep')
-  end)
+  end, nil, "x") -- A disjoint modeled layout retains the genuine Ctrl+J reservation.
  end)
  helpers.it('(physical-editor-ui) foreign canonical source refuses retained draft without backup',function()
   with_scope(function(scope,owners,controls,path)
@@ -486,7 +533,7 @@ end)
 helpers.describe("Linux unqualified physical delivery admission", function()
 	local source = '[shortcuts]\nenabled=true\n[shortcuts.keyboard]\nctrl_k="enter"\nforeign_slot="keep"\nphysical_none_KeyJ="send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text="owned"\nother_owner__send_text="keep"\n'
 	local function options(owners, controls)
-		package.loaded["adapters.xkb_capture"] = {source_generation=function() return 1 end}
+		controls.capture.source_generation = function() return 1 end
 		return {defer=function(fn) controls.queued[#controls.queued+1]=fn;return true end,
 			admission=function() return {master=owners.manager.is_enabled(),paused=false,inhibited=false} end}
 	end
@@ -625,5 +672,73 @@ helpers.describe("scope fixture native loop custody", function()
 		end
 		helpers.assert_true(fired, "the actual native timer callback must run")
 		helpers.assert_true(settled, "the exact native timer must physically close")
+	end)
+end)
+
+helpers.describe("Physical preflight preserves original admission and parameter publication", function()
+	local source = '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nmagic_editor = "none"\nphysical_none_KeyJ = "send_text"\n[gesture_parameters]\nkeyboard__physical_none_KeyJ__send_text = "old"\nother_owner__send_text = "keep"\n'
+	helpers.it("strict unavailable capability returns before any collision producer", function()
+		with_scope(function(scope, owners, controls, path)
+			local calls, original = 0, owners.keyboard.capture_collision_inventory
+			owners.keyboard.capture_collision_inventory = function() calls = calls + 1; return original() end
+			for _, query in ipairs({ function() return false end, function() return 0 end,
+				function() return "true" end, function() return {} end, function() return nil end,
+				function() error("controlled capability refusal") end }) do
+				owners.keyboard.physical_delivery_available = query
+				for _, rows in ipairs({
+					{{ section = "shortcuts.keyboard", key = "physical_none_KeyK", value = "copy" }},
+					{{ section = "gesture_parameters", key = "keyboard__physical_none_KeyJ__send_text", value = "new" }},
+				}) do
+					local accepted, reason = scope.edit(rows)
+					helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+				end
+			end
+			owners.keyboard.physical_delivery_available = nil
+			local accepted, reason = scope.edit({{ section = "shortcuts.keyboard", key = "physical_none_KeyK", value = "copy" }})
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			helpers.assert_eq(calls, 0); helpers.assert_eq(controls.source_reads, 0)
+			helpers.assert_eq(Sandbox.read_bytes(path), source); helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(controls.runtime_calls, 0); helpers.assert_eq(scope.pending(), false)
+		end, source)
+	end)
+	helpers.it("ready parameter-only edits retain the actual typed publisher without a new input query", function()
+		with_scope(function(scope, owners, controls, path)
+			helpers.assert_eq(controls.native_delivery_available(), false)
+			local calls, original = 0, owners.keyboard.capture_collision_inventory
+			owners.keyboard.capture_collision_inventory = function() calls = calls + 1; return original() end
+			helpers.assert_true(scope.edit({{ section = "gesture_parameters", key = "keyboard__physical_none_KeyJ__send_text", value = "★" }}))
+			local decoded = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(decoded.shortcuts.keyboard.physical_none_KeyJ, "send_text")
+			helpers.assert_eq(decoded.gesture_parameters.keyboard__physical_none_KeyJ__send_text, "★")
+			helpers.assert_eq(decoded.gesture_parameters.other_owner__send_text, "keep")
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__physical_none_KeyJ", "send_text"), "★")
+			helpers.assert_eq(calls, 0); helpers.assert_eq(controls.source_reads, 0)
+			helpers.assert_eq(scope.pending(), false); helpers.assert_eq(controls.device_calls, 0)
+		end, source)
+	end)
+	helpers.it("revoked readiness after a genuine inventory blocks acquisition and publication", function()
+		with_scope(function(scope, _, controls, path)
+			controls.on_chord_source = function() controls.delivery_available = false end
+			local accepted, reason = scope.edit({{ section = "shortcuts.keyboard", key = "physical_none_KeyK", value = "copy" }})
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			helpers.assert_eq(controls.source_reads, 1); helpers.assert_eq(Sandbox.read_bytes(path), source)
+			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+			helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(scope.pending(), false)
+		end, source)
+	end)
+	helpers.it("mixed unsupported logical rows retain the original typed publisher refusal", function()
+		with_scope(function(scope, _, controls, path)
+			local accepted, reason = scope.edit({
+				{ section = "shortcuts.keyboard", key = "physical_none_KeyK", value = "copy" },
+				{ section = "shortcuts.keyboard", key = "ctrl_p", value = "enter" },
+			})
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "save_failed")
+			helpers.assert_eq(Sandbox.read_bytes(path), source)
+			local decoded = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(decoded.shortcuts.keyboard.physical_none_KeyK, nil)
+			helpers.assert_eq(decoded.shortcuts.keyboard.ctrl_p, nil)
+			helpers.assert_eq(controls.source_reads, 1); helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		end, source)
 	end)
 end)

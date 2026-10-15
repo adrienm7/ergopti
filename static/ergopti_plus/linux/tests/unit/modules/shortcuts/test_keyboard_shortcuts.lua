@@ -1163,3 +1163,33 @@ helpers.describe("Keyboard consumption queue acknowledgement", function()
 		end)
 	end
 end)
+
+helpers.describe("keyboard collision claim source", function()
+	helpers.it("retains explicit native reservations and refuses source divergence", function()
+		local keyboard, storage = load_over_config({ ctrl_j = "none", magic_editor = "none" })
+		local ok, why = pcall(function()
+			local frame = assert(keyboard.capture_collision_inventory())
+			helpers.assert_true(frame.current())
+			local found = false
+			for _, claim in ipairs(frame.claims) do
+				if claim.binding == "keyboard__ctrl_j" then found = claim.key == "j" and claim.mods.ctrl == true end
+			end
+			helpers.assert_true(found, "None is a retained ordinary native-behavior reservation")
+			Sandbox.write_bytes(storage.path, '[shortcuts.keyboard]\nctrl_j = "copy"\nmagic_editor = "none"\n')
+			helpers.assert_eq(frame.current(), false)
+			helpers.assert_nil(keyboard.capture_collision_inventory())
+		end)
+		drop_config(); if not ok then error(why, 0) end
+	end)
+	helpers.it("configuration acquisition and its release cannot revive an old collision frame", function()
+		local keyboard = load_over_config({ ctrl_j = "none", magic_editor = "none" })
+		local ok, why = pcall(function()
+			local frame = assert(keyboard.capture_collision_inventory()); local token = {}
+			helpers.assert_true(keyboard.acquire_configuration(token))
+			helpers.assert_nil(keyboard.capture_collision_inventory()); helpers.assert_eq(frame.current(), false)
+			helpers.assert_true(keyboard.release_configuration(token)); helpers.assert_eq(frame.current(), false)
+			helpers.assert_true(keyboard.capture_collision_inventory().current())
+		end)
+		drop_config(); if not ok then error(why, 0) end
+	end)
+end)
