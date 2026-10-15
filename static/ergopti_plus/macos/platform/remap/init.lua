@@ -47,6 +47,9 @@ local Timings     = require("infra.timings")
 local FileSystem  = require("adapters.file_system")
 local Manifest    = require("infra.manifest_reader")
 local TomlWriter  = require("toml_codec.writer")
+local NavigationInventory = { config = Config.load_user_config, save = Config.save_user_config,
+	write = FileSystem.write_if_unchanged, read = FileSystem.read_with_status,
+	load = NavLayer.load, observe = NavLayer.capture_configured_inputs }
 
 -- The managed-output classifier is a lease prerequisite even when the
 -- keylogger feature is disabled. A load failure must keep generated rules
@@ -101,11 +104,10 @@ local LOGIN_ITEMS_SETTINGS_URL = "x-apple.systempreferences:com.apple.LoginItems
 
 -- Resolve the directory that contains this init.lua at load time.
 -- Works whether the file is symlinked, run from the project, or deployed.
-local _SELF_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./")
 
 -- Data JSONs live alongside this module under data/; Karabiner-Elements is
 -- macOS-exclusive so there is no reason to put these files in _shared/.
-local _DATA_DIR = _SELF_DIR .. "data/"
+local _DATA_DIR = (debug.getinfo(1, "S").source:sub(2):match("^(.*[/\\])") or "./") .. "data/"
 
 -- Standard Karabiner-Elements config path, expressed as a tilde path so the
 -- FileSystem port adapter can resolve it through hs.fs.pathToAbsolute (which
@@ -304,10 +306,14 @@ local function persist_enabled_flag(enabled, transaction)
 	local persisted = {}
 	for key, item in pairs(_state) do persisted[key] = item end
 	persisted.enabled = enabled == true
-	local ok, saved_or_err, _, receipt = pcall(Config.save_user_config, persisted, resolve_user_config())
+	local navigation_publication = NavigationInventory.begin_enable_save(transaction)
+	local selected_save, selected_write = Config.save_user_config, FileSystem.write_if_unchanged
+	local ok, saved_or_err, _, receipt = pcall(selected_save, persisted, resolve_user_config())
 	if ok and type(receipt) == "table" and transaction ~= nil then
 		transaction.file = receipt
 	end
+	NavigationInventory.finish_enable_save(navigation_publication, transaction,
+		selected_save, selected_write, ok and saved_or_err == true, receipt)
 	if not ok or saved_or_err ~= true then
 		Logger.error(LOG, "Karabiner enabled preference could not be persisted: %s.",
 			tostring(ok and saved_or_err or saved_or_err))
@@ -330,6 +336,7 @@ local function commit_enable_transition(transaction)
 	if not persist_enabled_flag(true, transaction) then return false, "persistence-failed" end
 	_state.enabled = true
 	transaction.committed = true
+	NavigationInventory.commit_enabled(transaction)
 	return true, "enabled"
 end
 
@@ -5290,6 +5297,286 @@ local function clone_persisted_settings(source)
 	}
 end
 
+-- Configured-map receipts stay private to the original regeneration attempt.
+-- Preparation is observational; only its original successful final fence admits
+-- an inventory, and no receipt grants native installation or output authority.
+(function(ports)
+	local function snapshot(source)
+		if type(source) ~= "table" or getmetatable(source) ~= nil
+			or type(source.enabled) ~= "boolean" or (source.tap_holds_enabled ~= nil and type(source.tap_holds_enabled) ~= "boolean")
+			or (source.mod_combos_enabled ~= nil and type(source.mod_combos_enabled) ~= "boolean")
+			or type(source.combo_symmetric) ~= "boolean" then return nil end
+		local result = { enabled = source.enabled, tap_holds_enabled = source.tap_holds_enabled ~= false,
+			mod_combos_enabled = source.mod_combos_enabled ~= false, combo_symmetric = source.combo_symmetric }
+		for _, name in ipairs({ "tap_hold_config", "mod_combos_config" }) do
+			local entries = rawget(source, name)
+			if type(entries) ~= "table" or getmetatable(entries) ~= nil then return nil end
+			local rows = {}
+			for id, cfg in pairs(entries) do
+				if type(id) ~= "string" or type(cfg) ~= "table" or getmetatable(cfg) ~= nil then return nil end
+				local row = {}
+				for key, value in pairs(cfg) do
+					if (key == "tap" or key == "hold" or key == "combo") and type(value) == "string" then row[key] = value
+					elseif key == "timeout_ms" and type(value) == "number" and value == value
+						and value > 0 and value % 1 == 0 then row[key] = value
+					else return nil end
+				end
+				rows[id] = row
+			end
+			result[name] = rows
+		end
+		return result
+	end
+	local function equal(left, right)
+		if type(left) ~= type(right) then return false end
+		if type(left) ~= "table" then return left == right end
+		for key, value in pairs(left) do if not equal(value, right[key]) then return false end end
+		for key in pairs(right) do if left[key] == nil then return false end end
+		return true
+	end
+
+	local function capture_metadata()
+		local taps, combos, noncanonical, actions = M.TAP_HOLD_KEYS, M.MOD_COMBOS, M.NON_CANONICAL_COMBOS, M.AVAILABLE_ACTIONS
+		if type(taps) ~= "table" or getmetatable(taps) ~= nil or type(combos) ~= "table" or getmetatable(combos) ~= nil
+			or type(noncanonical) ~= "table" or getmetatable(noncanonical) ~= nil then return nil end
+		local rows = {}
+		for _, definitions in ipairs({ taps, combos }) do
+			local entries, count = {}, 0
+			for index, definition in pairs(definitions) do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(definition) ~= "table"
+					or getmetatable(definition) ~= nil or type(rawget(definition, "id")) ~= "string" then return nil end
+				local from = rawget(definition, "from")
+				if from ~= nil and (type(from) ~= "table" or getmetatable(from) ~= nil) then return nil end
+				entries[index] = { definition = definition, id = definition.id, from = from,
+					key = from and rawget(from, "key_code"), hidden = rawget(definition, "menu_hidden") }
+				count = count + 1
+			end
+			for index = 1, count do if rawget(definitions, index) == nil then return nil end end
+			rows[#rows + 1] = { definitions = definitions, entries = entries, count = count }
+		end
+		local symmetric_halves = {}
+		for id, value in pairs(noncanonical) do
+			if type(id) ~= "string" or type(value) ~= "boolean" then return nil end
+			symmetric_halves[id] = value
+		end
+		local function activation_snapshot()
+			if M.AVAILABLE_ACTIONS ~= actions or type(actions) ~= "table" or getmetatable(actions) ~= nil then return nil end
+			local result, count = {}, 0
+			for index, action in pairs(actions) do
+				if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(action) ~= "table"
+					or getmetatable(action) ~= nil or type(rawget(action, "id")) ~= "string"
+					or result[action.id] ~= nil then return nil end
+				local activates, events = false, rawget(action, "karabiner_to")
+				if events ~= nil then
+					if type(events) ~= "table" or getmetatable(events) ~= nil then return nil end
+					for _, event in ipairs(events) do
+						if type(event) ~= "table" or getmetatable(event) ~= nil then return nil end
+						local variable = rawget(event, "set_variable")
+						if variable ~= nil then
+							if type(variable) ~= "table" or getmetatable(variable) ~= nil then return nil end
+							if rawget(variable, "name") == "layer_active" and rawget(variable, "value") == 1 then activates = true end
+						end
+					end
+				end
+				result[action.id] = activates
+				count = count + 1
+			end
+			for index = 1, count do if rawget(actions, index) == nil then return nil end end
+			return result
+		end
+		local activators = activation_snapshot()
+		if activators == nil then return nil end
+		local function definitions_current()
+			if M.TAP_HOLD_KEYS ~= taps or M.MOD_COMBOS ~= combos then return false end
+			for _, cohort in ipairs(rows) do
+				if getmetatable(cohort.definitions) ~= nil then return false end
+				local count = 0
+				for index, definition in pairs(cohort.definitions) do
+					local original = cohort.entries[index]
+					if not original or definition ~= original.definition or getmetatable(definition) ~= nil
+						or rawget(definition, "id") ~= original.id or rawget(definition, "from") ~= original.from
+						or rawget(definition, "menu_hidden") ~= original.hidden then return false end
+					if original.from ~= nil and (getmetatable(original.from) ~= nil or rawget(original.from, "key_code") ~= original.key) then return false end
+					count = count + 1
+				end
+				if count ~= cohort.count then return false end
+			end
+			local actual = activation_snapshot()
+			if actual == nil then return false end
+			for id, value in pairs(activators) do if actual[id] ~= value then return false end end
+			for id, value in pairs(actual) do if activators[id] ~= value then return false end end
+			if M.NON_CANONICAL_COMBOS ~= noncanonical or getmetatable(noncanonical) ~= nil then return false end
+			for id, value in pairs(symmetric_halves) do if rawget(noncanonical, id) ~= value then return false end end
+			for id, value in pairs(noncanonical) do if symmetric_halves[id] ~= value then return false end end
+			return true
+		end
+		return { taps = taps, combos = combos, activators = activators,
+			symmetric_halves = symmetric_halves, current = definitions_current }
+
+	end
+
+	local function source_ports_current()
+		return package.loaded["platform.remap"] == M and getmetatable(M) == nil
+			and M.capture_configured_navigation_inventory == ports.capture
+			and package.loaded["platform.remap.config"] == Config and getmetatable(Config) == nil
+			and Config.load_user_config == ports.config and Config.save_user_config == ports.save
+			and package.loaded["adapters.file_system"] == FileSystem and getmetatable(FileSystem) == nil
+			and FileSystem.read_with_status == ports.read and FileSystem.write_if_unchanged == ports.write
+			and package.loaded["platform.remap.nav_layer"] == NavLayer and getmetatable(NavLayer) == nil
+			and NavLayer.load == ports.load and NavLayer.capture_configured_inputs == ports.observe
+	end
+
+	function ports.invalidate() ports.record = nil end
+
+	--- Prepares optional source facts before the original compiler consumes them.
+	--- The opaque observation is exactly the same Nav.load second return.
+	function ports.prepare(layer, observation, epoch)
+		ports.record = nil
+		if not source_ports_current() or _state == nil or _state.nav_layer ~= layer
+			or _lifecycle_epoch ~= epoch then return nil end
+		local frame = { owner = setmetatable({ _state }, { __mode = "v" }), epoch = epoch,
+			layer = layer, metadata = capture_metadata(), settings = snapshot(_state), eligible = false,
+			enable_transaction = _enabled_transition and _enabled_transition.kind == "enabling"
+				and _state.enabled == false and _enabled_transition or nil }
+		if frame.metadata == nil or frame.settings == nil then return nil end
+		local function owned(expected)
+			local state = frame.owner[1]
+			return source_ports_current() and state ~= nil and _state == state
+				and _lifecycle_epoch == frame.epoch and _state.nav_layer == layer
+				and frame.metadata.current() and equal(expected or frame.settings, snapshot(state))
+		end
+		if not owned() then return nil end
+		local path = resolve_user_config()
+		if type(path) ~= "string" or not owned() then return nil end
+		local called, parsed, status, source = pcall(ports.config, frame.metadata.taps, frame.metadata.combos, path)
+		if not called or not owned() or not equal(frame.settings, snapshot(parsed))
+			or (status ~= "ok" and status ~= "absent") or type(source) ~= "table" or source.path ~= path
+			or source.status ~= status or (status == "ok" and type(source.content) ~= "string") then return nil end
+		local content = source.content
+		local function settings_current()
+			if not owned() then return false end
+			local actual_path = resolve_user_config()
+			if actual_path ~= path or not owned() then return false end
+			local actual, actual_status = ports.read(path)
+			return actual_status == status and actual == content and owned()
+		end
+		if not settings_current() then return nil end
+		local captured, nav = pcall(ports.observe, layer, observation)
+		if not captured or type(nav) ~= "table" or type(nav.codes) ~= "table"
+			or type(nav.current) ~= "function" or type(nav.sealed) ~= "function"
+			or not settings_current() then return nil end
+		frame.codes = {}; for index, code in ipairs(nav.codes) do frame.codes[index] = code end
+		frame.current = function()
+			if ports.record ~= frame or not settings_current() or nav.current() ~= true then return false end
+			return settings_current() and nav.sealed() == true and ports.record == frame
+		end
+		-- This handoff accepts only the original acknowledged save from the exact
+		-- enabling transaction. Later reads validate its candidate; they never
+		-- establish a replacement baseline for a compile made from older settings.
+		frame.commit_enabled = function(transaction, receipt)
+			if ports.record ~= frame or transaction ~= frame.enable_transaction
+				or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+				or transaction.committed ~= true or transaction.file ~= receipt
+				or frame.enable_receipt ~= receipt or type(receipt) ~= "table" or getmetatable(receipt) ~= nil
+				or receipt.path ~= path or type(receipt.candidate) ~= "string"
+				or receipt.verify_absence ~= true or receipt.publication_cleanup ~= nil
+				or type(receipt.source) ~= "table" or getmetatable(receipt.source) ~= nil
+				or receipt.source.status ~= status or receipt.source.content ~= content
+				or frame.settings.enabled ~= false then return false end
+			local expected = {}
+			for name, value in pairs(frame.settings) do expected[name] = value end
+			expected.enabled = true
+			if not owned(expected) or nav.current() ~= true or ports.record ~= frame then return false end
+			local called, parsed, actual_status, actual_source = pcall(ports.config,
+				frame.metadata.taps, frame.metadata.combos, path)
+			if not called or actual_status ~= "ok" or type(actual_source) ~= "table"
+				or actual_source.path ~= path or actual_source.status ~= "ok"
+				or actual_source.content ~= receipt.candidate or not equal(expected, snapshot(parsed))
+				or not owned(expected) or nav.current() ~= true or ports.record ~= frame then return false end
+			content, status, frame.settings = receipt.candidate, "ok", expected
+			return frame.current()
+		end
+		ports.record = frame
+		if not frame.current() then
+			if ports.record == frame then ports.record = nil end
+			return nil
+		end
+		return frame
+	end
+
+	function ports.begin_enable_save(transaction)
+		local frame = ports.record
+		if frame == nil or transaction == nil or frame.enable_transaction ~= transaction
+			or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+			or transaction.committed == true or frame.settings.enabled ~= false then return nil end
+		local called, current = pcall(frame.current)
+		if not called or current ~= true or ports.record ~= frame then return nil end
+		return frame
+	end
+
+	function ports.finish_enable_save(frame, transaction, save, write, accepted, receipt)
+		if frame == nil or ports.record ~= frame or transaction ~= frame.enable_transaction
+			or _enabled_transition ~= transaction or transaction.kind ~= "enabling"
+			or transaction.committed == true or accepted ~= true or receipt ~= transaction.file
+			or save ~= ports.save or write ~= ports.write or not source_ports_current() then return end
+		frame.enable_receipt = receipt
+	end
+
+	function ports.commit_enabled(transaction)
+		local frame = ports.record
+		if frame == nil or frame.enable_transaction ~= transaction then return end
+		local called, accepted = pcall(frame.commit_enabled, transaction, transaction.file)
+		if ports.record == frame and (not called or accepted ~= true) then ports.record = nil end
+	end
+
+	--- Settles only the exact optional preparation after original final admission.
+	function ports.settle(frame, accepted)
+		if frame == nil or ports.record ~= frame then return end
+		local called, current = pcall(frame.current)
+		if ports.record ~= frame then return end
+		if accepted == true and called and current == true then frame.eligible = true
+		else ports.record = nil end
+	end
+
+	--- Returns reservations from the original successful configured compilation.
+	--- Later reads compare the original facts; they never establish a baseline.
+	--- @return table|nil inventory Detached native input codes with a currency join.
+	function M.capture_configured_navigation_inventory()
+		local frame = ports.record
+		if frame == nil or not frame.eligible or not _running or _shutdown_requested
+			or _enabled_preflight or _enabled_transition or _bulk_settings_transaction then return nil end
+		local function current()
+			return ports.record == frame and frame.eligible and _running and not _shutdown_requested
+				and not _enabled_preflight and not _enabled_transition and not _bulk_settings_transaction
+				and frame.current()
+		end
+		if not current() then return nil end
+		local baseline, metadata, enters = frame.settings, frame.metadata, false
+		if baseline.enabled then
+			for _, definition in ipairs(metadata.taps) do
+				local cfg = baseline.tap_hold_config[definition.id] or {}
+				-- Right Command stays generated for Script-Control with Tap-Holds off.
+				if (baseline.tap_holds_enabled or definition.from and definition.from.key_code == "right_command")
+					and (metadata.activators[cfg.tap or "none"] == true or metadata.activators[cfg.hold or "none"] == true) then enters = true end
+			end
+			if baseline.mod_combos_enabled then
+				for _, definition in ipairs(metadata.combos) do
+					local cfg = baseline.mod_combos_config[definition.id] or {}
+					if not definition.menu_hidden and (metadata.activators[cfg.tap or "none"] == true
+						or metadata.activators[cfg.hold or "none"] == true
+						or metadata.activators[cfg.combo or "none"] == true
+							and not (baseline.combo_symmetric and metadata.symmetric_halves[definition.id])) then enters = true end
+				end
+			end
+		end
+		local codes = {}
+		if enters then for index, code in ipairs(frame.codes) do codes[index] = code end end
+		if not current() then return nil end
+		return { codes = codes, current = current }
+	end
+	ports.capture = M.capture_configured_navigation_inventory
+end)(NavigationInventory)
+
 --- Captures one detached, persistence-only settings snapshot.
 --- A parent transaction must never snapshot an enabled/bulk candidate in flight.
 --- @return table|nil snapshot
@@ -5695,6 +5982,8 @@ function M.regenerate(
 	context.attempt_finished = false
 	context.layout_invalidated = false
 	local callback_settled = false
+	local navigation_receipt
+	NavigationInventory.invalidate()
 	local function finish(ok, reason)
 		if callback_settled then return end
 		callback_settled = true
@@ -5714,6 +6003,7 @@ function M.regenerate(
 				context.built_layout_serial
 			)
 		end
+		NavigationInventory.settle(navigation_receipt, ok == true)
 		context:settle(ok == true, reason)
 	end
 	local function fail(reason)
@@ -5845,12 +6135,14 @@ function M.regenerate(
 
 	-- The navigation layer is data: layers.toml is read again for every
 	-- regeneration, so an edited file applies with the next one.
-	local ok_nav, nav_layer = pcall(NavLayer.load)
+	local ok_nav, nav_layer, nav_observation = pcall(NavLayer.load)
 	if not ok_nav then
 		Logger.error(LOG, "The navigation layer could not be read: %s.", tostring(nav_layer))
 		return fail("nav-layer-unavailable")
 	end
 	_state.nav_layer = nav_layer
+	local observed, receipt = pcall(NavigationInventory.prepare, nav_layer, nav_observation, context.epoch)
+	if observed then navigation_receipt = receipt end
 
 	-- The script chords that run now, read like the layer for every build.
 	if _script_chords_source ~= nil then

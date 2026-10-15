@@ -109,3 +109,107 @@ helpers.describe('Mac physical reason transport under production Boolean admissi
   end)
  end
 end)
+
+helpers.describe("Mac configured Navigation preflight input contract", function()
+	for _, slot in ipairs({ "physical_none_KeyJ", "physical_ctrl_KeyJ" }) do
+		helpers.it("nav-configured preflight reserves optional-any input for " .. slot, function()
+			Fixture.run(function(f)
+				local previous = package.loaded["platform.remap"]
+				local captures, rejoins = 0, 0
+				package.loaded["platform.remap"] = { capture_configured_navigation_inventory = function()
+					captures = captures + 1
+					return { codes = { 38 }, current = function() rejoins = rejoins + 1; return true end }
+				end }
+				local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+				local accepted, reason = f.keyboard.validate_physical_edits({
+					{ section = "shortcuts.keyboard", key = slot, value = "send_text" },
+				}, claim)
+				package.loaded["platform.remap"] = previous
+				helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+				helpers.assert_eq(captures, 1, "the consumer must receive its configured owner")
+				helpers.assert_true(rejoins > 0, "the consumed reservation requires a current source join")
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(reason, "collision")
+				helpers.assert_eq(f.files.config, source)
+			end, source)
+		end)
+	end
+
+	helpers.it("nav-configured preflight does not reserve unrelated positions", function()
+		Fixture.run(function(f)
+			local previous = package.loaded["platform.remap"]
+			local captures = 0
+			package.loaded["platform.remap"] = { capture_configured_navigation_inventory = function()
+				captures = captures + 1; return { codes = { 5 }, current = function() return true end }
+			end }
+			local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+			local accepted = f.keyboard.validate_physical_edits(rows, claim)
+			package.loaded["platform.remap"] = previous
+			helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+			helpers.assert_eq(captures, 1)
+			helpers.assert_eq(accepted, true)
+		end, source)
+	end)
+
+	helpers.it("nav-configured preflight refuses a revoked source instead of inventing an empty owner", function()
+		Fixture.run(function(f)
+			local previous = package.loaded["platform.remap"]
+			local rejoins = 0
+			package.loaded["platform.remap"] = { capture_configured_navigation_inventory = function()
+				return { codes = { 38 }, current = function() rejoins = rejoins + 1; return false end }
+			end }
+			local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+			local accepted, reason = f.keyboard.validate_physical_edits(rows, claim)
+			package.loaded["platform.remap"] = previous
+			helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+			helpers.assert_true(rejoins > 0)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(reason, "source_changed")
+		end, source)
+	end)
+
+	helpers.it("nav-configured preflight preserves unavailability from an unobserved owner", function()
+		Fixture.run(function(f)
+			local previous = package.loaded["platform.remap"]
+			package.loaded["platform.remap"] = { capture_configured_navigation_inventory = function() return nil end }
+			local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+			local accepted, reason = f.keyboard.validate_physical_edits(rows, claim)
+			package.loaded["platform.remap"] = previous
+			helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+			helpers.assert_eq(accepted, false)
+			helpers.assert_eq(reason, "unavailable")
+		end, source)
+	end)
+end)
+
+helpers.describe("Mac missing Navigation producer admission", function()
+	for _, collision in ipairs({ false, true }) do
+		helpers.it("nav-configured absent owner " .. (collision and "retains a definite collision" or "refuses an otherwise free input"), function()
+			Fixture.run(function(f)
+				local previous = package.loaded["platform.remap"]
+				package.loaded["platform.remap"] = nil
+				local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+				local accepted, reason = f.keyboard.validate_physical_edits({
+					{ section = "shortcuts.keyboard", key = collision and "physical_ctrl_KeyG" or "physical_none_KeyJ", value = "send_text" },
+				}, claim)
+				package.loaded["platform.remap"] = previous
+				helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+				helpers.assert_eq(accepted, false)
+				helpers.assert_eq(reason, collision and "collision" or "unavailable")
+			end, source)
+		end)
+	end
+	helpers.it("nav-configured absent owner preserves explicit None and removal bypass", function()
+		Fixture.run(function(f)
+			local previous = package.loaded["platform.remap"]; package.loaded["platform.remap"] = nil
+			local claim = {}; helpers.assert_eq(f.keyboard.acquire_physical_publication(claim), true)
+			local accepted = f.keyboard.validate_physical_edits({
+				{ section = "shortcuts.keyboard", key = "physical_none_KeyJ", value = "none" },
+				{ section = "shortcuts.keyboard", key = "physical_ctrl_KeyG", delete = true },
+			}, claim)
+			package.loaded["platform.remap"] = previous
+			helpers.assert_eq(f.keyboard.release_physical_publication(claim), true)
+			helpers.assert_eq(accepted, true)
+		end, source)
+	end)
+end)
