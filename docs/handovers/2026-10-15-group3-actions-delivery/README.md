@@ -55,6 +55,38 @@ the resident stop receipt and every incoming direct-digit case.
   scripted keyboards, controlled native fixtures or portable C. Final combined
   CI/native/packaging/installation remain open.
 
+## Subsequent safe checkpoint
+
+The later complete modeled macOS unit suite on immutable
+`ae27870cc98bdeb903eeca7a3ff1a2061bb15836` passes all **19,991** cases, with
+zero failures and exit0 in1,538.87seconds. All10,312 tracked source images,
+index and HEAD remain exact. This closes the three fixture failures for that
+actual source; it does not erase the earlier failed batch or qualify Darwin.
+
+[Manual run38766625752](https://github.com/adrienm7/ergopti/actions/runs/38766625752)
+validates Windows/Linux on exactly that ae source. Shared Verdict, Linux units,
+Linux E2E and Linux Build pass; Windows units and the seventeen Linux install
+scenarios are still running at this checkpoint. macOS is unselected. No native
+Windows success, final installer success or release is claimed prematurely.
+Raw logs/artifacts currently redirect to an unconfigured storage host and are
+unreceived; detailed hosted counts are not inferred from metadata success.
+The narrow host addition is saved for environment review, not claimed applied.
+
+After the local gate closes, the feature receives fresh dev
+`156e58d9ff0e1df337712cc48593343757d01034`. Its five-path AltGr supplier has
+three AHK preimages exactly matching ae. Independent source review finds no
+concrete conflict: the new source/capture APIs retain original genuinely
+registered KLE callbacks, not physical event, first-press or output proof.
+No callbacks are invoked by this integration. Original native/refusal and
+injected-port withholding guards remain. The ae CI excludes this newer source;
+combined native acceptance stays open rather than borrowing that verdict.
+
+Root's full-save timer repair043fcd6b has both original source/test preimages
+byte-equal to this feature. Its complete registered-child/semantic-seal
+successors have been requested before adoption: the original published meta
+representation has a known source-ratchet failure, so it is not imported as a
+qualified intermediate. Root's release publication boundary remains reserved.
+
 ## Remaining work by TODO
 
 No whole group item is removed; transversal16/38 remain. Item22 stays excluded.

@@ -141,6 +141,17 @@ unset. Inside `AssertThrows` that UnsetError passes whatever the product does.
 Move the loop body into a helper whose closure reads a parameter, or use
 `.Bind()`. `tools/test/test-ahk-loop-capture.cjs` rejects both shapes.
 
+### project-ahk-enclosed-function-identity-needs-local-isolation
+
+Enclosing an existing function can silently turn it into a closure when its
+assigned or loop locals overlap the enclosing owner's locals or statics. A
+function without free variables keeps stable identity, but a capturing function
+is recreated on later owner invocations: an identity roster can reject its own
+genuine registrar and silently withhold the expected source lease. Compare both
+complete local scopes before enclosing legacy code; use distinct owner names or
+explicit child locals, then receive the actual default registrar across owner
+invocations. A no-free-variable language probe cannot qualify a capturing body.
+
 ### project-ahk-settimer-reenters-during-file-io
 
 AHK pumps messages during some blocking file operations. A timer that schedules
