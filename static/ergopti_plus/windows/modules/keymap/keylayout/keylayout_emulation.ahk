@@ -61,9 +61,18 @@ global KLE_DEAD_RESET_KEYS := ["SC00E", "SC001", "SC01C", "SC00F", "SC153",
 
 ; Scan code of AltGr (right Alt); the AltGr level uses it as a prefix key, the
 ; same form as the Ergopti AltGr layer so AHK's variant rules apply to both.
-global KLE_ALTGR_SC := "SC138"
+/** Owns the canonical native AltGr declarations used by both registration paths. */
+_KLE_BindingDeclaration(Name) {
+	switch Name {
+		case "altgr_scan": return "SC138"
+		case "input_level": return "I2"
+	}
+	throw ValueError("Unknown native layout binding declaration.")
+}
 
-global KLE_INPUT_LEVEL := "I2"
+global KLE_ALTGR_SC := _KLE_BindingDeclaration("altgr_scan")
+
+global KLE_INPUT_LEVEL := _KLE_BindingDeclaration("input_level")
 ; Alt chords need a higher input level to keep the application's own Alt
 ; shortcuts, as in the Ergopti emulation.
 global KLE_ALT_INPUT_LEVEL := "I3"
@@ -97,6 +106,8 @@ global _KLE_ResetObserverRegistering := 0
 global _KLE_ResetObserverCohort := 0
 global _KLE_ResetObserverCapture := 0
 global _KLE_ResetObserverGeneration := 0
+
+_KLE_AltGrBindingOwner("initialize")
 
 
 
@@ -675,85 +686,332 @@ _KLE_PendingDeadKeyCriterion(*) {
  */
 KeylayoutEmulation_Register(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
 		BrokerFn := MagicEditorRecordLayoutFallback) {
-	global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
-	global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
-	global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverGeneration
-	global _KLE_ResetObserverCapture
-	if KLE_Registered
-		throw Error("The layout emulation hotkeys are already registered.")
-	if IsObject(_KLE_ResetObserverRegistering) {
-		_KLE_ResetObserverRegistering["invalid"] := true
-		throw Error("Layout emulation registration is already in progress.")
+	return _KLE_AltGrBindingOwner("register", KeycodeTable, HotkeyFn, HotIfFn, ForegroundFn, BrokerFn)
+}
+
+/** Returns the original AltGr binding factory after complete native registration. */
+KeylayoutEmulation_AltGrBindingSource() {
+	return _KLE_AltGrBindingOwner("source")
+}
+
+/** Captures binding metadata only; caller Maps grant no native input authority. */
+KeylayoutEmulation_CaptureAltGrBinding(Source, Scan) {
+	return _KLE_AltGrBindingOwner("capture", Source, Scan)
+}
+
+/** Owns one native registration attempt independently of the loaded layout. */
+_KLE_AltGrBindingOwner(Request, Args*) {
+	global KLE_Registered, KLE_ALTGR_SC, KLE_INPUT_LEVEL, _KLE_ResetObserverRegistering, _SharedDir
+	static Phase := "uninitialized", Factory := 0, Bindings := Map(), Scans := []
+	static OriginalRoot := "", ExpectedScans := [], ExpectedPrefix := "", ExpectedOptions := ""
+	static BindingPrefix := "", Options := "", ActiveCriterion := 0, NativeGuard := 0
+	static ContextReleased := false
+	static NativeCall := Func.Prototype.Call, NativeBind := Func.Prototype.Bind
+	static NativeHotIfFunction := HotIf, NativeHotkeyFunction := Hotkey, NativeCriticalFunction := Critical
+	static Owners := [KeylayoutEmulation_Register, _KLE_RegisterBindings,
+		KeylayoutEmulation_AltGrBindingSource, KeylayoutEmulation_CaptureAltGrBinding,
+		_KLE_AltGrBindingOwner, _KLE_OnAltGr, _KLE_AltGrCriterion,
+		_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
+		_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
+		LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
+		_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+		Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
+
+	OwnersCurrent() {
+		Current := [KeylayoutEmulation_Register, _KLE_RegisterBindings,
+			KeylayoutEmulation_AltGrBindingSource, KeylayoutEmulation_CaptureAltGrBinding,
+			_KLE_AltGrBindingOwner, _KLE_OnAltGr, _KLE_AltGrCriterion,
+			_KLE_BaseCriterion, _KLE_OnKey, _KLE_ShortcutCriterion, _KLE_OnShortcut,
+			_KLE_PendingDeadKeyCriterion, KeylayoutEmulation_ResetDeadKey,
+			LayoutRegistry_Keycodes, _LayoutRegistryReadKeycodes, FSReadStrict, JsonParse, FileExist,
+			_KLE_BindingDeclaration, MagicEditorRecordLayoutFallback,
+			Hotkey, HotIf, Critical, Map.Call, Func.Prototype.Call, Func.Prototype.Bind]
+		for BindingIndex, BindingOwnerFunction in Owners
+			if !(BindingOwnerFunction is Func) || BindingOwnerFunction != Current[BindingIndex]
+					|| Object.Prototype.HasOwnProp.Call(BindingOwnerFunction, "Call")
+					|| Object.Prototype.HasOwnProp.Call(BindingOwnerFunction, "Bind")
+				return false
+		return true
 	}
-	; A failed attempt may leave physical bindings installed. No captured
-	; observer is published until the complete original registration returns.
-	_KLE_ResetObserverCohort := 0, _KLE_ResetObserverCapture := 0
-	_KLE_ResetObserverGeneration += 1
-	if _KLE_ResetObserverGeneration <= 0
-		throw Error("Reset observer registration identity overflowed.")
-	Registration := Map("generation", _KLE_ResetObserverGeneration, "bindings", Map())
-	Guard := Map("invalid", false)
-	ScanCodes := []
-	for Key in KeycodeTable["keys"]
-		ScanCodes.Push(Key["ahk"])
-	Count := 0
-	; HotIf is process-wide: a timer thread registering another layer must not
-	; interleave with this sequence, and the criterion is reset even on a throw.
-	_AtCrit := Critical("On")
-	_KLE_ResetObserverRegistering := Guard
+
+	Plain(Value, Prototype) {
+		if !IsObject(Value) || ObjGetBase(Value) != Prototype
+			return false
+		for BindingName in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	BindingsCurrent() {
+		if Scans.Length == 0 || Bindings.Count != Scans.Length
+			return false
+		for BindingScan in Scans {
+			if !Bindings.Has(BindingScan)
+				return false
+			BindingCallback := Bindings[BindingScan]
+			if !(BindingCallback is BoundFunc) || Object.Prototype.HasOwnProp.Call(BindingCallback, "Call")
+					|| Object.Prototype.HasOwnProp.Call(BindingCallback, "Bind")
+				return false
+		}
+		return true
+	}
+
+	SourceCurrent() {
+		if Phase != "ready"
+			return false
+		if !OwnersCurrent() || !(Factory is BoundFunc)
+				|| Object.Prototype.HasOwnProp.Call(Factory, "Call")
+				|| Object.Prototype.HasOwnProp.Call(Factory, "Bind")
+				|| !(KLE_Registered is Integer) || KLE_Registered != 1
+				|| !BindingsCurrent() {
+			Factory := 0
+			Phase := "failed"
+			return false
+		}
+		return true
+	}
+
+	CaptureOwned(BindingScan) {
+		if !SourceCurrent() || !(BindingScan is String) || !Bindings.Has(BindingScan)
+			return 0
+		return Map("source", Factory, "scan", BindingScan, "prefix", BindingPrefix,
+			"name", BindingPrefix . " & " . BindingScan, "callback", Bindings[BindingScan],
+			"criterion", _KLE_AltGrCriterion, "options", Options, "metadata_only", true)
+	}
+
+	RequireRegistering() {
+		if Phase != "registering" || !OwnersCurrent() || KLE_Registered
+			throw Error("The original AltGr binding registration was withdrawn.")
+		if IsObject(NativeGuard) && (_KLE_ResetObserverRegistering != NativeGuard
+				|| !Plain(NativeGuard, Map.Prototype) || NativeGuard.Get("invalid", true))
+			throw Error("The original layout registration guard was withdrawn.")
+	}
+
+	NativeHotIf(Values*) {
+		; A withdrawn source must still release the original process-wide context.
+		if Values.Length == 0 {
+			NativeCall.Call(NativeHotIfFunction)
+			ActiveCriterion := 0, ContextReleased := true
+			return
+		}
+		RequireRegistering()
+		if !IsObject(NativeGuard) {
+			NativeGuard := _KLE_ResetObserverRegistering
+			if !Plain(NativeGuard, Map.Prototype) || NativeGuard.Get("invalid", true)
+				throw Error("The original layout registration guard is unavailable.")
+		}
+		NativeCall.Call(NativeHotIfFunction, Values*)
+		RequireRegistering()
+		ActiveCriterion := Values.Length ? Values[1] : 0
+		ContextReleased := Values.Length == 0
+	}
+
+	NativeHotkey(BindingName, BindingCallback, InputOptions) {
+		RequireRegistering()
+		NativeCall.Call(NativeHotkeyFunction, BindingName, BindingCallback, InputOptions)
+		RequireRegistering()
+		if ActiveCriterion != _KLE_AltGrCriterion
+			return
+		Position := Bindings.Count + 1
+		if Position > Scans.Length || BindingName != BindingPrefix . " & " . Scans[Position]
+				|| InputOptions != Options || !(BindingCallback is BoundFunc)
+				|| Object.Prototype.HasOwnProp.Call(BindingCallback, "Call")
+			throw Error("The original AltGr slot did not register completely.")
+		Bindings[Scans[Position]] := BindingCallback
+	}
+
+	if !(Request is String)
+		throw TypeError("A layout binding operation is required.")
+	if Request == "initialize" {
+		PreviousCritical := NativeCall.Call(NativeCriticalFunction, "On")
+		try {
+			if Phase != "uninitialized"
+				throw Error("Layout binding ownership is already initialized.")
+			if !OwnersCurrent() || !IsSet(_SharedDir) || !(_SharedDir is String) || _SharedDir == ""
+				throw Error("The original layout binding initialization is unavailable.")
+			OriginalRoot := _SharedDir
+			ExpectedPrefix := NativeCall.Call(_KLE_BindingDeclaration, "altgr_scan")
+			ExpectedOptions := NativeCall.Call(_KLE_BindingDeclaration, "input_level")
+			Phase := "fresh"
+			return true
+		} finally NativeCall.Call(NativeCriticalFunction, PreviousCritical)
+	}
+	if Request == "source"
+		return SourceCurrent() ? Factory : 0
+	if Request == "capture"
+		return Args.Length == 2 && SourceCurrent() && Args[1] is BoundFunc && Args[1] == Factory
+			? CaptureOwned(Args[2]) : 0
+	if Request != "register" || Args.Length != 5
+		throw ValueError("The layout binding operation is invalid.")
+	PreviousCritical := NativeCall.Call(NativeCriticalFunction, "On")
 	try {
-		for Sc in ScanCodes {
-			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false, ForegroundFn))
-			HotkeyFn.Call(Sc, _KLE_OnKey.Bind(Sc, false), KLE_INPUT_LEVEL)
-			HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, true, ForegroundFn))
-			HotkeyFn.Call("+" . Sc, _KLE_OnKey.Bind(Sc, true), KLE_INPUT_LEVEL)
-			Count += 2
-			if KLE_NATIVE_CHORD_KEYS.Has(Sc)
-				continue
-			HotIfFn.Call(_KLE_ShortcutCriterion)
-			for Prefix in KLE_SHORTCUT_PREFIXES {
-				Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
-				if Prefix == "#"
-					BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), _KLE_ShortcutCriterion)
-				else
-					HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
+		if Phase == "uninitialized"
+			throw Error("Layout binding ownership has not been initialized.")
+		if Phase == "preflight" || Phase == "registering" {
+			Phase := "failed"
+			throw Error("Layout binding registration was reentered.")
+		}
+		if Phase == "ready"
+			SourceCurrent()
+		DelegateLegacy := KLE_Registered || Phase != "fresh"
+		if !DelegateLegacy
+			Phase := "preflight"
+	} finally NativeCall.Call(NativeCriticalFunction, PreviousCritical)
+	if DelegateLegacy
+		return NativeCall.Call(_KLE_RegisterBindings, Args*)
+	try {
+		; Injected ports retain their old controlled behavior without source issuance.
+		if !OwnersCurrent() || Args[2] != Hotkey || Args[3] != HotIf
+				|| !(Args[4] is Integer) || Args[4] != 0 || Args[5] != MagicEditorRecordLayoutFallback {
+			Phase := "failed"
+			return NativeCall.Call(_KLE_RegisterBindings, Args*)
+		}
+		if !(KLE_ALTGR_SC is String) || KLE_ALTGR_SC != ExpectedPrefix
+				|| !(KLE_INPUT_LEVEL is String) || KLE_INPUT_LEVEL != ExpectedOptions
+			throw ValueError("The original AltGr binding declarations were replaced.")
+		; Read the original shared file through its retained owner and root, ignoring
+		; the replaceable public registry cache. No private inventory is exported.
+		Canonical := NativeCall.Call(_LayoutRegistryReadKeycodes, OriginalRoot)
+		if Phase != "preflight" || !OwnersCurrent()
+			throw Error("Layout binding preflight was withdrawn.")
+		if !Plain(Canonical, Map.Prototype) || !Canonical.Has("keys")
+				|| !Plain(Canonical["keys"], Array.Prototype) || Canonical["keys"].Length == 0
+			throw ValueError("The original layout keycode source is malformed.")
+		Seen := Map()
+		for BindingKey in Canonical["keys"] {
+			if !Plain(BindingKey, Map.Prototype) || !BindingKey.Has("ahk") || !(BindingKey["ahk"] is String)
+					|| !RegExMatch(BindingKey["ahk"], "^SC[0-9A-F]{3}$") || Seen.Has(BindingKey["ahk"])
+				throw ValueError("The original layout keycode source is malformed.")
+			Seen[BindingKey["ahk"]] := true
+			ExpectedScans.Push(BindingKey["ahk"])
+		}
+		Table := Args[1]
+		if !Plain(Table, Map.Prototype) || !Table.Has("keys") || !Plain(Table["keys"], Array.Prototype)
+				|| Table["keys"].Length != ExpectedScans.Length
+			throw ValueError("The supplied layout keycode inventory is not complete.")
+		for BindingIndex, BindingKey in Table["keys"] {
+			if !Plain(BindingKey, Map.Prototype) || !BindingKey.Has("ahk") || !(BindingKey["ahk"] is String)
+					|| BindingKey["ahk"] != ExpectedScans[BindingIndex]
+				throw ValueError("The supplied layout keycode inventory was replaced.")
+			Scans.Push(ExpectedScans[BindingIndex])
+		}
+		PreviousCritical := NativeCall.Call(NativeCriticalFunction, "On")
+		try {
+			if Phase != "preflight" || !OwnersCurrent()
+				throw Error("Layout binding preflight cannot adopt a reentered attempt.")
+			BindingPrefix := ExpectedPrefix, Options := ExpectedOptions
+			Phase := "registering"
+		} finally NativeCall.Call(NativeCriticalFunction, PreviousCritical)
+	} catch as Err {
+		Phase := "failed"
+		throw Err
+	}
+	try {
+		BindingResult := NativeCall.Call(_KLE_RegisterBindings, Table,
+			NativeBind.Call(NativeHotkey), NativeBind.Call(NativeHotIf), 0, Args[5])
+		PreviousCritical := NativeCall.Call(NativeCriticalFunction, "On")
+		try {
+			if Phase != "registering" || !OwnersCurrent() || !ContextReleased
+					|| !BindingsCurrent() || !(KLE_Registered is Integer) || KLE_Registered != 1
+				throw Error("The original AltGr binding source did not complete.")
+			Factory := NativeBind.Call(CaptureOwned)
+			Phase := "ready"
+		} finally NativeCall.Call(NativeCriticalFunction, PreviousCritical)
+	} catch as Err {
+		Factory := 0
+		Phase := "failed"
+		throw Err
+	}
+	if !SourceCurrent()
+		throw Error("The original AltGr binding source was withdrawn before publication.")
+	return BindingResult
+
+	; The effectful body is lexical: no public alternate registration can bypass ownership.
+	_KLE_RegisterBindings(KeycodeTable, HotkeyFn := Hotkey, HotIfFn := HotIf, ForegroundFn := 0,
+			BrokerFn := MagicEditorRecordLayoutFallback) {
+		local Count
+		global KLE_Registered, KLE_SHORTCUT_PREFIXES, KLE_NATIVE_CHORD_KEYS
+		global KLE_DEAD_RESET_KEYS, KLE_ALTGR_SC, KLE_INPUT_LEVEL, KLE_ALT_INPUT_LEVEL
+		global _KLE_ResetObserverRegistering, _KLE_ResetObserverCohort, _KLE_ResetObserverGeneration
+		global _KLE_ResetObserverCapture
+		if KLE_Registered
+			throw Error("The layout emulation hotkeys are already registered.")
+		if IsObject(_KLE_ResetObserverRegistering) {
+			_KLE_ResetObserverRegistering["invalid"] := true
+			throw Error("Layout emulation registration is already in progress.")
+		}
+		; A failed attempt may leave physical bindings installed. No captured
+		; observer is published until the complete original registration returns.
+		_KLE_ResetObserverCohort := 0, _KLE_ResetObserverCapture := 0
+		_KLE_ResetObserverGeneration += 1
+		if _KLE_ResetObserverGeneration <= 0
+			throw Error("Reset observer registration identity overflowed.")
+		Registration := Map("generation", _KLE_ResetObserverGeneration, "bindings", Map())
+		Guard := Map("invalid", false)
+		ScanCodes := []
+		for Key in KeycodeTable["keys"]
+			ScanCodes.Push(Key["ahk"])
+		Count := 0
+		; HotIf is process-wide: a timer thread registering another layer must not
+		; interleave with this sequence, and the criterion is reset even on a throw.
+		_AtCrit := Critical("On")
+		_KLE_ResetObserverRegistering := Guard
+		try {
+			for Sc in ScanCodes {
+				HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, false, ForegroundFn))
+				HotkeyFn.Call(Sc, _KLE_OnKey.Bind(Sc, false), KLE_INPUT_LEVEL)
+				HotIfFn.Call(_KLE_BaseCriterion.Bind(Sc, true, ForegroundFn))
+				HotkeyFn.Call("+" . Sc, _KLE_OnKey.Bind(Sc, true), KLE_INPUT_LEVEL)
+				Count += 2
+				if KLE_NATIVE_CHORD_KEYS.Has(Sc)
+					continue
+				HotIfFn.Call(_KLE_ShortcutCriterion)
+				for Prefix in KLE_SHORTCUT_PREFIXES {
+					Level := (SubStr(Prefix, 1, 1) == "!") ? KLE_ALT_INPUT_LEVEL : KLE_INPUT_LEVEL
+					if Prefix == "#"
+						BrokerFn.Call(Sc, _KLE_OnShortcut.Bind(Sc, Prefix), _KLE_ShortcutCriterion)
+					else
+						HotkeyFn.Call(Prefix . Sc, _KLE_OnShortcut.Bind(Sc, Prefix), Level)
+					Count += 1
+				}
+			}
+			HotIfFn.Call(_KLE_AltGrCriterion)
+			for Sc in ScanCodes {
+				HotkeyFn.Call(KLE_ALTGR_SC . " & " . Sc, _KLE_OnAltGr.Bind(Sc), KLE_INPUT_LEVEL)
 				Count += 1
 			}
-		}
-		HotIfFn.Call(_KLE_AltGrCriterion)
-		for Sc in ScanCodes {
-			HotkeyFn.Call(KLE_ALTGR_SC . " & " . Sc, _KLE_OnAltGr.Bind(Sc), KLE_INPUT_LEVEL)
-			Count += 1
-		}
-		ResetCriterion := _KLE_PendingDeadKeyCriterion
-		HotIfFn.Call(ResetCriterion)
-		for Key in KLE_DEAD_RESET_KEYS {
-			Binding := Map("scan", Key, "name", "~" . Key,
-				"callback", KeylayoutEmulation_ResetDeadKey,
-				"criterion", ResetCriterion, "options", KLE_INPUT_LEVEL)
-			HotkeyFn.Call(Binding["name"], Binding["callback"], Binding["options"])
-			Registration["bindings"][Key] := Binding
-			Count += 1
-		}
-	} finally {
-		try HotIfFn.Call()
-		finally {
-			try Critical(_AtCrit)
+			ResetCriterion := _KLE_PendingDeadKeyCriterion
+			HotIfFn.Call(ResetCriterion)
+			for Key in KLE_DEAD_RESET_KEYS {
+				Binding := Map("scan", Key, "name", "~" . Key,
+					"callback", KeylayoutEmulation_ResetDeadKey,
+					"criterion", ResetCriterion, "options", KLE_INPUT_LEVEL)
+				HotkeyFn.Call(Binding["name"], Binding["callback"], Binding["options"])
+				Registration["bindings"][Key] := Binding
+				Count += 1
+			}
+		} finally {
+			try HotIfFn.Call()
 			finally {
-				if _KLE_ResetObserverRegistering != Guard
-					Guard["invalid"] := true
-				_KLE_ResetObserverRegistering := 0
+				try Critical(_AtCrit)
+				finally {
+					if _KLE_ResetObserverRegistering != Guard
+						Guard["invalid"] := true
+					_KLE_ResetObserverRegistering := 0
+				}
 			}
 		}
+		KLE_Registered := true
+		if !Guard["invalid"] && Registration["bindings"].Count == KLE_DEAD_RESET_KEYS.Length {
+			_KLE_ResetObserverCohort := Registration
+			_KLE_ResetObserverCapture := _KLE_CaptureResetObserverOwned.Bind(Registration,
+				Registration["bindings"], Registration["bindings"].Clone(), _KLE_ResetObserverGeneration)
+		}
+		return Count
 	}
-	KLE_Registered := true
-	if !Guard["invalid"] && Registration["bindings"].Count == KLE_DEAD_RESET_KEYS.Length {
-		_KLE_ResetObserverCohort := Registration
-		_KLE_ResetObserverCapture := _KLE_CaptureResetObserverOwned.Bind(Registration,
-			Registration["bindings"], Registration["bindings"].Clone(), _KLE_ResetObserverGeneration)
-	}
-	return Count
 }
+
+
 
 
 
