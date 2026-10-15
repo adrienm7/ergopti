@@ -94,6 +94,35 @@ class ManagedHTTPTransport(httpx.BaseTransport):
             with self.lock:
                 if self.closed:
                     raise httpx.ConnectError("Managed network transport is closed", request=request)
+                deadline = request.extensions.get("ergopti_native_deadline")
+                remaining = None
+                if deadline is not None:
+                    if not Native._positive_timeout(deadline):
+                        raise httpx.ReadTimeout(
+                            "Managed network deadline is invalid", request=request
+                        )
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise httpx.ReadTimeout(
+                            "Managed network deadline is exhausted", request=request
+                        )
+                timeouts = request.extensions.get("timeout", {})
+                if not isinstance(timeouts, dict):
+                    raise httpx.ReadTimeout("Managed network timeout is invalid", request=request)
+                timeouts = dict(timeouts)
+                for operation in ("connect", "read", "write", "pool"):
+                    value = timeouts.get(operation)
+                    if value is None:
+                        value = self.idle_timeout
+                    elif not Native._positive_timeout(value):
+                        raise httpx.ReadTimeout(
+                            "Managed network timeout is invalid", request=request
+                        )
+                    timeouts[operation] = value if remaining is None else min(value, remaining)
+                # The HF client deliberately has no overall HTTPX timeout. Retain
+                # its admitted idle bound on explicit relays before holding shutdown
+                # admission across headers. Copy rather than alter a caller's map.
+                request.extensions["timeout"] = timeouts
                 transport = self.explicit.get(relay)
                 if transport is None:
                     if len(self.explicit) >= self.policy.maximum_selections:
@@ -107,7 +136,9 @@ class ManagedHTTPTransport(httpx.BaseTransport):
                             "Managed network relay is unavailable", request=request
                         ) from None
                     self.explicit[relay] = transport
-            return transport.handle_request(request)
+                # Serialize relay acquisition with shutdown, just as for the
+                # native child: a closed pool can acquire a new connection.
+                return transport.handle_request(request)
         # GET and HEAD are the actual locked HF snapshot operations. Uploads
         # and non-replayable bodies never silently acquire another transport.
         if request.method not in ("GET", "HEAD"):
@@ -117,9 +148,6 @@ class ManagedHTTPTransport(httpx.BaseTransport):
         deadline = request.extensions.get("ergopti_native_deadline")
         if deadline is not None and not Native._positive_timeout(deadline):
             raise httpx.ReadTimeout("Managed network deadline is invalid", request=request)
-        timeout = None if deadline is None else deadline - time.monotonic()
-        if timeout is not None and timeout <= 0:
-            raise httpx.ReadTimeout("Managed network deadline is exhausted", request=request)
         timeouts = request.extensions.get("timeout", {})
         idle = timeouts.get("read") if isinstance(timeouts, dict) else None
         if idle is None:
@@ -137,6 +165,9 @@ class ManagedHTTPTransport(httpx.BaseTransport):
                 raise httpx.ConnectError("Managed network transport is closed", request=request)
             # Serialize construction with close: shutdown cannot return while
             # an unregistered physical native child is awaiting its headers.
+            timeout = None if deadline is None else deadline - time.monotonic()
+            if timeout is not None and timeout <= 0:
+                raise httpx.ReadTimeout("Managed network deadline is exhausted", request=request)
             try:
                 response = Native.open_request(
                     str(request.url), headers, request.method, timeout, idle, mode == "direct"

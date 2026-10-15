@@ -146,7 +146,7 @@ function renderCask(tag, sha256, assetName = ASSET_NAME) {
 		'  # A running app loads its Lua files from the bundle: it is quit before the',
 		'  # bundle is replaced, and relaunched after an upgrade if it was running.',
 		'  uninstall_preflight do',
-		`    running = system_command("/usr/bin/pgrep", args: ["-f", "/${APP_NAME}/Contents/"],`,
+		`    running = system_command("/usr/bin/pgrep", args: ["-f", "/${APP_NAME.replaceAll('.', '[.]')}/Contents/"],`,
 		'                                               must_succeed: false).success?',
 		'    if running',
 		`      FileUtils.mkdir_p(File.dirname("${RELAUNCH_MARKER}"))`,

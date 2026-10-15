@@ -1,0 +1,86 @@
+{
+	"kind": "container-retirement-source-custody",
+	"feature_head": "9a2430abbb380a31d1ed87c80f3b2ed6c45bed08",
+	"dev_received": "156e58d9ff0e1df337712cc48593343757d01034",
+	"runtime_proposals_activated": false,
+	"raw_logs_or_credentials": false,
+	"payloads": [
+		{
+			"path": "proposals/macos-diagnostic-six-paths.tar.gz",
+			"bytes": 191718,
+			"sha256": "242b1107dc6db7fe2b7ac7d7c89aeda2dcf4b98f880bc50adfd122d38df63e63"
+		},
+		{
+			"path": "proposals/windows-root-native-api-reference.tar.gz",
+			"bytes": 14655,
+			"sha256": "1d99a70507f9c71173c713b4863ff776bd9d1591ace1b6fb096b8d03071f8530"
+		},
+		{
+			"path": "proposals/windows-inactive-source-bridge.tar.gz",
+			"bytes": 5620,
+			"sha256": "041df810733310ab3d598729c02dbd158bad7e68305920363aa67a96055c9633"
+		},
+		{
+			"path": "causal/withdraw-stage-output.patch",
+			"bytes": 451,
+			"sha256": "a8f67c49be5959364623c302cfb53ff6f2a23c9c1813b760b5b8ff0e37c05fff"
+		},
+		{
+			"path": "causal/withdraw-class-scope.patch",
+			"bytes": 3849,
+			"sha256": "aac0e8d09f79bcb6d3dea93fd713f6ebec91651d1a70d09c7b10eb5200d5da2a"
+		},
+		{
+			"path": "causal/class-scope-controls.cjs.source",
+			"bytes": 5467,
+			"sha256": "d507ec64358edd5658346feefade1b57b13ba762076f330454210dba71f96eed"
+		},
+		{
+			"path": "receipts/feature-37c-portable.json",
+			"bytes": 940,
+			"sha256": "d099541739a3ab20718ce84af9b0325602e6d28a3b331b2d34508957afdf996a",
+			"original_source_sha256": "541f30f450857cabd8a9afa1518594c4ae713d6785c7a25239d8650dcd79c6b9",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		},
+		{
+			"path": "receipts/feature-9a-portable.json",
+			"bytes": 2204,
+			"sha256": "ebad3cb9a0438019490594389dfe2a70480bcd584f66f526825c549890477742",
+			"original_source_sha256": "c8f22c38f58cf182947f92d758dab6e8ffdf290633f556f390cc452af5de9087",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		},
+		{
+			"path": "receipts/ruby-four-casks.json",
+			"bytes": 1125,
+			"sha256": "0609674911b5d81c23cb0bd0061ad14c84d3d23879ab5778c669fd52228b1bdb",
+			"original_source_sha256": "2b8ab15ad6b2d8dac5ec35c4d5a2cbdc2741b55fcb5e0e9df9c2d9436b676b89",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		},
+		{
+			"path": "receipts/previous-owned-branch-cleanup.json",
+			"bytes": 2020,
+			"sha256": "3fb83c7efd0ed2e0ac3bf8186feacf5253ea6f8390cea9a098694790ea78a54b",
+			"original_source_sha256": "d0649e91e242ef9ad5d5d833fcc13db15be2ad8afd69c53c4c173f64d031ab17",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		},
+		{
+			"path": "setup/authenticated-ruby-source.tar.gz",
+			"bytes": 3321,
+			"sha256": "e030016684babf1c202d2ff5f298b0d27f14e50f653685a54afb114322fa9eda"
+		},
+		{
+			"path": "receipts/root305d-original-435.json",
+			"bytes": 4390,
+			"sha256": "040f795ae2a8067c735828f541b25e5ad90a3188c6036bd65a0b5c38e05a5794",
+			"original_source_sha256": "c054349e74d9effe1bf7cab089f18ab37227c82d043efcb1916a40a0df6c8a14",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		},
+		{
+			"path": "receipts/root305d-two-guards.json",
+			"bytes": 2364,
+			"sha256": "5bd622b8ff4173b0442c9f2d62e5c03156c532c1097b2476859f0eea576a66c3",
+			"original_source_sha256": "5e4cafbf884020d2e69637d199808dac37f4146453e69a6f3260b3bf0261b33f",
+			"representation": "repository-formatted closed JSON; source facts unchanged"
+		}
+	]
+}
