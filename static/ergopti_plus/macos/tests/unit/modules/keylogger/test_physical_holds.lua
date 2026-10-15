@@ -365,3 +365,144 @@ helpers.describe("matched physical hold delivery", function()
 		end
 	end)
 end)
+
+local function media_hold_policy()
+	local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local text = file:read("*a"); assert(file:close())
+	return require("keylogger.media_identity").new(require("json").decode(text))
+end
+
+--- Builds a semantic media receiver with genuine baseline, clock and interval owners.
+--- Native transport/input and wall-clock formatting are explicit fixture ports.
+local function media_hold_fixture(change)
+	local policy = media_hold_policy()
+	local observed = { presses = {}, releases = {}, numeric = {}, aggregates = { presses = {}, holds = {} } }
+	local frames = Frames.new("media", "8", { { id = "41", keyboard = false,
+		keys = { { page = 12, usage = 205, cookie = 1 }, { page = 12, usage = 181, cookie = 2 } } } })
+	local convert = Clock.new({ version = 1, domain = "mach_absolute_time", numer = 1, denom = 1 })
+	local history = Context.new(8, function() return ORIGINAL_DATE end)
+	history.observe(0, { allowed = true, app = "Original", epoch = 1000 })
+	local dependencies = { batch_limit = 16,
+		admit = function(frame) return frame.incarnation .. "/" .. frame.lease end,
+		keycode = require("modules.keylogger.physical_key_identity").resolve,
+		context = function(ticks) return history.resolve(convert(ticks)) end,
+		emit = function(entry) observed.numeric[#observed.numeric + 1] = entry; return true end,
+		holds = { convert = convert,
+			context = function(first, last) return history.resolve_interval(convert(first), convert(last)) end,
+			emit = function(entry) observed.numeric[#observed.numeric + 1] = entry; return true end,
+		},
+		media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+			emit = function(press)
+				observed.presses[#observed.presses + 1] = copy(press)
+				policy.aggregate_press(observed.aggregates.presses, press)
+				return true
+			end,
+			emit_release = function(release)
+				observed.releases[#observed.releases + 1] = copy(release)
+				policy.aggregate_hold(observed.aggregates.holds, release, 150)
+				return true
+			end,
+		},
+	}
+	if change then change(dependencies, policy, observed) end
+	local receiver = Delivery.new(dependencies)
+	local function media_row(sequence, ticks, down, cookie, usage)
+		return { sequence = tostring(sequence), timestamp = tostring(ticks), value = down and "1" or "0",
+			device = "41", has_page = true, has_usage = true, page = 12, usage = usage or 205,
+			has_cookie = true, cookie = cookie or 1 }
+	end
+	local function media_batch(records)
+		return { version = 1, kind = "batch", incarnation = "media", lease = "8", coverage = "fixture_only", records = records }
+	end
+	Frames.start(receiver, frames)
+	return { receiver = receiver, observed = observed, history = history, row = media_row, batch = media_batch }
+end
+
+helpers.describe("matched semantic media holds", function()
+	helpers.it("keeps original press identity/application/date through a later focus and catalogue change", function()
+		local assigned = "media.play_pause"
+		local f = media_hold_fixture(function(dependencies)
+			dependencies.media.resolve = function() return assigned end
+		end)
+		f.receiver.deliver(f.batch({ f.row(1, 1000000000, true) }))
+		assigned = "media.next_track"
+		f.history.observe(1100000000, { allowed = true, app = "OtherApp", epoch = 5000 })
+		f.receiver.deliver(f.batch({ f.row(2, 1255000000, false) }))
+		helpers.assert_eq(f.observed.presses, { { capture = "media/8", device = "41", media_id = "media.play_pause",
+			app = "Original", timestamp = ORIGINAL_DATE } })
+		helpers.assert_eq(f.observed.releases, { { capture = "media/8", device = "41", media_id = "media.play_pause",
+			app = "Original", timestamp = ORIGINAL_DATE, hold_ms = 255 } })
+		helpers.assert_eq(f.observed.numeric, {})
+		helpers.assert_eq(f.observed.aggregates.presses["2026-10-04\1Original\1media.play_pause"].count, 1)
+		helpers.assert_eq(f.observed.aggregates.holds["2026-10-04\1Original\1media.play_pause"], {
+			date = "2026-10-04", app = "Original", media_id = "media.play_pause", sum_ms = 255,
+			count = 1, max_ms = 255, tap_count = 0, hold_count = 1,
+		})
+	end)
+
+	helpers.it("cancels the whole media duration across an excluded interval and retires its release once", function()
+		local f = media_hold_fixture()
+		f.receiver.deliver(f.batch({ f.row(1, 1000000000, true) }))
+		f.history.observe(1100000000, { allowed = false, app = "Excluded", epoch = 2000 })
+		f.history.observe(1200000000, { allowed = true, app = "Resumed", epoch = 3000 })
+		f.receiver.deliver(f.batch({ f.row(2, 1255000000, false), f.row(3, 1256000000, false) }))
+		helpers.assert_eq(#f.observed.presses, 1)
+		helpers.assert_eq(f.observed.releases, {})
+		helpers.assert_eq(f.observed.aggregates.holds, {})
+		helpers.assert_eq(f.receiver.uncounted(), {})
+	end)
+
+	helpers.it("matches each media element independently while autorepeat adds no press or duration", function()
+		local f = media_hold_fixture()
+		f.receiver.deliver(f.batch({ f.row(1, 1000000000, true), f.row(2, 1010000000, true),
+			f.row(3, 1020000000, true, 2, 181), f.row(4, 1150000000, false), f.row(5, 1221000000, false, 2, 181) }))
+		helpers.assert_eq(#f.observed.presses, 2)
+		helpers.assert_eq(#f.observed.releases, 2)
+		helpers.assert_eq(f.observed.releases[1].hold_ms, 150)
+		helpers.assert_eq(f.observed.releases[2].hold_ms, 201)
+		helpers.assert_eq(f.observed.releases[1].media_id, "media.play_pause")
+		helpers.assert_eq(f.observed.releases[2].media_id, "media.next_track")
+		helpers.assert_eq(f.observed.numeric, {})
+	end)
+
+	for _, refused in ipairs({ false, "accepted" }) do
+		helpers.it("refuses unacknowledged media release " .. tostring(refused), function()
+			local f = media_hold_fixture(function(dependencies)
+				dependencies.media.emit_release = function() return refused end
+			end)
+			f.receiver.deliver(f.batch({ f.row(1, 1000000000, true) }))
+			rejects(function() f.receiver.deliver(f.batch({ f.row(2, 1150000000, false) })) end,
+				"Physical sink refused the release")
+			helpers.assert_eq(f.receiver.active(), false)
+		end)
+	end
+
+	helpers.it("requires a distinct media release sink before an enabled hold owner exists", function()
+		rejects(function() media_hold_fixture(function(dependencies) dependencies.media.emit_release = nil end) end,
+			"Missing semantic media release port")
+	end)
+
+	helpers.it("snapshots the caller's explicit media capture ports before opening any task", function()
+		with_capture(function(capture, observed, controls)
+			local policy, seen = media_hold_policy(), {}
+			controls.dependencies.media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+				emit = function(press) seen[#seen + 1] = press; return true end,
+				emit_release = function(release) seen[#seen + 1] = release; return true end }
+			helpers.assert_true(capture.init(controls.dependencies))
+			controls.dependencies.media.resolve = function() error("The caller's changed resolver cannot replace the source snapshot") end
+			controls.dependencies.media.emit = function() error("The caller's changed sink cannot replace the source snapshot") end
+			local replacement = Frames.new("production-fixture", "7", { { id = "41", keyboard = false,
+				keys = { { page = 12, usage = 205, cookie = 1 } } } })
+			for name, frame in pairs(replacement) do frame.coverage = "complete"; controls.frames[name] = frame end
+			controls.frames.media = { version = 1, kind = "batch", incarnation = "production-fixture", lease = "7",
+				coverage = "complete", records = { { sequence = "1", device = "41", timestamp = "24000000",
+					has_page = true, page = 12, has_usage = true, usage = 205, value = "1", has_cookie = true, cookie = 1 } } }
+			helpers.assert_true(capture.start(controls.options)); controls.verified(); controls.open()
+			observed.tasks[3].chunk(nil, "media\n")
+			helpers.assert_eq(#seen, 1)
+			helpers.assert_eq(seen[1].media_id, "media.play_pause")
+			helpers.assert_nil(seen[1].keycode)
+			helpers.assert_eq(observed.credits, {})
+		end)
+	end)
+end)

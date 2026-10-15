@@ -1,0 +1,46 @@
+// Sources/ErgoptiPlus/OwnedVirtualHIDDriverPublicationReference.swift
+import Foundation
+enum OwnedVirtualHIDDriverPublicationReference {
+ static let serviceLabel = "org.pqrs.service.daemon.Karabiner-VirtualHIDDevice-Daemon"
+ static let servicePlistBytes = 653
+ static let servicePlistSHA256 = "4431ec6b5d220004bfa947cb9c069de34365b5ec4f5fd0cf674a74c8e7923659"
+ static let entries: [String: (directory: Bool, bytes: Int, hash: String)] = [
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/_CodeSignature": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/_CodeSignature/CodeResources": (false, 2585, "c541af24a376259cd600371fd60911d2bd26765af00013c4078ee66eb0aa164c"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/embedded.provisionprofile": (false, 13383, "c38ad42248a52500e819a9b001c0e56f464bfb95935758db53f10e3fbc2bbc34"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/Info.plist": (false, 1557, "0fb5e8877dbbf929dd5fb8f1cfce7fe737971bf355c39d29a4fc5c7c44e05f99"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/Resources": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/Resources/app.icns": (false, 317132, "a04f2c5b8a37caa88fec8b80d50d2459596df50273c5b406bba3bacf302bb032"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/PkgInfo": (false, 8, "82502191c9484b04d685374f9879a0066069c49b8acae7a04b01d38d07e8eca0"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon": (false, 3452416, "9620bd06cbbfbd377689fb5a0ba2f1e1bd346effe089fe49a083d7963f1a76ab"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/_CodeSignature": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/_CodeSignature/CodeResources": (false, 3485, "27a82fb67a2a81adf149d3984a2cf32eb79312ad8dce1c34a212bd236ce7699d"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/_CodeSignature": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/_CodeSignature/CodeResources": (false, 2042, "f0deee2ab5184793a169caaed6be5d6280f70cf928c8905a71cfaaa229a33f78"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/embedded.provisionprofile": (false, 13551, "f00794ba8d3b24c8596b5662d7c32812cef7746f54cbfa983f19a235a7ced14c"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/._embedded.provisionprofile": (false, 491, "89f1cecc2e5c5a8451a0482c6a55b11ffc6361d2374ca5878c10132a2d206c62"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/Info.plist": (false, 1409, "60863adaa1ffe6b1c954df12dac7b563933389803752d44df24c788a8620b0db"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Library/SystemExtensions/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice.dext/org.pqrs.Karabiner-DriverKit-VirtualHIDDevice": (false, 295984, "1ad5457b892121eff4b9ecedd0528af0e6ea82928827ad76fb7c5b9c247c0b6e"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/embedded.provisionprofile": (false, 12556, "966896faffd9bb1b6a839e63bef6e8d4c3b8c35eb1c0ccd528e2e311762178da"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/._embedded.provisionprofile": (false, 579, "31187b1fd98223fdbf4bdc8d46fb86da52ec03591de2e4f71275a7cec5aea14e"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Info.plist": (false, 1560, "6c32907dabb6a45ef30b5e0ba943afc70a022e4be29ed6784e02d35ce4845f29"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Resources": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/Resources/app.icns": (false, 888867, "2160478d48b3e91c134dfc2c6c376d5481b3ae2c360ff4c82d8c7258846fdf10"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/PkgInfo": (false, 8, "82502191c9484b04d685374f9879a0066069c49b8acae7a04b01d38d07e8eca0"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS": (true, 0, "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"),
+  "Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager": (false, 320768, "171adc21108409a8164a38df19e3a8191b240074b4db9b40063d5b1ac03ba19e"),
+ ]
+ static let manager = "/Applications/.Karabiner-VirtualHIDDevice-Manager.app"
+ static let daemon = "/Library/Application Support/org.pqrs/Karabiner-DriverKit-VirtualHIDDevice/Applications/Karabiner-VirtualHIDDevice-Daemon.app"
+ static let daemonExecutable = daemon + "/Contents/MacOS/Karabiner-VirtualHIDDevice-Daemon"
+ static let originalStockServicePlist = "/Library/Application Support/org.pqrs/Karabiner-Elements/Karabiner-Elements Privileged Daemons v2.app/Contents/Library/LaunchDaemons/" + serviceLabel + ".plist"
+ static let servicePlist = "/Library/LaunchDaemons/" + serviceLabel + ".plist"
+}

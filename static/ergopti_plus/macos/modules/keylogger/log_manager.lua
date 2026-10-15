@@ -776,6 +776,33 @@ function M.log_physical_release(release)
 	return M.append_log(entry)
 end
 
+--- Queues one admitted media event with an exact FIFO ownership acknowledgement.
+--- Durable acceptance is independently handled by the retained ingest transaction.
+---@param action string physical_media_press or physical_media_release.
+---@param row table Captured original identity and matched hold metadata.
+---@return boolean accepted
+function M.log_physical_media(action, row)
+	if not _require_state("log_physical_media") then return false end
+	if not _physical_sink_active then return false end
+	local generation = _physical_sink_generation
+	assert(type(row) == "table" and getmetatable(row) == nil, "Invalid physical media event")
+	assert(type(row.timestamp) == "string"
+		and row.timestamp:match("^%d%d%d%d%-%d%d%-%d%d %d%d:%d%d:%d%d%.%d%d%d$"),
+		"Invalid original physical media timestamp")
+	PhysicalWire.decimal(row.device, true)
+	local store = require("keylogger.media_store")
+	local batch = require("keylogger.aggregator_helpers").new_batch()
+	local entry = { type = "system_event", action = action }
+	for _, name in ipairs({ "timestamp", "capture", "device", "app", "media_id", "hold_ms", "keycode", "scancode" }) do
+		entry[name] = row[name]
+	end
+	local core = require("modules.keylogger.aggregator.core")
+	store.replay(core.media_policy(), batch, { entry }, core.HOLD_THRESHOLD_MS)
+	if not _physical_sink_active or _physical_sink_generation ~= generation
+		or PhysicalAccounting.admitted_capture() ~= entry.capture then return false end
+	return M.append_log(entry)
+end
+
 function M.log_shortcut(shortcut_key, app_name)
 	if not _require_state("log_shortcut") then return end
 	if type(shortcut_key) ~= "string" or shortcut_key == "" then return end
@@ -927,7 +954,7 @@ local DERIVED_DEVICE_TABLES = {
 	"ngram_chars", "ngram_bigrams", "ngram_trigrams", "ngram_quadgrams",
 	"ngram_pentagrams", "ngram_hexagrams", "ngram_heptagrams", "ngram_words",
 	"ngram_word_bigrams", "ngram_shortcuts", "ngram_shortcut_bigrams",
-	"ngram_keycodes", "ngram_scancodes",
+	"ngram_keycodes", "ngram_scancodes", "ngram_media_keys", "agg_app_day_media_hold",
 }
 
 --- Returns the byte offset through the last complete transaction in a ledger.

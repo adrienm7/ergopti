@@ -1,0 +1,11 @@
+{
+  "status": "INDEPENDENT_PARENT_BYTES_SOURCE_CUSTODY_RECEIVED_NO_ADOPTION",
+  "archive_sha256": "1082d21fa31ebcfadfab496a34e46a3cee8821f66811af3f3558c5107a558daf",
+  "regular_members": 417,
+  "all_manifest_hashes_sizes_modes_verified": true,
+  "all_65_final_sources_match_literal_supplier_bodies": true,
+  "current_stock_query": "4fa42207d1e0f74d092467faf0dbaa2e716486a8f6c58910a3348ef7c68102bc",
+  "genuine_query_failure_behavioral_regression": "NOT_AUTHORED_OR_RUN",
+  "native_compiler_or_target_execution": 0,
+  "profiles_or_stock_mutator_or_READY_grant": false
+}

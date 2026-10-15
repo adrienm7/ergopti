@@ -803,6 +803,7 @@ function render_current_tab() {
 		? Object.entries(app_state.data.kc).map(([key, item]) => ({ key, count: item.count || 0 }))
 		: [];
 	render_kc_heatmap(kc_data_for_heatmap);
+	render_media_keys();
 
 	render_table();
 }
@@ -2004,4 +2005,104 @@ function render_table() {
 		tbody.innerHTML =
 			html || `<tr><td colspan="8" style="text-align:center;">${_t('ui_typing.no_data')}</td></tr>`;
 	});
+}
+
+/**
+ * Renders admitted semantic media as labelled rows from the daily manifest.
+ * Live ngrams are intentionally absent: the manifest already owns today's
+ * media aggregates. These identities change no keyboard geometry/text metrics.
+ */
+function render_media_keys() {
+	const container = document.getElementById('media_keys_container');
+	if (!container) return;
+	const catalogue = typeof METRICS_MEDIA_KEYS === 'undefined' ? [] : METRICS_MEDIA_KEYS;
+	const object = (value) =>
+		value !== null &&
+		typeof value === 'object' &&
+		!Array.isArray(value) &&
+		Object.prototype.toString.call(value) === '[object Object]';
+	const integer = (value, min = 0, max = Number.MAX_SAFE_INTEGER) =>
+		Number.isSafeInteger(value) && value >= min && value <= max;
+	const rows = new Map(
+		catalogue.map(({ id, label_key }) => [
+			id,
+			{
+				id,
+				label_key,
+				count: 0,
+				s: 0,
+				n: 0,
+				m: 0,
+				tap: 0,
+				hold: 0,
+				valid: true
+			}
+		])
+	);
+	const start = document.getElementById('date_start')?.value || '';
+	const end = document.getElementById('date_end')?.value || '';
+	const manifest = object(window.metrics_manifest) ? window.metrics_manifest : {};
+	Object.entries(manifest).forEach(([date, apps]) => {
+		if (
+			!/^\d{4}-\d{2}-\d{2}$/.test(date) ||
+			(start && date < start) ||
+			(end && date > end) ||
+			!object(apps)
+		)
+			return;
+		Object.entries(apps).forEach(([app_name, app]) => {
+			if (!matches_typing_app_selection(app_name) || !object(app)) return;
+			rows.forEach((row, id) => {
+				if (object(app.media_keys) && Object.hasOwn(app.media_keys, id)) {
+					const count = app.media_keys[id];
+					if (!integer(count) || !integer(row.count + count)) row.valid = false;
+					else row.count += count;
+				}
+				if (!object(app.media_hold) || !Object.hasOwn(app.media_hold, id)) return;
+				const hold = app.media_hold[id];
+				if (
+					!object(hold) ||
+					!['s', 'n', 'm', 'tap', 'hold'].every((key) => Object.hasOwn(hold, key)) ||
+					Object.keys(hold).some((key) => !['s', 'n', 'm', 'tap', 'hold'].includes(key)) ||
+					!integer(hold.s) ||
+					!integer(hold.n, 1) ||
+					!integer(hold.m, 0, 9223372036854) ||
+					!integer(hold.tap) ||
+					!integer(hold.hold) ||
+					hold.tap + hold.hold !== hold.n ||
+					hold.s < hold.m ||
+					['s', 'n', 'tap', 'hold'].some((key) => !integer(row[key] + hold[key]))
+				) {
+					row.valid = false;
+					return;
+				}
+				for (const key of ['s', 'n', 'tap', 'hold']) row[key] += hold[key];
+				row.m = Math.max(row.m, hold.m);
+			});
+		});
+	});
+	const visible = [...rows.values()].filter((row) => row.valid && (row.count > 0 || row.n > 0));
+	container.hidden = visible.length === 0;
+	if (visible.length === 0) {
+		container.innerHTML = '';
+		return;
+	}
+	const number = (value) => escape_html(format_number_plain(value));
+	const list = visible
+		.map((row) => {
+			let details = `${number(row.count)} ${escape_html(_t('ui_typing.unit_keyspressed'))}`;
+			if (row.n > 0) {
+				const breakdown = _t('onboarding.checklist.tap_hold')
+					.replace('{1}', String(row.tap))
+					.replace('{2}', String(row.hold));
+				details +=
+					` · ${escape_html(breakdown)} · ${escape_html(_t('ui_apps.col_duration'))}: ` +
+					`${escape_html(_t('ui_typing.lbl_total'))} ${number(row.s)} ms · ` +
+					`${escape_html(_t('ui_typing.key_tip_avg_dur'))} ${number(Number((row.s / row.n).toFixed(1)))} ms · ` +
+					`${escape_html(_t('ui_typing.lbl_longest_time'))}: ${number(row.m)} ms`;
+			}
+			return `<li data-media-id="${row.id}"><strong>${escape_html(_t(row.label_key))}</strong><br>${details}</li>`;
+		})
+		.join('');
+	container.innerHTML = `<h3>${escape_html(_t('sg_actions.sg_order.header.grp_media'))}</h3><ul>${list}</ul>`;
 }

@@ -663,3 +663,210 @@ helpers.describe("log_manager append transaction ownership", function()
 		end)
 	end)
 end)
+
+
+--- These controls borrow the reviewed native/FIFO fixture; only the catalogue
+--- provider below is an explicit pure source port, never physical admission.
+local function with_media_fifo(failures, callback)
+	helpers.with_stub_scope({ "modules.keylogger.aggregator.core" }, function()
+		local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+		local bytes = file:read("*a"); file:close()
+		local policy = require("keylogger.media_store").policy(require("json").decode(bytes))
+		local core = { media_policy = function() return policy end, HOLD_THRESHOLD_MS = 200 }
+		package.loaded["modules.keylogger.aggregator.core"] = core
+		with_fixture(function() return load_log_manager_fixture(failures) end, function(fixture)
+			callback(fixture, core)
+		end)
+	end)
+end
+local function media_fifo_row()
+	return { capture = "sink-test", device = "18446744073709551615", media_id = "media.play_pause",
+		app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }
+end
+helpers.describe("composed media FIFO preserves reviewed history writer authority", function()
+	helpers.it("refuses media outside the exact admitted capture and stopped lifecycle", function()
+		with_media_fifo(0, function(fixture)
+			local row = media_fifo_row()
+			helpers.assert_eq(fixture.manager.log_physical_media("physical_media_release", row), false)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(fixture.manager.log_physical_media("physical_media_release", row), false)
+			helpers.assert_true(fixture.manager.ensure_ingest_running())
+			row.capture = "another-capture"
+			helpers.assert_eq(fixture.manager.log_physical_media("physical_media_release", row), false)
+			helpers.assert_true(fixture.manager.stop())
+		end)
+	end)
+	helpers.it("copies approved retained media fields into the original FIFO despite storage refusal", function()
+		with_media_fifo(2, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			fixture.state.is_enabled, fixture.state.is_private_window = false, true
+			local row = media_fifo_row()
+			helpers.assert_true(fixture.manager.log_physical_media("physical_media_release", row))
+			helpers.assert_eq(#fixture.appended, 0, "accepted media performs no immediate eventtap IO")
+			row.media_id, row.app, row.hold_ms = "media.next_track", "Changed", 1
+			helpers.assert_true(fixture.mode.interrupt("sink-owner", "sink-test"))
+			helpers.assert_eq(fixture.manager.stop(), false)
+			helpers.assert_true(fixture.manager.stop())
+			helpers.assert_eq(fixture.appended, {{ type = "system_event", action = "physical_media_release",
+				capture = "sink-test", device = "18446744073709551615", media_id = "media.play_pause",
+				app = "Original", timestamp = "2026-08-13 12:00:00.000", hold_ms = 251 }})
+		end)
+	end)
+	helpers.it("rejects inherited or malformed physical media attribution before FIFO ownership", function()
+		with_media_fifo(0, function(fixture)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			for _, change in ipairs({ { timestamp = "2026-08-13 12:00:00" }, { device = "18446744073709551616" },
+				{ keycode = 74 }, { scancode = 115 } }) do
+				local row = media_fifo_row(); for key, value in pairs(change) do row[key] = value end
+				local ok, failure = pcall(fixture.manager.log_physical_media, "physical_media_release", row)
+				helpers.assert_eq(ok, false)
+				helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			end
+			local inherited = setmetatable({}, { __index = media_fifo_row() })
+			local ok, failure = pcall(fixture.manager.log_physical_media, "physical_media_release", inherited)
+			helpers.assert_eq(ok, false)
+			helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			helpers.assert_eq(#fixture.appended, 0)
+			helpers.assert_true(fixture.manager.stop())
+		end)
+	end)
+	helpers.it("does not let catalogue validation reopen a generation retired and restarted reentrantly", function()
+		with_media_fifo(0, function(fixture, core)
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			local original = core.media_policy
+			core.media_policy = function()
+				helpers.assert_true(fixture.manager.stop())
+				helpers.assert_true(fixture.manager.ensure_ingest_running())
+				return original()
+			end
+			helpers.assert_eq(fixture.manager.log_physical_media("physical_media_release", media_fifo_row()), false,
+				"restarted lifecycle does not own a prior generation's media call")
+			helpers.assert_true(fixture.manager.stop())
+		end)
+	end)
+end)
+
+helpers.describe("prepared physical media catalogue and FIFO ports", function()
+	helpers.it("prepares copied policy and FIFO functions once without metric callback file IO", function()
+		with_media_fifo(0, function(fixture, core)
+			local calls, original, manager = 0, core.media_policy, fixture.manager
+			core.media_policy = function() calls = calls + 1; return original() end
+			local constructor = require("modules.keylogger.physical_media_metrics")
+			local ports = constructor.new()
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(ports.resolve(12, 205, "none", "41"), "media.play_pause")
+			helpers.assert_eq(ports.is_known("media.unknown"), false)
+			helpers.assert_eq(ports.emit(media_fifo_row()), false, "construction itself grants no capture or FIFO admission")
+			helpers.assert_true(fixture.mode.select_stream("sink-owner"))
+			helpers.assert_true(fixture.mode.admit("sink-owner", "sink-test", "complete"))
+			local policy = original(); local resolve, known = policy.resolve_hid, policy.is_known
+			local sink = manager.log_physical_media
+			local old_open = io.open
+			local ok, reason = pcall(function()
+				core.media_policy = function() error("unexpected policy reload") end
+				policy.resolve_hid, policy.is_known = function() error("mutated policy resolver") end, function() error("mutated known predicate") end
+				manager.log_physical_media = function() error("replaced public FIFO") end
+				io.open = function() error("metric callback must not read source files") end
+				helpers.assert_eq(ports.resolve(12, 205, "none", "41"), "media.play_pause")
+				helpers.assert_true(ports.is_known("media.play_pause"))
+				-- The real FIFO still needs its existing cached-policy validator;
+				-- restore that provider, without permitting any file open.
+				core.media_policy = original; policy.resolve_hid, policy.is_known = resolve, known
+				helpers.assert_true(ports.emit_release(media_fifo_row()))
+				helpers.assert_eq(#fixture.appended, 0)
+			end)
+			io.open, core.media_policy, manager.log_physical_media = old_open, original, sink
+			policy.resolve_hid, policy.is_known = resolve, known
+			if not ok then error(reason, 0) end
+			helpers.assert_true(manager.stop()); helpers.assert_eq(#fixture.appended, 1)
+			helpers.assert_eq(fixture.appended[1].action, "physical_media_release")
+		end)
+	end)
+	helpers.it("does not accept a truthy FIFO acknowledgment as media publication", function()
+		with_media_fifo(0, function(fixture)
+			local manager, original = fixture.manager, fixture.manager.log_physical_media
+			local calls = {}
+			manager.log_physical_media = function(action) calls[#calls + 1] = action; return "accepted" end
+			local ports = require("modules.keylogger.physical_media_metrics").new()
+			helpers.assert_eq(ports.emit(media_fifo_row()), false)
+			helpers.assert_eq(ports.emit_release(media_fifo_row()), false)
+			helpers.assert_eq(calls, { "physical_media_press", "physical_media_release" })
+			manager.log_physical_media = original; helpers.assert_true(manager.stop())
+		end)
+	end)
+end)
+
+--- Real catalogue-loader source with a declared Lua file leaf. These models
+--- prove read/close/cache ordering only, never installed or native authority.
+local function with_catalogue_loader(options, callback)
+	local handle = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local frozen = handle:read("*a"); assert(handle:close())
+	helpers.with_fresh_modules({ "modules.keylogger.aggregator.core" }, function()
+		local core = require("modules.keylogger.aggregator.core")
+		local previous = io.open
+		local facts = { opens = 0, reads = 0, closes = 0 }
+		local file = { read = function()
+			facts.reads = facts.reads + 1
+			if options.read_throw and facts.reads == 1 then error("controlled catalogue read refusal") end
+			return options.malformed and facts.reads == 1 and "{}" or frozen
+		end, close = function()
+			facts.closes = facts.closes + 1
+			return not options.close_refusal
+		end }
+		local weak = setmetatable({ file }, { __mode = "v" })
+		io.open = function(path, mode)
+			if path:match("metrics_media_keys%.json$") then facts.opens = facts.opens + 1; return weak[1] end
+			return previous(path, mode)
+		end
+		local ok, reason = pcall(callback, core, facts, function() file = nil; collectgarbage("collect"); return weak[1] end)
+		io.open = previous
+		if not ok then error(reason, 0) end
+	end)
+end
+helpers.describe("complete media source loading before capture preparation", function()
+	helpers.it("loads and closes exactly once then reuses the same admitted five-key policy", function()
+		with_catalogue_loader({}, function(core, facts)
+			local policy = core.media_policy()
+			helpers.assert_eq(policy.resolve_hid(12, 205), "media.play_pause")
+			helpers.assert_true(rawequal(core.media_policy(), policy))
+			helpers.assert_eq(facts, { opens = 1, reads = 1, closes = 1 })
+		end)
+	end)
+	helpers.it("closes the original file after a read throw before allowing a healthy retry", function()
+		with_catalogue_loader({ read_throw = true }, function(core, facts)
+			local ok, failure = pcall(core.media_policy)
+			helpers.assert_eq(ok, false)
+			helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			helpers.assert_eq(facts, { opens = 1, reads = 1, closes = 1 })
+			helpers.assert_eq(core.media_policy().resolve_hid(12, 205), "media.play_pause")
+			helpers.assert_eq(facts, { opens = 2, reads = 2, closes = 2 })
+		end)
+	end)
+	helpers.it("keeps unknown close debt rooted and refuses cache or replacement acquisition", function()
+		with_catalogue_loader({ close_refusal = true }, function(core, facts, release_fixture_reference)
+			local ok, failure = pcall(core.media_policy)
+			helpers.assert_eq(ok, false)
+			helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			helpers.assert_type(release_fixture_reference(), "table", "production must retain the exact refused handle")
+			local ok, failure = pcall(core.media_policy)
+			helpers.assert_eq(ok, false)
+			helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			helpers.assert_eq(facts, { opens = 1, reads = 1, closes = 1 })
+		end)
+	end)
+	helpers.it("does not cache a fully closed malformed catalogue and accepts its healthy successor", function()
+		with_catalogue_loader({ malformed = true }, function(core, facts)
+			local ok, failure = pcall(core.media_policy)
+			helpers.assert_eq(ok, false)
+			helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+			helpers.assert_eq(facts, { opens = 1, reads = 1, closes = 1 })
+			helpers.assert_eq(core.media_policy().resolve_hid(12, 205), "media.play_pause")
+			helpers.assert_eq(facts, { opens = 2, reads = 2, closes = 2 })
+		end)
+	end)
+end)

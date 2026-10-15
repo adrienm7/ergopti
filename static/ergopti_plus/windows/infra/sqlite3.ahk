@@ -243,6 +243,16 @@ SQLite_Open(path, flags := 0) {
 		return pdb
 }
 
+; Returns the native immediate-close status. Unlike close_v2, sqlite3_close
+; refuses outstanding statements instead of acknowledging a deferred zombie.
+; The caller retains its exact handle on refusal or a thrown native call.
+; Existing SQLite_Close callers keep their original deferred-close behavior.
+SQLite_CloseChecked(db) {
+		if !db
+				throw ValueError("A checked SQLite close requires its owned connection.")
+		return DllCall(SQLiteConst.DLL . "\sqlite3_close", "Ptr", db, "Int")
+}
+
 SQLite_Close(db) {
 		if !db
 				return

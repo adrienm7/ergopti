@@ -79,7 +79,20 @@ KLR_LoadSchema(db) {
 				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
 				return false
 		}
-		return SQLite_Exec(db, schema)
+		if !SQLite_Exec(db, schema)
+				return false
+		return KLR_LoadMediaSchema(db)
+}
+
+; Apply only the additive schema to a private cold or upgrade candidate.
+KLR_LoadMediaSchema(db) {
+		global _SharedDir
+		try media_schema := FileRead(_SharedDir . "\data\db\media_schema.sql", "UTF-8")
+		catch as err {
+				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
+				return false
+		}
+		return SQLite_Exec(db, media_schema)
 }
 
 
@@ -195,6 +208,17 @@ KLR_BuildDatabase(metrics_dir) {
 		; into one tail append (klr-reader-durable-cache).
 		if !KLRCache.db
 				KLR_CacheAttach(md, logPath)
+		; Format 14 predates media tables. Upgrade only a private copy before
+		; any unchanged-image fast path can return the published handle.
+		BeforeMediaUpgrade := KLRCache.db
+		if BeforeMediaUpgrade && !KLR_UpgradeMediaCache()
+				return 0
+		if BeforeMediaUpgrade && KLRCache.db != BeforeMediaUpgrade {
+				; Hand the additive upgrade to the next worker without another
+				; whole-image clone. Existing atomic save preserves a locked source.
+				KLRCache.saved_at := ""
+				KLR_CacheSaveIfOwned(md, logPath)
+		}
 		; A warm refresh never mutates the published handle. Collect all new bytes,
 		; clone the last-good database, and apply/re-project on that private handle.
 		; Publication swaps both DB and offsets only after every ledger reaches a
@@ -345,6 +369,56 @@ KLR_BuildDatabase(metrics_dir) {
 		if KLR_CacheSaveIfOwned(md, logPath) && cold.Has("checkpoint")
 				KLR_RebuildDiscardCheckpoint(md)
 		return KLRCache.db
+}
+
+; Preserve the already-validated offsets and numeric projection when an old
+; cache predates the additive media schema. The read-only image stays unchanged
+; until a complete private successor can be published.
+KLR_UpgradeMediaCache(LoadMedia := unset) {
+		static UnretiredCandidate := 0
+		if UnretiredCandidate
+				throw Error("Semantic media cache upgrade has an unretired candidate.")
+		Rows := SQLite_Query(KLRCache.db,
+				"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
+		if Rows[1]["n"] = 2
+				return true
+		Candidate := KLR_CloneCandidate(KLRCache.db)
+		if !Candidate
+				return false
+		Failure := 0
+		try {
+				Loader := IsSet(LoadMedia) ? LoadMedia : KLR_LoadMediaSchema
+				if !Loader.Call(Candidate)
+						throw Error("Semantic media cache schema installation failed.")
+				Rows := SQLite_Query(Candidate,
+						"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
+				if Rows[1]["n"] != 2
+						throw Error("Semantic media cache schema installation is incomplete.")
+				KLR_PublishCandidate(Candidate, KLR_CopyOffsets(KLRCache.last_sizes),
+						KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots))
+				Candidate := 0
+		} catch as Caught {
+				Failure := Caught
+		} finally {
+				if Candidate {
+						; SQLite_Close defers native retirement. This newly
+						; acquired candidate requires the actual native retirement result.
+						try {
+								Status := SQLite_CloseChecked(Candidate)
+								if Status != SQLiteConst.OK
+										throw Error("Semantic media cache candidate close refused: " . Status)
+						} catch as CleanupFailure {
+								UnretiredCandidate := Candidate
+								if IsObject(Failure)
+										Failure.Message .= " | " . CleanupFailure.Message
+								else
+										Failure := CleanupFailure
+						}
+				}
+		}
+		if IsObject(Failure)
+				throw Failure
+		return true
 }
 
 ; Retire a candidate that failed to publish, and answer what the build should

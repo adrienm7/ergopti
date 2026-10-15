@@ -10,10 +10,20 @@ local function replace_once(source, before, after)
 	assert(not source:find(before, last + 1, true), "Ambiguous real fixture boundary")
 	return source:sub(1, first - 1) .. after .. source:sub(last + 1)
 end
+--- Restricts legacy instrumentation to its original child, retaining the media child.
+local function historical_child_scope(source)
+	local boundary = "\nlocal function media_child()\n"
+	local first, last = source:find(boundary, 1, true)
+	assert(first ~= nil, "Missing media fixture boundary")
+	assert(not source:find(boundary, last + 1, true), "Ambiguous media fixture boundary")
+	return source:sub(1, first - 1), source:sub(first)
+end
 local function composition_child()
 	local root = assert(arg[3])
 	local original = root .. "/static/ergopti_plus/macos/tests/unit/modules/keylogger/test_physical_history_persistence.lua"
 	local file = assert(io.open(original, "r")); local source = file:read("*a"); file:close()
+	local media_suffix
+	source, media_suffix = historical_child_scope(source)
 	-- The wrapper records facts only: every decisive check occurs after protected frames.
 	source = replace_once(source, '-- Start first: binding must observe an actual running engine, never assign enabled.', [[
 local actual_sampler = assert(tracker.sample_physical_context)
@@ -52,6 +62,7 @@ assert(bootstrap.legacy_conserved and bootstrap.acknowledged, "All actual sample
 receipt.bootstrap = bootstrap
 print(json.encode(receipt))
 ]])
+	source = source .. media_suffix
 	source = replace_once(source, 'test_physical_history_persistence%.lua$', 'test_physical_history_bootstrap%.lua$')
 	assert(load(source, "@" .. original, "t", _G))()
 end
@@ -384,4 +395,66 @@ helpers.describe("fresh physical sample dynamic pause boundaries", function()
    helpers.assert_eq(last(c).allowed,false);helpers.assert_eq(scope.current(owner,token),false)
   end)
  end)
+end)
+
+
+helpers.describe("historical bootstrap fixture source scope", function()
+	helpers.it("preserves the separate media child and rejects ambiguous scope boundaries", function()
+		local root = helpers.driver_root() .. "../../.."
+		local original = root .. "/static/ergopti_plus/macos/tests/unit/modules/keylogger/test_physical_history_persistence.lua"
+		local file = assert(io.open(original, "rb")); local source = assert(file:read("*a")); assert(file:close())
+		local prefix, suffix = historical_child_scope(source)
+		helpers.assert_eq(prefix .. suffix, source)
+		local boundary = "\nlocal function media_child()\n"
+		local accepted, reason = pcall(historical_child_scope, source .. boundary)
+		helpers.assert_eq(accepted, false)
+		helpers.assert_true(tostring(reason):find("Ambiguous media fixture boundary", 1, true) ~= nil)
+		local captured
+		local previous_load, previous_arg = load, arg
+		_G.load = function(text, name, mode, environment)
+			helpers.assert_eq(name, "@" .. original)
+			helpers.assert_eq(mode, "t"); helpers.assert_true(rawequal(environment, _G))
+			captured = text
+			return function() end -- Source inspection only; the real child executes in the independent cases.
+		end
+		_G.arg = { [3] = root }
+		local ok, detail = pcall(composition_child)
+		_G.load, _G.arg = previous_load, previous_arg
+		helpers.assert_eq(ok, true, tostring(detail))
+		local _, actual_suffix = historical_child_scope(captured)
+		local expected_suffix = replace_once(suffix, 'test_physical_history_persistence%.lua$', 'test_physical_history_bootstrap%.lua$')
+		helpers.assert_eq(actual_suffix, expected_suffix, "Only the existing dispatch filename may change in the media suffix")
+		helpers.assert_true(actual_suffix:find('then media_child() else child() end;return end', 1, true) ~= nil)
+	end)
+
+	helpers.it("executes the unchanged media child through the composed real SQLite dispatch", function()
+		local root = helpers.driver_root() .. "../../.."
+		local source = assert(debug.getinfo(1, "S").source):gsub("^@", "")
+		local python = [[
+import importlib.util, os, sys, tempfile
+from pathlib import Path
+root=Path(sys.argv[1]).resolve()
+spec=importlib.util.spec_from_file_location("bootstrap_media",root/"tools/diagnostics/hs274_persistence_test.py")
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);m.ROOT=root
+os.environ["ERGOPTI_PHYSICAL_SOURCE_ROOT"]=str(root)
+os.environ["ERGOPTI_PERSISTENCE_CASE"]="media"
+with tempfile.TemporaryDirectory(prefix="ergopti-bootstrap-media-") as temporary:
+    receipt=m.run_fixture(sys.argv[2],temporary,Path(sys.argv[3]).resolve())
+    ids=["media.brightness_down","media.brightness_up","media.next_track","media.play_pause","media.previous_track"]
+    expected={"media":[{"date":"2026-10-05","app":"Original","media_id":key,"c":2 if key in ("media.play_pause","media.next_track") else 1} for key in ids],
+      "holds":[{"date":"2026-10-05","app":"Original","media_id":key,"sum_ms":251,"count":1,"max_ms":251,"tap_count":0,"hold_count":1} for key in ids],
+      "keyboard":[{"keycode":53,"c":1},{"keycode":72,"c":1}],
+      "raw":[{"action":"physical_media_press","n":7},{"action":"physical_media_release","n":5}]}
+    for phase in ("live","reopened","rebuilt"):
+        if receipt[phase]!=expected: raise AssertionError((phase,receipt[phase]))
+    if receipt["retired"] is not True or receipt["refused"]: raise AssertionError(receipt)
+print("PASS: composed bootstrap dispatch retains actual media SQLite expectations")
+]]
+		local executable = os.getenv("LUA") or arg[-1]
+		helpers.assert_true(type(executable) == "string" and executable ~= "")
+		local command = "python3 -c " .. quote(python) .. " " .. quote(root) .. " " .. quote(executable) .. " " .. quote(source) .. " 2>&1"
+		local pipe = assert(io.popen(command, "r")); local output = pipe:read("*a"); local ok, kind, status = pipe:close()
+		helpers.assert_eq(ok, true, output); helpers.assert_eq(kind, "exit", output); helpers.assert_eq(status, 0, output)
+		helpers.assert_eq(output, "PASS: composed bootstrap dispatch retains actual media SQLite expectations\n")
+	end)
 end)

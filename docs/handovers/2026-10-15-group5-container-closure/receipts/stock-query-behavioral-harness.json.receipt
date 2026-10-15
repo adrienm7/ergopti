@@ -1,0 +1,95 @@
+{
+  "decision": "NO_EXISTING_GENUINE_ROOTED_QUERY_HARNESS",
+  "scope": "Read-only software harness investigation, not a new source or test grant.",
+  "sources_read": [
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverStockQuery.swift",
+      "sha256": "4fa42207d1e0f74d092467faf0dbaa2e716486a8f6c58910a3348ef7c68102bc",
+      "bytes": 10853
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-driver-stock-lease-private-20261015/POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverStockLease.swift",
+      "sha256": "29d0b76a8f9619c1a5640ca3403deae2659e30e86271580707b01432aa241687",
+      "bytes": 10055
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-driver-stock-lease-private-20261015/POST/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVHDDriverStockLeaseTests.swift",
+      "sha256": "2b028384cadf1ced2c7eef2e32120660cf5f7ed4dd5bb3ff355b47668c708c32",
+      "bytes": 6648
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-coexistence-caller-join-private-20261015/SUCCESSOR-2-PARTIAL-CONTROL/POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverUpdateRequestChannel.swift",
+      "sha256": "35944f22a301365731763dfb4538c3a213b143edd3f6a19c17636424370ed035",
+      "bytes": 23552
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-coexistence-caller-join-private-20261015/POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverUpdateMainOperation.swift",
+      "sha256": "0c1e76a26d019dc169a777e848c7ae804f5292f12e8288cd7973287e1c4b5c89",
+      "bytes": 39409
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-coexistence-caller-join-private-20261015/POST/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "sha256": "8e164bf2f38c4de04cff80e266142437a2b247c28c20174d79ead0fedd2b546e",
+      "bytes": 21606
+    },
+    {
+      "path": "/workspace/ergopti/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeInstalledPeerOwnerTests.swift",
+      "sha256": "c86edf208ada491ae6fb320c49de32ba22229ae76d7b4c9f5de3ba9a9dca7c08",
+      "bytes": 7634
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-driver-scoped-publication-private-20261015/SEALED-SCOPED-1/SUPPORT/CANONICAL/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallWorker.swift",
+      "sha256": "b1c627ec48a50307c3bfc1ec012e14bfdad67e144c822de05d36fcc35d5a21df",
+      "bytes": 18999
+    }
+  ],
+  "reachability": [
+    {
+      "source": "OwnedVHDDriverStockQuery.start",
+      "condition": "Actual non-main thread and original.queryInputsCurrent must pass before the /bin constructor attempt. An injected throwing constructor alone cannot make a normal XCTest reach this branch."
+    },
+    {
+      "source": "OwnedVHDDriverStockLease",
+      "condition": "Private initializer takes the original typed Root.Request. acquire requires actual UID/EUID zero, current Request, current original staged installer publisher, real process birth and protected /Library/LaunchDaemons tree. queryInputsCurrent rechecks those original owners."
+    },
+    {
+      "source": "OwnedVHDDriverUpdateRequestChannel.Root",
+      "condition": "Private Root and fileprivate Request constructors; actual purpose flag, signed current staged helper, root UID, native same-process image, owned nonroot channel directory, actual kernel peer and same-publisher signed Main are required. There is no test-positive constructor."
+    },
+    {
+      "source": "OwnedVHDDriverUpdateMainOperation",
+      "condition": "Issuer is fileprivate and follows actual signed launcher identity, exact CLI purpose, localized user confirmation and original same-instance channel; no existing test creates it positively."
+    }
+  ],
+  "existing_tests": {
+    "stock12": "Fixed arguments/classifier descriptions; actual native Descriptor close/reuse; ordinary-user C EPERM. None constructs or starts Query.",
+    "Main_Root": "Actual-main-thread denial tests explicitly assert no genuine Root Request or cleanup token. Socketpair/frames/selection tests are non-authority transport/data controls.",
+    "InstallTree": "Existing native temporary-directory captures can test true tree verification, native descriptor closure/idempotence and FD_CLOEXEC. They cannot supply a StockLease or Query authorization."
+  },
+  "concrete_prerequisite_for_exact_rooted_query_test": [
+    "A separately reviewed native test receiving entry must obtain the genuine same-publisher signed Main channel and original staged root helper Request, with the actual explicit consent/purpose lifetime intact. It may then acquire the real StockLease and call the real read-only Query directly; StockLease acquisition does not require asserting stock absence, and claimPublication must not be called for this diagnostic.",
+    "Add a bounded instance-local negative-only fault checkpoint to the actual tree-capture path after original descriptors are retained, before the constructor can return. It may only force failure/revoke; no caller-supplied successful tree, positive current predicate, UID, signature, Request, stock-absence receipt or arbitrary executable is accepted.",
+    "To prove unknown descriptor cleanup rather than an ordinary throwing path alone, the native receiving must cause/observe a real owned-descriptor close failure or unavailable original close receipt and retain that original attempt. A new positive retry, unverified scalar failure flag or statement-order assertion does not establish this.",
+    "The actual test assertions should observe Query.start/poll/retired and owning StockLease.retire: after the genuine throwing capture poll remains cleanupPending, retired stays false and no launchctl child is created; repeated calls do not recreate/close a foreign reused descriptor. A successful original capture/close control must retain its genuine positive close flow. These tests are not presently authored or executable through the existing XCTest harness."
+  ],
+  "smallest_non_authority_software_seam_candidate": {
+    "design": "If ordinary-user native behavioral coverage is needed before a genuine Root receiving harness exists, factor the real fixed-tool tree-capture/retirement lifetime into a retained transport-free owner used by Query itself. It owns the actual attempted capture, original tree/partial cleanup receipt and sticky debt; exposes capture/retirement observations only, never a process launch, absence, publication or Request grant. Query must use this same owner at its actual start and final poll cuts; a detached mirror helper is insufficient.",
+    "test_use": "Use the existing genuine temporary-directory/native InstallTree fixture to force a real throwing capture (for example a refused child encountered after ancestor capture), and a bounded negative-only descriptor fault to exercise real cleanup debt. Run actual owner capture/retirement with true original FDs, including foreign-number reuse preservation; never set attempted/closed booleans in tests.",
+    "boundary": "This would qualify the production cleanup component, not a complete rooted Query run. A separate exact integration assertion/receiving is still required to prove Query uses its original owner. It is a production refactor requiring independent review, not an already available test seam.",
+    "status": "PROPOSAL_ONLY_NOT_AUTHORED; no competing source edits requested or made."
+  },
+  "rejected_shortcuts": [
+    "Fabricated Root/Request/StockLease or a positive factory/predicate.",
+    "Calling a throwing tree initializer in isolation and claiming Query cleanup is tested.",
+    "Constructor/source-order mirror, manually setting attempted/nativeClosed, or duplicating a small state machine solely for tests.",
+    "Interpreting real launchctl descriptive absence, exit status, test flags or a stored Boolean as installer/cleanup authority."
+  ],
+  "execution": {
+    "product_tests": 0,
+    "native": 0,
+    "compiler": 0,
+    "installer": 0,
+    "canonical_mutations": 0,
+    "operations": "Read source, search declarations and hash immutable inputs only."
+  }
+}

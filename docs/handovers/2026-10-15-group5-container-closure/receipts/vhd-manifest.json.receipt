@@ -1,0 +1,19 @@
+{
+  "state": "SOURCE_CUSTODY_SUCCESSOR_WITH_IDENTIFIED_QUERY_HOLD_RESOLVED_NO_PROFILE_OR_NATIVE_GRANT",
+  "archive": {
+    "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/FINAL-QUERY-DEBT-SUCCESSOR/future-vhd-reviewed-source-query-debt-successor.tar.gz",
+    "sha256": "1082d21fa31ebcfadfab496a34e46a3cee8821f66811af3f3558c5107a558daf",
+    "bytes": 14129088
+  },
+  "receipt": {
+    "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/FINAL-QUERY-DEBT-SUCCESSOR/RECEIPT.json",
+    "sha256": "18f13188cc70ff23f457b0cbd6eeb3ae3001ad8c980d8115861c7b8017a1d2ea",
+    "bytes": 5680
+  },
+  "current_status": {
+    "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/FINAL-QUERY-DEBT-SUCCESSOR/CHANGED-METADATA/CURRENT-SOURCE-STATUS.json",
+    "sha256": "d5e32f2e51648c0258f505a10c2a3b3ec98d5e588d40517729e74b224921e8c9",
+    "bytes": 1941
+  },
+  "predecessor_and_hold_overlay_preserved": true
+}

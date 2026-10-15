@@ -327,3 +327,150 @@ helpers.describe("physical delivery (hs274)", function()
 		})
 	end)
 end)
+
+--- Creates a shared media policy independently of the native delivery capability.
+local function semantic_policy()
+	local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local text = file:read("*a"); assert(file:close())
+	return require("keylogger.media_identity").new(require("json").decode(text))
+end
+
+local MEDIA_DEVICE = "18446744073709551614"
+local MEDIA_ELEMENTS = {
+	{ page = 12, usage = 205, cookie = 1 }, { page = 12, usage = 181, cookie = 2 },
+	{ page = 12, usage = 182, cookie = 3 }, { page = 12, usage = 111, cookie = 4 },
+	{ page = 12, usage = 112, cookie = 5 }, { page = 12, usage = 226, cookie = 6 },
+	{ page = 12, usage = 176, cookie = 7 },
+}
+
+helpers.describe("opt-in semantic media delivery", function()
+	helpers.it("delivers all five semantic presses and keeps the numeric volume identity separate", function()
+		local policy, media_rows = semantic_policy(), {}
+		local receiver, numeric = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+			media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+				emit = function(press) media_rows[#media_rows + 1] = press; return true end },
+		})
+		local records = {}
+		for index, element in ipairs(MEDIA_ELEMENTS) do
+			records[#records + 1] = row(index, element.usage, 1, MEDIA_DEVICE, 12, element.cookie)
+		end
+		helpers.assert_eq(receiver.deliver(batch(records)), "7")
+		local identities = {}
+		for _, press in ipairs(media_rows) do
+			identities[#identities + 1] = press.media_id
+			helpers.assert_nil(press.keycode)
+			helpers.assert_eq(press.capture, "test-capture")
+			helpers.assert_eq(press.device, MEDIA_DEVICE)
+		end
+		helpers.assert_eq(identities, { "media.play_pause", "media.next_track", "media.previous_track",
+			"media.brightness_up", "media.brightness_down" })
+		helpers.assert_eq(#numeric, 1)
+		helpers.assert_eq(numeric[1].keycode, 74)
+		helpers.assert_nil(numeric[1].media_id)
+		helpers.assert_eq(receiver.uncounted(), { { page = 12, usage = 176, keyboard_type = "none",
+			reason = Identity.REASON_UNMAPPED, count = 1 } })
+	end)
+
+	helpers.it("keeps omitted capability and repeated physical media edges in their original default paths", function()
+		local receiver, numeric = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } })
+		receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1), row(2, 205, 1, MEDIA_DEVICE, 12, 1) }))
+		helpers.assert_eq(numeric, {})
+		helpers.assert_eq(receiver.uncounted(), { { page = 12, usage = 205, keyboard_type = "none",
+			reason = Identity.REASON_UNMAPPED, count = 1 } })
+		local policy, media = semantic_policy(), {}
+		receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+			media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+				emit = function(press) media[#media + 1] = press; return true end },
+		})
+		receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1), row(2, 205, 1, MEDIA_DEVICE, 12, 1) }))
+		helpers.assert_eq(#media, 1)
+		helpers.assert_eq(receiver.uncounted(), {})
+	end)
+
+	helpers.it("retains initial-down suppression for semantic media and counts only a fresh edge", function()
+		local policy, media = semantic_policy(), {}
+		local receiver = fixture({ keycode = Identity.resolve, media = {
+			resolve = policy.resolve_hid, is_known = policy.is_known,
+			emit = function(press) media[#media + 1] = press; return true end,
+		} })
+		local frames = Frames.new("native-epoch", "18446744073709551615", {
+			{ id = MEDIA_DEVICE, keyboard = false, keys = { { page = 12, usage = 205, cookie = 1, down = true } } },
+		})
+		for _, initial_row in ipairs(frames.page.rows) do
+			if initial_row.kind == "key" then initial_row.down = true end
+		end
+		Frames.start(receiver, frames)
+		receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1), row(2, 205, 0, MEDIA_DEVICE, 12, 1),
+			row(3, 205, 1, MEDIA_DEVICE, 12, 1) }))
+		helpers.assert_eq(#media, 1)
+	end)
+
+	helpers.it("never credits media excluded by the same captured privacy context", function()
+		local policy, media = semantic_policy(), {}
+		local receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+			context = function() return { allowed = false } end,
+			media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+				emit = function(press) media[#media + 1] = press; return true end },
+		})
+		helpers.assert_eq(receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1) })), "1")
+		helpers.assert_eq(media, {})
+		helpers.assert_eq(receiver.uncounted(), {})
+	end)
+
+	for _, refused in ipairs({ false, "accepted" }) do
+		helpers.it("fences semantic media sink refusal " .. tostring(refused) .. " without false batch acknowledgement", function()
+			local policy = semantic_policy()
+			local receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+				media = { resolve = policy.resolve_hid, is_known = policy.is_known, emit = function() return refused end },
+			})
+			rejects(function() receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1) })) end,
+				"Physical sink refused the press")
+			helpers.assert_eq(receiver.active(), false)
+		end)
+	end
+
+	for _, invalid in ipairs({ false, 205, "keyboard.play_pause", "media.unknown" }) do
+		helpers.it("refuses unadmitted semantic identity " .. tostring(invalid) .. " before a sink sees it", function()
+			local policy, media = semantic_policy(), {}
+			local receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+				media = { resolve = function() return invalid end, is_known = policy.is_known,
+					emit = function(press) media[#media + 1] = press; return true end },
+			})
+			rejects(function() receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1) })) end,
+				"Invalid semantic media identity")
+			helpers.assert_eq(media, {})
+		end)
+	end
+
+	helpers.it("qualifies the entire batch before the first semantic media publication", function()
+		local policy, media = semantic_policy(), {}
+		local receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+			media = { resolve = policy.resolve_hid, is_known = policy.is_known,
+				emit = function(press) media[#media + 1] = press; return true end },
+		})
+		local invalid = row(2, 181, 1, MEDIA_DEVICE, 12, 2); invalid.sequence = "3"
+		rejects(function() receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1), invalid })) end,
+			"Physical sequence gap or replay")
+		helpers.assert_eq(media, {})
+	end)
+
+	helpers.it("refuses reentrant media resolution after the exact delivery owner stops", function()
+		local policy, media, receiver = semantic_policy(), {}, nil
+		receiver = identity_fixture({ { id = MEDIA_DEVICE, keyboard = false, keys = MEDIA_ELEMENTS } }, {
+			media = { resolve = function(page, usage) receiver.stop(); return policy.resolve_hid(page, usage) end,
+				is_known = policy.is_known, emit = function(press) media[#media + 1] = press; return true end },
+		})
+		rejects(function() receiver.deliver(batch({ row(1, 205, 1, MEDIA_DEVICE, 12, 1) })) end,
+			"Physical delivery was revoked")
+		helpers.assert_eq(media, {})
+	end)
+
+	for _, missing in ipairs({ "resolve", "is_known", "emit" }) do
+		helpers.it("requires the explicit media callback " .. missing, function()
+			local policy = semantic_policy()
+			local capability = { resolve = policy.resolve_hid, is_known = policy.is_known, emit = function() return true end }
+			capability[missing] = nil
+			rejects(function() fixture({ media = capability }) end, "Missing semantic media port: " .. missing)
+		end)
+	end
+end)

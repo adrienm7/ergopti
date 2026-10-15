@@ -288,6 +288,9 @@ function find_in_page(forward) {
 // ==========================
 // ==========================
 
+// Generated media labels are rendered again after the actual locale changes.
+document.addEventListener('i18n:applied', render_media_keys);
+
 document.addEventListener('DOMContentLoaded', () => {
 	// Set Chart.js default tick/label color based on system color scheme.
 	// The default rgba(0,0,0,0.6) is nearly invisible in dark mode.
