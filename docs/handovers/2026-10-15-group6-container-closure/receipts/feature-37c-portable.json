@@ -1,0 +1,23 @@
+{
+	"at": "2026-10-15T12:14:42.079006+00:00",
+	"head": "37c71f975a0585590437bd4739a1476dc56e4a9d",
+	"verify_change_exit": 0,
+	"command": "tools/rtk/rtk.sh node tools/test/verify-change.cjs --range=e850833c74f3f10c6718eb822fd2aa21f83f13b2..HEAD",
+	"format_files_passed": 430,
+	"js_checks_passed": 426,
+	"js_checks_failed": 0,
+	"lua_modules": 1604,
+	"lua_tests_passed": 19827,
+	"lua_tests_failed": 0,
+	"full_log_sha256": "0c51a82b95de96afaf3ef6602bc423fb1fb933e9f5a01a4f41412a9f2c607431",
+	"cask_owner_with_actual_ruby_exit": 0,
+	"cask_owner_log_sha256": "7b01cc813f9983b2eaf9059963b616c1d5327301f867aeb162c592c0048172f0",
+	"actual_generated_cask_ruby_syntax_passed": 4,
+	"locked_client_portable_cases_passed": 15,
+	"tracked_source_hashes_verified": 10251,
+	"tracked_source_changes": [],
+	"working_tree_clean": true,
+	"head_unchanged": true,
+	"native_windows_macos_receiving": "UNRUN",
+	"dev_publication": "HELD_BY_ROOT_RELEASE_COMPOSITION"
+}
