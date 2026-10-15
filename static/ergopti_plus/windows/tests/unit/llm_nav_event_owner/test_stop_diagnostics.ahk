@@ -177,7 +177,10 @@ _LNEO_StartCustodyReceiptValid(Tap) {
 	Lines.Pop()
 	Position := 1
 	Boots := Map()
-	while Position <= Lines.Length && RegExMatch(Lines[Position], "^# \[boot\] .+$") {
+	; Boot records are optional runtime frames; the exact mandatory census follows.
+	while Position <= Lines.Length {
+		if !RegExMatch(Lines[Position], "^# \[boot\] .+$")
+			break
 		if Boots.Has(Lines[Position])
 			return false
 		Boots[Lines[Position]] := true
@@ -290,11 +293,14 @@ _LNEO_StartCustodyReceiptControls() {
 	GoodReceipt .= "# 3 passed, 0 failed.`n"
 	AssertTrue(_LNEO_StartCustodyReceiptValid(GoodReceipt))
 	AssertTrue(_LNEO_StartCustodyReceiptValid(StrReplace(GoodReceipt, "`n", "`r`n")))
+	AssertTrue(_LNEO_StartCustodyReceiptValid("# [boot] controlled startup`n" . GoodReceipt))
 	ReceiptLines := StrSplit(GoodReceipt, "`n")
 	FirstBlock := ReceiptLines[3] . "`n" . ReceiptLines[4] . "`n" . ReceiptLines[5] . "`n"
 	SecondBlock := ReceiptLines[6] . "`n" . ReceiptLines[7] . "`n" . ReceiptLines[8] . "`n"
 	AssertTrue(InStr(GoodReceipt, FirstBlock . SecondBlock) > 0)
 	BadReceipts := [
+		"# [boot] repeated`n# [boot] repeated`n" . GoodReceipt,
+		"# [boot]`n" . GoodReceipt,
 		StrReplace(GoodReceipt, FirstBlock . SecondBlock, SecondBlock . FirstBlock),
 		StrReplace(GoodReceipt, ReceiptLines[4] . "`n", ReceiptLines[4] . "`n" . ReceiptLines[4] . "`n"),
 		StrReplace(GoodReceipt, FirstBlock, ""),
