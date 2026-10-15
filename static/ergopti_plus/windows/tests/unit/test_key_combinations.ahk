@@ -40,7 +40,9 @@ _KCT_With(Taps, Holds, Body, GateOn := true) {
 	global _KeyCombinationTaken, _KeyCombinationHandled, CategoryEnabled, _OB_ALTGR_PASSTHROUGH
 	global _KeyCombinationPressAssignments
 	Saved := { Taps: KeyCombinationTaps, Holds: KeyCombinationHolds, Index: _KeyCombinationFirstKeys,
-		Taken: _KeyCombinationTaken, Handled: _KeyCombinationHandled, Assignments: _KeyCombinationPressAssignments,
+		Taken: _KeyCombinationTaken, Handled: _KeyCombinationHandled,
+		HadAssignments: IsSet(_KeyCombinationPressAssignments),
+		Assignments: IsSet(_KeyCombinationPressAssignments) ? _KeyCombinationPressAssignments : 0,
 		HadGate: CategoryEnabled.Has("KeyCombinations"), Gate: CategoryEnabled.Get("KeyCombinations", true),
 		Onboarding: IsSet(_OB_ALTGR_PASSTHROUGH) ? _OB_ALTGR_PASSTHROUGH : false }
 	KeyCombinationTaps := Taps
@@ -58,7 +60,10 @@ _KCT_With(Taps, Holds, Body, GateOn := true) {
 		_KeyCombinationFirstKeys := Saved.Index
 		_KeyCombinationTaken := Saved.Taken
 		_KeyCombinationHandled := Saved.Handled
-		_KeyCombinationPressAssignments := Saved.Assignments
+		if Saved.HadAssignments
+			_KeyCombinationPressAssignments := Saved.Assignments
+		else
+			_KeyCombinationPressAssignments := unset
 		if Saved.HadGate
 			CategoryEnabled["KeyCombinations"] := Saved.Gate
 		else
