@@ -2,6 +2,11 @@
 
 # Configuration and menus: inactive personal-menu proposal
 
+The [diagnostics opener follow-up](2026-10-15-DIAGNOSTIC-OPENER.md) records the
+real Linux child-failure reproduction, asynchronous completion across the
+actual report callers, and the remaining installed export and log-collection
+acceptance. Its earlier Linux CI success has an exact separate source boundary.
+
 The [later configuration receiving](2026-10-15-CONFIG-FOLLOWUP.md) records
 stable-immediate-parent Personal-root recovery, its corrected handle diagnostic,
 complete sparse-fact receiving and the separate inactive four-constructor

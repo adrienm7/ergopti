@@ -132,14 +132,18 @@ local function session_for(view, ctx)
 			require("ui.changelog").open({ channel = channel, channel_owner = ctx.channel_owner })
 			return true
 		end,
-		report = function(result)
-			return require("ui.error_dialog").report({
+		report = function(result, on_complete, is_current)
+			if not is_current() then return end
+			local reported = require("ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),
 					tostring(result.detail)),
 				time = os.date("%Y-%m-%d %H:%M:%S"),
 			})
+			-- Native reporting is synchronous; its receipt completes this request
+			-- inline only while the same check still owns the report action.
+			if is_current() then on_complete(reported) end
 		end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,

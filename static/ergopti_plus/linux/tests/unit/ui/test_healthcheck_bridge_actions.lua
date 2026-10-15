@@ -325,6 +325,10 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return string.format("%q", value) end,
 				run = function(command) calls[#calls + 1] = command; return true end,
+				run_async = function(executable, args, _, done)
+					calls[#calls + 1] = { executable = executable, args = args }
+					done({ ok = true, code = 0 })
+				end,
 			}
 			local ok, err = xpcall(function()
 				local answer = bridge.on_message({ action = "report", text = exported.share_text,
@@ -338,10 +342,116 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				local repo = bridge.config().repository
 				local stable = require("healthcheck.share").document(exported.snapshot, bridge.config().schema, "ignored").fields
 				local url = require("diagnostics.issue_link").build_url(bridge.config().templates, repo, "bug", stable)
-				helpers.assert_eq(calls[4], "xdg-open " .. string.format("%q", url) .. " >/dev/null 2>&1 &")
+				helpers.assert_eq(calls[4], { executable = "xdg-open", args = { url } })
 			end, debug.traceback)
 			fs.write, package.loaded["adapters.shell_runner"] = old_write, old_shell
 			if not ok then error(err, 0) end
 		end)
 	end)
+end)
+
+
+--- Owns only a deferred launcher port; every returned native-style receipt is
+--- delivered explicitly by the subject, outside the producer's protected call.
+local function with_deferred_opener(body)
+	with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
+		local shell, fs = package.loaded["adapters.shell_runner"], require("adapters.file_system")
+		local held_write = fs.write
+		context.openers, context.writes = {}, 0
+		fs.write = function()
+			context.writes = context.writes + 1
+			if context.after_write then context.after_write() end
+			return true
+		end
+		package.loaded["adapters.shell_runner"] = {
+			quote = require("adapters.shell_runner").quote, run = function() return true end,
+			run_async = function(program, args, _, done)
+				local call = { program = program, args = args, done = done, cancelled = 0 }
+				context.openers[#context.openers + 1] = call
+				return { cancel = function() call.cancelled = call.cancelled + 1; if context.on_cancel then context.on_cancel() end end }
+			end,
+		}
+		local function request()
+			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 90 }, {}, page(context))
+			return bridge.on_message({ action = "report", text = exported.share_text, fields = {} }, {}, page(context))
+		end
+		local ok, detail = xpcall(function()
+			bridge.on_message("ready", {}, page(context)); body(bridge, context, request)
+		end, debug.traceback)
+		fs.write, package.loaded["adapters.shell_runner"] = held_write, shell
+		if not ok then error(detail, 0) end
+	end)
+end
+
+helpers.describe("diagnostics asynchronous opener ownership", function()
+	helpers.it("(diagnostic-opener-session) awaits reveal and browser, then delivers the actual failure", function()
+		with_deferred_opener(function(_, c, request)
+			helpers.assert_nil(request()); helpers.assert_eq(#c.openers, 1); helpers.assert_eq(#c.pushed, 0)
+			c.openers[1].done({ ok = false, code = 23, error = "native reveal refused" })
+			helpers.assert_eq(#c.openers, 2, "reveal refusal stays warning-only after the completed save")
+			helpers.assert_eq(#c.pushed, 0, "browser admission does not acknowledge report completion")
+			c.openers[2].done({ ok = false, code = 24, error = "native browser refused" })
+			helpers.assert_eq(#c.pushed, 1)
+			local result = require("json").decode(c.pushed[1]:match("receiveDiagnostics%((.*)%)$"))
+			helpers.assert_eq(result.ok, false); helpers.assert_eq(result.action, "report")
+			c.openers[2].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
+		end)
+	end)
+	for _, retirement in ipairs({ "refresh", "ready", "close", "native_close", "epoch" }) do
+		helpers.it("(diagnostic-opener-session) " .. retirement .. " revokes pending continuation", function()
+			with_deferred_opener(function(bridge, c, request)
+				helpers.assert_nil(request())
+				if retirement == "refresh" then bridge.on_message({ action = "refresh", detailed = false, extensive = false }, {}, page(c))
+				elseif retirement == "ready" then bridge.on_message("ready", {}, page(c))
+				elseif retirement == "close" then bridge.on_message({ action = "close" }, {}, page(c))
+				elseif retirement == "native_close" then bridge.on_window_closed(c.epoch)
+				else c.epoch = c.epoch + 1 end
+				c.openers[1].done({ ok = true, code = 0 })
+				helpers.assert_eq(#c.openers, 1, "retired reveal cannot open a browser")
+				helpers.assert_eq(#c.pushed, 0, "no old action receipt reaches the replacement generation")
+			end)
+		end)
+	end
+	helpers.it("(diagnostic-opener-session) a newer action owns the only completion", function()
+		with_deferred_opener(function(_, c, request)
+			helpers.assert_nil(request())
+			helpers.assert_nil(request()); helpers.assert_true(c.openers[1].cancelled > 0)
+			c.openers[1].done({ ok = true, code = 0 }); helpers.assert_eq(#c.openers, 2)
+			c.openers[2].done({ ok = true, code = 0 }); helpers.assert_eq(#c.openers, 3)
+			c.openers[3].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-session) synchronous save reentry cannot dispatch the retired reveal", function()
+		with_deferred_opener(function(bridge, c, request)
+			c.after_write = function() bridge.on_message({ action = "refresh", detailed = false, extensive = false }, {}, page(c)) end
+			helpers.assert_nil(request()); helpers.assert_eq(c.writes, 1); helpers.assert_eq(#c.openers, 0)
+			helpers.assert_eq(#c.pushed, 0)
+		end)
+	end)
+end)
+
+helpers.describe("diagnostic opener cancellation reentry", function()
+	helpers.it("(opener-cancel-reentry) preserves a nested action instead of overwriting it", function()
+		with_deferred_opener(function(_, c, request)
+			request()
+			c.on_cancel = function() c.on_cancel = nil; request() end
+			request()
+			helpers.assert_eq(#c.openers, 2)
+			c.openers[2].done({ ok = true, code = 0 })
+			helpers.assert_eq(#c.openers, 3)
+			c.openers[3].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
+		end)
+	end)
+	for _, transition in ipairs({ "ready", "native_close" }) do
+		helpers.it("(opener-cancel-reentry) " .. transition .. " retains the replacement page", function()
+			with_deferred_opener(function(bridge, c, request)
+				request()
+				c.on_cancel = function() c.on_cancel = nil; bridge.on_message("ready", {}, page(c)); request() end
+				if transition == "ready" then bridge.on_message("ready", {}, page(c)) else bridge.on_window_closed(c.epoch) end
+				helpers.assert_eq(#c.openers, 2)
+				c.openers[2].done({ ok = true, code = 0 }); helpers.assert_eq(#c.openers, 3)
+				c.openers[3].done({ ok = true, code = 0 }); helpers.assert_eq(#c.pushed, 1)
+			end)
+		end)
+	end
 end)

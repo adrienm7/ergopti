@@ -74,6 +74,18 @@ local _folded = 0
 -- The error the next window opens for, and the open window's session
 local _pending = nil
 local _session = nil
+local _action_revision = 0
+
+--- Retires this page's action before its child can call back into a successor.
+local function cancel_action(session)
+	_action_revision = _action_revision + 1
+	local revision = _action_revision
+	if not session then return revision end
+	local request = session.action_request
+	session.action_token, session.action_request = nil, nil
+	if request then request.cancel() end
+	return revision
+end
 
 -- Seconds on a monotonic clock, replaceable by tests
 M.clock = function() return require("infra.monotonic").now_ms() / 1000 end
@@ -224,21 +236,30 @@ end
 --- for a window that shows a failure of its own (the update-check window): the
 --- same diagnostics report, redacted, the same prefilled issue form.
 --- @param record table { kind = "error", module, message, time }
---- @return boolean reported
-function M.report(record)
-	if _scope_owner ~= nil or _scope_busy then return false end
+--- @return table|nil cancellable report; completion receives its actual outcome.
+function M.report(record, complete, current)
+	assert(type(complete) == "function" and type(current) == "function", "Error report needs its completion owner")
+	local generation = _scope_generation
+	local function owned()
+		return current() == true and generation == _scope_generation and _scope_owner == nil and not _scope_busy
+			and package.loaded["ui.error_dialog.bridge"] == M
+	end
+	if not owned() then return nil end
 	local ok_report, fields = pcall(build_report, record)
+	if not owned() then return nil end
 	if not ok_report then
-		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module),
-			tostring(fields))
-		return false
+		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module), tostring(fields))
+		if owned() then complete(false) end
+		return nil
 	end
 	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
 		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
-	local result = require("ui.healthcheck.report").perform(
+	if not owned() then return nil end
+	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
-		fields.paths, fields.documents, fields.context, nil, fields.snapshot)
-	return result.ok == true
+		fields.paths, fields.documents, fields.context, nil, fields.snapshot, {
+			current = owned, complete = function(result) if owned() then complete(result.ok == true, result.missing == true) end end,
+		})
 end
 
 --- The page's first message: the error and its report, already redacted.
@@ -270,11 +291,13 @@ end
 
 --- Frees the policy for the next window.
 local function settle()
+	local previous = _session
 	_scheduled = nil
 	_busy = false
 	_folded = 0
 	_pending = nil
 	_session = nil
+	cancel_action(previous)
 end
 
 --- Opens the window for the pending error.
@@ -327,13 +350,16 @@ end
 --- Pushes a message into the open window.
 --- @param message table
 --- @return boolean pushed
-local function push(message)
+local function push(message, expected)
+	local manager = require("ui.webview_manager")
+	if expected and (_session ~= expected or manager.current_epoch(APP) ~= expected.epoch) then return false end
 	local ok, json = pcall(require("json").encode, message)
 	if not ok then
 		Logger.error(LOG, "An error window message could not be encoded: %s.", tostring(json))
 		return false
 	end
-	return require("ui.webview_manager").eval_js(APP, "if(window.receiveErrorDialog)window.receiveErrorDialog(" .. json .. ")")
+	if expected and (_session ~= expected or manager.current_epoch(APP) ~= expected.epoch) then return false end
+	return manager.eval_js(APP, "if(window.receiveErrorDialog)window.receiveErrorDialog(" .. json .. ")")
 end
 
 --- Performs one action of the page.
@@ -362,8 +388,28 @@ local function perform(name, context)
 	else
 		action = { action = "open_path", id = session.open_id }
 	end
-	local result = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot)
-	return { type = "action", action = name, ok = result.ok == true, missing = result.missing == true }
+	local revision = cancel_action(session)
+	if _session ~= session or revision ~= _action_revision then return nil end
+	local token = { snapshot = session.snapshot, generation = _scope_generation }
+	session.action_token = token
+	local inline, answer, completed = true, nil, false
+	local function current()
+		return _session == session and session.action_token == token and session.snapshot == token.snapshot
+			and _scope_generation == token.generation and require("ui.webview_manager").current_epoch(APP) == session.epoch
+	end
+	local request = require("ui.healthcheck.report").perform(action, session.paths, session.documents, session.context, nil, session.snapshot, {
+		current = current,
+		complete = function(result)
+			if not current() or completed then return end
+			completed = true
+			session.action_request = nil
+			local message = { type = "action", action = name, ok = result.ok == true, missing = result.missing == true }
+			if inline then answer = message else push(message, session) end
+		end,
+	})
+	inline = false
+	if current() and not completed then session.action_request = request else request.cancel() end
+	return answer
 end
 
 --- Handles an incoming page message.
@@ -382,7 +428,11 @@ function M.on_message(payload, _state, context)
 			Logger.error(LOG, "The error report could not be built: %s.", tostring(fields))
 			return nil
 		end
+		local previous = _session
+		local revision = cancel_action(previous)
+		if _session ~= previous or revision ~= _action_revision then return nil end
 		_session = fields
+		_session.epoch = type(context) == "table" and context.epoch or nil
 		_session.record = _pending
 		return init_message(_session)
 	end
