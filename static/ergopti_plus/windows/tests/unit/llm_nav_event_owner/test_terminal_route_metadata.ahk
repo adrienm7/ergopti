@@ -361,6 +361,96 @@ _LNTR_TypedMarshalCase() {
 	AssertThrows(() => _LLM_NavEventOwnerTerminalRouteMarshal(Hole), "holes cannot become zeroed native registrations")
 }
 
+; Literal kind6 ABI data; this fixture never claims a registered binding source.
+_DDBA_Route(Scan) {
+	return Map("recipe_id", 301, "route_id", 11, "required_prefixes", 0,
+		"prefix_bit", 0, "required_dead_key_id", 0, "next_dead_key_id", 0,
+		"code", Scan, "target_vk", 0, "target_scan", 0,
+		"axis", 2, "kind", 6, "required_modifiers", 0, "effective_modifiers_lr", 0)
+}
+
+_DDBA_Marshal() {
+	Loop 10 {
+		Scan := A_Index + 1
+		Route := _DDBA_Route(Scan)
+		Bytes := _LLM_NavEventOwnerTerminalRouteMarshal([Route])
+		AssertEqual(40, Bytes.Size)
+		AssertEqual(301, NumGet(Bytes, 0, "UInt64"))
+		AssertEqual(11, NumGet(Bytes, 8, "UInt"))
+		AssertEqual(Scan, NumGet(Bytes, 28, "UShort"))
+		AssertEqual(0, NumGet(Bytes, 30, "UShort"), "source intent cannot guess a host VK")
+		AssertEqual(0, NumGet(Bytes, 32, "UShort"), "source intent cannot guess a host scan")
+		AssertEqual(2, NumGet(Bytes, 34, "UChar"))
+		AssertEqual(6, NumGet(Bytes, 35, "UChar"), "direct intent is distinct from KLE Unicode kind2")
+		Read := _LLM_NavEventOwnerTerminalRouteRead(Bytes, 0)
+		for Name, Value in Route
+			AssertEqual(Value, Read[Name], "the exact native descriptor survives AHK ABI transport")
+	}
+}
+
+_DDBA_Refusals() {
+	for Mutation in [Map("axis", 1), Map("code", 1), Map("code", 0x0C),
+		Map("target_vk", 0x31), Map("target_scan", 2), Map("required_modifiers", 1),
+		Map("required_prefixes", 1), Map("prefix_bit", 1),
+		Map("required_dead_key_id", 1), Map("next_dead_key_id", 1),
+		Map("effective_modifiers_lr", 1), Map("kind", 7)] {
+		Route := _DDBA_Route(2)
+		for Name, Value in Mutation
+			Route[Name] := Value
+		AssertThrows(() => _LLM_NavEventOwnerTerminalRouteMarshal([Route]),
+			"direct-digit metadata rejects transforms, guessed targets and out-of-family sources")
+	}
+}
+
+_DDBA_Decode() {
+	Loop 10 {
+		Scan := A_Index + 1
+		for Edge in [[0, 0], [0, 1], [1, 0]] {
+			Receipt := _LNTR_Receipt(301, 11)
+			NumPut("UShort", 0x31, "UShort", Scan, Receipt, 136)
+			NumPut("UChar", Edge[1], "UChar", Edge[2], Receipt, 141)
+			NumPut("UShort", Scan, Receipt, 172)
+			NumPut("UChar", 6, Receipt, 179)
+			Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(Receipt, 901)
+			AssertEqual(6, Snapshot["route"]["kind"])
+			AssertEqual(Scan, Snapshot["route"]["code"])
+			AssertEqual(Edge[1], Snapshot["event"]["key_up"])
+			AssertEqual(Edge[2], Snapshot["event"]["repeat"])
+			AssertTrue(Snapshot["metadata_only"])
+			AssertFalse(Snapshot["cohort_complete"])
+			AssertFalse(Snapshot["transformed_output_enabled"])
+			AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+				"a source-only direct digit cannot be stepped through the KLE Unicode model")
+		}
+	}
+}
+
+_DDBA_NoKLEReinterpretation() {
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Admission := _LLM_NavEventOwnerTerminalRouteRecipes[19]
+	AssertEqual(2, Admission["route"]["kind"], "the original retained recipe is a real KLE Unicode digit")
+	AssertEqual("1", KeylayoutEmulation_StepReplayRoute(Admission["recipe"], "none")["Output"])
+	; Match every public fixture identity so only the source-family exclusion can
+	; prevent a direct digit from being reinterpreted through that KLE model.
+	Route := _DDBA_Route(2), Route["recipe_id"] := 19, Route["route_id"] := 19
+	Admission["route"] := Route.Clone()
+	Receipt := _LNTR_Receipt(19, 19)
+	NumPut("UShort", 2, Receipt, 138)
+	NumPut("UShort", 2, Receipt, 172)
+	NumPut("UChar", 6, Receipt, 179)
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(Receipt, 901)
+	AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+		"even a matching retained KLE digit cannot give source-only kind6 Unicode output")
+}
+
+Test("direct-digit-metadata-abi: ten source scans retain exact targetless x64 descriptors", _DDBA_Marshal)
+Test("direct-digit-metadata-abi: targets chords transforms and invalid scans refuse", _DDBA_Refusals)
+Test("direct-digit-metadata-abi: Down repeat Up remain diagnostic without Unicode stepping", _DDBA_Decode)
+Test("direct-digit-metadata-abi: matching retained KLE digit cannot authorize Unicode reinterpretation",
+	() => _LNTR_WithState(_DDBA_NoKLEReinterpretation))
+
 Test("terminal route metadata: authoritative subset marshals exact x64 descriptors (todo49-route-adapter)",
 	() => _LNTR_WithState(_LNTR_MarshalCase))
 Test("terminal route metadata: refusal preserves admitted recipes and coverage (todo49-route-adapter)",

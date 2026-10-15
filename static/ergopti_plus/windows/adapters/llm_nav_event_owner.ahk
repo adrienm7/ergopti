@@ -3003,7 +3003,7 @@ _LLM_NavEventOwnerTerminalRouteValidate(Route) {
 		"required_prefixes", 0xFFFFFFFF, "prefix_bit", 0xFFFFFFFF,
 		"required_dead_key_id", 0xFFFFFFFF, "next_dead_key_id", 0xFFFFFFFF,
 		"code", 0x1FF, "target_vk", 0xFF, "target_scan", 0x1FF,
-		"axis", 2, "kind", 5, "required_modifiers", 15, "effective_modifiers_lr", 255)
+		"axis", 2, "kind", 6, "required_modifiers", 15, "effective_modifiers_lr", 255)
 	for Name, Maximum in Limits
 		if !Route.Has(Name) || !(Route[Name] is Integer)
 				|| Route[Name] < 0 || Route[Name] > Maximum
@@ -3013,6 +3013,16 @@ _LLM_NavEventOwnerTerminalRouteValidate(Route) {
 			|| (Route["axis"] == 1 && Route["code"] > 255)
 			|| (Route["target_vk"] != 0 && Route["target_scan"] != 0)
 		throw ValueError("The terminal route key identity is invalid.")
+	if Route["kind"] == 6 {
+		; Source intent cannot inherit KLE text or guess a host output identity.
+		if Route["axis"] != 2 || Route["code"] < 0x02 || Route["code"] > 0x0B
+				|| Route["target_vk"] || Route["target_scan"]
+				|| Route["required_modifiers"] || Route["required_prefixes"]
+				|| Route["prefix_bit"] || Route["effective_modifiers_lr"]
+				|| Route["required_dead_key_id"] || Route["next_dead_key_id"]
+			throw ValueError("The direct-digit source descriptor is invalid.")
+		return true
+	}
 	Transform := Route["kind"] == 4 || Route["kind"] == 5
 	if Transform {
 		if Route["required_modifiers"] || Route["required_prefixes"]
