@@ -945,4 +945,56 @@ check('literal Unit lot produces the unchanged complete role and receipt', () =>
 });
 assert.equal(controls, 160, 'all prior 141 controls and 19 literal Unit controls execute');
 
+/** The native composition validator needs the approved commit's complete HEAD ancestry. */
+function assertManagedNativeHistory(workflow) {
+	const condition =
+		"${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}";
+	const checkouts = workflow.jobs['e2e-hs'].steps.filter(
+		(step) => step.uses === 'actions/checkout@v4' && step.if === condition
+	);
+	assert.equal(checkouts.length, 1, 'Exact managed native checkout required');
+	assert.deepEqual(
+		checkouts[0].with,
+		{ 'fetch-depth': 0 },
+		'Managed native ancestry requires complete Git history'
+	);
+	return checkouts[0];
+}
+check('managed native checkout retains full history for approved source ancestry', () => {
+	assertManagedNativeHistory(YAML.parse(literalUnitSource, { uniqueKeys: true }));
+});
+for (const [name, mutate] of [
+	['missing history input', (checkout) => delete checkout.with],
+	['depth one', (checkout) => (checkout.with['fetch-depth'] = 1)],
+	['boolean depth', (checkout) => (checkout.with['fetch-depth'] = false)],
+	['other finite depth', (checkout) => (checkout.with['fetch-depth'] = 2)],
+	[
+		'full history on the wrong role',
+		(checkout, workflow) => {
+			delete checkout.with;
+			const other = workflow.jobs['e2e-hs'].steps.find(
+				(step) => step.uses === 'actions/checkout@v4' && step.if !== checkout.if
+			);
+			assert.ok(other, 'A distinct checkout must witness wrong-role refusal');
+			other.with = { 'fetch-depth': 0 };
+		}
+	],
+	[
+		'changed role guard',
+		(checkout) => {
+			checkout.if = checkout.if.replace("'managed-ollama-native'", "'tooltip-canvas'");
+		}
+	]
+])
+	check('managed native history refuses ' + name, () => {
+		const changed = YAML.parse(literalUnitSource, { uniqueKeys: true });
+		mutate(assertManagedNativeHistory(changed), changed);
+		assert.throws(() => assertManagedNativeHistory(changed), assert.AssertionError);
+	});
+assert.equal(
+	controls,
+	167,
+	'all prior 160 controls and seven managed native history controls execute'
+);
+
 console.log('macos-stage-roles: ' + controls + ' controls passed');
