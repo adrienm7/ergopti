@@ -4581,7 +4581,12 @@ Windows PC acceptance, delegated to the maintainer:
   leaves the Accessibility dialog and guardian state untouched; a failed
   preference read also retires this guide. The 13 original portable Lua cases
   and four new regressions pass; the original implementation fails all four
-  new cases. Native window and Login Items approval acceptance remain open.
+  new cases. Cleanup now retains the original dialog and poll until native
+  deletion and timer stop acknowledge completion; retries do not reopen steps
+  or overwrite a window created by a close callback. Focused portable receiving
+  passes all 20 guide and 16 dialog cases, retaining the earlier assertions and
+  seven additive causal controls. Native window and Login Items approval
+  acceptance remain open.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows

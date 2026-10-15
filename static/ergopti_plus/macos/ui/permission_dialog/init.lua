@@ -308,12 +308,17 @@ end
 --- @return boolean shown True when the dialog of this kind is open.
 function M.show(spec)
 	validate(spec)
+	if _session ~= nil and _session.closing then return false end
 	if _session ~= nil and _session.kind == spec.kind then
 		raise(_session)
 		return true
 	end
 	if _session ~= nil and M.close(_session.kind) ~= true then
 		Logger.error(LOG, "The %s permission dialog could not replace the open one.", spec.kind)
+		return false
+	end
+	if _session ~= nil then
+		Logger.info(LOG, "A permission dialog opened during close; the %s request was superseded.", spec.kind)
 		return false
 	end
 
@@ -353,6 +358,7 @@ function M.show(spec)
 		focus         = not floating,
 		chrome        = floating and ui_builder.PERMISSION_DIALOG_CHROME or nil,
 		on_close      = function()
+			session.closed = true
 			if _session == session then
 				_session = nil
 				Logger.info(LOG, "The %s permission dialog was closed by the user.", session.kind)
@@ -386,14 +392,24 @@ end
 function M.close(kind)
 	local session = _session
 	if session == nil or (kind ~= nil and session.kind ~= kind) then return true end
-	_session = nil
-	notify_closed(session)
+	if session.closing then return false end
+	session.closing = true
 	local webview = session.webview
-	if webview == nil then return true end
-	local ok, err = pcall(function() webview:delete() end)
+	local ok, err = pcall(function()
+		if webview ~= nil then webview:delete() end
+	end)
+	session.closing = false
 	if not ok then
-		Logger.error(LOG, "The %s permission dialog could not be closed: %s.", session.kind, tostring(err))
-		return false
+		Logger.error(LOG, "The %s permission dialog deletion raised: %s.", session.kind, tostring(err))
+		if session.closed ~= true then return false end
+	end
+	-- A native close callback can already have released this exact session.
+	-- Otherwise successful deletion is its acknowledgement; a refusal keeps
+	-- the original window and callback available to the next cleanup attempt.
+	if _session == session then
+		session.closed = true
+		_session = nil
+		notify_closed(session)
 	end
 	Logger.info(LOG, "The %s permission dialog closed.", session.kind)
 	return true
