@@ -43,7 +43,11 @@ final class OwnedRuntimeBootstrapStageOwner {
 		return plan.retire()
 	}
 	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
-	/// Disposable filesystem effect controls return only an ACK, never a production stage/publication owner.
+	struct InitializerCloseResult: Equatable { let status: Int32, error: Int32 }
+	/// Observes real direct-descriptor closes; never returns a production stage/publication owner.
+	static func fixtureRejectedInitializerRetirement(stage: URL) throws -> [InitializerCloseResult]? {
+		try OwnedRuntimeBootstrapStagePlan.fixtureRejectedInitializerRetirement(stage: stage)
+	}
 	static func fixtureRetire(stage: URL, afterPin: (() throws -> Void)? = nil) throws -> Bool {
 		let plan = try OwnedRuntimeBootstrapStagePlan(stage: stage, protected: false)
 		try afterPin?(); return plan.retire()
@@ -58,18 +62,62 @@ private final class OwnedRuntimeBootstrapStagePlan {
 	private let parentDescriptor: Int32
 	private var nodes: [Node] = []
 	private var closeRefused = false, started = false, completed = false, parentClosed = false
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	private final class InitializerRetirementObservation { var result: [OwnedRuntimeBootstrapStageOwner.InitializerCloseResult]? }
+	private static let observationKey = "com.ergoptiplus.tests.bootstrap-stage-initializer-retirement"
+	private var initializerObservation: InitializerRetirementObservation?
+	#endif
 	init(stage: URL, protected: Bool) throws {
 		self.stage = stage; self.protected = protected
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		initializerObservation = Thread.current.threadDictionary[Self.observationKey] as? InitializerRetirementObservation
+		#endif
 		parentTree = try OwnedRuntimeInstallTree(root: stage.deletingLastPathComponent(), protected: protected, includeChildren: false)
 		snapshot = try OwnedRuntimeInstallTree(root: stage, protected: protected)
 		parentDescriptor = try parentTree.duplicateRootDescriptor()
-		var complete = false
-		defer { if !complete { for node in nodes { Darwin.close(node.descriptor) }; Darwin.close(parentDescriptor) } }
+		// Initialized self owns the parent and captured nodes; deinit also runs after a late throw.
 		guard try FileManager.default.contentsOfDirectory(atPath: stage.path).sorted() == ["Helper.app"] else { throw OwnedRuntimeInstallFailure.source }
 		try snapshot.verify(); try capture(parent: parentDescriptor, name: stage.lastPathComponent, relative: "")
-		try snapshot.verify(); try parentTree.verifyAnchor(); complete = true
+		try snapshot.verify(); try parentTree.verifyAnchor()
 	}
-	deinit { for node in nodes { Darwin.close(node.descriptor) }; if !parentClosed { Darwin.close(parentDescriptor) } }
+	deinit {
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		var results: [OwnedRuntimeBootstrapStageOwner.InitializerCloseResult] = []
+		#endif
+		for node in nodes {
+			let status = Darwin.close(node.descriptor)
+			#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+			let closeError = status == 0 ? 0 : errno
+			results.append(.init(status: status, error: closeError))
+			#endif
+			if status != 0 { closeRefused = true }
+		}
+		if !parentClosed {
+			parentClosed = true
+			let status = Darwin.close(parentDescriptor)
+			#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+			let closeError = status == 0 ? 0 : errno
+			results.append(.init(status: status, error: closeError))
+			#endif
+			if status != 0 { closeRefused = true }
+		}
+		#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+		initializerObservation?.result = results
+		#endif
+	}
+	#if ERGOPTI_GUARDIAN_TEST_SUPPORT
+	static func fixtureRejectedInitializerRetirement(stage: URL) throws -> [OwnedRuntimeBootstrapStageOwner.InitializerCloseResult]? {
+		guard Thread.current.threadDictionary[observationKey] == nil else { throw OwnedRuntimeInstallFailure.source }
+		let observation = InitializerRetirementObservation()
+		Thread.current.threadDictionary[observationKey] = observation
+		defer { Thread.current.threadDictionary.removeObject(forKey: observationKey) }
+		do {
+			_ = try OwnedRuntimeBootstrapStagePlan(stage: stage, protected: false)
+			throw OwnedRuntimeInstallFailure.destination
+		} catch OwnedRuntimeInstallFailure.destination { throw OwnedRuntimeInstallFailure.destination }
+		catch { return observation.result }
+	}
+	#endif
 	private func protection(_ descriptor: Int32, _ value: stat) throws {
 		guard value.st_mode & 0o6022 == 0, !protected || value.st_uid == 0 else { throw OwnedRuntimeInstallFailure.protection }
 		guard let acl = acl_get_fd_np(descriptor, ACL_TYPE_EXTENDED) else { throw OwnedRuntimeInstallFailure.protection }
