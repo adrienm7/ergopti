@@ -12612,6 +12612,17 @@ compiled or enrolled by production and cannot complete item91.
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
 
+  The joined macOS scope run exposed ten regressions in the configured
+  Navigation reservation change: nine fixtures lacked the genuine compiled
+  inventory, and None incorrectly bypassed ordinary collision admission.
+  The fixture now receives the real Nav/remap compilation receipt; only the
+  new Navigation acquisition is bypassed for None. All 27 original cases
+  remain, with three additive boundaries: original 17/10, fixed 30/0,
+  production withdrawal 27/3, fixture withdrawal 21/9 and restoration 30/0.
+  The existing adjacent preflight passes 23/0. These controlled components
+  preserve explicit Generator/deploy/lease doubles; complete final-source
+  macOS and native receiving remain required.
+
   Linux navigation now admits original-load bytes only after the unchanged
   shared classified reader acknowledges close. Actual absence remains absence;
   failed reads or false/nil close acknowledgements refuse the source. Boot
