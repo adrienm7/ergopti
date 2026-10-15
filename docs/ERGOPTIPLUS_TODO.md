@@ -5312,6 +5312,15 @@ The original twelve queue scenarios and added four dispatcher scenarios are
 source-reviewed, not executed by this receiving. Native compilation, signing,
 queue behavior, helper17 and physical acceptance remain unqualified.
 
+The three existing SDK source-dependency owners now bind that reviewed queue-only
+builder through their complete entry-to-receiver-to-loader chain. All fourteen
+original portable route cases remain; three additional source controls reject
+historical or altered builders and changed dependency modules before any child
+can start. Normal and optimized receiving each pass seventeen cases; four
+protected builder-capture cases also pass in each mode. Historical approvals,
+source profiles and independent expectations remain unchanged. No SDK build,
+native compiler, signed product or driver-update profile is qualified here.
+
 Ordinary launcher child environments now discard an inherited installed-capture
 control marker before launching Hammerspoon. Fresh-owned selected launches add
 only their original newly issued marker after that boundary. The three frozen

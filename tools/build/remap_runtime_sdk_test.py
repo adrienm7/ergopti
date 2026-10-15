@@ -3,6 +3,7 @@
 from contextlib import ExitStack
 import importlib.util
 import inspect
+import subprocess
 from pathlib import Path
 import sys
 import tempfile
@@ -431,11 +432,117 @@ class SDKRouteControls(unittest.TestCase):
             with self.subTest(sdk=sdk):
                 self.report_package_route(sdk=sdk, refuse_source=True)
 
+    QUEUE_BUILD_SHA = "24065c518469ac9d60ba3d0888e053ee0158642e5720c4caff64121dd280ceee"
+    PREVIOUS_BUILD_SHA = "a59fa9603e6be88f7ec701f808c6789bcdeff1371de65de143fdf9a3d8f07f5c"
+
+    def protected_source_fixture(self, root):
+        repository = Path(__file__).resolve().parents[2]
+        for relative in (
+            "tools/diagnostics/hs274_native_build.py",
+            "tools/build/remap_runtime_source.py",
+            "tools/build/remap_runtime_build.py",
+            "tools/build/core_sdk/operational_core_source.py",
+            "tools/build/core_sdk/receive_core_sdk.py",
+            "tools/build/core_sdk/run_core_sdk.py",
+        ):
+            leaf = root / relative
+            leaf.parent.mkdir(parents=True, exist_ok=True)
+            leaf.write_bytes((repository / relative).read_bytes())
+        return root / "tools/build/core_sdk"
+
+    def previous_protected_builder(self, current):
+        fixture_paths = (
+            b'"tools/build/fixtures/owned_runtime_queue_test.cpp":',
+            b'"tools/build/fixtures/owned_runtime_queue_ports.hpp":',
+            b'"tools/build/fixtures/owned_runtime_dispatcher_test.cpp":',
+        )
+        previous = b"".join(
+            line
+            for line in current.splitlines(keepends=True)
+            if not any(path in line for path in fixture_paths)
+        ).replace(
+            b"afdd012bee750b713d10665e28c35705318bc6f4ae1bb9a54f7e96105912b22a",
+            b"ca54e61d19dd071fc23ce991efc1a9a2798304a6486872261a092019ad97ec58",
+        )
+        self.assertEqual(BUILD.BASE.digest(previous), self.PREVIOUS_BUILD_SHA)
+        return previous
+
+    def test_queue_only_builder_has_genuine_source_issuer(self):
+        repository = Path(__file__).resolve().parents[2]
+        current = (repository / "tools/build/remap_runtime_build.py").read_bytes()
+        self.assertEqual(BUILD.BASE.digest(current), self.QUEUE_BUILD_SHA)
+        source = load(
+            "queue_sdk_actual_source", Path(__file__).parent / "core_sdk/operational_core_source.py"
+        )
+        with (
+            patch.object(subprocess, "run", side_effect=AssertionError("No native command")),
+            patch.object(subprocess, "Popen", side_effect=AssertionError("No child")),
+        ):
+            build, factory, path, _, data = source._load_build(repository, time.monotonic() + 30)
+            self.assertEqual(data, current)
+            self.assertEqual(path, repository / "tools/build/remap_runtime_build.py")
+            self.assertIs(build._source_factory(), factory)
+            self.assertEqual(
+                build.SOURCE_FACTORY_SHA256,
+                "9caa7c6b7a89fd1420452b59c4c5697a7a2aaaa9293498652f6b8a6628094c9d",
+            )
+            self.assertFalse(hasattr(build, "DRIVER_UPDATE_OWNED_SOURCE_PROFILE"))
+
+    def test_old_or_altered_builder_refuses_before_native(self):
+        repository = Path(__file__).resolve().parents[2]
+        current = (repository / "tools/build/remap_runtime_build.py").read_bytes()
+        self.assertEqual(BUILD.BASE.digest(current), self.QUEUE_BUILD_SHA)
+        for data in (self.previous_protected_builder(current), current + b"\n# altered builder\n"):
+            with (
+                self.subTest(digest=BUILD.BASE.digest(data)),
+                tempfile.TemporaryDirectory() as temporary,
+            ):
+                root = Path(temporary).resolve()
+                directory = self.protected_source_fixture(root)
+                (root / "tools/build/remap_runtime_build.py").write_bytes(data)
+                source = load("queue_sdk_refused_source", directory / "operational_core_source.py")
+                with (
+                    patch.object(
+                        subprocess, "run", side_effect=AssertionError("No native command")
+                    ),
+                    patch.object(subprocess, "Popen", side_effect=AssertionError("No child")),
+                ):
+                    with self.assertRaisesRegex(RuntimeError, "Fixed SDK build owner changed"):
+                        source._load_build(root, time.monotonic() + 30)
+                self.assertIsNone(source._BUILD)
+
+    def test_actual_sdk_entry_import_binds_receiver_and_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary).resolve()
+            directory = self.protected_source_fixture(root)
+            with (
+                patch.object(subprocess, "run", side_effect=AssertionError("No native command")),
+                patch.object(subprocess, "Popen", side_effect=AssertionError("No child")),
+            ):
+                entry = load("queue_sdk_actual_entry", directory / "run_core_sdk.py")
+                receiver = sys.modules[entry.receive.__module__]
+                self.assertIs(entry.receive, receiver.receive)
+                self.assertEqual(receiver.source.BUILD_SHA, self.QUEUE_BUILD_SHA)
+                receiver.source._load_build(root, time.monotonic() + 30)
+                for filename, message in (
+                    ("operational_core_source.py", "Fixed operational source owner changed"),
+                    ("receive_core_sdk.py", "Fixed SDK receiving source changed"),
+                ):
+                    with self.subTest(filename=filename):
+                        leaf = directory / filename
+                        original = leaf.read_bytes()
+                        try:
+                            leaf.write_bytes(original + b"\n# altered dependency\n")
+                            with self.assertRaisesRegex(RuntimeError, message):
+                                load("queue_sdk_tampered_entry", directory / "run_core_sdk.py")
+                        finally:
+                            leaf.write_bytes(original)
+
 
 if __name__ == "__main__":
     suite = unittest.defaultTestLoader.loadTestsFromTestCase(SDKRouteControls)
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     print("SDK portable route controls", result.testsRun, "native/signing/packaging unqualified")
     raise SystemExit(
-        0 if result.wasSuccessful() and result.testsRun == 14 and not result.skipped else 1
+        0 if result.wasSuccessful() and result.testsRun == 17 and not result.skipped else 1
     )
