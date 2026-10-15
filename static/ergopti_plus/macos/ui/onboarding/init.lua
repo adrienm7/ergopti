@@ -332,6 +332,16 @@ local function inject_strings(code, owner, view)
 	retitle(owner, view, strings[WINDOW_TITLE_KEY] or WINDOW_TITLE_KEY)
 end
 
+--- The folder retained by an empty wizard input, from its captured destination.
+--- @param config_path string Absolute configuration file path.
+--- @return string|nil folder
+local function empty_config_folder(config_path)
+	local folder = type(config_path) == "string" and config_path:match("^(.*[/\\])[^/\\]+$") or nil
+	if not folder or folder:sub(1, 1) ~= "/" or folder:find("%z") then return nil end
+	-- Native configuration files live under the driver's terminal subdirectory.
+	return (folder:gsub("([/\\])hammerspoon[/\\]$", "%1"))
+end
+
 --- Sends the initData payload (locale, strings, folders and the values in
 --- force) so the first step renders correctly on open.
 local function inject_init_data(owner, view, config_path)
@@ -342,7 +352,7 @@ local function inject_init_data(owner, view, config_path)
 	if not strings then return end
 
 	-- Resolve the current + default config directories so the wizard can
-	-- pre-fill the input AND show the default as a placeholder.
+	-- pre-fill the input when the driver uses a custom folder.
 	local cur_config_dir, default_config_dir = "", ""
 	local ok_mp, menu_paths = pcall(require, "ui.menu.menu_paths")
 	if ok_mp and menu_paths then
@@ -365,6 +375,11 @@ local function inject_init_data(owner, view, config_path)
 	if not publication_is_current(owner, view) or _config_path ~= config_path then return end
 	local values = current_values(config_path)
 	if not values or not publication_is_current(owner, view) or _config_path ~= config_path then return end
+	local empty_config_dir = empty_config_folder(config_path)
+	if not empty_config_dir then
+		Logger.error(LOG, "Onboarding empty configuration folder unresolved for the captured source.")
+		return
+	end
 
 	local config_dir = (cur_config_dir ~= default_config_dir) and cur_config_dir or ""
 	local resolved, metrics_path = pcall(M._metrics_path_for, config_dir)
@@ -381,7 +396,9 @@ local function inject_init_data(owner, view, config_path)
 		-- One locale order for the wizard and every tray language menu.
 		locales            = i18n.get_sorted_locales(),
 		default_config_dir = default_config_dir,
-		-- Empty when the folder is the OS default: the placeholder shows it.
+		-- An empty wizard field retains its captured configuration destination.
+		empty_config_dir   = empty_config_dir,
+		-- Empty when the folder is the OS default.
 		config_dir         = config_dir,
 		system_layout      = system_layout,
 		current            = values,

@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "أجب بنعم لاختيار ما سيتم استيراده.",
 	"onboarding.checklist.summary": "العناصر المراد استيرادها: تم تحديد {1} من {2}",
 	"onboarding.checklist.tap_hold": "نقر: {1} · ضغط مطوّل: {2}",
+	"onboarding.config_folder.hint": "يتم تحميل الملفات الشخصية من هذا المجلد. اترك الحقل فارغًا لاستخدام: {1}",
 	"onboarding.done.body": "تم حفظ الإعدادات. سيتم إعادة تحميل البرنامج الآن.",
 	"onboarding.done.restart_required": "تم حفظ الإعدادات. ستُطبَّق عند التشغيل التالي للبرنامج.",
 	"onboarding.done.title": "اكتمل الإعداد!",

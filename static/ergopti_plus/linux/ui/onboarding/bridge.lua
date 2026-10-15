@@ -217,6 +217,7 @@ local function build_init_data(state)
 		locale = current_locale,
 		strings = strings,
 		default_config_dir = default_dir,
+		empty_config_dir = default_dir,
 		config_dir = current_dir ~= default_dir and current_dir or "",
 		-- The consent text names the metrics store.
 		metrics_path = config_paths.metrics_path(),

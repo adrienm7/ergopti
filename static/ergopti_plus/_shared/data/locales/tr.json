@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Neyin içe aktarılacağını seçmek için Evet yanıtını verin.",
 	"onboarding.checklist.summary": "İçe aktarılacak öğeler: {2} öğeden {1} seçildi",
 	"onboarding.checklist.tap_hold": "dokunma: {1} · basılı tutma: {2}",
+	"onboarding.config_folder.hint": "Kişisel dosyalar bu klasörden yüklenir. {1} klasörünü kullanmak için bu alanı boş bırakın.",
 	"onboarding.done.body": "Yapılandırma kaydedildi. Komut dosyası şimdi yeniden yüklenecek.",
 	"onboarding.done.restart_required": "Yapılandırma kaydedildi. Komut dosyası bir sonraki başlatıldığında geçerli olacak.",
 	"onboarding.done.title": "Kurulum tamamlandı!",

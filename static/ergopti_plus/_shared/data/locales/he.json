@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "ענו כן כדי לבחור מה לייבא.",
 	"onboarding.checklist.summary": "פריטים לייבוא: נבחרו {1} מתוך {2}",
 	"onboarding.checklist.tap_hold": "הקשה: {1} · החזקה: {2}",
+	"onboarding.config_folder.hint": "הקבצים האישיים נטענים מתיקייה זו. יש להשאיר את השדה ריק כדי להשתמש ב־{1}.",
 	"onboarding.done.body": "ההגדרות נשמרו. הסקריפט יטען מחדש עכשיו.",
 	"onboarding.done.restart_required": "ההגדרות נשמרו. הן ייכנסו לתוקף בהפעלה הבאה של הסקריפט.",
 	"onboarding.done.title": "ההגדרה הושלמה!",

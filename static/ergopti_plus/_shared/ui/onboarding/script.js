@@ -37,6 +37,8 @@ var _pages = [];
 var _steps = [STEP_LANGUAGE, STEP_CONFIG];
 var _stepIndex = 0;
 var _configDir = '';
+// Folder the native host commits to when the folder input is empty.
+var _emptyConfigDir = '';
 var _loadedDir = '';
 var _requestedDir = '';
 var _configPending = false;
@@ -533,11 +535,13 @@ function _renderLanguage() {
 function _renderConfig() {
 	document.getElementById('config-title').textContent = _t('dialog.config_folder.title');
 	document.getElementById('config-desc').textContent = _t('dialog.config_folder.label');
-	document.getElementById('config-hint').textContent = _t('dialog.config_folder.hint');
+	document.getElementById('config-hint').textContent = _t('onboarding.config_folder.hint')
+		.split('{1}')
+		.join(_emptyConfigDir);
 	document.getElementById('config-browse').textContent = _t('common.browse');
 	var input = document.getElementById('config-input');
 	input.value = _configDir;
-	input.placeholder = window.DEFAULT_CONFIG_DIR || '';
+	input.placeholder = _emptyConfigDir;
 }
 
 /**
@@ -841,13 +845,16 @@ window.applyStrings = function (payload) {
 /**
  * Called by the host once the page is ready.
  * @param {{locale: string, strings: Object, locales: Array, platform: string,
- *   default_config_dir: string, config_dir: string, current: Object,
+ *   default_config_dir: string, config_dir: string, empty_config_dir: string, current: Object,
  *   metrics_path: string, system_layout?: string}} data
  */
 window.initData = function (data) {
 	var catalogue = _catalogue();
 	var platform = catalogue.platforms[data.platform];
 	if (!platform) throw new Error('onboarding host names an unknown platform: ' + data.platform);
+	if (typeof data.empty_config_dir !== 'string' || data.empty_config_dir.trim() === '') {
+		throw new Error('onboarding host must name the configuration folder used for an empty input');
+	}
 	_platform = data.platform;
 	_pages = platform.pages;
 	_steps = [STEP_LANGUAGE, STEP_CONFIG].concat(
@@ -860,6 +867,7 @@ window.initData = function (data) {
 	window.DEFAULT_CONFIG_DIR = data.default_config_dir || '';
 	window.SYSTEM_LAYOUT = data.system_layout || '';
 	_configDir = typeof data.config_dir === 'string' ? data.config_dir : '';
+	_emptyConfigDir = data.empty_config_dir;
 	_loadedDir = _configDir;
 	_requestedDir = '';
 	_configPending = false;
@@ -997,6 +1005,12 @@ document.getElementById('btn-back').addEventListener('click', function () {
 		_configDir = (document.getElementById('config-input').value || '').trim();
 	}
 	if (_stepIndex > 0) _go(_stepIndex - 1);
+});
+
+document.getElementById('config-input').addEventListener('input', function () {
+	// A delayed locale preview can re-render this step before navigation.
+	// Keep raw edits in the page state; leaving the step owns their admission.
+	_configDir = document.getElementById('config-input').value;
 });
 
 document.getElementById('config-browse').addEventListener('click', function () {

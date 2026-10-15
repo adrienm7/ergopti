@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Svar Ja for å velge hva som skal importeres.",
 	"onboarding.checklist.summary": "Elementer som skal importeres: {1} av {2} valgt",
 	"onboarding.checklist.tap_hold": "trykk: {1} · holdt nede: {2}",
+	"onboarding.config_folder.hint": "Personlige filer lastes inn fra denne mappen. La feltet stå tomt for å bruke: {1}",
 	"onboarding.done.body": "Konfigurasjon lagret. Skriptet lastes inn på nytt nå.",
 	"onboarding.done.restart_required": "Konfigurasjon lagret. Den trer i kraft neste gang skriptet starter.",
 	"onboarding.done.title": "Oppsett fullført!",
