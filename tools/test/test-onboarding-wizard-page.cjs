@@ -313,6 +313,7 @@ function openWizard(extra) {
 				locale: 'en',
 				strings: locale('en'),
 				default_config_dir: '/Volumes/Fixture/me/.config/ergopti_plus/',
+				empty_config_dir: '/Volumes/Fixture/me/.config/ergopti_plus/',
 				locales: [
 					{ code: 'en', flag: '', name: 'English' },
 					{ code: 'fr', flag: '', name: 'Français' }
@@ -2141,6 +2142,120 @@ function advanceToMetrics(page) {
 	);
 	page.window.applyCurrentValues({ request: 2, values: {} });
 	assert.equal(page.el('btn-next').disabled, false);
+})();
+
+// ======================================
+// ======= 10/ Empty folder target ======
+// ======================================
+
+(function anEmptyFolderNamesItsNativeTarget() {
+	const current = '/Volumes/Personal/B/';
+	const osDefault = '/Volumes/Default/A/';
+	for (const platform of ['macos', 'windows', 'linux']) {
+		const target = platform === 'macos' ? current : osDefault;
+		const page = openWizard({
+			platform,
+			config_dir: current,
+			default_config_dir: osDefault,
+			empty_config_dir: target
+		});
+		page.platform = platform;
+		page.click('btn-next');
+		const input = page.el('config-input');
+		assert.equal(input.value, current, platform + ': the current folder stays explicit');
+		assert.equal(input.placeholder, target, platform + ': empty means the native target');
+		assert.equal(
+			page.el('config-hint').textContent,
+			'Personal files are loaded from this folder. Leave empty to use: ' + target,
+			platform + ': the hint names the actual empty target even while the field is filled'
+		);
+
+		input.value = '';
+		input.dispatch('input');
+		page.messages.splice(0);
+		page.click('btn-next');
+		assert.deepEqual(
+			page.messages.find((message) => message.action === 'loadExistingConfig'),
+			{ action: 'loadExistingConfig', config_dir: '', request: 1 },
+			platform + ': the import wire contract still sends the empty field'
+		);
+		page.window.applyCurrentValues({ request: 1, values: {} });
+		page.click('btn-back');
+		page
+			.el('lang-list')
+			.children.find((row) => row.dataset.code === 'fr')
+			.click();
+		page.window.applyStrings({ locale: 'fr', strings: locale('fr') });
+		assert.equal(input.value, '', platform + ': locale changes preserve the empty answer');
+		assert.equal(input.placeholder, target, platform + ': locale changes preserve its target');
+		const done = finish(page);
+		assert.equal(done.answers.config_dir, '', platform + ': Finish retains native empty semantics');
+	}
+})();
+
+(function everyLocaleNamesTheSameEmptyFolderTarget() {
+	const target = '/Volumes/Personal/<B> & {1}/';
+	const codes = fs.readdirSync(LOCALE_DIR).filter((name) => name.endsWith('.json'));
+	const page = openWizard({
+		config_dir: '/Volumes/Explicit/C/',
+		default_config_dir: '/Volumes/Default/A/',
+		empty_config_dir: target,
+		locales: codes.map((name) => ({ code: name.slice(0, -5), flag: '', name }))
+	});
+	page.click('btn-next');
+	assert.equal(codes.length, 21, 'the empty-folder hint covers all 21 locales');
+	for (const name of codes) {
+		const code = name.slice(0, -5);
+		const strings = locale(code);
+		const template = strings['onboarding.config_folder.hint'];
+		assert.equal(typeof template, 'string', code + ': the onboarding-only hint exists');
+		assert.equal(occurrences(template, '{1}'), 1, code + ': exactly one folder placeholder');
+		page
+			.el('lang-list')
+			.children.find((row) => row.dataset.code === code)
+			.click();
+		page.window.applyStrings({ locale: code, strings });
+		assert.equal(
+			page.el('config-hint').textContent,
+			template.replace('{1}', () => target),
+			code + ': path punctuation is rendered literally in text'
+		);
+		assert.equal(page.el('config-input').value, '/Volumes/Explicit/C/');
+		assert.equal(page.el('config-input').placeholder, target);
+	}
+	page.window.setConfigDir('/Volumes/Picked/D/');
+	page
+		.el('lang-list')
+		.children.find((row) => row.dataset.code === 'en')
+		.click();
+	page.window.applyStrings({ locale: 'en', strings: locale('en') });
+	assert.equal(page.el('config-input').value, '/Volumes/Picked/D/');
+	assert.equal(
+		page.el('config-input').placeholder,
+		target,
+		'picking a folder does not redefine empty'
+	);
+})();
+
+(function aMissingEmptyFolderTargetCannotResetThePage() {
+	const page = openWizard({ empty_config_dir: '/Volumes/Captured/B/' });
+	page.click('btn-next');
+	page.window.setConfigDir('/Volumes/Picked/C/');
+	for (const invalid of [undefined, null, '', '   ', 42]) {
+		assert.throws(
+			() => page.window.initData({ platform: 'macos', empty_config_dir: invalid }),
+			/configuration folder used for an empty input/,
+			'an invalid target refuses before resetting the wizard'
+		);
+		assert.equal(page.el('config-input').value, '/Volumes/Picked/C/');
+		assert.equal(page.el('config-input').placeholder, '/Volumes/Captured/B/');
+	}
+})();
+
+(function theFolderTargetScriptInvalidatesTheNativeResourceCache() {
+	const match = html.match(/src="script\.js\?v=(\d+)"/);
+	assert.ok(match, 'the native document versions its onboarding script URL');
+	assert.ok(Number(match[1]) > 7, 'folder-target rendering retires the published v7 script cache');
 })();
 
 console.log(

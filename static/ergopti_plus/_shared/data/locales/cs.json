@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Odpovězte Ano a vyberte, co importovat.",
 	"onboarding.checklist.summary": "Položky k importu: vybráno {1} z {2}",
 	"onboarding.checklist.tap_hold": "klepnutí: {1} · podržení: {2}",
+	"onboarding.config_folder.hint": "Osobní soubory se načítají z této složky. Pro použití složky {1} ponechte pole prázdné.",
 	"onboarding.done.body": "Konfigurace uložena. Skript se nyní znovu načte.",
 	"onboarding.done.restart_required": "Konfigurace uložena. Projeví se při příštím spuštění skriptu.",
 	"onboarding.done.title": "Nastavení dokončeno!",

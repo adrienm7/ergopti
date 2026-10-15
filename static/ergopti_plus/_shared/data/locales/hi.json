@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "क्या आयात करना है, यह चुनने के लिए हाँ चुनें।",
 	"onboarding.checklist.summary": "आयात करने योग्य आइटम: {2} में से {1} चुने गए",
 	"onboarding.checklist.tap_hold": "टैप: {1} · दबाए रखें: {2}",
+	"onboarding.config_folder.hint": "व्यक्तिगत फ़ाइलें इस फ़ोल्डर से लोड की जाती हैं। {1} का उपयोग करने के लिए यह फ़ील्ड खाली छोड़ें।",
 	"onboarding.done.body": "कॉन्फ़िगरेशन सहेजा गया। स्क्रिप्ट अब पुनः लोड होगी।",
 	"onboarding.done.restart_required": "कॉन्फ़िगरेशन सहेजा गया। यह स्क्रिप्ट के अगली बार शुरू होने पर लागू होगा।",
 	"onboarding.done.title": "सेटअप पूर्ण!",

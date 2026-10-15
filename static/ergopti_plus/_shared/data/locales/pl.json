@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Odpowiedz Tak, aby wybrać, co zaimportować.",
 	"onboarding.checklist.summary": "Elementy do zaimportowania: wybrano {1} z {2}",
 	"onboarding.checklist.tap_hold": "stuknięcie: {1} · przytrzymanie: {2}",
+	"onboarding.config_folder.hint": "Pliki osobiste są wczytywane z tego folderu. Pozostaw pole puste, aby użyć: {1}",
 	"onboarding.done.body": "Konfiguracja zapisana. Skrypt zostanie teraz ponownie załadowany.",
 	"onboarding.done.restart_required": "Konfiguracja zapisana. Zostanie zastosowana przy następnym uruchomieniu skryptu.",
 	"onboarding.done.title": "Konfiguracja zakończona!",

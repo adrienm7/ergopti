@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Antwoord Ja om te kiezen wat er wordt geïmporteerd.",
 	"onboarding.checklist.summary": "Te importeren items: {1} van {2} geselecteerd",
 	"onboarding.checklist.tap_hold": "aantikken: {1} · ingedrukt houden: {2}",
+	"onboarding.config_folder.hint": "Persoonlijke bestanden worden uit deze map geladen. Laat dit veld leeg om deze map te gebruiken: {1}",
 	"onboarding.done.body": "Configuratie opgeslagen. Het script wordt nu opnieuw geladen.",
 	"onboarding.done.restart_required": "Configuratie opgeslagen. Ze wordt toegepast wanneer het script de volgende keer start.",
 	"onboarding.done.title": "Installatie voltooid!",

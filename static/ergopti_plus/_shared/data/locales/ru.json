@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Ответьте «Да», чтобы выбрать, что импортировать.",
 	"onboarding.checklist.summary": "Элементы для импорта: выбрано {1} из {2}",
 	"onboarding.checklist.tap_hold": "нажатие: {1} · удержание: {2}",
+	"onboarding.config_folder.hint": "Личные файлы загружаются из этой папки. Оставьте поле пустым, чтобы использовать: {1}",
 	"onboarding.done.body": "Конфигурация сохранена. Скрипт будет перезагружен.",
 	"onboarding.done.restart_required": "Конфигурация сохранена. Она вступит в силу при следующем запуске скрипта.",
 	"onboarding.done.title": "Настройка завершена!",

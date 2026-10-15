@@ -412,6 +412,7 @@ _OnbWeb_InjectInitData() {
 		. ",locale:" . _OnbWeb_JsStr(_ob_locale)
 		. ",locales:" . _OnbWeb_LocalesJson()
 		. ",default_config_dir:" . _OnbWeb_JsStr(_DefaultConfigDir)
+		. ",empty_config_dir:" . _OnbWeb_JsStr(_Onboarding_ConfigDirFor(""))
 		. ",config_dir:" . _OnbWeb_JsStr(ConfigDir)
 		. ",current:" . OnboardingValuesJson(Values)
 		. ",system_layout:" . _OnbWeb_JsStr(_OnbWeb_SystemLayoutHint())

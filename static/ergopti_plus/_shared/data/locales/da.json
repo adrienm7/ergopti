@@ -1892,6 +1892,7 @@
 	"onboarding.checklist.inactive": "Svar Ja for at vælge, hvad der skal importeres.",
 	"onboarding.checklist.summary": "Elementer, der skal importeres: {1} af {2} valgt",
 	"onboarding.checklist.tap_hold": "tryk: {1} · hold nede: {2}",
+	"onboarding.config_folder.hint": "Personlige filer indlæses fra denne mappe. Lad feltet være tomt for at bruge: {1}",
 	"onboarding.done.body": "Konfiguration gemt. Scriptet genindlæses nu.",
 	"onboarding.done.restart_required": "Konfiguration gemt. Den træder i kraft næste gang scriptet starter.",
 	"onboarding.done.title": "Opsætning fuldført!",
