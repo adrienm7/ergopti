@@ -1255,6 +1255,9 @@ Ergopti_OnShutdown(reason, code) {
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try HealthCheck_StopWindowControl()
+		catch as Err
+			try LoggerError("Lifecycle", "Diagnostics window control teardown failed: {1}.", Err.Message)
 		try _HC_Close()
 		try WebView_StopBrowserWarmup()
 		catch as Err

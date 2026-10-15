@@ -12,14 +12,46 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 15 direct Windows Diagnostics control
+
+The Windows driver now owns a deferred local control endpoint for opening its
+existing Diagnostics window while only its notification-area icon is exposed.
+The [local helper](tooling/windows-diagnostics-control.md) verifies the executable
+hash and sends the retained PID and native process creation time. The receiver
+checks its own lifetime before admitting the request, including against recycled
+window handles. Registration follows actual driver readiness; shutdown revokes
+callbacks before retiring the listener. The endpoint opens only Diagnostics and
+does not start a second driver, collection, export or download.
+
+Native targeted receiving passes23/23 control cases,36/36 existing HealthCheck
+cases,14/14 collection cases and70/70 Windows E2E cases, each complete with
+natural exit0. Independent regressions retain the original startup-withdrawal
+failure and the missing refusal of an unbound request. A real Win32 fixture
+receives the PID/lifetime-bound message and naturally exits0; its window callback
+is observed once, but it does not exercise the actual Diagnostics GUI. The helper
+therefore reports window opening as UNVERIFIED until separately observed.
+Whole-entry compilation separates good0/bad17/entry0. Format, strict conventions
+and1,918-file AHK encoding pass. The warning multiset remains6,630 with no added
+entry. The old-source full JS attempt is explicitly CONTROLLED_ABORT after
+incoming dev supersedes its slow menu checks; it is neither natural completion
+nor a full pass. Receive the freshly integrated composition before publication.
+Complete Windows units and native macOS/Linux acceptance remain OPEN.
+
+The owned c8 build retires naturally with exit0 through the ordinary AHK File/Exit
+command. An independent native fixture first vetoes that command, then accepts
+the next request and exits0, proving that this path respects OnExit rather than
+forcing termination. The unrelated personal worker and external Ollama survive.
+
 ### October 15 pending warmup ownership correction
 
-The published156e58d9ff Windows build starts against the authorized isolated
-Ollama0.40.4 server and eventually reaches actual model readiness. Its startup
-also records refused request retirement and retries before readiness; this is
-not a clean startup qualification. The observer sends no substitute warmup.
-Its new actual Diagnostics archive remains pending the maintainer opening the
-tray application's Diagnostics window. The earlier verified f1b archive remains
+The publishedc8a7b1f6e1 Windows build reaches actual cold model readiness against
+the authorized isolated Ollama0.40.4 server. The observer confirms no loaded model
+before launch and sends no substitute warmup. Its log records the model warmed
+up and ready without an observed ERROR/FATAL; existing cleanup warnings remain.
+Its actual Diagnostics attempt reaches12/14 checks, then the two-minute deadline
+cancels the guided stage while UI control is interrupted. The independently
+retained worker handle reports exit1; there is no ZIP or final results file.
+This is failed archive receiving. The earlier verified f1b archive remains
 retained; no later archive is inferred from it.
 
 The source correction retains a genuinely pending warmup and its original
