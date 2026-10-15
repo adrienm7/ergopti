@@ -1235,6 +1235,7 @@ function M.apply_configuration(config)
 	CoreState.private_filter_enabled = config.private_filter_enabled
 	CoreState.secure_field_filter_enabled = config.secure_field_filter_enabled
 	CoreState.system_auth_filter_enabled = config.system_auth_filter_enabled
+	assert(settle_context_modifiers(), "Configuration modifier settlement remains pending")
 	publish_physical_configuration()
 	return true
 end
@@ -1245,6 +1246,7 @@ function M.set_disabled_apps(apps)
 	local assigned = type(apps) == "table" and apps or {}
 	CoreState.disabled_apps = _physical_configuration_binding
 		and require("keylogger.physical_configuration_observation").own_apps(assigned) or assigned
+	assert(settle_context_modifiers(), "Disabled apps modifier settlement remains pending")
 	publish_physical_configuration()
 	Logger.debug(LOG, "Disabled apps updated (%d entry(ies)).", #CoreState.disabled_apps)
 end
@@ -1286,6 +1288,9 @@ function M.set_system_auth_filter_enabled(v)
 			"System auth filter modifier settlement remains pending")
 		_system_auth_modifier_settlement_pending = false
 	end
+	-- Keep the shared policy cache current for the next private/secure/app writer.
+	-- Neither this successful observation nor publication clears context debt.
+	_modifier_context_allowed = allowed_after
 	publish_physical_configuration()
 	Logger.debug(LOG, "System auth filter: %s.", CoreState.system_auth_filter_enabled and "on" or "off")
 end

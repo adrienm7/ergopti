@@ -4896,6 +4896,35 @@ focused selection passes 127/0 under Lua 5.4 with native-port models. This does
 not qualify actual AX delivery, installed startup or physical private-window
 transitions, and does not repair the customer lease incident.
 
+The disabled-app and aggregate configuration writers now settle that same
+modifier owner before publishing policy. A successful system-auth setter also
+synchronizes the shared allowed-state cache without clearing either pending
+debt; a later secure/private/app writer cannot miss an exclusion after an auth
+opt-out. The complete 127-case prefix and 16 frozen additions pass 143/0;
+original production fails 11 assertions, and omissions of the aggregate join,
+app join and auth-cache synchronization restore five, five and three failures.
+Existing configuration observation controls pass 39/0.
+
+The preceding combined source `85fe055c64010c40f69983ed014cf73e058ba65d`
+passes formatting, 19,928 portable macOS units and 101 simulated E2E cases
+with one original skip. Common passes 425/426: the unchanged uninstall
+preflight fails under the protected Git-marked temporary root and passes in an
+approved command-local private `/var/tmp` directory. The final policy-writer
+successor also passes formatting, 19,944 portable macOS units and the same
+101 simulated E2E cases with one original skip. Its grouped Common gate
+passes 425/426: the unchanged genuine-clone control returns 128 with less
+free overlay storage than its Git history plus checkout require. After
+relocating an already-closed archive byte-for-byte to separate temporary
+storage while retaining its original path, that unchanged control passes
+in the same private temporary directory, including actual C/header/ELF
+receiving. The grouped gate remains exit 1; no full Common rerun or native
+macOS qualification is claimed. Swift is explicitly deferred on Linux.
+ARM64/Intel compilation, signed-helper and packaged launch/installation
+qualification remain open. A separate unexecuted Linux ordinary-key hold
+counterexample can include an excluded middle interval; its native hold owner
+requires coordination before a source fix. No Windows physical acceptance or
+customer lease repair follows from these portable results.
+
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled
 filtering preserves included durations. A refused settlement retains a private
