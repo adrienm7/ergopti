@@ -12,6 +12,7 @@ import subprocess
 import signal
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from unittest import mock
@@ -346,6 +347,344 @@ class ActualHTTPXReceiving(unittest.TestCase):
             close_session()
 
 
+class ManagedTransportAdmissionReceiving(unittest.TestCase):
+    def setUp(self):
+        import httpcore
+        import httpx
+
+        self.httpx = httpx
+        self.managed = load("receiving_relay_managed", NETWORK / "managed_http.py")
+        self.environment = mock.patch.dict(
+            os.environ, {"http_proxy": "http://relay.invalid:3128"}, clear=True
+        )
+        self.environment.start()
+        self.owner = self.managed.ManagedHTTPTransport(1)
+        self.connections = []
+        self.pool_closed = threading.Event()
+        outer = self
+
+        class Backend(httpcore.MockBackend):
+            def connect_tcp(self, *args, **kwargs):
+                outer.connections.append(outer.pool_closed.is_set())
+                return super().connect_tcp(*args, **kwargs)
+
+        self.explicit = httpx.HTTPTransport(proxy="http://relay.invalid:3128", trust_env=False)
+        self.explicit._pool._network_backend = Backend(
+            [b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\ntest"]
+        )
+        self.original_handle = self.explicit.handle_request
+        original_close = self.explicit.close
+
+        def close():
+            original_close()
+            self.pool_closed.set()
+
+        self.explicit.close = close
+        self.factory = mock.patch.object(httpx, "HTTPTransport", return_value=self.explicit)
+        self.factory_mock = self.factory.start()
+
+    def tearDown(self):
+        self.owner.close()
+        self.factory.stop()
+        self.environment.stop()
+
+    def test_shutdown_cannot_finish_before_inflight_relay_header_acquisition(self):
+        entered = threading.Event()
+        release = threading.Event()
+        classified = threading.Event()
+        admission = []
+        close_done = threading.Event()
+        errors = []
+        response = []
+
+        def handle(request):
+            entered.set()
+            if not release.wait(5):
+                raise AssertionError("test gate was not released")
+            return self.original_handle(request)
+
+        def sender():
+            try:
+                response.append(
+                    self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+                )
+            except BaseException as error:
+                errors.append(error)
+
+        def closer():
+            try:
+                self.owner.close()
+            except BaseException as error:
+                errors.append(error)
+            finally:
+                close_done.set()
+
+        class ObservedLock:
+            def __init__(self):
+                self.inner = threading.RLock()
+
+            def __enter__(self):
+                if threading.current_thread() is closing:
+                    acquired = self.inner.acquire(blocking=False)
+                    admission.append(acquired)
+                    classified.set()
+                    if not acquired:
+                        self.inner.acquire()
+                else:
+                    self.inner.acquire()
+                return self
+
+            def __exit__(self, *unused):
+                self.inner.release()
+
+        self.owner.lock = ObservedLock()
+        self.explicit.handle_request = handle
+        sending = threading.Thread(target=sender)
+        closing = threading.Thread(target=closer)
+        sending.start()
+        try:
+            self.assertTrue(entered.wait(5))
+            closing.start()
+            self.assertTrue(classified.wait(5))
+            if admission == [True]:
+                # The original lets close finish first; only then admit the
+                # actual HTTPX acquisition. No scheduling delay decides this.
+                self.assertTrue(close_done.wait(5))
+        finally:
+            release.set()
+            sending.join(5)
+            if closing.ident is not None:
+                closing.join(5)
+            for item in response:
+                item.close()
+        self.assertFalse(sending.is_alive())
+        self.assertFalse(closing.is_alive())
+        self.assertEqual(errors, [])
+        self.assertEqual(len(response), 1)
+        self.assertEqual(response[0].status_code, 200)
+        self.assertTrue(close_done.is_set())
+        self.assertEqual(
+            self.connections,
+            [False],
+            "the actual HTTPX pool acquired a connection after close returned",
+        )
+        self.assertEqual(admission, [False], "shutdown did not wait for admitted relay headers")
+
+    def test_relay_header_acquisition_retains_shutdown_admission(self):
+        acquired = []
+
+        def probe():
+            held = self.owner.lock.acquire(blocking=False)
+            acquired.append(held)
+            if held:
+                self.owner.lock.release()
+
+        def handle(request):
+            contender = threading.Thread(target=probe)
+            contender.start()
+            contender.join(5)
+            self.assertFalse(contender.is_alive())
+            return self.original_handle(request)
+
+        self.explicit.handle_request = handle
+        response = self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        response.close()
+        self.assertEqual(
+            acquired,
+            [False],
+            "shutdown admission was free while the explicit pool could acquire a connection",
+        )
+
+    def test_already_closed_owner_never_constructs_a_relay(self):
+        self.owner.close()
+        with self.assertRaises(self.httpx.ConnectError):
+            self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        self.factory_mock.assert_not_called()
+        self.assertEqual(self.connections, [])
+
+    def test_relay_failure_releases_serialization_for_close(self):
+        def fail(request):
+            raise self.httpx.ConnectError("inert receiving refusal", request=request)
+
+        self.explicit.handle_request = fail
+        with self.assertRaises(self.httpx.ConnectError):
+            self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        self.owner.close()
+        self.assertTrue(self.pool_closed.is_set())
+        self.assertEqual(self.connections, [])
+
+    def _capture_timeouts(self, request):
+        captured = []
+        original = self.explicit.handle_request
+
+        def handle(request):
+            captured.append(dict(request.extensions["timeout"]))
+            return original(request)
+
+        self.explicit.handle_request = handle
+        response = self.owner.handle_request(request)
+        response.close()
+        self.assertEqual(len(captured), 1)
+        return captured[0]
+
+    def test_explicit_none_timeouts_use_the_admitted_idle_bound(self):
+        with self.httpx.Client(timeout=None, trust_env=False) as client:
+            request = client.build_request("GET", "http://origin.invalid/a")
+        original = request.extensions["timeout"]
+        self.assertEqual(original, dict.fromkeys(("connect", "read", "write", "pool")))
+        self.assertEqual(self._capture_timeouts(request), dict.fromkeys(original, 1))
+        self.assertEqual(original, dict.fromkeys(original))
+
+    def test_explicit_positive_caller_timeouts_are_preserved(self):
+        supplied = {"connect": 0.25, "read": 0.5, "write": 0.75, "pool": 0.125}
+        request = self.httpx.Request(
+            "GET", "http://origin.invalid/a", extensions={"timeout": supplied}
+        )
+        self.assertEqual(self._capture_timeouts(request), supplied)
+
+    def test_explicit_deadline_caps_the_original_operation_allowances(self):
+        supplied = {"connect": 8, "read": 0.25, "write": None, "pool": None}
+        request = self.httpx.Request(
+            "GET",
+            "http://origin.invalid/a",
+            extensions={"timeout": supplied, "ergopti_native_deadline": 102},
+        )
+        with mock.patch.object(self.managed.time, "monotonic", return_value=100):
+            self.assertEqual(
+                self._capture_timeouts(request),
+                {"connect": 2, "read": 0.25, "write": 1, "pool": 1},
+            )
+        self.assertEqual(supplied, {"connect": 8, "read": 0.25, "write": None, "pool": None})
+
+    def test_explicit_deadline_is_rechecked_after_shutdown_admission(self):
+        clock = [100]
+
+        class AdvancingLock:
+            def __init__(self):
+                self.inner = threading.RLock()
+                self.entries = 0
+
+            def __enter__(self):
+                self.inner.acquire()
+                self.entries += 1
+                if self.entries == 2:
+                    clock[0] = 103
+                return self
+
+            def __exit__(self, *unused):
+                self.inner.release()
+
+        self.owner.lock = AdvancingLock()
+        request = self.httpx.Request(
+            "GET", "http://origin.invalid/a", extensions={"ergopti_native_deadline": 102}
+        )
+        with mock.patch.object(self.managed.time, "monotonic", side_effect=lambda: clock[0]):
+            with self.assertRaises(self.httpx.ReadTimeout):
+                self.owner.handle_request(request)
+        self.factory_mock.assert_not_called()
+        self.assertEqual(self.connections, [])
+
+    def test_explicit_invalid_timeout_refuses_before_pool_admission(self):
+        for value in (True, False, 0, -1, float("inf"), float("nan"), "1"):
+            for operation in ("connect", "read", "write", "pool"):
+                with self.subTest(value=value, operation=operation):
+                    request = self.httpx.Request(
+                        "GET", "http://origin.invalid/a", extensions={"timeout": {operation: value}}
+                    )
+                    with self.assertRaises(self.httpx.ReadTimeout):
+                        self.owner.handle_request(request)
+        request = self.httpx.Request("GET", "http://origin.invalid/a", extensions={"timeout": []})
+        with self.assertRaises(self.httpx.ReadTimeout):
+            self.owner.handle_request(request)
+        self.factory_mock.assert_not_called()
+        self.assertEqual(self.connections, [])
+
+    def test_explicit_invalid_or_expired_deadline_refuses_before_pool_admission(self):
+        for value in (True, False, 0, -1, float("inf"), float("nan"), "102", 99, 100):
+            with self.subTest(value=value):
+                request = self.httpx.Request(
+                    "GET", "http://origin.invalid/a", extensions={"ergopti_native_deadline": value}
+                )
+                with mock.patch.object(self.managed.time, "monotonic", return_value=100):
+                    with self.assertRaises(self.httpx.ReadTimeout):
+                        self.owner.handle_request(request)
+        self.factory_mock.assert_not_called()
+        self.assertEqual(self.connections, [])
+
+    def _observe_native_deadline_after_admission(self, admission_clock, *, expired):
+        clock = [100]
+        calls = []
+        closes = []
+
+        class AdvancingLock:
+            def __init__(self):
+                self.inner = threading.RLock()
+                self.entries = 0
+
+            def __enter__(self):
+                self.inner.acquire()
+                self.entries += 1
+                if self.entries == 2:
+                    clock[0] = admission_clock
+                return self
+
+            def __exit__(self, *unused):
+                self.inner.release()
+
+        class InertNativeResponse:
+            status = 200
+            headers = []
+
+            def close(self):
+                closes.append(True)
+
+        def observe(url, headers, method, timeout, idle, direct):
+            calls.append({"timeout": timeout, "idle": idle, "direct": direct})
+            return InertNativeResponse()
+
+        self.owner.lock = AdvancingLock()
+        request = self.httpx.Request(
+            "GET", "https://origin.invalid/a", extensions={"ergopti_native_deadline": 102}
+        )
+        with mock.patch.dict(os.environ, {}, clear=True):
+            with mock.patch.object(self.managed.time, "monotonic", side_effect=lambda: clock[0]):
+                with mock.patch.object(self.managed.Native, "open_request", side_effect=observe):
+                    if expired:
+                        with self.assertRaises(self.httpx.ReadTimeout):
+                            self.owner.handle_request(request)
+                    else:
+                        response = self.owner.handle_request(request)
+                        response.close()
+        self.assertEqual(request.extensions["ergopti_native_deadline"], 102)
+        self.factory_mock.assert_not_called()
+        self.assertEqual(self.connections, [])
+        if expired:
+            self.assertEqual(calls, [])
+            self.assertEqual(closes, [])
+        else:
+            self.assertEqual(
+                calls, [{"timeout": 102 - admission_clock, "idle": 1, "direct": False}]
+            )
+            self.assertEqual(closes, [True])
+            self.assertEqual(self.owner.active, set())
+
+    def test_native_expired_deadline_refuses_after_admission_before_acquisition(self):
+        self._observe_native_deadline_after_admission(103, expired=True)
+
+    def test_native_acquisition_receives_only_the_budget_remaining_after_admission(self):
+        self._observe_native_deadline_after_admission(101.5, expired=False)
+
+    def test_normal_actual_httpx_pool_preserves_body_and_retirement(self):
+        response = self.owner.handle_request(self.httpx.Request("GET", "http://origin.invalid/a"))
+        try:
+            self.assertEqual(response.read(), b"test")
+        finally:
+            response.close()
+        self.owner.close()
+        self.assertTrue(self.pool_closed.is_set())
+        self.assertEqual(self.connections, [False])
+
+
 if __name__ == "__main__":
     if sys.argv[1:] == ["--policy-only"]:
         print(
@@ -367,7 +706,10 @@ if __name__ == "__main__":
             "Selected: actual HTTPX 0.28.1/HF 1.13.0 client receiving over authored native protocol peers. Native Apple networking: not executed.",
             flush=True,
         )
-        suite = unittest.defaultTestLoader.loadTestsFromTestCase(ActualHTTPXReceiving)
+        suite = unittest.TestSuite(
+            unittest.defaultTestLoader.loadTestsFromTestCase(case)
+            for case in (ActualHTTPXReceiving, ManagedTransportAdmissionReceiving)
+        )
     elif not sys.argv[1:]:
         print(
             "Selected: protocol/shared-policy and actual HTTPX/HF client receiving. Native Apple networking: not executed.",
@@ -375,7 +717,12 @@ if __name__ == "__main__":
         )
         suite = unittest.TestSuite(
             unittest.defaultTestLoader.loadTestsFromTestCase(case)
-            for case in (NativePipeReceiving, SharedPolicyReceiving, ActualHTTPXReceiving)
+            for case in (
+                NativePipeReceiving,
+                SharedPolicyReceiving,
+                ActualHTTPXReceiving,
+                ManagedTransportAdmissionReceiving,
+            )
         )
     else:
         raise SystemExit(
