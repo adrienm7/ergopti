@@ -239,6 +239,9 @@ function M.flush()
 		end
 	end
 
+	-- These unpositioned keys stay outside numeric heatmap/typing aggregates.
+	require("keylogger.media_store").flush(S.agg_batch, S.device_id, exec)
+
 	for key, row in pairs(S.agg_batch.kc_ngram) do
 		local ok = exec(string.format(
 			"INSERT INTO ngram_keycodes (device_id, date, app, keycode, c) VALUES (%s,%s,%s,%d,%d) "

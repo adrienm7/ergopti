@@ -478,3 +478,228 @@ helpers.describe("keylogger-device-log-privacy", function()
 		end)
 	end)
 end)
+
+helpers.describe("sqlite_writer — media schema startup ownership", function()
+	local function observe(schedule, check)
+		helpers.with_stub_scope({ "infra.logger", "modules.keylogger.sqlite_writer", "modules.keylogger.text_cipher" }, function()
+			local state = { opens = 0, reads = 0, file_closes = 0, db_closes = 0, applied = 0, logs = {} }
+			local logger = helpers.make_logger_stub()
+			logger.error = function(_, format, ...) state.logs[#state.logs + 1] = string.format(format, ...) end
+			package.loaded["infra.logger"] = logger
+			local db = {
+				exec = function(_, sql)
+					if sql:find("BEGIN IMMEDIATE;", 1, true) then
+						state.applied = state.applied + 1
+						if schedule.apply == "throw" then error("media transaction threw") end
+						if schedule.apply == "refuse" then return 1 end
+					end
+					if sql == "ROLLBACK;" then
+						state.rollbacks = (state.rollbacks or 0) + 1
+						if schedule.rollback == "throw" then error("media rollback threw") end
+						if schedule.rollback == "refuse" then return 1 end
+					end
+					return 0
+				end,
+				nrows = function() return function() return nil end end,
+				prepare = function() return nil end,
+				errmsg = function() return "fixture database error" end,
+				close = function()
+					state.db_closes = state.db_closes + 1
+					if schedule.db_close == "throw" and state.db_closes == 1 then error("database close threw") end
+					if schedule.db_close == "refuse" and state.db_closes == 1 then return 1 end
+					return 0
+				end,
+			}
+			local sw = helpers.load_with_stubs("modules.keylogger.sqlite_writer", {
+				fs = { attributes = function() return { mode = "file" } end },
+				sqlite3 = { OK = 0, ERROR = 1, ROW = 100, DONE = 101,
+					open = function()
+						state.opens = state.opens + 1
+						if state.opens == 2 and schedule.second_db then return schedule.second_db end
+						return db
+					end },
+			})
+			sw.init({ paths = { sqlite_path = "/tmp/media-startup.sqlite" },
+				device_obj = { device_id = "test", name = "Test", os = "macOS", created_at = "2024-01-01" },
+				device_id = "test" })
+			local original_open = io.open
+			io.open = function(path, ...)
+				if not path:find("media_schema.sql", 1, true) then return original_open(path, ...) end
+				if schedule.open == "throw" then error("media open threw") end
+				if schedule.open == "nil" then return nil, "media open refused" end
+				return {
+					read = function()
+						state.reads = state.reads + 1
+						if schedule.read == "throw" then error("media read threw") end
+						if schedule.read == "nil" then return nil, "media read refused" end
+						return "CREATE TABLE media_fixture (id INTEGER);"
+					end,
+					close = function()
+						state.file_closes = state.file_closes + 1
+						if schedule.close == "throw" then error("media close threw") end
+						if schedule.close == "nil" then return nil, "media close refused" end
+						if schedule.close == "false" then return false, "media close refused" end
+						return true
+					end,
+				}
+			end
+			local ok, failure = xpcall(function() check(sw, state, db) end, debug.traceback)
+			io.open = original_open
+			if not ok then error(failure, 0) end
+		end)
+	end
+
+	for _, failure in ipairs({ "nil", "throw" }) do
+		helpers.it("retires acquired database after media open " .. failure, function()
+			observe({ open = failure }, function(sw, state)
+				local ok, result = pcall(sw.open_db)
+				helpers.assert_true(ok, "media open failure must not escape startup ownership")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_nil(sw.get_db())
+				helpers.assert_eq(state.applied, 0)
+			end)
+		end)
+		helpers.it("closes media file and database after media read " .. failure, function()
+			observe({ read = failure }, function(sw, state)
+				local ok, result = pcall(sw.open_db)
+				helpers.assert_true(ok, "media read failure must not escape startup ownership")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(state.file_closes, 1)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_nil(sw.get_db())
+				helpers.assert_eq(state.applied, 0)
+				helpers.assert_true(table.concat(state.logs, "\n"):find("media read", 1, true) ~= nil)
+			end)
+		end)
+	end
+
+	for _, failure in ipairs({ "nil", "false", "throw" }) do
+		helpers.it("retains ambiguous media file close debt after " .. failure, function()
+			observe({ close = failure }, function(sw, state)
+				local ok, result = pcall(sw.open_db)
+				helpers.assert_true(ok, "file close refusal must become a failed startup")
+				helpers.assert_eq(result, false)
+				helpers.assert_nil(sw.get_db())
+				helpers.assert_eq(state.applied, 0)
+				helpers.assert_eq(state.file_closes, 1)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_eq(sw.open_db(), false, "unretired file must block replacement")
+				helpers.assert_eq(state.opens, 1)
+				helpers.assert_eq(state.file_closes, 1, "ambiguous consumed descriptor must never be closed again")
+			end)
+		end)
+	end
+
+	for _, failure in ipairs({ "refuse", "throw" }) do
+		helpers.it("retains exact unadmitted database after cleanup " .. failure, function()
+			observe({ read = "nil", db_close = failure }, function(sw, state)
+				helpers.assert_eq(sw.open_db(), false)
+				helpers.assert_nil(sw.get_db(), "unadmitted database must not escape as writable")
+				helpers.assert_eq(state.file_closes, 1)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_eq(sw.open_db(), false, "cleanup debt must block replacement")
+				helpers.assert_eq(state.opens, 1)
+				helpers.assert_eq(sw.close_db(), true, "exact SQLite refusal can be retried")
+				helpers.assert_eq(state.db_closes, 2)
+				helpers.assert_eq(state.file_closes, 1)
+				helpers.assert_eq(sw.open_db(), false, "read failure remains failure on a legitimate new attempt")
+				helpers.assert_eq(state.opens, 2, "successful retirement releases acquisition gate")
+				local logs = table.concat(state.logs, "\n")
+				helpers.assert_true(logs:find("media read", 1, true) ~= nil, "primary error retained")
+				helpers.assert_true(logs:find("close", 1, true) ~= nil, "cleanup error retained")
+			end)
+		end)
+	end
+
+	helpers.it("preserves primary read error and ambiguous file cleanup debt together", function()
+		observe({ read = "nil", close = "nil" }, function(sw, state)
+			helpers.assert_eq(sw.open_db(), false)
+			helpers.assert_eq(state.file_closes, 1)
+			helpers.assert_eq(state.db_closes, 1)
+			helpers.assert_eq(sw.close_db(), false, "retired SQLite does not clear ambiguous file ownership")
+			helpers.assert_eq(state.file_closes, 1, "ambiguous file cleanup must not be repeated")
+			helpers.assert_eq(state.db_closes, 1, "successfully retired SQLite must not be closed twice")
+			local logs = table.concat(state.logs, "\n")
+			helpers.assert_true(logs:find("media read refused", 1, true) ~= nil)
+			helpers.assert_true(logs:find("media close refused", 1, true) ~= nil)
+		end)
+	end)
+
+	helpers.it("allows a healthy retry only after failed read owners retired", function()
+		local schedule = { read = "nil" }
+		observe(schedule, function(sw, state)
+			helpers.assert_eq(sw.open_db(), false)
+			helpers.assert_nil(sw.get_db())
+			helpers.assert_eq(state.file_closes, 1)
+			helpers.assert_eq(state.db_closes, 1)
+			schedule.read = nil
+			helpers.assert_eq(sw.open_db(), true)
+			helpers.assert_true(sw.get_db() ~= nil)
+			helpers.assert_eq(state.opens, 2)
+			helpers.assert_eq(state.file_closes, 2)
+			helpers.assert_eq(state.applied, 1)
+			helpers.assert_eq(sw.close_db(), true)
+			helpers.assert_eq(state.db_closes, 2)
+		end)
+	end)
+
+
+	for _, failure in ipairs({ "refuse", "throw" }) do
+		helpers.it("retires refused media transaction with exact SQLite debt after " .. failure, function()
+			observe({ apply = failure, db_close = "refuse" }, function(sw, state)
+				local ok, result = pcall(sw.open_db)
+				helpers.assert_true(ok, "media transaction failure must not escape its ownership boundary")
+				helpers.assert_eq(result, false)
+				helpers.assert_nil(sw.get_db())
+				helpers.assert_eq(state.file_closes, 1)
+				helpers.assert_eq(state.rollbacks, 1)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_eq(sw.open_db(), false, "media SQL cleanup debt must block replacement")
+				helpers.assert_eq(state.opens, 1)
+				helpers.assert_eq(sw.close_db(), true)
+				helpers.assert_eq(state.db_closes, 2)
+			end)
+		end)
+		helpers.it("retains media apply and rollback errors after rollback " .. failure, function()
+			observe({ apply = "refuse", rollback = failure }, function(sw, state)
+				local ok, result = pcall(sw.open_db)
+				helpers.assert_true(ok, "rollback failure must still retire the database")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(state.rollbacks, 1)
+				helpers.assert_eq(state.db_closes, 1)
+				helpers.assert_nil(sw.get_db())
+				local logs = table.concat(state.logs, "\n")
+				helpers.assert_true(logs:find("apply semantic media", 1, true) ~= nil)
+				helpers.assert_true(logs:find("rollback", 1, true) ~= nil)
+			end)
+		end)
+	end
+
+
+	helpers.it("does not acknowledge full retirement while a distinct admitted database remains", function()
+		local schedule = {}
+		observe(schedule, function(sw, state, admitted)
+			helpers.assert_eq(sw.open_db(), true)
+			local pending_closes = 0
+			local pending = setmetatable({ close = function()
+				pending_closes = pending_closes + 1
+				if pending_closes == 1 then return 1 end
+				return 0
+			end }, { __index = admitted })
+			schedule.second_db = pending
+			schedule.read = "nil"
+			helpers.assert_eq(sw.open_db(), false)
+			helpers.assert_true(sw.get_db() == admitted)
+			helpers.assert_eq(pending_closes, 1)
+			helpers.assert_eq(sw.close_db(), false, "retiring pending database must not ACK the live admitted owner")
+			helpers.assert_eq(pending_closes, 2)
+			helpers.assert_eq(state.db_closes, 0)
+			helpers.assert_true(sw.get_db() == admitted)
+			helpers.assert_eq(sw.close_db(), true)
+			helpers.assert_eq(state.db_closes, 1)
+			helpers.assert_nil(sw.get_db())
+		end)
+	end)
+
+end)

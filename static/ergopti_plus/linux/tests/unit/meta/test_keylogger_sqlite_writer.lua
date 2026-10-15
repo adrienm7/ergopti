@@ -10,9 +10,18 @@ local helpers = require("tests.helpers")
 local it = require("tests.support.metrics_preferences_fixture").it
 local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 
+--- Recognizes the mandatory additive initializer separately from target faults.
+--- A real CLI first-open control below checks that this DDL actually commits.
+local function is_media_schema_startup(command)
+	return command:find("BEGIN IMMEDIATE;", 1, true)
+		and command:find("CREATE TABLE IF NOT EXISTS ngram_media_keys", 1, true)
+		and command:find("CREATE TABLE IF NOT EXISTS agg_app_day_media_hold", 1, true)
+		and command:find("COMMIT;", 1, true)
+end
+
 --- Models native stdout and LuaJIT's ambiguous pclose without replacing the
 --- production builder or query logic. lines()/read() both mirror the real ABI.
-local function with_writer_read_receipts(body, status, test)
+local function with_writer_read_receipts(body, status, test, startup_status)
 	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
 	local previous_execute, previous_popen = os.execute, io.popen
 	local path = os.tmpname()
@@ -20,9 +29,13 @@ local function with_writer_read_receipts(body, status, test)
 	assert(file:write("existing native database fixture") and file:close())
 	os.execute = function() return 0 end
 	io.popen = function(command)
-		local content, code = type(body) == "function" and body(command) or body, status
+		local content, code
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
+		elseif is_media_schema_startup(command) then
+			content, code = "", startup_status or 0
+		else
+			content, code = type(body) == "function" and body(command) or body, status
 		end
 		return {
 			read = function(_, mode)
@@ -75,6 +88,9 @@ local function with_category_commands(refusal, test)
 	end
 	local ok, reason = xpcall(function()
 		helpers.assert_true(writer.open_db(path))
+		-- Startup has its own acknowledged schema migration; these observations
+		-- belong only to the category operation whose transaction is under test.
+		for index = #commands, 1, -1 do commands[index] = nil end
 		test(writer, commands)
 	end, debug.traceback)
 	os.execute, io.popen = previous_execute, previous_popen
@@ -578,6 +594,8 @@ local function with_meta_value_output(value, status, test)
 		local content, code = "", status
 		if command:find("SELECT sql FROM sqlite_master", 1, true) then
 			content, code = "CREATE TABLE devices (os CHECK (os IN ('linux')))\n", 0
+		elseif is_media_schema_startup(command) then
+			content, code = "", 0
 		elseif command:find("SELECT json_quote(value)", 1, true) then
 			content = value == nil and "" or require("json").encode(value) .. "\n"
 		elseif command:find("SELECT value FROM meta", 1, true) then
@@ -1079,5 +1097,45 @@ helpers.describe("keylogger-device-log-privacy", function()
 		end, debug.traceback)
 		package.loaded["logger.shim"], package.loaded["modules.keylogger.sqlite_writer"] = previous_logger, previous_writer
 		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("linux-sqlite-media-startup-boundary", function()
+	it("linux-sqlite-media-startup-boundary: startup refusal cannot reach the target body", function()
+		local called = false
+		local ok, failure = pcall(with_writer_read_receipts, "", 0, function() called = true end, 7)
+		helpers.assert_eq(ok, false, "a refused mandatory media schema must fail initialization")
+		helpers.assert_type(failure, "string")
+		helpers.assert_eq(called, false, "no operation may run after startup refusal")
+	end)
+
+	it("linux-sqlite-media-startup-boundary: configured receipt belongs only to the target query", function()
+		local calls = 0
+		with_writer_read_receipts(function(command)
+			calls = calls + 1
+			helpers.assert_contains(command, "SELECT value FROM receipt;", "startup must not consume target output")
+			return "untrusted row"
+		end, 7, function(writer)
+			helpers.assert_nil(writer.query_rows("SELECT value FROM receipt;"))
+		end)
+		helpers.assert_eq(calls, 1, "only the original target query consumes its configured fault")
+	end)
+
+	it("linux-sqlite-media-startup-boundary: actual first open commits both additive native tables", function()
+		local writer = helpers.load_module("modules.keylogger.sqlite_writer")
+		local path = os.tmpname()
+		local available = os.execute("command -v sqlite3 >/dev/null 2>&1")
+		local ok, reason = xpcall(function()
+			if available ~= true and available ~= 0 then
+				helpers.assert_eq(writer.open_db(path), false, "missing SQLite is an explicit prerequisite refusal")
+				return
+			end
+			helpers.assert_true(writer.open_db(path), "the original native startup must finish before a query")
+			local rows = writer.query_rows("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold');")
+			helpers.assert_eq(rows, { "2" }, "schema startup must really commit both shared tables without fixture provisioning")
+		end, debug.traceback)
+		writer.close_db()
+		os.remove(path)
+		if not ok then error(reason, 0) end
 	end)
 end)

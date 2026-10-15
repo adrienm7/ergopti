@@ -2512,3 +2512,127 @@ helpers.describe("physical history exact loaded owner forwarding", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("explicit optional managed media factory preparation", function()
+	helpers.it("rejects nonfunction declarations before Capture and preserves healthy numeric-only preparation", function()
+		with_managed_session({ omit_manager = true }, function(_, d)
+			local capture = require("modules.keylogger.physical_capture")
+			local original, calls = capture.init, 0
+			capture.init = function(...) calls = calls + 1; return original(...) end
+			for _, declaration in ipairs({ false, true, "media", {} }) do
+				local ok, failure = pcall(d.adapter.init, 128, function() end, { managed = true }, declaration)
+				helpers.assert_eq(ok, false)
+				helpers.assert_type(failure, "string", "invalid input must raise an explicit error")
+				helpers.assert_eq(calls, 0); helpers.assert_eq(#d.observed.spawns, 0)
+			end
+			local manager = assert(d.adapter.init(128, function() end, { managed = true }))
+			helpers.assert_eq(calls, 1); helpers.assert_eq(#d.observed.spawns, 0)
+			manager.stop(); flush_event(d); helpers.assert_true(manager.retired())
+		end)
+	end)
+	helpers.it("refuses throwing or malformed declared constructors without consuming Capture or healthy retry", function()
+		with_managed_session({ omit_manager = true }, function(_, d)
+			local capture = require("modules.keylogger.physical_capture")
+			local original, calls = capture.init, 0
+			capture.init = function(...) calls = calls + 1; return original(...) end
+			local valid = { resolve = function() return nil end, is_known = function() return false end,
+				emit = function() return false end, emit_release = function() return false end }
+			for _, constructor in ipairs({ function() error("controlled preparation refusal") end,
+				function() return nil end, function() return {} end,
+				function() return setmetatable({}, { __index = valid }) end,
+				function() local extra = {}; for key, value in pairs(valid) do extra[key] = value end; extra.ready = true; return extra end }) do
+				local manager, reason = d.adapter.init(128, function() end, { managed = true }, constructor)
+				helpers.assert_nil(manager); helpers.assert_eq(reason, "physical_history_media_preparation_failed")
+				helpers.assert_eq(calls, 0); helpers.assert_eq(#d.observed.spawns, 0)
+			end
+			local manager = assert(d.adapter.init(128, function() end, { managed = true }))
+			helpers.assert_eq(calls, 1); manager.stop(); flush_event(d); helpers.assert_true(manager.retired())
+		end)
+	end)
+	helpers.it("passes a once-prepared copied media port into actual Capture without a second reentrant owner", function()
+		with_managed_session({ omit_manager = true }, function(_, d)
+			local capture = require("modules.keylogger.physical_capture")
+			local original, calls, supplied, nested = capture.init, 0, nil, nil
+			capture.init = function(ports) calls = calls + 1; supplied = ports.media; return original(ports) end
+			local policy_file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+			local bytes = policy_file:read("*a"); assert(policy_file:close())
+			local policy = require("keylogger.media_store").policy(require("json").decode(bytes))
+			local previous_core = package.loaded["modules.keylogger.aggregator.core"]
+			package.loaded["modules.keylogger.aggregator.core"] = { media_policy = function() return policy end }
+			local manager_port = require("modules.keylogger.log_manager")
+			manager_port.log_physical_media = function() return false end -- Explicit modeled FIFO refusal, no authority.
+			local constructors = 0
+			local ok, manager = pcall(function()
+				return assert(d.adapter.init(128, function() end, { managed = true }, function()
+					constructors = constructors + 1
+					nested = { d.adapter.init(128, function() end, { managed = true }) }
+					return require("modules.keylogger.physical_media_metrics").new()
+				end))
+			end)
+			package.loaded["modules.keylogger.aggregator.core"] = previous_core
+			if not ok then error(manager, 0) end
+			helpers.assert_eq(constructors, 1); helpers.assert_eq(calls, 1)
+			helpers.assert_nil(nested[1]); helpers.assert_eq(nested[2], "physical_history_session_already_initialized")
+			helpers.assert_eq(supplied.resolve(12, 205, "none", "41"), "media.play_pause")
+			helpers.assert_eq(supplied.emit({}), false)
+			helpers.assert_eq(#d.observed.spawns, 0); helpers.assert_eq(d.mode.credit_source(), "legacy")
+			manager.stop(); flush_event(d); helpers.assert_true(manager.retired())
+		end)
+	end)
+end)
+
+
+--- Real callable outer preparation; the fixture models native leaves only.
+local function with_actual_media_constructor(d, callback)
+	local file = assert(io.open(helpers.shared("data/keycodes/metrics_media_keys.json"), "rb"))
+	local bytes = file:read("*a"); assert(file:close())
+	local policy = require("keylogger.media_store").policy(require("json").decode(bytes))
+	local previous_core = package.loaded["modules.keylogger.aggregator.core"]
+	package.loaded["modules.keylogger.aggregator.core"] = { media_policy = function() return policy end }
+	require("modules.keylogger.log_manager").log_physical_media = function() return false end
+	local constructor = require("modules.keylogger.physical_media_metrics")
+	local original = constructor.new
+	local ok, reason = pcall(callback, constructor, original)
+	constructor.new = original; package.loaded["modules.keylogger.aggregator.core"] = previous_core
+	if not ok then error(reason, 0) end
+end
+helpers.describe("actual outer managed media preparation factory", function()
+	helpers.it("uses the actual constructor once through the captured initializer without starting a native source", function()
+		with_managed_session({ omit_manager = true }, function(_, d)
+			with_actual_media_constructor(d, function(constructor, actual_new)
+				local calls, prepared = 0, nil
+				constructor.new = function() calls = calls + 1; prepared = actual_new(); return prepared end
+				local capture = require("modules.keylogger.physical_capture")
+				local actual_init, enrolled = capture.init, nil
+				capture.init = function(ports) enrolled = ports.media; return actual_init(ports) end
+				d.adapter.init = function() error("replacement public initializer must not run") end
+				local manager = assert(d.adapter.prepare_managed_metrics(128, function() end))
+				helpers.assert_eq(calls, 1); helpers.assert_type(enrolled, "table")
+				helpers.assert_eq(enrolled.resolve(12, 205), "media.play_pause")
+				helpers.assert_true(rawequal(enrolled.resolve, prepared.resolve))
+				helpers.assert_eq(manager.status().state, "prepared")
+				helpers.assert_eq(#d.observed.spawns, 0); helpers.assert_eq(d.mode.credit_source(), "legacy")
+				manager.stop(); flush_event(d); helpers.assert_true(manager.retired())
+			end)
+		end)
+	end)
+	helpers.it("does not fall back to numeric preparation after declared constructor refusal and supports exact healthy retry", function()
+		with_managed_session({ omit_manager = true }, function(_, d)
+			with_actual_media_constructor(d, function(constructor, actual_new)
+				local capture = require("modules.keylogger.physical_capture")
+				local actual_init, calls = capture.init, 0
+				capture.init = function(...) calls = calls + 1; return actual_init(...) end
+				constructor.new = function() error("controlled constructor refusal") end
+				local manager, reason = d.adapter.prepare_managed_metrics(128, function() end)
+				helpers.assert_nil(manager); helpers.assert_eq(reason, "physical_history_media_preparation_failed")
+				helpers.assert_eq(calls, 0); helpers.assert_eq(#d.observed.spawns, 0)
+				constructor.new = actual_new
+				manager = assert(d.adapter.prepare_managed_metrics(128, function() end))
+				helpers.assert_eq(calls, 1); helpers.assert_eq(manager.status().state, "prepared")
+				helpers.assert_eq(#d.observed.spawns, 0); helpers.assert_eq(d.mode.credit_source(), "legacy")
+				manager.stop(); flush_event(d); helpers.assert_true(manager.retired())
+			end)
+		end)
+	end)
+end)
