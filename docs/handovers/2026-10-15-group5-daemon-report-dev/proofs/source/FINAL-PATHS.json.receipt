@@ -1,0 +1,200 @@
+{
+  "base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+  "paths": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 6613,
+        "sha256": "7ffaf33a12188f049087a1c12efbb68f7953859863835cb10322ca9a8f0007d2"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+      "mode": "100644",
+      "preimage": {
+        "bytes": 933,
+        "sha256": "869f3cdf291924c94b677931ccab70a026a9c41e0e5c58704018f91e3a25ac76"
+      },
+      "postimage": {
+        "bytes": 975,
+        "sha256": "a99adf39f75bf83b9f934d9a19559e5f20c9d18652bc61a14bf7c4a1cb1fdb56"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 1342,
+        "sha256": "91360676a4144f09132dd809737bd4cc98a8169bb66bd8968b36ff4a20bde509"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 688,
+        "sha256": "05ccd19a9ec3f7ef5a717e5a07a02c8f47253e1b4dff3029cc652a69cf640e08"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 33151,
+        "sha256": "59ebbcbf4575b4d10d6e24f6ab479648009bbf237ec057a758b219bea546c354"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 20656,
+        "sha256": "01e3375cce49dbde653068a9a243d405ffba18f6893c8f64b60eead79826b424"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 1480,
+        "sha256": "7537c3802872dd1aa08cf3ca899ab9bd43b0381c4028c30fc0024146d4ef75af"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 1170,
+        "sha256": "408cd3fab2d98f7096ca93e15af27ed634d1893c83305d1e665f86d0a1e2e83c"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 16022,
+        "sha256": "4eb1b70c037195cfe1d733a385593279b5a8fedd17f2b8ef27323601be6ce7e6"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 12990,
+        "sha256": "7fd7faa1c7d6f0367dc8a0b374d81b76702caf860addeffd7e1834fa8f7801cf"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 6608,
+        "sha256": "5d74b6da01b5132bae0b6a04cc972eb2c6fc8a4146a45f879b5cd2c012a9fa74"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "mode": "100644",
+      "preimage": {
+        "bytes": 47673,
+        "sha256": "c4cdc51ace44b6124ec6a5ed5284ab8ecb96668f0b92071cbe7ee071086f2c14"
+      },
+      "postimage": {
+        "bytes": 48223,
+        "sha256": "ece423dd420af84eec1df9a18a3f4f0eb2998811bdca7fbd34bc6104ab8d4f56"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 8043,
+        "sha256": "c7b52afe1adcf27e87b944dba4dcd61a81565d61eaa0c4c7f0d6289787875b63"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 5554,
+        "sha256": "32d83a2345d39f34adabaf28a7f630f8baf527cfe7f85747210873518debc236"
+      }
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 1884,
+        "sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+      }
+    },
+    {
+      "path": "tools/build/fixtures/vhd-daemon-report-reference-source.swift.txt",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 7646,
+        "sha256": "224f9583a53ee5c08681f1814737e69203b699092663030e5e05b06feabf65b4"
+      }
+    },
+    {
+      "path": "tools/build/generate_vhd_daemon_report_reference.py",
+      "mode": "100644",
+      "preimage": null,
+      "postimage": {
+        "bytes": 1871,
+        "sha256": "5dcd494a74e7be28abc7d43e73a8f9b8c186ae7bf7d82d39bbd62c407d210621"
+      }
+    },
+    {
+      "path": "tools/build/owned-runtime-installer/InstallerMain.swift",
+      "mode": "100644",
+      "preimage": {
+        "bytes": 850,
+        "sha256": "1bc1eafe132ef6c4592c6c51d160c6f8e28bdf30aeaf190ec3972e2d1e77a8cb"
+      },
+      "postimage": {
+        "bytes": 1348,
+        "sha256": "af6c43af09f1af468c388bf29af0be7beefef61394cadfb55093577caa2bd29e"
+      }
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build.py",
+      "mode": "100644",
+      "preimage": {
+        "bytes": 54943,
+        "sha256": "fc62979a9177ec775514f366df12f0865099e51f54fb11d01f8c93310c2a3141"
+      },
+      "postimage": {
+        "bytes": 60346,
+        "sha256": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
+      }
+    },
+    {
+      "path": "tools/build/owned_runtime_product_build_test.py",
+      "mode": "100644",
+      "preimage": {
+        "bytes": 7506,
+        "sha256": "7011b525ba9836b5777709ff39ade58e07e9dc63119db32c4da15e56b9a4310f"
+      },
+      "postimage": {
+        "bytes": 13538,
+        "sha256": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f"
+      }
+    }
+  ]
+}

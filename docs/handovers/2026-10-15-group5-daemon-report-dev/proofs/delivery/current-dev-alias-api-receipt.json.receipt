@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "gh",
+    "api",
+    "--method",
+    "GET",
+    "repos/adrienm7/ergopti/git/trees/a549c14f8aa158072e6ccc0b2ae57427e3195f8e?recursive=1"
+  ],
+  "status": 0,
+  "elapsed_seconds": 2.7734287590137683,
+  "stdout_bytes": 3367926,
+  "stdout_sha256": "783f115991bf319a723ff7a49e42b27f1f2eb4689500226b983bbee148e4141f",
+  "stderr_bytes": 0,
+  "limits": "read-only GitHub tree API; no fetch/shared refs or source writes"
+}

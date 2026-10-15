@@ -1,0 +1,71 @@
+{
+  "scope": "exported selection only; no gate executed",
+  "gates": [
+    [
+      "format",
+      {
+        "why": "CI checks actual Prettier/Ruff formatting before suites; formatter self-tests do not validate source files",
+        "sample": [
+          "tools/build/generate_vhd_daemon_report_reference.py",
+          "tools/build/owned_runtime_product_build.py",
+          "tools/build/owned_runtime_product_build_test.py"
+        ]
+      }
+    ],
+    [
+      "js",
+      {
+        "why": "port compliance, single-source, parity and document-consumer checks live here; doc-paths rejects obsolete roots in driver docs only",
+        "sample": [
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h"
+        ]
+      }
+    ],
+    [
+      "swift-launcher",
+      {
+        "why": "native launcher code must compile and its process-level XCTest must run on macOS; other hosts report the CI deferral explicitly",
+        "sample": [
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h"
+        ]
+      }
+    ],
+    [
+      "hs",
+      {
+        "why": "the macOS driver, its shared Lua runtime, or a shared corpus/port contract changed",
+        "sample": [
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+          "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h"
+        ]
+      }
+    ]
+  ],
+  "files": [
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+    "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+    "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+    "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+    "tools/build/fixtures/vhd-daemon-report-reference-source.swift.txt",
+    "tools/build/generate_vhd_daemon_report_reference.py",
+    "tools/build/owned-runtime-installer/InstallerMain.swift",
+    "tools/build/owned_runtime_product_build.py",
+    "tools/build/owned_runtime_product_build_test.py"
+  ]
+}

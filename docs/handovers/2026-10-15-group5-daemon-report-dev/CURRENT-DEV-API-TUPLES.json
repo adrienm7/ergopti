@@ -1,0 +1,498 @@
+{
+	"patch_base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+	"current_remote_commit": "a549c14f8aa158072e6ccc0b2ae57427e3195f8e",
+	"actual_API_root_tree": "f4a9b7d85c82564f9b42a359cce42135bc256523",
+	"API_truncated": false,
+	"tree_source_sha256": "5a4d5cc8a74ef61302b3a733e28cd67bf548f4fea2b46f486e02eb1791d09e4a",
+	"rows": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+			"role": "patch-precondition",
+			"expected_git_blob": "6fdf71c92b356e6f9a5bf8b6a2fa3ba0413ae2f8",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "6fdf71c92b356e6f9a5bf8b6a2fa3ba0413ae2f8",
+				"size": 933
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": "29dc594194ceabac555ea5619e0db35aea02c60c",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "29dc594194ceabac555ea5619e0db35aea02c60c",
+				"size": 47673
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "tools/build/fixtures/vhd-daemon-report-reference-source.swift.txt",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "tools/build/generate_vhd_daemon_report_reference.py",
+			"role": "patch-precondition",
+			"expected_git_blob": null,
+			"actual": null,
+			"equal": true
+		},
+		{
+			"path": "tools/build/owned-runtime-installer/InstallerMain.swift",
+			"role": "patch-precondition",
+			"expected_git_blob": "481b7feb7694f8c10e68cf362813afc6a399ed9f",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "481b7feb7694f8c10e68cf362813afc6a399ed9f",
+				"size": 850
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/build/owned_runtime_product_build.py",
+			"role": "patch-precondition",
+			"expected_git_blob": "280299f2790b275642e73da266f0919f406660dc",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "280299f2790b275642e73da266f0919f406660dc",
+				"size": 54943
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/build/owned_runtime_product_build_test.py",
+			"role": "patch-precondition",
+			"expected_git_blob": "dd2d2c1baf60af9e2077c26ef99ee3426dcef516",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "dd2d2c1baf60af9e2077c26ef99ee3426dcef516",
+				"size": 7506
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/build/owned-runtime-installer/BuildValidationMain.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "0d20c69fae06b7810752c345f9e9902733d8d529",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "0d20c69fae06b7810752c345f9e9902733d8d529",
+				"size": 302
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/build/owned-runtime-native/installed_physical_source.mm",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "2051fa1cfc32f0aa6e5aebd19298f629a96a40db",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "2051fa1cfc32f0aa6e5aebd19298f629a96a40db",
+				"size": 18678
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/build/InstalledRuntimePublisher.hpp",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "14a9a95954bf29f43707abcbdcc126e425cfc607",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "14a9a95954bf29f43707abcbdcc126e425cfc607",
+				"size": 17969
+			},
+			"equal": true
+		},
+		{
+			"path": "tools/diagnostics/hs274_native_build.py",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "5fc9137d995d57aac1432119d5709415864fce53",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "5fc9137d995d57aac1432119d5709415864fce53",
+				"size": 52457
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "e8e7bfdda49bdec878577801a5c89bd248ef4af9",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "e8e7bfdda49bdec878577801a5c89bd248ef4af9",
+				"size": 9148
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "7b41109acbc7b8ec2c59cfe12811e7a55cc47f6b",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "7b41109acbc7b8ec2c59cfe12811e7a55cc47f6b",
+				"size": 9292
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallOwner.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "233c7fa70ff170757ff3a21fe3971a08186fda6d",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "233c7fa70ff170757ff3a21fe3971a08186fda6d",
+				"size": 21107
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallWorker.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "53cb34837c0f444ba3fab99c7489877dd95c6a14",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "53cb34837c0f444ba3fab99c7489877dd95c6a14",
+				"size": 18999
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimePublisherIdentity.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "83f87fa0496bc31bdb022ae6563f0fa2b92dba91",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "83f87fa0496bc31bdb022ae6563f0fa2b92dba91",
+				"size": 12367
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallJournal.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "b1f215ea296e66e4aeb330ebc937b37189021e54",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "b1f215ea296e66e4aeb330ebc937b37189021e54",
+				"size": 24388
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeServiceLifecycleLock.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "2c7bbff779dea033fc3e978af50abf74466a9a38",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "2c7bbff779dea033fc3e978af50abf74466a9a38",
+				"size": 13316
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "de1b55d85249440f33f6721d52a035660c0f2848",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "de1b55d85249440f33f6721d52a035660c0f2848",
+				"size": 1113
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBuildValidationEntry.swift",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "b313a0be73fcce11bd6006c310bae1ad1c640700",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "b313a0be73fcce11bd6006c310bae1ad1c640700",
+				"size": 2715
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedRuntimeLifecycleContract.c",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "57cae9cc042849b1b9febe2be0b21f3bd239da61",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "57cae9cc042849b1b9febe2be0b21f3bd239da61",
+				"size": 315
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/CPOSIXCompatibility.c",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "3f7096e1e3c312d8bb32d092067142871595783f",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "3f7096e1e3c312d8bb32d092067142871595783f",
+				"size": 1741
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedProgramCompatibility.c",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "7d6eaa6eee6367c6e5a1f233ef5c3c4e294ede44",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "7d6eaa6eee6367c6e5a1f233ef5c3c4e294ede44",
+				"size": 31810
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeLifecycleContract.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "ed44655f3467ab331df17eb8c42b4ccf1f5c9ba3",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "ed44655f3467ab331df17eb8c42b4ccf1f5c9ba3",
+				"size": 494
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+			"role": "compiler-dependency-preimage-overlap",
+			"expected_git_blob": "6fdf71c92b356e6f9a5bf8b6a2fa3ba0413ae2f8",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "6fdf71c92b356e6f9a5bf8b6a2fa3ba0413ae2f8",
+				"size": 933
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "80314a5c75aef69f30e2a8e0ff2cdbace9272a1f",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "80314a5c75aef69f30e2a8e0ff2cdbace9272a1f",
+				"size": 3770
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedChildReapingCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "6f3134771dc93eadc320025323f581a45e651ca4",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "6f3134771dc93eadc320025323f581a45e651ca4",
+				"size": 1454
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedInstalledConfiguration.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "74c188dbe0b6e1ca76e0077ff7ed326416d3c494",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "74c188dbe0b6e1ca76e0077ff7ed326416d3c494",
+				"size": 1407
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/LoopbackListenerCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "02a7a140949ba34a0e6c30dabc5573e76485f425",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "02a7a140949ba34a0e6c30dabc5573e76485f425",
+				"size": 3012
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedImageAliasCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "1ce9c23a5cab77d64ecd72ebae31ed8ee507285b",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "1ce9c23a5cab77d64ecd72ebae31ed8ee507285b",
+				"size": 1659
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedSuspendedImageCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "38d9459d601aa4638e70323ffc0bb3a69c3b4a4b",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "38d9459d601aa4638e70323ffc0bb3a69c3b4a4b",
+				"size": 938
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "cbb96830e6ba9c9b0c9e9eec26df6dc128054af0",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "cbb96830e6ba9c9b0c9e9eec26df6dc128054af0",
+				"size": 1312
+			},
+			"equal": true
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeSignatureCompatibility.h",
+			"role": "unchanged-compiler-dependency",
+			"expected_git_blob": "bfc1f7758088a84bf6e2bf323575c4078cc29663",
+			"actual": {
+				"mode": "100644",
+				"type": "blob",
+				"sha": "bfc1f7758088a84bf6e2bf323575c4078cc29663",
+				"size": 486
+			},
+			"equal": true
+		}
+	],
+	"all5_pres15_absences26_deps_equal": true,
+	"limits": "Read-only API exact blob/mode compatibility check; not an ancestor blanket waiver, source approval or native receiving.",
+	"commit_binding": "proofs/delivery/current-dev-commit-binding.json.receipt",
+	"dependency_role_clarification": {
+		"actual_dev_tuples": 26,
+		"remain_unchanged_by_patch": 25,
+		"one_preimage_overlap": [
+			"static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h"
+		],
+		"compiled_overlap": "Use exact20-path postimage of CPOSIXCompatibility.h. Its Dev tuple is an application precondition, not another compiled copy. Original historical receipts remain byte-whole."
+	},
+	"commit_alias_response": "prior endpoint returned commit-alias sha; exact tree endpoint separately verified identical rows and correct root id"
+}

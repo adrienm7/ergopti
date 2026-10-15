@@ -1,0 +1,64 @@
+{
+  "state": "SOURCE_CLEAR_PRIVATE_SIX_PATH_HISTORICAL_REPORT_COMPONENT",
+  "packet": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-component-private-20261015/SEALED-SOURCE-ONLY/MANIFEST.json",
+    "sha256": "ed762f1654d9d95fa4584f577cbe49d2c64c5c3ddcf5bfd21557a7432c06ce63",
+    "subjects": 18,
+    "census_sha256": "f77a0b33b60bb8f2f431e45736890d040a699b96098f0b188857f0b8194f99f4",
+    "all_hashes_and_sizes_authenticated": true
+  },
+  "frozen_contracts": [
+    "ad87e366693242cf5e3f947ba390cc9b5a1d0189d0dac1f3e251b7f6d5fb57c2",
+    "caebbe760ff797f8ddd3cbed113903d4d3cdb96e2eaa92e05d2af62692314a25"
+  ],
+  "base": "c5ed928a88b4fca0e3329a86cc3676b4da9f8e96",
+  "source_inputs": {
+    "path": "/workspace/ergopti-group5-work/vhd-daemon-report-component-private-20261015/SEALED-SOURCE-ONLY/SOURCE-INPUTS.json",
+    "sha256": "cadfbdeee2769650bf4b85b2825450e1df7d214746f731c085969b9a09bdd453",
+    "all7_existing_primitive_pins_exact_actual_Git": true,
+    "all6_PRE_blobs_or_absences_exact_actual_Git": true,
+    "all6_mode100644_and_POST_hash_size_bindings": true
+  },
+  "source_patch": {
+    "sha256": "3227d57ffbe49e2e37637f933ced04706b2762d54432e978a43ca42bd14b9801",
+    "six_forward_and_complete_inverse_independently_verified_in_memory": true,
+    "canonical_application_or_ref_change_by_reviewer": false
+  },
+  "source_findings": [
+    "Rooted zero-argument owner admits only actual background thread/rootUID+eUID/exact distinct argv and genuine currentStagedInstaller source; nil attempted publisher and unknown captures retain cleanup debt.",
+    "Fixed endpoint only; nofollow held ancestor descriptors and named-vnode recuts, root-owned no022 directories/files, exact rootonly0700, root-owned socket/no022 and original endpoint metadata fence connection/report/ACK.",
+    "Actual kernel socket-cookie/device/inode observation rejects zero/unknown/native mismatch; original and duplicate witness preserve socket identity. Descriptors are tracked before fstat/libproc/configuration can fail. Saved syscall errors precede post-I/O identity calls.",
+    "Actual getpeereid/LOCAL_PEERPID/native process birth rechecked around I/O with rootUID; fixed daemon/Info byte digests and protected named files plus real dynamic/static Apple/pqrs signed image/path/CMS/hostCDHash and PIDbirth fence report publication.",
+    "One monotonic2s lifetime begins at acquire and is not reset by partial reads/retries/heartbeats. Exact five-byte heartbeat may be ignored within the unchanged budget and finite count; no report from heartbeat.",
+    "Exact23-byte type4 server-request payload has five ordered tags and literal0/1 Boolean domain. Only exact13-byte empty type5 SAME-id deliveryACK is emitted; no client HID request/initialize/reset/post/terminate/service/install/profile effects.",
+    "Successful return is immutable historical fivebool data only after fullACK and checked local closure; no public current(report), ABI/compatibility/READY or client permission. Remote erase_client/vendorIOKit cleanup remains unobserved.",
+    "Source stop is negative. Partial identity/acquisition/operation/closure failure keeps original records, saved failure and roots; close failure is not retried or acknowledged from EOF/deinit.",
+    "Corrected retirement closes original socket while duplicate retains the original object; only original checked success permits witness close. Original refusal preserves witness and debt; publisher is not retired over unresolved descriptor debt."
+  ],
+  "draft_corrections": {
+    "rootonly_mode_and_socket_protection": "Bounded peer finding corrected in sealed source; actual vendor rootonly owner_all0700 source grounds policy.",
+    "witness_retirement_order": {
+      "frozen_schedule_path": "/workspace/ergopti-group5-work/vhd-daemon-report-component-private-20261015/SEALED-SOURCE-ONLY/FROZEN-WITNESS-RETIREMENT-BEFORE-CORRECTION.json",
+      "sha256": "86a9082db9a59a707e038870fac3f5f80d728cacc769e26d55d5aa5e037f97fd",
+      "corrected": true
+    },
+    "prepare_duplicate_local_status": "Distinct endpointStatus/connectStatus in sealed source."
+  },
+  "test_and_receipt_scope": {
+    "all_original_XCTest_tree_bytes": "Exact immutable Git ls-tree source map saved ORIGINAL-TEST-TREE8d01 matches; no old test path changed in six-path patch.",
+    "new_XCTest_methods": 12,
+    "executed": 0,
+    "native_Swift_C_socket_Security_IOKit": "UNRUN",
+    "frozen8_native_lifetime_schedules": "Retained before code, no claim of executed receiving.",
+    "vendor_reference_receipt_sha256": "cc439a921497fcce2de3581a907ea48bf237d0f767e1ce4ace7d46fd227df905",
+    "vendor_reference": "All5 subjects/raw authenticate: actual unchanged C++23 vendor32Boolean combinations/ACK/heartbeat only; NOT authored Swift or privileged/native receiving."
+  },
+  "remaining_dependencies_and_limits": [
+    "Main/root report-only purpose/entry/staged invocation/product-caller integration remains missing separate lot; B/publication/initialwithdraw capabilities cannot substitute.",
+    "Canonical shared-umbrella/compiler input/adoption custody remains Root/G3; no existing rootgrammar/Main/controller/inventory/workflow/Package or sourceapproval changes by this review.",
+    "Actual Darwin build and all12 new tests/endpoint success/refusal/signature/FD/peer/debt receiving still required; no fake SDK headers or entitlement grant.",
+    "Original numericIOKit provider authorization remains unavailable, unchanged. This report never substitutes for numericABI10800 or driverregistry generation.",
+    "No reviewer target execution/candidate import/formatter/generator/native privilege or canonical/ref/index mutation."
+  ],
+  "concrete_blockers_within_this_six_path_source_scope": []
+}

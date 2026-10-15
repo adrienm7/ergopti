@@ -1,0 +1,197 @@
+{
+	"state": "SOURCE_ONLY_NOT_ADOPTED",
+	"base": "56c4c98ab4b673213b20d90199794fdcd4a43ee3",
+	"source_patch": {
+		"path": "SOURCE.patch.gz",
+		"sha256": "18877591f7aca83ac845964d8878ebe160eb45b5d26030786cbc2ae84687a942",
+		"paths": 15,
+		"encoding": "gzip",
+		"archive_sha256": "939c21931e820d7dc10f9fc8e9c1c6def774d5838b058168e073d8da845fc0fc",
+		"uncompressed_bytes": 113096
+	},
+	"source_paths": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+			"preimage": null,
+			"postimage": {
+				"bytes": 5127,
+				"sha256": "e732aaa5a92fbc42f71fe95a35c4dc5177266635e850f3ccf568912b0baded96"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+			"preimage": {
+				"bytes": 1209,
+				"sha256": "0dba9d85bbaf1f30b44290ea6da4e2dbc251a6d20bb3d865fe674dddb9dde2b9"
+			},
+			"postimage": {
+				"bytes": 1251,
+				"sha256": "0636f319ab17583bb6d5610e13ffd56cdfa824b2d5f0a45319f50a6ad7cf9f80"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+			"preimage": null,
+			"postimage": {
+				"bytes": 1088,
+				"sha256": "84aff1a2ba6913e498c54bdd2d3942794d60f7f976763a821709f33baf847fa2"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 25135,
+				"sha256": "2156aaf593207609e5812f27292e0fc86572d90eb842e87dc3fbdfe0d50e5483"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 20638,
+				"sha256": "380cc82324d616b0c64eb9a44c2d93661320da254b76a38de76dd259a79656af"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 1480,
+				"sha256": "7537c3802872dd1aa08cf3ca899ab9bd43b0381c4028c30fc0024146d4ef75af"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 15865,
+				"sha256": "57bfc0cb5eb8adde6894b6ec55f1a235a4c95cf6ce6b1bd1c51d0772b89dc567"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 12990,
+				"sha256": "7fd7faa1c7d6f0367dc8a0b374d81b76702caf860addeffd7e1834fa8f7801cf"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 6574,
+				"sha256": "374ea3e82fd04cbf1e7251048a171126ca460760243f6b09e8e4f8c25c9bff5f"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+			"preimage": {
+				"bytes": 56604,
+				"sha256": "99ecabdc6fba25df9c85a4a4b5d7019dd584174b57a493fb55a56dd4573b2804"
+			},
+			"postimage": {
+				"bytes": 57148,
+				"sha256": "34c9a0c4898c5706a271fcb239e597e1c3ce8e5fe0907bfdc38470ae1feceb09"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 6909,
+				"sha256": "fdd555bb145de3a39675cd74d81d4608165622450d04ff0ef689fc4f402e4c4e"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 5554,
+				"sha256": "32d83a2345d39f34adabaf28a7f630f8baf527cfe7f85747210873518debc236"
+			}
+		},
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+			"preimage": null,
+			"postimage": {
+				"bytes": 1884,
+				"sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+			}
+		},
+		{
+			"path": "tools/build/owned-runtime-installer/InstallerMain.swift",
+			"preimage": {
+				"bytes": 1220,
+				"sha256": "3ef17872340f01377baebc690f379a7467df6c2f32baa395420824cc54cfbfe6"
+			},
+			"postimage": {
+				"bytes": 1395,
+				"sha256": "9c8c79b590a736899f7eafeb99090be22adc1608c9a991b6f903d4e3ee829b9c"
+			}
+		},
+		{
+			"path": "tools/build/owned_runtime_product_build.py",
+			"preimage": {
+				"bytes": 65478,
+				"sha256": "dc14141df1630b7d43e0b443a7bf6eb76b76902bda7818710367f76139288f12"
+			},
+			"postimage": {
+				"bytes": 65799,
+				"sha256": "e3e9e61674bb69e9245218da4491ab804ddd9cc5d50d40ea47b3d747db129966"
+			}
+		}
+	],
+	"receipts": [
+		{
+			"path": "reviews/component.json.receipt",
+			"sha256": "bc4ed0ba5887fc791267d456b11d70cf7cdb408130fe78b61be728a4abb5ec71",
+			"scope": "Independent source review only; original receipt bytes preserved"
+		},
+		{
+			"path": "reviews/worker-enrollment.json.receipt",
+			"sha256": "f2da62be67190f1a03590bf7f28cfb6982505a8561141a9fafecb906da46f806",
+			"scope": "Independent source review only; original receipt bytes preserved"
+		},
+		{
+			"path": "reviews/connected.json.receipt",
+			"sha256": "5de2a48fa392e659a9add3f090dda57dd1edb7b2a0b9933dd06bf023106ab67a",
+			"scope": "Independent source review only; original receipt bytes preserved"
+		},
+		{
+			"path": "PATCH-RECEIPT.json.receipt",
+			"sha256": "a0d517dae2c5a76fd3a6b30f2911645a0b4c07d39c22ab5f8f7a35bb569f0827"
+		}
+	],
+	"authored_XCTest_methods": 28,
+	"executed_XCTest_methods": 0,
+	"native_executed": false,
+	"remaining": [
+		"Separate bounded Dev-compatible successor for absent G5 clock/catalogue/peer dependencies and divergent preimages",
+		"Current source approval and Root/G3 shared-file custody",
+		"Real macOS SDK build and current signed dependency closure",
+		"ARM64 and Intel XCTest execution",
+		"Privileged daemon endpoint/signature/descriptor/retirement receiving",
+		"Physical installation and acceptance"
+	],
+	"claims_excluded": [
+		"Numeric ABI compatibility",
+		"Live READY or installed readiness",
+		"Remote daemon cleanup",
+		"Lease incident root cause"
+	],
+	"dependency_scope": {
+		"standalone_Dev": false,
+		"standalone_Dev_revision": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+		"required_G5_symbols": [
+			"VHDChannelClock",
+			"OwnedVirtualHIDDriverPublicationReference",
+			"ergopti_vhd_publication_channel_peer"
+		],
+		"clock_source": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDriverPublicationTransport.swift",
+		"divergent_preimages": ["CPOSIX C/header", "Main", "InstallerMain", "product builder"],
+		"limit": "Fifteen preimage matches on G5 do not establish standalone Dev dependency closure; no whole-history import",
+		"source_adoption_and_SDK_roster_owners": ["Root", "G3"]
+	}
+}

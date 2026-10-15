@@ -1,0 +1,6 @@
+{
+  "command": "git apply --check --whitespace=error-all SOURCE.patch",
+  "status": 1,
+  "stderr": "SOURCE.patch:122: new blank line at EOF; SOURCE.patch:194: new blank line at EOF; error: 2 lines add whitespace errors.",
+  "scope": "C and clock added files trailing blank only; source subset immutable"
+}

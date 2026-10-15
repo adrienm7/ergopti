@@ -1,0 +1,11 @@
+{
+  "scope": "source-only before repair",
+  "schedule": "genuine suspended owned query child passed exact image/birth/source, activation succeeds, complete fixed reply and exit0 before post-activation live-image query",
+  "expect": "accept completion only through original native owner leader_exited+status_valid+error0 receipt and later original retirement/destroy/EOF/captures/source-current; wrong live image still refuses",
+  "no_grant": [
+    "PID absence",
+    "cached stdout alone",
+    "script text",
+    "guessed status"
+  ]
+}
