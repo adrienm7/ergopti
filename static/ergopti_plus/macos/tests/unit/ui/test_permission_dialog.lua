@@ -445,3 +445,99 @@ helpers.describe("permission dialog (permission-dialog-native)", function()
 		end
 	end)
 end)
+
+helpers.describe("Permission dialog retains refused closes (permission-dialog-close-custody)", function()
+	helpers.it("retains the original window and callback after deletion throws", function()
+		with_dialog(function(h)
+			local closes = 0
+			helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end,
+				on_closed = function() closes = closes + 1 end }))
+			local window = h.windows[1]
+			local delete = window.delete
+			window.delete = function() error("independent original window deletion refusal") end
+			helpers.assert_eq(h.dialog.close("login_items"), false)
+			helpers.assert_true(h.dialog.is_open("login_items"), "the original session remains reachable")
+			helpers.assert_eq(closes, 0, "an unsuccessful delete is not a closed notification")
+			helpers.assert_eq(window.deleted, false)
+			helpers.assert_eq(h.dialog.show({ kind = "accessibility", bundle_path = BUNDLE_PATH,
+				open_settings = function() return true end }), false, "another permission cannot replace pending cleanup")
+			helpers.assert_eq(#h.windows, 1)
+			window.delete = delete
+			helpers.assert_true(h.dialog.close("login_items"))
+			helpers.assert_true(window.deleted)
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(h.dialog.is_open("login_items"), false)
+			helpers.assert_true(h.dialog.close("login_items"))
+			helpers.assert_eq(closes, 1, "retry after settlement cannot notify twice")
+		end)
+	end)
+
+	helpers.it("refuses recursive replacement until the original delete returns", function()
+		with_dialog(function(h)
+			local closes, deletes = 0, 0
+			helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end,
+				on_closed = function() closes = closes + 1 end }))
+			local window = h.windows[1]
+			local delete = window.delete
+			window.delete = function(self)
+				deletes = deletes + 1
+				helpers.assert_eq(h.dialog.close("login_items"), false, "the same native delete cannot be reentered")
+				helpers.assert_eq(h.dialog.show({ kind = "login_items", open_settings = function() return true end }), false)
+				return delete(self)
+			end
+			helpers.assert_true(h.dialog.close("login_items"))
+			helpers.assert_eq(deletes, 1)
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(h.open_count(), 0)
+		end)
+	end)
+end)
+
+helpers.describe("Permission dialog close acknowledgements survive reentry (permission-dialog-close-reentry)", function()
+	helpers.it("keeps a native close acknowledged when deletion then throws after a replacement opens", function()
+		with_dialog(function(h)
+			local closes, replacement_closes = 0, 0
+			helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end,
+				on_closed = function()
+					closes = closes + 1
+					helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end,
+						on_closed = function() replacement_closes = replacement_closes + 1 end }))
+				end }))
+			local original = h.windows[1]
+			local delete = original.delete
+			original.delete = function(self)
+				delete(self)
+				error("independent secondary error after the genuine native close callback")
+			end
+			helpers.assert_true(h.dialog.close("login_items"), "the original native callback is its close acknowledgement")
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(replacement_closes, 0)
+			helpers.assert_eq(#h.windows, 2)
+			helpers.assert_true(original.deleted)
+			helpers.assert_eq(h.windows[2].deleted, false, "the new owner is not part of the original close")
+			helpers.assert_true(h.dialog.is_open("login_items"))
+			helpers.assert_true(h.dialog.close("login_items"))
+			helpers.assert_eq(replacement_closes, 1)
+		end)
+	end)
+
+	helpers.it("lets the window opened by the close callback supersede an outer show", function()
+		with_dialog(function(h)
+			local closes = 0
+			helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end,
+				on_closed = function()
+					closes = closes + 1
+					helpers.assert_true(h.dialog.show({ kind = "login_items", open_settings = function() return true end }))
+				end }))
+			helpers.assert_eq(h.dialog.show({ kind = "accessibility", bundle_path = BUNDLE_PATH,
+				open_settings = function() return true end }), false, "the reentrant owner supersedes this request")
+			helpers.assert_eq(closes, 1)
+			helpers.assert_eq(#h.windows, 2, "the outer call creates no orphaned third window")
+			helpers.assert_eq(h.open_count(), 1)
+			helpers.assert_true(h.dialog.is_open("login_items"))
+			helpers.assert_eq(h.dialog.is_open("accessibility"), false)
+			helpers.assert_true(h.dialog.close("login_items"))
+			helpers.assert_eq(h.open_count(), 0)
+		end)
+	end)
+end)
