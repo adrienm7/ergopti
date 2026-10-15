@@ -15,6 +15,15 @@ local helpers = require("tests.helpers")
 --- @param picked string|nil Parameter collected by the picker editor.
 --- @return table observed Native effects.
 local function choose(parameter, clicked, refusal, picked)
+	local original_modules = {}
+	for name, value in pairs(package.loaded) do original_modules[name] = value end
+	local action_id = parameter and "open_url" or "lookup"
+	local assigned, parameters = "none", {}
+	local function copy(source)
+		local result = {}
+		for key, value in pairs(source) do result[key] = value end
+		return result
+	end
 	local names = {
 		"ui.menu.menu_gestures", "modules.gestures", "ui.menu.menu_utils", "infra.dialog_util",
 		"infra.i18n", "infra.manifest_menu", "ui.action_picker", "ui.menu.shortcut_utils",
@@ -25,22 +34,38 @@ local function choose(parameter, clicked, refusal, picked)
 	local saved_shell = package.loaded["adapters.shell_runner"]
 	for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
 	local gestures = {
-		DEFAULT_STATE = { gestures = true }, get_action = function() return "none" end,
-		get_sg_names = function() return { "lookup" } end,
+		DEFAULT_STATE = { gestures = true }, get_action = function() return assigned end,
+		get_all_actions = function() return { tap_2 = assigned } end,
+		is_assignable = function() return true end,
+		get_sg_names = function() return { action_id } end,
 		get_action_label = function() return "Lookup" end,
 		set_action = function(_, action)
+			assigned = action
 			if action == "none" then return true end
 			if refusal == "throw" then error("assignment refused") end
 			if refusal == "nil" then return nil end
 			return refusal ~= "false"
 		end,
 		on_action_changed = function() return { key = "tap_2", msg = "Conflict", url = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension" } end,
-		get_action_parameter_spec = function() return parameter and "link" or nil end,
-		get_action_parameter = function() return "" end,
+		get_action_parameter_spec = function(action)
+			local row = require("_generated.action_catalogue").actions[action]
+			return row and row.parameter
+		end,
+		get_action_parameter = function(binding, action) return parameters[binding .. "__" .. action] or "" end,
+		get_all_action_parameters = function() return copy(parameters) end,
+		replace_action_parameters = function(snapshot)
+			parameters = copy(snapshot)
+			observed.parameter = parameters["tap_2__" .. action_id]
+			return true
+		end,
 		parameter_prompt = function() return "URL" end,
 		parameter_error = function() return "Invalid URL" end,
 		validate_action_parameter = function() return true end,
-		set_action_parameter = function(_, _, value) observed.parameter = value; return true end,
+		set_action_parameter = function(binding, action, value)
+			parameters[binding .. "__" .. action] = value
+			observed.parameter = value
+			return true
+		end,
 		system_gesture_conflicts = function() return { { label = "Two-finger secondary click" } } end,
 		system_pinch_enabled = function() return true end,
 		open_system_gestures = function() observed.settings = observed.settings + 1 end,
@@ -72,24 +97,22 @@ local function choose(parameter, clicked, refusal, picked)
 			return providers.gesture_slots_2()
 		end,
 	}
-	package.loaded["ui.action_picker"] = { open = function(_, callback) callback("lookup", picked) end }
-	package.loaded["ui.menu.shortcut_utils"] = {
-		action_parameter_title = function(label) return label end,
-		picker_parameter_fields = function() return {} end,
-		-- The kind-aware ask of the real module, reduced to its text prompt.
-		ask_parameter_value = function(_, _, _, title, prior)
-			local button, typed = package.loaded["infra.dialog_util"].text_prompt(title, "", prior)
-			if button ~= "button.save" then return nil end
-			return typed
-		end,
-	}
+	package.loaded["ui.action_picker"] = { open = function(_, callback) callback(action_id, picked) end }
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["adapters.storage"] = { get = function() return false end }
 	package.loaded["infra.deferred_work"] = { after = function(_, callback) observed.queue[#observed.queue + 1] = callback; return true end }
 	package.loaded["adapters.shell_runner"] = { open = function(url) observed.opened[#observed.opened + 1] = url; return true end }
 	local ok, err = xpcall(function()
+		-- Keep the prompt and retained writer owner genuine; dialog/native ports
+		-- remain controlled by this UI-boundary fixture.
+		package.loaded["ui.menu.shortcut_utils"] = nil
+		require("ui.menu.shortcut_utils")
+		local state = { gestures = true }
+		local transaction = require("tests.support.program_parameter_fixture")(gestures, state, "dialog",
+			function() return assigned end, function() return true end)
 		local menu = require("ui.menu.menu_gestures").build({
-			gestures = gestures, state = { gestures = true }, save_prefs = function() return true end,
+			gestures = gestures, state = state, save_prefs = function() return true end,
+			commit_program_parameter = transaction.apply,
 			updateMenu = function() end,
 		})
 		menu.submenu[1].items[1].action()
@@ -97,6 +120,10 @@ local function choose(parameter, clicked, refusal, picked)
 	end, debug.traceback)
 	for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 	package.loaded["adapters.shell_runner"] = saved_shell
+	for name in pairs(package.loaded) do
+		if original_modules[name] == nil then package.loaded[name] = nil end
+	end
+	for name, value in pairs(original_modules) do package.loaded[name] = value end
 	if not ok then error(err, 0) end
 	return observed
 end
