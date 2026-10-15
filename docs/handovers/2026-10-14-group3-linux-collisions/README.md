@@ -114,3 +114,28 @@ four skipped jobs); Release is skipped. macOS is intentionally unselected.
 The Snapshot17 handover records the source-only repair and its pending owner
 adoption. No entire TODO item, public physical capability or device acceptance
 is completed by this partial integration; requirements 16 and 38 remain.
+
+## Original navigation source close acknowledgement
+
+The original Linux Nav loader now uses the existing shared classified reader
+at its original shipped/user load callbacks. It no longer accepts bytes after
+an unacknowledged close. Proven absence, user-file boot isolation, strict reload
+retaining the installed tuple, shipped-source fatality and compilation/filtering
+remain intact. No shared reader, schema, Manager, Hook, workflow or public
+physical availability policy changed.
+
+Five additive `(nav-source-close-ack)` cases read real temporary files and
+physically close each owned handle once before returning controlled false/nil
+acknowledgements. Both original-producer runs fail exactly those five cases;
+the same assertions pass on the correction under LuaJIT and Lua 5.4. The ten
+existing reload cases retain their complete bodies/assertions/names/order.
+The first Lua 5.4 invocation used the repository root and additionally failed a
+relative crypto-fixture load; the corrected invocation uses the required driver
+working directory and receives exactly five causal failures. That first run is
+retained as a failed invocation, not credited as clean regression evidence.
+
+These are read/close contract controls, not evidence of kernel close failure,
+physical input, a source-observation lease, collision-family admission, installed
+output or whole-suite acceptance. The original Nav/Manager custody and remaining
+item 97 software/native/physical requirements stay open. Native CI must qualify
+the final Linux source separately; Windows/macOS implementations are unchanged.
