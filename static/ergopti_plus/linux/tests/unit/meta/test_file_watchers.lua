@@ -1513,7 +1513,17 @@ helpers.describe("file_watchers Personal topology", function()
 	end
 	helpers.it("(linux-watch-root-anchor) native ignores distinct parent siblings without recursive scans", function()
 		session("native", function(s)
-			s.start(); helpers.assert_eq(s.active(s.root), 1, "the immediate parent has one separately owned anchor")
+			local logger = require("logger.shim")
+			local held_success, reported = logger.success, nil
+			logger.success = function(_, format, ...)
+				local message = string.format(format, ...)
+				reported = tonumber(message:match("^File watchers armed: (%d+) handle")) or reported
+			end
+			local called, detail = pcall(s.start)
+			logger.success = held_success
+			helpers.assert_true(called, tostring(detail))
+			helpers.assert_eq(reported, 2, "report both genuine active handles: empty Personal root and its parent")
+			helpers.assert_eq(s.active(s.root), 1, "the immediate parent has one separately owned anchor")
 			local scans = s.scans
 			for _, name in ipairs({ "Personal", "personal\\", "unrelated" }) do
 				local sibling = s.directory(s.root .. "/" .. name)
