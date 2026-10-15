@@ -8,6 +8,20 @@ paths-editor proposal. Root's current release boundary queues new Dev
 integration; neither the proposal archive nor a passing focused test closes
 the remaining Group 1 items.
 
+The [Personal topology follow-up](2026-10-15-PERSONAL-TOPOLOGY.md) records
+feature `7523f4b19`: late-created and moved directories receive recursive
+watcher coverage, accepted reloads survive incomplete coverage scans, and
+native handle retirement retains explicit ownership. The exact 83/82 focused
+receiving, predecessor failures, unchanged original test prefix and complete
+13,802-unit/193-E2E canonical gate are sealed separately. Linux manual
+38717729588 finishes failed with two new fixture failures; the assertion-preserving
+`/var/tmp` correction and its complete local unit pass remain separate from
+that failed run. Adjacent Linux/macOS picker atoms and the shared Lua sparse
+fact-report correction are recorded at composition `280174ee2`. Final diagnostic
+units and corrected-source macOS+Linux CI remain pending at this checkpoint;
+source fixtures and the earlier identity CI do not qualify installed behavior. Root's integration boundary and the
+remaining native/device requirements remain in effect.
+
 The [saved proposal](personal-default-inactive-proposal.tar.gz) preserves nine
 reviewed patches, four independent control inputs and nine receiving receipts.
 Its SHA-256 is `d363f5f18be730371977064c72fccafecc17de774ab780337397eca07f610302`. Extract into an owned temporary directory and verify
