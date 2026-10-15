@@ -116,6 +116,15 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-b
 -- =========================================
 -- =========================================
 
+--- Removes directory separators without changing Linux filename identity.
+--- Case and backslashes are literal; an all-slash path still names the root.
+--- @param path string Directory path.
+--- @return string path without trailing separators, or the filesystem root.
+local function _directory_path(path)
+	local normalized = path:gsub("/+$", "")
+	return normalized == "" and "/" or normalized
+end
+
 --- Returns the mtime of a path as a number (epoch seconds), or nil on error.
 --- Uses a complete posix timespec when available, otherwise GNU date.
 --- @param path string Absolute or relative path.
@@ -426,7 +435,7 @@ local function _scan_personal_dir(dir, depth, visited)
 		return
 	end
 
-	local canonical = dir:gsub("[/\\]+$", ""):lower()
+	local canonical = _directory_path(dir)
 	if visited[canonical] then
 		Logger.warn(LOG, "Personal hotstrings scan revisited '%s' — skipping to break a directory cycle.", dir)
 		return
@@ -515,7 +524,7 @@ function M.start(opts)
 
 	-- ── 9.2) Personal hotstrings (recursive .toml scan) ──
 	if personal_dir ~= "" then
-		local clean_dir = personal_dir:gsub("[/\\]+$", "")
+		local clean_dir = _directory_path(personal_dir)
 		_scan_personal_dir(clean_dir, 1, {})
 	end
 
