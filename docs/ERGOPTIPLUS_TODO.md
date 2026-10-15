@@ -12630,6 +12630,23 @@ This is controlled software receiving with modeled map ports. Public delivery st
 consumers, cross-device source/modifier/output and real dead-key joins remain
 open, as do Windows/macOS, native/installed and physical qualification.
 
+The Linux physical-edit preflight now joins the actual configured Magic Key
+replacement as a fifth claim family. Stale source/cache observations and waiting
+or accepted deferred choices refuse before configuration acquisition. Every
+deferred callback exit clears only its exact pending observation while preserving
+original errors and an accepted reentrant successor. None/removal and yielding
+Magic Editor recommendations retain their original behavior. Targeted receiving
+passes 272/0 on each Lua ABI, including 25 additions; 22 causal children produce
+the expected twelve failures and ten passes across three omissions and the
+old/corrected exception cases. The final composition records 13,751 unit passes
+and one failed unchanged native luv child-state check; its single unchanged
+replay passes. Linux E2E passes 193/193 and real X11/XKB passes 65/65. The full
+unit result remains red; final Common, packaging and installation stay pending.
+Other owners, Script/Navigation and other hotstring paths, source/modifier/output
+joins, Unicode/dead keys, Windows/macOS integration and native/installed/physical
+acceptance remain open. Public physical delivery stays unavailable; item 97
+remains partial.
+
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
   item 97's model rather than another layout switch. Implemented: the shared
@@ -12678,6 +12695,14 @@ open, as do Windows/macOS, native/installed and physical qualification.
   Common/native receiving remains separate. No chosen-key output, star-setting migration or
   public physical delivery is enabled; other input owners, native output,
   three-OS integration and installed/device acceptance remain unfinished.
+
+Item 97's fifth-family preflight now protects edits against the actual configured
+Linux Magic Key replacement, including stale/cache and pending-choice refusals
+before the transaction. Exact exception cleanup preserves reentrant successors;
+None/removal remains unchanged. This does not supply chosen-key output or an
+acknowledged star-setting migration. Other input/output owners, dead keys,
+Windows/macOS replacement integration and native/installed/physical acceptance
+remain open; public delivery stays unavailable and item 98 remains partial.
 
 - [~] **101.** Investigate the supplied Windows diagnostic's retained keylogger
   shutdown debt (watchers=0). Keep privacy filtering fail-closed;
@@ -13762,6 +13787,19 @@ unit cases and 193/193 E2E cases; final Common/native receiving stays separate.
 This partial four-family inventory grants no public
 delivery and does not complete Script/Navigation/hotstring/other consumers or
 native input/output joins, Windows/macOS or installed/physical qualification.
+
+The Linux preflight now includes the actual configured Magic Key replacement,
+without turning its conditional editor recommendation into a hard reservation.
+Default/custom recommendations still yield to personal physical/logical claims;
+explicit None retains priority. Stale/cache and pending-choice observations
+refuse before transaction acquisition. The targeted and causal receiving in
+item 97 is controlled software evidence. The final whole Linux unit result
+retains one unchanged native luv child-state failure, while its single replay,
+all 193 E2E cases and all 65 X11/XKB checks pass. Final Common/native packaging
+and installation remain pending.
+Complete other-owner collisions, live source/modifier/output joins,
+Windows/macOS integration and native/installed/physical delivery remain open;
+item 108 stays partial.
 
 - [~] **109.** Use one shared ErgoptiPlus — Title prefix/separator policy
   for application windows, with empty prefix removing branding. Implemented:

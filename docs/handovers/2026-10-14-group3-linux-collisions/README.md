@@ -63,10 +63,34 @@ and working-tree status unchanged. The preceding thirteen failed unit cases
 remain in the historical run; this is a new successful receiving of corrected
 sources. Final Common, native packaging and installation remain separate gates. The
 final integrated SHA will receive Common and native Windows/Linux CI without a
-release. The preceding macOS portable results reuse the exact same macOS and
-shared source images; the pure new policy is currently consumed only by Linux.
+release. Before the two incoming Dev onboarding fixes, the preceding macOS
+portable results reused the same 3,664 macOS/shared source images. After those changes,
+the changed macOS onboarding module independently passes 71 cases and its
+Common page control passes; these are separate portable results, not final
+AppKit or complete macOS qualification. The new pure policy is consumed only by
+Linux.
 The latest pre-adoption baseline separately passed all 426 Common controls;
 that baseline is not a fresh Common qualification of these thirteen Lua posts.
+
+The preflight now joins the actual configured Magic Key replacement as a fifth
+Linux claim family. Its original source, cached preference, generation and
+capture observations must remain current before the configuration transaction.
+Waiting and accepted queued choices refuse. Deferred exception cleanup clears
+only the exact pending observation, propagates original errors and preserves an
+accepted reentrant successor. None/removal and conditional Magic Editor priority
+remain unchanged.
+
+Mixed targeted receiving passes 272/0 on each Lua ABI (123 Magic source, 110
+shortcut scope and 39 physical scope), including 25 new cases. The 22 causal
+children retain twelve expected failures and ten passes: three omissions per
+ABI, then the old exception path's three failures and passing successor guard,
+and all four corrected cases. The final composition runs all 521 Linux modules:
+13,751 unit passes and one failure in the unchanged native luv child-state assertion. Its unchanged
+single-case replay passes; the historical complete result remains red and its
+cause is not established. Linux E2E passes all 193 cases, and actual X11/XKB
+passes 65/65. Final Common, native packaging and installation remain pending
+on the integrated SHA. These results grant no physical-collision delivery or
+acknowledged star migration.
 
 Public physical delivery remains unavailable. Script, Navigation, hotstring and
 other consumers, cross-device provenance, modifier/output ownership, arbitrary

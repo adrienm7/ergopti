@@ -26,14 +26,15 @@ local SOURCE = '[shortcuts]\nenabled = true\nwrap_text_if_selected = true\nchatg
 --- @param chord_j_identity string|nil Fixed modeled XKB identity for native code 36.
 local function with_scope(body, source, chord_j_identity)
 	local loaded = {}
-	local tap_manager, tap_path
+	local tap_manager, tap_path, magic_owner
 	for name, value in pairs(package.loaded) do loaded[name] = value end
 	local ok, err = pcall(function()
 		Sandbox.with_config(source or SOURCE, function(path)
 			for _, name in ipairs({ "modules.shortcuts.manager", "modules.shortcuts.keyboard_shortcuts", "modules.shortcuts.tap_keys",
 				"modules.shortcuts.chatgpt", "modules.shortcuts.script_chords", "modules.gestures.manager",
 				"infra.shortcuts_scope", "ui.menu.menu_builder", "modules.shortcuts.key_combinations",
-				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions" }) do
+				"platform.remap.tap_hold_manager", "adapters.xkb_capture", "modules.shortcuts.physical_collisions",
+				"modules.hotstrings.magic_key_source", "infra.hotstring_preferences" }) do
 				package.loaded[name] = nil
 			end
 			local controls = { backups = {}, queued = {}, executed = {}, paused = false, device_calls = 0, runtime_calls = 0 }
@@ -101,6 +102,11 @@ local function with_scope(body, source, chord_j_identity)
 				end,
 			}
 			package.loaded["adapters.file_system"] = files
+			-- Keep this fixture's genuine pre-Magic-init phase while binding the
+			-- new observer to the same actual route, file ports and preference owner.
+			local magic_preferences = require("infra.hotstring_preferences")
+			assert(magic_preferences._set_file_for_test(path))
+			magic_owner = require("modules.hotstrings.magic_key_source")
 			local apply_keyboard = keyboard.apply_configuration
 			keyboard.apply_configuration = function(token, state)
 				controls.runtime_calls = controls.runtime_calls + 1
@@ -170,6 +176,7 @@ local function with_scope(body, source, chord_j_identity)
 			if not passed then error(failure, 0) end
 		end)
 	end)
+	if magic_owner then magic_owner._reset_for_test() end
 	if tap_manager then tap_manager._reset_for_test() end
 	if tap_path then os.remove(tap_path) end
 	for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end

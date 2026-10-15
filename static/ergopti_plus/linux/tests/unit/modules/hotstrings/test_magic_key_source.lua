@@ -1470,3 +1470,197 @@ helpers.describe("magic key source: native timeout throw is a refused capture ad
 		end)
 	end)
 end)
+
+--- Keeps the real cached preference owner and exact source route in one fixture.
+local function with_collision_source(content, body)
+	local saved = package.loaded["infra.config_paths"]
+	local routed
+	package.loaded["infra.config_paths"] = { config = function() return routed end }
+	local ok, why = pcall(function()
+		with_source(content, function(Source, Preferences, path)
+			routed = path
+			body(Source, Preferences, path)
+		end)
+	end)
+	package.loaded["infra.config_paths"] = saved
+	if not ok then error(why, 0) end
+end
+
+helpers.describe("configured Magic Key collision receipt", function()
+	helpers.it("(magic-collision) observes the real plain replacement consumer without typing during capture", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims, { { kind = "chord", binding = "magic_key_source__replacement", code = 36, mods = {} } })
+			helpers.assert_true(frame.current()); helpers.assert_true(frame.sealed())
+			helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+			helpers.assert_true(Source.on_key({ code = 36, mods = {} }))
+			helpers.assert_eq(calls.typed, { "★" }); helpers.assert_eq(calls.dispatched, { { char = "★", code = 36 } })
+		end)
+	end)
+	for _, case in ipairs({
+		{ name = "absent automatic source", content = nil, state = { active = true, replace = true } },
+		{ name = "explicit automatic source", content = '[hotstrings]\nmagic_key_source = "auto"\n', state = { active = true, replace = true } },
+		{ name = "paused owner", state = { active = false, replace = true } },
+		{ name = "replacement switched off", state = { active = true, replace = false } },
+		{ name = "untypable replacement", state = { active = true, replace = true, typable = false } },
+		{ name = "prior native owner refusal", state = { active = true, replace = true, blocked_code = 36 } },
+	}) do
+		helpers.it("(magic-collision) has no replacement reservation for " .. case.name, function()
+			local content = case.content
+			if not case.name:find("automatic", 1, true) then content = '[hotstrings]\nmagic_key_source = "KeyJ"\n' end
+			with_collision_source(content, function(Source)
+				local calls = wire(Source, case.state)
+				local frame = assert(Source.capture_collision_inventory())
+				helpers.assert_eq(frame.claims, {}); helpers.assert_true(frame.current())
+				helpers.assert_eq(Source.on_key({ code = 36, mods = {} }), false)
+				helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+			end)
+		end)
+	end
+	helpers.it("(magic-collision) refuses waiting and accepted queued choices until real settlement", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local calls, chosen = wire(Source, { active = true, replace = true, typed_ok = true }), {}
+			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() error("candidate is admitted") end }))
+			helpers.assert_nil(Source.capture_collision_inventory())
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			helpers.assert_eq(chosen, {}, "the accepted key has not yet published its preference")
+			helpers.assert_nil(Source.capture_collision_inventory(), "_capture is now nil but the genuine queued setter remains pending")
+			run_due(calls)
+			helpers.assert_eq(chosen, { "KeyC" })
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims[1].code, 46); helpers.assert_true(frame.current())
+			helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+		end)
+	end)
+	helpers.it("(magic-collision) cancellation withdraws a queued choice without retiring a successor", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local calls, chosen = wire(Source, { active = true, replace = true, typed_ok = true }), {}
+			helpers.assert_true(Source.capture({ on_chosen = function(value) chosen[#chosen + 1] = value end, on_refused = function() error("cancelled request must not notify") end }))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			Source.cancel_capture()
+			local successor = assert(Source.capture_collision_inventory())
+			run_due(calls)
+			helpers.assert_eq(chosen, {}); helpers.assert_eq(Source.get(), "KeyJ")
+			helpers.assert_true(successor.current()); helpers.assert_eq(successor.claims[1].code, 36)
+		end)
+	end)
+	helpers.it("(magic-collision) real preference acquisition and inverse revoke the original frame", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source, Preferences)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			local frame, snapshot, token = assert(Source.capture_collision_inventory()), assert(Preferences.snapshot()), {}
+			helpers.assert_true(Preferences.acquire(token)); helpers.assert_eq(frame.current(), false)
+			helpers.assert_nil(Source.capture_collision_inventory())
+			helpers.assert_true(Preferences.adopt(token, snapshot.document))
+			helpers.assert_true(Preferences.restore(token, snapshot)); helpers.assert_true(Preferences.release(token))
+			helpers.assert_eq(frame.current(), false, "restoring equal values cannot restore the old preference generation")
+			helpers.assert_true(assert(Source.capture_collision_inventory()).current())
+		end)
+	end)
+	helpers.it("(magic-collision) refuses changed source bytes before the preference cache refresh", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source, Preferences, path)
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			local frame, generation = assert(Source.capture_collision_inventory()), Preferences.generation()
+			local file = assert(io.open(path, "wb")); file:write('[hotstrings]\nmagic_key_source = "KeyC"\n'); file:close()
+			helpers.assert_eq(Preferences.generation(), generation)
+			helpers.assert_eq(frame.current(), false); helpers.assert_nil(Source.capture_collision_inventory())
+			helpers.assert_true(Preferences.refresh())
+			local fresh = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(fresh.claims[1].code, 46); helpers.assert_true(fresh.current())
+		end)
+	end)
+	helpers.it("(magic-collision) late initialization revokes the known inactive constructor frame", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims, {}); helpers.assert_true(frame.current())
+			wire(Source, { active = true, replace = true, typed_ok = true })
+			helpers.assert_eq(frame.current(), false)
+			helpers.assert_eq(assert(Source.capture_collision_inventory()).claims[1].code, 36)
+		end)
+	end)
+end)
+
+helpers.describe("accepted Magic choice observation ends on every callback exit", function()
+	helpers.it("(magic-pending-finally) chosen handler error propagates after real publication without retaining observation debt", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+			local primary, chosen = {}, {}
+			helpers.assert_true(Source.capture({
+				on_chosen = function(value) chosen[#chosen + 1] = value; error(primary, 0) end,
+				on_refused = function() error("the real setter must accept KeyC") end,
+			}))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			helpers.assert_nil(Source.capture_collision_inventory())
+			local ok, failure = pcall(run_due, calls)
+			helpers.assert_eq(ok, false); helpers.assert_true(rawequal(failure, primary))
+			helpers.assert_eq(chosen, { "KeyC" }); helpers.assert_eq(Source.get(), "KeyC")
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims[1].code, 46); helpers.assert_true(frame.current())
+			helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+		end)
+	end)
+	helpers.it("(magic-pending-finally) refused handler error propagates after real setter refusal without retaining observation debt", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source, _, path)
+			local calls = wire(Source, { active = true, replace = true, typable = false })
+			local primary, refused = {}, {}
+			local file = assert(io.open(path, "rb")); local before = file:read("*a"); file:close()
+			helpers.assert_true(Source.capture({
+				on_chosen = function() error("the real untypable setter must refuse") end,
+				on_refused = function(reason) refused[#refused + 1] = reason; error(primary, 0) end,
+			}))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			local ok, failure = pcall(run_due, calls)
+			helpers.assert_eq(ok, false); helpers.assert_true(rawequal(failure, primary))
+			helpers.assert_eq(refused, { "dialog.magic_key_source.untypable" }); helpers.assert_eq(Source.get(), "KeyJ")
+			file = assert(io.open(path, "rb")); local after = file:read("*a"); file:close()
+			helpers.assert_eq(after, before)
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims, {}); helpers.assert_true(frame.current())
+			helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+		end)
+	end)
+	helpers.it("(magic-pending-finally) deferred readiness error propagates without a setter or retained observation debt", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source, _, path)
+			local primary, throwing, notified = {}, false, 0
+			local state = setmetatable({ active = true, replace = true, typed_ok = true }, {
+				__index = function(_, name) if name == "grab" and throwing then error(primary, 0) end end,
+			})
+			local calls = wire(Source, state)
+			local file = assert(io.open(path, "rb")); local before = file:read("*a"); file:close()
+			helpers.assert_true(Source.capture({ on_chosen = function() notified = notified + 1 end,
+				on_refused = function() notified = notified + 1 end }))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			throwing = true
+			local ok, failure = pcall(run_due, calls)
+			throwing = false
+			helpers.assert_eq(ok, false); helpers.assert_true(rawequal(failure, primary))
+			helpers.assert_eq(notified, 0); helpers.assert_eq(Source.get(), "KeyJ")
+			file = assert(io.open(path, "rb")); local after = file:read("*a"); file:close()
+			helpers.assert_eq(after, before)
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims[1].code, 36); helpers.assert_true(frame.current())
+		end)
+	end)
+	helpers.it("(magic-pending-finally) throwing predecessor cannot clear an accepted reentrant successor choice", function()
+		with_collision_source('[hotstrings]\nmagic_key_source = "KeyJ"\n', function(Source)
+			local calls = wire(Source, { active = true, replace = true, typed_ok = true })
+			local primary, successor = {}, {}
+			helpers.assert_true(Source.capture({ on_chosen = function()
+				helpers.assert_true(Source.capture({ on_chosen = function(value) successor[#successor + 1] = value end,
+					on_refused = function() error("successor must accept its genuine key") end }))
+				helpers.assert_true(Source.on_key({ code = 36, mods = {} }))
+				error(primary, 0)
+			end, on_refused = function() error("predecessor must accept its genuine key") end }))
+			helpers.assert_true(Source.on_key({ code = 46, mods = {} }))
+			local ok, failure = pcall(run_due, calls)
+			helpers.assert_eq(ok, false); helpers.assert_true(rawequal(failure, primary))
+			helpers.assert_eq(Source.get(), "KeyC"); helpers.assert_eq(successor, {})
+			helpers.assert_nil(Source.capture_collision_inventory(), "the successor still owns a real deferred setter")
+			run_due(calls)
+			helpers.assert_eq(successor, { "KeyJ" }); helpers.assert_eq(Source.get(), "KeyJ")
+			local frame = assert(Source.capture_collision_inventory())
+			helpers.assert_eq(frame.claims[1].code, 36); helpers.assert_true(frame.current())
+			helpers.assert_eq(calls.typed, {}); helpers.assert_eq(calls.dispatched, {})
+		end)
+	end)
+end)
