@@ -13426,6 +13426,23 @@ and installation qualification are still required.
   cover real source compensation with explicit native/advisory doubles.
   Complete final-source and actual macOS qualification remain required.
 
+  Linux now joins parameter and assignment publication for all four menu
+  invokers through the existing retained transaction. Refused publication
+  preserves the complete prior source, parameter and assignment; successful
+  selection publishes both fields once. The generic owner refuses physical
+  slots before acquiring leases. All 44 original cases remain: the logical
+  regression cohort changes from 45/8 to 53/0, and final coverage passes 56/0
+  on LuaJIT and Lua 5.4 with causal physical-boundary withdrawals. The existing
+  config-surface guard recognizes the central parameter-row constructor and
+  keeps its historical controls plus executable-token and quoted-data refusal
+  cases. The existing dispatch fixture now retains genuine configuration,
+  Manager, Keyboard and transaction owners through confirmation; all 73
+  cases pass on both Lua ABIs with original assertions and additional exact
+  disk/runtime and one-publication checks. Its existing uninstalled-startup
+  diagnostics remain recorded. Whole final-source suites and native
+  qualification are still pending; this does not implement Apple Shortcuts
+  or complete item 106.
+
   The read-only JXA diagnostic attempts a fixed same-process preflight with
   the SDK-owned Apple-event descriptor and Shortcuts read event with
   prompting disabled. It starts no target and executes no shortcut. Optional
