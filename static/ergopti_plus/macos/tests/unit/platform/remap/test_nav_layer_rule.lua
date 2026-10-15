@@ -431,3 +431,152 @@ helpers.describe("navigation physical inputs and virtual outputs (iso-typing-con
 		end
 	end)
 end)
+
+
+helpers.describe("navigation source close acknowledgement", function()
+	local fixture_sequence = 0
+	local layer_text = '[_meta]\nschema_version = 1\n[layers.nav.all]\n"KeyJ" = "keystroke:ArrowDown"\n'
+
+	-- Intercept only a genuine stream's ACK after its real read and physical
+	-- close. Cleanup restores IO and the original cache even when loading raises.
+	local function receive_close_refusal(source, acknowledgement)
+		local original_open = io.open
+		local original_hs = rawget(_G, "hs")
+		local original_cache = {}
+		for name, value in pairs(package.loaded) do original_cache[name] = value end
+		local records, levels = {}, {}
+		local facts = { opens = 0, reads = 0, closes = 0, native_closes = 0, cleanup_closes = 0 }
+		local directory, user_path, made_directory, created_file, quote
+		local function close_record(record)
+			if record.attempted then return record.closed end
+			record.attempted = true
+			local called, closed = pcall(record.close, record.handle)
+			record.closed = called and closed == true
+			if record.observed and record.closed then facts.native_closes = facts.native_closes + 1 end
+			return record.closed
+		end
+		local called, outcome = pcall(function()
+			quote = require("text_utils").shell_quote
+			fixture_sequence = fixture_sequence + 1
+			directory = helpers.temp_dir() .. "/ergopti_mac_nav_close_" .. tostring(os.time()) .. "_"
+				.. tostring(math.random(100000, 999999)) .. "_" .. tostring(fixture_sequence)
+			local made = os.execute("mkdir " .. quote(directory))
+			assert(made == true or made == 0, "owned navigation directory must be created")
+			made_directory = true
+			user_path = directory .. "/layers.toml"
+			local file = assert(original_open(user_path, "wb"))
+			created_file = true
+			local fixture = { handle = file, close = file.close }
+			records[#records + 1] = fixture
+			assert(file:write(layer_text), "owned navigation fixture must be written")
+			assert(close_record(fixture), "fixture write close must be acknowledged")
+			local capture = helpers.make_logger_stub()
+			for _, level in ipairs({ "start", "success", "warn", "error" }) do
+				capture[level] = function() levels[#levels + 1] = level end
+			end
+			package.loaded["infra.logger"] = capture
+			package.loaded["platform.remap.nav_layer"] = nil
+			local Fresh = require("platform.remap.nav_layer")
+			local target = source == "user" and user_path or helpers.shared("data/keycodes/physical_keys.json")
+			io.open = function(path, mode)
+				if path ~= target or mode ~= "r" and mode ~= "rb" then return original_open(path, mode) end
+				local handle, detail, code = original_open(path, mode)
+				if not handle then return nil, detail, code end
+				local record = { handle = handle, close = handle.close, observed = true }
+				records[#records + 1] = record
+				facts.opens = facts.opens + 1
+				return {
+					read = function(_, ...)
+						facts.reads = facts.reads + 1
+						local text, read_detail = handle:read(...)
+						facts.read_string = type(text) == "string"
+						return text, read_detail
+					end,
+					close = function()
+						facts.closes = facts.closes + 1
+						assert(not record.attempted, "navigation stream must be closed exactly once")
+						if not close_record(record) then return nil, "real fixture close was not acknowledged" end
+						if acknowledgement == "false" then return false, "controlled close ACK refusal" end
+						assert(acknowledgement == "nil", "unknown controlled ACK")
+						return nil, "controlled close ACK refusal"
+					end,
+				}
+			end
+			local loaded, result = pcall(Fresh.load, { shared_root = helpers.shared(), config_dir = directory })
+			return { loaded = loaded, result = result }
+		end)
+		io.open = original_open
+		for name in pairs(package.loaded) do
+			if original_cache[name] == nil then package.loaded[name] = nil end
+		end
+		for name, value in pairs(original_cache) do package.loaded[name] = value end
+		_G.hs = original_hs
+		local cleanup_errors = {}
+		for _, record in ipairs(records) do
+			if not record.attempted then
+				if record.observed then facts.cleanup_closes = facts.cleanup_closes + 1 end
+				close_record(record)
+			end
+			if not record.closed then cleanup_errors[#cleanup_errors + 1] = "real stream close remains unacknowledged" end
+		end
+		if created_file then
+			local removed_ok, removed, detail = pcall(os.remove, user_path)
+			if not removed_ok or removed ~= true then
+				cleanup_errors[#cleanup_errors + 1] = "fixture removal refused: " .. tostring(removed_ok and detail or removed)
+			end
+		end
+		if made_directory then
+			local removed_ok, removed = pcall(os.execute, "rmdir " .. quote(directory))
+			if not removed_ok or removed ~= true and removed ~= 0 then
+				cleanup_errors[#cleanup_errors + 1] = "fixture directory removal refused"
+			end
+		end
+		if not called or #cleanup_errors > 0 then
+			error((called and "" or tostring(outcome) .. "; ") .. table.concat(cleanup_errors, "; "), 0)
+		end
+		outcome.facts, outcome.levels = facts, levels
+		return outcome
+	end
+
+	local function assert_real_stream_closed(outcome)
+		helpers.assert_eq(outcome.facts.opens, 1)
+		helpers.assert_eq(outcome.facts.reads, 1)
+		helpers.assert_eq(outcome.facts.read_string, true, "the genuine source was actually read")
+		helpers.assert_eq(outcome.facts.closes, 1)
+		helpers.assert_eq(outcome.facts.native_closes, 1, "the original physical stream close succeeded once")
+		helpers.assert_eq(outcome.facts.cleanup_closes, 0, "no second close or cleanup replacement supplies the ACK")
+	end
+
+	local function assert_user_refused(outcome)
+		assert_real_stream_closed(outcome)
+		helpers.assert_eq(outcome.loaded, true, "a user source failure retains the existing isolated-load contract")
+		helpers.assert_nil(next(outcome.result.bindings), "unacknowledged bytes cannot bind a key")
+		helpers.assert_nil(NavLayer.build_rule(outcome.result.bindings, outcome.result.registry))
+		helpers.assert_nil(next(outcome.result.wheel.vertical))
+		helpers.assert_nil(next(outcome.result.wheel.horizontal))
+		helpers.assert_eq(table.concat(outcome.levels, " "), "start warn error", "the failed load cannot log SUCCESS")
+	end
+
+	local function assert_shipped_refused(outcome)
+		assert_real_stream_closed(outcome)
+		helpers.assert_eq(outcome.loaded, false, "a failed shipped source is fatal before loading starts")
+		helpers.assert_true(type(outcome.result) == "string" and outcome.result:find("source close failed", 1, true) ~= nil)
+		helpers.assert_eq(outcome.levels, {}, "no START or SUCCESS precedes valid shipped context")
+	end
+
+	helpers.it("(nav-source-close-ack) a false user close ACK isolates the real file without SUCCESS", function()
+		assert_user_refused(receive_close_refusal("user", "false"))
+	end)
+
+	helpers.it("(nav-source-close-ack) a nil user close ACK isolates the real file without SUCCESS", function()
+		assert_user_refused(receive_close_refusal("user", "nil"))
+	end)
+
+	helpers.it("(nav-source-close-ack) a false shipped close ACK refuses context before START", function()
+		assert_shipped_refused(receive_close_refusal("shipped", "false"))
+	end)
+
+	helpers.it("(nav-source-close-ack) a nil shipped close ACK refuses context before START", function()
+		assert_shipped_refused(receive_close_refusal("shipped", "nil"))
+	end)
+end)

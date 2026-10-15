@@ -53,8 +53,6 @@ M.NAV_LAYER_ID = "nav"
 M.HOLD_ACTION_ID = "layer"
 
 local OS = "macos"
--- errno for a path that does not exist, as io.open reports it.
-local ENOENT = 2
 
 
 
@@ -374,25 +372,19 @@ end
 -- ===============================
 -- ===============================
 
---- Reads a whole shipped file; raises when it cannot.
-local function read_shipped(path)
-	local fh, err = io.open(path, "rb")
-	if not fh then error("nav_layer: cannot read " .. path .. ": " .. tostring(err)) end
-	local content = fh:read("*a")
-	fh:close()
-	return content
+--- Reads the user's layer file: only genuine absence is nil; failed read or
+--- close acknowledgement must not lend its bytes to the navigation loader.
+local function read_user_file(path)
+	local content, status, detail = require("toml_codec.writer").read_classified(path)
+	if status == "ok" and type(content) == "string" then return content end
+	if status == "absent" and content == nil then return nil end
+	error("nav_layer: cannot read " .. path .. ": " .. tostring(detail or "source read was not acknowledged"), 0)
 end
 
---- Reads the user's layer file: nil when it does not exist, raises when it cannot be read.
-local function read_user_file(path)
-	local fh, err, code = io.open(path, "rb")
-	if not fh then
-		if code == ENOENT then return nil end
-		error(tostring(err))
-	end
-	local content = fh:read("*a")
-	fh:close()
-	if content == nil then error("cannot read " .. path) end
+--- Shipped context has no optional-file contract: even genuine absence is fatal.
+local function read_shipped(path)
+	local content = read_user_file(path)
+	if content == nil then error("nav_layer: cannot read " .. path .. ": source is absent", 0) end
 	return content
 end
 
