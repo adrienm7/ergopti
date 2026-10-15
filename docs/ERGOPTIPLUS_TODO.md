@@ -100,7 +100,14 @@ Even its reported success cannot qualify the single-active-driver prerequisite;
 that actual startup receiving must be repeated alone. The earlier full Windows
 unit attempt first lacks a result at the cached gesture-status captions case.
 That exact case passes alone1/1 in13.5seconds with unchanged source. The full
-run's order/state/load stall and its separate file-filter UIA failure remain OPEN.
+run's recorded terminal durations sum to7,189,057.867ms, leaving at most
+10,942.133ms of the unchanged7,200,000ms watchdog before bootstrap and receipt
+overhead. The next case therefore starts with less time than its separate
+13.5-second receiving requires; its apparent hang is not established. Complete
+suite receiving remains OPEN. The file-filter UIA failure separately reproduces
+on clean7a61e3f211:0/1PASS, natural exit1, complete manifest, unchanged source.
+Its client again exceeds the bounded observation window after entering the
+restored-filter phase. No timeout, assertion or central runner is weakened.
 
 The official Windows builder again receives8 replay/11 output/6 trace matrices,
 all44 owner cases and the existing41-export hardened x64 DLL with exact source
@@ -153,6 +160,26 @@ either into a green gate. Shared runtime compatibility also remains software
 work: the macOS producer and stager require synchronized official/custom
 versions, and0.40.4 changes transfer and pull-handler seams. Native macOS/Linux
 receiving remains OPEN or UNRUN.
+
+The warmup correction is published normally on dev as7a61e3f211, preserving
+atomic history and main. Its clean-source official build succeeds with pinned
+AutoHotkey2.0.26:ErgoptiPlus-7a61e3f211.exe,11,083,264bytes, SHA256
+`83969dd2d47f8fd428ccaf4e9d58f124e29642d4ba7b2f6ac1b6bea24535c2ce`.
+Build stamps are restored and the source stays clean. The prior f1b test
+application remains active, so the new build is not started alongside it.
+The earlier f1b Diagnostics archive remains verified; a new installed archive
+and actual corrected warmup are not yet received. Personal configuration and
+the unrelated UIA worker remain preserved.
+
+The complete official0.40.4 Git tree and eleven selected source files are now
+received against exact commit45e6011815c74acde6a346512856b69dd79dd22b. Each
+selected file matches its declared Git blob and size, with a retained SHA256.
+The old server/internal/client/ollama/registry.go is actually absent. Transfer
+download/redirect paths replace the old location and enforce address validation
+and a checked dialer. The existing native wrapper replaces that transport;
+retaining only CheckRedirect would not preserve those connection checks. A
+reviewed source port must account for that veto before changing the shared
+runtime pins. Source acquisition is not compilation or native qualification.
 
 ### October 15 AHK direct-digit registration receiving
 
