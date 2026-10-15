@@ -1,0 +1,49 @@
+{
+	"command": "tools/rtk/rtk.sh node tools/test/verify-change.cjs",
+	"exit": 0,
+	"duration_seconds": 673.372,
+	"head": "b087fd7cf3442cccbd51a18f86b0d4d95d5945ff",
+	"incoming_dev": "156e58d9ff0e1df337712cc48593343757d01034",
+	"head_unchanged": true,
+	"staged_tree_unchanged": true,
+	"tracked_inputs": 10253,
+	"source_modes_unchanged": true,
+	"changed_inputs": [],
+	"log_sha256": "b212b6b094f2b411d91aa619474c8c606c68327468548103aa985bbf2ca26fcc",
+	"native_windows": "NOT_EXECUTABLE_ON_LINUX; retain actual gate skips",
+	"Dev_Main_push": false,
+	"at": "2026-10-15T17:07:59.830218+00:00",
+	"published_feature_head": "9a2430abbb380a31d1ed87c80f3b2ed6c45bed08",
+	"merge_parents": [
+		"b087fd7cf3442cccbd51a18f86b0d4d95d5945ff",
+		"156e58d9ff0e1df337712cc48593343757d01034"
+	],
+	"format": "PASS;430 Python files already formatted plus Prettier check",
+	"ahk_encoding": "PASS1917 UTF8BOM+LF",
+	"default_JS": {
+		"pass": 426,
+		"fail": 0,
+		"selected_skipped": 0
+	},
+	"actual_AHK_unit": "SKIPPED_NO_AUTOHOTKEY",
+	"actual_AHK_parse": "SKIPPED_WINDOWS_ONLY",
+	"actual_AHK_E2E": "SKIPPED_NO_AUTOHOTKEY",
+	"Mac_native": "UNRUN",
+	"root_private_435": "Original433PASS/2FAIL retained; corrected protocol owner176PASS; other failure reproduced baseline",
+	"new_source_blob": "177bb6579b181ee593a0394eb6b2c5d8a5ac7b5f",
+	"source_delivery": "https://github.com/adrienm7/ergopti/issues/86#issuecomment-6197552412",
+	"own5code_test_paths_and_TODO36_62": "UNCHANGED",
+	"feature_remote_verified": true,
+	"automatic_workflows_found": 0,
+	"automatic_census": "TERMINAL_EMPTY; no cancellations needed; manual/preexisting preserved",
+	"working_tree_index": "CLEAN",
+	"commit_hooks": "PASS_ALL; first sandboxed attempt could not launch Git and ended before commit; exact same full hooks succeeded with process permission",
+	"post_commit_tree_equals_validated_staged_tree": true,
+	"items_removed": [],
+	"group6_complete": false,
+	"remaining": [
+		"Root source adoption and actual Swift compiler/discovery/pure7",
+		"actual original23 interpreted-AHK production role/runtime/caller/source/acquisition/READY/retirement contract",
+		"actual authorized Mac archive/Brew/Sparkle/install/network/trust-restoration/model acceptance"
+	]
+}

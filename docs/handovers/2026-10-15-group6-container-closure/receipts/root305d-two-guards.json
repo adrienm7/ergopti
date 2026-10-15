@@ -1,0 +1,79 @@
+{
+	"root_source": "305d88ae1e311c5ec68cf97759f7a458913b8e19",
+	"runtime": "Node22.22.2; CPython3.12.14; inert owned shell publishers",
+	"original_tree_inputs": 10305,
+	"unchanged_root_blob_bytes": 10300,
+	"exact_sealed_postimages": [
+		{
+			"path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWPADWireTests.swift",
+			"sha256": "909f07da8c95c660e09a0ea341265a6c7510929d3a9fb0ce3f6ad90fd5ae0d85"
+		},
+		{
+			"path": "static/ergopti_plus/macos/tests/support/native_http_wire_fixture.py",
+			"sha256": "9cba433377ef892cc993129970509da5f96381c4c36376b028c66c3fe4f707ec"
+		},
+		{
+			"path": "tools/test/macos_native_http_receiving_facts_test.py",
+			"sha256": "2fd9fe16ade62b4eacb8c9167a92082c0ecccceeb7cfca5ea4fe995819f64887"
+		},
+		{
+			"path": "tools/test/test-macos-native-pac-qualification.cjs",
+			"sha256": "3004620784e1caad4efe01964a4aa0d2386e8d94af78d33d1865173f2674dfb3"
+		},
+		{
+			"path": "tools/test/test-swift-xctest-evidence.cjs",
+			"sha256": "4e0da1a174827df7da4f69dce6ae78fc3cd9a2c9bd73a158fa4f45a4be8a162f"
+		}
+	],
+	"old_guard_with_diagnostic": {
+		"pac": {
+			"exit": 1,
+			"result": "CAUSAL_ASSERTION_FAILURE_8_NE_1"
+		},
+		"swift_evidence": {
+			"exit": 0,
+			"result": "PASS"
+		}
+	},
+	"sealed_oracle_composition": {
+		"pac": {
+			"exit": 0,
+			"original_controls": 82,
+			"new_controls": 24,
+			"result": "PASS"
+		},
+		"swift_evidence": {
+			"exit": 0,
+			"result": "PASS; no invented numeric subject count"
+		}
+	},
+	"old_runs_source_fence_equal": true,
+	"candidate_runs_source_fence_equal": true,
+	"checks_not_executed": [
+		"fullJS",
+		"Swift compilation/discovery/execution",
+		"native Darwin14",
+		"real PAC/WPAD/trust/CA",
+		"Brew",
+		"Root source adoption"
+	],
+	"source_only": true,
+	"network_used_by_guards": false,
+	"new_ci_jobs_or_roles": false,
+	"canonical_mutations": false,
+	"commands": [
+		"tools/rtk/rtk.sh node tools/test/test-macos-native-pac-qualification.cjs",
+		"tools/rtk/rtk.sh node tools/test/test-swift-xctest-evidence.cjs"
+	],
+	"versions": {
+		"node": "v22.22.2",
+		"python": "3.12.14",
+		"RTK": "v0.43.0",
+		"platform": "Linux x86_64; no Darwin execution"
+	},
+	"Worker12_native_execution": "UNRUN",
+	"native14_execution": "UNRUN",
+	"Swift_compiler_execution": "UNRUN",
+	"source_adoption": "UNRUN",
+	"original_receipt_sha256": "a537e6c702ae6ff3ca291962e9f03330d83fb862697bd164cabc811633e3dbbb"
+}
