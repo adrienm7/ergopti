@@ -3,8 +3,8 @@
 	"source_basis": "46d6388d29f854f529985fcc43cded73b325c890",
 	"closure_dev_basis": "c8a7b1f6e19f508dee1f1e132d4ca1c77f6ec95d",
 	"qualification": "not a production adoption or final-source native qualification",
-	"payload_count": 63,
-	"payload_bytes": 456381,
+	"payload_count": 66,
+	"payload_bytes": 478015,
 	"files": [
 		{
 			"path": "findings/debug-window/FINDING.json.txt",
@@ -333,6 +333,27 @@
 			"source": "/workspace/.ergopti-cloud/container-closure-writabletmp-final-gate/stdout.log",
 			"bytes": 108138,
 			"sha256": "20da7c22547178d2739c419458e37e340b31ca69424c1061e53f751324c2a395",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/input-actions.stderr.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-input-actions.stderr",
+			"bytes": 0,
+			"sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/input-actions.stdout.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-input-actions.stdout",
+			"bytes": 20619,
+			"sha256": "c768289342b775f5f1924be1bf6f43c201727f1a0a3a921f766e3c155aa67bc4",
+			"byte_exact": true
+		},
+		{
+			"path": "receipts/final-g5-composition/verification.json.txt",
+			"source": "/workspace/.ergopti-cloud/container-closure-uninstall-triage/final-g5-composition.json",
+			"bytes": 1015,
+			"sha256": "85148419310a0fd092c430edb473ed85ab71bc03bfe38be02e1943b3ec1b4f27",
 			"byte_exact": true
 		},
 		{

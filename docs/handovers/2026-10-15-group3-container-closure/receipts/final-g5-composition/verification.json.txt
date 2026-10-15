@@ -1,0 +1,25 @@
+{
+  "kind": "final-published-supplier-composition-receiving",
+  "source_head": "7062a53f2f1c01abdd1d34ecf33137702462f223",
+  "incoming_dev": "eb9e3dc05955f2e5e7a81075a65fa919db62dd05",
+  "previous_group3": "5dbb5ae0b010aef3edfab31578ca9cbc694799f2",
+  "source_overlap": [
+    "docs/ERGOPTIPLUS_TODO.md"
+  ],
+  "preservation": "all non-TODO supplier postimages retained exactly; all8Group5 and13Group3 numeric TODO blocks retained exactly; earlier committed Root notes retained",
+  "observed_utc": "2026-10-15T20:03:32.712881+00:00",
+  "command": [
+    "node",
+    "tools/test/run-js-suite.cjs",
+    "--feature=input-and-actions"
+  ],
+  "exit_code": 0,
+  "passed": 76,
+  "failed": 0,
+  "format_changed_canonical_todo": "PASS",
+  "all_tracked_worktree_blobs_equal_head": true,
+  "tracked_blob_count": 10443,
+  "native_final_composition": "NOT_RUN",
+  "whole_common_final_composition": "NOT_RUN",
+  "scope": "source/portable action controls only; previous whole433/435andtwo targetedpasses remain separately scoped"
+}

@@ -114,3 +114,19 @@ outside this cleanup. No running manual workflow is cancelled or modified.
 
 Direct coordination and final integration/deletion receipts are recorded in
 [issue86](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6200414142).
+
+## Final upstream reconciliation
+
+After the complete local receiving closes, actual dev advances to
+`eb9e3dc05955f2e5e7a81075a65fa919db62dd05` through Group5's container closure.
+Group3 receives it without conflict in `7062a53f2f1c01abdd1d34ecf33137702462f223`.
+Only the global TODO intersects the two suppliers. All other source images from
+both suppliers are retained exactly; all eight incoming Group5 and thirteen
+Group3 item blocks remain exact. Earlier committed Root notes also remain.
+
+On that combined source, all76 Input/Actions Common controls pass and the
+canonical TODO passes formatting. Every tracked working-tree blob matches its
+HEAD image after those controls. The full Common suite and native/E2E/package/
+installation are not rerun for the final composition; earlier results retain
+their exact historical scope. This explicit partial preservation is requested
+by the maintainer, with all remaining qualification in the global checklist.
