@@ -4729,6 +4729,16 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   checked closure of its original descriptor. The additional real-FD XCTest
   is authored, not executed off Darwin; close failure retains separate debt
   and never retries an ambiguously consumed descriptor.
+  A dedicated `tools/diagnostics/vhd_daemon_report_xctest_receiver.py`
+  receives the frozen 32 original cases plus that additional descriptor case
+  on one explicitly selected native architecture. It requires Debug SwiftPM,
+  exact started/passed pairs, unchanged committed compiler inputs (including
+  external quoted headers), complete capture and retirement of every original
+  process owner before source-after checks or a terminal verdict. Portable
+  receiver controls pass all 24 cases, including cached-code refusal; they do
+  not execute Swift. ARM64 and
+  Intel enrollment and execution remain pending with the CI owner, separately
+  from the distinct 17-command helper build and signed query acceptance.
   No numeric ABI, resident
   readiness, remote cleanup, physical accounting or lease fix is qualified;
   item 31 stays open.
