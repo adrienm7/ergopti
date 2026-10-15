@@ -12313,6 +12313,17 @@ registration-loop repair is independently reviewed and shared with Root, not
 adopted or natively qualified. Keep the strict stdout/TAP assertion and all
 original budgets. See the Snapshot17 handover; item 91 remains partial.
 
+The retained Windows pair press now also captures its selected tap/hold values
+and exact slot Map owners at admission. Replacement before dispatch, repeat,
+resolver/logging callbacks or delayed tap retirement cannot execute the newly
+published assignment; an observed revocation remains until a new key-down.
+Completed native hold results and original release debt stay unchanged. All
+317 prior assertion starts and 39 literal registrations remain, with twelve
+additional registered assignment cases. This source repair is reviewed but
+actual AHK parser/unit/E2E, original/candidate causal execution, final native
+package/install/startup and physical receiving remain NOT_RUN. It does not
+enable simultaneous input or establish genuine raw AltGr provenance.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
