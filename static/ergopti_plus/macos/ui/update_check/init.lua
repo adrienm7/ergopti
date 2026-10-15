@@ -43,6 +43,7 @@ local BRIDGE_NAME = "update_check_bridge"
 -- The exact window this module created, and its session.
 local _webview = nil
 local _session = nil
+local _open_revision = 0
 
 
 
@@ -73,16 +74,17 @@ local function push_to(view, message)
 end
 
 --- Forgets the window's session: a late answer of its check shows nothing.
-local function retire_session()
-	if _session ~= nil then _session.retire() end
-	_session = nil
+local function retire_session(expected)
+	local owned = expected or _session
+	if _session == owned then _session = nil end
+	if owned ~= nil then owned.retire() end
 end
 
 --- Closes the window this module created.
 local function close_window()
 	local view = _webview
-	retire_session()
 	_webview = nil
+	retire_session()
 	if view ~= nil then
 		local ok, err = pcall(function() view:delete() end)
 		if not ok then Logger.error(LOG, "The update-check window did not close: %s.", tostring(err)) end
@@ -134,16 +136,13 @@ local function session_for(view, ctx)
 		end,
 		report = function(result, on_complete, is_current)
 			if not is_current() then return end
-			local reported = require("ui.error_dialog").report({
+			return require("ui.error_dialog").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),
 					tostring(result.detail)),
 				time = os.date("%Y-%m-%d %H:%M:%S"),
-			})
-			-- Native reporting is synchronous; its receipt completes this request
-			-- inline only while the same check still owns the report action.
-			if is_current() then on_complete(reported) end
+			}, on_complete, is_current)
 		end,
 		open_log = open_today_log,
 		close = function() if view == _webview then close_window() end end,
@@ -168,6 +167,8 @@ end
 ---   automatic-check owner and channel owner, and the menu refresh.
 --- @return boolean opened
 function M.open(ctx)
+	_open_revision = _open_revision + 1
+	local revision = _open_revision
 	if type(ctx) ~= "table" or type(ctx.channel_owner) ~= "table" then
 		Logger.error(LOG, "The update-check window needs the menu session's channel owner.")
 		return false
@@ -177,10 +178,14 @@ function M.open(ctx)
 		Logger.error(LOG, "The update-check window cannot open: ui_builder is unavailable.")
 		return false
 	end
-	if _webview ~= nil and _session ~= nil then
-		ui_builder.force_focus(_webview, false)
+	if revision ~= _open_revision or package.loaded["ui.update_check"] ~= M then return false end
+	if _webview ~= nil then
+		local view = _webview
+		ui_builder.force_focus(view, false)
+		if revision ~= _open_revision or _webview ~= view then return false end
 		retire_session()
-		_session = session_for(_webview, ctx)
+		if revision ~= _open_revision or _webview ~= view then return false end
+		_session = session_for(view, ctx)
 		_session.start()
 		return true
 	end
@@ -195,7 +200,7 @@ function M.open(ctx)
 		Logger.error(LOG, "The update-check message channel could not be created.")
 		return false
 	end
-	local candidate = nil
+	local candidate, candidate_session = nil, nil
 	uc:setCallback(function(message)
 		if candidate == nil or candidate ~= _webview or _session == nil then return end
 		_session.on_message(type(message) == "table" and message.body or nil)
@@ -210,15 +215,17 @@ function M.open(ctx)
 		assets_dir = (Paths.shared("ui/update_check") or "") .. "/",
 		on_close = function()
 			if candidate ~= nil and candidate == _webview then
-				retire_session()
+				local owned_session = _session
 				_webview = nil
+				retire_session(owned_session)
 			end
 		end,
 		on_webview_created = function(owned)
-			if _webview ~= nil then return false end
+			if _webview ~= nil or revision ~= _open_revision then return false end
 			candidate = owned
 			_webview = owned
-			_session = session_for(owned, ctx)
+			candidate_session = session_for(owned, ctx)
+			_session = candidate_session
 			return true
 		end,
 		schedule_after = function(delay, callback, label)
@@ -226,9 +233,12 @@ function M.open(ctx)
 		end,
 		is_current = function() return candidate ~= nil and candidate == _webview end,
 	})
-	if view == nil or view ~= candidate or _session == nil then
-		retire_session()
-		_webview = nil
+	if revision ~= _open_revision then return false end
+	if view == nil or view ~= candidate or _session ~= candidate_session then
+		if _webview == candidate then
+			_webview = nil
+			retire_session(candidate_session)
+		end
 		Logger.error(LOG, "The update-check window could not be created.")
 		return false
 	end
