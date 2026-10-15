@@ -1,0 +1,13 @@
+{
+  "status": "INDEPENDENT_PARENT_SOURCE_BYTES_RECEIVED_INERT_NO_ADOPTION",
+  "files": 89,
+  "all_source_origin_bytes_exact": true,
+  "all_hashes_sizes_Git_modes_exact": true,
+  "observed_POSIX_mode_counts": {
+    "0o600": 88
+  },
+  "initial_stricter_POSIX_mode_preflight": "REFUSED_0600_NE_0644; manifest declares Git100644 nonexecutable mode, not all POSIX permission bits; no source byte change",
+  "manifest_sha256": "63d825882d789364d8eb640202e330ee6974625c2f415cce1ebc02be748537bd",
+  "native_input_actor_execution": 0,
+  "G3_hook_reader_adoption": "OWNER_CHECKPOINT_PENDING"
+}

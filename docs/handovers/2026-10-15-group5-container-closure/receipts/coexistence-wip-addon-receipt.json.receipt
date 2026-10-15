@@ -1,0 +1,9 @@
+{
+  "archive": "proof-historical-matrix-unreviewed-wip-addon.tar.gz",
+  "sha256": "9e55dbf163b816626ee64c7ba0cfbe50f980e18f276ce95c4efa01e847bc5ad0",
+  "bytes": 193250,
+  "members": 10,
+  "source_manifest_sha256": "22d678307166fd3e77e5811213005383c546240d56c32577b3d56b42d5f8c061",
+  "readback": "ALL_BYTES_EXACT",
+  "status": "UNREVIEWED_UNEXECUTED_NOT_ADOPTABLE"
+}

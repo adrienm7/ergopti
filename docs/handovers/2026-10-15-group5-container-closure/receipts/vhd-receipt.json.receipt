@@ -1,0 +1,113 @@
+{
+  "state": "SOURCE_CUSTODY_SUCCESSOR_WITH_IDENTIFIED_QUERY_HOLD_RESOLVED_NO_PROFILE_OR_NATIVE_GRANT",
+  "archive": {
+    "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/FINAL-QUERY-DEBT-SUCCESSOR/future-vhd-reviewed-source-query-debt-successor.tar.gz",
+    "sha256": "1082d21fa31ebcfadfab496a34e46a3cee8821f66811af3f3558c5107a558daf",
+    "bytes": 14129088
+  },
+  "all_streamed_members_bytes_modes_kinds_readback_exact": true,
+  "predecessor_archive_preserved": {
+    "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/future-vhd-reviewed-source.tar.gz",
+    "sha256": "db2e0dff7e1167bc1989b1f093b6a1c9b796b8a875b4924a22875c41af7b8f54",
+    "bytes": 13884059
+  },
+  "fixed_new_inputs_recuts_exact": [
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/MANIFEST.json",
+      "sha256": "80c1cf17b008b89e078644123ebf6f90cbb549d2b91d837a31bbb6ca7d937919",
+      "bytes": 2706
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-independent-payload-20261015/REVIEW.json",
+      "sha256": "fac1d687b7cdf65df0cce2a2efdf6924ab73e28e862b965d47cc81f07b96da08",
+      "bytes": 2390
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/FROZEN-REGRESSION.swift",
+      "sha256": "c21823228fc26c9aa3176304f292ea4b3b23bf9d9bb1cac8ff028873b8c39226",
+      "bytes": 1828
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/FROZEN-REQUIREMENTS.json",
+      "sha256": "758d497c9e728bce41e9b79de0a9d4b32334712ffc50326d3581392a7769f2b4",
+      "bytes": 1047
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/PATCH-CHECK/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverStockQuery.swift",
+      "sha256": "81e4e881625ccdb73e790c70435ee592a2aa33536be7110194e8ab942bc3fef2",
+      "bytes": 10618
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/PATCH-RECEIVING.json",
+      "sha256": "72da5243e5346b48621e1227637f542045f677330f63aad96f7d46b71d9625bb",
+      "bytes": 1126
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/POST/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverStockQuery.swift",
+      "sha256": "4fa42207d1e0f74d092467faf0dbaa2e716486a8f6c58910a3348ef7c68102bc",
+      "bytes": 10853
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/PRE/static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVHDDriverStockQuery.swift",
+      "sha256": "81e4e881625ccdb73e790c70435ee592a2aa33536be7110194e8ab942bc3fef2",
+      "bytes": 10618
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/PRE/static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVHDDriverStockLeaseTests.swift",
+      "sha256": "2b028384cadf1ced2c7eef2e32120660cf5f7ed4dd5bb3ff355b47668c708c32",
+      "bytes": 6648
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/README.md",
+      "sha256": "61d5021607ad0ab75ec99a663b43bd00051eae1428a8f10cf3963a8b27765280",
+      "bytes": 1447
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/REGRESSION-LIMIT.json",
+      "sha256": "c0408b3ac6dccb7db61d629ba15c2d030cf35f1a8872c2c7db018a6ee26f7ca4",
+      "bytes": 603
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/SOURCE-INVERSE.patch",
+      "sha256": "42a41a98858a0742b69b8280620f5c64d53b4d9da6f8e51b8c2f8c82047f72bd",
+      "bytes": 1722
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-private-20261015/SOURCE.patch",
+      "sha256": "e2d88e86a8ca6d530834e28065891523958ce2644b1a1c70ec724f59a1caf3ec",
+      "bytes": 1722
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/CURRENT-HOLD-OVERLAY-1/CURRENT-SOURCE-HOLD.json",
+      "sha256": "adc8573c4aa17a87c9d977846d31ee0f8c8506f76b7dd0cd1bc6393401b22b6f",
+      "bytes": 2624
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/CURRENT-HOLD-OVERLAY-1/MANIFEST.json",
+      "sha256": "8307ae69634dbc757c56efd40ecbbdcc85202e623e65846b5a3b9ef453b9ec5b",
+      "bytes": 834
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/CURRENT-HOLD-OVERLAY-1/OVERLAP-ORDER-AND-LIMITS.json",
+      "sha256": "4ba1e02850b4dfadc1c1fdbf82f0dfec1f707e49d4a4670229c1c0d7401b9da9",
+      "bytes": 2267
+    },
+    {
+      "path": "/workspace/ergopti-group5-work/vhd-future-source-public-handover-private-20261015/CURRENT-HOLD-OVERLAY-1/FINAL-SOURCE-INDEX.json",
+      "sha256": "0d1b460c7dcdeab7514f84c8b41c8173744878250fb2a94c96475f2a169d595f",
+      "bytes": 31006
+    }
+  ],
+  "payload_file_count": 417,
+  "final_declared_paths": 65,
+  "source_delta_count": 1,
+  "query_POST": "4fa42207d1e0f74d092467faf0dbaa2e716486a8f6c58910a3348ef7c68102bc",
+  "new_source_review": {
+    "path": "/workspace/ergopti-group5-work/vhd-stock-query-capture-debt-independent-payload-20261015/REVIEW.json",
+    "sha256": "fac1d687b7cdf65df0cce2a2efdf6924ab73e28e862b965d47cc81f07b96da08",
+    "bytes": 2390
+  },
+  "native_regression_cases_added": 0,
+  "native_tests_executed": 0,
+  "canonical_or_remote_or_workflow_or_target_execution": 0
+}

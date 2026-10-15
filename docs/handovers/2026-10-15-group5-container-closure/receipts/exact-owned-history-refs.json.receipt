@@ -1,0 +1,261 @@
+{
+  "dev": "c8a7b1f6e19f508dee1f1e132d4ca1c77f6ec95d",
+  "standard_fetch_error_retained": "NON_FF_OLD_CI_TRACKING_REF_PRESERVED; all current remote tips fetched into new custody namespace without force",
+  "refs": [
+    {
+      "kind": "remote",
+      "name": "codex/ci-macos-input",
+      "ref": "refs/retirement/group5/remote/codex/ci-macos-input",
+      "sha": "8c2480d6e659c8037f1e73d5a53c55f847400b84"
+    },
+    {
+      "kind": "remote",
+      "name": "codex/ci-macos-startup-diagnostics",
+      "ref": "refs/retirement/group5/remote/codex/ci-macos-startup-diagnostics",
+      "sha": "0617f781ef981e29c3cfc6eeb0b1c9cec24f9ade"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input",
+      "ref": "refs/retirement/group5/remote/feat/macos-input",
+      "sha": "e2085d488e77b360b832fb3615ad07c667326378"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-auth-backport",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-auth-backport",
+      "sha": "a16a95aa6796eb53b0daa94ee7b6ee9ac70f6e0c"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-auth-dev",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-auth-dev",
+      "sha": "d71279cb98a1a7b6d1c67db57950c2d94a8d5cdc"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-cold-paused-backport",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-cold-paused-backport",
+      "sha": "294c01a2d9784696c1529f7806ad5bf3793ca726"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-dev",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-dev",
+      "sha": "3b3a012a8ef26ceffa97f13412eed9947a545aa5"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-fifo-fairness",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-fifo-fairness",
+      "sha": "1d3216c0ff174fb74ae2c9aa0ffeb3f41b61e9f6"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-final-stop",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-final-stop",
+      "sha": "bede31e4cad44317200a88566ea79c94ed9e33ec"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-final-stop-ready",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-final-stop-ready",
+      "sha": "ad1bd2cf8173cf6e044e9700dbb7c7a6eb19b7bf"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-hosted-exit-owner",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-hosted-exit-owner",
+      "sha": "8658a9bc10a0132febb43d2cfb9253741a690805"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-lease-cli-two",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-lease-cli-two",
+      "sha": "d4294d15c30bcbbc18cec91e6c932c31cfc177e3"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-lease-final-stream",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-lease-final-stream",
+      "sha": "cebe69abc355600dc2540425ea805a13edc06839"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-legacy-async",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-legacy-async",
+      "sha": "caf451c056d185f4e86d0964a05db0d488ddbecd"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-physical-holds",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-physical-holds",
+      "sha": "00804c164b29a926465ffcd6bebb5474ae7734d6"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-input-safe-off-backport",
+      "ref": "refs/retirement/group5/remote/feat/macos-input-safe-off-backport",
+      "sha": "94c9ec9a6113b593df7ba4c3dc503981ad656670"
+    },
+    {
+      "kind": "remote",
+      "name": "feat/macos-owned-runtime-native-build",
+      "ref": "refs/retirement/group5/remote/feat/macos-owned-runtime-native-build",
+      "sha": "ca6507e53c8e96940da7fb7752f4d6c8c36f6ee9"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input",
+      "ref": "refs/heads/feat/macos-input",
+      "sha": "e2085d488e77b360b832fb3615ad07c667326378"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-bootstrap-heartbeat",
+      "ref": "refs/heads/feat/macos-input-bootstrap-heartbeat",
+      "sha": "9480d8d89ca9916d1f12764eaac27e2b1988222d"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-dev",
+      "ref": "refs/heads/feat/macos-input-dev",
+      "sha": "3b3a012a8ef26ceffa97f13412eed9947a545aa5"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-fifo-fairness",
+      "ref": "refs/heads/feat/macos-input-fifo-fairness",
+      "sha": "1d3216c0ff174fb74ae2c9aa0ffeb3f41b61e9f6"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-final-stop",
+      "ref": "refs/heads/feat/macos-input-final-stop",
+      "sha": "bede31e4cad44317200a88566ea79c94ed9e33ec"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-final-stop-ready",
+      "ref": "refs/heads/feat/macos-input-final-stop-ready",
+      "sha": "ad1bd2cf8173cf6e044e9700dbb7c7a6eb19b7bf"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-heartbeat-catchup",
+      "ref": "refs/heads/feat/macos-input-heartbeat-catchup",
+      "sha": "9480d8d89ca9916d1f12764eaac27e2b1988222d"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-heartbeat-scheduling",
+      "ref": "refs/heads/feat/macos-input-heartbeat-scheduling",
+      "sha": "f3dda45b2ead5d7be4d6dae0f2dc94751ee53175"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-hosted-exit-owner",
+      "ref": "refs/heads/feat/macos-input-hosted-exit-owner",
+      "sha": "8658a9bc10a0132febb43d2cfb9253741a690805"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-hs-lease-clock",
+      "ref": "refs/heads/feat/macos-input-hs-lease-clock",
+      "sha": "3d3064b3e98d2aeaaa923fcca5d3b7a9c1661054"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-lease-cli-two",
+      "ref": "refs/heads/feat/macos-input-lease-cli-two",
+      "sha": "d4294d15c30bcbbc18cec91e6c932c31cfc177e3"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-lease-terminal-facts",
+      "ref": "refs/heads/feat/macos-input-lease-terminal-facts",
+      "sha": "69fcb820ee5062ad445b93927cc536c543a3a878"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-legacy-async",
+      "ref": "refs/heads/feat/macos-input-legacy-async",
+      "sha": "caf451c056d185f4e86d0964a05db0d488ddbecd"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-legacy-confirmation",
+      "ref": "refs/heads/feat/macos-input-legacy-confirmation",
+      "sha": "ac833f7c970b0d7b5d36d91a36e66b60da58fece"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-logger-fixture-path",
+      "ref": "refs/heads/feat/macos-input-logger-fixture-path",
+      "sha": "e47c88c23999973b6cd936cfed3db40e2a1cf3a5"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-native-silence",
+      "ref": "refs/heads/feat/macos-input-native-silence",
+      "sha": "69fcb820ee5062ad445b93927cc536c543a3a878"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-owned-lease-facts",
+      "ref": "refs/heads/feat/macos-input-owned-lease-facts",
+      "sha": "3d3064b3e98d2aeaaa923fcca5d3b7a9c1661054"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-owned-lifecycle",
+      "ref": "refs/heads/feat/macos-input-owned-lifecycle",
+      "sha": "9480d8d89ca9916d1f12764eaac27e2b1988222d"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-owned-producer",
+      "ref": "refs/heads/feat/macos-input-owned-producer",
+      "sha": "18e1637d175761d6e802a58934514b2443c8b985"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-physical-holds",
+      "ref": "refs/heads/feat/macos-input-physical-holds",
+      "sha": "00804c164b29a926465ffcd6bebb5474ae7734d6"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-safe-off-backport",
+      "ref": "refs/heads/feat/macos-input-safe-off-backport",
+      "sha": "94c9ec9a6113b593df7ba4c3dc503981ad656670"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-input-silence-process-regression",
+      "ref": "refs/heads/feat/macos-input-silence-process-regression",
+      "sha": "9480d8d89ca9916d1f12764eaac27e2b1988222d"
+    },
+    {
+      "kind": "local",
+      "name": "feat/macos-owned-runtime-native-build",
+      "ref": "refs/heads/feat/macos-owned-runtime-native-build",
+      "sha": "ca6507e53c8e96940da7fb7752f4d6c8c36f6ee9"
+    },
+    {
+      "kind": "old_tracking_ref",
+      "name": "refs/remotes/origin/codex/ci-macos-input",
+      "ref": "refs/remotes/origin/codex/ci-macos-input",
+      "sha": "9e5c70967587052eb7eb11cd9e47c02f8f9f4030"
+    },
+    {
+      "kind": "inactive_custody_snapshot",
+      "name": "preexisting-other-group-staged-inputs",
+      "ref": "refs/retirement/group5/preexisting-receiving-index",
+      "sha": "66364e1e41c53bbad1900e08aba96ae832a632e8",
+      "tree": "f004b2ca5a97e87610046a1d67be0ef6f6236c09",
+      "original_worktree_head": "00804c164b29a926465ffcd6bebb5474ae7734d6",
+      "not_product_adopted": true
+    }
+  ]
+}
