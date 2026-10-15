@@ -55,7 +55,9 @@ enum ErgoptiReplay_Kind {
 	ERGOPTI_REPLAY_DIGIT = 2,
 	ERGOPTI_REPLAY_DEAD_KEY = 3,
 	ERGOPTI_REPLAY_MODIFIER = 4,
-	ERGOPTI_REPLAY_PREFIX = 5
+	ERGOPTI_REPLAY_PREFIX = 5,
+	/* Source intent only; unlike KLE DIGIT, this never implies Unicode output. */
+	ERGOPTI_REPLAY_DIRECT_DIGIT = 6
 };
 
 enum ErgoptiReplay_ModifierLR {
@@ -87,6 +89,9 @@ enum ErgoptiReplay_Modifier {
  * composition. recipe_id retains the caller-owned KLE model/step recipe. The
  * AHK Keylayout_Step owner resolves complex next-state/output from that model.
  * Targets describe native edges, never guessed characters or composed glyphs.
+ * DIRECT_DIGIT identifies scan02..0B without a registered target, modifier or
+ * composition transform. Its host mapping and accepted output remain unowned;
+ * native-edge preparation refuses it and output planning stays diagnostic.
  */
 typedef struct ErgoptiReplay_Route {
 	uint64_t recipe_id;

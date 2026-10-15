@@ -443,9 +443,66 @@ static void TestInputOutputAliasing(void)
 	puts("PASS replay-route reused input/output buffer retains its incoming event.");
 }
 
+/** Direct-digit sources are distinct from KLE text and cannot predeclare a host target. */
+static void TestDirectDigitSourceRegistration(void)
+{
+	ErgoptiReplay_Route digits[10] = {{0}};
+	for (uint32_t i = 0; i < 10; ++i) {
+		digits[i].recipe_id = 2000 + i;
+		digits[i].route_id = 100 + i;
+		digits[i].axis = ERGOPTI_REPLAY_SCAN;
+		digits[i].code = (uint16_t)(0x02 + i);
+		digits[i].kind = ERGOPTI_REPLAY_DIRECT_DIGIT;
+	}
+	for (uint32_t i = 0; i < 10; ++i) {
+		ErgoptiReplay_State state; Start(&state);
+		assert(ErgoptiReplay_Register(&state, OWNER, 2, 82, digits, 10) == 0);
+		for (uint32_t edge_index = 0; edge_index < 3; ++edge_index) {
+			ErgoptiReplay_Event event = { .timestamp = edge_index + 1, .source_id = 1,
+				.origin = ERGOPTI_REPLAY_PHYSICAL, .scan = (uint16_t)(0x02 + i),
+				.vk = (uint16_t)(i == 9 ? 0x30 : 0x31 + i),
+				.repeat = edge_index == 1, .key_up = edge_index == 2 };
+			ErgoptiReplay_Snapshot snapshot;
+			ErgoptiReplay_NativeKeyEdge native_edge;
+			assert(ErgoptiReplay_Step(&state, OWNER, &event, &snapshot) == 0);
+			assert(snapshot.route.kind == ERGOPTI_REPLAY_DIRECT_DIGIT);
+			assert(snapshot.route.recipe_id == 2000 + i);
+			assert(snapshot.route_generation == 2 && snapshot.route_layout_id == 82);
+			assert(snapshot.route.target_vk == 0 && snapshot.route.target_scan == 0);
+			/* Source interpretation alone never invents a native host mapping. */
+			memset(&native_edge, 0xA5, sizeof(native_edge));
+			assert(ErgoptiReplay_PrepareNativeEdge(&state, OWNER, &snapshot, &native_edge)
+				== ERGOPTI_REPLAY_UNSUPPORTED);
+			assert(native_edge.vk == 0 && native_edge.scan == 0);
+			if (edge_index == 0)
+				assert(ErgoptiReplay_Register(&state, OWNER, 3, 83, NULL, 0) == 0);
+		}
+	}
+	for (uint32_t bad_index = 0; bad_index < 11; ++bad_index) {
+		ErgoptiReplay_State state; Start(&state);
+		ErgoptiReplay_Route bad = digits[0];
+		if (bad_index == 0) bad.code = 0x29;
+		if (bad_index == 1) { bad.axis = ERGOPTI_REPLAY_VK; bad.code = 0x31; }
+		if (bad_index == 2) bad.target_vk = 0x31;
+		if (bad_index == 3) bad.target_scan = 0x02;
+		if (bad_index == 4) bad.required_modifiers = ERGOPTI_REPLAY_SHIFT;
+		if (bad_index == 5) bad.required_prefixes = 1;
+		if (bad_index == 6) bad.prefix_bit = 1;
+		if (bad_index == 7) bad.effective_modifiers_lr = ERGOPTI_REPLAY_LSHIFT;
+		if (bad_index == 8) bad.required_dead_key_id = 1;
+		if (bad_index == 9) bad.next_dead_key_id = 1;
+		if (bad_index == 10) bad.kind = 7;
+		ErgoptiReplay_State unchanged = state;
+		assert(ErgoptiReplay_Register(&state, OWNER, 2, 82, &bad, 1)
+			== ERGOPTI_REPLAY_INVALID_REGISTRATION);
+		assert(memcmp(&state, &unchanged, sizeof(state)) == 0);
+	}
+}
+
 /** Recipe consumption must not promote corrupted or untrusted provenance. */
 static void TestRecipeValidation(void)
 {
+	TestDirectDigitSourceRegistration();
 	ErgoptiReplay_State state;
 	ErgoptiReplay_Snapshot snapshot;
 	ErgoptiReplay_Snapshot corrupt;
