@@ -4872,8 +4872,7 @@ left/right modifiers remain independent even with identical aggregate flags.
 The complete 41-case current test prefix and frozen 47 additive controls pass
 88/0; original production gives 50/38, and omitting either correction restores
 29 or 11 failures. Five adjacent focused suites pass 68/0. These are portable
-event-port controls, not native or physical acceptance. Private-window policy
-transitions remain a separate unfinished software join.
+event-port controls, not native or physical acceptance.
 
 The secure-context prerequisite now supplies the keylogger's exact pure
 settlement callback to the context tracker. AX focus, application/bootstrap
@@ -4884,7 +4883,18 @@ observer clients retain their existing initialization contract; supplied
 callbacks are validated and remain part of the exact reinitialization identity.
 The previous 88 case bodies and frozen 11 secure controls remain unchanged;
 three additive callable API controls complete the focused 102-case selection.
-Native AX, physical input and private-window policy completion remain pending.
+Native AX and physical input acceptance remain pending.
+
+Private-window policy now uses the same exact modifier settlement owner. The
+actual window writer publishes classification and settlement before unrelated
+identity, fullscreen, clock or persistence callbacks; it preserves the prior
+denial during title acquisition. A nil-window callback retries existing debt,
+and the public private-filter setter cannot publish past a refused settlement.
+The complete 102-case prefix and frozen 20 private controls remain unchanged;
+five additive callback controls cover refusal and early metadata reentry. The
+focused selection passes 127/0 under Lua 5.4 with native-port models. This does
+not qualify actual AX delivery, installed startup or physical private-window
+transitions, and does not repair the customer lease incident.
 
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled
