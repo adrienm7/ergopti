@@ -520,6 +520,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/modules/features/number_row_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
+#Include modules/keymap/layout/digit_row_bindings.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
 ; and the Ergopti tables are read by modules/keymap/layout.ahk.
@@ -1349,6 +1350,9 @@ BootProfile_Mark("Metrics/keylogger started")
 #Include infra/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
+; Update the original static slots in place: creating runtime variants would
+; move the direct digits behind the static typing tap-hold roll variants.
+DigitRow_RegisterBindings()
 ; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.

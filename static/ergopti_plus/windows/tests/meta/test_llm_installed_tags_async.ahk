@@ -185,8 +185,20 @@ _MetaCheckInstalledTagsNonBlocking() {
 		"EnsureModelReady must wait for the async installed-tags snapshot after deps-ready")
 	Assert(InStr(EnsureBody, "return false", , ProbePos) > ProbePos,
 		"the bridge must not start before the first installed-tags snapshot commits")
-	Assert(InStr(DoneBody, "LLM_Menu_TryStartBridge()") > 0,
-		"the first exact tags terminal must retry the deferred bridge start")
+	ResumeBody := _DriverFuncBody("LLM_Menu_ResumeBackendLifecycleAfterTags")
+	ReadyBody := _DriverFuncBody("LLM_Menu_OnDepsReady")
+	Assert(ResumeBody != "" && ReadyBody != "", "the deferred lifecycle owners must exist")
+	Assert(InStr(DoneBody, "LLM_Menu_ResumeBackendLifecycleAfterTags()") > 0,
+		"the first exact tags terminal must resume its deferred lifecycle")
+	CurrentPos := InStr(ResumeBody, "!_LLM_Menu_BackendLifecycleIntentIsCurrent(")
+	ResumePos := InStr(ResumeBody, "return LLM_Menu_OnDepsReady(")
+	Assert(CurrentPos > 0 && ResumePos > CurrentPos,
+		"a cached-model completion must retain and validate its originating intent and port")
+	BridgePos := InStr(ReadyBody, '"start_bridge"')
+	OwnerPos := InStr(ReadyBody, "_LLM_BackendLifecycleReadyContinuation != Continuation")
+	WarmupPos := InStr(ReadyBody, '"warmup"')
+	Assert(BridgePos > 0 && OwnerPos > BridgePos && WarmupPos > OwnerPos,
+		"a bridge callback cannot lend warmup ownership to a successor")
 
 	; (8) Model-browser open/filter runs in a GUI/input callback, so it must
 	; consume the same cache rather than reaching the synchronous list helper.
