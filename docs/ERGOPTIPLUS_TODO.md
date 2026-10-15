@@ -12326,6 +12326,17 @@ actual AHK parser/unit/E2E, original/candidate causal execution, final native
 package/install/startup and physical receiving remain NOT_RUN. It does not
 enable simultaneous input or establish genuine raw AltGr provenance.
 
+A finite inactive Windows simultaneous arbitration core is preserved in the
+[prepared source capsule](handovers/2026-10-15-group3-windows-pair-core/README.md).
+Its detached C plans retain inclusive delay, canonical symmetry/None, first-down
+identity/time, ordered fallback, repeat/Up and latched retirement. Linux GCC
+executes640 handwritten assertions in15 functions, also with ASan/UBSan; nine
+omissions fail the unchanged expectations. This is not a native input engine:
+the genuine single-hook/RawInput provenance, shared-policy/action bridge,
+Windows MSVC/test enrollment, real native delivery and physical acceptance
+remain absent or UNRUN. Existing menus stay unavailable. The archive is not
+compiled or enrolled by production and cannot complete item91.
+
 - [~] **93.** Implement Linux combinations using item 91's shared pair
   IDs, slots and configuration sections. Implemented: ordered tap/hold delivery
   on one exact keyboard through the real Hook/tap-hold engine, bounded menus,
