@@ -216,6 +216,9 @@ _KeyCombinationIndexFirstKeys(Taps, Holds) {
 ; The action a pair runs on a tap of its second key, or "none".
 KeyCombinationTapOf(PairId) {
 	global KeyCombinationTaps, KEY_COMBINATION_NONE
+	; Parse-time criteria can reach this accessor before its slot owners exist.
+	if !IsSet(KeyCombinationTaps) || !IsSet(KEY_COMBINATION_NONE)
+		return ""
 	return KeyCombinationTaps.Get(PairId, KEY_COMBINATION_NONE)
 }
 

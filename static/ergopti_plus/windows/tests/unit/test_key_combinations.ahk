@@ -1621,3 +1621,38 @@ Test("key combinations: actual modifier resolver rejoins its slot before ownersh
 	_KCT_AssignmentChangesAtAdmissionLog.Bind("ctrl"))
 Test("key combinations: actual layer duration rejoins its slot before ownership (pair-assignment-revocation)",
 	_KCT_AssignmentChangesAtAdmissionLog.Bind("nav"))
+
+; Pair assignment capture is reachable through parse-time #HotIf. Its tap
+; accessor must refuse its own absent map/sentinel, like the hold accessor.
+_KCT_TapSlotUnsetAtBoot(Missing) {
+	global KeyCombinationTaps, KEY_COMBINATION_NONE
+	Saved := { HadTaps: IsSet(KeyCombinationTaps),
+		Taps: IsSet(KeyCombinationTaps) ? KeyCombinationTaps : 0,
+		HadNone: IsSet(KEY_COMBINATION_NONE),
+		None: IsSet(KEY_COMBINATION_NONE) ? KEY_COMBINATION_NONE : 0 }
+	try {
+		AssertTrue(IsSet(KeyCombinationTaps) && IsSet(KEY_COMBINATION_NONE),
+			"the ordinary runner has both original owners before independently unsetting one")
+		if Missing == "taps"
+			KeyCombinationTaps := unset
+		else if Missing == "none"
+			KEY_COMBINATION_NONE := unset
+		else
+			throw ValueError("Unknown pair tap accessor boot control", -1, Missing)
+		AssertEqual("", KeyCombinationTapOf("left_alt_then_caps_lock"),
+			"an absent tap slot owner or canonical empty value refuses without an unset read")
+	} finally {
+		if Saved.HadTaps
+			KeyCombinationTaps := Saved.Taps
+		else
+			KeyCombinationTaps := unset
+		if Saved.HadNone
+			KEY_COMBINATION_NONE := Saved.None
+		else
+			KEY_COMBINATION_NONE := unset
+	}
+}
+Test("key combinations: unset tap assignments refuse the parse-time tap accessor (pair-tap-slot-boot)",
+	_KCT_TapSlotUnsetAtBoot.Bind("taps"))
+Test("key combinations: unset empty sentinel refuses the parse-time tap accessor (pair-tap-slot-boot)",
+	_KCT_TapSlotUnsetAtBoot.Bind("none"))
