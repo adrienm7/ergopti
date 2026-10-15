@@ -842,6 +842,7 @@ function M.start(opts)
 
 	local watcher_count = luv and #_luv_handles or #_pump_entries
 	for _ in pairs(_personal_entries) do watcher_count = watcher_count + 1 end
+	if _personal_anchor then watcher_count = watcher_count + 1 end
 	Logger.success(LOG, "File watchers armed: %d handle(s) (%s).", watcher_count, backend_label)
 end
 
