@@ -42,7 +42,7 @@ _LNTR_WithState(Fn) {
 		; through the original protocol before returning the borrowed globals.
 		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown) {
 			try {
-				AssertTrue(LLM_NavEventOwner_Stop(), "owned metadata fixture cleanup must acknowledge Stop")
+				AssertTrue(_LNTR_StopFixtureState(), "owned metadata fixture cleanup must acknowledge Stop")
 				AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
 			} catch as Err {
 				CleanupFailure := Err
@@ -66,6 +66,21 @@ _LNTR_WithState(Fn) {
 		if IsObject(CleanupFailure) && !IsObject(Primary)
 			throw CleanupFailure
 	}
+}
+
+_LNTR_StopFixtureState() {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerPort
+	; A preceding real ABI case leaves its DLL intentionally process-resident.
+	; Its retained frame requires the unchanged genuine native Stop receipt;
+	; the fixture's custom ACK cannot retire that C lifetime.
+	Port := _LLM_NavEventOwnerPort
+	if !(_LLM_NavEventOwnerModule is Integer) || _LLM_NavEventOwnerModule <= 0
+			|| !(Port is Map) || !Port.Has("stop")
+		return LLM_NavEventOwner_Stop()
+	Stop := Port["stop"]
+	Port.Delete("stop")
+	try return LLM_NavEventOwner_Stop()
+	finally Port["stop"] := Stop
 }
 
 _LNTR_LoadFixture(Base) {
@@ -1584,3 +1599,27 @@ _LNTR_RefusalSuccessorCase() {
 
 Test("terminal route metadata: acknowledged refusal cleanup admits the original successor (todo49-route-adapter)",
 	_LNTR_RefusalSuccessorCase)
+
+; The resident DLL lifetime survives the original no-hook ABI case. Its later
+; controlled fixture must retire retained references through the real protocol.
+_LNTR_ResidentAbiBeforeControlledRetirement() {
+	_LNEO_RealNativeAbiRoundTripDoesNotStartHook()
+	_LNEO_RealNativeAbiBareDigitValidation()
+	Targets := [_LLM_NavEventOwnerPortFn, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationRetain,
+		_LLM_NavEventOwnerTerminalRegistrationUnknown]
+	Received := 0
+	for Target in Targets {
+		_LNTR_V3_AfterSourceCallableWithdrawal(Target)
+		Received += 1
+	}
+	for Boundary in ["register", "held"] {
+		for Target in Targets {
+			_LNTR_V3_AfterRegistrationFacade(Target, Boundary)
+			Received += 1
+		}
+	}
+	AssertEqual(15, Received, "every original source/register/held facade keeps its cleanup obligation")
+}
+Test("terminal route metadata: resident ABI precedes controlled retirement (terminal-resident-cleanup)",
+	_LNTR_ResidentAbiBeforeControlledRetirement)
