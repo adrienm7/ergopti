@@ -5300,6 +5300,18 @@ and model inverses. These do not qualify Darwin concurrency, installed capture,
 physical delivery, signed factory outputs or the customer lease cause. Full
 selected source qualification and hosted receiving remain required.
 
+The protected production compiler owner now admits the already-published queue
+control successor and retains its three original C++ fixture identities through
+capture and currentness checks. The previous pin refused current source before
+compilation while still admitting the historical control. Four additive genuine
+constructor controls reject old or altered Python, each changed fixture and
+later fixture mutations, without permitting a compiler or child process.
+All 41 original builder methods and ten separate parallel-model methods remain
+whole; normal and optimized runs each pass 45 main and ten parallel controls.
+The original twelve queue scenarios and added four dispatcher scenarios are
+source-reviewed, not executed by this receiving. Native compilation, signing,
+queue behavior, helper17 and physical acceptance remain unqualified.
+
 Ordinary launcher child environments now discard an inherited installed-capture
 control marker before launching Hammerspoon. Fresh-owned selected launches add
 only their original newly issued marker after that boundary. The three frozen

@@ -1781,7 +1781,10 @@ class _ProductionSink(_SigningSink):
             {
                 "tools/build/remap_runtime_idle_test.py": "3ebc1e39c0abbb55c08fe2466b2106a136fd9fd38c2476ab5652c5866e7f3c6d",
                 "tools/build/fixtures/owned_runtime_idle_test.cpp": "5e5b50a572b91fd48bd6f60bf681a019f6c9a6125fbc4c8e2d225fb6558b5a04",
-                "tools/build/remap_runtime_queue_test.py": "ca54e61d19dd071fc23ce991efc1a9a2798304a6486872261a092019ad97ec58",
+                "tools/build/remap_runtime_queue_test.py": "afdd012bee750b713d10665e28c35705318bc6f4ae1bb9a54f7e96105912b22a",
+                "tools/build/fixtures/owned_runtime_queue_test.cpp": "dc6961f81069b8b56c9e60aaea364d2075f82103a40b8162dd6df91090fa5801",
+                "tools/build/fixtures/owned_runtime_queue_ports.hpp": "387327aa76bbe59de82f18c7f55defdc5a15daff2739620215638e4d599dd029",
+                "tools/build/fixtures/owned_runtime_dispatcher_test.cpp": "df3e4bd5de28072479c57dac3b64387786dc44276effaa179d673cf9c4d51969",
             },
             deadline,
         )
