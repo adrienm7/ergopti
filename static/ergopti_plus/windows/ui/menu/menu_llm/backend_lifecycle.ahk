@@ -11,9 +11,11 @@
 #Requires AutoHotkey v2.0
 
 global _LLM_BackendLifecycleEpoch := 0
+global _LLM_BackendLifecycleReadyContinuation := 0
 
 _LLM_Menu_CaptureBackendLifecycleIntent(ShowUi := true) {
-	global _LLM_Menu, _LLM_BackendLifecycleEpoch
+	global _LLM_Menu, _LLM_BackendLifecycleEpoch, _LLM_BackendLifecycleReadyContinuation
+	_LLM_BackendLifecycleReadyContinuation := 0
 	_LLM_BackendLifecycleEpoch += 1
 	return Map(
 		"epoch", _LLM_BackendLifecycleEpoch,
@@ -40,7 +42,8 @@ _LLM_Menu_BackendLifecycleIntentIsCurrent(Intent) {
 }
 
 LLM_Menu_BackendLifecycleInvalidate(CancelOllama := false, Port := 0) {
-	global _LLM_BackendLifecycleEpoch
+	global _LLM_BackendLifecycleEpoch, _LLM_BackendLifecycleReadyContinuation
+	_LLM_BackendLifecycleReadyContinuation := 0
 	_LLM_BackendLifecycleEpoch += 1
 	if CancelOllama
 		_LLM_Menu_BackendLifecycleCall(Port, "cancel_ollama")
@@ -236,7 +239,7 @@ LLM_Menu_BootstrapOllama(ShowUi := true, Port := 0, Intent := 0) {
 }
 
 LLM_Menu_OnDepsReady(Intent := 0, Port := 0) {
-	global _LLM_Menu
+	global _LLM_Menu, _LLM_BackendLifecycleReadyContinuation
 	if !(Intent is Map)
 		Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
 	if !_LLM_Menu_BackendLifecycleIntentIsCurrent(Intent)
@@ -250,10 +253,33 @@ LLM_Menu_OnDepsReady(Intent := 0, Port := 0) {
 	_LLM_Menu_BackendLifecycleCall(Port, "menu_build")
 	if !_LLM_Menu_BackendLifecycleIntentIsCurrent(Intent)
 		return false
+	; The first bridge attempt may await the asynchronous model-cache terminal.
+	Continuation := Map("intent", Intent, "port", Port)
+	_LLM_BackendLifecycleReadyContinuation := Continuation
 	if !_LLM_Menu_BackendLifecycleCall(Port, "start_bridge")
+		return false
+	if _LLM_BackendLifecycleReadyContinuation != Continuation
+		return false
+	_LLM_BackendLifecycleReadyContinuation := 0
+	if !_LLM_Menu_BackendLifecycleIntentIsCurrent(Intent)
 		return false
 	_LLM_Menu_BackendLifecycleCall(Port, "warmup")
 	return true
+}
+
+/** Resumes only the lifecycle that actually deferred its bridge for model tags. */
+LLM_Menu_ResumeBackendLifecycleAfterTags() {
+	global _LLM_BackendLifecycleReadyContinuation
+	Continuation := _LLM_BackendLifecycleReadyContinuation
+	if Continuation is Integer && Continuation == 0
+		return false
+	if !(Continuation is Map) || Continuation.Count != 2
+			|| !Continuation.Has("intent") || !Continuation.Has("port")
+		throw ValueError("The deferred model-cache lifecycle is malformed.")
+	_LLM_BackendLifecycleReadyContinuation := 0
+	if !_LLM_Menu_BackendLifecycleIntentIsCurrent(Continuation["intent"])
+		return false
+	return LLM_Menu_OnDepsReady(Continuation["intent"], Continuation["port"])
 }
 
 LLM_Menu_OnDepsFailed(Message, Intent := 0, Port := 0) {

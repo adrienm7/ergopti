@@ -77,6 +77,7 @@ _LBLD_Schedule(State, Callback, Period) {
 _LBLD_Reset(Menu) {
 	global _LLM_Menu := Menu
 	global _LLM_BackendLifecycleEpoch := 0
+	global _LLM_BackendLifecycleReadyContinuation := 0
 }
 
 _LBLD_ApiNeverConsultsOllama() {
@@ -401,18 +402,226 @@ _LBLD_ModelAbaKeepsOnlyFinalIntentCurrent() {
 		"the final A generation must remain live after an A-B-A cycle")
 }
 
-; Every case replaces the shared _LLM_Menu and the lifecycle epoch. Left in
+/** Keeps actual cache/auxiliary ownership around the injected lifecycle ports. */
+_LBLD_WithTagsFixture(Callback) {
+	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
+	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter, _LLM_Deps_State
+	global _LLM_InstalledTagsCache, _LLM_InstalledTagsCacheAt
+	Saved := [_LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners,
+		_LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter, _LLM_Deps_State]
+	HadCache := IsSet(_LLM_InstalledTagsCache), HadAt := IsSet(_LLM_InstalledTagsCacheAt)
+	SavedCache := HadCache ? _LLM_InstalledTagsCache : 0
+	SavedAt := HadAt ? _LLM_InstalledTagsCacheAt : 0
+	try {
+		_LLM_AuxGeneration += 1, _LLM_AuxOwnerCounter := 0
+		_LLM_AuxOwners := Map(), _LLM_AuxCleanupDebt := Map(), _LLM_AuxCleanupDebtCounter := 0
+		_LLM_InstalledTagsCache := unset, _LLM_InstalledTagsCacheAt := 0
+		AssertFalse(LLM_InstalledTagsCacheReady(), "the first probe starts without an admitted snapshot")
+		; Dependencies and bridge are controlled ports; no native request may run.
+		_LLM_Deps_State := "pending"
+		return Callback.Call()
+	} finally {
+		try LLM_AuxInvalidate("deferred_tags_fixture_cleanup")
+		finally {
+			_LLM_AuxGeneration := Saved[1], _LLM_AuxOwnerCounter := Saved[2], _LLM_AuxOwners := Saved[3]
+			_LLM_AuxCleanupDebt := Saved[4], _LLM_AuxCleanupDebtCounter := Saved[5], _LLM_Deps_State := Saved[6]
+			_LLM_InstalledTagsCache := HadCache ? SavedCache : unset
+			_LLM_InstalledTagsCacheAt := HadAt ? SavedAt : unset
+		}
+	}
+}
+
+_LBLD_TagsBridgeStart(State) {
+	State["start"] += 1
+	if !LLM_InstalledTagsCacheReady()
+		return false
+	if State.Get("replace_during_start", false)
+		State["successor"] := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	return true
+}
+
+_LBLD_TagsDeferredReady() {
+	_LBLD_WithTagsFixture(_LBLD_TagsDeferredReadyInner)
+}
+
+_LBLD_TagsDeferredReadyInner() {
+	global _LLM_BackendLifecycleReadyContinuation
+	State := _LBLD_State(), Port := _LBLD_Port(State)
+	Port["start_bridge"] := _LBLD_TagsBridgeStart.Bind(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	AssertFalse(LLM_Menu_OnDepsReady(Intent, Port), "uncached bridge defers its original lifecycle")
+	AssertEqual(1, State["start"])
+	AssertEqual(0, State["warmup"])
+	Owner := LLM_AuxBegin("menu_tags", Map("backend", "ollama"))
+	AssertTrue(_LLM_Menu_OnInstalledTagsProbeDone(["local-a"], Owner, (*) => true))
+	AssertEqual(2, State["start"], "the actual cache terminal retries the originating bridge port")
+	AssertEqual(1, State["warmup"], "the deferred readiness must reach its original warmup port")
+	AssertEqual(0, _LLM_BackendLifecycleReadyContinuation)
+	AssertFalse(_LLM_Menu_OnInstalledTagsProbeDone(["local-a"], Owner, (*) => true))
+	AssertFalse(LLM_Menu_ResumeBackendLifecycleAfterTags(), "an absent continuation cannot create a new intent")
+	AssertEqual(2, State["start"])
+	AssertEqual(1, State["warmup"], "duplicate completion cannot duplicate model loading")
+}
+
+_LBLD_TagsRetiredReady(Variant) {
+	_LBLD_WithTagsFixture(_LBLD_TagsRetiredReadyInner.Bind(Variant))
+}
+
+_LBLD_TagsRetiredReadyInner(Variant) {
+	global _LLM_Menu
+	State := _LBLD_State(), Port := _LBLD_Port(State)
+	Port["start_bridge"] := _LBLD_TagsBridgeStart.Bind(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	AssertFalse(LLM_Menu_OnDepsReady(Intent, Port))
+	Owner := LLM_AuxBegin("menu_tags", Map("backend", "ollama"))
+	switch Variant {
+		case "invalidate": LLM_Menu_BackendLifecycleInvalidate()
+		case "disable": _LLM_Menu["enabled"] := false
+		case "api": _LLM_Menu["backend"] := "api"
+		case "model": _LLM_Menu["model"] := "successor-model"
+		case "successor": _LLM_Menu_CaptureBackendLifecycleIntent(false)
+		default: throw ValueError("Unknown deferred readiness control.")
+	}
+	_LLM_Menu_OnInstalledTagsProbeDone(["local-a"], Owner, (*) => true)
+	AssertEqual(1, State["start"], Variant . " cannot restart an old bridge continuation")
+	AssertEqual(0, State["warmup"], Variant . " cannot warm a stale or successor selection")
+}
+
+_LBLD_TagsReentrantReady() {
+	_LBLD_WithTagsFixture(_LBLD_TagsReentrantReadyInner)
+}
+
+_LBLD_TagsReentrantReadyInner() {
+	State := _LBLD_State(), Port := _LBLD_Port(State)
+	Port["start_bridge"] := _LBLD_TagsBridgeStart.Bind(State)
+	_LBLD_Reset(_LBLD_Menu("ollama", true))
+	Intent := _LLM_Menu_CaptureBackendLifecycleIntent(false)
+	AssertFalse(LLM_Menu_OnDepsReady(Intent, Port))
+	State["replace_during_start"] := true
+	Owner := LLM_AuxBegin("menu_tags", Map("backend", "ollama"))
+	AssertTrue(_LLM_Menu_OnInstalledTagsProbeDone(["local-a"], Owner, (*) => true))
+	AssertEqual(2, State["start"])
+	AssertEqual(0, State["warmup"], "a bridge callback cannot lend an old intent to its successor")
+	State["replace_during_start"] := false
+	AssertTrue(LLM_Menu_OnDepsReady(State["successor"], Port))
+	AssertEqual(3, State["start"])
+	AssertEqual(1, State["warmup"], "the explicitly dispatched successor remains live")
+}
+
+
+/** Receives both model-correction callers against an exact source body. */
+_LBLD_ModelCorrectionsKeepLifecycle() {
+	Body := _DriverFuncBody("LLM_Menu_EnsureModelReady")
+	Assert(Body != "", "the installed-model correction subject must exist")
+	Assert(RegExMatch(Body, "^\s*LLM_Menu_EnsureModelReady\(\)\s*\{"),
+		"the common source reader retains the complete function definition")
+	Subject := Body
+	Program := '
+(
+#Requires AutoHotkey v2.0
+#SingleInstance Off
+#NoTrayIcon
+#Warn All, StdOut
+Suspend(true)
+global _LLM_Menu := 0, _DriverInputInitPending := false
+global _LLM_LOCAL_DEFAULTS := Map("llm_model", "default-model")
+global OwnedApply := 0, ProbeCalls := 0
+LLM_Deps_IsReady() => true
+LLM_InstalledTagsCacheReady() => true
+_LLM_Menu_FireInstalledTagsProbe() {
+ global ProbeCalls
+ ProbeCalls += 1
+ return true
+}
+LLM_IsModelInstalled(Model) => Model == "default-model"
+_LLM_DefaultFor(Key, Fallback) => Fallback
+LLM_PickBestInstalledDisplayName() => "default-model"
+_LLM_ResolveOllamaTagCore(Model, *) => Model
+_LLM_Menu_SetCandidateValue(Candidate, Key, Value) {
+ Candidate[Key] := Value
+ return true
+}
+_LLM_Menu_ApplyModelCommitted(*) => true
+LLM_Menu_CommitMutation(Context, MutateFn, ApplyFn := 0) {
+ global _LLM_Menu, OwnedApply
+ Candidate := _LLM_Menu.Clone()
+ if !MutateFn.Call(Candidate)
+  return false
+ OwnedApply += ApplyFn == _LLM_Menu_ApplyModelCommitted ? 1 : 0
+ _LLM_Menu := Candidate
+ return HasMethod(ApplyFn, "Call") ? ApplyFn.Call(Candidate) : true
+}
+LoggerWarn(*) => 0
+SUBJECT
+Failures := 0
+for Scenario in ["default", "replacement"] {
+ _LLM_Menu := Map("backend", "ollama", "model", Scenario == "default" ? "" : "not-installed")
+ OwnedApply := 0, ProbeCalls := 0
+ if !LLM_Menu_EnsureModelReady() || _LLM_Menu["model"] != "default-model" || ProbeCalls != 0 {
+  FileAppend("PRECONDITION: the original correction did not publish its model." . Chr(10), "**")
+  ExitApp(2)
+ }
+ FileAppend("OBSERVED model=" . Scenario . " owned_apply=" . OwnedApply . Chr(10), "*")
+ if OwnedApply != 1 {
+  Failures += 1
+  FileAppend("CAUSAL: " . Scenario . " correction omitted its committed-model lifecycle." . Chr(10), "**")
+ }
+}
+FileAppend("MODEL_CORRECTION received cases=2" . Chr(10), "*")
+ExitApp(Failures ? 1 : 0)
+)'
+	Root := A_Temp . "\ergopti_tags_model_" . A_ScriptHwnd . "_" . A_TickCount
+	if FileExist(Root)
+		throw Error("Preserve the previous model-correction receiving.")
+	DirCreate(Root)
+	Child := Root . "\subject.ahk"
+	FileAppend(StrReplace(Program, "SUBJECT", Subject), Child, "UTF-8")
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Child], OnDone)
+	AssertTrue(Handle.start(), "the source-only model-correction child must start")
+	while !Receipt.Calls {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	FileAppend(Receipt.Output, Root . "\stdout.log", "UTF-8")
+	FileAppend(Receipt.Errors, Root . "\stderr.log", "UTF-8")
+	AssertEqual(1, Receipt.Calls)
+	AssertTrue(Handle.terminate(), "the completed child retains no native process")
+	AssertEqual(0, Receipt.Code, "model-correction source refusal retained at " . Root . ": "
+		. SubStr(Receipt.Errors . Receipt.Output, -8192))
+	AssertEqual("", Receipt.Errors)
+	AssertContains(Receipt.Output, "OBSERVED model=default owned_apply=1")
+	AssertContains(Receipt.Output, "OBSERVED model=replacement owned_apply=1")
+	AssertContains(Receipt.Output, "MODEL_CORRECTION received cases=2")
+	AssertFalse(InStr(Receipt.Output, "[WATCHDOG]"))
+	for Name in ["subject.ahk", "stdout.log", "stderr.log"]
+		FileDelete(Root . "\" . Name)
+	DirDelete(Root)
+}
+
+
+; Every case replaces the shared menu, epoch and readiness continuation. Left in
 ; place, the partial fixture Map reached the next test of the same run: later
 ; LLM menu tests failed with "Item has no value" whenever a filter such as
 ; --only lifecycle ran them after these (llm-backend-fixture-isolation).
 _LBLD_Isolated(TestFn) {
-	global _LLM_Menu, _LLM_BackendLifecycleEpoch
+	global _LLM_Menu, _LLM_BackendLifecycleEpoch, _LLM_BackendLifecycleReadyContinuation
 	SavedMenu := _LLM_Menu
 	SavedEpoch := _LLM_BackendLifecycleEpoch
+	SavedContinuation := _LLM_BackendLifecycleReadyContinuation
 	try TestFn.Call()
 	finally {
 		_LLM_Menu := SavedMenu
 		_LLM_BackendLifecycleEpoch := SavedEpoch
+		_LLM_BackendLifecycleReadyContinuation := SavedContinuation
 	}
 }
 
@@ -445,7 +654,23 @@ _LBLD_Cases() {
 			_LBLD_ApplyModelCommitRetiresAndReplacesIntent],
 		["[ahk3-01] model A-B-A keeps only the final generation current "
 			. "(ahk3-01-model-lifecycle-owner)",
-			_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent]]
+			_LBLD_ModelAbaKeepsOnlyFinalIntentCurrent],
+		["installed-tags-warmup: actual tag completion resumes one owned warmup",
+			_LBLD_TagsDeferredReady],
+		["installed-tags-warmup: invalidation retires the deferred lifecycle",
+			_LBLD_TagsRetiredReady.Bind("invalidate")],
+		["installed-tags-warmup: disabling rejects the old completion",
+			_LBLD_TagsRetiredReady.Bind("disable")],
+		["installed-tags-warmup: API switch rejects the old completion",
+			_LBLD_TagsRetiredReady.Bind("api")],
+		["installed-tags-warmup: model replacement cannot borrow the old intent",
+			_LBLD_TagsRetiredReady.Bind("model")],
+		["installed-tags-warmup: a successor cannot borrow the old completion",
+			_LBLD_TagsRetiredReady.Bind("successor")],
+		["installed-tags-warmup: reentrant bridge publication keeps the successor owned",
+			_LBLD_TagsReentrantReady],
+		["installed-tags-warmup: both installed-model corrections enter lifecycle ownership",
+			_LBLD_ModelCorrectionsKeepLifecycle]]
 }
 
 for _LBLD_Spec in _LBLD_Cases()
@@ -456,7 +681,7 @@ for _LBLD_Spec in _LBLD_Cases()
 ; registry range the file filled, not the _LBLD_Cases list: a case registered
 ; with a bare Test( outside that list, the original leak, is checked too.
 _LBLD_EveryCaseRestoresSharedState() {
-	global TEST_REGISTRY, _LLM_Menu, _LLM_BackendLifecycleEpoch
+	global TEST_REGISTRY, _LLM_Menu, _LLM_BackendLifecycleEpoch, _LLM_BackendLifecycleReadyContinuation
 	global _LBLD_FIRST_CASE, _LBLD_LAST_CASE
 	Src := FileRead(A_LineFile, "UTF-8")
 	Marker := "`nglobal _LBLD_LAST_CASE := TEST_REGISTRY.Length"
@@ -473,6 +698,7 @@ _LBLD_EveryCaseRestoresSharedState() {
 			continue
 		MenuBefore := _LLM_Menu
 		EpochBefore := _LLM_BackendLifecycleEpoch
+		ContinuationBefore := _LLM_BackendLifecycleReadyContinuation
 		Entry.callback.Call()
 		Checked += 1
 		Assert(_LLM_Menu == MenuBefore,
@@ -480,6 +706,8 @@ _LBLD_EveryCaseRestoresSharedState() {
 			. "(llm-backend-fixture-isolation)")
 		AssertEqual(EpochBefore, _LLM_BackendLifecycleEpoch,
 			Entry.name . " must restore the backend lifecycle epoch")
+		Assert(_LLM_BackendLifecycleReadyContinuation == ContinuationBefore,
+			Entry.name . " must restore the exact deferred readiness continuation")
 	}
 	AssertEqual(_LBLD_Cases().Length, Checked,
 		"every backend lifecycle case must be registered through _LBLD_Cases, which isolates it, and checked")
