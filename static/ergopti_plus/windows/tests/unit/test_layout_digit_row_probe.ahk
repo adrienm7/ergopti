@@ -28,6 +28,9 @@
 
 #Requires AutoHotkey v2.0
 
+; Definitions only: these closed-source tests never register hotkeys or emit.
+#Include ../../modules/keymap/layout/digit_row_bindings.ahk
+
 
 
 
@@ -1092,3 +1095,68 @@ _NHKL_NoEscapingValue(Callback) {
 _NHKL_ObservedResult(Result, *) {
 	return Result
 }
+
+; Closed-source cases only. Genuine twenty-slot updates, ready factories,
+; callback priority and partial native registration require the idle fixture.
+_DDB_UnregisteredSource() {
+	AssertEqual(0, DigitRow_BindingSource(), "unregistered bindings cannot publish a factory")
+}
+
+_DDB_ForbiddenFactory(*) {
+	throw Error("A foreign digit source must never be invoked.")
+}
+
+_DDB_UnregisteredForeignFactories() {
+	for Source in [0, Map("complete", true, "bindings", 20), {}, _DDB_ForbiddenFactory.Bind()]
+		AssertEqual(0, DigitRow_CaptureBinding(Source, 0x02),
+			"caller descriptions cannot create a source before native registration")
+}
+
+_DDB_UnregisteredScans() {
+	Source := _DDB_ForbiddenFactory.Bind()
+	for Scan in [-1, 0, 1, 0x0C, 1.5, "SC002", {}, Map()]
+		AssertEqual(0, DigitRow_CaptureBinding(Source, Scan),
+			"an unissued source cannot resolve any supplied scan")
+}
+
+_DDB_NoSuppliedRegistrar() {
+	for Authority in [Map("hotkey", _DDB_ForbiddenFactory), _DDB_ForbiddenFactory, {}]
+		AssertThrows(_DigitRowBindingOwner.Bind("register", Authority),
+			"a supplied registrar or receipt must be rejected before native registration")
+	AssertEqual(0, DigitRow_BindingSource())
+}
+
+_DDB_NoIssuerOperation() {
+	for Request in ["issue", "ready", "reset", "complete", Map("operation", "register")]
+		AssertThrows(_DigitRowBindingOwner.Bind(Request),
+			"private completion cannot be obtained through a public operation")
+	AssertEqual(0, DigitRow_BindingSource())
+}
+
+_DDB_WithdrawnPrimitive() {
+	Before := A_IsCritical
+	HadCall := Object.Prototype.HasOwnProp.Call(Hotkey, "Call")
+	if HadCall
+		SavedCall := Hotkey.GetOwnPropDesc("Call")
+	try {
+		Hotkey.DefineProp("Call", {Value: _DDB_ForbiddenFactory})
+		AssertThrows(DigitRow_RegisterBindings,
+			"withdrawn registration must refuse before selecting HotIf or installing anything")
+		AssertEqual(0, DigitRow_BindingSource())
+		AssertEqual(Before, A_IsCritical, "preflight refusal must preserve critical state")
+	} finally {
+		if HadCall
+			Hotkey.DefineProp("Call", SavedCall)
+		else
+			Hotkey.DeleteProp("Call")
+	}
+	AssertThrows(DigitRow_RegisterBindings, "a failed registration cannot retry into a new issuer")
+	AssertEqual(0, DigitRow_BindingSource())
+}
+
+Test("direct-digit-source: no factory before genuine registration", _DDB_UnregisteredSource)
+Test("direct-digit-source: caller factories stay closed before registration", _DDB_UnregisteredForeignFactories)
+Test("direct-digit-source: scans cannot manufacture an unissued source", _DDB_UnregisteredScans)
+Test("direct-digit-source: registration accepts no supplied authority", _DDB_NoSuppliedRegistrar)
+Test("direct-digit-source: no public completion or reset operation", _DDB_NoIssuerOperation)
+Test("direct-digit-source: withdrawn primitive refuses and permanently withholds issuance", _DDB_WithdrawnPrimitive)
