@@ -469,3 +469,32 @@ helpers.describe("hotstring editor classified source admission", function()
 		end)
 	end
 end)
+
+
+helpers.describe("configuration filesystem root persistence", function()
+	for _, selected in ipairs({ "/", "///" }) do
+		helpers.it("linux-config-root: selected root survives bootstrap storage: " .. selected, function()
+			local saved_storage, saved_paths = package.loaded["adapters.storage"], package.loaded["infra.config_paths"]
+			local values, deleted = {}, 0
+			package.loaded["adapters.storage"] = {
+				get = function(key, fallback) return values[key] or fallback end,
+				set = function(key, value) values[key] = value; return true end,
+				delete = function(key) values[key] = nil; deleted = deleted + 1; return true end,
+			}
+			package.loaded["infra.config_paths"] = nil
+			local ok, err = xpcall(function()
+				local paths = require("infra.config_paths")
+				helpers.assert_true(paths.set_config_dir(selected))
+				helpers.assert_eq(values["paths.config_dir"], "/")
+				helpers.assert_eq(paths.get_config_dir(), "/")
+				helpers.assert_eq(paths.config("config.toml"), "/config.toml")
+				helpers.assert_eq(paths.config("/layers.toml"), "/layers.toml")
+				helpers.assert_eq(deleted, 0, "a root selection never clears the override")
+				helpers.assert_true(paths.set_config_dir(""))
+				helpers.assert_eq(paths.get_config_dir(), paths.default_config_dir())
+			end, debug.traceback)
+			package.loaded["adapters.storage"], package.loaded["infra.config_paths"] = saved_storage, saved_paths
+			if not ok then error(err, 0) end
+		end)
+	end
+end)

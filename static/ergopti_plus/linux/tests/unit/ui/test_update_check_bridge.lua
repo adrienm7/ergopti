@@ -55,7 +55,7 @@ local function load_bridge(answer)
 		complete = function(id, ok, message) context.completed[#context.completed + 1] = { id, ok, message } end,
 	}
 	package.loaded["ui.error_dialog.bridge"] = {
-		report = function(record) context.reports[#context.reports + 1] = record; return true end,
+		report = function(record, complete) context.reports[#context.reports + 1] = record; complete(true) end,
 	}
 	package.loaded["ui.changelog.bridge"] = {
 		push_subscribed_channel = function(id) context.channel_pushes[#context.channel_pushes + 1] = id end,

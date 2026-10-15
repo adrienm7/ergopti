@@ -4154,6 +4154,14 @@ These are software implementations; final hardware verification remains below.
   not a current recommendation target. Do not assume deletion implements the
   recommendation.
 
+  Retirement continuation (2026-10-15): qualify current recommended, clear and global
+  scope composition, including Script, on Windows, macOS and Linux. Receive
+  unknown/outdated-entry preservation, verified backups, exact runtime acknowledgement,
+  external-write refusal, retryable compensation and installed restart. Complete the
+  Linux layout/number-row participants with their genuine native producers under item
+  33; file publication alone does not establish effective behavior. Preserve Root's
+  Windows transaction and receiving ownership. This item remains partial.
+
 Authenticated Windows run38166375806 on source6d84b866 passes all eight
 original global-scope cases: real Restore/Clear, absent consent, backup and
 external-write refusal, immediate refusal, recovery debt and source collisions.
@@ -4550,6 +4558,14 @@ remain required, separately from the local gates.
   use real DOM, native bridge and file publication; the restart port is an
   observer, not a restarted daemon. Hosted native qualification, physical input,
   Wayland and physical-device wizard re-runs remain pending.
+
+  Retirement continuation (2026-10-15): preserve the implemented seven-page wizard,
+  21-locale text, folder writers, chooser-result checks, deferred initialization retry
+  and import-timeout corrections. Receive installed fresh/existing/moved-folder flows,
+  No/recommended choices, refusal/repair, configuration changes, actual triggers and
+  restart on every OS. Portable native doubles, GTK page sessions and generic installed-
+  launch scenarios do not replace this matrix. Do not redo delivered fixes without a
+  reproduced regression.
 
 The detached macOS recommendation owner now binds its candidate to optional raw
 path/status/bytes returned by the same Config read that admitted the model.
@@ -5625,6 +5641,27 @@ The dormant provider selected gate completed with all sources, HEAD and index in
   and 11,693 Linux unit tests, plus both portable E2E suites. Native macOS
   qualification remains pending;
   this bounded source-publication correction does not complete item 33.
+  October 15 native picker corrections are published on the feature branch:
+  macOS `5bc47ca57` refuses failed OSA diagnostics before either path parser;
+  Linux `b6f0cbd86` accepts dialog stdout only after a checked successful child
+  exit; Linux `ab2ca83d2` preserves explicit filesystem-root selection through
+  bootstrap storage and resolution. All original assertions remain. Selected
+  gates pass 19,830 portable macOS units and 101 E2E cases with one explicit
+  skip; Linux corrected gates pass 13,810 and then 13,814 units with 193 E2E
+  cases. The first Linux picker gate's two positive bridge-port fixture failures
+  are retained, then repaired without weakening assertions. The
+  [batched receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  distinguishes failed predecessors, portable gates and pending exact-source
+  hosted/installed acceptance. These bounded corrections do not close item 33.
+  A separate October 15 paths-editor proposal preserves each folder field's
+  user intent across repeated native initialization. It remains inactive:
+  Root must enroll its new independent JS test and npm alias together with
+  the two shared page assets. Portable causal receiving is six cases
+  passed/103 failed on the original page and 109/zero corrected; genuine GTK
+  receiving is 174/zero, original 71/five, restored 174/zero. The exact
+  [proposal and receiving](handovers/2026-10-12-config-menus/2026-10-15-PATH-RECEIVING.md)
+  retain native Browse, Cocoa/WebView2, installed logger and device acceptance
+  as outstanding requirements; no configuration-policy closure is inferred.
   October 15 ownership review keeps the remaining Linux keyboard-layout
   participant and number-row/direct-access runtime producer join open. Compose
   with Group 3's real producer before adding clear/restore, external-conflict,
@@ -5668,6 +5705,14 @@ The dormant provider selected gate completed with all sources, HEAD and index in
   and session-write refusal (site 108); retired keys reported for explicit
   cleanup are exempt from automatic deletion migrations and remain on disk
   until that cleanup (site 112).
+
+  Retirement continuation (2026-10-15): compose the Linux keyboard-layout and number-
+  row/direct-access scope participants with Group 3's actual runtime producers, then
+  receive clear/restore, source conflicts and compensation. The shared paths-editor
+  dirty-intent proposal remains inactive until Root enrolls its independent CHECKS entry
+  and npm alias together with both page assets. The Windows picker proposal still needs
+  native AHK and installed receiving. Preserve published picker and filesystem-root
+  corrections; finish cross-file policy and installed acceptance.
 
 The custom local-server publication fixture now clones the native callback
 table before installing its interceptors and asserts the genuine singleton
@@ -7306,6 +7351,79 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
 
+  Retirement continuation (2026-10-15): source bfa604bab observes an existing explicit
+  --config FILE.toml and its immediate parent through replacement, absence and repair.
+  Receive installed source activation, edits/replacement/absence/repair, sibling
+  negatives and restart. Arbitrary ancestor admission and external symlink-target
+  lifetime remain separate source work. Complete current Windows writer/scope/general-
+  suite, full warning/stdout, packaging, installation and startup receiving through
+  Root's owners. Preserve #Warn, original callbacks, transaction assertions and budgets.
+  The latest exact-source evidence is indexed by the configuration handover; no item is
+  closed by source or portable tests.
+
+  A further October 15 correction covers the daemon's existing explicit
+  `--config FILE.toml` mode, which previously admitted no reload observer.
+  The selected file and its immediate parent retain exact lexical/native
+  ownership across replacement and repair, without scanning neighboring files
+  or a substituted directory. All original watcher test bytes remain; sixteen
+  independent additions pass on both Lua engines and fail against the literal
+  original producer. Feature atom `bfa604bab` passes complete default selected
+  receiving: 13,865 units across 521 modules and 193 E2E cases, with zero
+  failures, plus strict conventions. Its exact boundary is retained in the
+  [dated preparation boundary](handovers/2026-10-12-config-menus/2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md).
+  Installed source activation and the transaction/startup qualification below
+  remain required; item 42 stays partial.
+
+  Later October 15 atoms `02713ee47` and `2990b16e1` restore Personal-root
+  coverage through its stable immediate parent and count that genuine parent
+  handle in startup diagnostics. All 83 previous watcher subjects remain;
+  eight root lifecycle controls pass, and complete base-root verification
+  receives 13,824 units/193 E2E cases. The count control fails its predecessor
+  and passes the successor; final successor receiving is recorded in the
+  [follow-up checkpoint](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md).
+  Arbitrary ancestor admission, external symlink-target replacement, installed
+  source activation, transaction/startup and physical acceptance remain open.
+  This bounded root repair does not close item 42 or qualify a distribution.
+
+  A second October 15 Linux follow-up repairs Personal watcher coverage when
+  directories are created, moved or replaced after startup. Existing accepted
+  reload callbacks remain active during coverage refusal; bounded repair and
+  exact entry/session fences preserve healthy registrations and retire actual
+  native handles through close acknowledgment. All original 49 test bytes and
+  assertions remain intact; 34 independent additions execute under both Lua
+  engines, including when optional lua-posix is absent. Exact final receiving
+  is 83 passed/zero failed with POSIX and 82/zero with global absence; one
+  unchanged original POSIX integration is then unavailable, not passed. The
+  prior producer fails 28 cases in both contexts. Final selected canonical
+  verification passes 13,802 units across 521 modules and 193 scripted E2E
+  cases. An earlier exact-source gate fails at an unchanged Unix-socket fixture
+  under a long temporary path; baseline reproduction and the complete short,
+  unique-path rerun are retained separately. Feature atom `7523f4b19` remains
+  queued for Root's release integration boundary. The
+  [topology receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  pins all source, causal, portability and complete gate packets. Its Linux
+  manual 38717729588 finishes failed: the unit API annotation reports
+  13,799 passes/two failures; package/install are skipped. Local reproduction
+  identifies two new base-source fixture paths inside the unchanged intentional
+  `/tmp/` exclusion. Fixture-only `3011ea7ef` admits those two sessions under
+  `/var/tmp`, retaining every assertion; full Linux units pass 13,802/zero.
+  The failed hosted run remains failed. The later stable-immediate-parent
+  correction is bounded as recorded above; installed source activation,
+  transaction/startup and physical acceptance remain open. Item 42 stays partial.
+
+  October 15 follow-up fixes Linux personal-directory watcher identity:
+  recursive scans retain case and literal backslashes, including a configured
+  root ending in backslash. Original 39 cases remain byte-for-byte; ten new
+  real-file controls pass in Lua 5.4 and LuaJIT. With the original producer,
+  the same controls report 43 passes/six failures; corrected receiving is
+  49/zero. Selected local verification passes 13,768 units across 521 modules
+  and 193 E2E cases. Feature atom `b666a22f7` is queued for Root's current
+  release integration boundary; it is not a new Dev delivery. See the
+  [path receiving checkpoint](handovers/2026-10-12-config-menus/2026-10-15-PATH-RECEIVING.md)
+  for the exact Linux-only CI source and retained evidence. This corrects
+  reload observation; transaction, installed-startup and device qualification
+  remain required.
+
   Refreshed Linux receiving prerequisite (2026-10-14): the polling backend
   now sends scalar/incomplete luaposix timestamps through the existing
   nanosecond reader, preserving complete native timespecs. All 34 original
@@ -8158,14 +8276,32 @@ integrated, then publish one grouped release.
   site listed in tools/test/native-menu-rows-baseline.json); migrate them to
   zero.
 
+  Retirement continuation (2026-10-15): the last recorded owning census is Windows 16 /
+  macOS 2 / Linux 1; regenerate the current census before the next migration. Four
+  Windows Personal constructors remain inactive in the three-path proposal pending
+  Root's closed schema, physical/proof helper and both JS-consumer joins. Forty portable
+  controls do not replace 31 native behaviors and 12 source witnesses. Compose remaining
+  IA menu producers with their owners; qualify native callbacks, cleanup, startup and
+  installed menus. Do not lower the baseline or close items 54/81 from an archive or
+  source scan.
+
 October 15 review preserves the current generated census: Windows 16, macOS 2,
 Linux 1. Four Windows Personal constructors and fifteen IA sites remain. The
 inactive Personal packet still covers only one constructor: seven of nine patch
 preimages match, while Root's two JS consumers require composition with its
 current native-target grammar and proof helpers. Its 31 native behavioral and
-12 source-witness controls remain UNRUN. No patch is adopted and item 54
+12 source-witness controls remain UNRUN. The earlier patch is not adopted and item 54
 remains partial; use the [current receiving](handovers/2026-10-12-config-menus/2026-10-15-RECEIVING.md)
 before choosing the next owned lot.
+
+A later [four-constructor handoff](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+retains a separate inactive three-path proposal for all four Personal sites.
+Its 40 bounded controls and source review do not complete Root's schema,
+physical/proof and two-JS-consumer joins: malformed new recipes are currently
+accepted by the old validator, while current proof readers refuse the candidate.
+The 31 native behavioral and 12 source-witness controls remain UNRUN. No active
+producer, generator, independent corpus or baseline changes; no census
+reduction or item completion is claimed.
 
 On 2026-10-12, the shared shortcut-extension construction recipe owns admission,
 allocation, native builder observation and result placement. The unchanged
@@ -12325,14 +12461,31 @@ is committed; one request is one commit with its regression test.
   drivers (`tools/test/native-menu-rows-baseline.json`). The current census
   was regenerated by its owning generator on 2026-10-12.
 
+  Retirement continuation (2026-10-15): continue the shared-menu migration with item 54
+  and the actual generated census. Receive the inactive four-Personal-constructor
+  proposal only after its schema/helper/both-JS-consumer joins, current preimages and
+  independent expectations are verified; its Windows native cases remain unexecuted.
+  Coordinate IA producers and global composition with their owners, then qualify native
+  lifecycle and installed behavior. This item remains partial; the configuration
+  handover contains recoverable proposals, not active features.
+
 October 15 review preserves the current generated census: Windows 16, macOS 2,
 Linux 1. Four Windows Personal constructors and fifteen IA sites remain. The
 inactive Personal packet still covers only one constructor: seven of nine patch
 preimages match, while Root's two JS consumers require composition with its
 current native-target grammar and proof helpers. Its 31 native behavioral and
-12 source-witness controls remain UNRUN. No patch is adopted and item 81
+12 source-witness controls remain UNRUN. The earlier patch is not adopted and item 81
 remains partial; use the [current receiving](handovers/2026-10-12-config-menus/2026-10-15-RECEIVING.md)
 before choosing the next owned lot.
+
+A later [four-constructor handoff](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+retains a separate inactive three-path proposal for all four Personal sites.
+Its 40 bounded controls and source review do not complete Root's schema,
+physical/proof and two-JS-consumer joins: malformed new recipes are currently
+accepted by the old validator, while current proof readers refuse the candidate.
+The 31 native behavioral and 12 source-witness controls remain UNRUN. No active
+producer, generator, independent corpus or baseline changes; no census
+reduction or item completion is claimed.
 
 On 2026-10-12, one genuine Windows shortcut-extension construction and
 placement site moves to the shared recipe: Windows 17 to 16, macOS 2, Linux 1.
@@ -14240,7 +14393,16 @@ test precondition failure, not a Lua defect or a successful permission grant.
   Windows and Linux already publish after provider commitment. Hosted source
   qualification and actual model readiness remain separate results.
 
-- [ ] **138.** Export complete English diagnostics and an editable issue.
+- [~] **138.** Export complete English diagnostics and an editable issue.
+
+  Retirement continuation (2026-10-15): source 57bcca233 receives macOS opener
+  termination and current ownership; 313b0ef7c rejects incomplete recent-file read/close
+  receipts. Complete English local report projection, metadata-only issue URL and these
+  producer corrections are implemented. Still implement the shared privacy/collection
+  contract and three native daily-log collectors: the 64 KiB / 50-entry tail is not a
+  complete day. Receive installed copy/write/close/reveal/browser refusal and ordering,
+  replaced-generation isolation and actual GitHub field editability on all three OSes.
+  Never upload automatically. This item remains partial.
 
   Every shared field, check label, result, technical diagnostic and attachment
   sent to GitHub must be English, independently of the localized application
@@ -14262,6 +14424,59 @@ test precondition failure, not a Lua defect or a successful permission grant.
   raw messages, private paths and unknown entries remain excluded. This uses
   the existing bounded recent tail, not a complete day-log attachment. Integrated
   native receiving and the complete daily-log collection remain open.
+
+  October 15 feature atom `280174ee2` corrects shared Lua fact retention for
+  sparse and mixed-key tables: actual contiguous keys determine list traversal,
+  preserving admitted numeric and keyed facts. The report format, independent
+  corpus and caller redaction policy remain unchanged. Both Lua engines pass
+  nine focused cases; strict conventions, 426 JS checks and 101 portable macOS
+  E2E cases pass, with one E2E scenario explicitly skipped. Full macOS units
+  and selected Linux receiving remain running at this dated checkpoint;
+  corrected-source hosted and installed flows remain pending. This narrow
+  correction does not close the complete English export, attachment, generation
+  binding, daily-log or GitHub field-editability requirements above. The
+  [batched receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
+  retains the source and remaining acceptance. No automatic upload is added.
+
+  Later complete receiving for the exact sparse-fact source capture passes
+  all 426 JS checks, 19,829 portable macOS units and 101 E2E cases with one
+  explicit skip, plus 13,804 Linux units and 193 E2E cases. Atom `2990b16e1`
+  also reports the genuine Personal parent watcher in the existing handle count;
+  its predecessor fails the new count assertion and the successor passes it.
+  The [follow-up receiving](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+  distinguishes these source captures from composed hosted and installed
+  qualification. Complete export, daily logs and actual issue editability
+  remain open; item 138 is not closed.
+
+  The later desktop-opener lot receives Linux launcher completion instead of
+  acknowledging a background shell. A private real child exits 23 while the
+  literal predecessor incorrectly returns success. Healthcheck, error-dialog
+  and update-check callers now use explicit completion and current-owner
+  receipts; the shared Lua update-check controller also receives the macOS
+  native result inline. Session replacement and retirement fence later effects.
+  The [opener follow-up](handovers/2026-10-12-config-menus/2026-10-15-DIAGNOSTIC-OPENER.md)
+  distinguishes that source work, its dated receiving and remaining installed
+  acceptance. Full daily logs still need a shared privacy/collection contract
+  and three native collectors; the bounded recent-error tail remains separate.
+
+  The macOS follow-up now receives diagnostic path/reveal task completion
+  instead of acknowledging native task admission. A literal real-child
+  reproduction receives exit 23 while the old report still returns success;
+  another control observes browser dispatch before reveal completion. Current
+  caller ownership, native deadlines and cancellation joins pass all 88 focused
+  Lua 5.4 cases, including 55 original subjects, and independent source review.
+  The
+  [dated receiving boundary](handovers/2026-10-12-config-menus/2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md)
+  keeps full suites, hosted source qualification and installed acceptance
+  separate. The existing native HTTP-URL acknowledgment does not qualify
+  browser rendering. Complete export, daily logs and GitHub editability remain
+  open, and item 138 is not closed. A further literal recent-error reader
+  control exposes read and close refusals incorrectly acknowledged as a valid
+  file. The bounded shared Lua reader correction passes 17 focused cases per
+  host, including all three original subjects; its sealed predecessor passes
+  five and fails twelve. Independent review accepts the correction. Complete
+  composed gates and hosted receiving remain pending at this dated boundary;
+  unreadable-file and initial-absence source policies remain authoritative.
 
 - [ ] **139.** Remove personal identities from daily and shared error logs.
 

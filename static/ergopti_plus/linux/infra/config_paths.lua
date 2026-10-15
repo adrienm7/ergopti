@@ -121,6 +121,7 @@ function M.get_config_dir()
 	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
 		return M.default_config_dir()
 	end
+	if configured:match("^/+$") then return "/" end
 	configured = configured:gsub("/+$", "")
 	return configured ~= "" and configured or M.default_config_dir()
 end
@@ -130,7 +131,7 @@ end
 --- @return boolean True only when bootstrap storage confirms the mutation.
 function M.set_config_dir(path)
 	if type(path) ~= "string" then return false end
-	local normalized = path:gsub("/+$", "")
+	local normalized = path:match("^/+$") and "/" or path:gsub("/+$", "")
 	if normalized ~= "" and normalized:sub(1, 1) ~= "/" then return false end
 
 	local ok, Storage = pcall(require, "adapters.storage")
@@ -158,7 +159,7 @@ end
 function M.config(rel)
 	local base = M.get_config_dir()
 	if type(rel) ~= "string" or rel == "" then return base end
-	return (base .. "/" .. (rel:gsub("^/+", "")))
+	return ((base == "/" and "" or base) .. "/" .. (rel:gsub("^/+", "")))
 end
 
 --- The driver's data directory, optionally with a path appended.

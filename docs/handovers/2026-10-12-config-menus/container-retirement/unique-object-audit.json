@@ -1,0 +1,6602 @@
+{
+	"feature_prerequisite": "c90aab10318aa29f4f7dc00b741dd39c02d5cc39",
+	"dev_prerequisite": "c8a7b1f6e19f508dee1f1e132d4ca1c77f6ec95d",
+	"refs": {
+		"refs/heads/codex/ci-config-menus": "840004ea43505538ff00c48ca10f64dca3c1b0b5",
+		"refs/heads/codex/ci-config-menus-linux-path-identity": "b12fc635dc7e014054ec9e287a959c7d311d2d5c",
+		"refs/heads/codex/config-menus-cache-target": "e31e6820d5fbac23573fcdc45405cff53fc2d36c",
+		"refs/heads/codex/config-menus-composed-intent": "a300eed046ce76d7c641c742dec503a34fe83836",
+		"refs/heads/codex/config-menus-diagnostic-report": "7523f4b192caa06f0cdadda331d4e11a99b9442f",
+		"refs/heads/codex/config-menus-folder-intent": "8eb07a65cf2dcecb9ad59baf9d75c2aed7d41d39",
+		"refs/heads/codex/config-menus-folder-target": "dadcae0eb5d9b0db1e5605ca6d133b8d24b0472f",
+		"refs/heads/codex/config-menus-macos-picker": "5bc47ca57fa858f596a91f69154c2d613013ebb6",
+		"refs/heads/codex/config-menus-receiving-20261015": "1bfe03d171904b09c8a03302eae5ce1b7ce131ee",
+		"refs/heads/codex/config-menus-root-picker": "7523f4b192caa06f0cdadda331d4e11a99b9442f",
+		"refs/remotes/origin/codex/ci-config-menus": "ee2bba32802b64a4189195eb11ada3e7dd76ebd4"
+	},
+	"unique_objects": 1084,
+	"types": {
+		"commit": 146,
+		"tree": 655,
+		"blob": 283
+	},
+	"uncompressed_unique_object_bytes": 53524072,
+	"blob_bytes": 50859982,
+	"findings": [
+		{
+			"category": "personal_home_path",
+			"oid": "b2b756271b7197f987ec60a02c453bd41f7d8b17",
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_bridge_actions.lua",
+			"line": 222,
+			"value_sha256": "ec91507496935c873f4d65f9838cb1554793d26e674e66bb2f75154389a361db",
+			"matched_bytes": 12
+		},
+		{
+			"category": "personal_home_path",
+			"oid": "b2b756271b7197f987ec60a02c453bd41f7d8b17",
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_bridge_actions.lua",
+			"line": 270,
+			"value_sha256": "ec91507496935c873f4d65f9838cb1554793d26e674e66bb2f75154389a361db",
+			"matched_bytes": 12
+		},
+		{
+			"category": "personal_home_path",
+			"oid": "5e093adb45893a674785b6176452a29a2b59d7d1",
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_report_issue.lua",
+			"line": 23,
+			"value_sha256": "ec91507496935c873f4d65f9838cb1554793d26e674e66bb2f75154389a361db",
+			"matched_bytes": 12
+		},
+		{
+			"category": "personal_home_path",
+			"oid": "e79a6f1054c5544b5ff43a45932f25c24d829874",
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_report_issue.lua",
+			"line": 23,
+			"value_sha256": "ec91507496935c873f4d65f9838cb1554793d26e674e66bb2f75154389a361db",
+			"matched_bytes": 12
+		}
+	],
+	"objects": [
+		{
+			"oid": "ee2bba32802b64a4189195eb11ada3e7dd76ebd4",
+			"type": "commit",
+			"bytes": 557,
+			"path_hint": ""
+		},
+		{
+			"oid": "66df66373b18f362efdc440b8400eb00f0a0a989",
+			"type": "commit",
+			"bytes": 582,
+			"path_hint": ""
+		},
+		{
+			"oid": "ff0fac6afe707cdb164f1cd37b7b856ed79a4384",
+			"type": "commit",
+			"bytes": 550,
+			"path_hint": ""
+		},
+		{
+			"oid": "a31bc6fe438dace2ad2a0efb1a896c8fb9093cb9",
+			"type": "commit",
+			"bytes": 494,
+			"path_hint": ""
+		},
+		{
+			"oid": "9ab2ea73e4657b158de1eeb89db2ef44f3b9b188",
+			"type": "commit",
+			"bytes": 490,
+			"path_hint": ""
+		},
+		{
+			"oid": "39faa0f8fff71a627da73301a19c6a30e3bb548e",
+			"type": "commit",
+			"bytes": 495,
+			"path_hint": ""
+		},
+		{
+			"oid": "d7b8d23bb1f1c80b4b70ce6cf599ba66c31bd01a",
+			"type": "commit",
+			"bytes": 385,
+			"path_hint": ""
+		},
+		{
+			"oid": "b12fc635dc7e014054ec9e287a959c7d311d2d5c",
+			"type": "commit",
+			"bytes": 320,
+			"path_hint": ""
+		},
+		{
+			"oid": "ae6245f0a158290c600a3589d0e32db2273c971f",
+			"type": "commit",
+			"bytes": 312,
+			"path_hint": ""
+		},
+		{
+			"oid": "8eb07a65cf2dcecb9ad59baf9d75c2aed7d41d39",
+			"type": "commit",
+			"bytes": 268,
+			"path_hint": ""
+		},
+		{
+			"oid": "840004ea43505538ff00c48ca10f64dca3c1b0b5",
+			"type": "commit",
+			"bytes": 324,
+			"path_hint": ""
+		},
+		{
+			"oid": "a300eed046ce76d7c641c742dec503a34fe83836",
+			"type": "commit",
+			"bytes": 269,
+			"path_hint": ""
+		},
+		{
+			"oid": "fa71226dcffa659e88019f59a15c82ad680e9c1a",
+			"type": "commit",
+			"bytes": 269,
+			"path_hint": ""
+		},
+		{
+			"oid": "e31e6820d5fbac23573fcdc45405cff53fc2d36c",
+			"type": "commit",
+			"bytes": 287,
+			"path_hint": ""
+		},
+		{
+			"oid": "dadcae0eb5d9b0db1e5605ca6d133b8d24b0472f",
+			"type": "commit",
+			"bytes": 281,
+			"path_hint": ""
+		},
+		{
+			"oid": "64816041074ab54f822795760bc20990f9e22ee4",
+			"type": "commit",
+			"bytes": 480,
+			"path_hint": ""
+		},
+		{
+			"oid": "7b01f3d290a936edbfa0b62d796fe357e01a8c1b",
+			"type": "commit",
+			"bytes": 305,
+			"path_hint": ""
+		},
+		{
+			"oid": "f385e3c7b43604031f857c48046adbf9cd802005",
+			"type": "commit",
+			"bytes": 307,
+			"path_hint": ""
+		},
+		{
+			"oid": "4bf40f3c7a390ea7b2b50909324ccdd5039d7725",
+			"type": "commit",
+			"bytes": 367,
+			"path_hint": ""
+		},
+		{
+			"oid": "ad6b2e2e6f6b555516d670bf3169f4763673554e",
+			"type": "commit",
+			"bytes": 272,
+			"path_hint": ""
+		},
+		{
+			"oid": "f7bcf2efaf60194badaa448aba3284f4b41b454a",
+			"type": "commit",
+			"bytes": 273,
+			"path_hint": ""
+		},
+		{
+			"oid": "f6057f4ebe69d7b7ca3de90a2427b8b541cd96d8",
+			"type": "commit",
+			"bytes": 278,
+			"path_hint": ""
+		},
+		{
+			"oid": "3cf427ae39152b7438a47fbc043ac60a2975753f",
+			"type": "commit",
+			"bytes": 279,
+			"path_hint": ""
+		},
+		{
+			"oid": "26ba014af83f89515e3f43c79bab5b9a0a617eff",
+			"type": "commit",
+			"bytes": 260,
+			"path_hint": ""
+		},
+		{
+			"oid": "09eb51fe2d8fa5dc6ac263138d764c5ffe6cfab1",
+			"type": "commit",
+			"bytes": 261,
+			"path_hint": ""
+		},
+		{
+			"oid": "ac8a4897c5e0c80b2a0422ea268bd757454a2037",
+			"type": "commit",
+			"bytes": 557,
+			"path_hint": ""
+		},
+		{
+			"oid": "de3b540a945d483d532b2914621883a1394e4d93",
+			"type": "commit",
+			"bytes": 553,
+			"path_hint": ""
+		},
+		{
+			"oid": "fbee26e89b96157fbfc52951b76ef611c84c39d1",
+			"type": "commit",
+			"bytes": 480,
+			"path_hint": ""
+		},
+		{
+			"oid": "bb1eda77d8384a9a884e93dc3f8aad6cc4e11246",
+			"type": "commit",
+			"bytes": 511,
+			"path_hint": ""
+		},
+		{
+			"oid": "974213a80b4c7c696000bda71fd92b3c81c57df1",
+			"type": "commit",
+			"bytes": 601,
+			"path_hint": ""
+		},
+		{
+			"oid": "44c97a4e91bf613d1def7aebae5872dc17061b4f",
+			"type": "commit",
+			"bytes": 502,
+			"path_hint": ""
+		},
+		{
+			"oid": "5ec8e90b94886c20b01e7a75a0712e5122dfc684",
+			"type": "commit",
+			"bytes": 616,
+			"path_hint": ""
+		},
+		{
+			"oid": "2abf20a7099705901300387f6f8338236531e47d",
+			"type": "commit",
+			"bytes": 266,
+			"path_hint": ""
+		},
+		{
+			"oid": "79eaf01612ca937bcb15177bf6c7a6194a7d304b",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "968878ffd413fb18f359f4d56aeb1b3ac131156b",
+			"type": "commit",
+			"bytes": 365,
+			"path_hint": ""
+		},
+		{
+			"oid": "29e0cabf89b844e7cfdf630312062ec26953f161",
+			"type": "commit",
+			"bytes": 382,
+			"path_hint": ""
+		},
+		{
+			"oid": "f1db72eabfb7960cd78b788ae9adbd2b5f8d1a38",
+			"type": "commit",
+			"bytes": 386,
+			"path_hint": ""
+		},
+		{
+			"oid": "5f2b47487ad09d851f58d80e469144210b866a6f",
+			"type": "commit",
+			"bytes": 388,
+			"path_hint": ""
+		},
+		{
+			"oid": "67600cac3c92f10d2a9c415ff19e197c10a4fea2",
+			"type": "commit",
+			"bytes": 384,
+			"path_hint": ""
+		},
+		{
+			"oid": "0fc619a060f2b66f8af07392decc6861e22d4a4e",
+			"type": "commit",
+			"bytes": 330,
+			"path_hint": ""
+		},
+		{
+			"oid": "3bd46b01c4339250da11cafb8415d5317537f377",
+			"type": "commit",
+			"bytes": 370,
+			"path_hint": ""
+		},
+		{
+			"oid": "42c392f3e8ea0ad6e4edcb55d4f377e38007d634",
+			"type": "commit",
+			"bytes": 378,
+			"path_hint": ""
+		},
+		{
+			"oid": "e78ba8d1e1bf5c459c76678394c9637b8b7fa4af",
+			"type": "commit",
+			"bytes": 362,
+			"path_hint": ""
+		},
+		{
+			"oid": "64e51a5d864698a731f31298466e7f2f75076f5b",
+			"type": "commit",
+			"bytes": 367,
+			"path_hint": ""
+		},
+		{
+			"oid": "470f24ed63be0cb63bcc6163c34bd1332c0bd8ae",
+			"type": "commit",
+			"bytes": 365,
+			"path_hint": ""
+		},
+		{
+			"oid": "3fe6c90287177ef00ff64c060b5e55cd752c3441",
+			"type": "commit",
+			"bytes": 373,
+			"path_hint": ""
+		},
+		{
+			"oid": "28f949841ad842febded5a9fa6d1e401f533f462",
+			"type": "commit",
+			"bytes": 366,
+			"path_hint": ""
+		},
+		{
+			"oid": "7f58b17c850f04a7ad5d2a7903352e299c9778b8",
+			"type": "commit",
+			"bytes": 355,
+			"path_hint": ""
+		},
+		{
+			"oid": "fb7d55ad540c06ed144b2f164d4054bd9b5b8dcd",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "cbfecad34d8effa46e64ed6eff591ef5ed7126d4",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "54c8e0d41e9c38859a7989eb9ee471468f4b399c",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "29233a63c365b044d47acf4bc90d9b24b1d89b8a",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "caa830f67f6add596853d0575fa845a8f2aea408",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "f9885218b765843f3ca5c050d8ce7d8ddd59c562",
+			"type": "commit",
+			"bytes": 313,
+			"path_hint": ""
+		},
+		{
+			"oid": "1ce208d04e86c3dcd2713752d217f1685cf4c3bc",
+			"type": "commit",
+			"bytes": 307,
+			"path_hint": ""
+		},
+		{
+			"oid": "636d479712b21c3b1c6961981ce01a1575aa2936",
+			"type": "commit",
+			"bytes": 325,
+			"path_hint": ""
+		},
+		{
+			"oid": "e26db1458b454d64f9122bdd9ac88febf681c346",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "aa9e527fb98ef06e1dc1350e15679a1f29e23984",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "04b3ff04c88b9bf21ff902d4591c9a81257c9578",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "57235af328f01f720d67ce06f85b74eaaa0ae3fb",
+			"type": "commit",
+			"bytes": 325,
+			"path_hint": ""
+		},
+		{
+			"oid": "ac85eda3327a8d45e879ffb44b3e2ff0cce220da",
+			"type": "commit",
+			"bytes": 321,
+			"path_hint": ""
+		},
+		{
+			"oid": "06ca47f249b71b3a990ca67529d993b2da8376d3",
+			"type": "commit",
+			"bytes": 317,
+			"path_hint": ""
+		},
+		{
+			"oid": "95221cceafe5d87c72d9298aa0497db11886b0f2",
+			"type": "commit",
+			"bytes": 317,
+			"path_hint": ""
+		},
+		{
+			"oid": "4b4370d716387035f7268d6d01ffecd328a537c1",
+			"type": "commit",
+			"bytes": 312,
+			"path_hint": ""
+		},
+		{
+			"oid": "0bb1b1a6010c3717a90ef845b93085fc2d7000a6",
+			"type": "commit",
+			"bytes": 550,
+			"path_hint": ""
+		},
+		{
+			"oid": "de96b36e8cb51bdd30aec54d7f556e1e21b307a6",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "5779f2942578ecab75d6684689030dd03d9d2367",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "929cf72edfd8d9fd64dc1240c20c0d1dd3ce999b",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "a931e83dbf317e054beb18bb0ab1bc2f5674a08a",
+			"type": "commit",
+			"bytes": 327,
+			"path_hint": ""
+		},
+		{
+			"oid": "06080e8b5ba4e7c60711867cdc479a8365282284",
+			"type": "commit",
+			"bytes": 321,
+			"path_hint": ""
+		},
+		{
+			"oid": "a1926903cdddd60e68b97b4b79e77682a75cd4bf",
+			"type": "commit",
+			"bytes": 326,
+			"path_hint": ""
+		},
+		{
+			"oid": "1534027e2fa893e03a6d286efb9fc6a00a32ea50",
+			"type": "commit",
+			"bytes": 329,
+			"path_hint": ""
+		},
+		{
+			"oid": "bab25d6cefc4deec76ea29e967aebda320789565",
+			"type": "commit",
+			"bytes": 327,
+			"path_hint": ""
+		},
+		{
+			"oid": "ccf2cd8f6ffa543f9f8adbc582c64df0eba657fb",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "a4771bdab421834c38939df574ff3ee2f66e22a1",
+			"type": "commit",
+			"bytes": 322,
+			"path_hint": ""
+		},
+		{
+			"oid": "cedcee5e5b056aab3e33f3089c0d9305afa95f11",
+			"type": "commit",
+			"bytes": 322,
+			"path_hint": ""
+		},
+		{
+			"oid": "322b5a702b421039b3f081956c5b32d42753ef3b",
+			"type": "commit",
+			"bytes": 319,
+			"path_hint": ""
+		},
+		{
+			"oid": "f689ffacd585f7fedfa982907648f87659c0d5d6",
+			"type": "commit",
+			"bytes": 266,
+			"path_hint": ""
+		},
+		{
+			"oid": "9e76988e3cbbe9618a67d9021d925f0b5e24d10d",
+			"type": "commit",
+			"bytes": 331,
+			"path_hint": ""
+		},
+		{
+			"oid": "f468bb4c6a7a75e397b29d7e29042169169b57a4",
+			"type": "commit",
+			"bytes": 317,
+			"path_hint": ""
+		},
+		{
+			"oid": "8ccc7594e7acafe4e5873d207e12caa23448f5c6",
+			"type": "commit",
+			"bytes": 264,
+			"path_hint": ""
+		},
+		{
+			"oid": "23b139f89ce62844bb1fad3eea08e0b7de4bdf75",
+			"type": "commit",
+			"bytes": 326,
+			"path_hint": ""
+		},
+		{
+			"oid": "c9e5467dc3fa1a5f7a4ea682bec0496e17dee8e6",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "b0a8c1597d57044fb9c07db2fc4461e84f658341",
+			"type": "commit",
+			"bytes": 315,
+			"path_hint": ""
+		},
+		{
+			"oid": "485e22bfbd0a61e03ffb081cba923b33038c4190",
+			"type": "commit",
+			"bytes": 328,
+			"path_hint": ""
+		},
+		{
+			"oid": "2a52d49ef2891c811dccf54560ba795888beee9a",
+			"type": "commit",
+			"bytes": 321,
+			"path_hint": ""
+		},
+		{
+			"oid": "57284719b2d2c19757174f53aaa29c34e336dd3b",
+			"type": "commit",
+			"bytes": 333,
+			"path_hint": ""
+		},
+		{
+			"oid": "aabb6a2f926223b2ccb0a4020d26fe78cf9fb6e3",
+			"type": "commit",
+			"bytes": 316,
+			"path_hint": ""
+		},
+		{
+			"oid": "b230e2e1f0b3ac70c8919ccf11604339ec98215c",
+			"type": "commit",
+			"bytes": 311,
+			"path_hint": ""
+		},
+		{
+			"oid": "822392e0c5a38e56fc50ef6e060b8c9b15fcb4cc",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "57953f9bbc37079c33bb4aa000d078dc9e34d700",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "32688c70f4bbc029b4aea48b78ff26a067006f45",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "13629ccaafd1df2ab5eb47b83fb76fcedde87527",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "f38162bd736965baf46400b850a72db41d4a5c63",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "0de44627a0b6611a22e5c95c69dc16561d871518",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "6ba8f0bc0d40d0a005987d518865bdee78caa245",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "d48ead80b81456aefc9c513e10ff197cc9b538dc",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "5b24b18119443394fd9e1673971426c47cb50e8d",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "67a5a6af3df7fa37823fe60ce8c27216b0deea32",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "31ef3962b5eb875753d1b0607afeeb3954c3c4aa",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "09f67446fde6cc075c09b6bfcfcfa453ba3594bc",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "3c988af8011884326cc7b00979ba33dbd59ac06c",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "d26068b4d3afadb09a2dea91a7818a81467739cc",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "78f38894513a1e833cf7903d42009ea816fa4e06",
+			"type": "commit",
+			"bytes": 364,
+			"path_hint": ""
+		},
+		{
+			"oid": "00b01aa7da26feb61eb19a9281e61b53355e1e43",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "0ab3d7e3bdbd7974ee1b1fae6d3e7161253024b8",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "ebd329e91a06461943059632f4f7f467f0f0651b",
+			"type": "commit",
+			"bytes": 584,
+			"path_hint": ""
+		},
+		{
+			"oid": "8a80e6efdf9975c728296ecc7023c09918653135",
+			"type": "commit",
+			"bytes": 479,
+			"path_hint": ""
+		},
+		{
+			"oid": "575a3bcaf795b21cb5f259082387421674bcfd0a",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "7d09c69121b15cec8f6d2cf7b49145e8334339c0",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "45e74c87b3e1efdbb0719020a4fcc8720a3bac80",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "28eda875fd0d6e5d813bbea2b9966c859d11d527",
+			"type": "commit",
+			"bytes": 368,
+			"path_hint": ""
+		},
+		{
+			"oid": "03f923ee2c39531b9fc7bfcba36f71e9e04ba14f",
+			"type": "commit",
+			"bytes": 364,
+			"path_hint": ""
+		},
+		{
+			"oid": "011fe47d58617cba222a5345302e307cec99e7b8",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "6bf86bfc283d2c71499ae1086c396001620b6990",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "458e9cb1960dc8b0039fa0898835c422cef7c491",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "274816cbfc8b25d91569eca9a1371f77ba273d3b",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "145024aa1c219707e1359b9fff51f03c1542fe2c",
+			"type": "commit",
+			"bytes": 318,
+			"path_hint": ""
+		},
+		{
+			"oid": "2c142f424ed49813d6388633ca31c5a688168e2f",
+			"type": "commit",
+			"bytes": 321,
+			"path_hint": ""
+		},
+		{
+			"oid": "79668ac2cfdd53c66f879d38174f16491240322c",
+			"type": "commit",
+			"bytes": 331,
+			"path_hint": ""
+		},
+		{
+			"oid": "a898725735a1f318cf070fe3a3fed63d5e912f99",
+			"type": "commit",
+			"bytes": 318,
+			"path_hint": ""
+		},
+		{
+			"oid": "1e57e14f5c61163fae32f157ce26b4d3406dbc9a",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "3e4189a485ff95dba9aff54bc21e2a76701bf01d",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "4bb2281591df4a6e4dac6753f79161b96fde5ac9",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "bf4a67cec123beef88c0423ff69c3eefb1d382b8",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "b750c3a91207e18c40285d9400d5e29db2bfa3b0",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "d440383e84e66be004400a24f444e836a8cec4b9",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "b5ac92238746cca648f8446b5f724f25a5bcc90c",
+			"type": "commit",
+			"bytes": 324,
+			"path_hint": ""
+		},
+		{
+			"oid": "2a4b56c5884e359f6a29f38682b5ad23fd8f62e8",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "7f555c51daa1863f009c219c3de89d4acbbd9bc0",
+			"type": "commit",
+			"bytes": 313,
+			"path_hint": ""
+		},
+		{
+			"oid": "40119954cf0fb54541bd1b4b1a9ee41828a58c2d",
+			"type": "commit",
+			"bytes": 312,
+			"path_hint": ""
+		},
+		{
+			"oid": "6b646296ee52beca679c45cf5e092ae635933b68",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "8c3e24230932af90c6b49092374ed8855ee06e77",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "e825f699c58709d192e23f990c01b592b1ffdb22",
+			"type": "commit",
+			"bytes": 266,
+			"path_hint": ""
+		},
+		{
+			"oid": "b458918ad8b1122b97c88a54a6a9754e1b5432ed",
+			"type": "commit",
+			"bytes": 364,
+			"path_hint": ""
+		},
+		{
+			"oid": "9c2324eb2c13509c5cc5bbe510a2a8dfa0c6f2ee",
+			"type": "commit",
+			"bytes": 274,
+			"path_hint": ""
+		},
+		{
+			"oid": "d8f61d6c6e45bd880e3af24fcb722a4e27568a7a",
+			"type": "commit",
+			"bytes": 329,
+			"path_hint": ""
+		},
+		{
+			"oid": "b9ef673fc7a06837eece84f52c4d094c4d1cbc58",
+			"type": "commit",
+			"bytes": 329,
+			"path_hint": ""
+		},
+		{
+			"oid": "9f1e59a88f4bc5393940e57bbc54305952376757",
+			"type": "commit",
+			"bytes": 311,
+			"path_hint": ""
+		},
+		{
+			"oid": "ae67c147a4a70a9c6d081cdcc77ccbfdcaffa571",
+			"type": "commit",
+			"bytes": 317,
+			"path_hint": ""
+		},
+		{
+			"oid": "745f3247d059bb9b8933bb8db2c5301774aee223",
+			"type": "commit",
+			"bytes": 321,
+			"path_hint": ""
+		},
+		{
+			"oid": "1819eabe37f0dc8bd2f587886a82fcf8fbd7e1bf",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "c895ae17a809c89f7ac98ba7970da5cb8a23460c",
+			"type": "commit",
+			"bytes": 314,
+			"path_hint": ""
+		},
+		{
+			"oid": "4800d5c83878e653622941b790390e1497cab6c5",
+			"type": "commit",
+			"bytes": 312,
+			"path_hint": ""
+		},
+		{
+			"oid": "eb85009310acf2ae43c9f5a49b610cdabba37635",
+			"type": "commit",
+			"bytes": 328,
+			"path_hint": ""
+		},
+		{
+			"oid": "6f15ffd7f5ef9d6d7ae70c36dad946a55429f212",
+			"type": "commit",
+			"bytes": 669,
+			"path_hint": ""
+		},
+		{
+			"oid": "e7992152329049e0953ca8de057e7d33ba6ed55a",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "e6c94d6398173fb14c9ee48ec116a484c92dbcab",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "b8613a9b18bde7c950b51e840fd58b436bb76002",
+			"type": "blob",
+			"bytes": 1291679,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "54342098d2da194c752982f0c4d138c8bd6221b0",
+			"type": "tree",
+			"bytes": 2460,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "2fa3c32d44bc6ef308769ec9ca5563d30337096e",
+			"type": "tree",
+			"bytes": 2011,
+			"path_hint": "docs/handovers/2026-10-12-config-menus"
+		},
+		{
+			"oid": "64a5d375111428912b60e6597c00840629abfb4c",
+			"type": "blob",
+			"bytes": 7210,
+			"path_hint": "docs/handovers/2026-10-12-config-menus/2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md"
+		},
+		{
+			"oid": "271070d1cb3223923ef7e496b9f54da85fc6dab7",
+			"type": "blob",
+			"bytes": 15390,
+			"path_hint": "docs/handovers/2026-10-12-config-menus/README.md"
+		},
+		{
+			"oid": "4de4887caf2fa11e26c86eff7776c78a3ba07a55",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "438210b7094c60f668825e1be01700bcb524cfb1",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "56fcbdf76ca328ea7cf694d9e062fa9815b05049",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "50bb36fdeb3246a4f705215b4ef7a92afbccd983",
+			"type": "tree",
+			"bytes": 3516,
+			"path_hint": "static/ergopti_plus/_shared/lua"
+		},
+		{
+			"oid": "7d7db51e3f9c63171d806afb8b960a4067cabca4",
+			"type": "tree",
+			"bytes": 155,
+			"path_hint": "static/ergopti_plus/_shared/lua/healthcheck"
+		},
+		{
+			"oid": "e1d617c00dec1715801477bbb70cd5cf19a7b07d",
+			"type": "blob",
+			"bytes": 14091,
+			"path_hint": "static/ergopti_plus/_shared/lua/healthcheck/snapshot.lua"
+		},
+		{
+			"oid": "dc19db1242b824e85abaf665b950131fdeb362b3",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "49c4dce320cd39d92bbd502d5b1050ec6d8c9c99",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "6d05f9f1d2d7020ac2aaa8628e434a194934ab88",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "0bf894e56cc26e2abcf279820d66b8d2b020feb6",
+			"type": "tree",
+			"bytes": 3844,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui"
+		},
+		{
+			"oid": "9215a505d810dc94d540f69226836d6ff8a215bc",
+			"type": "blob",
+			"bytes": 8323,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui/test_healthcheck_recent_issues_source.lua"
+		},
+		{
+			"oid": "c6cf27e2d60069110a9becf5a8c241787f1139e5",
+			"type": "tree",
+			"bytes": 547,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "df969ea9ccd122a59024fe58a1450bcd0d6ea0ba",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "097feb4c26aef2cf71769dc4b139789b4da6398d",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "db6d25715e697b8dcee32883cf004792af2dbaac",
+			"type": "tree",
+			"bytes": 12387,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "8b2cf115c9c19b005bdf35362844bb2fd00fcfee",
+			"type": "blob",
+			"bytes": 22068,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_error_dialog.lua"
+		},
+		{
+			"oid": "b2b756271b7197f987ec60a02c453bd41f7d8b17",
+			"type": "blob",
+			"bytes": 21092,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_bridge_actions.lua"
+		},
+		{
+			"oid": "891ee2d3eb3ecab0eac358a1f0fbdf47d0fc7e4b",
+			"type": "blob",
+			"bytes": 9552,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_recent_issues_source.lua"
+		},
+		{
+			"oid": "5e093adb45893a674785b6176452a29a2b59d7d1",
+			"type": "blob",
+			"bytes": 34861,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_report_issue.lua"
+		},
+		{
+			"oid": "db21b3d1856178e2800227429e73e2a3795c5549",
+			"type": "blob",
+			"bytes": 15196,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_update_check_window.lua"
+		},
+		{
+			"oid": "67c23e1ea8aef4543ac8b5830aa5c0753735cebd",
+			"type": "tree",
+			"bytes": 1167,
+			"path_hint": "static/ergopti_plus/macos/ui"
+		},
+		{
+			"oid": "a56008a82344cb44e62b10546df68275c059558c",
+			"type": "tree",
+			"bytes": 36,
+			"path_hint": "static/ergopti_plus/macos/ui/error_dialog"
+		},
+		{
+			"oid": "e87a5b8fd6e251cd9a39bf285f90aff383c66ac7",
+			"type": "blob",
+			"bytes": 28892,
+			"path_hint": "static/ergopti_plus/macos/ui/error_dialog/init.lua"
+		},
+		{
+			"oid": "06d280976963bed83fa5e8c593ecd71d14afe5fb",
+			"type": "tree",
+			"bytes": 267,
+			"path_hint": "static/ergopti_plus/macos/ui/healthcheck"
+		},
+		{
+			"oid": "50f001a26883eaf271d4fb57cdb6d59ea55488c6",
+			"type": "blob",
+			"bytes": 37727,
+			"path_hint": "static/ergopti_plus/macos/ui/healthcheck/core.lua"
+		},
+		{
+			"oid": "9e9b2b5d325e02fe1e7b500d48dc3b9afc1bb046",
+			"type": "blob",
+			"bytes": 17897,
+			"path_hint": "static/ergopti_plus/macos/ui/healthcheck/report.lua"
+		},
+		{
+			"oid": "a5993d8998b44450230affd0a20209b11267e619",
+			"type": "tree",
+			"bytes": 36,
+			"path_hint": "static/ergopti_plus/macos/ui/update_check"
+		},
+		{
+			"oid": "6fc656d83a182791039daf8753a1c2a2c23f5ceb",
+			"type": "blob",
+			"bytes": 9687,
+			"path_hint": "static/ergopti_plus/macos/ui/update_check/init.lua"
+		},
+		{
+			"oid": "9835c0d63617f156a3c272e46019690b2249aaf6",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "fae3db7a7640bf99ba30aeec4401cda4cc0a2f2f",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "0eb0f53b528e01112872d8f55d1b2fcef93261db",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "811c6f7740c941e74ee4363a1f907471e4430412",
+			"type": "tree",
+			"bytes": 547,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "a5086567aee2e412c10733f34075201c682f4acb",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "1e78bc41ad0e4d678ad3d5c3f5da0abd84903e6f",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "5d20b22b5427868added5acff5a5b9c7ee9a01d0",
+			"type": "tree",
+			"bytes": 12387,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "e79a6f1054c5544b5ff43a45932f25c24d829874",
+			"type": "blob",
+			"bytes": 33349,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/test_healthcheck_report_issue.lua"
+		},
+		{
+			"oid": "5f3a0f0c5926593b8fe10802ca779d5e55222e51",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "ead8bb11c8897a9039ae56d1d0b54edec22554bc",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "89140af6d61cb4534117e904fac7951973be9ed4",
+			"type": "blob",
+			"bytes": 1281296,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "2e2bf46c1181cf0055041a65bc64163e4e884a1f",
+			"type": "tree",
+			"bytes": 2460,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "10fa57bc9bcea2904fa378be70cab2bff8071539",
+			"type": "tree",
+			"bytes": 1868,
+			"path_hint": "docs/handovers/2026-10-12-config-menus"
+		},
+		{
+			"oid": "6fcab7c38d215169494373a7fa95c681df8fd533",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "c59712904f595c88a6720f19460e549d5084d478",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "ead256874e904c6e13022d439af24585e269cfa3",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "6a89ed4cc0f413960b579c3b806d202c96b55d5d",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "12530f9447260ccb42f103a5ae5fd9601e0c67b3",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "20dc176b1eb6018b64f8e4dffbcbd496f2389056",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "c90316fe8de3b8bc45218ec5bbb82609b22bd840",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "5e930445b2beefd26d8a163effb49f9eac7304de",
+			"type": "blob",
+			"bytes": 1264700,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "3d88561de399a47d45beb9e6039ba59b840176f3",
+			"type": "tree",
+			"bytes": 2460,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "f68076bf9b8e9e530022000d354fec5dd2745c75",
+			"type": "tree",
+			"bytes": 1518,
+			"path_hint": "docs/handovers/2026-10-12-config-menus"
+		},
+		{
+			"oid": "70cf090095e21c3fdd08dc1aeb173dbea3a3ad6e",
+			"type": "blob",
+			"bytes": 13616,
+			"path_hint": "docs/handovers/2026-10-12-config-menus/README.md"
+		},
+		{
+			"oid": "bf7cb636c64b55e961465adc8883acb158072376",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "169a12143d887f386f07671937a23b63ac9d2e19",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "42f940b81e7f0f1f87434de52d5f43e11fcbd9a1",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "405b5a2fcefedf0928fd765cb3d185b346f2dfcf",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "b2ec7fe7df90012fff32462b11242491bd697e22",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "d75e443db3e8927eb80bd80b651dde5652c46381",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "f3b3ac9b7c8162085ce8fa61787accd1ea7b8f98",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "7cbd84313c7530a5e8edee9f0062b786f23b8dae",
+			"type": "tree",
+			"bytes": 7856,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/meta"
+		},
+		{
+			"oid": "0df9e5096f43551492be0aed1ba37c38ac9dbb6f",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "2db86b39e4d30156eab566fcdf4353ce7f334ee2",
+			"type": "tree",
+			"bytes": 789,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "132ddda6142a35e27d99c5d614363e3f9c11ee4e",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "2e9fd73c18aa2557bc320a662c869a61caaf8a94",
+			"type": "tree",
+			"bytes": 32919,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "15fb808c6a115ed9d3f623d37c551af993fafb78",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "751f849345dc07924d51905dd9eb1223e57bfb79",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "fb0aad1983a06d2b5b4c3304b3aed35e81150aa3",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "b21b442ff6e9d75050a2b2aab5016185e3f9767c",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "0701cbcf911d3a66ae479444f60bbecbaa70d17b",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "f935f75b4da6fadf902d98a44eb0aa5c7d9a05ea",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "ff33df79f338a24b1047882692a45c7ebe9ba797",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "face3b0475dc2d55190f25be9136f2d461ce3418",
+			"type": "tree",
+			"bytes": 1533,
+			"path_hint": "static/ergopti_plus/_shared/ui"
+		},
+		{
+			"oid": "ac53a6f5831eab49675d0108f667063e7f5bae70",
+			"type": "tree",
+			"bytes": 112,
+			"path_hint": "static/ergopti_plus/_shared/ui/onboarding"
+		},
+		{
+			"oid": "e1a109e36c594de8e86366ffde51a4d94bb01458",
+			"type": "blob",
+			"bytes": 3925,
+			"path_hint": "static/ergopti_plus/_shared/ui/onboarding/index.html"
+		},
+		{
+			"oid": "1df5612016af4d0b270f50ab7a42b9a62868d63f",
+			"type": "blob",
+			"bytes": 34200,
+			"path_hint": "static/ergopti_plus/_shared/ui/onboarding/script.js"
+		},
+		{
+			"oid": "406d7495842a7d74e6feb48e338ba35d2b0acb45",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "4b023039f8cea549621817568eb457833f21e95b",
+			"type": "tree",
+			"bytes": 32919,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "8b77c2bf007a7c41ff48f3b8b0c0704b86812ad9",
+			"type": "blob",
+			"bytes": 82284,
+			"path_hint": "tools/test/test-onboarding-wizard-page.cjs"
+		},
+		{
+			"oid": "fddc20b78bec009d78b4e36f245b1f503cd2a0d4",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "632cb6ad4fdf4c3fd2f75a5a4c1fe03f7c1c43b6",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "b4358a77be0b26a9572f7c633f8940558ae76712",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "d82efab0803a1049fa344ccec240155ecc614b29",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "2e9f672fb4addd97e6501c53923bee35ce5ec791",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "c0dc9f0553fd9bcbc618ab64b7ccec2e9e6f06ad",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "591fa1433662823aeac0bdabfd0f87218c25b1aa",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "a9f54dcebdb7350d3d32ab252eb97b2697bb48dd",
+			"type": "tree",
+			"bytes": 1533,
+			"path_hint": "static/ergopti_plus/_shared/ui"
+		},
+		{
+			"oid": "a4a30a1863b04036f7412fa924ffdf00f7947228",
+			"type": "tree",
+			"bytes": 112,
+			"path_hint": "static/ergopti_plus/_shared/ui/onboarding"
+		},
+		{
+			"oid": "4bc5ae408c48b2a41cb9c621ac093b632c098253",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "37e86885d5c944d235f6eb5435db2e895d3bb7fd",
+			"type": "tree",
+			"bytes": 32919,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "aaa284e91e2dd59a0d05cd48bb91891ca3a45922",
+			"type": "blob",
+			"bytes": 81976,
+			"path_hint": "tools/test/test-onboarding-wizard-page.cjs"
+		},
+		{
+			"oid": "8f4c22b1ad25dab2f4250f52b85b066f3ec47d42",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "d3ac401c57743e7e3dd27660128e7f6ccbaf0a5e",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "f393379e5b3257ecb759b77a3b52c7797f0cbb65",
+			"type": "blob",
+			"bytes": 1145627,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "dcda48826a7239798e7dbc38b5970bc6205aa868",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "b40cd913e83121b9262d29484ff5e0ca0180143c",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "25167d8e1b9ecaa9c59cfbb485ff0339ed0477ce",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b252f97fb0d929682f105f87a9615ddf9f4a20d8",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "2303bcad3eba24f67ae095fb041be8b394843924",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "e594da52d3e4b4b7be920712e896a86cd7c9b375",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "d407564de421c57edd0b9b5cc8a2ff632a9a3593",
+			"type": "blob",
+			"bytes": 92255,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "c50df60fb1addd7c2b9f01b69c3d3b63ff51ddbd",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "3f71d78054a975dce92fd5d793a79b1a6d86268e",
+			"type": "blob",
+			"bytes": 1129177,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "99e3f461117a18573ccf954b2edaccb69c479029",
+			"type": "tree",
+			"bytes": 1907,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "4eba688e7988c2f1f8cf584378694e5d42b68f27",
+			"type": "tree",
+			"bytes": 150,
+			"path_hint": "docs/handovers/2026-10-12-dev-consolidation"
+		},
+		{
+			"oid": "1c2b40ce8b3eb663901e4eb3226a132fbd3d1d32",
+			"type": "blob",
+			"bytes": 33711,
+			"path_hint": "docs/handovers/2026-10-12-dev-consolidation/README.md"
+		},
+		{
+			"oid": "a1bebf4212de841257b2d439f4c060c4989dcf58",
+			"type": "blob",
+			"bytes": 2619,
+			"path_hint": "docs/handovers/2026-10-12-dev-consolidation/windows-receiving-prompt.md"
+		},
+		{
+			"oid": "b5b7233b15ddbf0c4b35ea35c8ff3d698570da7b",
+			"type": "tree",
+			"bytes": 37,
+			"path_hint": "docs/handovers/2026-10-12-group6-ci"
+		},
+		{
+			"oid": "cf530ffb5a4ce350c0f2c2123ebc939fe9b5084f",
+			"type": "blob",
+			"bytes": 29388,
+			"path_hint": "docs/handovers/2026-10-12-group6-ci/README.md"
+		},
+		{
+			"oid": "0ee745ec647772230fe70de0b32b87d097cfe975",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "e893e0b9a5b21609020b29f00643a4dc76f1a03a",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "3121047a8b74089318595e55a702ba39b3b6fbb6",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "6052eab929875439e823dce76c166c144680ba7f",
+			"type": "tree",
+			"bytes": 3516,
+			"path_hint": "static/ergopti_plus/_shared/lua"
+		},
+		{
+			"oid": "d2e959cb8f415817e3087094912a4fe8c02ff0c9",
+			"type": "tree",
+			"bytes": 6073,
+			"path_hint": "static/ergopti_plus/_shared/lua/test"
+		},
+		{
+			"oid": "2ab21612457538b64477a86a401b31113da67ca2",
+			"type": "tree",
+			"bytes": 625,
+			"path_hint": "static/ergopti_plus/_shared/modules"
+		},
+		{
+			"oid": "b8383d554360966172ab03164b0f94197767200d",
+			"type": "tree",
+			"bytes": 1533,
+			"path_hint": "static/ergopti_plus/_shared/ui"
+		},
+		{
+			"oid": "53a7a02ab04a6802f0d043d369444c612a292a80",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "81949544456c9c540de2b913f97c17ce288cc7f7",
+			"type": "tree",
+			"bytes": 3220,
+			"path_hint": "static/ergopti_plus/linux/infra"
+		},
+		{
+			"oid": "5727dc36294f0640720ca186829d9e8ca0d5dd11",
+			"type": "tree",
+			"bytes": 361,
+			"path_hint": "static/ergopti_plus/linux/modules"
+		},
+		{
+			"oid": "3c41658eed5023ec252a4561d917b343458894ba",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "8ea61b641c55c20ce7738402ae940f71c103cdcd",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "5cb975a1da5c64876125c7edb5bde41005cd67e8",
+			"type": "tree",
+			"bytes": 4247,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/infra"
+		},
+		{
+			"oid": "7b2a8a06def7ecb4e0f5539840ccd2911207945e",
+			"type": "tree",
+			"bytes": 2049,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/modules"
+		},
+		{
+			"oid": "f73dc61087102c4fcc4267599e2fbf0498cff02a",
+			"type": "tree",
+			"bytes": 547,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "46fe4f41020bd533aede1ec4102fa250310b87c2",
+			"type": "tree",
+			"bytes": 2880,
+			"path_hint": "static/ergopti_plus/macos/adapters"
+		},
+		{
+			"oid": "281a9180522617be681a042fba31464340277713",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "f9ac53cc22f60cb530bbc442e34ddebba7d20da1",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "dbe25a06ee4e48568d430bdd31ad38b29ea1f85d",
+			"type": "tree",
+			"bytes": 5149,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/adapters"
+		},
+		{
+			"oid": "630b89eb4d21f6b5cad1e0a13682407e1767fbdd",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "4f9aa2a293ecb470443abe291494caa85e6b87d2",
+			"type": "tree",
+			"bytes": 789,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "a5473beea854eab94b04442d6aae49ba3c8d4146",
+			"type": "blob",
+			"bytes": 109618,
+			"path_hint": "static/ergopti_plus/windows/tests/run_all.ahk"
+		},
+		{
+			"oid": "af5da2e4e21b5b4ee80e4d003a59fd6262b621ad",
+			"type": "tree",
+			"bytes": 39747,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "f4497acb2a781d75eb0cc340f9c64226ee989cee",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b416f37a4db13ee33662b4d5bdc40d175e30b1d9",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "6187bbc466ec0b42ccab3c3f18517470a93b6d36",
+			"type": "blob",
+			"bytes": 15550,
+			"path_hint": "tools/ci/receive-windows-acquired-read-build-source.ps1"
+		},
+		{
+			"oid": "58818dd3c3439c3d06c1504a5cd5b5fc1ccfaded",
+			"type": "tree",
+			"bytes": 565,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private"
+		},
+		{
+			"oid": "515b13c6768717b470a1347b5f2e14e804e1db07",
+			"type": "blob",
+			"bytes": 2126,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/BOUNDED-PARENT-INSERTION.template.txt"
+		},
+		{
+			"oid": "0dd79dc0e6288ae3d3d3fce01df780ad6eba6631",
+			"type": "blob",
+			"bytes": 1484473,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/CURRENT-PRODUCER-INVENTORY.json"
+		},
+		{
+			"oid": "d0b0312b78662ab44b6f199f0844fb19042678ee",
+			"type": "blob",
+			"bytes": 8532,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/FROZEN-CANDIDATE-SOURCE-PROJECTION-REVIEW.json"
+		},
+		{
+			"oid": "72882822a6bb5f4a080514b3e0e7bd682ca1fe2b",
+			"type": "blob",
+			"bytes": 5449565,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/FROZEN-CURRENT-ORIGINAL-WARNING-CONTEXTS.json"
+		},
+		{
+			"oid": "766478ec2ec7448dbbbc0dc9aa7eaf29699a76e8",
+			"type": "blob",
+			"bytes": 6093,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/FROZEN-ORIGINAL-BASELINE-ELIGIBILITY.json"
+		},
+		{
+			"oid": "74c57af8a46eb43200c979cffe3f5234abf59c2d",
+			"type": "blob",
+			"bytes": 4332,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/FROZEN-TWO-CASE-ORACLE.json"
+		},
+		{
+			"oid": "6732e6f6b126855926d9e42531f03bd15befec7a",
+			"type": "blob",
+			"bytes": 29052,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/PARENT-AC8-PREIMAGE.txt"
+		},
+		{
+			"oid": "6063c9ce4ed4e91d1b9726ce345a7ce5017a278c",
+			"type": "blob",
+			"bytes": 23714,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/observe-registry-memo-original.cjs"
+		},
+		{
+			"oid": "e258a06293c1f5fa89ea34273feff6a72893d7e6",
+			"type": "blob",
+			"bytes": 38196,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/qualify-registry-memo-two.cjs"
+		},
+		{
+			"oid": "ec39dd6f479819c9ef3187f70ff8f03517fd3f50",
+			"type": "blob",
+			"bytes": 28195,
+			"path_hint": "tools/ci/run-windows-acquired-read-cohort.cjs"
+		},
+		{
+			"oid": "d5863e543e7a3af8d9c34ab614ea35dda906e64e",
+			"type": "blob",
+			"bytes": 14577,
+			"path_hint": "tools/ci/run-windows-shortcut-extension-fourteen.cjs"
+		},
+		{
+			"oid": "6a67a8e8b826d12e4c9817216b185390f6cc1ba9",
+			"type": "blob",
+			"bytes": 31053,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "c677aa12cf52568a854ba4e40b9800682a157092",
+			"type": "blob",
+			"bytes": 60749,
+			"path_hint": "tools/ci/toml-comment-original.json"
+		},
+		{
+			"oid": "7a7bf7cbdb07ce3453c0d0275727338cd0fdcf9d",
+			"type": "blob",
+			"bytes": 504693,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "0afd4aed8d4b17cceba7c89d1c2cc65fea3389eb",
+			"type": "blob",
+			"bytes": 1312,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "ba610846f2be738778e2a08adf4f1cd77023a5b0",
+			"type": "blob",
+			"bytes": 6259,
+			"path_hint": "tools/ci/windows-updater-original-diagnostic-cohort-inputs.json"
+		},
+		{
+			"oid": "6e00cc8407b79820f1842fa69578679e78c188a8",
+			"type": "blob",
+			"bytes": 10197,
+			"path_hint": "tools/ci/windows-updater-original-source.cjs"
+		},
+		{
+			"oid": "cb8943b0f9b7ee36087fdfdb4ff267b9e869daea",
+			"type": "tree",
+			"bytes": 32852,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "349522e1c4e51a8b2673681b982b77d14d3b9652",
+			"type": "blob",
+			"bytes": 32436,
+			"path_hint": "tools/test/test-ahk-suite-manifest.cjs"
+		},
+		{
+			"oid": "f6d992d5d370afc3e0dd9f080e85f6559c39ff2a",
+			"type": "blob",
+			"bytes": 21489,
+			"path_hint": "tools/test/test-windows-updater-original-source.cjs"
+		},
+		{
+			"oid": "df230004d1003184aa1b736d97a7c31cf6cb15c4",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "54c57e2fbc0af6f6aa7a347e9098da2776a3fd0c",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "3b24840c2389a99b28c1310faebc2f21923e3353",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "e1d723739ba892f65d1a9e640493faf2c46bc3da",
+			"type": "blob",
+			"bytes": 504414,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "8b2e21fcb8ef0351e8904761b3b707f636c82467",
+			"type": "blob",
+			"bytes": 1234,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "9601f80fd8989a695eccc467da0c99aac91a60f4",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "9b809c0cd2c49f4657f64f4991a68c7295a62613",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "4cdda3f4f3bc8f2915992580faaa4e0f19dad9af",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "9cac19238c3f2712c999cfb3c2d3d6addd96fea4",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "87cd5dd4088c5556888e7a21d1d6d675a2dccec4",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b29aa742d4404ed31beaad65cd1728ae09f0e2c2",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "ba6db2dd5c2e5e180f19b98f07188667b3545a3a",
+			"type": "tree",
+			"bytes": 292,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private"
+		},
+		{
+			"oid": "e1c7d1375cb4c0ce7f23be0ee37d189c230cc87a",
+			"type": "blob",
+			"bytes": 1969,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/BOUNDED-PARENT-INSERTION.template.txt"
+		},
+		{
+			"oid": "fa4db7f930c508841b9a6a9eb2b3dc24b35c509b",
+			"type": "blob",
+			"bytes": 1483131,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/CURRENT-PRODUCER-INVENTORY.json"
+		},
+		{
+			"oid": "6663a3926f19be5d20c9bd697e527706b60d915f",
+			"type": "blob",
+			"bytes": 30896,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "91f51382d46fb728286bae53997236f8a622d78a",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "573212c58ae3437da9fea382adc6af9783d754e5",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "867d19d6c35ccabf2ef63485c058e915bdabc35b",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "375e586f7a2f16f371051791e5ea44fa506a24c1",
+			"type": "blob",
+			"bytes": 504015,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "24d727fe6167be164c0c73ff79f57297fd4df4e8",
+			"type": "blob",
+			"bytes": 1249,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "da13693d04fa3c8c6f6e89cb3e0e967c78f35458",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "a14a638f3b6098816fe49ba02147928fae3bad9a",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "e16dcd81f13cc78a65ca9478306cc3317287cd02",
+			"type": "blob",
+			"bytes": 1126513,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "e433c53e0cee2c20a9024f1365b89f9600d1fe26",
+			"type": "tree",
+			"bytes": 1857,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "2c65e0e3a4a1a1dcb35505a25ea7f1f3bc19ae45",
+			"type": "tree",
+			"bytes": 150,
+			"path_hint": "docs/handovers/2026-10-12-dev-consolidation"
+		},
+		{
+			"oid": "16044247fae0599a2ea0372d65bb05bca1f7a8aa",
+			"type": "blob",
+			"bytes": 32966,
+			"path_hint": "docs/handovers/2026-10-12-dev-consolidation/README.md"
+		},
+		{
+			"oid": "d447178b934c2ad479d45edb386746ad00350c91",
+			"type": "tree",
+			"bytes": 37,
+			"path_hint": "docs/handovers/2026-10-12-group6-ci"
+		},
+		{
+			"oid": "dc4ac02256a846ce9b98569e3c2dc27fcb707900",
+			"type": "blob",
+			"bytes": 26395,
+			"path_hint": "docs/handovers/2026-10-12-group6-ci/README.md"
+		},
+		{
+			"oid": "1e6e5cd6758c48ed10532ee125d47914927c7f08",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "8df4962d6fd067b2d4b6de94b91759f71a66dcae",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "fe76ac2aa04e72ee644b9821f164b0f0ad51c378",
+			"type": "tree",
+			"bytes": 547,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "e0919ec8d3f3db69e12dc81140aa7a58dc38fe39",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "4a9f93086e0f935c7cd11984c3c1a97cc23e28d5",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "1080999a28b62c1a8c458979eadb6151b3c873cd",
+			"type": "tree",
+			"bytes": 12387,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "b7bee517bb248918e8547169049a19a8d0789087",
+			"type": "tree",
+			"bytes": 8937,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu"
+		},
+		{
+			"oid": "0166d232509cfab0b4d4437e00fb5adc5c443f37",
+			"type": "tree",
+			"bytes": 5031,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm"
+		},
+		{
+			"oid": "d39a75f0c0e7d9cc3363b381a9fd36928e8d3dee",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "f1ffbd681574f047833b97e2547affa9f4ee2935",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "66d04fb48011f9b462d100b293791b819cb0a4fe",
+			"type": "tree",
+			"bytes": 292,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private"
+		},
+		{
+			"oid": "2d1039c6e843dccfa941283fb8f4e403ed234c6b",
+			"type": "blob",
+			"bytes": 1482732,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/CURRENT-PRODUCER-INVENTORY.json"
+		},
+		{
+			"oid": "9b044e3d03b6847a1b0d08f480047c1057690dbf",
+			"type": "blob",
+			"bytes": 22974,
+			"path_hint": "tools/ci/registry-memo-two-qualification-private/observe-registry-memo-original.cjs"
+		},
+		{
+			"oid": "b428ded86a61021e48b2c168adeafd4b6c8d382c",
+			"type": "blob",
+			"bytes": 28169,
+			"path_hint": "tools/ci/run-windows-acquired-read-cohort.cjs"
+		},
+		{
+			"oid": "afb30d4ae6dbf5094ee3d2f483138f2713b2bbb8",
+			"type": "blob",
+			"bytes": 30896,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "b0ed3e0c4f1fded503beb8b5310067a3eaab51ab",
+			"type": "blob",
+			"bytes": 503986,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "e95cfcfc88d16829af66e6980d2462ecd9474f38",
+			"type": "blob",
+			"bytes": 1234,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "edc82f504e48e074d9b08eaec0e30cd24b2b91c5",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "fd43679eeeccc81c9b05d883b23a55348dc79607",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "74cb5d9bbd747f40bbd2df748ef2121be2e5a3b8",
+			"type": "tree",
+			"bytes": 1564,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "7026780145e41f7c69057cb6ce4f1cd53ea943a0",
+			"type": "blob",
+			"bytes": 503923,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "4a87eac2f33a79e5d179ddfda830717f8816ff6c",
+			"type": "blob",
+			"bytes": 1249,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "b170db1125d55d2b8c4d2f57d7721fc3d3e2f081",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "319884dfb20483556cbeb191df813a6b2bbf3afa",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "a23d9eb3b08310bf111a2a01b00828758cadc61d",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "227981fe095abaa726d6b2e22914d7cb9c72f1a5",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "2416bd2c13ab0dd5f27a220d152285cbc2c2ef82",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "81bcdea9e93eeb2216f03b9afa71c5f7976b1596",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "41653e4b7efb964f36710c0956d9b43f0c0ed2ba",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "977d85b09bb2580ff36bd1790dd4b0f29724e558",
+			"type": "blob",
+			"bytes": 66962,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "c19df962be41acb4edf69c0930d20413d4fc140f",
+			"type": "blob",
+			"bytes": 47372,
+			"path_hint": "static/ergopti_plus/windows/infra/config_transition_runtime.ahk"
+		},
+		{
+			"oid": "d7e9cf2251d80ecc04e5720a7ec8040f22aff977",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "0d1eea8ed692376c78b023992198d3720e62babd",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "a81cf2595a1427baac9ac0240ccc28855cad9cd7",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "0a0a2e7877f0b7339e00ce4af3445e3cf3d31d38",
+			"type": "blob",
+			"bytes": 96731,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk"
+		},
+		{
+			"oid": "04e4497aad8d15d6fe090560137d47e563e7b6ba",
+			"type": "blob",
+			"bytes": 68732,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_transition_windows_port.ahk"
+		},
+		{
+			"oid": "8f6e50d402d01f237a9580c66783a6f3a226fe2d",
+			"type": "blob",
+			"bytes": 74662,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_toml_build_updated_content.ahk"
+		},
+		{
+			"oid": "5b7d84733e095d058efc6f3a9f2ad5a9c5f8c9a6",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "20eaeb90efb0771daaa24be357dfc1e32eaa10d9",
+			"type": "tree",
+			"bytes": 1349,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "2cb651558249ebc69158735616f80f171cf5a322",
+			"type": "tree",
+			"bytes": 512,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private"
+		},
+		{
+			"oid": "2ef1cc9f58da11149a300b4298be585d0c7f2b2f",
+			"type": "blob",
+			"bytes": 1654,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/AUTHENTICATED-RAW-JOINS.json"
+		},
+		{
+			"oid": "d8b6c9b0a04b9314a280ee8144630be538981afb",
+			"type": "blob",
+			"bytes": 1770,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/FROZEN-API-METADATA-V2.json"
+		},
+		{
+			"oid": "2ecb4c076879bd13eb21e9b456da6e3464ef1846",
+			"type": "blob",
+			"bytes": 4781,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/FROZEN-EIGHT-CASE-ORACLE.json"
+		},
+		{
+			"oid": "f549721cae005d6731d52f9432f73a4d841a698d",
+			"type": "blob",
+			"bytes": 1897,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/FROZEN-RECEIVER-CONTROLS.json"
+		},
+		{
+			"oid": "9260f695ef4c4a0e0fb2ae8f65263128dbf9b253",
+			"type": "blob",
+			"bytes": 6403,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/FROZEN-V3-TRANSPORT-CONTROLS.json"
+		},
+		{
+			"oid": "19435c59729a9a65a6a65ebd09d919dd8164fdbb",
+			"type": "blob",
+			"bytes": 965527,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/FROZEN-WARNING-SOURCE-CONTEXTS.json"
+		},
+		{
+			"oid": "98a30146f61cb1304f16e1f9ffeaf76dce9bc286",
+			"type": "blob",
+			"bytes": 5921,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/RECEIVER-CONTROLS.cjs"
+		},
+		{
+			"oid": "faaa5734c5ed10d1d2f7c60c9cfa35524bf43d37",
+			"type": "blob",
+			"bytes": 6169,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/V3-TRANSPORT-CONTROLS.cjs"
+		},
+		{
+			"oid": "3f4477a47d584c673e6bfa8776b206378a1d22f3",
+			"type": "blob",
+			"bytes": 27802,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/qualify-captured-images-eight.cjs"
+		},
+		{
+			"oid": "6013e335a280f3d01602e8ae9df12743dbaaa55c",
+			"type": "blob",
+			"bytes": 15524,
+			"path_hint": "tools/ci/receive-windows-acquired-read-build-source.ps1"
+		},
+		{
+			"oid": "4805f0d9448114ae8d72cad23d58aacdd8f2659d",
+			"type": "blob",
+			"bytes": 489091,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "4e4a5b18b982fec0de3b28b1dd1093d216630d49",
+			"type": "blob",
+			"bytes": 11550,
+			"path_hint": "tools/ci/windows-string-compare-private-benchmark.ahk"
+		},
+		{
+			"oid": "aed73eee138a7f7caab38cd297291f81cefb5f88",
+			"type": "blob",
+			"bytes": 7621,
+			"path_hint": "tools/ci/windows-string-compare-private-oracle.json"
+		},
+		{
+			"oid": "b75654e4e2103b68202b48edd83f9ae034b977a8",
+			"type": "blob",
+			"bytes": 1299,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "123104654278f231585537f7dba9c0ca4cccded4",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "7d1c8830f90df0a7a7a367686ddbfb84383c1c11",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "77d0ee35e97aa4919110eb23e5df29adb3f5529f",
+			"type": "tree",
+			"bytes": 1349,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "5698bd97eb204d224529e59a0fe7ef0c15ff78e1",
+			"type": "tree",
+			"bytes": 398,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private"
+		},
+		{
+			"oid": "b33a082c24ffad41c9f5b40338d4c920f06ac658",
+			"type": "blob",
+			"bytes": 24806,
+			"path_hint": "tools/ci/captured-images-eight-qualification-private/qualify-captured-images-eight.cjs"
+		},
+		{
+			"oid": "5ec1554fb7b3e516b024dfb54893958d6e950350",
+			"type": "blob",
+			"bytes": 29052,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "851c6f5622ce9f8f983341eb4d18e6b3138f751d",
+			"type": "blob",
+			"bytes": 489091,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "d0f227148c64337d2dd431ef5c3f0899ec53b311",
+			"type": "blob",
+			"bytes": 1299,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "9e779168a1503473fc88225122f1e3f48f6e29b0",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "e92e919c766be45fc961eea2efb4fffad5c7e36e",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "cad4a624767aece2cd70ccd41d76eb14166cce3c",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "5fdda7171c967131182c682c49b67c5be468bb1a",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "1886a7f166bc213c60e91f2ffc45703c11a02fcc",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "435ceaeafbd5c6d496838b96ffdfe606c7609031",
+			"type": "blob",
+			"bytes": 67046,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "aa244b616a4abe6522de2631935af2966c4ca2b8",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "6aace851ba752ca148cec0c5100795b79581fce9",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "0b5f1e052a00d27ac6da686871dedcf0ce5ebefa",
+			"type": "blob",
+			"bytes": 86106,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk"
+		},
+		{
+			"oid": "7c6ab7712a789d31add47a4bd9577860ed5c1631",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "111fffc733145232c44ef8d424e225ac00becbad",
+			"type": "tree",
+			"bytes": 1279,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "bfbb794d6c25428aa3f6c7b14c84c88da1112a7c",
+			"type": "blob",
+			"bytes": 27397,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "97bb7330c0dda0410ba19560e69213151252cf73",
+			"type": "blob",
+			"bytes": 488304,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "e48ff88be7505616edda1a43c1c37f401c19bb30",
+			"type": "blob",
+			"bytes": 1273,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "f97d44a0777de1ea5643f972f67ec04a53ccaf06",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "8211d58a82490f51e911439ea6a820812a089cac",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "d765e8e7a1290f7bc412aeb17723727ac5b41b8e",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "2abdc2c8efa163f2fd446c03dd01fa39f14b7f6b",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "a9ab1061ce168df7d986cbb5eb27e22948b00c80",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "adcdfe1fc1fc77921f64afa1fe2afa56b1a09e47",
+			"type": "blob",
+			"bytes": 47195,
+			"path_hint": "static/ergopti_plus/windows/infra/config_transition_runtime.ahk"
+		},
+		{
+			"oid": "8c2c7113c9629fe9f6c5ff09be95f72a94166936",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "230e3d84bceff184c96e151c2003de01962e651a",
+			"type": "tree",
+			"bytes": 1279,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "0b1c4272d4c65b4bfa0dc5459f801e693138ac7d",
+			"type": "blob",
+			"bytes": 488721,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "4823dcdca30903c919a5cf737ac51b7bfa2a72d2",
+			"type": "blob",
+			"bytes": 1403,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "f7beb8172c8b46c1431be2d8cd43bb897c352244",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "e32a5deaf2aeb8b81530d239e9689105eec7a8a2",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "be796f9f4f575e146041d3439fee7b160d119d00",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "86043928cabc880bcd0f51004a425733c3449958",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "b0ff34ac7a9eff48566cbfa300c0bf8abc35654c",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "01720e9e03e5da0b6e578c405463f5b9d67310b1",
+			"type": "blob",
+			"bytes": 67088,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "1d9e22a0a95efd45f756db9d27d03fe569b88278",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "9f11fbdf9e55dc32087d2b608a91897b148f9788",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "b7821f3241df6cbe6686f0b42f626440db7a2775",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "91c3598651912958b416e87f7e73929e0f6261de",
+			"type": "tree",
+			"bytes": 1137,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "d8469d240d14381d45a73c1bdd55f385a5693cc8",
+			"type": "blob",
+			"bytes": 19194,
+			"path_hint": "tools/ci/run-windows-toml-comment-cohort.cjs"
+		},
+		{
+			"oid": "668997262c104f325f76d21936eb3557d2ed7aec",
+			"type": "blob",
+			"bytes": 491381,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "ab9430877221f0ceef34e3023e73adae9e27e784",
+			"type": "blob",
+			"bytes": 1125,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "6182c508e60954d712f0b7fac94f854e6f8e4138",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "e8096a95e23fdb45408e983fb2c42c7c85f546d3",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "b58fab946d8587127033f9356a227474d8b504ee",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "e94a0d311fe9e0a53ee89b3e7de6060523733d71",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "b31882f161d92c1796c7a15d6dfff2b1edbf1cd3",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "0089872dcc4be16ca55e7dd1d1df70a090b0e1df",
+			"type": "blob",
+			"bytes": 66299,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "a8cc95d162f555436eb9e04004daa7eaeac76b09",
+			"type": "blob",
+			"bytes": 45416,
+			"path_hint": "static/ergopti_plus/windows/infra/config_transition_runtime.ahk"
+		},
+		{
+			"oid": "c310663e3a99e086686ea5382af222e47402e4a0",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b2c1f06a70d29250eb2ef919cee3880f24a42623",
+			"type": "tree",
+			"bytes": 1137,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "372a6db21dcaec84f44914b5bac57da54fbe6817",
+			"type": "blob",
+			"bytes": 489874,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "bf5520532c1ad1344cd3031db96bb092f753618d",
+			"type": "blob",
+			"bytes": 1146,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "7e126ae30e39c9f4b3364ed3a46a63827b9624dc",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "6c84e273dc1efa37a52acd16cedaea8dc894762e",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "44f39b6d56828d0f2f82ba2766b0ab2519c50a1d",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "54f8819d806447dafe587e8e239695842c265a36",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "660e94d2690d44c8d81357e21b4b372e19a7c200",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "469c69e228c581119afb57eab3fa8fc9bb105904",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "3ac34f5a3b3653eed113c29d215a07314202d4e1",
+			"type": "tree",
+			"bytes": 1137,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "d74c196d0b8eb5fae075812714f0048c49163def",
+			"type": "blob",
+			"bytes": 488882,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "9be130213f2d341f1ba55cc00caf616f3f5f3ba9",
+			"type": "blob",
+			"bytes": 1137,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "89278cd968bae76250e43212d4493a4c900bd931",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "f6e2afb4b2e5db1d4c77d116f8ac1a60e3a970a7",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "9a9a0339658a151fb95f3dc30064fae22aa1b633",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "78609857589d891411e58e9d33d78d8dcd5a9496",
+			"type": "blob",
+			"bytes": 83637,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "e023d5b04eeae7c9bf94fbeac76681c3420f0c07",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "3acb6a98d8b9b8b9cb269f2c4524e6ee8bcde933",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "1d26c00bd959adaece3e0f7cb7913b64d5fe229d",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "4d775e2f0afdb13c5f2cacb94f7dd57aae54da0f",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "122f565b848c0adc1211e277da474aaa0416601a",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "39f8698891062772f167635c652dda58527a62bb",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b79eee7bb60cf01e4b9551a664b23e001f265131",
+			"type": "tree",
+			"bytes": 1066,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "16aba681c76e4a2162ab28e53d46b7d3d606cac2",
+			"type": "blob",
+			"bytes": 15524,
+			"path_hint": "tools/ci/receive-windows-acquired-read-build-source.ps1"
+		},
+		{
+			"oid": "8e6862815bec53c2b1bbecf0190346eb94f417e9",
+			"type": "blob",
+			"bytes": 28169,
+			"path_hint": "tools/ci/run-windows-acquired-read-cohort.cjs"
+		},
+		{
+			"oid": "d718d27bec9e176cd1454468373a30c68ef10547",
+			"type": "blob",
+			"bytes": 487743,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "6f5eed9e742ab57c0741f9c3fc3bc546a18a0608",
+			"type": "blob",
+			"bytes": 920,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "f8f10ec6598a87e8ca04f48b5ca42ac56fef80a6",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "8962519b7f0a3a4f1b84968acc4cf4c5b4f7fa9b",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "f8d764387429f8d843b5f42e93c8b3c87377a242",
+			"type": "tree",
+			"bytes": 1066,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "2c9b10d6ba79fd55e1ab0b25ee36fe5397c44c46",
+			"type": "blob",
+			"bytes": 15546,
+			"path_hint": "tools/ci/receive-windows-acquired-read-build-source.ps1"
+		},
+		{
+			"oid": "0f8a0cdb902bbd3998e00870226166bf7f15d32f",
+			"type": "blob",
+			"bytes": 28169,
+			"path_hint": "tools/ci/run-windows-acquired-read-cohort.cjs"
+		},
+		{
+			"oid": "6aacf6bce635f66c88ab44b3cfde68f0a60f655d",
+			"type": "blob",
+			"bytes": 11602,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "7901f795c5c81c3b2bd816bfe4e53756ad8044ef",
+			"type": "blob",
+			"bytes": 460,
+			"path_hint": "tools/ci/windows-toml-comment-cohort-inputs.json"
+		},
+		{
+			"oid": "dada3014dd360a72abc2387a925882cf793bb16f",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "8e2d06479ebfbaa3d64909c93f3e69c2b8a57bd6",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "d0d70666a5f232a2d250d470111d28059edb0f72",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "8d7967e958c5c9e34dbb781f8611edf20351f1ed",
+			"type": "blob",
+			"bytes": 79220,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "aaeed164b0f4d1db905e6ab8cdc6a83d1839bc15",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "af5cc3de892b10367e2d5234da91041162bd75f4",
+			"type": "tree",
+			"bytes": 882,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "b17f704f5872a6dbab00f909e3354b4a209796b2",
+			"type": "blob",
+			"bytes": 15524,
+			"path_hint": "tools/ci/receive-windows-acquired-read-build-source.ps1"
+		},
+		{
+			"oid": "2b3876e0886c9725327152909c0a64092fe4e79d",
+			"type": "blob",
+			"bytes": 23682,
+			"path_hint": "tools/ci/run-windows-acquired-read-cohort.cjs"
+		},
+		{
+			"oid": "0d0b4b41c8bbfa4aa48c895cb56a4f59c93b18f7",
+			"type": "blob",
+			"bytes": 486734,
+			"path_hint": "tools/ci/windows-acquired-read-cohort-inputs.json"
+		},
+		{
+			"oid": "6d37784e066b41897660eb59510497fdac156137",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "560641c7f006ecd95a2fed187190adbc419d6754",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "b49a07d615647833b9b775e699e5f4e8ab95a841",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "2c0991a8955d33cdf940584f7128fba5f4e5aecb",
+			"type": "blob",
+			"bytes": 79908,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "8aae17253ad5d55d05ef4aa832525d983c1c9ab8",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "3bc3de69e9d9c06a6a38261faa507791626fc328",
+			"type": "tree",
+			"bytes": 626,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "61a527a735cc8419e3512e5f0996009b5938ab8c",
+			"type": "blob",
+			"bytes": 15030,
+			"path_hint": "tools/ci/receive-windows-personal-file-caption-build-source.ps1"
+		},
+		{
+			"oid": "e367dec22d41096c4c0ab6adc6b177a3ac0d7e70",
+			"type": "blob",
+			"bytes": 21052,
+			"path_hint": "tools/ci/run-windows-personal-file-caption-cohort.cjs"
+		},
+		{
+			"oid": "d32da9a8db661c03464706668ca7b4de0f4b482e",
+			"type": "blob",
+			"bytes": 487664,
+			"path_hint": "tools/ci/windows-personal-file-caption-cohort-inputs.json"
+		},
+		{
+			"oid": "f6a60c175e2c4a7d1b4308d78294eb4155f65b89",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "cd3cd298ffdc71ba042394eae152a32a30b1f1ce",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "61138ec8322983e83a7af1ed435b9c07d364fd4e",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "8836c4ec2a66fcda35a3e4b0d6cd85dfa7b55251",
+			"type": "blob",
+			"bytes": 79323,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "0992b4c2132d381915cc84fbbb9be57b1c0ac767",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "bca9302dcc23741033a792f2bdc2f9fbeffae316",
+			"type": "tree",
+			"bytes": 626,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "c68360d732fe28408579e130f48513de30396ddf",
+			"type": "blob",
+			"bytes": 15030,
+			"path_hint": "tools/ci/receive-windows-personal-file-caption-build-source.ps1"
+		},
+		{
+			"oid": "f95a80cabafb563ce5d920c80eeb4dd1c9622c21",
+			"type": "blob",
+			"bytes": 18548,
+			"path_hint": "tools/ci/run-windows-personal-file-caption-cohort.cjs"
+		},
+		{
+			"oid": "5def8cd630c5ebd9bcd2c082236559927a433710",
+			"type": "blob",
+			"bytes": 483371,
+			"path_hint": "tools/ci/windows-personal-file-caption-cohort-inputs.json"
+		},
+		{
+			"oid": "7d36e9238c5947acce5131afe4b87b6760227abc",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "d2d29601980fb0670552e31797076f77a9fced99",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "8e9b015ed4fa05629f987964f2ed4c4301b399ff",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "441981c2b955d32f69267f2f6a3f75902987cf43",
+			"type": "blob",
+			"bytes": 77637,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "b7706fd625107beff7e4c04328574b7828eb6309",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "2253e90f292e7cf582ec397e2b0a70a125fc9b8e",
+			"type": "tree",
+			"bytes": 626,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "41ad4e0f6cbd00131b8927ba5f1078594634b4c1",
+			"type": "blob",
+			"bytes": 483348,
+			"path_hint": "tools/ci/windows-personal-file-caption-cohort-inputs.json"
+		},
+		{
+			"oid": "ac0e79c1942120ea04c1750cc3ef80f3ea0162ea",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "971a75de50e985865259c43296ceafb6315ec06c",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "97303a89587b7cfbb2cc732d3a77f4b1f9a0018c",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "ea03017d843b967da72674f6600d092e87ea9a1a",
+			"type": "blob",
+			"bytes": 77048,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "b9e5590365b1e550b97e1c87b6bb34cac0f35ae8",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "f57dfc7dd417a586914c2435cc90f4a8c6eb0d52",
+			"type": "tree",
+			"bytes": 611,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "ce4cf2582af9f35eaba76fbafafd8c1b1bce97b5",
+			"type": "blob",
+			"bytes": 14822,
+			"path_hint": "tools/ci/receive-windows-original-restore-build-source.ps1"
+		},
+		{
+			"oid": "454a4b2d6ca26ac28595cef8978e529f166ea93f",
+			"type": "blob",
+			"bytes": 16633,
+			"path_hint": "tools/ci/run-windows-global-restore-original.cjs"
+		},
+		{
+			"oid": "08d9a3057d19e8b61918a083f113875811bdf191",
+			"type": "blob",
+			"bytes": 478166,
+			"path_hint": "tools/ci/windows-global-restore-original-inputs.json"
+		},
+		{
+			"oid": "8cbd896313c1555ab58d73c0e724272a4381dec6",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "4f46ea654d17a44882b74a9a4d50bd2df0716134",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "e1ef75a8bbeeff76612618c8d8bfbc9986a44037",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "15c968a86a700bc057af8227db2698eec723588b",
+			"type": "blob",
+			"bytes": 74926,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "99bb4006cf667e2d159ffebad2a3d9ea42acbcc0",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "bde070e97a52152e206b601c1c0bb97606e71b13",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "aeb27b42185cfc195e42e513efc90af06f77a0ba",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "0650a9019e25f67955cfc850a0db48a79e71c1b8",
+			"type": "tree",
+			"bytes": 106,
+			"path_hint": "static/ergopti_plus/_shared/tests"
+		},
+		{
+			"oid": "34ee9f5e2d589445e71d3e53d2fa72f6fd9f1e90",
+			"type": "tree",
+			"bytes": 1607,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus"
+		},
+		{
+			"oid": "3b840dc23737bcf9cf9c5bdd15cff385b0e4affc",
+			"type": "tree",
+			"bytes": 5788,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus"
+		},
+		{
+			"oid": "48fa97d36f769283f93b77005d90436e0550e8f9",
+			"type": "blob",
+			"bytes": 2337,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus/windows_personal_file_parent_caption_original.json"
+		},
+		{
+			"oid": "5327a4160d81f3ad50b1633ac6bb5db2ffd456fc",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "072c93d575304c57ab8e8b10a7e8cf9b535fdd42",
+			"type": "tree",
+			"bytes": 544,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "dffe77ed967c06eeb081dc120912986cadd26cea",
+			"type": "blob",
+			"bytes": 12517,
+			"path_hint": "tools/ci/run-windows-personal-file-caption-cohort.cjs"
+		},
+		{
+			"oid": "306c89c0cdb00cf6b4b60a7aacd3dbe02658f51c",
+			"type": "blob",
+			"bytes": 479767,
+			"path_hint": "tools/ci/windows-personal-file-caption-cohort-inputs.json"
+		},
+		{
+			"oid": "0dfd3af06f361264cb53fa7ad336f2a1f81a8bff",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "6eac5df3f7a8b3191cbeffeba8263022d55b43dc",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "fa39f902aa229481b7fac7bae83caed5dde3ddde",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "4f190061fcc72750d340676fa3ed185256e672ac",
+			"type": "blob",
+			"bytes": 74911,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "7ea71b04f9db5215e5b9b5fd8db589bec470ec18",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "c548fa0bd8799ccd03b54e6bc2bb3f076ab1c309",
+			"type": "tree",
+			"bytes": 534,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "09eb1b8fdd6716a81137ba772f6751d55bfa96b5",
+			"type": "blob",
+			"bytes": 10627,
+			"path_hint": "tools/ci/run-windows-global-restore-original.cjs"
+		},
+		{
+			"oid": "bc158261520719bd984a0cf8242482ff7693941f",
+			"type": "blob",
+			"bytes": 476016,
+			"path_hint": "tools/ci/windows-global-restore-original-inputs.json"
+		},
+		{
+			"oid": "600938ce6547430f001751bb5d60f3bd52a5aef4",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "5b22e1c9655c788ad24ebf941ec8a669469cc589",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "2bdfbc9f103ea0fc82f7446822a69b1bb63277b1",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "b06b89597e1a6e74fef586662acb7c2d94f05f01",
+			"type": "blob",
+			"bytes": 74952,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "693ec4b174fe478881a20d22f020e16b9cabaa71",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "60ce58798b0b5fdb03831de5785387ecbc466847",
+			"type": "tree",
+			"bytes": 552,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "8ad0bd74494cfcab511eb255bfa47f5859c29cee",
+			"type": "blob",
+			"bytes": 12402,
+			"path_hint": "tools/ci/run-windows-extension-observed-result-cohort.cjs"
+		},
+		{
+			"oid": "bf6e92e881a93a863e5ed2a43684db4d47569fee",
+			"type": "blob",
+			"bytes": 286201,
+			"path_hint": "tools/ci/windows-extension-observed-result-cohort-inputs.json"
+		},
+		{
+			"oid": "abb810467532f9de563f6403d5a6c335f29c6be6",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "9a6583ae6ce4b5a3a5df491bb915114993d4f993",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "80e8f56123427cbd6b2f7e87cc3fdbe7e6c23550",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "09108a2c744e3a71ecbf1c499ce47640d6ddc1ce",
+			"type": "blob",
+			"bytes": 74945,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "c6f480be5d8b73405fc3f826339a22fa0b1ddfa4",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "0961d36c35598ef7659fea94f37d38338b61e1bc",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "cf139a22f82192bfcb9b354298dff138c517b94c",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "0675d30c1d01fc8ee292693650337029f83c6d6a",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "fd0e3482f9d943f2d7778c32d52caaa7948e3f3a",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "860d1feeda94e911bcc457cb3031f0519c06a805",
+			"type": "blob",
+			"bytes": 35424,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_hotstrings_scope.ahk"
+		},
+		{
+			"oid": "62d0c1e88b76343e6e61aed579650b42a891a74e",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "187df2fc1434859cfe00d32af19bee205c65bd77",
+			"type": "tree",
+			"bytes": 542,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "7c8fd82c6bcd3faefe24b0ca1457cb58cddebef2",
+			"type": "blob",
+			"bytes": 10452,
+			"path_hint": "tools/ci/run-windows-string-factory-nested-facts.cjs"
+		},
+		{
+			"oid": "c97f277f3d8feb674f38eaa7c7d2cc09ff1fedad",
+			"type": "blob",
+			"bytes": 282423,
+			"path_hint": "tools/ci/windows-string-factory-nested-facts-inputs.json"
+		},
+		{
+			"oid": "dc8fbddcc78acb275cb60fd7aa5c883feb9f4947",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "6ca962307c5690fae11d4476812ca3c39ecedc13",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "fa2a51ab10c5e2e293f24460442b34fdc3bc7c03",
+			"type": "tree",
+			"bytes": 552,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "b413dc5e89d87b70631c84b75a46215734de414c",
+			"type": "blob",
+			"bytes": 9856,
+			"path_hint": "tools/ci/run-windows-extension-observed-result-cohort.cjs"
+		},
+		{
+			"oid": "4151f166230e4c60bdba45c5fd8dea2d10e4f275",
+			"type": "blob",
+			"bytes": 284180,
+			"path_hint": "tools/ci/windows-extension-observed-result-cohort-inputs.json"
+		},
+		{
+			"oid": "3ac3d698847ca77eed8b522f35abee613b5cb378",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "949c8b215b494092f10c8a28ca82d36d71077880",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "deef421b368887fa5690c4b815f5bff6be9d431e",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "c161f7de3d76061e6b436f20871694f80fcf3e18",
+			"type": "blob",
+			"bytes": 74906,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "fb38c4d96ee20e2fd33b37ff68c5c0f0ba9a18e8",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "02aa89abc066c95011c98f4d96f0dbbca008afb3",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "e00630856b0532b5c0702f919033fd4616297350",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "949109fb582bfe266d760be629cf548d0bedb345",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "a61938927d3caf8e57822a486dcee253a1de00b0",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "372bf2272afb6b8851a1c1d7f543c052079c4c7c",
+			"type": "blob",
+			"bytes": 34367,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_hotstrings_scope.ahk"
+		},
+		{
+			"oid": "a6d1c839881a8185be96bf27c073bd7a0e495edb",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "5cd51ae8adb2acfef7f5d3adfce9a128c348619c",
+			"type": "tree",
+			"bytes": 530,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "62bac3b11ff2468ea44e5abc34fcf577097aa276",
+			"type": "blob",
+			"bytes": 10419,
+			"path_hint": "tools/ci/run-windows-config-authority-cost.cjs"
+		},
+		{
+			"oid": "3fec9251a37e423c30d704bb74a0596117ad59df",
+			"type": "blob",
+			"bytes": 282388,
+			"path_hint": "tools/ci/windows-config-authority-cost-inputs.json"
+		},
+		{
+			"oid": "26293323487c82cecbdde0ae68b1112cf454136e",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "a9aaa539cc1ffff09593904a3095cc5b022cd6b7",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "4fc0a7f580d329646a89a75b24244f2bdca361b0",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "90c872ac23dcf9a7ea193c1c486bb7ccfae3a12f",
+			"type": "blob",
+			"bytes": 74838,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "4d347cd07d95ca5731dbcf6e7b11e4d3e0b3b76e",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "64af6e8f8db2eadb24bf67a833449e6d9d385990",
+			"type": "tree",
+			"bytes": 532,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "8bf6706fc800fc643b3d006af330023518916011",
+			"type": "blob",
+			"bytes": 10412,
+			"path_hint": "tools/ci/run-windows-bootstrap-owner-cohort.cjs"
+		},
+		{
+			"oid": "afd728ddb7d951d8e4885a5a7a705757e040329d",
+			"type": "blob",
+			"bytes": 289805,
+			"path_hint": "tools/ci/windows-bootstrap-owner-cohort-inputs.json"
+		},
+		{
+			"oid": "9364ad305de0b692cf22c0d7bd720471c512dade",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "8c7701400cd8b6d8078408eaa0727ee8fe804874",
+			"type": "tree",
+			"bytes": 207,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "3fbe0e1c9045f400e696f722fa5ab93ea214483f",
+			"type": "tree",
+			"bytes": 689,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "f8661429dd321795853cece6416d677aa0036527",
+			"type": "blob",
+			"bytes": 74842,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "fd8ddc3d442a20769b6dcae59e7c82decc9293b5",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "938eb42cdbbd1615a1d59bdcd2d3136f2ce2ba99",
+			"type": "tree",
+			"bytes": 532,
+			"path_hint": "tools/ci"
+		},
+		{
+			"oid": "2ba36c1075e02bed0d5ddf03fbbfdf036a4b12b6",
+			"type": "blob",
+			"bytes": 8253,
+			"path_hint": "tools/ci/run-windows-gesture-restart-cohort.cjs"
+		},
+		{
+			"oid": "512ac2ed6e1160829323217b881f5e5d294da7d9",
+			"type": "blob",
+			"bytes": 2358,
+			"path_hint": "tools/ci/windows-gesture-restart-cohort-inputs.json"
+		},
+		{
+			"oid": "b92aaa50a74def100e8a22d27835d00133243a50",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "71b301b7d1f66bee07a5b3f5bab967ccd02737f0",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "a7edd9df8f6d6bf500d96684511fb26f5fcc26ad",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "024c4bf8b054547beda8dbd8e85d0de12be98bf6",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "5eab45d343f399979406ab19bb368644411aac22",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "48038d0ff299c4943d575ca085a95cbd3e682c07",
+			"type": "tree",
+			"bytes": 39449,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "4d6ef887de03dac4e8c93630859352a7db0e87a2",
+			"type": "blob",
+			"bytes": 48244,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk"
+		},
+		{
+			"oid": "ff5c175e2ad26b7e6af793653b463e97cbf033ee",
+			"type": "blob",
+			"bytes": 12195,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_global_config_scope.ahk"
+		},
+		{
+			"oid": "f2a8868aaebdb44fea5b523ad0e3bb64f947b322",
+			"type": "blob",
+			"bytes": 22231,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_hotstrings_scope.ahk"
+		},
+		{
+			"oid": "e5ec5e3b14efaa3128f68b4978c79bc955261b98",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "4f5e23be8b29bc2430599ad2c5c4da70ab2e79e0",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "c2fdb209e03d89eccca36b75c4f1c4f18c8a3e70",
+			"type": "blob",
+			"bytes": 933885,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "5e3955ec9ead88666f63b081397bdcc7edf3cb55",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "8aff580f31910063d3dd2f475898aa4398224c5a",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "555033951ab98ac8e4842d1296f894d006a3eced",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "2611a6d03d9eeec7e1f29c2e53bff0c6e46bd514",
+			"type": "tree",
+			"bytes": 625,
+			"path_hint": "static/ergopti_plus/_shared/modules"
+		},
+		{
+			"oid": "946b6f84e8b3c0265e7d0f63e4dffdaa461dc26c",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "f317651c08d7381cd8d5710f4ce35dd584568867",
+			"type": "tree",
+			"bytes": 31251,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "d6c9db66c666cefa8d6f78b8838a09313102230c",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "0b5c9470d2c4321acabfeb24a24823516a8b4610",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "5598ca4805aec63f47119a3c3115366392299fac",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "18ee2468d9d6757148c1f6936294217bca666bd1",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "69200998fe1d57b067fb6e35734b4ede99f5d376",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "b930a982881087529df029da57cdfaed24a09ff2",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "5bc405a65ac4bb7ad49fb595fe2897fdf06cd278",
+			"type": "tree",
+			"bytes": 3844,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui"
+		},
+		{
+			"oid": "ae3077de7fa9f377781158a00cd6f72dbb9f373c",
+			"type": "blob",
+			"bytes": 14036,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui/test_menu_languages_and_global_separator.lua"
+		},
+		{
+			"oid": "40cb0f17990d408a5f6a134f372d7ef0e62374c5",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "e09b2bb0a4e03bcd2163dfd292ad8d7a612ac49f",
+			"type": "tree",
+			"bytes": 31251,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "3a4578fc2bbc3ab927caed1ebe801492b4bd4528",
+			"type": "tree",
+			"bytes": 1388,
+			"path_hint": ""
+		},
+		{
+			"oid": "eae992a4daf1ca97f117bb3bd7d6821c84156437",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "fe39b0076fbb832012c6951e2dbb729e1b3d8579",
+			"type": "blob",
+			"bytes": 925837,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "8086ba3797a1057ff752891f81d25b91d50a399d",
+			"type": "tree",
+			"bytes": 378,
+			"path_hint": "static"
+		},
+		{
+			"oid": "4268efcd310a698b9f2c19715bcbc2a2f64b8a95",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "083839f91a5bd75578e84dcff8d3855a2f149b5f",
+			"type": "tree",
+			"bytes": 450,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "f76a8fe1ba9282bd72f768812af59569b934235f",
+			"type": "tree",
+			"bytes": 3465,
+			"path_hint": "static/ergopti_plus/_shared/lua"
+		},
+		{
+			"oid": "fa13fb3b3ae85b49abce5217dd2db3768ad9893a",
+			"type": "tree",
+			"bytes": 547,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "c09bceba0d7a8e1a52a8685c2ca1e702693a8125",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "b4fd590a78ac194f99a32169d2486d449d9db920",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "aed2b7efee1a1601bb4015876fbf37e088b0ae10",
+			"type": "tree",
+			"bytes": 12387,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "519eea700ff2bdc1b1a826c784ffd98667871604",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "96ab5430f1e59880e2d6d76dd17b2a2d990627be",
+			"type": "tree",
+			"bytes": 31186,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "d530405fb24d2ffa8ff444a91fda8a97666b80fc",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "26a715d1f14352b3ecdbb5547f4e179b2f59d001",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "976d02623731067bedd95aa4b15dab7a3838cdcb",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "0381365c76e4a2f79375eb6667704828083feaab",
+			"type": "tree",
+			"bytes": 355,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "67065613778c8ac3f59c0b3a1e6c5886b5bf3e5d",
+			"type": "tree",
+			"bytes": 465,
+			"path_hint": "static/ergopti_plus/_shared/data"
+		},
+		{
+			"oid": "5a9c5a1f4865079fc9bbc7b07e94599674629f53",
+			"type": "tree",
+			"bytes": 735,
+			"path_hint": "static/ergopti_plus/_shared/data/locales"
+		},
+		{
+			"oid": "760090fda6ef4ed82ed3aecd190ef16721bcb8d9",
+			"type": "blob",
+			"bytes": 277536,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/ar.json"
+		},
+		{
+			"oid": "4ac194022b3ac0fb2a318d149e47363f94e7e553",
+			"type": "blob",
+			"bytes": 235089,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/cs.json"
+		},
+		{
+			"oid": "b67f03f9fce5fcae2b7143d9c6dbef51700a094b",
+			"type": "blob",
+			"bytes": 227631,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/da.json"
+		},
+		{
+			"oid": "64c3e297c2e14463834d5bc720739f71d15bda7d",
+			"type": "blob",
+			"bytes": 239287,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/de.json"
+		},
+		{
+			"oid": "ae75faf3bed4584c32227167a69e4cf0a94b9b52",
+			"type": "blob",
+			"bytes": 221673,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/en.json"
+		},
+		{
+			"oid": "7d854c01e44d17fcd047f73b39d1b28adefc5cc8",
+			"type": "blob",
+			"bytes": 236944,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/es.json"
+		},
+		{
+			"oid": "3e4ec7eb3e903508cce647f530adec97e15cfa6d",
+			"type": "blob",
+			"bytes": 243001,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/fr.json"
+		},
+		{
+			"oid": "f6a24386a510ef77e6fb31a5c8052c54de99419b",
+			"type": "blob",
+			"bytes": 258635,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/he.json"
+		},
+		{
+			"oid": "96f09eb5010b93ae603a5a3972badaccb2fdc0d5",
+			"type": "blob",
+			"bytes": 356574,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/hi.json"
+		},
+		{
+			"oid": "0c468f4a6cbfaf91411e02959a24d49362a9cdfd",
+			"type": "blob",
+			"bytes": 236334,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/it.json"
+		},
+		{
+			"oid": "07a278a1c63dc07d0a6a2c7131fc43c42cf6548d",
+			"type": "blob",
+			"bytes": 265038,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/ja.json"
+		},
+		{
+			"oid": "d9fe709679145006aa0629341525de9d1406068a",
+			"type": "blob",
+			"bytes": 242530,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/ko.json"
+		},
+		{
+			"oid": "8b58f322547e4c58ecc3ab0bc67dcf40febb88dd",
+			"type": "blob",
+			"bytes": 233562,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/nl.json"
+		},
+		{
+			"oid": "a3d423429f7da556b0086a63372f1adf661fff2e",
+			"type": "blob",
+			"bytes": 227557,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/no.json"
+		},
+		{
+			"oid": "87bd6fc4d1fc61f55e6a4477e391cf80a72656be",
+			"type": "blob",
+			"bytes": 236606,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/pl.json"
+		},
+		{
+			"oid": "8414323a213289d3b7c8d42eea864d1eba546b9f",
+			"type": "blob",
+			"bytes": 236811,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/pt.json"
+		},
+		{
+			"oid": "0b1c9ad6ec611a784cfdf33894a3120e5c414a79",
+			"type": "blob",
+			"bytes": 308352,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/ru.json"
+		},
+		{
+			"oid": "a409b3a798015c0cc23f7c183d4cbed9ddd9b6c7",
+			"type": "blob",
+			"bytes": 231355,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/sv.json"
+		},
+		{
+			"oid": "001a90f5eec79d251ec50e8e91bf0d85a806cbf6",
+			"type": "blob",
+			"bytes": 235774,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/tr.json"
+		},
+		{
+			"oid": "bc22e4ab20a5e310bc2c103eb51efb493a7dda04",
+			"type": "blob",
+			"bytes": 305319,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/uk.json"
+		},
+		{
+			"oid": "98826aaf8e48ea43ec394ac10d6ce4d7f8997eef",
+			"type": "blob",
+			"bytes": 217404,
+			"path_hint": "static/ergopti_plus/_shared/data/locales/zh.json"
+		},
+		{
+			"oid": "ea3476a53f3af36a55bbb8c6171fa0e878c55bbf",
+			"type": "tree",
+			"bytes": 3291,
+			"path_hint": "static/ergopti_plus/_shared/lua"
+		},
+		{
+			"oid": "5fe1c23eabc4770dc273781aba9e5c68ed810972",
+			"type": "tree",
+			"bytes": 315,
+			"path_hint": "static/ergopti_plus/_shared/lua/menu"
+		},
+		{
+			"oid": "b724b6015616da76f2661aaa1f776150a4a6e11a",
+			"type": "blob",
+			"bytes": 89701,
+			"path_hint": "static/ergopti_plus/_shared/lua/menu/renderer.lua"
+		},
+		{
+			"oid": "5d8cccffd5080a851f2e2204bd50749d49fc9a71",
+			"type": "tree",
+			"bytes": 625,
+			"path_hint": "static/ergopti_plus/_shared/modules"
+		},
+		{
+			"oid": "e9a73c6fa5aa5b1336456a56c04e54d3ca811f2d",
+			"type": "tree",
+			"bytes": 314,
+			"path_hint": "static/ergopti_plus/_shared/modules/features"
+		},
+		{
+			"oid": "51c4d4258b762fadb9a0519b74923a19ad240b09",
+			"type": "blob",
+			"bytes": 282550,
+			"path_hint": "static/ergopti_plus/_shared/modules/features/manifest.toml"
+		},
+		{
+			"oid": "70f12d1550cf9d1fe17e96358041562409c95b34",
+			"type": "tree",
+			"bytes": 83,
+			"path_hint": "static/ergopti_plus/_shared/modules/menu"
+		},
+		{
+			"oid": "c9573ca633d8cb367aaa014b08dde791377e5b3b",
+			"type": "blob",
+			"bytes": 128226,
+			"path_hint": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json"
+		},
+		{
+			"oid": "5b9c9039402609b04b40ef2618224ea22241ea31",
+			"type": "tree",
+			"bytes": 106,
+			"path_hint": "static/ergopti_plus/_shared/tests"
+		},
+		{
+			"oid": "bf486225a7f2ff18ca7676b6a4b18f78f6d7c50d",
+			"type": "tree",
+			"bytes": 1560,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus"
+		},
+		{
+			"oid": "91be47ef809105656473bf69987c84add0a69f27",
+			"type": "tree",
+			"bytes": 5127,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus"
+		},
+		{
+			"oid": "60e83d2068730d23e9055ec91590a3b1c932ae93",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "5aa8894c94793212f8b756b70727196d9ab23481",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "603d2d72ceb8c34c41108e026a8923fb3aa935d9",
+			"type": "blob",
+			"bytes": 26059,
+			"path_hint": "static/ergopti_plus/linux/tests/test_manifest.lua"
+		},
+		{
+			"oid": "69a8d289dfcfe4a620272e0d1396d46a1582fefd",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "949b671d2294ed50404c1e7c913f754e5f1398b8",
+			"type": "tree",
+			"bytes": 3791,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui"
+		},
+		{
+			"oid": "8dfb3f7f3fe3e3fbc376820a9485d24c7759d6d2",
+			"type": "tree",
+			"bytes": 1356,
+			"path_hint": "static/ergopti_plus/linux/ui"
+		},
+		{
+			"oid": "f1b821deba9968fe2ee50df9712208b1219bc736",
+			"type": "tree",
+			"bytes": 424,
+			"path_hint": "static/ergopti_plus/linux/ui/menu"
+		},
+		{
+			"oid": "3b6d78a8a06ef24fd160c94b2feaf28063482a29",
+			"type": "blob",
+			"bytes": 226425,
+			"path_hint": "static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+		},
+		{
+			"oid": "620412cecabf50f74c4f3ba56ecd4353d44140e1",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "b9d71f6322901ea09227a7c10f1da6abdadf6f02",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "8cbefed568b981166ebde031b397a2ece2251ca0",
+			"type": "tree",
+			"bytes": 5036,
+			"path_hint": "static/ergopti_plus/macos/tests/support"
+		},
+		{
+			"oid": "39f4468c33158def255c9d587159473b7ce04b6a",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "8c84e3d719491e33f04e7ed652c0d368b1fc1ec7",
+			"type": "tree",
+			"bytes": 12123,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "93116bc038334ca7bbd2e3d1940dd1e4675697bc",
+			"type": "tree",
+			"bytes": 8813,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu"
+		},
+		{
+			"oid": "bbb27a41be502a4c965887c52f374554a565324a",
+			"type": "tree",
+			"bytes": 4821,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm"
+		},
+		{
+			"oid": "12be6fa0ae531d30d52655d8db5b2a53b3aebe11",
+			"type": "tree",
+			"bytes": 1167,
+			"path_hint": "static/ergopti_plus/macos/ui"
+		},
+		{
+			"oid": "1762fb0a2128debf080f62622e6d535d41b0e08f",
+			"type": "tree",
+			"bytes": 2168,
+			"path_hint": "static/ergopti_plus/macos/ui/menu"
+		},
+		{
+			"oid": "9810d051157811bf75a7a88c555178395fc5dc17",
+			"type": "blob",
+			"bytes": 43988,
+			"path_hint": "static/ergopti_plus/macos/ui/menu/builder.lua"
+		},
+		{
+			"oid": "7377a6026c72ccbb6c94045502261b6a0eaa8bbb",
+			"type": "tree",
+			"bytes": 1676,
+			"path_hint": "static/ergopti_plus/macos/ui/menu/menu_llm"
+		},
+		{
+			"oid": "7e53d69c09e98fa7d4ffce76d344cc8ae18e06b7",
+			"type": "blob",
+			"bytes": 93334,
+			"path_hint": "static/ergopti_plus/macos/ui/menu/menu_llm/init.lua"
+		},
+		{
+			"oid": "8d2de2e101761c4a7ebe8d135b68526065d3b562",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "c7e6aba6cc9c4c9b244bb20a0d8e41da0f532c69",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "b3bf97cc2aa38857c6daba792f3291aef96222da",
+			"type": "blob",
+			"bytes": 77678,
+			"path_hint": "static/ergopti_plus/windows/infra/manifest_menu.ahk"
+		},
+		{
+			"oid": "2415cf58d936987c62c1440716088003867eb4ea",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "b0a9e21aa1c5b798aef9ea7bcf07447065197b11",
+			"type": "tree",
+			"bytes": 49360,
+			"path_hint": "static/ergopti_plus/windows/tests/meta"
+		},
+		{
+			"oid": "ef655360dec0343a6733a91d5652f834535ff116",
+			"type": "tree",
+			"bytes": 38729,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "56ad93404e932f6aef066a432f52f6f72e82c84b",
+			"type": "blob",
+			"bytes": 77890,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_manifest_menu_declarations_are_read.ahk"
+		},
+		{
+			"oid": "65f4981bf6a32068e30bffaa31d334fe4a7d16b2",
+			"type": "tree",
+			"bytes": 1168,
+			"path_hint": "static/ergopti_plus/windows/ui"
+		},
+		{
+			"oid": "8a876072e7860c900736a9c73d10745b1246b2b2",
+			"type": "tree",
+			"bytes": 665,
+			"path_hint": "static/ergopti_plus/windows/ui/menu"
+		},
+		{
+			"oid": "62eb9edb0912012c0d2ffd3b62f4fdcded9d8424",
+			"type": "tree",
+			"bytes": 795,
+			"path_hint": "static/ergopti_plus/windows/ui/menu/menu_llm"
+		},
+		{
+			"oid": "47c18fbd6f7246e4ad82ac09915f2bf5d987675e",
+			"type": "blob",
+			"bytes": 27443,
+			"path_hint": "static/ergopti_plus/windows/ui/menu/menu_llm/menu_main.ahk"
+		},
+		{
+			"oid": "c3c5785ddd966673cacb95167ebba8de13d1e587",
+			"type": "blob",
+			"bytes": 12641,
+			"path_hint": "static/ergopti_plus/windows/ui/menu/menu_submenus.ahk"
+		},
+		{
+			"oid": "510171dd6d02c91f917eda5605a6d5ad861b00a4",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "96088451ce48f61fef1d50a280b15145c9a7bae0",
+			"type": "tree",
+			"bytes": 834,
+			"path_hint": "tools/lib"
+		},
+		{
+			"oid": "c2fa2efc856301fd3f0b7d4c9364bf6ee119bef5",
+			"type": "blob",
+			"bytes": 7754,
+			"path_hint": "tools/lib/menu-native-llm-parent-binding.cjs"
+		},
+		{
+			"oid": "d64c07180bbc161cc62fc486cca67efb0e2f6750",
+			"type": "blob",
+			"bytes": 19476,
+			"path_hint": "tools/lib/menu-row-availability.cjs"
+		},
+		{
+			"oid": "9d5d25e5c76a721def5426f7c75c6c8fccf74362",
+			"type": "tree",
+			"bytes": 26748,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "6807794248e0b44a7cbea9ea00aee0427413f31e",
+			"type": "tree",
+			"bytes": 1310,
+			"path_hint": "tools/test/fixtures"
+		},
+		{
+			"oid": "c2de8b2cc4ec040b98d1e1b33f7a506d0dddff59",
+			"type": "blob",
+			"bytes": 3966,
+			"path_hint": "tools/test/native-menu-rows-baseline.json"
+		},
+		{
+			"oid": "6ec6a4541503d844765d573455b51cb96161f101",
+			"type": "blob",
+			"bytes": 93180,
+			"path_hint": "tools/test/run-js-suite.cjs"
+		},
+		{
+			"oid": "e77794cd52d0d0cd5bff80fb3675afaa66c271c4",
+			"type": "blob",
+			"bytes": 399195,
+			"path_hint": "tools/test/test-menu-manifest.cjs"
+		},
+		{
+			"oid": "11cc0eec075d2748e29545adb1215fcd9f3f105e",
+			"type": "blob",
+			"bytes": 167978,
+			"path_hint": "tools/test/test-menu-parity.cjs"
+		},
+		{
+			"oid": "03d36ca6edaccb1a9630ec686f39d54a364ca5d3",
+			"type": "blob",
+			"bytes": 9084,
+			"path_hint": "tools/test/test-native-menu-census-admission.cjs"
+		},
+		{
+			"oid": "fefabd8c57214c9f9a74b15d862d618853c660dd",
+			"type": "blob",
+			"bytes": 13658,
+			"path_hint": "tools/test/test-native-menu-rows.cjs"
+		},
+		{
+			"oid": "8f6cad89bb51a74c9b09f33c92ee7dcc2d8a8d47",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "e6b674e19623d08141f8bde1220b48f6b8370394",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "762c9bddb09a381be6c2016adac1b8e82a6d0f78",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "578d4fcd395fa057b4ad06697f48e3684978664a",
+			"type": "tree",
+			"bytes": 355,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "25aa0a5b05ad5344aad288dae6f212333dca259b",
+			"type": "tree",
+			"bytes": 625,
+			"path_hint": "static/ergopti_plus/_shared/modules"
+		},
+		{
+			"oid": "e0f6f9652f51a321e7bcd9d8efcf556a1d5ad0a2",
+			"type": "tree",
+			"bytes": 314,
+			"path_hint": "static/ergopti_plus/_shared/modules/features"
+		},
+		{
+			"oid": "2de43f8ece1b1e1b41b9a98918b9d718499c7cbc",
+			"type": "blob",
+			"bytes": 281404,
+			"path_hint": "static/ergopti_plus/_shared/modules/features/manifest.toml"
+		},
+		{
+			"oid": "d69d686730170b4bdc0e028039a741a0dd822345",
+			"type": "tree",
+			"bytes": 83,
+			"path_hint": "static/ergopti_plus/_shared/modules/menu"
+		},
+		{
+			"oid": "06c7a25a007bacf596968f322c3c70e7219a6291",
+			"type": "blob",
+			"bytes": 127084,
+			"path_hint": "static/ergopti_plus/_shared/modules/menu/menu_manifest.json"
+		},
+		{
+			"oid": "38badebad0da471f89e2217fdddc2b5b7ee8c085",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "ab21b126c70d452e7f2b1f84616b6c6a99097181",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "48c84a8707553ffac442f81f2243817c4e40a337",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "e1e0be76b2e230b890a593712c26c704e74f8e8d",
+			"type": "tree",
+			"bytes": 3723,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui"
+		},
+		{
+			"oid": "fa8bbe08d503d5daf16d7d02094327f300881b38",
+			"type": "tree",
+			"bytes": 1356,
+			"path_hint": "static/ergopti_plus/linux/ui"
+		},
+		{
+			"oid": "4c391a811a7834a156b3fc9ac3be141f2b44bd61",
+			"type": "tree",
+			"bytes": 424,
+			"path_hint": "static/ergopti_plus/linux/ui/menu"
+		},
+		{
+			"oid": "9be6c366ff37ecb93bd87e1a61182ca067ad839b",
+			"type": "blob",
+			"bytes": 225780,
+			"path_hint": "static/ergopti_plus/linux/ui/menu/menu_builder.lua"
+		},
+		{
+			"oid": "94ff44bd6c7a29e46bf56c6ec7af349a43bd2256",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "775833b878abae345c55cb699a17274f67af740b",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "2d100e31c5c8613a18c4cb5c81ae0a22acb7bed9",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "ee7f4884719bea58f6e2731a9c250886284b0f5d",
+			"type": "tree",
+			"bytes": 12123,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "fe9ad7c4df54a56dad4fd887995c61ff0f3c2dc6",
+			"type": "tree",
+			"bytes": 8745,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu"
+		},
+		{
+			"oid": "a5e290d46af0d49e96f6aeccd5cf78285e484d7c",
+			"type": "tree",
+			"bytes": 1167,
+			"path_hint": "static/ergopti_plus/macos/ui"
+		},
+		{
+			"oid": "b3c55e6057bd55944618067f5c96be52de616179",
+			"type": "tree",
+			"bytes": 2168,
+			"path_hint": "static/ergopti_plus/macos/ui/menu"
+		},
+		{
+			"oid": "350c967432e808122c7313f6e9a685a4484df3be",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "61d3c7cf2f88f5bcd6ab60de707d06558f001d94",
+			"type": "tree",
+			"bytes": 1168,
+			"path_hint": "static/ergopti_plus/windows/ui"
+		},
+		{
+			"oid": "654d9a8c044b342b9545c7849ad50d0455bd1daa",
+			"type": "tree",
+			"bytes": 665,
+			"path_hint": "static/ergopti_plus/windows/ui/menu"
+		},
+		{
+			"oid": "3ac4f5b0e6405eb445fda6223b4e7a611078aae7",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "d6afa6c1ba3a8ede24a58866840f5606608ea909",
+			"type": "tree",
+			"bytes": 834,
+			"path_hint": "tools/lib"
+		},
+		{
+			"oid": "217436a63171dba5c863f4719a096b32a118bb26",
+			"type": "tree",
+			"bytes": 26683,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "f205eb5b70dbb4ba1aa35ac531351dde4319a43d",
+			"type": "blob",
+			"bytes": 4224,
+			"path_hint": "tools/test/native-menu-rows-baseline.json"
+		},
+		{
+			"oid": "b58efab2402bd791dcd5f75f5cc8179c14cf5b75",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "eb6d45bd2814b2e2778a9e4af64834970da1bf98",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "ae3d6d6590ea2fd60d5bf5e4bac6f641ffb12038",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "6f9de6e7c81d3bd6cadf23856ebb1e7f19906037",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "6899091d3a0efaf54f848f109df538192f9a5672",
+			"type": "blob",
+			"bytes": 82274,
+			"path_hint": "static/ergopti_plus/windows/ErgoptiPlus.ahk"
+		},
+		{
+			"oid": "50415967446a182186263300b671e75f5a12ca8b",
+			"type": "tree",
+			"bytes": 1750,
+			"path_hint": "static/ergopti_plus/windows/adapters"
+		},
+		{
+			"oid": "48a27dfe96072329c65b2211ddd47166ee1a1d4b",
+			"type": "blob",
+			"bytes": 33782,
+			"path_hint": "static/ergopti_plus/windows/adapters/file_system.ahk"
+		},
+		{
+			"oid": "de48aa26be658d14bcd80c77c836b4f1591f9585",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "bedd22eb5ae8d957164743a37d5e9b5eab2708a5",
+			"type": "blob",
+			"bytes": 101042,
+			"path_hint": "static/ergopti_plus/windows/infra/config_io.ahk"
+		},
+		{
+			"oid": "4f0f9dc47960c4dbb56890997a7e42777d87defa",
+			"type": "blob",
+			"bytes": 57763,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "c3520912eecfb082e5da1c701b392899c72b0051",
+			"type": "blob",
+			"bytes": 35968,
+			"path_hint": "static/ergopti_plus/windows/infra/config_transition_runtime.ahk"
+		},
+		{
+			"oid": "d5edde379c2e7b350992bae892f5c5009c46e7ad",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "27300d089982930fad12a5d81b33a4ba42d33b97",
+			"type": "blob",
+			"bytes": 12988,
+			"path_hint": "static/ergopti_plus/windows/infra/toml/config_snapshot.ahk"
+		},
+		{
+			"oid": "256a58b675fa97962ea9bb1bc584d28ba8fb6729",
+			"type": "blob",
+			"bytes": 53101,
+			"path_hint": "static/ergopti_plus/windows/infra/toml/toml_helpers.ahk"
+		},
+		{
+			"oid": "5663c4acdc5408f7556d488b346a2d783c2cedb2",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "788ffb5e3c8f716a12aafb2ec7fe01b94241c786",
+			"type": "tree",
+			"bytes": 49360,
+			"path_hint": "static/ergopti_plus/windows/tests/meta"
+		},
+		{
+			"oid": "7b6e287663c265ddca8080482e643d9b52b14518",
+			"type": "tree",
+			"bytes": 1043,
+			"path_hint": "static/ergopti_plus/windows/tests/support"
+		},
+		{
+			"oid": "c5e9ffb95e4f8c925b834d148c1953544701e74e",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "54d7fba8c344c1847903a9a456284190aef8af51",
+			"type": "blob",
+			"bytes": 68286,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk"
+		},
+		{
+			"oid": "e395a1e67f70773e2d555364162f8ac07e49d39f",
+			"type": "blob",
+			"bytes": 68314,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk"
+		},
+		{
+			"oid": "06ff97c8229375ac5489fd76f76e635332c44fd4",
+			"type": "blob",
+			"bytes": 24495,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_transition_windows_port.ahk"
+		},
+		{
+			"oid": "2a4fa0f40ec82d624c8326b57d6e86e99ef148a6",
+			"type": "blob",
+			"bytes": 20983,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_write_terminal_barrier.ahk"
+		},
+		{
+			"oid": "51629a426bf8022bedec54df289dbde7848f89b1",
+			"type": "blob",
+			"bytes": 137187,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk"
+		},
+		{
+			"oid": "b9447866575afd2cdf87de7d7bedd353034671d1",
+			"type": "blob",
+			"bytes": 9351,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_filesystem_native_write.ahk"
+		},
+		{
+			"oid": "f01c3b4b2b5598984e76beeb917599df8f99d620",
+			"type": "blob",
+			"bytes": 21542,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_master_gates.ahk"
+		},
+		{
+			"oid": "9a3aef2fcb65fefd0d1c4fc06b4251038416dc76",
+			"type": "tree",
+			"bytes": 1168,
+			"path_hint": "static/ergopti_plus/windows/ui"
+		},
+		{
+			"oid": "f5901ec98130fd37b93ff1f0687fe15078388a59",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "f315474b586d6a608f29c09352fd54b698110d57",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "cc570f811b67020ee2d99949728729b8fb4e51ac",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "9d52569b54d9caee6b083ff70394c8cb93238d96",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "3a61f5042f8b91971600c81c4e9369eb2471fe00",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "7c3ab819c760c8e82da5c803667677773ef5a884",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "f0fd3f5ec2905f7c3e3092a85340cbbdb40d5bb8",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "dfe9c39da434c26c6b78645f4f2421128d2cce5f",
+			"type": "blob",
+			"bytes": 58102,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_llm_menu_backend_model_labels.ahk"
+		},
+		{
+			"oid": "c23754129741f2541420d73e1dcf679ae315a31b",
+			"type": "blob",
+			"bytes": 32200,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_llm_menu_build_submenu.ahk"
+		},
+		{
+			"oid": "2c4c26ed20f3d4f0906326f3e8573a3e7e1c5212",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "4ee458f3262a58ddca4a099da3c2e755babdc6e9",
+			"type": "tree",
+			"bytes": 26552,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "32a0c59ff770cf8f5494df7c7663c7ee606410d7",
+			"type": "blob",
+			"bytes": 396999,
+			"path_hint": "tools/test/test-menu-manifest.cjs"
+		},
+		{
+			"oid": "0fcc4424658c9f994378b1a6c499485146ec6393",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "d4a104092bfd82f3ed1de257de529261f3e96aa7",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "d8c5e6be5bf16fb4bb3442b9eeb98c74ecf8585a",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "b5714446168087e2f41305ede027aa51da42fea9",
+			"type": "tree",
+			"bytes": 355,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "069cfe6bc829051b6ae4ba3da80c43170ce9ffe3",
+			"type": "tree",
+			"bytes": 106,
+			"path_hint": "static/ergopti_plus/_shared/tests"
+		},
+		{
+			"oid": "5f25677ce55cef8f9d12257a9b339fcef48fd6ae",
+			"type": "tree",
+			"bytes": 1560,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus"
+		},
+		{
+			"oid": "dc01f2609487a3256e60dc9492eb9920883c3c99",
+			"type": "tree",
+			"bytes": 5127,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus"
+		},
+		{
+			"oid": "341972362f6b47f860015234453be0de47ea6a4e",
+			"type": "blob",
+			"bytes": 7745,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus/linux_about_parent.json"
+		},
+		{
+			"oid": "530584957f6194f696733b7945d0638df94cb034",
+			"type": "blob",
+			"bytes": 14199,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus/windows_backend_child_captions.json"
+		},
+		{
+			"oid": "57138d90588857d7c7c17a980c620965dbc77f94",
+			"type": "blob",
+			"bytes": 10215,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus/windows_llm_backend_parent_captions.json"
+		},
+		{
+			"oid": "ed1b44c94181e143750d0f75c3da0158a1d197a5",
+			"type": "blob",
+			"bytes": 4384,
+			"path_hint": "static/ergopti_plus/_shared/tests/corpus/menus/windows_llm_profile_parent_captions.json"
+		},
+		{
+			"oid": "487fc1f232748ce5818e7b8210952802d7f0d834",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "f92a29bad5ef54a1006f7f446b2ebc3901425580",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "6d28f547ff75284b14b7195bb7eac9db8e8cc64c",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "6dca6bda2a320c9e987d2e02fc33523ac5a50929",
+			"type": "tree",
+			"bytes": 3723,
+			"path_hint": "static/ergopti_plus/linux/tests/unit/ui"
+		},
+		{
+			"oid": "33b9c5e94a3e16c4c074a677326e19266ed2a25e",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "0316c785c0b26d8430d645abb7663efb2b6c11e6",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "3a5e556848cfd1c7442ad64f6fb469ddfb7e8076",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "43cb1d1eeb968c2e87da240b9b6a9e8f8aa7001f",
+			"type": "tree",
+			"bytes": 12123,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui"
+		},
+		{
+			"oid": "0b117cccd8cbba399c4b0d209065620d3137337c",
+			"type": "tree",
+			"bytes": 8745,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu"
+		},
+		{
+			"oid": "ea57a5bad87b5e45553f0cc774bfc4120df34261",
+			"type": "tree",
+			"bytes": 4821,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm"
+		},
+		{
+			"oid": "c37204f200c673fa74522c8d0edd7b47d414df8e",
+			"type": "blob",
+			"bytes": 21927,
+			"path_hint": "static/ergopti_plus/macos/tests/unit/ui/menu/menu_llm/test_llm_menu_toggle_row.lua"
+		},
+		{
+			"oid": "395bcf4699377a231e8a24db59867d6221a14238",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "f7f1efa71ceff7505ad61e9eba7bf574c7f5b901",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "687e905478ca58c1dad376062f1ed9796e48bd79",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "4e94ff1546d811a8d9b41bf1f61f6426729697de",
+			"type": "blob",
+			"bytes": 58053,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_llm_menu_backend_model_labels.ahk"
+		},
+		{
+			"oid": "2b64866104cd9f777b7ff42ff73803e9aab93552",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "44a5807a3d37fa2482ded5c4980863ca03945b29",
+			"type": "tree",
+			"bytes": 834,
+			"path_hint": "tools/lib"
+		},
+		{
+			"oid": "53d84ca943f7fbcaaeef57747c193a370b46786a",
+			"type": "blob",
+			"bytes": 7476,
+			"path_hint": "tools/lib/menu-native-llm-parent-binding.cjs"
+		},
+		{
+			"oid": "847d3b1804b843e0fbbbe650670c0f12cda22b2c",
+			"type": "tree",
+			"bytes": 26429,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "44b625c14f94ce005adc29a8d82c98225a92e328",
+			"type": "blob",
+			"bytes": 395970,
+			"path_hint": "tools/test/test-menu-manifest.cjs"
+		},
+		{
+			"oid": "65225282109a79adb8c61788cf2df985db46cb71",
+			"type": "blob",
+			"bytes": 167320,
+			"path_hint": "tools/test/test-menu-parity.cjs"
+		},
+		{
+			"oid": "d614eb1eaa04925bef9895f547c7aaed0b1cebfe",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "52456da682d5d41fa907af01cc6f3ab48189f315",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "025f6f4c606fb349f321f84955d842bc573611bc",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "22be689f84599000b332cf72d0f66f73383ea1f6",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "52f82e02eac28a97341cde6ccaf757d816ff29ef",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "459f1277e8c860ef5a8fb96e3d1e14c0d5b85834",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "8ecc4c462b5ec646a2466d43938340804f3308bc",
+			"type": "blob",
+			"bytes": 66508,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk"
+		},
+		{
+			"oid": "f65500b14905825d50d9d7e5712861a11257fb46",
+			"type": "blob",
+			"bytes": 136635,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk"
+		},
+		{
+			"oid": "60ea3272c093d8450ba6d2e8dfdf659c3bcc01f9",
+			"type": "blob",
+			"bytes": 120685,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_llm_menu_transactions_20260813.ahk"
+		},
+		{
+			"oid": "29a00e45b32fbf086b4220f4607df04026ef0423",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "c00a81003842e072f8b2c9690fd5aaecfd02d8bc",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "e7728b6a7e0ec4dfacca53e936c61a6ffb88dd62",
+			"type": "blob",
+			"bytes": 807186,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "0698f371320d872c1e4a34190b4b81346b88c9c0",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "0743dcb16b8c77d989562b9578e690614dae6b81",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "c9d9264afc33d301a381f7e9d939aa1e4c134b06",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "a53ed0dee1bde66445c4a2f1c14e86d28ae847d0",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "2744aef6d5dd1d876988fbb57537584ca8ed4b65",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "da046d0693ae770e1a84d3593400674a262f5a88",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "cc21cd8a7cd3f8282d29186f30e5ba3ddd6240e9",
+			"type": "tree",
+			"bytes": 26429,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "226529bf8162f98794a68acd84c7ab25d7d986a8",
+			"type": "blob",
+			"bytes": 366123,
+			"path_hint": "tools/test/test-menu-manifest.cjs"
+		},
+		{
+			"oid": "9358deefa74e8ac886ffaa2b70bd5cbdc3ef57ed",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "5b9d9708d8b0c77f9e4645a81ebd804d8ef341b0",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "62d4d77285a9eddd815cb5dd0c2f4c9f9cca560d",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "f7a7ddfb140b9a6cc2fbffa565f5e623445527b3",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "6d69eacb16d757e293114c26151782cbb45793de",
+			"type": "tree",
+			"bytes": 1750,
+			"path_hint": "static/ergopti_plus/windows/adapters"
+		},
+		{
+			"oid": "e787fd21494c3d8184ef4eb88530bf37727df077",
+			"type": "blob",
+			"bytes": 33519,
+			"path_hint": "static/ergopti_plus/windows/adapters/file_system.ahk"
+		},
+		{
+			"oid": "81f000957c933e08935adf55d53012dc824af786",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "61d598308d20ca5748ea227e063e32f4950cfd52",
+			"type": "blob",
+			"bytes": 55840,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "d62ed925152a7da81cae1f761212bbb0f370161d",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "081ca0893d5c53f1d672e554931a8a65e76a967f",
+			"type": "blob",
+			"bytes": 12573,
+			"path_hint": "static/ergopti_plus/windows/infra/toml/config_snapshot.ahk"
+		},
+		{
+			"oid": "2dcaccaaa07bb82056091f1fb8f90967f148b7c7",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "be97961425e243c545c12cb5f07b0c42a2742ca9",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "c0db915d8930bb12817e3e992d23c83122e353d1",
+			"type": "blob",
+			"bytes": 62302,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_full_save_generation.ahk"
+		},
+		{
+			"oid": "ab5337ccd478cf9e369c63b808b749576951c97a",
+			"type": "blob",
+			"bytes": 133627,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk"
+		},
+		{
+			"oid": "6bee85c4ceee1c9679f559544789a17044973a87",
+			"type": "tree",
+			"bytes": 1168,
+			"path_hint": "static/ergopti_plus/windows/ui"
+		},
+		{
+			"oid": "d6fecc840f75ce179242c497903c1912e4047025",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "c8173ef07b3f221e0fbfedd95a0b3e5f9a8e4756",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "318fd7ed2180a041ff403e9f998f25a82d3524f4",
+			"type": "blob",
+			"bytes": 807230,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "b6240b35b42e29daae8d3283f89d241b0ef3df2c",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "150e926d0dbdbd4fcab76140c2c51bbe1c495636",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "b40aaef67974f945a2f4213e3bb78d1b6abee522",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "a202c86b9d9e5b7330da2d7515b471a9d50f4992",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "752b40c8704fa3f368805ee15611f8a8d9f36a5c",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "060a0072dc8370dfc3dd274554b34fa01cbc6c65",
+			"type": "tree",
+			"bytes": 1356,
+			"path_hint": "static/ergopti_plus/linux/ui"
+		},
+		{
+			"oid": "f746f8cd740cde5390880026b9c6a78f13de98b7",
+			"type": "tree",
+			"bytes": 424,
+			"path_hint": "static/ergopti_plus/linux/ui/menu"
+		},
+		{
+			"oid": "cd74b7399fc7ca0b7cf4f0c66d8d798606c88dd5",
+			"type": "blob",
+			"bytes": 11774,
+			"path_hint": "static/ergopti_plus/linux/ui/menu/agent_rows.lua"
+		},
+		{
+			"oid": "b1e31ec3e941e87c6bc5243188d4792b05a2a326",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "bb54e36e566219cabc9a08dd2953fa390629f348",
+			"type": "tree",
+			"bytes": 1167,
+			"path_hint": "static/ergopti_plus/macos/ui"
+		},
+		{
+			"oid": "8811cda06d2ebd5e80c933e162591e5c5f9b9c79",
+			"type": "tree",
+			"bytes": 2168,
+			"path_hint": "static/ergopti_plus/macos/ui/menu"
+		},
+		{
+			"oid": "8aaa49cdb205469bfcd6b8baede59773abf559ca",
+			"type": "tree",
+			"bytes": 1676,
+			"path_hint": "static/ergopti_plus/macos/ui/menu/menu_llm"
+		},
+		{
+			"oid": "e42395e4d9f4c612199d9997faa2695593af2d8b",
+			"type": "blob",
+			"bytes": 19547,
+			"path_hint": "static/ergopti_plus/macos/ui/menu/menu_llm/agent_panel.lua"
+		},
+		{
+			"oid": "9a263b2a4c189e297f5d35eeef97c01f73d3f351",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "869ed8b2575974cc1c4fb1c756b975b938ae1eec",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "8682410507383833be71d941c4dd955d34bb7695",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "15bab8c4019bd397e27b43c9e3f0d717c546bf93",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "45c098b052d9754d8d2e94ffab9bdbdbd155ce56",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "569ecaa71d1e1ab0004e0ff6a38e060d570faaa5",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "9c2dac97f8fec22ea9e557c6f6e8aee8a92abb29",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "99a582cbb56cb6861a285224df1909eb1cfcb754",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "4fe2842d09ee52e048c92bf28c2ae12a4f0b9da2",
+			"type": "blob",
+			"bytes": 801784,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "420e9d045fb9fc7976fd38098c3212c95de1dd1c",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "103f5857f0212db5c32546288140e4745f373c53",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "9dbaca1dce39e6fb896e89ea18261934c255ee65",
+			"type": "tree",
+			"bytes": 355,
+			"path_hint": "static/ergopti_plus/_shared"
+		},
+		{
+			"oid": "3c760ce2d49d0473561f2b158cb39c02bd14b141",
+			"type": "tree",
+			"bytes": 465,
+			"path_hint": "static/ergopti_plus/_shared/data"
+		},
+		{
+			"oid": "a49ed1dd58a11ed95792ac83076ab7a66b5eaa7f",
+			"type": "tree",
+			"bytes": 3291,
+			"path_hint": "static/ergopti_plus/_shared/lua"
+		},
+		{
+			"oid": "2bc6b30e9bc8b8387f70b0ebfdea99860932e862",
+			"type": "tree",
+			"bytes": 5582,
+			"path_hint": "static/ergopti_plus/_shared/lua/test"
+		},
+		{
+			"oid": "b3dd5acbcc71042c15c047abc22c40d1f5459da4",
+			"type": "tree",
+			"bytes": 625,
+			"path_hint": "static/ergopti_plus/_shared/modules"
+		},
+		{
+			"oid": "f0a39d2a14689cd5fe8d095b98de2dc48223d0d7",
+			"type": "tree",
+			"bytes": 622,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "25c214a96095d8a32c241d08fbb89c59f4bc56ae",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "f8bd5f53203827bcf6bf3672c3c2ad58fd659427",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "dfd60852f22bce35c281a3e7a539eb3e9ce3a4c1",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "f289f0ffb5c3d3ed838c7c4a82ec67ece3ad7542",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "43ea048cc9e39a9393fe99899c9fdf89200f758d",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "90975ffb67edd1a87db5810fadf16c72a11e21c3",
+			"type": "tree",
+			"bytes": 26112,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "0bf797c46fe3a2ec479a19e00e4c50ff176821b1",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "df78ca69cefd334ec0fd0dd831d7037c8828b2ab",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "39eeb31fc83008eb183e005baef0a48e2e23846d",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "fbec700744cbfde61be69d8779fe113dd1ae23d0",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "a3d15d0f8608166577bd7814f8457c1f018f2231",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "899d55fb87a79f1ab875db757d0a2a30e26239c4",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "7a59b6af147f322400cafa86251219e904fbef64",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "6ba0da9be07fe1bdb929df9965625a3c0225b46f",
+			"type": "blob",
+			"bytes": 37635,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk"
+		},
+		{
+			"oid": "884813cca2c24d1bab6257c27f5fdbfe081a5e6b",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "b55f41188e1cdfa3ee507709523e5eceb37a0e14",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "4d45f30bf2d8946854cda46c48a6dc1bc8f93af4",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "862f10a238cb43c0d4e5599f137ce6a456fb17d0",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "ad0d1fffcd402b6d22a3d7d79f580ba9e3aa3712",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "745466d861827c5586b04a9947b2548bc977056c",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "9d055e463e49f475c0835b2abcd2f09ea639ccff",
+			"type": "blob",
+			"bytes": 67892,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_manifest_menu_declarations_are_read.ahk"
+		},
+		{
+			"oid": "abaaae0d09bc36991d2e19987eb1053832b92c1f",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "f0a05c88e69b15c039908eecc3bad345623b0cac",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "e0f513d8d0ae798fe23cdc9a9630d600c23918d5",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "c3589ef0191fe3f4eae0d3914fc89eb71bcfe98e",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "3b0b523f2de1108ba9af4ee538d100290ca569a4",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "f755ffce9418afbf36cbc09556fb75b011d7c6bc",
+			"type": "blob",
+			"bytes": 16325,
+			"path_hint": "static/ergopti_plus/windows/infra/config_write_lease.ahk"
+		},
+		{
+			"oid": "00fea82c716006348984efe300404e325623a46a",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "58257e95509f7a0724f64c08160d97ebf047492e",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "618d02f3b228912d7471b04261ce87a126ee08a7",
+			"type": "blob",
+			"bytes": 18144,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_write_terminal_barrier.ahk"
+		},
+		{
+			"oid": "65130f4e25547a3edad0dc8e8160014b4b0c1e70",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "08dcb6c32a25b679721e3fdf723987f17c451bc4",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "d149f057532bc2289a211b25e61a55ccf61f9677",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "fa7f2141aca5c3632e0816180b2f45bbceb8d107",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "d66344d85cc153d225870402726304632bd8694c",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "5addc0bbc9e1257b717b1817c2a670e3696382fd",
+			"type": "blob",
+			"bytes": 55551,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "36f5e6cacbf6ce5c927fdfe9a24f5e08c815a62e",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "62e26dc1fee5f445bd29c15f868bff59749022cc",
+			"type": "tree",
+			"bytes": 38666,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "f495a6479d13c2407d73787b90fc8cafab1be10c",
+			"type": "blob",
+			"bytes": 67166,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_config_migrate.ahk"
+		},
+		{
+			"oid": "6246799384fb84ad84800cba924949b4731b4a10",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "646ca55452c842c3dc21b01c1bfd6fe00e7e45fc",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "789267a24def4a21488223ffe83b26211b36d1a8",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "99940391f84001c138e2f9769e23b4d1c73a1d85",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "5117d8ecdeb49d80554768deddb3cc5e3b9cbbed",
+			"type": "tree",
+			"bytes": 4078,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "f32fdef4ffc47935d728dfb2f7850ae55238f18d",
+			"type": "blob",
+			"bytes": 55535,
+			"path_hint": "static/ergopti_plus/windows/infra/config_migrate.ahk"
+		},
+		{
+			"oid": "c132106d8caaa980d5f3b8504cdea7708bbf93ad",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "19f7c9b57377134d2f906d095cd9fc5c669b65d1",
+			"type": "tree",
+			"bytes": 49360,
+			"path_hint": "static/ergopti_plus/windows/tests/meta"
+		},
+		{
+			"oid": "f067aadfcd6fe8b0dfdf7d6d35a2e76618d2fa88",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "d686fdb44ec7686aaf0ee5eea1fce1f9adef8166",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "76273e323e04efd8e2c7f3a804755aa3d2795a67",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "66f4016d0f04be6eabb7036e24d6778df96bfaf4",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "d4d15a1dc14b98147037c62c2df1062d327277f2",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "ee534f106b5983a1c035ceca552df1dedbac6c0d",
+			"type": "tree",
+			"bytes": 1043,
+			"path_hint": "static/ergopti_plus/windows/tests/support"
+		},
+		{
+			"oid": "596cb80d09557d637b693864d5d34ed3fc11a012",
+			"type": "blob",
+			"bytes": 24587,
+			"path_hint": "static/ergopti_plus/windows/tests/support/feature_state_boot_smoke.ahk"
+		},
+		{
+			"oid": "7fa417a4a8e006d041199bb416e7a561afa3e21e",
+			"type": "tree",
+			"bytes": 38061,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "24763b003b4a0807dc72c728aa7a6dc8e7622130",
+			"type": "blob",
+			"bytes": 9777,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_feature_state_boot.ahk"
+		},
+		{
+			"oid": "7a7636114c0593971514e4c30cccdd590b9e3221",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "7de62f7f7e08b9eeac56599eff9ab9a44c1ff9b2",
+			"type": "tree",
+			"bytes": 178,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "935e505ed6e12f90122d1f893834ba3fcbc1c41a",
+			"type": "tree",
+			"bytes": 573,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "5f452701967553b41dc70eff362994fa5fede09a",
+			"type": "blob",
+			"bytes": 63499,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "a17350f228e83032325b8b8dd886e448d0185cf2",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "1efb63cc28696a65d4433f87a3fb21533674723e",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "ead3e65141a91c3075f5dcd63d5a417405d37937",
+			"type": "blob",
+			"bytes": 671921,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "4cca3342edd9d4d51ca0e56e047c9a6d5d1c9fb4",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "b08d1a18ca29a1e04b0f987e92e00aaddae2578a",
+			"type": "tree",
+			"bytes": 23775,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "d5e8cec2c87cfc9bd10b5e7c94833526a635367c",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "9ef8f18fb44095afd2268f5a4cdde9e4fae001ae",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "b073ac14b66ac505a774a4d43c0c63c30ffcdaf4",
+			"type": "blob",
+			"bytes": 665565,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "1ae5d9ae3ae9cc4c6776f029c1080610e68fdd23",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "0ede749b6181fdccd4fa50ebf7f4f1a5a53a115d",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "fcf6ddafe592bd1b3d5c2aa7696c2414bd660cec",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "eed707fcdf9f288b9b04684330686162dca3cbe6",
+			"type": "tree",
+			"bytes": 23775,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "7ca21776c3a9222bd2158ca4e943644e55aee2b2",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "26759bf20f52bfa54ca689517f782211ff5491bd",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "5cdf65951313edec032b052f582b6520e52423ea",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "739b729b59e3e8b257ec16c0b04648b406400bfd",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "dfdfe80e902a1f5fb5b88cc2d64113e3c1ae7f92",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "2a2aa1f37bdbe9a63a59a20e8d9913df852f2d48",
+			"type": "tree",
+			"bytes": 37937,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "b89ab0806cd7c7ec5c8e0155144db40384c08457",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "d9a74a49616377a98e3362866eb88ded4862caad",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "90744a63ec09748079b40f05aff45c035ca40bff",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "4d22de1e3f25fcf2d503902389e4c31799bb14da",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "800aa066231f07dbe78a669f104c668033768202",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "120c9546ed609b5af2abd07faf2bb8e26780e579",
+			"type": "tree",
+			"bytes": 37868,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "e4253d5e5eb52cdaf30f7cfeb7944545f1f644e7",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "073ba20f5833521372159c15a251f899cf7ca767",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "abb87930bfb95c44f49dba61553bfea027d44474",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "010db713e67fe933678b9ecb804b4d35c952d580",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "dce6a6554a90b6444dd64f4b188d4cbe34aa26e5",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "8fe5f6340a6387023eb14ca4f1ce380f772094b9",
+			"type": "tree",
+			"bytes": 37868,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "5a58e5e3b7d5cd6aacda8acde0af0eb622253a0e",
+			"type": "blob",
+			"bytes": 121170,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk"
+		},
+		{
+			"oid": "6e4b34f4f6dce9289d55601b28a28d14d3c5967d",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "f6b647b342259357b0892eb12981ac142cbf1a38",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "0b268f059dfd647e90e783e280c723f0a28e629b",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "7c3d663a72b22964d55d7b2b735b5a1633f745f1",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "a20d17239ae6a857229cf6ec0dbd37aa68148e26",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "5edb513d22556ac043ce96b7ca7c73aaf5cbe77d",
+			"type": "tree",
+			"bytes": 37868,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "61ac9f20d6bca867132a73588ed9a424a2a6b776",
+			"type": "blob",
+			"bytes": 131499,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_features_manifest.ahk"
+		},
+		{
+			"oid": "9441b6da139c9b329f4ff1ff26833e61fe1f833e",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "33814982960f093c4b3283a67b7b69eda31bfca6",
+			"type": "tree",
+			"bytes": 178,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "0b59d2b4f04f05b04ff181b802e6ecd4ae336e5c",
+			"type": "tree",
+			"bytes": 573,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "ee51923707a786163f252920ef958be371df5981",
+			"type": "blob",
+			"bytes": 61374,
+			"path_hint": ".github/workflows/ci-windows.yml"
+		},
+		{
+			"oid": "cadb5b8a8b65348a1f774b554b0c780f9589ec1f",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "a098e60a762ac67b05cb3a99cea8d17b11e67e6c",
+			"type": "tree",
+			"bytes": 23455,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "f834b79052fe88a4283fcdb7e45ab325779d1c76",
+			"type": "tree",
+			"bytes": 612,
+			"path_hint": "tools/test/fixtures"
+		},
+		{
+			"oid": "69417de4d3823507e5560a5d8a97fc19f8ebfee8",
+			"type": "blob",
+			"bytes": 521,
+			"path_hint": "tools/test/fixtures/windows-inline-reader-original-route-inverse.patch"
+		},
+		{
+			"oid": "49ca608474719e8795a2ead2dc4f801dc9bec107",
+			"type": "blob",
+			"bytes": 569,
+			"path_hint": "tools/test/fixtures/windows-inline-span-original-route-inverse.patch"
+		},
+		{
+			"oid": "5eda7042289e0e885c5aec111bad7547108541fd",
+			"type": "blob",
+			"bytes": 12783,
+			"path_hint": "tools/test/report.cjs"
+		},
+		{
+			"oid": "96ca21ce4df608620f6d5228fb3e79e9553c8595",
+			"type": "blob",
+			"bytes": 11531,
+			"path_hint": "tools/test/run-windows-inline-causal.cjs"
+		},
+		{
+			"oid": "183ad3b0d0e2bafd5994595abf1840062b21b2d8",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "be18a7dc7c34a0079c4d00b42f1c16b34ec25b12",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "60722037f18d03824a9d5bb8dfc89b2ad88fef1f",
+			"type": "tree",
+			"bytes": 23398,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "3bdc8950ac93d1bca6dd308d695a61e6f5b12a53",
+			"type": "blob",
+			"bytes": 10574,
+			"path_hint": "tools/test/report.cjs"
+		},
+		{
+			"oid": "36a4785e72d2afda916d9acc697e3eceaff75cc8",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "9097fd631236be9b66382e12e5bca83a4bd14f9e",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "bb02e2241b14d8ec9ab111625ddaf5b5f9d7eb86",
+			"type": "tree",
+			"bytes": 23398,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "0a4cf2b81e5d3f1a9339e84cbc0dae7de9aa23ef",
+			"type": "blob",
+			"bytes": 9451,
+			"path_hint": "tools/test/report.cjs"
+		},
+		{
+			"oid": "a39a2a2d9cd3d8ea1b7e664e4c0bc2e2ced2f55b",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "ea632f56daa7eed9bef54950107a6722a132069c",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "ad681ebfec36a65b788d3bbf09cb8691da2df674",
+			"type": "blob",
+			"bytes": 512402,
+			"path_hint": "docs/ERGOPTIPLUS_TODO.md"
+		},
+		{
+			"oid": "7aea5eda657b4962fa0c0c0829d8387f3d366dff",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "80b104bcbe957310129d1dcecba5daaf68950d75",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "4f262f750efd7e9955fed1fbd81a495331350659",
+			"type": "tree",
+			"bytes": 589,
+			"path_hint": "static/ergopti_plus/linux"
+		},
+		{
+			"oid": "ff0386fc00161515b58ffa5d7223f80665e7b2be",
+			"type": "tree",
+			"bytes": 438,
+			"path_hint": "static/ergopti_plus/linux/tests"
+		},
+		{
+			"oid": "4859ece5b67180b3c1ff2d04759675adbcc03a58",
+			"type": "tree",
+			"bytes": 259,
+			"path_hint": "static/ergopti_plus/linux/tests/unit"
+		},
+		{
+			"oid": "96c9ca42d747b8e4499410e426983f8267c6f057",
+			"type": "tree",
+			"bytes": 514,
+			"path_hint": "static/ergopti_plus/macos"
+		},
+		{
+			"oid": "f6de2426161ba1dec4b3f20a689a18d713245b2e",
+			"type": "tree",
+			"bytes": 479,
+			"path_hint": "static/ergopti_plus/macos/tests"
+		},
+		{
+			"oid": "9b7cd26e7ac3c8d16085d1767628ef5d64ec4d56",
+			"type": "tree",
+			"bytes": 744,
+			"path_hint": "static/ergopti_plus/macos/tests/unit"
+		},
+		{
+			"oid": "45304fa27027aaf529fddf7772f1059633147607",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "dae073e8a42ca393cd38303ff68c681b79e96a7c",
+			"type": "tree",
+			"bytes": 3932,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "be51cf25df5f4661a4b3e45f66174f9226aae76a",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "ec27488c7c912d89ac4c8f05093bd1a8ab1cead6",
+			"type": "tree",
+			"bytes": 37688,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "f2949fd8395ba0d68a6a2f21c71de46e54d8f540",
+			"type": "tree",
+			"bytes": 1081,
+			"path_hint": "static/ergopti_plus/windows/ui"
+		},
+		{
+			"oid": "3ae342f7096ebb117d4050ea4681ba90bf8b177e",
+			"type": "tree",
+			"bytes": 665,
+			"path_hint": "static/ergopti_plus/windows/ui/menu"
+		},
+		{
+			"oid": "ea3858ab6ad8cf37b97dab441ebb3661afae86a0",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "abcfc5dc60b7f5ea36d022c110092e86ec1e6170",
+			"type": "tree",
+			"bytes": 23398,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "39d04f6c975f2e50eb4d51e40a37df91719f3fe4",
+			"type": "tree",
+			"bytes": 602,
+			"path_hint": "tools/test/support"
+		},
+		{
+			"oid": "abd72e143a58190232da54c103a212b80664a894",
+			"type": "blob",
+			"bytes": 2565,
+			"path_hint": "tools/test/support/ahk-menu-lifecycle-runtime.cjs"
+		},
+		{
+			"oid": "e47450b41ae699efdf6994902a81d609ae04bf64",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "47128ec0f8bd38805d3aa8eb915ea0708fd0dfba",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "7c3db62c1992e605c6b8e81302af6363b3ec7d8d",
+			"type": "tree",
+			"bytes": 23398,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "eeb94019c56febe663c173034536f8474619650d",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "38b6e17f3690020e708e7a0baedf63e592a9fe00",
+			"type": "tree",
+			"bytes": 556,
+			"path_hint": "docs"
+		},
+		{
+			"oid": "eb99bcb49606b048210d7a2d7bfd23c2007a5ed8",
+			"type": "tree",
+			"bytes": 353,
+			"path_hint": "docs/handovers"
+		},
+		{
+			"oid": "68c08efd1eff2cfd5f8223a820c25fc62fb741ac",
+			"type": "tree",
+			"bytes": 407,
+			"path_hint": "docs/handovers/2026-10-04-config-menus"
+		},
+		{
+			"oid": "bc469e33877083b62641905d5ebdb4a228d6cfcc",
+			"type": "tree",
+			"bytes": 1248,
+			"path_hint": "docs/handovers/2026-10-04-config-menus/prepared"
+		},
+		{
+			"oid": "df4f856586d96d38fb2d7e24a608049723ec8d35",
+			"type": "tree",
+			"bytes": 107,
+			"path_hint": "docs/handovers/2026-10-04-config-menus/prepared/windows-current-feature-fixtures-25b"
+		},
+		{
+			"oid": "0b9a44c521f7d8ca8b3ff7e19a27fbdfe2227fe3",
+			"type": "blob",
+			"bytes": 2389,
+			"path_hint": "docs/handovers/2026-10-04-config-menus/prepared/windows-current-feature-fixtures-25b/README.md"
+		},
+		{
+			"oid": "063252c486cd99fab5ed2b50fd9b9e49b2346736",
+			"type": "blob",
+			"bytes": 11720,
+			"path_hint": "docs/handovers/2026-10-04-config-menus/prepared/windows-current-feature-fixtures-25b/windows-current-feature-fixtures-25b.patch"
+		},
+		{
+			"oid": "f4e652f7be3fcbaeba1ce88535c66504bf51bafe",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "7de90d45762a8fcc8f0146fc4cfb7841cc62740b",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "791eb69422e1d00f34ab205a2503edaf37086b01",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "1950796abee7af4802ae116fa8c71537e5c2c3bd",
+			"type": "tree",
+			"bytes": 3932,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "742b6061aeb7926e6969352db9fd92e1c0ec7dd1",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "d6914f3e7d66f0de8f9e65941a83e6711915bb78",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "607b671a461d8f0de74c78d7b0d85ec2affd8e29",
+			"type": "tree",
+			"bytes": 37225,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "4034c8afa2634a5b1f68d4dbd309fc67071ef862",
+			"type": "blob",
+			"bytes": 39660,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_toml_build_updated_content.ahk"
+		},
+		{
+			"oid": "2fe46018cca7dc7185796e9e844fc2d9c491693d",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "133a081034a59bd37efdd67ed4b9627a7c3fdc31",
+			"type": "tree",
+			"bytes": 23071,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "844717e2a4f38f6df9269b94f95aa5c8a2477b67",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "2750cc875e14a75fae5f389a25655714598e94b0",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "74809328951e58bad96ec81f4a6dfba0c5f6fa91",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "83b4ee9229b4ab2f74d2bc08958c1129064d5bcf",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "dd97bad36f4562c139130ebf91316a84c8d35f3b",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "0f7e08cf9e99f51d7df5fa07f5200902cc3c0989",
+			"type": "tree",
+			"bytes": 3932,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "713b58484eaf240c1f976dce032b2985b88fcf3d",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "7c31a65641896a54cd3145de84ea92da0fc3a4a4",
+			"type": "blob",
+			"bytes": 25042,
+			"path_hint": "static/ergopti_plus/windows/infra/toml/toml_document.ahk"
+		},
+		{
+			"oid": "ef810757d99cbfaeb2e6b7f842df1f74e0d378d2",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "1e76d2f8ac883d137f22a2708808a7fd2250c66a",
+			"type": "tree",
+			"bytes": 37225,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "1e299be98b8d0588ddf74e96aa0962b09568f70e",
+			"type": "blob",
+			"bytes": 38159,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_toml_build_updated_content.ahk"
+		},
+		{
+			"oid": "b3bfcb021abbdc5aaeddf2b83a311cb0029671e5",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "d72ac506e160c0609432efb611f1b831cc7acb6b",
+			"type": "tree",
+			"bytes": 313,
+			"path_hint": "static"
+		},
+		{
+			"oid": "ff0bc631b9f14755410fb975d6518e7001ee0c4e",
+			"type": "tree",
+			"bytes": 230,
+			"path_hint": "static/ergopti_plus"
+		},
+		{
+			"oid": "eb68a8aab3717cce11b96359a4c09a445dc5c0d3",
+			"type": "tree",
+			"bytes": 380,
+			"path_hint": "static/ergopti_plus/windows"
+		},
+		{
+			"oid": "72f5e4ba52af6fe70b0a92513968c89a2f4ffd31",
+			"type": "tree",
+			"bytes": 3932,
+			"path_hint": "static/ergopti_plus/windows/infra"
+		},
+		{
+			"oid": "4eba78a116d2dda423cad40c32ffcbcf34334e0d",
+			"type": "tree",
+			"bytes": 279,
+			"path_hint": "static/ergopti_plus/windows/infra/toml"
+		},
+		{
+			"oid": "495556ac797a6ddaa459aa791e69ea91e9440054",
+			"type": "blob",
+			"bytes": 25004,
+			"path_hint": "static/ergopti_plus/windows/infra/toml/toml_document.ahk"
+		},
+		{
+			"oid": "59aa474f9d18a73a60bf6e2f0492f86fb3d3c4d4",
+			"type": "tree",
+			"bytes": 704,
+			"path_hint": "static/ergopti_plus/windows/tests"
+		},
+		{
+			"oid": "a6e53e3ffd77425f60f9507b3ccb933da5a1e197",
+			"type": "tree",
+			"bytes": 37225,
+			"path_hint": "static/ergopti_plus/windows/tests/unit"
+		},
+		{
+			"oid": "2e22bfdb12714120003678094198959df04b6ce2",
+			"type": "blob",
+			"bytes": 36524,
+			"path_hint": "static/ergopti_plus/windows/tests/unit/test_toml_build_updated_content.ahk"
+		},
+		{
+			"oid": "9cb97ebbc6b085c88e64e7279286dc0060f6bd7d",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "9b7f99efb483de3b1c35b6e229daf7cfa1bd521c",
+			"type": "tree",
+			"bytes": 23071,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "4b3d29a6a2e0276b0c9b1e6748f7e73aab174a4b",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "e14fb2a23414326e0a454c4d85e9b7ecb8115c24",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "1117085f5805e9f8105eee0e043b62fb078790ea",
+			"type": "tree",
+			"bytes": 23071,
+			"path_hint": "tools/test"
+		},
+		{
+			"oid": "b95c54266930ff18a6a0b09ebbf9ef599425904b",
+			"type": "tree",
+			"bytes": 602,
+			"path_hint": "tools/test/support"
+		},
+		{
+			"oid": "d079a216ddcc7085daf9e5f6ad5dc1f332528d2b",
+			"type": "blob",
+			"bytes": 2828,
+			"path_hint": "tools/test/support/ahk-menu-lifecycle-runtime.cjs"
+		},
+		{
+			"oid": "f0ad18547a79dd88b16d5b5b78a44557ddfe77c8",
+			"type": "tree",
+			"bytes": 1323,
+			"path_hint": ""
+		},
+		{
+			"oid": "c861810b6a2655811ef9052d06a5d267725758da",
+			"type": "tree",
+			"bytes": 178,
+			"path_hint": ".github"
+		},
+		{
+			"oid": "b9ea0ed5766f5fbb58fb19c6cea9a3aaf4df57a0",
+			"type": "tree",
+			"bytes": 573,
+			"path_hint": ".github/workflows"
+		},
+		{
+			"oid": "827bc28bf371387c2e3e7f86a9a7f55727207313",
+			"type": "blob",
+			"bytes": 99782,
+			"path_hint": ".github/workflows/ci-linux.yml"
+		},
+		{
+			"oid": "03ee4bb813b181aea67e16f68c85a7eb4b824331",
+			"type": "tree",
+			"bytes": 576,
+			"path_hint": "tools"
+		},
+		{
+			"oid": "f65cd41c775c5426f00100e2fc02cf66b14b93f0",
+			"type": "tree",
+			"bytes": 22823,
+			"path_hint": "tools/test"
+		}
+	],
+	"ownership": {
+		"owned_local_codex_refs": [
+			"refs/heads/codex/ci-config-menus",
+			"refs/heads/codex/ci-config-menus-linux-path-identity",
+			"refs/heads/codex/config-menus-cache-target",
+			"refs/heads/codex/config-menus-composed-intent",
+			"refs/heads/codex/config-menus-diagnostic-report",
+			"refs/heads/codex/config-menus-folder-intent",
+			"refs/heads/codex/config-menus-folder-target",
+			"refs/heads/codex/config-menus-macos-picker",
+			"refs/heads/codex/config-menus-receiving-20261015",
+			"refs/heads/codex/config-menus-root-picker"
+		],
+		"owned_local_feature_ref": "refs/heads/feat/config-menus",
+		"remote_deletion_candidates": {
+			"refs/heads/feat/config-menus": "c90aab10318aa29f4f7dc00b741dd39c02d5cc39",
+			"refs/heads/codex/ci-config-menus": "ee2bba32802b64a4189195eb11ada3e7dd76ebd4"
+		},
+		"preserve_unowned_local_branch": {
+			"ref": "refs/heads/work",
+			"tip": "63cf3d005d371edb4e4093a906da276ced487182"
+		}
+	},
+	"privacy_classification": {
+		"signed_urls_detected": 0,
+		"github_token_like_detected": 0,
+		"authorization_literals_detected": 0,
+		"private_key_headers_detected": 0,
+		"home_path_findings": "Four synthetic jdoe canaries in historical macOS test fixtures. Values not included in this audit.",
+		"private_user_logs_established": false,
+		"coverage": "All 283 unique Git blob plaintext payloads were inspected with closed credential/URL/key/home-path patterns. No raw payloads or matched values copied."
+	},
+	"preservation_boundary": {
+		"needed_active_source": "Remote CI tip and feature differ only by the final public receiving archive. No additional live source correction is required from the CI tip.",
+		"unpublished_folder_source": "All touched tip blobs in four older candidate branches exist in feature path history except one older onboarding test blob, which is exactly the later published test minus six added cache assertions.",
+		"compact_history": "The 146 unique commits and exact older fixture can be retained inertly in a compact Git bundle with public c90/C8 ancestor prerequisites. Parent owns actual pack creation, prerequisite verification and publication."
+	}
+}
