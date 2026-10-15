@@ -669,24 +669,6 @@ SC00C:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0C])
 SC00D:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0D])
 #HotIf
 
-; Serialised digit-row emit. Critical("On") makes the SendEvent uninterruptible
-; so it cannot interleave with a neighbouring remapped letter's emit in the
-; single OS input queue (remap-emit-critical-uneven). Down and Up are split so
-; the key's auto-repeat / release timing is preserved exactly as before.
-_DigitRowDown(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Down}")
-	; Same rule as _RemapEmit and _DigitShiftSend ten lines below, which this
-	; sibling was left out of: an armed suppressing hook eats this character, so
-	; it must not be recorded as having reached the screen.
-	if _EmitReachedScreen()
-		UpdateLastSentCharacter(Digit)
-}
-_DigitRowUp(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Up}")
-}
-
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
 ; while the unshifted key already sends the digit via the block above.

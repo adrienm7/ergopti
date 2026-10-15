@@ -198,8 +198,8 @@ _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner := 0, BuildFn := 0) {
 	if MustResumeBridge {
 		if IsSet(LLM_Menu_EnsureModelReady)
 			LLM_Menu_EnsureModelReady()
-		if IsSet(LLM_Menu_TryStartBridge)
-			LLM_Menu_TryStartBridge()
+		if IsSet(LLM_Menu_ResumeBackendLifecycleAfterTags)
+			LLM_Menu_ResumeBackendLifecycleAfterTags()
 	}
 	if Changed
 		_LLM_Menu_AuxBuild(BuildFn)
