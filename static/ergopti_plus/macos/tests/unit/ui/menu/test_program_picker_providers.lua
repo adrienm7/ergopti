@@ -349,3 +349,20 @@ for _, kind in ipairs({ "keyboard", "tap", "script" }) do
 		end)
 	end)
 end
+
+
+helpers.describe("script prompt cancellation preserves the predecessor binding", function()
+	helpers.it("(script-prompt-cancel-predecessor) declined prompt keeps the actual existing native slot", function()
+		with_provider("script", { cancel = true, foreign_native = "copy" }, function(fixture, pick, state)
+			pick()
+			helpers.assert_eq(fixture.action, "copy", "cancellation cannot replace the retained native binding")
+			helpers.assert_eq(state.script_control_shortcuts.script_altgr_enter, "none", "the prior independent menu value stays unchanged")
+			helpers.assert_eq(fixture.canonical_action, "none")
+			helpers.assert_eq(fixture.parameters, { retained = "unrelated" })
+			helpers.assert_eq(fixture.canonical_parameters, { retained = "unrelated" })
+			helpers.assert_eq(fixture.sets, 0, "a cancelled prompt never enters assignment mutation")
+			helpers.assert_eq(fixture.saves, 0)
+			helpers.assert_eq(fixture.updates, 0)
+		end)
+	end)
+end)
