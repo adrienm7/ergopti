@@ -1497,4 +1497,112 @@ helpers.describe("file_watchers Personal topology", function()
 			end)
 		end)
 	end
+	for _, root_backend in ipairs({ "native", "pump" }) do
+		helpers.it("(linux-watch-root-anchor) " .. root_backend .. " recovers an empty removed and recreated Personal root", function()
+			session(root_backend, function(s)
+				s.start(); s.remove_directory(s.personal); s.settle(1)
+				s.directory(s.personal)
+				local path = s.file(s.personal .. "/rules.toml", '[personal]\nvalue = "recreated"\n')
+				s.observe_path = path; s.settle(1)
+				helpers.assert_eq(s.observed[1], '[personal]\nvalue = "recreated"\n')
+				s.file(path, '[personal]\nvalue = "later"\n'); s.settle(1)
+				helpers.assert_eq(s.observed[2], '[personal]\nvalue = "later"\n')
+				s.idle()
+			end)
+		end)
+	end
+	helpers.it("(linux-watch-root-anchor) native ignores distinct parent siblings without recursive scans", function()
+		session("native", function(s)
+			s.start(); helpers.assert_eq(s.active(s.root), 1, "the immediate parent has one separately owned anchor")
+			local scans = s.scans
+			for _, name in ipairs({ "Personal", "personal\\", "unrelated" }) do
+				local sibling = s.directory(s.root .. "/" .. name)
+				s.file(sibling .. "/rules.toml"); s.settle(0)
+			end
+			helpers.assert_eq(s.scans, scans, "parent siblings cannot admit a recursive Personal census")
+			s.idle()
+		end)
+	end)
+	helpers.it("(linux-watch-root-anchor) native refused anchor preserves healthy coverage and retries admission", function()
+		session("native", function(s)
+			local path = s.file(s.personal .. "/rules.toml")
+			s.start_refused = s.root; s.start()
+			helpers.assert_eq(s.active(s.personal), 1, "parent activation refusal cannot discard an admitted healthy root")
+			helpers.assert_eq(s.active(path), 1, "parent activation refusal cannot discard existing file coverage")
+			s.file(path); s.settle(1); s.settle(0)
+			s.start_refused = nil; s.settle(0)
+			helpers.assert_eq(s.active(s.root), 1, "bounded repair must admit the previously refused parent anchor")
+			s.idle(); s.remove_file(path); s.remove_directory(s.personal); s.settle(1)
+			s.directory(s.personal); s.file(path); s.settle(1); s.file(path); s.settle(1)
+		end)
+	end)
+	helpers.it("(linux-watch-root-anchor) native retirement ACK and session fence include the parent anchor", function()
+		session("native", function(s)
+			s.start()
+			local anchor
+			for _, record in ipairs(s.callbacks) do if record.path == s.root then anchor = record end end
+			helpers.assert_true(anchor ~= nil, "capture the genuine parent callback")
+			s.withhold_ack = s.root
+			helpers.assert_eq(s.stop(), false, "the parent anchor retains its unacknowledged close ownership")
+			s.drain(); helpers.assert_true(anchor.retired, "the actual native close precedes its held acknowledgement")
+			helpers.assert_true(type(anchor.pending_ack) == "function", "the exact parent ACK is held")
+			s.withhold_ack = nil; s.start(true)
+			anchor.callback(nil, "personal", { rename = true }); s.settle(0); s.idle()
+			helpers.assert_eq(s.active(s.root), 1, "the retired session cannot replace its successor's parent")
+			anchor.pending_ack(); anchor.pending_ack = nil
+			s.stop(); s.drain(); helpers.assert_true(s.stop(), "the delivered parent ACK releases its retirement debt")
+		end)
+	end)
+
+	helpers.it("(linux-watch-root-anchor) native committed source repair refreshes bytes while only its parent refuses", function()
+		session("native", function(s)
+			s.start_refused = s.root; s.start(); s.denied = s.personal
+			local sub = s.directory(s.personal .. "/unobserved")
+			local path = s.file(sub .. "/rules.toml", "first accepted source\n")
+			s.observe_path = path; s.settle(1)
+			helpers.assert_eq(s.observed[1], "first accepted source\n")
+			s.file(path, "latest unobserved source\n"); s.settle(0)
+			s.denied = nil; s.settle(0); s.settle(1)
+			helpers.assert_eq(s.observed[2], "latest unobserved source\n", "committed file coverage must refresh even while parent admission still refuses")
+			s.start_refused = nil; s.settle(0); s.idle()
+		end)
+	end)
+	helpers.it("(linux-watch-root-anchor) native nil-filename errors retain diagnostics and repair ownership", function()
+		session("native", function(s)
+			s.start()
+			local anchor
+			for _, record in ipairs(s.callbacks) do if record.path == s.root then anchor = record end end
+			helpers.assert_true(anchor ~= nil)
+			local logger, warnings = require("logger.shim"), {}
+			local held_warn = logger.warn
+			logger.warn = function(_, format, ...) warnings[#warnings + 1] = string.format(format, ...) end
+			local called, detail = pcall(anchor.callback, "controlled native parent error", nil, nil)
+			logger.warn = held_warn
+			helpers.assert_true(called, tostring(detail))
+			helpers.assert_eq(#warnings, 1, "a native parent error cannot disappear through filename filtering")
+			helpers.assert_true(warnings[1]:find("controlled native parent error", 1, true) ~= nil)
+			s.settle(0); s.settle(1)
+			helpers.assert_true(anchor.retired, "the errored native binding must retire through its actual close")
+			helpers.assert_eq(s.active(s.root), 1, "bounded retry must restore one owned parent binding")
+			local path = s.file(s.personal .. "/rules.toml"); s.settle(1); s.file(path); s.settle(1); s.idle()
+		end)
+	end)
+
+	helpers.it("(linux-watch-root-anchor) native ambiguous rename port receipt rebinds unchanged metadata", function()
+		session("native", function(s)
+			local path = s.file(s.personal .. "/rules.toml"); s.start()
+			local anchor, old_root
+			for _, record in ipairs(s.callbacks) do
+				if record.path == s.root then anchor = record elseif record.path == s.personal then old_root = record end
+			end
+			helpers.assert_true(anchor ~= nil and old_root ~= nil, "capture genuine handles before the controlled ambiguous receipt")
+			-- This controls the native callback port, not an actual kernel rename.
+			-- Equal current metadata cannot establish that an old binding survived.
+			anchor.callback(nil, nil, { rename = true }); s.settle(1)
+			helpers.assert_true(old_root.retired, "an ambiguous rename cannot reuse a potentially detached root binding")
+			helpers.assert_eq(s.active(s.personal), 1)
+			s.file(path); s.settle(1); s.idle()
+		end)
+	end)
+
 end)

@@ -80,6 +80,7 @@ local _pump_entries = {}
 local _personal_root, _personal_dirty, _personal_retry_at = nil, false, nil
 local _personal_epoch, _personal_revision = 0, 0
 local _personal_entries, _personal_retiring = {}, {}
+local _personal_anchor, _personal_rebind = nil, false
 local _reconcile_personal
 
 -- Callback invoked on debounced change detection.
@@ -546,6 +547,27 @@ end
 --- Admits only this exact active lexical binding and its original session.
 local function _personal_event(entry, err, filename, events)
 	if entry.epoch ~= _personal_epoch or _personal_root == nil or entry.retired or entry.close_requested then return end
+	if entry.anchor_name and err then
+		Logger.warn(LOG, "Personal parent fs_event error on '%s': %s.", entry.path, tostring(err))
+		if entry.active and _personal_anchor == entry then
+			_personal_anchor = nil
+			_retire_personal(entry)
+			_personal_dirty, _personal_rebind = true, true
+			_personal_revision = _personal_revision + 1
+			_personal_retry_at = _now_ms() + _debounce_sec * 1000
+		elseif entry.staging then
+			entry.anchor_failed = true
+		end
+		return
+	end
+	if entry.anchor_name then
+		-- Observe only this admitted lexical root, never its parent's siblings.
+		if type(filename) == "string" and filename ~= "" then
+			if filename ~= entry.anchor_name then return end
+		elseif not _personal_rename(events) then
+			return
+		end
+	end
 	if not entry.active then
 		if entry.staging then
 			_personal_revision = _personal_revision + 1
@@ -556,13 +578,18 @@ local function _personal_event(entry, err, filename, events)
 		end
 		return
 	end
-	if _personal_entries[entry.path] ~= entry then return end
+	if (entry.anchor_name and _personal_anchor ~= entry) or (not entry.anchor_name and _personal_entries[entry.path] ~= entry) then return end
 	if err then
 		Logger.warn(LOG, "Personal fs_event error on '%s': %s.", entry.path, tostring(err))
 		return
 	end
 	local changed, topology = entry.path, false
-	if entry.kind == "directory" then
+	if entry.anchor_name then
+		changed, topology = _personal_root, true
+		-- A deleted directory can reuse its inode before this event is drained.
+		-- Rebind its sources rather than retaining watches on the old objects.
+		if _personal_rename(events) then _personal_rebind = true end
+	elseif entry.kind == "directory" then
 		if type(filename) == "string" and filename ~= "" then
 			changed = entry.path .. "/" .. filename
 			local previous = _personal_entries[changed]
@@ -591,9 +618,9 @@ local function _personal_event(entry, err, filename, events)
 end
 
 --- Arms new directories before enumerating them; queued events cannot fall into a gap.
-local function _new_personal_entry(path, attributes, epoch)
+local function _new_personal_entry(path, attributes, epoch, anchor_name)
 	local entry = { path = path, dev = attributes.dev, ino = attributes.ino, kind = attributes.kind,
-		epoch = epoch, active = false, staging = true }
+		epoch = epoch, active = false, staging = true, anchor_name = anchor_name }
 	if not luv then
 		entry.last_mtime = _mtime(path)
 		if entry.last_mtime == nil then return nil, "personal polling timestamp is unavailable: " .. path end
@@ -611,7 +638,27 @@ local function _new_personal_entry(path, attributes, epoch)
 		return nil, "personal watcher activation refused: " .. path .. ": " .. tostring(protected and detail or activated)
 	end
 	entry.started = true
+	if entry.anchor_failed then _retire_personal(entry); return nil, "personal parent watcher failed during activation: " .. path end
 	return entry
+end
+
+--- Keeps one native parent binding across removal/replacement of the admitted root.
+--- Refusal remains retryable without discarding healthy recursive coverage.
+local function _ensure_personal_anchor(epoch)
+	if not luv or _personal_root == "/" then return true end
+	local parent, name = _personal_root:match("^(.*)/([^/]+)$")
+	if not parent then parent, name = ".", _personal_root elseif parent == "" then parent = "/" end
+	local attributes = _personal_metadata(parent)
+	if not attributes or attributes.kind ~= "directory" then return false end
+	if _personal_anchor and _personal_anchor.path == parent and _same_personal_binding(_personal_anchor, attributes) then return true end
+	local entry = _new_personal_entry(parent, attributes, epoch, name)
+	if not entry then return false end
+	if epoch ~= _personal_epoch then _retire_personal(entry); return false end
+	local previous = _personal_anchor
+	_personal_anchor = entry
+	entry.staging, entry.active = false, true
+	if previous then _retire_personal(previous) end
+	return true
 end
 
 --- Produces a complete census, keeping ambiguous or refused subtrees unjudged.
@@ -662,8 +709,10 @@ end
 _reconcile_personal = function()
 	if _personal_root == nil then _personal_dirty = false; return true end
 	local epoch, revision, previous = _personal_epoch, _personal_revision, _personal_entries
+	local anchored = _ensure_personal_anchor(epoch)
+	if epoch ~= _personal_epoch then return false end
 	local desired, staged = {}, {}
-	local called, accepted, detail = pcall(_personal_census, _personal_root, 1, desired, staged, previous, epoch)
+	local called, accepted, detail = pcall(_personal_census, _personal_root, 1, desired, staged, _personal_rebind and {} or previous, epoch)
 	if not called or not accepted or epoch ~= _personal_epoch or previous ~= _personal_entries or revision ~= _personal_revision then
 		for _, entry in ipairs(staged) do _retire_personal(entry) end
 		Logger.warn(LOG, "Personal watcher coverage remains unchanged; reconciliation refused: %s.", tostring(called and detail or accepted))
@@ -672,10 +721,10 @@ _reconcile_personal = function()
 	local changed = false
 	for path, entry in pairs(desired) do if previous[path] ~= entry then changed = true end end
 	for path, entry in pairs(previous) do if desired[path] ~= entry then changed = true end end
-	_personal_entries, _personal_dirty = desired, false
+	_personal_entries, _personal_dirty, _personal_rebind = desired, not anchored, false
 	for _, entry in pairs(desired) do entry.staging, entry.active = false, true end
 	for path, entry in pairs(previous) do if desired[path] ~= entry then _retire_personal(entry) end end
-	return true, changed
+	return anchored, changed
 end
 
 --- Repairs coverage on a bounded independent deadline, never once per idle pump.
@@ -685,7 +734,9 @@ local function _retry_personal_coverage()
 	local accepted, changed = _reconcile_personal()
 	if epoch ~= _personal_epoch then return end
 	if accepted then _personal_retry_at = nil else _personal_retry_at = _now_ms() + _debounce_sec * 1000 end
-	if accepted and changed then
+	if changed then
+		-- A successful census may repair source coverage while the optional
+		-- parent binding is still refused and retains its own retry deadline.
 		-- Files could change while their refused bindings were unobserved. Admit
 		-- one fresh consumer read through the existing settle/generation owner.
 		_schedule_reload("personal coverage repaired", { _personal_root })
@@ -816,7 +867,8 @@ end
 --- including before start() or after a prior stop(). Idempotent.
 function M.stop()
 	_personal_epoch = _personal_epoch + 1
-	_personal_root, _personal_dirty, _personal_retry_at = nil, false, nil
+	_personal_root, _personal_dirty, _personal_retry_at, _personal_rebind = nil, false, nil, false
+	if _personal_anchor then _retire_personal(_personal_anchor); _personal_anchor = nil end
 	for _, entry in pairs(_personal_entries) do _retire_personal(entry) end
 	_personal_entries = {}
 	_retry_personal_retirement()
