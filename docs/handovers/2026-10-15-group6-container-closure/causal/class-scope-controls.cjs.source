@@ -1,0 +1,133 @@
+// group6-diagnostic-class-oracle/controls.cjs
+'use strict';
+
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const crypto = require('node:crypto');
+const base = __dirname;
+const first = 'tools/test/test-macos-native-pac-qualification.cjs';
+const second = 'tools/test/test-swift-xctest-evidence.cjs';
+const old = fs.readFileSync(path.join(base, 'preimage', first), 'utf8');
+const next = fs.readFileSync(path.join(base, 'candidate', first), 'utf8');
+const oldOther = fs.readFileSync(path.join(base, 'preimage', second), 'utf8');
+const nextOther = fs.readFileSync(path.join(base, 'candidate', second), 'utf8');
+const start = next.indexOf('/** Read direct test members');
+const split = next.indexOf('/** Independent literal source controls;');
+const end = next.indexOf('/** Constructed transcript and actual CLI controls;');
+assert.ok(start > 0 && split > start && end > split);
+const fragment = next.slice(start, end);
+const legacyFormat =
+	"\t\tconst methods = [...fs.readFileSync(file, 'utf8').matchAll(/\\bfunc (test\\w+)\\(/g)].map(\n\t\t\t(match) => match[1]\n\t\t);";
+let restored = next.slice(0, start) + next.slice(end);
+restored = restored.replace('\n\tswiftClassSourceControls();', '');
+restored = restored.replace(
+	"\t\tconst methods = swiftClassTestMethods(fs.readFileSync(file, 'utf8'), suite);",
+	legacyFormat
+);
+restored = restored.replace(
+	'definitions[suite] = swiftClassTestMethods(source, suite);',
+	'definitions[suite] = [...source.matchAll(/\\bfunc (test\\w+)\\(/g)].map((match) => match[1]);'
+);
+restored = restored.replace(
+	'module.exports.swiftClassTestMethods = swiftClassTestMethods;\nmodule.exports.swiftClassSourceControls = swiftClassSourceControls;\n',
+	''
+);
+assert.equal(
+	restored,
+	old,
+	'Every other Root guard byte and all original82 assertions stay exact.'
+);
+const restoredOther = nextOther
+	.replace(
+		"const { swiftClassTestMethods } = require('./test-macos-native-pac-qualification.cjs');\n",
+		''
+	)
+	.replace(
+		'definitions[suite] = swiftClassTestMethods(text, suite);',
+		'definitions[suite] = [...text.matchAll(/\\bfunc (test\\w+)\\(/g)].map((match) => match[1]);'
+	);
+assert.equal(restoredOther, oldOther, 'No other XCTest receiver/source-control byte may change.');
+new vm.Script(next);
+new vm.Script(nextOther);
+function load(selected) {
+	return vm.runInNewContext(
+		selected + '\n({ reader: swiftClassTestMethods, controls: swiftClassSourceControls })',
+		{
+			require: (name) => {
+				assert.equal(name, 'node:assert/strict');
+				return assert;
+			},
+			console: { log() {} }
+		},
+		{ timeout: 1000 }
+	);
+}
+const actual = load(fragment);
+assert.equal(actual.controls(), 24);
+const withdrawal =
+	'function swiftClassTestMethods(source, suite) {\n\treturn [...source.matchAll(/\\bfunc (test\\w+)\\(/g)].map((match) => match[1]);\n}\n\n';
+const withdrawnFragment = withdrawal + next.slice(split, end);
+new vm.Script(withdrawnFragment);
+let counterfactual;
+try {
+	load(withdrawnFragment).controls();
+	assert.fail('Expected causal neighboring-class refusal.');
+} catch (error) {
+	assert.equal(error.code, 'ERR_ASSERTION');
+	assert.deepEqual(Array.from(error.actual), ['testOther', 'testOriginal', 'testOther']);
+	assert.deepEqual(Array.from(error.expected), ['testOriginal']);
+	counterfactual = 'CAUSAL_ASSERTION_FAILURE';
+}
+assert.equal(actual.controls(), 24);
+const [preimage, candidate] = process.argv.slice(2);
+assert.ok(preimage && candidate, 'Pass exactly the delivered Swift preimage and candidate paths.');
+for (const [name, expected] of [
+	[preimage, '1b4279cb8b02de2c17a60aee3610c1a3b1cc5155bc58d6ac37119190a4722a3b'],
+	[candidate, '909f07da8c95c660e09a0ea341265a6c7510929d3a9fb0ce3f6ad90fd5ae0d85']
+])
+	assert.equal(crypto.createHash('sha256').update(fs.readFileSync(name)).digest('hex'), expected);
+const statementStart = old.indexOf('\t\tconst methods = [...fs.readFileSync(file,');
+const statementEnd = old.indexOf('\n\t\treturn { suite, methods };', statementStart);
+assert.ok(statementStart > 0 && statementEnd > statementStart);
+const statements = old.slice(statementStart, statementEnd) + '\nmethods;';
+assert.equal(
+	vm.runInNewContext(statements, { fs, file: preimage, assert, index: 2, counts: [12, 1, 1] })
+		.length,
+	1
+);
+assert.throws(
+	() =>
+		vm.runInNewContext(statements, { fs, file: candidate, assert, index: 2, counts: [12, 1, 1] }),
+	(error) => error.code === 'ERR_ASSERTION' && error.actual === 8 && error.expected === 1
+);
+const frames = fs.readFileSync(candidate, 'utf8');
+assert.deepEqual(Array.from(actual.reader(frames, 'ManagedHTTPWPADWireTests')), [
+	'testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork'
+]);
+assert.equal(actual.reader(frames, 'ManagedWPADFailureDiagnosticTests').length, 7);
+console.log(
+	JSON.stringify(
+		{
+			Root_guard_source: 'a53f6bfc1027253ff0240efe77c89919dd96e5f8',
+			source_controls_passed: 24,
+			withdrawal: counterfactual,
+			restored_source_controls_passed: 24,
+			Root_original_source_restored: true,
+			actual_Root_statement_original: 'PASS1',
+			actual_Root_statement_enrolled_candidate: 'FAIL8_NE_1',
+			corrected_native_WPAD: 1,
+			separate_pure_tests: 7,
+			JS_parse: 'PASS2_AND_WITHDRAWAL',
+			whole_Root_modules_or_controllers_imported: false,
+			full82_guard_suite: 'UNRUN',
+			fullJS: 'UNRUN',
+			Swift_compiler_execution: 'UNRUN',
+			native_execution: 'UNRUN',
+			canonical_mutations: false
+		},
+		null,
+		2
+	)
+);
