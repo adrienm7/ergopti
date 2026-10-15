@@ -34,6 +34,9 @@ const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const { run } = require('./run-linux-window-switch-receipts.cjs');
+const { spawnSync } = require('node:child_process');
+const crypto = require('node:crypto');
+const { pythonExecutable } = require('../lib/python.cjs');
 
 const ROOT = path.resolve(__dirname, '../..');
 const NATIVE = 'tools/test/run-linux-window-switch-receipts.cjs';
@@ -729,9 +732,69 @@ async function main() {
 	);
 }
 
+/** Run only AST-selected Python diagnostic controls, outside the real native fixture registry. */
+function portableDiagnosticControls() {
+	const python = pythonExecutable();
+	const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-window-diagnostic-controls-'));
+	const source = path.join(
+		ROOT,
+		'static/ergopti_plus/linux/tests/hardware/run_window_switch_receipts.py'
+	);
+	const sourceHash = () =>
+		crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');
+	try {
+		const expectedHash = sourceHash();
+		for (const [filename, count] of [
+			['test_window_setup_failure_diagnostics.py', 6],
+			['test_window_cleanup_exception_precedence.py', 4]
+		]) {
+			const script = path.join(path.dirname(source), filename);
+			const output = path.join(directory, filename + '.json');
+			const result = spawnSync(
+				python,
+				['-I', '-B', script, '--source', source, '--receipt', output],
+				{
+					cwd: ROOT,
+					encoding: 'utf8',
+					stdio: ['ignore', 'pipe', 'pipe'],
+					shell: false,
+					windowsHide: true,
+					timeout: 15000,
+					maxBuffer: 1024 * 1024
+				}
+			);
+			if (result.stdout) process.stdout.write(result.stdout);
+			if (result.stderr) process.stderr.write(result.stderr);
+			assert.equal(result.error, undefined, filename + ': Python control did not complete');
+			assert.equal(result.signal, null, filename + ': Python control was interrupted');
+			assert.equal(result.status, 0, filename + ': Python control failed');
+			const receipt = JSON.parse(fs.readFileSync(output, 'utf8'));
+			assert.equal(receipt.state, 'PASS', filename + ': successful receipt required');
+			assert.equal(receipt.tests_run, count, filename + ': complete original control census');
+			for (const field of ['failures', 'errors', 'skipped'])
+				assert.equal(receipt[field], 0, filename + ': no ' + field + ' admitted');
+			assert.equal(receipt.native_actor_executed, false, filename + ': pure controls only');
+			assert.equal(receipt.selection.source_path, source, filename + ': exact source path');
+			assert.equal(
+				receipt.selection.source_sha256,
+				expectedHash,
+				filename + ': exact source bytes'
+			);
+			assert.equal(receipt.selection.production_module_imported, false);
+			assert.equal(receipt.selection.production_main_executed, false);
+			assert.equal(sourceHash(), expectedHash, filename + ': source changed during receiving');
+		}
+	} finally {
+		fs.rmSync(directory, { recursive: true, force: true });
+	}
+	console.log('PASS: Linux window portable diagnostics; 6 setup and 4 cleanup controls.');
+}
+
 if (require.main === module)
-	main().catch((error) => {
-		console.error(error);
-		process.exitCode = 1;
-	});
+	main()
+		.then(portableDiagnosticControls)
+		.catch((error) => {
+			console.error(error);
+			process.exitCode = 1;
+		});
 module.exports = { validate };
