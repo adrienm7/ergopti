@@ -148,15 +148,34 @@ end
 --- @return string|nil chunk nil when the file cannot be opened.
 --- @return boolean|string at_file_start, or the open error.
 --- @return number|nil errno of the open failure.
+--- @throws string When an opened file cannot be completely read and closed.
 function M.read_tail(path, max_bytes, open_fn)
 	local fh, err, code = (open_fn or io.open)(path, "rb")
 	if not fh then return nil, tostring(err), code end
-	local size = fh:seek("end")
-	local start = math.max(0, size - max_bytes)
-	fh:seek("set", start)
-	local chunk = fh:read(size - start) or ""
-	fh:close()
-	return chunk, start == 0
+	local read_ok, chunk, at_start = pcall(function()
+		local size, size_detail = fh:seek("end")
+		if type(size) ~= "number" or size < 0 then error("errors file end seek failed: " .. tostring(size_detail)) end
+		local start = math.max(0, size - max_bytes)
+		local position, seek_detail = fh:seek("set", start)
+		if position ~= start then error("errors file position seek failed: " .. tostring(seek_detail)) end
+		local expected = size - start
+		if expected == 0 then return "", start == 0 end
+		local content, read_detail = fh:read(expected)
+		if type(content) ~= "string" or #content ~= expected then
+			error("errors file tail read did not complete: " .. tostring(read_detail))
+		end
+		return content, start == 0
+	end)
+	local close_ok, closed, close_detail = pcall(function() return fh:close() end)
+	if not read_ok then
+		local message = tostring(chunk)
+		if not close_ok or closed ~= true then
+			message = message .. "; errors file close failed: " .. tostring(close_ok and close_detail or closed)
+		end
+		error(message, 2)
+	end
+	if not close_ok or closed ~= true then error("errors file close failed: " .. tostring(close_ok and close_detail or closed), 2) end
+	return chunk, at_start
 end
 
 --- Loads the recent-issue bounds from _shared/modules/diagnostics/recent_issues.json.

@@ -226,3 +226,19 @@ correction. Native Windows general receiving, macOS Managed/archive qualificatio
 installed wizard/device acceptance and the complete `Texte collé.txt` remain
 open. All six Group 1 items and transversal 16/38 stay partial; the feature and
 inactive Personal proposal are retained.
+
+## Selected-file reload and Mac opener follow-up, 2026-10-15
+
+The [new receiving boundary](2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md)
+records the normal Dev refresh, the independently reproduced selected-file
+reload defect and the macOS task-admission mismatch. Linux focused receiving
+passes sixteen added cases on both Lua engines; feature atom `bfa604bab` passes
+13,865 units and 193 E2E cases without failure. macOS focused receiving passes 88 cases
+and independent lifetime review accepts the four producers. Later terminal evidence must qualify its exact
+source separately; no previous run is borrowed for these corrections.
+
+The user does not recognize the old attachment reference. Its unavailable
+contents are not inferred or treated as a new prerequisite: current item 138
+and the explicit diagnostics request guide this bounded follow-up. Complete
+daily-log collection, installed export and actual issue editability remain open.
+Root retains integration ownership; no item is removed or release requested.
