@@ -1,0 +1,80 @@
+{
+  "files": {
+    "REPORT.md": {
+      "sha256": "5a39351c1325525269d25ca2b0acf59333ef801106cfd9644ea737a43ec17f97",
+      "bytes": 5086
+    },
+    "archive-members.json": {
+      "sha256": "b43418e95224de3bd19b53b1569577bccf39d1ebcdebef1f4b98528b4b1a2bc5",
+      "bytes": 1028
+    },
+    "artifact.zip": {
+      "sha256": "e11ee910e481e55564592d1a6e97b98d7af884aa541990f974a37bb8bfd46ea6",
+      "bytes": 2639579
+    },
+    "artifacts-page1.json": {
+      "sha256": "55f25ee87f0900db791ab566c6c3d2be29d3431cefa02dce2d1e46495ab73995",
+      "bytes": 38687
+    },
+    "failure-facts.json": {
+      "sha256": "54a0a677b63497baa0a1d2f300d2f408865d460f2fc4c4c000b915c58c6e8fb4",
+      "bytes": 16669
+    },
+    "job.json": {
+      "sha256": "c36d49dc6fd17b65d395a434e330504dfd6dd46d56a7c9497e05481808546d70",
+      "bytes": 7002
+    },
+    "job.raw.log": {
+      "sha256": "f37ba10b4a08909739e900c7ab93311b88aa6b175ed1824b28064a9af324ec04",
+      "bytes": 4243634
+    },
+    "metadata-receiving.json": {
+      "sha256": "1e48f44304d4f1eb65999b5c0f2e76370b075d4dc6cce5e0cfd7b4a9b02d173f",
+      "bytes": 320
+    },
+    "payload-receiving.json": {
+      "sha256": "10b4985e6d11130fca2ebbc31b803bb8da22758765d006bd2676e95be414a447",
+      "bytes": 320
+    },
+    "prior703-ordinal-joins.json": {
+      "sha256": "e3ee4e3d7faf29a495f2e1cc50c573bc2030703a55e7ef5dddfe207facbbe2cb",
+      "bytes": 299318
+    },
+    "review.json": {
+      "sha256": "a5ebf9b3b9c06e387325ad50b124001337816a6cfdc3f5270882e6fd406b9f69",
+      "bytes": 606
+    },
+    "source/static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1": {
+      "sha256": "2d18da079e95068323e7d0a278b3e12987f9d0735fef50f6821e2806370a29ac",
+      "bytes": 83505
+    },
+    "source/static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk": {
+      "sha256": "15c977c28e8bbc6b8c84475d1d5f652af57d4e388275afa173d5fdbccfd6f5e7",
+      "bytes": 26240
+    },
+    "source/static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk": {
+      "sha256": "ca88b2adf92a3f04112f744a0f37d57507bb17fe70f9710b7eeb13d0ad021d13",
+      "bytes": 127637
+    },
+    "source-pins.json": {
+      "sha256": "688f6de795f2cf31655866feca326e086efeea4fcc3ad02aece97aa46a4c0ed6",
+      "bytes": 772
+    },
+    "summary.json": {
+      "sha256": "eabd6b3333c405bb225a73d8d1739f4dc96858daa537745848b9b5500a2782a0",
+      "bytes": 3959
+    },
+    "windows-ahk-execution-manifest.json": {
+      "sha256": "7789d9c34ff54f4f0f3806ae10a2cd1c5fc603f9ba1601ed5938c0f2b41c93c3",
+      "bytes": 2283058
+    },
+    "windows-ahk-suite.stderr.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "windows-ahk-suite.stdout.log": {
+      "sha256": "cb73ef67106609ab4f247d66e0bb9920ff8859b92fcb5e7b1ff405e5f25d8977",
+      "bytes": 4468565
+    }
+  }
+}

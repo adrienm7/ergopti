@@ -87,41 +87,23 @@ successors have been requested before adoption: the original published meta
 representation has a known source-ratchet failure, so it is not imported as a
 qualified intermediate. Root's release publication boundary remains reserved.
 
-## Remaining work by TODO
+## Final receiving and container closure
 
-No whole group item is removed; transversal16/38 remain. Item22 stays excluded.
+The numbered Group 3 blocks in [the global checklist](../../ERGOPTIPLUS_TODO.md)
+are the sole remaining-work list. Historical pending statements above describe
+those exact earlier checkpoints and must not override final receipts in the
+[container closure handoff](../2026-10-15-group3-container-closure/README.md).
 
-| Items     | Concrete remaining work                                                                                                                                                                            |
-| --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 63/71/73  | Current three-OS provider/menu/full-save/upgrade and installed acceptance. Actual luminance needs a supported screen. The historical disabled-category cause is unknown.                           |
-| 91        | Integrate authenticated native source/press custody, retained first-down/up arbitration and real simultaneous delivery; the detached core is inactive preparation.                                 |
-| 93        | Receive the declared Xi runtime and real input/modifier/output joins, then installed and kernel lifecycle proof. Existing simultaneous Manager must not be rebuilt.                                |
-| 96        | Run the corrected positive picker case below, then final selection/migration/installed acceptance.                                                                                                 |
-| 97/98/108 | Complete genuine physical-source/modifier/output ownership and cross-owner collision joins, arbitrary symbols/Magic output and acknowledged migration. Capability remains false where unavailable. |
-| 106       | Actual Apple Shortcuts invocation and bounded native service retirement remain absent; inventory/adapter tests cannot substitute. Final parameter-owner acceptance is separate.                    |
-| 107       | Windows HKL and Mac forced digit/symbol output owners remain missing; Linux requires declared Xi/Writer/Xorg joins. Original source/native/TIS/profile guards remain mandatory.                    |
-| 109       | Fresh invisible Windows debug-console/key-history acquisition still needs an original native owner; do not retitle A_ScriptHwnd.                                                                   |
-| 111       | Final current Mac/installed receiving and real cursor-display/focus/two-monitor acceptance. Existing successful Linux switcher/install proof remains valid for its exact source.                   |
+The ae278 manual run is now terminal: Shared and the whole Linux lane passed,
+including all seventeen installed launches. Windows completed12,729 unit cases:
+12,722 passed and seven original managed-network fixture cases failed. The
+corrected item96 picker callback passed; Windows E2E/build/install were skipped.
+No native Mac or physical-input qualification is inferred.
 
-The Xi fourteen-path literal patch and exact two Root workflow operands are
-recoverable in [coordination6194744385](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6194744385).
-They remain unadopted, pending generated/runtime/workflow ownership composition;
-real resolver success is not ELF staging or installation. The raw-origin patch
-in [coordination6191540747](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6191540747)
-adds a nineteenth native fingerprint input and needs its own genuine rebuild
-and fallback/FIFO proof. Do not mix it into the eighteen-input artifact above.
-
-## Fast next Windows receiving
-
-Receive the exact public fixture source at a natural safe boundary, from the
-Windows driver directory, using the existing runner without changing budgets:
-
-```powershell
-AutoHotkey64.exe /ErrorStdOut=UTF-8 tests\run_all.ahk --only "layout selection: genuine scope completion commits the selected Ergopti+ source (todo96-picker-handoff)"
-```
-
-The prior failing callback took3.3seconds. The runner refuses zero matches.
-The fix explicitly asserts that sparse storage omits the neutral empty leaf,
-then retains the effective-empty value assertion. A green targeted callback
-still does not replace whole final E2E/build/install qualification. Source
-handoff: [coordination6195137297](https://github.com/adrienm7/ergopti/issues/86#issuecomment-6195137297).
+The later full-save timer admission correction is committed in46d6388d, with
+all435 local Common controls passing. Its genuine native receiving remains
+unexecuted. The current feature subsequently received devc8a7b1f6 without
+conflict. The historical release publication hold was followed by an explicit
+maintainer instruction to integrate this partial work and close the container.
+The closure handoff preserves literal inactive raw-origin/Xi preparations and
+compact terminal evidence; the global checklist retains every open group item.

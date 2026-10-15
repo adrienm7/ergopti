@@ -1,0 +1,12 @@
+#ifndef ERGOPTI_RAW_HOOK_ORIGIN_H
+#define ERGOPTI_RAW_HOOK_ORIGIN_H
+#include "replay_route_core.h"
+/* Exact original non-injected NavCaptureTerminalEventLocked supplier:
+ * incoming.origin = ERGOPTI_REPLAY_PHYSICAL;
+ * This finite projection is not a Windows hook execution. */
+static inline uint8_t ErgoptiReplay_RawHookOrigin(uint32_t vk, uint32_t raw_scan, uint32_t flags)
+{
+ (void)vk; (void)raw_scan; (void)flags;
+ return ERGOPTI_REPLAY_PHYSICAL;
+}
+#endif

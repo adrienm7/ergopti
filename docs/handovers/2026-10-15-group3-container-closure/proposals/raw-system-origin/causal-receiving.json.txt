@@ -1,0 +1,109 @@
+{
+  "outdir": "/tmp/ergopti-raw-origin-causal-lwsmqizs",
+  "baseline_projection": "exact original native producer constant origin assignment; actual original e850 portable core; unchanged new handwritten control+all8old matrices; not native Windows execution",
+  "rows": [
+    {
+      "name": "original-producer-original-core",
+      "compile_argv": [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-O2",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/replay_route_core.c",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/replay_route_core_test.c",
+        "-o",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/test"
+      ],
+      "compile_exit": 0,
+      "run_exit": -6,
+      "stdout": "",
+      "stderr": "test: /tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/replay_route_core_test.c:631: TestRawSystemOriginDoesNotRetireUserHold: Assertion `memcmp(&retained, &state, sizeof(state)) == 0' failed.\n"
+    },
+    {
+      "name": "candidate",
+      "compile_argv": [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-O2",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate/replay_route_core.c",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate/replay_route_core_test.c",
+        "-o",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate/test"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    },
+    {
+      "name": "withdrawn-origin-guard",
+      "compile_argv": [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-O2",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/replay_route_core.c",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/replay_route_core_test.c",
+        "-o",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/test"
+      ],
+      "compile_exit": 0,
+      "run_exit": -6,
+      "stdout": "",
+      "stderr": "test: /tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/replay_route_core_test.c:631: TestRawSystemOriginDoesNotRetireUserHold: Assertion `memcmp(&retained, &state, sizeof(state)) == 0' failed.\n"
+    },
+    {
+      "name": "restored",
+      "compile_argv": [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-O2",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/restored/replay_route_core.c",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/restored/replay_route_core_test.c",
+        "-o",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/restored/test"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    },
+    {
+      "name": "candidate-sanitized",
+      "compile_argv": [
+        "cc",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-Wpedantic",
+        "-Werror",
+        "-O1",
+        "-g",
+        "-fsanitize=address,undefined",
+        "-fno-omit-frame-pointer",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate-sanitized/replay_route_core.c",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate-sanitized/replay_route_core_test.c",
+        "-o",
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate-sanitized/test"
+      ],
+      "compile_exit": 0,
+      "run_exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    }
+  ]
+}

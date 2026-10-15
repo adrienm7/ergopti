@@ -1,0 +1,137 @@
+[
+  {
+    "path": ".github/workflows/ci-linux.yml",
+    "historical_blob_prefix": "a181b80c2",
+    "historical_sha256": "827d0823219a063caffebca093888d401606e63f651aee3cc0543139c314e0db",
+    "current_sha256": "987e99fc4a6f35beaac34daff281af41db29fd51b68b8e4162b42c5ff4c4ca83",
+    "same_preimage": false,
+    "generated": false,
+    "workflow": true
+  },
+  {
+    "path": "static/ergopti_plus/_shared/data/linux_native_runtime.json",
+    "historical_blob_prefix": "fbf2017ba",
+    "historical_sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195",
+    "current_sha256": "cde8bda76903021b054cb8c7bf570908070dae9e2fee7fcabd46cc93ee630195",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "static/ergopti_plus/linux/_generated/native_runtime.lua",
+    "historical_blob_prefix": "5de96c152",
+    "historical_sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2",
+    "current_sha256": "188d4ff7f5e8d0433d5f9b1b72feea039fd0faf8b05b0e49965614d1ec3a6bf2",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "static/ergopti_plus/linux/install.sh",
+    "historical_blob_prefix": "c7fd173cd",
+    "historical_sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c",
+    "current_sha256": "696eb956a134e8b2720b4f7b3215b1381cbddcdad3648f8332a294b8ee117a0c",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "tools/build/PKGBUILD",
+    "historical_blob_prefix": "6ec563800",
+    "historical_sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4",
+    "current_sha256": "3d0e6c20497052cd782601275555f908d108eb2da584e04ed68e9a5c203d44d4",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "tools/build/build-linux-deb.sh",
+    "historical_blob_prefix": "c82ab4816",
+    "historical_sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989",
+    "current_sha256": "9b8db04146ef2a19ad3cdee17e891ef77a1e52a97a0df83d8660c081661e0989",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "tools/build/build-linux-rpm.sh",
+    "historical_blob_prefix": "7bb07bab8",
+    "historical_sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd",
+    "current_sha256": "89c3d29ae1357aeb5701c0d98be5713584ec1f800379a32b751b8170efd59edd",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "tools/build/nix/flake.nix",
+    "historical_blob_prefix": "06b9e6823",
+    "historical_sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e",
+    "current_sha256": "a38dc1ca31d4d10df3cfd265035b7e807b1cdec99bc4336468d7773e02e7b97e",
+    "same_preimage": true,
+    "generated": true,
+    "workflow": false
+  },
+  {
+    "path": "tools/build/stage-linux-network-runtime.py",
+    "historical_blob_prefix": "3cf44fa94",
+    "historical_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
+    "current_sha256": "ac48a4e9755fb2b9e9cbe35c81b097942bf7be76d14466e03b891b4c78f302f5",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/codegen/codegen-linux-native-runtime.cjs",
+    "historical_blob_prefix": "e1e2b0dde",
+    "historical_sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1",
+    "current_sha256": "a2e2e8dc4659cf0a2ec6373eb0dc18cb70665a86d564585828d7cbfa81b68dd1",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/test/fixtures/validation-curl/PINS.json",
+    "historical_blob_prefix": "3d555ba58",
+    "historical_sha256": "e46c8011cf4a8da400dff797c3f09d34ac5cdc91fb04bbebbd4b44466432c8de",
+    "current_sha256": "e46c8011cf4a8da400dff797c3f09d34ac5cdc91fb04bbebbd4b44466432c8de",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/test/test-linux-crypto-runtime.cjs",
+    "historical_blob_prefix": "701bb5e34",
+    "historical_sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf",
+    "current_sha256": "0a87f625930d8ce6baeae903d723f82a6d40f1c7948fc78adcd6324f4bddbfbf",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/test/test-linux-launcher-deps.cjs",
+    "historical_blob_prefix": "b82ddf459",
+    "historical_sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411",
+    "current_sha256": "f80709c6adadd63c52691c415ddf57091f5d1e27dcb5c6eaef4ffba335dde411",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/test/test-linux-network-runtime.cjs",
+    "historical_blob_prefix": "811dcbcdf",
+    "historical_sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e",
+    "current_sha256": "cf4838268f5a5bb8686fa6e6ace0c61386b49c37cd8553f5e905387e14d2bf3e",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  },
+  {
+    "path": "tools/test/test-linux-portable-network-runtime.cjs",
+    "historical_blob_prefix": "b28b5500a",
+    "historical_sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a",
+    "current_sha256": "91e1b5aab50a927ec547b7f3ed6757854807210a21fc75d104eb585ccbd4176a",
+    "same_preimage": true,
+    "generated": false,
+    "workflow": false
+  }
+]

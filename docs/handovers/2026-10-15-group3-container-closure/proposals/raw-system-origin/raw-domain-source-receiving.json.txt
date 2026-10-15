@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/AutoHotkey/AutoHotkey/v2.0.26/source/keyboard_mouse.h",
+      "body_sha256": "0ad6ae8dcb310aed572d2495ff90c4ea58331e8557437a6b6ec2f56b8582b847",
+      "literal_range": "133\u2013150",
+      "saved_excerpt": "raw-domain-source.txt"
+    },
+    {
+      "url": "https://learn.microsoft.com/en-us/windows/win32/api/winuser/ns-winuser-kbdllhookstruct",
+      "status": "NOT_RECEIVED",
+      "error": "<urlopen error Tunnel connection failed: 403 Forbidden>"
+    }
+  ],
+  "native_occurrence": "NOT_OBSERVED; no Windows physical/current runner execution"
+}

@@ -1,0 +1,6 @@
+[
+  "python3",
+  "/workspace/.ergopti-cloud/reap_validation.py",
+  "node",
+  "tools/test/verify-change.cjs"
+]

@@ -1,0 +1,13 @@
+# Item 109: proposed window-position subclass boundary
+
+The proposed mechanism does not provide a supported guarantee of fresh capture without activation. This finite source finding concerns only an owned-thread `SetWindowSubclass` callback that clears `SWP_SHOWWINDOW` during `WM_WINDOWPOSCHANGING`; it does not declare all possible native capture methods impossible.
+
+Exact retained AutoHotkey 2.0.26 commit `542510fe0eee2358820a1864ec8b4c9d61b39e0b` updates the genuine Edit text before showing its identity window (`script2.cpp:779–786`). It then calls activating `ShowWindow(SW_SHOW)` and possibly `SW_RESTORE` (`788–793`). Independently, it attempts `SetForegroundWindow` and its own fallback (`795–797`). A window-position callback does not intercept that subsequent API call.
+
+Microsoft's authoritative `WM_WINDOWPOSCHANGING` documentation permits adjusting position flags, but explicitly states at lines 52–53 that changes to some flags, including `SWP_NOACTIVATE` and `SWP_NOOWNERZORDER`, are ignored during that message. Clearing SHOW therefore cannot be combined with an assumed supported NOACTIVATE veto there. The finding does not assert that clearing SHOW is always ignored, or that every hidden-window activation attempt necessarily succeeds.
+
+The exact retained fallback in `window.cpp` retries foreground activation at line 69, can attach the foreground and target input threads at 192/194, emits Alt-UP at 223 after failure and may emit two Alt strokes at 260–261. On success it can bring the target to the top at 309. Those operations lie outside the proposed WINDOWPOS flags edit. Final hiddenness alone does not establish unchanged foreground, child focus or keyboard state. Same-process ownership is also insufficient for the subclass helper: Microsoft requires the owning thread and explicitly provides no callback reference counting.
+
+`FINDING.json` records the original retained paths, full body SHA-256/bytes, immutable AutoHotkey URLs, authoritative Microsoft documentation URL/body snapshots and literal line excerpts. The packet includes those six exact source/documentation bodies. Microsoft documentation snapshots are not release-pinned Windows implementation proof; upstream AutoHotkey source is not source-to-current-binary qualification.
+
+No native actor, test, API probe, window message, source change, checkout/index/ref or workflow operation was performed. No product patch or probe was prepared because the proposed flag-only mechanism lacks the required activation guarantee. Existing changed-sentinel, whole-acquisition visibility/foreground, child-focus and identity assertions remain necessary for any future genuinely supported provider.

@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "verdict": "ACTUAL_COMPLETE_12722_PASS_7_FAIL_NATIVE_TLS_CONSTRUCTOR_BOUNDARY_CONFIRMED",
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "run": 38766625752,
+  "job": 116532179116,
+  "summary_sha256": "eabd6b3333c405bb225a73d8d1739f4dc96858daa537745848b9b5500a2782a0",
+  "report_sha256": "5a39351c1325525269d25ca2b0acf59333ef801106cfd9644ea737a43ec17f97",
+  "source_pins_sha256": "688f6de795f2cf31655866feca326e086efeea4fcc3ad02aece97aa46a4c0ed6",
+  "reviewer_native_or_tests": false,
+  "specific_inner_provider_guard": "UNKNOWN",
+  "production_behavior_fix_proposed": false
+}
