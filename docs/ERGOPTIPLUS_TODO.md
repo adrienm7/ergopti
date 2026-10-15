@@ -5321,6 +5321,35 @@ protected builder-capture cases also pass in each mode. Historical approvals,
 source profiles and independent expectations remain unchanged. No SDK build,
 native compiler, signed product or driver-update profile is qualified here.
 
+Five semantic consumer-key identities now retain their own press and hold
+records through admitted macOS capture, FIFO, raw history, separate shared SQL
+projections and the daily dashboard. They never acquire numeric keyboard
+positions or typing/WPM credit. The real keycode generator supplies their
+existing translated labels in all 21 languages. Linux storage and the daily
+reader use the same shared schema and policy for already-admitted events;
+ambiguous read/write completion retains debt and publishes no media success.
+Focused receiving passes 272 macOS cases, 28 bootstrap cases, twelve shared UI
+cases and 22 existing Linux SQLite-module cases on each Lua runtime. The
+bootstrap fixture now scopes its original instrumentation to the original
+child, preserving the independently checked media child and every old assertion.
+The Windows reader now projects the same separate media maps through native
+SQL constraints, keeping every numeric projection. Old format14 cache images
+are upgraded on a private clone before the unchanged-image return; the open
+read-only original and its offsets remain unchanged. Failed unpublished
+candidates require an actual non-v2 SQLite close acknowledgment and retain debt
+on refusal. Seven independent SQL recipe controls pass; nine additional AHK
+cases are authored but unexecuted on this Linux host.
+
+Windows PC steps: run all nine `Semantic media history:` native cases, including
+prepared-statement BUSY/finalize/OK and both old read-only cache upgrade paths;
+then the existing durable-cache, worker memory/exit, parse, unit/meta, E2E and
+build checks on the final source. The existing publisher retains its disposable
+worker lifetime contract; no new per-connection cleanup proof is claimed.
+Linux native device/capture identity enrollment and Windows event-local
+RawInput provenance remain software follow-ups, distinct from these readers.
+Native packages, installed capture, WebView presentation and physical input
+remain unqualified; owned startup is still not enabled.
+
 Ordinary launcher child environments now discard an inherited installed-capture
 control marker before launching Hammerspoon. Fresh-owned selected launches add
 only their original newly issued marker after that boundary. The three frozen

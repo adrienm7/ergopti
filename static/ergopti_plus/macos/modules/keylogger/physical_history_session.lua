@@ -26,7 +26,7 @@ local function scope_ports(scope, names)
 	return result
 end
 
-local function resolve_native_ports(managed)
+local function resolve_native_ports(managed, media_constructor)
 	local native = rawget(_G, "hs")
 	local json = type(native) == "table" and rawget(native, "json") or nil
 	local decode, encode = port(json, "decode"), port(json, "encode")
@@ -37,7 +37,7 @@ local function resolve_native_ports(managed)
 	local engine_bind = port(Keylogger, "bind_physical_lifecycle_observer")
 	local system_bind, pause_bind = port(Watchers, "bind_physical_lifecycle_observer"), port(ScriptControl, "bind_physical_pause_observer")
 	local context_sample = managed and port(Tracker, "sample_physical_context") or nil
-	return { context_sample = context_sample, decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
+	return { media_constructor = media_constructor, context_sample = context_sample, decode = decode, encode = encode, capture_init = capture_init, capture_bind = capture_bind, capture_stop = capture_stop, clock_bind = clock_bind, project = project, configuration_bind = configuration_bind, context_bind = context_bind, may_persist = may_persist, engine_bind = engine_bind, system_bind = system_bind, pause_bind = pause_bind }
 end
 
 local function new_session(capacity, on_refused, native_ports)
@@ -275,6 +275,20 @@ local function start_options(value)
 	result.arguments = {}
 	for index, argument in next, arguments do result.arguments[index] = argument end
 	return result
+end
+
+--- Snapshots only an explicitly supplied optional pure media constructor.
+--- Missing optional ports preserve legacy numeric-only preparation; a declared
+--- constructor cannot be skipped or used as source/READY/native support evidence.
+local function prepare_media(constructor)
+	if constructor == nil then return nil end
+	local supplied = constructor()
+	assert(type(supplied) == "table" and getmetatable(supplied) == nil, "Invalid prepared physical media ports")
+	local names = { resolve = true, is_known = true, emit = true, emit_release = true }
+	for name in next, supplied do assert(names[name], "Invalid prepared physical media port") end
+	local snapshot = {}
+	for name in pairs(names) do snapshot[name] = port(supplied, name) end
+	return snapshot
 end
 
 --- Creates a dormant once-init manager; all successor leases use fresh closures.
@@ -528,7 +542,12 @@ local function new_manager(capacity, on_refused, native_ports)
 		schedule()
 		notify()
 	end
+	initializing = true
+	local prepared, media = pcall(prepare_media, native_ports.media_constructor)
+	initializing = false
+	if not prepared then return nil, "physical_history_media_preparation_failed" end
 	local capture_ports = {
+		media = media,
 		spawn = port(ShellRunner, "spawn"), decode = native_ports.decode, encode = native_ports.encode,
 		clock_ready = function(info) return routes("clock_ready", info) end,
 		baseline_ready = function() return routes("baseline_ready") end,
@@ -661,13 +680,15 @@ local function validate_options(options)
 end
 
 --- Installs captured ports once; neither form starts or installs a native runtime.
-function M.init(capacity, on_refused, options)
+function M.init(capacity, on_refused, options, media_constructor)
 	local managed = validate_options(options)
+	assert(media_constructor == nil or managed and type(media_constructor) == "function",
+		"Invalid optional physical media constructor")
 	assert(math.type(capacity) == "integer" and capacity > 0 and capacity <= Coordinator.MAX_HISTORY,
 		"Invalid native history session budget")
 	assert(type(on_refused) == "function", "Missing native history session refusal observer")
 	if initialized or initializing then return nil, "physical_history_session_already_initialized" end
-	local native_ports = resolve_native_ports(managed)
+	local native_ports = resolve_native_ports(managed, media_constructor)
 	if managed then
 		local manager, reason, stop = new_manager(capacity, on_refused, native_ports)
 		if manager then current_owner, current_stop, current_retired = manager, stop, manager.retired end
@@ -691,6 +712,15 @@ function M.init(capacity, on_refused, options)
 	current_owner = session
 	current_stop, current_retired = legacy_forwarder(session, handlers, native_ports, on_refused)
 	return session
+end
+
+--- Explicit dormant managed metrics preparation; never a boot/start/READY grant.
+--- Capture the original initializer so public facade replacement cannot redirect
+--- this factory into a different owner or numeric fallback.
+local prepare_original = M.init
+function M.prepare_managed_metrics(capacity, on_refused)
+	local constructor = port(require("modules.keylogger.physical_media_metrics"), "new")
+	return prepare_original(capacity, on_refused, { managed = true }, constructor)
 end
 
 --- Forwards only to this module's privately captured, already initialized owner.
