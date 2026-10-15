@@ -12511,6 +12511,17 @@ original budgets. See the Snapshot17 handover; item 91 remains partial.
   are prerequisites, not assignment authority. Active new physical delivery remains
   unavailable on Linux/macOS; fixed accent menus/defaults are not retired.
 
+  Linux navigation now admits original-load bytes only after the unchanged
+  shared classified reader acknowledges close. Actual absence remains absence;
+  failed reads or false/nil close acknowledgements refuse the source. Boot
+  isolates a refused user file while preserving tap-holds; reload keeps the
+  exact installed engine/admission, and a refused shipped registry is fatal.
+  Five new real-file/controlled-ACK cases fail on the original producer and
+  pass on the correction under LuaJIT and Lua 5.4; all ten original reload
+  cases remain unchanged. This repairs the read contract only: original-load
+  source observation, all-owner collision admission and native delivery remain
+  open, with no new physical assignment/output capability.
+
   The Linux daemon E2E fixture now explicitly activates the real virtual
   magic-replacement preference before selecting a repeat source. Enabling
   mapping sections alone does not establish that precondition. Original
