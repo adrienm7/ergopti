@@ -12608,10 +12608,14 @@ failure: the new ownership route reaches the tap accessor before its two
 global owners are guaranteed. The accessor now refuses either absent owner
 with the same empty result as the existing hold accessor; two independent
 unset controls retain and restore actual prior global presence. All 349 prior
-assertion starts and 51 registrations remain. Source review and encoding pass;
-the unchanged native meta guard, new AHK cases and complete native successor
-remain UNRUN. The hosted 11,976-pass/703-failure result is retained; the other
-failures are not exonerated by this repair or by different file ownership.
+assertion starts and 51 registrations remain. Source review and encoding pass.
+The later exact-source Windows run 38738856943 receives both new accessor
+controls and the original boot meta guard as PASS; all 703 previously failed
+case names and occurrences now pass. The complete successor receives 12,682
+passes and one separate picker-fixture failure recorded under item96.
+The corrected picker still needs targeted native receiving; E2E, build and
+installation were skipped. The original 11,976/703 failure is retained, and
+the earlier seven managed-network failure causes remain unknown.
 
 A finite inactive Windows simultaneous arbitration core is preserved in the
 [prepared source capsule](handovers/2026-10-15-group3-windows-pair-core/README.md).
@@ -13726,6 +13730,16 @@ and installation qualification are still required.
   declined: scanner 11/0, provider 79/0. Moving assignment before the unchanged
   prompt guard yields 57/22 and restoration 79/0. These focused test repairs do
   not claim a new complete macOS/native or installed qualification.
+
+  The same frozen selected batch completes Linux E2E 193/0 and unit receiving
+  13,857/0 across 521 modules. The final reconciled feature tree preserves all
+  Linux/shared/tool sources byte-for-byte from that run; only the three Mac
+  fixtures and Windows/dev inputs differ. The batch remains exit1 because of
+  its original three Mac failures, followed by focused corrected receiving
+  126/0, not a newly green whole suite. The coherent native18 Windows pair is
+  received from Root's published source; current dev composition and native
+  acceptance remain separate. See the
+  [delivery checkpoint](handovers/2026-10-15-group3-actions-delivery/README.md).
 
   Linux now joins parameter and assignment publication for all four menu
   invokers through the existing retained transaction. Refused publication
