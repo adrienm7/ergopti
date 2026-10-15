@@ -315,6 +315,8 @@ jobs:
       # never in a tree restored from an earlier run.
       # Retained original role: managed-ollama-native
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
         env:
           GOTOOLCHAIN: 'local'
           ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
