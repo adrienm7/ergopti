@@ -5554,6 +5554,15 @@ the complete three-OS checkpoint remain pending.
 - [ ] **36.** Packaging remainder (the former item 21): macOS release archive as
       `.tar.xz` (verify Sparkle, the Homebrew cask and CI install first).
 
+2026-10-15 the generated Homebrew process matcher now treats the application
+bundle dot literally. The prior ERE also matched foreign ErgoptiPlusXapp,
+ErgoptiPlus-app and ErgoptiPlusZapp processes and could request an erroneous
+relaunch. The existing cask guard covers both channels and both archive formats
+with independent real/foreign path fixtures; original source fails causally.
+This portable generator correction does not qualify native pgrep, consent,
+Brew install/upgrade/recovery or archive/signature receiving. Item36 and16/38
+remain open.
+
 2026-10-12 producer and publication archive readers share one-close receiving
 that preserves exact read/validation and secondary close failures, including
 thrown falsy values. Nonblocking open precedes the original regular-file checks;
