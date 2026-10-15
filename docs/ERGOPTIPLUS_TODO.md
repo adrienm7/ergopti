@@ -13793,6 +13793,20 @@ Recoverable inactive patches, independent source reviews and real command
 receipts are preserved in [the source-receiving followup](handovers/2026-10-14-group3-source-receiving-followup/README.md).
 No item is removed; all native/installed/physical requirements remain.
 
+The exact current-default macOS source supplier is now published as
+`5b0664a64e6d023506563ee822631f42369df229`. Its 139 API/Git input bodies
+match the independently received 127-leaf default; actual dev0ba and strict69
+ancestry are proved, with no EB6 ancestry assumption. A concrete four-controller
+proposal retains 133 project/policy inputs and separate operational custody.
+Independent source review closes its final-metadata/source-join ordering defect;
+original 51 controls remain whole-AST exact and thirteen additive controls are
+UNRUN. Root's independent operational authority, trusted digest transport,
+workflow enrollment and actual native receiving remain required. The complete
+recoverable source capsule and literal review limits are in
+[the current-default handoff](handovers/2026-10-15-group3-current-default-source/README.md).
+This is not profile approval, SDK expansion, new native availability or item
+completion.
+
 - [~] **108.** Make the default hotstring-editor shortcut follow the
   physical key directly typing the chosen magic character: Ctrl on macOS,
   Win/Super on Windows/Linux. Implemented: one ordinary editable conditional
@@ -14075,6 +14089,18 @@ owners. It exposes only fixed title enums, status and UTF-8 byte counts from
 the last completed native search. All thirteen original helper controls pass
 on the joined sources; they execute no hardware main or native GUI. The final
 native source, package and installed window acceptance remains unqualified.
+
+Manual Linux run38677041572 on integrated dev0ba is terminal FAILURE at original
+owned-xmessage discovery: the first active test window remains unobserved within
+the unchanged five-second deadline, before any routing action. The closed
+diagnostic records status1/stdout0/stderr0, live server/WM/client and an empty
+EWMH stack; cause is unknown. Common 426, properties, Linux 13757/0 units and
+package pass, but both strict verdicts fail and installation/launch is UNRUN.
+A local genuine attempt refuses before actor acquisition because the required
+kernel child-census entry is absent; no guard is bypassed. This does not prove
+a product regression or native/physical acceptance. Exact source/failure and
+recoverable receiving limits are preserved in
+[the current-default handoff](handovers/2026-10-15-group3-current-default-source/README.md).
 
 - [ ] **112.** Accept an AI prediction immediately with its configured
       modifier-plus-digit shortcut, with matching shortcut hints on all three OSes.
