@@ -825,21 +825,29 @@ function M.update_private_status()
 	if _is_paused() then return end
 
 	local win = hs.window.focusedWindow()
-	_state.is_private_window    = false
 	_state.is_fullscreen        = false
 	_state.session_document_path = nil
 
-	if not win then return end
-	observe_window_identity(win)
+	if not win then
+		_state.is_private_window = false
+		require_modifier_settlement()
+		return
+	end
 
+	-- Preserve the prior denial until the classifier has actual title input.
+	-- All unrelated native metadata and persistence callbacks run only after
+	-- the new classification and its exact modifier settlement are published.
+	local native_title = win:title()
+	local title = native_title or ""
+	_state.is_private_window = PrivateWindow.matches(title, get_private_keywords())
+	require_modifier_settlement()
+
+	observe_window_identity(win)
 	-- hs.window:isFullScreen() returns nil for a window that does not expose the
 	-- attribute, and is_fullscreen feeds an INTEGER NOT NULL column — coerce to a
 	-- boolean here so a nil can never reach the writer in the first place.
 	_state.is_fullscreen = win:isFullScreen() == true
-
-	local native_title = win:title()
-	local title = native_title or ""
-	local now   = hs.timer.absoluteTime() / 1000000
+	local now = hs.timer.absoluteTime() / 1000000
 
 	-- Log intra-app window switches (tab changes, new windows in the same app)
 	if _last_win_title and _last_win_title ~= title and _state.active_app_name then
@@ -862,9 +870,7 @@ function M.update_private_status()
 	-- function already has the title in hand on every window change.
 	_state.active_win_title = title
 
-	-- Check for private/incognito mode keywords in the window title
-	if PrivateWindow.matches(title, get_private_keywords()) then
-		_state.is_private_window = true
+	if _state.is_private_window then
 		Logger.debug(LOG, "Private browsing window detected in '%s'.", _state.active_app_name or "?")
 	end
 
@@ -1060,7 +1066,7 @@ end
 -- ============================
 -- ============================
 
---- Initializes the context tracker with its three injected dependencies.
+--- Initializes the context tracker with required dependencies and an optional settlement owner.
 --- Must be called exactly once before any callbacks are registered.
 --- The pause predicate is mandatory: without it the tracker would keep writing
 --- app switches, window titles and autocorrect events while the script is
