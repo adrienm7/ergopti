@@ -4920,10 +4920,29 @@ in the same private temporary directory, including actual C/header/ELF
 receiving. The grouped gate remains exit 1; no full Common rerun or native
 macOS qualification is claimed. Swift is explicitly deferred on Linux.
 ARM64/Intel compilation, signed-helper and packaged launch/installation
-qualification remain open. A separate unexecuted Linux ordinary-key hold
-counterexample can include an excluded middle interval; its native hold owner
-requires coordination before a source fix. No Windows physical acceptance or
-customer lease repair follows from these portable results.
+qualification remain open. No Windows physical acceptance or customer lease
+repair follows from these portable results.
+
+Linux ordinary-key measurements now retain an opaque admission identity from
+their actual DOWN through UP. Observed private, secure and application-policy
+exclusion, pause entry and UI capture revoke the entire interval before
+reentrant callbacks. Statistics reset retains observed focus while revoking
+old measurements; recovered held-key snapshots cannot mint a fresh press.
+The real Main startup binds this port only to its completed capture session.
+Both LuaJIT and Lua 5.4 pass 23 focused cases and 62 neighboring controls.
+Original production preserves the eight original cases and fails ten actual
+excluded-duration assertions; its separate missing-new-port assertion is not
+counted as incident causality. Two existing Main callback fixtures require an
+explicit genuine collector dependency, with their original assertions intact.
+The complete frozen-source Linux batch passes 13,772 units across 521 modules
+and 193 simulated E2E cases through the original LuaJIT runner. All six source
+images remain unchanged; process supervision observes zero pending or rescued
+children. Formatting and all 426 Common checks pass on the combined source.
+The [independent source review](handovers/2026-10-15-group5-linux-holds/SOURCE-REVIEW.md)
+retains its literal decision and exact original/current identities.
+Native supplier-profile reconciliation, actual X11/group/window-switch and Nix
+package qualification, Wayland delivery and physical acceptance remain open.
+No native pin or customer lease assertion is waived by this source correction.
 
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled

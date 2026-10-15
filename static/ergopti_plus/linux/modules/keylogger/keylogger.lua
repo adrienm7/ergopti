@@ -293,6 +293,11 @@ local function may_record()
 	return true
 end
 
+-- Opaque producer authority: excluded time can never be reconstructed on release.
+local _hold_token = {}
+local _hold_focus_app = nil
+local settle_hold_policy
+
 -- Base directory for log file persistence (JSON fallback).
 local _log_dir = nil
 
@@ -438,6 +443,9 @@ function M.init(opts)
 	_private_filter_enabled     = preferences["metrics.private_filter_enabled"]
 	_secure_filter_enabled      = preferences["metrics.secure_filter_enabled"]
 	_system_auth_filter_enabled = preferences["metrics.system_auth_filter_enabled"]
+
+	_hold_token = {}
+	_hold_focus_app = nil
 
 	-- Custom password apps (reset then rebuild to avoid duplicates on re-init).
 	if type(options.password_apps) == "table" then
@@ -767,6 +775,7 @@ end
 --- @param timestamp_ms number|nil Monotonic transition timestamp in milliseconds.
 function M.on_app_focus(app_id, timestamp_ms)
 	if type(app_id) ~= "string" or app_id == "" then return end
+	M.observe_hold_focus(app_id)
 	-- Gated like every other recording entry point: focus time and app
 	-- switches are records too, and tracking them while recording is
 	-- forbidden would persist them on the next flush. The in-flight interval
@@ -1061,6 +1070,34 @@ function M.is_password_app(app_id)
 	return false
 end
 
+local hold_password_app = M.is_password_app
+settle_hold_policy = function()
+	if not may_record() or hold_password_app(_hold_focus_app) then
+		_hold_token = {}
+		return false
+	end
+	return true
+end
+
+--- Publishes focus to the hold producer before reentrant UI callbacks.
+--- @param app_id string|nil Current foreground application, retained only in memory.
+function M.observe_hold_focus(app_id)
+	_hold_focus_app = type(app_id) == "string" and app_id ~= "" and app_id or nil
+	settle_hold_policy()
+end
+
+--- Returns the current admission identity for physical hold measurements.
+--- @return table|nil token Opaque authority, never a duration or input payload.
+function M.hold_accounting_token()
+	if not settle_hold_policy() then return nil end
+	return _hold_token
+end
+
+--- Retires in-flight measurements when the daemon owner excludes input.
+function M.cancel_hold_intervals()
+	_hold_token = {}
+end
+
 --- Records how long one key was held.
 ---
 --- The threshold between a tap and a hold is the shared tap-hold activation
@@ -1151,6 +1188,7 @@ end
 function M.suppress()
 	if not _suppressed then
 		_suppressed = true
+		settle_hold_policy()
 		Logger.debug(LOG, "Keystroke logging suppressed (password field detected).")
 	end
 end
@@ -1180,6 +1218,7 @@ function M.set_enabled(enabled)
 		return false
 	end
 	_enabled = wanted
+	settle_hold_policy()
 	Logger.debug(LOG, "Metrics collection: %s.", tostring(_enabled))
 	return true
 end
@@ -1194,6 +1233,7 @@ end
 --- @param is_private boolean
 function M.set_private_window(is_private)
 	_private_window = (is_private == true)
+	settle_hold_policy()
 	Logger.debug(LOG, "Private browsing window: %s.", tostring(_private_window))
 end
 
@@ -1202,6 +1242,7 @@ end
 --- @param is_secure boolean
 function M.set_secure_field(is_secure)
 	_secure_field = (is_secure == true)
+	settle_hold_policy()
 	Logger.debug(LOG, "Secure field focused: %s.", tostring(_secure_field))
 end
 
@@ -1215,6 +1256,7 @@ function M.set_private_filter_enabled(enabled)
 		return false
 	end
 	_private_filter_enabled = wanted
+	settle_hold_policy()
 	Logger.debug(LOG, "Private-browsing filter: %s.", tostring(_private_filter_enabled))
 	return true
 end
@@ -1229,6 +1271,7 @@ function M.set_secure_filter_enabled(enabled)
 		return false
 	end
 	_secure_filter_enabled = wanted
+	settle_hold_policy()
 	Logger.debug(LOG, "Secure-field filter: %s.", tostring(_secure_filter_enabled))
 	return true
 end
@@ -1243,6 +1286,7 @@ function M.set_system_auth_filter_enabled(enabled)
 		return false
 	end
 	_system_auth_filter_enabled = wanted
+	settle_hold_policy()
 	Logger.debug(LOG, "System-auth filter: %s.", tostring(_system_auth_filter_enabled))
 	return true
 end
@@ -1357,6 +1401,7 @@ function M.apply_configuration(candidate)
 	_secure_filter_enabled = candidate.secure_filter_enabled
 	_system_auth_filter_enabled = candidate.system_auth_filter_enabled
 	_encrypt_enabled = candidate.encrypt
+	settle_hold_policy()
 	Logger.debug(LOG, "Collector configuration applied without historical conversion.")
 	return true
 end
@@ -1712,6 +1757,7 @@ end
 
 --- Resets all session data.
 function M.reset_session()
+	_hold_token = {}
 	if Metrics then Metrics.reset_session() end
 	_app_stats = {}
 	_focused_app_id         = nil

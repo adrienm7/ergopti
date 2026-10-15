@@ -105,7 +105,7 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 					local start = assert(source:find(marker, 1, true), "actual callback must exist") + #marker
 					local prefix = assert(source:sub(start):match("^(.-engine:reset%b())"), "callback reset must exist")
 					local compile = loadstring or load
-					local callback = assert(compile("return function(engine)\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
+					local callback = assert(compile("return function(engine)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
 						.. prefix .. "\nend", "@actual-unknown-reset-prefix"))()
 					local engine = Core.new()
 					helpers.assert_true(engine:load_mappings({ { trigger = "date", replacement = "owned-result", is_word = true } }))
