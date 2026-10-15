@@ -166,5 +166,75 @@ class HelperGuardianAcceptanceTests(unittest.TestCase):
         self.assertTrue(any("timed out" in item for item in receipt["cleanup_errors"]))
 
 
+class HelperReceiptPublicationTests(unittest.TestCase):
+    """Use real write refusal after the controlled native collector completes."""
+
+    def observe_with_directory_receipt(self, configure=None):
+        with TemporaryDirectory() as directory:
+            application = Path(directory) / "ErgoptiPlus.app"
+            executable = application / "Contents/MacOS/ErgoptiPlus"
+            executable.parent.mkdir(parents=True)
+            executable.write_bytes(b"owned helper fixture")
+            boundary = NativeBoundary(executable)
+            if configure:
+                configure(boundary)
+            output = Path(directory) / "receipt.json"
+            output.mkdir()
+            error = None
+            with (
+                patch.object(probe.sys, "platform", "darwin"),
+                patch.object(probe.os, "getuid", return_value=FIXTURE_UID, create=True),
+                patch.dict(os.environ, {"RUNNER_ENVIRONMENT": "github-hosted"}),
+                patch.object(probe.subprocess, "run", side_effect=boundary.run),
+            ):
+                try:
+                    probe.observe(application, output)
+                except Exception as failure:
+                    error = failure
+            self.assertTrue(
+                output.is_dir(), "failed publication preserves the existing destination"
+            )
+            return boundary, error
+
+    def test_receipt_write_refusal_keeps_initial_refusal_and_never_registers(self):
+        boundary, error = self.observe_with_directory_receipt(
+            lambda boundary: setattr(boundary, "initial_status", 0)
+        )
+        self.assertIsInstance(error, RuntimeError)
+        self.assertIn("Exact guardian absence was not confirmed before registration", str(error))
+        self.assertIn("receipt publication failed", str(error))
+        self.assertIsInstance(error.__cause__, OSError)
+        self.assertTrue(all(call[:2] == ["/bin/launchctl", "print"] for call in boundary.calls))
+
+    def test_receipt_write_refusal_keeps_unregister_and_cleanup_failures(self):
+        def configure(boundary):
+            boundary.keep_registered = True
+            boundary.unregister_stdout = "refused\n"
+            boundary.bootout_error = subprocess.TimeoutExpired("owned bootout", 10)
+
+        boundary, error = self.observe_with_directory_receipt(configure)
+        self.assertIsInstance(error, RuntimeError)
+        self.assertIn("Native helper did not acknowledge guardian removal", str(error))
+        self.assertIn("Guardian cleanup failed", str(error))
+        self.assertIn("timed out", str(error))
+        self.assertIn("Owned guardian absence after cleanup was not confirmed", str(error))
+        self.assertIn("receipt publication failed", str(error))
+        self.assertIsInstance(error.__cause__, OSError)
+        self.assertTrue(boundary.present, "publication failure cannot acknowledge native cleanup")
+        self.assertEqual(sum(call[1] == "bootout" for call in boundary.calls), 1)
+
+    def test_successful_native_model_still_refuses_an_unpublished_receipt(self):
+        boundary, error = self.observe_with_directory_receipt()
+        self.assertIsInstance(error, RuntimeError)
+        self.assertIn("receipt publication failed", str(error))
+        self.assertIsInstance(error.__cause__, OSError)
+        self.assertFalse(boundary.present)
+        self.assertFalse(any(call[1] == "bootout" for call in boundary.calls))
+        self.assertEqual(sum(call[1] == "--register-remap-guardian" for call in boundary.calls), 3)
+        self.assertEqual(
+            sum(call[1] == "--unregister-remap-guardian" for call in boundary.calls), 3
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
