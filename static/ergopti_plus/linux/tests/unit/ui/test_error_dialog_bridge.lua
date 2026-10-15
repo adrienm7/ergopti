@@ -77,9 +77,14 @@ local function load_bridge(controls)
 		},
 		["ui.healthcheck.report"] = {
 			redaction_context = function() return { home = HOME, user = "jdoe", case_insensitive = false } end,
-			perform = function(action, paths)
+			perform = function(action, paths, _, _, _, _, owner)
 				context.performed[#context.performed + 1] = { action = action, paths = paths }
-				return { ok = true }
+				if controls.deferred_report then
+					context.report_owner = owner
+					return { cancel = function() context.report_cancelled = true; if context.on_cancel then context.on_cancel() end end }
+				end
+				owner.complete({ ok = true })
+				return { cancel = function() end }
 			end,
 		},
 		["adapters.storage"] = {
@@ -112,7 +117,7 @@ local function load_bridge(controls)
 		local actual = require("ui.healthcheck.report")
 		package.loaded["ui.healthcheck.report"] = {
 			redaction_context = function() return actual.redaction_context({ identity = function() return { home = HOME, user = "synthetic" } end }) end,
-			perform = function(action, paths, documents, context_value, _, snapshot)
+			perform = function(action, paths, documents, context_value, _, snapshot, owner)
 				return actual.perform(action, paths, documents, context_value, {
 					copy = function(text)
 						context.copied = text
@@ -122,9 +127,9 @@ local function load_bridge(controls)
 						context.saved = { dir = dir, name = name, text = text }
 						return dir .. "/" .. name
 					end,
-					reveal = function(path) context.revealed = path; return true end,
-					open_url = function(url) context.opened = url; return true end,
-				}, snapshot)
+					reveal = function(path, done) context.revealed = path; done({ ok = true, code = 0 }) end,
+					open_url = function(url, done) context.opened = url; done({ ok = true, code = 0 }) end,
+				}, snapshot, owner)
 			end,
 		}
 	end
@@ -172,6 +177,13 @@ local function page(context)
 		context.closed = (context.closed or 0) + 1
 		return true
 	end }
+end
+
+--- Standalone reports complete inline only because these ports supply closed receipts.
+local function reported(bridge, record)
+	local outcome
+	bridge.report(record, function(value) outcome = value end, function() return true end)
+	return outcome
 end
 
 helpers.describe("error window bridge (linux): policy and deferral (error-dialog-linux)", function()
@@ -377,7 +389,7 @@ end)
 helpers.describe("error window sharing uses the real report sink", function()
 	helpers.it("retains the host snapshot and excludes the local error from the issue (error-sharing-owner)", function()
 		with_bridge({ real_report = true }, function(bridge, context)
-			helpers.assert_true(bridge.report({ kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
+			helpers.assert_true(reported(bridge, { kind = "error", module = "synthetic", message = "CANARY-private.invalid/notes", time = "local" }))
 			helpers.assert_type(context.copied, "string")
 			helpers.assert_type(context.opened, "string")
 			helpers.assert_true(context.copied:find("CANARY", 1, true) == nil)
@@ -388,7 +400,7 @@ helpers.describe("error window sharing uses the real report sink", function()
 			helpers.assert_contains(context.saved.text, "# ErgoptiPlus diagnostics")
 		end)
 		with_bridge({ real_report = true, copy = false }, function(bridge, context)
-			helpers.assert_eq(bridge.report({ kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
+			helpers.assert_eq(reported(bridge, { kind = "error", module = "synthetic", message = "CANARY", time = "local" }), false)
 			helpers.assert_nil(context.opened, "clipboard refusal must prevent the browser")
 			helpers.assert_nil(context.saved, "clipboard refusal must prevent attachment publication")
 		end)
@@ -413,4 +425,47 @@ helpers.describe("error window retains its captured sharing identity", function(
 			helpers.assert_true(context.copied:find("-1744", 1, true) ~= nil, "admitted technical status remains useful")
 		end)
 	end)
+end)
+
+
+helpers.describe("error report asynchronous ownership", function()
+	for _, retirement in ipairs({ "ready", "close", "epoch" }) do
+		helpers.it("(error-opener-session) " .. retirement .. " rejects old action completion", function()
+			with_bridge({ deferred_report = true }, function(bridge, c)
+				bridge.init(); bridge.on_error("synthetic", "failed", "failed"); run_deferred(c)
+				bridge.on_message("ready", {}, page(c))
+				helpers.assert_nil(bridge.on_message({ action = "report" }, {}, page(c)))
+				local old = c.report_owner
+				if retirement == "ready" then bridge.on_message("ready", {}, page(c))
+				elseif retirement == "close" then bridge.on_message({ action = "close" }, {}, page(c))
+				else c.epoch = c.epoch + 1 end
+				local pushed = #c.pushed
+				old.complete({ ok = true }); helpers.assert_eq(#c.pushed, pushed)
+				helpers.assert_eq(old.current(), false)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("error opener cancellation reentry", function()
+	for _, transition in ipairs({ "report", "ready", "native_close" }) do
+		helpers.it("(opener-cancel-reentry) error " .. transition .. " preserves a replacement", function()
+			with_bridge({ deferred_report = true }, function(bridge, c)
+				bridge.init(); bridge.on_error("synthetic", "failed", "failed"); run_deferred(c)
+				bridge.on_message("ready", {}, page(c)); bridge.on_message({ action = "report" }, {}, page(c))
+				local nested
+				c.on_cancel = function()
+					c.on_cancel = nil
+					if transition == "native_close" then bridge.on_error("synthetic-new", "next", "next"); run_deferred(c) end
+					bridge.on_message("ready", {}, page(c)); bridge.on_message({ action = "report" }, {}, page(c)); nested = c.report_owner
+				end
+				if transition == "native_close" then bridge.on_window_closed(c.epoch)
+				elseif transition == "ready" then bridge.on_message("ready", {}, page(c))
+				else bridge.on_message({ action = "report" }, {}, page(c)) end
+				helpers.assert_eq(#c.performed, 2)
+				helpers.assert_true(nested.current())
+				local before = #c.pushed; nested.complete({ ok = true }); helpers.assert_eq(#c.pushed, before + 1)
+			end)
+		end)
+	end
 end)

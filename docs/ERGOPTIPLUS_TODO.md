@@ -15127,6 +15127,17 @@ test precondition failure, not a Lua defect or a successful permission grant.
   qualification. Complete export, daily logs and actual issue editability
   remain open; item 138 is not closed.
 
+  The later desktop-opener lot receives Linux launcher completion instead of
+  acknowledging a background shell. A private real child exits 23 while the
+  literal predecessor incorrectly returns success. Healthcheck, error-dialog
+  and update-check callers now use explicit completion and current-owner
+  receipts; the shared Lua update-check controller also receives the macOS
+  native result inline. Session replacement and retirement fence later effects.
+  The [opener follow-up](handovers/2026-10-12-config-menus/2026-10-15-DIAGNOSTIC-OPENER.md)
+  distinguishes that source work, its dated receiving and remaining installed
+  acceptance. Full daily logs still need a shared privacy/collection contract
+  and three native collectors; the bounded recent-error tail remains separate.
+
 - [ ] **139.** Remove personal identities from daily and shared error logs.
 
   The received macOS log exposed the computer name/device prefix at keylogger

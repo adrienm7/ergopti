@@ -199,3 +199,58 @@ helpers.describe("update-check window (macOS host)", function()
 		end)
 	end)
 end)
+
+
+helpers.describe("update-check native report completion", function()
+	for _, reported in ipairs({ true, false }) do
+		helpers.it("completes the native report receipt inline, accepted=" .. tostring(reported), function()
+			scenario(function(ctx)
+				local owners = fake_owners(function(channel)
+					return { state = "error", channel = channel, detail = "HTTP 503", others = {} }
+				end)
+				local view = fake_view()
+				local session = ctx.Host._session_for(view, owners)
+				ctx.Host._set_window(view, session)
+				session.start()
+				local native_records = {}
+				package.loaded["ui.error_dialog"].report = function(record)
+					native_records[#native_records + 1] = record
+					return reported
+				end
+				session.on_message({ action = "report" })
+				helpers.assert_eq(#native_records, 1, "the synchronous native report owner must run exactly once")
+				helpers.assert_eq(native_records[1].module, "updater")
+				local acknowledgement = view.messages[#view.messages]
+				helpers.assert_eq(acknowledgement.type, "action", "completion reaches the page before dispatch returns")
+				helpers.assert_eq(acknowledgement.action, "report")
+				helpers.assert_eq(acknowledgement.ok, reported, "the page receives the actual native boolean receipt")
+				helpers.assert_eq(acknowledgement.missing, false)
+			end)
+		end)
+	end
+
+	helpers.it("a synchronous native report cannot acknowledge into its replacement session", function()
+		scenario(function(ctx)
+			local owners = fake_owners(function(channel)
+				return { state = "error", channel = channel, detail = "HTTP 503", others = {} }
+			end)
+			local view = fake_view()
+			local session = ctx.Host._session_for(view, owners)
+			ctx.Host._set_window(view, session)
+			session.start()
+			local replacement, replacement_messages, reopened
+			package.loaded["ui.error_dialog"].report = function()
+				reopened = ctx.Host.open(owners)
+				replacement = ctx.Host._session()
+				replacement_messages = #view.messages
+				return true
+			end
+			session.on_message({ action = "report" })
+			helpers.assert_true(reopened, "native report reentry may replace the same window's session")
+			helpers.assert_true(replacement ~= nil and replacement ~= session)
+			helpers.assert_eq(#view.messages, replacement_messages, "the retired report cannot append an acknowledgement")
+			helpers.assert_eq(view.messages[#view.messages].state, "error", "the replacement check's own answer remains current")
+			ctx.Host._set_window(nil, nil)
+		end)
+	end)
+end)
