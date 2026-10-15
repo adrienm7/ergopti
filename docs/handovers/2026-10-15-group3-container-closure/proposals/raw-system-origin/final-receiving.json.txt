@@ -1,0 +1,64 @@
+{
+  "portable_execution_only": true,
+  "cwd_isolation": "all final runs use their unique owned /tmp directory; RLIMIT_CORE=0",
+  "baseline_projection": "exact original native producer constant origin assignment; actual original e850 portable core; unchanged new handwritten control+all8old matrices; not native Windows execution",
+  "original_assertion_start_lines_preserved": 151,
+  "old_matrices_preserved": 8,
+  "new_named_matrices": 2,
+  "new_assertion_start_lines": 13,
+  "rows": [
+    {
+      "name": "original-producer-original-core",
+      "cwd": "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core",
+      "argv": [
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/test"
+      ],
+      "exit": -6,
+      "stdout": "",
+      "stderr": "test: /tmp/ergopti-raw-origin-causal-lwsmqizs/original-producer-original-core/replay_route_core_test.c:631: TestRawSystemOriginDoesNotRetireUserHold: Assertion `memcmp(&retained, &state, sizeof(state)) == 0' failed.\n"
+    },
+    {
+      "name": "candidate",
+      "cwd": "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate",
+      "argv": [
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate/test"
+      ],
+      "exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    },
+    {
+      "name": "withdrawn-origin-guard",
+      "cwd": "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard",
+      "argv": [
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/test"
+      ],
+      "exit": -6,
+      "stdout": "",
+      "stderr": "test: /tmp/ergopti-raw-origin-causal-lwsmqizs/withdrawn-origin-guard/replay_route_core_test.c:631: TestRawSystemOriginDoesNotRetireUserHold: Assertion `memcmp(&retained, &state, sizeof(state)) == 0' failed.\n"
+    },
+    {
+      "name": "restored",
+      "cwd": "/tmp/ergopti-raw-origin-causal-lwsmqizs/restored",
+      "argv": [
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/restored/test"
+      ],
+      "exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    },
+    {
+      "name": "candidate-sanitized",
+      "cwd": "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate-sanitized",
+      "argv": [
+        "/tmp/ergopti-raw-origin-causal-lwsmqizs/candidate-sanitized/test"
+      ],
+      "exit": 0,
+      "stdout": "PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.\nPASS replay-route registration swap: queued and held recipes remain immutable.\nPASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.\nPASS replay-route rejection: initialization, ownership, registration, time and unsupported output.\nPASS replay-route scan ownership and finite source-aware hold capacity.\nPASS replay-route reused input/output buffer retains its incoming event.\nPASS replay-route recipe validation rejects owner, provenance and malformed output.\nPASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.\nPortable replay-route core tests passed: 8/8 matrices.\nPASS raw keyboard-driver synthetic Ctrl/Shift cannot retire retained real modifier recipes.\nPASS full raw scan/flag classification preserves injection refusal and conservative unknowns.\nWindows native registration, replay delivery and physical qualification remain untested.\n",
+      "stderr": ""
+    }
+  ],
+  "native_windows": "NOT_RUN",
+  "raw_system_events_from_current_device": "NOT_OBSERVED",
+  "canonical_changes": 0
+}

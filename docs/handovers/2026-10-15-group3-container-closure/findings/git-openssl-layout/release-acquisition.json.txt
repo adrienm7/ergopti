@@ -1,0 +1,246 @@
+[
+  {
+    "tag": "2.55.0.windows.5",
+    "status": 200,
+    "sha256": "85c64477281164b10ca6bf42752b927074b59fb5b18c6319ba20c5d62f29a5bf",
+    "release_id": 373873197,
+    "published_at": "2026-08-20T16:21:31Z",
+    "assets": [
+      {
+        "id": 522489680,
+        "name": "Git-2.55.0.5-64-bit.exe",
+        "size": 65343712,
+        "digest": "sha256:d065a4e23c3d9a6b5073d609b5be0830227ec3ca053c083ba385061ddfaf94c6",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-64-bit.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489680"
+      },
+      {
+        "id": 522489859,
+        "name": "Git-2.55.0.5-64-bit.tar.bz2",
+        "size": 117482532,
+        "digest": "sha256:58fdf5679db11901697d2257cd076c8cdc49d64fe641b3e64ad158f1c5bf9b8d",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-64-bit.tar.bz2",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489859"
+      },
+      {
+        "id": 522489954,
+        "name": "Git-2.55.0.5-arm64.exe",
+        "size": 63259960,
+        "digest": "sha256:c955de342b1465bc637f0e71fddf4e28e8d0b829668ec1866ab32a839303e8e3",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-arm64.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489954"
+      },
+      {
+        "id": 522490114,
+        "name": "Git-2.55.0.5-arm64.tar.bz2",
+        "size": 160746098,
+        "digest": "sha256:5bf4618b6391069282d60437d3c4b26623d77dc7384b161c82f402517cde71b7",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-arm64.tar.bz2",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522490114"
+      },
+      {
+        "id": 522489908,
+        "name": "MinGit-2.55.0.5-32-bit.zip",
+        "size": 39145987,
+        "digest": "sha256:2c5c030d18fc6a6437c6d3f85895302e67995507db740afb415648306c6b450d",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-32-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489908"
+      },
+      {
+        "id": 522489786,
+        "name": "MinGit-2.55.0.5-64-bit.zip",
+        "size": 38989688,
+        "digest": "sha256:56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-64-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489786"
+      },
+      {
+        "id": 522490033,
+        "name": "MinGit-2.55.0.5-arm64.zip",
+        "size": 37650057,
+        "digest": "sha256:05843f9d6e60306c3ab886799e2c67200caab921571f10512df3493049179ddb",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-arm64.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522490033"
+      },
+      {
+        "id": 522489931,
+        "name": "MinGit-2.55.0.5-busybox-32-bit.zip",
+        "size": 34625912,
+        "digest": "sha256:da123203a73a05038790645a436d078f69c5670e7e2104335df267006d203439",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-busybox-32-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489931"
+      },
+      {
+        "id": 522489803,
+        "name": "MinGit-2.55.0.5-busybox-64-bit.zip",
+        "size": 34484406,
+        "digest": "sha256:a0287b54d3ead0c5abd0d15094f5b4c909867aae6bf8b9f2aee7109d24fa0081",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-busybox-64-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489803"
+      },
+      {
+        "id": 522490077,
+        "name": "MinGit-2.55.0.5-busybox-arm64.zip",
+        "size": 33133945,
+        "digest": "sha256:5adf5203ba3b4706c21687ea1bcd871c727917d913773a41b0af69b86c997d6f",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/MinGit-2.55.0.5-busybox-arm64.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522490077"
+      },
+      {
+        "id": 522489720,
+        "name": "pdbs-for-git-64-bit-2.55.0.5-1.zip",
+        "size": 17051902,
+        "digest": "sha256:2772406eb625feaf608dee59ed37150a3ed3c1071d0001770326e3f9111e86ea",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/pdbs-for-git-64-bit-2.55.0.5-1.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489720"
+      },
+      {
+        "id": 522489991,
+        "name": "pdbs-for-git-arm64-2.55.0.5-1.zip",
+        "size": 2330829,
+        "digest": "sha256:6fd6c1fe112f9203fc12d3cc70fc6afd321303e7e701b657391f393f929f0259",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/pdbs-for-git-arm64-2.55.0.5-1.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489991"
+      },
+      {
+        "id": 522489735,
+        "name": "PortableGit-2.55.0.5-64-bit.7z.exe",
+        "size": 58960208,
+        "digest": "sha256:5aa8a20f6e9abb2c755f0e73c91c687701a46b309ad84a0ca6509380fa4ae290",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/PortableGit-2.55.0.5-64-bit.7z.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522489735"
+      },
+      {
+        "id": 522490004,
+        "name": "PortableGit-2.55.0.5-arm64.7z.exe",
+        "size": 59215872,
+        "digest": "sha256:49d1dd3158017fa9805d07268433dbab7021b2ec1c1cc3fbabaf8b8255764dd0",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/PortableGit-2.55.0.5-arm64.7z.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/522490004"
+      }
+    ],
+    "body": "Changes since Git for Windows v2.55.0(4) (August 11th 2026)\r\n\r\nFollowing the [MSYS2 project](https://www.msys2.org/news/#2026-02-28-dropping-support-for-windows-81), on which Git for Windows is based, Windows 8.1 support will be dropped after Git for Windows v2.55.\r\n\r\n### New Features\r\n\r\n* Comes with the MSYS2 runtime (Git for Windows flavor) based on [Cygwin v3.6.10](https://inbox.sourceware.org/cygwin-announce/f9d2b89b-c99c-4d02-b0cf-61adea84566b@dronecode.org.uk/).\r\n* Comes with [OpenSSH v10.5.P1](https://github.com/openssh/openssh-portable/releases/tag/V_10_5_P1).\r\n\r\n### Bug Fixes\r\n\r\n* The long-standing [bug](https://github.com/git-for-windows/git/issues/5303) where Git Bash's screen was cleared after `git.exe` called `vim` (e.g. to edit a commit message) [was fixed](https://github.com/git-for-windows/msys2-runtime/pull/131).\r\n* The Bash executables in the 64-bit and ARM64 distributions no longer carry an invalid Authenticode signature.\r\n\r\nFilename | SHA-256\r\n-------- | -------\r\nGit-2.55.0.5-64-bit.exe | d065a4e23c3d9a6b5073d609b5be0830227ec3ca053c083ba385061ddfaf94c6\r\nGit-2.55.0.5-arm64.exe | c955de342b1465bc637f0e71fddf4e28e8d0b829668ec1866ab32a839303e8e3\r\nPortableGit-2.55.0.5-64-bit.7z.exe | 5aa8a20f6e9abb2c755f0e73c91c687701a46b309ad84a0ca6509380fa4ae290\r\nPortableGit-2.55.0.5-arm64.7z.exe | 49d1dd3158017fa9805d07268433dbab7021b2ec1c1cc3fbabaf8b8255764dd0\r\nMinGit-2.55.0.5-64-bit.zip | 56d7b226b7693196cfc71fef26568f536c4a021ab6c37ff2db4287bed908e96e\r\nMinGit-2.55.0.5-arm64.zip | 05843f9d6e60306c3ab886799e2c67200caab921571f10512df3493049179ddb\r\nMinGit-2.55.0.5-32-bit.zip | 2c5c030d18fc6a6437c6d3f85895302e67995507db740afb415648306c6b450d\r\nMinGit-2.55.0.5-busybox-64-bit.zip | a0287b54d3ead0c5abd0d15094f5b4c909867aae6bf8b9f2aee7109d24fa0081\r\nMinGit-2.55.0.5-busybox-arm64.zip | 5adf5203ba3b4706c21687ea1bcd871c727917d913773a41b0af69b86c997d6f\r\nMinGit-2.55.0.5-busybox-32-bit.zip | da123203a73a05038790645a436d078f69c5670e7e2104335df267006d203439\r\nGit-2.55.0.5-64-bit.tar.bz2 | 58fdf5679db11901697d2257cd076c8cdc49d64fe641b3e64ad158f1c5bf9b8d\r\nGit-2.55.0.5-arm64.tar.bz2 | 5bf4618b6391069282d60437d3c4b26623d77dc7384b161c82f402517cde71b7\r\n"
+  },
+  {
+    "tag": "2.56.0.windows.2",
+    "status": 200,
+    "sha256": "b2adaeec39167f602fe929bc43a6597de7b7dafffb0496a8d32e3c188906c12e",
+    "release_id": 404111703,
+    "published_at": "2026-10-05T21:42:10Z",
+    "assets": [
+      {
+        "id": 613673483,
+        "name": "Git-2.56.0.2-64-bit.exe",
+        "size": 66763664,
+        "digest": "sha256:52188f917b378f00c70ec136bcf090005f30d44fbc4eba0bce759cc6592d60f6",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/Git-2.56.0.2-64-bit.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673483"
+      },
+      {
+        "id": 613673894,
+        "name": "Git-2.56.0.2-64-bit.tar.bz2",
+        "size": 118485193,
+        "digest": "sha256:16ca394bdb94b372267d79e1e10b68763674f73e03e0648202a7971a8a730a84",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/Git-2.56.0.2-64-bit.tar.bz2",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673894"
+      },
+      {
+        "id": 613674221,
+        "name": "Git-2.56.0.2-arm64.exe",
+        "size": 64316408,
+        "digest": "sha256:b9ced78ce371577dc966f50ae571909d6731e36d31065d35c8efa21544c58bf0",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/Git-2.56.0.2-arm64.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674221"
+      },
+      {
+        "id": 613674654,
+        "name": "Git-2.56.0.2-arm64.tar.bz2",
+        "size": 161388227,
+        "digest": "sha256:221865b66f4e6ce8f86837acd777c4580e23de8bf526e99dda274c2544cab7a0",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/Git-2.56.0.2-arm64.tar.bz2",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674654"
+      },
+      {
+        "id": 613674085,
+        "name": "MinGit-2.56.0.2-32-bit.zip",
+        "size": 39426788,
+        "digest": "sha256:f63de755797c4cec513f7df0c7a6d2f5addc9d5b4e910fda0f502f72e0643366",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-32-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674085"
+      },
+      {
+        "id": 613673731,
+        "name": "MinGit-2.56.0.2-64-bit.zip",
+        "size": 39806486,
+        "digest": "sha256:da35e72aa21c005a5a0d298cfbae110bc1609a815730ea0dde84b01a1b3cd3be",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-64-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673731"
+      },
+      {
+        "id": 613674511,
+        "name": "MinGit-2.56.0.2-arm64.zip",
+        "size": 37936336,
+        "digest": "sha256:38b33dc6024026e3315cf88ab2cfea65205bbd7bb3a8e824bd21c8ad4fe609a7",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-arm64.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674511"
+      },
+      {
+        "id": 613674166,
+        "name": "MinGit-2.56.0.2-busybox-32-bit.zip",
+        "size": 34897794,
+        "digest": "sha256:65de4d3477b308f3af418b4497331bb5ac66372d8078930f74e36aefed359aa7",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-busybox-32-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674166"
+      },
+      {
+        "id": 613673799,
+        "name": "MinGit-2.56.0.2-busybox-64-bit.zip",
+        "size": 35287516,
+        "digest": "sha256:a8a9172a6747926648b78a3411f3b94813dd22da8a8ec5dbe61122bc414edd63",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-busybox-64-bit.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673799"
+      },
+      {
+        "id": 613674590,
+        "name": "MinGit-2.56.0.2-busybox-arm64.zip",
+        "size": 33420352,
+        "digest": "sha256:319621dff5c8be06937e7e68ad671782f7c72e91e45cd1da124ddc2bfa99690b",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/MinGit-2.56.0.2-busybox-arm64.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674590"
+      },
+      {
+        "id": 613674391,
+        "name": "pdbs-for-git-arm64-2.56.0.2-1.zip",
+        "size": 2306035,
+        "digest": "sha256:48c15e91b25f667792bd3648f1ae09c2baff98065950cb1a80f47adae89796d4",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/pdbs-for-git-arm64-2.56.0.2-1.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674391"
+      },
+      {
+        "id": 613673578,
+        "name": "pdbs-for-git-ucrt64-2.56.0.2-1.zip",
+        "size": 18240975,
+        "digest": "sha256:3e78910b6a2f7da26e0d61bcb285ae1c54e1ded245944758501869e1ec9aec69",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/pdbs-for-git-ucrt64-2.56.0.2-1.zip",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673578"
+      },
+      {
+        "id": 613673625,
+        "name": "PortableGit-2.56.0.2-64-bit.7z.exe",
+        "size": 60027568,
+        "digest": "sha256:075e158ef8e1f0ab80b347e245405d3eca735c2dc88fd8e032e137d0ca61f61b",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/PortableGit-2.56.0.2-64-bit.7z.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613673625"
+      },
+      {
+        "id": 613674413,
+        "name": "PortableGit-2.56.0.2-arm64.7z.exe",
+        "size": 59581088,
+        "digest": "sha256:0f21e681bd33e006e0348dfa1a2be6769efd77e3bfdb247320314facde23a46c",
+        "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.2/PortableGit-2.56.0.2-arm64.7z.exe",
+        "api": "https://api.github.com/repos/git-for-windows/git/releases/assets/613674413"
+      }
+    ],
+    "body": "Changes since Git for Windows v2.56.0 (September 28th 2026)\n\n### New Features\n\n* Comes with [OpenSSL v3.5.9](https://www.openssl.org/news/openssl-3.5-notes.html).\n* To help with fixing [stale references to the Git Credential Manager](https://github.com/git-for-windows/git/issues/6455) after Git for Windows v2.56.0's MINGW64 -> UCRT64 migration, [a compatibility shim is now installed](https://github.com/git-for-windows/MINGW-packages/pull/224).\n\n### Bug Fixes\n\n* Suppressing the user-wide Git config via `GIT_CONFIG_GLOBAL=NUL` [was broken in v2.56.0](https://github.com/git-for-windows/git/issues/6449) (surprisingly, as a consequence of the MINGW64 -> UCRT64 migration), which [was fixed](https://github.com/git-for-windows/git/pull/6450).\n* [Fixed](https://github.com/git-for-windows/MINGW-packages/pull/222) a bug in Git for Windows, v2.56.0, where the x64 Git executables [lost their Authenticode signatures by mistake](https://github.com/git-for-windows/git/issues/6456).\n* An assertion [was fixed](https://github.com/git-for-windows/MINGW-packages/pull/226) that caused pushes to fail when the server requires a client certificate.\n\nFilename | SHA-256\n-------- | -------\nGit-2.56.0.2-64-bit.exe | 52188f917b378f00c70ec136bcf090005f30d44fbc4eba0bce759cc6592d60f6\nGit-2.56.0.2-arm64.exe | b9ced78ce371577dc966f50ae571909d6731e36d31065d35c8efa21544c58bf0\nPortableGit-2.56.0.2-64-bit.7z.exe | 075e158ef8e1f0ab80b347e245405d3eca735c2dc88fd8e032e137d0ca61f61b\nPortableGit-2.56.0.2-arm64.7z.exe | 0f21e681bd33e006e0348dfa1a2be6769efd77e3bfdb247320314facde23a46c\nMinGit-2.56.0.2-64-bit.zip | da35e72aa21c005a5a0d298cfbae110bc1609a815730ea0dde84b01a1b3cd3be\nMinGit-2.56.0.2-arm64.zip | 38b33dc6024026e3315cf88ab2cfea65205bbd7bb3a8e824bd21c8ad4fe609a7\nMinGit-2.56.0.2-32-bit.zip | f63de755797c4cec513f7df0c7a6d2f5addc9d5b4e910fda0f502f72e0643366\nMinGit-2.56.0.2-busybox-64-bit.zip | a8a9172a6747926648b78a3411f3b94813dd22da8a8ec5dbe61122bc414edd63\nMinGit-2.56.0.2-busybox-arm64.zip | 319621dff5c8be06937e7e68ad671782f7c72e91e45cd1da124ddc2bfa99690b\nMinGit-2.56.0.2-busybox-32-bit.zip | 65de4d3477b308f3af418b4497331bb5ac66372d8078930f74e36aefed359aa7\nGit-2.56.0.2-64-bit.tar.bz2 | 16ca394bdb94b372267d79e1e10b68763674f73e03e0648202a7971a8a730a84\nGit-2.56.0.2-arm64.tar.bz2 | 221865b66f4e6ce8f86837acd777c4580e23de8bf526e99dda274c2544cab7a0\n"
+  }
+]

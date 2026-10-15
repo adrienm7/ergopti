@@ -1,0 +1,31 @@
+{
+  "kind": "scope-clarification-historical-integration",
+  "fixed_dev": "156e58d9ff0e1df337712cc48593343757d01034",
+  "feature": "51eec199f573fe720b848aa9a1a973b84b1be0e9",
+  "dev_is_ancestor_of_feature": true,
+  "current_checkpoint_published_atoms": {
+    "integrated": 0,
+    "feature_only": 27
+  },
+  "historical_integrated_examples_outside_that_list": [
+    {
+      "sha": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+      "title": "feat(actions): integrate collision admission and Snapshot receiving",
+      "ancestor_of_fixed_dev": true,
+      "exit": 0
+    },
+    {
+      "sha": "df323bea2689cc661c3dba7626973e4ce7bb2d95",
+      "title": "fix(actions): preserve Shortcuts settlement successor",
+      "ancestor_of_fixed_dev": true,
+      "exit": 0
+    },
+    {
+      "sha": "31bad34b1eb061bde1c2caddcca14973a919d411",
+      "title": "merge(actions): preserve source receiving followups",
+      "ancestor_of_fixed_dev": true,
+      "exit": 0
+    }
+  ],
+  "limits": "Do not say no Group3 work ever integrated. Only the current27atom list is feature-only. No squash equivalence considered."
+}

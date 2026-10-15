@@ -1,0 +1,7 @@
+{
+  "exit": 1,
+  "passed": 0,
+  "first_failure": [
+    "AttributeError: module 'owned_xi_stager' has no attribute 'explicit_xi_sources'. Did you mean: 'explicit_digest_sources'?"
+  ]
+}

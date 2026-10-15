@@ -1,0 +1,11 @@
+{
+  "scope": "Actual Linux pkg-config and ELF SONAME resolution only; no runtime staging/build/install/Xorg delivery claim",
+  "source_sha256": "261a8202a99ddb80cc54595d846467eac4eaa3b91eefbba7186571e5709bd1e5",
+  "initial_direct_children": [],
+  "status": "REFUSED",
+  "exception_type": "RuntimeRefused",
+  "reason": "Native packaging command refused.",
+  "terminal_direct_children": [],
+  "elapsed_seconds": 1.640814426005818,
+  "source_unchanged": true
+}

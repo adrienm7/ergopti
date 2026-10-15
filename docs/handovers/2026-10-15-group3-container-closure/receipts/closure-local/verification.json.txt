@@ -1,0 +1,57 @@
+{
+  "kind": "closure-local-verification-with-retained-original-failures",
+  "source_head": "1f863fe873255883244a746fbf48b50960e6786d",
+  "completed_observation_utc": "2026-10-15T19:56:30.057581+00:00",
+  "whole_verify_change": {
+    "command": [
+      "node",
+      "tools/test/verify-change.cjs"
+    ],
+    "head": "1f863fe873255883244a746fbf48b50960e6786d",
+    "exit_code": 1,
+    "elapsed_seconds": 1391.2307766770246,
+    "frame_equal": true,
+    "file_count": 10387,
+    "completed_utc": "2026-10-15T19:52:25.139041+00:00",
+    "stdout_sha256": "20da7c22547178d2739c419458e37e340b31ca69424c1061e53f751324c2a395",
+    "stderr_sha256": "0fe37ab60ae3861b29e55f86741580c5eb88058ac3b88adf08138a13b316e2c1"
+  },
+  "format": "PASS",
+  "common": {
+    "total": 435,
+    "passed": 433,
+    "failed": 2,
+    "full_run_conclusion": "FAIL",
+    "failed_names": [
+      "Linux uninstall preserves personal data and rejects unrelated installations",
+      "managed Ollama portable admission and operation retirement"
+    ]
+  },
+  "targeted_receiving": [
+    {
+      "command": [
+        "node",
+        "tools/test/test-linux-uninstall-sandbox.cjs"
+      ],
+      "observed_exit": 0,
+      "TMPDIR": "/var/tmp/ergopti-cloud-validation",
+      "permissions": "ordinary user, scoped sandbox escalation for owned temporary fixture",
+      "assertions_and_product_unchanged": true,
+      "observation": "the /tmp sandbox run refuses a synthetic .git ancestor; unchanged original command also passes without the passive observer under the original temporary root"
+    },
+    {
+      "command": [
+        "node",
+        "tools/test/test-managed-ollama-protocol.cjs"
+      ],
+      "observed_exit": 0,
+      "TMPDIR": "/var/tmp/ergopti-cloud-validation",
+      "assertions_and_original_60_second_clock_deadline_unchanged": true,
+      "original_clock_receiver_controls": 32,
+      "observation": "whole restricted run timed out starting the clock receiver; targeted complete command passes. Exact reason for prior elapsed-time difference is not established."
+    }
+  ],
+  "source_frame_unchanged_after_targets": true,
+  "native_windows_macos": "NOT_RUN",
+  "scope": "portable Common source controls only; no whole final native/E2E/build/install/release qualification"
+}

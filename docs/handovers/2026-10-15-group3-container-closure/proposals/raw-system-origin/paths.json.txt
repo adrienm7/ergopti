@@ -1,0 +1,42 @@
+[
+  {
+    "path": "static/ergopti_plus/windows/native/nav_event_owner/nav_event_owner.c",
+    "before_sha256": "7d495b256c34766cfa9f3630d4b7ad86fc862d49940223116df50f93d3553a66",
+    "after_sha256": "f1e951aaa815abdd716c780118fc0d580cebebd28bad06245d36ad299d931295",
+    "before_bytes": 144156,
+    "after_bytes": 144569,
+    "supplier": "073800ed8"
+  },
+  {
+    "path": "static/ergopti_plus/windows/native/nav_event_owner/raw_hook_origin.h",
+    "before_sha256": null,
+    "after_sha256": "719e57af56ba5666d4617a665bf2473250448ea34b0bcf17fed6a4cecc6521a2",
+    "before_bytes": 0,
+    "after_bytes": 1556,
+    "supplier": "new file"
+  },
+  {
+    "path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.c",
+    "before_sha256": "95a789c11e970df103d3e52fe4475deb8db64ecf45690a1e5436df75c662748a",
+    "after_sha256": "9b1a71dbe462426673742c744e31265f38aa211c7324b9e7af5e0d3716406f36",
+    "before_bytes": 14827,
+    "after_bytes": 14881,
+    "supplier": "e850833c74f3f10c6718eb822fd2aa21f83f13b2"
+  },
+  {
+    "path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core.h",
+    "before_sha256": "8b146f67b82ef09e122534754ab5cb080bd9ed4a0276b3197608c7ba0470f297",
+    "after_sha256": "4a4d6ab65ef1eed9f44ce7baaf1292f5667f395177e9d91e18376b8c47295f37",
+    "before_bytes": 12277,
+    "after_bytes": 12395,
+    "supplier": "e850833c74f3f10c6718eb822fd2aa21f83f13b2"
+  },
+  {
+    "path": "static/ergopti_plus/windows/native/nav_event_owner/replay_route_core_test.c",
+    "before_sha256": "aa1fd4bc56c21c8da2333d91ddfe394a09e3f498e2b5b070a2235ee52092ddf9",
+    "after_sha256": "20834893b17df9bac7bf5c42c26007ac49465d21ceb0f944175501ef6ceeae31",
+    "before_bytes": 28729,
+    "after_bytes": 32213,
+    "supplier": "e850833c74f3f10c6718eb822fd2aa21f83f13b2"
+  }
+]

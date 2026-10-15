@@ -1,0 +1,152 @@
+
+import copy,importlib.util,json,pathlib,sys,tempfile,types
+spec=importlib.util.spec_from_file_location('owned_xi_stager',sys.argv[1]);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+passed=0
+with tempfile.TemporaryDirectory(prefix='ergopti-xi-staging-') as temporary:
+ root=pathlib.Path(temporary);sources=root/'sources';sources.mkdir()
+ for name in ['luajit','curl','luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3','libXi.so.6','libX11.so.6','libxcb.so.1']:
+  (sources/name).write_bytes(('independent controlled bytes '+name).encode())
+ schema=sources/'gschemas.compiled';schema.write_bytes(b'independent schema bytes')
+ descriptor={'soname':'libXi.so.6','pkg_config':'xi','portable_dlopen_roots':['libXi.so.6']}
+ valid={'libraries':{'xi':descriptor}}
+ real_run=m.run;real_closure=m.copy_elf_closure;real_uname=m.os.uname;real_which=m.shutil.which
+ def check(name,body):
+  global passed
+  body();passed+=1;print('PASS controlled Xi '+name)
+ def resolve(data,directory=str(sources),elf=' (SONAME) Library soname: [libXi.so.6]\n',failed=None):
+  calls=[]
+  def command(arguments,**options):
+   calls.append(arguments)
+   if arguments==['pkg-config','--variable=libdir','xi']:
+    if failed=='pkg-config':raise m.RuntimeRefused('Controlled Xi metadata refused.')
+    return directory
+   assert arguments==['readelf','--dynamic','--',str((pathlib.Path(directory)/'libXi.so.6').resolve())]
+   assert options['env']['LC_ALL']=='C'
+   if failed=='readelf':raise m.RuntimeRefused('Controlled Xi inspection refused.')
+   return elf
+  m.run=command
+  try:observed=m.explicit_xi_sources(data)
+  finally:m.run=real_run
+  assert calls==[['pkg-config','--variable=libdir','xi'],['readelf','--dynamic','--',str(sources/'libXi.so.6')]]
+  assert observed==[sources/'libXi.so.6']
+ def refuses(data,**options):
+  try:resolve(data,**options)
+  except (m.RuntimeRefused,OSError):return
+  raise AssertionError('Malformed or unavailable Xi source was admitted')
+ check('actual resolver positive',lambda:resolve(valid))
+ variants=[
+  ('missing libraries',{}),('malformed libraries',{'libraries':[]}),
+  ('missing descriptor',{'libraries':{}}),('nonmapping descriptor',{'libraries':{'xi':[]}}),
+ ]
+ for name,key,value in [
+  ('wrong SONAME','soname','libXi.so.7'),('missing pkg-config','pkg_config',None),
+  ('foreign pkg-config','pkg_config','x11'),('missing roots','portable_dlopen_roots',None),
+  ('empty roots','portable_dlopen_roots',[]),('duplicate roots','portable_dlopen_roots',['libXi.so.6','libXi.so.6']),
+  ('wrong root','portable_dlopen_roots',['libXi.so.7'])
+ ]:
+  data=copy.deepcopy(valid)
+  if value is None:del data['libraries']['xi'][key]
+  else:data['libraries']['xi'][key]=value
+  variants.append((name,data))
+ for name,data in variants:check(name,lambda data=data:refuses(data))
+ for name,options in [
+  ('empty libdir',{'directory':''}),('relative libdir',{'directory':'relative/lib'}),
+  ('missing regular source',{'directory':str(root/'missing')}),
+  ('missing ELF SONAME',{'elf':''}),('wrong ELF SONAME',{'elf':' (SONAME) Library soname: [libXi.so.7]\n'}),
+  ('duplicate ELF SONAME',{'elf':' (SONAME) Library soname: [libXi.so.6]\n (SONAME) Library soname: [libXi.so.6]\n'}),
+  ('pkg-config refusal',{'failed':'pkg-config'}),('readelf refusal',{'failed':'readelf'})
+ ]:check(name,lambda options=options:refuses(valid,**options))
+ nonregular=root/'nonregular';nonregular.mkdir();(nonregular/'libXi.so.6').mkdir()
+ check('nonregular source',lambda:refuses(valid,directory=str(nonregular)))
+ class BoundaryReached(Exception):pass
+ def actual_stage():
+  appdir=root/'actual-stage';driver=appdir/'usr/lib/ergopti';(driver/'platform/network').mkdir(parents=True)
+  (driver/'platform/network/runtime_probe.lua').write_bytes(b'never executed by controlled stage')
+  catalogue=root/'stage-catalogue.json';catalogue.write_text(json.dumps({
+   'libraries':{'xi':descriptor},'network_runtime':{'portable':{'gio_modules':['libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so']}},
+   'archive_digest_runtime':{'soname':'libcrypto.so.3','portable_dlopen_roots':['libcrypto.so.3']}
+  }))
+  commands=[];received=[]
+  def command(arguments,**options):
+   commands.append(arguments)
+   if arguments[0]==str(sources/'luajit'):return str(sources/'luv.so')
+   if arguments in [['pkg-config','--variable=libdir','libcrypto'],['pkg-config','--variable=libdir','xi'],['pkg-config','--variable=giomoduledir','gio-2.0'],['pkg-config','--variable=schemasdir','gio-2.0']]:return str(sources)
+   if arguments[0]=='readelf':
+    assert options['env']['LC_ALL']=='C'
+    assert arguments in [['readelf','--dynamic','--',str(sources/'libcrypto.so.3')],['readelf','--dynamic','--',str(sources/'libXi.so.6')]]
+    return ' (SONAME) Library soname: ['+pathlib.Path(arguments[-1]).name+']\n'
+   assert arguments[0]=='ldd' and len(arguments)==2
+   if arguments[1]==str(sources/'libXi.so.6'):
+    return 'libX11.so.6 => '+str(sources/'libX11.so.6')+' (0x1)\nlibc.so.6 => /controlled-external/libc.so.6 (0x2)\n'
+   if arguments[1]==str(sources/'libX11.so.6'):
+    return 'libxcb.so.1 => '+str(sources/'libxcb.so.1')+' (0x3)\n'
+   return ''
+  def closure(seeds,directory,owners):
+   assert seeds==[str(sources/'luajit'),str(sources/'curl'),*[sources/name for name in ['luv.so','libgiognomeproxy.so','libgiolibproxy.so','libdconfsettings.so','libcrypto.so.3','libXi.so.6']]]
+   xi=directory/'libXi.so.6'
+   assert xi in owners and owners[xi]['complete'],'Explicit Xi root was not copied by the original owner before closure'
+   before=owners[xi]
+   real_closure(seeds,directory,owners)
+   assert owners[xi] is before
+   for name in ['libXi.so.6','libX11.so.6','libxcb.so.1']:
+    assert owners[directory/name]['complete']
+    assert (directory/name).read_bytes()==(sources/name).read_bytes()
+   assert directory/'libc.so.6' not in owners
+   assert ['ldd',str(sources/'libXi.so.6')] in commands and ['ldd',str(sources/'libX11.so.6')] in commands
+   received.append(True);raise BoundaryReached()
+  m.run=command;m.copy_elf_closure=closure;m.os.uname=lambda:types.SimpleNamespace(machine='x86_64');m.shutil.which=lambda name:str(sources/name)
+  try:
+   try:m.stage(str(appdir),str(catalogue),'unused template')
+   except BoundaryReached:pass
+   else:raise AssertionError('Controlled boundary was not reached')
+  finally:m.run=real_run;m.copy_elf_closure=real_closure;m.os.uname=real_uname;m.shutil.which=real_which
+  assert received==[True] and m._DESTINATION_ROOT is None
+ check('same owner explicit root and transitive closure',actual_stage)
+ def repeat_copy():
+  appdir=root/'repeat-copy';appdir.mkdir()
+  with m.owned_root(appdir):
+   directory=m.destination_directory(appdir/'usr/lib');destination=directory/'libXi.so.6';owners={}
+   m.copy_unique(sources/'libXi.so.6',destination,owners)
+   original=owners[destination];identity=destination.stat()
+   m.copy_unique(sources/'libXi.so.6',destination,owners)
+   current=destination.stat()
+   assert owners[destination] is original and original['complete']
+   assert (current.st_dev,current.st_ino)==(identity.st_dev,identity.st_ino)
+   assert destination.read_bytes()==(sources/'libXi.so.6').read_bytes()
+  assert m._DESTINATION_ROOT is None
+ check('same original root copy idempotence',repeat_copy)
+ def copy_conflict():
+  appdir=root/'copy-conflict';appdir.mkdir()
+  with m.owned_root(appdir):
+   directory=m.destination_directory(appdir/'usr/lib');owners={};destination=directory/'libXi.so.6'
+   m.copy_unique(sources/'libXi.so.6',destination,owners)
+   retained=destination.read_bytes();other=root/'other-Xi';other.write_bytes(b'foreign independent replacement')
+   try:m.copy_unique(other,destination,owners)
+   except m.RuntimeRefused:pass
+   else:raise AssertionError('Conflicting Xi destination admitted')
+   assert destination.read_bytes()==retained and owners[destination]['complete']
+  assert m._DESTINATION_ROOT is None
+ check('conflicting copied Xi root',copy_conflict)
+ def copy_write_refusal():
+  appdir=root/'copy-write-refusal';appdir.mkdir();real_open=m.os.open;real_write=m.os.write;outputs=[]
+  def observed_open(*args,**options):
+   fd=real_open(*args,**options)
+   if args[1]&m.os.O_WRONLY:outputs.append(fd)
+   return fd
+  def refused_write(fd,block):raise m.RuntimeRefused('Controlled Xi output refused.')
+  with m.owned_root(appdir):
+   directory=m.destination_directory(appdir/'usr/lib');destination=directory/'libXi.so.6';owners={}
+   m.os.open=observed_open;m.os.write=refused_write
+   try:
+    try:m.copy_unique(sources/'libXi.so.6',destination,owners)
+    except m.RuntimeRefused as refusal:assert str(refusal)=='Controlled Xi output refused.'
+    else:raise AssertionError('Refused Xi write was admitted')
+   finally:m.os.open=real_open;m.os.write=real_write
+   assert len(outputs)==1 and not owners[destination]['complete']
+   try:m.os.fstat(outputs[0])
+   except OSError:pass
+   else:raise AssertionError('Xi output descriptor was not retired')
+  assert m._DESTINATION_ROOT is None
+ check('refused root write and actual descriptor retirement',copy_write_refusal)
+assert passed==25
+print('Controlled Xi staging: 25 passed; 0 skipped; installed/native ABI unqualified.')

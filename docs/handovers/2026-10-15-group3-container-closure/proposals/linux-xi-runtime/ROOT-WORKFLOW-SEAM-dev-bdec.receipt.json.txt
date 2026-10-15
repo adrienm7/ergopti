@@ -1,0 +1,12 @@
+{
+  "basis": "bdec49b3c254277f46ecc0e2120d1de9fce122cb",
+  "before_sha256": "ea4ba5c0ba918cf40c8d2480b3233643a9c395f6fe365c1553ba023daf0e7869",
+  "after_sha256": "eb429e77c107a869c652b18337bb1942b139f45f149fb69639b32661c86fc6e7",
+  "patch_sha256": "8f381f719dd4eaa639540dfd22d28006cb2cb4159e5a68f3128f9e85a20dfb2e",
+  "delta": "exactly two libxi-dev APT operands",
+  "withdrawal_exact": true,
+  "native": "NOT_RUN",
+  "workflow_mutation": false,
+  "preserved_language_pack_fr": true,
+  "preserved_language_pack_de": true
+}

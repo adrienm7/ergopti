@@ -1,0 +1,41 @@
+# Actual ae278 Linux / Common terminal artifact receiving
+
+Sourceae27870cc98bdeb903eeca7a3ff1a2061bb15836, manual run38766625752 attempt1. This extends the immutable metadata/403 and one-recovered-download checkpoints; no failure is erased. Account17 payload recovery was actually observed, then37 explicitly selected existing compact artifacts downloaded200. No large distribution/site/model archives were downloaded. Total retained packet16MiB. Selected ZIPs/types/member names/size ceilings and hashes checked. Only completed Linux/Common logs were requested; active WindowsUnit was not requested or watched.
+
+Verified actual results:
+
+| Scope | Received result |
+| --- | --- |
+| Common JS | 435 PASS exactly once across nine journals |
+| Additional Common producers | 27 properties PASS; original hotstring-format precheck and writer SUCCESS |
+| Linux unit | 13857 PASS /0FAIL;13857 unique case timing IDs;521 module timings are not extra tests |
+| Linux E2E | original raw footer193/193 and all-scenarios-passed; source-bound E2E receipt |
+| Linux required stage evidence |20 documents,58 unique required subject keys, no deferred subject;17 install documents |
+| Official runtime/model | passed, native_executed, child0, zero descendants, actual six-byte inference |
+| LuaJIT XI2 | ABI29/property cases3, recorded cleanup/family/display retirement; CONTROLLED |
+
+Common source proof: independently received actualAE nine suite.json Git blobs and source inventory/receiver code. Recomputed canonical inventory SHA b0d71426916eaaad4fc613d17658cd2620e5ded7093c7b803a0c488980faed33. Every journal header binds source/run/attempt/platform/inventory; ordered start/result IDs/global ordinals/names/reproduction commands match exact source declarations; each resultPASS/exit0/no signal/error; footers complete and duration sums agree. All435 IDs occur once across the complete nine-feature set. Unique actual consumer raw line confirms435 union. API census binds all11 original lot names to unique actual attempt1 successful jobs, each with one successful original writer. Two non-JS lots intentionally have no JS journal: properties raw27 and actual format precheck/writer are separately received. No mutation lot is expected on feat/actions. Qualification envelopes say status=full; no deferred/profile waiver substitutes for received execution.
+
+| Feature | Checks |
+| --- | --- |
+| ai-and-network | 45 |
+| data-and-source-contracts | 61 |
+| diagnostics-and-metrics | 44 |
+| distribution-and-updates | 61 |
+| input-and-actions | 76 |
+| menus | 31 |
+| release-ci | 33 |
+| shared-ui | 31 |
+| test-infrastructure | 53 |
+
+Linux source proof: actual immutable .github/linux-ci-coverage.json and original receiver code read. Each of20 documents binds source/job/platform metadata, all subjects positive and classified, with no duplicated subject or deferred envelope. All58 mandatory subject floors met across test-linux/e2e-linux/package-linux/install-linux;17 matrix installation documents account for17 actual successful job instances. Actual LinuxVerdict raw output confirms original aggregate evidence validation. Unit raw footer and manifest agree13857/0, all case/module timing statuses pass/no timing errors. No actual unit skip marker found in the raw; matrix steps for other installation modes remain legitimatelySKIPPED within successful jobs, never counted as executed branches. E2E evidence includes original hotstring193 and named native/software subjects; raw footer193/193 received separately, not inferred from floor100.
+
+Runtime/model receiving: official artifact reports real-model-chat through actual Engine/Coordinator/EventLoop, typed runtime0.24.0, modelgranite4:350m-h, one pull/chat dispatch and six-byte inference, archive/pull/serve settled, native loop retired, terminal shutdown requested, zero descendants; physical closure adopted1/pending0/rescue0. The scope explicitly excludes daemon entrypoint and physical GUI. All1390 before/after source hashes equal; independently joined them and additional XI2 repository inputs to actualAE Git blobs1393 unique hash matches. External system/runtime-generated images retain their producer pins; not misrepresented as Git source or reobserved remote processes.
+
+XI2 receiving: actual original C3 case names property-created/modified/deleted received both from unit predecessor and E2E property artifact. Each reports fetched/freed/published3, xerrors0, input injections0 and settled compiler/native family acquisitions/reaps/closes with absent namespaces. Actual LuaJIT producer reportsABI29/native cases3/stage4/cleanuptrue and display retired/pidfd closed/rescue0. Scope isCONTROLLED; input_output_grant=false and native_epoch_claim=false throughout. This validates these native ABI/property-cookie software scenarios, not physical-device priority, product input/output authority or catalogue/default enrollment.
+
+Actual received publication plan binds source/run/ref/event and selectionwindows+linux, release=false, channeldev, empty native qualification profile; Mac lanefalse. At saved42-job checkpoint all21 Linux jobs (unit/E2E/build/17 installs/verdict) and SharedVerdict succeeded; WindowsUnit remainedin_progress. No later Windows/whole-run result is inferred. ReleaseVerify/Publish not yet instantiated in that checkpoint; release intent is independentlyfalse in the actual plan. Parent remains sole watcher.
+
+Raw bindings: LinuxUnit log6634113B SHAe42010f78654a417af6ceb8e374474e8f498de5ae29656c9af18c26f076cd371; LinuxE2E log1652778B SHAfc4b02b033aadd3a70119ca35edc92f42665d1b75052fd2eadd6977704b962e1; Common consumer log192823B SHAbc90c1e9398c4b3626d42b37670117941e9b2104de551aca432c4d1b220a9e60; LinuxVerdict39073B SHAc08b3c20c89d6af852860bc4e833ef01640a7e7a4c55e54b7e81dba961c206af. Full individual artifact/member/source pins are retained in JSON, no signed URLs or credentials exposed.
+
+Reviewer ran only bounded downloads, original raw parsing, independent stdlib evidence/schema joins and immutable Git blob hashing. No subject tests/imports/actors, CI dispatch/cancel, source/generator/runner/index/ref/worktree/environment edits. No physical capability, Windows result or unrelated feature completion transferred.

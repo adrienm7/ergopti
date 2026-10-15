@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/owned-xi-controls.py", line 36, in <module>
+    check('actual resolver positive',lambda:resolve(valid))
+  File "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/owned-xi-controls.py", line 15, in check
+    body();passed+=1;print('PASS controlled Xi '+name)
+    ^^^^^^
+  File "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/owned-xi-controls.py", line 36, in <lambda>
+    check('actual resolver positive',lambda:resolve(valid))
+                                            ^^^^^^^^^^^^^^
+  File "/workspace/.ergopti-cloud/reviews/linux-xi-runtime-current-X-private-v1/owned-xi-controls.py", line 28, in resolve
+    try:observed=m.explicit_xi_sources(data)
+                 ^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'owned_xi_stager' has no attribute 'explicit_xi_sources'. Did you mean: 'explicit_digest_sources'?

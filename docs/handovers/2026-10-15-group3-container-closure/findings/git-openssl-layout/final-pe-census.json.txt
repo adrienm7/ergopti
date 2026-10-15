@@ -1,0 +1,177 @@
+[
+  {
+    "path": "images/MinGit-2.55.0.5-64-bit/mingw64/bin/libcrypto-3-x64.dll",
+    "bytes": 5805212,
+    "sha256": "0330b5f558996f297d687e1a2b2fcc2cacf883b16baef74aaef35285d7c1231c",
+    "imports": [
+      "ADVAPI32.dll",
+      "CRYPT32.dll",
+      "KERNEL32.dll",
+      "msvcrt.dll",
+      "USER32.dll",
+      "WS2_32.dll"
+    ],
+    "export_count": 5883,
+    "required_exports": [
+      "BIO_free",
+      "BIO_new",
+      "BIO_read",
+      "BIO_s_mem",
+      "BIO_write",
+      "ERR_clear_error",
+      "ERR_peek_last_error",
+      "OPENSSL_version_major",
+      "OpenSSL_version_num"
+    ],
+    "missing_required_exports": [],
+    "OpenSSL_ascii_strings": [
+      "OpenSSL 3.5.7 9 Jun 2026"
+    ],
+    "objdump_sha256": "cf3886b07d4753073ae9924cb1c4b4062316ef36d5112cf2af45bb652d0a7c52",
+    "export_census_sha256": "bc73a2a6f7d485481ae2537075b2ccf37455013a822ed5fc99cfa90056f1662a",
+    "static_PE": {
+      "machine": "0x8664",
+      "coff_characteristics": "0x2026",
+      "optional_magic": "0x20b",
+      "size_ceiling_32MiB": true
+    }
+  },
+  {
+    "path": "images/MinGit-2.55.0.5-64-bit/mingw64/bin/libssl-3-x64.dll",
+    "bytes": 1026716,
+    "sha256": "feb5b300e0b3a021fed481178f3d66896426576d4d13b85a304d2a3809b25bfd",
+    "imports": [
+      "libcrypto-3-x64.dll",
+      "KERNEL32.dll",
+      "msvcrt.dll",
+      "WS2_32.dll"
+    ],
+    "export_count": 603,
+    "required_exports": [
+      "OPENSSL_init_ssl",
+      "SSL_CTX_check_private_key",
+      "SSL_CTX_ctrl",
+      "SSL_CTX_free",
+      "SSL_CTX_new",
+      "SSL_CTX_use_PrivateKey_ASN1",
+      "SSL_CTX_use_certificate_ASN1",
+      "SSL_do_handshake",
+      "SSL_free",
+      "SSL_get_error",
+      "SSL_new",
+      "SSL_read",
+      "SSL_set_accept_state",
+      "SSL_set_bio",
+      "SSL_shutdown",
+      "SSL_write",
+      "TLS_server_method"
+    ],
+    "missing_required_exports": [],
+    "OpenSSL_ascii_strings": [],
+    "objdump_sha256": "373c288b85f4dc7a577f1a69d569834e177272d318e7b186217e19fc816437a8",
+    "export_census_sha256": "73617578cef6fb34d4902e103aa3969ef1b80d7033aef584b09ad33817d3b617",
+    "static_PE": {
+      "machine": "0x8664",
+      "coff_characteristics": "0x2026",
+      "optional_magic": "0x20b",
+      "size_ceiling_32MiB": true
+    }
+  },
+  {
+    "path": "images/MinGit-2.56.0.2-64-bit/ucrt64/bin/libcrypto-3-x64.dll",
+    "bytes": 5399196,
+    "sha256": "f8839fd7d5b5e7b1763c88705538c5762a2f97df17f37092e37de3c663f30b1e",
+    "imports": [
+      "ADVAPI32.dll",
+      "CRYPT32.dll",
+      "KERNEL32.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-locale-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "USER32.dll",
+      "WS2_32.dll"
+    ],
+    "export_count": 5883,
+    "required_exports": [
+      "BIO_free",
+      "BIO_new",
+      "BIO_read",
+      "BIO_s_mem",
+      "BIO_write",
+      "ERR_clear_error",
+      "ERR_peek_last_error",
+      "OPENSSL_version_major",
+      "OpenSSL_version_num"
+    ],
+    "missing_required_exports": [],
+    "OpenSSL_ascii_strings": [
+      "OpenSSL 3.5.9 29 Sep 2026"
+    ],
+    "objdump_sha256": "95dd42fb4f83740dfdb538d2996904c83e41ec2b836d41cb83de387cb5f7f1bf",
+    "export_census_sha256": "bc73a2a6f7d485481ae2537075b2ccf37455013a822ed5fc99cfa90056f1662a",
+    "static_PE": {
+      "machine": "0x8664",
+      "coff_characteristics": "0x2026",
+      "optional_magic": "0x20b",
+      "size_ceiling_32MiB": true
+    }
+  },
+  {
+    "path": "images/MinGit-2.56.0.2-64-bit/ucrt64/bin/libssl-3-x64.dll",
+    "bytes": 966300,
+    "sha256": "6af55a4d522e2cc29ff0833cad4f6f7560f8ba2d107b97990d9415c590a4224a",
+    "imports": [
+      "libcrypto-3-x64.dll",
+      "KERNEL32.dll",
+      "api-ms-win-crt-convert-l1-1-0.dll",
+      "api-ms-win-crt-environment-l1-1-0.dll",
+      "api-ms-win-crt-filesystem-l1-1-0.dll",
+      "api-ms-win-crt-heap-l1-1-0.dll",
+      "api-ms-win-crt-private-l1-1-0.dll",
+      "api-ms-win-crt-runtime-l1-1-0.dll",
+      "api-ms-win-crt-stdio-l1-1-0.dll",
+      "api-ms-win-crt-string-l1-1-0.dll",
+      "api-ms-win-crt-time-l1-1-0.dll",
+      "api-ms-win-crt-utility-l1-1-0.dll",
+      "WS2_32.dll"
+    ],
+    "export_count": 603,
+    "required_exports": [
+      "OPENSSL_init_ssl",
+      "SSL_CTX_check_private_key",
+      "SSL_CTX_ctrl",
+      "SSL_CTX_free",
+      "SSL_CTX_new",
+      "SSL_CTX_use_PrivateKey_ASN1",
+      "SSL_CTX_use_certificate_ASN1",
+      "SSL_do_handshake",
+      "SSL_free",
+      "SSL_get_error",
+      "SSL_new",
+      "SSL_read",
+      "SSL_set_accept_state",
+      "SSL_set_bio",
+      "SSL_shutdown",
+      "SSL_write",
+      "TLS_server_method"
+    ],
+    "missing_required_exports": [],
+    "OpenSSL_ascii_strings": [],
+    "objdump_sha256": "f5f2cad718e5836123fb26f3aed75938593d11db7c1d5803cd9bf7046509193f",
+    "export_census_sha256": "73617578cef6fb34d4902e103aa3969ef1b80d7033aef584b09ad33817d3b617",
+    "static_PE": {
+      "machine": "0x8664",
+      "coff_characteristics": "0x2026",
+      "optional_magic": "0x20b",
+      "size_ceiling_32MiB": true
+    }
+  }
+]

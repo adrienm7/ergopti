@@ -1,0 +1,17 @@
+{
+  "source": "ae27870cc98bdeb903eeca7a3ff1a2061bb15836",
+  "paths": {
+    "static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1": {
+      "sha256": "2d18da079e95068323e7d0a278b3e12987f9d0735fef50f6821e2806370a29ac",
+      "git_blob": "f6ee2486a5b0d0e80d6a09ce153aca0a9afd6474"
+    },
+    "static/ergopti_plus/windows/tests/unit/test_managed_remote_transport.ahk": {
+      "sha256": "ca88b2adf92a3f04112f744a0f37d57507bb17fe70f9710b7eeb13d0ad021d13",
+      "git_blob": "0d7f663615165424c9377d26c8e912eaec0d6724"
+    },
+    "static/ergopti_plus/windows/tests/unit/test_layout_manager_host.ahk": {
+      "sha256": "15c977c28e8bbc6b8c84475d1d5f652af57d4e388275afa173d5fdbccfd6f5e7",
+      "git_blob": "3e0482dbc573e730e0514060a3035fa4a70c203a"
+    }
+  }
+}

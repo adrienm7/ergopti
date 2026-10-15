@@ -1,0 +1,20 @@
+--- a/.github/workflows/ci-linux.yml
++++ b/.github/workflows/ci-linux.yml
+@@ -3100,7 +3100,7 @@
+               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
+           elif [ "$mode" = full ]; then
+           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
+-            luajit lua-luv curl binutils pkg-config libglib2.0-dev \
++            luajit lua-luv curl binutils pkg-config libglib2.0-dev libxi-dev \
+             glib-networking dconf-gsettings-backend gsettings-desktop-schemas
+           else
+               exit 1
+@@ -3517,7 +3517,7 @@
+         # already have), and the tarball smoke runs the installed tree with it.
+         run: |
+           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv curl binutils pkg-config \
+-            libglib2.0-dev glib-networking dconf-gsettings-backend \
++            libglib2.0-dev libxi-dev glib-networking dconf-gsettings-backend \
+             gsettings-desktop-schemas
+ 
+       - name: Assemble the driver bundle
