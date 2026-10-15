@@ -8910,6 +8910,13 @@ retirement failure. The unchanged isolated case and the complete45-case
 portable owner subsequently passed with retained stream/child closure.
 The cause remains unknown; no causal runtime or native fix is claimed.
 
+Failure-only diagnostics now read the original owned stderr with nonblocking,
+nofollow and exact file identity admission, projecting bounded closed exception
+and frame tokens without raw values. An initial assertion remains primary if
+cleanup also refuses. All45 existing methods and original assertions/clocks
+remain; actual-helper formatter, primary-custody and nonblocking withdrawals
+fail causally. This improves receiving only and does not fix the unknown cause.
+
 2026-10-13 the managed Go receiving policy now enrolls all17 original
 failure-stage subtests from committed e94153e87b, retaining every57 earlier
 identity and all original bounds. Both official89d architecture transcripts
