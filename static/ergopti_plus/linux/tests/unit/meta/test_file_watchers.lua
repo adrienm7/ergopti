@@ -1033,8 +1033,9 @@ helpers.describe("file_watchers Personal topology", function()
 		}
 		print("  [Personal topology fixture uses native luv scan/stat port; lua-posix unavailable]")
 	end
-	local function session(backend_name, run)
-		local root = assert(native_luv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/ergopti_topology_XXXXXX"))
+	-- Base-source cases select /var/tmp because the producer deliberately excludes /tmp.
+	local function session(backend_name, run, root_parent)
+		local root = assert(native_luv.fs_mkdtemp((root_parent or os.getenv("TMPDIR") or "/tmp") .. "/ergopti_topology_XXXXXX"))
 		local directories, files, records = { root }, {}, {}
 		local state = { root = root, now = 0, reloads = 0, scans = 0, callbacks = {},
 			fail_callback = false, denied = nil, start_refused = nil, stop_refused = nil, close_refused = nil }
@@ -1335,7 +1336,7 @@ helpers.describe("file_watchers Personal topology", function()
 			helpers.assert_true(not root_owner.retired and native_luv.is_active(root_owner.handle), "the original main Hotstrings owner is unchanged")
 			helpers.assert_true(not base_owner.retired and native_luv.is_active(base_owner.handle), "the original base owner is unchanged")
 			s.file(s.base .. "/source.lua"); s.settle(1)
-		end)
+		end, "/var/tmp")
 	end)
 	helpers.it("(linux-watch-topology) native observes a file created while a new directory census is open", function()
 		session("native", function(s)
@@ -1404,7 +1405,7 @@ helpers.describe("file_watchers Personal topology", function()
 			s.file(s.personal .. "/new.toml"); s.settle(1)
 			s.file(s.base .. "/changed.lua"); s.settle(1)
 			s.file(s.personal .. "/other.toml"); s.settle(1)
-		end)
+		end, "/var/tmp")
 	end)
 	helpers.it("(linux-watch-topology) native repaired unobserved coverage refreshes the consumer's latest bytes once", function()
 		session("native", function(s)
