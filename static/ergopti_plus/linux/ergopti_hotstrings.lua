@@ -821,6 +821,7 @@ local function main()
 
 	local script_actions = ScriptActions.new({
 		reset = function()
+			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset()
@@ -834,6 +835,7 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if paused then keylogger.cancel_hold_intervals() end
 			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
@@ -874,6 +876,7 @@ local function main()
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
+			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset(false)
@@ -1235,6 +1238,7 @@ local function main()
 	local capture_owned_scancodes = {}
 	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
+		capture_owned_scancodes[scancode] = nil
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
@@ -1643,6 +1647,13 @@ local function main()
 		end
 		return consume_bound_chord(detail)
 	end)
+	-- Bind the same privacy owner for both ends of a physical measurement.
+	local hold_token = keylogger.hold_accounting_token
+	local function hold_admission()
+		if keylogger.hold_accounting_token ~= hold_token
+			or script_actions.is_paused() or input_capture_gate.blocks_text() then return nil end
+		return hold_token()
+	end
 	local function handle_hold(scancode, held_ms)
 		if capture_owned_scancodes[scancode] then
 			capture_owned_scancodes[scancode] = nil
@@ -1690,6 +1701,7 @@ local function main()
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
 		onHold = on_hold,
+		onHoldAdmission = hold_admission,
 		onEmitRaw  = injector.emit_key,
 		outputBroker = injector.output_broker(),
 		requireOutputBroker = opts.grab == true,
@@ -2259,6 +2271,8 @@ local function main()
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			keylogger.observe_hold_focus(appName)
+			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			-- A focus change moves the caret to a different text context. The matcher
 			-- and its aligned timing history must cross that boundary together.
 			_undoable = nil
@@ -2269,7 +2283,6 @@ local function main()
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the
 			-- driver had no private-browsing filter at all.
-			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			-- The title itself, which was received and discarded. The apps dashboard
 			-- groups a day by window — the difference between "four hours in the
 			-- editor" and "four hours across three files" — and this driver had
@@ -2298,6 +2311,7 @@ local function main()
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
 		_cached_app_id = foreground and foreground.appId or nil
+		keylogger.observe_hold_focus(_cached_app_id)
 		keylogger.set_private_window(
 			keylogger.is_private_window(foreground and foreground.windowTitle))
 		-- Primed here too. Without it the first window of the session — which on a
