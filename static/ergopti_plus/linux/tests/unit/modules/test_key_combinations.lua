@@ -2073,3 +2073,38 @@ helpers.describe("original Manager terminal pair identity (controlled transport)
 		end
 	end)
 end)
+
+local function with_collision_pair_owner(body)
+	local previous, saved = Owner, package.loaded["modules.shortcuts.key_combinations"]
+	Owner = helpers.load_module("modules.shortcuts.key_combinations")
+	local ok, why = pcall(body)
+	Owner = previous; package.loaded["modules.shortcuts.key_combinations"] = saved
+	if not ok then error(why, 0) end
+end
+
+helpers.describe("complete combination collision claim source", function()
+	helpers.it("retains ordered claim identity and revokes on source or facade replacement", function()
+		with_collision_pair_owner(function()
+			local f = make(); helpers.assert_true(Owner.set_instance(f.owner))
+			local frame = assert(Owner.capture_collision_inventory())
+			helpers.assert_true(frame.current()); helpers.assert_eq(frame.claims, {
+				{ binding = "combination__caps_lock_then_tab", first = "caps_lock", second = "tab" },
+			})
+			f.bytes = '[shortcuts.key_combination_taps]\ncaps_lock_then_tab = "copy"\n'
+			helpers.assert_eq(frame.current(), false)
+			f.bytes = base_text
+			local replacement = make(); helpers.assert_true(Owner.set_instance(replacement.owner))
+			helpers.assert_eq(frame.current(), false); helpers.assert_eq(frame.sealed(), false)
+		end)
+	end)
+	helpers.it("a configuration lease and compensation never revive a prior pair claim", function()
+		with_collision_pair_owner(function()
+			local f = make(); helpers.assert_true(Owner.set_instance(f.owner))
+			local frame = assert(Owner.capture_collision_inventory()); local token = {}
+			helpers.assert_true(f.owner.acquire_configuration(token))
+			helpers.assert_nil(Owner.capture_collision_inventory()); helpers.assert_eq(frame.current(), false)
+			helpers.assert_true(f.owner.release_configuration(token)); helpers.assert_eq(frame.current(), false)
+			helpers.assert_true(Owner.capture_collision_inventory().current())
+		end)
+	end)
+end)

@@ -1001,4 +1001,64 @@ end
 
 KeyboardPublication.register(M, M.published_binding_catalogue)
 
+
+--- Captures all effective keyboard claims without acquiring a configuration lease.
+--- @return table|nil frame Detached claims and an exact source/runtime guard.
+function M.capture_collision_inventory()
+	load_assignments()
+	if _configuration_owner ~= nil then return nil end
+	local Routes = require("infra.config_paths")
+	local route, read, factory = Routes.config, Writer.read_classified, M.capture_collision_inventory
+	local path = route("config.toml")
+	local bytes, status = read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	local expected = M.configuration_candidate(Codec.decode(bytes or ""))
+	local actual, explicit, epoch = _assignments, _explicit_assignments, _dispatch_generation
+	local function same(left, right)
+		for key, value in pairs(left) do if right[key] ~= value then return false end end
+		for key, value in pairs(right) do if left[key] ~= value then return false end end
+		return true
+	end
+	local function runtime()
+		return rawequal(package.loaded["modules.shortcuts.keyboard_shortcuts"], M)
+			and _configuration_owner == nil and _dispatch_generation == epoch
+			and rawequal(_assignments, actual) and rawequal(_explicit_assignments, explicit)
+			and same(actual, expected.assignments) and same(explicit, expected.explicit_assignments)
+			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
+			and Writer.read_classified == read and M.capture_collision_inventory == factory
+	end
+	local function current()
+		if not runtime() or route("config.toml") ~= path then return false end
+		local content, classification = read(path)
+		if content ~= bytes or classification ~= status or route("config.toml") ~= path or not runtime() then return false end
+		return runtime()
+	end
+	if not current() then return nil end
+	local claims, configured = {}, {}
+	for slot, action in pairs(actual) do configured[slot] = action end
+	for slot, action in pairs(explicit) do configured[slot] = action end
+	for slot in pairs(configured) do
+		local descriptor = M.physical_slot_descriptor(slot)
+		if descriptor then
+			claims[#claims + 1] = { kind = "chord", binding = M.binding_id(slot),
+				code = physical_slots().stable_native_code(slot, "evdev"), mods = descriptor.mods }
+		elseif slot ~= MagicEditor.SLOT_ID then
+			local mods, key = required_modifiers(slot), suffix_of(select(2, split_slot(slot)))
+			if not mods or not key then return nil end
+			claims[#claims + 1] = { kind = "logical", binding = M.binding_id(slot), key = key,
+				mods = { ctrl = mods.ctrl == true, alt = mods.alt == true, shift = mods.shift == true, super = mods.meta == true } }
+		end
+	end
+	-- Magic Editor yields to explicit personal claims in the existing shared
+	-- policy; its conditional recommendation is not an occupied reservation.
+	if not current() then return nil end
+	return { claims = claims, path = path, content = bytes, status = status, current = current, sealed = runtime }
+end
+
+--- Translates only the original registry's stable Linux physical identity.
+function M.physical_native_code(slot) return physical_slots().stable_native_code(slot, "evdev") end
+
+--- Uses the same logical identity normalization as ordinary dispatch.
+function M.collision_identity(identity) return suffix_of(identity) end
+
 return M

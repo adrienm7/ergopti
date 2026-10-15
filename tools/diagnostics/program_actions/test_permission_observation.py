@@ -3,8 +3,11 @@
 """Independent closed diagnostic vectors; no native consent or catalogue claim."""
 
 import base64
+from contextlib import ExitStack, contextmanager
 import json
+import os
 from pathlib import Path
+import stat
 import sys
 import tempfile
 import types
@@ -13,6 +16,59 @@ from unittest.mock import patch
 
 from permission_observation import OPERATION, PermissionProtocol, PermissionQuery
 from run_signed_query_probe import QueryProtocol, Refused, SignedQuery
+
+
+@contextmanager
+def controlled_executable_metadata(helper):
+    """Project only the synthetic Windows helper's missing POSIX execute bit."""
+    if os.name != "nt":
+        yield
+        return
+    import run_signed_query_probe as probe
+
+    original = probe.identity
+    actual_os = os
+    actual_lstat = actual_os.lstat
+    owned_path = actual_os.fspath(helper)
+
+    class ExecutableFixtureStat:
+        """Retain one fresh real stat sample and every unprojected field."""
+
+        __slots__ = ("_actual",)
+
+        def __init__(self, actual):
+            object.__setattr__(self, "_actual", actual)
+
+        def __setattr__(self, field, value):
+            raise AttributeError("fixture metadata is read-only")
+
+        @property
+        def st_mode(self):
+            return self._actual.st_mode | stat.S_IXUSR
+
+        def __getattr__(self, field):
+            return getattr(self._actual, field)
+
+    def fixture_lstat(path):
+        probe.require(actual_os.fspath(path) == owned_path, "identity_refused")
+        actual = actual_lstat(path)
+        probe.require(actual.st_mode & 0o111 == 0, "identity_refused")
+        return ExecutableFixtureStat(actual)
+
+    # Keep the production predicate and tuple; this port belongs only to the fixture.
+    identity = types.FunctionType(
+        original.__code__,
+        dict(
+            original.__globals__,
+            os=types.SimpleNamespace(lstat=fixture_lstat, path=actual_os.path),
+        ),
+        original.__name__,
+        original.__defaults__,
+        original.__closure__,
+    )
+    identity.__kwdefaults__ = original.__kwdefaults__
+    with patch.object(probe, "identity", identity):
+        yield
 
 
 def packet():
@@ -164,11 +220,12 @@ class PermissionObservationControls(unittest.TestCase):
         self.assertIs(PermissionQuery.cancel, SignedQuery.cancel)
 
     def test_actual_controlled_pipe_preserves_capture_and_retirement(self):
-        from test_signed_query_probe import ControlledGroup
+        from test_signed_query_probe import ControlledGroup, controlled_query_ports
 
-        with tempfile.TemporaryDirectory() as directory:
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as ports:
             helper = Path(directory) / "owned-metadata-fixture"
             script = "#!" + sys.executable + "\nimport base64,json,sys\n"
+            script += "if sys.platform == 'win32': sys.stdout.reconfigure(newline='\\n')\n"
             script += "print('Q1 HELD',flush=True)\ncommand=sys.stdin.readline()\n"
             script += "assert sys.argv[1:] == ['--automation-query-worker','permission-observation','19']\n"
             script += "if command == 'ACTIVATE\\n':\n"
@@ -178,8 +235,11 @@ class PermissionObservationControls(unittest.TestCase):
             script += "else:\n    print('Q1 RETIRED 15',flush=True)\n"
             helper.write_text(script)
             helper.chmod(0o700)
+            ports.enter_context(controlled_query_ports(helper, (("permission-observation", "19"),)))
             query = PermissionQuery(
-                helper, types.SimpleNamespace(OwnedProcessGroup=ControlledGroup), object()
+                helper,
+                types.SimpleNamespace(OwnedProcessGroup=ControlledGroup),
+                object(),
             )
             try:
                 self.assertEqual(query.observe(19), packet())
@@ -214,7 +274,14 @@ class PermissionAdmissionControls(unittest.TestCase):
             else raw
         )
         target.write_bytes(raw)
-        return probe, root, target, relative, raw, {relative: hashlib.sha256(raw).hexdigest()}
+        return (
+            probe,
+            root,
+            target,
+            relative,
+            raw,
+            {relative: hashlib.sha256(raw).hexdigest()},
+        )
 
     def test_verified_bytes_bind_original_custody_and_restore_module(self):
         probe, root, target, relative, raw, hashes = self.fixture()
@@ -228,7 +295,9 @@ class PermissionAdmissionControls(unittest.TestCase):
         with self.assertRaises(Refused):
             constructor("unused", None, None).observe(0)
 
-    def test_prior_module_membership_and_value_survive_success_and_execution_exception(self):
+    def test_prior_module_membership_and_value_survive_success_and_execution_exception(
+        self,
+    ):
         key = "run_signed_query_probe"
         original = sys.modules[key]
         for state in ("absent", "existing", "blocked-none"):
@@ -278,7 +347,11 @@ class PermissionAdmissionControls(unittest.TestCase):
             b'raise AssertionError("unverified decoder executed")'
         )
         with (
-            patch.object(probe.subprocess, "check_output", return_value=b"different tracked bytes"),
+            patch.object(
+                probe.subprocess,
+                "check_output",
+                return_value=b"different tracked bytes",
+            ),
             self.assertRaisesRegex(Refused, "source_refused"),
         ):
             probe.load_permission_query(root, "a" * 40, hashes)
@@ -334,7 +407,7 @@ class PermissionMainAdmissionControls(unittest.TestCase):
         import io
         import os
         import run_signed_query_probe as probe
-        from test_signed_query_probe import ControlledGroup
+        from test_signed_query_probe import ControlledGroup, controlled_query_ports
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -371,7 +444,11 @@ class PermissionMainAdmissionControls(unittest.TestCase):
             helper = app / "Contents/MacOS/ErgoptiAutomationQuery"
             helper.parent.mkdir(parents=True)
             script = (
-                "#!" + sys.executable + "\nimport base64,json,sys\nprint('Q1 HELD',flush=True)\n"
+                "#!"
+                + sys.executable
+                + "\nimport base64,json,sys\n"
+                + "if sys.platform == 'win32': sys.stdout.reconfigure(newline='\\n')\n"
+                + "print('Q1 HELD',flush=True)\n"
             )
             script += "command=sys.stdin.readline()\nif command == 'ACTIVATE\\n':\n"
             script += (
@@ -443,7 +520,11 @@ class PermissionMainAdmissionControls(unittest.TestCase):
                 patch.object(probe.sys, "argv", arguments),
                 patch.dict(
                     os.environ,
-                    {"GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "17", "GITHUB_RUN_ATTEMPT": "2"},
+                    {
+                        "GITHUB_SHA": "a" * 40,
+                        "GITHUB_RUN_ID": "17",
+                        "GITHUB_RUN_ATTEMPT": "2",
+                    },
                 ),
                 patch.object(probe.subprocess, "check_output", side_effect=git),
                 patch.object(
@@ -454,10 +535,18 @@ class PermissionMainAdmissionControls(unittest.TestCase):
                 patch.object(
                     probe, "load_permission_query", wraps=probe.load_permission_query
                 ) as load,
+                controlled_query_ports(
+                    helper, (("discover", "1"), ("permission-observation", "3"))
+                ),
+                controlled_executable_metadata(helper),
                 contextlib.redirect_stdout(io.StringIO()),
             ):
                 result = probe.main()
-            return result, json.loads((output / "observation.json").read_bytes()), load.call_count
+            return (
+                result,
+                json.loads((output / "observation.json").read_bytes()),
+                load.call_count,
+            )
 
     def test_main_admits_metadata_without_forgiving_business_permission_refusal(self):
         code, observed, calls = self.run_probe()
@@ -471,7 +560,8 @@ class PermissionMainAdmissionControls(unittest.TestCase):
         self.assertEqual(observed["sdk_permission_observation"]["metadata"]["osstatus"], 0)
         self.assertTrue(observed["local_retired"])
         self.assertEqual(
-            observed["sdk_permission_observation"]["operations"][0]["outer_owner"]["signals"], []
+            observed["sdk_permission_observation"]["operations"][0]["outer_owner"]["signals"],
+            [],
         )
 
     def test_original_cancel_held_skips_new_diagnostic(self):

@@ -751,4 +751,69 @@ function M._reset_for_test()
 end
 
 BindingPublication.register("combination", "platform.remap.tap_hold_manager", M, M.published_binding_catalogue)
+
+--- Captures configured native key-prefix reservations from the original Manager.
+--- This observes source/configuration ownership; it grants no physical/output rights.
+function M.capture_collision_inventory()
+	if not _initialized or not _loaded or _paused or not config_exports_current()
+		or original_logical_catalogue_current(_combinations) ~= true then return nil end
+	local Files = require("adapters.file_system")
+	local read, factory = Files.read_with_status, M.capture_collision_inventory
+	local path, defaults, loaded, engine, installed, epoch = _user_path, _defaults_path, _loaded, _engine, _installed_engine, _generation
+	local enabled, paused, combinations = _enabled, _paused, _combinations
+	local bytes, status = read(path)
+	local shipped, shipped_status = read(defaults)
+	if status ~= "ok" or shipped_status ~= "ok" or type(bytes) ~= "string" or type(shipped) ~= "string" then return nil end
+	local decoded = Config.load_document(defaults, Codec.decode(bytes), nil, path)
+	if decoded.enabled ~= loaded.enabled or not fields_equal(decoded.keys, loaded.keys) then return nil end
+	local keys = copy_fields(loaded.keys)
+	local codes = copy_fields(original_engine_key_codes)
+	local native_records = {}
+	if enabled and loaded.enabled and engine and type(engine.by_code) == "table" then
+		for id, fields in pairs(keys) do
+			local code = codes[id]
+			local row = code and engine.by_code[code]
+			if fields.enabled ~= false and row ~= nil then
+				if type(row) ~= "table" or row.id ~= id then return nil end
+				native_records[code] = { row = row, fields = copy_fields(row) }
+			end
+		end
+	end
+	local function runtime()
+		if engine and ((engine.layer_depth or 0) ~= 0 or next(engine.held or {}) ~= nil
+			or next(engine.key_refs or {}) ~= nil or next(engine.physical_down or {}) ~= nil) then return false end
+		for code, saved in pairs(native_records) do
+			if not rawequal(engine.by_code[code], saved.row) or not fields_equal(saved.row, saved.fields) then return false end
+		end
+		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M) and _initialized
+			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
+			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _generation == epoch
+			and _enabled == enabled and _paused == paused and not paused and config_exports_current()
+			and loaded.enabled == decoded.enabled and rawequal(_combinations, combinations)
+			and original_logical_catalogue_current(combinations) == true
+			and fields_equal(loaded.keys, keys) and fields_equal(Engine.KEY_CODES, codes)
+			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+			and M.capture_collision_inventory == factory
+	end
+	local function current()
+		if not runtime() then return false end
+		local content, classification = read(path)
+		local current_defaults, defaults_status = read(defaults)
+		return content == bytes and classification == status and current_defaults == shipped
+			and defaults_status == shipped_status and runtime()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if enabled and loaded.enabled then
+		if not rawequal(installed, engine) or not M.is_active() then return nil end
+		for code, saved in pairs(native_records) do
+			-- Native tap with no hold has no by_code entry in the actual engine.
+			claims[#claims + 1] = { kind = "prefix", binding = "tap_hold__" .. saved.row.id,
+				codes = { code }, unmodified_only = true }
+		end
+	end
+	if not current() then return nil end
+	return { claims = claims, codes = codes, path = path, content = bytes, status = status, current = current, sealed = runtime }
+end
+
 return M

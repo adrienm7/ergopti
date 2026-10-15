@@ -870,10 +870,11 @@ const SNAPSHOT16_OWNER =
 const SNAPSHOT16_TEST =
 	'static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_FIXED_IMAGES = {
-	[SNAPSHOT16_OWNER]: 'd049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97',
-	[SNAPSHOT16_TEST]: '411e9a737b5f65be9e9eec59f7e96075130c7fd5a72e6c08fdabc7493169d992'
+	[SNAPSHOT16_OWNER]: 'c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1',
+	[SNAPSHOT16_TEST]: 'bada83f6a7d6a17c7f0a39c995ba6b8551c114a9a905474c45ba78ae31bc28c9'
 };
 const SNAPSHOT16_NAMES = [
+	'windows91 snapshots: source prototype stays image data (snapshot-base-data)',
 	'windows91 snapshots: original scalar comparison refuses clones while unchanged composite source remains current',
 	'windows91 snapshots: Map mode and string case remain exact',
 	'windows91 snapshots: integer and string key slots remain distinct',
@@ -945,17 +946,17 @@ function snapshot16Receive(bytes, mode) {
 		.filter(Boolean);
 	const selected = lines.filter((line) => line.startsWith('# --only '));
 	assert.equal(selected.length, 1, 'snapshot16 requires one actual selection');
-	const selection = /^# --only windows91 snapshots: - 16 of ([1-9]\d*) test\(s\) selected\.$/.exec(
+	const selection = /^# --only windows91 snapshots: - 17 of ([1-9]\d*) test\(s\) selected\.$/.exec(
 		selected[0]
 	);
-	assert.ok(selection && Number(selection[1]) >= 16, 'snapshot16 wrong selected census');
+	assert.ok(selection && Number(selection[1]) >= 17, 'snapshot16 wrong selected census');
 	assert.doesNotMatch(
 		text,
 		/^# (?:DEFERRED|QUALIFICATION_ELIGIBLE)/m,
 		'snapshot16 no profile substitution'
 	);
 	if (mode === 'dry') {
-		assert.equal(lines.filter((line) => /^1\.\./.test(line)).join('\n'), '1..16');
+		assert.equal(lines.filter((line) => /^1\.\./.test(line)).join('\n'), '1..17');
 		assert.equal(lines.filter((line) => line === '# dry-run - skipping execution.').length, 1);
 		assert.doesNotMatch(text, /^(?:RUNNING |ok |not ok |# duration_ms|# \d+ passed,)/m);
 		return { registered_total: Number(selection[1]), dry_loaded: true };
@@ -964,10 +965,10 @@ function snapshot16Receive(bytes, mode) {
 	assert.doesNotMatch(text, /^# dry-run/m);
 	const manifest = validateAhkSuiteManifest(text);
 	assert.equal(manifest.complete, true, manifest.errors.join('; '));
-	assert.equal(manifest.planned, 16);
-	assert.equal(manifest.executed_count, 16);
-	assert.equal(manifest.timed_count, 16);
-	assert.equal(manifest.passed, 16);
+	assert.equal(manifest.planned, 17);
+	assert.equal(manifest.executed_count, 17);
+	assert.equal(manifest.timed_count, 17);
+	assert.equal(manifest.passed, 17);
 	assert.equal(manifest.failed, 0);
 	assert.deepEqual(
 		manifest.executed.map((entry) => entry.name),
@@ -1017,14 +1018,14 @@ function receiveSnapshot16(ports) {
 // Handwritten execution observations exercise the same receiver, not an AHK
 // source scanner. These ports never create a native qualification receipt.
 const snapshot16Dry =
-	'1..16\r\n# --only windows91 snapshots: - 16 of 200 test(s) selected.\r\n# dry-run - skipping execution.\r\n';
+	'1..17\r\n# --only windows91 snapshots: - 17 of 200 test(s) selected.\r\n# dry-run - skipping execution.\r\n';
 const snapshot16Tap =
-	'1..16\r\n# --only windows91 snapshots: - 16 of 200 test(s) selected.\r\n' +
+	'1..17\r\n# --only windows91 snapshots: - 17 of 200 test(s) selected.\r\n' +
 	SNAPSHOT16_NAMES.map(
 		(name, index) =>
-			`RUNNING ${index + 1}/16 - ${name}\r\nok ${index + 1} - ${name}\r\n# duration_ms ${index + 1} 1\r\n`
+			`RUNNING ${index + 1}/17 - ${name}\r\nok ${index + 1} - ${name}\r\n# duration_ms ${index + 1} 1\r\n`
 	).join('') +
-	'# 16 passed, 0 failed.\r\n';
+	'# 17 passed, 0 failed.\r\n';
 function snapshot16Controlled(change = () => {}) {
 	const state = {
 		frame: {
@@ -1059,7 +1060,7 @@ let snapshot16Controls = 0;
 function snapshot16Control(name, change, refused = true, expectedLaunches) {
 	const { ports, state } = snapshot16Controlled(change);
 	if (refused) assert.throws(() => receiveSnapshot16(ports), undefined, name);
-	else assert.equal(receiveSnapshot16(ports).phases[1].manifest.passed, 16, name);
+	else assert.equal(receiveSnapshot16(ports).phases[1].manifest.passed, 17, name);
 	if (expectedLaunches !== undefined) assert.equal(state.launches.length, expectedLaunches, name);
 	snapshot16Controls += 1;
 }
@@ -1080,35 +1081,35 @@ function snapshot16ChangeText(edit) {
 }
 snapshot16Control(
 	'omitted terminal result',
-	snapshot16ChangeText((text) => text.replace(`ok 16 - ${SNAPSHOT16_NAMES[15]}\r\n`, ''))
+	snapshot16ChangeText((text) => text.replace(`ok 17 - ${SNAPSHOT16_NAMES[16]}\r\n`, ''))
 );
 snapshot16Control(
 	'duplicate terminal result',
-	snapshot16ChangeText((text) => text + `ok 16 - ${SNAPSHOT16_NAMES[15]}\r\n`)
+	snapshot16ChangeText((text) => text + `ok 17 - ${SNAPSHOT16_NAMES[16]}\r\n`)
 );
 snapshot16Control(
-	'extra complete test cannot replace exact sixteen',
+	'extra complete test cannot replace exact seventeen',
 	snapshot16ChangeText((text) =>
 		text
-			.replace('1..16', '1..17')
-			.replaceAll('/16 -', '/17 -')
+			.replace('1..17', '1..18')
+			.replaceAll('/17 -', '/18 -')
 			.replace(
-				'# 16 passed, 0 failed.',
-				'RUNNING 17/17 - extra\r\nok 17 - extra\r\n# duration_ms 17 1\r\n# 17 passed, 0 failed.'
+				'# 17 passed, 0 failed.',
+				'RUNNING 18/18 - extra\r\nok 18 - extra\r\n# duration_ms 18 1\r\n# 18 passed, 0 failed.'
 			)
 	)
 );
 snapshot16Control(
 	'running is not a terminal result',
-	snapshot16ChangeText((text) => text.slice(0, text.indexOf(`ok 16 - ${SNAPSHOT16_NAMES[15]}`)))
+	snapshot16ChangeText((text) => text.slice(0, text.indexOf(`ok 17 - ${SNAPSHOT16_NAMES[16]}`)))
 );
 snapshot16Control(
-	'different sixteen names cannot borrow the selection',
+	'different seventeen names cannot borrow the selection',
 	snapshot16ChangeText((text) => text.replaceAll(SNAPSHOT16_NAMES[4], 'different genuine test'))
 );
 snapshot16Control(
 	'missing timing',
-	snapshot16ChangeText((text) => text.replace('# duration_ms 16 1\r\n', ''))
+	snapshot16ChangeText((text) => text.replace('# duration_ms 17 1\r\n', ''))
 );
 for (const [name, field, value] of [
 	['failed exit', 'status', 7],
@@ -1215,7 +1216,53 @@ snapshot16Control('green bytes cannot revise native exit during receiving', (por
 		return bytes;
 	};
 });
-console.log(`Snapshot16 receiving: ${snapshot16Controls} controlled non-native cases passed.`);
+// The published prototype-data regression is mandatory and remains first.
+snapshot16Control(
+	'published prototype-data regression cannot be omitted from seventeen results',
+	snapshot16ChangeText((text) =>
+		text.replace(
+			'ok 1 - windows91 snapshots: source prototype stays image data (snapshot-base-data)\r\n',
+			''
+		)
+	)
+);
+snapshot16Control(
+	'published prototype-data regression cannot exchange order with the original first case',
+	snapshot16ChangeText((text) =>
+		text
+			.replaceAll(
+				'windows91 snapshots: source prototype stays image data (snapshot-base-data)',
+				'PRIVATE_SNAPSHOT17_ORDER_SLOT'
+			)
+			.replaceAll(
+				'windows91 snapshots: original scalar comparison refuses clones while unchanged composite source remains current',
+				'windows91 snapshots: source prototype stays image data (snapshot-base-data)'
+			)
+			.replaceAll(
+				'PRIVATE_SNAPSHOT17_ORDER_SLOT',
+				'windows91 snapshots: original scalar comparison refuses clones while unchanged composite source remains current'
+			)
+	)
+);
+for (const [file, oldHash] of [
+	[SNAPSHOT16_OWNER, 'd049972c3566def451dedd9e9a34747e4a0dc7c3dcac600dabc419de02c84e97'],
+	[SNAPSHOT16_TEST, '411e9a737b5f65be9e9eec59f7e96075130c7fd5a72e6c08fdabc7493169d992']
+]) {
+	snapshot16Control(
+		'published seventeen cases cannot borrow the preceding image: ' + file,
+		(ports, state) => {
+			state.frame.inputs.find((input) => input.path === file).sha256 = oldHash;
+		},
+		true,
+		0
+	);
+}
+assert.equal(
+	snapshot16Controls,
+	26,
+	'all twenty-two original and four successor controls remain enrolled'
+);
+console.log(`Snapshot17 receiving: ${snapshot16Controls} controlled non-native cases passed.`);
 
 /** These facts observe closed bytes; they never normalize or admit a transcript. */
 function snapshot16CaptureFacts(bytes, mode) {
@@ -1481,7 +1528,7 @@ if (ahkIndex !== -1) {
 			native_actions_qualified: false
 		};
 		console.log(
-			'Snapshot16 native: exact original enrolled runner dry-loaded; 16/16 terminal cases passed; both direct children exited and capture descriptors closed; full suite remains unqualified.'
+			'Snapshot16 native: exact original enrolled runner dry-loaded; 17/17 terminal cases passed; both direct children exited and capture descriptors closed; full suite remains unqualified.'
 		);
 	} catch (error) {
 		receipt = {
