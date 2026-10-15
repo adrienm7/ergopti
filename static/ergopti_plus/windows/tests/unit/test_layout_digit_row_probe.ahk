@@ -1160,3 +1160,138 @@ Test("direct-digit-source: scans cannot manufacture an unissued source", _DDB_Un
 Test("direct-digit-source: registration accepts no supplied authority", _DDB_NoSuppliedRegistrar)
 Test("direct-digit-source: no public completion or reset operation", _DDB_NoIssuerOperation)
 Test("direct-digit-source: withdrawn primitive refuses and permanently withholds issuance", _DDB_WithdrawnPrimitive)
+
+/** Quotes an absolute owned fixture path for the child AHK source. */
+_DDP_Literal(Value) {
+	return Chr(34) . StrReplace(StrReplace(Value, Chr(96), Chr(96) . Chr(96)),
+		Chr(34), Chr(96) . Chr(34)) . Chr(34)
+}
+
+/** Resolves fixture roots before the original owners retain their exact paths. */
+_DDP_Path(Value) {
+	Length := DllCall("Kernel32\GetFullPathNameW", "Str", Value, "UInt", 0, "Ptr", 0, "Ptr", 0, "UInt")
+	if !Length
+		throw OSError()
+	BufferPath := Buffer(Length * 2, 0)
+	Written := DllCall("Kernel32\GetFullPathNameW", "Str", Value, "UInt", Length,
+		"Ptr", BufferPath, "Ptr", 0, "UInt")
+	if !Written || Written >= Length
+		throw Error("The digit producer fixture root cannot be resolved.")
+	return StrGet(BufferPath, "UTF-16")
+}
+
+/** Reuses the original graph and original static slots without running its tests. */
+_DDP_ChildSource(Scenario, ResultsPath) {
+	global _DriverDir, _StaticDir, _SharedDir, _ExtensionsDir
+	TestsDir := _DDP_Path(_DriverDir . "\tests")
+	Source := FileRead(TestsDir . "\run_all.ahk", "UTF-8")
+	Lines := []
+	for Line in StrSplit(Source, "`n") {
+		if InStr(Line, "#Include") == 1 && !RegExMatch(Line, "^#Include ([^\r\n]+)$")
+			throw Error("The original digit producer include directive changed.")
+		if RegExMatch(Line, "^#Include ([^\r\n]+)$", &Match) {
+			if RegExMatch(Match[1], '["%*]')
+				throw Error("The original digit producer include syntax changed.")
+			Resolved := _DDP_Path(TestsDir . "\" . Match[1])
+			if !FileExist(Resolved)
+				throw Error("An original digit producer include is missing.")
+			Line := "#Include " . Resolved
+		}
+		Lines.Push(Line)
+	}
+	Source := ArrayJoin(Lines, "`n")
+	Source := StrReplace(Source, "#SingleInstance Force", "#SingleInstance Off`n#NoTrayIcon", , &InstanceCount)
+	Source := StrReplace(Source, "SetWorkingDir(A_ScriptDir)",
+		"SetWorkingDir(" . _DDP_Literal(TestsDir) . ")`nSuspend(true)", , &WorkingCount)
+	Framework := "#Include " . TestsDir . "\test_framework.ahk"
+	Source := StrReplace(Source, Framework,
+		'EnvSet("ERGOPTI_AHK_RESULTS_FILE", ' . _DDP_Literal(ResultsPath) . ")`n"
+		. 'OnExit(_DDP_TraceExit)' . "`n" . Framework, , &ResultsCount)
+	Source := StrReplace(Source, "global _VendorDir := A_ScriptDir . " . Chr(34) . "\..\vendor" . Chr(34),
+		"global _VendorDir := " . _DDP_Literal(_DDP_Path(_DriverDir . "\vendor")), , &VendorCount)
+	Stub := "#Include " . TestsDir . "\test_stubs.ahk"
+	Roots := ""
+	for Name, Value in Map("_StaticDir", _StaticDir, "_SharedDir", _SharedDir,
+		"_DriverDir", _DriverDir, "_ExtensionsDir", _ExtensionsDir)
+		Roots .= "`nglobal " . Name . " := " . _DDP_Literal(_DDP_Path(Value))
+	Source := StrReplace(Source, Stub, Stub . Roots, , &RootCount)
+	if InstanceCount != 1 || WorkingCount != 1 || ResultsCount != 1 || VendorCount != 1 || RootCount != 1
+		throw Error("The original digit producer bootstrap boundaries changed.")
+	Slots := []
+	DriverSource := _DriverSourceConcat()
+	if DriverSource == ""
+		throw Error("The original digit binding source is unreadable.")
+	; Whole-source matching retains the authored slots after their module moves.
+	for Line in StrSplit(DriverSource, "`n")
+		if RegExMatch(Line, '^SC[0-9A-F]{3}(?: Up)?:: _DigitRow(?:Down|Up)\("[0-9]"\)$')
+			Slots.Push(Line)
+	if Slots.Length != 20
+		throw Error("The original twenty digit binding slots changed.")
+	Body := FileRead(TestsDir . "\fixtures\terminal_digit_producer_body.ahk", "UTF-8")
+	Body := 'FileAppend("DIGIT_CHILD entry" . Chr(10), "*")' . "`n" . Body
+		. "`n_DDP_TraceExit(Reason, Code) {`n"
+		. 'FileAppend("DIGIT_CHILD exit=" . Reason . " code=" . Code . Chr(10), "*")' . "`n}`n"
+	Body := StrReplace(Body, 'Scenario := EnvGet("ERGOPTI_DIGIT_RECEIVING_SCENARIO")',
+		"Scenario := " . _DDP_Literal(Scenario), , &ScenarioCount)
+	if ScenarioCount != 1
+		throw Error("The closed digit producer scenario boundary changed.")
+	Body .= '`n#InputLevel 2`n#HotIf NumberRowEffectiveMode() == "digits"`n'
+		. ArrayJoin(Slots, "`n") . "`n#HotIf`n"
+	Source := StrReplace(Source, "`nRunTests()", "`n" . Body, , &EntryCount)
+	if EntryCount != 1
+		throw Error("The original digit producer runner boundary changed.")
+	return Source
+}
+
+/** Receives one suspended child; its original private loader owns every scope. */
+_DDP_Run(Scenario) {
+	global _DriverDir
+	Root := A_Temp . "\ergopti_digit_producer_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Scenario
+	if DirExist(Root)
+		throw Error("Preserve an existing digit producer fixture.")
+	DirCreate(Root)
+	; Some canonical registration modules resolve corpus roots from A_ScriptDir.
+	; Keep that original directory; the temporary extension excludes this child
+	; from source enumeration. Archive its exact image after actual retirement.
+	Child := _DDP_Path(_DriverDir . "\tests") . "\.digit_producer_" . A_ScriptHwnd . "_" . A_TickCount . ".tmp"
+	Results := Root . "\run.tap"
+	if FileExist(Child)
+		throw Error("Preserve an existing digit producer child image.")
+	FileAppend(_DDP_ChildSource(Scenario, Results), Child, "UTF-8")
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut=UTF-8", Child], OnDone)
+	AssertTrue(Handle.start(), "the exact suspended digit producer child starts")
+	; Keep the canonical watchdog. No outer observation timeout kills this child.
+	while !Receipt.Calls {
+		_SR_TreePoll()
+		Sleep(10)
+	}
+	FileAppend(Receipt.Output, Root . "\stdout.log", "UTF-8")
+	FileAppend(Receipt.Errors, Root . "\stderr.log", "UTF-8")
+	AssertEqual(1, Receipt.Calls, "the exact digit producer child completes once")
+	AssertTrue(Handle.terminate(), "the completed digit producer tree has no retained process")
+	FileAppend(Child, Root . "\source-location.txt", "UTF-8")
+	FileMove(Child, Root . "\child.ahk")
+	AssertEqual(0, Receipt.Code, "actual digit producer refusal retained in " . Root . ": " . SubStr(Receipt.Errors . Receipt.Output, -8192))
+	AssertEqual("", Receipt.Errors, "the actual digit producer has no hidden error")
+	AssertContains(Receipt.Output, "PASS scenario=" . Scenario . " source_only=true physical_qualified=false")
+	AssertFalse(InStr(Receipt.Output, "[WATCHDOG]"), "watchdog retirement never qualifies a child")
+	; Delete only these exact successful fixture files; preserve unexpected entries.
+	for Name in ["child.ahk", "run.tap", "stdout.log", "stderr.log", "source-location.txt"]
+		FileDelete(Root . "\" . Name)
+	DirDelete(Root)
+}
+
+for Scenario in ["production-inactive", "production-caps", "production-composition", "production-kle",
+	"production-held-withdrawal", "production-capacity", "source-clean", "source-row-replacement",
+	"source-mode-case", "source-callback-call", "source-factory-call", "source-policy-observer",
+	"candidate-clean", "candidate-route", "candidate-route-clone", "candidate-admission",
+	"candidate-binding", "candidate-recipe", "candidate-reason-case", "scope-policy-legacy",
+	"scope-pending-binding", "scope-pending-route", "scope-pending-admission", "scope-pending-recipe", "bind-own-call"]
+	Test("direct-digit-producer: " . Scenario, _DDP_Run.Bind(Scenario))

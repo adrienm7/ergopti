@@ -2398,6 +2398,9 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 			Frame := NativeScope["frame"]
 			try {
 				GuardScope()
+				NativeScope["capture_digit_source"].Call()
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
 				SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
 				GuardScope()
 				Source := HasMethod(SourceFn, "Call") ? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
@@ -2425,6 +2428,7 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 				throw Err
 			}
 			Frame["candidate"] := Candidate
+			NativeScope["seal_candidate"].Call()
 			GuardScope()
 			_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source)
 			if !CheckCurrent(false)
@@ -2526,7 +2530,7 @@ _LLM_NavEventOwnerTerminalRegistrationCapture() {
 	for RecipeId in Recipes
 		if !(RecipeId is Integer) || RecipeId <= 0 || RecipeId > NextRecipe
 			throw ValueError("The terminal recipe identity owner precedes its retained references.")
-	Frame := Map("owner", Owner, "generation", Generation, "recipes", Recipes,
+	Frame := Map("digit_source", 0, "owner", Owner, "generation", Generation, "recipes", Recipes,
 		"models", Models, "coverage", Coverage, "recipe_refs", Recipes.Clone(),
 		"model_refs", Models.Clone(), "candidate", 0, "bindings", 0, "native_attempted", false,
 		"next_recipe", NextRecipe, "next_layout", NextLayout)
@@ -2554,6 +2558,11 @@ _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Owned, Snapshot) {
 }
 
 _LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels := true, CheckIds := true) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			|| !OriginalLoader.Call("digit_current", Frame)
+		return false
 	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
 	global _LLM_NavEventOwnerTerminalRouteCoverage
@@ -2606,9 +2615,16 @@ _LLM_NavEventOwnerTerminalRegistrationRetain(Frame) {
 			throw ValueError("A retained terminal recipe cell is malformed.")
 		Recipe := Admission["recipe"]
 		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
+			throw ValueError("A retained terminal route is not a plain Map.")
+		Binding := Admission.Get("binding", 0)
+		if (Admission["route"]["kind"] == 6) != (Binding is Map)
+				|| (Binding is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Binding))
+			throw ValueError("A direct-digit admission lost its retained binding fields.")
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
 				|| (Recipe is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe))
 			throw ValueError("The retained terminal route/model recipe is malformed.")
-		Routes[Id] := Map("route", Admission["route"], "recipe", Recipe,
+		Routes[Id] := Map("binding", Binding, "binding_fields", Binding is Map ? Binding.Clone() : 0,
+			"route", Admission["route"], "recipe", Recipe,
 			"model", Recipe is Map ? Recipe.Get("model", 0) : 0,
 			"route_fields", Admission["route"].Clone(),
 			"recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
@@ -2637,6 +2653,13 @@ _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels) {
 			if Type(Admission.Get(Name, "")) != Type(Expected[Name]) || !(Admission.Get(Name, "") == Expected[Name])
 				return false
 		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Expected["route"], Expected["route_fields"])
+			return false
+		Binding := Expected["binding"]
+		if Binding is Map {
+			if Admission.Get("binding", 0) != Binding
+					|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Binding, Expected["binding_fields"])
+				return false
+		} else if Admission.Has("binding")
 			return false
 		Recipe := Expected["recipe"]
 		if Recipe is Map && (!_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe)
@@ -2824,6 +2847,236 @@ LLM_NavEventOwner_TerminalRouteCoverage() {
 	return Coverage
 }
 
+/** Captures a diagnostic binding lease and an independent private current check. */
+_LLM_NavEventOwnerCaptureDigitSource() {
+	static OriginalSource := DigitRow_BindingSource
+	static OriginalCapture := DigitRow_CaptureBinding
+	static OriginalMode := NumberRowEffectiveMode
+	static OriginalSelf := _LLM_NavEventOwnerCaptureDigitSource
+	static NativeCall := Func.Prototype.Call
+	static NativeBind := Func.Prototype.Bind
+	static OriginalPlainMap := _LLM_NavEventOwnerTerminalRegistrationPlainMap
+	static OriginalRefsCurrent := _LLM_NavEventOwnerTerminalRegistrationRefsCurrent
+
+	FunctionsCurrent() {
+		for Pair in [[OriginalSource, DigitRow_BindingSource],
+			[OriginalCapture, DigitRow_CaptureBinding], [OriginalMode, NumberRowEffectiveMode],
+			[OriginalSelf, _LLM_NavEventOwnerCaptureDigitSource],
+			[OriginalPlainMap, _LLM_NavEventOwnerTerminalRegistrationPlainMap],
+			[OriginalRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationRefsCurrent],
+			[NativeCall, Func.Prototype.Call], [NativeBind, Func.Prototype.Bind]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	RequireFunctions() {
+		if !FunctionsCurrent()
+			throw Error("The original direct-digit source accessor was withdrawn.")
+	}
+
+	ReadMode() {
+		RequireFunctions()
+		Value := NativeCall.Call(OriginalMode)
+		RequireFunctions()
+		if !(Value is String) || !(Value == "native" || Value == "symbols" || Value == "digits")
+			throw ValueError("The direct-digit source mode is invalid.")
+		return Value
+	}
+
+	Mode := ReadMode(), Factory := 0, Rows := Map(), Images := Map()
+	if Mode == "digits" {
+		RequireFunctions()
+		Factory := NativeCall.Call(OriginalSource)
+		RequireFunctions()
+		if !((Factory is Integer && Factory == 0) || Factory is BoundFunc)
+			throw ValueError("The direct-digit source factory is invalid.")
+		if Factory is BoundFunc {
+			Loop 10 {
+				Scan := A_Index + 1
+				RequireFunctions()
+				Row := NativeCall.Call(OriginalCapture, Factory, Scan)
+				RequireFunctions()
+				if !NativeCall.Call(OriginalPlainMap, Row) || Row.Count != 8
+						|| Row.Get("source", 0) != Factory
+						|| !(Row.Get("scan", "") is Integer) || Row["scan"] != Scan
+						|| !(Row.Get("digit", 0) is String) || !RegExMatch(Row["digit"], "^[0-9]$")
+						|| !(Row.Get("down", 0) is BoundFunc) || !(Row.Get("up", 0) is BoundFunc)
+						|| !(Row.Get("criterion", 0) is String) || Row["criterion"] == ""
+						|| !(Row.Get("input_level", "") is Integer) || Row["input_level"] != 2
+						|| !(Row.Get("metadata_only", "") is Integer) || Row["metadata_only"] != true
+					throw ValueError("The original direct-digit binding was not captured completely.")
+				Rows[Scan] := Row
+				Images[Scan] := Row.Clone()
+			}
+		}
+	}
+	Cell := Map("mode", Mode, "factory", Factory, "rows", Rows)
+	CellImage := Cell.Clone()
+	RowRefs := Rows.Clone()
+
+	Current() {
+		if !FunctionsCurrent()
+			return false
+		if !NativeCall.Call(OriginalRefsCurrent, Cell, CellImage)
+				|| !NativeCall.Call(OriginalRefsCurrent, Rows, RowRefs)
+			return false
+		if !NativeCall.Call(OriginalPlainMap, Rows) || !NativeCall.Call(OriginalPlainMap, Images)
+			return false
+		if Mode != "digits"
+			return Rows.Count == 0 && Images.Count == 0
+		if NativeCall.Call(OriginalSource) != Factory || !FunctionsCurrent()
+			return false
+		if Factory is Integer
+			return Factory == 0 && Rows.Count == 0 && Images.Count == 0
+		if Rows.Count != 10 || Images.Count != 10
+			return false
+		Loop 10 {
+			Scan := A_Index + 1
+			if !Rows.Has(Scan) || !Images.Has(Scan)
+					|| !NativeCall.Call(OriginalRefsCurrent, Rows[Scan], Images[Scan])
+				return false
+			Observed := NativeCall.Call(OriginalCapture, Factory, Scan)
+			if !FunctionsCurrent() || !NativeCall.Call(OriginalRefsCurrent, Observed, Images[Scan])
+				return false
+		}
+		return FunctionsCurrent() && NativeCall.Call(OriginalRefsCurrent, Cell, CellImage)
+			&& NativeCall.Call(OriginalRefsCurrent, Rows, RowRefs)
+	}
+
+	ModeCurrent() {
+		; Policy Maps may run an observer. Complete that observation before the
+		; source-only witnesses and the caller's complete registration checks.
+		return FunctionsCurrent() && ReadMode() == Mode && Current()
+	}
+
+	RequireFunctions()
+	Guard := NativeCall.Call(NativeBind, Current)
+	ModeGuard := NativeCall.Call(NativeBind, ModeCurrent)
+	RequireFunctions()
+	if !ModeGuard.Call()
+		throw Error("The direct-digit source changed during capture.")
+	; The loader retains this exact guard privately. The public Frame receives
+	; only Cell; copying or replacing that Map cannot replace its private witness.
+	return Map("source", Cell, "current", Guard, "mode_current", ModeGuard)
+}
+
+/** Freezes pending admissions before any registration callback can observe them. */
+_LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell) {
+	static OriginalPlain := _LLM_NavEventOwnerTerminalRegistrationPlainMap
+	static OriginalRefs := _LLM_NavEventOwnerTerminalRegistrationRefsCurrent
+	static OriginalSelf := _LLM_NavEventOwnerCaptureTerminalCandidate
+	static NativeCall := Func.Prototype.Call, NativeBind := Func.Prototype.Bind
+
+	FunctionsCurrent() {
+		for Pair in [[OriginalPlain, _LLM_NavEventOwnerTerminalRegistrationPlainMap],
+			[OriginalRefs, _LLM_NavEventOwnerTerminalRegistrationRefsCurrent],
+			[OriginalSelf, _LLM_NavEventOwnerCaptureTerminalCandidate],
+			[NativeCall, Func.Prototype.Call], [NativeBind, Func.Prototype.Bind]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	PlainArray(Value) {
+		if !(Value is Array) || ObjGetBase(Value) != Array.Prototype
+			return false
+		for Name in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	if !FunctionsCurrent() || !NativeCall.Call(OriginalPlain, Candidate)
+			|| !NativeCall.Call(OriginalPlain, DigitCell)
+			|| !PlainArray(Candidate.Get("routes", 0))
+			|| !PlainArray(Candidate.Get("unconverted", 0))
+			|| !NativeCall.Call(OriginalPlain, Candidate.Get("recipes", 0))
+		throw ValueError("The pending terminal candidate has an invalid shape.")
+	Routes := Candidate["routes"], Recipes := Candidate["recipes"], Reasons := Candidate["unconverted"]
+	if Routes.Length < 1 || Recipes.Count != Routes.Length
+		throw ValueError("The pending terminal candidate is incomplete.")
+	RouteRefs := Routes.Clone(), RecipeRefs := Recipes.Clone(), ReasonImage := Reasons.Clone()
+	CandidateImage := Candidate.Clone(), Records := Map(), RouteImages := [], Digits := Map()
+	for Index, Route in Routes {
+		if !NativeCall.Call(OriginalPlain, Route)
+			throw ValueError("A pending native descriptor is not a plain Map.")
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || Id <= 0 || !Recipes.Has(Id) || Records.Has(Id)
+			throw ValueError("A pending recipe identity is invalid or duplicated.")
+		Admission := Recipes[Id]
+		if !NativeCall.Call(OriginalPlain, Admission)
+				|| !NativeCall.Call(OriginalPlain, Admission.Get("route", 0))
+				|| !NativeCall.Call(OriginalRefs, Admission["route"], Route)
+			throw ValueError("A pending admission does not retain its exact native descriptor.")
+		Recipe := Admission.Get("recipe", 0), Binding := Admission.Get("binding", 0)
+		if Recipe is Map && !NativeCall.Call(OriginalPlain, Recipe)
+			throw ValueError("A pending model recipe is not a plain Map.")
+		if Route.Get("kind", 0) == 6 {
+			Scan := Route.Get("code", 0)
+			if !(Scan is Integer) || Scan < 0x02 || Scan > 0x0B || Digits.Has(Scan)
+					|| !(Recipe is Integer) || Recipe != 0
+					|| DigitCell.Get("mode", "") != "digits"
+					|| !(DigitCell.Get("factory", 0) is BoundFunc)
+					|| !NativeCall.Call(OriginalPlain, DigitCell.Get("rows", 0))
+					|| !DigitCell["rows"].Has(Scan)
+					|| !NativeCall.Call(OriginalRefs, Binding, DigitCell["rows"][Scan])
+				throw ValueError("A pending digit admission lost its canonical binding source.")
+			Digits[Scan] := true
+		} else if Admission.Has("binding")
+			throw ValueError("Only direct-digit admissions may retain binding metadata.")
+		RouteImages.Push(Route.Clone())
+		Records[Id] := Map("admission", Admission, "fields", Admission.Clone(),
+			"route", Admission["route"], "route_fields", Admission["route"].Clone(),
+			"recipe", Recipe, "recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
+			"binding", Binding, "binding_fields", Binding is Map ? Binding.Clone() : 0)
+	}
+	ExpectedDigits := DigitCell["mode"] == "digits" && DigitCell["factory"] is BoundFunc ? 10 : 0
+	if Digits.Count != ExpectedDigits
+		throw ValueError("The pending direct-digit source family is incomplete.")
+	for Reason in Reasons
+		if !(Reason is String)
+			throw ValueError("A pending coverage explanation is not text.")
+
+	Current() {
+		if !FunctionsCurrent() || !NativeCall.Call(OriginalRefs, Candidate, CandidateImage)
+				|| !NativeCall.Call(OriginalRefs, Recipes, RecipeRefs)
+				|| !PlainArray(Routes) || Routes.Length != RouteRefs.Length
+				|| !PlainArray(Reasons) || Reasons.Length != ReasonImage.Length
+			return false
+		for Index, Expected in RouteRefs
+			if !Routes.Has(Index) || Routes[Index] != Expected
+					|| !NativeCall.Call(OriginalRefs, Routes[Index], RouteImages[Index])
+				return false
+		for Index, Reason in ReasonImage
+			if !Reasons.Has(Index) || !(Reasons[Index] is String) || !(Reasons[Index] == Reason)
+				return false
+		for Id, Record in Records {
+			Admission := Recipes[Id]
+			if Admission != Record["admission"]
+					|| !NativeCall.Call(OriginalRefs, Admission, Record["fields"])
+					|| !NativeCall.Call(OriginalRefs, Record["route"], Record["route_fields"])
+				return false
+			if Record["recipe"] is Map
+					&& !NativeCall.Call(OriginalRefs, Record["recipe"], Record["recipe_fields"])
+				return false
+			if Record["binding"] is Map
+					&& !NativeCall.Call(OriginalRefs, Record["binding"], Record["binding_fields"])
+				return false
+		}
+		return FunctionsCurrent()
+	}
+
+	if !FunctionsCurrent()
+		throw Error("The original terminal candidate witness constructor was withdrawn.")
+	Guard := NativeCall.Call(NativeBind, Current)
+	if !FunctionsCurrent() || !Guard.Call()
+		throw Error("The pending terminal candidate changed during witness capture.")
+	return Guard
+}
+
+
 _LLM_NavEventOwnerTerminalRouteSource() {
 	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_State
 	Caps := GetKeyState("CapsLock", "T") ? 1 : 0
@@ -2902,6 +3155,30 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 	Recipes := Map()
 	Unconverted := ["CapsLock", "AltGr", "dead-key sequences", "tap-hold transforms",
 		"shortcut chords", "prefix layers", "direct-digit overrides", "pre-registration holds"]
+	DigitRows := 0
+	if Frame is Map && IsSet(ScopeGuard) {
+		Guard()
+		Cell := Frame["digit_source"]
+		if Cell["mode"] == "digits" && Cell["factory"] is BoundFunc
+			DigitRows := Cell["rows"]
+	}
+	AppendDirectDigits() {
+		if !(DigitRows is Map)
+			return
+		Guard()
+		; Marshal rejects an oversized composed registry before either registration boundary.
+		Loop 10 {
+			Guard()
+			Scan := A_Index + 1
+			Binding := DigitRows[Scan].Clone()
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Guard()
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(Id, Routes.Length + 1, 2, Scan, 6)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", 0, "binding", Binding, "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
 	NaturalScans := Map()
 	for Modifier in [[0xA2, 0x01, 0x01D], [0xA3, 0x02, 0x11D],
 			[0xA4, 0x04, 0x038], [0xA5, 0x08, 0x138], [0xA0, 0x10, 0x02A],
@@ -2921,6 +3198,7 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 	}
 	if !Source["active"] || Source["caps"] {
 		Unconverted.Push(Source["caps"] ? "CapsLock active at registration" : "KLE base inactive")
+		AppendDirectDigits()
 		return Map("layout_id", LayoutId, "routes", Routes,
 			"recipes", Recipes, "unconverted", Unconverted)
 	}
@@ -2934,6 +3212,7 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 		throw ValueError("The authoritative KLE source is malformed.")
 	if Source["composition_state"] != KEYLAYOUT_NEUTRAL_STATE {
 		Unconverted.Push("KLE composition active at registration")
+		AppendDirectDigits()
 		return Map("layout_id", LayoutId, "routes", Routes,
 			"recipes", Recipes, "unconverted", Unconverted)
 	}
@@ -2953,6 +3232,11 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 		}
 		for Shift in [0, 1] {
 			Guard()
+			Scan := Integer("0x" . SubStr(Sc, 3))
+			if DigitRows is Map && !Shift && Scan >= 0x02 && Scan <= 0x0B {
+				Unconverted.Push(Sc . ":base:direct-digit source, output unconverted")
+				continue
+			}
 			Eligible := Source["eligible"].Call(Sc, Shift)
 			Guard()
 			if !Eligible {
@@ -2992,6 +3276,7 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 		}
 	}
 	Guard()
+	AppendDirectDigits()
 	return Map("layout_id", LayoutId, "routes", Routes,
 		"recipes", Recipes, "unconverted", Unconverted)
 }
@@ -3703,6 +3988,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	static IssuedModule := 0, IssuedExports := 0, OriginalExports := 0
 	static ActiveFrame := 0, RetainedFrame := 0, ActiveStop := 0, Constructing := false
 	static Scopes := Map()
+	static OriginalDigitCapture := _LLM_NavEventOwnerCaptureDigitSource
+	static OriginalCandidateCapture := _LLM_NavEventOwnerCaptureTerminalCandidate
 	static OriginalOwners := [
 		_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
 		_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
@@ -3841,12 +4128,15 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			if !OwnersCurrent() || !PlainMap(Frame) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
 				throw Error("The original registration capture is invalid.")
 			CapturedNative := ExportsCurrent()
-			State := {Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
+			State := {DigitTried: false, DigitCaptured: false, DigitCell: 0, DigitGuard: 0, DigitModeGuard: 0,
+				CandidateTried: false, CandidateCell: 0, CandidateGuard: 0,
+				Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
 				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
 				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
 				Module: CapturedNative ? IssuedModule : 0, Exports: CapturedNative ? IssuedExports : 0,
 				Generation: Frame["generation"], NextRecipe: Frame["next_recipe"], NextLayout: Frame["next_layout"]}
-			Operations := Map("frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
+			Operations := Map("capture_digit_source", CaptureDigitSource, "seal_candidate", SealCandidate,
+				"frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
 				"native", NativeRegistration, "complete", CompleteFrame, "close", CloseFrame)
 			Image := Operations.Clone()
 			Scopes[Operations] := {Image: Image, Close: CloseFrame}
@@ -3859,18 +4149,74 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		GuardFrame() {
 			if ActiveFrame != State || State.Closed || !OwnersCurrent() || !ScopeCurrent(State.Operations)
 				throw Error("The original registration dispatcher was withdrawn.")
+			if State.DigitCaptured && !DigitCurrent(State, false) {
+				if State.Mode != "unselected" || Frame["native_attempted"]
+					State.Uncertain := true
+				throw Error("The original direct-digit source changed during registration.")
+			}
+		}
+
+		CaptureDigitSource() {
+			GuardFrame()
+			if State.DigitTried
+				throw Error("The registration frame already attempted source capture.")
+			State.DigitTried := true
+			if _LLM_NavEventOwnerCaptureDigitSource != OriginalDigitCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalDigitCapture, "Call")
+				throw Error("The original direct-digit capture helper was withdrawn.")
+			Issued := OriginalDigitCapture.Call()
+			GuardFrame()
+			if _LLM_NavEventOwnerCaptureDigitSource != OriginalDigitCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalDigitCapture, "Call")
+					|| !PlainMap(Issued) || Issued.Count != 3
+					|| !PlainMap(Issued.Get("source", 0))
+					|| !(Issued.Get("current", 0) is BoundFunc)
+					|| Object.Prototype.HasOwnProp.Call(Issued["current"], "Call")
+					|| !(Issued.Get("mode_current", 0) is BoundFunc)
+					|| Object.Prototype.HasOwnProp.Call(Issued["mode_current"], "Call")
+				throw Error("The original direct-digit source capture was not issued.")
+			; Private witnesses publish together only after complete pure capture.
+			State.DigitCell := Issued["source"], State.DigitGuard := Issued["current"]
+			State.DigitModeGuard := Issued["mode_current"]
+			if !State.DigitModeGuard.Call()
+				throw Error("The direct-digit source changed before issuance.")
+			GuardFrame()
+			Frame["digit_source"] := State.DigitCell
+			State.DigitCaptured := true
+			return State.DigitCell
+		}
+
+		SealCandidate() {
+			GuardFrame()
+			if !State.DigitCaptured || State.CandidateTried || State.Mode != "unselected"
+				throw Error("The original candidate witness cannot be issued twice.")
+			State.CandidateTried := true
+			if _LLM_NavEventOwnerCaptureTerminalCandidate != OriginalCandidateCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
+				throw Error("The original candidate witness constructor was withdrawn.")
+			Candidate := Frame["candidate"]
+			Witness := OriginalCandidateCapture.Call(Candidate, State.DigitCell)
+			GuardFrame()
+			if _LLM_NavEventOwnerCaptureTerminalCandidate != OriginalCandidateCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
+					|| !(Witness is BoundFunc) || Object.Prototype.HasOwnProp.Call(Witness, "Call")
+					|| !Witness.Call()
+				throw Error("The original terminal candidate changed before witness issuance.")
+			State.CandidateCell := Candidate, State.CandidateGuard := Witness
+			return true
 		}
 
 		CustomRegistration() {
 			GuardFrame()
-			if State.Mode != "unselected"
-				throw Error("The registration scope already selected its boundary.")
+			if !State.DigitCaptured || !(State.CandidateGuard is BoundFunc) || State.Mode != "unselected"
+				throw Error("The registration scope already selected its boundary or lacks source capture.")
 			State.Mode := "custom"
 		}
 
 		NativeRegistration(Owner, Generation, LayoutId, Bindings, Count) {
 			GuardFrame()
-			if State.Mode != "unselected" || !EpochCurrent(State.Epoch)
+			if !State.DigitCaptured || !(State.CandidateGuard is BoundFunc)
+					|| State.Mode != "unselected" || !EpochCurrent(State.Epoch)
 					|| !_LLM_NavEventOwnerTerminalRouteRefreshing
 				throw Error("The original native registration scope was withdrawn.")
 			State.Mode := "default"
@@ -3928,6 +4274,37 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Scopes.Delete(State.Operations)
 			State.Operations := 0
 		}
+	}
+
+	DigitCurrent(State, ObserveMode := true) {
+		StateCurrent() {
+			return IsObject(State) && ActiveFrame == State && !State.Closed
+				&& OwnersCurrent() && ScopeCurrent(State.Operations) && PlainMap(State.Frame)
+		}
+		if !StateCurrent()
+			return false
+		if !State.DigitCaptured
+			return State.Mode == "unselected" && !State.Frame["native_attempted"]
+		Cell := State.DigitCell, Pure := State.DigitGuard, Policy := State.DigitModeGuard
+		SourceCurrent() {
+			return StateCurrent() && PlainMap(Cell) && State.DigitCell == Cell
+				&& State.Frame.Get("digit_source", 0) == Cell
+				&& State.DigitGuard == Pure && State.DigitModeGuard == Policy
+				&& Pure is BoundFunc && Policy is BoundFunc
+				&& !Object.Prototype.HasOwnProp.Call(Pure, "Call")
+				&& !Object.Prototype.HasOwnProp.Call(Policy, "Call")
+		}
+		if !SourceCurrent() || !(ObserveMode ? Policy.Call() : Pure.Call()) || !SourceCurrent()
+			return false
+		if State.CandidateGuard is BoundFunc {
+			Witness := State.CandidateGuard, Candidate := State.CandidateCell
+			if !PlainMap(Candidate) || State.Frame.Get("candidate", 0) != Candidate
+					|| Object.Prototype.HasOwnProp.Call(Witness, "Call") || !Witness.Call()
+					|| !SourceCurrent() || State.CandidateCell != Candidate
+					|| State.Frame.Get("candidate", 0) != Candidate || State.CandidateGuard != Witness
+				return false
+		}
+		return SourceCurrent()
 	}
 
 	BuildStop(Snapshot) {
@@ -4071,6 +4448,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	if Request == "guard_frame"
 		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
 			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
+	if Request == "digit_current"
+		return IsObject(ActiveFrame) && ActiveFrame.Frame == Payload && DigitCurrent(ActiveFrame)
 	if Request == "allows_native_admission"
 		return OwnersCurrent() && !IsObject(ActiveStop) && !Constructing
 	if Request == "begin_frame" {
