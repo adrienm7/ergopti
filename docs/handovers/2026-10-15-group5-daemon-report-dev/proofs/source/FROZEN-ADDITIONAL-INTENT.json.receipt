@@ -1,0 +1,44 @@
+{
+  "state": "FROZEN_BEFORE_NEW_SOURCE",
+  "base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+  "profile": {
+    "default_helper_count": 9,
+    "default_validator_count": 6,
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "report_helper_count": 16,
+    "report_c_count": 4,
+    "root_excludes": [
+      "MainOperation",
+      "Main",
+      "Choice",
+      "Activation"
+    ],
+    "invalid_profile": "refuse exact non-bool including 0/1/None",
+    "currentness": "all actual source/header/moduleMap bytes captured before and after every child"
+  },
+  "query": {
+    "flag": "--query-vhd-daemon-report-purpose",
+    "stdout": "OWNED_VHD_DAEMON_REPORT_PURPOSE|1|readonly-historical\n",
+    "status": 0,
+    "stderr": "",
+    "negative": [
+      "default helper exits64",
+      "wrong body",
+      "truncated body",
+      "extra body",
+      "nonzero status",
+      "failed destruction",
+      "source stale",
+      "wrong actual child image/birth/uid",
+      "pipe replacement",
+      "early cancellation"
+    ],
+    "before_admin": "only actual signed source-current owned child + EOF captures + exact actual exit + native retired+destroy and checked local close",
+    "authority": "availability data only; no publisher/Root/device/stage acquisition in pure query handler"
+  },
+  "conservation": "all original28 XCTest methods literal whole; all14 original Python methods whole; default vectors unchanged",
+  "native": "UNEXECUTED"
+}

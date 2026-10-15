@@ -1,0 +1,47 @@
+[
+  {
+    "path": "EXACT-CASE-RECEIVING.json",
+    "bytes": 2734,
+    "sha256": "dc9e907089242ac31859afbabc177010d3fe45cc49d1d7efeb1d600aff8f1513"
+  },
+  {
+    "path": "FROZEN-RECEIVING-PLAN.json",
+    "bytes": 1451,
+    "sha256": "5fb9c808427264c7278c62288e440ef9567be4cba99d8b34b2d6b8d9c6eb0da7"
+  },
+  {
+    "path": "RESULT.json",
+    "bytes": 2333,
+    "sha256": "9041b31a3fe252ec4e06236a94f84b5d598a0861af9e59e6bc3c5a646949e8ac"
+  },
+  {
+    "path": "receipts/normal.stderr",
+    "bytes": 2723,
+    "sha256": "e0dfb8a1ab88fe7b2dec50ca08633f736c30a1437a057cb3119f85ecc3374baa"
+  },
+  {
+    "path": "receipts/normal.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "receipts/optimized.stderr",
+    "bytes": 2723,
+    "sha256": "e0dfb8a1ab88fe7b2dec50ca08633f736c30a1437a057cb3119f85ecc3374baa"
+  },
+  {
+    "path": "receipts/optimized.stdout",
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "path": "source/tools/build/owned_runtime_product_build.py",
+    "bytes": 60346,
+    "sha256": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0"
+  },
+  {
+    "path": "source/tools/build/owned_runtime_product_build_test.py",
+    "bytes": 13538,
+    "sha256": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f"
+  }
+]

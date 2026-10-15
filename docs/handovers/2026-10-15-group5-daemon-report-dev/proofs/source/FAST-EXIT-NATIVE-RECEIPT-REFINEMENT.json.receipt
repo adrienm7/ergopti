@@ -1,0 +1,6 @@
+{
+  "native_source": "d60ad231:OwnedProgramCompatibility.c:663-727",
+  "finding": "leader_exited is positively observed SZOMB on retained original unreaped child before group_nonlive can return EAGAIN; status_valid is only populated after actual waitpid at final retired receipt",
+  "amendment": "positive error0+leader_exited permits only continued polling after live-image recut fails; no result acceptance until later actual status_valid+exit0+retired+destroy+closed captures",
+  "scope": "not PID absence or unknown receipt; wrong live image still cancels"
+}

@@ -4697,6 +4697,17 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   Historical five-Boolean data grants no numeric ABI, READY, installation or
   remote-cleanup authority and does not establish the lease incident's cause.
 
+  The Dev-based successor is preserved in
+  `docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
+  review clears a finite 20-path source proposal; actual Python controls pass
+  19 normal and 19 optimized cases. Exact preimages and dependencies match
+  observed Dev a549c14f, but production sources remain unapplied. The normal
+  build runner does not select this report profile. Both-architecture native
+  compilation/linking, signed helper query and retirement, all 32 Swift cases
+  and daemon/staging cleanup receiving remain pending. No numeric ABI, resident
+  readiness, remote cleanup, physical accounting or lease fix is qualified;
+  item 31 stays open.
+
   The diagnostic producer, CLI baseline admission and current Python reader
   now agree on baseline version 2, retaining keyboard type per device and HID
   usage page per key. Live readers require complete version-2 coverage;

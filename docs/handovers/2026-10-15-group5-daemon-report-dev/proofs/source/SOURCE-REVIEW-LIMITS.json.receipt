@@ -1,0 +1,48 @@
+{
+  "state": "PRIVATE_SOURCE_ONLY_REVIEW_READY",
+  "base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+  "paths": 20,
+  "changed_existing": 5,
+  "added": 15,
+  "profile": {
+    "entry": "compile_native_parts(..., daemon_report=True) and private _package_live(..., daemon_report=True)",
+    "default_helper_swift": 9,
+    "default_validator_swift": 6,
+    "default_commands": 11,
+    "report_helper_swift": 16,
+    "report_native_c_objects_per_arch": 4,
+    "report_commands": 17,
+    "architectures": [
+      "arm64",
+      "x86_64"
+    ],
+    "normal_build_runner": "unchanged; report profile requires explicit existing owner continuation selection",
+    "default_product": "pure report-purpose query returns64 => unavailable before administrator request",
+    "SDK_payload_combination": "refused; no B transport/catalogue/peer source imported",
+    "module": "actual fixed umbrella and all10 repository headers captured; generated module-map retained FD + bytes before/after every compilerchild; exact owner snapshot across packaging"
+  },
+  "query_corrections": [
+    "genuine private-session supervisor before child/admin",
+    "native error and nil owner proves no child; checked local closure retained",
+    "positive original native leader_exited permits continued polling after fast child completion; final status_valid+exit0+retired+destroy+EOF+source-current still mandatory"
+  ],
+  "generator": "private owner generator executed over unchanged immutable authenticated donor catalogue; only2 rows projected; expectations not regenerated",
+  "checks": {
+    "strict_git_apply_forward_inverse": "PASS20 posts,5pres+15absences restored",
+    "Ruff": "PASS actual repo config; static only",
+    "verify_change": "exported selection only, no gates executed",
+    "old_python": "13 methods bytewhole",
+    "new_python": "6 UNEXECUTED",
+    "old_swift": "28 methods/full3prefixes whole",
+    "new_swift": "4 pure reply controls UNEXECUTED",
+    "Swift_Darwin_native_admin_daemon": "UNEXECUTED"
+  },
+  "limits": [
+    "No numeric VirtualHID ABI or entitlement grant",
+    "Five booleans are historical vendor observations for this observer connection; last2 do not describe resident producer readiness",
+    "Remote erase_client/IOKit cleanup remains UNOBSERVED",
+    "Real macOS SDK exported signing headers/link and APIs must compile natively; absent APIs refuse before administrator stage",
+    "No consent/ready/current/report authority from capability reply or source review",
+    "Original15/28 and original subsetHOLD immutable; not an adopted Dev source or shipping qualification"
+  ]
+}

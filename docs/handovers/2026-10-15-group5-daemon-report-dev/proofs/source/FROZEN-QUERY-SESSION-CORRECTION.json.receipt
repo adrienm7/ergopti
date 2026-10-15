@@ -1,0 +1,23 @@
+{
+  "before_source": "SOURCE-SUBSET-SEALED",
+  "native_source": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4:OwnedProgramCompatibility.c:397-415",
+  "cases": [
+    {
+      "name": "ordinary_headless_main_not_session_leader",
+      "expect": "call original private-session primitive before original query prepare; failure refuses before spawn/admin"
+    },
+    {
+      "name": "prepare_known_error_nil_owner",
+      "expect": "known no-child error closes pipe resources; native no-child closed, unavailable rather than permanent false debt"
+    },
+    {
+      "name": "prepare_zero_nil_owner",
+      "expect": "unknown contract result stays cleanup debt"
+    },
+    {
+      "name": "post_spawn_owner_error",
+      "expect": "preserve retained native owner and cancellation/retirement, never erase debt"
+    }
+  ],
+  "scope": "SOURCE_ONLY_NATIVE_UNEXECUTED"
+}
