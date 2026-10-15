@@ -62,6 +62,33 @@ end
 
 local _writer_ok, TomlWriter = pcall(require, "toml_codec.writer")
 if not _writer_ok then TomlWriter = nil end
+local collision_read = TomlWriter and TomlWriter.read_classified
+local collision_decode, collision_shared = TomlCodec.decode, Paths.shared
+local collision_single_character = TextCase.is_single_character
+local collision_generation, collision_initialized = 0, false
+local wrap_source
+local collision_json, collision_json_decode
+local collision_factory
+
+local function copy_wrap_pairs(pairs_by_symbol)
+	local copy = {}
+	for symbol, pair in pairs(pairs_by_symbol) do
+		copy[symbol] = { left = pair.left, right = pair.right }
+	end
+	return copy
+end
+
+local function wrap_pairs_equal(actual, expected)
+	if type(actual) ~= "table" or getmetatable(actual) ~= nil then return false end
+	for symbol, pair in pairs(actual) do
+		local saved = expected[symbol]
+		if type(pair) ~= "table" or getmetatable(pair) ~= nil or not saved
+			or pair.left ~= saved.left or pair.right ~= saved.right then return false end
+		for field in pairs(pair) do if field ~= "left" and field ~= "right" then return false end end
+	end
+	for symbol in pairs(expected) do if rawget(actual, symbol) == nil then return false end end
+	return true
+end
 
 --- Records that the user fired a shortcut.
 ---
@@ -109,7 +136,7 @@ local UTF8_BOM = "\239\187\191"
 --- every wrap pair is silently lost.
 --- @return string Absolute catalogue path, or "" when the location is unresolvable.
 local function resolve_wrap_symbols_path()
-	return Paths.shared(WRAP_SYMBOLS_REL_PATH) or ""
+	return collision_shared(WRAP_SYMBOLS_REL_PATH) or ""
 end
 
 --- Reads the shared wrap-symbols JSON and flattens its ordered groups into the
@@ -137,19 +164,23 @@ local function load_wrap_pairs()
 		return lookup, ordered
 	end
 
-	local fh = io.open(path, "r")
-	if not fh then
+	if type(collision_read) ~= "function" then
+		Logger.error(LOG, "Shared wrap-symbols reader unavailable — catalogue not loaded.")
+		return lookup, ordered
+	end
+	collision_json, collision_json_decode = json, json.decode
+	local content, status = collision_read(path)
+	if status ~= "ok" or type(content) ~= "string" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue unreadable at '%s'.", path)
 		return lookup, ordered
 	end
-	local content = fh:read("*a")
-	fh:close()
+	local original_content = content
 
 	if type(content) == "string" and content:sub(1, 3) == UTF8_BOM then
 		content = content:sub(4)
 	end
 
-	local ok, data = pcall(json.decode, content)
+	local ok, data = pcall(collision_json_decode, content)
 	if not ok or type(data) ~= "table" or type(data.groups) ~= "table" then
 		Logger.error(LOG, "Shared wrap-symbols catalogue failed to parse — catalogue not loaded.")
 		return lookup, ordered
@@ -173,6 +204,7 @@ local function load_wrap_pairs()
 	for _ in pairs(lookup) do count = count + 1 end
 	Logger.info(LOG, "Wrap-symbol catalogue loaded from shared SSoT (%d lookup key(s)).", count)
 
+	wrap_source = { path = path, content = original_content, pairs = copy_wrap_pairs(lookup) }
 	return lookup, ordered
 end
 
@@ -553,6 +585,7 @@ function M.set_enabled(enabled)
 	end
 
 	_enabled = enabled
+	collision_generation = collision_generation + 1
 	if not enabled then
 		_caps_word_active = false
 		_caps_word_triggered = false
@@ -616,6 +649,7 @@ function M.set_wrap_on_type_enabled(enabled)
 		end
 	end
 	_wrap_on_type = enabled
+	collision_generation = collision_generation + 1
 	Logger.info(LOG, "Wrap selection on typed symbol %s.", enabled and "enabled" or "disabled")
 	return true
 end
@@ -661,12 +695,18 @@ function M.init(opts)
 
 	local enabled = DEFAULT_ENABLED
 	local wrap_on_type = DEFAULT_WRAP_ON_TYPE
+	collision_initialized = false
 	if _persist then
-		local fh = io.open(_config_path, "r")
-		if fh then
-			local content = fh:read("*a")
-			fh:close()
-			local ok, config = pcall(TomlCodec.decode, content)
+		local content, status
+		if type(collision_read) == "function" then content, status = collision_read(_config_path) end
+		if status ~= "ok" and status ~= "absent" then
+			Logger.error(LOG, "Shortcut configuration read was not acknowledged — failing closed.")
+			enabled, wrap_on_type = false, false
+		elseif status == "absent" then
+			collision_initialized = true
+		else
+			collision_initialized = true
+			local ok, config = pcall(collision_decode, content)
 			if not ok or type(config) ~= "table" then
 				Logger.error(LOG, "Shortcut configuration is invalid — failing closed.")
 				enabled = false
@@ -693,6 +733,7 @@ function M.init(opts)
 	if type(opts.enabled) == "boolean" then enabled = opts.enabled end
 	_enabled = enabled
 	_wrap_on_type = wrap_on_type
+	collision_generation = collision_generation + 1
 	Logger.info(LOG, "Shortcuts manager initialised (enabled=%s, wrap_on_type=%s).",
 		tostring(_enabled), tostring(_wrap_on_type))
 end
@@ -704,6 +745,7 @@ end
 function M.acquire_configuration(owner)
 	if type(owner) ~= "table" or _configuration_owner ~= nil or not _persist or not _config_path then return false end
 	_configuration_owner = owner
+	collision_generation = collision_generation + 1
 	return true
 end
 
@@ -753,9 +795,74 @@ function M.apply_configuration(owner, state)
 	for _, key in ipairs({ "enabled", "wrap", "caps_word_active", "caps_word_triggered" }) do
 		if type(state[key]) ~= "boolean" then return false end
 	end
+	collision_generation = collision_generation + 1
 	_enabled, _wrap_on_type = state.enabled, state.wrap
 	_caps_word_active, _caps_word_triggered = state.caps_word_active, state.caps_word_triggered
 	return true
 end
+
+local collision_candidate, collision_init = M.configuration_candidate, M.init
+local collision_get_pair, collision_enabled, collision_wrap_enabled = M.get_wrap_pair, M.is_enabled, M.is_wrap_on_type_enabled
+local collision_admitted = M.configuration_admitted
+
+--- Captures configured wrap-symbol eligibility, without observing a selection.
+--- These reservations describe a possible earlier consumer, never active output.
+--- @return table|nil frame Original source/runtime guards and detached claims.
+function M.capture_collision_inventory()
+	if not collision_initialized or not _persist or _configuration_owner ~= nil or not wrap_source then return nil end
+	local Routes = require("infra.config_paths")
+	local route = Routes.config
+	local path, epoch, enabled, wrap = _config_path, collision_generation, _enabled, _wrap_on_type
+	local source = wrap_source
+	local function runtime()
+		return rawequal(package.loaded["modules.shortcuts.manager"], M) and getmetatable(M) == nil
+			and _configuration_owner == nil and collision_initialized and _persist and _config_path == path
+			and collision_generation == epoch and _enabled == enabled and _wrap_on_type == wrap
+			and rawequal(wrap_source, source) and wrap_pairs_equal(WRAP_PAIRS, source.pairs)
+			and rawequal(package.loaded["infra.config_paths"], Routes) and Routes.config == route
+			and rawequal(package.loaded["infra.paths"], Paths) and Paths.shared == collision_shared
+			and rawequal(package.loaded["toml_codec.writer"], TomlWriter) and TomlWriter.read_classified == collision_read
+			and rawequal(package.loaded["toml_codec"], TomlCodec) and TomlCodec.decode == collision_decode
+			and rawequal(package.loaded["json"], collision_json) and collision_json.decode == collision_json_decode
+			and M.configuration_candidate == collision_candidate and M.init == collision_init
+			and M.get_wrap_pair == collision_get_pair and M.is_enabled == collision_enabled
+			and M.is_wrap_on_type_enabled == collision_wrap_enabled and M.configuration_admitted == collision_admitted
+			and TextCase.is_single_character == collision_single_character
+			and rawequal(package.loaded["unicode_case"], TextCase)
+			and M.capture_collision_inventory == collision_factory
+	end
+	if not runtime() or route("config.toml") ~= path then return nil end
+	local bytes, status = collision_read(path)
+	if status ~= "ok" and status ~= "absent" then return nil end
+	local decoded, document = pcall(collision_decode, bytes or "")
+	if not decoded or type(document) ~= "table" then return nil end
+	local resolved, expected = pcall(collision_candidate, document)
+	if not resolved or type(expected) ~= "table" or expected.enabled ~= enabled or expected.wrap ~= wrap then return nil end
+	local function current()
+		if not runtime() or route("config.toml") ~= path
+			or collision_shared(WRAP_SYMBOLS_REL_PATH) ~= source.path then return false end
+		local content, classification = collision_read(path)
+		local catalogue, catalogue_status = collision_read(source.path)
+		return content == bytes and classification == status and catalogue_status == "ok"
+			and catalogue == source.content and route("config.toml") == path
+			and collision_shared(WRAP_SYMBOLS_REL_PATH) == source.path and runtime()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if enabled and wrap then
+		for symbol in pairs(source.pairs) do
+			if collision_single_character(symbol) then
+				for _, shift in ipairs({ false, true }) do
+					claims[#claims + 1] = { kind = "logical", binding = "wrap_on_type__" .. symbol,
+						key = symbol:lower(), mods = { shift = shift } }
+				end
+			end
+		end
+	end
+	if not current() then return nil end
+	return { path = path, content = bytes, status = status, claims = claims, current = current, sealed = runtime }
+end
+
+collision_factory = M.capture_collision_inventory
 
 return M

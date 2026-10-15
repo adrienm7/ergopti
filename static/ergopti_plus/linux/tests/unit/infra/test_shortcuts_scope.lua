@@ -1134,7 +1134,7 @@ local function with_collision_scope(source, tap_config, body, navigation_text)
 				chord_sources = function(requests)
 					controls.source_reads = controls.source_reads + 1
 					local token, rows = {}, {}
-					local identities = { [15] = "tab", [36] = "j", [37] = "k", [41] = "grave", [58] = "caps_lock" }
+					local identities = { [15] = "tab", [36] = controls.chord_j_identity or "j", [37] = "k", [41] = "grave", [58] = "caps_lock" }
 					for _, request in ipairs(requests) do
 						for _, caps in ipairs({ false, true }) do
 							rows[#rows + 1] = { code = request.code, mods = request.mods, caps = caps,
@@ -1469,5 +1469,87 @@ helpers.describe("Linux configured Navigation physical collision preflight", fun
 			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
 			unchanged(owners, controls, path, before)
 		end, NAV_NONE)
+	end)
+end)
+
+
+helpers.describe("Linux configured wrap-symbol physical collision preflight", function()
+	local WRAP_BASE = COLLISION_BASE:gsub("enabled = true", "enabled = true\nwrap_text_if_selected = true")
+	local function unchanged(owners, controls, path, before)
+		helpers.assert_eq(Sandbox.read_bytes(path), before)
+		helpers.assert_eq(#controls.backups, 0); helpers.assert_eq(controls.runtime_calls, 0)
+		helpers.assert_eq(controls.device_calls, 0); helpers.assert_eq(#controls.executed, 0)
+		helpers.assert_eq(controls.pair_changes, 0); helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+	end
+
+	for _, modifier in ipairs({ "none", "shift" }) do
+		helpers.it("(wrap-configured-preflight) refuses an enabled " .. modifier .. " wrap trigger before any publication", function()
+			with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = "("
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_" .. modifier .. "_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "collision")
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	for _, modifier in ipairs({ "ctrl", "alt", "super" }) do
+		helpers.it("(wrap-configured-preflight) " .. modifier .. " bypasses wrapping but gains no native delivery rights", function()
+			with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+				local before = Sandbox.read_bytes(path)
+				controls.chord_j_identity = "("
+				controls.on_source = function() controls.delivery_available = false end
+				local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_" .. modifier .. "_KeyJ",
+					value = "copy", intent = "keyboard_assignment" } })
+				helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+				helpers.assert_eq(controls.source_reads, 1)
+				unchanged(owners, controls, path, before)
+			end)
+		end)
+	end
+
+	helpers.it("(wrap-configured-preflight) disabled wrapping is not a guessed collision or native readiness", function()
+		local source = '[shortcuts]\nenabled = true\nwrap_text_if_selected = false\n[shortcuts.keyboard]\nmagic_editor = "none"\n'
+		with_collision_scope(source, NO_TAP_HOLDS, function(scope, owners, controls, path)
+			local before = Sandbox.read_bytes(path)
+			controls.chord_j_identity = "("
+			controls.on_source = function() controls.delivery_available = false end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "unavailable")
+			unchanged(owners, controls, path, before)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-preflight) a real switch round trip during XKB observation revokes old claims", function()
+		with_collision_scope(WRAP_BASE, NO_TAP_HOLDS, function(scope, owners, controls, path)
+			local before, changed = Sandbox.read_bytes(path), false
+			controls.chord_j_identity = "("
+			controls.on_source = function()
+				if changed then return end; changed = true
+				local token = {}
+				helpers.assert_true(owners.manager.acquire_configuration(token))
+				helpers.assert_true(owners.manager.release_configuration(token))
+			end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "copy", intent = "keyboard_assignment" } })
+			helpers.assert_eq(accepted, false); helpers.assert_eq(reason, "source_changed")
+			unchanged(owners, controls, path, before)
+		end)
+	end)
+
+	helpers.it("(wrap-configured-preflight) explicit physical None preserves native intent without observing wrap reservations", function()
+		with_scope(function(scope, owners, controls, path)
+			local original, calls = owners.manager.capture_collision_inventory, 0
+			owners.manager.capture_collision_inventory = function() calls = calls + 1; error("None does not acquire wrapping") end
+			local accepted, reason = scope.edit({ { section = "shortcuts.keyboard", key = "physical_none_KeyJ",
+				value = "none", intent = "keyboard_assignment" } })
+			owners.manager.capture_collision_inventory = original
+			helpers.assert_eq(accepted, true, tostring(reason)); helpers.assert_eq(calls, 0)
+			helpers.assert_eq(Sandbox.read_bytes(path):find('physical_none_KeyJ', 1, true) ~= nil, true)
+			helpers.assert_eq(owners.keyboard.physical_delivery_available(), false)
+		end, WRAP_BASE)
 	end)
 end)
