@@ -1201,7 +1201,7 @@ helpers.describe("ui.bridge_handlers", function()
 			state.shell = {
 				has_command = function(binary) return binary == "zenity" end,
 				quote = function(value) return "'" .. value .. "'" end,
-				exec_line = function() return "/tmp/picked/" end,
+				exec_checked = function() return true, "/tmp/picked/" end,
 			}
 			local result = handler.on_message({ action = "pickConfigDir", current = "" }, state)
 			helpers.assert_true(result.picked)
@@ -2327,7 +2327,7 @@ helpers.describe("ui.bridge_handlers", function()
 				shell = {
 					has_command = function(binary) return binary == "zenity" end,
 					quote = function(value) return "'" .. value .. "'" end,
-					exec_line = function() return "/tmp/ergopti-picked/" end,
+					exec_checked = function() return true, "/tmp/ergopti-picked/" end,
 				},
 				webview_manager = {
 					eval_js = function(app, code)

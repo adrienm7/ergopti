@@ -2,6 +2,74 @@
 
 # Configuration and menus: inactive personal-menu proposal
 
+## Container retirement checkpoint
+
+The maintainer explicitly requested Dev delivery and deletion of Group 1's
+feature, private and CI branches before this container is removed. The global
+[ErgoptiPlus TODO](../../ERGOPTIPLUS_TODO.md) is the sole current checklist:
+items 5, 7, 33, 42, 54, 81 and 138 remain partial; 16/38 remain required and 22
+stays withdrawn. No Group 1-specific TODO file is retained. Other groups' TODO
+files are outside this cleanup.
+
+The [retirement capsule](container-retirement/README.md) preserves unique
+private/CI history and portable continuation inputs. Earlier sections below are
+dated evidence, including their original failed and pending states; their
+branch names and container paths are historical references, not prerequisites.
+Fresh continuation starts from actual current Dev and the global TODO.
+
+Published runtime atoms `bfa604bab`, `57bcca233` and `313b0ef7c` and proof
+`c90aab103` are preserved by this delivery. The
+[final receiving packet](2026-10-15-RELOAD-AND-DIAGNOSTICS-RECEIVING.tar.gz)
+has SHA-256 `26e326a2701ef257b2639a4ab091e91ec537d255027dc10415321a91586c05ae`.
+Actual CI2 `ee2bba328` / run
+[38776110277](https://github.com/adrienm7/ergopti/actions/runs/38776110277)
+tested source tree `e7992152329049e0953ca8de057e7d33ba6ed55a`: 19 jobs,
+9 successful, 5 failed and 5 skipped. Its raw receiving confirms 19,894 macOS
+unit passes / zero failures / 1,604 modules and all 426 JS checks passed;
+those footers provide no skipped counter. Archive and both Managed Ollama jobs
+and their verdicts failed. Release/Publish was skipped.
+
+Original C1/T1 remains failed: 39 jobs, 28 successful, 6 failed and 5 skipped,
+including the owned stub-isolation regression subsequently repaired by the
+one-fixture T2 change. All 17 Linux installed-launch scenarios passed on T1.
+Local T1 receives 426 JS checks, 13,879 Linux units / 193 E2E, and 101 macOS
+E2E passes plus one explicit skip. Corrected T2 full HS passes 19,894 / zero.
+These source captures do not qualify this later retirement composition or
+installed reports, browser rendering, GitHub field editing or Windows behavior.
+The new composition's separate local verification receipt is in the capsule.
+
+The [diagnostics opener follow-up](2026-10-15-DIAGNOSTIC-OPENER.md) records the
+real Linux child-failure reproduction, asynchronous completion across the
+actual report callers, and the remaining installed export and log-collection
+acceptance. Its earlier Linux CI success has an exact separate source boundary.
+
+The [later configuration receiving](2026-10-15-CONFIG-FOLLOWUP.md) records
+stable-immediate-parent Personal-root recovery, its corrected handle diagnostic,
+complete sparse-fact receiving and the separate inactive four-constructor
+proposal. Exact hosted outcomes and remaining owner/installed acceptance are
+kept distinct; neither source review nor an archive activates the proposal.
+The earlier report below retains its dated pending claims.
+
+The [October 15 path follow-up](2026-10-15-PATH-RECEIVING.md) records the
+published Linux watcher fix, its separate CI source, and the inactive shared
+paths-editor proposal. Root's current release boundary queues new Dev
+integration; neither the proposal archive nor a passing focused test closes
+the remaining Group 1 items.
+
+The [Personal topology follow-up](2026-10-15-PERSONAL-TOPOLOGY.md) records
+feature `7523f4b19`: late-created and moved directories receive recursive
+watcher coverage, accepted reloads survive incomplete coverage scans, and
+native handle retirement retains explicit ownership. The exact 83/82 focused
+receiving, predecessor failures, unchanged original test prefix and complete
+13,802-unit/193-E2E canonical gate are sealed separately. Linux manual
+38717729588 finishes failed with two new fixture failures; the assertion-preserving
+`/var/tmp` correction and its complete local unit pass remain separate from
+that failed run. Adjacent Linux/macOS picker atoms and the shared Lua sparse
+fact-report correction are recorded at composition `280174ee2`. Final diagnostic
+units and corrected-source macOS+Linux CI remain pending at this checkpoint;
+source fixtures and the earlier identity CI do not qualify installed behavior. Root's integration boundary and the
+remaining native/device requirements remain in effect.
+
 The [saved proposal](personal-default-inactive-proposal.tar.gz) preserves nine
 reviewed patches, four independent control inputs and nine receiving receipts.
 Its SHA-256 is `d363f5f18be730371977064c72fccafecc17de774ab780337397eca07f610302`. Extract into an owned temporary directory and verify
@@ -194,3 +262,19 @@ correction. Native Windows general receiving, macOS Managed/archive qualificatio
 installed wizard/device acceptance and the complete `Texte collé.txt` remain
 open. All six Group 1 items and transversal 16/38 stay partial; the feature and
 inactive Personal proposal are retained.
+
+## Selected-file reload and Mac opener follow-up, 2026-10-15
+
+The [new receiving boundary](2026-10-15-SELECTED-FILE-AND-MAC-OPENER.md)
+records the normal Dev refresh, the independently reproduced selected-file
+reload defect and the macOS task-admission mismatch. Linux focused receiving
+passes sixteen added cases on both Lua engines; feature atom `bfa604bab` passes
+13,865 units and 193 E2E cases without failure. macOS focused receiving passes 88 cases
+and independent lifetime review accepts the four producers. Later terminal evidence must qualify its exact
+source separately; no previous run is borrowed for these corrections.
+
+The user does not recognize the old attachment reference. Its unavailable
+contents are not inferred or treated as a new prerequisite: current item 138
+and the explicit diagnostics request guide this bounded follow-up. Complete
+daily-log collection, installed export and actual issue editability remain open.
+Root retains integration ownership; no item is removed or release requested.

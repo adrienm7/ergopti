@@ -43,7 +43,11 @@ local function build(opts)
 		end,
 		install = function(result) ctx.installs[#ctx.installs + 1] = result.latest; return opts.install_refused ~= true end,
 		open_changelog = function(channel) ctx.changelogs[#ctx.changelogs + 1] = channel; return true end,
-		report = function(result) ctx.reports[#ctx.reports + 1] = result; return true end,
+		report = function(result, complete, current)
+			ctx.reports[#ctx.reports + 1] = result
+			if opts.report then return opts.report(result, complete, current, ctx) end
+			complete(true)
+		end,
 		open_log = function() ctx.opened = ctx.opened + 1; return false, true end,
 		close = function() ctx.closes = ctx.closes + 1 end,
 		log_path = function()
@@ -214,5 +218,95 @@ helpers.describe("updater.check_session: the update-check window's session", fun
 	helpers.it("refuses to start without every port", function()
 		local ok = pcall(load_session().new, { push = function() return true end })
 		helpers.assert_eq(ok, false, "a missing port is an error, not a silent no-op")
+	end)
+end)
+
+
+local function failed_report(opts)
+	local ctx = build(opts)
+	ctx.session.start()
+	ctx.checks[1].answer({ state = "error", channel = "dev", current = "1", detail = "synthetic", reason_key = "unexpected" })
+	return ctx
+end
+
+helpers.describe("update report explicit completion", function()
+	helpers.it("(update-report-async) admission waits and duplicate completion cannot change the result", function()
+		local done
+		local c = failed_report({ report = function(_, complete) done = complete; return { cancel = function() end } end })
+		local before = #c.pushed; c.session.on_message({ action = "report" }); helpers.assert_eq(#c.pushed, before)
+		done(false); helpers.assert_eq(#c.pushed, before + 1); helpers.assert_eq(last(c).ok, false)
+		done(true); helpers.assert_eq(#c.pushed, before + 1)
+	end)
+	for _, retirement in ipairs({ "start", "retire", "new_report" }) do
+		helpers.it("(update-report-async) " .. retirement .. " retires the previous exact result owner", function()
+			local calls, cancelled = {}, 0
+			local c = failed_report({ report = function(_, done, current)
+				calls[#calls + 1] = { done = done, current = current }
+				return { cancel = function() cancelled = cancelled + 1 end }
+			end })
+			c.session.on_message({ action = "report" })
+			if retirement == "start" then c.session.start()
+			elseif retirement == "retire" then c.session.retire()
+			else c.session.on_message({ action = "report" }) end
+			local before = #c.pushed
+			helpers.assert_eq(cancelled, 1); helpers.assert_eq(calls[1].current(), false)
+			calls[1].done(true); helpers.assert_eq(#c.pushed, before)
+			if retirement == "new_report" then calls[2].done(true); helpers.assert_eq(#c.pushed, before + 1) end
+		end)
+	end
+	for _, transition in ipairs({ "report", "start", "answer" }) do
+		helpers.it("(update-report-async) cancellation retirement fences the old " .. transition .. " continuation", function()
+			local calls = 0
+			local c = failed_report({ report = function(_, _, _, ctx)
+				calls = calls + 1
+				return { cancel = function() ctx.session.retire() end }
+			end })
+			c.session.on_message({ action = "report" })
+			local pushed, checks, result = #c.pushed, #c.checks, c.session.result()
+			if transition == "report" then c.session.on_message({ action = "report" })
+			elseif transition == "start" then c.session.start()
+			else c.checks[1].answer({ state = "error", channel = "dev", current = "v1", reason_key = "unexpected" }) end
+			helpers.assert_eq(calls, 1)
+			helpers.assert_eq(#c.pushed, pushed)
+			helpers.assert_eq(#c.checks, checks)
+			helpers.assert_eq(c.session.result(), result)
+		end)
+	end
+	for _, successor in ipairs({ "report", "start" }) do
+		helpers.it("(update-report-async) cancellation preserves a reentrant successor " .. successor, function()
+			local calls, cancelled = {}, false
+			local c = failed_report({ report = function(_, done, current, ctx)
+				calls[#calls + 1] = { done = done, current = current }
+				return { cancel = function()
+					if cancelled then return end
+					cancelled = true
+					if successor == "report" then ctx.session.on_message({ action = "report" }) else ctx.session.start() end
+				end }
+			end })
+			c.session.on_message({ action = "report" })
+			c.session.on_message({ action = "report" })
+			helpers.assert_eq(#calls, successor == "report" and 2 or 1)
+			helpers.assert_eq(calls[1].current(), false)
+			if successor == "report" then
+				helpers.assert_eq(calls[2].current(), true)
+				local before = #c.pushed; calls[2].done(true)
+				helpers.assert_eq(#c.pushed, before + 1); helpers.assert_eq(last(c).ok, true)
+			else helpers.assert_eq(last(c).state, "checking") end
+		end)
+	end
+	helpers.it("(update-report-async) inline completion followed by an exception acknowledges only once", function()
+		local c = failed_report({ report = function(_, done) done(true); error("after completion") end })
+		local before = #c.pushed; c.session.on_message({ action = "report" })
+		helpers.assert_eq(#c.pushed, before + 1); helpers.assert_eq(last(c).ok, true)
+		helpers.assert_true(c.logs[#c.logs].text:find("after completion", 1, true) ~= nil)
+	end)
+	helpers.it("(update-report-async) a handle returned after inline replacement is cancelled", function()
+		local cancelled, old_done = 0
+		local c = failed_report({ report = function(_, done, _, ctx)
+			old_done = done; ctx.session.start()
+			return { cancel = function() cancelled = cancelled + 1 end }
+		end })
+		c.session.on_message({ action = "report" }); helpers.assert_eq(cancelled, 1)
+		local before = #c.pushed; old_done(true); helpers.assert_eq(#c.pushed, before)
 	end)
 end)

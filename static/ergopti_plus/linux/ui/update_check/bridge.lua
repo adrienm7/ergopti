@@ -269,14 +269,14 @@ local function new_session(updater)
 			return started
 		end,
 		open_changelog = function() return manager.show("changelog") == true end,
-		report = function(result)
+		report = function(result, complete, current)
 			return require("ui.error_dialog.bridge").report({
 				kind = "error",
 				module = "updater",
 				message = string.format("Update check failed on channel %s: %s", tostring(result.channel),
 					tostring(result.detail)),
 				time = os.date("%Y-%m-%d %H:%M:%S"),
-			})
+			}, complete, current)
 		end,
 		-- The menu's own "today's log" opener: the path comes from the sink that
 		-- writes it

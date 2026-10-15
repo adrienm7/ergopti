@@ -80,6 +80,288 @@ local function load_report()
 	return Report, calls, overrides
 end
 
+--- Adapts the existing synchronous effect fixtures to explicit completion.
+local function async_effects(overrides)
+	local effects = {}
+	for key, value in pairs(overrides or {}) do effects[key] = value end
+	for _, key in ipairs({ "open", "reveal", "open_url" }) do
+		local effect = effects[key]
+		if effect then effects[key] = function(target, done)
+			done({ ok = effect(target) == true })
+			return { cancel = function() end }
+		end end
+	end
+	return effects
+end
+
+--- Receives the inline terminal produced by the existing synchronous fixtures.
+local function completed_action(Report, action, paths, config, context, overrides, snapshot)
+	local result
+	Report.perform(action, paths, config, context, async_effects(overrides), snapshot, {
+		current = function() return true end,
+		complete = function(receipt) result = receipt end,
+	})
+	assert(result ~= nil, "The synchronous fixture must complete inline")
+	return result
+end
+
+-- Direct injections and the timing reader's native path consumer form one fixture.
+local NATIVE_MODULES = {
+	"adapters.shell_runner", "adapters.timer_scheduler", "ui.healthcheck.report",
+	"infra.logger", "infra.timings", "infra.paths",
+}
+
+--- Keeps the complete asynchronous fixture body under one restoration boundary.
+--- @param body function Construction, callbacks and assertions.
+local function with_native_opener(body)
+	return helpers.with_stub_scope(NATIVE_MODULES, body)
+end
+
+--- Runs one native-opener subject with its complete fixture lifetime.
+local function native_case(name, body)
+	helpers.it(name, function() return with_native_opener(body) end)
+end
+
+--- Captures the native opener without opening any desktop application.
+local function native_opener()
+	local Report, calls, overrides = load_report()
+	local native = { tasks = {}, timers = {}, callbacks = {}, current = true, errors = {} }
+	package.loaded["infra.logger"].error = function(_, message, ...)
+		native.errors[#native.errors + 1] = string.format(message, ...)
+	end
+	package.loaded["adapters.timer_scheduler"] = {
+		after = function(delay, callback)
+			if native.timer_throw then error("controlled timer refusal") end
+			local timer = { callback = callback, delay = delay }
+			native.timers[#native.timers + 1] = timer
+			if native.timer_hook then native.timer_hook() end
+			return timer, native.timer_refuse ~= true
+		end,
+		cancel = function(timer) timer.cancelled = true; return true end,
+	}
+	package.loaded["adapters.shell_runner"] = {
+		spawn = function(bin, args, done)
+			if native.construct_throw then error("controlled construction refusal") end
+			if native.construct_refuse then return nil end
+			local task = { bin = bin, args = args, done = done, started = false, settled = false, stopped = 0 }
+			function task.start()
+				task.deadline_count_at_start = #native.timers
+				if native.start_throw then error("controlled start refusal") end
+				task.started = native.start_refuse ~= true
+				if native.start_complete_throw then task.finish(0); error("controlled completed start exception") end
+				return task.started
+			end
+			function task.isSettled() return task.settled end
+			function task.onSettled(callback) task.observer = callback; return true end
+			function task.terminate()
+				task.stopped = task.stopped + 1
+				if native.cancel_hook then native.cancel_hook(task) end
+				return native.terminate_refuse ~= true, "pending"
+			end
+			function task.finish(code)
+				task.settled = true
+				if done then done(code, "", "controlled opener") end
+				if task.observer then task.observer() end
+			end
+			native.tasks[#native.tasks + 1] = task
+			return task
+		end,
+	}
+	local function run()
+		return Report.perform({ action = "open_path", id = "errors_today" },
+			{ errors_today = "/synthetic/errors.log" }, {}, {}, { exists = function() return true end }, nil, {
+				current = function() return native.current end,
+				complete = function(result) native.callbacks[#native.callbacks + 1] = result end,
+			})
+	end
+	return native, run, Report, calls, overrides
+end
+
+helpers.describe("macOS diagnostics native opener completion (macos-opener-terminal)", function()
+	native_case("refuses a throwing timing reader before constructing a native capability", function()
+		local native, run = native_opener()
+		local previous = package.loaded["infra.timings"]
+		package.loaded["infra.timings"] = { sec = function() error("controlled timing admission refusal") end }
+		local ok, detail = pcall(run)
+		package.loaded["infra.timings"] = previous
+		helpers.assert_true(ok, tostring(detail))
+		helpers.assert_eq(#native.callbacks, 1)
+		helpers.assert_eq(native.callbacks[1].ok, false)
+		helpers.assert_eq(#native.tasks, 0, "a missing deadline must not pin a prepared native task")
+	end)
+
+	native_case("receives exit 23 instead of acknowledging start", function()
+		local native, run = native_opener()
+		run()
+		helpers.assert_eq(#native.callbacks, 0, "native admission cannot complete an action")
+		native.tasks[1].finish(23)
+		helpers.assert_eq(#native.callbacks, 1, "the genuine terminal reaches the owner")
+		helpers.assert_eq(native.callbacks[1].ok, false)
+	end)
+
+	native_case("admits the canonical deadline before starting the native opener", function()
+		local native, run = native_opener()
+		run()
+		helpers.assert_eq(#native.timers, 1, "an accepted opener requires its deadline")
+		native.timers[1].callback()
+		helpers.assert_eq(native.tasks[1].stopped, 1, "deadline retains the exact child for retirement")
+		native.tasks[1].finish(0)
+		helpers.assert_eq(native.callbacks[1].ok, false, "late exit zero cannot erase the deadline")
+	end)
+
+	native_case("cancel fences completion while retaining pending native retirement", function()
+		local native, run = native_opener()
+		local request = run()
+		helpers.assert_true(type(request.cancel) == "function", "the action retains cancellation authority")
+		request.cancel()
+		helpers.assert_eq(native.tasks[1].stopped, 1)
+		native.tasks[1].finish(0)
+		helpers.assert_eq(#native.callbacks, 0)
+	end)
+
+	native_case("independent current owners retain both concurrent opener children", function()
+		local native, run = native_opener()
+		run()
+		run()
+		helpers.assert_eq(native.tasks[1].stopped, 0, "another current owner's opener is not cleanup debt")
+		native.tasks[1].finish(0)
+		native.tasks[2].finish(23)
+		helpers.assert_eq(#native.callbacks, 2)
+		helpers.assert_eq(native.callbacks[1].ok, true)
+		helpers.assert_eq(native.callbacks[2].ok, false)
+	end)
+
+	native_case("cancelling one concurrent opener cannot cancel its independent sibling", function()
+		local native, run = native_opener()
+		local first = run()
+		run()
+		first.cancel()
+		helpers.assert_eq(native.tasks[1].stopped, 1)
+		helpers.assert_eq(native.tasks[2].stopped, 0)
+		native.tasks[2].finish(0)
+		helpers.assert_eq(#native.callbacks, 1)
+	end)
+	native_case("an inline terminal followed by start throw logs once without a second outcome", function()
+		local native, run = native_opener()
+		native.start_complete_throw = true
+		run()
+		helpers.assert_eq(#native.callbacks, 1)
+		helpers.assert_eq(native.callbacks[1].ok, true)
+		helpers.assert_eq(#native.errors, 1, "the exception remains observable after terminal success")
+		helpers.assert_contains(native.errors[1], "controlled completed start exception")
+	end)
+
+	for _, refusal in ipairs({ "timer_refuse", "timer_throw", "construct_refuse", "construct_throw", "start_refuse", "start_throw" }) do
+		native_case("native opener admission refuses without hanging: " .. refusal, function()
+			local native, run = native_opener()
+			native[refusal] = true
+			run()
+			helpers.assert_eq(#native.callbacks, 1)
+			helpers.assert_eq(native.callbacks[1].ok, false)
+			if refusal:match("^timer") then helpers.assert_eq(native.tasks[1].started, false) end
+		end)
+	end
+
+	native_case("deadline exists before native start and uses the shared timing", function()
+		local native, run = native_opener()
+		run()
+		helpers.assert_eq(native.tasks[1].deadline_count_at_start, 1)
+		helpers.assert_eq(native.timers[1].delay, require("infra.timings").sec("ui", "desktop_open_timeout_ms"))
+		native.tasks[1].finish(0)
+		helpers.assert_true(native.timers[1].cancelled)
+		helpers.assert_eq(native.callbacks[1].ok, true)
+	end)
+
+	native_case("timer admission reentry cannot start a retired owner's opener", function()
+		local native, run = native_opener()
+		native.timer_hook = function() native.current = false end
+		run()
+		helpers.assert_eq(native.tasks[1].started, false)
+		native.tasks[1].finish(0)
+		helpers.assert_eq(#native.callbacks, 0)
+	end)
+
+	native_case("a duplicate child terminal cannot acknowledge twice", function()
+		local native, run = native_opener()
+		run()
+		native.tasks[1].finish(0)
+		native.tasks[1].finish(23)
+		helpers.assert_eq(#native.callbacks, 1)
+		helpers.assert_eq(native.callbacks[1].ok, true)
+	end)
+
+	native_case("retained cleanup retries only a retired child and preserves its successor", function()
+		local native, run = native_opener()
+		native.terminate_refuse = true
+		local first = run()
+		first.cancel()
+		helpers.assert_eq(native.tasks[1].stopped, 1)
+		native.terminate_refuse = false
+		run()
+		helpers.assert_eq(native.tasks[1].stopped, 2)
+		helpers.assert_eq(native.tasks[2].stopped, 0)
+		native.tasks[2].finish(0)
+		native.tasks[1].finish(23)
+		helpers.assert_eq(#native.callbacks, 1)
+	end)
+
+	native_case("a timed-out reveal with pending retirement never opens the browser", function()
+		local native, _, Report, calls, overrides = native_opener()
+		local config = documents()
+		local snapshot = { driver = "macos", sections = { versions = { ergopti_version = "2.4.0" } } }
+		local doc = Share.document(snapshot, config.schema)
+		overrides.reveal = nil
+		Report.perform({ action = "report", text = doc.text }, { diagnostics_dir = "/synthetic/diagnostics" },
+			config, {}, async_effects(overrides), snapshot, {
+				current = function() return true end,
+				complete = function(result) native.callbacks[#native.callbacks + 1] = result end,
+			})
+		native.timers[1].callback()
+		helpers.assert_eq(#calls.open_url, 0, "pending cleanup is not a reveal terminal")
+		helpers.assert_eq(native.callbacks[1].ok, false)
+		native.tasks[1].finish(0)
+		helpers.assert_eq(#calls.open_url, 0, "late retirement cannot revive a refused report")
+	end)
+
+	native_case("report waits for reveal terminal and preserves its warning-only refusal", function()
+		local native, _, Report, calls, overrides = native_opener()
+		local config = documents()
+		local snapshot = { driver = "macos", sections = { versions = { ergopti_version = "2.4.0" } } }
+		local doc = Share.document(snapshot, config.schema)
+		overrides.reveal = nil
+		Report.perform({ action = "report", text = doc.text }, { diagnostics_dir = "/synthetic/diagnostics" },
+			config, {}, async_effects(overrides), snapshot, {
+				current = function() return true end,
+				complete = function(result) native.callbacks[#native.callbacks + 1] = result end,
+			})
+		helpers.assert_eq(#calls.copy, 1)
+		helpers.assert_eq(#calls.save, 1)
+		helpers.assert_eq(#calls.open_url, 0, "browser must wait for the exact reveal receipt")
+		helpers.assert_eq(#native.callbacks, 0)
+		native.tasks[1].finish(23)
+		helpers.assert_eq(#calls.open_url, 1, "failed reveal retains the existing warning policy")
+		helpers.assert_eq(native.callbacks[1].ok, true)
+	end)
+
+end)
+
+helpers.describe("native opener fixture restoration", function()
+	helpers.it("restores exact native modules and global state after an assertion throws", function()
+		local saved, saved_hs = {}, rawget(_G, "hs")
+		for _, name in ipairs(NATIVE_MODULES) do saved[name] = package.loaded[name] end
+		local ok, detail = pcall(with_native_opener, function()
+			native_opener()
+			error("controlled native-opener assertion failure")
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(tostring(detail), "controlled native-opener assertion failure")
+		for _, name in ipairs(NATIVE_MODULES) do
+			helpers.assert_true(rawequal(package.loaded[name], saved[name]), "exact module restored after throw: " .. name)
+		end
+		helpers.assert_true(rawequal(rawget(_G, "hs"), saved_hs), "the prior native stub owner is restored")
+	end)
+end)
+
 --- Decodes one percent-encoded query parameter of a URL.
 --- @param url string
 --- @param key string
@@ -133,7 +415,7 @@ local function perform(action, adjust)
 		request.text = approved_text(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
 		action = request
 	end
-	return Report.perform(action, paths(), documents(), context, overrides, snapshot), calls
+	return completed_action(Report, action, paths(), documents(), context, overrides, snapshot), calls
 end
 
 helpers.describe("healthcheck page actions (report-bug-flow)", function()
@@ -224,7 +506,7 @@ helpers.describe("healthcheck page actions (report-bug-flow)", function()
 		Logger.error = function(_, message, ...) logged[#logged + 1] = string.format(message, ...) end
 		Logger.warn = Logger.error
 		overrides.exists = function() return false end
-		local result = Report.perform({ action = "open_path", id = "errors_today" },
+		local result = completed_action(Report, { action = "open_path", id = "errors_today" },
 			{ errors_today = LOGS .. "/ErgoptiPlus_errors_2026-09-24.log" }, documents(),
 			Report.redaction_context(overrides), overrides)
 		helpers.assert_eq(result.ok, false)
@@ -272,7 +554,9 @@ helpers.describe("healthcheck debug menu reports (report-bug-flow)", function()
 				return { driver = "macos", sections = { versions = { ergopti_version = "2.4.0" }, system = { os = "macOS 15.1" } } }
 			end,
 		}
-		helpers.assert_eq(Report.suggest_feature(overrides), true)
+		local completed
+		Report.suggest_feature(async_effects(overrides), function(ok) completed = ok end)
+		helpers.assert_eq(completed, true)
 		package.loaded["ui.healthcheck.core"] = nil
 		local repo = documents().repository
 		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo
@@ -364,7 +648,7 @@ helpers.describe("default attachment completion", function()
 				}
 			end
 			local ok, err = xpcall(function()
-				local result = Report.perform({ action = "report", text = doc.text, fields = {} },
+				local result = completed_action(Report, { action = "report", text = doc.text, fields = {} },
 					paths(), config, Report.redaction_context(overrides), overrides, snapshot)
 				helpers.assert_eq(result.ok, refusal == "none")
 				helpers.assert_eq(writes, 1)
@@ -433,7 +717,7 @@ helpers.describe("closed recent error facts", function()
 			helpers.assert_contains(doc.text, "log_observation_only")
 			for _, action in ipairs({ "copy", "save", "report" }) do
 				local Report, calls, overrides = load_report()
-				local outcome = Report.perform({ action = action, text = doc.text, name = doc.name, fields = {} },
+				local outcome = completed_action(Report, { action = action, text = doc.text, name = doc.name, fields = {} },
 					paths(), config, Report.redaction_context(overrides), overrides, vector.snapshot)
 				helpers.assert_eq(outcome.ok, true, "the real report sink receives the retained fact snapshot")
 				if action ~= "save" then helpers.assert_eq(calls.copy[1], doc.text) end

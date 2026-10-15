@@ -139,6 +139,19 @@ helpers.describe("diagnostics corpus: bug report text (issue-report-corpus)", fu
 			helpers.assert_eq(IssueReport.markdown(vector.info, vector.body), vector.expected, vector.id)
 		end)
 	end
+
+	helpers.it("dump preserves sparse list entries and keyed diagnostic facts (issue-report-corpus)", function()
+		local results = { "first", nil, "third", "fourth", diagnostic = "retained metadata" }
+		helpers.assert_eq(IssueReport.dump({ results = results }),
+			"results:\n  1: first\n  3: third\n  4: fourth\n  diagnostic: retained metadata")
+	end)
+
+	helpers.it("dump preserves numeric keys outside a sparse sequence (issue-report-corpus)", function()
+		local results = { "first", nil, "third", [100] = "later" }
+		helpers.assert_eq(IssueReport.dump({ results = results }),
+			"results:\n  1: first\n  100: later\n  3: third")
+	end)
+
 	-- The report goes to GitHub whole (the issue link cuts it): no summary of
 	-- it and no saved file name is left to drift from the page's
 	helpers.it("has no summary and no file name of its own (issue-report-corpus)", function()

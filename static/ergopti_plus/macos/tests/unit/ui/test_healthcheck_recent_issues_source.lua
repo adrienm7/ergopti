@@ -102,3 +102,91 @@ helpers.describe("healthcheck recent issues source (errors-file-issues)", functi
 		end)
 	end)
 end)
+
+
+--- Exercises the existing recent-source refusal contract after a real open.
+local function with_tail_receipt(fault, callback)
+	local sequence = tostring(os.time()) .. "_" .. fault
+	local path = (os.getenv("TMPDIR") or os.getenv("TEMP") or "/tmp") .. "/ergopti_tail_receipt_" .. sequence .. ".log"
+	local text = fault == "empty" and "" or "2026-09-23 10:00:01:002 [ERROR] [Probe] synthetic retained error\n"
+	local file = assert(io.open(path, "wb"))
+	assert(file:write(text)); assert(file:close())
+	local original_open, calls, opened = io.open, { close = 0, read = 0 }, {}
+	io.open = function(name, mode)
+		local fh, detail, code = original_open(name, mode)
+		if name ~= path or not fh then return fh, detail, code end
+		local entry = { handle = fh, closed = false }; opened[#opened + 1] = entry
+		return {
+			seek = function(_, whence, offset)
+				if fault == "seek_end_nil" and whence == "end" then return nil, "controlled end seek refusal", 5 end
+				if fault == "seek_set_nil" and whence == "set" then return nil, "controlled position seek refusal", 5 end
+				if fault == "seek_end_raise" and whence == "end" then error("controlled end seek exception") end
+				return fh:seek(whence, offset)
+			end,
+			read = function(_, size)
+				calls.read = calls.read + 1
+				if fault == "read_nil" or fault == "read_close_nil" then return nil, "controlled read refusal", 5 end
+				if fault == "read_errno2" then return nil, "controlled later ENOENT read refusal", 2 end
+				if fault == "read_raise" then error("controlled read exception") end
+				if fault == "read_short" then return assert(fh:read(size)):sub(1, -2) end
+				return fh:read(size)
+			end,
+			close = function()
+				calls.close = calls.close + 1
+				local closed, close_detail = fh:close(); entry.closed = closed == true
+				if fault == "close_nil" or fault == "read_close_nil" then return nil, "controlled close refusal", 5 end
+				if fault == "close_errno2" then return nil, "controlled later ENOENT close refusal", 2 end
+				if fault == "close_false" then return false, "controlled false close receipt" end
+				if fault == "close_raise" then error("controlled close exception") end
+				return closed, close_detail
+			end,
+		}
+	end
+	local ran, primary = pcall(callback, path, calls)
+	io.open = original_open
+	local closed_before_cleanup = true
+	for _, entry in ipairs(opened) do
+		if not entry.closed then closed_before_cleanup = false; assert(entry.handle:close()) end
+	end
+	assert(os.remove(path))
+	if not ran then error(primary, 0) end
+	helpers.assert_eq(calls.close, 1, "the source owner must close each opened native file exactly once, including after IO refusal")
+	helpers.assert_true(closed_before_cleanup, "the production owner, rather than fixture cleanup, must close the real file")
+end
+
+helpers.describe("healthcheck closed recent-file IO", function()
+	for _, fault in ipairs({ "seek_end_nil", "seek_set_nil", "seek_end_raise", "read_nil", "read_errno2", "read_raise", "read_short", "close_nil", "close_errno2", "close_false", "close_raise", "read_close_nil" }) do
+		helpers.it("(errors-file-io-receipts) refuses " .. fault .. " without a ring fallback", function()
+			with_tail_receipt(fault, function(path)
+				with_healthcheck(function(Logger, healthcheck)
+					Logger.set_level(SILENT_LEVEL); Logger.ERRORS_LOG_FILE = path
+					local issues = healthcheck.run().sections.issues
+					helpers.assert_eq(issues.recent_source, "unavailable", "a post-open IO refusal cannot claim a valid file or absence")
+					helpers.assert_eq(issues.recent, {})
+				end)
+			end)
+		end)
+	end
+	helpers.it("(errors-file-io-receipts) admits an empty closed file without inventing entries", function()
+		with_tail_receipt("empty", function(path)
+			with_healthcheck(function(Logger, healthcheck)
+				Logger.set_level(SILENT_LEVEL); Logger.ERRORS_LOG_FILE = path
+				local issues = healthcheck.run().sections.issues
+				helpers.assert_eq(issues.recent_source, "errors_file")
+				helpers.assert_eq(issues.recent, {})
+			end)
+		end)
+	end)
+end)
+
+
+helpers.describe("healthcheck simultaneous source refusals", function()
+	helpers.it("(errors-file-io-receipts) preserves both read and close refusal details", function()
+		with_tail_receipt("read_close_nil", function(path)
+			local completed, detail = pcall(require("healthcheck.snapshot").read_tail, path, 1)
+			helpers.assert_eq(completed, false, "post-open refusal cannot return an open-failure errno")
+			helpers.assert_true(tostring(detail):find("controlled read refusal", 1, true) ~= nil, "retain the original read refusal")
+			helpers.assert_true(tostring(detail):find("controlled close refusal", 1, true) ~= nil, "retain the independent close refusal")
+		end)
+	end)
+end)
