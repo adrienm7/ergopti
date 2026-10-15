@@ -4460,7 +4460,12 @@ installation and device acceptance remain pending; items 7, 16 and 38 stay open.
   qualify the signed helper's real ServiceManagement registration, wrong-inode
   refusal, unregistration, idempotence and final job absence on both macOS
   architectures. The current main CI does not enroll that complete acceptance
-  collector. Windows PC acceptance must also verify exact registry restoration
+  collector. Receipt publication now preserves the original registration or
+  unregistration refusal and every cleanup failure when the output cannot be
+  written; an unpublished receipt always refuses qualification. The original
+  six portable controls and three real filesystem write-refusal regressions
+  pass, without executing ServiceManagement or native helper roles.
+  Windows PC acceptance must also verify exact registry restoration
   after OFF/removal and preserved prior values after an authorization refusal.
   Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
@@ -5899,7 +5904,11 @@ Windows-dependent acceptance is explicitly deferred to the maintainer PC. Comple
   signed-helper acceptance lane also checks wrong-inode refusal, successful
   unregistration and idempotence, retaining primary and cleanup errors.
   Focused registered macOS tests pass 315 cases and the diagnostic judge passes
-  six regressions. Complete native Swift, helper registration and three-OS
+  six original regressions, plus three additive real filesystem write-refusal
+  cases. Publication failure cannot hide cleanup debt or acknowledge success;
+  the original write exception remains chained alongside the native failure.
+  All nine portable cases pass in normal and optimized Python modes. Complete
+  native Swift, helper registration and three-OS
   qualification remain pending.
 
 Signed-helper acceptance run 37081066757 passed actual native registration,
