@@ -12848,8 +12848,19 @@ or Shift consumers; Ctrl/Alt/Super and the separate Script AltGr namespace stay
 disjoint. No PRIMARY polling, selection or native delivery is inferred. Both
 Lua ABIs pass36 owner and121 complete shortcut-scope cases; the focused
 original consumer5/3 becomes8/0,
-with malformed-source refusal retained. LLM prediction and full source/input/
-output ownership remain open, and public physical delivery stays unavailable.
+with malformed-source refusal retained. Full source/input/output ownership remains open, and public physical delivery
+stays unavailable.
+
+Configured Linux prediction inputs now join collision preflight through the
+original navigation preferences and initialized handler capabilities. The finite
+may-consume inventory includes actual native arrow/digit roles, Shift+Tab and
+live/agent Tab without polling predictions. Disabled AI remains unavailable:
+the original explicit prediction API can still consume an offer. Only the
+original permanently closed runtime permits an empty inventory; an unknown AI
+owner cannot authorize a free mapping. Both Lua ABIs receive25 owner and9
+consumer controls, including genuine original-source failures and three source
+withdrawals. All original assertions remain. Full joined driver/installed and
+native qualification remain required; item97 and transverse16/38 stay open.
 
 - [~] **98.** Replace fixed make-J-the-star-key with a user-chosen
   physical position and arbitrary output, including explicit None, through
