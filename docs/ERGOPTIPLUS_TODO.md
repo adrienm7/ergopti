@@ -6634,6 +6634,17 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
 
 - [~] **42.** config.toml batch writer follow-ups (`toml-batch-existing-key`):
 
+  Later October 15 atoms `02713ee47` and `2990b16e1` restore Personal-root
+  coverage through its stable immediate parent and count that genuine parent
+  handle in startup diagnostics. All 83 previous watcher subjects remain;
+  eight root lifecycle controls pass, and complete base-root verification
+  receives 13,824 units/193 E2E cases. The count control fails its predecessor
+  and passes the successor; final successor receiving is recorded in the
+  [follow-up checkpoint](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md).
+  Arbitrary ancestor admission, external symlink-target replacement, installed
+  source activation, transaction/startup and physical acceptance remain open.
+  This bounded root repair does not close item 42 or qualify a distribution.
+
   A second October 15 Linux follow-up repairs Personal watcher coverage when
   directories are created, moved or replaced after startup. Existing accepted
   reload callbacks remain active during coverage refusal; bounded repair and
@@ -6656,8 +6667,9 @@ The signed native checkpoint 37116923472 reached the actual independent JSON cod
   identifies two new base-source fixture paths inside the unchanged intentional
   `/tmp/` exclusion. Fixture-only `3011ea7ef` admits those two sessions under
   `/var/tmp`, retaining every assertion; full Linux units pass 13,802/zero.
-  The failed hosted run remains failed, with corrected-source CI pending. Root recreation/parent anchors, installed source activation,
-  transaction/startup and physical acceptance remain open; item 42 stays partial.
+  The failed hosted run remains failed. The later stable-immediate-parent
+  correction is bounded as recorded above; installed source activation,
+  transaction/startup and physical acceptance remain open. Item 42 stays partial.
 
   October 15 follow-up fixes Linux personal-directory watcher identity:
   recursive scans retain case and literal backslashes, including a configured
@@ -7521,9 +7533,18 @@ Linux 1. Four Windows Personal constructors and fifteen IA sites remain. The
 inactive Personal packet still covers only one constructor: seven of nine patch
 preimages match, while Root's two JS consumers require composition with its
 current native-target grammar and proof helpers. Its 31 native behavioral and
-12 source-witness controls remain UNRUN. No patch is adopted and item 54
+12 source-witness controls remain UNRUN. The earlier patch is not adopted and item 54
 remains partial; use the [current receiving](handovers/2026-10-12-config-menus/2026-10-15-RECEIVING.md)
 before choosing the next owned lot.
+
+A later [four-constructor handoff](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+retains a separate inactive three-path proposal for all four Personal sites.
+Its 40 bounded controls and source review do not complete Root's schema,
+physical/proof and two-JS-consumer joins: malformed new recipes are currently
+accepted by the old validator, while current proof readers refuse the candidate.
+The 31 native behavioral and 12 source-witness controls remain UNRUN. No active
+producer, generator, independent corpus or baseline changes; no census
+reduction or item completion is claimed.
 
 On 2026-10-12, the shared shortcut-extension construction recipe owns admission,
 allocation, native builder observation and result placement. The unchanged
@@ -11655,9 +11676,18 @@ Linux 1. Four Windows Personal constructors and fifteen IA sites remain. The
 inactive Personal packet still covers only one constructor: seven of nine patch
 preimages match, while Root's two JS consumers require composition with its
 current native-target grammar and proof helpers. Its 31 native behavioral and
-12 source-witness controls remain UNRUN. No patch is adopted and item 81
+12 source-witness controls remain UNRUN. The earlier patch is not adopted and item 81
 remains partial; use the [current receiving](handovers/2026-10-12-config-menus/2026-10-15-RECEIVING.md)
 before choosing the next owned lot.
+
+A later [four-constructor handoff](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+retains a separate inactive three-path proposal for all four Personal sites.
+Its 40 bounded controls and source review do not complete Root's schema,
+physical/proof and two-JS-consumer joins: malformed new recipes are currently
+accepted by the old validator, while current proof readers refuse the candidate.
+The 31 native behavioral and 12 source-witness controls remain UNRUN. No active
+producer, generator, independent corpus or baseline changes; no census
+reduction or item completion is claimed.
 
 On 2026-10-12, one genuine Windows shortcut-extension construction and
 placement site moves to the shared recipe: Windows 17 to 16, macOS 2, Linux 1.
@@ -14897,6 +14927,16 @@ test precondition failure, not a Lua defect or a successful permission grant.
   binding, daily-log or GitHub field-editability requirements above. The
   [batched receiving](handovers/2026-10-12-config-menus/2026-10-15-PERSONAL-TOPOLOGY.md)
   retains the source and remaining acceptance. No automatic upload is added.
+
+  Later complete receiving for the exact sparse-fact source capture passes
+  all 426 JS checks, 19,829 portable macOS units and 101 E2E cases with one
+  explicit skip, plus 13,804 Linux units and 193 E2E cases. Atom `2990b16e1`
+  also reports the genuine Personal parent watcher in the existing handle count;
+  its predecessor fails the new count assertion and the successor passes it.
+  The [follow-up receiving](handovers/2026-10-12-config-menus/2026-10-15-CONFIG-FOLLOWUP.md)
+  distinguishes these source captures from composed hosted and installed
+  qualification. Complete export, daily logs and actual issue editability
+  remain open; item 138 is not closed.
 
 - [ ] **139.** Remove personal identities from daily and shared error logs.
 
