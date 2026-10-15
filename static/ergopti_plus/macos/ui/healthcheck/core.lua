@@ -66,6 +66,7 @@ local _session = nil
 local _continuation_timers = {}
 local _closing_window = nil
 local _focus_owner = nil
+local _open_revision = 0
 
 --- Returns an isolated description of the live eventtap telemetry contract.
 --- @param runtime_version string|nil Hammerspoon version reported at runtime.
@@ -93,11 +94,23 @@ function M.event_tap_telemetry(runtime_version)
 	}
 end
 
+--- Invalidates action ownership before native cancellation can reenter the bridge.
+--- @param session table Exact retained page session.
+local function cancel_action(session)
+	session.action_epoch = (session.action_epoch or 0) + 1
+	local epoch = session.action_epoch
+	local previous = session.action_request
+	session.action_request = nil
+	if previous then previous.cancel() end
+	return epoch
+end
+
 --- Stops a page session's probes and releases its message controller.
 --- @param session table|nil
 local function retire_session(session)
 	if not session then return end
 	if _session == session then _session = nil end
+	cancel_action(session)
 	if session.probes then
 		session.probes.cancel()
 		session.probes = nil
@@ -114,9 +127,14 @@ end
 
 --- Cancels every delayed window continuation independently.
 --- @return boolean settled True only when all exact handles were released.
-local function stop_continuations()
+local function continuation_snapshot()
 	local snapshot = {}
 	for handle in pairs(_continuation_timers) do snapshot[#snapshot + 1] = handle end
+	return snapshot
+end
+
+local function stop_continuations(snapshot)
+	snapshot = snapshot or continuation_snapshot()
 	local settled = true
 	for _, handle in ipairs(snapshot) do
 		local ok, cancelled = xpcall(function()
@@ -139,6 +157,8 @@ end
 --- @return boolean settled True only when the window and its runtime settled.
 local function close_owned_window(webview, reason)
 	if _window ~= webview then return true end
+	local session, generation = _session, _window_generation
+	local continuations = continuation_snapshot()
 	_focus_owner = nil
 	if type(webview.delete) ~= "function" then
 		Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
@@ -153,9 +173,9 @@ local function close_owned_window(webview, reason)
 		return false
 	end
 	if _window == webview then _window = nil end
-	_window_generation = _window_generation + 1
-	retire_session(_session)
-	local continuations_stopped = stop_continuations()
+	if _window_generation == generation then _window_generation = generation + 1 end
+	retire_session(session)
+	local continuations_stopped = stop_continuations(continuations)
 	if not continuations_stopped then
 		Logger.error(LOG, "Healthcheck %s retained timer cleanup debt.", reason)
 	end
@@ -795,7 +815,10 @@ end
 --- @param action table From healthcheck.actions.validate.
 --- @param documents table M.config().
 local function perform_action(session, action, documents)
+	local epoch = cancel_action(session)
+	if _session ~= session or _window ~= session.webview then return end
 	Cleanup.refresh(session)
+	if _session ~= session or _window ~= session.webview or session.action_epoch ~= epoch then return end
 	if action.action == "export_snapshot" then
 		if not require("healthcheck.share").capture_page_checks(session.snapshot, action) then
 			send(session, { type = "action", action = "export_snapshot", ok = false, export_sequence = action.export_sequence })
@@ -821,10 +844,25 @@ local function perform_action(session, action, documents)
 		start_probes(session)
 	else
 		local Report = require("ui.healthcheck.report")
-		local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
-		result.type = "action"
-		result.action = action.action
-		send(session, result)
+		local snapshot = session.snapshot
+		local revision, generation = snapshot.export_revision, session.generation
+		local function current()
+			return package.loaded["ui.healthcheck.core"] == M and _session == session and _window == session.webview and _closing_window ~= session.webview
+				and session.action_epoch == epoch and session.snapshot == snapshot
+				and snapshot.export_revision == revision and session.generation == generation
+		end
+		local completed = false
+		local request = Report.perform(action, snapshot.sections.paths, documents, Report.redaction_context(), nil, snapshot, {
+			current = current,
+			complete = function(result)
+				if not current() then return end
+				completed = true
+				session.action_request = nil
+				result.type, result.action = "action", action.action
+				send(session, result)
+			end,
+		})
+		if current() and not completed then session.action_request = request else request.cancel() end
 	end
 end
 
@@ -884,8 +922,11 @@ end
 --- @param opts table|nil { mode = "report"|nil, state = menu state|nil }
 --- @return boolean opened
 function M.show_window(opts)
+	_open_revision = _open_revision + 1
+	local revision = _open_revision
 	opts = type(opts) == "table" and opts or {}
 	Logger.start(LOG, "Opening the diagnostics window…")
+	if revision ~= _open_revision or package.loaded["ui.healthcheck.core"] ~= M then return false end
 	if type(opts.state) == "table" then _menu_state = opts.state end
 
 	if _window then
@@ -896,6 +937,7 @@ function M.show_window(opts)
 		return false
 	end
 
+	if revision ~= _open_revision or package.loaded["ui.healthcheck.core"] ~= M then return false end
 	local ok_snap, snapshot = pcall(M.run)
 	if not ok_snap or type(snapshot) ~= "table" then
 		Logger.error(LOG, "The diagnostics could not be collected: %s.", tostring(snapshot))
@@ -984,10 +1026,11 @@ function M.show_window(opts)
 			if _closing_window == wv then return end
 			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
 			if action == "closing" or action == "closed" then
+				local continuations = continuation_snapshot()
 				_window = nil
 				_window_generation = _window_generation + 1
 				retire_session(session)
-				if not stop_continuations() then
+				if not stop_continuations(continuations) then
 					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
 				end
 			end

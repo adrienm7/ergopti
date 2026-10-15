@@ -240,10 +240,16 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			-- /usr/bin/open: what revealing a file in Finder would run
 			local previous_shell = package.loaded["adapters.shell_runner"]
 			package.loaded["adapters.shell_runner"] = {
-				spawn = function(bin, args)
+				spawn = function(bin, args, done)
 					context.spawned[#context.spawned + 1] = { bin = bin, args = args }
 					context.effects[#context.effects + 1] = "spawn"
-					return { start = function() return true end }
+					local settled, observer = false, nil
+					return {
+						start = function() settled = true; done(0, "", ""); if observer then observer() end; return true end,
+						isSettled = function() return settled end,
+						onSettled = function(callback) observer = callback; return true end,
+						terminate = function() return true, settled and "settled" or "pending" end,
+					}
 				end,
 			}
 			local previous_open, previous_attributes = io.open, hs.fs.attributes
@@ -382,6 +388,79 @@ helpers.describe("diagnostics user presentation admission", function()
 			context.page({ body = { action = "close" } })
 			context.probe_result("github_api", { state = "ok", ms = 2 }, {})
 			helpers.assert_eq(context.focused, 1, "Late retired completion must stay inert")
+		end)
+	end)
+end)
+
+
+helpers.describe("diagnostics asynchronous action ownership", function()
+	for _, change in ipairs({ "close", "refresh", "revision", "module" }) do
+		helpers.it("rejects a retained opener after " .. change, function()
+			as_jdoe(function()
+				local core, context = load_window()
+				core.show_window()
+				local owner, snapshot, cancelled
+				require("ui.healthcheck.report").perform = function(_, _, _, _, _, captured, captured_owner)
+					owner, snapshot = captured_owner, captured
+					return { cancel = function() cancelled = true end }
+				end
+				context.page({ body = { action = "open_path", id = "diagnostics_dir" } })
+				helpers.assert_true(owner.current())
+				if change == "revision" then snapshot.export_revision = (snapshot.export_revision or 0) + 1
+				elseif change == "module" then package.loaded["ui.healthcheck.core"] = {}
+				else context.page({ body = { action = change } }) end
+				local messages = #context.scripts
+				owner.complete({ ok = true })
+				helpers.assert_eq(#context.scripts, messages, "stale completions cannot acknowledge into the page")
+				helpers.assert_eq(owner.current(), false)
+				if change == "close" or change == "refresh" then helpers.assert_true(cancelled) end
+			end)
+		end)
+	end
+
+	helpers.it("cancellation reentry keeps the newest action and does not dispatch the displaced one", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			local owners, reentered = {}, false
+			require("ui.healthcheck.report").perform = function(_, _, _, _, _, _, owner)
+				owners[#owners + 1] = owner
+				return { cancel = function()
+					if not reentered then reentered = true; context.page({ body = { action = "open_path", id = "diagnostics_dir" } }) end
+				end }
+			end
+			context.page({ body = { action = "open_path", id = "diagnostics_dir" } })
+			context.page({ body = { action = "open_path", id = "diagnostics_dir" } })
+			helpers.assert_eq(#owners, 2, "only the original and reentrant successor dispatch")
+			helpers.assert_eq(owners[1].current(), false)
+			helpers.assert_true(owners[2].current())
+			owners[2].complete({ ok = true })
+			helpers.assert_eq(page_messages(context)[1].ok, true)
+		end)
+	end)
+end)
+
+
+helpers.describe("diagnostics close cancellation reentry", function()
+	helpers.it("reentrant reopen during native action cancellation preserves the replacement", function()
+		as_jdoe(function()
+			local core, context = load_window()
+			core.show_window()
+			local owners, reentered = {}, false
+			require("ui.healthcheck.report").perform = function(_, _, _, _, _, _, owner)
+				owners[#owners + 1] = owner
+				return { cancel = function()
+					if not reentered then
+						reentered = true
+						core.show_window()
+						context.page({ body = { action = "open_path", id = "diagnostics_dir" } })
+					end
+				end }
+			end
+			context.page({ body = { action = "open_path", id = "diagnostics_dir" } })
+			core.show_window()
+			helpers.assert_eq(#owners, 2)
+			helpers.assert_true(owners[2].current(), "the replacement published by cancellation remains current")
 		end)
 	end)
 end)
