@@ -691,3 +691,233 @@ _KLRManifest_AssertSnapshotRefusal(Changed, Message) {
 	}
 	AssertTrue(Refused, Message)
 }
+
+
+; This fixture provisions the shared additive table independently of the loader,
+; so an old reader cannot pass simply because the new production API is absent.
+_KLRMedia_OpenFixture() {
+	global _SharedDir
+	Db := _KLRManifest_OpenFixture()
+	try {
+		AssertTrue(SQLite_Exec(Db, FileRead(_SharedDir . "\data\db\media_schema.sql", "UTF-8")))
+		return Db
+	} catch as Failure {
+		SQLite_Close(Db)
+		throw Failure
+	}
+}
+
+_KLRMedia_ProductionSchema() {
+	Db := _KLRManifest_OpenFixture()
+	try {
+		Rows := SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('ngram_media_keys','agg_app_day_media_hold')")
+		AssertEqual(2, Rows[1]["n"], "the production loader must apply the committed additive media schema")
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day_kc_hold")[1]["n"],
+			"loading media schema cannot replace existing numeric rows")
+	} finally {
+		SQLite_Close(Db)
+	}
+}
+Test("Semantic media history: production additive schema", _KLRMedia_ProductionSchema)
+
+_KLRMedia_SeededProjection() {
+	Db := _KLRMedia_OpenFixture()
+	try {
+		Ids := ["media.play_pause", "media.next_track", "media.previous_track", "media.brightness_up", "media.brightness_down"]
+		for Id in Ids {
+			AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_media_keys VALUES ('a','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",2),"
+				. "('b','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",3);"
+				. "INSERT INTO agg_app_day_media_hold VALUES ('a','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",100,1,100,1,0),"
+				. "('b','2025-05-01','editor.exe'," . SQLite_Q(Id) . ",300,1,300,0,1);"))
+		}
+		AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_media_keys VALUES ('a','2025-04-30','editor.exe','media.play_pause',17);"))
+		Manifest := KLR_ReadManifestBase(Db, "2025-05-01", "2025-05-01")
+		Entry := Manifest["2025-05-01"]["editor.exe"]
+		AssertTrue(Entry.Has("media_keys") && Entry.Has("media_hold"), "the actual reader must publish separate media maps")
+		for Id in Ids {
+			AssertEqual(5, Entry["media_keys"][Id])
+			Hold := Entry["media_hold"][Id]
+			AssertEqual(400, Hold["s"])
+			AssertEqual(2, Hold["n"])
+			AssertEqual(300, Hold["m"], "device maxima are not additive")
+			AssertEqual(1, Hold["tap"])
+			AssertEqual(1, Hold["hold"])
+		}
+		AssertFalse(Manifest.Has("2025-04-30"), "the original date filter also owns media rows")
+		AssertEqual(1000, Entry["kc_hold"]["16"]["s"], "numeric keyboard/volume namespaces stay unchanged")
+		AssertFalse(Entry["kc_hold"].Has("media.play_pause"), "media cannot acquire a fabricated keyboard position")
+		Encoded := JsonParse(KLR_BuildManifestJson(Db, "2025-05-01", "2025-05-01"))
+		AssertEqual(5, Encoded["2025-05-01"]["editor.exe"]["media_keys"]["media.play_pause"],
+			"the real prefetch JSON path must retain semantic media")
+		AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name LIKE '_ergopti_media_%_projection'")[1]["n"],
+			"temporary schema validation must be retired before any manifest is returned")
+	} finally {
+		SQLite_Close(Db)
+	}
+}
+Test("Semantic media history: real two-device projection and JSON", _KLRMedia_SeededProjection)
+
+_KLRMedia_RejectsUnsafeProjection() {
+	for Kind in ["counter-overflow", "unknown-identity", "empty-app"] {
+		Db := _KLRMedia_OpenFixture()
+		try {
+			if Kind = "counter-overflow" {
+				AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_media_keys VALUES ('a','2025-05-01','editor.exe','media.play_pause',9007199254740991),"
+					. "('b','2025-05-01','editor.exe','media.play_pause',1);"))
+			} else if Kind = "unknown-identity" {
+				AssertTrue(SQLite_Exec(Db, "PRAGMA ignore_check_constraints=ON;"
+					. "INSERT INTO ngram_media_keys VALUES ('a','2025-05-01','editor.exe','media.unknown',1);"
+					. "PRAGMA ignore_check_constraints=OFF;"))
+			} else {
+				AssertTrue(SQLite_Exec(Db, "INSERT INTO ngram_media_keys VALUES ('a','2025-05-01','','media.play_pause',1);"))
+			}
+			AssertThrows(() => KLR_ReadManifestBase(Db, "2025-05-01", "2025-05-01"),
+				"the real reader must refuse " . Kind . " rather than return a plausible partial media payload")
+			AssertEqual(0, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name LIKE '_ergopti_media_%_projection'")[1]["n"],
+				"failed validation must still retire its own temporary schema")
+		} finally {
+		SQLite_Close(Db)
+	}
+	}
+}
+Test("Semantic media history: native shared-policy refusals", _KLRMedia_RejectsUnsafeProjection)
+
+_KLRMedia_PreservesForeignTemporaryTable() {
+	Db := _KLRMedia_OpenFixture()
+	try {
+		AssertTrue(SQLite_Exec(Db, "CREATE TEMP TABLE _ergopti_media_keys_projection (sentinel TEXT);"
+			. "INSERT INTO _ergopti_media_keys_projection VALUES ('foreign owner');"))
+		AssertThrows(() => KLR_ReadManifestBase(Db), "a prior table cannot be treated as this reader's validator")
+		Rows := SQLite_Query(Db, "SELECT sentinel FROM temp._ergopti_media_keys_projection")
+		AssertEqual("foreign owner", Rows[1]["sentinel"], "refusal cannot remove or replace the foreign owner")
+	} finally {
+		SQLite_Close(Db)
+	}
+}
+Test("Semantic media history: foreign temporary table is preserved", _KLRMedia_PreservesForeignTemporaryTable)
+
+_KLRMedia_RetainsCleanupRefusal() {
+	Body := _DriverFuncBody("KLR__MediaProjectionRows")
+	AssertTrue(Body != "", "negative controls require the actual projection owner function")
+	Db := _KLRMedia_OpenFixture()
+	try {
+		NativeExceptDrop := (OwnedDb, Sql) => InStr(Sql, "DROP TABLE", true) ? false : SQLite_Exec(OwnedDb, Sql)
+		AssertThrows(() => KLR__MediaProjectionRows(Db, "", NativeExceptDrop),
+			"a refused native DROP cannot qualify successful rows")
+		AssertThrows(() => KLR_ReadManifestBase(Db), "unretired validator names must block replacement")
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM sqlite_temp_master WHERE name LIKE '_ergopti_media_%_projection'")[1]["n"],
+			"refused cleanup retains the exact temporary owners instead of hiding debt")
+	} finally {
+		SQLite_Close(Db)
+	}
+}
+Test("Semantic media history: cleanup refusal is retained", _KLRMedia_RetainsCleanupRefusal)
+
+; The old format is still admitted by the real cache owner. Exercise its
+; read-only no-tail fast path, rather than constructing a fresh media schema.
+_KLRMedia_OldWarmCache(KeepOriginalReader := true) {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	Stored := 0
+	try {
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, "2026-01-01 10:00:00.000", "2026-01-01", "code.exe", ["a", "b"]))
+		Before := _KLRDC_DerivedFingerprint(_KLRDC_BuildAsWorker())
+		CachePath := KLR_CachePath(_KLRDC_Root())
+		KLR_ResetCache()
+		Stored := SQLite_Open(CachePath)
+		AssertTrue(Stored != 0)
+		AssertEqual("14", _KLR_CacheMetaValue(Stored, "format_version"), "freeze the actual pre-media format")
+		AssertTrue(SQLite_Exec(Stored, "DROP TABLE ngram_media_keys; DROP TABLE agg_app_day_media_hold;"))
+		SQLite_Close(Stored)
+		Stored := 0
+		KLRCache.disposable := true
+		AssertEqual(1, KLR_CacheAttach(_KLRDC_Root(), A_Temp . "\ergopti_klrdc.log"),
+			"the old cache must reach production warm admission")
+		OldDb := KLRCache.db
+		AssertEqual(1, DllCall(SQLiteConst.DLL . "\sqlite3_db_readonly", "Ptr", OldDb, "AStr", "main", "Int"))
+		; Observe the original image independently while the candidate is upgraded.
+		if KeepOriginalReader {
+			Stored := SQLite_Open(CachePath, SQLiteConst.OPEN_RO)
+			AssertTrue(Stored != 0)
+		}
+		Db := KLR_BuildDatabase(_KLRDC_Root())
+		AssertTrue(Db != 0 && Db != OldDb, "missing tables require a private admitted successor")
+		if KeepOriginalReader {
+			AssertEqual(0, SQLite_Query(Stored,
+				"SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('ngram_media_keys','agg_app_day_media_hold')")[1]["n"],
+				"the open read-only original must remain unchanged")
+		} else {
+			Stored := SQLite_Open(CachePath, SQLiteConst.OPEN_RO)
+			AssertTrue(Stored != 0)
+			AssertEqual(2, SQLite_Query(Stored,
+				"SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('ngram_media_keys','agg_app_day_media_hold')")[1]["n"],
+				"successful upgrade must persist once so future workers retain the no-clone fast path")
+		}
+		AssertEqual(Before, _KLRDC_DerivedFingerprint(Db), "upgrade cannot rebuild or alter numeric projection")
+		Manifest := KLR_ReadManifestBase(Db, "2026-01-01", "2026-01-01")
+		AssertEqual(0, Manifest["2026-01-01"]["code.exe"]["media_keys"].Count,
+			"an old cache carries no fabricated semantic media credit")
+		AssertEqual(Db, KLR_BuildDatabase(_KLRDC_Root()), "an admitted unchanged image keeps its existing fast path")
+	} finally {
+		if Stored
+			SQLite_Close(Stored)
+		_KLRDC_Cleanup()
+	}
+}
+Test("Semantic media history: old format14 warm cache private upgrade", _KLRMedia_OldWarmCache)
+
+_KLRMedia_UpgradeRefusalPreservesPublished() {
+	global _SharedDir
+	AssertTrue(_DriverFuncBody("KLR_UpgradeMediaCache") != "", "the negative schedule requires the actual upgrade owner")
+	KLR_ResetCache()
+	Db := _KLRManifest_OpenFixture((OwnedDb) => SQLite_Exec(OwnedDb,
+		FileRead(_SharedDir . "\data\db\schema.sql", "UTF-8")))
+	KLRCache.db := Db
+	KLRCache.last_sizes := Map("original.sql", 23)
+	KLRCache.ledger_snapshots := Map("original.sql", Map("index_low", 41))
+	Before := SQLite_Query(Db, "SELECT SUM(sum_ms) AS s FROM agg_app_day_kc_hold")[1]["s"]
+	try {
+		RefusingLoader := (Candidate) => false
+		AssertThrows(() => KLR_UpgradeMediaCache(RefusingLoader),
+			"schema refusal cannot publish an incomplete private copy")
+		AssertEqual(Db, KLRCache.db, "the exact old published owner remains retained")
+		AssertEqual(23, KLRCache.last_sizes["original.sql"])
+		AssertEqual(41, KLRCache.ledger_snapshots["original.sql"]["index_low"])
+		AssertEqual(0, SQLite_Query(Db,
+			"SELECT COUNT(*) AS n FROM sqlite_master WHERE name IN ('ngram_media_keys','agg_app_day_media_hold')")[1]["n"])
+		AssertTrue(KLR_UpgradeMediaCache(), "a fully retired failed candidate permits legitimate retry")
+		AssertTrue(KLRCache.db != Db, "only the complete successor may replace the old owner")
+		AssertEqual(Before, SQLite_Query(KLRCache.db, "SELECT SUM(sum_ms) AS s FROM agg_app_day_kc_hold")[1]["s"])
+	} finally {
+		KLR_ResetCache()
+	}
+}
+Test("Semantic media history: failed cache upgrade retains published source", _KLRMedia_UpgradeRefusalPreservesPublished)
+
+_KLRMedia_CheckedCloseRefusesLiveStatement() {
+	AssertTrue(_DriverFuncBody("SQLite_CloseChecked") != "", "the native close control requires its real source owner")
+	Db := _KLRManifest_OpenFixture()
+	Statement := 0
+	try {
+		Sql := SQLite_StrToUtf8("SELECT * FROM agg_app_day_kc_hold", &SqlBuffer)
+		AssertEqual(SQLiteConst.OK, DllCall(SQLiteConst.DLL . "\sqlite3_prepare_v2", "Ptr", Db,
+			"Ptr", Sql, "Int", -1, "Ptr*", &Statement, "Ptr", 0, "Int"))
+		AssertTrue(Statement != 0, "the refusal requires a genuinely live native statement")
+		AssertEqual(5, SQLite_CloseChecked(Db), "sqlite3_close must return native BUSY rather than a zombie success")
+		AssertEqual(2, SQLite_Query(Db, "SELECT COUNT(*) AS n FROM agg_app_day_kc_hold")[1]["n"],
+			"BUSY must retain the same usable connection until its original statement is finalized")
+		AssertEqual(SQLiteConst.OK, SQLite_FinalizeStatement(Statement))
+		Statement := 0
+		AssertEqual(SQLiteConst.OK, SQLite_CloseChecked(Db), "the exact connection retires after its statement")
+		Db := 0
+	} finally {
+		if Statement
+			SQLite_FinalizeStatement(Statement)
+		if Db
+			SQLite_Close(Db)
+	}
+}
+Test("Semantic media history: checked native close refuses live statement", _KLRMedia_CheckedCloseRefusesLiveStatement)
+
+Test("Semantic media history: upgraded image persists for future worker", _KLRMedia_OldWarmCache.Bind(false))

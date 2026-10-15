@@ -182,5 +182,142 @@ class ProductionBuildControls(unittest.TestCase):
             product._compiled_bytes(self.leaf, stamp, time.monotonic() - 1)
 
 
+class DaemonReportBuildControls(unittest.TestCase):
+    """Command/source models only; these never compile or mint a native owner."""
+
+    def setUp(self):
+        self.owner = tempfile.TemporaryDirectory(prefix="ergopti-report-build-controls-")
+        self.addCleanup(self.owner.cleanup)
+        self.root = Path(self.owner.name).resolve()
+        self.work = self.root / "work"
+        self.sdk = self.root / "MacOSX.sdk"
+        self.headers = self.root / "hs-lua-headers"
+        for path in (self.work, self.sdk, self.headers):
+            path.mkdir()
+
+    def commands(self, report):
+        return dict(
+            product.compile_commands(
+                self.root, self.work, self.sdk, self.headers, daemon_report=report
+            )
+        )
+
+    def test_default_source_rosters_are_exact_and_report_is_additive(self):
+        self.assertEqual(len(product.HELPER_SOURCES), 9)
+        self.assertEqual(len(product.VALIDATOR_SOURCES), 6)
+        self.assertEqual(product.product_source_paths(), product.SOURCE_PATHS)
+        expected = tuple(
+            product.SWIFT + "OwnedVirtualHIDDaemonReport" + name + ".swift"
+            for name in (
+                "Protocol",
+                "Observer",
+                "RequestChannel",
+                "StageOwner",
+                "Worker",
+                "Clock",
+                "Reference",
+            )
+        )
+        self.assertEqual(product.REPORT_SWIFT_SOURCES, expected)
+        selected = product.product_source_paths(daemon_report=True)
+        self.assertEqual(len(selected), len(set(selected)))
+        for path in expected + product.SOURCE_PATHS:
+            self.assertIn(path, selected)
+        for forbidden in ("MainOperation", "DriverPublication", "ActivationSession", "Choice"):
+            self.assertFalse(any(forbidden in path for path in selected))
+
+    def test_report_has_exact_native_objects_for_both_architectures(self):
+        commands = self.commands(True)
+        expected = {
+            name + "_" + arch
+            for arch in ("arm64", "x86_64")
+            for name in (
+                "lifecycle",
+                "installer",
+                "validator",
+                "module",
+                "report_CPOSIXCompatibility",
+                "report_OwnedProgramCompatibility",
+                "report_OwnedVHDReportSocketIdentity",
+            )
+        }
+        expected.update(("installer_universal", "validator_universal", "module_universal"))
+        self.assertEqual(set(commands), expected)
+        for arch in ("arm64", "x86_64"):
+            installer = commands["installer_" + arch]
+            for stem in (
+                "lifecycle",
+                "CPOSIXCompatibility",
+                "OwnedProgramCompatibility",
+                "OwnedVHDReportSocketIdentity",
+            ):
+                self.assertEqual(installer.count(str(self.work / (stem + "_" + arch + ".o"))), 1)
+            self.assertIn("-fmodule-map-file=" + str(self.work / "report.modulemap"), installer)
+            self.assertEqual(installer.count("ERGOPTI_DAEMON_REPORT"), 1)
+            self.assertEqual(installer.count("SWIFT_PACKAGE"), 1)
+            for relative in product.REPORT_SWIFT_SOURCES:
+                self.assertEqual(installer.count(str(self.root / relative)), 1)
+
+    def test_validator_module_lifecycle_and_lipo_commands_are_unchanged(self):
+        original, report = self.commands(False), self.commands(True)
+        for name, argv in original.items():
+            if not name.startswith("installer_arm64") and not name.startswith("installer_x86_64"):
+                self.assertEqual(report[name], argv)
+        self.assertEqual(len(original), 11)
+        self.assertEqual(len(report), 17)
+
+    def test_nonboolean_profile_refuses_without_creating_compile_files(self):
+        for invalid in (0, 1, None, "report", (), {}):
+            with self.subTest(profile=invalid):
+                with self.assertRaises(product.ProductBuildRefusal):
+                    self.commands(invalid)
+                with self.assertRaises(product.ProductBuildRefusal):
+                    product.product_source_paths(daemon_report=invalid)
+        self.assertEqual(list(self.work.iterdir()), [])
+
+    def test_module_map_is_exact_owned_umbrella_and_no_caller_declarations(self):
+        header = str(
+            self.root / (product.LAUNCHER + "CPOSIXCompatibility/include/CPOSIXCompatibility.h")
+        )
+        self.assertEqual(
+            product.report_module_map(self.root),
+            ('module CPOSIXCompatibility { header "' + header + '" export * }\n').encode(),
+        )
+        with self.assertRaises(product.ProductBuildRefusal):
+            product.report_module_map(Path("/tmp/bad\nmodule Other"))
+
+    def test_full_repository_header_closure_is_held_in_report_profile(self):
+        prefix = product.LAUNCHER + "CPOSIXCompatibility/include/"
+        expected = tuple(
+            prefix + name
+            for name in (
+                "CPOSIXCompatibility.h",
+                "OwnedProgramCompatibility.h",
+                "OwnedChildReapingCompatibility.h",
+                "OwnedInstalledConfiguration.h",
+                "LoopbackListenerCompatibility.h",
+                "OwnedImageAliasCompatibility.h",
+                "OwnedSuspendedImageCompatibility.h",
+                "OwnedListenerEventCompatibility.h",
+                "OwnedRuntimeSignatureCompatibility.h",
+                "OwnedVHDReportSocketIdentity.h",
+            )
+        )
+        self.assertEqual(product.REPORT_HEADERS, expected)
+        for header in expected:
+            self.assertEqual(product.product_source_paths(daemon_report=True).count(header), 1)
+        self.assertEqual(
+            product.REPORT_C_SOURCES,
+            tuple(
+                product.LAUNCHER + "CPOSIXCompatibility/" + name
+                for name in (
+                    "CPOSIXCompatibility.c",
+                    "OwnedProgramCompatibility.c",
+                    "OwnedVHDReportSocketIdentity.c",
+                )
+            ),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

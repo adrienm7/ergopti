@@ -4581,10 +4581,19 @@ installation and device acceptance remain pending; items 7, 16 and 38 stay open.
 
 - [~] **13.** Complete F2: honor the Karabiner integration switch before leases
   and guardians; preserve personal rules; back up and restore Windows touchpad
-  registry values through one owner. Remaining: turning the switch off or «
-  Retirer Ergopti de Karabiner » does not unregister a guardian LaunchAgent
-  registered while it was on (needs a headless unregister role in the launcher,
-  verified on a Mac). Legend: `[x]` implemented, reviewed and integrated on
+  registry values through one owner. The headless unregister role and the
+  OFF/removal transaction are implemented (also tracked in item 35). Remaining:
+  qualify the signed helper's real ServiceManagement registration, wrong-inode
+  refusal, unregistration, idempotence and final job absence on both macOS
+  architectures. The current main CI does not enroll that complete acceptance
+  collector. Receipt publication now preserves the original registration or
+  unregistration refusal and every cleanup failure when the output cannot be
+  written; an unpublished receipt always refuses qualification. The original
+  six portable controls and three real filesystem write-refusal regressions
+  pass, without executing ServiceManagement or native helper roles.
+  Windows PC acceptance must also verify exact registry restoration
+  after OFF/removal and preserved prior values after an authorization refusal.
+  Legend: `[x]` implemented, reviewed and integrated on
   `integration-2` (published only once `dev` is pushed); `[~]` integrated with
   the precise remainder recorded in the item or in the overnight handoff.
 - [~] **16.** Publish final corrective commits, verify CI and release assets,
@@ -4975,7 +4984,17 @@ Windows PC acceptance, delegated to the maintainer:
   automatic; a requires_approval answer now opens numbered Login Items steps in
   the native permission dialog (once per launch, after the Accessibility dialog,
   closed automatically on approval; not while Tap-Holds are off, where the
-  banner stays). Integrated; verify on a Mac.
+  banner stays). The guide now also closes and retires its poll if Tap-Holds
+  turn off while the steps are visible or queued behind Accessibility. This
+  leaves the Accessibility dialog and guardian state untouched; a failed
+  preference read also retires this guide. The 13 original portable Lua cases
+  and four new regressions pass; the original implementation fails all four
+  new cases. Cleanup now retains the original dialog and poll until native
+  deletion and timer stop acknowledge completion; retries do not reopen steps
+  or overwrite a window created by a close callback. Focused portable receiving
+  passes all 20 guide and 16 dialog cases, retaining the earlier assertions and
+  seven additive causal controls. Native window and Login Items approval
+  acceptance remain open.
 - [~] **30.** Physical magic-key setting on all three OSes: one
   `hotstrings.magic_key_source` (a KeyboardEvent.code, `auto` by default),
   config schema v5 migrating every spelling of the Windows
@@ -5091,97 +5110,185 @@ Linux capture now requires the actual deferred answer queue acknowledgement befo
   with an explanation and offer a driver-only update requiring explicit
   confirmation. About 30-40 agent-days plus maintainer hardware time.
 
-  A passive VirtualHID daemon-report proposal is preserved in
-  `docs/handovers/2026-10-15-group5-daemon-report/`. Its 15 prepared
-  production/test paths have independent source review and exact forward/inverse
-  evidence, but remain unapplied. The 28 authored XCTest methods have not run;
-  real SDK compilation, current source approval/shared-file handoff, ARM64 and
-  Intel execution, and privileged endpoint/retirement receiving remain required.
-  Historical five-Boolean data grants no numeric ABI, READY, installation or
-  remote-cleanup authority and does not establish the lease incident's cause.
+### Group 5 container retirement — 2026-10-15
 
-  The Dev-based successor is preserved in
-  `docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
-  review clears a finite 20-path source proposal; actual Python controls pass
-  19 normal and 19 optimized cases. Exact preimages and dependencies match
-  observed Dev a549c14f, but production sources remain unapplied. The normal
-  build runner does not select this report profile. Both-architecture native
-  compilation/linking, signed helper query and retirement, all 32 Swift cases
-  and daemon/staging cleanup receiving remain pending. No numeric ABI, resident
-  readiness, remote cleanup, physical accounting or lease fix is qualified;
-  item 31 stays open.
+The maintainer requested preservation on Dev and deletion of this container's
+owned branches. This is a partial delivery checkpoint, not completion of the
+whole group. The [self-contained source handover](handovers/2026-10-15-group5-container-closure/README.md)
+retains needed preparations, original reviews, exact source bodies, historical
+variants and actual failures. No separate private Group 5 TODO file is retained.
+Items 13, 24, 30, 31, 35, 40, 43 and 44 and transversal 16/38 remain open.
 
-  The diagnostic producer, CLI baseline admission and current Python reader
-  now agree on baseline version 2, retaining keyboard type per device and HID
-  usage page per key. Live readers require complete version-2 coverage;
-  immutable version-1 evidence is decoded only through explicit historical
-  replay. All four declaration boundaries are checked, including CLI-only
-  mismatch and missing/ambiguous declarations. Portable receiving passes 75
-  Python methods and four actual C++20 builds/runs; the new version-2 producer
-  control executes 43 independent assertions. Original native evidence and
-  JSON fixture expectations are unchanged. Current production callers retain
-  strict live admission. This supplies the WP4 diagnostic protocol dependency,
-  not an installed headless producer, signed runtime, native SDK, package or
-  physical acceptance; WP3-WP10 and customer lease recovery remain open.
+Delivered source: the reviewed SDK dependency chain and separate five-key media
+history/storage/dashboard are committed. The selected local gate passes 426 JS,
+20,037 macOS Lua and 13,792 Linux Lua cases; modeled macOS E2E passes 101 with one
+explicit skip, Linux E2E passes 193. The 48 executable/test/data paths are fenced
+by the retained exact-input receipt. Native macOS/Swift, native AHK, packages,
+installation and physical acceptance remain unexecuted by that checkpoint.
 
-  The dormant factory/build source lane now retains authentic upstream input
-  custody for the original 65 replacements and the explicit installed-SDK
-  opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
-  preparation preserves the original claim and packaging checks; default boot
-  and the legacy factory route remain unchanged. The dependency-closed source
-  includes the original build/control suppliers rather than detached staging
-  facades. Canonical portable receiving passes 81 methods with no skips:
-  original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
-  routing 12. A genuine private factory materialization received 4,557 files,
-  four links, its version generator and 12 generated outputs; that private
-  source receipt is not acceptance of this installed product.
+Remaining group requirements:
 
-  Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
-  software actors and their source-authenticated receiver. Canonical receiving
-  passes all 22 controls without rewriting independent expectations.
-  Original 60-second compile, 10-second execution and whole 300-second budgets
-  remain; Darwin uses the existing 330-second owned-process guardian. Real
-  macOS SDK/IOKit compilation, signing, packaging, installation, activation and
-  physical acceptance remain unqualified. Native shipping/Foundation suppliers,
-  correlated retained history, media persistence and the confirmed driver-only
-  update transaction are still software work; this does not solve customer
-  lease PONG/READY/exit73 or complete item 31.
+- **13 and35:** qualify final actual STOPPED, exact guardian unregistration,
+  preference OFF and removal of owned rules, including failed/recovery phases,
+  retained native debt and actual signed installed-helper acceptance. Do not
+  infer retirement from a signal, missing handle or hidden dialog.
+- **24:** complete native window/Login Items approval and retirement acceptance
+  for the already-corrected guide and guardian behavior.
+- **30:** complete physical magic-key acceptance on Windows, macOS ANSI/ISO and
+  Linux; receive the remaining magic-source/tap-action collision and lifecycle
+  composition with its actual owner. Preserve acknowledged queue, native-source,
+  pause, release and repeat behavior; do not repeat already-qualified repairs.
+- **31, owned runtime:** receive the inactive VHD/source packets against current
+  Dev without changing frozen approvals or inventing ABI/READY. Actual default
+  and SDK compilation, signed packaging, official resource metadata/CMS checks,
+  helper/client lifecycle and the authored native suites remain required. The
+  StockQuery attempted-capture debt fix is source-reviewed; a genuine privileged
+  behavioral regression still requires its real signed Root harness.
+- **31, coexistence:** the active-stock stop/retirement operation remains missing
+  software owned with the existing Karabiner lifecycle session. Negative stock
+  observation and an explicit preference/confirmation are not stop authority.
+  The reviewed menu/cold-scope and guardian preparations remain inactive. Root
+  must receive its proof helpers; the full parity historical/recovery matrix
+  still fails at assertion 8210. The tiny follow-up fixture proposal is
+  unreviewed/unexecuted. Preserve every original cohort and refusal control.
+- **31, Linux statistics:** receive the eight-path pre-remap native-source/media
+  proposal with G3 ownership, then qualify final composition and actual native
+  input. Portable supplier 92 and consumer 32 cases per Lua runtime are separate;
+  the pause bug is corrected. FIFO/C-fstat and modeled transports do not prove
+  actual evdev, grab, injection, hotplug or a physical device.
+- **31, Windows PC:** run all nine authored semantic-reader native cases,
+  prepared-statement BUSY/finalize/OK, both old read-only-cache upgrades, durable
+  publication, worker lifetime/memory/exit, parse/unit/meta/E2E/build. Implement
+  and qualify original event-local RawInput device provenance before claiming
+  equivalent physical-device capture; keyboard-hook vk/sc alone is insufficient.
+- **40:** complete all eight signed, packaged real-Hammerspoon configuration
+  build/merge/restoration variants. Preserve AppleEvent consent, original
+  deadlines, personal rules and independent JSON expectations.
+- **43:** the original ambiguous historical configuration is unavailable; its
+  exact failure cannot be diagnosed from an invented replacement. Keep the
+  confirmed, backed-up cleanup path and qualify it on a real upgrade/profile.
+- **44:** qualify actual native child completion, owned CapsWord signals and
+  pointer cancellation on the final installed Mac source.
 
-  The dormant physical consumer now retains subscription and verifier startup,
-  cancellation and accounting ownership through the exact outstanding native
-  invocation. Version refusal gives one unavailable warning without retries;
-  event sinks must explicitly acknowledge admission, and holds crossing an
-  excluded interval are cancelled in full. Legacy boot remains unchanged and
-  does not enable an owned runtime. Focused receiving passes 210/0 across 13
-  modules, retaining the newer admission-settlement and original baseline and
-  transport controls. Four original primitives with the forward owner retain
-  177 passes and 28 failures; the exact original verifier-start implementation
-  retains all 205 earlier controls and fails four of five new lifecycle cases.
-  This is software receiving over modeled native ports, not installed runtime,
-  hardware, packaging or customer lease qualification. Full selected and native
-  acceptance remain required; item 31 stays open.
+The customer lease PONG/READY/RESUMED/exit73 cause remains open with the existing
+lifecycle owner. Reload, the statistics changes and archived source diagnostics
+are not a proved repair. Hardware tests are not the only remaining work: the
+software ownership, proof/profile reception and native CI requirements above
+must also be completed. All unrelated group blocks and transversal validation
+requirements are preserved.
 
-  The actual context tracker now issues an explicitly bound observation
-  subscription through the native clock adapter. Secure-field completion comes
-  from the real writer and matching app PID; failed or reentrant observations
-  deny publication, and exact callback frames survive detach until unwinding.
-  Legacy three-argument initialization and nil-observer detector behavior are
-  preserved. Focused receiving passes 341 declared controls and two direct
-  assertion modules, including 29 observation controls (original composition:
-  1 pass and 28 failures), 125 wiring controls and 28 healthcheck controls.
-  Correlated sampling, complete retained-history ownership, native acceptance
-  and production activation remain required; this is a dormant software slice.
+A passive VirtualHID daemon-report proposal is preserved in
+`docs/handovers/2026-10-15-group5-daemon-report/`. Its 15 prepared
+production/test paths have independent source review and exact forward/inverse
+evidence, but remain unapplied. The 28 authored XCTest methods have not run;
+real SDK compilation, current source approval/shared-file handoff, ARM64 and
+Intel execution, and privileged endpoint/retirement receiving remain required.
+Historical five-Boolean data grants no numeric ABI, READY, installation or
+remote-cleanup authority and does not establish the lease incident's cause.
 
-  FileSystem transaction receipts now retain their original private issuer,
-  publication chain and current source view; replacement after admission is
-  refused, including an unchanged-byte publication. The six independent
-  software controls receive 0 PASS / 6 FAIL on the original issuer, 6 / 0 on
-  the correction, and the same 0 / 6 after restoration. The cold fixture sets
-  its existing logger stub before resolving its Hammerspoon stub. Real I/O,
-  held descriptors and restoration are observed; HS metadata remains modeled.
-  This narrow slice does not qualify Config bindings, the production runtime,
-  native macOS installation or the customer lease failure. Those requirements
-  remain open under this item.
+The Dev-based successor is preserved in
+`docs/handovers/2026-10-15-group5-daemon-report-dev/`. Its independent
+review clears the finite 20-path source implementation. The real production
+packaging continuation now selects its report helper for the current VHD
+profile, while the separate installed-SDK route remains unchanged. The report
+dispatch follows the launcher's private umask installation. Independently
+reviewed source bindings preserve the original signing/image checks; frozen
+native approvals and SDK evidence are not refreshed. Python receiving passes
+19 product controls and 14 route controls in normal and optimized modes; the
+original caller fails the new route regression. Both-architecture native
+compilation/linking, the distinct 17-command helper build, signed query and
+retirement, all 33 Swift cases and daemon/staging cleanup remain pending.
+The current CI's architecture filters do not execute these 33 cases or that
+distinct helper build; enrollment is coordinated with the CI owner.
+A changed observed file now keeps its observation refusal while permitting
+checked closure of its original descriptor. The additional real-FD XCTest
+is authored, not executed off Darwin; close failure retains separate debt
+and never retries an ambiguously consumed descriptor.
+A dedicated `tools/diagnostics/vhd_daemon_report_xctest_receiver.py`
+receives the frozen 32 original cases plus that additional descriptor case
+on one explicitly selected native architecture. It requires Debug SwiftPM,
+exact started/passed pairs, unchanged committed compiler inputs (including
+external quoted headers), complete capture and retirement of every original
+process owner before source-after checks or a terminal verdict. Portable
+receiver controls pass all 24 cases, including cached-code refusal; they do
+not execute Swift. ARM64 and
+Intel enrollment and execution remain pending with the CI owner, separately
+from the distinct 17-command helper build and signed query acceptance.
+No numeric ABI, resident
+readiness, remote cleanup, physical accounting or lease fix is qualified;
+item 31 stays open.
+
+The diagnostic producer, CLI baseline admission and current Python reader
+now agree on baseline version 2, retaining keyboard type per device and HID
+usage page per key. Live readers require complete version-2 coverage;
+immutable version-1 evidence is decoded only through explicit historical
+replay. All four declaration boundaries are checked, including CLI-only
+mismatch and missing/ambiguous declarations. Portable receiving passes 75
+Python methods and four actual C++20 builds/runs; the new version-2 producer
+control executes 43 independent assertions. Original native evidence and
+JSON fixture expectations are unchanged. Current production callers retain
+strict live admission. This supplies the WP4 diagnostic protocol dependency,
+not an installed headless producer, signed runtime, native SDK, package or
+physical acceptance; WP3-WP10 and customer lease recovery remain open.
+
+The dormant factory/build source lane now retains authentic upstream input
+custody for the original 65 replacements and the explicit installed-SDK
+opt-in (101 replacements, 54 SDK inputs). Source-bound signed product
+preparation preserves the original claim and packaging checks; default boot
+and the legacy factory route remain unchanged. The dependency-closed source
+includes the original build/control suppliers rather than detached staging
+facades. Canonical portable receiving passes 81 methods with no skips:
+original build 41 plus parallel-build 10, product 13, entrypoint 5 and SDK
+routing 12. A genuine private factory materialization received 4,557 files,
+four links, its version generator and 12 generated outputs; that private
+source receipt is not acceptance of this installed product.
+
+Four frozen original CLI/HID snapshots now accompany the existing 8/6/8
+software actors and their source-authenticated receiver. Canonical receiving
+passes all 22 controls without rewriting independent expectations.
+Original 60-second compile, 10-second execution and whole 300-second budgets
+remain; Darwin uses the existing 330-second owned-process guardian. Real
+macOS SDK/IOKit compilation, signing, packaging, installation, activation and
+physical acceptance remain unqualified. Native shipping/Foundation suppliers,
+correlated retained history, media persistence and the confirmed driver-only
+update transaction are still software work; this does not solve customer
+lease PONG/READY/exit73 or complete item 31.
+
+The dormant physical consumer now retains subscription and verifier startup,
+cancellation and accounting ownership through the exact outstanding native
+invocation. Version refusal gives one unavailable warning without retries;
+event sinks must explicitly acknowledge admission, and holds crossing an
+excluded interval are cancelled in full. Legacy boot remains unchanged and
+does not enable an owned runtime. Focused receiving passes 210/0 across 13
+modules, retaining the newer admission-settlement and original baseline and
+transport controls. Four original primitives with the forward owner retain
+177 passes and 28 failures; the exact original verifier-start implementation
+retains all 205 earlier controls and fails four of five new lifecycle cases.
+This is software receiving over modeled native ports, not installed runtime,
+hardware, packaging or customer lease qualification. Full selected and native
+acceptance remain required; item 31 stays open.
+
+The actual context tracker now issues an explicitly bound observation
+subscription through the native clock adapter. Secure-field completion comes
+from the real writer and matching app PID; failed or reentrant observations
+deny publication, and exact callback frames survive detach until unwinding.
+Legacy three-argument initialization and nil-observer detector behavior are
+preserved. Focused receiving passes 341 declared controls and two direct
+assertion modules, including 29 observation controls (original composition:
+1 pass and 28 failures), 125 wiring controls and 28 healthcheck controls.
+Correlated sampling, complete retained-history ownership, native acceptance
+and production activation remain required; this is a dormant software slice.
+
+FileSystem transaction receipts now retain their original private issuer,
+publication chain and current source view; replacement after admission is
+refused, including an unchanged-byte publication. The six independent
+software controls receive 0 PASS / 6 FAIL on the original issuer, 6 / 0 on
+the correction, and the same 0 / 6 after restoration. The cold fixture sets
+its existing logger stub before resolving its Hammerspoon stub. Real I/O,
+held descriptors and restoration are observed; HS metadata remains modeled.
+This narrow slice does not qualify Config bindings, the production runtime,
+native macOS installation or the customer lease failure. Those requirements
+remain open under this item.
 
 WP3 delivery/transport captures its original admission ports, requires literal
 completion of an optional original baseline observer, and keeps task settlement
@@ -5200,6 +5307,85 @@ remains partial.
 WP3 prerequisite: the actual macOS physical accounting owner now requires exact held-modifier settlement before accepting source transitions. The keylogger retires each crossing physical release without emitting an orphan hold or a new press, including pause and secure-context crossings; ordinary legacy and collision behavior remains unchanged. Existing native fixture parents restore their settlement child through the scoped cache owner, while normal production stop/restart retains the same CoreState. Portable focused tests pass (32 held-key cases, 24 policy cases, 3 legacy collision cases, 23 existing cache-scope cases, and 9 unchanged alias configuration/privacy cases); the original real gap-release source fails all eight side-key cases. This does not enable a producer or headless mode, alter transport/baseline versions, or complete WP3/WP4/native acceptance. Full root and hosted macOS qualification remain required.
 
 The minimal native lease-silence receiving topic derives from Dev `a2b1fb4be16ff88b9bab755841d744960512b89e`. Its additive DEBUG control uses real outer/inner processes with a fixed no-effect CLI and scripted guardian authority. The source-bound manual ARM/Intel receiver retains the direct Swift child status separately from the PTY and output-capture statuses. Forty-nine portable receiving controls passed on the retained helper packet. Its original 26 transcript assertions plus 14 frozen direct-status cases and one double-LF refusal now run as 41 lasting normal-suite controls; the separate eight source/host controls remain supplemental. All 41 lasting controls and the four strict CI inventories pass. The exact published logger fixture prerequisite `e47c88c23999973b6cd936cfed3db40e2a1cf3a5` is received unchanged so the original covering suite selects its configured sink. Actual native compilation/execution and current package acceptance remain unexecuted. The independent manual-only ARM/Intel CI job is enrolled under explicitly handed-off workflow custody, preserving every existing job, budget, package/install control and release condition. This neither proves the user watchdog exit73 cause nor grants physical input, installed-runtime or shipping authority.
+
+WP3 pause bookkeeping now retires observed modifier releases during pause and
+settles remaining held keys through the existing suppression owner on resume.
+A completed paused press/release pair cannot swallow the next active press;
+left/right modifiers remain independent even with identical aggregate flags.
+The complete 41-case current test prefix and frozen 47 additive controls pass
+88/0; original production gives 50/38, and omitting either correction restores
+29 or 11 failures. Five adjacent focused suites pass 68/0. These are portable
+event-port controls, not native or physical acceptance.
+
+The secure-context prerequisite now supplies the keylogger's exact pure
+settlement callback to the context tracker. AX focus, application/bootstrap
+and resynchronization writers settle an effective exclusion before holds can
+be included again; a refused settlement retains admission debt. The secure
+filter setter and excluded modifier events use that same owner. Three-argument
+observer clients retain their existing initialization contract; supplied
+callbacks are validated and remain part of the exact reinitialization identity.
+The previous 88 case bodies and frozen 11 secure controls remain unchanged;
+three additive callable API controls complete the focused 102-case selection.
+Native AX and physical input acceptance remain pending.
+
+Private-window policy now uses the same exact modifier settlement owner. The
+actual window writer publishes classification and settlement before unrelated
+identity, fullscreen, clock or persistence callbacks; it preserves the prior
+denial during title acquisition. A nil-window callback retries existing debt,
+and the public private-filter setter cannot publish past a refused settlement.
+The complete 102-case prefix and frozen 20 private controls remain unchanged;
+five additive callback controls cover refusal and early metadata reentry. The
+focused selection passes 127/0 under Lua 5.4 with native-port models. This does
+not qualify actual AX delivery, installed startup or physical private-window
+transitions, and does not repair the customer lease incident.
+
+The disabled-app and aggregate configuration writers now settle that same
+modifier owner before publishing policy. A successful system-auth setter also
+synchronizes the shared allowed-state cache without clearing either pending
+debt; a later secure/private/app writer cannot miss an exclusion after an auth
+opt-out. The complete 127-case prefix and 16 frozen additions pass 143/0;
+original production fails 11 assertions, and omissions of the aggregate join,
+app join and auth-cache synchronization restore five, five and three failures.
+Existing configuration observation controls pass 39/0.
+
+The preceding combined source `85fe055c64010c40f69983ed014cf73e058ba65d`
+passes formatting, 19,928 portable macOS units and 101 simulated E2E cases
+with one original skip. Common passes 425/426: the unchanged uninstall
+preflight fails under the protected Git-marked temporary root and passes in an
+approved command-local private `/var/tmp` directory. The final policy-writer
+successor also passes formatting, 19,944 portable macOS units and the same
+101 simulated E2E cases with one original skip. Its grouped Common gate
+passes 425/426: the unchanged genuine-clone control returns 128 with less
+free overlay storage than its Git history plus checkout require. After
+relocating an already-closed archive byte-for-byte to separate temporary
+storage while retaining its original path, that unchanged control passes
+in the same private temporary directory, including actual C/header/ELF
+receiving. The grouped gate remains exit 1; no full Common rerun or native
+macOS qualification is claimed. Swift is explicitly deferred on Linux.
+ARM64/Intel compilation, signed-helper and packaged launch/installation
+qualification remain open. No Windows physical acceptance or customer lease
+repair follows from these portable results.
+
+Linux ordinary-key measurements now retain an opaque admission identity from
+their actual DOWN through UP. Observed private, secure and application-policy
+exclusion, pause entry and UI capture revoke the entire interval before
+reentrant callbacks. Statistics reset retains observed focus while revoking
+old measurements; recovered held-key snapshots cannot mint a fresh press.
+The real Main startup binds this port only to its completed capture session.
+Both LuaJIT and Lua 5.4 pass 23 focused cases and 62 neighboring controls.
+Original production preserves the eight original cases and fails ten actual
+excluded-duration assertions; its separate missing-new-port assertion is not
+counted as incident causality. Two existing Main callback fixtures require an
+explicit genuine collector dependency, with their original assertions intact.
+The complete frozen-source Linux batch passes 13,772 units across 521 modules
+and 193 simulated E2E cases through the original LuaJIT runner. All six source
+images remain unchanged; process supervision observes zero pending or rescued
+children. Formatting and all 426 Common checks pass on the combined source.
+The [independent source review](handovers/2026-10-15-group5-linux-holds/SOURCE-REVIEW.md)
+retains its literal decision and exact original/current identities.
+Native supplier-profile reconciliation, actual X11/group/window-switch and Nix
+package qualification, Wayland delivery and physical acceptance remain open.
+No native pin or customer lease assertion is waived by this source correction.
 
 WP3 bounded system-authentication setter receiving now cancels a complete
 held-modifier interval when its effective policy becomes excluded. Disabled
@@ -5306,6 +5492,56 @@ worker and seven modeled dispatcher contract controls, plus intended red source
 and model inverses. These do not qualify Darwin concurrency, installed capture,
 physical delivery, signed factory outputs or the customer lease cause. Full
 selected source qualification and hosted receiving remain required.
+
+The protected production compiler owner now admits the already-published queue
+control successor and retains its three original C++ fixture identities through
+capture and currentness checks. The previous pin refused current source before
+compilation while still admitting the historical control. Four additive genuine
+constructor controls reject old or altered Python, each changed fixture and
+later fixture mutations, without permitting a compiler or child process.
+All 41 original builder methods and ten separate parallel-model methods remain
+whole; normal and optimized runs each pass 45 main and ten parallel controls.
+The original twelve queue scenarios and added four dispatcher scenarios are
+source-reviewed, not executed by this receiving. Native compilation, signing,
+queue behavior, helper17 and physical acceptance remain unqualified.
+
+The three existing SDK source-dependency owners now bind that reviewed queue-only
+builder through their complete entry-to-receiver-to-loader chain. All fourteen
+original portable route cases remain; three additional source controls reject
+historical or altered builders and changed dependency modules before any child
+can start. Normal and optimized receiving each pass seventeen cases; four
+protected builder-capture cases also pass in each mode. Historical approvals,
+source profiles and independent expectations remain unchanged. No SDK build,
+native compiler, signed product or driver-update profile is qualified here.
+
+Five semantic consumer-key identities now retain their own press and hold
+records through admitted macOS capture, FIFO, raw history, separate shared SQL
+projections and the daily dashboard. They never acquire numeric keyboard
+positions or typing/WPM credit. The real keycode generator supplies their
+existing translated labels in all 21 languages. Linux storage and the daily
+reader use the same shared schema and policy for already-admitted events;
+ambiguous read/write completion retains debt and publishes no media success.
+Focused receiving passes 272 macOS cases, 28 bootstrap cases, twelve shared UI
+cases and 22 existing Linux SQLite-module cases on each Lua runtime. The
+bootstrap fixture now scopes its original instrumentation to the original
+child, preserving the independently checked media child and every old assertion.
+The Windows reader now projects the same separate media maps through native
+SQL constraints, keeping every numeric projection. Old format14 cache images
+are upgraded on a private clone before the unchanged-image return; the open
+read-only original and its offsets remain unchanged. Failed unpublished
+candidates require an actual non-v2 SQLite close acknowledgment and retain debt
+on refusal. Seven independent SQL recipe controls pass; nine additional AHK
+cases are authored but unexecuted on this Linux host.
+
+Windows PC steps: run all nine `Semantic media history:` native cases, including
+prepared-statement BUSY/finalize/OK and both old read-only cache upgrade paths;
+then the existing durable-cache, worker memory/exit, parse, unit/meta, E2E and
+build checks on the final source. The existing publisher retains its disposable
+worker lifetime contract; no new per-connection cleanup proof is claimed.
+Linux native device/capture identity enrollment and Windows event-local
+RawInput provenance remain software follow-ups, distinct from these readers.
+Native packages, installed capture, WebView presentation and physical input
+remain unqualified; owned startup is still not enabled.
 
 Ordinary launcher child environments now discard an inherited installed-capture
 control marker before launching Hammerspoon. Fresh-owned selected launches add
@@ -5911,7 +6147,11 @@ Windows-dependent acceptance is explicitly deferred to the maintainer PC. Comple
   signed-helper acceptance lane also checks wrong-inode refusal, successful
   unregistration and idempotence, retaining primary and cleanup errors.
   Focused registered macOS tests pass 315 cases and the diagnostic judge passes
-  six regressions. Complete native Swift, helper registration and three-OS
+  six original regressions, plus three additive real filesystem write-refusal
+  cases. Publication failure cannot hide cleanup debt or acknowledge success;
+  the original write exception remains chained alongside the native failure.
+  All nine portable cases pass in normal and optimized Python modes. Complete
+  native Swift, helper registration and three-OS
   qualification remain pending.
 
 Signed-helper acceptance run 37081066757 passed actual native registration,
@@ -7617,6 +7857,14 @@ Legacy label candidates coalesce only exact non-semantic aliases. Tap, hold and 
   Registered macOS tests pass 12908 cases, and private eager-acquisition and
   consumer-refusal mutations are rejected. Native macOS qualification and
   manual hardware acceptance remain pending.
+  CapsWord probe teardown now retains each exact native task until its own
+  completion callback. False/nil termination results and accepted signals
+  without completion cannot acknowledge watcher retirement; abandoned probes
+  retain the same cleanup owner for retry. The 21 original focused case bodies
+  remain unchanged; four additive regressions fail against the original
+  production source and pass after correction. Focused portable receiving
+  passes 25 lifecycle cases and seven pointer/signal cases. Actual native child
+  exit, pointer input and installed application acceptance remain unqualified.
 - [~] **46.** **Partial: local model admission and download offers.** Windows,
   macOS and Linux share model-presence policy for chat, agents and screen
   reading. Missing, removed, unavailable and malformed model lists remain

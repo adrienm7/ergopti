@@ -31,6 +31,7 @@ def observe(application, output):
     )
     receipt = {"kind": "native-helper-registration", "full_git_bootstrap_verified": False}
     primary_error = None
+    publication_error = None
     cleanup_errors = []
     owns_possible_job = False
 
@@ -120,11 +121,18 @@ def observe(application, output):
             receipt["job_absent_after_cleanup"] = False
             cleanup_errors.append("Final guardian observation failed: " + str(error))
         receipt["cleanup_errors"] = cleanup_errors
-        Path(output).write_text(
-            json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n"
-        )
+        try:
+            Path(output).write_text(
+                json.dumps(receipt, indent=2) + "\n", encoding="utf-8", newline="\n"
+            )
+        except Exception as error:
+            publication_error = error
     errors = ([primary_error] if primary_error else []) + cleanup_errors
+    if publication_error is not None:
+        errors.append("Native helper receipt publication failed: " + str(publication_error))
     if errors:
+        if publication_error is not None:
+            raise RuntimeError("; ".join(errors)) from publication_error
         raise RuntimeError("; ".join(errors))
     return receipt
 

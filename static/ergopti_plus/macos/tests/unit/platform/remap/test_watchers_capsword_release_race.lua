@@ -204,7 +204,13 @@ local function fresh_harness(options)
 					if h.fail_teardown_once and fake.terminate_attempts == 1 then
 						error("injected task terminate failure")
 					end
+					if h.terminate_refused_nil then return nil end
+					if h.terminate_refused_false then return false end
 					fake.terminated = true
+					-- This fixture explicitly delivers completion unless a case holds it.
+					-- Native signal acceptance alone never promises this delivery timing.
+					if not h.defer_termination_completion then callback(143, "", "") end
+					return self
 				end
 				h.tasks[index] = {
 					command = command,
@@ -594,5 +600,64 @@ helpers.describe("watchers CapsWord resource failures are fail-closed", function
 			"cleanup must call the hook API again after registration throws")
 		helpers.assert_nil(h.last_hook,
 			"cleanup attempts to remove a hook that raised after partial installation")
+	end)
+end)
+
+helpers.describe("CapsWord probe retirement requires its original completion", function()
+	for _, refusal in ipairs({ "false", "nil" }) do
+		helpers.it("CapsWord watcher: retains a task whose termination returns " .. refusal, function()
+			local h = fresh_harness()
+			pointer(h)
+			local task = h.tasks[1]
+			h["terminate_refused_" .. refusal] = true
+			helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false,
+				"a refused signal cannot settle the original task")
+			helpers.assert_eq(task.fake.terminate_attempts, 1)
+			helpers.assert_eq(task.fake.terminated, false)
+			h["terminate_refused_" .. refusal] = false
+			h.defer_termination_completion = true
+			helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false,
+				"accepted termination is still pending until the exact completion")
+			helpers.assert_eq(task.fake.terminate_attempts, 2, "the original task remains available for retry")
+			helpers.assert_true(task.fake.terminated)
+			task.callback(143, "", "")
+			helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+			helpers.assert_eq(task.fake.terminate_attempts, 2, "completion released only that exact task")
+			helpers.assert_eq(#h.writers, 0)
+			helpers.assert_eq(#h.capslock, 0)
+		end)
+	end
+
+	helpers.it("CapsWord watcher: an accepted signal without completion retains the probe owner", function()
+		local h = fresh_harness()
+		pointer(h)
+		local task = h.tasks[1]
+		h.defer_termination_completion = true
+		helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false)
+		helpers.assert_true(task.fake.terminated, "the native-port model accepted its signal")
+		helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false)
+		helpers.assert_eq(task.fake.terminate_attempts, 2, "no callback means the owner remains retained")
+		task.callback(0, "1", "")
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+		helpers.assert_eq(task.fake.terminate_attempts, 2)
+		helpers.assert_eq(#h.writers, 0, "a stopped generation cannot mutate CapsWord on late completion")
+		helpers.assert_eq(#h.capslock, 0)
+	end)
+
+	helpers.it("CapsWord watcher: watchdog abandonment retains a refused original task", function()
+		local h = fresh_harness()
+		pointer(h)
+		local task = h.tasks[1]
+		h.terminate_refused_false = true
+		local watchdog = timers_at(h, 1.5)[1]
+		helpers.assert_true(watchdog ~= nil)
+		watchdog.callback()
+		helpers.assert_eq(task.fake.terminate_attempts, 1)
+		helpers.assert_eq(h.watchers.stop_gesture_watcher(h.watcher), false)
+		helpers.assert_eq(task.fake.terminate_attempts, 2, "the watchdog must not discard refused cleanup")
+		task.callback(0, "1", "")
+		helpers.assert_true(h.watchers.stop_gesture_watcher(h.watcher))
+		helpers.assert_eq(#h.writers, 0, "the abandoned probe no longer owns its old write intent")
+		helpers.assert_eq(#h.capslock, 0)
 	end)
 end)

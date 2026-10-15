@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 
 SPEC = importlib.util.spec_from_file_location(
     "owned_four_target_preparation", Path(__file__).with_name("remap_runtime_build.py")
@@ -982,6 +983,130 @@ def concurrent_owned_control_suite():
     return unittest.defaultTestLoader.loadTestsFromTestCase(ConcurrentOwnedControls)
 
 
+class ProductionControlSourceControls(unittest.TestCase):
+    """Exercise genuine protected capture without compiling or signing any product."""
+
+    QUEUE = "tools/build/remap_runtime_queue_test.py"
+    CURRENT_QUEUE = "afdd012bee750b713d10665e28c35705318bc6f4ae1bb9a54f7e96105912b22a"
+    PREVIOUS_QUEUE = "ca54e61d19dd071fc23ce991efc1a9a2798304a6486872261a092019ad97ec58"
+    FIXTURES = (
+        "tools/build/fixtures/owned_runtime_queue_test.cpp",
+        "tools/build/fixtures/owned_runtime_queue_ports.hpp",
+        "tools/build/fixtures/owned_runtime_dispatcher_test.cpp",
+    )
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory(prefix="protected-queue-source-")
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name).resolve()
+        self.repository = self.root / "repository"
+        self.repository.mkdir(mode=0o700)
+        self.owner = self.root / "owner"
+        self.owner.mkdir(mode=0o700)
+        self.deadline = time.monotonic() + 10
+        repository = Path(__file__).resolve().parents[2]
+        relatives = (
+            SUBJECT.ARTIFACT_RELATIVE,
+            SUBJECT.MACHO_RELATIVE,
+            SUBJECT.PRODUCTION_RELATIVE,
+            "tools/build/remap_runtime_idle_test.py",
+            "tools/build/fixtures/owned_runtime_idle_test.cpp",
+            self.QUEUE,
+            *self.FIXTURES,
+        )
+        for relative in relatives:
+            leaf = self.repository / relative
+            leaf.parent.mkdir(parents=True, exist_ok=True)
+            leaf.write_bytes((repository / relative).read_bytes())
+        self.current_queue = (self.repository / self.QUEUE).read_bytes()
+        self.assertEqual(SUBJECT.BASE.digest(self.current_queue), self.CURRENT_QUEUE)
+        # Admission executes captured Python modules, but must never launch a child.
+        self.run = mock.patch.object(subprocess, "run", side_effect=AssertionError("No compiler"))
+        self.popen = mock.patch.object(subprocess, "Popen", side_effect=AssertionError("No child"))
+        self.run_mock = self.run.start()
+        self.addCleanup(self.run.stop)
+        self.popen_mock = self.popen.start()
+        self.addCleanup(self.popen.stop)
+
+    def capture(self):
+        return SUBJECT._ProductionSink(
+            self.repository,
+            self.owner,
+            self.deadline,
+            SUBJECT._directory_identity(self.owner.lstat()),
+            None,
+            None,
+            None,
+            self.repository / "build/macos/luasocket-build",
+        )
+
+    def source_refusal(self, callback):
+        with self.assertRaises(SUBJECT.BASE.NativeBuildError) as caught:
+            callback()
+        self.assertEqual(caught.exception.code, "source_identity")
+        self.run_mock.assert_not_called()
+        self.popen_mock.assert_not_called()
+
+    def historical_queue(self):
+        # Exact inverse of published 6b35, independently bound to its ca54 preimage.
+        start = b"\n\n# Keep the original acquisition and error controls independently enrolled.\n"
+        end = b'\n\nif __name__ == "__main__":'
+        head, separator, tail = self.current_queue.partition(start)
+        self.assertEqual(separator, start)
+        _, separator, tail = tail.partition(end)
+        self.assertEqual(separator, end)
+        previous = (head + end + tail).replace(
+            b'def executable(directory, source, fixture="owned_runtime_queue_test.cpp"):',
+            b"def executable(directory, source):",
+        )
+        previous = previous.replace(
+            b'str(BUILD / "fixtures" / fixture),',
+            b'str(BUILD / "fixtures/owned_runtime_queue_test.cpp"),',
+        )
+        self.assertEqual(SUBJECT.BASE.digest(previous), self.PREVIOUS_QUEUE)
+        return previous
+
+    def test_current_queue_capture_admits_before_compilation(self):
+        sink = self.capture()
+        files = {row.path: row.data for row in sink.control_source.files}
+        self.assertEqual(files[self.QUEUE], self.current_queue)
+        for relative in self.FIXTURES:
+            self.assertEqual(files[relative], (self.repository / relative).read_bytes())
+        sink.current(self.deadline)
+        self.run_mock.assert_not_called()
+        self.popen_mock.assert_not_called()
+
+    def test_historical_and_altered_queue_refuse_before_compilation(self):
+        for data in (self.historical_queue(), self.current_queue + b"\n# altered source\n"):
+            with self.subTest(digest=SUBJECT.BASE.digest(data)):
+                (self.repository / self.QUEUE).write_bytes(data)
+                self.source_refusal(self.capture)
+
+    def test_each_queue_fixture_mutation_refuses_before_compilation(self):
+        self.capture()
+        for relative in self.FIXTURES:
+            with self.subTest(fixture=relative):
+                leaf = self.repository / relative
+                original = leaf.read_bytes()
+                try:
+                    leaf.write_bytes(original + b"\n// altered control\n")
+                    self.source_refusal(self.capture)
+                finally:
+                    leaf.write_bytes(original)
+
+    def test_each_queue_fixture_stays_current_after_capture(self):
+        for relative in self.FIXTURES:
+            with self.subTest(fixture=relative):
+                sink = self.capture()
+                leaf = self.repository / relative
+                original = leaf.read_bytes()
+                try:
+                    leaf.write_bytes(original + b"\n// altered after capture\n")
+                    self.source_refusal(lambda: sink.current(self.deadline))
+                finally:
+                    leaf.write_bytes(original)
+
+
 if __name__ == "__main__":
     concurrent_result = unittest.TextTestRunner(verbosity=2).run(concurrent_owned_control_suite())
     print(
@@ -1014,4 +1139,4 @@ if __name__ == "__main__":
         "errors=" + str(len(result.errors)),
         "skipped=" + str(len(result.skipped)),
     )
-    raise SystemExit(0 if result.wasSuccessful() and count == 41 and not result.skipped else 1)
+    raise SystemExit(0 if result.wasSuccessful() and count == 45 and not result.skipped else 1)

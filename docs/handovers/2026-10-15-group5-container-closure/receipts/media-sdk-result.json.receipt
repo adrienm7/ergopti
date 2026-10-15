@@ -1,0 +1,34 @@
+{
+  "status": "PASSED_WITH_EXPLICIT_NATIVE_DEFERRALS",
+  "all_49_owned_hashes_and_index_tree_unchanged": true,
+  "index_tree": "74b2d4af4f854f5c30ab43303d7848cd3da84216",
+  "CommonJS": {
+    "passed": 426,
+    "failed": 0
+  },
+  "MacLua": {
+    "passed": 20037,
+    "failed": 0,
+    "modules": 1604
+  },
+  "LinuxLua": {
+    "passed": 13792,
+    "failed": 0,
+    "modules": 521
+  },
+  "LinuxE2E": {
+    "passed": 193,
+    "failed": 0
+  },
+  "MacE2E_pass_lines": 101,
+  "MacE2E_skip_lines": [
+    "  SKIP  e2e[buffer_cap_trigger_longer_than_window]  (driver-specific: rolling_buffer_cap)"
+  ],
+  "Mac_native": "NOT_RUN",
+  "AHK_native": "SKIPPED_NO_RUNTIME",
+  "native_subreaper": {
+    "adopted": 234,
+    "pending": 0,
+    "rescue": 0
+  }
+}
