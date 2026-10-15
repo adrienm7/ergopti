@@ -2261,3 +2261,180 @@ function advanceToMetrics(page) {
 console.log(
 	'Onboarding wizard page: pages, defaults, manifest paths, re-run, title, folder, consent and checklist labels passed.'
 );
+
+// ======================================
+// ======= 11/ Retained folder edits ====
+// ======================================
+
+(function delayedLocaleRepliesPreserveFolderEdits() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		for (const intent of ['typed', 'empty', 'picked']) {
+			for (const response of ['matching', 'stale']) {
+				const context = platform + '/' + intent + '/' + response;
+				const target = platform === 'macos' ? '/Volumes/Personal/B/' : '/Volumes/Default/A/';
+				const page = openWizard({
+					platform,
+					config_dir: '/Volumes/Personal/B/',
+					default_config_dir: '/Volumes/Default/A/',
+					empty_config_dir: target
+				});
+				page.platform = platform;
+				page
+					.el('lang-list')
+					.children.find((row) => row.dataset.code === 'fr')
+					.click();
+				assert.deepEqual(page.messages.splice(0), [{ action: 'previewLocale', locale: 'fr' }]);
+				// The page can navigate while the native preview is still in flight.
+				page.click('btn-next');
+				assert.deepEqual(page.messages.splice(0), [{ action: 'localeSelected', locale: 'fr' }]);
+				const input = page.el('config-input');
+				const raw =
+					intent === 'typed'
+						? ' /Volumes/Typed/<D> & {1}/ '
+						: intent === 'empty'
+							? ''
+							: '/Volumes/Picked/C/';
+				const expected = intent === 'typed' ? '/Volumes/Typed/<D> & {1}/' : raw;
+				if (intent === 'picked') {
+					page.click('config-browse');
+					assert.deepEqual(page.messages.splice(0), [
+						{ action: 'pickConfigDir', current: '/Volumes/Personal/B/' }
+					]);
+					page.window.setConfigDir('/Volumes/Picked/C/');
+				} else {
+					input.value = raw;
+					input.dispatch('input');
+					page.window.setConfigDir('');
+					page.window.setConfigDir(null);
+				}
+				assert.equal(input.value, raw, context + ': raw input survives a cancelled picker');
+				assert.deepEqual(
+					page.messages.splice(0),
+					[],
+					context + ': typing does not read or resolve metrics'
+				);
+				page.window.applyStrings({
+					locale: response === 'matching' ? 'fr' : 'en',
+					strings: locale(response === 'matching' ? 'fr' : 'en')
+				});
+				assert.equal(
+					input.value,
+					raw,
+					context + ': delayed locale delivery retains exact raw intent'
+				);
+				assert.equal(
+					input.placeholder,
+					target,
+					context + ': editing does not change the native empty target'
+				);
+				assert.equal(
+					page.document.title,
+					locale(response === 'matching' ? 'fr' : 'en')['onboarding.welcome.title'],
+					context + ': stale locale envelopes remain refused'
+				);
+				page.click('btn-next');
+				assert.deepEqual(
+					page.messages.splice(0),
+					[
+						{ action: 'loadExistingConfig', config_dir: expected, request: 1 },
+						{ action: 'resolveMetricsPath', config_dir: expected, request: 1 }
+					],
+					context + ': navigation alone trims and requests the chosen source'
+				);
+				assert.equal(page.el('btn-next').disabled, true, context + ': unread source blocks pages');
+				page.click('btn-next');
+				assert.deepEqual(
+					page.messages.splice(0),
+					[],
+					context + ': pending source cannot reach Finish'
+				);
+				page.window.applyCurrentValues({ request: 0, values: {} });
+				assert.equal(
+					page.el('btn-next').disabled,
+					true,
+					context + ': stale response cannot admit pages'
+				);
+				page.window.applyCurrentValues({ request: 1, values: {} });
+				assert.equal(
+					page.el('btn-next').disabled,
+					false,
+					context + ': exact response admits pages'
+				);
+				page.click('btn-back');
+				assert.equal(
+					input.value,
+					expected,
+					context + ': Back retains the admitted, trimmed folder'
+				);
+				const done = finish(page);
+				assert.equal(
+					done.answers.config_dir,
+					expected,
+					context + ': Finish keeps exact native empty or explicit semantics'
+				);
+				assert.equal(
+					done.answers.locale,
+					'fr',
+					context + ': the selected locale remains the Finish intent'
+				);
+			}
+		}
+	}
+})();
+
+(function editingThePendingFolderRetiresItsReadAuthority() {
+	for (const platform of ['windows', 'macos', 'linux']) {
+		const page = openWizard({ platform, config_dir: '/Volumes/Personal/B/' });
+		page.platform = platform;
+		page.click('btn-next');
+		const input = page.el('config-input');
+		input.value = '/Volumes/Pending/A/';
+		input.dispatch('input');
+		page.messages.splice(0);
+		page.click('btn-next');
+		assert.deepEqual(page.messages.splice(0), [
+			{ action: 'loadExistingConfig', config_dir: '/Volumes/Pending/A/', request: 1 },
+			{ action: 'resolveMetricsPath', config_dir: '/Volumes/Pending/A/', request: 1 }
+		]);
+		page.click('btn-back');
+		input.value = '/Volumes/Successor/C/';
+		input.dispatch('input');
+		assert.deepEqual(
+			page.messages.splice(0),
+			[],
+			platform + ': editing the pending folder does not publish'
+		);
+		// This reply names the pending request, but its folder is no longer selected.
+		page.window.applyCurrentValues({ request: 1, values: {} });
+		input.value = '/Volumes/Pending/A/';
+		input.dispatch('input');
+		page.click('btn-next');
+		assert.deepEqual(
+			page.messages.splice(0),
+			[
+				{ action: 'loadExistingConfig', config_dir: '/Volumes/Pending/A/', request: 2 },
+				{ action: 'resolveMetricsPath', config_dir: '/Volumes/Pending/A/', request: 2 }
+			],
+			platform + ': a retired read is not reused when the folder is selected again'
+		);
+		assert.equal(page.el('btn-next').disabled, true);
+		page.window.applyCurrentValues({ request: 1, values: {} });
+		assert.equal(page.el('btn-next').disabled, true, platform + ': retired response remains stale');
+		page.window.applyCurrentValues({ request: 2, values: {} });
+		assert.equal(page.el('btn-next').disabled, false);
+		assert.equal(finish(page).answers.config_dir, '/Volumes/Pending/A/');
+	}
+})();
+
+(function theFolderIntentScriptInvalidatesItsPredecessorCache() {
+	const match = html.match(/src="script\.js\?v=(\d+)"/);
+	assert.ok(match, 'the native document versions its onboarding script URL');
+	assert.ok(
+		Number(match[1]) > 8,
+		'retained typed intent retires the folder-target v8 script cache'
+	);
+})();
+
+console.log(
+	'Onboarding folder edits: delayed locale delivery, raw input, source admission and Finish passed.'
+);
