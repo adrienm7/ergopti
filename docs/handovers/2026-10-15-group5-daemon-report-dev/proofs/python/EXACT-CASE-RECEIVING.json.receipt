@@ -1,0 +1,67 @@
+{
+  "receipts": [
+    {
+      "mode": "normal",
+      "exact19_names_present_once": true,
+      "passed": 19,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "not_executed": 0,
+      "names": [
+        "test_default_source_rosters_are_exact_and_report_is_additive",
+        "test_full_repository_header_closure_is_held_in_report_profile",
+        "test_module_map_is_exact_owned_umbrella_and_no_caller_declarations",
+        "test_nonboolean_profile_refuses_without_creating_compile_files",
+        "test_report_has_exact_native_objects_for_both_architectures",
+        "test_validator_module_lifecycle_and_lipo_commands_are_unchanged",
+        "test_compiled_copy_hash_mismatch_refuses",
+        "test_exact_both_architecture_compile_rosters",
+        "test_existing_destination_refuses",
+        "test_expired_copy_deadline_refuses",
+        "test_held_content_mutation_refuses",
+        "test_held_read_and_atime_only_stay_current",
+        "test_lifecycle_object_links_only_installer_once",
+        "test_module_uses_only_fixed_repository_and_hs_headers",
+        "test_named_inode_replacement_refuses",
+        "test_product_directory_symlink_refuses",
+        "test_product_hardlink_refuses",
+        "test_signature_header_reaches_both_native_swift_products",
+        "test_source_mode_change_refuses"
+      ]
+    },
+    {
+      "mode": "optimized",
+      "exact19_names_present_once": true,
+      "passed": 19,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "not_executed": 0,
+      "names": [
+        "test_default_source_rosters_are_exact_and_report_is_additive",
+        "test_full_repository_header_closure_is_held_in_report_profile",
+        "test_module_map_is_exact_owned_umbrella_and_no_caller_declarations",
+        "test_nonboolean_profile_refuses_without_creating_compile_files",
+        "test_report_has_exact_native_objects_for_both_architectures",
+        "test_validator_module_lifecycle_and_lipo_commands_are_unchanged",
+        "test_compiled_copy_hash_mismatch_refuses",
+        "test_exact_both_architecture_compile_rosters",
+        "test_existing_destination_refuses",
+        "test_expired_copy_deadline_refuses",
+        "test_held_content_mutation_refuses",
+        "test_held_read_and_atime_only_stay_current",
+        "test_lifecycle_object_links_only_installer_once",
+        "test_module_uses_only_fixed_repository_and_hs_headers",
+        "test_named_inode_replacement_refuses",
+        "test_product_directory_symlink_refuses",
+        "test_product_hardlink_refuses",
+        "test_signature_header_reaches_both_native_swift_products",
+        "test_source_mode_change_refuses"
+      ]
+    }
+  ],
+  "original": 13,
+  "new": 6,
+  "native_Swift32": "UNEXECUTED"
+}

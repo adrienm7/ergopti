@@ -1,0 +1,8 @@
+{
+  "catalogue": {
+    "sha256": "224f9583a53ee5c08681f1814737e69203b699092663030e5e05b06feabf65b4",
+    "bytes": 7646
+  },
+  "clock_transport": "cadccd8e9d3c065fb1ac1340887882ad9b1ebe7666c624fc9c730cf6810de98b",
+  "peer_source": "f0a227a11c0dccb3ddca026f021efd5b1668a201d776448c5143177cd1ed8058"
+}

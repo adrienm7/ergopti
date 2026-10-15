@@ -1,0 +1,37 @@
+{
+	"base": "d60ad231ae41c7391c1012c5feb9fc5723bbcca4",
+	"gzip_lossless": true,
+	"gzip_header": "1f8b08000000000002ff",
+	"private_validation_umask": "022, original restored",
+	"strict_git_commands": [
+		{
+			"argv": ["git", "apply", "--check", "--whitespace=error-all", "<private-decompressed-patch>"],
+			"status": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"argv": ["git", "apply", "--whitespace=error-all", "<private-decompressed-patch>"],
+			"status": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"argv": ["git", "apply", "-R", "--check", "<private-decompressed-patch>"],
+			"status": 0,
+			"stdout": "",
+			"stderr": ""
+		},
+		{
+			"argv": ["git", "apply", "-R", "<private-decompressed-patch>"],
+			"status": 0,
+			"stdout": "",
+			"stderr": ""
+		}
+	],
+	"posts_exact20_physical_mode0644": true,
+	"restored_exact5_pres15_absences": true,
+	"canonical_apply": false,
+	"native_or_target_execution": false,
+	"prior_private_mode_refusal": "proofs/delivery/initial-private-mode-refusal.json.receipt"
+}

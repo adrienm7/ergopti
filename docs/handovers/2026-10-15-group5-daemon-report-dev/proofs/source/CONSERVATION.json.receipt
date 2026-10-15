@@ -1,0 +1,24 @@
+{
+  "original_swift28_method_texts": "whole original3 file prefixes",
+  "swift_files": [
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "whole_prefix_bytes": 6909,
+      "sha256": "fdd555bb145de3a39675cd74d81d4608165622450d04ff0ef689fc4f402e4c4e"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+      "whole_prefix_bytes": 5554,
+      "sha256": "32d83a2345d39f34adabaf28a7f630f8baf527cfe7f85747210873518debc236"
+    },
+    {
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "whole_prefix_bytes": 1884,
+      "sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+    }
+  ],
+  "original_python13_methods": "whole original file prefix and footer",
+  "new_python6_methods": "UNEXECUTED",
+  "new_swift4_pure_query_methods": "UNEXECUTED",
+  "all_native": "UNEXECUTED"
+}

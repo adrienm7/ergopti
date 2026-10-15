@@ -1,0 +1,56 @@
+{
+  "receipts": [
+    {
+      "mode": "normal",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "owned_runtime_product_build_test.py"
+      ],
+      "cwd": "/workspace/ergopti-group5-work/vhd-daemon-report-dev-python-receiving-20261015/source/tools/build",
+      "elapsed_seconds": 0.07370738597819582,
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "status": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 2723,
+      "reported_test_count": 19,
+      "literal_success_suffix": true,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e0dfb8a1ab88fe7b2dec50ca08633f736c30a1437a057cb3119f85ecc3374baa",
+      "skipped": 0,
+      "limits": "portable Python and POSIX filesystem/command models only; native unexecuted"
+    },
+    {
+      "mode": "optimized",
+      "argv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3",
+        "-O",
+        "owned_runtime_product_build_test.py"
+      ],
+      "cwd": "/workspace/ergopti-group5-work/vhd-daemon-report-dev-python-receiving-20261015/source/tools/build",
+      "elapsed_seconds": 0.1983195870416239,
+      "timeout_seconds": 30,
+      "timed_out": false,
+      "status": 0,
+      "stdout_bytes": 0,
+      "stderr_bytes": 2723,
+      "reported_test_count": 19,
+      "literal_success_suffix": true,
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "e0dfb8a1ab88fe7b2dec50ca08633f736c30a1437a057cb3119f85ecc3374baa",
+      "skipped": 0,
+      "limits": "portable Python and POSIX filesystem/command models only; native unexecuted"
+    }
+  ],
+  "sources_unchanged": true,
+  "before": {
+    "tools/build/owned_runtime_product_build.py": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0",
+    "tools/build/owned_runtime_product_build_test.py": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f"
+  },
+  "after": {
+    "tools/build/owned_runtime_product_build.py": "df7ca3937d5ea724914671669ffde015140f9abc0ffff87e6ac7daa5f0cf2fa0",
+    "tools/build/owned_runtime_product_build_test.py": "6fcaabdfed12d71582e09bdf30b1275000412d7109ac9c2cd2dee139a6936a6f"
+  },
+  "tmp_children_after": [],
+  "native": "UNEXECUTED"
+}
