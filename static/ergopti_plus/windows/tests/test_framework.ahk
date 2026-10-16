@@ -310,8 +310,10 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
 	Quote := Chr(34)
-	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
-		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote
+	; Atomic runs keep large fixture literals from exhausting the PCRE stack.
+	; Escaped delimiters remain separate atoms and cannot close their string.
+	Pattern := "'(?:``[\s\S]|[^'``]++)*+'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``]++)*+" . Quote
 		. "|;[^`r`n]*|(?m:^[ `t]*/\*)"
 	Position := 1
 	CopiedThrough := 1

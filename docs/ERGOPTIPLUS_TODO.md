@@ -12,6 +12,24 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 bounded native source masking
+
+The shared AHK source masker now consumes unambiguous quoted runs
+atomically, preserving escapes and exact UTF-16 offsets without spending
+one PCRE frame per ordinary code unit. Three large-literal regressions fail
+on the original helper with PCRE execution errors and pass after the fix.
+All 26 original quoted-definition, Unicode-offset and block-comment cases
+pass unchanged. The real principal receipt-sharing case separately passes
+1/1 with exit0. The private composed receiver retains its 45 PASS / 1 FAIL
+result: its temporary fourth bootstrap entry is deliberately rejected by
+that original guard; no assertion or expected bootstrap count is changed.
+
+Encoding, conventions, source ratchets, actual parse and all 70 E2E cases
+pass on the composed source images. Current startup remains OPEN: the
+suspend-marker attempt refuses undurable logger queues and its native
+child times out. The failed JavaScript/startup receipts remain retained.
+A clean baseline comparison is running separately; no cause is yet assigned.
+
 ### October 16 installed c618 receiving and histogram fixture repair
 
 Published c618170dcfb5ee09371894ae881aaf9cfc8f1e22 receives a fresh official
