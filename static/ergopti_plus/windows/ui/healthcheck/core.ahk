@@ -27,6 +27,7 @@
 ; hoisted, so load order across the healthcheck/*.ahk files is irrelevant.
 ; ==============================================================================
 
+#Include %A_LineFile%\..\..\..\adapters\diagnostics_control.ahk
 
 
 ; Module-level state. _HealthCheckStartMs anchors the uptime origin at module
@@ -37,24 +38,6 @@ global _HealthCheckLastError := ""
 global _HealthCheckWarnCount := 0
 global _HealthCheckErrCount  := 0
 global _HealthCheckWindowControl := 0
-
-/** Returns the session-local Win32 message for opening the diagnostics window. */
-HealthCheck_ControlMessage() {
-	static Message := DllCall("User32\RegisterWindowMessageW",
-		"Str", "Ergopti.Diagnostics.Open.v1", "UInt")
-	if !Message
-		throw OSError(A_LastError, -1, "The diagnostics control message could not be registered.")
-	return Message
-}
-
-/** Returns this process lifetime independently of any caller-owned window handle. */
-HealthCheck_ControlCreationTime() {
-	Times := Buffer(32, 0)
-	if !DllCall("Kernel32\GetProcessTimes", "Ptr", DllCall("Kernel32\GetCurrentProcess", "Ptr"),
-			"Ptr", Times, "Ptr", Times.Ptr + 8, "Ptr", Times.Ptr + 16, "Ptr", Times.Ptr + 24, "Int")
-		throw OSError(A_LastError, -1, "The diagnostics control process lifetime could not be read.")
-	return NumGet(Times, 0, "UInt64")
-}
 
 /** Owns one listener and its coalesced deferred window request. */
 class HealthCheckWindowControl {
@@ -164,7 +147,7 @@ HealthCheck_StartWindowControl() {
 	try {
 		Control := HealthCheckWindowControl(HealthCheck_ControlMessage,
 			(Message, Callback, Threads) => OnMessage(Message, Callback, Threads),
-			(Callback, Period) => SetTimer(Callback, Period), HealthCheck_ShowWindow,
+			HealthCheck_ControlTimer, HealthCheck_ShowWindow,
 			_HealthCheck_WindowControlReady, A_ScriptHwnd, ProcessExist(), HealthCheck_ControlCreationTime())
 		_HealthCheckWindowControl := Control
 		Control.Start()
