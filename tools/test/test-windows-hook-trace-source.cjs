@@ -99,17 +99,83 @@ function checkSerializationBinding(source) {
 			'The serializer native parameter widths changed.'
 		);
 	}
-	const bodyMatch = withoutComments(source.c).match(
-		new RegExp(`ERGOPTI_NAV_CALL\\s+${name}\\s*\\([^)]*\\)\\s*\\{([^{}]+)\\}`)
+	const implementation = withoutComments(source.c);
+	const declaration = implementation.match(
+		new RegExp(`ERGOPTI_NAV_CALL\\s+${name}\\s*\\([^)]*\\)\\s*\\{`)
 	);
-	assert(bodyMatch && bodyMatch[1].trim(), 'The actual serializer helper body must exist.');
-	const body = bodyMatch[1];
-	const aliases = body.indexOf('NavTerminalOutputAliasesState(out_inputs,');
-	const countAlias = body.indexOf('NavTerminalOutputAliasesState(out_count, sizeof(*out_count))');
-	const lock = body.indexOf('EnterCriticalSection(&g_nav_state.lock)');
-	const head = body.indexOf('NavCheckTerminalOutputLocked(&g_nav_state, owner, key)');
-	const dispatch = body.indexOf('ErgoptiOutput_SerializeAttempt(');
-	const unlock = body.indexOf('LeaveCriticalSection(&g_nav_state.lock)');
+	assert(declaration, 'The actual serializer helper body must exist.');
+	const first = declaration.index + declaration[0].length;
+	let depth = 1,
+		quote = '',
+		last = first;
+	for (; last < implementation.length && depth !== 0; last += 1) {
+		const character = implementation[last];
+		if (quote) {
+			if (character === '\\') last += 1;
+			else if (character === quote) quote = '';
+		} else if (character === '"' || character === "'") quote = character;
+		else if (character === '{') depth += 1;
+		else if (character === '}') depth -= 1;
+	}
+	assert.equal(depth, 0, 'The actual serializer body must close all nested blocks.');
+	const body = implementation.slice(first, last - 1);
+	assert(body.trim(), 'The actual serializer helper body must be nonempty.');
+	// Quoted proof text cannot authenticate an executable lock or storage preflight.
+	let code = '',
+		literal = '';
+	for (let index = 0; index < body.length; index += 1) {
+		const character = body[index];
+		if (literal) {
+			if (character.charCodeAt(0) === 92) {
+				index += 1;
+				code += ' ';
+			} else if (character === literal) literal = '';
+			code += ' ';
+		} else if (character === '"' || character === "'") {
+			literal = character;
+			code += ' ';
+		} else code += character;
+	}
+	assert.equal(literal, '', 'The actual serializer must close quoted literals.');
+	const storage = code.match(
+		/if\s*\(NavTerminalOutputAliasesStorageLocked\(out_inputs,\s*capacity\s*\*\s*sizeof\(\*out_inputs\)\)\s*\|\|\s*NavTerminalOutputAliasesStorageLocked\(out_count,\s*sizeof\(\*out_count\)\)\)\s*\{([^{}]+)\}/
+	);
+	assert(storage, 'Both allocated-output spans require an actual locked preflight.');
+	assert.equal(
+		normalize(storage[1]),
+		'LeaveCriticalSection(&g_nav_state.lock); return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;',
+		'Allocated-storage refusal must release its lock and fail before serialization.'
+	);
+	// Admit only the authenticated refusal block and retain the straight-line success grammar.
+	const successBody = code.slice(0, storage.index) + code.slice(storage.index + storage[0].length);
+	assert(
+		!/[{}]/.test(successBody),
+		'The serializer success path must not introduce additional control blocks.'
+	);
+	const aliases = successBody.indexOf('NavTerminalOutputAliasesState(out_inputs,');
+	const countAlias = successBody.indexOf(
+		'NavTerminalOutputAliasesState(out_count, sizeof(*out_count))'
+	);
+	const lockStatement = 'EnterCriticalSection(&g_nav_state.lock);';
+	const lock = successBody.indexOf(lockStatement);
+	const head = successBody.indexOf('NavCheckTerminalOutputLocked(&g_nav_state, owner, key)');
+	const dispatch = successBody.indexOf('ErgoptiOutput_SerializeAttempt(');
+	const unlock = successBody.indexOf('LeaveCriticalSection(&g_nav_state.lock)');
+	assert.equal(
+		successBody.split(lockStatement).length,
+		2,
+		'The serializer acquires exactly one owner lock.'
+	);
+	assert.equal(
+		successBody.split('LeaveCriticalSection(&g_nav_state.lock)').length,
+		2,
+		'No additional success-path unlock may precede serialization.'
+	);
+	assert.equal(
+		code.slice(code.indexOf(lockStatement) + lockStatement.length, storage.index).trim(),
+		'',
+		'Allocated-storage preflight must follow the lock without a conditional bypass.'
+	);
 	assert(
 		aliases >= 0 &&
 			countAlias > aliases &&
@@ -120,7 +186,7 @@ function checkSerializationBinding(source) {
 		'Whole-owner preflight and FIFO authentication must retain the same lock through serialization.'
 	);
 	assert(
-		body.includes(
+		successBody.includes(
 			'&g_nav_state.terminal_output, owner, key, attempt, out_inputs, capacity, out_count'
 		),
 		'The bridge must serialize its authoritative retained attempt and exact caller outputs.'
@@ -433,7 +499,7 @@ const serializationMutations = [
 			assert(start >= 0 && end > start, 'The early-unlock inverse needs the actual bridge body.');
 			const body = text.slice(start, end);
 			const changed = body
-				.replace('\tLeaveCriticalSection(&g_nav_state.lock);\n', '')
+				.replace('\n\tLeaveCriticalSection(&g_nav_state.lock);\n', '\n')
 				.replace(
 					'\tif (status == ERGOPTI_NAV_STATUS_OK)\n',
 					'\tLeaveCriticalSection(&g_nav_state.lock);\n\tif (status == ERGOPTI_NAV_STATUS_OK)\n'
@@ -442,6 +508,72 @@ const serializationMutations = [
 		}
 	]
 ];
+// Losing either heap-span guard or its refusal must not borrow valid static preflight.
+for (const [original, replacement] of [
+	['NavTerminalOutputAliasesStorageLocked(out_inputs, capacity * sizeof(*out_inputs))', 'false'],
+	['NavTerminalOutputAliasesStorageLocked(out_count, sizeof(*out_count))', 'false'],
+	[
+		'LeaveCriticalSection(&g_nav_state.lock);\n\t\treturn ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;',
+		'LeaveCriticalSection(&g_nav_state.lock);\n\t\treturn ERGOPTI_NAV_STATUS_OK;'
+	]
+]) {
+	serializationMutations.push([
+		'c',
+		(text) => {
+			const start = text.indexOf('ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(');
+			const end = text.indexOf('/** Commits only the reported exact accepted prefix', start);
+			assert(start >= 0 && end > start, 'The allocated-span inverse requires the actual bridge.');
+			const body = text.slice(start, end);
+			assert.equal(
+				body.split(original).length,
+				2,
+				'The inverse has one genuine serializer preimage.'
+			);
+			return text.slice(0, start) + body.replace(original, replacement) + text.slice(end);
+		}
+	]);
+}
+
+serializationMutations.push([
+	'c',
+	(text) => {
+		const start = text.indexOf('ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(');
+		const end = text.indexOf('/** Commits only the reported exact accepted prefix', start);
+		assert(start >= 0 && end > start, 'The conditional-wrapper inverse needs the actual bridge.');
+		const body = text.slice(start, end);
+		const lock = '\tEnterCriticalSection(&g_nav_state.lock);\n';
+		const unlock = '\n\tLeaveCriticalSection(&g_nav_state.lock);\n';
+		assert.equal(body.split(lock).length, 2, 'The inverse needs one actual lock.');
+		assert.equal(body.split(unlock).length, 2, 'The inverse needs one actual success unlock.');
+		const changed = body.replace(lock, '\tif (0) {\n' + lock).replace(unlock, unlock + '\t}\n');
+		return text.slice(0, start) + changed + text.slice(end);
+	}
+]);
+
+serializationMutations.push([
+	'c',
+	(text) => {
+		const start = text.indexOf('ERGOPTI_NAV_CALL ErgoptiNav_SerializeTerminalOutputAttempt(');
+		const end = text.indexOf('/** Commits only the reported exact accepted prefix', start);
+		assert(start >= 0 && end > start, 'The quoted-proof inverse needs the actual bridge.');
+		const bridge = text.slice(start, end);
+		const open = bridge.indexOf('{'),
+			close = bridge.lastIndexOf('}');
+		assert(open >= 0 && close > open, 'The quoted-proof inverse needs the complete actual body.');
+		const body = bridge.slice(open + 1, close);
+		assert.equal(body.split('EnterCriticalSection(&g_nav_state.lock);').length, 2);
+		assert(body.includes('NavTerminalOutputAliasesStorageLocked(out_inputs,'));
+		const quoted = JSON.stringify(body.replace(/\s+/g, ' '));
+		const changed =
+			bridge.slice(0, open + 1) +
+			'\n\tconst char *proof_only = ' +
+			quoted +
+			';\n\t(void)proof_only;\n\treturn ERGOPTI_NAV_STATUS_OK;\n' +
+			bridge.slice(close);
+		return text.slice(0, start) + changed + text.slice(end);
+	}
+]);
+
 for (const [name, mutate] of serializationMutations) {
 	const changed = mutate(source[name]);
 	assert.notEqual(

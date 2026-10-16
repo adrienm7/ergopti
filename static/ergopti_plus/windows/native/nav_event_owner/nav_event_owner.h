@@ -683,6 +683,22 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_StopHookTrace(
 	uint64_t owner, uint64_t token, uint64_t generation);
 
 #if defined(ERGOPTI_NAV_TESTING)
+/** Borrowed immutable views for serialized hook-free alias regressions only. */
+typedef struct ErgoptiNav_TestStorageView {
+	const void *routes;
+	size_t route_bytes;
+	const void *semantic;
+	size_t semantic_bytes;
+} ErgoptiNav_TestStorageView;
+
+/**
+ * Borrows exact allocated descriptors and opaque state excluding its lock.
+ * Requires the exact route owner and no native hook/thread. Registration,
+ * reset, Move or Stop invalidates the spans. Never compiled/exported by the DLL.
+ */
+int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestBorrowStorage(
+	uint64_t owner, ErgoptiNav_TestStorageView *out_view);
+
 /** Applies one provenance-free startup modifier through the production helper. */
 int32_t ERGOPTI_NAV_CALL ErgoptiNav_TestSeedInitialModifier(
 	uint16_t vk,

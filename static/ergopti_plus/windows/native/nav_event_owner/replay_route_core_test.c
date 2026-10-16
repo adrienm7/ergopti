@@ -154,6 +154,7 @@ static void TestEventVectors(void)
 		assert(edge.vk == native_edges[index].vk && edge.scan == native_edges[index].scan);
 	}
 	puts("PASS replay-route event vectors: effective transforms, sources, repeats and prefixes.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Queue snapshots and held ups retain old immutable route/layout identities. */
@@ -195,6 +196,7 @@ static void TestRegistrationSwap(void)
 	assert(ErgoptiReplay_PrepareNativeEdge(&state, OWNER, &down, &edge) == 0);
 	assert(edge.scan == 0x2D);
 	puts("PASS replay-route registration swap: queued and held recipes remain immutable.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Supplied composition identities survive edges and refuse layout guesses. */
@@ -236,6 +238,7 @@ static void TestComposition(void)
 	assert(character.composition_after.dead_key_id == 0);
 	assert(dead.composition_after.dead_key_id == 7);
 	puts("PASS replay-route composition: supplied transitions and frozen snapshots, no glyph oracle.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Invalid registration and events cannot partially publish or mutate state. */
@@ -294,6 +297,7 @@ static void TestRejections(void)
 	assert(ErgoptiReplay_PrepareNativeEdge(&state, OWNER, &snapshot, &edge) == ERGOPTI_REPLAY_UNSUPPORTED);
 	assert(edge.vk == 0 && edge.scan == 0);
 	puts("PASS replay-route rejection: initialization, ownership, registration, time and unsupported output.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** An explicit scan family cannot silently fall back to a VK character recipe. */
@@ -328,6 +332,7 @@ static void TestScanPriorityAndCapacity(void)
 	event.key_up = 0;
 	assert(ErgoptiReplay_Step(&state, OWNER, &event, &snapshot) == ERGOPTI_REPLAY_UNREGISTERED);
 	puts("PASS replay-route scan ownership and finite source-aware hold capacity.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Reusing an event buffer for its output must not erase the incoming edge. */
@@ -439,8 +444,10 @@ static void TestInputOutputAliasing(void)
 			&reused.incoming, &reused.snapshot) == 0);
 		assert(reused.snapshot.event.timestamp == 3 && reused.snapshot.event.key_up == 0);
 		assert(reused.snapshot.modifiers_lr_before == 0 && reused.snapshot.modifiers_lr_after == 0x10);
+		assert(ErgoptiReplay_Dispose(&protected_state.live, OWNER) == 0);
 	}
 	puts("PASS replay-route reused input/output buffer retains its incoming event.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Direct-digit sources are distinct from KLE text and cannot predeclare a host target. */
@@ -477,6 +484,7 @@ static void TestDirectDigitSourceRegistration(void)
 			if (edge_index == 0)
 				assert(ErgoptiReplay_Register(&state, OWNER, 3, 83, NULL, 0) == 0);
 		}
+		assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 	}
 	for (uint32_t bad_index = 0; bad_index < 11; ++bad_index) {
 		ErgoptiReplay_State state; Start(&state);
@@ -496,6 +504,7 @@ static void TestDirectDigitSourceRegistration(void)
 		assert(ErgoptiReplay_Register(&state, OWNER, 2, 82, &bad, 1)
 			== ERGOPTI_REPLAY_INVALID_REGISTRATION);
 		assert(memcmp(&state, &unchanged, sizeof(state)) == 0);
+		assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 	}
 }
 
@@ -535,6 +544,7 @@ static void TestRecipeValidation(void)
 		== ERGOPTI_REPLAY_INVALID_ARGUMENT);
 	assert(edge.vk == 0 && edge.scan == 0 && edge.key_up == 0 && edge.repeat == 0);
 	puts("PASS replay-route recipe validation rejects owner, provenance and malformed output.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 /** Unsupported modifier sources cannot poison the later authoritative route. */
@@ -579,6 +589,7 @@ static void TestSourceIdsAndDeadTransitions(void)
 	assert(snapshot.composition_before.dead_key_id == 7);
 	assert(snapshot.composition_after.dead_key_id == 0);
 	puts("PASS replay-route physical source IDs and explicitly supplied repeated dead-key transition.");
+	assert(ErgoptiReplay_Dispose(&state, OWNER) == 0);
 }
 
 int main(void)

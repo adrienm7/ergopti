@@ -81,6 +81,7 @@ static void TestKleDigitFromActualReplay(void)
 		assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == 0);
 		assert(consumed.key_up == event.key_up && consumed.repeat == event.repeat);
 	}
+	assert(ErgoptiReplay_Dispose(&routes, OWNER) == 0);
 }
 
 static void TestLiteralVectors(void)
@@ -111,6 +112,7 @@ static void TestLiteralVectors(void)
 		assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
 		assert(edge.scan == 0x10 && edge.key_up == 0 && edge.origin == 1);
 	}
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 static void TestSuffixAndFailure(void)
@@ -150,6 +152,7 @@ static void TestSuffixAndFailure(void)
 	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, b, 1) == 0);
 	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0 && edge.scan == 0x10);
 	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == -6);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 /** Direct digit source metadata cannot borrow KLE's Unicode output authority. */
@@ -206,12 +209,171 @@ static void TestDirectDigitDiagnostics(void)
 				if (edge_index == 0)
 					assert(ErgoptiReplay_Register(&routes, OWNER, 2, 3, NULL, 0) == 0);
 			}
+			assert(ErgoptiReplay_Dispose(&routes, OWNER) == 0);
 		}
 	}
 }
 
+/** Coherent old-state generations compose; malformed empty bridges never dispatch. */
+static void TestEmptyCompositionBridgeGuards(void)
+{
+	ErgoptiReplay_State routes = ERGOPTI_REPLAY_STATE_INIT;
+	ErgoptiReplay_State before;
+	ErgoptiReplay_Route recipes[2] = {
+		{.recipe_id = 71, .route_id = 1, .code = 0x29, .axis = ERGOPTI_REPLAY_SCAN,
+			.kind = ERGOPTI_REPLAY_DEAD_KEY, .next_dead_key_id = 7},
+		{.recipe_id = 72, .route_id = 2, .code = 0x28, .axis = ERGOPTI_REPLAY_SCAN,
+			.kind = ERGOPTI_REPLAY_DEAD_KEY, .required_dead_key_id = 7, .next_dead_key_id = 8}
+	};
+	ErgoptiReplay_Event event = {.timestamp = 100, .source_id = 1,
+		.vk = 0xC0, .scan = 0x29, .origin = ERGOPTI_REPLAY_PHYSICAL};
+	ErgoptiReplay_Snapshot bridge;
+	assert(ErgoptiReplay_Initialize(&routes, OWNER) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 1, 81, recipes, 2) == 0);
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &bridge) == 0);
+	event.timestamp++; event.key_up = 1;
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &bridge) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 3, 81, recipes, 2) == 0);
+	event.timestamp++; event.key_up = 0; event.source_id = 2;
+	event.vk = 0xDE; event.scan = 0x28;
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &bridge) == 0);
+	assert(bridge.status == ERGOPTI_REPLAY_OK && bridge.route_generation == 3);
+	assert(bridge.composition_before.dead_key_id == 7 && bridge.composition_before.generation == 1);
+	assert(bridge.composition_before.layout_id == 81 && bridge.composition_after.dead_key_id == 8);
+	assert(bridge.composition_after.generation == 3 && bridge.composition_after.layout_id == 81);
+	memcpy(&before, &routes, sizeof(before));
+	for (uint32_t vector = 0; vector < 18; ++vector) {
+		ErgoptiOutput_State output = ERGOPTI_OUTPUT_STATE_INIT;
+		ErgoptiReplay_Snapshot supplied;
+		ErgoptiOutput_Key key;
+		ErgoptiReplay_Event consumed, preserved;
+		ErgoptiOutput_Unit units[2];
+		uint64_t attempt = 0;
+		uint32_t count = 99, dispatchable = 99;
+		uint16_t text = 0x78;
+		memcpy(&supplied, &bridge, sizeof(supplied));
+		switch (vector) {
+			case 1: supplied.route.required_dead_key_id = 9; break;
+			case 2: supplied.composition_before.generation = 0; break;
+			case 3: supplied.composition_before.generation = 4; break;
+			case 4: supplied.composition_before.layout_id = 82; break;
+			case 5: supplied.composition_after.dead_key_id = 9; break;
+			case 6: supplied.composition_after.generation = 1; break;
+			case 7: supplied.composition_after.layout_id = 82; break;
+			case 8: supplied.modifiers_lr_before = supplied.modifiers_lr_after = 0x10; break;
+			case 9: supplied.modifiers_lr_after = 0x10; break;
+			case 10: supplied.route.required_prefixes = 1; break;
+			case 11: supplied.prefixes_before = 1; break;
+			case 12: supplied.route.target_scan = 1; break;
+			case 13: supplied.event.repeat = 1; break;
+			case 14: supplied.route.next_dead_key_id = 0; break;
+			case 15: supplied.route.effective_modifiers_lr = 0x10; break;
+			default: break;
+		}
+		assert(ErgoptiOutput_Initialize(&output, OWNER) == 0);
+		assert(ErgoptiOutput_Plan(&output, OWNER, 10, 1, &routes, &supplied,
+			vector == 16 ? &text : NULL, vector == 16 ? 1 : 0,
+			vector == 17 ? 0 : 1, &key) == (vector == 0 ? 0 : ERGOPTI_OUTPUT_DIAGNOSTIC));
+		assert(ErgoptiOutput_Inspect(&output, OWNER, &key, units, 2, &count, &dispatchable) == 0);
+		assert(count == 0 && dispatchable == (vector == 0 ? 1u : 0u));
+		memset(&consumed, 0xA5, sizeof(consumed));
+		memcpy(&preserved, &consumed, sizeof(preserved));
+		if (vector == 0) {
+			assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == 0);
+			assert(memcmp(&consumed, &bridge.event, sizeof(consumed)) == 0);
+		} else {
+			assert(ErgoptiOutput_BeginAttempt(&output, OWNER, &key, units, 2,
+				&count, &attempt) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+			assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+			assert(memcmp(&consumed, &preserved, sizeof(consumed)) == 0);
+			assert(output.accepted == 0 && output.attempting == 0);
+		}
+		assert(memcmp(&routes, &before, sizeof(routes)) == 0);
+		assert(memcmp(routes.routes, recipes, sizeof(recipes)) == 0);
+	}
+	assert(ErgoptiReplay_Dispose(&routes, OWNER) == 0);
+}
+
+/** Empty completion retains old-state identity and requires no invented ACK. */
+static void TestEmptyCompositionFinalGuards(void)
+{
+	ErgoptiReplay_State routes = ERGOPTI_REPLAY_STATE_INIT;
+	ErgoptiReplay_State before;
+	ErgoptiReplay_Route recipes[2] = {
+		{.recipe_id = 81, .route_id = 1, .code = 0x29, .axis = ERGOPTI_REPLAY_SCAN,
+			.kind = ERGOPTI_REPLAY_DEAD_KEY, .next_dead_key_id = 7},
+		{.recipe_id = 82, .route_id = 2, .code = 0x1E, .axis = ERGOPTI_REPLAY_SCAN,
+			.kind = ERGOPTI_REPLAY_DEAD_KEY, .required_dead_key_id = 7}
+	};
+	ErgoptiReplay_Event event = {.timestamp = 100, .source_id = 1,
+		.vk = 0xC0, .scan = 0x29, .origin = ERGOPTI_REPLAY_PHYSICAL};
+	ErgoptiReplay_Snapshot completion;
+	assert(ErgoptiReplay_Initialize(&routes, OWNER) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 1, 81, recipes, 2) == 0);
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &completion) == 0);
+	event.timestamp++; event.key_up = 1;
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &completion) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 3, 81, recipes, 2) == 0);
+	event.timestamp++; event.key_up = 0; event.source_id = 2;
+	event.vk = 'A'; event.scan = 0x1E;
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &completion) == 0);
+	assert(completion.status == ERGOPTI_REPLAY_OK && completion.route_generation == 3);
+	assert(completion.composition_before.dead_key_id == 7 && completion.composition_before.generation == 1);
+	assert(completion.composition_before.layout_id == 81);
+	assert(completion.composition_after.dead_key_id == 0 && completion.composition_after.generation == 0);
+	assert(completion.composition_after.layout_id == 0);
+	memcpy(&before, &routes, sizeof(before));
+	for (uint32_t vector = 0; vector < 17; ++vector) {
+		ErgoptiOutput_State output = ERGOPTI_OUTPUT_STATE_INIT;
+		ErgoptiReplay_Snapshot supplied;
+		ErgoptiOutput_Key key;
+		ErgoptiReplay_Event consumed, preserved;
+		ErgoptiOutput_Unit units[2];
+		uint32_t count = 99, dispatchable = 99;
+		memcpy(&supplied, &completion, sizeof(supplied));
+		switch (vector) {
+			case 1: supplied.route.required_dead_key_id = 9; break;
+			case 2: supplied.composition_before.generation = 0; break;
+			case 3: supplied.composition_before.generation = 4; break;
+			case 4: supplied.composition_before.layout_id = 82; break;
+			case 5: supplied.composition_after.dead_key_id = 9; break;
+			case 6: supplied.composition_after.generation = 1; break;
+			case 7: supplied.composition_after.layout_id = 82; break;
+			case 8: supplied.modifiers_lr_before = supplied.modifiers_lr_after = 0x10; break;
+			case 9: supplied.modifiers_lr_after = 0x10; break;
+			case 10: supplied.route.required_prefixes = 1; break;
+			case 11: supplied.prefixes_before = 1; break;
+			case 12: supplied.route.target_scan = 1; break;
+			case 13: supplied.event.repeat = 1; break;
+			case 14: supplied.route.next_dead_key_id = 8; break;
+			case 15: supplied.route.effective_modifiers_lr = 0x10; break;
+			default: break;
+		}
+		assert(ErgoptiOutput_Initialize(&output, OWNER) == 0);
+		assert(ErgoptiOutput_Plan(&output, OWNER, 10, 1, &routes, &supplied,
+			NULL, 0, vector == 16 ? 0 : 1, &key) == (vector == 0 ? 0 : ERGOPTI_OUTPUT_DIAGNOSTIC));
+		assert(ErgoptiOutput_Inspect(&output, OWNER, &key, units, 2, &count, &dispatchable) == 0);
+		assert(count == 0 && dispatchable == (vector == 0 ? 1u : 0u));
+		assert(output.accepted == 0 && output.attempting == 0);
+		memset(&consumed, 0xA5, sizeof(consumed)); preserved = consumed;
+		if (vector == 0) {
+			assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == 0);
+			assert(memcmp(&consumed, &completion.event, sizeof(consumed)) == 0);
+		} else {
+			assert(ErgoptiOutput_Consume(&output, OWNER, &key, &consumed) == ERGOPTI_OUTPUT_DIAGNOSTIC);
+			assert(memcmp(&consumed, &preserved, sizeof(consumed)) == 0);
+		}
+		assert(memcmp(&routes, &before, sizeof(routes)) == 0);
+		assert(memcmp(routes.routes, recipes, sizeof(recipes)) == 0);
+	}
+	assert(ErgoptiReplay_Dispose(&routes, OWNER) == 0);
+}
+
+
 static void TestEdgesAndGuard(void)
 {
+	TestEmptyCompositionBridgeGuards();
+	TestEmptyCompositionFinalGuards();
 	TestDirectDigitDiagnostics();
 	ErgoptiOutput_State o; ErgoptiReplay_State r; Start(&o, &r);
 	ErgoptiReplay_Snapshot s = Snapshot(); ErgoptiOutput_Key key;
@@ -245,6 +407,7 @@ static void TestEdgesAndGuard(void)
 		assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 1);
 		assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == 0);
 	}
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 static void TestDiagnosticCopyAndBounds(void)
@@ -288,6 +451,7 @@ static void TestDiagnosticCopyAndBounds(void)
 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 4, &r, &s, NULL, 0, 1, &key) == 1);
 	assert(ErgoptiOutput_Inspect(&o, OWNER, &key, NULL, 0, &count, &dispatchable) == 0);
 	assert(count == 0 && dispatchable == 0 && o.snapshot.status == 1);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 /** Real routing output, not a fabricated all-zero absent-registration fixture. */
@@ -324,6 +488,7 @@ static void TestUnregisteredCoreInterop(void)
 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 2, &r, &actual, NULL, 0, 1, &key) == 1);
 	assert(ErgoptiOutput_Inspect(&o, OWNER, &key, NULL, 0, &count, &dispatchable) == 0);
 	assert(count == 0 && dispatchable == 0 && o.snapshot.event.key_up == 1);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 /** Exact ABI custody must retain representation bytes, not only field values. */
@@ -360,10 +525,49 @@ static void TestSnapshotRepresentationCustody(void)
 	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
 	assert(memcmp(&edge, expected + 104, 24) == 0);
 	assert(memcmp(&o.snapshot, expected, sizeof(expected)) == 0);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
+}
+
+/** Valid descriptors may resemble planner state but never become writable state. */
+static void TestAllocatedPlannerStateAlias(void)
+{
+	enum { ROUTES = 196 };
+	ErgoptiReplay_State routes = ERGOPTI_REPLAY_STATE_INIT;
+	ErgoptiReplay_Route descriptors[ROUTES] = {{0}}, frozen[ROUTES];
+	ErgoptiReplay_Event event = {.timestamp = 1, .source_id = 1, .scan = ROUTES,
+		.origin = ERGOPTI_REPLAY_PHYSICAL};
+	ErgoptiReplay_Snapshot snapshot;
+	ErgoptiOutput_State shape = ERGOPTI_OUTPUT_STATE_INIT;
+	ErgoptiOutput_Key key, preserved;
+	for (uint32_t i = 0; i < ROUTES; ++i) {
+		descriptors[i].recipe_id = i + 1;
+		descriptors[i].route_id = i + 1;
+		descriptors[i].code = (uint16_t)(i + 1);
+		descriptors[i].axis = ERGOPTI_REPLAY_SCAN;
+		descriptors[i].kind = ERGOPTI_REPLAY_CHARACTER;
+	}
+	descriptors[0].recipe_id = OWNER;
+	descriptors[1].required_prefixes = 1;
+	assert(ErgoptiReplay_Initialize(&routes, OWNER) == 0);
+	assert(ErgoptiReplay_Register(&routes, OWNER, 1, 81, descriptors, ROUTES) == 0);
+	assert(ErgoptiReplay_Step(&routes, OWNER, &event, &snapshot) == 0);
+	memcpy(frozen, routes.routes, sizeof(frozen));
+	/* Inspect a bounded byte prefix without dereferencing an aliased typed state. */
+	memcpy(&shape, routes.routes, offsetof(ErgoptiOutput_State, snapshot));
+	assert(shape.owner == OWNER && shape.initialized && !shape.active);
+	assert(shape.last_sequence < 2 && shape.next_plan_id != UINT64_MAX);
+	memset(&key, 0xA5, sizeof(key));
+	memcpy(&preserved, &key, sizeof(preserved));
+	assert(ErgoptiOutput_Plan((ErgoptiOutput_State *)(void *)routes.routes,
+		OWNER, 1, 2, &routes, &snapshot, NULL, 0, 1, &key) == ERGOPTI_OUTPUT_INVALID);
+	assert(memcmp(frozen, routes.routes, sizeof(frozen)) == 0);
+	assert(memcmp(&key, &preserved, sizeof(key)) == 0);
+	assert(ErgoptiReplay_Dispose(&routes, OWNER) == 0);
 }
 
 static void TestInvalidAndOwnership(void)
 {
+	TestAllocatedPlannerStateAlias();
 	ErgoptiOutput_State o = ERGOPTI_OUTPUT_STATE_INIT; ErgoptiReplay_State r;
 	assert(ErgoptiOutput_Initialize(&o, 0) == -1);
 	o.owner = OWNER + 1; assert(ErgoptiOutput_Initialize(&o, OWNER) == -1);
@@ -386,6 +590,7 @@ static void TestInvalidAndOwnership(void)
 	assert(ErgoptiOutput_Cancel(&o, OWNER, &key) == 0);
 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 1, &r, &s, NULL, 0, 1, &key) == -6);
 	assert(ErgoptiOutput_Plan(&o, OWNER, 10, 2, &r, &s, NULL, 1025, 1, &key) == -7);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 /** Crossed authentic sources keep a natural modifier active until its final UP. */
@@ -499,6 +704,7 @@ static void TestNaturalModifierSourceCustody(void)
 						assert(consumed.vk == modifiers[modifier].vk && consumed.scan == modifiers[modifier].scan);
 						assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == ERGOPTI_OUTPUT_STALE);
 					}
+					assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 				}
 			}
 		}
@@ -564,6 +770,7 @@ static void TestWin32UnicodeAttemptPrefixes(void)
 			}
 			assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
 			assert(edge.scan == 0x10 && edge.repeat == 1);
+			assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 		}
 	}
 }
@@ -608,6 +815,7 @@ static void TestWin32NaturalKeysFromActualReplay(void)
 			assert(ErgoptiOutput_Consume(&o, OWNER, &key, &consumed) == 0);
 			assert(consumed.key_up == up && consumed.scan == vectors[v].scan);
 		}
+		assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 	}
 }
 
@@ -685,6 +893,7 @@ static void TestWin32SerializationRefusalsAndBounds(void)
 	assert(ErgoptiOutput_Acknowledge(&o, OWNER, &key, attempt, 2048) == 0);
 	ErgoptiReplay_Event edge;
 	assert(ErgoptiOutput_Consume(&o, OWNER, &key, &edge) == 0);
+	assert(ErgoptiReplay_Dispose(&r, OWNER) == 0);
 }
 
 int main(void)

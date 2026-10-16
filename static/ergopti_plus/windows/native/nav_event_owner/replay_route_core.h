@@ -16,8 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* Bounded representative registrations; this is not a complete KLE table. */
-#define ERGOPTI_REPLAY_MAX_ROUTES 128u
+/* Physical hold custody is bounded independently of the immutable route graph. */
 #define ERGOPTI_REPLAY_MAX_HELD_KEYS 64u
 #define ERGOPTI_REPLAY_STATE_INIT {0}
 
@@ -180,7 +179,8 @@ typedef struct ErgoptiReplay_State {
 	uint8_t initialized;
 	uint8_t has_timestamp;
 	ErgoptiReplay_Composition composition;
-	ErgoptiReplay_Route routes[ERGOPTI_REPLAY_MAX_ROUTES];
+	ErgoptiReplay_Route *routes;
+	uintptr_t storage_owner;
 	ErgoptiReplay_Hold holds[ERGOPTI_REPLAY_MAX_HELD_KEYS];
 } ErgoptiReplay_State;
 
@@ -228,6 +228,17 @@ _Static_assert(offsetof(ErgoptiReplay_Snapshot, route) == 128, "Replay captured 
 
 /** Initializes once with a nonzero owner; duplicate initialization is rejected. */
 int32_t ErgoptiReplay_Initialize(ErgoptiReplay_State *state, uint64_t owner);
+
+/** Releases this instance's metadata; the native caller fences output debt first. */
+int32_t ErgoptiReplay_Dispose(ErgoptiReplay_State *state, uint64_t owner);
+
+/** Transfers one initialized instance into fresh destination storage exactly once. */
+int32_t ErgoptiReplay_Move(
+	ErgoptiReplay_State *destination, ErgoptiReplay_State *source, uint64_t owner);
+
+/** Refuses output spans that wrap or overlap the instance and its route storage. */
+int ErgoptiReplay_OverlapsStorage(
+	const ErgoptiReplay_State *state, const void *output, size_t output_size);
 
 /**
  * Atomically publishes a fully validated authoritative registration set.
