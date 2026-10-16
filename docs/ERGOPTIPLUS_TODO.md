@@ -12,6 +12,42 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 published native build receiving
+
+The native checkpoint is published on dev at
+`6bc80aee722fa87162678e13752332a0c1635ea3`, by an ordinary fast-forward from
+8c21c6adf2 after fresh explicit dev/groups fetches and remote identity checks.
+Main remains unchanged. The actual ordinary Windows build has11,122,176 bytes,
+SHA256c4328c0292dba84151a275feb04f273ec646bbe2c047568833107d2384636cb9,
+and reaches driver readiness with the officially regenerated native bundle.
+The local Diagnostics API acknowledges its exact PID/lifetime request; the
+actual Diagnostics window is then visibly observed without operator interaction.
+
+Its actual collection produces a verified7,953-byte ZIP, SHA256
+554072145af801d859ab60007ee29f27e4e8e76b5847cb4696f537014921ad99.
+CRC, entry allowlist, redaction, source and component hashes pass. The results
+are6PASS,6UNRUN and2explicit physical SKIP, with qualification flags false.
+UIA and rendering pass in this collection; the earlier8c21 archive's two
+failures remain retained and their original cause is not established by this
+later success. The exact collector handle exits0 after36.937s; independent
+directory inspection confirms request, cancellation and UIA target controls
+are retired. The application subsequently accepts one ordinary File/Exit
+request and naturally exits0, without force or kill.
+
+The personal locator remains byte-identical and the protected personal UIA
+worker keeps its original native lifetime. A subsequent independent census
+finds the former standalone Ollama PID18388 and its16107 listener absent.
+This receiving issued no controlled stop to that server; its termination time
+and cause are unobserved. Do not claim uninterrupted external-server survival
+or restart an absent external owner by guessing its intended state.
+
+Final source controls, source-read and false-green ratchets, encoding, strict
+conventions and full formatting with the existing pinned Ruff0.15.8 pass with
+unchanged source. The frozen full JavaScript result remains423PASS/10FAIL,
+exit1. The final reader has separate targeted receiving; no green full-gate
+result is inferred. Original Frame/source pinning, stream/cohort work, the
+native file-filter failure, physical Windows, macOS and native Linux remain OPEN.
+
 ### October 16 canonical native bundle and installed shutdown receiving
 
 The canonical Windows source now integrates exact-count replay route storage,
