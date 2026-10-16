@@ -12,6 +12,43 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 published58e9 installed Diagnostics receiving
+
+The two atomic native-repeat and exact-count corrections are published on dev
+at58e934f53ec4c8341eb417c14b1a193052f546bb after fresh dev/groups fetches and
+remote checks. Main and the preserved group remote branch remain unchanged.
+The ordinary Windows builder produces11,122,688 bytes, SHA256
+21e6c5039d03f64e58e9dbcfb406faefbfa333bad5f4cac6bd1229118438efaf.
+The compiled application reaches actual readiness in an isolated configuration;
+the personal locator is restored byte-identically and its original UIA worker
+remains preserved. The local control API opens its actual observed Diagnostics
+window without an operator tray action. The real collection button launches
+one worker, whose retained native handle signals natural exit0.
+
+The resulting7,959-byte ZIP has SHA256
+a4aefe91afc46e752e9a8f3d6b199cd6f076688b948d06664a078e2b56686dfe.
+CRC, entry allowlist, redaction, exact source and all component hashes pass.
+Results retain6PASS,6UNRUN and2 explicitly ignored physical steps; production
+and physical qualification flags remain false. Independent session inspection
+finds only the six retained result artifacts, with request, cancellation and
+UIA target controls retired. These are automated native Windows observations;
+they do not qualify physical keyboard behavior or native macOS/Linux.
+
+Installed application shutdown remains OPEN. The first ordinary File/Exit
+request does not signal process retirement within30seconds. After Diagnostics
+is separately closed, one further ordinary exit request still does not signal
+retirement within30seconds. Both failed receipts remain preserved; the exact
+compiled test process stays alive. No force/kill or second input owner is used.
+Repeated menu rebuilds are observed, but their cause and connection to the exit
+failure remain unestablished. This ZIP success does not qualify app shutdown;
+the prior6bc80aee72 ordinary-exit proof remains historical and separate.
+
+CI38921192200 receives the published source and reports a Linux unit failure
+in the native metrics histogram fixture: its SQLite read refuses while reading
+the manifest. The exact job log is retained; attribution to this lot is not
+established. No Linux success or globally green CI is inferred. The remaining
+software, complete suites, physical Windows and native macOS/Linux stay OPEN.
+
 ### October 16 queued native repeat receiving
 
 Committed native correction f6088c2b8a settles the original physical UP after
@@ -87,7 +124,7 @@ Delivery of this lot remains OPEN; the last verified installed artifact and
 Diagnostics ZIP remain the6bc80aee72 checkpoint below. Source/Frame pinning,
 historical admission, normal graph integration, stream/cohort software and
 production policy remain unfinished. Physical Windows, native macOS and
-unavailable native Linux are not qualified by these Windows VM controls.
+unavailable native Linux are not qualified by these automated Windows controls.
 
 ### October 16 native file-filter observer receiving
 
