@@ -12,6 +12,22 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 Windows metrics reader native access
+
+The Windows metrics readers now use the existing strict UTF-8 adapter
+for all schema reads and one native open adapter for ledger acquisitions.
+Access/sharing flags, explicit encodings, omitted native encoding defaults,
+returned file ownership and native failures are preserved. This changes
+Windows dependency direction, with no shared port or other driver change.
+
+All 76 original cases in the five reader files pass naturally with exact
+authored names and unchanged assertions, including file identity, write
+sharing, malformed input and encrypted reconstruction. This private
+owning-file selection is not the complete default suite. The original
+modules/lib OS-call ratchet passes at 250 against its unchanged baseline
+of 252; the original source failed at 257. Full startup, native Linux/macOS
+and physical acceptance remain separately OPEN.
+
 ### October 16 bounded native source masking
 
 The shared AHK source masker now consumes unambiguous quoted runs
