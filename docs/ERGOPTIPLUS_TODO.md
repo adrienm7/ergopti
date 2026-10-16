@@ -12,6 +12,52 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 canonical layout source and normal graph receiving
+
+The original Windows Load/Unload owner now prepares complete canonical data
+before atomically publishing a source. Failed activation preserves the previous
+admitted layout. Private native function identities, typed deep snapshots and
+monotonic epochs fence current-source access. Retained old readers preserve
+their original data after replacement or unload; reading data grants no native
+event or output authority.
+
+Normal replay uses one breadth-first state namespace across all eight
+Shift/Caps/Option selectors. Independently built fixed-family graphs cannot
+represent transitions that enter a state through one family and leave through
+another. The existing fixed-family reader keeps its original API. Original
+parser models remain the source of all rows; no shared defaults or other
+driver's runtime changes. These private Windows data APIs support the dedicated
+native Frame integration, which remains unfinished.
+
+The real original-source control fails at the missing normal-reader assertion.
+The new five-case family passes, including a literal mixed-family path and a
+shipped Ergol composition crossing selectors. All168 targeted canonical cases
+pass naturally with complete manifests and unchanged source:5 normal graphs,
+37 source-owner controls,7 fixed graphs,91 reset observers,10 registry cases,
+4 binding controls and14 reset-identity cases. The last family contains13
+physical-identity behavior cases plus one unchanged source scanner. The first
+receiver incorrectly expected13 and exits1; its failure is retained. Independent
+verification authenticates both original source rosters and every actual
+terminal name, without changing a filter, assertion or source or rerunning it.
+The separate original emulation selection passes all20 cases, with overlap
+against those families; these counts are not unique-suite totals.
+
+All12 source controls, encoding, conventions, ratchets and full formatting pass.
+Actual parse, full startup and all70 E2E cases pass naturally without skips.
+The complete current default suite is unqualified; the earlier full JavaScript
+failures, incomplete Windows run and unresolved journal debt remain retained.
+This source lot is not yet packaged. Source/Frame pinning, historical native
+admission, stream/cohort software and production policy remain OPEN, as do
+physical Windows and native macOS/Linux acceptance.
+
+The preceding58e934f53e installed build subsequently reaches a completed
+suspension and accepts an ordinary File/Exit request: exact retained process
+handle, natural exit0 and no force/kill. The three earlier active-state exit
+failures remain preserved, including the observed real Quit menu action.
+Pausing is a separate successful path and does not repair active shutdown.
+The exact original Diagnostics collection remains visible after an API-driven
+close/reopen; the verified ZIP and source identity remain that earlier build.
+
 ### October 16 published58e9 installed Diagnostics receiving
 
 The two atomic native-repeat and exact-count corrections are published on dev
@@ -37,8 +83,9 @@ they do not qualify physical keyboard behavior or native macOS/Linux.
 Installed application shutdown remains OPEN. The first ordinary File/Exit
 request does not signal process retirement within30seconds. After Diagnostics
 is separately closed, one further ordinary exit request still does not signal
-retirement within30seconds. Both failed receipts remain preserved; the exact
-compiled test process stays alive. No force/kill or second input owner is used.
+retirement within30seconds. Both failed receipts remain preserved. The exact compiled test process stayed
+alive at that checkpoint and later retired naturally after verified suspension,
+as recorded above. No force/kill or second input owner was used.
 Repeated menu rebuilds are observed, but their cause and connection to the exit
 failure remain unestablished. This ZIP success does not qualify app shutdown;
 the prior6bc80aee72 ordinary-exit proof remains historical and separate.
