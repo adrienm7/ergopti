@@ -81,3 +81,28 @@ for InComment in [false, true]
 	for Glyph in ["é", "😀", "𝄞"]
 		Test("driver source: Unicode offsets " . Glyph . " comment=" . InComment . " (driver-mask-unicode-offsets)",
 			_DSQD_UnicodeOffsets.Bind(Glyph, InComment))
+
+/** Large real fixtures must not exhaust PCRE while hiding quoted source decoys. */
+_DSQD_LongLiteralMask(Scenario) {
+	Quote := Scenario == "single" ? Chr(39) : Chr(34)
+	Payload := StrReplace(Format("{:100000}", ""), " ", "x")
+	if Scenario == "escaped-double"
+		Payload := StrReplace(Payload, "x", Chr(96) . Quote)
+	Prefix := "Value := "
+	Live := "LiteralMaskSubject() {`n return 42`n}"
+	Source := Prefix . Quote . Payload . Quote . "`n" . Live
+	Original := Source
+	Masked := _DriverMaskNonCode(&Source)
+	AssertEqual(StrLen(Source), StrLen(Masked), "large masks must preserve exact native offsets")
+	AssertEqual(Prefix, SubStr(Masked, 1, StrLen(Prefix)))
+	Span := SubStr(Masked, StrLen(Prefix) + 1, StrLen(Payload) + 2)
+	AssertFalse(RegExMatch(Span, "[^ ]"), "every quoted byte must remain data")
+	AssertEqual("`n" . Live, SubStr(Masked, StrLen(Prefix) + StrLen(Payload) + 3))
+	Definition := _DriverFindFunctionDefinition(&Masked, "LiteralMaskSubject", 1, true)
+	AssertTrue(IsObject(Definition), "the real following function must remain discoverable")
+	AssertEqual(InStr(Source, Live), Definition.Idx, "the following definition keeps its exact source offset")
+	AssertEqual(Original, Source, "masking must retain its immutable source")
+}
+for Scenario in ["single", "double", "escaped-double"]
+	Test("driver mask: large " . Scenario . " literal retains exact code boundaries (driver-mask-large-literal)",
+		_DSQD_LongLiteralMask.Bind(Scenario))
