@@ -12,6 +12,52 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 native file-filter observer receiving
+
+The original native observer repeats a full shell-view traversal for each
+filename and spelling. Actual tracing receives approximately5.3-5.7 seconds
+per traversal despite the existing500ms UIA transaction setting. Its unchanged
+24-second outer bound expires before the restored-filter observation finishes;
+the parent then retires its exact owned dialog. This establishes an observer
+budget failure, without establishing a production file-filter defect.
+
+The corrected observer takes one fresh ListItem/DataItem census per poll and
+applies the original exact-name, duplicate, ProcessId and IsOffscreen predicates
+to that census. No census survives a filter change; no query or process bound
+increases. Canonical receiving completes all7 selected cases, natural exit0,
+including the original five-policy native selected/cancelled dialog exercise
+and two added predicate controls. The actual friendly-label and unfiltered
+mutants still fail for their original exact refusal messages. The additional
+controls cover exact spelling, case, prefix, visibility, duplicate and foreign
+process refusal. Encoding, strict conventions, source-read and false-green
+ratchets pass with unchanged tracked source.
+
+The frozen full unit run exits2 through its unchanged120-minute watchdog:
+12,780 planned,5,930 terminal/timed results,5,928PASS and2FAIL. The guarded
+acquired-read read_bounded control fails its repair assertion and retains
+rollback/retirement debt; the following write_create_durable control fails
+admission. Case5,931 starts without a terminal result and6,849 later cases
+never start. Their unresolved journals remain retained. The native file-filter
+case itself passes; no cause or repair of the journal failures is inferred.
+
+The frozen JavaScript run completes all433 checks,422PASS/11FAIL, exit1.
+One failure is the title-audit source guard still requiring per-name provider
+queries. Its updated reader requires the fresh census and local exact-name,
+duplicate, process and visibility predicates. All prior control families remain;
+the substring mutation moves to the actual local comparator and seven additive
+inverses reject case-insensitive names, duplicate acceptance, foreign processes,
+offscreen acceptance, stale rows and repeated provider traversal. Its actual
+CLI passes22 native-behavior mutations and the original66 title mutations,
+natural exit0. The other ten full-run failures remain failed, including link
+privilege refusals and Linux/macOS/toolchain receiving. This targeted reader
+receiving does not establish a green complete JavaScript composition.
+
+This receives owned Windows native file dialogs and the generated test
+predicate. The previous incomplete full unit result remains incomplete;
+the full current composition is not qualified by these seven cases. Original
+Frame/source pinning, historical admission, stream/cohort software, physical
+Windows, native macOS and unavailable native Linux remain OPEN.
+
 ### October 16 published native build receiving
 
 The native checkpoint is published on dev at
@@ -46,7 +92,7 @@ conventions and full formatting with the existing pinned Ruff0.15.8 pass with
 unchanged source. The frozen full JavaScript result remains423PASS/10FAIL,
 exit1. The final reader has separate targeted receiving; no green full-gate
 result is inferred. Original Frame/source pinning, stream/cohort work, the
-native file-filter failure, physical Windows, macOS and native Linux remain OPEN.
+full unit receiving, physical Windows, macOS and native Linux remain OPEN.
 
 ### October 16 canonical native bundle and installed shutdown receiving
 
