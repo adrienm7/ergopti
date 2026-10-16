@@ -12,6 +12,71 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 current CI and installed receiving
+
+CI 38944902800 on 5f4f3c74c7 completes the actual Windows default suite
+with 12,837 PASS and 7 FAIL, natural exit1. Its source-bound execution
+manifest contains all 12,844 planned, executed and timed cases. The prior
+receipt-sharing, two OS-call and timer-inventory failures no longer occur.
+All seven remaining native network/updater cases fail during the fixture's
+native TLS constructor, before trust installation or transport receiving.
+Their original failures and failed cleanup facts remain retained. A separate
+Windows probe executes that exact original C# TLS constructor successfully
+and retires its ephemeral resources without opening a trust store or
+creating a listener. It does not explain or close the hosted failures.
+
+The artifact's console log loses Unicode in some case names and failure
+separators. Independent exact TAP receiving therefore refuses that log;
+the original raw default-suite results are absent from this artifact.
+Published execution-manifest counts remain reported CI evidence, without
+reconstructing a clean native receipt from replacement characters.
+
+Both macOS architectures now compile the actual managed launcher and pass
+the SDK XCTest step. Later number-row, PAC/WPAD, native HTTP and managed
+model stages still fail; those jobs are not green. Hosted Linux unit tests
+pass 14,013 cases and receive the repaired histogram fixture. Linux E2E
+still fails one of four current device-schema cases: opening the already
+current schema while a genuine native reader holds a shared lock. Its
+other three schema cases and eleven device-registration cases pass. These
+hosted receipts do not qualify the maintainer's Linux or macOS devices.
+
+The generated-corrections source image passes the full format gate. Its
+complete original JavaScript run finishes naturally with exit1, with
+422 PASS and 11 FAIL, all 433 starts paired with terminal results and
+the source image unchanged. Failures include host/platform refusals and
+a Windows metrics native child timeout; none is relabelled as success or
+presumed unrelated. The actual full-driver startup case in that run passes
+with natural exit0. Earlier intermittent startup/logger failures remain
+open despite that successful attempt.
+
+An independent metrics replay preserves the original 60-second native
+deadline and every assertion. Both authored AHK snapshot-reopen cases pass
+with natural exit0, followed by the original JavaScript bridge checks. Its
+captured native output and results remain separate from the full-run timeout;
+that earlier failure is not erased and its cause is still unproven.
+
+Published 5f4f3c74c7 also receives an official 11,140,096-byte Windows build,
+SHA256 d7f7c86307fe4272ceda131fb4ce5271a3866cf9e468619a5340a65df6c979e2.
+The process-bound API opens its actual Diagnostics window. Two collections
+produce six automatic/native successes but reach the physical-step deadline;
+their cancellation markers and deadline SKIPs remain retained. A third
+collection survives verified close/reopen at 10/14 and receives an explicit
+physical-step skip before the deadline, but its native UIA and render probes
+fail with native_probe_error and HResult -2146233087. Its exact result is
+4 PASS, 2 FAIL, 6 UNRUN and 2 SKIP, not clean native receiving.
+
+That 3,743-byte failure-report ZIP has SHA256
+be9a72dff0a644e54178b4d844b6b2b29cbfa416ddaca4b38ef7e9c7e0707f07.
+CRC, entry allowlist, redaction and source/component hashes pass, while the
+original stricter clean-receiving verifier correctly refuses the two native
+failures. The retained worker handle signals natural exit0; independent
+inspection confirms request, cancellation and UIA controls retired. After
+Diagnostics closes, one ordinary unsuspended File/Exit request retires the
+exact application with exit0, without force/kill. Personal configuration
+and the pre-existing protected worker are preserved. Production, physical,
+native macOS and personal Linux qualification remain open. The earlier
+c618 clean archive is retained separately and does not erase this failure.
+
 ### October 16 generated diagram and updater source seal receiving
 
 CI 38944902800 exposes three generated-output failures from the missing
