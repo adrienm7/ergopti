@@ -12,6 +12,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 Diagnostics control native timer boundary
+
+The original control protocol, Win32 message and 100 ns process lifetime
+checks are unchanged. Native operations now belong to a dedicated Windows
+adapter, and its timer rejects positive or non-integer periods before
+publishing a repeating callback. Zero cancels the exact callback; admitted
+negative periods remain one-shot. No opaque timer inventory exemption is
+added, and no macOS/Linux control endpoint is invented.
+
+The actual production collaborator passes all three principal-runner cases
+for refusal, one-shot execution and native cancellation, with its source
+image captured before and after execution. The refusal case fails on the
+original wiring. The existing timer inventory and UI OS-call ratchet pass
+without relaxed assertions: UI native calls fall from 128 to the unchanged
+baseline of 126. Actual parse and 70 E2E cases pass; the failed current
+suspend-marker startup and prior JavaScript execution stay OPEN.
+The verified c618 installed binary and archive remain the usable artifact;
+these later source corrections have not yet been packaged.
+
 ### October 16 Windows metrics reader native access
 
 The Windows metrics readers now use the existing strict UTF-8 adapter

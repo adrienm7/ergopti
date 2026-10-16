@@ -1024,3 +1024,44 @@ _TestHC_WindowControlUnboundRequest() {
 	}
 }
 Test("Diagnostics control refuses an unbound request (diagnostics-control-unbound)", _TestHC_WindowControlUnboundRequest)
+
+/** Receives the actual production timer collaborator, including native cancellation. */
+_TestHC_ActualControlTimer(Scenario) {
+	global _HealthCheckWindowControl
+	AssertFalse(IsObject(_HealthCheckWindowControl), "the actual diagnostics endpoint must have no prior owner")
+	Count := 0
+	Callback := (*) => Count += 1
+	HealthCheck_StartWindowControl()
+	Control := _HealthCheckWindowControl
+	try {
+		if Scenario == "repeating" {
+			AssertThrows(() => Control.TimerFn.Call(Callback, 100),
+				"the production diagnostics control must refuse a repeating timer")
+		} else if Scenario == "cancelled" {
+			PreviousCritical := A_IsCritical
+			Critical("On")
+			try {
+				Control.TimerFn.Call(Callback, -1)
+				Control.TimerFn.Call(Callback, 0)
+			} finally Critical(PreviousCritical)
+			Sleep(100)
+			AssertEqual(0, Count, "actual native cancellation must withdraw the exact callback")
+		} else {
+			AssertEqual("one-shot", Scenario, "the authored native scenario must be known")
+			Control.TimerFn.Call(Callback, -1)
+			Started := A_TickCount
+			while Count == 0 && A_TickCount - Started < 2000
+				Sleep(10)
+			AssertEqual(1, Count, "the actual deferred callback must run")
+			Sleep(100)
+			AssertEqual(1, Count, "the actual callback must remain one-shot")
+		}
+	} finally {
+		try Control.TimerFn.Call(Callback, 0)
+		finally HealthCheck_StopWindowControl()
+	}
+	AssertFalse(IsObject(_HealthCheckWindowControl), "the actual production listener must retire")
+}
+Test("Diagnostics native timer: repeating periods are refused (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("repeating"))
+Test("Diagnostics native timer: actual one-shot executes once (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("one-shot"))
+Test("Diagnostics native timer: actual cancellation retires its callback (diagnostics-control-native-timer)", _TestHC_ActualControlTimer.Bind("cancelled"))
