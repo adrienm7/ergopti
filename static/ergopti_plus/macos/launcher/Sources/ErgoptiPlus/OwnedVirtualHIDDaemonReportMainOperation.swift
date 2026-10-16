@@ -160,10 +160,10 @@ final class OwnedVirtualHIDDaemonReportMainOperation {
 			return (reader, writer, witness)
 		}
 		guard let output = makePipe(), let errors = makePipe(), inputsCurrent() else { return false }
-		let arguments = [executable, "--query-vhd-daemon-report-purpose"].map { strdup($0) } + [nil]
-		let environment = ["PATH=/usr/bin:/bin:/usr/sbin:/sbin"].map { strdup($0) } + [nil]
-		defer { for case let p? in arguments { free(p) }; for case let p? in environment { free(p) } }
-		guard arguments.dropLast().allSatisfy({ $0 != nil }), environment.dropLast().allSatisfy({ $0 != nil }) else { return false }
+		guard let arguments = duplicateCStringVector([executable, "--query-vhd-daemon-report-purpose"]) else { return false }
+		defer { for case let pointer? in arguments { free(pointer) } }
+		guard let environment = duplicateCStringVector(["PATH=/usr/bin:/bin:/usr/sbin:/sbin"]) else { return false }
+		defer { for case let pointer? in environment { free(pointer) } }
 		var argv = arguments, envp = environment
 		queryAttempted = true
 		let prepared = argv.withUnsafeMutableBufferPointer { args in
