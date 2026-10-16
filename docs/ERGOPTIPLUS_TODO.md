@@ -12,6 +12,21 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 daemon-report Swift allocation correction
+
+Both native SDK logs reject the daemon-purpose query's inferred strdup
+array closures. The query now reuses the existing typed nil-terminated
+C-string vector owner, with separate argument and environment cleanup.
+A refused second allocation still releases the first; native process,
+signature, administrator-consent and report-admission policy are unchanged.
+
+Windows explicitly defers Swift compilation. The earlier Intel and Apple
+silicon compiler failures remain retained, and corrected native builds and
+XCTest are UNRUN until macOS CI receives this source. Portable receipt
+controls are not compiler evidence; a separate Windows-host invocation
+of 24 such controls has 22 PASS and 2 host-API errors and is not green.
+No native macOS qualification or successful later stage is inferred.
+
 ### October 16 Diagnostics control native timer boundary
 
 The original control protocol, Win32 message and 100 ns process lifetime
