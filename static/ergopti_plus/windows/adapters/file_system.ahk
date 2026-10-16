@@ -48,6 +48,17 @@ FSReadBytesStrict(Path) {
 	return FileRead(Path, "RAW")
 }
 
+; Opens an owned native file without changing flags, encoding, or failure behavior.
+; @param Path {String} File path.
+; @param Flags {String|Integer} Native access, sharing and translation flags.
+; @param Encoding {String} Optional encoding; omission retains the native default.
+; @return {File|0} Native file result; native exceptions remain visible.
+FSOpenStrict(Path, Flags, Encoding := unset) {
+	if IsSet(Encoding)
+		return FileOpen(Path, Flags, Encoding)
+	return FileOpen(Path, Flags)
+}
+
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.

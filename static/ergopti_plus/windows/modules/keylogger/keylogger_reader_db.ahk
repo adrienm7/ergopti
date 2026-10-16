@@ -74,7 +74,7 @@ KLR_LoadSchema(db) {
 		schema_path := KLR_ResolveSchemaPath()
 		if !FileExist(schema_path)
 				return false
-		try schema := FileRead(schema_path, "UTF-8")
+		try schema := FSReadStrict(schema_path)
 		catch as err {
 				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
 				return false
@@ -87,7 +87,7 @@ KLR_LoadSchema(db) {
 ; Apply only the additive schema to a private cold or upgrade candidate.
 KLR_LoadMediaSchema(db) {
 		global _SharedDir
-		try media_schema := FileRead(_SharedDir . "\data\db\media_schema.sql", "UTF-8")
+		try media_schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
 		catch as err {
 				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
 				return false
@@ -636,7 +636,7 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
 		; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
 		; AHK-side conversion only for the tiny carry string.
-		try fh := FileOpen(path, "r`n", "UTF-8")
+		try fh := FSOpenStrict(path, "r`n", "UTF-8")
 		catch as err {
 				try LoggerError("KLReader", "Metrics ledger open failed: {1}.", err.Message)
 				return false
@@ -835,7 +835,7 @@ KLR_LedgerSnapshotFromHandle(file_handle) {
 }
 
 KLR_LedgerSnapshot(path) {
-		try fh := FileOpen(path, "r")
+		try fh := FSOpenStrict(path, "r")
 		catch as err {
 				try LoggerError("KLReader", "Metrics ledger snapshot open failed: {1}.", err.Message)
 				return Map("ok", false)
@@ -879,7 +879,7 @@ KLR_LedgerWriteTimeIsSame(left, right) {
 KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 	Guard := 0
 	try {
-		Guard := FileOpen(Path, "r-w", "UTF-8")
+		Guard := FSOpenStrict(Path, "r-w", "UTF-8")
 		if !IsObject(Guard)
 			return Map("ok", false)
 		; FileOpen prefetches for BOM detection. Accessing Handle discards that
@@ -906,7 +906,7 @@ KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 }
 
 KLR_ReadLedgerTail(path, start_offset) {
-		try fh := FileOpen(path, "r", "UTF-8")
+		try fh := FSOpenStrict(path, "r", "UTF-8")
 		catch as err {
 				try LoggerError("KLReader", "Incremental ledger open failed: {1}.", err.Message)
 				return Map("ok", false, "sql", "", "end_offset", start_offset)
