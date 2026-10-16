@@ -22,6 +22,16 @@ end
 ---@return boolean known
 function M.is_known(id) return type(id) == "string" and IDS[id] == true end
 
+--- Keeps additive schema admission atomic without reserving an unnecessary writer.
+--- Existing tables need only a read transaction; SQLite acquires write ownership
+--- when a genuine upgrade executes DDL and still requires COMMIT acknowledgement.
+---@param schema string Admitted packaged additive schema.
+---@return string sql Deferred native transaction.
+function M.schema_transaction(schema)
+	assert(type(schema) == "string" and schema:find("%S"), "Media schema source is unavailable")
+	return "BEGIN;\n" .. schema .. "\nCOMMIT;"
+end
+
 local function identity(row)
 	assert(type(row) == "table" and M.is_known(row.media_id), "Unsupported stored media identity")
 	assert(row.keycode == nil and row.scancode == nil, "Stored media cannot fabricate a keyboard position")

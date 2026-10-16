@@ -271,12 +271,14 @@ local function _ensure_media_schema()
 	local schema = _read_media_resource("data/db/media_schema.sql")
 	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
 	if schema == nil or catalogue == nil then return false end
-	local ok, policy = pcall(function() return MediaStore.policy(Json.decode(catalogue)) end)
+	local ok, policy, transaction = pcall(function()
+		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema)
+	end)
 	if not ok then
-		Logger.error(LOG, "Semantic media catalogue admission refused.")
+		Logger.error(LOG, "Semantic media schema or catalogue admission refused.")
 		return false
 	end
-	if not _exec("BEGIN IMMEDIATE;\n" .. schema .. "\nCOMMIT;", true) then return false end
+	if not _exec(transaction, true) then return false end
 	_media_policy = policy
 	return true
 end
