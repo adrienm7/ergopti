@@ -12,6 +12,26 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 generated diagram and updater source seal receiving
+
+CI 38944902800 exposes three generated-output failures from the missing
+Diagnostics adapter node and one stale updater source hash. The original
+local architecture and updater source controls reproduce both failures,
+each with natural exit1. The canonical diagram generator adds the missing
+adapter node. Its nine checks, the complete generated-output no-drift guard
+and all four deliberate drift perturbations then pass with natural exit0.
+
+The updater source sealer reviews the immutable 5f4f3c74c7 source. Only the
+test framework image differs among its twenty-one frozen inputs, matching
+the received PCRE stack correction. The official sealer refreshes that hash
+and source base; its check passes. The original independent oracle, cohort
+names, child commands, deadlines and all qualification fields are unchanged.
+The original portable source controls finish naturally with 21 PASS and one
+explicit Windows case-namespace SKIP, plus one internal symlink-only SKIP.
+These controls are native=false and official=false; native updater receiving
+remains UNRUN. Full current format/JavaScript receiving and hosted CI remain
+separate from these targeted results.
+
 ### October 16 daemon-report Swift allocation correction
 
 Both native SDK logs reject the daemon-purpose query's inferred strdup
