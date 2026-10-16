@@ -35,6 +35,12 @@ with tempfile.TemporaryDirectory(prefix="ergopti-histogram-regression-") as temp
         connection.executescript(
             (root / "static/ergopti_plus/_shared/data/db/schema.sql").read_text()
         )
+        # Both readers project media aggregates alongside the histogram queries.
+        connection.executescript(
+            (root / "static/ergopti_plus/_shared/data/db/media_schema.sql").read_text(
+                encoding="utf-8"
+            )
+        )
         for day in ["2020-01-01", datetime.date.today().isoformat()]:
             for app in ["app-a", "app-b"]:
                 # Two byte-identical blobs and one distinct blob share a group key.

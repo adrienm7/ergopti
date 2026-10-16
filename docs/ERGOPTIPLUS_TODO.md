@@ -12,6 +12,53 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 installed c618 receiving and histogram fixture repair
+
+Published c618170dcfb5ee09371894ae881aaf9cfc8f1e22 receives a fresh official
+Windows build with 11,140,096 bytes, SHA256
+b049853fc671d0935738613dfc9892a59b0a27ece06d5f0f65bde221499ea6bd.
+The isolated application reaches actual readiness; the personal locator and its
+original UIA worker remain unchanged. The process-bound API opens Diagnostics
+without a maintainer tray action. One real collection survives Diagnostics
+close/reopen at 10/14 and reaches the observed archive-created state.
+
+The 7,953-byte ZIP has SHA256
+e1b9b2eccf30bc5c93fb1325a55dd9470922bbe3b82c82f53722aed28a61fb20.
+CRC, allowed entries, redaction, exact source and all component hashes pass.
+Its 6 PASS, 6 UNRUN and 2 explicitly ignored physical steps remain separate;
+production and physical qualification flags stay false. The original worker's
+retained handle signals natural exit0, and independent session inspection finds
+only the six result artifacts, with request, cancellation and UIA controls gone.
+Ordinary File/Exit then retires this exact unsuspended build with exit0 after
+one request, without force/kill. The three earlier 58e9 active exit failures stay
+retained; this successful current receiving supersedes the preceding open
+compiled-shutdown checkpoint for this build only.
+
+CI 38921192200 on 58e934f53e completes its actual Windows default suite with
+12,774 PASS and 11 FAIL, natural exit1: one receipt-sharing PCRE execution error,
+two OS-call purity ratchets, seven native managed/updater transport fixtures and
+one fast-timer inventory failure. These failures remain OPEN. Both macOS
+architectures also fail launcher compilation and later native stages; no native
+macOS or Linux success is inferred.
+
+The Linux histogram fixture failure is reproduced against the actual SQLite
+database constructed by its original Python entry. Both production media
+queries fail because the fixture omits the canonical media schema. It now loads
+that schema alongside the base schema. Both real SQLite SELECTs then succeed,
+while original histogram/source rows and totals remain unchanged. Existing Lua
+reader assertions are unchanged. This Windows-host database receiving does not
+execute LuaJIT or qualify either native reader; CI receiving remains OPEN.
+
+The full format check passes. The current default JavaScript execution finishes
+naturally with exit1, source unchanged: all 433 cases have paired starts and
+terminal results, with 422 PASS and 11 FAIL. Independent verification reads the
+original runner's `result` timing records; the first receiver incorrectly looked
+for `check` records and its refusal is retained. No native execution is rerun or
+reclassified. Ten prior check identities recur, which is not causal baseline
+exoneration. The additional actual existing-config startup failure logs a
+source/schema handoff refusal after readiness and a committed first full save.
+Its exact observations are retained; full current startup and JS remain OPEN.
+
 ### October 16 local-server final settlement correction
 
 Windows panel retirement now uses the original native owner's final retry
