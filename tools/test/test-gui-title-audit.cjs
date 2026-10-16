@@ -386,7 +386,14 @@ function assertNativeFileFilterBehavior(source) {
 		'"shell32\\SHCreateItemFromParsingName"',
 		'ComCall(5, ObserverItem, "UInt", 0, "Ptr*", &ObserverDisplay)',
 		'return ObserverName == ObserverTypedName ? [ObserverName] : [ObserverName, ObserverTypedName]',
-		'OwnerElement.FindElements([{Type: "ListItem", Name: OwnerName}, {Type: "DataItem", Name: OwnerName}])',
+		'OwnerItems := OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'ObserverRestoredItems := ObserverElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'ObserverInitialItems := 0',
+		'_NFO_Visible(OwnerItems, OwnerNames, OwnerProcess) {',
+		'for OwnerCandidate in OwnerItems {',
+		'if OwnerCandidate.Name == OwnerName',
+		'OwnerMatches.Push(OwnerCandidate)',
+		'if OwnerMatches.Length > 1',
 		'OwnerMatch.ProcessId != OwnerProcess',
 		'if !OwnerMatch.IsOffscreen',
 		'WinGetPID("ahk_id " . OwnerHandle) != OwnerProcess',
@@ -407,6 +414,19 @@ function assertNativeFileFilterBehavior(source) {
 		'FileAppend(ObserverErrorText, A_Args[1] . ".failure", "UTF-8-RAW")'
 	])
 		assert.ok(observer.includes(invariant), `the separate native client retains ${invariant}`);
+	// Each settling poll owns one fresh census; exact names and custody are
+	// checked locally so provider traversal is not repeated for every spelling.
+	assert.equal(
+		(observer.match(/\.FindElements\(/g) || []).length,
+		2,
+		'only the initial/all-files poll and restored-filter poll traverse the shell view'
+	);
+	assert.ok(
+		observer.includes(
+			'_NFO_Visible(ObserverRestoredItems, ObserverTxtNames, ObserverProcess) && !_NFO_Visible(ObserverRestoredItems, ObserverBinNames, ObserverProcess)'
+		),
+		'both restored-filter predicates consume the same fresh census'
+	);
 	for (const phase of [
 		'entry',
 		'com',
@@ -539,7 +559,29 @@ const nativeBehaviorMutations = [
 		/^Test\("native file filter:[^"\n]+\(shared-window-titles\)"[,]\s*_NDT_ActualNativeFileFilterBehavior\)/m,
 		(registration) => registration.replace(/^Test\(/, 'DisabledCase(')
 	),
-	nativePolicySource.replace('Name: OwnerName}', 'Name: OwnerName, mm: "SubString"}'),
+	nativePolicySource.replace(
+		'OwnerCandidate.Name == OwnerName',
+		'InStr(OwnerCandidate.Name, OwnerName)'
+	),
+	nativePolicySource.replace('OwnerCandidate.Name == OwnerName', 'OwnerCandidate.Name = OwnerName'),
+	nativePolicySource.replace('if OwnerMatches.Length > 1', 'if OwnerMatches.Length > 2'),
+	nativePolicySource.replace(
+		'OwnerMatch.ProcessId != OwnerProcess',
+		'OwnerMatch.ProcessId == OwnerProcess'
+	),
+	nativePolicySource.replace('if !OwnerMatch.IsOffscreen', 'if OwnerMatch.IsOffscreen'),
+	nativePolicySource.replace(
+		'ObserverInitialItems := 0',
+		'ObserverInitialItems := ObserverRestoredItems'
+	),
+	nativePolicySource.replace(
+		'ObserverRestoredItems := ObserverElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])',
+		'ObserverRestoredItems := ObserverInitialItems'
+	),
+	nativePolicySource.replace(
+		'OwnerMatches := []',
+		'OwnerMatches := OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])'
+	),
 	nativePolicySource.replace(
 		'ControlChooseIndex(2, ObserverType)',
 		'ControlChooseIndex(1, ObserverType)'

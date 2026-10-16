@@ -373,7 +373,7 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'throw Error("The owned shell-view UIA element must match its native process")' . "`n"
 		. 'ObserverStarted := A_TickCount' . "`n"
 		. '_NFO_Phase("restricted-txt", ObserverPhaseStarted)' . "`n"
-		. '_NFO_WaitVisible(ObserverElement, ObserverTxtNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted, ObserverWaitMs)' . "`n"
+		. 'ObserverInitialItems := _NFO_WaitVisible(ObserverElement, ObserverTxtNames, ObserverWindow, ObserverProcess, ObserverView, ObserverType, ObserverStarted, ObserverWaitMs)' . "`n"
 		. 'ObserverItems := ControlGetItems(ObserverType)' . "`n"
 		. 'if ControlGetIndex(ObserverType) != 1' . "`n"
 		. 'throw Error("The owned picker must begin on its first file type")' . "`n"
@@ -382,10 +382,11 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
 		. '}' . "`n"
 		. '_NFO_Phase("restricted-bin", ObserverPhaseStarted)' . "`n"
-		. 'if _NFO_Visible(ObserverElement, ObserverBinNames, ObserverProcess)' . "`n"
+		. 'if _NFO_Visible(ObserverInitialItems, ObserverBinNames, ObserverProcess)' . "`n"
 		. 'throw Error("Owned BIN visible under the restricted file filter")' . "`n"
 		. 'if ObserverItems.Length != 2 || ObserverItems[1] != ObserverExpectedItems[1] || ObserverItems[2] != ObserverExpectedItems[2]' . "`n"
 		. 'throw Error("The native friendly names must match independently observed SetFileTypes labels")' . "`n"
+		. 'ObserverInitialItems := 0' . "`n"
 		. '_NFO_Phase("all-files", ObserverPhaseStarted)' . "`n"
 		. 'ControlChooseIndex(2, ObserverType)' . "`n"
 		. 'ObserverStarted := A_TickCount' . "`n"
@@ -397,7 +398,8 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'ObserverStarted := A_TickCount' . "`n"
 		. 'loop {' . "`n"
 		. '_NFO_Fence(ObserverWindow, ObserverProcess, ObserverView, ObserverType)' . "`n"
-		. 'if ControlGetIndex(ObserverType) == 1 && _NFO_Visible(ObserverElement, ObserverTxtNames, ObserverProcess) && !_NFO_Visible(ObserverElement, ObserverBinNames, ObserverProcess)' . "`n"
+		. 'ObserverRestoredItems := ObserverElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])' . "`n"
+		. 'if ControlGetIndex(ObserverType) == 1 && _NFO_Visible(ObserverRestoredItems, ObserverTxtNames, ObserverProcess) && !_NFO_Visible(ObserverRestoredItems, ObserverBinNames, ObserverProcess)' . "`n"
 		. 'break' . "`n"
 		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs' . "`n"
 		. 'throw Error("The restored native file filter must show TXT and hide BIN")' . "`n"
@@ -457,9 +459,13 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. 'if !DllCall("IsChild", "Ptr", OwnerWindow, "Ptr", OwnerType) || WinGetClass("ahk_id " . OwnerType) != "ComboBox" || DllCall("GetDlgCtrlID", "Ptr", OwnerType, "Int") != 1136' . "`n"
 		. 'throw Error("The owned filter observations require the native file-type descendant")' . "`n"
 		. '}' . "`n"
-		. '_NFO_Visible(OwnerElement, OwnerNames, OwnerProcess) {' . "`n"
+		. '_NFO_Visible(OwnerItems, OwnerNames, OwnerProcess) {' . "`n"
 		. 'for OwnerName in OwnerNames {' . "`n"
-		. 'OwnerMatches := OwnerElement.FindElements([{Type: "ListItem", Name: OwnerName}, {Type: "DataItem", Name: OwnerName}])' . "`n"
+		. 'OwnerMatches := []' . "`n"
+		. 'for OwnerCandidate in OwnerItems {' . "`n"
+		. 'if OwnerCandidate.Name == OwnerName' . "`n"
+		. 'OwnerMatches.Push(OwnerCandidate)' . "`n"
+		. '}' . "`n"
 		. 'if OwnerMatches.Length > 1' . "`n"
 		. 'throw Error("An exact owned filename must identify at most one native file item")' . "`n"
 		. 'for OwnerMatch in OwnerMatches {' . "`n"
@@ -474,8 +480,9 @@ _NDT_FileFilterObserverSource(UiaOwner) {
 		. '_NFO_WaitVisible(OwnerElement, OwnerNames, OwnerWindow, OwnerProcess, OwnerView, OwnerType, ObserverStarted, ObserverWaitMs) {' . "`n"
 		. 'loop {' . "`n"
 		. '_NFO_Fence(OwnerWindow, OwnerProcess, OwnerView, OwnerType)' . "`n"
-		. 'if _NFO_Visible(OwnerElement, OwnerNames, OwnerProcess)' . "`n"
-		. 'return' . "`n"
+		. 'OwnerItems := OwnerElement.FindElements([{Type: "ListItem"}, {Type: "DataItem"}])' . "`n"
+		. 'if _NFO_Visible(OwnerItems, OwnerNames, OwnerProcess)' . "`n"
+		. 'return OwnerItems' . "`n"
 		. 'if ((A_TickCount - ObserverStarted) & 0xFFFFFFFF) >= ObserverWaitMs' . "`n"
 		. 'throw Error("An exact owned file item did not become visible in the native shell view")' . "`n"
 		. 'Sleep(10)' . "`n"
@@ -731,11 +738,10 @@ _NDT_CheckFileFilterBehaviorPolicy(Index, Spec, Fixture, Artifact, Owner, Owners
 
 
 /**
- * Derives process bounds from three independently settling native view transitions.
- * Each filename has at most two shell spellings. A visible spelling requires
- * FindElements, ProcessId and IsOffscreen; absence only requires FindElements.
- * A final synchronous query can cross its polling deadline, so its complete
- * request bound belongs to the outer owner. Modal setup keeps its existing bound.
+ * Retains per-query settings and the established outer native observation caps.
+ * A provider traversal can exceed one UIA transaction timeout. Each poll shares
+ * its fresh item census between filename predicates, without reusing that census
+ * after a filter change. The exact child owner still enforces the wall-clock cap.
  * @returns {object} Canonical per-query, per-transition and process bounds.
  */
 _NDT_FileFilterBudgets() {
@@ -1354,3 +1360,83 @@ _NDT_FilterFailureFactsSource() {
 	AssertFalse(InStr(Source, "SetActiveWindow") || InStr(Source, "WinActivate"), "the diagnostic never changes focus")
 }
 Test("native file filter: action diagnostics retain observation-only owned source", _NDT_FilterFailureFactsSource)
+
+/**
+ * Executes the actual generated filename predicate on projected UIA item fields.
+ * Native picker cases separately prove the provider's type selection and HWND
+ * fences; these controls preserve exact names, duplicate refusal and process IDs.
+ * @param {string} PredicateCase - Matching or fence control selection.
+ */
+_NDT_FileFilterViewPredicate(PredicateCase) {
+	Root := A_Temp . "\ergopti_filter_view_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the view predicate fixture has one private root")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		ObserverSource := _NDT_FileFilterObserverSource("unused-observer-library.ahk")
+		Start := InStr(ObserverSource, "`n_NFO_Visible(")
+		Finish := InStr(ObserverSource, "`n_NFO_WaitVisible(", , Start)
+		AssertTrue(Start > 0 && Finish > Start, "the actual generated item predicate must exist")
+		PredicateSource := SubStr(ObserverSource, Start + 1, Finish - Start)
+		Program := [
+			'#Requires AutoHotkey v2.0',
+			'#SingleInstance Off',
+			'#NoTrayIcon',
+			'#Warn All, StdOut',
+			'try {',
+			'if A_Args[1] == "matching" {',
+			'Check(!_NFO_Visible([], ["owned.txt"], 41), "an empty census is not visible")',
+			'Check(_NFO_Visible([{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}], ["owned.txt"], 41), "the exact owned item is visible")',
+			'Check(_NFO_Visible([{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}], ["owned", "owned.txt"], 41), "authoritative shell spelling alternatives remain exact")',
+			'Check(!_NFO_Visible([{Name: "OWNED.TXT", ProcessId: 41, IsOffscreen: 0}], ["owned.txt"], 41), "different case cannot acquire a name")',
+			'Check(!_NFO_Visible([{Name: "owned.txt.more", ProcessId: 41, IsOffscreen: 0}], ["owned.txt"], 41), "a prefix cannot acquire a name")',
+			'Check(!_NFO_Visible([{Name: "owned.txt", ProcessId: 41, IsOffscreen: 1}], ["owned.txt"], 41), "an offscreen match is not visible")',
+			'Items := [{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}, {Name: "owned.bin", ProcessId: 41, IsOffscreen: 0}]',
+			'Check(_NFO_Visible(Items, ["owned.txt"], 41) && _NFO_Visible(Items, ["owned.bin"], 41), "the same unfiltered census exposes both files")',
+			'Items[2].IsOffscreen := 1',
+			'Check(_NFO_Visible(Items, ["owned.txt"], 41) && !_NFO_Visible(Items, ["owned.bin"], 41), "the same census preserves both visibility results")',
+			'} else if A_Args[1] == "fences" {',
+			'Duplicate := "An exact owned filename must identify at most one native file item"',
+			'Foreign := "A native file item cannot cross the owned process fence"',
+			'Refuse([{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}, {Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}], Duplicate)',
+			'Refuse([{Name: "owned.txt", ProcessId: 41, IsOffscreen: 0}, {Name: "owned.txt", ProcessId: 41, IsOffscreen: 1}], Duplicate)',
+			'Refuse([{Name: "owned.txt", ProcessId: 42, IsOffscreen: 0}], Foreign)',
+			'Refuse([{Name: "owned.txt", ProcessId: 42, IsOffscreen: 1}], Foreign)',
+			'} else throw ValueError("Unknown predicate control")',
+			'FileAppend("view-predicate-observed", "*", "UTF-8-RAW")',
+			'ExitApp(0)',
+			'} catch as PredicateFailure {',
+			'FileAppend(Type(PredicateFailure) . ": " . PredicateFailure.Message, "**", "UTF-8-RAW")',
+			'ExitApp(2)',
+			'}',
+			'Check(Value, Message) {',
+			'if !Value',
+			'throw Error(Message)',
+			'}',
+			'Refuse(RejectedItems, ExpectedMessage) {',
+			'try _NFO_Visible(RejectedItems, ["owned.txt"], 41)',
+			'catch as RefusalFailure {',
+			'if RefusalFailure.Message != ExpectedMessage',
+			'throw Error("The wrong refusal was observed: " . RefusalFailure.Message)',
+			'return',
+			'}',
+			'throw Error("An invalid matching census was accepted")',
+			'}'
+		]
+		ProbeSource := ""
+		for Statement in Program
+			ProbeSource .= Statement . "`n"
+		Harness := Root . "\view_predicate.ahk"
+		FileAppend(ProbeSource . PredicateSource, Harness, "UTF-8")
+		AssertEqual("view-predicate-observed",
+			_NDT_RunChild(A_AhkPath, ["/ErrorStdOut", Harness, PredicateCase], Ownership),
+			"the actual generated predicate preserves its exact matching and refusal contract")
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native file filter: a view census preserves exact filename visibility (file-filter-view-census)",
+	_NDT_FileFilterViewPredicate.Bind("matching"))
+Test("native file filter: a view census refuses duplicates and foreign owners (file-filter-view-census)",
+	_NDT_FileFilterViewPredicate.Bind("fences"))
