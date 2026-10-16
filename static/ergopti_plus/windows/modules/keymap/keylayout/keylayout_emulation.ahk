@@ -108,6 +108,7 @@ global _KLE_ResetObserverCapture := 0
 global _KLE_ResetObserverGeneration := 0
 
 _KLE_AltGrBindingOwner("initialize")
+_KLE_CanonicalSourceOwner("initialize")
 
 
 
@@ -272,37 +273,7 @@ KeylayoutEmulation_KeyCodes(KeycodeTable, Convention) {
  *   layout, if any, stays loaded.
  */
 KeylayoutEmulation_Load(Id, Text, Convention, KeycodeTable) {
-	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
-	KeyCodes := KeylayoutEmulation_KeyCodes(KeycodeTable, Convention)
-	Model := Keylayout_Parse(Text)
-	LevelIndex := Map()
-	for Shift in [false, true] {
-		for Caps in [false, true] {
-			for Option in [false, true] {
-				Pressed := Map()
-				if Shift
-					Pressed["shift"] := true
-				if Caps
-					Pressed["caps"] := true
-				if Option
-					Pressed["option"] := true
-				LevelIndex[_KLE_ComboKey(Shift, Caps, Option)] := Keylayout_KeyMapIndex(Model, Pressed)
-			}
-		}
-	}
-	LevelIndex["command"] := Keylayout_KeyMapIndex(Model, Map("command", true))
-	; Resolve every key once so a broken action fails here, not on a keystroke.
-	for _, Index in LevelIndex
-		for _, Code in KeyCodes
-			Keylayout_Resolve(Model, Index, Code)
-	Compositions := _KLE_BuildCompositions(Model)
-	KLE_Model := Model
-	KLE_Id := Id
-	KLE_State := KEYLAYOUT_NEUTRAL_STATE
-	KLE_KeyCodes := KeyCodes
-	KLE_LevelIndex := LevelIndex
-	KLE_Compositions := Compositions
-	return KeyCodes.Count
+	return _KLE_CanonicalSourceOwner("load", Id, Text, Convention, KeycodeTable)
 }
 
 ; Native base characters address the layout's actions by their neutral output,
@@ -335,12 +306,7 @@ _KLE_BuildCompositions(Model) {
  * Stops emulating: drops the model so every emulation hotkey stands down.
  */
 KeylayoutEmulation_Unload() {
-	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_Compositions, KEYLAYOUT_NEUTRAL_STATE
-	KLE_Model := 0
-	KLE_Id := ""
-	KLE_State := KEYLAYOUT_NEUTRAL_STATE
-	KLE_KeyCodes := Map()
-	KLE_Compositions := Map()
+	_KLE_CanonicalSourceOwner("unload")
 }
 
 
@@ -1085,11 +1051,499 @@ _KLE_Activate(Id, LocalCopy, KeycodeTable) {
 	try {
 		Keys := KeylayoutEmulation_Load(Id, LocalCopy["Text"], LocalCopy["Entry"]["keycode_convention"], KeycodeTable)
 	} catch as Err {
-		KeylayoutEmulation_Unload()
-		LoggerError("LayoutEmulation", "The '{1}' layout is not emulated: {2}", Id, Err.Message)
+		; Failed preparation must not unload the previously admitted source.
+		LoggerError("LayoutEmulation", "Loading the '{1}' layout failed: {2}", Id, Err.Message)
 		return false
 	}
 	LoggerSuccess("LayoutEmulation", "Emulating the '{1}' layout, version {2} ({3} keys).",
 		Id, LocalCopy["Entry"]["version"], Keys)
 	return true
+}
+
+/**
+ * Builds complete canonical data for one fixed Caps/Option family.
+ * This pure constructor grants no source, handler, native or output authority.
+ * The registration frame must capture it through its original private owner.
+ * @param {Map} Model Exact admitted parser model retained by the graph.
+ * @param {Map} KeyCodes Physical scan to canonical macOS key identity.
+ * @param {Array} Levels Base and Shift keyMap indices of the fixed family.
+ * @param {String} LayoutName Exact registry identity of the captured model.
+ * @param {Boolean} Caps Fixed family value; not a native event selector.
+ * @param {Boolean} Option Fixed family value; not an AltGr ownership proof.
+ * @returns {BoundFunc} Read-only graph operations returning independent records.
+ */
+_KLE_BuildReplayGraph(Model, KeyCodes, Levels, LayoutName, Caps, Option) {
+	if !(Model is Map) || !(KeyCodes is Map) || !(Levels is Array) || Levels.Length != 2
+			|| !(LayoutName is String) || LayoutName == ""
+			|| !(Caps is Integer) || Caps < 0 || Caps > 1
+			|| !(Option is Integer) || Option < 0 || Option > 1
+		throw ValueError("A complete fixed canonical graph family is required.")
+	Selectors := []
+	for Shift in [0, 1]
+		Selectors.Push(Map("shift", Shift, "caps", Caps, "option", Option, "index", Levels[Shift + 1]))
+	return _KLE_BuildReplayGraphOwned(Model, KeyCodes, Selectors, LayoutName, false, Caps, Option)
+}
+
+/**
+ * Builds one state namespace across all eight normal modifier selectors.
+ * @param {Map} Model Parsed canonical model.
+ * @param {Map} KeyCodes Complete physical scan-to-keycode inventory.
+ * @param {Map} Levels Canonical normal combo-to-keyMap indices.
+ * @param {String} LayoutName Original source layout identity.
+ * @returns {BoundFunc} Detached scalar graph reader, without native authority.
+ */
+_KLE_BuildNormalReplayGraph(Model, KeyCodes, Levels, LayoutName) {
+	if !(Levels is Map)
+		throw ValueError("A complete normal canonical selector table is required.")
+	Selectors := []
+	for Caps in [0, 1] {
+		for Option in [0, 1] {
+			for Shift in [0, 1] {
+				Name := _KLE_ComboKey(Shift, Caps, Option)
+				if !Levels.Has(Name)
+					throw ValueError("The normal canonical selector table is incomplete.")
+				Selectors.Push(Map("shift", Shift, "caps", Caps, "option", Option, "index", Levels[Name]))
+			}
+		}
+	}
+	return _KLE_BuildReplayGraphOwned(Model, KeyCodes, Selectors, LayoutName, true)
+}
+
+; Both public data scopes share the same transition and immutable-reader owner.
+_KLE_BuildReplayGraphOwned(Model, KeyCodes, Selectors, LayoutName, Normal, Caps := 0, Option := 0) {
+	global KEYLAYOUT_NEUTRAL_STATE
+	GraphCall := Func.Prototype.Call, GraphMapClone := Map.Prototype.Clone, GraphArrayClone := Array.Prototype.Clone
+	if !(Model is Map) || !(KeyCodes is Map) || !(LayoutName is String) || LayoutName == ""
+			|| !(Normal is Integer) || (Normal != 0 && Normal != 1)
+			|| !(Selectors is Array) || Selectors.Length != (Normal ? 8 : 2)
+		throw ValueError("A complete canonical graph selector inventory is required.")
+	Sets := Model.Get("KeyMapSets", 0), MapSet := Model.Get("MapSet", 0)
+	if !(Sets is Map) || !(MapSet is String) || !Sets.Has(MapSet) || !(Sets[MapSet] is Map)
+		throw ValueError("The canonical graph map set is undefined.")
+	Bases := Model.Get("Bases", Map()).Get(MapSet, 0)
+	CapturedSelectors := [], SelectorKeys := Map()
+	for Selector in Selectors {
+		if !(Selector is Map)
+			throw ValueError("The canonical graph selector is invalid.")
+		for Name in ["shift", "caps", "option"]
+			if !Selector.Has(Name) || !(Selector[Name] is Integer) || Selector[Name] < 0 || Selector[Name] > 1
+				throw ValueError("The canonical graph modifier selector is invalid.")
+		if !Selector.Has("index")
+			throw ValueError("The canonical graph level identity is invalid.")
+		Index := Selector["index"]
+		if !(Index is Integer) || Index < 0
+				|| (!Sets[MapSet].Has(Index) && (!(Bases is Map) || !Bases.Has(Index)))
+			throw ValueError("The canonical graph level identity is invalid.")
+		SelectorKey := Selector["shift"] . "|" . Selector["caps"] . "|" . Selector["option"]
+		if SelectorKeys.Has(SelectorKey) || (!Normal && (Selector["caps"] != Caps || Selector["option"] != Option))
+			throw ValueError("The canonical graph selector inventory is ambiguous.")
+		SelectorKeys[SelectorKey] := true
+		CapturedSelectors.Push([Selector["shift"], Selector["caps"], Selector["option"], Index])
+	}
+	if KeyCodes.Count == 0
+		throw ValueError("The canonical graph requires its physical key inventory.")
+	Names := ""
+	for Scan, Code in KeyCodes {
+		if !(Scan is String) || !RegExMatch(Scan, "^SC[0-9A-F]{3}$")
+				|| Integer("0x" . SubStr(Scan, 3)) == 0
+				|| Integer("0x" . SubStr(Scan, 3)) > 0x1FF
+				|| !(Code is Integer) || Code < 0
+			throw ValueError("The canonical graph physical identity is invalid.")
+		Names .= Scan . "`n"
+	}
+	Keys := [], SeenKeys := Map()
+	Loop Parse, Sort(RTrim(Names, "`n")), "`n" {
+		Scan := A_LoopField
+		if !KeyCodes.Has(Scan) || SeenKeys.Has(Scan)
+			throw ValueError("The canonical graph physical inventory changed during sorting.")
+		SeenKeys[Scan] := true
+		Keys.Push([Scan, KeyCodes[Scan]])
+	}
+	if Keys.Length != KeyCodes.Count
+		throw Error("The canonical graph physical inventory was truncated.")
+	States := [KEYLAYOUT_NEUTRAL_STATE], StateIds := Map()
+	StateIds.CaseSense := "On"
+	StateIds[KEYLAYOUT_NEUTRAL_STATE] := 0
+	Rows := [], Lookup := Map(), Cursor := 1
+	Lookup.CaseSense := "On"
+	while Cursor <= States.Length {
+		Before := States[Cursor], BeforeId := Cursor - 1
+		Cursor += 1
+		for Key in Keys {
+			for Selector in CapturedSelectors {
+				Shift := Selector[1], RowCaps := Selector[2], RowOption := Selector[3], Index := Selector[4]
+				Step := Keylayout_Step(Model, Before, Index, Key[2])
+				if !(Step is Map) || !(Step.Get("Output", 0) is String)
+						|| !(Step.Get("Next", 0) is String) || Step["Next"] == ""
+					throw ValueError("The canonical graph transition is invalid.")
+				After := Step["Next"]
+				if !StateIds.Has(After) {
+					StateIds[After] := States.Length
+					States.Push(After)
+				}
+				AfterId := StateIds[After]
+				; A neutral nonprinting key is data, never a character admission.
+				Kind := BeforeId || AfterId ? 3
+					: Step["Output"] == "" ? 0 : RegExMatch(Step["Output"], "^[0-9]$") ? 2 : 1
+				Row := Map("before", Before, "after", After,
+					"before_id", BeforeId, "after_id", AfterId,
+					"scan", Key[1], "shift", Shift, "index", Index, "keycode", Key[2],
+					"output", Step["Output"], "kind", Kind)
+				if Normal
+					Row["caps"] := RowCaps, Row["option"] := RowOption
+				Rows.Push(Row)
+				LookupKey := Before . "|" . Key[1] . "|" . Shift
+				if Normal
+					LookupKey .= "|" . RowCaps . "|" . RowOption
+				if Lookup.Has(LookupKey)
+					throw Error("The canonical graph transition selector is duplicated.")
+				Lookup[LookupKey] := Rows.Length
+			}
+		}
+	}
+	if Rows.Length != States.Length * Keys.Length * CapturedSelectors.Length
+		throw Error("The canonical graph family was truncated.")
+	Information := Map("layout_name", LayoutName, "model_key", ObjPtr(Model),
+		"caps", Caps, "option", Option, "physical_keys", Keys.Length,
+		"states", States.Length, "transitions", Rows.Length)
+	if Normal {
+		Information.Delete("caps"), Information.Delete("option")
+		Information["selectors"] := CapturedSelectors.Length
+	}
+	return Read.Bind()
+
+	Read(Operation, Args*) {
+		switch Operation {
+			case "info":
+				if Args.Length != 0
+					throw ValueError("Canonical graph info takes no arguments.")
+				return GraphCall.Call(GraphMapClone, Information)
+			case "row":
+				if Args.Length != 1 || !(Args[1] is Integer) || Args[1] < 1 || Args[1] > Rows.Length
+					throw ValueError("The canonical graph row identity is invalid.")
+				return GraphCall.Call(GraphMapClone, Rows[Args[1]])
+			case "states":
+				if Args.Length != 0
+					throw ValueError("Canonical graph states take no arguments.")
+				return GraphCall.Call(GraphArrayClone, States)
+			case "find":
+				if Args.Length != (Normal ? 5 : 3) || !(Args[1] is String) || !(Args[2] is String)
+						|| !(Args[3] is Integer) || Args[3] < 0 || Args[3] > 1
+						|| !StateIds.Has(Args[1]) || !RegExMatch(Args[2], "^SC[0-9A-F]{3}$")
+					throw ValueError("The canonical graph lookup identity is invalid.")
+				LookupKey := Args[1] . "|" . Args[2] . "|" . Args[3]
+				if Normal {
+					for Position in [4, 5]
+						if !(Args[Position] is Integer) || Args[Position] < 0 || Args[Position] > 1
+							throw ValueError("The canonical graph lookup modifier is invalid.")
+					LookupKey .= "|" . Args[4] . "|" . Args[5]
+				}
+				if !Lookup.Has(LookupKey)
+					throw ValueError("The canonical graph does not own that transition.")
+				return GraphCall.Call(GraphMapClone, Rows[Lookup[LookupKey]])
+			case "matches_model":
+				; Identity only. Source-epoch and semantic admission belong to the frame.
+				if Args.Length != 1
+					throw ValueError("Canonical graph model comparison takes one argument.")
+				return Args[1] == Model
+			default:
+				throw ValueError("Unknown canonical graph operation.")
+		}
+	}
+}
+
+/**
+ * Retains exact identities and scalar contents of plain canonical source data.
+ * The returned guard reads no callback or user property. It does not copy input
+ * authority: only the original source loader may use it to issue a live lease.
+ * @param {Array} Roots Parser model and its companion source containers.
+ * @returns {BoundFunc} Read-only structural identity and content guard.
+ */
+_KLE_CaptureCanonicalImage(Roots) {
+	Images := Map()
+	Capture(Roots)
+	return Current.Bind()
+
+	Plain(Value, Prototype) {
+		if ObjGetBase(Value) != Prototype
+			return false
+		for Name in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	Capture(Value) {
+		if !IsObject(Value) {
+			if !(Value is String) && !(Value is Integer)
+				throw ValueError("Canonical source scalars must have exact types.")
+			return
+		}
+		if Images.Has(Value)
+			return
+		if Value is Map && Plain(Value, Map.Prototype) {
+			Pairs := []
+			Images[Value] := {Kind: "map", Policy: Value.CaseSense, Items: Pairs}
+			for Key, Item in Value {
+				if !(Key is String) && !(Key is Integer)
+					throw ValueError("Canonical source keys must have exact scalar types.")
+				Pairs.Push([Key, Item])
+				Capture(Item)
+			}
+		} else if Value is Array && Plain(Value, Array.Prototype) {
+			Items := []
+			Images[Value] := {Kind: "array", Items: Items}
+			Loop Value.Length {
+				if !Value.Has(A_Index)
+					throw ValueError("Canonical source arrays cannot contain holes.")
+				Items.Push(Value[A_Index])
+				Capture(Value[A_Index])
+			}
+		} else
+			throw ValueError("Canonical source containers must be plain data.")
+	}
+
+	Same(Actual, Expected) {
+		return Type(Actual) == Type(Expected) && Actual == Expected
+	}
+
+	Current() {
+		for Value, Image in Images {
+			if Image.Kind == "map" {
+				if !(Value is Map) || !Plain(Value, Map.Prototype)
+						|| !Same(Value.CaseSense, Image.Policy) || Value.Count != Image.Items.Length
+					return false
+				Index := 0
+				for Key, Item in Value {
+					Index += 1
+					if !Same(Key, Image.Items[Index][1]) || !Same(Item, Image.Items[Index][2])
+						return false
+				}
+			} else {
+				if !(Value is Array) || !Plain(Value, Array.Prototype) || Value.Length != Image.Items.Length
+					return false
+				Loop Value.Length
+					if !Value.Has(A_Index) || !Same(Value[A_Index], Image.Items[A_Index])
+						return false
+			}
+		}
+		return true
+	}
+}
+
+/**
+ * Owns parsing, publication and capture of the original canonical layout source.
+ * No operation accepts an already-parsed model, a graph or a publication witness.
+ * Preparation finishes before atomic publication; failed loads preserve the old
+ * source. A retained reader remains data after live-source withdrawal.
+ * @param {String} Request initialize, load, unload or capture.
+ * @param {Array} Args Exact public Load arguments for the load operation only.
+ * @returns {Integer|Map} Loaded key count, or an original read-only source lease.
+ */
+_KLE_CanonicalSourceOwner(Request, Args*) {
+	global KLE_Model, KLE_Id, KLE_State, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions
+	global KEYLAYOUT_NEUTRAL_STATE
+	global KEYLAYOUT_MODIFIER_TOKENS, KEYLAYOUT_MAX_BASE_DEPTH
+	global _KEYLAYOUT_TAG_RE, _KEYLAYOUT_ATTR_RE, _KEYLAYOUT_ENTITY_RE
+	static Initialized := false, Busy := false, Epoch := 0, Cell := 0, Vocabulary := 0
+	static OriginalOwners := [_KLE_CanonicalSourceOwner, _KLE_CaptureCanonicalImage,
+		_KLE_BuildReplayGraph, KeylayoutEmulation_Load, KeylayoutEmulation_Unload,
+		KeylayoutEmulation_CaptureCanonicalSource, KeylayoutEmulation_KeyCodes,
+		_KLE_BuildCompositions, _KLE_ComboKey, Keylayout_Parse, Keylayout_DecodeEntities,
+		_Keylayout_Attributes, _Keylayout_ParseModifierKeys, Keylayout_KeyMapIndex,
+		Keylayout_KeyEntry, Keylayout_Resolve, Keylayout_IsPrintable, Keylayout_Step,
+		Map.Call, Map.Prototype.Clone, Array.Prototype.Clone,
+		Func.Prototype.Call, Func.Prototype.Bind, Critical,
+		_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned]
+	static NativeCall := Func.Prototype.Call, NativeBind := Func.Prototype.Bind, NativeCritical := Critical
+
+	FunctionsCurrent() {
+		Owners := [_KLE_CanonicalSourceOwner, _KLE_CaptureCanonicalImage,
+			_KLE_BuildReplayGraph, KeylayoutEmulation_Load, KeylayoutEmulation_Unload,
+			KeylayoutEmulation_CaptureCanonicalSource, KeylayoutEmulation_KeyCodes,
+			_KLE_BuildCompositions, _KLE_ComboKey, Keylayout_Parse, Keylayout_DecodeEntities,
+			_Keylayout_Attributes, _Keylayout_ParseModifierKeys, Keylayout_KeyMapIndex,
+			Keylayout_KeyEntry, Keylayout_Resolve, Keylayout_IsPrintable, Keylayout_Step,
+			Map.Call, Map.Prototype.Clone, Array.Prototype.Clone,
+			Func.Prototype.Call, Func.Prototype.Bind, Critical,
+			_KLE_BuildNormalReplayGraph, _KLE_BuildReplayGraphOwned]
+		for Index, Original in OriginalOwners
+			if !(Original is Func) || Original != Owners[Index]
+					|| Object.Prototype.HasOwnProp.Call(Original, "Call")
+				return false
+		if IsObject(Vocabulary) {
+			for Pair in [[KEYLAYOUT_NEUTRAL_STATE, Vocabulary.Neutral],
+				[KEYLAYOUT_MAX_BASE_DEPTH, Vocabulary.MaxDepth], [_KEYLAYOUT_TAG_RE, Vocabulary.Tag],
+				[_KEYLAYOUT_ATTR_RE, Vocabulary.Attribute], [_KEYLAYOUT_ENTITY_RE, Vocabulary.Entity]]
+				if Type(Pair[1]) != Type(Pair[2]) || !(Pair[1] == Pair[2])
+					return false
+			if KEYLAYOUT_MODIFIER_TOKENS != Vocabulary.Tokens
+					|| Object.Prototype.HasOwnProp.Call(Vocabulary.Image, "Call")
+					|| !NativeCall.Call(Vocabulary.Image)
+				return false
+		}
+		return true
+	}
+
+	RequireFunctions() {
+		if !FunctionsCurrent() {
+			if IsObject(Cell)
+				Cell.Revoked := true
+			throw Error("The original canonical source constructor was withdrawn.")
+		}
+	}
+
+	PrepareCell(Active, Model, Id, Keys, Levels, Compositions, Graph := 0, NormalGraph := 0) {
+		RequireFunctions()
+		Image := NativeCall.Call(OriginalOwners[2], [Model, Keys, Levels, Compositions])
+		RequireFunctions()
+		if !(Image is BoundFunc) || Object.Prototype.HasOwnProp.Call(Image, "Call") || !Image.Call()
+			throw Error("The prepared canonical source data changed before issuance.")
+		return {Active: Active, Revoked: false, Model: Model, Id: Id, Keys: Keys, Levels: Levels,
+			Compositions: Compositions, Graph: Graph, NormalGraph: NormalGraph, Image: Image}
+	}
+
+	CellCurrent(OriginalCell, OriginalEpoch) {
+		return FunctionsCurrent() && !OriginalCell.Revoked && Cell == OriginalCell && Epoch == OriginalEpoch
+			&& Type(KLE_Model) == Type(OriginalCell.Model) && KLE_Model == OriginalCell.Model
+			&& Type(KLE_Id) == Type(OriginalCell.Id) && KLE_Id == OriginalCell.Id && KLE_KeyCodes == OriginalCell.Keys
+			&& KLE_LevelIndex == OriginalCell.Levels && KLE_Compositions == OriginalCell.Compositions
+			&& !Object.Prototype.HasOwnProp.Call(OriginalCell.Image, "Call")
+			&& (!IsObject(OriginalCell.Graph) || !Object.Prototype.HasOwnProp.Call(OriginalCell.Graph, "Call"))
+			&& (!IsObject(OriginalCell.NormalGraph) || !Object.Prototype.HasOwnProp.Call(OriginalCell.NormalGraph, "Call"))
+			&& NativeCall.Call(OriginalCell.Image)
+	}
+
+	IssueLease(OriginalCell, OriginalEpoch) {
+		RequireFunctions()
+		for Graph in [OriginalCell.Graph, OriginalCell.NormalGraph]
+			if IsObject(Graph) && (!(Graph is BoundFunc) || Object.Prototype.HasOwnProp.Call(Graph, "Call"))
+				throw Error("The original canonical graph reader was withdrawn.")
+		CurrentGuard := NativeCall.Call(NativeBind, Current)
+		Reader := NativeCall.Call(NativeBind, Read, OriginalCell.Graph)
+		NormalReader := NativeCall.Call(NativeBind, Read, OriginalCell.NormalGraph)
+		RequireFunctions()
+		return Map("active", OriginalCell.Active, "epoch", OriginalEpoch,
+			"layout_name", OriginalCell.Id, "model", OriginalCell.Model,
+			"current", CurrentGuard, "read", Reader, "normal_read", NormalReader)
+
+		Current() {
+			; Preparation temporarily blocks admission; a failed Load keeps its source.
+			if !Initialized || Busy
+				return false
+			if CellCurrent(OriginalCell, OriginalEpoch)
+				return true
+			OriginalCell.Revoked := true
+			return false
+		}
+
+		Read(CapturedGraph, Operation, ReadArgs*) {
+			; Historical scalar rows do not require the current loader or parser.
+			if Func.Prototype.Call != NativeCall || Object.Prototype.HasOwnProp.Call(NativeCall, "Call")
+					|| !(CapturedGraph is BoundFunc) || Object.Prototype.HasOwnProp.Call(CapturedGraph, "Call")
+				throw Error("The captured canonical source has no admitted graph reader.")
+			return NativeCall.Call(CapturedGraph, Operation, ReadArgs*)
+		}
+	}
+
+	RequireFunctions()
+	if !(Request is String)
+		throw ValueError("A canonical source operation is required.")
+	if Request == "initialize" {
+		if Args.Length != 0 || Initialized || Busy
+			throw Error("The canonical source owner cannot initialize twice.")
+		PreparedVocabulary := {Tokens: KEYLAYOUT_MODIFIER_TOKENS, Neutral: KEYLAYOUT_NEUTRAL_STATE,
+			MaxDepth: KEYLAYOUT_MAX_BASE_DEPTH, Tag: _KEYLAYOUT_TAG_RE,
+			Attribute: _KEYLAYOUT_ATTR_RE, Entity: _KEYLAYOUT_ENTITY_RE}
+		PreparedVocabulary.Image := NativeCall.Call(OriginalOwners[2], [KEYLAYOUT_MODIFIER_TOKENS])
+		Vocabulary := PreparedVocabulary
+		Cell := PrepareCell(false, KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex, KLE_Compositions)
+		Initialized := true
+		return 0
+	}
+	if !Initialized || Busy
+		throw Error("The canonical source owner is unavailable.")
+	if Request == "capture" {
+		if Args.Length != 0
+			throw ValueError("Canonical source capture takes no supplied witness.")
+		Lease := IssueLease(Cell, Epoch)
+		if !Lease["current"].Call()
+			throw Error("The live canonical source changed during capture.")
+		return Lease
+	}
+	if Request != "load" && Request != "unload"
+		throw ValueError("Unknown canonical source operation.")
+	if Args.Length != (Request == "load" ? 4 : 0)
+		throw ValueError("The canonical source operation has invalid arguments.")
+	PreviousCell := Cell, PreviousEpoch := Epoch
+	; Explicit Load reparses new inputs; it does not adopt the old public state.
+	; The starting image only fences concurrent mutation during that preparation.
+	PreviousModel := KLE_Model, PreviousId := KLE_Id, PreviousKeys := KLE_KeyCodes
+	PreviousLevels := KLE_LevelIndex, PreviousCompositions := KLE_Compositions
+	StartingImage := NativeCall.Call(OriginalOwners[2],
+		[PreviousModel, PreviousKeys, PreviousLevels, PreviousCompositions])
+	Busy := true
+	try {
+		if Request == "load" {
+			Id := Args[1], Text := Args[2], Convention := Args[3], KeycodeTable := Args[4]
+			KeyCodes := NativeCall.Call(OriginalOwners[7], KeycodeTable, Convention)
+			; Supplied keycode data may run an observer before the next producer.
+			RequireFunctions()
+			Model := NativeCall.Call(OriginalOwners[10], Text)
+			RequireFunctions()
+			LevelIndex := Map()
+			for Shift in [false, true] {
+				for Caps in [false, true] {
+					for Option in [false, true] {
+						Pressed := Map()
+						if Shift
+							Pressed["shift"] := true
+						if Caps
+							Pressed["caps"] := true
+						if Option
+							Pressed["option"] := true
+						LevelIndex[_KLE_ComboKey(Shift, Caps, Option)] := Keylayout_KeyMapIndex(Model, Pressed)
+					}
+				}
+			}
+			LevelIndex["command"] := Keylayout_KeyMapIndex(Model, Map("command", true))
+			for _, Index in LevelIndex
+				for _, Code in KeyCodes
+					Keylayout_Resolve(Model, Index, Code)
+			Compositions := _KLE_BuildCompositions(Model)
+			RequireFunctions()
+			Levels := [LevelIndex[_KLE_ComboKey(0, 0, 0)], LevelIndex[_KLE_ComboKey(1, 0, 0)]]
+			Graph := NativeCall.Call(OriginalOwners[3], Model, KeyCodes, Levels, Id, 0, 0)
+			NormalGraph := NativeCall.Call(OriginalOwners[25], Model, KeyCodes, LevelIndex, Id)
+			NewCell := PrepareCell(true, Model, Id, KeyCodes, LevelIndex, Compositions, Graph, NormalGraph)
+		} else {
+			Model := 0, Id := "", KeyCodes := Map(), Compositions := Map()
+			LevelIndex := KLE_LevelIndex
+			NewCell := PrepareCell(false, Model, Id, KeyCodes, LevelIndex, Compositions)
+		}
+		RequireFunctions()
+		NewEpoch := Epoch + 1
+		if !(NewEpoch is Integer) || NewEpoch <= Epoch
+			throw Error("The canonical source epoch overflowed.")
+		PreviousCritical := NativeCall.Call(NativeCritical, "On")
+		try {
+			RequireFunctions()
+			if Cell != PreviousCell || Epoch != PreviousEpoch
+					|| Type(KLE_Model) != Type(PreviousModel) || !(KLE_Model == PreviousModel)
+					|| Type(KLE_Id) != Type(PreviousId) || !(KLE_Id == PreviousId) || KLE_KeyCodes != PreviousKeys
+					|| KLE_LevelIndex != PreviousLevels || KLE_Compositions != PreviousCompositions
+					|| Object.Prototype.HasOwnProp.Call(StartingImage, "Call")
+					|| !NativeCall.Call(StartingImage)
+				throw Error("The starting canonical source changed during preparation.")
+			KLE_Model := Model, KLE_Id := Id, KLE_State := KEYLAYOUT_NEUTRAL_STATE
+			KLE_KeyCodes := KeyCodes, KLE_LevelIndex := LevelIndex, KLE_Compositions := Compositions
+			Cell := NewCell, Epoch := NewEpoch
+			Busy := false
+		} finally NativeCall.Call(NativeCritical, PreviousCritical)
+		return KeyCodes.Count
+	} finally Busy := false
+}
+
+/** Returns source data issued by the original loader, never by supplied maps. */
+KeylayoutEmulation_CaptureCanonicalSource() {
+	return _KLE_CanonicalSourceOwner("capture")
 }
