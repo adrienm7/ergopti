@@ -22,7 +22,8 @@ _DDPR_RequireThrows(Fn, ExpectedType, ExpectedMessage) {
 	catch as Err
 		Failure := Err
 	_DDPR_Require(IsObject(Failure) && Type(Failure) == ExpectedType
-		&& Failure.Message == ExpectedMessage, "the intended refusal was not observed")
+		&& Failure.Message == ExpectedMessage, "the intended refusal was not observed; expected_type=" . ExpectedType . "; actual_type=" . Type(Failure)
+		. "; expected_message=" . ExpectedMessage . "; actual_message=" . (IsObject(Failure) ? Failure.Message . "; actual_extra=" . Failure.Extra . "; actual_stack=" . Failure.Stack : "no exception"))
 }
 
 _DDPR_Noop(*) {
@@ -219,14 +220,6 @@ _DDPR_Production(Scenario) {
 		KLE_KeyCodes := Map()
 		Loop 60
 			KLE_KeyCodes[Format("SC{:03X}", A_Index + 0x3F)] := 0
-		Failure := 0
-		try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
-		catch as Err
-			Failure := Err
-		_DDPR_Require(IsObject(Failure)
-			&& Failure.Message == "The terminal route registry exceeds its supported subset.", "oversized registry did not fail at the canonical marshal boundary")
-		_DDPR_Require(_DDPR_State.Calls.Length == 0, "oversized registry reached registration")
-		return
 	}
 	else if Scenario != "production-kle" && Scenario != "production-held-withdrawal"
 		throw Error("unknown production scenario")
@@ -249,7 +242,17 @@ _DDPR_Production(Scenario) {
 	}
 	Coverage := LLM_NavEventOwner_TerminalRouteCoverage()
 	_DDPR_Require(!Coverage["cohort_complete"] && !Coverage["transformed_output_enabled"], "diagnostic source acquired output qualification")
-	if Scenario == "production-kle" || Scenario == "production-held-withdrawal" {
+	if Scenario == "production-capacity" {
+		_DDPR_Require(Kle.Length == 120 && _DDPR_State.Calls[1].Length == 146,
+			"the original producer truncated the sixty controlled base and Shift pairs")
+		for Size in [5839, 5841] {
+			Bytes := Buffer(Size, 0)
+			_DDPR_RequireThrows(_LLM_NavEventOwnerNativeRegisterTerminalRoutes.Bind(1, 1, 1,
+				Bytes, 146, _DDPR_Register), "ValueError",
+				"The terminal route native registration ABI is invalid.")
+		}
+		_DDPR_Require(_DDPR_State.Calls.Length == 1, "a mismatched exact-count span reached registration")
+	} else if Scenario == "production-kle" || Scenario == "production-held-withdrawal" {
 		_DDPR_Require(Kle.Length == 4, "independent base and Shift KLE routes were discarded")
 		if Scenario == "production-held-withdrawal" {
 			DigitId := Digits[1]["recipe_id"], KleId := Kle[1]["recipe_id"]
