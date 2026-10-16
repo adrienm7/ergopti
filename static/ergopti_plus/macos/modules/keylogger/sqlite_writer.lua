@@ -34,6 +34,7 @@ local TextCipher = require("modules.keylogger.text_cipher")
 -- Statement shapes for the at-rest migration (section 8). Shared with Linux so
 -- the two drivers cannot drift on which columns a conversion may rewrite.
 local Migration  = require("keylogger.text_migration")
+local MediaStore = require("keylogger.media_store")
 local LOG    = "keylogger.sqlite_writer"
 
 
@@ -231,8 +232,9 @@ function M.open_db()
 		_retire_media_startup_db(db)
 		return false
 	end
-	local apply_ok, apply_result = pcall(db.exec, db,
-		"BEGIN IMMEDIATE;\n" .. media_schema .. "\nCOMMIT;")
+	local apply_ok, apply_result = pcall(function()
+		return db:exec(MediaStore.schema_transaction(media_schema))
+	end)
 	if not apply_ok or apply_result ~= sqlite3.OK then
 		Logger.error(LOG, "Cannot apply semantic media schema: %s.", tostring(apply_result))
 		local rollback_ok, rollback_result = pcall(db.exec, db, "ROLLBACK;")

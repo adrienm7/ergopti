@@ -13,8 +13,7 @@ local sw     = helpers.load_module("modules.keylogger.sqlite_writer")
 --- Recognizes the mandatory additive initializer separately from target faults.
 --- A real CLI first-open control below checks that this DDL actually commits.
 local function is_media_schema_startup(command)
-	return command:find("BEGIN IMMEDIATE;", 1, true)
-		and command:find("CREATE TABLE IF NOT EXISTS ngram_media_keys", 1, true)
+	return command:find("CREATE TABLE IF NOT EXISTS ngram_media_keys", 1, true)
 		and command:find("CREATE TABLE IF NOT EXISTS agg_app_day_media_hold", 1, true)
 		and command:find("COMMIT;", 1, true)
 end
@@ -64,7 +63,7 @@ local function with_writer_read_receipts(body, status, test, startup_status)
 end
 
 --- Models CLI exit receipts while retaining the production builder and writer.
-local function with_category_commands(refusal, test)
+local function with_category_commands(refusal, test, retain_startup)
 	local writer = helpers.load_module("modules.keylogger.sqlite_writer")
 	local previous_execute, previous_popen = os.execute, io.popen
 	local path = os.tmpname()
@@ -90,7 +89,9 @@ local function with_category_commands(refusal, test)
 		helpers.assert_true(writer.open_db(path))
 		-- Startup has its own acknowledged schema migration; these observations
 		-- belong only to the category operation whose transaction is under test.
-		for index = #commands, 1, -1 do commands[index] = nil end
+		if not retain_startup then
+			for index = #commands, 1, -1 do commands[index] = nil end
+		end
 		test(writer, commands)
 	end, debug.traceback)
 	os.execute, io.popen = previous_execute, previous_popen
@@ -98,6 +99,22 @@ local function with_category_commands(refusal, test)
 	os.remove(path)
 	if not ok then error(reason, 0) end
 end
+
+helpers.describe("linux-sqlite-media-schema-admission", function()
+	it("media-schema-deferred-open: current schema admission does not reserve a writer", function()
+		with_category_commands(nil, function(_, commands)
+			local schemas = 0
+			for _, command in ipairs(commands) do
+				if is_media_schema_startup(command) then
+					schemas = schemas + 1
+					helpers.assert_true(command:find("BEGIN;\n", 1, true) ~= nil)
+					helpers.assert_nil(command:find("BEGIN IMMEDIATE;", 1, true))
+				end
+			end
+			helpers.assert_eq(schemas, 1, "The actual writer must admit its canonical additive schema once")
+		end, true)
+	end)
+end)
 
 helpers.describe("linux-sqlite-category-transaction", function()
 	it("linux-sqlite-category-transaction: score receipt refusal cannot acknowledge an edit", function()

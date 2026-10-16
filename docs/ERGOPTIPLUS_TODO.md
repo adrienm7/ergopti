@@ -12,6 +12,35 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 media schema reader-lock admission
+
+The Linux and macOS SQLite writers no longer reserve a write transaction
+before admitting the current additive media schema. A shared transaction
+builder uses deferred BEGIN; real flush and rebuild writes keep their existing
+IMMEDIATE transactions. Failed admission attempts rollback and preserves
+unresolved cleanup debt until exact retirement succeeds. Windows uses its
+existing private candidate path and needs no matching change.
+
+Both owning regressions fail against the original writer and pass after the
+correction: all 39 macOS cases and 129 Linux cases pass in their recorded selections.
+A genuine SQLite reader process confirms that current-schema admission succeeds
+without changing schema_version. Missing or partial schema still refuses under
+the reader lock with complete rollback, then succeeds after reader retirement.
+These Windows-host controls do not qualify native macOS or Linux execution.
+
+The complete original macOS runner on Windows finishes naturally with 19,248
+passed and 949 failed tests; its changed writer module passes all 39 cases.
+Its original E2E runner passes 67 cases with two explicit host/driver skips.
+Both canonical Linux commands refuse because usable WSL LuaJIT is unavailable.
+The original complete JavaScript suite finishes naturally with 421 PASS and 12
+FAIL, all 433 starts paired with exact terminal names; actual full startup passes.
+Two failures are child timeouts in updater-source and opaque-network controls.
+Both original commands subsequently pass on one unchanged-source replay with
+unchanged deadlines. Their earlier failures remain retained and the timeout
+cause is unproven; unexecuted native gates remain OPEN.
+Hosted CI 38959224502 independently retains the original shared-reader failure.
+Corrected hosted receiving and physical/personal native qualification stay OPEN.
+
 ### October 16 current CI and installed receiving
 
 CI 38944902800 on 5f4f3c74c7 completes the actual Windows default suite

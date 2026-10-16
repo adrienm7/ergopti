@@ -488,7 +488,8 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 			package.loaded["infra.logger"] = logger
 			local db = {
 				exec = function(_, sql)
-					if sql:find("BEGIN IMMEDIATE;", 1, true) then
+					if sql:find("CREATE TABLE media_fixture", 1, true) then
+						state.schema_sql = sql
 						state.applied = state.applied + 1
 						if schedule.apply == "throw" then error("media transaction threw") end
 						if schedule.apply == "refuse" then return 1 end
@@ -548,6 +549,15 @@ helpers.describe("sqlite_writer — media schema startup ownership", function()
 			if not ok then error(failure, 0) end
 		end)
 	end
+
+	helpers.it("media-schema-deferred-open: current schema admission does not reserve a writer", function()
+		observe({}, function(sw, state)
+			helpers.assert_true(sw.open_db())
+			helpers.assert_eq(state.applied, 1)
+			helpers.assert_eq(state.schema_sql,
+				"BEGIN;\nCREATE TABLE media_fixture (id INTEGER);\nCOMMIT;")
+		end)
+	end)
 
 	for _, failure in ipairs({ "nil", "throw" }) do
 		helpers.it("retires acquired database after media open " .. failure, function()
