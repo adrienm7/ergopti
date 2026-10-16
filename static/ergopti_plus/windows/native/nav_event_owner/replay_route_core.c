@@ -7,7 +7,20 @@
 #include "replay_route_core.h"
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <string.h>
+
+/* The existing hook-free test target supplies real, counted libc allocation.
+ * Production and portable matrices retain the normal compiler runtime calls. */
+#if defined(ERGOPTI_NAV_TESTING)
+void *ErgoptiReplay_TestAllocate(size_t bytes);
+void ErgoptiReplay_TestRelease(void *storage);
+#define AllocateRouteStorage ErgoptiReplay_TestAllocate
+#define ReleaseRouteStorage ErgoptiReplay_TestRelease
+#else
+#define AllocateRouteStorage malloc
+#define ReleaseRouteStorage free
+#endif
 
 /** Checks lifecycle ownership before any mutation or recipe consumption. */
 static int32_t CheckOwner(const ErgoptiReplay_State *state, uint64_t owner)
@@ -18,6 +31,9 @@ static int32_t CheckOwner(const ErgoptiReplay_State *state, uint64_t owner)
 		return ERGOPTI_REPLAY_NOT_INITIALIZED;
 	if (state->owner != owner)
 		return ERGOPTI_REPLAY_OWNER_MISMATCH;
+	if (state->storage_owner != (uintptr_t)state
+			|| ((state->route_count == 0) != (state->routes == NULL)))
+		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	return ERGOPTI_REPLAY_OK;
 }
 
@@ -39,6 +55,25 @@ static bool WritableOverlaps(
 		return true;
 	return output_start < protected_start + protected_size
 		&& protected_start < output_start + output_size;
+}
+
+/** Checks descriptor byte arithmetic on both supported pointer widths. */
+static bool RouteStorageBytes(uint32_t count, size_t *bytes)
+{
+	*bytes = (size_t)count * sizeof(ErgoptiReplay_Route);
+	return count == 0 || *bytes / count == sizeof(ErgoptiReplay_Route);
+}
+
+/** Immutable descriptors remain protected after moving off the owner's stack. */
+int ErgoptiReplay_OverlapsStorage(
+	const ErgoptiReplay_State *state, const void *output, size_t output_size)
+{
+	size_t bytes = 0;
+	if (state != NULL && !RouteStorageBytes(state->route_count, &bytes))
+		return true;
+	return WritableOverlaps(output, output_size, state, sizeof(*state))
+		|| (state != NULL && WritableOverlaps(output, output_size,
+			state->routes, bytes));
 }
 
 /** Only one-bit prefix identities may enter the shared held-prefix mask. */
@@ -119,11 +154,41 @@ int32_t ErgoptiReplay_Initialize(ErgoptiReplay_State *state, uint64_t owner)
 		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	if (state->initialized)
 		return ERGOPTI_REPLAY_ALREADY_INITIALIZED;
-	if (state->owner != 0 || state->generation != 0 || state->route_count != 0)
+	if (state->owner != 0 || state->generation != 0 || state->route_count != 0
+			|| state->routes != NULL || state->storage_owner != 0)
 		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	memset(state, 0, sizeof(*state));
 	state->owner = owner;
 	state->initialized = 1;
+	state->storage_owner = (uintptr_t)state;
+	return ERGOPTI_REPLAY_OK;
+}
+
+int32_t ErgoptiReplay_Dispose(ErgoptiReplay_State *state, uint64_t owner)
+{
+	int32_t status = CheckOwner(state, owner);
+	if (status != ERGOPTI_REPLAY_OK)
+		return status;
+	ReleaseRouteStorage(state->routes);
+	memset(state, 0, sizeof(*state));
+	return ERGOPTI_REPLAY_OK;
+}
+
+int32_t ErgoptiReplay_Move(
+	ErgoptiReplay_State *destination, ErgoptiReplay_State *source, uint64_t owner)
+{
+	int32_t status;
+	if (destination == NULL || ErgoptiReplay_OverlapsStorage(source, destination, sizeof(*destination)))
+		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
+	status = CheckOwner(source, owner);
+	if (status != ERGOPTI_REPLAY_OK)
+		return status;
+	if (destination->initialized || destination->owner || destination->generation
+			|| destination->route_count || destination->routes || destination->storage_owner)
+		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
+	*destination = *source;
+	destination->storage_owner = (uintptr_t)destination;
+	memset(source, 0, sizeof(*source));
 	return ERGOPTI_REPLAY_OK;
 }
 
@@ -131,30 +196,39 @@ int32_t ErgoptiReplay_Register(
 	ErgoptiReplay_State *state, uint64_t owner, uint64_t generation,
 	uint64_t layout_id, const ErgoptiReplay_Route *routes, uint32_t count)
 {
-	ErgoptiReplay_Route candidate[ERGOPTI_REPLAY_MAX_ROUTES];
+	ErgoptiReplay_Route *candidate = NULL;
+	size_t candidate_bytes;
 	uint32_t index;
 	uint32_t previous;
 	int32_t status = CheckOwner(state, owner);
 	if (status != ERGOPTI_REPLAY_OK)
 		return status;
-	if (generation == 0 || layout_id == 0 || count > ERGOPTI_REPLAY_MAX_ROUTES
+	if (generation == 0 || layout_id == 0 || !RouteStorageBytes(count, &candidate_bytes)
 			|| (count != 0 && routes == NULL))
 		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	if (generation <= state->generation)
 		return ERGOPTI_REPLAY_STALE_REGISTRATION;
 	/* Copy first so a caller-owned or overlapping input cannot mutate validation. */
-	memset(candidate, 0, sizeof(candidate));
-	if (count != 0)
-		memcpy(candidate, routes, sizeof(*routes) * count);
+	if (count != 0) {
+		candidate = AllocateRouteStorage(candidate_bytes);
+		if (candidate == NULL)
+			return ERGOPTI_REPLAY_CAPACITY;
+		memcpy(candidate, routes, candidate_bytes);
+	}
 	for (index = 0; index < count; ++index) {
-		if (!RouteValid(&candidate[index]))
+		if (!RouteValid(&candidate[index])) {
+			ReleaseRouteStorage(candidate);
 			return ERGOPTI_REPLAY_INVALID_REGISTRATION;
+		}
 		for (previous = 0; previous < index; ++previous) {
-			if (RoutesConflict(&candidate[previous], &candidate[index]))
+			if (RoutesConflict(&candidate[previous], &candidate[index])) {
+				ReleaseRouteStorage(candidate);
 				return ERGOPTI_REPLAY_INVALID_REGISTRATION;
+			}
 		}
 	}
-	memcpy(state->routes, candidate, sizeof(candidate));
+	ReleaseRouteStorage(state->routes);
+	state->routes = candidate;
 	state->route_count = count;
 	state->generation = generation;
 	state->layout_id = layout_id;
@@ -251,7 +325,7 @@ int32_t ErgoptiReplay_Step(
 	const ErgoptiReplay_Route *route;
 	int32_t status;
 	/* Refuse before even a refusal result could overwrite lifecycle storage. */
-	if (WritableOverlaps(snapshot, sizeof(*snapshot), state, sizeof(*state)))
+	if (ErgoptiReplay_OverlapsStorage(state, snapshot, sizeof(*snapshot)))
 		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	/* A caller may reuse snapshot.event as the next input buffer. Freeze that
 	 * edge before clearing the output, so a valid up cannot become an orphan. */
@@ -357,7 +431,7 @@ int32_t ErgoptiReplay_PrepareNativeEdge(
 {
 	int32_t status;
 	/* The output cannot destroy either lifecycle storage or its captured recipe. */
-	if (WritableOverlaps(edge, sizeof(*edge), state, sizeof(*state))
+	if (ErgoptiReplay_OverlapsStorage(state, edge, sizeof(*edge))
 			|| WritableOverlaps(edge, sizeof(*edge), snapshot, sizeof(*snapshot)))
 		return ERGOPTI_REPLAY_INVALID_ARGUMENT;
 	if (edge != NULL)

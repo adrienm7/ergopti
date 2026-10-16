@@ -12,6 +12,63 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 canonical native bundle and installed shutdown receiving
+
+The canonical Windows source now integrates exact-count replay route storage,
+allocated-output alias refusal and empty composition completion. Official
+`-UpdateTracked` reconstruction and the subsequent no-update drift check both
+exit0 with the original8 replay,11 output,6 trace and44 native owner matrices.
+The generated DLL has41 hardened x64 exports,151,040 bytes and SHA256
+5081CF88F00BA08FF5A27E51BEA42E0A257836C8863ECC2D5FE348C98480E930;
+the source/recipe fingerprint is
+841847E4D126534EC20931DE59A2E187668391625517E13F7B0E74CDDD9DBF64.
+Both reconstruction receipts retain exact source identity; drift leaves the
+tracked diff unchanged. Qualification flags remain false.
+
+The serializer source gate previously assumed a brace-free function. It now
+admits only the authenticated locked storage-refusal block, preserving the
+straight-line success path, exact lock lifetime and ABI checks. Its original13
+and additive19 negative controls pass, with18 recording controls and no native
+child or compiler execution. An actual private predecessor accepts a dead
+conditional wrapper and fails the added inverse; the corrected reader refuses
+that wrapper. Another actual inverse exposes an inert string containing the
+complete proof; quoted literals are now masked before authenticating executable
+storage and lock checks. The corrected reader rejects that inverse as well.
+Source inspection does not qualify native callback execution.
+
+Canonical Windows callback receiving completes the six terminal selections
+212/98/12/11/123/211, all667 cases, then91 KLE observer and10 existing
+layout-registry cases. Each selection retains a complete execution manifest,
+natural exit0, no skips and unchanged tracked source. These are injected-port
+callback results, separate from genuine user32 receiving and physical input.
+
+The published8c21c6adf2 installed build is observed displaying Diagnostics
+after the local API request. Its actual collection produces a3,746-byte ZIP,
+SHA256d4ac82adea9ff61042b0a47f284aab45c03b10f71a0d4a08100c69feee57abdb.
+CRC, entry allowlist, redaction, source and component hashes pass, but its
+results are4PASS,2FAIL,6UNRUN and2explicit physical SKIP. UIA and rendering
+retain `native_probe_error`; rendering follows the shared exception path and
+is not established as an independently executed probe. The six-PASS acceptance
+verifier exits1 and is preserved. The separate integrity receipt records both
+failures without qualifying them. The exact collector handle exits0 after
+90.558s, before its120-second deadline, and session control files are retired.
+The same installed application subsequently accepts one ordinary File/Exit
+request and naturally exits0, with no force or kill. Personal locator bytes,
+the protected personal worker and the external Ollama server remain preserved.
+
+The frozen canonical composition with the preceding reader completes all433
+default JavaScript checks:423PASS and10FAIL, natural exit1, unchanged source.
+Failures retain symlink privilege refusals, Linux-only archive assembly, missing
+sandbox service and Brew compiler/interface receiving. They remain failed;
+matching earlier failure identities alone is not complete attribution. Initial
+format receiving also fails because ambient Ruff0.15.11 differs from pinned
+0.15.8; the existing pinned executable is used for supplemental receiving.
+The final reader adds the quoted-proof inverse after this frozen full run.
+Original Frame/source pinning, historical admission, stream
+delivery, handler cohort conversion and production policy remain unfinished.
+The native file-filter failure, installed UIA/render receiving, physical Windows,
+native macOS and unavailable native Linux remain OPEN.
+
 ### October 16 installed Diagnostics API and archive receiving
 
 The direct Diagnostics control correction is published on dev at

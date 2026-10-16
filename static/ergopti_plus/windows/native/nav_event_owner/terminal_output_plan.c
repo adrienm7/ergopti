@@ -38,6 +38,8 @@ static int InputValid(
 	const ErgoptiReplay_State *routes, uint64_t owner, const ErgoptiReplay_Snapshot *s)
 {
 	return routes != NULL && routes->initialized && routes->owner == owner
+		&& routes->storage_owner == (uintptr_t)routes
+		&& ((routes->route_count == 0) == (routes->routes == NULL))
 		&& s->observed_generation != 0 && s->observed_generation <= routes->generation
 		&& s->observed_layout_id != 0 && s->event.source_id != 0
 		&& s->event.vk <= 255 && s->event.scan <= 511
@@ -95,6 +97,51 @@ static int Neutral(const ErgoptiReplay_Snapshot *s)
 		&& s->route.required_dead_key_id == 0 && s->route.next_dead_key_id == 0
 		&& s->composition_before.dead_key_id == 0 && s->composition_after.dead_key_id == 0;
 }
+/** Structural control only; native sequence escrow is a separate obligation. */
+static int EmptyCompositionTransition(const ErgoptiReplay_Snapshot *s, uint32_t length)
+{
+	return length == 0 && s->status == ERGOPTI_REPLAY_OK
+		&& s->route.kind == ERGOPTI_REPLAY_DEAD_KEY
+		&& !s->event.key_up && !s->event.repeat
+		&& s->route.target_vk == 0 && s->route.target_scan == 0
+		&& s->route.effective_modifiers_lr == 0
+		&& s->route.required_modifiers == GenericModifiers(s->modifiers_lr_before)
+		&& s->modifiers_lr_before == s->modifiers_lr_after
+		&& s->prefixes_before == 0 && s->prefixes_after == 0
+		&& s->route.required_prefixes == 0 && s->route.prefix_bit == 0
+		&& s->route.next_dead_key_id != 0
+		&& s->composition_before.dead_key_id == s->route.required_dead_key_id
+		&& (s->route.required_dead_key_id == 0
+			? s->composition_before.generation == 0 && s->composition_before.layout_id == 0
+			: s->composition_before.generation != 0
+				&& s->composition_before.generation <= s->route_generation
+				&& s->composition_before.layout_id == s->route_layout_id)
+		&& s->composition_after.dead_key_id == s->route.next_dead_key_id
+		&& s->composition_after.generation == s->route_generation
+		&& s->composition_after.layout_id == s->route_layout_id;
+}
+
+/** Structural composition shapes; FIFO ownership is authenticated by the caller. */
+static int CompositionOutput(const ErgoptiReplay_Snapshot *s, uint32_t length)
+{
+	if (s->status != ERGOPTI_REPLAY_OK || s->route.kind != ERGOPTI_REPLAY_DEAD_KEY
+			|| s->event.repeat || s->route.target_vk || s->route.target_scan
+			|| s->route.effective_modifiers_lr || s->prefixes_before || s->prefixes_after
+			|| s->route.required_prefixes || s->route.prefix_bit
+			|| s->modifiers_lr_before != s->modifiers_lr_after) return 0;
+	if (s->event.key_up)
+		return length == 0 && memcmp(&s->composition_before,
+			&s->composition_after, sizeof(s->composition_before)) == 0;
+	return s->route.required_modifiers == GenericModifiers(s->modifiers_lr_before)
+		&& s->route.required_dead_key_id != 0 && s->route.next_dead_key_id == 0
+		&& s->composition_before.dead_key_id == s->route.required_dead_key_id
+		&& s->composition_before.generation != 0
+		&& s->composition_before.generation <= s->route_generation
+		&& s->composition_before.layout_id == s->route_layout_id
+		&& s->composition_after.dead_key_id == 0
+		&& s->composition_after.generation == 0 && s->composition_after.layout_id == 0;
+}
+
 static int NaturalModifier(const ErgoptiReplay_Snapshot *s)
 {
 	static const struct { uint16_t vk, scan; uint8_t lr; } natural[] = {
@@ -125,10 +172,14 @@ int32_t ErgoptiOutput_Plan(
 	const ErgoptiReplay_State *routes, const ErgoptiReplay_Snapshot *snapshot,
 	const uint16_t *text, uint32_t length, uint8_t cohort_complete, ErgoptiOutput_Key *key)
 {
-	int32_t status = CheckOwner(state, owner);
+	int32_t status;
 	ErgoptiReplay_Snapshot frozen;
 	ErgoptiOutput_Unit units[ERGOPTI_OUTPUT_MAX_UNITS] = {{0}};
 	uint32_t count = 0; uint8_t eligible = 0;
+	if (ErgoptiReplay_OverlapsStorage(routes, state, sizeof(*state))
+			|| ErgoptiReplay_OverlapsStorage(routes, key, sizeof(*key)))
+		return ERGOPTI_OUTPUT_INVALID;
+	status = CheckOwner(state, owner);
 	if (status != 0) return status;
 	if (state->active) return ERGOPTI_OUTPUT_BUSY;
 	if (length > ERGOPTI_OUTPUT_MAX_UTF16) return ERGOPTI_OUTPUT_CAPACITY;
@@ -146,7 +197,18 @@ int32_t ErgoptiOutput_Plan(
 				&& frozen.status != ERGOPTI_REPLAY_UNSUPPORTED)
 			|| !ValidUtf16(text, length))
 		return ERGOPTI_OUTPUT_INVALID;
-	if (frozen.status == ERGOPTI_REPLAY_OK && Neutral(&frozen)) {
+	if (EmptyCompositionTransition(&frozen, length) || CompositionOutput(&frozen, length)) {
+		eligible = 1;
+		if (!frozen.event.key_up) {
+			for (uint32_t i = 0; i < length; ++i) {
+				units[count].kind = ERGOPTI_OUTPUT_UNICODE;
+				units[count++].utf16 = text[i];
+				units[count].kind = ERGOPTI_OUTPUT_UNICODE;
+				units[count].key_up = 1;
+				units[count++].utf16 = text[i];
+			}
+		}
+	} else if (frozen.status == ERGOPTI_REPLAY_OK && Neutral(&frozen)) {
 		if ((frozen.route.kind == ERGOPTI_REPLAY_CHARACTER
 				|| frozen.route.kind == ERGOPTI_REPLAY_DIGIT)
 				&& frozen.route.effective_modifiers_lr == 0
