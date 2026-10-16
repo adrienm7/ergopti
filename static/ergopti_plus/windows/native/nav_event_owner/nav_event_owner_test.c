@@ -3691,7 +3691,8 @@ static bool TestTerminalSerializedOutputUnicode(const char *name)
 			ErgoptiNav_TestEvent replayed; uint32_t replayed_count;
 			TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
 				ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, &replayed, 1, &replayed_count) == 0);
-			TEST_ASSERT(name, replayed_count == 1 && replayed.kind == ERGOPTI_NAV_EVENT_UP);
+			/* The complete Unicode pair owns the original UP without raw replay. */
+			TEST_ASSERT(name, replayed_count == 0);
 		}
 	}
 	return true;
@@ -4518,8 +4519,85 @@ static bool TestEmptyFinal(uint32_t early_up_mask, uint32_t final_up_first, uint
 }
 
 
+/** Unicode consumption owns its original UP, never the next repeated DOWN. */
+static bool TestQueuedUnicodeRepeatOwnsUp(uint8_t kind, uint32_t timing)
+{
+	const char *name = "queued Unicode repeats own independent output and original UP";
+	ErgoptiNav_Owner owner = TestOwner(TEST_OWNER_A, 7, 1);
+	ErgoptiNav_DispatchResult result;
+	ErgoptiNav_TerminalCaptureSnapshot capture;
+	ErgoptiNav_TerminalRouteSnapshot head;
+	ErgoptiReplay_Route route = {0};
+	ErgoptiOutput_Key key;
+	ErgoptiOutput_Unit units[2];
+	ErgoptiNav_TestEvent replayed[4];
+	uint64_t generation = 0, attempt = 0, previous_attempt = 0;
+	uint32_t count = 0;
+	uint8_t mask = 0, passed = 0, ordered = 0;
+	uint16_t vk = kind == ERGOPTI_REPLAY_DIGIT ? '1' : 'A';
+	uint16_t scan = kind == ERGOPTI_REPLAY_DIGIT ? 0x02 : 0x1E;
+	uint16_t text = kind == ERGOPTI_REPLAY_DIGIT ? '7' : 'x';
+	TEST_ASSERT(name, timing <= 2);
+	TEST_ASSERT(name, kind == ERGOPTI_REPLAY_CHARACTER || kind == ERGOPTI_REPLAY_DIGIT);
+	TEST_ASSERT(name, TestSetupOwner(name, &owner, &generation));
+	TEST_ASSERT(name, ErgoptiNav_TestSetRunning(1) == 0);
+	TEST_ASSERT(name, ErgoptiNav_TestSetOsModifierKeys(1, NULL, 0) == 0);
+	route.recipe_id = 3401; route.route_id = 1;
+	route.axis = ERGOPTI_REPLAY_SCAN; route.code = scan;
+	route.kind = kind; route.target_scan = scan;
+	TEST_ASSERT(name, ErgoptiNav_RegisterTerminalRoutes(TEST_OWNER_A, 1, 11, &route, 1) == 0);
+	TEST_ASSERT(name, ErgoptiNav_BeginTerminalCapture(TEST_OWNER_B) == 0);
+	for (uint32_t index = 0; index < (timing == 2 ? 1u : 3u); ++index)
+		TEST_ASSERT(name, TestHookFlow(name, vk, scan, ERGOPTI_NAV_EVENT_DOWN,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	if (timing == 0)
+		TEST_ASSERT(name, TestHookFlow(name, vk, scan, ERGOPTI_NAV_EVENT_UP,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	TEST_ASSERT(name, ErgoptiNav_TestAdmitTerminalOutput(1) == 0);
+	for (uint32_t index = 0; index < 3; ++index) {
+		TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+		TEST_ASSERT(name, head.route.status == 0 && head.route.route.recipe_id == 3401);
+		TEST_ASSERT(name, head.route.event.repeat == (index == 0 ? 0 : 1));
+		TEST_ASSERT(name, ErgoptiNav_PlanTerminalOutput(TEST_OWNER_A, TEST_OWNER_B,
+			head.sequence, &text, 1, &key) == 0);
+		TEST_ASSERT(name, ErgoptiNav_BeginTerminalOutputAttempt(TEST_OWNER_A, &key,
+			units, 2, &count, &attempt) == 0);
+		TEST_ASSERT(name, count == 2 && attempt > previous_attempt);
+		TEST_ASSERT(name, units[0].kind == ERGOPTI_OUTPUT_UNICODE && units[0].utf16 == text && !units[0].key_up);
+		TEST_ASSERT(name, units[1].kind == ERGOPTI_OUTPUT_UNICODE && units[1].utf16 == text && units[1].key_up);
+		previous_attempt = attempt;
+		TEST_ASSERT(name, ErgoptiNav_AcknowledgeTerminalOutput(TEST_OWNER_A, &key, attempt, 2) == 0);
+		TEST_ASSERT(name, ErgoptiNav_ConsumeTerminalOutput(TEST_OWNER_A, &key) == 0);
+		if (index == 0 && timing == 2) {
+			for (uint32_t repeat = 0; repeat < 2; ++repeat)
+				TEST_ASSERT(name, TestHookFlow(name, vk, scan, ERGOPTI_NAV_EVENT_DOWN,
+					ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+		}
+	}
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == 0);
+	TEST_ASSERT(name, capture.queued == (timing == 0 ? 1u : 0u));
+	if (timing != 0) {
+		TEST_ASSERT(name, ErgoptiNav_Stop() == ERGOPTI_NAV_STATUS_STOP_PENDING);
+		TEST_ASSERT(name, TestHookFlow(name, vk, scan, ERGOPTI_NAV_EVENT_UP,
+			ERGOPTI_NAV_INJECTION_PHYSICAL, 0, &result, &mask, &passed, &ordered));
+	}
+	TEST_ASSERT(name, ErgoptiNav_PeekTerminalRoute(TEST_OWNER_B, 0, &head) == 0);
+	TEST_ASSERT(name, head.route.event.key_up == 1 && head.route.route.recipe_id == 3401);
+	TEST_ASSERT(name, ErgoptiNav_TestReleaseTerminalCapture(TEST_OWNER_B,
+		ERGOPTI_NAV_TERMINAL_RELEASE_ABORT, UINT32_MAX, replayed, 4, &count) == 0);
+	TEST_ASSERT(name, count == 0);
+	TEST_ASSERT(name, ErgoptiNav_GetTerminalCapture(TEST_OWNER_B, &capture) == 0);
+	TEST_ASSERT(name, capture.queued == 0 && capture.phase == ERGOPTI_NAV_TERMINAL_IDLE);
+	TEST_ASSERT(name, ErgoptiNav_Stop() == 0);
+	printf("PASS queued Unicode repeat custody kind=%u timing=%u: output3 raw0 exact-UP retired.\n", kind, timing);
+	return true;
+}
+
 static bool TestTerminalOutputCustodySettlesExactFifoHead(void)
 {
+	for (uint8_t kind = ERGOPTI_REPLAY_CHARACTER; kind <= ERGOPTI_REPLAY_DIGIT; ++kind)
+		for (uint32_t timing = 0; timing < 3; ++timing)
+			if (!TestQueuedUnicodeRepeatOwnsUp(kind, timing)) return false;
 	if (!TestNativeAllocatedOutputSpans() || !TestNativeAllocatedLiveOutput()) return false;
 	for (uint32_t limit = 0; limit <= 6; ++limit)
 		if (!TestEmptyChainRollback(limit)) return false;

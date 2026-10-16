@@ -876,16 +876,20 @@ static bool NavTerminalPrefixOwnsUpLocked(const NavState *state, const NavTermin
 	return false;
 }
 
-/** Completed empty transitions also own every captured and future original UP. */
+/** Completed Unicode and empty transitions own their original physical UP. */
 static void NavSettleTerminalDownLocked(NavState *state, uint64_t down_sequence)
 {
 	if (down_sequence == 0) return;
 	for (uint32_t index = 0; index < ERGOPTI_REPLAY_MAX_HELD_KEYS; ++index)
 		if (state->terminal_down_sequences[index] == down_sequence)
 			state->terminal_transformed_down[index] = down_sequence;
-	for (uint32_t index = 0; index < state->terminal_prefix_queued + state->terminal_queued; ++index)
-		if (state->terminal_events[index].down_sequence == down_sequence)
-			state->terminal_events[index].output_settled = 1;
+	for (uint32_t index = 0; index < state->terminal_prefix_queued + state->terminal_queued; ++index) {
+		NavTerminalKeyEdge *edge = &state->terminal_events[index];
+		if (edge->down_sequence != down_sequence) continue;
+		/* A later repeated DOWN still needs its own output acknowledgement. */
+		if (!edge->key_up && edge->route.event.repeat) edge->raw_forbidden = 1;
+		else edge->output_settled = 1;
+	}
 }
 
 /** Only the complete owned empty chain can authorize its next transition. */
@@ -3696,6 +3700,10 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ConsumeTerminalOutput(
 					NavConsumeTerminalReplayLocked(&g_nav_state, settled);
 					g_nav_state.terminal_replayed += settled;
 				} else {
+					if (!edge.key_up && (candidate.snapshot.route.kind == ERGOPTI_REPLAY_CHARACTER
+							|| candidate.snapshot.route.kind == ERGOPTI_REPLAY_DIGIT))
+						NavSettleTerminalDownLocked(&g_nav_state,
+							g_nav_state.terminal_events[g_nav_state.terminal_prefix_queued].down_sequence);
 					NavConsumeTerminalOutputHeadLocked(&g_nav_state);
 					++g_nav_state.terminal_replayed;
 				}
