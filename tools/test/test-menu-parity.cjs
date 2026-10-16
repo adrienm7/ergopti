@@ -5847,6 +5847,61 @@ function personalFrameEdgePublication(edge, sources, definition, row, platform) 
 		true,
 		'restored actual caller retains the genuine frame route'
 	);
+
+	// The receipt protocol replaces a bare handle Boolean. Closed source evidence
+	// must retain both identities and own-data access before cleanup can publish.
+	const cleanupFile = 'windows/infra/manifest_menu.ahk';
+	for (const [name, original, replacement] of [
+		['Boolean ledger', '&& OwnerReceipt is Object', '&& OwnerReceipt == true'],
+		[
+			'registry lifetime',
+			'&& Map.Prototype.Get.Call(Registries[3], Handle) == OwnerReceipt',
+			'&& true'
+		],
+		[
+			'Menu lifetime',
+			'ReceiptDescriptor.Value == OwnerReceipt',
+			'ReceiptDescriptor.Value != OwnerReceipt'
+		],
+		[
+			'own-data access',
+			'ReceiptDescriptor := Object.Prototype.GetOwnPropDesc.Call(Child, MENU_DISPATCH_OWNER_PROPERTY)',
+			'ReceiptDescriptor := {Value: Child.%MENU_DISPATCH_OWNER_PROPERTY%}'
+		]
+	]) {
+		assert.equal(
+			sources[cleanupFile].split(original).length,
+			2,
+			`${name}: one actual cleanup preimage`
+		);
+		const changedCleanup = sources[cleanupFile].replace(original, replacement);
+		assert.notEqual(
+			changedCleanup,
+			sources[cleanupFile],
+			`${name}: the mutation must change its owner`
+		);
+		assert.equal(
+			changedCleanup.replace(replacement, original),
+			sources[cleanupFile],
+			`${name}: exact inverse`
+		);
+		assert.equal(
+			personalFrameEdgePublication(
+				edge,
+				{ ...sources, [cleanupFile]: changedCleanup },
+				definition,
+				row,
+				'ahk'
+			),
+			false,
+			`${name}: withdrawn cleanup authority cannot publish a DATA frame`
+		);
+		assert.equal(
+			personalFrameEdgePublication(edge, sources, definition, row, 'ahk'),
+			true,
+			`${name}: exact restoration retains the original publication`
+		);
+	}
 }
 
 // Iterated to a fixed point rather than walked once: the graph is shallow today

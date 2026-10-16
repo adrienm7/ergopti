@@ -157,3 +157,20 @@ _OTO_RefusalPatternCountsOnlyTwoWrappers() {
 			"An unrelated or lookalike wrapper never enters the legitimate refusal count.")
 }
 Test("OnExit: canonical refusal count admits exactly two wrappers", _OTO_RefusalPatternCountsOnlyTwoWrappers)
+
+; A completed native boot reproduced heap corruption after the main exit callback:
+; current-tray deletion retained detached registered Menu/callback cycles.
+_OTO_RegisteredMenusRetireAfterLastVeto() {
+	Body := _StripFullLineComments(_DriverFuncBody("Ergopti_OnShutdown"))
+	Assert(Body != "", "the actual lifecycle owner must remain source-visible")
+	Terminal := InStr(Body, "ShutdownTerminal := true", true)
+	Population := InStr(Body, "MenuPopulation_Shutdown()", true)
+	Startup := InStr(Body, "MenuStartupCommands_Shutdown()", true)
+	Menus := InStr(Body, "MenuDispatcher_Shutdown()", true)
+	Assert(Terminal > 0 && Population > Terminal && Startup > Population && Menus > Startup,
+		"accepted shutdown must retire registered detached menus after stopping their producers")
+	AssertFalse(RegExMatch(SubStr(Body, Menus), _SHUTDOWN_REFUSAL_PATTERN),
+		"menu retirement must never run before a later shutdown veto")
+}
+Test("menu-terminal-shutdown: registered menus retire only after terminal acceptance",
+	_OTO_RegisteredMenusRetireAfterLastVeto)

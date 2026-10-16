@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-15. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-16. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,162 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 16 installed Diagnostics API and archive receiving
+
+The direct Diagnostics control correction is published on dev at
+`58d96a6a6c9cfae19e179dfb6dae9d5455203447`, by a normal fast-forward from
+`97d1a2e06665197ac744a6e266764be18f5837ef`. Main remains unchanged. Its actual
+compiled Windows build opens Diagnostics through the hash/PID/lifetime-bound
+helper without notification-area interaction. The visible page reports the
+correct build. Closing and reopening that page through the same helper changes
+its frontend epoch from2 to5 and resumes the same10/14 collection.
+
+The actual installed collection produces a verified7,961-byte ZIP: CRC, closed
+entry allowlist, redaction and all component hashes pass. Its rows are6PASS,
+6UNRUN and2explicit guided SKIP, with production and physical qualification
+false. The independently retained worker handle signals exit0 after96.181s,
+before the120-second deadline; session control files are retired. A second
+actual collection receives the dedicated Cancel action, preserves a verified
+archive with cancelled physical steps, and its exact worker exits0 after22.925s.
+Cancellation finalizes evidence with SKIP; it is not a collector exception.
+The initial observer incorrectly expected exit1 and remains a failed harness
+receipt. Source-contract and session receiving confirm the actual exit0,
+before-deadline cancellation and cleanup without changing the application.
+Personal configuration remains byte-identical; the protected personal worker
+and the authorized external Ollama process are preserved.
+
+Application retirement is a separate native failure: the subsequent ordinary
+File/Exit request reaches terminal teardown, then the retained application
+handle reports `0xC0000374` heap corruption. A fresh same-image, AI-enabled
+boot-only control reproduces that exit without opening Diagnostics and with
+browser warmup skipped by the RAM policy. Its first exit request is correctly
+vetoed during a configuration transaction; the accepted later request crashes.
+Fresh AI-disabled boots reproduce the same failure, including the earlier
+`c8a7b1f6e1` binary without the new Diagnostics control endpoint. A private,
+same-binary control also reproduces it after the production exit callback;
+recursively retiring the currently published tray tree still ends with the
+same heap corruption. That attempted cleanup is not a verified correction.
+A lifetime-bound native observer records the actual exception and a local
+minidump without killing the application or downloading debugger software.
+These controls exclude Diagnostics interaction and enabled AI as required
+triggers, but do not locate the corruption or qualify the build's shutdown.
+Root is isolating the retained objects; the archive/worker successes above
+must not hide this application failure.
+
+Subsequent private same-binary controls isolate menu retirement: both recursive
+registered-owner release and a flat exact-owner release naturally exit0, while
+their inventory-only controls reproduce `0xC0000374`. The flat arm preserves
+unregistered borrowed descendants. The measured inventory contains202 live
+registered menus, including16 detached owners; successful retirement reaches
+zero callbacks and owner entries without a global map clear. A production
+candidate now records a non-retaining exact Menu lifetime receipt, rejects stale
+handle reuse, holds all admitted owners through flat deletion/pruning, and runs
+only after terminal shutdown acceptance. The scoped DATA cleanup retains its
+exact receipt comparisons. Two added pre-fix cases fail naturally; the initial
+candidate receives4/4 targeted cases and preserves borrowed/foreign rows and
+ordinary Menu destruction. A review-driven withdrawal control exposes an added
+receipt-reader dependency in scoped cleanup, then in its ordinary prune; each
+actual predecessor exits1. After retaining intrinsic receipt inspection and
+leaving ordinary prune's callable contract intact, all5 targeted cases pass,
+natural exit0. A broader menu attempt is incomplete: a second same-entry AHK
+invocation replaced the first after34/237 cases. Its exit0 is not success, and
+that receipt is excluded from qualification. Same-entry AHK runs are serialized
+for subsequent receiving. These are Windows software results. Full candidate
+gates and reception of the ordinary compiled application remain OPEN; the private
+instrumented executables are not delivery builds or physical qualification.
+
+The ordinary driver entry now also compiles through the official static-bundle
+and pinned AHK recipe, without probe callbacks. Its isolated AI-disabled boot
+completes native menu preparation and its sole ordinary File/Exit request
+receives natural exit0. This private pre-commit candidate is identified by
+base58d96a6a6c plus preserved patchD6B997449EED093DDFB2635957974821881B40605CF1D6D167513E7C71941AEF;
+binary SHA2568e4c76132e8c155ebc458792a6868e0606f885b860b7b18bae83a69432067c5c.
+Personal locator bytes and the protected worker remain unchanged. Full candidate
+gates, the final committed build and its Diagnostics archive remain OPEN. This
+result receives the reproduced software shutdown trigger, not physical input or
+native macOS/Linux acceptance.
+
+Before the shutdown candidate, the exact published58d96a6a6c source completes
+all433 default JavaScript checks:423PASS and10FAIL, natural exit1, unchanged. Actual full AHK
+startup passes, as do the targeted23control,36HealthCheck,14collection and70E2E
+cases. The ten failures retain symlink privilege refusals, Linux-only archive
+execution, the missing sandbox service and Homebrew native compiler/interface
+failures. They remain failures; this is not a green full gate. Complete Windows
+units and the retained native file-filter failure remain OPEN. Physical input,
+display and installed-application acceptance, native macOS and native Linux
+remain separate and unqualified.
+
+The private composition candidate now receives exact-count C route storage:
+the196-row capacity regression fails on the original128 limit and passes after
+the change. Allocation failure and invalid/conflicting registration preserve
+the previous table. Independent reviews expose four further native output
+parameters and a pure plan-state alias; their actual original-red controls now
+pass after correction. All24 native output alias vectors preserve allocated
+routes; the four lifecycle outputs also preserve the complete semantic state.
+The official private rebuild retains8replay,11output,6trace and44native matrices,
+41hardened exports and regenerated DLL/provenance. This is still private
+software receiving. The complete AHK graph/stream connection, chained and repeat
+semantics, handler cohort conversion and production policy remain unfinished;
+no candidate C/DLL or native qualification flag is published by this checkpoint.
+
+### October 16 shutdown composition receiving
+
+The frozen shutdown candidate completes70/70 E2E cases and whole-entry
+compilation,1,918-file encoding, strict conventions,435-file format and the
+380/380 source-read ratchet. Its full unit attempt has5,922PASS and one native
+file-filter FAIL before the original7,200,000ms watchdog exits2 at case5,924.
+Of12,778 planned cases,6,855 lack a terminal result. This remains incomplete;
+supplementary selections cannot qualify the monolithic attempt.
+
+The same frozen candidate executes433 JS checks:420PASS,13FAIL, natural exit1,
+tracked source unchanged. Two new failures expose the closed personal DATA
+source proof still requiring the previous Boolean ledger. The exact cleanup
+proof now follows the opaque Menu receipt protocol; its private full menu
+parity receives301 menus and472 label keys across21 locales, natural exit0.
+Four source mutations refuse Boolean ownership, lost registry identity, lost
+Menu identity and getter-capable receipt access, with exact positive restoration.
+The applied canonical parity, manifest and site-artifact checks now each pass
+with natural exit0 and unchanged source. Supplemental canonical Windows menus
+receive238/238, category checkboxes7/7, OnExit4/4, native DATA1/1 and shutdown5/5;
+these selections overlap and are not summed. Each has a complete manifest,
+natural exit0 and unchanged source. Current E2E70/70, whole-entry compilation,
+encoding, strict conventions, format and the pinned-source ratchet pass again.
+The one newly introduced fixture-only global-shadow warning is removed by a
+local variable rename; final focused receiving passes5/5. The exact source/detail
+warning multiset retains all6,646 existing entries, with none added or removed.
+The full433-check result above remains its retained failed result, and the
+interrupted full-unit attempt remains incomplete. The corrected selections
+establish only their stated scope.
+The new site-artifact failure is a real ENOSPC allocation on C:, separately
+from these proof regressions; future receiving uses owned D: temporary storage.
+The ten earlier failing check identities remain unresolved; matching identity
+alone does not prove matching failure attribution.
+
+Private canonical graph receiving covers20 layout/Caps/Option data families,
+with both original split-selector and undefined-level controls failing as
+expected. The original-loader source owner receives30/30 cases, natural exit0,
+and three actual before-review controls fail with their required messages.
+This receives data provenance only. Original Frame, historical admission,
+processed/delivered stream and native capture publication remain unwired.
+
+The private C candidate also receives24 zero-output completion combinations,
+including queued/late UP settlement and cancel/stale-plan raw fallback. Original
+production planning refuses the empty final. Official update and subsequent
+drift reconstruction pass all original8 replay,11 output,6 trace and44 owner
+matrices,41 hardened x64 exports, with source/recipe fingerprint
+841847E4D126534EC20931DE59A2E187668391625517E13F7B0E74CDDD9DBF64
+and DLL SHA2565081CF88F00BA08FF5A27E51BEA42E0A257836C8863ECC2D5FE348C98480E930.
+The first added VK assertion used a wrong fixture premise: scan-based raw
+replay intentionally reports virtual key0. That failed receipt is retained;
+the final oracle checks zero VK, exact scan, kind, marker and edge count.
+No candidate C/DLL or native qualification flag is published by this checkpoint.
+
+The native file-filter trace attempts fail before filter observation because
+the owned shell item cannot resolve. They do not locate the existing UIA
+restoration failure. Preserve those failures, correct only the private runtime
+path preparation and trace actual native calls without changing the test budgets.
+Physical Windows, native macOS and native Linux remain OPEN.
 
 ### October 15 direct Windows Diagnostics control
 
