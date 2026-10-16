@@ -3260,10 +3260,6 @@ _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard 
 				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":" . Resolved["Kind"])
 				continue
 			}
-			if Routes.Length >= 128 {
-				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":registration capacity")
-				continue
-			}
 			Guard()
 			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
 			Kind := RegExMatch(Resolved["Text"], "^[0-9]$") ? 2 : 1
@@ -3326,12 +3322,17 @@ _LLM_NavEventOwnerTerminalRouteValidate(Route) {
 }
 
 _LLM_NavEventOwnerTerminalRouteMarshal(Routes) {
-	if !(Routes is Array) || Routes.Length > 128
-		throw ValueError("The terminal route registry exceeds its supported subset.")
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original terminal route storage owner was withdrawn.")
+	if !(Routes is Array)
+		throw ValueError("A typed terminal route registry is required.")
 	Loop Routes.Length
 		if !Routes.Has(A_Index)
 			throw ValueError("The terminal route registry contains a missing entry.")
-	Bindings := Buffer(Routes.Length * 40, 0)
+	StorageBytes := OriginalLoader.Call("route_storage_size", Routes.Length)
+	Bindings := Buffer(StorageBytes, 0)
 	Ids := Map()
 	Families := Map()
 	Selectors := Map()
@@ -3528,8 +3529,8 @@ _LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, LayoutId, Bind
 	if !OriginalLoader.Call("allows_native_admission")
 		throw Error("Native terminal registration cannot cross private stop admission.")
 	if !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation <= 0
-			|| !(LayoutId is Integer) || LayoutId <= 0 || !(Count is Integer) || Count < 0
-			|| Count > 128 || !(Bindings is Buffer) || Bindings.Size != Count * 40
+			|| !(LayoutId is Integer) || LayoutId <= 0 || !(Bindings is Buffer)
+			|| Bindings.Size != OriginalLoader.Call("route_storage_size", Count)
 		throw ValueError("The terminal route native registration ABI is invalid.")
 	if IsSet(NativeOperation)
 		return NativeOperation.Call(Owner, Generation, LayoutId, Bindings, Count)
@@ -4448,6 +4449,15 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	if Request == "guard_frame"
 		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
 			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
+	; UInt32 count times the forty-byte x64 descriptor fits signed64-bit arithmetic.
+	; This admission calculation adds no callable dependency to genuine Stop.
+	if Request == "route_storage_size" {
+		if !OwnersCurrent()
+			throw Error("The original terminal route storage owner was withdrawn.")
+		if !(Payload is Integer) || Payload < 0 || Payload > 0xFFFFFFFF
+			throw ValueError("The terminal route descriptor count is invalid.")
+		return Payload * 40
+	}
 	if Request == "digit_current"
 		return IsObject(ActiveFrame) && ActiveFrame.Frame == Payload && DigitCurrent(ActiveFrame)
 	if Request == "allows_native_admission"

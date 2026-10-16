@@ -1587,8 +1587,10 @@ _LNTR_ReceiveActualChild(CaseName := "positive") {
 	global _LLM_NavEventOwnerTerminalRouteUnknown
 	ParentModule := _LLM_NavEventOwnerModule, ParentExports := _LLM_NavEventOwnerExports
 	ParentEpoch := _LLM_NavEventOwnerRuntimeEpoch, ParentUnknown := _LLM_NavEventOwnerTerminalRouteUnknown
-	Kind := CaseName == "positive" ? "positive" : "negative"
-	SelectedName := Kind == "positive"
+	Kind := CaseName == "positive" ? "positive" : CaseName == "exact-count" ? "exact-count" : "negative"
+	SelectedName := Kind == "exact-count"
+		? "native-route-exact-count-child: actual196 descriptors and native retirement"
+		: Kind == "positive"
 		? "native-retirement-genuine-child: actual registration and full-owner retirement"
 		: "native-retirement-genuine-negative: " . CaseName
 	TestsRoot := A_ScriptDir
@@ -1718,3 +1720,179 @@ _LNTR_ResidentAbiBeforeControlledRetirement() {
 }
 Test("terminal route metadata: resident ABI precedes controlled retirement (terminal-resident-cleanup)",
 	_LNTR_ResidentAbiBeforeControlledRetirement)
+
+/** Creates literal independent forty-byte descriptor expectations above the old cap. */
+_TRE_Routes() {
+	Routes := []
+	Loop 196 {
+		Routes.Push(Map("recipe_id", A_Index, "route_id", A_Index,
+			"required_prefixes", 0, "prefix_bit", 0,
+			"required_dead_key_id", 0, "next_dead_key_id", 0,
+			"code", A_Index, "target_vk", 0, "target_scan", 0,
+			"axis", 2, "kind", 1, "required_modifiers", 0, "effective_modifiers_lr", 0))
+	}
+	return Routes
+}
+
+/** Checks all serialized bytes using the public literal wire layout, not its decoder. */
+_TRE_Marshal() {
+	Routes := _TRE_Routes()
+	Bytes := _LLM_NavEventOwnerTerminalRouteMarshal(Routes)
+	AssertEqual(7840, Bytes.Size, "all196 descriptors retain exactly forty bytes each")
+	Loop 196 {
+		Expected := Buffer(40, 0)
+		NumPut("UInt64", A_Index, "UInt", A_Index, Expected, 0)
+		NumPut("UShort", A_Index, Expected, 28)
+		NumPut("UChar", 2, "UChar", 1, Expected, 34)
+		Offset := (A_Index - 1) * 40
+		Loop 40
+			AssertEqual(NumGet(Expected, A_Index - 1, "UChar"),
+				NumGet(Bytes, Offset + A_Index - 1, "UChar"),
+				"the complete native wire image agrees with an independent literal descriptor")
+	}
+}
+
+/** Receives the unchanged wrapper ABI through its existing controlled native boundary. */
+_TRE_NativeBoundary() {
+	Bytes := Buffer(7840, 0), Facts := {Calls: 0}
+	AssertEqual(0, _LLM_NavEventOwnerNativeRegisterTerminalRoutes(17, 19, 23, Bytes, 196, Receive),
+		"the actual wrapper forwards an exact-count registration above128")
+	AssertEqual(1, Facts.Calls, "the controlled boundary is reached once")
+	for Vector in [[Buffer(7839, 0), 196], [Buffer(7841, 0), 196],
+		[Bytes, -1], [Bytes, "196"], [Bytes, 1.5], [Bytes, 0x100000000]] {
+		Expected := Vector[2] is Integer && Vector[2] == 196
+			? "The terminal route native registration ABI is invalid." : "The terminal route descriptor count is invalid."
+		_TRE_ValueError(_LLM_NavEventOwnerNativeRegisterTerminalRoutes.Bind(17, 19, 23,
+			Vector[1], Vector[2], Receive), Expected)
+	}
+	AssertEqual(1, Facts.Calls, "every invalid count/span is refused before the supplied boundary")
+
+	Receive(Owner, Generation, LayoutId, Bindings, Count) {
+		Facts.Calls += 1
+		AssertTrue(Owner == 17 && Generation == 19 && LayoutId == 23,
+			"the wrapper preserves exact owner and generation identities")
+		AssertTrue(Bindings == Bytes && Count == 196,
+			"the wrapper preserves the exact owned buffer and full count")
+		return 0
+	}
+}
+
+/** Controlled source data proves that the builder never silently truncates routes. */
+_TRE_Build() {
+	global KLE_KeyCodes
+	KLE_KeyCodes := Map()
+	Loop 100
+		KLE_KeyCodes[Format("SC{:03X}", 0x60 + A_Index - 1)] := 0
+	State := _LNTR_PortState()
+	Source := _LNTR_Source(State)
+	Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, 1)
+	AssertEqual(216, Candidate["routes"].Length,
+		"one hundred controlled source keys retain both levels and all sixteen natural modifier identities")
+	AssertEqual(216, Candidate["recipes"].Count, "the recipe inventory matches the complete descriptor count")
+	AssertEqual(8640, _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"]).Size,
+		"the complete builder result crosses the same exact-count marshaller")
+	for Reason in Candidate["unconverted"]
+		AssertFalse(InStr(Reason, "registration capacity"), "no old capacity refusal hides a dropped descriptor")
+}
+
+/** Zero remains valid; invalid count types and UInt32 overflow remain explicit refusals. */
+_TRE_Counts() {
+	AssertEqual(0, _LLM_NavEventOwnerNativeEnsureLoaded("route_storage_size", 0), "the existing empty-table ABI remains representable")
+	AssertEqual(7840, _LLM_NavEventOwnerNativeEnsureLoaded("route_storage_size", 196), "count and stride share one checked arithmetic owner")
+	AssertEqual(171798691800, _LLM_NavEventOwnerNativeEnsureLoaded("route_storage_size", 0xFFFFFFFF),
+		"the exact UInt32 maximum is representable without allocating that buffer")
+	for Count in [-1, "196", 1.5, 0x100000000]
+		_TRE_ValueError(_LLM_NavEventOwnerNativeEnsureLoaded.Bind("route_storage_size", Count),
+			"The terminal route descriptor count is invalid.")
+}
+
+Test("terminal-route-exact-count: all196 literal descriptors retain every wire byte", _TRE_Marshal)
+Test("terminal-route-exact-count: the native wrapper forwards the full count and refuses mismatched spans", _TRE_NativeBoundary)
+Test("terminal-route-exact-count: the source builder retains every controlled base and Shift route",
+	() => _LNTR_WithState(_TRE_Build))
+Test("terminal-route-exact-count: count arithmetic retains zero and refuses UInt32 overflow", _TRE_Counts)
+
+/** Receives the actual x64 DLL without starting a keyboard hook or emitting input. */
+_TRE_GenuineNativeCount() {
+	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerStarted
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteUnknown
+	Owner := 17, Retired := false, Primary := 0, CleanupFailure := 0, RefusalCalls := 0
+	AssertEqual(0, _LLM_NavEventOwnerModule, "the count receiver requires a fresh private native issuer")
+	AssertFalse(_LLM_NavEventOwnerStarted, "this ABI receiver starts no keyboard hook")
+	AssertEqual(0, _LLM_NavEventOwnerPort, "no supplied port can manufacture native registration")
+	try {
+		AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded(), "the original loader issues the actual vendor DLL")
+		ImageName := Buffer(65536, 0)
+		Characters := DllCall("Kernel32\GetModuleFileNameW", "Ptr", _LLM_NavEventOwnerModule,
+			"Ptr", ImageName, "UInt", 32768, "UInt")
+		AssertTrue(Characters > 0 && Characters < 32768, "the actual module supplies its complete native image path")
+		_TestPrint("# native-exact-count image=" . StrGet(ImageName.Ptr, Characters, "UTF-16"))
+		Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Buffer(512, 0), 64)
+		AssertEqual(8, Probe["status"], "fresh C has no existing terminal owner")
+		_TestPrint("# native-exact-count phase=fresh owner_status=" . Probe["status"])
+		Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(_TRE_Routes())
+		AssertEqual(7840, Bindings.Size, "the actual native submission owns all196 forty-byte descriptors")
+		AssertEqual(0, _LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, 19, 23, Bindings, 196),
+			"the actual DLL accepts the exact complete registration without an injected native operation")
+		Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Buffer(512, 0), 64)
+		AssertTrue(Probe["status"] == 0 && Probe["count"] == 0,
+			"the same genuine C owner is admitted without inventing held input")
+		_TestPrint("# native-exact-count phase=registered count=196 held=" . Probe["count"])
+		for Size in [7839, 7841] {
+			Bytes := Buffer(Size, 0)
+			_TRE_ValueError(_LLM_NavEventOwnerNativeRegisterTerminalRoutes.Bind(Owner, 20, 23,
+				Bytes, 196, UnexpectedOperation), "The terminal route native registration ABI is invalid.")
+		}
+		AssertEqual(0, RefusalCalls, "no malformed span reaches a native operation")
+		AssertFalse(_LLM_NavEventOwnerStarted, "registration alone never installs a keyboard hook")
+		AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "direct ABI receiving creates no claimed AHK frame")
+		AssertTrue(LLM_NavEventOwner_Stop(), "the actual default native Stop retires the route storage")
+		Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Buffer(512, 0), 64)
+		AssertEqual(8, Probe["status"], "actual C owner retirement is independently queried")
+		Retired := true
+		_TestPrint("# native-exact-count phase=retired owner_status=" . Probe["status"])
+	} catch as Err {
+		Primary := Err
+	} finally {
+		if _LLM_NavEventOwnerModule && !Retired {
+			try {
+				AssertTrue(LLM_NavEventOwner_Stop(), "failed ABI receiving retains actual native cleanup ownership")
+				Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Buffer(512, 0), 64)
+				AssertEqual(8, Probe["status"], "failed receiving still proves actual C owner retirement")
+				Retired := true
+				_TestPrint("# native-exact-count phase=cleanup owner_status=" . Probe["status"])
+			} catch as Err {
+				CleanupFailure := Err
+			}
+		}
+	}
+	if Primary is Error {
+		if CleanupFailure is Error
+			_TestPrint("# native-exact-count secondary_cleanup=" . CleanupFailure.Message)
+		throw Primary
+	}
+	if CleanupFailure is Error
+		throw CleanupFailure
+
+	UnexpectedOperation(Args*) {
+		RefusalCalls += 1
+		return 0
+	}
+}
+
+if _LNTR_NativeRetirementChildKind == "exact-count"
+	Test("native-route-exact-count-child: actual196 descriptors and native retirement", _TRE_GenuineNativeCount)
+else if _LNTR_NativeRetirementChildKind == ""
+	Test("terminal-route-native-exact-count: actual DLL registration and retirement in a fresh child",
+		_LNTR_ReceiveActualChild.Bind("exact-count"))
+
+/** Requires the actual value-error contract, not an unrelated failing callback. */
+_TRE_ValueError(Operation, ExpectedMessage) {
+	Failure := 0
+	try Operation.Call()
+	catch as Err
+		Failure := Err
+	AssertTrue(Failure is ValueError, "the actual invalid count/span produces ValueError; actual=" . Type(Failure)
+		. "; detail=" . (IsObject(Failure) ? Failure.Message . "; extra=" . Failure.Extra . "; stack=" . Failure.Stack : "no exception"))
+	AssertEqual(ExpectedMessage, Failure.Message, "the actual refusal belongs to the count/span owner")
+}

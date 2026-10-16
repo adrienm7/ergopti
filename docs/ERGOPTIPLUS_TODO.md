@@ -12,6 +12,83 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 queued native repeat receiving
+
+Committed native correction f6088c2b8a settles the original physical UP after
+successful neutral character or digit Unicode output. Each queued repeated
+DOWN remains forbidden from raw replay and requires its own output receipt;
+settling the first output does not acknowledge later repeats. Six added timing
+controls cover early/late UP and repeats arriving after the first output.
+The original continuation and Abort reproductions fail before this correction;
+the fixed continuation receives three distinct outputs with no raw replay.
+Abort retains explicit pending debt instead of falsely completing queued work.
+The partial correction that acknowledges repeats prematurely still fails.
+
+The official owner reconstructs the DLL and manifest and then passes its
+no-update drift check:8 replay,11 output,6 trace and44 native owner matrices,
+including the six new timing controls. The41-export x64 DLL has151,040 bytes,
+SHA256B09A4DD3BC2C266DD15032DD4105602126DBD28993AA227FF1F2DF36F0C06CC9,
+and source/recipe fingerprint
+C6E97B8E4AEDE5133B569F219989ADD217FFB4A85A3B6C7BB0C0CD98C1A54FDE.
+The original serialized-Unicode UP expectation now requires zero raw replay;
+modifier, cancellation, partial-output and unrelated-key refusals remain.
+These native C controls report output acknowledgements explicitly and do not
+establish actual SendInput or physical keyboard behavior. A composed held
+repeat after composition remains unsupported with named pending debt.
+
+### October 16 exact-count AHK route receiving
+
+The AHK builder no longer silently truncates routes at128, and the marshaller
+and native wrapper no longer reject larger exact tables. Checked UInt32 count
+and forty-byte arithmetic remain inside the original native issuance owner;
+no additional callable becomes a dependency of genuine Stop. This AHK correction
+uses the official41-export DLL from the queued-repeat checkpoint above.
+
+Actual private predecessor receiving fails at all four intended boundaries:
+196-descriptor marshalling, native wrapper admission,216routes truncated to128,
+and the new arithmetic operation's absence. The corrected four-case selection
+passes naturally, including every wire byte, zero/UInt32 maximum arithmetic
+without giant allocation, and actual ValueError/message refusals for bad spans
+and counts. The suspended production fixture's original capacity refusal is
+retained before the fix; its corrected path receives all146routes and refuses
+both mismatched spans, natural exit0. Early copied-include and diagnostic-stream
+observer failures remain preserved. The original producer assertion exposed
+an unrelated UnsetError in a draft callback; bound inputs and strict error
+type/message checks now prevent that error from satisfying ABI refusal tests.
+
+A distinct fresh process loads the pinned DLL through the original loader.
+Actual GetModuleFileNameW, native realpath, volume/file identity and SHA256
+agree with the official artifact. It observes an absent C owner, registers all
+196descriptors without an injected native operation, independently queries the
+same owner with zero held recipes, and confirms owner retirement after genuine
+Stop. Malformed-span controls use a counted operation and prove zero dispatch,
+without handing a short allocation to C. The predecessor refuses at the old
+marshaller and still receives genuine cleanup; the corrected native case
+passes naturally. No keyboard hook is installed and no input is emitted.
+
+The actual canonical new-DLL composition now completes all34 selected cases:
+4 exact-count units,1 production producer,1 genuine native admission,10 existing
+metadata cases and18 genuine native retirement cases. Every selection retains
+an exact complete manifest, natural exit0 and unchanged source. Source controls,
+encoding, conventions, ratchets and full formatting pass. The official Root
+drift check, real parse and startup controls, and all70 E2E cases also pass.
+
+The earlier frozen full composition, before the queued-repeat native commit,
+completes all433 JavaScript checks with423PASS/10FAIL, exit1. Its AHK suite
+reaches the unchanged120-minute watchdog and exits2:12,785 planned,5,925PASS,
+zero terminal failures and6,860 cases without terminal results. Case5,926 starts
+without a terminal result and6,859 later cases never start. The new exact-count
+cases are received separately above; the incomplete full run does not receive
+them. The earlier acquired-read rollback and following admission failures
+remain unresolved and their journals are preserved. No complete green full
+suite or successful native qualification is inferred.
+
+Delivery of this lot remains OPEN; the last verified installed artifact and
+Diagnostics ZIP remain the6bc80aee72 checkpoint below. Source/Frame pinning,
+historical admission, normal graph integration, stream/cohort software and
+production policy remain unfinished. Physical Windows, native macOS and
+unavailable native Linux are not qualified by these Windows VM controls.
+
 ### October 16 native file-filter observer receiving
 
 The original native observer repeats a full shell-view traversal for each
