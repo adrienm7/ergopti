@@ -147,6 +147,7 @@ graph TD
         WINDOWS_console_window["ConsoleWindow.ahk"]
         WINDOWS_crash_report_worker["CrashReportWorker.ahk"]
         WINDOWS_crypto["Crypto.ahk"]
+        WINDOWS_diagnostics_control["DiagnosticsControl.ahk"]
         WINDOWS_editor_replace["EditorReplace.ahk"]
         WINDOWS_file_system["FileSystem.ahk"]
         WINDOWS_graphics_renderer["GraphicsRenderer.ahk"]
