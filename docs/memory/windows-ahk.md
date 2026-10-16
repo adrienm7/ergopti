@@ -219,6 +219,11 @@ new kind of worker that reuses the entry or the executable joins both. When
 that refusal comes back, read `bootstrap.log` for the mutex line and look for
 a worker that ended at the same second.
 
+The same rule applies to `tests/run_all.ahk`: concurrent `--only` invocations
+from the same checkout replace the earlier runner through `#SingleInstance
+Force`. Its predecessor can exit0 with an unfinished test plan. Serialize these
+invocations and require a complete manifest before accepting a zero exit.
+
 ### project-ahk-getmenustate-counts-rows-in-the-high-byte
 
 For a row that opens a submenu, `GetMenuState` returns the row's flags in the

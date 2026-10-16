@@ -3051,6 +3051,7 @@ _MR_FrameNativeImageEqual(Before, After) {
 _MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, NativePortOwner, PruneOwner) {
 	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
 	global _MenuDispatchLastFire, _MenuDispatchClickSequences
+	global MENU_DISPATCH_OWNER_PROPERTY
 	if Object.Prototype.HasOwnProp.Call(NativePortOwner, "Call")
 		throw Error("Owned DATA stage cleanup lost its native cohort")
 	for Registry in Registries {
@@ -3059,6 +3060,7 @@ _MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, NativePortOw
 		for Name in ObjOwnProps(Registry)
 			throw Error("Owned DATA stage cleanup registry is no longer plain")
 	}
+	OwnerReceipt := Map.Prototype.Get.Call(Registries[3], Handle, false)
 	Owned := [], Ids := NativePortOwner.Call("ids", Child, Handle)
 	for Id in Ids {
 		if !Map.Prototype.Has.Call(Registries[1], Id) || !Map.Prototype.Has.Call(Registries[2], Id)
@@ -3087,8 +3089,14 @@ _MR_FrameReleaseChild(Child, Handle, Registries, ExpectedCallbacks, NativePortOw
 						Map.Prototype.Delete.Call(Registries[Index], Id)
 			}
 			if Map.Prototype.Has.Call(Registries[3], Handle)
-				&& Map.Prototype.Get.Call(Registries[3], Handle) == true
-				Map.Prototype.Delete.Call(Registries[3], Handle)
+				&& OwnerReceipt is Object
+				&& Map.Prototype.Get.Call(Registries[3], Handle) == OwnerReceipt
+				&& Object.Prototype.HasOwnProp.Call(Child, MENU_DISPATCH_OWNER_PROPERTY) {
+				ReceiptDescriptor := Object.Prototype.GetOwnPropDesc.Call(Child, MENU_DISPATCH_OWNER_PROPERTY)
+				if Object.Prototype.HasOwnProp.Call(ReceiptDescriptor, "Value")
+					&& ReceiptDescriptor.Value == OwnerReceipt
+					Map.Prototype.Delete.Call(Registries[3], Handle)
+			}
 		}
 		if _MenuDispatchCallbacks == Registries[1] && _MenuDispatchTokens == Registries[2]
 			&& _MenuDispatchOwnerHandles == Registries[3] && _MenuDispatchLastFire == Registries[4]

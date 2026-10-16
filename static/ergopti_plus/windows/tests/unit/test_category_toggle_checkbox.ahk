@@ -373,3 +373,157 @@ Test("category toggle: no builder inserts a switch by hand (category-toggle-chec
 	_CTC_NoHandBuiltCategorySwitch)
 Test("category toggle: an action on a row that opens a submenu is reported (category-toggle-checkbox)",
 	_CTC_ActionOnSubtreeIsReported)
+
+; A native handle can be recycled after its original Menu object is released.
+; Terminal custody needs a non-retaining receipt on both the live Menu and ledger.
+_CTC_DispatchOwnerLifetime() {
+	global _MenuDispatchOwnerHandles
+	Owned := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(Owned, "owned command", (*) => 0))
+		Receipt := _MenuDispatchOwnerHandles[Owned.Handle]
+		Assert(Receipt is Object, "a bare handle boolean cannot identify a Menu lifetime")
+		Assert(Object.Prototype.HasOwnProp.Call(Owned, "__ErgoptiMenuDispatcherOwner"),
+			"the actual Menu carries its non-retaining lifetime receipt")
+		AssertEqual(Receipt, Object.Prototype.GetOwnPropDesc.Call(Owned,
+			"__ErgoptiMenuDispatcherOwner").Value)
+		for ReceiptField in ObjOwnProps(Receipt)
+			AssertFalse(true, "the receipt cannot hold a Menu or callback reference")
+	} finally _CTC_ReleaseMenu(Owned)
+}
+Test("menu-terminal-shutdown: native ownership identifies the exact Menu lifetime",
+	_CTC_DispatchOwnerLifetime)
+
+_CTC_WithTerminalRegistry(Callback) {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global _MenuDispatchLastFire, _MenuDispatchClickSequences
+	Saved := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
+		_MenuDispatchLastFire, _MenuDispatchClickSequences]
+	_MenuDispatchCallbacks := Map(), _MenuDispatchTokens := Map(), _MenuDispatchOwnerHandles := Map()
+	_MenuDispatchLastFire := Map(), _MenuDispatchClickSequences := Map()
+	try Callback.Call()
+	finally {
+		_MenuDispatchCallbacks := Saved[1], _MenuDispatchTokens := Saved[2], _MenuDispatchOwnerHandles := Saved[3]
+		_MenuDispatchLastFire := Saved[4], _MenuDispatchClickSequences := Saved[5]
+	}
+}
+
+_CTC_UnexpectedReceiptGetter(*) {
+	throw Error("Terminal ownership must not invoke a foreign receipt getter.")
+}
+
+_CTC_TerminalOwnMenus() {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global MENU_DISPATCH_OWNER_PROPERTY
+	Root := Menu(), Child := Menu(), Grandchild := Menu(), Detached := Menu(), Borrowed := Menu(), Foreign := Menu()
+	AllMenus := [Root, Child, Grandchild, Detached, Borrowed, Foreign], Ids := []
+	try {
+		for MenuPair in [[Child, Root], [Grandchild, Child], [Detached, Root]] {
+			AssertEqual(1, RegisterMenuItem(MenuPair[1], "capturing command", _CTC_OwnedMenuProbe.Bind(MenuPair*)))
+			Ids.Push(_MenuItemIdAtPosition(MenuPair[1], 0))
+		}
+		Borrowed.Add("borrowed raw command", (*) => 0)
+		Foreign.Add("foreign raw command", (*) => 0)
+		Foreign.DefineProp(MENU_DISPATCH_OWNER_PROPERTY, {Get: _CTC_UnexpectedReceiptGetter})
+		_MenuDispatchOwnerHandles[Foreign.Handle] := _MenuDispatchOwnerHandles[Child.Handle]
+		Child.Add("grandchild", Grandchild), Child.Add("borrowed", Borrowed)
+		Root.Add("child", Child)
+		Root.Delete()
+		MenuDispatcher_PruneMenu(Root)
+		for Id in Ids
+			Assert(_MenuDispatchCallbacks.Has(Id), "root-only deletion leaves detached capturing registrations")
+		Root.Add("child", Child)
+		; Restore the stale foreign ledger entry to exercise terminal admission too.
+		_MenuDispatchOwnerHandles[Foreign.Handle] := _MenuDispatchOwnerHandles[Child.Handle]
+		PreviousCritical := A_IsCritical
+		MenuDispatcher_Shutdown(Root)
+		AssertEqual(PreviousCritical, A_IsCritical, "terminal cleanup restores the caller's critical state")
+		for Owned in [Root, Child, Grandchild, Detached]
+			AssertEqual(0, TrayMenuItemCount(Owned), "every exact registered owner retires, including detached menus")
+		AssertEqual(1, TrayMenuItemCount(Borrowed), "parent ownership never grants deletion of an unregistered borrowed child")
+		AssertEqual(1, TrayMenuItemCount(Foreign), "a stale receipt cannot authorize deletion of a different live menu")
+		for Id in Ids {
+			AssertFalse(_MenuDispatchCallbacks.Has(Id))
+			AssertFalse(_MenuDispatchTokens.Has(Id))
+		}
+		AssertEqual(0, _MenuDispatchCallbacks.Count)
+		AssertEqual(0, _MenuDispatchOwnerHandles.Count)
+		MenuDispatcher_Shutdown(Root)
+		AssertEqual(1, TrayMenuItemCount(Borrowed), "repeated retirement remains harmless to borrowed rows")
+	} finally {
+		for Owned in AllMenus
+			Menu.Prototype.Delete.Call(Owned)
+		MenuDispatcher_PruneMenu(Root)
+	}
+}
+Test("menu-terminal-shutdown: releases registered cycles and preserves unauthenticated borrowed menus",
+	_CTC_WithTerminalRegistry.Bind(_CTC_TerminalOwnMenus))
+
+_CTC_LedgerDoesNotRetainMenu() {
+	global _MenuDispatchOwnerHandles, _MenuDispatchCallbacks
+	Owned := Menu(), Root := Menu()
+	try {
+		AssertEqual(1, RegisterMenuItem(Owned, "plain command", (*) => 0))
+		Handle := Owned.Handle, Receipt := _MenuDispatchOwnerHandles[Handle]
+		AssertEqual(1, RegisterMenuItem(Owned, "second command", (*) => 0))
+		AssertEqual(Receipt, _MenuDispatchOwnerHandles[Handle], "registrations share one exact Menu lifetime")
+		Owned := 0
+		Assert(DllCall("GetMenuItemCount", "ptr", Handle, "int") < 0,
+			"the registry receipt cannot keep a retired native Menu alive")
+		AssertFalse(_MenuDispatchResolveOwner(Handle, Receipt))
+		MenuDispatcher_Shutdown(Root)
+		AssertEqual(0, _MenuDispatchCallbacks.Count)
+		AssertEqual(0, _MenuDispatchOwnerHandles.Count)
+	} finally {
+		if Owned is Menu
+			_CTC_ReleaseMenu(Owned)
+		_CTC_ReleaseMenu(Root)
+	}
+}
+Test("menu-terminal-shutdown: lifetime receipts do not retain released native menus",
+	_CTC_WithTerminalRegistry.Bind(_CTC_LedgerDoesNotRetainMenu))
+
+_CTC_FrameReleaseWithoutReceiptReader() {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles
+	global _MenuDispatchLastFire, _MenuDispatchClickSequences
+	Child := Menu(), Foreign := Menu(), Capturing := _CTC_OwnedMenuProbe.Bind(Child, Child), ReaderCalls := [0]
+	ReceiptReader := _MenuDispatchOwnerReceipt
+	HadCall := Object.Prototype.HasOwnProp.Call(ReceiptReader, "Call")
+	SavedCall := HadCall ? Object.Prototype.GetOwnPropDesc.Call(ReceiptReader, "Call") : false
+	try {
+		AssertEqual(1, RegisterMenuItem(Child, "owned staged command", Capturing))
+		AssertEqual(1, RegisterMenuItem(Foreign, "retained foreign command", (*) => 0))
+		Handle := Child.Handle, Id := _MenuItemIdAtPosition(Child, 0)
+		ForeignId := _MenuItemIdAtPosition(Foreign, 0)
+		Registries := [_MenuDispatchCallbacks, _MenuDispatchTokens, _MenuDispatchOwnerHandles,
+			_MenuDispatchLastFire, _MenuDispatchClickSequences]
+		AssertTrue(TrayMenuFrameNative("current"))
+		Object.Prototype.DefineProp.Call(ReceiptReader, "Call",
+			{Call: (Args*) => (ReaderCalls[1] += 1, _CTC_UnexpectedReceiptGetter())})
+		Failure := false
+		try _MR_FrameReleaseChild(Child, Handle, Registries, [Capturing], TrayMenuFrameNative, MenuDispatcher_PruneMenu)
+		catch as Err
+			Failure := Err
+		Object.Prototype.DeleteProp.Call(ReceiptReader, "Call")
+		if HadCall
+			Object.Prototype.DefineProp.Call(ReceiptReader, "Call", SavedCall)
+		AssertFalse(Failure, "native staged retirement cannot depend on an unretained receipt-reader callback")
+		AssertEqual(0, ReaderCalls[1], "scoped cleanup and its ordinary prune never invoke the withdrawn reader")
+		AssertEqual(0, TrayMenuItemCount(Child))
+		AssertFalse(_MenuDispatchCallbacks.Has(Id))
+		AssertFalse(_MenuDispatchTokens.Has(Id))
+		AssertFalse(_MenuDispatchOwnerHandles.Has(Handle))
+		AssertEqual(1, TrayMenuItemCount(Foreign))
+		AssertTrue(_MenuDispatchCallbacks.Has(ForeignId))
+		AssertTrue(_MenuDispatchTokens.Has(ForeignId))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ReceiptReader, "Call")
+			Object.Prototype.DeleteProp.Call(ReceiptReader, "Call")
+		if HadCall
+			Object.Prototype.DefineProp.Call(ReceiptReader, "Call", SavedCall)
+		_CTC_ReleaseMenu(Child)
+		_CTC_ReleaseMenu(Foreign)
+	}
+}
+Test("menu-terminal-shutdown: staged native cleanup survives receipt-reader withdrawal",
+	_CTC_WithTerminalRegistry.Bind(_CTC_FrameReleaseWithoutReceiptReader))

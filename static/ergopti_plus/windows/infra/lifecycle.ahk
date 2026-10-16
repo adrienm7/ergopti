@@ -1282,6 +1282,9 @@ Ergopti_OnShutdown(reason, code) {
 			; Ordinary Exit has no reload-success callback to protect. Every refusal
 			; gate has accepted, so best-effort teardown is terminal here.
 			try _GestureUnhook()
+		try MenuDispatcher_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Registered menu teardown failed: {1}.", Err.Message)
 		return 0
 		} finally {
 			if OwnShutdownBundle
