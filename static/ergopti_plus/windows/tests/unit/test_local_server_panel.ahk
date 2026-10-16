@@ -1498,3 +1498,67 @@ _LSCI_JoinedReplacementRetainsOldDebt() {
 	} finally Fixture.Dispose()
 }
 Test("local-server-cache-identity: equal-membership source refresh preserves exact old native debt until acknowledged", _LSCI_JoinedReplacementRetainsOldDebt)
+
+
+; Cancellation can finish between the original cancel result and its final retry.
+; Only the controlled child's completion timing changes; both native operations run.
+class _LSPN_FinalSettlementOwner extends LocalServersOwner {
+	__New(Options) {
+		super.__New(Options)
+		this.BoundaryChild := 0
+		this.ReleaseAtBoundary := false
+		this.CancelResults := []
+		this.RetryResults := []
+	}
+
+	Cancel(Shutdown := false) {
+		Result := super.Cancel(Shutdown)
+		this.CancelResults.Push(Result)
+		if this.ReleaseAtBoundary && this.BoundaryChild is _LSM_ChildReceipt
+			this.BoundaryChild.TerminateAllowed := true
+		return Result
+	}
+
+	RetryPending() {
+		Result := super.RetryPending()
+		this.RetryResults.Push(Result)
+		return Result
+	}
+}
+
+_LSPN_FinalSettlementRetirement(ReleaseAtBoundary, Shutdown) {
+	Fixture := _LSPN_Fixture()
+	try {
+		AssertEqual(0, Fixture.Native.Jobs.Count)
+		AssertEqual(0, Fixture.Owner.Records.Count)
+		Native := _LSPN_FinalSettlementOwner(Fixture.Native.Options)
+		Fixture.Native := Native
+		Fixture.Panel.Native := Native
+		Fixture.Prepare()
+		Child := Fixture.RescanWithCancellationDebt()
+		Native.BoundaryChild := Child
+		Native.ReleaseAtBoundary := ReleaseAtBoundary
+		Native.CancelResults := []
+		Native.RetryResults := []
+		Attempt := Fixture.BeginShutdown()
+		Retired := Fixture.Panel.Retire(Shutdown)
+		AssertEqual(1, Native.CancelResults.Length, "the actual native cancellation runs exactly once")
+		AssertFalse(Native.CancelResults[1], "the original cancel boundary retains the exact refused child")
+		AssertEqual(1, Native.RetryResults.Length, "the actual native final retry runs exactly once")
+		AssertEqual(ReleaseAtBoundary, Native.RetryResults[1], "final native settlement follows only the controlled child's completion")
+		AssertEqual(ReleaseAtBoundary, Retired, "final exact native settlement must govern panel retirement")
+		AssertEqual(Shutdown, Native.Closed, "shutdown admission remains the original native owner's decision")
+		AssertFalse(Fixture.World.Owner.Admit(), "the exact shutdown attempt must still revoke fresh source authority")
+		AssertEqual(Attempt, _LLM_Menu_ApiPrivateLifecycleState()["attempt"])
+		if ReleaseAtBoundary {
+			AssertEqual(0, Fixture.Owner.Records.Count)
+			AssertEqual(0, Native.Jobs.Count)
+		} else {
+			AssertTrue(Fixture.Owner.Records.Count > 0, "unsettled actual HTTP ownership must remain retained")
+		}
+	} finally Fixture.Dispose()
+}
+Test("local-server-retire-final-settlement: final retry can complete reversible cancellation", _LSPN_FinalSettlementRetirement.Bind(true, false))
+Test("local-server-retire-final-settlement: final retry can complete closed-owner cancellation", _LSPN_FinalSettlementRetirement.Bind(true, true))
+Test("local-server-retire-final-settlement: unsettled reversible cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, false))
+Test("local-server-retire-final-settlement: unsettled closed-owner cancellation remains owned", _LSPN_FinalSettlementRetirement.Bind(false, true))

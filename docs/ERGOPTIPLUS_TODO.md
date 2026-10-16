@@ -12,6 +12,31 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 16 local-server final settlement correction
+
+Windows panel retirement now uses the original native owner's final retry
+census after cancellation. A refused cancellation can settle at that final
+boundary; its earlier false result must not veto an otherwise completed
+retirement. Remaining native jobs, model work and repair debt still refuse
+retirement. No shared or other driver's lifecycle contract changes.
+
+Four composed regressions exercise both reversible and closed-owner
+cancellation, with genuine native cancel and retry operations. The original
+source fails the two settling cases for the intended retirement assertion;
+the two retained-debt controls already pass. The correction passes all four.
+The complete owning-file selection then receives all40 original registered
+case callbacks and assertions naturally, with exact terminal names and no
+changed test bodies. This private registry selection is not the complete
+default Windows suite. Source controls, actual parse, full startup and all70
+E2E cases pass; the composed canonical graph code remains unchanged.
+
+Fresh compiled Diagnostics and active-state ordinary shutdown receiving
+remain OPEN. This regression proves the cancellation boundary defect, not
+that it explains or repairs the retained58e9 installed exit failures. The
+earlier verified ZIP and successful paused exit retain their original build
+identity. Full suites, native Frame/capture/stream/cohort software, managed
+AI, physical Windows and native macOS/Linux qualifications remain OPEN.
+
 ### October 16 canonical layout source and normal graph receiving
 
 The original Windows Load/Unload owner now prepares complete canonical data

@@ -990,10 +990,12 @@ class LLM_LocalServerPanel {
 			} finally Critical(ClaimCritical)
 			try RepairSettled := this._DropRepairs()
 			finally {
-				Cancelled := this.Native.Cancel(Shutdown)
+				this.Native.Cancel(Shutdown)
 				Settled := this.Native.RetryPending()
 			}
-			return RepairSettled && Cancelled && Settled
+			; The final retry can settle a request whose earlier cancellation was pending.
+			; Its exact native ownership census decides retirement at this boundary.
+			return RepairSettled && Settled
 		} finally Critical(PreviousCritical)
 	}
 }
