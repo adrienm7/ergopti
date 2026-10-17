@@ -2361,6 +2361,7 @@ LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
 			throw Error("The original registration constructor was withdrawn.")
 		if !OriginalLoader.Call("owns_scope", NativeScope)
 			throw Error("The registration scope was not genuinely issued.")
+		NativeScope["guard"].Call()
 	}
 
 	RetainUnknown() {
@@ -3991,6 +3992,9 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	static Scopes := Map()
 	static OriginalDigitCapture := _LLM_NavEventOwnerCaptureDigitSource
 	static OriginalCandidateCapture := _LLM_NavEventOwnerCaptureTerminalCandidate
+	static OriginalCanonicalCapture := KeylayoutEmulation_CaptureCanonicalSource
+	static OriginalCanonicalOwner := _KLE_CanonicalSourceOwner
+	static CanonicalCall := Func.Prototype.Call
 	static OriginalOwners := [
 		_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
 		_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
@@ -4114,6 +4118,24 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		return true
 	}
 
+	CanonicalOwnersCurrent() {
+		; Source admission is deliberately separate from native retirement custody.
+		for Pair in [[OriginalCanonicalCapture, KeylayoutEmulation_CaptureCanonicalSource],
+			[OriginalCanonicalOwner, _KLE_CanonicalSourceOwner], [CanonicalCall, Func.Prototype.Call]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	CanonicalCurrent(State) {
+		if !CanonicalOwnersCurrent() || !IsObject(State) || !PlainMap(State.CanonicalSource)
+			return false
+		Guard := State.CanonicalSource.Get("current", 0)
+		return Guard is BoundFunc && !Object.Prototype.HasOwnProp.Call(Guard, "Call")
+			&& CanonicalCall.Call(Guard) && CanonicalOwnersCurrent()
+	}
+
 	BuildFrame() {
 		if Constructing || !OwnersCurrent() || !A_IsCritical
 				|| !_LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStopping
@@ -4122,6 +4144,12 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			throw Error("The native registration scope cannot be issued.")
 		Constructing := true
 		try {
+			if !CanonicalOwnersCurrent()
+				throw Error("The original canonical source capture owner was withdrawn.")
+			; Capture even the inactive cell before any borrowed registration callout.
+			CanonicalSource := CanonicalCall.Call(OriginalCanonicalCapture)
+			if !CanonicalOwnersCurrent() || !PlainMap(CanonicalSource)
+				throw Error("The original canonical source capture was not issued.")
 			; Capture is invoked here, after the original-callable guard, never supplied.
 			if !OwnersCurrent()
 				throw Error("The original registration capture owner was withdrawn.")
@@ -4131,11 +4159,14 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			CapturedNative := ExportsCurrent()
 			State := {DigitTried: false, DigitCaptured: false, DigitCell: 0, DigitGuard: 0, DigitModeGuard: 0,
 				CandidateTried: false, CandidateCell: 0, CandidateGuard: 0,
+				CanonicalSource: CanonicalSource,
 				Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
 				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
 				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
 				Module: CapturedNative ? IssuedModule : 0, Exports: CapturedNative ? IssuedExports : 0,
 				Generation: Frame["generation"], NextRecipe: Frame["next_recipe"], NextLayout: Frame["next_layout"]}
+			if !CanonicalCurrent(State)
+				throw Error("The original canonical source changed during frame issuance.")
 			Operations := Map("capture_digit_source", CaptureDigitSource, "seal_candidate", SealCandidate,
 				"frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
 				"native", NativeRegistration, "complete", CompleteFrame, "close", CloseFrame)
@@ -4150,6 +4181,11 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		GuardFrame() {
 			if ActiveFrame != State || State.Closed || !OwnersCurrent() || !ScopeCurrent(State.Operations)
 				throw Error("The original registration dispatcher was withdrawn.")
+			if !CanonicalCurrent(State) {
+				if State.Mode != "unselected" || Frame["native_attempted"]
+					State.Uncertain := true
+				throw Error("The original canonical source changed during registration.")
+			}
 			if State.DigitCaptured && !DigitCurrent(State, false) {
 				if State.Mode != "unselected" || Frame["native_attempted"]
 					State.Uncertain := true
@@ -4245,6 +4281,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			}
 			if !EpochCurrent(State.Epoch) || (IssuedModule && !ExportsCurrent())
 				throw Error("The registration lifetime changed before its native call.")
+			GuardFrame()
 			State.Genuine := GenuineCall
 			State.Raw := DllCall(Address, "UInt64", Owner, "UInt64", Generation,
 				"UInt64", LayoutId, "Ptr", Bindings, "UInt", Count, "Int")
