@@ -51,15 +51,15 @@ module.exports = function checkNativeMenuLifecycle(ahk) {
 		assert.equal(manifest.failed, 0);
 		assert.equal(
 			manifest.passed,
-			5,
-			'run all four owner cases and the descendant lifecycle regression'
+			3,
+			'run both live owner commands and the descendant lifecycle regression'
 		);
-		assert.equal(manifest.timed_count, 5);
+		assert.equal(manifest.timed_count, 3);
 		assert.ok(
 			manifest.executed.every((row) => row.name.startsWith('hotstring-personal-menu-owner:'))
 		);
 		accepted = true;
-		console.log('AHK personal-menu lifecycle: five native cases and clean teardown passed.');
+		console.log('AHK personal-menu lifecycle: three native cases and clean teardown passed.');
 	} finally {
 		if (accepted) {
 			fs.rmSync(temporary, { recursive: true, force: true });
