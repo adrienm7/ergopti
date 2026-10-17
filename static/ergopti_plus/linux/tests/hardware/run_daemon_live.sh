@@ -23,6 +23,10 @@ for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp; do
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
+# Keep the new race regressions on the native lane, beyond recorder-based units.
+for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py; do
+	python3 "tests/hardware/${probe}" || exit 1
+done
 
 Xvfb :58 -screen 0 1024x768x24 >/dev/null 2>&1 &
 PIDS="$!"
@@ -35,6 +39,13 @@ sleep 1
 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
+# The matcher must observe exactly what two real source keyboards emit.
+if ! luajit tests/hardware/run_hook_text_custody.lua; then
+	# shellcheck disable=SC2086
+	kill ${PIDS} 2>/dev/null
+	exit 1
+fi
+
 # Native virtual-keyboard custody runs before the timed tray/daemon host. Its
 # two explicit sources and output use real production FFI ports, then retire.
 luajit tests/hardware/run_modifier_custody.lua
