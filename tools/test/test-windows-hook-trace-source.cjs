@@ -57,6 +57,12 @@ const DIAGNOSTIC = [
 ];
 
 const SERIALIZATION = ['ErgoptiNav_SerializeTerminalOutputAttempt'];
+const OWNED_CAPTURE = [
+	'ErgoptiNav_BeginTerminalCaptureOwned',
+	'ErgoptiNav_GetTerminalCaptureOwned',
+	'ErgoptiNav_PeekTerminalRouteOwned',
+	'ErgoptiNav_ReleaseTerminalCaptureOwned'
+];
 
 /** @param {string} relative Repository path. @returns {string} Exact UTF-8 source. */
 function read(relative) {
@@ -198,7 +204,7 @@ function checkSerializationBinding(source) {
 	const required = [...loader[1].matchAll(/"(Ergopti\w+)"/g)].map((match) => match[1]);
 	assert.deepEqual(
 		required.sort(),
-		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION].sort(),
+		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE].sort(),
 		'The real loader must require all original, diagnostic and serializer exports exactly once.'
 	);
 	const binding = source.custodyAdapter.match(
@@ -214,12 +220,121 @@ function checkSerializationBinding(source) {
 	);
 }
 
+/** Pins additive capture widths and the separate production-inclusion test owner. */
+function checkOwnedCapture(source) {
+	const normalize = (text) => text.replace(/\s+/g, ' ').trim();
+	const code = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+	const signatures = [
+		'uint64_t token, uint64_t *out_serial',
+		'uint64_t token, uint64_t expected_serial, ErgoptiNav_TerminalCaptureOwnedSnapshot *out_snapshot',
+		'uint64_t token, uint64_t expected_serial, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot',
+		'uint64_t token, uint64_t expected_serial, uint64_t processed_through, uint8_t committed'
+	];
+	for (const [index, name] of OWNED_CAPTURE.entries()) {
+		for (const [kind, terminator] of [
+			['c', '\\{'],
+			['h', ';']
+		]) {
+			const matches = [
+				...code(source[kind]).matchAll(
+					new RegExp(
+						`ERGOPTI_NAV_API\\s+int32_t\\s+ERGOPTI_NAV_CALL\\s+${name}\\s*\\(([^)]*)\\)\\s*${terminator}`,
+						'g'
+					)
+				)
+			];
+			assert.equal(matches.length, 1, 'An owned capture declaration must have one real owner.');
+			assert.equal(
+				normalize(matches[0][1]),
+				signatures[index],
+				'Owned capture ABI widths changed.'
+			);
+		}
+	}
+	const header = normalize(code(source.h));
+	for (const assertion of [
+		'sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28',
+		'sizeof(ErgoptiNav_TerminalCaptureOwnedSnapshot) == 44',
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture) == 0',
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture_base_sequence) == 28',
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, captured_through_sequence) == 36'
+	]) {
+		assert(header.includes(assertion), 'Owned capture bounds must retain their exact packed ABI.');
+	}
+	const cmake = source.cmake.replace(/#[^\n]*/g, '');
+	const builder = source.builder.replace(/^\s*#[^\n]*/gm, '');
+	const target = cmake.match(/add_executable\(ergopti_terminal_capture_owned_test\s+([^)]*)\)/);
+	assert(target, 'The owned capture CMake executable must exist.');
+	assert.deepEqual(target[1].trim().split(/\s+/), [
+		'terminal_capture_owned_test.c',
+		'editor_replace_test.c',
+		'editor_replace.c',
+		'replay_route_core.c',
+		'terminal_output_plan.c',
+		'hook_trace.c'
+	]);
+	assert.match(
+		cmake,
+		/add_test\(NAME ergopti_terminal_capture_owned_test\s+COMMAND ergopti_terminal_capture_owned_test\)/
+	);
+	assert.match(
+		cmake,
+		/target_compile_definitions\(ergopti_terminal_capture_owned_test PRIVATE\s+ERGOPTI_NAV_TESTING=1\)/
+	);
+	const argumentsBlock = builder.match(
+		/\$captureTestArguments = \$commonCompilerFlags \+ @\(([\s\S]*?)\) \+ \$commonLinkerFlags/
+	);
+	assert(argumentsBlock, 'The official capture test compiler recipe must exist.');
+	assert.deepEqual(argumentsBlock[1].split(',').map(normalize).filter(Boolean), [
+		'"/DERGOPTI_NAV_TESTING=1"',
+		'$captureTestSourcePath',
+		'$editorTestSourcePath',
+		'$editorSourcePath',
+		'$replaySourcePath',
+		'$outputSourcePath',
+		'$traceSourcePath',
+		'"/Fe:$captureTestExePath"',
+		'"/link"'
+	]);
+	assert(
+		builder.includes(
+			'$captureTestSourcePath = Join-Path $sourceDir "terminal_capture_owned_test.c"'
+		)
+	);
+	const required = builder.match(/foreach \(\$requiredSource in @\(([^\n]+)\)\)/);
+	assert(required && required[1].split(',').map(normalize).includes('$captureTestSourcePath'));
+	assert(
+		builder.includes(
+			'Invoke-CheckedNative -Label "Compiling the capture interval core test" -Executable "cl.exe" -Arguments $captureTestArguments'
+		)
+	);
+	assert(
+		builder.includes(
+			'Invoke-CheckedNative -Label "Running the capture interval core test" -Executable $captureTestExePath -Arguments @()'
+		)
+	);
+	const test = code(source.ownedTest);
+	assert.match(
+		test,
+		/#define main CapturedOriginalNativeMain\s+#include "nav_event_owner_test\.c"\s+#undef main\s+#include "nav_event_owner\.c"/
+	);
+	const registry = test.match(/const NavTestCase tests\[\] = \{([\s\S]*?)\n	\};/);
+	assert(registry, 'The actual owned capture case registry must exist.');
+	assert.equal(
+		[...registry[1].matchAll(/\{"capture-owned [^"\n]+", CaptureOwned\w+\}/g)].length,
+		12
+	);
+	assert(test.includes('if (!tests[index].function())'));
+	assert(test.includes('if (selected_count != 1)'));
+}
+
 /** @param {object} source Production source bundle. @returns {void} */
 function check(source) {
+	checkOwnedCapture(source);
 	const exports = [...source.def.matchAll(/^\s*(Ergopti\w+)\s*$/gm)].map((match) => match[1]);
 	assert.deepEqual(
 		exports.sort(),
-		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION].sort(),
+		[...EXISTING, ...DIAGNOSTIC, ...SERIALIZATION, ...OWNED_CAPTURE].sort(),
 		'The 37 original exports must survive the diagnostic ABI.'
 	);
 	checkSerializationBinding(source);
@@ -333,6 +448,7 @@ const source = {
 	h: read(NATIVE + 'nav_event_owner.h'),
 	def: read(NATIVE + 'nav_event_owner.def'),
 	cmake: read(NATIVE + 'CMakeLists.txt'),
+	ownedTest: read(NATIVE + 'terminal_capture_owned_test.c'),
 	adapter: read('static/ergopti_plus/windows/adapters/llm_nav_event_owner.ahk'),
 	custodyAdapter: read('static/ergopti_plus/windows/adapters/terminal_output_custody.ahk'),
 	builder: read('tools/build/build_windows_nav_owner.ps1'),
@@ -368,6 +484,56 @@ for (const [file, prefix] of [
 	assert.throws(() => checkModuleCustody(text + '\nDllCall("FreeLibrary", "Ptr", 1)', prefix));
 }
 check(source);
+let ownedCaptureControls = 0;
+for (const name of OWNED_CAPTURE) {
+	for (const kind of ['c', 'h', 'def', 'adapter']) {
+		const changed = source[kind].replaceAll(name, name + 'Missing');
+		assert.notEqual(changed, source[kind]);
+		assert.throws(() => check({ ...source, [kind]: changed }));
+		++ownedCaptureControls;
+	}
+}
+for (const [kind, from, to] of [
+	[
+		'cmake',
+		'add_test(NAME ergopti_terminal_capture_owned_test',
+		'add_test(NAME unused_capture_test'
+	],
+	['cmake', 'terminal_capture_owned_test.c', 'nav_event_owner.c'],
+	['builder', 'Running the capture interval core test', 'Unused capture interval core test'],
+	['builder', '$captureTestSourcePath,', '$sourcePath,'],
+	['ownedTest', '#include "nav_event_owner.c"', '#include "unused.c"'],
+	[
+		'ownedTest',
+		'{"capture-owned same-token legacy successor and Stop", CaptureOwnedSameToken}',
+		'{"unused", CaptureOwnedSameToken}'
+	]
+]) {
+	const changed = source[kind].replace(from, to);
+	assert.notEqual(changed, source[kind]);
+	assert.throws(() => check({ ...source, [kind]: changed }));
+	++ownedCaptureControls;
+}
+for (const [from, to] of [
+	[
+		'sizeof(ErgoptiNav_TerminalCaptureOwnedSnapshot) == 44',
+		'sizeof(ErgoptiNav_TerminalCaptureOwnedSnapshot) == 43'
+	],
+	[
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture_base_sequence) == 28',
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture_base_sequence) == 27'
+	],
+	[
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, captured_through_sequence) == 36',
+		'offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, captured_through_sequence) == 35'
+	]
+]) {
+	const changed = source.h.replace(from, to);
+	assert.notEqual(changed, source.h);
+	assert.throws(() => check({ ...source, h: changed }));
+	++ownedCaptureControls;
+}
+console.log(`Owned capture ABI/build source controls: ${ownedCaptureControls} passed.`);
 const mutations = [
 	['def', (text) => text.replace('\tErgoptiNav_StartHookTrace\n', '')],
 	['c', (text) => text.replace('if (g_nav_hook_trace.enabled) {', 'if (true) {')],
@@ -584,7 +750,7 @@ for (const [name, mutate] of serializationMutations) {
 	assert.throws(() => check({ ...source, [name]: changed }));
 }
 console.log(
-	`Hook trace source bindings: 37 original + 3 diagnostic + 1 serializer exports and ${mutations.length} original + ${serializationMutations.length} additive negative controls passed.`
+	`Hook trace source bindings: 37 original + 3 diagnostic + 1 serializer + 4 owned capture exports and ${mutations.length} original + ${serializationMutations.length} additive negative controls passed.`
 );
 console.log('Source binding only; native Windows callback execution remains UNRUN.');
 

@@ -12,6 +12,70 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 owned native capture intervals and processed frontiers
+
+Four additive native exports bind Begin, Get, Peek and release to a monotonic
+capture serial. Both legacy and owned Begin advance that serial; genuine Stop
+does not recycle it. A stale token/serial pair cannot read or retire a successor.
+Owned release stops at its caller's declared sequence frontier, retaining later
+raw edges and settled UP edges instead of consuming arrivals while SendInput is
+unlocked. The frontier does not prove that AHK has processed a callback.
+
+The dedicated owned snapshot is44 bytes: unchanged28-byte native accounting,
+followed by the sequence base saved at Begin and the captured-through sequence.
+All fields are read under the same validated owner lock. These bounds expose
+unwitnessed events even when zero-output Consume hides the original in rollback
+custody and both visible queue/replay counts are zero. Sequence exhaustion faults
+before wrap. Historical28-byte Get and184-byte Peek layouts remain unchanged.
+
+The unchanged original native owner completes44 authored cases with natural0;
+ten nested editor PASS lines are recorded separately. An outer wrapper still
+expects44 total lines and exits1; the retained exact registry audit establishes
+the actual child0 and44 authored completions without erasing that wrapper error.
+The separate production-core owner completes all twelve cases with natural0.
+Nine safe negative controls compile0 and fail at their intended assertions.
+The original eight assertions/registrations remain; four cases add successor and
+idle bounds, hidden-prefix visibility, whole44-byte alias preflight and exhaustion.
+The registered CMake/CTest receiving completes both original44 and new twelve-case
+owners,2/2 executable tests, natural0. The exact selected-case CLI also passes;
+an unknown name is refused with its expected exit2. Both official DLL builder
+invocations finish with natural0, receiving44 original owner cases, twelve new
+capture cases, eight replay matrices, eleven output matrices and six trace cases.
+The DLL has exactly45 exports and a manifest regenerated and verified by its owner.
+
+The preceding official45-export DLL and dependent PAC build remain retained.
+Their original source composition passed parsing, all70 E2E cases and all1,127
+terminal cases with natural0. Its complete JavaScript run records423 PASS
+and11 FAIL, natural1; exact failures remain retained and unexonerated.
+That receipt cannot qualify this subsequent bounds delta. The PAC generator
+recomputes the same source fingerprint from all twelve unchanged inputs and the
+actual MSVC importer. Its received executable hash still matches; its original
+seventeen Duktape and six Windows platform cases are not redundantly rerun.
+
+The refined official-worktree composition completes format, AHK encoding,
+strict conventions, hook/custody source guards, original native census and
+whole-entry compilation with natural0. All70 E2E and1,127 terminal cases finish
+with complete timed manifests, zero failures and natural0. The complete434-case
+JavaScript gate finishes424 PASS and10 FAIL, natural1. Seven failures reach
+required symlink creation without the necessary Windows privilege; another
+requires both compiler and symlink support. Native Linux archive assembly
+explicitly refuses this Windows host, and its Git-for-Windows Bash first-install
+sandbox lacks the expected service file. Each exact failing boundary is retained
+in the preceding receiving too, and every top-level failed script matches actual
+HEAD bytes. These results remain failures and confer no missing native credit.
+The prior PowerShell7 engine-crash failure is retained; its original desktop
+guard now passes within this complete current JavaScript run.
+
+All nineteen receiving commands retire naturally without changing their738
+frozen inputs, HEAD or index. A complete current default Windows suite is still
+unqualified; the completed hosted default suite belongs to an earlier source.
+
+The private AHK capture/source lease, authenticated callback stream, full cohort
+conversion and production output policy remain unfinished. The private source
+reservation component has eight passing cases and three intended negative controls;
+it is not yet connected to real capture or semantic completion.
+Physical Windows and native macOS/Linux qualification remain false or OPEN.
+
 ### October 17 canonical direct-digit fixture ownership
 
 The inactive and capacity digit scenarios previously changed public KLE globals
