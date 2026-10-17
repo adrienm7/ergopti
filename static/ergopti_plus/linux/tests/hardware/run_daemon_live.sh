@@ -79,6 +79,10 @@ if [ "${CUSTODY}" != "0" ]; then
 	exit "${CUSTODY}"
 fi
 
+# A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
+# JSON as Python servers do.
+LLM_READY="$(mktemp -u)"
+
 # The kernel prerequisites need XKB but no focused editor. Starting the bounded
 # editor before them let its 30-second lifetime expire before daemon admission.
 # This host's lifetime covers the tray host's 60-second budget and startup.
@@ -87,9 +91,6 @@ EDITOR_PID=$!
 PIDS="${PIDS} ${EDITOR_PID}"
 sleep 2
 
-# A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
-# JSON as Python servers do.
-LLM_READY="$(mktemp -u)"
 export ERGOPTI_LIVE_LLM_PORT=18431
 export ERGOPTI_LIVE_LLM_LOG="$(mktemp)"
 export ERGOPTI_LIVE_LLM_REPLY=" que tout le monde va bien"
