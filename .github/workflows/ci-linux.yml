@@ -3101,7 +3101,10 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
           elif [ "$mode" = full ]; then
-          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv dbus-x11
+          # The download window harness needs lgi, GTK and WebKit itself: since the
+          # E2E split, the desktop-webview row that installs them runs elsewhere.
+          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl lua-luv dbus-x11 \
+            xvfb lua-lgi gir1.2-webkit2-4.1 gir1.2-gtk-3.0
           export LUA_PATH='./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;/usr/share/lua/5.1/?.lua;/usr/share/lua/5.1/?/init.lua;;'
           export LUA_CPATH='/usr/lib/x86_64-linux-gnu/lua/5.1/?.so;;'
           dbus-run-session -- xvfb-run -a luajit tests/hardware/run_model_pull_receipts.lua
