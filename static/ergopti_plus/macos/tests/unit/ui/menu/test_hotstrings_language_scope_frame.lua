@@ -45,8 +45,7 @@ local function native_fixture(body)
 		}, updateMenu = function() end,
 	}
 	local modules = { hotstrings = { build_groups = hotstrings.build_groups,
-		build_language_bulk_actions = hotstrings.build_language_bulk_actions,
-		all_sections_switch = hotstrings.all_sections_switch } }
+		build_language_bulk_actions = hotstrings.build_language_bulk_actions } }
 	local function language()
 		local rows = assert(build(context, modules)[1]).submenu
 		for _, row in ipairs(rows) do

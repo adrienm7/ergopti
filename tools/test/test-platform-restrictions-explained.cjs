@@ -194,7 +194,7 @@ const KNOWN_UNEXPLAINED = new Set([
 	'["menu.gestures_menu","hs","---",null,null,null,null,12]',
 	'["menu.gestures_menu","hs","---",null,null,null,null,14]',
 	'["menu.gestures_menu","linux","---",null,null,null,null,18]',
-	'["menu.hotstrings_menu","linux","---",null,null,null,null,19]',
+	'["menu.hotstrings_menu","linux","---",null,null,null,null,18]',
 	'["menu.layout_menu","hs","---",null,null,null,null,11]',
 	'["menu.llm_menu","linux","---",null,null,null,null,6]',
 	'["menu.metrics_menu","linux","---",null,null,null,null,20]',

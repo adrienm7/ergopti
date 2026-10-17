@@ -351,27 +351,31 @@ _CPC_AssertBulkFunctionStagesBeforePublishing(Name) {
 	if !Category
 		Assert(InStr(Body, "return _ConfigCommitHotstringIntent(") > 0, Name . " must consume the common commit result")
 	PersistPos := InStr(Owner, "if !ConfigCommitBuilt(")
-	ReloadPos := InStr(Owner, "ReloadPreservingSuspend(")
+	ReloadPos := InStr(Owner, "ReloadPreservingSuspend", , PersistPos + 1)
 	Assert(PersistPos > 0 && ReloadPos > PersistPos, "durable commit must precede reload")
 	AssertEqual(1, _CPC_CountOccurrences(Owner, "ConfigCommitBuilt("), "one logical edit has one admitted config batch")
-	Assert(InStr(Owner, BuilderName . ".Bind(") > 0, "candidate construction must occur under the config lease")
+	if Category {
+		Assert(InStr(Owner, BuilderName . ".Bind(") > 0, "candidate construction must occur under the config lease")
+	} else {
+		; The section owner captures its plan to choose live rebuild or reload,
+		; so the builder runs inside the callback the gateway calls under lease.
+		BuildPos := InStr(Owner, "Build() {")
+		Assert(BuildPos > 0 && InStr(Owner, BuilderName . "(", , BuildPos) > BuildPos
+			&& InStr(Owner, "ConfigCommitBuilt(ConfigurationFile, Context, Build)") > 0,
+			"candidate construction must occur under the config lease")
+		LivePos := InStr(Owner, "RebuildHotstringsLive", , PersistPos + 1)
+		Assert(LivePos > PersistPos, "the in-process rebuild also follows the durable commit")
+	}
 	Assert(InStr(Builder, "MasterGateDesiredFeatures(") > 0 && InStr(Builder, "_ConfigPublishDesiredState.Bind(") > 0,
 		"the candidate retains intent and delegates atomic publication to the gateway")
 	for Source in [Body, Builder] {
 		Assert(!RegExMatch(Source, "m)^\s*(?:Features|CategoryEnabled|TapHold)\s*(?:\[|:=)"),
 			Name . " cannot publish shared state before the durable gateway accepts it")
 	}
-	if Name == "ToggleAllHotstrings" {
-		Collector := _DriverFuncBody("_CollectAllHotstringsV2Paths")
-		Assert(Collector != "" && InStr(Builder, "_CollectAllHotstringsV2Paths(Desired)") > 0,
-			"personal discovery must run on a detached desired candidate")
-		Assert(InStr(Collector, "_ConfigSeedPersonalHotstring(FeaturesTarget") > 0 && InStr(Collector, "EnsurePersonalHotstringFeature(") == 0,
-			"discovery cannot mutate the live feature tree")
-	}
 }
 
 _CPC_BulkMutationsStageBeforePublishing() {
-	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllFeatures",
+	for Name in ["ToggleCategoryAllFeatures",
 		"ToggleCategoryAllSections", "HS_TogglePersonalAllSections"]
 		_CPC_AssertBulkFunctionStagesBeforePublishing(Name)
 }

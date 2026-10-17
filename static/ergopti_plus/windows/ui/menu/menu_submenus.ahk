@@ -147,15 +147,6 @@ _HS_RegisterLanguageMenuCategories() {
 	}
 }
 
-; The whole tree's « all sections » checkbox, at the top of the Hotstrings menu:
-; ticked when the Hotstrings master is on and every hotstring section is, which
-; is exactly the state ToggleAllHotstrings(true) establishes.
-_HS_AllHotstringsOn() {
-	global Features
-	; Menu enumeration discovers paths without seeding or copying configuration.
-	return _HS_PathsAllEnabled(_CollectAllHotstringsV2Paths(Features, false))
-}
-
 ; List provider: one row per language pack, labelled with the language's native
 ; name, opening a submenu with one « all sections » checkbox for the whole
 ; language followed by that language's category submenus (built by InitSubMenus
@@ -245,7 +236,7 @@ _BuildDynamicHotstringsSubmenu(Options := unset) {
 		}
 	}
 	return _HS_CategoryMenu("DynamicHotstrings", "", Rows,
-		(_Targets, Enabled) => HotstringsDynamicScopeApply(Enabled, Options))
+		(_Targets, Enabled) => ToggleDynamicAllSections(Enabled, Options))
 }
 
 /**
@@ -279,47 +270,4 @@ _CountEnabledForCategory(V1Cat) {
 		}
 	}
 	return Total
-}
-
-
-; Collect every canonical v2 feature path that belongs to the Hotstrings
-; category: flat TOML categories (autocorrection, distances_reduction, …),
-; dynamic hotstrings, and personal TOML sections. Runtime-discovered personal
-; nodes are seeded only in the caller's detached candidate, never in live state
-; before persistence succeeds.
-_CollectAllHotstringsV2Paths(FeaturesTarget, SeedPersonal := true) {
-	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
-	Paths := []
-
-	; Flat categories — the manifest entry path IS the canonical v2 path.
-	for _, V1Cat in _FLAT_HOTSTRING_V1_CATS {
-		V2Section := _LegacyTopCategoryMap.Has(V1Cat) ? _LegacyTopCategoryMap[V1Cat] : ""
-		if (V2Section == "") {
-			continue
-		}
-		for _, Entry in ManifestFeaturesForSection(V2Section) {
-			Paths.Push(Entry["path"])
-		}
-	}
-
-	; Dynamic hotstrings — read straight from the manifest section.
-	for _, Entry in ManifestFeaturesForSection("hotstrings.dynamic") {
-		Paths.Push(Entry["path"])
-	}
-
-	; Personal TOML sections — the Features node + config section key the
-	; lowercased TOML section name.
-	PersonalTomlPath := IsSet(ScriptInformation) ? ScriptInformation.Get("PersonalTomlPath", "") : ""
-	if (PersonalTomlPath != "" and FileExist(PersonalTomlPath)) {
-		PersonalTomlData := ReadPersonalToml()
-		for _, SecName in PersonalTomlData["sections_order"] {
-			if (SecName != "-") {
-				if SeedPersonal
-					_ConfigSeedPersonalHotstring(FeaturesTarget, SecName)
-				Paths.Push("hotstrings.personal." . StrLower(SecName))
-			}
-		}
-	}
-
-	return Paths
 }

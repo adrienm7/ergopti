@@ -70,14 +70,8 @@ local CANONICAL_HOTSTRINGS_MENU = {
 	-- also inserted by hand, and the Lua drivers drew none.
 	"---",
 	"group:hotstrings_params",
-	-- One `dynamic:hotstring_bulk_actions` row until 2026-08-06, which expanded
-	-- to TWO rows inside each driver — so the manifest described neither, and
-	-- macOS had no handler for the id at all and rendered nothing. Then two
-	-- `command` rows, « tout activer » and « tout désactiver »; one `check` row
-	-- since, ticked when every section is on. The renderer builds it, and what
-	-- this list pins is what the user sees rather than a slot whose contents only
-	-- the drivers knew.
-	"check:hotstrings_all_sections",
+	-- No whole-tree « all sections » row since 2026-10-17: it switched on the
+	-- packs of every language at once. Each submenu owns its bulk rows.
 	"---",
 	"section_header:menu.hotstrings.header_common",
 	"list:hotstring_categories_standard",

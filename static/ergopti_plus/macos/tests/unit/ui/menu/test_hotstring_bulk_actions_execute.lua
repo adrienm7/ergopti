@@ -1,18 +1,15 @@
 --- tests/unit/ui/menu/test_hotstring_bulk_actions_execute.lua
 
 --- ==============================================================================
---- MODULE: Regression -- whole-tree hotstring commands execute
+--- MODULE: Regression -- hotstring bulk commands execute
 --- DESCRIPTION:
---- The hotstring provider emits row data (`label` / `action`), while the
---- manifest renderer consumes registered commands (`title` / `fn`).  The bridge
---- between them read `.fn`, silently replaced the missing value with an empty
---- function, and therefore rendered two healthy-looking rows that never reached
---- the provider callback.
----
---- The two rows are one « all sections » checkbox now. This test drives the
---- complete provider -> builder -> manifest renderer path and clicks the
---- rendered checkbox.  Merely scanning for either field would be a false green:
---- both spellings can exist while the bridge still reads the wrong one.
+--- The Hotstrings menu drew a whole-tree « all sections » checkbox that switched
+--- on the packs of every language at once; it is gone on every driver since
+--- 2026-10-17 (hotstrings-menu-no-whole-tree). The first test renders the real
+--- menu and proves no such row is drawn even when a provider still offers one.
+--- The bulk writer that remains, a language's « all sections » checkbox, must
+--- visit every real section once and publish nothing when the keymap refuses
+--- to start.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -48,8 +45,18 @@ local function find_row(rows, title)
 	return nil
 end
 
-helpers.describe("hotstring whole-tree commands: provider actions reach clicks", function()
-	helpers.it("executes both provider actions through the rendered menu", CaptionFixture.scoped(function()
+--- The language « all sections » checkbox of `groups`, as the tray draws it.
+--- @param hotstrings table The real provider module.
+--- @param ctx table Menu context.
+--- @param groups table Array of group names.
+--- @return table { checked = boolean, action = function|nil }
+local function language_switch(hotstrings, ctx, groups)
+	local row = hotstrings.build_language_bulk_actions(ctx, groups)[1]
+	return { checked = row.checked, action = row.action }
+end
+
+helpers.describe("hotstring bulk commands: no whole-tree row, language actions reach clicks", function()
+	helpers.it("the rendered Hotstrings menu draws no whole-tree « all sections » row", CaptionFixture.scoped(function()
 		local translator = helpers.load_with_stubs("infra.i18n")
 		CaptionFixture.install(translator)
 		package.loaded["ui.menu.builder"] = nil
@@ -78,20 +85,14 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		helpers.assert_true(ok, "building the user-visible menu must not raise")
 		helpers.assert_eq(type(menu), "table", "builder.generate must return menu rows")
 
-		local row = find_row(menu, "menu.hotstrings.enable_all_sections")
-		helpers.assert_eq(type(row and row.fn), "function",
-			"the rendered all-sections checkbox must carry the provider action")
-		helpers.assert_eq(row.checked, true, "the rendered checkbox carries the provider's tick")
+		helpers.assert_nil(find_row(menu, "menu.hotstrings.enable_all_sections"),
+			"the Hotstrings menu must not draw a row that switches every language at once")
 		helpers.assert_nil(find_row(menu, "menu.hotstrings.enable_all"), "the retired enable-all row is gone")
 		helpers.assert_nil(find_row(menu, "menu.hotstrings.disable_all"), "the retired disable-all row is gone")
-
-		row.fn()
-		helpers.assert_eq(table.concat(fired, ","), "switch",
-			"clicking the rendered checkbox must execute the provider callback; "
-				.. "an empty fallback function is a silent user-visible no-op")
+		helpers.assert_eq(#fired, 0, "nothing reached a whole-tree writer")
 	end))
 
-	helpers.it("the real provider updates every applicable section exactly once", function()
+	helpers.it("the language checkbox updates every applicable section exactly once", function()
 		local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
 		local enabled_sections = {}
 		local disabled_sections = {}
@@ -135,7 +136,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		}
 
 		-- Every section is off, so the switch is unticked and its click enables.
-		local switch = hotstrings.all_sections_switch(ctx)
+		local switch = language_switch(hotstrings, ctx, { "alpha", "beta" })
 		helpers.assert_eq(switch.checked, false, "nothing is on yet")
 		helpers.assert_eq(type(switch.action), "function", "the switch must expose an action")
 
@@ -153,7 +154,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 		helpers.assert_eq(rebuilds, 1, "one bulk click must rebuild the menu exactly once")
 
 		-- Rebuilt, as the menu is after every click: now ticked, so it disables.
-		switch = hotstrings.all_sections_switch(ctx)
+		switch = language_switch(hotstrings, ctx, { "alpha", "beta" })
 		helpers.assert_eq(switch.checked, true, "every group and section is on after the enabling click")
 		switch.action()
 		helpers.assert_eq(table.concat(disabled_sections, ","),
@@ -184,7 +185,7 @@ helpers.describe("hotstring whole-tree commands: provider actions reach clicks",
 
 		-- Building the switch reads the sections for its tick; only what the click
 		-- does afterwards is under test.
-		local switch = hotstrings.all_sections_switch(ctx)
+		local switch = language_switch(hotstrings, ctx, { "alpha" })
 		helpers.assert_eq(switch.checked, false, "nothing is on, so the click enables")
 		mutations = 0
 		switch.action()

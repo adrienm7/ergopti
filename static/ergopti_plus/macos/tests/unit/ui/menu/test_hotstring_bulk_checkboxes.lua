@@ -121,18 +121,6 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 			helpers.assert_eq(#batches, 1, "one click is one batch")
 			helpers.assert_eq(batches[1].enabled, not posture, "the click switches the whole language")
 		end)
-
-		helpers.it("the top of the menu has one switch for every section, ticked " .. tostring(posture), function()
-			local hotstrings = helpers.load_with_stubs("ui.menu.menu_hotstrings")
-			local ctx, batches = context(posture, posture, { "alpha.toml", "beta.toml" })
-			local switch = hotstrings.all_sections_switch(ctx)
-			helpers.assert_eq(switch.checked, posture, "ticked exactly when every group and section is on")
-			helpers.assert_eq(type(switch.action), "function", "the switch must act")
-			switch.action()
-			helpers.assert_eq(#batches, 1, "one click is one batch")
-			helpers.assert_eq(batches[1].enabled, not posture, "the click switches the whole tree")
-			helpers.assert_eq(#batches[1].changes, 2, "every group is in the batch")
-		end)
 	end
 
 	helpers.it("one group with a section off leaves every « all » checkbox unticked", function()
@@ -141,10 +129,9 @@ helpers.describe("hotstring scope commands and independent bulk checkboxes", fun
 		ctx.keymap.is_section_enabled = function(group, section)
 			return not (group == "beta" and section == "two")
 		end
-		helpers.assert_eq(hotstrings.all_sections_switch(ctx).checked, false,
-			"« all on » means all of them: one section off is not all")
 		local rows = hotstrings.build_language_bulk_actions(ctx, { "alpha", "beta" })
-		helpers.assert_eq(rows[1].checked, false, "the language checkbox reads every one of its groups")
+		helpers.assert_eq(rows[1].checked, false,
+			"« all on » means all of them: one section off is not all")
 		helpers.assert_eq(hotstrings.build_language_bulk_actions(ctx, { "alpha" })[1].checked, true,
 			"and only its own groups")
 	end)

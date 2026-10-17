@@ -171,8 +171,9 @@ end
 --- @param group_names table Native registry category ids.
 --- @param enabled boolean Explicit requested posture.
 --- @param admission function|nil Current exclusive personal-file owner check.
+--- @param excluded table|nil group -> { section = true } another submenu draws.
 --- @return function
-function M.category_scope_fn(ctx, group_names, enabled, admission)
+function M.category_scope_fn(ctx, group_names, enabled, admission, excluded)
 	local file_checks = {}
 	for _, name in ipairs(group_names) do
 		if PersonalFiles.components(name) then
@@ -201,7 +202,7 @@ function M.category_scope_fn(ctx, group_names, enabled, admission)
 				for _, name in ipairs(group_names) do ctx.state.hotstrings[name] = enabled end
 				if ctx.save_prefs() ~= true then return false end
 				return true
-			end)
+			end, excluded)
 			scope_committed = result == true
 			return result
 		end, function() ctx.updateMenu() end)

@@ -4,12 +4,12 @@
 ; MODULE: Hotstring Scope Menu Commands And Independent Checkboxes
 ; DESCRIPTION:
 ; Real Win32 category commands dispatch the explicit requested posture once,
-; regardless of existing gates and section choices. Language and whole-tree
-; section checkboxes retain their independent desired-state contract.
+; regardless of existing gates and section choices. Language section
+; checkboxes retain their independent desired-state contract. The Hotstrings
+; menu itself has no whole-tree « all sections » row.
 ;
 ; Bulk selection edits desired section state independently of category masters.
-; The checks below keep those masters closed while selecting every child and
-; exercise the durable writer against a scratch config.toml.
+; The checks below keep those masters closed while selecting every child.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -206,103 +206,39 @@ _HBC_LanguageSwitchRowIsACheckbox() {
 
 
 
-; ==========================================
-; ==========================================
-; ======= 4/ The whole-tree checkbox =======
-; ==========================================
-; ==========================================
+; =====================================================
+; =====================================================
+; ======= 4/ No whole-tree « all sections » row =======
+; =====================================================
+; =====================================================
 
-; Runs Body(ConfigPath) against a scratch config.toml with Gates applied over a
-; copy of the live gates, then restores every global the writer replaces. The
-; tree is the Rolls category: ui/tray_menu.ahk, which declares the tray's
-; category tables, is not loaded by this runner, so the fixture declares them.
-_HBC_WithScratchConfig(Gates, Body) {
-	global ConfigurationFile, Features, CategoryEnabled, _Stub_SentText, _ParseTomlCache
-	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
-	Assert(!IsSet(_FLAT_HOTSTRING_V1_CATS) and !IsSet(_LegacyTopCategoryMap),
-		"the runner loads the tray's category tables now; use them instead of this fixture's")
-	SavedPath := ConfigurationFile
-	SavedFeatures := Features
-	SavedCategories := CategoryEnabled
-	SavedOwner := MasterGateState().Clone()
-	ReloadsBefore := _Stub_SentText.Length
-	ConfigPath := "", Fixture := 0
-	try {
-		; The scratch file is genuinely boot-admitted before any section transaction.
-		Fixture := _ScopeOwnerFixture("")
-		ConfigPath := Fixture.path
-		_FLAT_HOTSTRING_V1_CATS := ["Rolls"]
-		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
-		ConfigurationFile := ConfigPath
-		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigPath), "whole-tree selection starts from its real current source")
-		Features := ManifestBuildFeaturesMap()
-		CategoryEnabled := CategoryEnabled.Clone()
-		for Gate, Value in Gates
-			CategoryEnabled[Gate] := Value
-		_HBC_SetSections("hotstrings.rolls", Gates["Hotstrings"])
-		MasterGateState()["initialized"] := false
-		MasterGateInitialize(Features, Map(), IsCategoryGated)
-		Body(ConfigPath)
-	} finally {
-		_FLAT_HOTSTRING_V1_CATS := unset
-		_LegacyTopCategoryMap := unset
-		ConfigurationFile := SavedPath
-		Features := SavedFeatures
-		CategoryEnabled := SavedCategories
-		MasterGateState().Clear()
-		for Key, Value in SavedOwner
-			MasterGateState()[Key] := Value
-		while (_Stub_SentText.Length > ReloadsBefore)
-			_Stub_SentText.Pop()
-		if _ParseTomlCache.Has(ConfigPath)
-			_ParseTomlCache.Delete(ConfigPath)
-		if IsObject(Fixture)
-			_ScopeOwnerCleanup(Fixture)
+; hotstrings-menu-no-whole-tree-2026-10-17: the Hotstrings menu drew one
+; checkbox that switched every section of every category on, the hotstring
+; packs of every language and the programmable hotstrings included. Only the
+; submenus keep bulk rows, each for its own content.
+_HBC_NoWholeTreeRow() {
+	Declared := _MR_GetMenuDef("hotstrings_menu")
+	Assert(Declared is Array && Declared.Length > 0, "the Hotstrings menu is declared")
+	for Row in Declared {
+		if !(Row is Map)
+			continue
+		Assert(Row.Get("id", "") != "hotstrings_all_sections",
+			"the Hotstrings menu must not declare a whole-tree « all sections » row")
+		Assert(Row.Get("i18n", "") != "menu.hotstrings.enable_all_sections",
+			"no top-level Hotstrings row may switch every section at once")
 	}
-}
-
-; What the reload that follows every write does before the tray is drawn again:
-; a closed gate zeroes its sections in Features.
-_HBC_ApplyGatesAsAtBoot() {
-	global Features
-	ApplyMasterGatesToFeatures(Features, Map(), IsCategoryGated, 0)
-}
-
-; Unticking switches every section off and leaves the gates as they are: the
-; Hotstrings switch and each category gate are checkboxes of their own.
-_HBC_WholeTreeUntickKeepsGates() {
-	_HBC_WithScratchConfig(Map("Hotstrings", true, "Rolls", true), _HBC_AssertUntickKeepsGates)
-}
-
-_HBC_AssertUntickKeepsGates(ConfigPath) {
-	global CategoryEnabled
-	AssertTrue(ToggleAllHotstrings(false), "the whole-tree write must commit")
-	AssertTrue(CategoryEnabled["Hotstrings"],
-		"unticking every section must leave the Hotstrings switch on, as macOS and Linux do")
-	AssertTrue(CategoryEnabled["Rolls"], "and every category gate as it was")
-	AssertEqual(-1, TOML_Read(ConfigPath, "category_enabled", "hotstrings", -1),
-		"no gate is written when the sections are switched off")
-	_HBC_ApplyGatesAsAtBoot()
-	AssertFalse(_HS_AllHotstringsOn(), "every section is off, so the checkbox is unticked")
-}
-
-; Ticking with a category gate closed opens it: that gate zeroes its sections at
-; every boot, so leaving it shut left the checkbox unticked however often it was
-; clicked.
-_HBC_WholeTreeTickOpensEveryGate() {
-	_HBC_WithScratchConfig(Map("Hotstrings", false, "Rolls", false), _HBC_AssertTickOpensGates)
-}
-
-_HBC_AssertTickOpensGates(ConfigPath) {
-	global CategoryEnabled
-	AssertFalse(_HS_AllHotstringsOn(), "unselected sections leave the checkbox unticked")
-	AssertTrue(ToggleAllHotstrings(true), "the whole-tree write must commit")
-	AssertFalse(CategoryEnabled["Hotstrings"], "selecting every section leaves the master disabled")
-	AssertFalse(CategoryEnabled["Rolls"], "section selection preserves the category gate")
-	AssertEqual(-1, TOML_Read(ConfigPath, "category_enabled", "rolls", -1),
-		"section selection cannot create a master override")
-	_HBC_ApplyGatesAsAtBoot()
-	AssertTrue(_HS_AllHotstringsOn(), "one click ticks the checkbox, once the reload has applied the gates")
+	; The submenus keep theirs: categories two explicit commands, languages one checkbox.
+	Category := _MR_GetMenuDef("hotstring_category_menu")
+	Ids := Map()
+	for Row in Category
+		if Row is Map
+			Ids[Row.Get("id", "")] := true
+	Assert(Ids.Has("hotstring_category_enable_all") && Ids.Has("hotstring_category_disable_all"),
+		"every category submenu keeps its check-all and uncheck-all commands")
+	; A bundled category's commands select that category only.
+	Apply := _DriverFuncBody("_HS_CategorySelectionApply")
+	Assert(Apply != "" && InStr(Apply, "ToggleCategoryAllSections(Targets[1], Enabled)") > 0,
+		"the category commands reach the category's own selection owner")
 }
 
 Test("hotstring bulk: the « all sections » row is one checkbox (hotstring-bulk-checkboxes)",
@@ -313,44 +249,5 @@ Test("hotstring bulk: a category opens with two explicit scoped commands (hotstr
 	_HBC_CategoryHeadRows)
 Test("hotstring bulk: a language opens with one « all » checkbox (hotstring-bulk-checkboxes)",
 	_HBC_LanguageSwitchRowIsACheckbox)
-Test("hotstring bulk: unticking the whole tree keeps every gate (hotstring-bulk-checkboxes)",
-	_HBC_WholeTreeUntickKeepsGates)
-Test("hotstring bulk: ticking the whole tree preserves disabled gates (hotstring-bulk-checkboxes)",
-	_HBC_WholeTreeTickOpensEveryGate)
-
-_HBC_ReadOnlyEnumerationDoesNotSeed() {
-	global ScriptInformation, _ReadPersonalTomlCache
-	global _FLAT_HOTSTRING_V1_CATS, _LegacyTopCategoryMap
-	Saved := ScriptInformation
-	SavedCache := _ReadPersonalTomlCache
-	SavedFlat := IsSet(_FLAT_HOTSTRING_V1_CATS) ? _FLAT_HOTSTRING_V1_CATS : false
-	SavedLegacy := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : false
-	Path := A_Temp . "\ergopti-enumeration-" . A_ScriptHwnd . "-" . A_TickCount . ".toml"
-	try {
-		FileAppend('[[First]]`n"first" = "one"`n[[Second]]`n"second" = "two"`n', Path, "UTF-8-RAW")
-		ScriptInformation := Map("PersonalTomlPath", Path)
-		_ReadPersonalTomlCache := false
-		; Scope the fixture to dynamic and personal paths; flat-category ownership
-		; belongs to the entry and is deliberately absent in the unit harness.
-		_FLAT_HOTSTRING_V1_CATS := []
-		_LegacyTopCategoryMap := Map()
-		Target := Map("hotstrings", Map())
-		ReadOnly := _CollectAllHotstringsV2Paths(Target, false)
-		AssertFalse(Target["hotstrings"].Has("personal"), "a checkbox read cannot seed live configuration")
-		Detached := _HSDeepCloneMap(Target)
-		Writable := _CollectAllHotstringsV2Paths(Detached)
-		AssertTrue(Detached["hotstrings"].Has("personal"), "writers still seed their detached candidate")
-		AssertEqual(Writable.Length, ReadOnly.Length)
-		loop Writable.Length
-			AssertEqual(Writable[A_Index], ReadOnly[A_Index], "read-only enumeration preserves canonical order")
-		AssertEqual("hotstrings.personal.first", ReadOnly[ReadOnly.Length - 1])
-		AssertEqual("hotstrings.personal.second", ReadOnly[ReadOnly.Length])
-	} finally {
-		ScriptInformation := Saved
-		_ReadPersonalTomlCache := SavedCache
-		_FLAT_HOTSTRING_V1_CATS := SavedFlat is Array ? SavedFlat : unset
-		_LegacyTopCategoryMap := SavedLegacy is Map ? SavedLegacy : unset
-		FileDelete(Path)
-	}
-}
-Test("hotstring bulk: read-only whole-tree enumeration preserves order without seeding live state", _HBC_ReadOnlyEnumerationDoesNotSeed)
+Test("hotstring bulk: the Hotstrings menu has no whole-tree « all sections » row (hotstring-bulk-checkboxes)",
+	_HBC_NoWholeTreeRow)

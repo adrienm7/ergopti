@@ -298,96 +298,138 @@ for _HSCS_Enabled in [true, false]
 Test("hotstring-extension-scope: retained command cannot activate an uninstalled pack",
 	_HSCS_ExtensionPackOwnedOwner.Bind(true, true))
 
-; The existing journal owns runtime admission and conditional rollback. Only
-; replacement launch is injected; the typed source, backup and journal are real.
-_HSCS_WithSource(Body) {
-	global _LegacyTopCategoryMap
-	Saved := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : unset
-	Fixture := _ScopeOwnerFixture()
-	Fixture.source := '[category_enabled]`nhotstrings = false`nrolls = false`nautocorrection = true`n[hotstrings.rolls.hc]`nenabled = false`ntime_activation_seconds = 0.75`n[hotstrings.rolls.sx]`nenabled = true`n[hotstrings.magic_key.replace]`nenabled = true`n[private]`ncredential = "retain-fixture-value"`n'
+; hotstrings-submenu-live-2026-10-17: every « check all » / « uncheck all »
+; wrote config.toml through the reload journal and restarted the whole driver,
+; which takes minutes on a real setup; each click queued behind it was refused
+; (« another configuration transaction is already in progress »). A selection the
+; in-process rebuild covers now applies live, like one section's checkbox, on a
+; real boot-admitted config.toml. Only the live and reload effects are ports.
+_HSCS_WithLiveConfig(Source, Gates, Body) {
+	global ConfigurationFile, Features, CategoryEnabled, _LegacyTopCategoryMap, _ParseTomlCache
+	Fixture := _ScopeOwnerFixture(Source)
+	SavedPath := ConfigurationFile, SavedFeatures := Features, SavedCategories := CategoryEnabled
+	SavedLegacy := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : unset
+	State := MasterGateState(), SavedState := State.Clone()
+	Calls := { live: 0, reload: 0 }
+	Live(*) {
+		Calls.live += 1
+		return true
+	}
+	Reload(*) {
+		Calls.reload += 1
+		return true
+	}
 	try {
-		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
-		Assert(FSWriteDurable(Fixture.path, Fixture.source))
-		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls")
-		Body.Call(Fixture)
+		ConfigurationFile := Fixture.path
+		_LegacyTopCategoryMap := Map("Rolls", "hotstrings.rolls", "MagicKey", "hotstrings.magic_key")
+		Features := ManifestBuildFeaturesMap()
+		ApplyConfigToml(Features, Fixture.path)
+		CategoryEnabled := Gates
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), IsCategoryGated)
+		Body.Call(Fixture, Map("live", Live, "reload", Reload), Calls)
 	} finally {
-		_LegacyTopCategoryMap := IsSet(Saved) ? Saved : unset
+		ConfigurationFile := SavedPath, Features := SavedFeatures, CategoryEnabled := SavedCategories
+		_LegacyTopCategoryMap := IsSet(SavedLegacy) ? SavedLegacy : unset
+		State.Clear()
+		for Key, Value in SavedState
+			State[Key] := Value
+		if _ParseTomlCache.Has(Fixture.path)
+			_ParseTomlCache.Delete(Fixture.path)
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
 
-_HSCS_PendingAndNativeRefusal(Enabled) {
-	_HSCS_WithSource(Check)
-	Check(Fixture) {
-		Refusal := 0, Bundle := 0
-		Launch(_Success, Borrowed, Refused) {
-			Bundle := Borrowed
-			Refusal := Refused
-			return true
-		}
-		Fixture.options["reload"] := Launch
+; A sparse writer omits a value equal to its manifest default; read it back
+; the way the real loader resolves it.
+_HSCS_Stored(Parsed, Section, Key := "enabled") {
+	if Parsed.Has(Section) && Parsed[Section].Has(Key)
+		return Parsed[Section][Key]
+	return ManifestDefaultFor(Section . "." . Key)
+}
+
+; Clicks the native « check all » (0) or « uncheck all » (1) command of Built.
+_HSCS_ClickBulk(Built, Enabled) {
+	global _MenuDispatchCallbacks
+	Position := Enabled ? 0 : 1
+	AssertEqual(t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all"),
+		_CTC_LabelAt(Built, Position))
+	Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
+	Assert(_MenuDispatchCallbacks.Has(Id), "the native command must be registered")
+	return _MenuDispatchCallbacks[Id].Call()
+}
+
+; Rolls: the gate follows the posture and the whole selection applies in-process.
+_HSCS_CategoryMenuLive(Enabled) {
+	Source := '[category_enabled]`nhotstrings = true`nrolls = ' . (Enabled ? "false" : "true")
+		. '`nautocorrection = true`n[hotstrings.rolls.hc]`nenabled = ' . (Enabled ? "false" : "true")
+		. '`ntime_activation_seconds = 0.75`n[hotstrings.magic_key.replace]`nenabled = true`n'
+		. '[private]`ncredential = "retain-fixture-value"`n'
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", true, "Rolls", !Enabled, "MagicKey", true), Check)
+	Check(Fixture, Options, Calls) {
+		global CategoryEnabled, Features
+		Built := _HS_CategoryMenu("Rolls", "", [], (Targets, Requested) => ToggleCategoryAllSections(Targets[1], Requested, Options))
 		try {
-			Receipt := HotstringsCategoryScopeApply(["Rolls"], Enabled, Fixture.options)
-			AssertEqual("pending", Receipt["status"], "accepted launch is never completed publication")
-			AssertEqual(Enabled ? "enable_all" : "disable_all", Receipt["mode"])
-			AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
-			AssertEqual(Enabled, TOML_Read(Fixture.path, "category_enabled", "rolls",
-				ManifestDefaultFor("category_enabled.rolls")))
-			Target := ManifestBuildFeaturesMap()
-			ApplyConfigToml(Target, Fixture.path)
-			for Entry in ManifestFeaturesForSection("hotstrings.rolls") {
-				Loc := FeatureLocateV2(Target, Entry["path"])
-				AssertEqual(Enabled, Loc["v2_node"][Loc["key"]], "each selected section reaches the real reader")
-			}
-			Parsed := TOML_ParseFreshFile(Fixture.path)
-			AssertEqual(false, Parsed["category_enabled"]["hotstrings"], "the engine master stays disabled")
-			AssertEqual(true, Parsed["category_enabled"]["autocorrection"], "another category keeps its choice")
-			AssertEqual(0.75, Parsed["hotstrings.rolls.hc"]["time_activation_seconds"])
-			AssertEqual(true, Parsed["hotstrings.magic_key.replace"]["enabled"], "an unrelated replacement choice is retained")
-			AssertEqual("retain-fixture-value", Parsed["private"]["credential"])
-			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-category")))
-			Refusal.Call("native category reload refused")
-			AssertEqual("refused", Receipt["status"])
-			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path), "late refusal restores exact original bytes")
-			Assert(!(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object))
-		} finally {
-			if Bundle is Object
-				_ConfigWriteTerminalRelease(Bundle)
+			AssertEqual(2, TrayMenuItemCount(Built), "empty providers leave exactly the two declared commands")
+			AssertTrue(_HSCS_ClickBulk(Built, Enabled), "the selection commits")
+		} finally _CTC_ReleaseMenu(Built)
+		AssertEqual(1, Calls.live, "a Rolls selection applies in-process")
+		AssertEqual(0, Calls.reload, "and never restarts the driver")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		AssertEqual(Enabled, _HSCS_Stored(Parsed, "category_enabled", "rolls"), "the category gate follows the posture")
+		AssertTrue(Parsed["category_enabled"]["hotstrings"], "the Hotstrings master is never written")
+		AssertTrue(Parsed["category_enabled"]["autocorrection"], "another category keeps its gate")
+		for Entry in ManifestFeaturesForSection("hotstrings.rolls")
+			AssertEqual(Enabled, _HSCS_Stored(Parsed, Entry["path"]), "every own section is selected: " . Entry["path"])
+		AssertEqual(0.75, Parsed["hotstrings.rolls.hc"]["time_activation_seconds"])
+		AssertTrue(Parsed["hotstrings.magic_key.replace"]["enabled"], "an unrelated choice is retained")
+		AssertEqual("retain-fixture-value", Parsed["private"]["credential"])
+		AssertEqual(Enabled, CategoryEnabled["Rolls"], "the live gate is published with the write")
+		Desired := MasterGateDesiredFeatures(Features)
+		for Entry in ManifestFeaturesForSection("hotstrings.rolls") {
+			Loc := FeatureLocateV2(Desired, Entry["path"])
+			AssertEqual(Enabled, Loc["v2_node"][Loc["key"]], "the live desired state follows: " . Entry["path"])
 		}
 	}
 }
 
-_HSCS_ImmediateRefusal(Enabled) {
-	_HSCS_WithSource(Check)
-	Check(Fixture) {
-		Fixture.options["reload"] := (*) => false
-		Receipt := HotstringsCategoryScopeApply(["Rolls"], Enabled, Fixture.options)
-		AssertEqual("refused", Receipt["status"])
-		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-		AssertEqual(Fixture.source, FSReadUtf8Exact(Receipt["backup"]))
+; A section an extension binds is drawn in that extension's submenu, so the
+; category's own « check all » never switches it (maintainer report 2026-10-17).
+; Magic key also holds a reload-only section, so this selection reloads.
+_HSCS_CategoryMenuKeepsBoundSections() {
+	global _HotstringBoundSources
+	Sections := ManifestFeaturesForSection("hotstrings.magic_key")
+	Assert(Sections.Length > 2, "magic key declares several sections")
+	BoundPath := ""
+	for Entry in Sections
+		if Entry["path"] != "hotstrings.magic_key.replace" {
+			BoundPath := Entry["path"]
+			break
+		}
+	Parts := StrSplit(BoundPath, ".")
+	Source := '[category_enabled]`nhotstrings = true`nmagic_key = true`n[' . BoundPath . ']`nenabled = false`n'
+	SavedBound := _HotstringBoundSources
+	_HotstringBoundSources := Map("magickey", Map("path", "fixture.toml",
+		"sections", Map(StrLower(Parts[3]), "fixture.toml")))
+	try _HSCS_WithLiveConfig(Source, Map("Hotstrings", true, "Rolls", true, "MagicKey", true), Check)
+	finally _HotstringBoundSources := SavedBound
+	Check(Fixture, Options, Calls) {
+		AssertTrue(ToggleCategoryAllSections("MagicKey", true, Options))
+		AssertEqual(0, Calls.live, "the J-to-star replacement is reload-only")
+		AssertEqual(1, Calls.reload)
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		AssertFalse(_HSCS_Stored(Parsed, BoundPath), "the extension's bound section is not this submenu's")
+		for Entry in Sections
+			if Entry["path"] != BoundPath
+				AssertTrue(_HSCS_Stored(Parsed, Entry["path"]), "every own section is selected: " . Entry["path"])
 	}
 }
 
-_HSCS_UnknownScope() {
-	_HSCS_WithSource(Check)
-	Check(Fixture) {
-		Launches := 0
-		Fixture.options["reload"] := (*) => Launches += 1
-		Receipt := HotstringsCategoryScopeApply(["Rolls", "missing"], true, Fixture.options)
-		AssertEqual("refused", Receipt["status"])
-		AssertEqual(0, Launches)
-		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-		AssertFalse(FSStrictExists(Receipt["backup"]), "an invalid scope creates no backup or partial write")
-	}
-}
-
-for _HSCS_Enabled in [true, false] {
-	Test("hotstring-category-owner: pending " . _HSCS_Enabled . " rolls back native refusal",
-		_HSCS_PendingAndNativeRefusal.Bind(_HSCS_Enabled))
-	Test("hotstring-category-owner: immediate " . _HSCS_Enabled . " refusal preserves exact source",
-		_HSCS_ImmediateRefusal.Bind(_HSCS_Enabled))
-}
-Test("hotstring-category-owner: an unknown sibling never launches or writes", _HSCS_UnknownScope)
+for _HSCS_Enabled in [true, false]
+	Test("hotstring-category-menu: native command " . _HSCS_Enabled . " applies live (hotstrings-submenu-live)",
+		_HSCS_CategoryMenuLive.Bind(_HSCS_Enabled))
+Test("hotstring-category-menu: check all leaves extension-bound sections alone (hotstrings-submenu-live)",
+	_HSCS_CategoryMenuKeepsBoundSections)
 
 _HSCS_InventoryOwnsOnlyHotstrings() {
 	Requested := []
@@ -408,134 +450,65 @@ _HSCS_InventoryOwnsOnlyHotstrings() {
 Test("hotstring-category-owner: other tray namespaces never enter the selected inventory",
 	_HSCS_InventoryOwnsOnlyHotstrings)
 
-; The real Win32 command dispatch reaches the durable scope owner, including
-; pending handoff and restoration after native refusal.
-_HSCS_MenuOwner(Enabled) {
-	global _MenuDispatchCallbacks
-	_HSCS_WithSource(Check)
-	Check(Fixture) {
-		Receipt := 0, Refusal := 0
-		Launch(_Success, _Borrowed, Refused) {
-			Refusal := Refused
-			return true
-		}
-		Apply(Targets, Requested) {
-			Receipt := HotstringsCategoryScopeApply(Targets, Requested, Fixture.options)
-		}
-		Fixture.options["reload"] := Launch
-		Built := _HS_CategoryMenu("Rolls", "", [], Apply)
-		try {
-			AssertEqual(2, TrayMenuItemCount(Built), "empty providers leave exactly the two declared commands")
-			Position := Enabled ? 0 : 1
-			AssertEqual(t(Enabled ? "menu.hotstrings.scope_enable_all" : "menu.hotstrings.scope_disable_all"),
-				_CTC_LabelAt(Built, Position))
-			Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
-			Assert(_MenuDispatchCallbacks.Has(Id))
-			_MenuDispatchCallbacks[Id].Call()
-			AssertEqual("pending", Receipt["status"])
-			AssertEqual(Enabled, TOML_Read(Fixture.path, "category_enabled", "rolls", false))
-			AssertEqual(false, TOML_Read(Fixture.path, "category_enabled", "hotstrings", true))
-			Refusal.Call("native category menu reload refused")
-			AssertEqual("refused", Receipt["status"])
-			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-		} finally _CTC_ReleaseMenu(Built)
-	}
-}
-for _HSCS_Enabled in [true, false]
-	Test("hotstring-category-menu-owner: native command " . _HSCS_Enabled . " commits through the journal",
-		_HSCS_MenuOwner.Bind(_HSCS_Enabled))
-
 ; Personal inventory is file-owned, not part of the manifest catalogue. A cached
 ; menu preview must not omit a section added before the configuration lease.
-_HSCS_PersonalMenuOwner(Enabled, LateRefusal) {
-	global ScriptInformation, Features, CategoryEnabled, _ReadPersonalTomlCache
-	global _PersonalExtTree, _FmtCountCache, _MenuDispatchCallbacks, _PrevDefaultLabel
-	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Launches := 0
-	PersonalPath := Fixture.path . ".personal.toml"
-	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.personal.first]`nenabled = false`ntime_activation_seconds = 0.75`n[hotstrings.personal.future]`nenabled = false`n[private]`ncredential = "retain-personal-fixture"`n'
-	SavedInfo := ScriptInformation, SavedFeatures := Features, SavedCategories := CategoryEnabled
-	SavedCache := _ReadPersonalTomlCache
-	SavedTree := IsSet(_PersonalExtTree) ? _PersonalExtTree : unset
-	SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
-	SavedDefaultLabel := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
-	State := MasterGateState(), SavedState := State.Clone()
-	Launch(_Success, Borrowed, Refused) {
-		Launches += 1
-		Bundle := Borrowed, Refusal := Refused
-		return LateRefusal
-	}
-	Fixture.options["reload"] := Launch
-	try {
-		Source := _CMJFixtureCurrentSource(Source)
-		Assert(FSWriteDurable(Fixture.path, Source))
-		ScriptInformation := ScriptInformation.Clone()
-		ScriptInformation["PersonalTomlPath"] := PersonalPath
-		_PersonalExtTree := Map(), _FmtCountCache := Map()
-		Features := ManifestBuildFeaturesMap()
-		_ConfigSeedPersonalHotstring(Features, "first")
-		CategoryEnabled := Map("Hotstrings", false, "Rolls", true)
-		State["initialized"] := false
-		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
-		Assert(FSWriteDurable(PersonalPath, '[[first]]`n'))
-		_ReadPersonalTomlCache := false
-		AssertEqual(1, ReadPersonalToml()["sections_order"].Length)
-		PersonalSource := '[[first]]`n[[second]]`n'
-		Assert(FSWriteDurable(PersonalPath, PersonalSource))
-		Rows := _HS_PersonalRows(Fixture.options)
-		AssertEqual(1, Rows.Length, "the personal file must be a real rendered submenu")
-		Built := Rows[1]["submenu"]
-		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
-		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
-		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")))
-		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")))
-		AssertFalse(_CTC_IsChecked(Built, Enabled ? 0 : 1))
-		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Enabled ? 0 : 1, "uint")
-		Assert(_MenuDispatchCallbacks.Has(Id))
-		Receipt := _MenuDispatchCallbacks[Id].Call()
-		AssertEqual(1, Launches, "one native click admits one reload transaction")
-		if LateRefusal {
-			AssertEqual("pending", Receipt["status"])
-			for Name in ["first", "second"]
-				AssertEqual(Enabled, TOML_Read(Fixture.path, "hotstrings.personal." . Name, "enabled",
-					ManifestDefaultFor("hotstrings.personal." . Name . ".enabled")),
-					"fresh discovery selects every actual section, including uncached additions")
+_HSCS_PersonalMenuLive(Enabled) {
+	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.personal.first]`nenabled = '
+		. (Enabled ? "false" : "true") . '`ntime_activation_seconds = 0.75`n[hotstrings.personal.future]`nenabled = false`n'
+		. '[private]`ncredential = "retain-personal-fixture"`n'
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", false, "Rolls", true), Check)
+	Check(Fixture, Options, Calls) {
+		global ScriptInformation, Features, CategoryEnabled, _ReadPersonalTomlCache
+		global _PersonalExtTree, _FmtCountCache, _PrevDefaultLabel
+		PersonalPath := Fixture.directory . "\personal.toml", Built := 0
+		SavedInfo := ScriptInformation, SavedCache := _ReadPersonalTomlCache
+		SavedTree := IsSet(_PersonalExtTree) ? _PersonalExtTree : unset
+		SavedCounts := IsSet(_FmtCountCache) ? _FmtCountCache : unset
+		SavedDefaultLabel := IsSet(_PrevDefaultLabel) ? _PrevDefaultLabel : unset
+		try {
+			ScriptInformation := ScriptInformation.Clone()
+			ScriptInformation["PersonalTomlPath"] := PersonalPath
+			_PersonalExtTree := Map(), _FmtCountCache := Map()
+			_ConfigSeedPersonalHotstring(Features, "first")
+			Assert(FSWriteDurable(PersonalPath, '[[first]]`n'))
+			_ReadPersonalTomlCache := false
+			AssertEqual(1, ReadPersonalToml()["sections_order"].Length)
+			PersonalSource := '[[first]]`n[[second]]`n'
+			Assert(FSWriteDurable(PersonalPath, PersonalSource))
+			Rows := _HS_PersonalRows(Options)
+			AssertEqual(1, Rows.Length, "the personal file must be a real rendered submenu")
+			Built := Rows[1]["submenu"]
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")))
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")))
+			AssertTrue(_HSCS_ClickBulk(Built, Enabled), "one native click commits one selection")
+			AssertEqual(1, Calls.live, "personal sections apply in-process")
+			AssertEqual(0, Calls.reload)
 			Parsed := TOML_ParseFreshFile(Fixture.path)
+			for Name in ["first", "second"]
+				AssertEqual(Enabled, _HSCS_Stored(Parsed, "hotstrings.personal." . Name),
+					"fresh discovery selects every actual section, including uncached additions")
 			AssertFalse(Parsed["category_enabled"]["hotstrings"])
 			AssertTrue(Parsed["category_enabled"]["rolls"])
 			AssertFalse(Parsed["hotstrings.personal.future"]["enabled"], "unlisted personal sections retain their settings")
 			AssertEqual(0.75, Parsed["hotstrings.personal.first"]["time_activation_seconds"])
 			AssertEqual("retain-personal-fixture", Parsed["private"]["credential"])
-			AssertFalse(Features["hotstrings"]["personal"].Has("second"), "pending selection cannot seed public runtime")
-			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-personal-scope")))
-			Refusal.Call("native personal menu reload refused")
+			AssertFalse(CategoryEnabled["Hotstrings"], "the engine master stays off")
+			AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath), "scope selection cannot rewrite the user's rules")
+		} finally {
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+			ScriptInformation := SavedInfo, _ReadPersonalTomlCache := SavedCache
+			_PersonalExtTree := IsSet(SavedTree) ? SavedTree : unset
+			_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
+			_PrevDefaultLabel := IsSet(SavedDefaultLabel) ? SavedDefaultLabel : unset
+			try FileDelete(PersonalPath)
 		}
-		AssertEqual("refused", Receipt["status"])
-		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "both refusal timings restore exact original bytes")
-		AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
-		AssertEqual(PersonalSource, FSReadUtf8Exact(PersonalPath), "scope selection cannot rewrite the user's rules")
-	} finally {
-		if Built is Menu
-			_CTC_ReleaseMenu(Built)
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		ScriptInformation := SavedInfo, Features := SavedFeatures, CategoryEnabled := SavedCategories
-		_ReadPersonalTomlCache := SavedCache
-		_PersonalExtTree := IsSet(SavedTree) ? SavedTree : unset
-		_FmtCountCache := IsSet(SavedCounts) ? SavedCounts : unset
-		_PrevDefaultLabel := IsSet(SavedDefaultLabel) ? SavedDefaultLabel : unset
-		State.Clear()
-		for Key, Value in SavedState
-			State[Key] := Value
-		try FileDelete(PersonalPath)
-		_ScopeOwnerCleanup(Fixture)
 	}
 }
 
-for _HSCS_Enabled in [true, false] {
-	for _HSCS_Late in [true, false]
-		Test("hotstring-personal-menu-owner: command " . _HSCS_Enabled . " preserves state after refusal " . _HSCS_Late,
-			_HSCS_PersonalMenuOwner.Bind(_HSCS_Enabled, _HSCS_Late))
-}
+for _HSCS_Enabled in [true, false]
+	Test("hotstring-personal-menu-owner: command " . _HSCS_Enabled . " applies live (hotstrings-submenu-live)",
+		_HSCS_PersonalMenuLive.Bind(_HSCS_Enabled))
 
 _HSCS_ExistingMenuTarget() {
 	Target := Menu(), Asked := []
@@ -633,150 +606,86 @@ _HSCS_WithDynamicBootState(Body) {
 }
 
 ; Dynamic scopes have eight canonical features and no separate category gate.
-; The native submenu reaches the same journal while the master or pause is off.
-_HSCS_DynamicMenuOwner(Enabled, Outcome, Paused := false) {
-	global Features, CategoryEnabled, _LegacyTopCategoryMap, _MenuDispatchCallbacks, _TomlFileCache
-	Fixture := _ScopeOwnerFixture(), Built := 0, Bundle := 0, Refusal := 0, Accepted := 0, Launches := 0
+; The native submenu applies in-process while the master or pause is off. The
+; programmable hotstrings keep their own row: a bulk click once switched them on
+; (2026-10-17, « [hotstrings.dynamic.user_code] enabled = true »).
+_HSCS_DynamicMenuLive(Enabled, Paused := false) {
 	Names := ["date", "date_fr", "date_long_fr", "phone_prefixes", "ssn_prefixes",
 		"iban_prefixes", "user_code", "text_expansion_personal_information"]
 	Source := '[category_enabled]`nhotstrings = false`nrolls = true`n[hotstrings.dynamic]`nenabled = false`n'
 	for Index, Name in Names {
-		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Mod(Index, 2) ? "true" : "false") . '`n'
+		Value := Name == "user_code" ? !Enabled : Mod(Index, 2)
+		Source .= '[hotstrings.dynamic.' . Name . ']`nenabled = ' . (Value ? "true" : "false") . '`n'
 		if Name == "date"
 			Source .= 'time_activation_seconds = 0.75`n'
 	}
 	Source .= '[hotstrings.dynamic.future_family]`nenabled = true`n[private]`ncredential = "retain-dynamic-fixture"`n'
-	SavedFeatures := Features, SavedCategories := CategoryEnabled
-	SavedLegacy := IsSet(_LegacyTopCategoryMap) ? _LegacyTopCategoryMap : unset
-	SavedSuspend := A_IsSuspended
-	State := MasterGateState(), SavedState := State.Clone()
-	Launch(Success, Borrowed, Refused) {
-		Launches += 1
-		Bundle := Borrowed, Refusal := Refused, Accepted := Success
-		return Outcome != "immediate_refusal"
-	}
-	Fixture.options["reload"] := Launch
-	try {
-		Source := _CMJFixtureCurrentSource(Source)
-		Assert(FSWriteDurable(Fixture.path, Source))
-		Fixture.source := Source
-		Features := ManifestBuildFeaturesMap()
-		ApplyConfigToml(Features, Fixture.path)
-		CategoryEnabled := Map("Hotstrings", false, "Rolls", true)
-		State["initialized"] := false
-		MasterGateInitialize(Features, Map("keys", Map()), (*) => false)
-		Suspend(Paused)
-		RuntimeBefore := KL_JsonEncode(Features)
-		; Semantic feature loading does not populate the separate live-text cache.
-		AssertEqual(Source, ReadTomlFile(Fixture.path), "fixture primes the live text cache before publication")
-		Cached := ParseTomlFile(Fixture.path)
-		Built := _BuildDynamicHotstringsSubmenu(Fixture.options)
-		AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven displayed families and their editor")
-		AssertEqual(t("menu.hotstrings.scope_enable_all"), _CTC_LabelAt(Built, 0))
-		AssertEqual(t("menu.hotstrings.scope_disable_all"), _CTC_LabelAt(Built, 1))
-		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
-		AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")), "there is no invented dynamic category switch")
-		AssertEqual(1, _CTC_CountLabel(Built, t("menu.shortcuts.edit_personal_info")), "the existing editor stays reachable")
-		AssertFalse(_CTC_IsChecked(Built, 0))
-		AssertFalse(_CTC_IsChecked(Built, 1))
-		AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "building the menu cannot persist a preference")
-		; A preview's legacy map cannot retarget the scope into another namespace.
-		_LegacyTopCategoryMap := Map("DynamicHotstrings", "shortcuts")
-		Position := Enabled ? 0 : 1
-		Id := DllCall("GetMenuItemID", "ptr", Built.Handle, "int", Position, "uint")
-		Assert(_MenuDispatchCallbacks.Has(Id), "both commands retain their native callbacks behind a closed master")
-		Receipt := _MenuDispatchCallbacks[Id].Call()
-		AssertEqual(1, Launches, "one native click admits one whole-family transaction")
-		AssertEqual(Enabled ? "enable_all" : "disable_all", Receipt["mode"])
-		AssertEqual(RuntimeBefore, KL_JsonEncode(Features), "pending or refused replacement cannot publish runtime choices")
-		AssertEqual(Paused, A_IsSuspended, "the scope never resumes a paused driver")
+	_HSCS_WithLiveConfig(Source, Map("Hotstrings", false, "Rolls", true), Check)
+	Check(Fixture, Options, Calls) {
+		global CategoryEnabled
+		SavedSuspend := A_IsSuspended, Built := 0
+		try {
+			Suspend(Paused)
+			Built := _BuildDynamicHotstringsSubmenu(Options)
+			AssertEqual(12, TrayMenuItemCount(Built), "two shared commands, two separators, seven displayed families and their editor")
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.enable_all_sections")), "the old checkbox is retired")
+			AssertEqual(0, _CTC_CountLabel(Built, t("menu.hotstrings.category_enable")), "there is no invented dynamic category switch")
+			AssertEqual(1, _CTC_CountLabel(Built, t("menu.shortcuts.edit_personal_info")), "the existing editor stays reachable")
+			AssertTrue(_HSCS_ClickBulk(Built, Enabled), "one native click commits one whole-family selection")
+			AssertEqual(Paused, A_IsSuspended, "the selection never resumes a paused driver")
+		} finally {
+			if Built is Menu
+				_CTC_ReleaseMenu(Built)
+			Suspend(SavedSuspend)
+		}
+		AssertEqual(1, Calls.live, "the dynamic families apply in-process")
+		AssertEqual(0, Calls.reload)
 		AssertFalse(CategoryEnabled["Hotstrings"], "the native engine master stays off")
 		AssertTrue(CategoryEnabled["Rolls"], "another category keeps its native gate")
-		if Outcome != "immediate_refusal" {
-			AssertEqual("pending", Receipt["status"], "accepted launch is not replacement acknowledgement")
-			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]), "the exact source is backed up before publication")
-			; Replacement boot reads pending bytes in a fresh interpreter. Mirror
-			; that read boundary with an exact owned copy, retaining this process
-			; cache until its transaction receives acknowledgement or refusal.
-			CandidatePath := Fixture.directory . "\replacement-reader.toml"
-			CandidateBytes := FSReadUtf8Exact(Fixture.path)
-			Assert(FSWriteDurable(CandidatePath, CandidateBytes))
-			AssertEqual(CandidateBytes, FSReadUtf8Exact(CandidatePath))
-			Target := ManifestBuildFeaturesMap()
-			_CMJFixtureReadonly(CandidatePath)
-			try ApplyConfigToml(Target, CandidatePath)
-			finally {
-				if _TomlFileCache.Has(CandidatePath)
-					_TomlFileCache.Delete(CandidatePath)
-			}
-			AssertEqual(Source, ReadTomlFile(Fixture.path), "pending publication preserves the live text cache")
-			Actual := ManifestFeaturesForSection("hotstrings.dynamic")
-			AssertEqual(Names.Length, Actual.Length, "every current dynamic family belongs to the canonical inventory")
-			for Name in Names {
-				Loc := FeatureLocateV2(Target, "hotstrings.dynamic." . Name)
-				Assert(Loc is Map, "the independent family must resolve: " . Name)
-				AssertEqual(Enabled, Loc["v2_node"][Loc["key"]], "the real config reader sees the explicit posture of " . Name)
-			}
-			Parsed := TOML_ParseFreshFile(Fixture.path)
-			AssertFalse(Parsed["category_enabled"]["hotstrings"])
-			AssertTrue(Parsed["category_enabled"]["rolls"])
-			AssertFalse(Parsed["category_enabled"].Has("dynamichotstrings"), "no additional category gate is written")
-			AssertFalse(Parsed["hotstrings.dynamic"]["enabled"], "an unrelated scalar keeps its stored value")
-			AssertTrue(Parsed["hotstrings.dynamic.future_family"]["enabled"], "unrecognized future families stay untouched")
-			AssertEqual(0.75, Parsed["hotstrings.dynamic.date"]["time_activation_seconds"])
-			AssertEqual("retain-dynamic-fixture", Parsed["private"]["credential"])
-			AssertEqual(ObjPtr(Cached), ObjPtr(ParseTomlFile(Fixture.path)), "pending bytes cannot replace cached desired authority")
-			Assert(!(_ConfigWriteLeaseTryAcquire(Fixture.path, "concurrent-dynamic-scope")))
-			if Outcome == "committed" {
-				Accepted.Call()
-				AssertEqual("committed", Receipt["status"], "only native acknowledgement completes publication")
-			} else {
-				Refusal.Call("native dynamic menu reload refused")
-			}
+		AssertEqual(Names.Length, ManifestFeaturesForSection("hotstrings.dynamic").Length,
+			"every current dynamic family belongs to the canonical inventory")
+		Parsed := TOML_ParseFreshFile(Fixture.path)
+		for Name in Names {
+			if Name == "user_code"
+				AssertEqual(!Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic.user_code"),
+					"the programmable hotstrings are not part of the families' bulk selection")
+			else
+				AssertEqual(Enabled, _HSCS_Stored(Parsed, "hotstrings.dynamic." . Name), "the explicit posture of " . Name)
 		}
-		if Outcome != "committed" {
-			AssertEqual("refused", Receipt["status"])
-			AssertEqual(Source, FSReadUtf8Exact(Fixture.path), "immediate and late refusal restore exact source bytes")
-			AssertEqual(Source, FSReadUtf8Exact(Receipt["backup"]))
-			Assert(!(_ConfigWriteLeaseSelectOwner(Bundle, Fixture.path) is Object))
-		}
-	} finally {
-		if Built is Menu
-			_CTC_ReleaseMenu(Built)
-		if Bundle is Object
-			_ConfigWriteTerminalRelease(Bundle)
-		Features := SavedFeatures, CategoryEnabled := SavedCategories
-		_LegacyTopCategoryMap := IsSet(SavedLegacy) ? SavedLegacy : unset
-		Suspend(SavedSuspend)
-		State.Clear()
-		for Key, Value in SavedState
-			State[Key] := Value
-		_ScopeOwnerCleanup(Fixture)
+		AssertFalse(Parsed["category_enabled"]["hotstrings"])
+		AssertTrue(Parsed["category_enabled"]["rolls"])
+		AssertFalse(Parsed["category_enabled"].Has("dynamichotstrings"), "no additional category gate is written")
+		AssertFalse(Parsed["hotstrings.dynamic"]["enabled"], "an unrelated scalar keeps its stored value")
+		AssertTrue(Parsed["hotstrings.dynamic.future_family"]["enabled"], "unrecognized future families stay untouched")
+		AssertEqual(0.75, Parsed["hotstrings.dynamic.date"]["time_activation_seconds"])
+		AssertEqual("retain-dynamic-fixture", Parsed["private"]["credential"])
 	}
 }
 
 for _HSCS_Enabled in [true, false] {
-	for _HSCS_Outcome in ["immediate_refusal", "late_refusal", "committed"]
-		Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " keeps the master and handles " . _HSCS_Outcome,
-			_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, _HSCS_Outcome)))
-	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " preserves pause across a late refusal",
-		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuOwner.Bind(_HSCS_Enabled, "late_refusal", true)))
+	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " keeps the master and applies live (hotstrings-submenu-live)",
+		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuLive.Bind(_HSCS_Enabled)))
+	Test("hotstring-dynamic-menu-owner: command " . _HSCS_Enabled . " preserves pause (hotstrings-submenu-live)",
+		_HSCS_WithDynamicBootState.Bind(_HSCS_DynamicMenuLive.Bind(_HSCS_Enabled, true)))
 }
 
 _HSCS_DynamicInvalidPosture() {
+	Launches := 0
+	Count(*) {
+		Launches += 1
+		return true
+	}
 	for Value in ["true", 2] {
-		Fixture := _ScopeOwnerFixture(), Launches := 0
+		Fixture := _ScopeOwnerFixture()
 		try {
-			Fixture.options["reload"] := (*) => Launches += 1
-			Receipt := HotstringsDynamicScopeApply(Value, Fixture.options)
-			AssertEqual("refused", Receipt["status"], "an invalid request cannot publish a partial selection")
+			AssertThrows(() => ToggleDynamicAllSections(Value, Map("live", Count, "reload", Count)),
+				"an invalid request cannot publish a partial selection")
 			AssertEqual(0, Launches)
 			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-			AssertFalse(FSStrictExists(Receipt["backup"]), "an invalid request creates no backup or write")
 		} finally _ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("hotstring-dynamic-menu-owner: invalid postures are refused before backup or reload", _HSCS_DynamicInvalidPosture)
+Test("hotstring-dynamic-menu-owner: invalid postures are refused before any write", _HSCS_DynamicInvalidPosture)
 
 ; This layout-only regression runs unchanged against the old zero-argument
 ; builder: the original checkbox fails before any native action is invoked.
@@ -918,7 +827,7 @@ _HSCS_PersonalEditorReadSite() {
 	Body := _DriverFuncBody("_HS_PersonalRows")
 	Assert(Body != "", "the actual personal provider must exist")
 	AssertTrue(_HSCS_PersonalFrameDelegation(Body), "the actual captured editor row reaches the canonical whole-frame renderer")
-	AssertContains(Body, "HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)",
+	AssertContains(Body, "HS_TogglePersonalAllSections(Enabled, Options), PersonalMenu)",
 		"the unchanged scope builder owns the still-empty native repaint target")
 	Assert(!InStr(Body, 'Map("label", t("menu.hotstrings.open_editor")'), "the shared declaration owns the label")
 }

@@ -145,30 +145,6 @@ _HotstringsCategoryScopeInventory(Categories, ReadSections := ManifestFeaturesFo
 	return Inventory
 }
 
-/**
- * Publishes a category/section batch through the existing fenced reload owner.
- * @param {Array} Targets Native category ids from the discovered tray catalogue.
- * @param {Integer} Enabled Explicit Boolean target.
- * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
- * @param {Array} BoundSections Optional exact native leaves, alongside whole groups.
- * @returns {Map} Pending or terminal reload receipt; native refusal restores bytes.
- */
-HotstringsCategoryScopeApply(Targets, Enabled, Options := unset, BoundSections := unset) {
-	if !IsSet(Options)
-		Options := Map()
-	if !IsSet(BoundSections)
-		BoundSections := []
-	Operations() {
-		global _LegacyTopCategoryMap
-		Inventory := _HotstringsCategoryScopeInventory(_LegacyTopCategoryMap)
-		Choices := HotstringsCategoryScopePlan(Inventory, Targets, Enabled, &Reason, BoundSections)
-		if !(Choices is Array)
-			throw Error("Hotstring category selection refused: " . Reason)
-		return _HotstringsScopeChoiceOperations(Choices)
-	}
-	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
-}
-
 ; Native bound leaves and pack-owned features join one detached journal image.
 _HotstringsScopeChoiceOperations(Choices, ExtensionGroups := unset) {
 	global Features, _LegacyTopCategoryMap
@@ -248,25 +224,6 @@ HotstringsExtensionScopeApply(ExtensionId, Enabled, Options := unset) {
 		if !(Choices is Array)
 			throw Error("Extension selection refused: " . Reason)
 		return _HotstringsScopeChoiceOperations(Choices, ExtensionGroups)
-	}
-	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
-}
-
-/**
- * Publishes every discovered personal section through the fenced reload owner.
- * The existing typed planner discovers and seeds personal paths inside the
- * lease; runtime choices remain unpublished until replacement acknowledgement.
- * @param {Integer} Enabled Explicit Boolean target.
- * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
- * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
- */
-HotstringsPersonalScopeApply(Enabled, Options := unset) {
-	if !IsSet(Options)
-		Options := Map()
-	Operations() {
-		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
-			throw TypeError("A personal hotstring scope requires an explicit Boolean target.")
-		return _ConfigBuildHotstringIntentPlan("personal", "", Enabled).updates
 	}
 	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
 }

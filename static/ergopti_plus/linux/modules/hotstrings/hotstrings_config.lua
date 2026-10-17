@@ -1662,6 +1662,20 @@ local function known_sections(id)
 	return names
 end
 
+--- The sections one category's own submenu draws: an extension's bound section
+--- (Ergopti's repeat corrections) is drawn, and switched, in that extension's
+--- submenu, so a category's « check all » never reaches it (2026-10-17).
+--- @param id string
+--- @return table Array of section names.
+local function own_sections(id)
+	local names = {}
+	local sections = _categories[id] and _categories[id].sections or {}
+	for _, name in ipairs(known_sections(id)) do
+		if not (type(sections[name]) == "table" and sections[name].extension) then names[#names + 1] = name end
+	end
+	return names
+end
+
 --- Switches one category off, keeping its section choices.
 --- @param group_name string
 --- @return boolean committed
@@ -2050,7 +2064,7 @@ local function section_changes(categories, enabled)
 			return nil
 		end
 		if enabled then changes[#changes + 1] = { group = category, enabled = true } end
-		for _, name in ipairs(known_sections(category)) do
+		for _, name in ipairs(own_sections(category)) do
 			if addressable(name) or PersonalFiles.components(category) then
 				changes[#changes + 1] = { group = category, section = name, enabled = enabled }
 			end
@@ -2095,7 +2109,7 @@ end
 --- @return string|nil reason Stable planner or persistence refusal.
 function M.set_category_scope_enabled(targets, enabled)
 	local inventory = {}
-	for id in pairs(_categories) do inventory[id] = known_sections(id) end
+	for id in pairs(_categories) do inventory[id] = own_sections(id) end
 	local changes, reason = PersonalAdoption.plan_selection(inventory, targets, enabled)
 	if not changes then
 		Logger.error(LOG, "Category selection refused: %s.", reason)

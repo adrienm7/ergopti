@@ -76,7 +76,24 @@ matching semantics and protects emoticons such as `:D`.
 
 Section and category toggles rebuild the custom hotstring registry in-process.
 Native-engine and layout-backed features under `hotstrings.*` remain explicit
-reload-only exceptions.
+reload-only exceptions. A submenu's « check all » / « uncheck all » follows the
+same rule (Windows `_ConfigCommitHotstringIntent` + `_HS_SelectionAppliesLive`):
+until 2026-10-17 every bulk click reloaded the Windows driver through the scope
+journal, which takes minutes on a real setup, and every click queued behind it
+was refused. A bulk selection switches only the sections its own submenu draws:
+never an extension's bound section (Ergopti's magic-key `replace` and repeat
+corrections), never the programmable `hotstrings.dynamic.user_code`, and the
+Hotstrings menu has no whole-tree « all sections » row (it enabled every
+language pack at once).
+
+### project-personal-folder-skips-writer-backups
+
+Every `.toml` under the personal hotstrings folder is a source, but the scoped
+writers back up each owned file beside itself as `<stem>.backup-<stamp>.toml`.
+Discovery skips that reserved name on all three drivers through the generated
+`PersonalFileIsBackup` / `personal_files.is_backup` (single source:
+`personal_files.json` `backup_infix`); a scan that misses it loads each copy as
+a duplicate source and the next reset backs up the backups.
 
 ### project-hotstrings-master-tick-reads-the-engine-gate
 
@@ -89,7 +106,7 @@ personal and dynamic hotstrings too, and AI predictions ride the same taps;
 Linux stores no flag, so its tick is `hotstrings_config.any_enabled()` or the
 dynamic master, and off closes every gate plus the dynamic master (on is
 `enable_all`). On Windows and macOS the categories keep their choices under
-the master, and « all sections » is the row that switches them.
+the master, and each submenu's « check all » is the row that switches them.
 
 ### project-hotstring-language-packs-and-opt-in
 

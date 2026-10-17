@@ -4,8 +4,8 @@
 --- MODULE: Regression — explicit category commands and scope checkboxes
 --- DESCRIPTION:
 --- Standard categories dispatch the requested full-enable/full-disable posture
---- through one owner, including dynamic families. Language and whole-tree controls retain their
---- separate checkbox behavior until their scoped migration.
+--- through one owner, including dynamic families. Language controls retain their separate
+--- checkbox behavior; the Hotstrings menu has no whole-tree « all sections » row.
 --- The whole tray is built from the real builder over a recording config, so the
 --- tick and the write each click sends are what is asserted.
 --- ==============================================================================
@@ -204,17 +204,14 @@ helpers.describe("hotstring bulk controls are one checkbox each (linux)", functi
 			end
 		end
 
-		helpers.it("bulk checkbox:the Hotstrings menu has one checkbox for every section, ticked " .. tostring(posture), function()
+		-- hotstrings-menu-no-whole-tree-2026-10-17: the top-level checkbox switched
+		-- on the packs of every language at once.
+		helpers.it("bulk checkbox:the Hotstrings menu has no whole-tree checkbox, from " .. tostring(posture), function()
 			local config, log = fake_config(posture, posture)
 			local menu = hotstrings_menu(config)
-			local all = row_for(menu, "menu.hotstrings.enable_all_sections")
-			helpers.assert_true(all ~= nil, "the top of the menu must offer one « all sections » checkbox")
-			helpers.assert_eq(all.checked, posture, "ticked exactly when every category and section is on")
-			all.fn()
-			helpers.assert_eq(#log.set_categories_sections, 1, "one click is one write")
-			helpers.assert_eq(log.set_categories_sections[1].ids, { "autocorrection", LANGUAGE_CATEGORY, "rolls" },
-				"every category, in one write")
-			helpers.assert_eq(log.set_categories_sections[1].on, not posture)
+			helpers.assert_nil(row_for(menu, "menu.hotstrings.enable_all_sections"),
+				"the top of the menu must not switch every language at once")
+			helpers.assert_eq(log.set_categories_sections, {}, "building the menu writes nothing")
 			assert_no_retired(menu)
 		end)
 	end
@@ -262,9 +259,9 @@ local function with_bulk_error_receipts(body)
 	if not ok then error(err, 0) end
 end
 
---- Selects the actual whole-tree command or the actual language-provider row.
+--- Selects the actual language-provider row.
 local function aggregate_row(menu, kind)
-	if kind == "tree" then return row_for(menu, "menu.hotstrings.enable_all_sections") end
+	assert(kind == "language", "only a language owns an aggregate checkbox")
 	for _, row in ipairs(menu) do
 		if type(row.menu) == "table" and row_for(row.menu, "menu.hotstrings.enable_all_sections") == row.menu[1] then
 			return row.menu[1]
@@ -273,7 +270,7 @@ local function aggregate_row(menu, kind)
 end
 
 helpers.describe("aggregate hotstring checkbox acknowledges the durable owner", function()
-	for _, kind in ipairs({ "tree", "language" }) do
+	for _, kind in ipairs({ "language" }) do
 		for _, verdict in ipairs({ "false", "nil", "throw", "truthy", "true" }) do
 			helpers.it("aggregate " .. kind .. " callback requires exact receipt " .. verdict, function()
 				with_bulk_error_receipts(function(notices, releases)
@@ -309,7 +306,7 @@ helpers.describe("aggregate hotstring checkbox acknowledges the durable owner", 
 end)
 
 helpers.describe("aggregate menu preserves actual private choices and native publication", function()
-	for _, kind in ipairs({ "tree", "language" }) do
+	for _, kind in ipairs({ "language" }) do
 		for _, refusal in ipairs({ "false", "nil", "throw", "truthy" }) do
 			helpers.it("aggregate " .. kind .. " retains the actual owner after writer " .. refusal, function()
 				local old_loader = package.loaded["modules.hotstrings.loader"]

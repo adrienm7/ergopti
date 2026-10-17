@@ -116,6 +116,28 @@ helpers.describe("explicit hotstring category selection", function()
 		end
 	end
 
+	-- hotstrings-submenu-live-2026-10-17: a section an extension binds is drawn,
+	-- and switched, in that extension's submenu; the category's own « check all »
+	-- and its language's checkbox never reach it.
+	for _, writer in ipairs({ "category", "language" }) do
+		helpers.it("(hotstring-category-owner) " .. writer .. " selection leaves an extension-bound section alone", function()
+			local section = CATEGORIES.french_autocorrection.sections.minus
+			section.extension = { id = "ergopti", name = "Ergopti" }
+			local ok, err = pcall(with_config, function(Config)
+				local committed = writer == "category"
+					and Config.set_category_scope_enabled({ "french_autocorrection" }, true)
+					or Config.set_categories_sections({ "french_autocorrection" }, true)
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(Config.is_group_enabled("french_autocorrection"), true)
+				helpers.assert_eq(Config.is_section_checked("french_autocorrection", "accents"), true)
+				helpers.assert_eq(Config.is_section_checked("french_autocorrection", "minus"), false,
+					"the bound section keeps its own choice")
+			end, CATEGORY_SOURCE)
+			section.extension = nil
+			if not ok then error(err, 0) end
+		end)
+	end
+
 	helpers.it("(hotstring-category-owner) rejects an unknown sibling without publishing or writing", function()
 		with_config(function(Config, path, published)
 			local before = #published
