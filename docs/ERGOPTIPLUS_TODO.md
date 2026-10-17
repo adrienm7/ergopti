@@ -3036,6 +3036,26 @@ These are software implementations; final hardware verification remains below.
       Investigate the source of both levels and the intended override priority,
       check the other drivers, and fix a confirmed discrepancy with a causal
       regression. The report is pending reproduction, not a confirmed root cause.
+      October 17: with the real registry Ergopti emulated over AZERTY, the
+      digit-row resolution keeps Shift with the emulation and types the digit on
+      every row key (`digit-row-ergopti-emulated-shift` regression). The same
+      resolution code shipped in v1.0.1, so the reporter's exact setup (native
+      layout, emulation switch, CapsLock) is still needed to reproduce it.
+- [ ] **Reported Windows key-combination settings, October 15.** A tester could
+      change the ² key but not the key combinations. Reading the code found no
+      cause: pair assignments go through the same save-and-reload chain as the
+      ² key. The pair menu is a transient `Menu` shown from
+      `KeyCombinationShowPairMenu`; check whether its clicks are lost once the
+      local object is released. Ask for the tester's log
+      (`[KeyCombinations] Pair` lines, `AHK drop detected`, `Menu command
+    refused`).
+- [ ] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
+      The typing watcher returns at `IsCategoryGated("Hotstrings")` before its
+      wrap block, so wrapping a selection with an OS layout works only when
+      Hotstrings is also on. Move the wrap attempt ahead of that gate (meta
+      tests pin its call inside `OnChar`) or grey the Windows wrap group with a
+      reason. The guillemet validation and UTF-8 reload bugs from the same
+      report were fixed on October 17.
 
 - [~] **L5.** Linux asynchronous process-group teardown: deadlines and shell
   cancellation now signal descendants even after libuv reaps their leader.
