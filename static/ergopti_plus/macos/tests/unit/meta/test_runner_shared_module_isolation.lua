@@ -45,10 +45,15 @@ helpers.describe("tests/run.lua isolates shared and platform modules", function(
 			local helpers_identity = package.loaded["tests.helpers"]
 			package.loaded[module_name] = true
 
-			local loaded, failure = pcall(require, "modules.keymap.terminators")
-			helpers.assert_eq(loaded, false,
+			-- The leak must be harmful before the purge proves anything: either the
+			-- catalogue load fails on the boolean, or the pass-through shim hands
+			-- the boolean itself to every consumer instead of a catalogue.
+			local loaded, result = pcall(require, "modules.keymap.terminators")
+			helpers.assert_true(not loaded or type(result) ~= "table",
 				"the leaked boolean must reproduce the original catalogue failure")
-			helpers.assert_true(tostring(failure):find("boolean", 1, true) ~= nil)
+			if not loaded then
+				helpers.assert_true(tostring(result):find("boolean", 1, true) ~= nil)
+			end
 
 			Isolation.purge(driver_root, shared_lua)
 			helpers.assert_nil(package.loaded[module_name])
