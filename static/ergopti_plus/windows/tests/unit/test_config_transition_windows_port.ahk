@@ -1002,8 +1002,10 @@ _CTWP_NativeReadTemporalCustody(Mode) {
 	Dir := _CTWP_NewDir("genuine-native-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
+	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
+	; at a quarter of the cost of the former 32 MiB source.
 	Padding := "x"
-	loop 25
+	loop 23
 		Padding .= Padding
 	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
 	Padding := ""
@@ -1141,8 +1143,10 @@ _CTWP_GuardedReadTemporalCustody(Mode) {
 	Dir := _CTWP_NewDir("genuine-guarded-read-temporal-custody")
 	PathsFile := Dir . "\paths.toml", Path := Dir . "\config.toml"
 	OldSource := _CTWP_SchemaSource("old actual timed recovery source")
+	; 8 MiB keeps the native read across a timer tick (1 MiB sometimes missed it)
+	; at a quarter of the cost of the former 32 MiB source.
 	Padding := "x"
-	loop 25
+	loop 23
 		Padding .= Padding
 	NewSource := _CTWP_SchemaSource("new actual timed recovery source") . "# " . Padding . "`n"
 	Padding := ""
