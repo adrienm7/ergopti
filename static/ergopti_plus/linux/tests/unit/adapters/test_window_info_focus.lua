@@ -107,9 +107,79 @@ end
 
 helpers.describe("window_info: X11", function()
 
+	helpers.it("(linux-focus-window-identity) distinguishes identically titled windows of one process", function()
+		local id = "0x1"
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return "firefox\n" end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return id .. "\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		local original = wi.focused_identity()
+		id = "0x2"
+		local switched = wi.focused_identity()
+		id = "0x1"
+		local restored = wi.focused_identity()
+		restore()
+		helpers.assert_eq(original, "x11:1337:0x1")
+		helpers.assert_eq(switched, "x11:1337:0x2")
+		helpers.assert_eq(restored, original, "returning to the original window preserves its identity")
+	end)
+
+	helpers.it("(linux-focus-window-identity) distinguishes applications with the same window title", function()
+		local id, comm = "0x1", "firefox"
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return comm .. "\n" end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return id .. "\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		helpers.assert_eq(wi.getFocused().appId, "firefox")
+		id, comm = "0x2", "keepassxc"
+		local second = wi.getFocused()
+		restore()
+		helpers.assert_eq(second.windowTitle, "Untitled")
+		helpers.assert_eq(second.appId, "keepassxc",
+			"a title shared by two applications cannot identify the focused process")
+	end)
+
+	helpers.it("(linux-focus-window-identity) retries an unavailable process identity", function()
+		local comm = ""
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return comm end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return "0x1\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		helpers.assert_eq(wi.getFocused().appId, "")
+		comm = "firefox\n"
+		local recovered = wi.getFocused()
+		restore()
+		helpers.assert_eq(recovered.appId, "firefox",
+			"a transient process query failure must not poison an unchanged window's identity")
+	end)
+
 	helpers.it("reports the title and the owning process", function()
 		local wi = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "Ergopti — Mozilla Firefox\n" },
+			{ "xdotool getwindowname", "Ergopti — Mozilla Firefox\n" },
 			{ "getwindowpid", "1337\n" },
 			{ "/proc/1337/comm", "firefox\n" },
 			{ "xdotool getactivewindow 2", "0x3400007\n" },
@@ -123,9 +193,9 @@ helpers.describe("window_info: X11", function()
 		restore()
 	end)
 
-	helpers.it("costs one subprocess while the focus does not change", function()
+	helpers.it("avoids repeated process lookups while the focus does not change", function()
 		local wi, log = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "Same Window\n" },
+			{ "xdotool getwindowname", "Same Window\n" },
 			{ "getwindowpid", "1337\n" },
 			{ "/proc/1337/comm", "firefox\n" },
 			{ "xdotool getactivewindow 2", "0x3400007\n" },
@@ -133,11 +203,10 @@ helpers.describe("window_info: X11", function()
 		wi.getFocused()
 		local after_first = #log
 		for _ = 1, 5 do wi.getFocused() end
-		-- This runs on the focus poll, four times a second. Re-resolving the
-		-- application every time would be twelve subprocesses a second to learn
-		-- something that changes a few times a minute.
-		helpers.assert_eq(#log - after_first, 5,
-			"an unchanged title must cost exactly one probe per call, got "
+		-- The window ID and title must stay current; the owning process needs
+		-- resolving only when either changes or its identity is still unknown.
+		helpers.assert_eq(#log - after_first, 10,
+			"an unchanged window needs only the identity and title probes, got "
 				.. tostring(#log - after_first) .. " for five calls")
 		restore()
 	end)
@@ -150,7 +219,7 @@ helpers.describe("window_info: X11", function()
 		package.loaded["infra.display_server"] = ds
 		local comm = "firefox"
 		Shell._set_runner(function(cmd)
-			if cmd:find("getactivewindow getwindowname", 1, true) then return title .. "\n" end
+			if cmd:find("xdotool getwindowname", 1, true) then return title .. "\n" end
 			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
 			if cmd:find("/proc/1337/comm", 1, true) then return comm .. "\n" end
 			if cmd:find("xdotool getactivewindow 2", 1, true) then return "0x1\n" end
@@ -170,7 +239,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("answers empty when there is no focused window", function()
 		local wi = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "" },
+			{ "xdotool getwindowname", "" },
 		})
 		local info = wi.getFocused()
 		helpers.assert_eq(info.windowTitle, "", "no window means no title")
@@ -192,6 +261,39 @@ end)
 -- =================================================================
 
 helpers.describe("window_info: Wayland", function()
+
+	for _, case in ipairs({
+		{ desktop = "sway", probe = "command -v 'swaymsg'", query = "swaymsg -t get_tree",
+			payload = '{"focused":true,"id":7,"pid":1337,"name":"Untitled","app_id":"editor"}', identity = "sway:1337:7" },
+		{ desktop = "Hyprland", probe = "command -v 'hyprctl'", query = "hyprctl activewindow",
+			payload = '{"address":"0x55","pid":1337,"title":"Untitled","class":"editor"}', identity = "hyprland:1337:0x55" },
+		{ desktop = "niri", probe = "command -v 'niri'", query = "niri msg",
+			payload = '{"id":7,"title":"Untitled","app_id":"editor"}', identity = "niri::7" },
+	}) do
+		helpers.it("(linux-focus-window-identity) reads native identity from " .. case.desktop, function()
+			local wi = under("wayland", case.desktop, { { case.probe, true }, { case.query, case.payload } })
+			local identity = wi.focused_identity()
+			restore()
+			helpers.assert_eq(identity, case.identity)
+		end)
+	end
+
+	helpers.it("(linux-focus-window-identity) refuses unknown compositor window identity", function()
+		local wi = under("wayland", "GNOME", {})
+		local identity = wi.focused_identity()
+		restore()
+		helpers.assert_eq(identity, nil, "application metadata cannot replace a native window identity")
+	end)
+
+	helpers.it("(linux-focus-window-identity) rejects Hyprland's no-active-window sentinel", function()
+		local wi = under("wayland", "Hyprland", {
+			{ "command -v 'hyprctl'", true },
+			{ "hyprctl activewindow", '{"address":"0x0","pid":0,"title":"","class":""}' },
+		})
+		local identity = wi.focused_identity()
+		restore()
+		helpers.assert_eq(identity, nil, "a compositor sentinel does not name an output target")
+	end)
 
 	helpers.it("walks the sway tree to the focused leaf", function()
 		local wi = under("wayland", "sway", {

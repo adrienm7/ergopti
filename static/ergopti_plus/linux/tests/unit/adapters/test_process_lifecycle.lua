@@ -72,6 +72,36 @@ local PS_AC = "COMMAND\na\nc\n"
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.describe("linux-native-focus-identity", function()
+	helpers.it("(linux-native-focus-identity) emits focus changes between identical metadata windows", function()
+		local original = package.loaded["adapters.window_info"]
+		local identity, title = "x11:1337:1", "Untitled"
+		package.loaded["adapters.window_info"] = {
+			getFocused = function() return { appId = "editor", windowTitle = title } end,
+			focused_identity = function() return identity end,
+		}
+		local events = {}
+		local ok, failure = pcall(function()
+			with_ps({ PS_AB }, function()
+				local lifecycle = helpers.load_module("adapters.process_lifecycle")
+				lifecycle.onFocusChange(function(app, caption) events[#events + 1] = { app, caption } end)
+				lifecycle.start(); lifecycle.tick(1)
+				helpers.assert_eq(#events, 0, "unchanged native focus is not a transition")
+				identity = "x11:1337:2"
+				lifecycle.tick(2)
+				helpers.assert_eq(events, { { "editor", "Untitled" } },
+					"a second native window must invalidate matcher and AI context even with identical metadata")
+				title = "Private window"
+				lifecycle.tick(3)
+				lifecycle.stop()
+				helpers.assert_eq(events[2], { "editor", "Private window" }, "title changes still invalidate privacy context")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
+		helpers.assert_true(ok, tostring(failure))
+	end)
+end)
+
 helpers.describe("linux-process-snapshot-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 143 }) do
 		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot replace a successful baseline", function()
