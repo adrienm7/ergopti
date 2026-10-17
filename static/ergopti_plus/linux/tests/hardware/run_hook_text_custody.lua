@@ -104,6 +104,20 @@ local ok, failure = pcall(function()
 	assert(table.concat(rows, ",") == "30:1,30:0,45:1,45:0", "spent repeat changed kernel output: " .. table.concat(rows, ","))
 	assert(table.concat(chars) == "a", "spent repeat invented matcher text: " .. table.concat(chars))
 	print("PASS: native injection spends a held key without inventing autorepeat text")
+
+	chars, rows = {}, {}
+	local capture = require("adapters.xkb_capture")
+	emit(1, 58, 1); emit(1, 30, 1)
+	assert(capture.caps_locked() == true, "physical CapsLock did not enter the captured locked state")
+	local locked_replacement = Injector.type_directly("x")
+	assert(locked_replacement.ok, "locked native replacement failed: " .. tostring(locked_replacement.error))
+	pump()
+	emit(1, 30, 0); emit(1, 58, 0)
+	emit(1, 58, 1); emit(1, 58, 0)
+	assert(capture.caps_locked() == false, "spent physical CapsLock release never retired its captured down")
+	assert(table.concat(rows, ",") == "58:1,30:1,30:0,58:0,58:1,58:0,45:1,45:0,58:1,58:0,58:1,58:0",
+		"lock retirement changed native output: " .. table.concat(rows, ","))
+	print("PASS: a spent physical CapsLock release retires XKB before the next toggle")
 end)
 
 Finder.find_devices = original_find
