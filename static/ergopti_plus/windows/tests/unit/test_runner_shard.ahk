@@ -1,45 +1,64 @@
 ﻿; tests/unit/test_runner_shard.ahk
 
 ; ==============================================================================
-; MODULE: Test runner sharding
+; MODULE: Test runner module groups
 ; DESCRIPTION:
-; CI splits the canonical suite across runners with run_all.ahk --shard=K/N.
-; The shards must partition the selected tests: every test runs in exactly
-; one shard, in its original relative order, and invalid bounds are refused.
+; CI splits the canonical suite across runners with run_all.ahk --module=<g>.
+; The groups must partition the registered tests by their file: every test
+; belongs to exactly one group, keeps its relative order, and unknown groups
+; are refused. --list replays an exact subset in registry order.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
 
 _RSH_Partition() {
-	Tests := []
-	loop 23
-		Tests.Push({name: "case " . A_Index})
-	AssertTrue(_SelectShard(Tests, 0, 0) == Tests, "no shard keeps the exact selection")
-	Seen := Map()
-	Total := 0
-	loop 6 {
-		Shard := _SelectShard(Tests, A_Index, 6)
-		Total += Shard.Length
+	global TEST_REGISTRY, TEST_MODULE_GROUPS
+	Seen := 0
+	Counts := Map()
+	for Group in TEST_MODULE_GROUPS {
+		Selected := _SelectModule(TEST_REGISTRY, Group[1])
+		Counts[Group[1]] := Selected.Length
+		Seen += Selected.Length
 		Previous := 0
-		for Entry in Shard {
-			AssertFalse(Seen.Has(Entry.name), "a test runs in a single shard")
-			Seen[Entry.name] := A_Index
-			Position := Integer(SubStr(Entry.name, 6))
-			AssertTrue(Position > Previous, "a shard keeps the original relative order")
+		for Entry in Selected {
+			Position := 0
+			for Index, Candidate in TEST_REGISTRY {
+				if Candidate == Entry {
+					Position := Index
+					break
+				}
+			}
+			AssertTrue(Position > Previous, "a module group keeps the registry order")
 			Previous := Position
 		}
 	}
-	AssertEqual(Tests.Length, Total, "the shards together run every selected test")
-	AssertEqual(Tests.Length, Seen.Count)
-	AssertEqual(4, _SelectShard(Tests, 1, 6).Length)
-	AssertEqual(3, _SelectShard(Tests, 6, 6).Length)
+	AssertEqual(TEST_REGISTRY.Length, Seen, "the module groups together hold every registered test once")
+	for Name, Count in Counts
+		AssertTrue(Count > 0, "module group '" . Name . "' selects at least one test")
+	AssertTrue(_SelectModule(TEST_REGISTRY, "") == TEST_REGISTRY, "no module keeps the exact selection")
 }
-Test("runner shard: the shards partition the selection in order (runner-shard)", _RSH_Partition)
+Test("runner module: the module groups partition the suite in order (runner-module)", _RSH_Partition)
 
-_RSH_InvalidBounds() {
-	Tests := [{name: "only"}]
-	AssertThrows(() => _SelectShard(Tests, 0, 3))
-	AssertThrows(() => _SelectShard(Tests, 4, 3))
-	AssertThrows(() => _SelectShard(Tests, "1", 3))
+_RSH_GroupRules() {
+	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\meta\test_x.ahk"))
+	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_local_server_panel.ahk"))
+	AssertEqual("llm-servers-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_local_server_join.ahk"))
+	AssertEqual("hotstrings", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_user_hotstrings.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
+	AssertThrows(() => _SelectModule([], "no-such-group"))
 }
-Test("runner shard: invalid shard bounds are refused (runner-shard)", _RSH_InvalidBounds)
+Test("runner module: files map to their product module and unknown groups are refused (runner-module)", _RSH_GroupRules)
+
+_RSH_List() {
+	Tests := [{name: "a"}, {name: "b"}, {name: "c"}]
+	ListFile := A_Temp . "\ergopti-runner-list-" . A_TickCount . ".txt"
+	FileAppend("c`r`na`n", ListFile, "UTF-8")
+	try {
+		Selected := _SelectListed(Tests, ListFile)
+		AssertEqual(2, Selected.Length)
+		AssertEqual("a", Selected[1].name, "a listed replay keeps the registry order")
+		AssertEqual("c", Selected[2].name)
+	} finally FileDelete(ListFile)
+	AssertTrue(_SelectListed(Tests, "") == Tests)
+}
+Test("runner module: --list replays the named tests in registry order (runner-module)", _RSH_List)

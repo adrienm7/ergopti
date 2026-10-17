@@ -432,7 +432,7 @@ const WINDOWS_FILE_RETENTION = [
 		name: 'Retain managed Ollama file component evidence',
 		condition: 'always()',
 		artifact:
-			'windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}',
+			'windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}',
 		paths: ['${{ runner.temp }}/windows-ollama-file-component/']
 	},
 	{
@@ -440,7 +440,7 @@ const WINDOWS_FILE_RETENTION = [
 		condition:
 			"${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}",
 		artifact:
-			'windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}',
+			'windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}',
 		paths: [
 			'${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/',
 			'${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/'

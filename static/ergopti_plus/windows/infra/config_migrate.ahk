@@ -959,6 +959,9 @@ ConfigMigrateRun(FilePath, Registry := 0, Stamp := "", BackupFn := 0, PublishFn 
 	return Result
 }
 
+; Number of deep registry liveness checks run in this process (diagnostics only).
+global ConfigMigrateRegistryChecks := 0
+
 ; One private issuer owns both read-only preparation and actual boot completion.
 ; Query requests expose checking closures, never mutable rows or phase setters.
 ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle := unset) {
@@ -1062,6 +1065,10 @@ ConfigMigrateBoot(FilePath, Request := "boot", Candidate := unset, OwnerBundle :
 	}
 
 	RegistryLive(Row) {
+		global ConfigMigrateRegistryChecks
+		; Each check deep-compares the whole shipped registry (about 17 ms); the
+		; count lets performance tests see how many a transaction pays for.
+		ConfigMigrateRegistryChecks += 1
 		if !NativeLive()
 			return false
 		try {
