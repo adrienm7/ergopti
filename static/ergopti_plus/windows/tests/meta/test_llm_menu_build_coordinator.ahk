@@ -280,7 +280,8 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 	Sources := ""
 	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu",
 			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm",
-			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle"] {
+			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle",
+			"TrayMenuRebindSubmenu"] {
 		Body := ReadBody.Call(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
