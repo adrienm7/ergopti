@@ -22,6 +22,7 @@ for tool in Xvfb dbus-launch openbox python3 luajit xkbcomp; do
 	command -v "${tool}" >/dev/null 2>&1 || { echo "ENVIRONMENT: ${tool} is missing" >&2; exit 2; }
 done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
+python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
 
 Xvfb :58 -screen 0 1024x768x24 >/dev/null 2>&1 &
 PIDS="$!"
@@ -34,10 +35,6 @@ sleep 1
 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
-python3 tests/hardware/atspi_fixture_app.py editor >/dev/null 2>&1 &
-PIDS="${PIDS} $!"
-sleep 2
-
 # Native virtual-keyboard custody runs before the timed tray/daemon host. Its
 # two explicit sources and output use real production FFI ports, then retire.
 luajit tests/hardware/run_modifier_custody.lua
@@ -82,6 +79,14 @@ if [ "${CUSTODY}" != "0" ]; then
 	exit "${CUSTODY}"
 fi
 
+# The kernel prerequisites need XKB but no focused editor. Starting the bounded
+# editor before them let its 30-second lifetime expire before daemon admission.
+# This host's lifetime covers the tray host's 60-second budget and startup.
+python3 tests/hardware/atspi_fixture_app.py editor --lifetime-seconds 120 >/dev/null 2>&1 &
+EDITOR_PID=$!
+PIDS="${PIDS} ${EDITOR_PID}"
+sleep 2
+
 # A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
 # JSON as Python servers do.
 LLM_READY="$(mktemp -u)"
@@ -106,6 +111,12 @@ for _ in $(seq 1 40); do [ -f "${READY}" ] && break; sleep 0.25; done
 [ -f "${READY}" ] || { echo "ENVIRONMENT: the StatusNotifier host never started" >&2; exit 2; }
 
 echo "=== the whole daemon, live ==="
+if ! kill -0 "${EDITOR_PID}" 2>/dev/null; then
+	echo "ENVIRONMENT: the focused editor exited before daemon admission" >&2
+	# shellcheck disable=SC2086
+	kill ${PIDS} "${HOST}" 2>/dev/null
+	exit 2
+fi
 luajit tests/hardware/run_daemon_live.lua
 TYPED=$?
 wait "${HOST}"
