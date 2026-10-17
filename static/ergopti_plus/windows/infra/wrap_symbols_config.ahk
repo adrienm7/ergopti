@@ -572,7 +572,8 @@ _WS_Load() {
 				CurLeft    := ""
 				CurRight   := ""
 				; _WS_Save writes UTF-8 without a BOM. Loop Read would decode it with
-				; the ANSI code page, so "« " came back as "Â« " after every reload.
+				; the ANSI code page, so a disabled guillemet came back mangled (and
+				; enabled) after every reload.
 				Content := FileRead(_WS_Config_Path, "UTF-8")
 				loop parse, Content, "`n", "`r" {
 						Line := Trim(A_LoopField, " `t")
