@@ -739,7 +739,9 @@ class SDKConstantTransportControls(unittest.TestCase):
     def fixture(self):
         temporary = subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-transport-")
         self.addCleanup(temporary.cleanup)
-        base = subject.Path(temporary.name)
+        # sdk_tool_path resolves xcrun's answers; macOS temporary directories sit
+        # behind the /var -> /private/var link, so the fixture uses canonical paths.
+        base = subject.Path(temporary.name).resolve()
         root, output, sdk = base / "root", base / "output", base / "sdk"
         source = root / "tools/diagnostics/apple_shortcuts_probe/sdk_constants.c"
         source.parent.mkdir(parents=True)
