@@ -187,6 +187,7 @@
 		"test:manual-prediction-refusals": "node ./tools/test/test-manual-prediction-refusals-single-source.cjs",
 		"test:keyboard-slot-defaults": "node ./tools/test/test-keyboard-slot-recommended-bindings.cjs",
 		"test:number-row-full-capture": "node ./tools/test/test-number-row-full-capture.cjs",
+		"test:number-row-current-test-causal": "node ./tools/test/test-number-row-current-test-causal.cjs",
 		"test:app-switch-labels": "node ./tools/test/test-app-switch-labels.cjs",
 		"test:automation-query-ci-publisher": "node ./tools/test/test-automation-query-ci-publisher.cjs",
 		"test:js": "node ./tools/test/run-js-suite.cjs",

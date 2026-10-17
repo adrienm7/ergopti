@@ -64,6 +64,45 @@ semantic raw-replay completion and measured production output remain OPEN.
 Physical Windows input and native macOS/Linux remain unqualified; no native
 capability flag changes.
 
+### October 17 current Carbon fixture and complete local source admission
+
+The selected Carbon fixture now receives source-selection notifications within
+a bounded monotonic interval. It preserves raw OSStatus separately from observed
+selection and refuses disabling a temporary source until restoration is observed.
+All twelve original method identities and 58 original assertion lines remain.
+Compilation, actual native convergence and both architecture receipts remain OPEN.
+
+The separate current-source owner enrolls 145 local inputs: 140 target sources
+and headers, the package manifest and lock, two qualification policies and the
+unchanged runtime number-row corpus. The historical 99-file roster omits 46 of
+these inputs and has seven additional outdated tuples beyond the previously
+reviewed replacement roles; it is retained only for historical receiving.
+The original historical core, positive receiver, network companion, 53/51
+controls and transport remain byte-identical.
+
+Twenty-three controlled software cases cover the complete roster, strict positive
+and counterfactual transcripts, approval shapes and genuine Git object reads.
+New transcript vectors reproduce a false refusal of numbered compiler source
+context. Failure recognition now distinguishes that context from actual located,
+bare and tool-prefixed errors and standalone assertion failures. The exact active
+line 435 counterfactual assertion and twelve-case cohort remain unchanged.
+
+A compact private Git namespace receives the actual generate/materialize CLI:
+145 unchanged positive images and exactly one producer omission in the second
+145-image projection. Nine controls receive the expected admission/refusal for
+source drift, an extra target, owner hash, qualification profile and old build
+authority. These explicitly controlled records are not independently issued
+source approvals and do not qualify native execution or published source.
+
+A further actual CLI control exposes admission through an internal source-parent
+junction with identical bytes. The corrected owner rejects aliased target roots
+and checks every admitted input's canonical name. Genuine corrected CLI receiving
+admits normal sources and refuses the same junction; all 145 original images are
+restored. The twenty-three software cases pass without skips. The historical
+receivers and their assertions remain unchanged. Actual published approval,
+native CI enrollment, consumed compiler/dependency inputs and paired Swift/TIS
+receiving remain OPEN. Neither signed application nor physical input is qualified.
+
 ### October 17 standalone native HTTP header closure
 
 Both standalone HTTP compiler recipes now stage the ten current public headers,
