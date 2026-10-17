@@ -279,12 +279,13 @@ _LMPC_ProjectionScript(Framework, Receipt, ReadBody := _DriverFuncBodyOrEmpty) {
 	}
 	Sources := ""
 	for Name in ["LLM_Menu_Build", "_LLM_Menu_PublishRoot", "initMenu",
-			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm"] {
+			"_MI_TopLevelBuilders", "_MI_StageTopLevel", "_MI_StageLlm",
+			"TrayMenuItemCount", "TrayMenuItemCaption", "TrayMenuSubmenuHandle"] {
 		Body := ReadBody.Call(Name)
 		AssertTrue(Body != "", "the actual root composition subject must exist: " Name)
 		Sources .= Body "`n"
 	}
-	for Name in ["_MI_StagePrebuiltLlm", "_LLM_Menu_PreparedRootCurrent"] {
+	for Name in ["_MI_StagePrebuiltLlm", "_LLM_Menu_PreparedRootCurrent", "_LLM_Menu_ReplacePublishedRow"] {
 		Body := ReadBody.Call(Name)
 		if Body != ""
 			Sources .= Body "`n"
@@ -339,6 +340,21 @@ _LMPC_TrayCheck(Args*) => 0
 _MR_IsForAhk(Entry) => true
 MenuRenderer_StageDisabledTopLevel(Args*) => 0
 MenuDispatcher_PruneMenu(Args*) => 0
+; Only the settled_* cases own a published root with an IA row to swap; the
+; others exercise the complete-root projection of a root still pending.
+_TrayRootFirstPublicationPending() {
+ global _LMPC_State
+ return !InStr(_LMPC_State["mode"], "settled_")
+}
+_LMPC_RowPublication(*) {
+ global _LMPC_State
+ if !InStr(_LMPC_State["mode"], "settled_")
+  throw Error("a root without a settled publication cannot swap one row")
+ _LMPC_State["row_steps"] += 1
+}
+MenuDispatcher_BeginReplacement(Args*) => _LMPC_RowPublication()
+MenuPopulation_Publish(Args*) => _LMPC_RowPublication()
+TrayMenu_ApplyPauseGreying(Args*) => _LMPC_RowPublication()
 TrayMenuStage_Begin() {
  global _TrayMenuStage
  _TrayMenuStage := []
@@ -355,7 +371,10 @@ TrayMenuStage_AddFeature(Label, Target) {
 TrayMenuStage_Check(Args*) => 0
 MenuManifest_LoadTopLevel() => [Map("id", "metrics"), Map("id", "llm")]
 _MI_StageLayout() => 0
-_MI_StageHotstrings() => 0
+_MI_StageHotstrings() {
+ global _LMPC_State
+ _LMPC_State["hotstrings_renders"] += 1
+}
 _MI_StageAgent() => 0
 _MI_StageShortcuts() => 0
 _MI_StageTapHolds() => 0
@@ -388,7 +407,7 @@ _LMPC_Authorize() {
  _LMPC_State["ticket_calls"] += 1
  if _LMPC_State["mode"] == "ticket_reentry"
   _LLM_Menu_Handle := _LMPC_State["foreign"]
- return _LMPC_State["mode"] != "ticket_refusal"
+ return !InStr(_LMPC_State["mode"], "refusal")
 }
 RebuildTrayMenu(AuthorizeFn, WorkerFn, Narrow, Promote) {
  global _LMPC_State, _LLM_Menu_Handle
@@ -416,14 +435,40 @@ TrayMenuStage_Publish(AuthorizeFn) {
 _LMPC_Case(Mode) {
  global _LMPC_State, _LLM_Menu_Handle, _LLM_Menu_InTray
  _LMPC_State := Map("mode", Mode, "builds", 0, "queued", 0, "prepared", true,
-  "siblings", 0, "candidates", [], "sibling", Menu(), "foreign", Menu(), "published", 0, "ticket_calls", 0)
+  "siblings", 0, "candidates", [], "sibling", Menu(), "foreign", Menu(), "published", 0, "ticket_calls", 0,
+  "row_steps", 0, "hotstrings_renders", 0)
  _LLM_Menu_Handle := Menu(), _LLM_Menu_InTray := true
+ ; A settled root shows its feature rows; the AI row holds the previous child.
+ if InStr(Mode, "settled_") {
+  A_TrayMenu.Delete()
+  A_TrayMenu.Add("metrics", _LMPC_State["sibling"])
+  A_TrayMenu.Add("menu.llm.title", _LLM_Menu_Handle)
+  Previous := _LLM_Menu_Handle
+ }
  Owner := LLMMenuBuildCoordinator(LLM_Menu_Build, () => false)
  Accepted := Owner.Request("received-view")
  AssertEqual(1, _LMPC_State["builds"], "one root projection must construct one AI subtree")
  AssertEqual(0, _LMPC_State["queued"], "root staging cannot consume rows a second time and queue preparation")
  AssertFalse(Owner.Active)
- if Mode == "normal" {
+ AssertEqual(0, _LMPC_State["hotstrings_renders"], "an AI repaint never renders a sibling feature menu")
+ if Mode == "settled_root" {
+  AssertTrue(Accepted)
+  AssertEqual(0, _LMPC_State["published"], "a settled root swaps the AI row instead of re-staging every row")
+  AssertEqual(0, _LMPC_State["siblings"], "no sibling row is rebuilt for an AI repaint")
+  AssertEqual(3, _LMPC_State["row_steps"], "the swap retires the old child like a root publication")
+  AssertEqual(1, Owner.PublishedGeneration)
+  AssertEqual(1, _LMPC_State["ticket_calls"])
+  AssertEqual(2, TrayMenuItemCount(A_TrayMenu))
+  AssertEqual(_LMPC_State["sibling"].Handle, TrayMenuSubmenuHandle(A_TrayMenu.Handle, 0))
+  AssertEqual(_LMPC_State["expected"].Handle, TrayMenuSubmenuHandle(A_TrayMenu.Handle, 1),
+   "the AI row now opens the new candidate")
+ } else if Mode == "settled_refusal" {
+  AssertFalse(Accepted)
+  AssertEqual(0, _LMPC_State["published"])
+  AssertEqual(0, _LMPC_State["row_steps"], "a refused swap leaves the published root untouched")
+  AssertEqual(Previous.Handle, TrayMenuSubmenuHandle(A_TrayMenu.Handle, 1))
+  AssertEqual(0, Owner.PublishedGeneration)
+ } else if Mode == "normal" {
   AssertTrue(Accepted)
   AssertEqual(1, _LMPC_State["published"])
   AssertEqual(1, Owner.PublishedGeneration)
@@ -440,7 +485,7 @@ REGISTRATIONS
 RunTests()
 )'
 	Registrations := ""
-	for Mode in ["normal", "stale_candidate", "ticket_refusal", "ticket_reentry"]
+	for Mode in ["normal", "stale_candidate", "ticket_refusal", "ticket_reentry", "settled_root", "settled_refusal"]
 		Registrations .= 'Test("root composition: ' Mode '", _LMPC_Case.Bind("' Mode '"))`n'
 	return Header Coordinator "`n" StrReplace(StrReplace(Harness, "SUBJECTS", Sources), "REGISTRATIONS", Registrations)
 }
@@ -469,8 +514,8 @@ _LMPC_ReceiveRootComposition() {
 		AssertEqual(0, State["exit"], State["output"])
 		AssertEqual("", State["errors"])
 		Result := FileRead(Receipt, "UTF-8")
-		AssertContains(Result, "# 4 passed, 0 failed.")
-		for Mode in ["normal", "stale_candidate", "ticket_refusal", "ticket_reentry"]
+		AssertContains(Result, "# 6 passed, 0 failed.")
+		for Mode in ["normal", "stale_candidate", "ticket_refusal", "ticket_reentry", "settled_root", "settled_refusal"]
 			AssertContains(Result, "root composition: " Mode)
 	} finally {
 		if IsObject(Task) {
