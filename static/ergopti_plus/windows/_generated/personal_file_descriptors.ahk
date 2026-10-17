@@ -9,6 +9,27 @@ PersonalFilePriorityTier() => "package"
 PersonalFileDefaultDelay() => 0
 PersonalFileScanMaxDepth() => 16
 
+/**
+ * Recognises the copies configuration writers leave beside their source
+ * (<stem>.backup-<stamp>.toml). They sit in the scanned hotstrings folder, so
+ * discovery must never load one as a hotstring source.
+ * @param {String} Name File name or path.
+ * @returns {Integer} True for a writer backup.
+ */
+PersonalFileIsBackup(Name) {
+	if !(Name is String)
+		return false
+	SplitPath(Name, &Leaf)
+	Extension := ".toml", Infix := ".backup-"
+	if StrLen(Leaf) <= StrLen(Extension) || StrLower(SubStr(Leaf, -StrLen(Extension))) != Extension
+		return false
+	Stem := SubStr(Leaf, 1, StrLen(Leaf) - StrLen(Extension))
+	Position := InStr(Stem, Infix, false, -1)
+	if Position <= 1
+		return false
+	return RegExMatch(SubStr(Stem, Position + StrLen(Infix)), "^[0-9-]+$") ? true : false
+}
+
 /** Builds an exact relative personal-source identity without choosing a runtime group. */
 PersonalFileDescribe(Components) {
 	if !(Components is Array) || Components.Length == 0

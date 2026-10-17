@@ -190,14 +190,15 @@ local COLOR_PRESETS = {
 -- init-fsdir-drops-state. Aliased locally so every call site below is unchanged.
 local safe_dir_entries = require("infra.fs_dir").entries
 
---- Lists TOML files in a directory, skipping names that start with `_`.
+--- Lists TOML files in a directory, skipping names that start with `_` and
+--- the backups configuration writers leave beside a source.
 --- Returns an array of absolute paths.
 --- @param dir string Absolute path to the directory.
 --- @return table Array of absolute TOML paths.
 local function list_toml_files(dir)
 	local out = {}
 	for _, name in ipairs(safe_dir_entries(dir)) do
-		if name:sub(1, 1) ~= "_" and name:match("%.toml$") then
+		if name:sub(1, 1) ~= "_" and name:match("%.toml$") and not PersonalFiles.is_backup(name) then
 			table.insert(out, dir .. "/" .. name)
 		end
 	end

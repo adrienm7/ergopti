@@ -482,6 +482,27 @@ helpers.describe("actual native personal file menu publication", function()
 			end
 		end })
 	end)
+
+	-- personal-file-backups-2026-10-17: writer backups beside a personal source
+	-- (<stem>.backup-<stamp>.toml) were loaded as more personal sources, each
+	-- duplicating every trigger of its original.
+	helpers.it("(personal-file-backups) never adopts writer backups as personal sources", function()
+		local paths = {}
+		fixture(function(f)
+			helpers.assert_eq(#f.loaded, 3, "the primary and the two genuine sources only")
+			for _, record in ipairs(f.loaded) do
+				helpers.assert_eq(Files.is_backup(record.path), false, "a backup was adopted: " .. tostring(record.path))
+			end
+		end, { setup = function(root)
+			for _, name in ipairs({ "alpha.backup-20261017-190645-1330382656.toml",
+					"personal_hotstrings.backup-20260625-004901.toml",
+					"personal_hotstrings.backup-20260625-004901.backup-20261017-190645-1330382656.toml" }) do
+				paths[#paths + 1] = root .. "/" .. name
+				write(paths[#paths], '[[probe]]\n"duplicate" = "Backup copy"\n')
+			end
+			return function() for _, path in ipairs(paths) do assert(os.remove(path)) end end
+		end })
+	end)
 end)
 
 helpers.describe("source-owned personal controls native publication", function()

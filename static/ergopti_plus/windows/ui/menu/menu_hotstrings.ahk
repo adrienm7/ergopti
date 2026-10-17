@@ -779,6 +779,8 @@ _HS_PreScanPersonal() {
 			} else if (A_LoopFileName ~= "i)\.toml$") {
 				if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
 					continue
+				if PersonalFileIsBackup(A_LoopFileName)
+					continue
 				SplitPath A_LoopFileFullPath, , , , &ExtStem
 				FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
 				FileCount := 0
