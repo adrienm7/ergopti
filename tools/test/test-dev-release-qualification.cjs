@@ -1033,6 +1033,40 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	console.log(
 		'Linux deferred suite envelopes: actual aggregate plus ten malformed/source/expiry/package/install refusals PASS.'
 	);
+	// A sharded E2E matrix defers once per row: the same run-wide receipt, every row present.
+	const rows = ['first-row', 'second-row'];
+	const shardedManifest = structuredClone(manifest);
+	shardedManifest.jobs['e2e-linux'].shards = rows;
+	const e2eDeferral = evidence.find((doc) => doc.job === 'e2e-linux');
+	const sharded = [
+		...evidence.filter((doc) => doc.job !== 'e2e-linux'),
+		...rows.map((shard) => ({ ...structuredClone(e2eDeferral), shard }))
+	];
+	const shardedArgs = { ...args, manifest: shardedManifest, evidence: sharded };
+	assert.equal(verifyAggregate(shardedArgs).qualified, false, 'every deferred row is admitted');
+	assert.throws(
+		() =>
+			verifyAggregate({
+				...shardedArgs,
+				evidence: sharded.filter((doc) => doc.shard !== 'second-row')
+			}),
+		/no evidence from shard second-row/,
+		'a deferred matrix still needs every row'
+	);
+	const mixed = structuredClone(sharded);
+	const executed = mixed.find((doc) => doc.shard === 'second-row');
+	delete executed.suite_qualification;
+	executed.subjects = { assertions: 1 };
+	assert.throws(
+		() => verifyAggregate({ ...shardedArgs, evidence: mixed }),
+		/Duplicate|duplicate/,
+		'a row cannot claim execution of a deferred suite'
+	);
+	assert.throws(
+		() => verifyAggregate({ ...args, evidence: [...evidence, structuredClone(e2eDeferral)] }),
+		/Duplicate deferred suite evidence/,
+		'an unsharded job still refuses a repeated deferral'
+	);
 }
 
 // The separately approved v1.0.2 profile cannot waive an unlisted test or installation.

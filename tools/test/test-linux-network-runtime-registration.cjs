@@ -3,6 +3,7 @@
 /** Keeps portable registration separate from mandatory native execution. */
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -178,7 +179,10 @@ function validateRuntimeCI(workflow, coverage) {
 	assert.ok(at > 0);
 	assert.equal(steps[at - 1].name, 'Qualify native HTTP streaming receipts');
 	const native = Pipeline.step(e2e[0].body, NATIVE_STEP);
-	assert.equal(Pipeline.stepField(native, 'if'), '${{ !cancelled() }}');
+	assert.equal(
+		Pipeline.stepField(native, 'if'),
+		LinuxE2E.condition(NATIVE_STEP, '${{ !cancelled() }}')
+	);
 	assert.equal(Pipeline.stepField(native, 'continue-on-error'), null);
 	assert.equal(Pipeline.stepField(native, 'timeout-minutes'), '3');
 	assertLinuxQualifiedRun(Pipeline.runOf(native), [
@@ -258,7 +262,10 @@ for (const [before, after] of [
 		'--subject "managed-network-runtime=4"'
 	],
 	[
-		'- name: ' + NATIVE_STEP + '\n        if: ${{ !cancelled() }}',
+		'- name: ' +
+			NATIVE_STEP +
+			'\n        if: ' +
+			LinuxE2E.condition(NATIVE_STEP, '${{ !cancelled() }}'),
 		'- name: ' + NATIVE_STEP + '\n        if: ${{ success() }}'
 	],
 	[

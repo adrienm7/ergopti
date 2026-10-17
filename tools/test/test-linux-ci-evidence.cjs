@@ -29,6 +29,17 @@ const { findRuntime, run: runLinux } = require('./run-linux-lua.cjs');
 const { verifyAggregate } = require('./linux-ci-evidence.cjs');
 const pipeline = require('./ci-full-default.cjs');
 const installMatrix = require('../ci/linux-install-matrix.cjs');
+const LINUX_E2E_SHARDS = require('./fixtures/linux-e2e-shards.json');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
+/** A Linux E2E step keeps its predicate, narrowed to its own matrix row. */
+const rowCondition = (name, predicate) =>
+	LinuxE2E.has(name) ? LinuxE2E.condition(name, predicate) : predicate;
+const UPDATER_IF = rowCondition('Update to the newest release and restart', '${{ !cancelled() }}');
+const UPDATER_EVIDENCE_IF = rowCondition(
+	'Upload live updater diagnostic evidence',
+	'${{ !cancelled() }}'
+);
+const XI2_RETAIN_IF = rowCondition('Retain actual XI2 property-cookie evidence', 'always()');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const MANIFEST = JSON.parse(
@@ -1183,6 +1194,24 @@ function fixtures() {
 	const evidence = [];
 	for (const [job, contract] of Object.entries(MANIFEST.jobs)) {
 		needs[job] = { result: 'success' };
+		// A sharded job delivers one document per matrix row, as its record step does.
+		if (contract.shards) {
+			for (const shard of contract.shards)
+				evidence.push({
+					schema_version: 1,
+					job,
+					shard,
+					sha: SHA,
+					architecture: 'X64',
+					distro: 'test-distro',
+					session: 'headless',
+					interpreter: 'LuaJIT 2.1',
+					subjects: Object.fromEntries(
+						LINUX_E2E_SHARDS.subjects[shard].map((subject) => [subject, contract.subjects[subject]])
+					)
+				});
+			continue;
+		}
 		for (const [subject, count] of Object.entries(contract.subjects))
 			evidence.push({
 				schema_version: 1,
@@ -1246,6 +1275,52 @@ rejects(({ evidence }) => {
 rejects(({ needs }) => {
 	needs.unclassified = { result: 'success' };
 }, /unclassified Linux job/);
+
+// The E2E matrix: a successful aggregate result alone never stands in for a row.
+const shardRow = (evidence, shard) =>
+	evidence.findIndex((row) => row.job === 'e2e-linux' && row.shard === shard);
+for (const shard of MANIFEST.jobs['e2e-linux'].shards) {
+	rejects(
+		({ evidence }) => {
+			const row = evidence[shardRow(evidence, shard)];
+			const subjects = row.subjects;
+			row.subjects = {};
+			// The row's subjects moved to another row: complete subjects, missing row.
+			const other = evidence.find((doc) => doc.job === 'e2e-linux' && doc.shard !== shard);
+			Object.assign(other.subjects, subjects);
+			evidence.splice(evidence.indexOf(row), 1);
+		},
+		new RegExp('no evidence from shard ' + shard)
+	);
+}
+rejects(({ evidence }) => {
+	evidence.push({ ...evidence[shardRow(evidence, 'updater')], subjects: { 'ollama-live': 1 } });
+}, /duplicate evidence document for e2e-linux shard updater/);
+rejects(({ evidence }) => {
+	evidence[shardRow(evidence, 'updater')].shard = 'unknown-row';
+}, /undeclared shard unknown-row/);
+rejects(({ evidence }) => {
+	delete evidence[shardRow(evidence, 'network-ai')].shard;
+}, /undeclared shard undefined/);
+rejects(({ evidence }) => {
+	evidence.find((row) => row.job === 'package-linux').shard = 'updater';
+}, /package-linux evidence names undeclared shard updater/);
+rejects(({ evidence }) => {
+	evidence[shardRow(evidence, 'updater')].shard = 'Updater Row';
+}, /invalid shard/);
+for (const shards of [[], ['a', 'a'], 'a', ['Bad Row']])
+	assert.throws(
+		() =>
+			verifyAggregate({
+				manifest: {
+					...MANIFEST,
+					jobs: { ...MANIFEST.jobs, 'e2e-linux': { ...MANIFEST.jobs['e2e-linux'], shards } }
+				},
+				...fixtures(),
+				expectedSha: SHA
+			}),
+		/declares invalid shards/
+	);
 
 // The gate lives in the Linux box: toJSON(needs) only sees the jobs of its own
 // workflow, so from ci.yml it would hold nothing but "linux".
@@ -1856,7 +1931,7 @@ const updaterStep = pipeline.step(
 /** The fixture token belongs only to the exact owned updater step. */
 function assertUpdaterAuthentication(step) {
 	assert.match(step, /^          GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
-	assert.strictEqual(pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.stepField(step, 'if'), UPDATER_IF);
 	assert.match(
 		step,
 		/^          bash static\/ergopti_plus\/linux\/tests\/hardware\/run_updater_live\.sh$/m
@@ -1874,7 +1949,7 @@ assert.throws(() =>
 	)
 );
 assert.throws(() =>
-	assertUpdaterAuthentication(updaterStep.replace('${{ !cancelled() }}', '${{ success() }}'))
+	assertUpdaterAuthentication(updaterStep.replace(UPDATER_IF, '${{ success() }}'))
 );
 assert.match(
 	updaterStep,
@@ -1890,7 +1965,7 @@ const updaterEvidence = pipeline.step(
  * @param {string} step The diagnostic artifact upload step.
  */
 function assertUpdaterEvidence(step) {
-	assert.strictEqual(pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.strictEqual(pipeline.stepField(step, 'if'), UPDATER_EVIDENCE_IF);
 	assert.strictEqual(pipeline.stepField(step, 'uses'), 'actions/upload-artifact@v4');
 	assert.strictEqual(pipeline.stepField(step, 'continue-on-error'), null);
 	assert.match(step, /^          name: linux-updater-live-diagnostics$/m);
@@ -1902,7 +1977,7 @@ function assertUpdaterEvidence(step) {
 }
 assertUpdaterEvidence(updaterEvidence);
 assert.throws(() =>
-	assertUpdaterEvidence(updaterEvidence.replace('${{ !cancelled() }}', '${{ success() }}'))
+	assertUpdaterEvidence(updaterEvidence.replace(UPDATER_EVIDENCE_IF, '${{ success() }}'))
 );
 assert.throws(() =>
 	assertUpdaterEvidence(
@@ -1990,7 +2065,7 @@ function assertRetainedQualification(step) {
 	}
 	// This exact owned native receipt retains failures, independent of qualification.
 	if (step.name === 'Retain actual XI2 property-cookie evidence') {
-		assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
+		assert.equal(pipeline.stepField(step.body, 'if'), XI2_RETAIN_IF);
 		assert.equal(pipeline.stepField(step.body, 'uses'), 'actions/upload-artifact@v4');
 		assert.equal(pipeline.stepField(step.body, 'run'), null);
 		assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
@@ -2022,7 +2097,7 @@ function assertRetainedQualification(step) {
 	}
 	const expected = retainedQualifications.get(step.name);
 	if (!expected) return false;
-	assert.equal(pipeline.stepField(step.body, 'if'), 'always()');
+	assert.equal(pipeline.stepField(step.body, 'if'), rowCondition(step.name, 'always()'));
 	assert.equal(pipeline.stepField(step.body, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(step.body, 'run'), null);
 	assert.equal(pipeline.stepField(step.body, 'continue-on-error'), null);
@@ -2036,7 +2111,7 @@ const xi2RetentionFixture = {
 	name: 'Retain actual XI2 property-cookie evidence',
 	body: [
 		'      - name: Retain actual XI2 property-cookie evidence',
-		'        if: always()',
+		'        if: ' + XI2_RETAIN_IF,
 		'        uses: actions/upload-artifact@v4',
 		'        with:',
 		'          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}',
@@ -2058,7 +2133,9 @@ assert.strictEqual(
 );
 assert.strictEqual(assertRetainedQualification(xi2ActualArtifacts[0]), true);
 const xi2RetentionMutations = [
-	['success-only condition', 'if: always()', 'if: ${{ !cancelled() }}'],
+	['success-only condition', 'if: ' + XI2_RETAIN_IF, 'if: ${{ !cancelled() }}'],
+	['every matrix row', 'if: ' + XI2_RETAIN_IF, 'if: always()'],
+	['another matrix row', "matrix.shard == 'input-display'", "matrix.shard == 'updater'"],
 	['wrong upload version', 'actions/upload-artifact@v4', 'actions/upload-artifact@v3'],
 	['warn policy', 'if-no-files-found: error', 'if-no-files-found: warn'],
 	['ignore policy', 'if-no-files-found: error', 'if-no-files-found: ignore'],
@@ -2236,7 +2313,9 @@ for (const [name, artifact, file] of [
 		body:
 			'      - name: ' +
 			name +
-			'\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: ' +
+			'\n        if: ' +
+			rowCondition(name, 'always()') +
+			'\n        uses: actions/upload-artifact@v4\n        with:\n          name: ' +
 			artifact +
 			'\n          path: ${{ runner.temp }}/' +
 			file +
@@ -2254,8 +2333,8 @@ for (const harness of testLinuxSteps.slice(unitAt + 1, recordAt)) {
 	if (assertRetainedQualification(harness)) continue;
 	assert.strictEqual(
 		pipeline.stepField(harness.body, 'if'),
-		'${{ !cancelled() }}',
-		`test-linux step "${harness.name}" must run under if: \${{ !cancelled() }}`
+		rowCondition(harness.name, '${{ !cancelled() }}'),
+		`e2e-linux step "${harness.name}" must run under !cancelled() in its own matrix row`
 	);
 }
 for (const tail of testLinuxSteps.slice(recordAt)) {

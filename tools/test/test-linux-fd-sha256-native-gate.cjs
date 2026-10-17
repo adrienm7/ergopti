@@ -10,6 +10,7 @@
  */
 'use strict';
 const assert = require('node:assert/strict');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const { assertLinuxQualifiedRun } = require('./ci-linux-qualified-run.cjs');
 const path = require('node:path');
 const { run, receipt, readCount } = require('./run-linux-fd-sha256-native.cjs');
@@ -247,7 +248,10 @@ for (const source of [
 	assert.ok(selectGates([source]).has(gate), `Native digest gate missing for ${source}`);
 const pipeline = Pipeline.open(ROOT);
 const step = Pipeline.step(pipeline.job('e2e-linux'), 'Qualify native retained FD SHA-256');
-assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+assert.equal(
+	Pipeline.stepField(step, 'if'),
+	LinuxE2E.condition('Qualify native retained FD SHA-256', '${{ !cancelled() }}')
+);
 assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 assert.equal(Pipeline.stepField(step, 'working-directory'), null);
 assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '3');

@@ -10,6 +10,7 @@
  */
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -155,7 +156,7 @@ function validateWorkflow(text, entry) {
 	const body = job(text, 'e2e-linux', '.github/workflows/ci-linux.yml');
 	for (const name of [SETUP, NATIVE]) {
 		const step = Pipeline.step(body, name);
-		assert.equal(Pipeline.stepField(step, 'if'), NOT_CANCELLED);
+		assert.equal(Pipeline.stepField(step, 'if'), LinuxE2E.condition(name, NOT_CANCELLED));
 		assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '35');
 		assert.ok(Pipeline.runOf(step).includes('set -euo pipefail'));
@@ -257,12 +258,16 @@ for (const [needle, replacement] of [
 	['- name: ' + SETUP, '- name: Removed managed setup'],
 	['- name: ' + NATIVE, '- name: Removed managed native'],
 	[
-		'- name: ' + NATIVE + '\n        if: ' + NOT_CANCELLED,
+		'- name: ' + NATIVE + '\n        if: ' + LinuxE2E.condition(NATIVE, NOT_CANCELLED),
 		'- name: ' + NATIVE + '\n        if: false'
 	],
 	[
-		'- name: ' + SETUP + '\n        if: ' + NOT_CANCELLED,
-		'- name: ' + SETUP + '\n        if: ' + NOT_CANCELLED + '\n        continue-on-error: true'
+		'- name: ' + SETUP + '\n        if: ' + LinuxE2E.condition(SETUP, NOT_CANCELLED),
+		'- name: ' +
+			SETUP +
+			'\n        if: ' +
+			LinuxE2E.condition(SETUP, NOT_CANCELLED) +
+			'\n        continue-on-error: true'
 	],
 	[
 		'--jobs 2 > "$validation_parent/setup.stdout.private"',

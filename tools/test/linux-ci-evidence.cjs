@@ -7,6 +7,9 @@
  * Records machine-readable proof for Linux CI subjects and verifies that every
  * mandatory manifest subject both ran and passed before linux-ok, the evidence
  * gate of .github/workflows/ci-linux.yml, can be green.
+ * A job the manifest splits into matrix shards must deliver exactly one
+ * document per declared shard: a successful matrix whose row recorded nothing
+ * (or a row the matrix lost) is refused even when its subjects look complete.
  * ============================================================================
  */
 
@@ -15,6 +18,9 @@
 const fs = require('fs');
 const path = require('path');
 const qualification = require('../ci/dev-release-qualification.cjs');
+
+// A shard is a matrix value that also names an artifact and a file.
+const SHARD = /^[a-z0-9][a-z0-9-]*$/;
 
 function fail(message) {
 	throw new Error(message);
@@ -54,6 +60,15 @@ function validateManifest(manifest) {
 		if (!contract.subjects || Object.keys(contract.subjects).length === 0) {
 			fail(`${job} declares no evidence subjects`);
 		}
+		if (
+			contract.shards !== undefined &&
+			(!Array.isArray(contract.shards) ||
+				contract.shards.length === 0 ||
+				new Set(contract.shards).size !== contract.shards.length ||
+				contract.shards.some((shard) => typeof shard !== 'string' || !SHARD.test(shard)))
+		) {
+			fail(`${job} declares invalid shards`);
+		}
 		for (const [subject, floor] of Object.entries(contract.subjects)) {
 			if (!subject || !Number.isInteger(floor) || floor < 1) {
 				fail(`${job}/${subject} has an invalid assertion floor`);
@@ -75,6 +90,12 @@ function validateEvidenceDocument(document, expectedSha) {
 	if (!document.subjects || Array.isArray(document.subjects)) {
 		fail(`${document.job} evidence has no subjects object`);
 	}
+	if (
+		document.shard !== undefined &&
+		(typeof document.shard !== 'string' || !SHARD.test(document.shard))
+	) {
+		fail(`${document.job} evidence has an invalid shard`);
+	}
 	for (const [subject, assertions] of Object.entries(document.subjects)) {
 		if (!subject || !Number.isInteger(assertions) || assertions < 1) {
 			fail(`${document.job}/${subject} has no positive executed assertion count`);
@@ -95,8 +116,19 @@ function verifyAggregate({
 
 	const indexedEvidence = new Map();
 	const deferredEvidence = new Map();
+	const suiteDeferred = new Set();
+	const shardEvidence = new Set();
 	for (const document of evidence) {
 		validateEvidenceDocument(document, expectedSha);
+		const owner = manifest.jobs[document.job];
+		if (owner && (owner.shards !== undefined || document.shard !== undefined)) {
+			if (!owner.shards || !owner.shards.includes(document.shard))
+				fail(`${document.job} evidence names undeclared shard ${document.shard}`);
+			const shardKey = document.job + '#' + document.shard;
+			if (shardEvidence.has(shardKey))
+				fail(`duplicate evidence document for ${document.job} shard ${document.shard}`);
+			shardEvidence.add(shardKey);
+		}
 		if (document.suite_qualification !== undefined) {
 			const scope = { 'test-linux': 'linux-unit-suite', 'e2e-linux': 'linux-e2e-suite' }[
 				document.job
@@ -119,9 +151,12 @@ function verifyAggregate({
 			if (!contract) fail('Deferred suite names an unclassified job.');
 			for (const subject of Object.keys(contract.subjects)) {
 				const key = document.job + '/' + subject;
-				if (deferredEvidence.has(key) || indexedEvidence.has(key))
+				// Every shard of a deferred suite carries the same run-wide receipt.
+				const repeated = contract.shards !== undefined && suiteDeferred.has(key);
+				if ((deferredEvidence.has(key) && !repeated) || indexedEvidence.has(key))
 					fail('Duplicate deferred suite evidence.');
 				deferredEvidence.set(key, document.suite_qualification);
+				suiteDeferred.add(key);
 			}
 			continue;
 		}
@@ -173,6 +208,10 @@ function verifyAggregate({
 			fail(`optional job ${job} concluded ${dependency.result}`);
 		}
 		if (dependency.result !== 'success') continue;
+		for (const shard of contract.shards ?? []) {
+			if (!shardEvidence.has(job + '#' + shard))
+				fail(`successful job ${job} has no evidence from shard ${shard}`);
+		}
 		for (const [subject, floor] of Object.entries(contract.subjects)) {
 			const key = `${job}/${subject}`;
 			const assertions = indexedEvidence.get(key);
@@ -235,9 +274,11 @@ function record(options) {
 		subjects[match[1]] = Number(match[2]);
 	}
 	if (Object.keys(subjects).length === 0) fail('record requires at least one --subject');
+	if (options.shard !== undefined && !SHARD.test(options.shard)) fail('invalid --shard value');
 	const document = {
 		schema_version: 1,
 		job: options.job,
+		...(options.shard !== undefined ? { shard: options.shard } : {}),
 		sha: options.sha,
 		architecture: options.architecture,
 		distro: options.distro,
@@ -267,7 +308,8 @@ function recordDeferredSuite(options) {
 		!options.output ||
 		!options.sha ||
 		!options.architecture ||
-		options.subjects.length
+		options.subjects.length ||
+		(options.shard !== undefined && !SHARD.test(options.shard))
 	)
 		fail('Invalid deferred suite record request.');
 	const receipt = readJson(options.receipt, 'suite qualification receipt');
@@ -280,6 +322,7 @@ function recordDeferredSuite(options) {
 	const document = {
 		schema_version: 1,
 		job: options.job,
+		...(options.shard !== undefined ? { shard: options.shard } : {}),
 		sha: options.sha,
 		architecture: options.architecture,
 		distro: 'ubuntu',

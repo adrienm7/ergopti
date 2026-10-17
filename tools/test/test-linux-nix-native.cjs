@@ -2,6 +2,7 @@
 /** Independent receipt/config/registration controls; these are not native credit. */
 'use strict';
 const assert = require('node:assert/strict');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
@@ -131,7 +132,11 @@ check('hosted registration is mandatory and additive', () => {
 	const marker = '      - name: Qualify genuine Nix installed runtime\n';
 	assert.equal(ci.split(marker).length, 2);
 	const step = ci.split(marker)[1].split('\n      - name:')[0];
-	assert.ok(step.includes('if: ${{ !cancelled() }}'));
+	assert.ok(
+		step.includes(
+			'if: ' + LinuxE2E.condition('Qualify genuine Nix installed runtime', '${{ !cancelled() }}')
+		)
+	);
 	assert.ok(step.includes('test:linux:nix-native'));
 	assert.ok(step.includes('nix-bin'));
 	assert.ok(!step.includes('curl |'));

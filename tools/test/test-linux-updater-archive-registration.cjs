@@ -3,6 +3,7 @@
 /** Independent mandatory archive/source-control registration and receipt refusals. */
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -122,7 +123,7 @@ function validateWorkflow(text) {
 	]) {
 		assert.equal(steps.filter((step) => step.name === name).length, 1);
 		const step = Pipeline.step(body, name);
-		assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+		assert.equal(Pipeline.stepField(step, 'if'), LinuxE2E.condition(name, '${{ !cancelled() }}'));
 		assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), timeout);
 	}
@@ -253,16 +254,20 @@ for (const [needle, replacement] of [
 	['- name: ' + ARCHIVE, '- name: Removed archive'],
 	['- name: ' + SOURCE, '- name: Removed source controls'],
 	[
-		'- name: ' + ARCHIVE + '\n        if: ${{ !cancelled() }}',
+		'- name: ' + ARCHIVE + '\n        if: ' + LinuxE2E.condition(ARCHIVE, '${{ !cancelled() }}'),
 		'- name: ' + ARCHIVE + '\n        if: false'
 	],
 	[
-		'- name: ' + SOURCE + '\n        if: ${{ !cancelled() }}',
+		'- name: ' + SOURCE + '\n        if: ' + LinuxE2E.condition(SOURCE, '${{ !cancelled() }}'),
 		'- name: ' + SOURCE + '\n        if: false'
 	],
 	[
-		'- name: ' + ARCHIVE + '\n        if: ${{ !cancelled() }}',
-		'- name: ' + ARCHIVE + '\n        if: ${{ !cancelled() }}\n        continue-on-error: true'
+		'- name: ' + ARCHIVE + '\n        if: ' + LinuxE2E.condition(ARCHIVE, '${{ !cancelled() }}'),
+		'- name: ' +
+			ARCHIVE +
+			'\n        if: ' +
+			LinuxE2E.condition(ARCHIVE, '${{ !cancelled() }}') +
+			'\n        continue-on-error: true'
 	],
 	[
 		'export ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD="$GITHUB_SHA"',

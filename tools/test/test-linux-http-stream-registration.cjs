@@ -12,6 +12,7 @@
 
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -90,7 +91,10 @@ function validate(root) {
 	const pipeline = Pipeline.open(root);
 	const job = pipeline.job('e2e-linux');
 	const step = Pipeline.step(job, 'Qualify native HTTP streaming receipts');
-	assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+	assert.equal(
+		Pipeline.stepField(step, 'if'),
+		LinuxE2E.condition('Qualify native HTTP streaming receipts', '${{ !cancelled() }}')
+	);
 	assert.equal(
 		Pipeline.stepField(step, 'continue-on-error'),
 		null,

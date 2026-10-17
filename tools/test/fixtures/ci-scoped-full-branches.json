@@ -112,7 +112,7 @@
 		},
 		{
 			"scope": "linux-e2e-suite",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-linux-e2e-suite.json\"\nnode tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed.\"\n    node tools/test/linux-ci-evidence.cjs record-deferred-suite --job e2e-linux --output \"$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json\" --sha \"$GITHUB_SHA\" --architecture \"$RUNNER_ARCH\" --receipt \"$receipt\"\n    node tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt \"$RUNNER_TEMP/stable-linux-simultaneous-native.json\"\nelif [ \"$mode\" = full ]; then\n",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-linux-e2e-suite.json\"\nnode tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed.\"\n    node tools/test/linux-ci-evidence.cjs record-deferred-suite --job e2e-linux --shard \"$LINUX_E2E_SHARD\" --output \"$RUNNER_TEMP/linux-ci-evidence/e2e-linux-$LINUX_E2E_SHARD.json\" --sha \"$GITHUB_SHA\" --architecture \"$RUNNER_ARCH\" --receipt \"$receipt\"\n    node tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt \"$RUNNER_TEMP/stable-linux-simultaneous-native.json\"\nelif [ \"$mode\" = full ]; then\n",
 			"suffix": "\nelse\n    exit 1\nfi",
 			"strip": 0,
 			"format": "bash"
@@ -1193,15 +1193,15 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"name": "Retain the source-bound linux-e2e-suite qualification",
-			"condition": "always()",
-			"body": "      - name: Retain the source-bound linux-e2e-suite qualification\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-linux-e2e-suite\n          path: ${{ runner.temp }}/stable-linux-e2e-suite.json\n          if-no-files-found: warn"
+			"condition": "${{ always() && matrix.shard == 'desktop-webview' }}",
+			"body": "      - name: Retain the source-bound linux-e2e-suite qualification\n        if: ${{ always() && matrix.shard == 'desktop-webview' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-linux-e2e-suite\n          path: ${{ runner.temp }}/stable-linux-e2e-suite.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "e2e-linux",
 			"name": "Retain the contained simultaneous qualification",
-			"condition": "always()",
-			"body": "      - name: Retain the contained simultaneous qualification\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-simultaneous-contained\n          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json\n          if-no-files-found: warn"
+			"condition": "${{ always() && matrix.shard == 'desktop-webview' }}",
+			"body": "      - name: Retain the contained simultaneous qualification\n        if: ${{ always() && matrix.shard == 'desktop-webview' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-simultaneous-contained\n          path: ${{ runner.temp }}/stable-linux-simultaneous-native.json\n          if-no-files-found: warn"
 		}
 	],
 	"receipt_consumers": [
