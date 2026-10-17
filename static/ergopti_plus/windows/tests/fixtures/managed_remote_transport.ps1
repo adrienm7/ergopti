@@ -488,6 +488,22 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
         return name.StartsWith("api-ms-win-", StringComparison.OrdinalIgnoreCase) ||
             name.StartsWith("ext-ms-win-", StringComparison.OrdinalIgnoreCase);
     }
+    // Git2.56 moved native binaries to UCRT64. Select exactly one installed
+    // native git.exe; a credential-manager compatibility directory is not an owner.
+    private static string ResolveNativeDirectory(string installationRoot)
+    {
+        string selected = null;
+        foreach (string prefix in new string[] { "ucrt64", "mingw64" }) {
+            string candidate = Path.GetFullPath(Path.Combine(installationRoot, prefix, "bin"));
+            if (!File.Exists(Path.Combine(candidate, "git.exe"))) continue;
+            if (selected != null)
+                throw new InvalidOperationException("Native Git installation prefix is ambiguous.");
+            selected = candidate;
+        }
+        if (selected == null)
+            throw new InvalidOperationException("Native Git installation prefix is unavailable.");
+        return selected;
+    }
     private static void VerifyDirectory(string path)
     {
         DirectoryInfo directory = new DirectoryInfo(path);
@@ -655,7 +671,8 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
             leaf == null || key == null || !key.Key.IsEphemeral)
             throw new InvalidOperationException("Native in-memory TLS fixture prerequisite unavailable.");
         KeyEphemeral = key.Key.IsEphemeral;
-        nativeDirectory = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "mingw64", "bin"));
+        initializationPhase = "directories";
+        nativeDirectory = ResolveNativeDirectory(Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git")));
         systemDirectory = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
         initializationPhase = "directories";
         VerifyDirectory(nativeDirectory);
