@@ -196,7 +196,7 @@ helpers.describe("keymap.terminators: the pause gate is not here", function()
 		-- so it is opened by its shared-relative path.
 		local sources = {}
 		sources["macos/modules/keymap/terminators.lua"] =
-			helpers.read_driver_source("local I18N_LABEL_KEYS")
+			helpers.read_driver_source("Hammerspoon-local re-export of the shared terminator catalogue")
 
 		local shared_fh = io.open(helpers.shared("lua/keymap/terminators.lua"), "r")
 		helpers.assert_true(shared_fh ~= nil, "_shared/lua/keymap/terminators.lua must be readable")
