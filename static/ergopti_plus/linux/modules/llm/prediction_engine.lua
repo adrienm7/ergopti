@@ -2524,6 +2524,25 @@ function M.dismiss(resync_owner)
 end
 
 
+--- Retires an accepted offer without recording an automatic agent rejection.
+--- A streaming partial or an early sequential variant can be accepted while its
+--- request still runs. Revoke callbacks before cancelling native work: cancellation
+--- may synchronously deliver a final response, and the physical edit is committed.
+local function close_accepted_offer()
+	advance_request_epoch()
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	local backend = _predicting and _inflight_backend or nil
+	_inflight_backend, _predicting = nil, false
+	clear_offer()
+	if backend then
+		local ok, cancelled = pcall(backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "Accepted prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
+end
+
 --- Accepts one displayed prediction after the daemon commits its physical edit.
 --- @param index integer
 --- @return boolean
@@ -2538,7 +2557,7 @@ function M.accept(index)
 		if ok and committed == true then
 			local agent = _suggestion_context and _suggestion_context.agent or nil
 			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
-			clear_offer()
+			close_accepted_offer()
 			return true
 		end
 	elseif candidate.replaces_selection then
@@ -2564,9 +2583,8 @@ function M.accept(index)
 		local observed, observe_err = pcall(_on_output, candidate.to_type, _suggestion_context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
-	clear_offer()
+	close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 	return true
 end
