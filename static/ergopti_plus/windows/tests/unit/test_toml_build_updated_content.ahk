@@ -1404,3 +1404,50 @@ _TBUI_CurrentFixtureRequiresRealBootAdmission() {
 }
 Test("toml config document writer: current source preparation requires real boot admission",
 	_TBUI_CurrentFixtureRequiresRealBootAdmission)
+
+
+; New sections are admitted by one parse of the retained headers. A bulk change
+; that introduced many sections paid one complete source parse per section
+; (8 s for one tray click on a 830-line config).
+_TBUI_NewSectionsShareOneAdmission() {
+	Source := ""
+	Loop 300
+		Source .= "[existing.section_" . A_Index . "]`nenabled = true`n`n"
+	Updates := []
+	Loop 40
+		Updates.Push({ Section: "fresh.section_" . A_Index, Key: "enabled", Value: TOML_Bool(true) })
+	Unit := 0, Build := 0
+	Loop 3 {
+		Started := A_TickCount
+		TOML_ParseDocument(Source)
+		Elapsed := A_TickCount - Started
+		Unit := A_Index == 1 ? Elapsed : Min(Unit, Elapsed)
+	}
+	Loop 2 {
+		Started := A_TickCount
+		Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
+		Elapsed := A_TickCount - Started
+		Build := A_Index == 1 ? Elapsed : Min(Build, Elapsed)
+	}
+	Parsed := TOML_ParseDocument(Result["content"])
+	AssertTrue(TOML_SameValue(Parsed["fresh"]["section_40"]["enabled"], TOML_Bool(true)))
+	AssertTrue(InStr(Result["content"], "[fresh.section_1]`nenabled = true`n") > 0,
+		"an admitted section is written under its own header")
+	; One header parse per section costs about 40 source parses; a shared
+	; admission costs a handful (source, model, admission, final check).
+	AssertTrue(Build <= 15 * Max(Unit, 16),
+		Format("40 new sections took {1} ms against {2} ms per parse", Build, Unit))
+}
+Test("toml config document writer: new sections share one header admission (toml-batch-admission)",
+	_TBUI_NewSectionsShareOneAdmission)
+
+; A header the source has already closed (a dotted key owns the namespace)
+; still falls back to its physical owner while its siblings get headers.
+_TBUI_RefusedHeaderFallsBackPerSection() {
+	Source := "[a]`nb.c = 1`n"
+	Updates := [{ Section: "a.b", Key: "d", Value: 2 }, { Section: "z", Key: "k", Value: 3 }]
+	Result := TOML_BuildConfigDocumentCandidate(Source, Updates, [])
+	AssertEqual(Chr(0xFEFF) . "[a]`nb.c = 1`nb.d = 2`n[z]`nk = 3`n", Result["content"])
+}
+Test("toml config document writer: a closed namespace falls back to its owner (toml-batch-admission)",
+	_TBUI_RefusedHeaderFallsBackPerSection)

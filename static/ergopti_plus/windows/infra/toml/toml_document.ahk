@@ -840,6 +840,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	NewTables.CaseSense := "On"
 	HeaderAdmission := Map()
 	HeaderAdmission.CaseSense := "On"
+	NewLeaves := []
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -858,19 +859,39 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		loop Parts.Length - 1
 			SectionParts.Push(Parts[A_Index])
 		Identity := _TOML_ConfigPathName(SectionParts)
-		; New sections need explicit headers for the still-live native flat reader.
-		; The semantic parser decides whether that declaration is legal: existing
-		; dotted or inline namespaces may already have closed the requested table.
-		; Explicit replacements first release only their classified physical owners.
-		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+		if SectionParts.Length
 			HeaderAdmission[Identity] := false
-			try {
-				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+		NewLeaves.Push({ Parts: Parts, Desired: Desired, SectionParts: SectionParts, Identity: Identity })
+	}
+	; New sections need explicit headers for the still-live native flat reader.
+	; The semantic parser decides whether that declaration is legal: existing
+	; dotted or inline namespaces may already have closed the requested table.
+	; Explicit replacements first release only their classified physical owners.
+	; One parse admits every header at once: parsing only adds declarations, so
+	; headers legal together are each legal alone. A refusal falls back to one
+	; parse per header, which a bulk change of 20 new sections paid every time.
+	if HeaderAdmission.Count {
+		Batch := ""
+		for Identity in HeaderAdmission
+			Batch .= "`n[" . Identity . "]`n"
+		try {
+			TOML_ParseDocument(HeaderSource . Batch)
+			for Identity in HeaderAdmission
 				HeaderAdmission[Identity] := true
-			} catch ValueError {
-				; Existing physical ownership remains the only legal insertion route.
+		} catch ValueError {
+			for Identity in HeaderAdmission {
+				try {
+					TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+					HeaderAdmission[Identity] := true
+				} catch ValueError {
+					; Existing physical ownership remains the only legal insertion route.
+				}
 			}
 		}
+	}
+	for Leaf in NewLeaves {
+		Parts := Leaf.Parts, Desired := Leaf.Desired
+		SectionParts := Leaf.SectionParts, Identity := Leaf.Identity
 		if SectionParts.Length && HeaderAdmission[Identity] {
 			if !NewTables.Has(Identity)
 				NewTables[Identity] := []
