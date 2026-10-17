@@ -596,10 +596,12 @@ Test(Name, Callback, Interactive := false) {
 ; dominates the CI wall time.
 global TEST_MODULE_GROUPS := [
 	["meta", "^meta/"],
-	["llm-servers-a", "test_local_server_panel|test_local_server_scope_cohort|test_managed_|ollama"],
+	["llm-servers-a", "test_local_server_panel|test_managed_|ollama"],
 	["llm-servers-b", "local_server"],
+	["llm-terminal", "llm_nav_event_owner/"],
 	["llm", "llm|model|prediction|vision|agent|tone|translate|prompt|api_test"],
-	["config-scope-a", "global_config_scope|restore_recommended|config_transition"],
+	["config-transition", "config_transition"],
+	["config-scope-a", "global_config_scope|restore_recommended"],
 	["config-scope-b", "scope|journal"],
 	["config", "config|toml|updater|migrat|backup|sqlite|settings"],
 	["hotstrings", "hotstring|personal|prefix|magic|capsword|tap|wrap|shortcut|text|corpus|dynamic"],
