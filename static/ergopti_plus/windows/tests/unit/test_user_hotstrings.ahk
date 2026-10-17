@@ -678,6 +678,38 @@ _UCHActualSourceAdmission() {
 }
 Test("programmable hotstrings: actual absent repaired empty disappeared and unreadable sources acknowledge honest admission", _UCHActualSourceAdmission)
 
+/**
+ * The repair offer is modal and runs on a timer thread. Opened during boot it
+ * interrupts the auto-execute thread, which then stays frozen wherever it was
+ * (the navigation owner start, the prefix index) until someone answers.
+ */
+_UCHRepairOfferWaitsForBoot() {
+	global _ConfigDir, _UserHotstringsRepairPending, _DriverBootPhase
+	Saved := [_ConfigDir, _UserHotstringsRepairPending]
+	SavedPhase := IsSet(_DriverBootPhase) ? _DriverBootPhase : unset
+	Fixture := _ScopeOwnerFixture()
+	try {
+		_ConfigDir := Fixture.directory . "\"
+		AssertFalse(FSStrictExists(UserHotstringsSourcePath()))
+		_DriverBootPhase := "starting", _UserHotstringsRepairPending := true
+		Shown := TestMsgBoxCount()
+		_UserHotstringsOfferRepair()
+		AssertEqual(Shown, TestMsgBoxCount(), "a repair offer must not open a modal dialog over the boot thread")
+		AssertTrue(_UserHotstringsRepairPending, "the deferred offer stays pending, so no duplicate is queued")
+		_DriverBootPhase := "ready"
+		_UserHotstringsOfferRepair()
+		AssertEqual(Shown + 1, TestMsgBoxCount(), "the deferred offer still opens once the driver is ready")
+		AssertFalse(_UserHotstringsRepairPending)
+		AssertFalse(FSStrictExists(UserHotstringsSourcePath()), "a declined offer creates nothing")
+	} finally {
+		SetTimer(_UserHotstringsOfferRepair, 0)
+		_ConfigDir := Saved[1], _UserHotstringsRepairPending := Saved[2]
+		_DriverBootPhase := IsSet(SavedPhase) ? SavedPhase : unset
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("programmable hotstrings: the repair offer waits for the end of boot (repair-offer-after-boot)", _UCHRepairOfferWaitsForBoot)
+
 _UCHNativePrivacyAndPause() {
 	global _ConfigDir, CategoryEnabled, HSE_Buffer, SFD_FIELD_CACHE
 	global _UserHotstringsOwner

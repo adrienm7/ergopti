@@ -450,6 +450,16 @@ through the loader's `publish_start_epoch` request. Action: state created
 inside Start that must outlive it joins the published epoch explicitly; test
 it through a started owner (`start-epoch-custody`), not a bare refresh.
 
+### project-boot-modal-freezes-auto-execute
+
+A modal dialog (`MsgBox`, `Ui_MsgBox`) opened by a timer while
+`_DriverBootPhase != "ready"` interrupts the auto-execute thread, which stays
+frozen at whatever line it had reached until the dialog is answered. Boot logs
+then point at an innocent stage (once `LLM_NavEventOwner_EnsureStarted`), and a
+line sampler only shows idle timers. Action: defer every boot-time modal until
+ready (`_ErrorDialog_Present`, `_UserHotstringsOfferRepair`); to find one,
+list the probe's `#32770` windows rather than its hot lines.
+
 ### project-llm-tap-hold-tab-is-the-users-tab
 
 The recommended AltGr taps Tab (`_shared/tap_hold/defaults.toml`), and a

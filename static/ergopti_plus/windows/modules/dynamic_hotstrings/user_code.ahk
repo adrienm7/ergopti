@@ -15,6 +15,8 @@
 ; Only the host may publish returned text. Callback actions remain user-owned.
 ; A two-MiB wire envelope bounds staged callback output (UTF-8 hex doubles bytes).
 global USER_HOTSTRINGS_MAX_WIRE_BYTES := 2 * 1024 * 1024
+; Polling interval of a repair offer waiting for the end of boot.
+global USER_HOTSTRINGS_REPAIR_BOOT_RETRY_MS := 500
 global _UserHotstringsOwner := 0
 global _UserHotstringsInputSerial := 0
 global _UserHotstringsCapture := 0
@@ -59,7 +61,13 @@ _UserHotstringsReport(Kind, Id) {
 }
 
 _UserHotstringsOfferRepair(*) {
-	global _UserHotstringsRepairPending
+	global _UserHotstringsRepairPending, _DriverBootPhase
+	; The offer is modal and runs on a timer thread: opened during boot, it
+	; interrupts the auto-execute thread and holds the whole boot until answered.
+	if IsSet(_DriverBootPhase) && _DriverBootPhase != "ready" {
+		SetTimer(_UserHotstringsOfferRepair, -USER_HOTSTRINGS_REPAIR_BOOT_RETRY_MS)
+		return
+	}
 	try {
 		Present := FSStrictExists(UserHotstringsSourcePath())
 		ActionLabel := Present ? T("menu.hotstrings.user_code.open_source") : T("menu.hotstrings.user_code.create_example")
