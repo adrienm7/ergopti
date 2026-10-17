@@ -11,7 +11,7 @@
 #Requires AutoHotkey v2.0
 
 _LNTR_WithState(Fn) {
-	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex, KLE_State
+	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex, KLE_State, KLE_Compositions
 	global _LLM_NavEventOwnerTerminalRouteGeneration
 	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteUnknown
 	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
@@ -22,7 +22,7 @@ _LNTR_WithState(Fn) {
 		_LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteRecipes,
 		_LLM_NavEventOwnerTerminalRouteModels, _LLM_NavEventOwnerTerminalRouteCoverage,
 		_LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteOwner,
-		_LLM_NavEventOwnerTerminalRouteUnknown]
+		_LLM_NavEventOwnerTerminalRouteUnknown, KLE_Compositions]
 	Primary := 0, CleanupFailure := 0
 	try {
 		_LLM_NavEventOwnerTerminalRouteGeneration := 0
@@ -63,6 +63,7 @@ _LNTR_WithState(Fn) {
 		_LLM_NavEventOwnerTerminalRouteRefreshing := Saved[12]
 		_LLM_NavEventOwnerTerminalRouteOwner := Saved[13]
 		_LLM_NavEventOwnerTerminalRouteUnknown := Saved[14]
+		KLE_Compositions := Saved[15]
 		if IsObject(CleanupFailure) && !IsObject(Primary)
 			throw CleanupFailure
 	}
@@ -96,12 +97,11 @@ _LNTR_LoadFixture(Base) {
 		. '<key code="0" output="' . StrUpper(Base) . '"/><key code="1" output="!"/></keyMap></keyMapSet>'
 		. '<actions><action id="dead"><when state="none" next="acute"/>'
 		. '<when state="acute" output="^"/></action></actions></keyboard>'
-	KLE_Model := Keylayout_Parse(Text)
-	KLE_Id := "replay-fixture-" . Base
-	KLE_KeyCodes := Map("SC010", 0, "SC011", 1, "SC012", 2)
-	KLE_LevelIndex := Map(_KLE_ComboKey(false, false, false), 0,
-		_KLE_ComboKey(true, false, false), 1)
-	KLE_State := "none"
+	; Registration tests use the original loader, never a supplied source witness.
+	Table := Map("conventions", ["iso"], "keys", [
+		Map("ahk", "SC010", "mac", 0), Map("ahk", "SC011", "mac", 1),
+		Map("ahk", "SC012", "mac", 2)])
+	AssertEqual(3, KeylayoutEmulation_Load("replay-fixture-" . Base, Text, "iso", Table))
 }
 
 _LNTR_Source(State) {
@@ -1811,6 +1811,75 @@ Test("terminal-route-exact-count: the native wrapper forwards the full count and
 Test("terminal-route-exact-count: the source builder retains every controlled base and Shift route",
 	() => _LNTR_WithState(_TRE_Build))
 Test("terminal-route-exact-count: count arithmetic retains zero and refuses UInt32 overflow", _TRE_Counts)
+
+/** A borrowed callback cannot select the canonical source after frame issuance. */
+_TCF_SourceReplacement(Operation, InitiallyInactive := false) {
+	State := _LNTR_PortState()
+	if InitiallyInactive
+		KeylayoutEmulation_Unload()
+	Before := KeylayoutEmulation_CaptureCanonicalSource()
+	State.Port["terminal_route_source"] := ReplaceSource
+	Failure := 0
+	try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	catch as Err
+		Failure := Err
+	AssertTrue(IsObject(Failure), "registration must refuse the callback's successor source")
+	AssertContains(Failure.Message, "canonical source", "the original captured source fences registration")
+	AssertEqual(0, State.Calls.Length, "source replacement is rejected before the registration boundary")
+	AssertFalse(Before["current"].Call(), "the callback actually replaced the original source")
+	After := KeylayoutEmulation_CaptureCanonicalSource()
+	AssertTrue(After["current"].Call(), "the legitimate successor remains usable")
+	AssertEqual(Operation == "load", After["active"], "the callback performed its exact source operation")
+
+	ReplaceSource() {
+		if Operation == "load" {
+			_LNTR_LoadFixture("z")
+			return _LNTR_Source(State)
+		}
+		KeylayoutEmulation_Unload()
+		return Map("active", 0, "caps", 0)
+	}
+}
+
+Test("terminal-canonical-frame: source callback cannot replace the captured active layout",
+	() => _LNTR_WithState(() => _TCF_SourceReplacement("load")))
+Test("terminal-canonical-frame: source callback cannot activate a captured inactive layout",
+	() => _LNTR_WithState(() => _TCF_SourceReplacement("load", true)))
+Test("terminal-canonical-frame: source callback cannot withdraw the captured layout",
+	() => _LNTR_WithState(() => _TCF_SourceReplacement("unload")))
+
+/** Source admission cannot take away the old frame's independent Stop authority. */
+_TCF_RegisteredReplacement() {
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	State := _LNTR_PortState()
+	State.Port["register_terminal_routes"] := ReplaceAfterRegistration
+	Failure := 0
+	try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	catch as Err
+		Failure := Err
+	AssertTrue(IsObject(Failure), "a late source replacement cannot certify publication")
+	AssertContains(Failure.Message, "canonical source")
+	AssertEqual(1, State.Calls.Length, "the exact original registration boundary ran once")
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map,
+		"an uncertain registration retains its original frame")
+	AssertTrue(KeylayoutEmulation_CaptureCanonicalSource()["current"].Call(),
+		"the successor is valid even though the old frame cannot admit it")
+	AssertTrue(_LNTR_StopFixtureState(), "source withdrawal must not prevent original retirement")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	State.Port["register_terminal_routes"] := _LNTR_Register.Bind(State)
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port),
+		"the legitimate successor can register after exact retirement")
+	AssertEqual(2, State.Calls.Length)
+
+	ReplaceAfterRegistration(Owner, Generation, Layout, Bindings, Count) {
+		Status := _LNTR_Register(State, Owner, Generation, Layout, Bindings, Count)
+		_LNTR_LoadFixture("z")
+		return Status
+	}
+}
+
+Test("terminal-canonical-frame: late source withdrawal retains independent Stop and successor admission",
+	() => _LNTR_WithState(_TCF_RegisteredReplacement))
 
 /** Receives the actual x64 DLL without starting a keyboard hook or emitting input. */
 _TRE_GenuineNativeCount() {

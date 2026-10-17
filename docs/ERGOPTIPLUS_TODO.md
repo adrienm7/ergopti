@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-16. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
+Updated: 2026-10-17. Latest stable: [v1.0.1](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1)
 at `63cf3d005d371edb4e4093a906da276ced487182`, published and verified by the
 publication owner with [CI 38178846226](https://github.com/adrienm7/ergopti/actions/runs/38178846226).
 This checklist is the current handoff; older workflow task-status files are
@@ -11,6 +11,31 @@ Item numbers are stable identifiers: a finished item is removed (its durable
 facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
+
+### October 17 Windows canonical registration source custody
+
+Every original registration frame now captures the original no-argument canonical
+source before borrowed source, recipe or registration callbacks, including its
+inactive cell. The exact current witness remains private to that frame. Admission
+rechecks it after callouts and before references can publish or retire. A supplied
+source map cannot replace that witness. These source checks are separate from the
+native export and Stop custody checks, so withdrawing admission cannot prevent
+retirement of the original retained frame. macOS and Linux do not use this
+C/AutoHotkey registration boundary.
+
+Three additive actual AHK cases first fail on the original dispatcher: a source
+callback can replace an active source, activate an inactive source or unload the
+captured source and still register. All three pass after correction. A fourth
+case exposes a late refusal after the registration callback; the corrected
+dispatcher refuses before reference publication, retains uncertain custody and
+permits a successor only after exact original Stop. All four cases now pass.
+The existing metadata selection passes ten cases, registration custody passes
+91 and native retirement passes nineteen, each with a complete timed manifest
+and natural exit0. BOM/LF and strict conventions also pass. The metadata fixture
+now loads its unchanged three-key XML through the original loader rather than
+assigning a parsed model and incomplete modifier table directly.
+
+Broader composed receiving and native qualification remain separate.
 
 ### October 16 media schema reader-lock admission
 
