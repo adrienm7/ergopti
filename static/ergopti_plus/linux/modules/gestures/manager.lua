@@ -915,7 +915,7 @@ local function requirement_holds(token)
 	if tool then
 		local ok, Shell = pcall(require, "adapters.shell_runner")
 		if not ok or type(Shell.has_command) ~= "function" then return nil, nil end
-		if Shell.has_command(tool) then return true, nil end
+		if Shell.has_command(tool, true) then return true, nil end
 		local hint = i18n.get("dialog.action_picker.requires_tool"):gsub("{1}", function() return tool end)
 		return false, hint
 	end
