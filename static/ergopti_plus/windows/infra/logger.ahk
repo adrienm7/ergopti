@@ -143,6 +143,8 @@ global _LOGGER_APPEND_OWNERS := Map()
 ; The stage of the latest refused append, from a closed set (never log text),
 ; so a shutdown refusal can say why queued lines stayed unwritten.
 global _LOGGER_LAST_APPEND_FAILURE := "none"
+; Successor flushes LoggerPrepareShutdown runs while lines keep arriving.
+global LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES := 8
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
@@ -756,20 +758,30 @@ _LoggerRepairShutdownDebts() {
 ; Optional refusal evidence contains only a detached snapshot of native owner
 ; counters; inspecting it never flushes, repairs, or releases logger ownership.
 ; @param Refusal {Map|Integer} Receives primitive refusal evidence, or zero on success.
+; @param FlushFn {Func|Integer} Test seam replacing _LoggerFlush; zero uses it.
 ; @returns {Boolean} True only after the existing durable shutdown boundary.
-LoggerPrepareShutdown(&Refusal := 0) {
+LoggerPrepareShutdown(&Refusal := 0, FlushFn := 0) {
 	Refusal := 0
+	Flush := HasMethod(FlushFn, "Call") ? FlushFn : _LoggerFlush
 	if !_LoggerRepairShutdownDebts() {
 		Refusal := _LoggerShutdownRefusalSnapshot("repair")
 		return false
 	}
-	if !_LoggerFlush(true) {
+	if !Flush.Call(true) {
 		Refusal := _LoggerShutdownRefusalSnapshot("flush")
 		return false
 	}
-	if _LoggerHasPendingDebt() && !_LoggerFlush(true) {
-		Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
-		return false
+	; Timers still running at shutdown can log while a flush writes outside
+	; Critical, so one successor flush could leave a burst queued. Drain again
+	; within a fixed bound; a sink that refuses every append still ends in the
+	; pending-debt refusal below.
+	loop LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES {
+		if !_LoggerHasPendingDebt()
+			break
+		if !Flush.Call(true) {
+			Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
+			return false
+		}
 	}
 	if _LoggerHasPendingDebt() {
 		Refusal := _LoggerShutdownRefusalSnapshot("pending_debt")
