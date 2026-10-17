@@ -76,7 +76,7 @@ local _trigger_char = ManifestReader.default_for("hotstrings.trigger_char")
 -- The canonical master leaf; its desired value is read at init() and refresh().
 local MASTER_PATH = "hotstrings.dynamic.enabled"
 local _desired_enabled = ManifestReader.default_for(MASTER_PATH)
-local _enabled      = false        -- native availability and desired master
+local _enabled      = false        -- builtin availability and desired master
 local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
@@ -319,7 +319,10 @@ end
 --- Returns true when the module has been initialised and has active rules.
 --- @return boolean
 function M.is_enabled()
-	return _enabled
+	-- The programmable owner can start, reload or stop independently of builtin
+	-- registration. Read its admitted availability live rather than caching it
+	-- only on refresh, which made identical scope snapshots restore differently.
+	return _enabled or (_desired_enabled and UserCode.is_enabled() and UserCode.count() > 0)
 end
 
 --- Commits the master and every canonical family through one runtime owner.
@@ -346,7 +349,7 @@ function M.set_enabled(state)
 	end
 	_desired_enabled = state
 	_enabled = state and _rules_count > 0
-	return _enabled == state
+	return M.is_enabled() == state
 end
 
 --- Adopts the master's canonical value after another owner published it.
@@ -367,8 +370,7 @@ function M.refresh(snapshot, inverse)
 			return false, "programmable-refused"
 		end
 	end
-	_enabled = _desired_enabled and (_rules_count > 0 or (UserCode.is_enabled() and UserCode.count() > 0))
-	if _enabled == _desired_enabled then return true end
+	if M.is_enabled() == _desired_enabled then return true end
 	return false, "builtin-unavailable"
 end
 
@@ -456,7 +458,7 @@ end
 --- @return boolean True if a dynamic expansion was performed.
 --- @return table|nil Canonical event details for a successful expansion.
 function M.on_trigger(buffer, trigger, start_is_boundary)
-	if not _enabled then return false end
+	if not M.is_enabled() then return false end
 	if type(buffer) ~= "string" or buffer == "" then return false end
 
 	-- Only fire on the configured trigger character.
@@ -561,7 +563,7 @@ end
 --- @return table Array of candidate records; empty when nothing is offered.
 function M.preview_candidates(buffer, start_is_boundary)
 	local rows = {}
-	if not _enabled then return rows end
+	if not M.is_enabled() then return rows end
 	if not require("dynamic_hotstrings").match_buffer(buffer, DYNAMIC_GROUP, M.is_rule_enabled, start_is_boundary) then
 		local user = UserCode.preview(buffer)
 		if user then
@@ -607,7 +609,7 @@ end
 --- @param start_is_boundary boolean|nil Input owner state captured with the complete buffer.
 --- @return string|nil Preview text, or nil.
 function M.preview(buffer, start_is_boundary)
-	if not _enabled then return nil end
+	if not M.is_enabled() then return nil end
 	if type(buffer) ~= "string" or buffer == "" then return nil end
 
 	local ok_eng, Engine = pcall(require, "dynamic_hotstrings")
@@ -751,7 +753,7 @@ function M.save_info(values)
 		return false
 	end
 
-	local was_enabled = _enabled
+	local was_enabled = M.is_enabled()
 	local refreshed = M.init({ trigger_char = _trigger_char, personal_info_path = _info_path })
 	if refreshed ~= true then
 		Logger.error(LOG, "Personal-info source committed but live rule refresh failed.")
@@ -872,7 +874,7 @@ end
 --- to filter on.
 --- @return table Array of mapping tables.
 function M.prefix_mappings()
-	if not _enabled then return {} end
+	if not M.is_enabled() then return {} end
 	local ok, Prefix = pcall(require, "modules.dynamic_hotstrings.prefix_rules")
 	if not ok or not Prefix then
 		Logger.error(LOG, "prefix_rules module unavailable — no prefix expansion is registered.")
