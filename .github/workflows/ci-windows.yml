@@ -499,6 +499,8 @@ jobs:
       # files older releases wrote, must reach ready with no ERROR logged. The
       # JS suite runs on Linux, where this smoke can only skip, so it runs here.
       - name: Run the full-driver startup smoke
+        # Whole-driver gates, not module tests: one module runner owns them.
+        if: matrix.module == 'hotstrings'
         shell: pwsh
         timeout-minutes: 20
         run: |
@@ -510,6 +512,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Test fresh Git clone bootstrap and warm startup
+        # Whole-driver gates, not module tests: one module runner owns them.
+        if: matrix.module == 'hotstrings'
         shell: pwsh
         timeout-minutes: 24
         run: |
