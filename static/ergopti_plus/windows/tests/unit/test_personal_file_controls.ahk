@@ -583,3 +583,52 @@ for _PFC_MetadataVector in JsonParse(FileRead(_SharedDir . "\tests\corpus\hotstr
 		Test("personal-file-metadata: (personal-metadata-source-type) " . _PFC_MetadataVector["name"],
 			_PFC_StoredMetadataTypesRefuse.Bind(_PFC_MetadataVector))
 }
+
+
+/**
+ * A file row asks four metadata questions per section. Each used to reparse the
+ * whole personal source, so a maintainer tree of three 35 KB files took 20-45 s
+ * to render on the single AutoHotkey thread and starved hotstring expansion.
+ * The owner answers from the parse its discovery admitted: rendering a large
+ * file reads its retained source zero times and stays far inside a menu budget.
+ */
+_PFC_FileRowRendersWithoutReparsing() {
+	Fixture := _PFC_Fixture()
+	Row := 0, ContentReads := 0, Owner := 0, Retained := ""
+	try {
+		Sections := 12, Entries := 60
+		Content := '[_meta]`ndescription = "Large"`ndelay = 0.25`n[_meta.sections]`n'
+		loop Sections
+			Content .= 'section_' . A_Index . ' = "Section ' . A_Index . '"`n'
+		loop Sections {
+			SectionIndex := A_Index
+			Content .= '`n[[section_' . SectionIndex . ']]`n'
+			loop Entries
+				Content .= '"trig' . SectionIndex . 'x' . A_Index . '" = { output = "Output '
+					. SectionIndex . ' ' . A_Index . '", is_word = true, auto_expand = false }`n'
+		}
+		FilePath := Fixture.root . "\large_personal.toml"
+		Assert(FSWriteDurable(FilePath, Content))
+		PersonalFileControls.Refresh()
+		Owner := PersonalFileControls.ForPath(FilePath)
+		Assert(Owner is PersonalFileAdoptedOwner, "the large source is a genuine adopted owner")
+		AssertTrue(Owner.MetadataAvailable("", "delay"), "the retained parse still answers the real question")
+		Retained := Owner.content
+		Owner.DefineProp("content", {Get: (*) => (ContentReads += 1, Retained)})
+		Started := _TestClockMs()
+		Row := _HS_TomlFileRow({path: FilePath, stem: "large_personal", sections: [], count: Sections * Entries})
+		Elapsed := _TestClockMs() - Started
+		Assert(Row is Map && Row["submenu"] is Menu, "the large file row is rendered")
+		AssertTrue(TrayMenuItemCount(Row["submenu"]) >= Sections, "every section row is rendered")
+		AssertEqual(0, ContentReads, "a file row never reparses its owner's source (perf-personal-metadata-2026-10-17)")
+		AssertTrue(Elapsed < 1500, "a " . Sections . "-section file row rendered in " . Round(Elapsed) . " ms")
+	} finally {
+		if Owner is PersonalFileAdoptedOwner && Retained != ""
+			Owner.DefineProp("content", {Value: Retained})
+		if Row is Map
+			_HS_PersonalReleaseMenus([Row["submenu"]])
+		_PFC_Cleanup(Fixture)
+	}
+}
+Test("personal-file-metadata: a file row renders from the admitted parse (perf-personal-metadata-2026-10-17)",
+	_PFC_FileRowRendersWithoutReparsing)
