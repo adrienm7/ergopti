@@ -224,6 +224,10 @@ HS_EnumeratePersonalExtFiles() {
 				continue
 			if (Prefix == "" and A_LoopFileName == "personal_hotstrings.toml")
 				continue
+			; A writer backup duplicates its source's triggers and would itself be
+			; backed up by the next scoped reset.
+			if PersonalFileIsBackup(A_LoopFileName)
+				continue
 			SplitPath OwnedChildPath, , , , &Stem
 			Found.Push(Map("Path", OwnedChildPath,
 				"Label", (Prefix == "" ? "" : Prefix . " / ") . Stem,

@@ -15,6 +15,8 @@
 --- One predicate, used by both scans, is what keeps the two lists equal.
 --- ==============================================================================
 
+local PersonalFiles = require("hotstrings.personal_files")
+
 local M = {}
 
 
@@ -47,14 +49,16 @@ local CONFIGURATION_FILES = {
 ---
 --- Underscore-prefixed files are metadata by convention; defaults.toml predates
 --- that convention and is named explicitly, as are the configuration files
---- that share the folder.
+--- that share the folder. Writer backups left beside a source are never loaded.
 --- @param path string A file name or path.
 --- @return boolean
 function M.is_category_file(path)
 	if type(path) ~= "string" or path == "" then return false end
 	local name = path:match("([^/\\]+)$")
 	if not name or not name:match("%.toml$") then return false end
+	-- A writer backup (<stem>.backup-<stamp>.toml) duplicates its source.
 	return name:sub(1, 1) ~= "_" and not METADATA_FILES[name] and not CONFIGURATION_FILES[name]
+		and not PersonalFiles.is_backup(name)
 end
 
 return M

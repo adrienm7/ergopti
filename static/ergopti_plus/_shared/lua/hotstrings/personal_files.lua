@@ -8,12 +8,32 @@ local NAMESPACE = "personal-file:"
 local SEPARATOR = ":"
 local LABEL_SEPARATOR = " / "
 local EXTENSION = ".toml"
+local BACKUP_INFIX = ".backup-"
 
 -- Adoption policy is separate from the exact three-field provenance descriptor.
 M.additional_default_enabled = true
 M.additional_priority_tier = "package"
 M.additional_default_delay_seconds = 0
 M.additional_scan_max_depth = 16
+
+--- Recognise the copies that configuration writers leave beside their source
+--- (<stem>.backup-<stamp>.toml). Every driver writes them into the scanned
+--- hotstrings folder, so discovery must never load one as a hotstring source.
+--- @param name any File name or path.
+--- @return boolean
+function M.is_backup(name)
+	if type(name) ~= "string" then return false end
+	local lower = (name:match("([^/\\]+)$") or ""):lower()
+	if #lower <= #EXTENSION or lower:sub(-#EXTENSION) ~= EXTENSION then return false end
+	local stem, start, from = lower:sub(1, -#EXTENSION - 1), nil, 1
+	while true do
+		local found = stem:find(BACKUP_INFIX, from, true)
+		if not found then break end
+		start, from = found, found + 1
+	end
+	if not start or start == 1 then return false end
+	return stem:sub(start + #BACKUP_INFIX):find("^[%d%-]+$") ~= nil
+end
 
 --- Preserve actual filename components, independent of labels or activation groups.
 --- @param components table Dense relative filename components, including .toml.

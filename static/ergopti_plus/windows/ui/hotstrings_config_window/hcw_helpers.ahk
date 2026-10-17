@@ -159,7 +159,9 @@ _HCW_BuildCategoryList(Publish := true) {
 			PersonalFiles := []
 			Loop Files, HsDir . "*.toml" {
 				Stem := RegExReplace(A_LoopFileName, "\.toml$", "")
-				if (SubStr(Stem, 1, 1) == "_") {
+				; A writer backup is not a source: listing it here also made the
+				; scoped reset own it and back up the backup.
+				if (SubStr(Stem, 1, 1) == "_") || PersonalFileIsBackup(A_LoopFileName) {
 					continue
 				}
 				PersonalFiles.Push({ Stem: Stem, Path: A_LoopFileFullPath })

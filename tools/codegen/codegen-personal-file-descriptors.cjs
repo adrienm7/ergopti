@@ -22,6 +22,7 @@ function validate(policy) {
 		policy.additional_default_delay_seconds !== 0 ||
 		!Number.isSafeInteger(policy.additional_scan_max_depth) ||
 		policy.additional_scan_max_depth < 1 ||
+		!/^\.[a-z]+-$/.test(policy.backup_infix) ||
 		typeof policy.label_separator !== 'string' ||
 		/[\x00-\x1f\x7f]/.test(policy.label_separator) ||
 		!policy.label_separator.isWellFormed()
@@ -29,7 +30,7 @@ function validate(policy) {
 		throw new TypeError('Invalid personal-file descriptor policy.');
 	if (
 		Object.keys(policy).sort().join(',') !==
-		'additional_default_delay_seconds,additional_default_enabled,additional_priority_tier,additional_scan_max_depth,component_separator,extension,label_separator,namespace,version'
+		'additional_default_delay_seconds,additional_default_enabled,additional_priority_tier,additional_scan_max_depth,backup_infix,component_separator,extension,label_separator,namespace,version'
 	)
 		throw new TypeError('Unknown personal-file descriptor policy field.');
 	return policy;
@@ -48,12 +49,32 @@ local NAMESPACE = @NAMESPACE@
 local SEPARATOR = @SEPARATOR@
 local LABEL_SEPARATOR = @LABEL_SEPARATOR@
 local EXTENSION = @EXTENSION@
+local BACKUP_INFIX = @BACKUP_INFIX@
 
 -- Adoption policy is separate from the exact three-field provenance descriptor.
 M.additional_default_enabled = @DEFAULT_ENABLED@
 M.additional_priority_tier = @PRIORITY_TIER@
 M.additional_default_delay_seconds = @DEFAULT_DELAY@
 M.additional_scan_max_depth = @SCAN_DEPTH@
+
+--- Recognise the copies that configuration writers leave beside their source
+--- (<stem>.backup-<stamp>.toml). Every driver writes them into the scanned
+--- hotstrings folder, so discovery must never load one as a hotstring source.
+--- @param name any File name or path.
+--- @return boolean
+function M.is_backup(name)
+	if type(name) ~= "string" then return false end
+	local lower = (name:match("([^/\\]+)$") or ""):lower()
+	if #lower <= #EXTENSION or lower:sub(-#EXTENSION) ~= EXTENSION then return false end
+	local stem, start, from = lower:sub(1, -#EXTENSION - 1), nil, 1
+	while true do
+		local found = stem:find(BACKUP_INFIX, from, true)
+		if not found then break end
+		start, from = found, found + 1
+	end
+	if not start or start == 1 then return false end
+	return stem:sub(start + #BACKUP_INFIX):find("^[%d%-]+$") ~= nil
+end
 
 --- Preserve actual filename components, independent of labels or activation groups.
 --- @param components table Dense relative filename components, including .toml.
@@ -150,6 +171,27 @@ PersonalFileDefaultEnabled() => @DEFAULT_ENABLED@
 PersonalFilePriorityTier() => @PRIORITY_TIER@
 PersonalFileDefaultDelay() => @DEFAULT_DELAY@
 PersonalFileScanMaxDepth() => @SCAN_DEPTH@
+
+/**
+ * Recognises the copies configuration writers leave beside their source
+ * (<stem>.backup-<stamp>.toml). They sit in the scanned hotstrings folder, so
+ * discovery must never load one as a hotstring source.
+ * @param {String} Name File name or path.
+ * @returns {Integer} True for a writer backup.
+ */
+PersonalFileIsBackup(Name) {
+	if !(Name is String)
+		return false
+	SplitPath(Name, &Leaf)
+	Extension := @EXTENSION@, Infix := @BACKUP_INFIX@
+	if StrLen(Leaf) <= StrLen(Extension) || StrLower(SubStr(Leaf, -StrLen(Extension))) != Extension
+		return false
+	Stem := SubStr(Leaf, 1, StrLen(Leaf) - StrLen(Extension))
+	Position := InStr(Stem, Infix, false, -1)
+	if Position <= 1
+		return false
+	return RegExMatch(SubStr(Stem, Position + StrLen(Infix)), "^[0-9-]+$") ? true : false
+}
 
 /** Builds an exact relative personal-source identity without choosing a runtime group. */
 PersonalFileDescribe(Components) {
@@ -254,6 +296,7 @@ PersonalFileDescriptorCopy(Descriptor) {
 		SEPARATOR: policy.component_separator,
 		LABEL_SEPARATOR: policy.label_separator,
 		EXTENSION: policy.extension,
+		BACKUP_INFIX: policy.backup_infix,
 		PRIORITY_TIER: policy.additional_priority_tier
 	})) {
 		lua = lua.replaceAll('@' + token + '@', JSON.stringify(value));

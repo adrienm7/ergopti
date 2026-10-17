@@ -346,6 +346,63 @@ _PFC_DirectoryCycleAndDepthRefuse() {
 }
 Test("personal-file-controls: real junction cycles are bounded and represented as unavailable menu folders", _PFC_DirectoryCycleAndDepthRefuse)
 
+_PFC_Join(Values) {
+	Text := ""
+	for Value in Values
+		Text .= (A_Index > 1 ? "|" : "") . Value
+	return Text
+}
+
+; personal-file-backups-2026-10-17: the Hotstrings scoped reset backs up every
+; personal file beside itself as <stem>.backup-<stamp>.toml. Discovery loaded
+; each copy as one more personal source (263 duplicate triggers apiece), and
+; the next reset owned the copies and backed up the backups.
+_PFC_WriterBackupsAreNeverSources() {
+	global _HS_PreScanPersonalCacheLoaded, _PersonalExtTree, _ExtTotalPersonalCounterGlobal
+	global _ParseExtTomlSectionsCache
+	Fixture := _PFC_Fixture()
+	SavedLoaded := _HS_PreScanPersonalCacheLoaded, SavedTree := _PersonalExtTree
+	SavedCount := _ExtTotalPersonalCounterGlobal.value
+	HadSectionsCache := IsSet(_ParseExtTomlSectionsCache)
+	SavedSectionsCache := HadSectionsCache ? _ParseExtTomlSectionsCache : 0
+	try {
+		for Name in ["a__b.backup-20261017-190645-1330382656.toml", "personal_hotstrings.backup-20260625-004901.toml",
+				"personal_hotstrings.backup-20260625-004901.backup-20261017-190645-1330382656.toml"]
+			Assert(FSWriteDurable(Fixture.root . "\" . Name, Fixture.content))
+		DirCreate(Fixture.root . "\nested")
+		Assert(FSWriteDurable(Fixture.root . "\nested\words.BACKUP-20261017-190645.TOML", Fixture.content))
+		Assert(FSWriteDurable(Fixture.root . "\nested\my.backup-plan.toml", Fixture.content))
+		Labels := Map()
+		for Pack in HS_EnumeratePersonalExtFiles()
+			Labels[Pack["Label"]] := true
+		AssertEqual(2, Labels.Count, "only the source and the non-backup nested file are personal sources")
+		Assert(Labels.Has("a__b") && Labels.Has("nested / my.backup-plan"))
+		_ParseExtTomlSectionsCache := Map()
+		_HS_PreScanPersonalCacheLoaded := false
+		_HS_PreScanPersonal()
+		Stems := []
+		for Toml in _PersonalExtTree[""]["tomls"]
+			Stems.Push(Toml.stem)
+		for Toml in _PersonalExtTree["nested"]["tomls"]
+			Stems.Push(Toml.stem)
+		AssertEqual("a__b|my.backup-plan", _PFC_Join(Stems), "the menu tree lists no writer backup")
+		for Name in ["x.backup-20261017.toml", "x.backup-20261017-190645-1.TOML", "dir\x.backup-1.toml"]
+			Assert(PersonalFileIsBackup(Name), Name)
+		for Name in ["x.toml", "backup-20261017.toml", ".backup-20261017.toml", "x.backup-.toml",
+				"x.backup-notes.toml", "x.backup-2026.toml.bak", "x.backup-2026.json", 42]
+			Assert(!PersonalFileIsBackup(Name), String(Name))
+	} finally {
+		_HS_PreScanPersonalCacheLoaded := SavedLoaded, _PersonalExtTree := SavedTree
+		_ExtTotalPersonalCounterGlobal.value := SavedCount
+		if HadSectionsCache
+			_ParseExtTomlSectionsCache := SavedSectionsCache
+		else
+			_ParseExtTomlSectionsCache := unset
+		_PFC_Cleanup(Fixture)
+	}
+}
+Test("personal-file-controls: writer backups are never personal sources (personal-file-backups)", _PFC_WriterBackupsAreNeverSources)
+
 _PFC_UnreadablePrimaryReservationRefuses() {
 	Fixture := _PFC_Fixture(), Lock := 0
 	Primary := Fixture.root . "\personal_hotstrings.toml"
