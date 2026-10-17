@@ -18,6 +18,11 @@ local checks, failures, handles, paths, tokens, pids = 0, 0, {}, {}, {}, {}
 -- contract. Blocking longer than the deadline preserves the stale-clock inverse.
 local HTTP_DEADLINE_MS = 1000
 local HTTP_STALE_WORK_MS = HTTP_DEADLINE_MS + 160
+-- A cold python3 writer plus its 40 ms delay must fit inside the digest
+-- budget on loaded runners. Blocking longer than the deadline preserves the
+-- stale-clock inverse exactly as for HTTP.
+local DIGEST_DEADLINE_MS = 500
+local DIGEST_STALE_WORK_MS = DIGEST_DEADLINE_MS + 160
 local ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
 
 -- Passive private observations preserve native arguments, result tuples and
@@ -230,8 +235,8 @@ for _, in_callback in ipairs({ false, true }) do
 	check("actual FIFO digest survives its new deadline " .. location, function()
 		local path, result, writer_result, start = fifo(), { callbacks = 0 }, nil, nil
 		local function arm()
-			uv.sleep(160); start = uv.hrtime()
-			assert(Digest.sha256(path, { owner = "clock-fixture", timeout_ms = 100 }, function(value, err)
+			uv.sleep(DIGEST_STALE_WORK_MS); start = uv.hrtime()
+			assert(Digest.sha256(path, { owner = "clock-fixture", timeout_ms = DIGEST_DEADLINE_MS }, function(value, err)
 				result.value, result.error, result.callbacks = value, err, result.callbacks + 1
 			end))
 			writer_result = writer(path)
