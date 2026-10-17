@@ -1502,7 +1502,8 @@ if (_DriverStartupSmokeDir != "") {
 						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
 						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
 						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
-						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"] . "`n",
+						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"]
+						. " last_append_failure=" . _StartupSmokeLoggerRefusal["last_append_failure"] . "`n",
 						"*", "UTF-8-RAW")
 				throw Error("The startup smoke could not make its diagnostic logs durable.")
 		}

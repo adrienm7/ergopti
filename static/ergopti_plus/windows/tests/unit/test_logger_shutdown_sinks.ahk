@@ -175,16 +175,20 @@ _LSS_RefusalReceipt(Sink) {
 		AssertEqual(Seed, FileRead(Path, "UTF-8"))
 		AssertEqual(1, _LSS_ReceiptQueue(Sink, PrivateMarker).Length)
 		AssertEqual(PrivateMarker, _LSS_ReceiptQueue(Sink, PrivateMarker)[1])
-		AssertEqual(10, Denied.Count, "only the closed primitive schema may leave the logger")
+		AssertEqual(11, Denied.Count, "only the closed primitive schema may leave the logger")
 		ExpectedKeys := Map("phase", true, "flush_active", true, "force_flush_pending", true,
 			"append_owners", true, "append_debts", true, "append_repairs", true,
-			"main_lines", true, "error_lines", true, "topical_queues", true, "topical_lines", true)
+			"main_lines", true, "error_lines", true, "topical_queues", true, "topical_lines", true,
+			"last_append_failure", true)
+		AssertTrue(RegExMatch(Denied["last_append_failure"],
+			"^(none|owner|privacy_config|redaction|debt_repair|open|write|flush)$"),
+			"the refused append stage comes from the closed set, never log text")
 		for Key, Value in Denied {
 			AssertTrue(ExpectedKeys.Has(Key))
 			AssertFalse(InStr(Key, PrivateMarker))
 			if Key == "phase"
 				AssertEqual("pending_debt", Value)
-			else {
+			else if Key != "last_append_failure" {
 				AssertTrue(Value is Integer)
 				AssertTrue(Value >= 0)
 			}
