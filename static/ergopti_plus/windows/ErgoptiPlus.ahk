@@ -443,6 +443,11 @@ if UIASW_IsWorkerInvocation()
 #Include infra/hotstrings/hotstring_buffer_effects.ahk
 #Include infra/hotstrings/hotstring_live_toggle.ahk
 #Include infra/hotstrings/hotstring_count_policy.ahk
+; The programmable-hotstring owner's state must exist before the first tray
+; render counts its rules and before a startup failure runs the shutdown
+; preflight that invalidates it. Its globals initialise at this include
+; position; modules/hotstrings.ahk's later #Include of it is then a no-op.
+#Include modules/dynamic_hotstrings/user_code.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
