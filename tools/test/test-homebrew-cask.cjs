@@ -1976,8 +1976,8 @@ check('profile-bound native HTTP routing preserves mandatory owners and closed r
 		assert.strictEqual(full.split(command).length - 1, 1);
 	for (const [before, after] of [
 		['--validate-scope-receipt-profile "$receipt"', '--validate-scope-receipt-profile "foreign"'],
-		['stable-v1-20261009-macos-native-deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes'],
-		['test "$profile" = stable-v1-0-1-20261011-four-macos-native-scopes', 'true'],
+		['stable-v1-20261009-macos-native-deferred', 'stable-v1-0-2-20261017-six-macos-native-scopes'],
+		['test "$profile" = stable-v1-0-2-20261017-six-macos-native-scopes', 'true'],
 		[
 			'native_http_receiving_test.py --client-only || status=1',
 			'native_http_receiving_test.py --client-only || true'

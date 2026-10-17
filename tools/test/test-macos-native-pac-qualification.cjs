@@ -410,7 +410,7 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER, PA
 if (require.main === module)
 	module.exports(require('./test-macos-dev-qualification-deferral.cjs').pacContext());
 
-/** Independently discovered Worker12 remains mandatory under the exact v1.0.1 scope. */
+/** Independently discovered Worker12 remains mandatory under the exact v1.0.2 scope. */
 function stableV101PacCollectorControls(repository) {
 	const assert = require('node:assert/strict');
 	const fs = require('node:fs');
@@ -429,11 +429,11 @@ function stableV101PacCollectorControls(repository) {
 		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
-		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.2'
 	};
 	const profile = q.authorizeQualificationProfile(
-		q.STABLE_V101_PROFILE_ID,
+		q.STABLE_V102_PROFILE_ID,
 		q.environmentContext(env),
 		now
 	);
@@ -535,6 +535,6 @@ function stableV101PacCollectorControls(repository) {
 	assert.throws(() => reader.evaluate(valid, 0, 0, { mode: 'deferred' }));
 	assert.throws(() => full.pacQualification(receipt, env, new Date(profile.expires_at)));
 	console.log(
-		'[OK] v1.0.1 PAC receiving requires every Worker12 method and both exact argument observations.'
+		'[OK] v1.0.2 PAC receiving requires every Worker12 method and both exact argument observations.'
 	);
 }

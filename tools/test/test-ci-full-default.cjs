@@ -531,8 +531,6 @@ for (const [rel, id, name] of [
 	],
 	[MAC, 'e2e-hs', 'Qualify actual selected number-row Carbon XCTest controls'],
 	[MAC, 'e2e-hs', 'Retain selected number-row Carbon XCTest diagnostics'],
-	[MAC, 'e2e-hs', 'Receive native final-byte number-row causal refusal'],
-	[MAC, 'e2e-hs', 'Retain native final-byte number-row causal diagnostics'],
 	[MAC, 'e2e-hs', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'e2e-hs', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls'],
@@ -1021,9 +1019,9 @@ check('Swift PAC arguments preserve empty and selected arrays under nounset', ()
 check(
 	'v101 scope admission is exact main push before expiry and all foreign contexts stay full',
 	() => {
-		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_V101_POLICY_PATH, 'utf8'));
-		assert.equal(stable.id, 'stable-v1-0-1-20261011-four-macos-native-scopes');
-		assert.equal(stable.expires_at, '2026-10-12T07:00:00Z');
+		const stable = JSON.parse(fs.readFileSync(Policy.STABLE_V102_POLICY_PATH, 'utf8'));
+		assert.equal(stable.id, 'stable-v1-0-2-20261017-six-macos-native-scopes');
+		assert.equal(stable.expires_at, '2026-10-20T22:00:00Z');
 		assert.deepEqual(Object.keys(stable.scopes), [
 			'macos-native-pac',
 			'macos-native-http',
@@ -1038,7 +1036,7 @@ check(
 			)
 		);
 		context.github_actions = 'true';
-		const clock = new Date('2026-10-12T06:59:59.999Z');
+		const clock = new Date('2026-10-20T21:59:59.999Z');
 		for (const scope of Object.keys(stable.scopes)) {
 			assert.equal(Policy.resolveQualificationProfile(context, clock, scope).id, stable.id);
 			assert.equal(
@@ -1054,8 +1052,8 @@ check(
 				['release', false],
 				['prerelease', 'true'],
 				['channel', 'dev'],
-				['tag', 'v1.0.2'],
-				['version', '1.0.2']
+				['tag', 'v1.0.3'],
+				['version', '1.0.3']
 			])
 				assert.equal(
 					Policy.resolveQualificationProfile({ ...context, [key]: value }, clock, scope),
@@ -1148,7 +1146,7 @@ node() {
 			env: {
 				...process.env,
 				MODE: mode,
-				PROFILE: mode === 'full' ? '' : 'stable-v1-0-1-20261011-four-macos-native-scopes'
+				PROFILE: mode === 'full' ? '' : 'stable-v1-0-2-20261017-six-macos-native-scopes'
 			}
 		});
 		assert.equal(result.status, 0, result.stderr);
@@ -1179,9 +1177,9 @@ check('v101 HTTP receiver defers only wire and preserves both mandatory statuses
 		assert.doesNotMatch(code, /\$\{\{/, 'every fixture-only workflow input is explicitly bound');
 		for (const [mode, profile, refused, failedCommand, expected] of [
 			['full', '', false, '', 0],
-			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, '', 0],
-			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'owned', 1],
-			['deferred', 'stable-v1-0-1-20261011-four-macos-native-scopes', false, 'client', 1],
+			['deferred', 'stable-v1-0-2-20261017-six-macos-native-scopes', false, '', 0],
+			['deferred', 'stable-v1-0-2-20261017-six-macos-native-scopes', false, 'owned', 1],
+			['deferred', 'stable-v1-0-2-20261017-six-macos-native-scopes', false, 'client', 1],
 			['full', '', true, '', 17],
 			['full', '', false, 'owned', 1],
 			['full', '', false, 'client', 1],

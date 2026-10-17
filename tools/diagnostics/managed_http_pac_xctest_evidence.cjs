@@ -155,7 +155,7 @@ function evaluate(text, swiftStatus, captureStatus, admission = null) {
 	const narrow =
 		qualification !== null &&
 		qualification.profile_id ===
-			require('../ci/dev-release-qualification.cjs').STABLE_V101_PROFILE_ID;
+			require('../ci/dev-release-qualification.cjs').STABLE_V102_PROFILE_ID;
 	const methods = narrow ? { ManagedHTTPWorkerTests: METHODS.ManagedHTTPWorkerTests } : METHODS;
 	const expectedNames = Object.entries(methods).flatMap(([suite, values]) =>
 		values.map((method) => `-[ErgoptiPlusTests.${suite} ${method}]`)

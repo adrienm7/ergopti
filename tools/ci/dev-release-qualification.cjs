@@ -11,12 +11,12 @@ const STABLE_POLICY_PATH = path.resolve(
 	__dirname,
 	'../../.github/ci/stable_release_qualification_exception.json'
 );
-const STABLE_V101_POLICY_PATH = path.resolve(
+const STABLE_V102_POLICY_PATH = path.resolve(
 	__dirname,
-	'../../.github/ci/stable_v101_macos_native_qualification_exception.json'
+	'../../.github/ci/stable_v102_macos_native_qualification_exception.json'
 );
-const STABLE_V101_PROFILE_ID = 'stable-v1-0-1-20261011-four-macos-native-scopes';
-const STABLE_V101_SCOPE_IDS = Object.freeze([
+const STABLE_V102_PROFILE_ID = 'stable-v1-0-2-20261017-six-macos-native-scopes';
+const STABLE_V102_SCOPE_IDS = Object.freeze([
 	'macos-native-pac',
 	'macos-native-http',
 	'macos-brew-archive',
@@ -24,14 +24,14 @@ const STABLE_V101_SCOPE_IDS = Object.freeze([
 	'macos-shortcuts-discovery',
 	'macos-launch-appleevents'
 ]);
-const STABLE_V101_PAC_METHODS = freeze({
+const STABLE_V102_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
 	ManagedHTTPWPADWireTests: [
 		'testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork'
 	],
 	ManagedBootstrapDownloadTests: ['testActualNativeBootstrapTLSFullURLPACAndArtifactPublication']
 });
-const STABLE_V101_BREW_METHODS = freeze({
+const STABLE_V102_BREW_METHODS = freeze({
 	HomebrewArchiveAcceptanceTests: [
 		'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
 	]
@@ -143,7 +143,7 @@ function parseClosedJson(raw) {
 	return value;
 }
 /** One separately authorized stable release; no older profile or future tag is extended. */
-function validateStableV101Policy(value) {
+function validateStableV102Policy(value) {
 	keys(value, [
 		'schema',
 		'id',
@@ -163,26 +163,25 @@ function validateStableV101Policy(value) {
 	]);
 	if (
 		value.schema !== 1 ||
-		value.id !== STABLE_V101_PROFILE_ID ||
+		value.id !== STABLE_V102_PROFILE_ID ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_quote !==
-			'il faut vraiment te dépêcher de créer cette release, quitte à bypass des tests' ||
-		value.expires_at !== '2026-10-12T07:00:00Z' ||
+		value.authorization_quote !== 'Différer pour 1.0.2 (Recommandé)' ||
+		value.expires_at !== '2026-10-20T22:00:00Z' ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||
 		value.release !== true ||
 		value.prerelease !== 'false' ||
 		value.channel !== 'main' ||
-		value.tag !== 'v1.0.1' ||
-		value.version !== '1.0.1' ||
+		value.tag !== 'v1.0.2' ||
+		value.version !== '1.0.2' ||
 		typeof value.authorization_note !== 'string' ||
 		!value.authorization_note ||
 		/[\r\n]/.test(value.authorization_note)
 	)
-		refuse('Invalid approved v1.0.1 boundary.');
-	keys(value.scopes, STABLE_V101_SCOPE_IDS);
-	for (const scope of STABLE_V101_SCOPE_IDS) {
+		refuse('Invalid approved v1.0.2 boundary.');
+	keys(value.scopes, STABLE_V102_SCOPE_IDS);
+	for (const scope of STABLE_V102_SCOPE_IDS) {
 		const row = value.scopes[scope];
 		const brew = scope === 'macos-brew-archive',
 			pac = scope === 'macos-native-pac',
@@ -204,14 +203,14 @@ function validateStableV101Policy(value) {
 								: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
-			refuse('Invalid v1.0.1 scope reason.');
+			refuse('Invalid v1.0.2 scope reason.');
 		if (brew) {
 			if (
 				row.kind !== 'swift_test_file' ||
 				row.path !== 'Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift' ||
 				row.name !== 'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
 			)
-				refuse('Invalid exact v1.0.1 Brew method.');
+				refuse('Invalid exact v1.0.2 Brew method.');
 		} else if (launch) {
 			const expected = POLICY.scopes[scope];
 			if (
@@ -220,7 +219,7 @@ function validateStableV101Policy(value) {
 				JSON.stringify(row.scenarios) !== JSON.stringify(expected.scenarios) ||
 				JSON.stringify(row.runners) !== JSON.stringify(expected.runners)
 			)
-				refuse('Invalid exact v1.0.1 AppleEvent launch matrix.');
+				refuse('Invalid exact v1.0.2 AppleEvent launch matrix.');
 		} else {
 			const expected = shortcuts ? POLICY.scopes[scope] : STABLE_EXTRA_SCOPES[scope];
 			if (
@@ -228,16 +227,16 @@ function validateStableV101Policy(value) {
 				row.path !== expected.path ||
 				JSON.stringify(row.args) !== JSON.stringify(expected.args)
 			)
-				refuse('Invalid exact v1.0.1 command scope.');
-			if (pac && JSON.stringify(row.methods) !== JSON.stringify(STABLE_V101_PAC_METHODS))
-				refuse('Invalid exact v1.0.1 PAC methods.');
+				refuse('Invalid exact v1.0.2 command scope.');
+			if (pac && JSON.stringify(row.methods) !== JSON.stringify(STABLE_V102_PAC_METHODS))
+				refuse('Invalid exact v1.0.2 PAC methods.');
 			if (
 				model &&
 				(JSON.stringify(row.architectures) !== JSON.stringify(['arm64', 'amd64']) ||
 					JSON.stringify(row.profiles) !==
 						JSON.stringify(['pac-inline', 'pac-url', 'explicit-proxy']))
 			)
-				refuse('Invalid exact v1.0.1 native model profiles.');
+				refuse('Invalid exact v1.0.2 native model profiles.');
 			if (
 				!pac &&
 				!model &&
@@ -245,13 +244,13 @@ function validateStableV101Policy(value) {
 				row.command !==
 					'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
 			)
-				refuse('Invalid exact v1.0.1 HTTP wire command.');
+				refuse('Invalid exact v1.0.2 HTTP wire command.');
 		}
 	}
 	return value;
 }
 function validatePolicy(value) {
-	if (value && value.id === STABLE_V101_PROFILE_ID) return validateStableV101Policy(value);
+	if (value && value.id === STABLE_V102_PROFILE_ID) return validateStableV102Policy(value);
 	const stable = value && value.id === STABLE_PROFILE_ID;
 	if (
 		stable &&
@@ -372,15 +371,15 @@ const POLICY = freeze(validatePolicy(parseClosedJson(fs.readFileSync(POLICY_PATH
 const STABLE_POLICY = freeze(
 	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_POLICY_PATH, 'utf8')))
 );
-const STABLE_V101_POLICY = freeze(
-	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_V101_POLICY_PATH, 'utf8')))
+const STABLE_V102_POLICY = freeze(
+	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_V102_POLICY_PATH, 'utf8')))
 );
 function eligible(context, now, policy = POLICY) {
 	keys(context, CONTEXT_KEYS);
 	const stamp = now instanceof Date ? now.getTime() : Date.parse(now);
 	if (!Number.isFinite(stamp)) refuse('Invalid qualification clock.');
 	return (
-		(policy !== STABLE_V101_POLICY || policy.authorized === true) &&
+		(policy !== STABLE_V102_POLICY || policy.authorized === true) &&
 		context.github_actions === 'true' &&
 		CONTEXT_KEYS.filter((k) => k !== 'github_actions').every((k) => context[k] === policy[k]) &&
 		stamp < Date.parse(policy.expires_at)
@@ -389,8 +388,8 @@ function eligible(context, now, policy = POLICY) {
 /** Automatic mismatch, expiry and later tags retain full default execution. */
 function resolveQualificationProfile(context, now = new Date(), scope = null) {
 	if ((scope === null || SCOPE_IDS.includes(scope)) && eligible(context, now)) return POLICY;
-	if (STABLE_V101_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_V101_POLICY))
-		return STABLE_V101_POLICY;
+	if (STABLE_V102_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_V102_POLICY))
+		return STABLE_V102_POLICY;
 	return STABLE_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_POLICY)
 		? STABLE_POLICY
 		: null;
@@ -402,8 +401,8 @@ function authorizeQualificationProfile(id, context, now = new Date()) {
 			? POLICY
 			: id === STABLE_POLICY.id
 				? STABLE_POLICY
-				: id === STABLE_V101_POLICY.id
-					? STABLE_V101_POLICY
+				: id === STABLE_V102_POLICY.id
+					? STABLE_V102_POLICY
 					: null;
 	if (!policy || !eligible(context, now, policy))
 		refuse('Qualification profile is not authorized for this context.');
@@ -411,7 +410,7 @@ function authorizeQualificationProfile(id, context, now = new Date()) {
 }
 function deferredScopes(profile) {
 	if (profile === null) return [];
-	if (profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V101_POLICY)
+	if (profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V102_POLICY)
 		refuse('Unknown qualification profile.');
 	return Object.keys(profile.scopes);
 }
@@ -423,7 +422,7 @@ function sourceSha(value) {
 /** Closed missing-proof metadata never conveys native lease or feature authority. */
 function qualificationReceipt(profile, scope, details) {
 	if (
-		(profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V101_POLICY) ||
+		(profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V102_POLICY) ||
 		!deferredScopes(profile).includes(scope)
 	)
 		refuse('Unknown qualification receipt scope.');
@@ -584,15 +583,15 @@ function ahkQualificationManifest(tap, execution, profile, sha) {
 /** Selects only this one proposed stable publication; existing callers remain full. */
 function stablePublicationProfile(context, now = new Date()) {
 	const selected = resolveQualificationProfile(context, now, 'macos-brew-archive');
-	return selected === STABLE_POLICY || selected === STABLE_V101_POLICY ? selected : null;
+	return selected === STABLE_POLICY || selected === STABLE_V102_POLICY ? selected : null;
 }
 /** Fresh admission precedes every publication side effect; missing proof stays explicit. */
 function stablePublicationNotice(id, context, sha, now = new Date()) {
 	if (id === '') return '';
-	if (id !== STABLE_POLICY.id && id !== STABLE_V101_PROFILE_ID)
+	if (id !== STABLE_POLICY.id && id !== STABLE_V102_PROFILE_ID)
 		refuse('Unknown stable publication selection.');
 	const profile = authorizeQualificationProfile(id, context, now);
-	if (profile === STABLE_V101_POLICY)
+	if (profile === STABLE_V102_POLICY)
 		return (
 			'DEFERRED / qualified:false (source ' +
 			sourceSha(sha) +
@@ -600,7 +599,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.1) retain source-bound missing-proof receipts. Only stable v1.0.1 main push before 2026-10-12T07:00:00Z is authorized; no permission, trust or sender workaround.'
+			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.2) retain source-bound missing-proof receipts. Only stable v1.0.2 main push before 2026-10-20T22:00:00Z is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -639,7 +638,7 @@ function scopeDisposition(receipt, scope, sha, context, now = new Date()) {
 /** Requires every actually emitted command scope receipt before public disclosure. */
 function admitCommandReceipts(directory, context, sha, now = new Date()) {
 	const expected =
-		stablePublicationProfile(context, now) === STABLE_V101_POLICY
+		stablePublicationProfile(context, now) === STABLE_V102_POLICY
 			? {
 					'macos-native-pac': ['arm64', 'amd64'],
 					'macos-native-http': ['arm64', 'amd64'],
@@ -667,9 +666,9 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 				refuse('Missing approved deferred command receipt.');
 		}
 	}
-	if (stablePublicationProfile(context, now) === STABLE_V101_POLICY) {
+	if (stablePublicationProfile(context, now) === STABLE_V102_POLICY) {
 		const scope = 'macos-launch-appleevents';
-		const matrix = STABLE_V101_POLICY.scopes[scope];
+		const matrix = STABLE_V102_POLICY.scopes[scope];
 		for (const scenario of matrix.scenarios) {
 			for (const runner of matrix.runners) {
 				const file = path.join(
@@ -738,7 +737,7 @@ function main(argv) {
 		return;
 	}
 	if (options['--validate-scope-receipt']) {
-		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope) && !STABLE_V101_SCOPE_IDS.includes(scope))
+		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope) && !STABLE_V102_SCOPE_IDS.includes(scope))
 			refuse('Unknown command qualification scope.');
 		console.log(
 			scopeDisposition(
@@ -789,7 +788,7 @@ function main(argv) {
 		fs.appendFileSync(
 			options['--github-env'],
 			'ERGOPTI_DEV_QUALIFICATION_PROFILE=' +
-				(profile && profile !== STABLE_V101_POLICY ? profile.id : '') +
+				(profile && profile !== STABLE_V102_POLICY ? profile.id : '') +
 				'\n'
 		);
 	if (profile) {
@@ -838,11 +837,11 @@ function main(argv) {
 	}
 }
 module.exports = {
-	STABLE_V101_POLICY_PATH,
-	STABLE_V101_PROFILE_ID,
-	STABLE_V101_PAC_METHODS,
-	STABLE_V101_BREW_METHODS,
-	validateStableV101Policy,
+	STABLE_V102_POLICY_PATH,
+	STABLE_V102_PROFILE_ID,
+	STABLE_V102_PAC_METHODS,
+	STABLE_V102_BREW_METHODS,
+	validateStableV102Policy,
 	admitCommandReceipts,
 	scopeDisposition,
 	stablePublicationProfile,

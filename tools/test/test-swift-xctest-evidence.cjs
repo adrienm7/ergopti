@@ -1226,7 +1226,7 @@ console.log(
 		evidence.pacQualification(receipt, { ...env, GITHUB_EVENT_NAME: 'pull_request' }, now)
 	);
 	assert.throws(() =>
-		evidence.pacQualification(receipt, { ...env, ERGOPTI_DEV_RELEASE_VERSION: '1.0.1' }, now)
+		evidence.pacQualification(receipt, { ...env, ERGOPTI_DEV_RELEASE_VERSION: '1.0.3' }, now)
 	);
 	assert.throws(() => evidence.pacQualification(receipt, env, new Date(configuration.expires_at)));
 	assert.throws(() =>
@@ -1273,8 +1273,8 @@ function stableV101PackageCollectorControls(repository) {
 		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.1',
-		ERGOPTI_DEV_RELEASE_VERSION: '1.0.1'
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.2'
 	};
 	const expectedPac = {
 		ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
@@ -1288,10 +1288,10 @@ function stableV101PackageCollectorControls(repository) {
 			'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
 		]
 	};
-	assert.deepEqual(q.STABLE_V101_PAC_METHODS, expectedPac);
-	assert.deepEqual(q.STABLE_V101_BREW_METHODS, expectedBrew);
+	assert.deepEqual(q.STABLE_V102_PAC_METHODS, expectedPac);
+	assert.deepEqual(q.STABLE_V102_BREW_METHODS, expectedBrew);
 	const profile = q.authorizeQualificationProfile(
-		q.STABLE_V101_PROFILE_ID,
+		q.STABLE_V102_PROFILE_ID,
 		q.environmentContext(env),
 		now
 	);
@@ -1424,7 +1424,7 @@ function stableV101PackageCollectorControls(repository) {
 		evidence.pacQualification(pacReceipt, { ...env, GITHUB_EVENT_NAME: 'pull_request' }, now)
 	);
 	assert.throws(() =>
-		evidence.pacQualification(pacReceipt, { ...env, ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2' }, now)
+		evidence.pacQualification(pacReceipt, { ...env, ERGOPTI_DEV_RELEASE_TAG: 'v1.0.3' }, now)
 	);
 	assert.throws(() => evidence.pacQualification(pacReceipt, env, new Date(profile.expires_at)));
 	assert.throws(() =>
@@ -1473,7 +1473,7 @@ function stableV101PackageCollectorControls(repository) {
 		false
 	);
 	console.log(
-		'[OK] Exact v1.0.1 package omissions retain Worker12, neighbors, source/expiry and truthful downstream notices.'
+		'[OK] Exact v1.0.2 package omissions retain Worker12, neighbors, source/expiry and truthful downstream notices.'
 	);
 }
 stableV101PackageCollectorControls(repository);
