@@ -12,6 +12,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 refused capture admission and successor ownership
+
+A refused or throwing terminal Begin callback can publish a successor before
+returning. The predecessor now clears only its own Pending state and withdraws
+the global owner only while that exact predecessor still occupies it. Cleanup
+of the predecessor's output ownership remains unchanged.
+
+Both new cases fail on the exact original HSE body with the intended successor
+assertion, then pass on the correction through the unchanged registered AHK
+runner. All nine original transaction-owner cases also pass. These controlled
+ports establish software ownership only. The exact official-worktree correction
+also passes whole-entry compilation, all70 E2E cases and all1,127 broader terminal
+cases, complete and timed, with natural exit0 and unchanged source. Encoding,
+strict conventions and the49-control custody source guard pass. The earlier
+failed full JavaScript receipt remains failed; no full-suite success is claimed.
+Unknown native Begin effects, capture source retention and semantic completion
+remain separate unfinished work.
+No physical Windows or native macOS/Linux qualification follows.
+
 ### October 17 immutable historical terminal admission
 
 Historical diagnostic stepping now belongs to a private ledger of the exact
