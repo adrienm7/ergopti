@@ -1712,7 +1712,16 @@ _ManagedRemoteScopeProducerControl() {
 		}
 		AssertEqual(1, Results.Length)
 		AssertEqual(0, Results[1]["exit"], "the actual producer and remover guards enforce native permission before store access")
-		AssertEqual("OWNED_ROOT_SCOPE_CONTROL_PASS", Trim(Results[1]["stdout"], "`r`n "))
+		; The scope owner first runs the six native TLS directory controls.
+		Expected := "PASS native TLS directory: legacy native owner`n"
+			. "PASS native TLS directory: UCRT native owner`n"
+			. "PASS native TLS directory: credential compatibility is not native Git`n"
+			. "PASS native TLS directory: ambiguous owners refused`n"
+			. "PASS native TLS directory: empty prefix refused`n"
+			. "PASS native TLS directory: absent installation refused`n"
+			. "NATIVE_TLS_DIRECTORY_CONTROL_OK 6/6`n"
+			. "OWNED_ROOT_SCOPE_CONTROL_PASS"
+		AssertEqual(Expected, StrReplace(Trim(Results[1]["stdout"], "`r`n "), "`r`n", "`n"))
 		AssertEqual("", Results[1]["stderr"])
 	} finally AssertTrue(Handle.terminate(), "the exact scope behavior-probe Job retires")
 }
