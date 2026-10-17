@@ -2462,9 +2462,9 @@ for (const [job, buildName, uploadName, transcript] of [
 		'managed-ollama-launcher-build.log'
 	],
 	[
-		'managed-ollama-native',
+		'managed-ollama-build',
 		'Build and admit the actual native source asset',
-		'Retain actual native producer, catalogue and receiving evidence',
+		'Retain the clean native source build evidence',
 		'managed-ollama-producer-build.log'
 	]
 ]) {
@@ -2548,7 +2548,11 @@ console.log(
 		body,
 		'Qualify actual SDK accepted-owner and deadline XCTest controls'
 	);
-	const producer = pipeline.step(body, 'Build and admit the actual native source asset');
+	// The clean build runs in its own cell; this cell admits it after its own SDK checks.
+	const producer = pipeline.step(
+		body,
+		'Receive and admit the clean native source asset from its build cell'
+	);
 	assert.ok(body.indexOf(compile) < body.indexOf(listener));
 	assert.ok(body.indexOf(listener) < body.indexOf(producer));
 	assert.match(listener, /tests\? skipped/);

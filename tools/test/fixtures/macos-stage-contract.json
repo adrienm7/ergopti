@@ -365,7 +365,7 @@
 				{
 					"name": "Retain the clean native source build evidence",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always() && env.ERGOPTI_OLLAMA_BUILD_ROOT != '') }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always()) }}"
 				},
 				{
 					"uses": "actions/checkout@v4",

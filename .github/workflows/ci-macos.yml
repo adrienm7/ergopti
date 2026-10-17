@@ -1386,7 +1386,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always() && env.ERGOPTI_OLLAMA_BUILD_ROOT != '') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
           name: managed-ollama-build-evidence-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
