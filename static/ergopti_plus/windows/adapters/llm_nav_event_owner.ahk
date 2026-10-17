@@ -2964,7 +2964,8 @@ _LLM_NavEventOwnerCaptureDigitSource() {
 }
 
 /** Freezes pending admissions before any registration callback can observe them. */
-_LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell) {
+_LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell, CanonicalSource := 0) {
+	global KEYLAYOUT_NEUTRAL_STATE
 	static OriginalPlain := _LLM_NavEventOwnerTerminalRegistrationPlainMap
 	static OriginalRefs := _LLM_NavEventOwnerTerminalRegistrationRefsCurrent
 	static OriginalSelf := _LLM_NavEventOwnerCaptureTerminalCandidate
@@ -2987,6 +2988,37 @@ _LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell) {
 		for Name in ObjOwnProps(Value)
 			return false
 		return true
+	}
+
+	RequireCanonicalRecipe(Recipe, Route) {
+		; Only the original frame supplies this private loader-issued witness.
+		; Digit bindings and natural modifiers have their own non-KLE sources.
+		if !NativeCall.Call(OriginalPlain, CanonicalSource)
+				|| !(CanonicalSource.Get("active", 0) is Integer) || CanonicalSource["active"] != 1
+				|| !(CanonicalSource.Get("model", 0) is Map)
+				|| Recipe.Get("model", 0) != CanonicalSource["model"]
+				|| !(Recipe.Get("layout_id", 0) is String)
+				|| !(Recipe["layout_id"] == CanonicalSource.Get("layout_name", 0))
+				|| !(Recipe.Get("scan", 0) is String) || !RegExMatch(Recipe["scan"], "^SC[0-9A-F]{3}$")
+				|| !(Recipe.Get("index", "") is Integer) || !(Recipe.Get("keycode", "") is Integer)
+			throw ValueError("The pending recipe does not belong to the captured canonical source.")
+		Reader := CanonicalSource.Get("read", 0)
+		if !(Reader is BoundFunc) || Object.Prototype.HasOwnProp.Call(Reader, "Call")
+			throw ValueError("The original canonical graph reader was withdrawn.")
+		Modifiers := Route.Get("required_modifiers", -1)
+		if !(Modifiers is Integer) || (Modifiers != 0 && Modifiers != 4)
+			throw ValueError("The pending canonical recipe has an unsupported modifier family.")
+		Row := NativeCall.Call(Reader, "find", KEYLAYOUT_NEUTRAL_STATE, Recipe["scan"], Modifiers == 4 ? 1 : 0)
+		if !NativeCall.Call(OriginalPlain, Row) || Row["before_id"] != 0 || Row["after_id"] != 0
+				|| (Row["kind"] != 1 && Row["kind"] != 2) || !(Row["output"] is String)
+				|| Row["index"] != Recipe["index"] || Row["keycode"] != Recipe["keycode"]
+				|| Route.Get("kind", 0) != Row["kind"] || Route.Get("axis", 0) != 2
+				|| Route.Get("code", 0) != Integer("0x" . SubStr(Row["scan"], 3))
+			throw ValueError("The pending recipe differs from its exact canonical graph row.")
+		for Name in ["required_prefixes", "prefix_bit", "effective_modifiers_lr", "target_vk", "target_scan",
+			"required_dead_key_id", "next_dead_key_id"]
+			if !Route.Has(Name) || !(Route[Name] is Integer) || Route[Name] != 0
+				throw ValueError("The pending canonical recipe changed its neutral descriptor.")
 	}
 
 	if !FunctionsCurrent() || !NativeCall.Call(OriginalPlain, Candidate)
@@ -3014,6 +3046,15 @@ _LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell) {
 		Recipe := Admission.Get("recipe", 0), Binding := Admission.Get("binding", 0)
 		if Recipe is Map && !NativeCall.Call(OriginalPlain, Recipe)
 			throw ValueError("A pending model recipe is not a plain Map.")
+		Kind := Route.Get("kind", 0)
+		if !(Kind is Integer) || Kind < 1 || Kind > 6
+			throw ValueError("A pending canonical admission has an invalid route kind.")
+		if Kind <= 3 {
+			if !(Recipe is Map)
+				throw ValueError("A pending canonical model descriptor requires its original recipe.")
+			RequireCanonicalRecipe(Recipe, Route)
+		} else if !(Recipe is Integer) || Recipe != 0
+			throw ValueError("A natural or digit admission cannot borrow a canonical model recipe.")
 		if Route.Get("kind", 0) == 6 {
 			Scan := Route.Get("code", 0)
 			if !(Scan is Integer) || Scan < 0x02 || Scan > 0x0B || Digits.Has(Scan)
@@ -4232,7 +4273,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
 				throw Error("The original candidate witness constructor was withdrawn.")
 			Candidate := Frame["candidate"]
-			Witness := OriginalCandidateCapture.Call(Candidate, State.DigitCell)
+			Witness := OriginalCandidateCapture.Call(Candidate, State.DigitCell, State.CanonicalSource)
 			GuardFrame()
 			if _LLM_NavEventOwnerCaptureTerminalCandidate != OriginalCandidateCapture
 					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
