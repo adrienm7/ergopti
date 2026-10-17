@@ -2999,6 +2999,44 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **Windows log review, October 17: menu clicks that land after a reload.**
+      Tray clicks retained during a slow startup run when the configuration
+      write they waited for ends. When that write was a hotstring intent that
+      requests a reload, the terminal barrier already owns every path, so each
+      retained toggle is refused with an error notification and lost
+      (`terminal_barrier_busy`, four toasts in one session). Decide one
+      contract: replay the retained intents in the successor, or drop them with
+      one localized notice that names the restart. `ConfigWriteLeaseBusy`
+      deliberately ignores a terminal owner, so the fix belongs in
+      `MenuCommandRun` and the startup retention owner, not in the lease.
+- [ ] **Windows log review, October 17: a transient keylogger flush refuses Quit.**
+      `KL_FlushShutdownReady` returns false for a flush in progress, a busy
+      journal or SQL append debt alike, and the refusal logs one ERROR without
+      the reason; the user had to choose Quit twice. Return the reason, log a
+      busy flush at INFO, and retry the same exit once the flush settles instead
+      of handing the refusal back to the user.
+- [ ] **Windows log review, October 17: boot failures name no variable.**
+      "This global variable has not been assigned a value." reached the boot
+      stage abort, the tray-root retry and the fatal startup line without
+      `Err.Extra`, file or line (`menu_init.ahk` passes `Err.Message` to
+      `BootProfile_StageAbort`; `menu_rebuild.ahk` does the same). Log the
+      complete error so a startup crash in the maintainer's log identifies the
+      global (likely `_UserHotstringsLoadEpoch`) without a repro.
+- [ ] **Windows log review, October 17: semantic TOML parse cost.**
+      `TOML_ParseDocument` takes about 110 ms for the maintainer's 830-line
+      `config.toml`. Every document-mode write parses the source, the expected
+      model and the final candidate, and every start pays two builds after
+      ready (130-210 ms and 160-400 ms, Config.TomlBuild). Header admission
+      now shares one parse (8 s for one bulk click before). Profile the
+      tokenizer (`_TOML_DocumentToken` per character) and reuse one parse per
+      transaction before adding any cache.
+- [ ] **Windows log review, October 17: blank lines accumulate in config.toml.**
+      The maintainer's file holds runs of five blank lines after many section
+      headers (830 lines for 8.4 KB). A clear/restore cycle of the document
+      writer alone is stable, so another writer adds one blank per pass.
+      Reproduce with the full-save, scope and cleanup writers in sequence on a
+      copy, then keep one separator per section.
+
 - [ ] **Maintainer request, October 13: configuration in diagnostic reports.**
       Include the user's TOML configuration files and their resolution order in
       system diagnostics and generated GitHub error reports. Preserve exact
