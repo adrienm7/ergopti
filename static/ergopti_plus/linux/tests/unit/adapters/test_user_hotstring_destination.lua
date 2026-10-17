@@ -29,7 +29,48 @@ local function with_snapshot(body)
 	if not ok then error(problem, 0) end
 end
 
+--- Constructs the production focus adapter on a compositor without window IPC.
+--- Native accessibility still uses the bounded helper owned above.
+--- @return table WindowInfo
+local function unsupported_wayland()
+	local names = { "adapters.window_info", "adapters.shell_runner", "infra.display_server" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	package.loaded["infra.display_server"] = {
+		is_wayland = function() return true end, is_x11 = function() return false end,
+		desktop = function() return "GNOME" end,
+	}
+	package.loaded["adapters.shell_runner"] = { has_command = function() return false end }
+	local ok, adapter = pcall(helpers.load_module, "adapters.window_info")
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	if not ok then error(adapter, 0) end
+	return adapter
+end
+
 helpers.describe("programmable native Linux destination", function()
+	helpers.it("(linux-atspi-focus-identity) preserves native targeting without compositor window IPC", function()
+		with_snapshot(function(s)
+			local window = unsupported_wayland()
+			local first = window.focused_identity()
+			helpers.assert_eq(first, "atspi::1.42:/org/a11y/atspi/accessible/7")
+			s.path = "/org/a11y/atspi/accessible/8"
+			helpers.assert_eq(window.focused_identity(), "atspi::1.42:/org/a11y/atspi/accessible/8",
+				"a fresh helper observation must detect programmatic focus changes")
+			s.timeout = true
+			helpers.assert_nil(window.focused_identity(), "a cached destination cannot authorize output after helper failure")
+		end)
+	end)
+	helpers.it("(linux-atspi-focus-identity) rejects inactive, non-native and password destination identities", function()
+		with_snapshot(function(s)
+			local window = unsupported_wayland()
+			for _, field in ipairs({ "active", "bus", "path", "role" }) do
+				local saved = s[field]
+				s[field] = ({ active = false, bus = "org.editor", path = "7", role = 40 })[field]
+				helpers.assert_nil(window.focused_identity(), field .. " cannot authorize native focus output")
+				s[field] = saved
+			end
+		end)
+	end)
 	helpers.it("(user-hotstrings-native) uses an exact detached bus/object receipt and rechecks actual focus", function()
 		with_snapshot(function(s)
 			helpers.assert_true(select(2, Atspi.get_snapshot()))
