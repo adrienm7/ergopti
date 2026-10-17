@@ -368,14 +368,14 @@ helpers.describe("GNU timeout capability admission", function()
 	for _, receipt in ipairs({ "supported", "refused", "unknown", "numeric", "text", "throw" }) do
 		helpers.it("requires exact GNU timeout capability receipt: " .. receipt, function()
 			local previous = Display.kind()
-			local supported, has_command, exec_checked = Runner.supported, Shell.has_command, Shell.exec_checked
+			local supported, has_command, run = Runner.supported, Shell.has_command, Shell.run
 			local probes = 0
 			Display._set_for_test(Display.X11, "capability fixture")
 			Runner.supported = function() return true end
 			Shell.has_command = function() return true end
-			Shell.exec_checked = function(command)
+			Shell.run = function(command)
 				probes = probes + 1
-				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' >/dev/null 2>&1")
 				if receipt == "throw" then error("controlled capability refusal") end
 				if receipt == "supported" then return true, "" end
 				if receipt == "refused" then return false, "" end
@@ -392,7 +392,7 @@ helpers.describe("GNU timeout capability admission", function()
 					helpers.assert_eq(tool, "GNU timeout")
 				end
 			end)
-			Runner.supported, Shell.has_command, Shell.exec_checked = supported, has_command, exec_checked
+			Runner.supported, Shell.has_command, Shell.run = supported, has_command, run
 			Display._set_for_test(previous, "restored")
 			if not checked then error(failure, 0) end
 		end)
