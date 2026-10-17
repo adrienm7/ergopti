@@ -12,7 +12,7 @@
 	"channel": "main",
 	"tag": "v1.0.2",
 	"version": "1.0.2",
-	"authorization_note": "Explicit human authorization on 2026-10-17 (\"Différer pour 1.0.2\", then \"Les 6 de la v1.0.1\") renews the same six v1.0.1 deferrals only for stable v1.0.2 main publication. The hosted macOS 15 runners still refuse the admin system-trust fixture and leave consent dialogs unanswered. Exactly these six scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"authorization_note": "Explicit human authorization on 2026-10-17 (\"Différer pour 1.0.2\", then \"Les 6 de la v1.0.1\") renews the same six v1.0.1 deferrals, then (\\\"Les differer aussi\\\") the 27 named owned-runtime XCTest methods, only for stable v1.0.2 main publication. The hosted macOS 15 runners still refuse the admin system-trust fixture and leave consent dialogs unanswered. Exactly these seven scopes remain DEFERRED/qualified:false. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
 	"scopes": {
 		"macos-native-pac": {
 			"kind": "command",
@@ -62,6 +62,52 @@
 			"scenarios": ["clean", "karabiner_config"],
 			"runners": ["macos-15", "macos-15-intel"],
 			"reason": "Only external AppleEvent transport and its dependent native delayed-timer, Karabiner and ScriptScope feature qualifications are DEFERRED and qualified:false for clean/karabiner_config on macos-15/macos-15-intel after unchanged hosted transport timeouts and unanswered consent. Actual installation, quarantine, logger, startup, alive, Quit, user-state and the complete launch matrix remain mandatory; no permission or runtime workaround is authorized."
+		},
+		"macos-owned-runtime": {
+			"kind": "swift_test_methods",
+			"path": "Tests/ErgoptiPlusTests",
+			"methods": {
+				"OwnedRuntimeCoreProvisionOwnerTests": [
+					"testCustodyEarlyAdmissionRefusalDoesNotRunInitializedSelfRetirement",
+					"testCustodyExistingMalformedLedgerRefusalRetiresInitializedSelfAndPreservesDebt",
+					"testCustodyFirstWriteRefusalRetiresInitializedSelfAndReleasesOriginalFlock",
+					"testExistingOwnedSystemConfigurationRefusesFirstStart",
+					"testModifiedRecordedPlistIsNotRemovedAfterRestart",
+					"testOwnedDirectoryPreparationCreatesOnlyClosedDataScope",
+					"testReplacedCreatedPlistSurvivesRefusedRollback",
+					"testRestartRetirementRequiresOriginalRecordedVnodeAndBytes",
+					"testServiceDebtBlocksImageLeasesWhileRecoveryNamespaceRemainsObservable",
+					"testServicePlistLateProtectionRefusalRetiresInitializedSelfExactlyOnce",
+					"testUnpublishedCreatedPlistAndLedgerRetireExactly"
+				],
+				"OwnedRuntimeInstalledPeerOwnerTests": [
+					"testActualExclusiveNamespaceLockRefusesSecondOwner",
+					"testActualSharedNamespaceLocksRefuseExclusiveMutation",
+					"testDuplicatedNativeTreeDescriptorDoesNotSurviveExec",
+					"testLifecycleLockRefusesPathReplacementAndPreservesIt",
+					"testLifecycleLockRejectsWritableOrNonemptyLedger",
+					"testNativeTreeCloseRevokesAllFurtherDescriptorAccess",
+					"testPersistentInstallLedgerBlocksImageAdmissionAfterOwnerDeath",
+					"testSurvivingNativeChildRetainsNamespaceAfterParentClose"
+				],
+				"OwnedRuntimeLifecycleInitializerCustodyTests": [
+					"testBootstrapStageLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt",
+					"testEarlyRefusalDoesNotInvokeInitializedSelfRetirement",
+					"testLateRefusalReleasesActualNamespaceBeforeSuccessor",
+					"testLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt"
+				],
+				"OwnedRuntimeMaintenanceJournalAdmissionTests": [
+					"testActualFixedMaintenanceLedgerBlocksOriginalImageAdmission"
+				],
+				"OwnedRuntimeNamespaceCloseOrderTests": [
+					"testCallerReferenceLossCannotRetireOriginalNativeNamespace",
+					"testNativeEarlierCloseRefusalKeepsActualNamespaceLocked"
+				],
+				"OwnedVirtualHIDDaemonReportMainOperationTests": [
+					"testRealKernelSelfImageObservationHasCurrentOriginalBirth"
+				]
+			},
+			"reason": "The 27 named owned-runtime custody XCTest methods (native flock, ACL, ownership, launchctl and kernel image observations) first ran on hosted macOS runners for v1.0.2 and fail there; they are DEFERRED and qualified:false. Every other Swift launcher test, the build, signing and the installation matrix remain mandatory."
 		}
 	}
 }
