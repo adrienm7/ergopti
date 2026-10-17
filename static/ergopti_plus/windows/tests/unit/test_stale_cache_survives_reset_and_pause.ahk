@@ -35,37 +35,48 @@
 
 _SCSP_StopGenerationClearsCache() {
 	global _LLM_Engine
-	; Prime the cache as if a prediction had just been shown for "bonjour".
-	_LLM_Engine := Map(
-		"request_id",   7,
-		"last_ctx",     "bonjour",
-		"last_results", ["!"],
-		"last_result",  "!"
-	)
+	SavedEngine := _LLM_Engine
+	try {
+		; Prime the cache as if a prediction had just been shown for "bonjour".
+		_LLM_Engine := Map(
+			"request_id",   7,
+			"last_ctx",     "bonjour",
+			"last_results", ["!"],
+			"last_result",  "!"
+		)
 
-	LLM_Engine_StopGeneration()
+		LLM_Engine_StopGeneration()
 
-	; The cache must be wiped so a returned-to / rebuilt context cannot replay a
-	; dismissed prediction. last_ctx empty + zero results forces the next
-	; FirePrediction onto the network path rather than the exact-match cache.
-	AssertEqual("", _LLM_Engine["last_ctx"],
-		"StopGeneration must clear last_ctx so a dismissed prediction cannot replay on the same context")
-	AssertEqual(0, _LLM_Engine["last_results"].Length,
-		"StopGeneration must clear last_results so the cache cannot re-render across a reset/pause")
-	AssertEqual("", _LLM_Engine["last_result"],
-		"StopGeneration must clear last_result (singular) so the legacy cache field cannot replay either")
+		; The cache must be wiped so a returned-to / rebuilt context cannot replay a
+		; dismissed prediction. last_ctx empty + zero results forces the next
+		; FirePrediction onto the network path rather than the exact-match cache.
+		AssertEqual("", _LLM_Engine["last_ctx"],
+			"StopGeneration must clear last_ctx so a dismissed prediction cannot replay on the same context")
+		AssertEqual(0, _LLM_Engine["last_results"].Length,
+			"StopGeneration must clear last_results so the cache cannot re-render across a reset/pause")
+		AssertEqual("", _LLM_Engine["last_result"],
+			"StopGeneration must clear last_result (singular) so the legacy cache field cannot replay either")
+	} finally {
+		; The four-key engine is this case's fixture, never the next test's engine.
+		_LLM_Engine := SavedEngine
+	}
 }
 Test("prediction_engine: StopGeneration clears the prediction cache (stale-cache-survives-reset-and-pause)", _SCSP_StopGenerationClearsCache)
 
 
 _SCSP_StopGenerationBumpsRequestId() {
 	global _LLM_Engine
-	_LLM_Engine := Map("request_id", 3, "last_ctx", "x", "last_results", ["y"], "last_result", "y")
-	before := _LLM_Engine["request_id"]
-	LLM_Engine_StopGeneration()
-	; request_id still advances (kills stale in-flight callbacks) -- the cache
-	; clear is additive, it must not regress the existing invalidation.
-	Assert(_LLM_Engine["request_id"] > before,
-		"StopGeneration must still bump request_id to invalidate in-flight callbacks")
+	SavedEngine := _LLM_Engine
+	try {
+		_LLM_Engine := Map("request_id", 3, "last_ctx", "x", "last_results", ["y"], "last_result", "y")
+		before := _LLM_Engine["request_id"]
+		LLM_Engine_StopGeneration()
+		; request_id still advances (kills stale in-flight callbacks) -- the cache
+		; clear is additive, it must not regress the existing invalidation.
+		Assert(_LLM_Engine["request_id"] > before,
+			"StopGeneration must still bump request_id to invalidate in-flight callbacks")
+	} finally {
+		_LLM_Engine := SavedEngine
+	}
 }
 Test("prediction_engine: StopGeneration still bumps request_id alongside the cache clear (stale-cache-survives-reset-and-pause)", _SCSP_StopGenerationBumpsRequestId)
