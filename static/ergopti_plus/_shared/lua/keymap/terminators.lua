@@ -15,8 +15,8 @@ local utf8_lib = (type(utf8) == "table" and utf8.offset and utf8.len) and utf8 o
 --- Owns the terminator catalogue (definitions, enable/disable state, custom
 --- user-added entries) and the O(1) lookup sets used by the per-keystroke
 --- hot path. Platform-neutral: no hs.* dependency, no i18n dependency —
---- labels are static French strings usable as display text or as keys for
---- upstream i18n resolution by host-driver shims.
+--- built-in slots carry a `label_key` that each driver's menu resolves in the
+--- active language; only custom slots carry a literal `label`.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Single Catalogue: TERMINATOR_DEFS is the only place that lists which
@@ -445,7 +445,6 @@ function M.update_magic_key(magic_key)
 	for _, def in ipairs(M.TERMINATOR_DEFS) do
 		if def.key == "star" then
 			def.chars = { magic_key }
-			def.label = magic_key .. " : Touche magique"
 			rebuild_cache()
 			return true
 		end

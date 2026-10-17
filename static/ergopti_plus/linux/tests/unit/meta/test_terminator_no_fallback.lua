@@ -113,7 +113,7 @@ helpers.describe("linux: word-delimiter menu changes are durable", function()
 		local function find_space(items)
 			for _, item in ipairs(items or {}) do
 				if type(item) == "table" then
-					if type(item.title) == "string" and item.title:find("␣ : Espace", 1, true) then
+					if type(item.title) == "string" and item.title:find("␣ : ", 1, true) == 1 then
 						space_row = item
 						return
 					end

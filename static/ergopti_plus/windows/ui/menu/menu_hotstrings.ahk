@@ -330,7 +330,9 @@ _HS_WordExpanderRows(Commands := unset) {
 			continue
 		}
 		Chars := D["chars"]
-		Lbl   := D["label"]
+		; The catalogue carries a locale key, never display text: resolving it
+		; here, at render time, follows a language switch without a restart.
+		Lbl   := t(D["label_key"])
 		; A consumed delimiter is swallowed by the expansion, an unconsumed one is
 		; typed after it. The difference shows only in the output, so the row has
 		; to say which it is. On Windows consumption is opt-in via
