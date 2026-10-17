@@ -80,6 +80,55 @@ const CHORD_CONFIGS = {
 		running: SCRIPT_CHORD_SLOTS.filter((slot) => slot !== 'script_altgr_enter')
 	}
 };
+// perf-personal-metadata-2026-10-17: a maintainer-sized hotstrings setup. The
+// staged boot render of the Hotstrings menu skips most of it; the full render
+// after registration reparsed every personal file four times per section and
+// took 9-45 s, which no default-config boot could reveal. Programmable
+// hotstrings are on too: their owner was counted by the first render before its
+// module had initialised, and the boot died before ready.
+const REALISTIC_HOTSTRINGS_FIXTURE = 'realistic-hotstrings';
+const HOTSTRINGS_RENDER_BUDGET_MS = 2000;
+const REALISTIC_HOTSTRINGS_CONFIG =
+	'[category_enabled]\nhotstrings = true\n[hotstrings.dynamic.user_code]\nenabled = true\n';
+const REALISTIC_USER_CODE_SOURCE = 'ErgoptiDynamicHotstrings(api) {\n\treturn []\n}\n';
+
+/**
+ * One personal hotstrings file shaped like a long-lived user file: _meta,
+ * section descriptions and several sections of inline-table entries.
+ * @param {number} file Index used to keep triggers distinct across files.
+ * @returns {string} TOML source of about 35 KB.
+ */
+function realisticPersonalHotstrings(file) {
+	const sections = ['autocorrection', 'code', 'email', 'vocabulary', 'test'];
+	let toml = `[_meta]\ndescription = "Personal ${file}"\nsections_order = [${sections.map((s) => `"${s}"`).join(', ')}]\n\n[_meta.sections]\n`;
+	for (const section of sections) toml += `${section} = "Section ${section}"\n`;
+	for (const section of sections) {
+		toml += `\n[[${section}]]\n`;
+		for (let entry = 0; entry < 53; entry += 1)
+			toml += `"p${file}${section.slice(0, 3)}${entry}" = { output = "Personal output ${file} ${section} ${entry}", is_word = true, auto_expand = false, is_case_sensitive = true, final_result = false }\n`;
+	}
+	return toml;
+}
+
+/**
+ * Every full Hotstrings menu render a boot logged, in milliseconds.
+ * @param {string} configRoot
+ * @returns {number[]}
+ */
+function hotstringsRenderTimes(configRoot) {
+	const logs = path.join(configRoot, 'ergopti_plus', 'logs');
+	if (!fs.existsSync(logs)) return [];
+	const times = [];
+	for (const name of fs.readdirSync(logs)) {
+		if (!/^ErgoptiPlus_\d/.test(name)) continue;
+		for (const line of fs.readFileSync(path.join(logs, name), 'utf8').split(/\r?\n/)) {
+			const match = /MENU\/initMenu: hotstrings menu rendered: \+(\d+) ms/.exec(line);
+			if (match) times.push(Number(match[1]));
+		}
+	}
+	return times;
+}
+
 // These fields are foreign data after the dedicated Metrics bindings retired.
 // The real boot and its existing acknowledged full save must retain both their
 // values and their independently written source comments.
@@ -416,6 +465,7 @@ async function main() {
 			'extension-enabled',
 			'extension-master-off',
 			'retired-metrics-config',
+			REALISTIC_HOTSTRINGS_FIXTURE,
 			...Object.keys(CHORD_CONFIGS),
 			...Object.keys(SEEDED_CONFIGS)
 		]) {
@@ -426,6 +476,24 @@ async function main() {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
 				fs.writeFileSync(path.join(config, 'config.toml'), RETIRED_METRICS_SOURCE);
+			}
+			if (fixture === REALISTIC_HOTSTRINGS_FIXTURE) {
+				const config = path.join(configRoot, 'config');
+				fs.mkdirSync(path.join(config, 'autohotkey'), { recursive: true });
+				fs.mkdirSync(path.join(config, 'hotstrings'), { recursive: true });
+				fs.writeFileSync(
+					path.join(config, 'autohotkey', 'config.toml'),
+					REALISTIC_HOTSTRINGS_CONFIG
+				);
+				fs.writeFileSync(
+					path.join(config, 'personal_dynamic_hotstrings.ahk'),
+					REALISTIC_USER_CODE_SOURCE
+				);
+				for (let file = 1; file <= 3; file += 1)
+					fs.writeFileSync(
+						path.join(config, 'hotstrings', `personal_${file}.toml`),
+						realisticPersonalHotstrings(file)
+					);
 			}
 			if (SEEDED_CONFIGS[fixture]) {
 				const config = path.join(configRoot, 'config', 'autohotkey');
@@ -538,6 +606,19 @@ async function main() {
 			}
 			const logged = failOnLoggedErrors(fixture, configRoot);
 			if (logged !== null) return logged;
+			// Every boot renders the Hotstrings menu at least twice: the staged
+			// first render and the full one after registration. Both stay a menu
+			// build, not a stall of the only input thread.
+			const renders = hotstringsRenderTimes(configRoot);
+			if (fixture === REALISTIC_HOTSTRINGS_FIXTURE && renders.length < 2)
+				return fail(
+					`${fixture}: expected the staged and the full Hotstrings menu renders, got ${renders.length}`
+				);
+			const slowest = Math.max(0, ...renders);
+			if (slowest > HOTSTRINGS_RENDER_BUDGET_MS)
+				return fail(
+					`${fixture}: a Hotstrings menu render took ${slowest} ms (budget ${HOTSTRINGS_RENDER_BUDGET_MS} ms; renders ${renders.join(', ')} ms)`
+				);
 			// Reuse the first fixture once so the no-bootstrap path is exercised too.
 			if (fixture === 'fresh-config') {
 				fs.unlinkSync(path.join(configRoot, 'ready.json'));
@@ -576,8 +657,8 @@ async function main() {
 		}
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
-				'script-chord, retired-Metrics, neutral-defaults and older-release boots reached ready with no error logged ' +
-				'and every script chord registered.\x1b[0m'
+				'script-chord, retired-Metrics, realistic-hotstrings, neutral-defaults and older-release boots reached ' +
+				'ready with no error logged, every Hotstrings menu render within budget and every script chord registered.\x1b[0m'
 		);
 		passed = true;
 		return 0;
