@@ -31,26 +31,33 @@ Test("AHK-007 remote terminal: exit status and readable body precede parsing (ah
 
 _RCTC_OneRootOwnsCompletionAndCanonicalUsage() {
 	global LLM_REMOTE_MODEL_PRICES
-	LLM_REMOTE_MODEL_PRICES := Map("priced", Map("in", 1.0, "out", 2.0))
-	Vectors := [
-		["openai", '{"reasoning":{"content":"decoy"},"decoy":{"prompt_tokens":900,"completion_tokens":800},'
-			. '"choices":[{"message":{"content":"final answer"}}],'
-			. '"usage":{"prompt_tokens":11,"completion_tokens":22,"total_tokens":33}}'],
-		["anthropic", '{"decoy":{"input_tokens":900,"output_tokens":800},'
-			. '"content":[{"type":"text","text":"final answer"}],'
-			. '"usage":{"input_tokens":11,"output_tokens":22}}'],
-		["gemini", '{"decoy":{"promptTokenCount":900,"candidatesTokenCount":800},'
-			. '"candidates":[{"content":{"parts":[{"text":"final answer"}]}}],'
-			. '"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":22,"totalTokenCount":33}}']
-	]
-	for Vector in Vectors {
-		Result := _LLMRemoteClassifyTerminal(Vector[1], _RCTC_Terminal(0, 200, true, Vector[2]), "priced")
-		AssertTrue(Result["terminal_ok"], Vector[1] . " complete 2xx terminal evidence must reach provider classification")
-		AssertTrue(Result["ok"], Vector[1] . " canonical completion must succeed")
-		AssertEqual("final answer", Result["text"], Vector[1] . " canonical completion must beat a decoy")
-		AssertEqual(11, Result["usage"]["prompt_tokens"], Vector[1] . " nested usage decoy must be ignored")
-		AssertEqual(22, Result["usage"]["completion_tokens"], Vector[1] . " canonical completion count must survive")
-		AssertEqual(33, Result["usage"]["total_tokens"], Vector[1] . " canonical total count must survive")
+	; The one-model price table is this case's fixture; the shipped catalogue
+	; it replaces is restored for the price tests that follow.
+	SavedPrices := LLM_REMOTE_MODEL_PRICES
+	try {
+		LLM_REMOTE_MODEL_PRICES := Map("priced", Map("in", 1.0, "out", 2.0))
+		Vectors := [
+			["openai", '{"reasoning":{"content":"decoy"},"decoy":{"prompt_tokens":900,"completion_tokens":800},'
+				. '"choices":[{"message":{"content":"final answer"}}],'
+				. '"usage":{"prompt_tokens":11,"completion_tokens":22,"total_tokens":33}}'],
+			["anthropic", '{"decoy":{"input_tokens":900,"output_tokens":800},'
+				. '"content":[{"type":"text","text":"final answer"}],'
+				. '"usage":{"input_tokens":11,"output_tokens":22}}'],
+			["gemini", '{"decoy":{"promptTokenCount":900,"candidatesTokenCount":800},'
+				. '"candidates":[{"content":{"parts":[{"text":"final answer"}]}}],'
+				. '"usageMetadata":{"promptTokenCount":11,"candidatesTokenCount":22,"totalTokenCount":33}}']
+		]
+		for Vector in Vectors {
+			Result := _LLMRemoteClassifyTerminal(Vector[1], _RCTC_Terminal(0, 200, true, Vector[2]), "priced")
+			AssertTrue(Result["terminal_ok"], Vector[1] . " complete 2xx terminal evidence must reach provider classification")
+			AssertTrue(Result["ok"], Vector[1] . " canonical completion must succeed")
+			AssertEqual("final answer", Result["text"], Vector[1] . " canonical completion must beat a decoy")
+			AssertEqual(11, Result["usage"]["prompt_tokens"], Vector[1] . " nested usage decoy must be ignored")
+			AssertEqual(22, Result["usage"]["completion_tokens"], Vector[1] . " canonical completion count must survive")
+			AssertEqual(33, Result["usage"]["total_tokens"], Vector[1] . " canonical total count must survive")
+		}
+	} finally {
+		LLM_REMOTE_MODEL_PRICES := SavedPrices
 	}
 }
 Test("AHK-007 remote terminal: one parsed root owns completion and usage (ahk-007-remote-terminal-classification)",
