@@ -480,8 +480,13 @@ jobs:
           # /ErrorStdOut keeps a parse/load error from popping a modal dialog that
           # would hang this step headlessly; the error text is captured via 2>&1.
           $output = & cmd /c "`"$ahk`" /ErrorStdOut `"$runner`" --dry-run 2>&1"
-          $warnings = $output | Where-Object { $_ -match "^Warning:" }
-          $errors   = $output | Where-Object { $_ -match "^Error:" }
+          $loadExit = $LASTEXITCODE
+          # /ErrorStdOut reports "<file> (<line>) : ==> Warning: ..." and
+          # "<file> (<line>) : ==> <load error>"; a line-start "Warning:" pattern
+          # never matched them, so this gate used to pass with any warning.
+          $warnings = @($output | Where-Object { $_ -match "==> Warning:" })
+          $errors   = @($output | Where-Object { $_ -match "==> " -and $_ -notmatch "==> Warning:" })
+          if ($loadExit -ne 0) { $errors += "AutoHotkey exited with $loadExit while loading the suite." }
           if ($errors) {
               $errors | ForEach-Object { Write-Host "  $_" }
               Write-Error "$($errors.Count) AHK load-time error(s) — fix before merging."

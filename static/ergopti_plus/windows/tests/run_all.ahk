@@ -27,6 +27,10 @@
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
+; Same policy as ErgoptiPlus.ahk: #Warn covers the whole compilation unit and
+; the vendored UIA.ahk shadows globals on purpose. Every other warning class
+; stays on and fails the CI compiler-warning gate.
+#Warn LocalSameAsGlobal, Off
 ; Parse runner flags:
 ;   --dry-run        parse/load gate only — register every test, skip execution.
 ;   --interactive    explicitly allow tests that activate windows or inject keys.

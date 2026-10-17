@@ -433,6 +433,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-number-row-current-test-causal.cjs"],
 			"repro": "npm run test:number-row-current-test-causal"
+		},
+		{
+			"id": "js-0439",
+			"ordinal": 439,
+			"name": "the Windows AHK compiler-warning gate fails on real /ErrorStdOut warnings and load errors",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-warning-gate.cjs"],
+			"repro": "npm run test:ahk-warning-gate"
 		}
 	]
 }
