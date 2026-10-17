@@ -37,9 +37,14 @@ function readDiagnosticMember(file, anchor, limit = MAX_MEMBER_BYTES) {
 	assert.ok(before.isFile(), 'diagnostic member must be a regular file');
 	assert.ok(before.size <= BigInt(limit), 'diagnostic member exceeds capture policy');
 	const identity = (stat) => [stat.dev, stat.ino, stat.size, stat.mtimeNs, stat.ctimeNs];
+	// Windows path stats (libuv's by-name fast path) report dev 0 while a
+	// descriptor stat reports the volume serial, so the path-to-descriptor join
+	// compares every other field; each side keeps its own complete identity.
+	const joined = (stat) => identity(stat).slice(1);
 	const fd = fs.openSync(file, 'r');
 	try {
-		assert.deepEqual(identity(fs.fstatSync(fd, { bigint: true })), identity(before));
+		const opened = fs.fstatSync(fd, { bigint: true });
+		assert.deepEqual(joined(opened), joined(before));
 		const bytes = Buffer.alloc(Number(before.size));
 		let offset = 0;
 		while (offset < bytes.length) {
@@ -47,7 +52,7 @@ function readDiagnosticMember(file, anchor, limit = MAX_MEMBER_BYTES) {
 			assert.ok(count > 0, 'diagnostic member shrank during capture');
 			offset += count;
 		}
-		assert.deepEqual(identity(fs.fstatSync(fd, { bigint: true })), identity(before));
+		assert.deepEqual(identity(fs.fstatSync(fd, { bigint: true })), identity(opened));
 		assert.deepEqual(identity(fs.lstatSync(file, { bigint: true })), identity(before));
 		assert.equal(fs.realpathSync(file), path.resolve(file), 'diagnostic redirection changed');
 		return bytes;
