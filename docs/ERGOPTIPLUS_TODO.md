@@ -12,6 +12,25 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 canonical direct-digit fixture ownership
+
+The inactive and capacity digit scenarios previously changed public KLE globals
+behind the original canonical source owner. Both original child processes fail
+at that owner's live-source refusal. The fixtures now call the real Unload and
+Load paths; the capacity scenario loads its sixty-key table through the same
+original XML fixture owner. All previous assertions remain in place, including
+the120/146 route counts and malformed-buffer refusals.
+
+The exact private registered runner receives both intended original failures,
+then all25 corrected direct-digit cases and all43 metadata cases with complete
+timed manifests and natural exit0. The exact official-worktree composition also
+passes all25 direct-digit and all43 metadata cases, complete and timed, with
+natural exit0. Whole-entry compilation, encoding, strict conventions and the
+49-control custody source guard also pass. No full JavaScript success follows.
+This repairs Windows test setup; it neither changes production policy nor
+qualifies physical input, native macOS or native Linux. Earlier failed full
+gates and unfinished C/AutoHotkey capture work remain OPEN.
+
 ### October 17 refused capture admission and successor ownership
 
 A refused or throwing terminal Begin callback can publish a successor before

@@ -84,7 +84,7 @@ _LNTR_StopFixtureState() {
 	finally Port["stop"] := Stop
 }
 
-_LNTR_LoadFixture(Base) {
+_LNTR_LoadFixture(Base, SuppliedTable := unset) {
 	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_LevelIndex, KLE_State
 	Text := '<?xml version="1.0" encoding="UTF-8"?><keyboard group="0" id="1" name="Replay">'
 		. '<layouts><layout first="0" last="0" mapSet="S" modifiers="M"/></layouts>'
@@ -98,6 +98,8 @@ _LNTR_LoadFixture(Base) {
 		. '<actions><action id="dead"><when state="none" next="acute"/>'
 		. '<when state="acute" output="^"/></action></actions></keyboard>'
 	; Registration tests use the original loader, never a supplied source witness.
+	if IsSet(SuppliedTable)
+		return KeylayoutEmulation_Load("replay-fixture-" . Base, Text, "iso", SuppliedTable)
 	Table := Map("conventions", ["iso"], "keys", [
 		Map("ahk", "SC010", "mac", 0), Map("ahk", "SC011", "mac", 1),
 		Map("ahk", "SC012", "mac", 2)])

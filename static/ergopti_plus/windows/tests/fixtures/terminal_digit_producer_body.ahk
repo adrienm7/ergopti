@@ -210,16 +210,20 @@ _DDPR_Production(Scenario) {
 	State := _LNTR_PortState()
 	State.Port["register_terminal_routes"] := _DDPR_Register
 	State.Port["list_terminal_held_recipes"] := _DDPR_Held
-	if Scenario == "production-inactive"
-		State.Port.Delete("terminal_route_source"), KLE_Model := 0
+	if Scenario == "production-inactive" {
+		State.Port.Delete("terminal_route_source")
+		KeylayoutEmulation_Unload()
+	}
 	else if Scenario == "production-caps"
 		State.Caps := 1
 	else if Scenario == "production-composition"
 		KLE_State := "acute"
 	else if Scenario == "production-capacity" {
-		KLE_KeyCodes := Map()
+		CapacityKeycodeTable := Map("conventions", ["iso"], "keys", [])
 		Loop 60
-			KLE_KeyCodes[Format("SC{:03X}", A_Index + 0x3F)] := 0
+			CapacityKeycodeTable["keys"].Push(Map("ahk", Format("SC{:03X}", A_Index + 0x3F), "mac", 0))
+		_DDPR_Require(_LNTR_LoadFixture("a", CapacityKeycodeTable) == 60,
+			"PRECONDITION: the original loader must admit all sixty capacity keys")
 	}
 	else if Scenario != "production-kle" && Scenario != "production-held-withdrawal"
 		throw Error("unknown production scenario")
