@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.infra.test_session_lock",
 	"tests.unit.modules.updater.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.test_production_manager_owners",
 	"tests.unit.infra.test_ollama_pinned_artifact",

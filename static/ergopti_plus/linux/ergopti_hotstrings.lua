@@ -66,6 +66,14 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
                SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
 
+-- Retain the launcher's lock here, while preventing any later external process
+-- from holding it after this daemon stops or crashes.
+local lock_protected, lock_error = require("infra.session_lock").protect()
+if not lock_protected then
+	io.stderr:write("[session_lock] " .. lock_error .. "\n")
+	os.exit(78)
+end
+
 
 -- =========================================
 -- =========================================

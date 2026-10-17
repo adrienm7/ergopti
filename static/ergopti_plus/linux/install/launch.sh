@@ -73,6 +73,8 @@ if "$SESSION_START"; then
 		if [ "$status" -eq 75 ]; then exit 0; fi
 		exit "$status"
 	fi
+	# LuaJIT restricts inheritance before loading modules that launch children.
+	export ERGOPTI_SESSION_LOCK_FD=9
 fi
 
 exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"
