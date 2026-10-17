@@ -3046,9 +3046,9 @@ These are software implementations; final hardware verification remains below.
       cause: pair assignments go through the same save-and-reload chain as the
       ² key. The pair menu is a transient `Menu` shown from
       `KeyCombinationShowPairMenu`; check whether its clicks are lost once the
-      local object is released. Ask for the tester's log
-      (`[KeyCombinations] Pair` lines, `AHK drop detected`, `Menu command
-    refused`).
+      local object is released. Ask for the tester's log: its
+      `[KeyCombinations] Pair` lines, `AHK drop detected` lines and
+      `Menu command refused` lines.
 - [ ] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
       The typing watcher returns at `IsCategoryGated("Hotstrings")` before its
       wrap block, so wrapping a selection with an OS layout works only when
