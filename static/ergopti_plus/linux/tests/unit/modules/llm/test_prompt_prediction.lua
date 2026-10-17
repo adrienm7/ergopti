@@ -100,7 +100,7 @@ local function scenario(opts, body)
 		}
 		local scheduler = Fakes.timer_scheduler()
 		local engine = require("modules.llm.prediction_engine")
-		engine.init({
+		engine.init({ focus_id = function() return "owned-prediction-window" end,
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {

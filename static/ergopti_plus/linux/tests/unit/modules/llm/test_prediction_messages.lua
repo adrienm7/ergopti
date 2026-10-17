@@ -65,7 +65,7 @@ local function messages_for(profile, context)
 	local engine = helpers.load_module("modules.llm.prediction_engine")
 	-- Initialised as the daemon does, which once passed a context length that
 	-- shadowed the menu's setting.
-	engine.init({ max_context = 500, triggers = { "//" }, overlay = {
+	engine.init({ focus_id = function() return "owned-prediction-window" end, max_context = 500, triggers = { "//" }, overlay = {
 		show = function(_, meta) last_meta = meta; return true end,
 		hide = function() return true end,
 	} })

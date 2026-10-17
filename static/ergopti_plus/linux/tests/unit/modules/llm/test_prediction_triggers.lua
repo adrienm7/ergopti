@@ -43,7 +43,7 @@ local function fixture(values)
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")
 	local fired = {}
-	engine.init({ scheduler = scheduler })
+	engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = scheduler })
 	engine.predict = function(context, output_context)
 		fired[#fired + 1] = { context = context, output_context = output_context }
 	end
@@ -53,7 +53,7 @@ end
 helpers.describe("prediction triggers: ordinary typing and word boundaries", function()
 	helpers.it("rejects a scheduler handle that was never armed", function()
 		local engine, _, fired = fixture()
-		engine.init({ scheduler = {
+		engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = {
 			after = function() return { armed = false, fired = true } end,
 			cancel = function() end,
 		} })

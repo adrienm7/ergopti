@@ -192,7 +192,7 @@ local function with_offer(options, body)
 		local world = { overlay = overlay, applied = {}, frames = frames, callbacks = callbacks }
 		local scheduler = Fakes.timer_scheduler()
 		world.engine = helpers.load_module("modules.llm.prediction_engine")
-		world.engine.init({
+		world.engine.init({ focus_id = function() return "owned-tooltip-window" end,
 			overlay = overlay,
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
@@ -620,7 +620,7 @@ local function with_configured_prediction(source, body, options)
 			end
 			local scheduler = Fakes.timer_scheduler()
 			local engine = require("modules.llm.prediction_engine")
-			local init = { overlay = overlay, scheduler = scheduler,
+			local init = { overlay = overlay, scheduler = scheduler, focus_id = function() return "owned-tooltip-window" end,
 				clock_ms = function() return scheduler.now * 1000 end,
 				apply_prediction = function(candidate) observations.applied[#observations.applied + 1] = candidate.to_type; return true end }
 			engine.init(init)
@@ -755,7 +755,7 @@ end)
 helpers.describe("Original prediction construction port custody", function()
 	helpers.it("(prediction-configured-reservation) later option callbacks cannot replace originally captured overlay capabilities", function()
 		with_configured_prediction(CONFIGURED_PREDICTION, function(engine, _, _, _, init)
-			local options = { overlay = init.overlay, apply_prediction = init.apply_prediction,
+			local options = { overlay = init.overlay, apply_prediction = init.apply_prediction, focus_id = init.focus_id,
 				scheduler = init.scheduler, clock_ms = init.clock_ms }
 			local changed = false
 			setmetatable(options, { __index = function(_, key)

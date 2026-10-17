@@ -30,7 +30,18 @@ assert(type(direct.native_object_path) == "string" and direct.native_object_path
 local capture = Destination.capture()
 if direct.role == 40 then assert(capture == nil, "password field cannot own user execution")
 else assert(capture and Destination.current(capture), "normal exact destination must be owned") end
-io.write("RECEIPT:" .. require("json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role}))
+-- Exercise unsupported-compositor routing over real GTK/AT-SPI ownership.
+-- This qualifies the native accessibility path, not a GNOME/KDE compositor.
+require("infra.display_server")._set_for_test("wayland", "gnome")
+local identity = require("adapters.window_info").focused_identity()
+if direct.role == 40 then assert(identity == nil, "password fields cannot own AI output")
+else
+    assert(identity == "atspi:" .. direct.native_bus_name .. ":" .. direct.native_object_path,
+        "AI output must retain the exact real active accessible owner")
+    assert(require("adapters.window_info").focused_identity() == identity,
+        "the same actual focused control must retain its identity")
+end
+io.write("RECEIPT:" .. require("json").encode({bus=direct.native_bus_name,path=direct.native_object_path,role=direct.role,ai_identity=identity}))
 """
 
 
@@ -127,6 +138,12 @@ def session(root):
                     )
                     assert len({r["path"] for r in receipts}) == 3, (
                         "three controls in one window require distinct native owners"
+                    )
+                    assert receipts[0]["ai_identity"] != receipts[1]["ai_identity"], (
+                        "unsupported-compositor AI must distinguish controls of the same real app/window"
+                    )
+                    assert "ai_identity" not in receipts[2], (
+                        "password AI target must be unavailable"
                     )
                     print(
                         "PASS virtual native destination: stable app bus, three exact field paths, password refusal"

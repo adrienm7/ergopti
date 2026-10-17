@@ -166,7 +166,7 @@ Http.postStream = native_post
 print("=== 4/ predictions from the engine ===")
 local offered, final = {}, nil
 local Engine = require("modules.llm.prediction_engine")
-Engine.init({
+Engine.init({ focus_id = function() return "owned-ollama-target" end,
 	overlay = {
 		show = function(candidates, meta)
 			offered = candidates

@@ -124,6 +124,7 @@ local function scenario(opts, body)
 			-- The daemon's seams: a copy probe, the injector's select-back, the window probe
 			read_selection = function()
 				world.reads = world.reads + 1
+				if world.on_read_selection then world.on_read_selection() end
 				if world.selection == nil then return false, "", "no_selection" end
 				return true, world.selection, nil
 			end,
@@ -367,5 +368,29 @@ helpers.it("translates a free language name without changing selection authority
 		helpers.assert_true(world.posts[1].body.messages[1].content:find("into Esperanto", 1, true) ~= nil)
 		helpers.assert_eq(world.reads, 1)
 		helpers.assert_eq(#world.replaced, 0, "no replacement before actual acceptance")
+	end)
+end)
+
+helpers.describe("selected translations require a known stable native focus", function()
+	for _, missing in ipairs({"empty", "unavailable"}) do
+		helpers.it("refuses translation before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
+			scenario({selection = SELECTION}, function(world)
+				world.focus = missing == "empty" and "" or nil
+				helpers.assert_eq(world.engine.translate_selection("en"), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+			end)
+		end)
+	end
+
+	helpers.it("refuses translation when focus moves during selection capture (selection-native-focus)", function()
+		scenario({selection = SELECTION}, function(world)
+			world.focus = "x11:10:100"
+			world.on_read_selection = function() world.focus = "x11:10:101" end
+			helpers.assert_eq(world.engine.translate_selection("en"), false)
+			helpers.assert_eq(world.reads, 1)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.replaced, 0)
+		end)
 	end)
 end)
