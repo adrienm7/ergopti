@@ -67,13 +67,15 @@ if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
 
 ; Optional selection flags (run_all sets them): --module=<group>,
-; --list=<file> and --dump-plan=<file>. Empty means unused.
+; --list=<file>, --dump-plan=<file> and --reverse. Empty means unused.
 if !IsSet(_AHK_MODULE)
 	global _AHK_MODULE := ""
 if !IsSet(_AHK_LIST_FILE)
 	global _AHK_LIST_FILE := ""
 if !IsSet(_AHK_DUMP_PLAN)
 	global _AHK_DUMP_PLAN := ""
+if !IsSet(_AHK_REVERSE)
+	global _AHK_REVERSE := false
 
 ; Only the principal runner owns parser registration. Including assertion
 ; helpers alone must not create an undeclared function dependency at load time.
@@ -618,6 +620,18 @@ _TestModuleOf(File) {
 	throw Error("The module groups must end with a catch-all.")
 }
 
+; Runs the selection backwards when Reverse is set. A test that silently
+; relies on state an earlier test left behind then runs before that test and
+; fails, which is how --reverse finds order-dependent tests.
+_SelectReversed(Tests, Reverse) {
+	if !Reverse
+		return Tests
+	Reversed := []
+	loop Tests.Length
+		Reversed.Push(Tests[Tests.Length - A_Index + 1])
+	return Reversed
+}
+
 ; Keeps the tests of one module group; an empty name keeps every test.
 _SelectModule(Tests, Module) {
 	global TEST_MODULE_GROUPS
@@ -874,7 +888,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
-	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN
+	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -888,7 +902,8 @@ RunTests() {
 	; replay of a single failing test.
 	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
 	UnmodularCount := ActiveTests.Length
-	ActiveTests := _SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE)
+	ActiveTests := _SelectReversed(_SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE),
+		_AHK_REVERSE)
 	if _AHK_DUMP_PLAN != "" {
 		Plan := ""
 		for Entry in ActiveTests
@@ -912,6 +927,8 @@ RunTests() {
 	if (_AHK_MODULE != "")
 		_TestPrint("# --module " . _AHK_MODULE . " - "
 			. ActiveTests.Length . " of " . UnmodularCount . " test(s) selected.")
+	if _AHK_REVERSE
+		_TestPrint("# --reverse - the selected tests run in reverse registry order.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
 		_CopyTestResultsForCi()

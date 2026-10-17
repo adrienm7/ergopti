@@ -6,7 +6,8 @@
 ; CI splits the canonical suite across runners with run_all.ahk --module=<g>.
 ; The groups must partition the registered tests by their file: every test
 ; belongs to exactly one group, keeps its relative order, and unknown groups
-; are refused. --list replays an exact subset in registry order.
+; are refused. --list replays an exact subset in registry order, and
+; --reverse runs the selection backwards to expose order-dependent tests.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -62,3 +63,16 @@ _RSH_List() {
 	AssertTrue(_SelectListed(Tests, "") == Tests)
 }
 Test("runner module: --list replays the named tests in registry order (runner-module)", _RSH_List)
+
+_RSH_Reverse() {
+	Tests := [{name: "a"}, {name: "b"}, {name: "c"}]
+	Reversed := _SelectReversed(Tests, true)
+	AssertEqual(3, Reversed.Length)
+	AssertEqual("c", Reversed[1].name, "--reverse runs the last selected test first")
+	AssertEqual("b", Reversed[2].name)
+	AssertEqual("a", Reversed[3].name)
+	AssertEqual("a", Tests[1].name, "the registry itself keeps its order")
+	AssertTrue(_SelectReversed(Tests, false) == Tests)
+	AssertEqual(0, _SelectReversed([], true).Length)
+}
+Test("runner module: --reverse runs the selection backwards (runner-module)", _RSH_Reverse)
