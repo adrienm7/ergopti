@@ -2771,7 +2771,7 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
 		HeldBuffer := Buffer(64 * 8, 0)
 		GuardFrame()
 		Reply := HasMethod(HeldFn, "Call") ? HeldFn.Call(Frame["owner"], HeldBuffer, 64)
-			: _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Frame["owner"], HeldBuffer, 64)
+			: OriginalLoader.Call("frame_held", Map("frame", Frame, "buffer", HeldBuffer))
 		GuardFrame()
 		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
 			RetainUnknown()
@@ -2798,7 +2798,10 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
 			Held[RecipeId] := true, Keep[RecipeId] := true
 		}
 		GuardFrame()
-		KeepModels := Map()
+		Protected := OriginalLoader.Call("protected_historical", Map("frame", Frame))
+		for RecipeId in Protected["recipes"]
+			Keep[RecipeId] := true
+		KeepModels := Protected["models"]
 		if Source.Get("model", 0) is Map
 			KeepModels[ObjPtr(Source["model"])] := true
 		RetireRecipes := []
@@ -2820,6 +2823,7 @@ _LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
 			RetainUnknown()
 			throw ValueError("Retirement cannot borrow a successor registration owner.")
 		}
+		OriginalLoader.Call("prune_historical", Map("frame", Frame, "keep", Keep, "models", KeepModels))
 		for RecipeId in RetireRecipes
 			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
 		for Identity in RetireModels
@@ -3433,6 +3437,7 @@ _LLM_NavEventOwnerTerminalRouteComposition(BufferSource, Offset) {
 
 /** Decodes the exact native FIFO metadata ABI without authorizing output. */
 _LLM_NavEventOwnerTerminalRouteDecode(Receipt, ExpectedToken := 0) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
 	if !(Receipt is Buffer) || Receipt.Size != 184
 		throw ValueError("The terminal route receipt ABI size is invalid.")
 	Token := NumGet(Receipt, 0, "UInt64")
@@ -3489,6 +3494,11 @@ _LLM_NavEventOwnerTerminalRouteDecode(Receipt, ExpectedToken := 0) {
 		Snapshot["route"] := _LLM_NavEventOwnerTerminalRouteRead(Receipt, 144)
 	} else
 		Snapshot["route"] := 0
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original historical metadata owner was withdrawn.")
+	; A derived stamp binds decoded diagnostic copies to one admitted lifetime.
+	Snapshot["admission_stamp"] := OriginalLoader.Call("stamp_historical", Snapshot)
 	return Snapshot
 }
 
@@ -3509,52 +3519,18 @@ LLM_NavEventOwner_PeekTerminalRoute(Token, Index, Port := 0) {
 }
 
 /**
- * Resolves an admitted metadata recipe through its retained KLE model only.
+ * Resolves admitted metadata through its original retained canonical graph row.
  * @param {Map} Snapshot - Decoded FIFO receipt while its queue or hold still owns
  *   the recipe. Retired diagnostic copies intentionally lose stepping permission.
  * @param {String} State - Explicit neutral composition state of this subset.
  * @returns {Map} Canonical diagnostic Next/Output, never a delivery permission.
  */
 LLM_NavEventOwner_StepTerminalRoute(Snapshot, State) {
-	global _LLM_NavEventOwnerTerminalRouteOwner
-	global _LLM_NavEventOwnerTerminalRouteRecipes, KEYLAYOUT_NEUTRAL_STATE
-	if !(Snapshot is Map) || !(State is String) || State != KEYLAYOUT_NEUTRAL_STATE
-			|| Snapshot.Get("status", -1) != 0
-			|| Snapshot.Get("owner", 0) != _LLM_NavEventOwnerTerminalRouteOwner
-			|| !(Snapshot.Get("route", 0) is Map) || !(Snapshot.Get("event", 0) is Map)
-			|| Snapshot["event"].Get("key_up", 1) != 0
-			|| !(Snapshot.Get("composition_before", 0) is Map)
-			|| Snapshot["composition_before"].Get("dead_key_id", -1) != 0
-		throw ValueError("The terminal recipe is outside the admitted neutral subset.")
-	for Name in ["owner", "route_generation", "route_layout_id", "status"]
-		if !Snapshot.Has(Name) || !(Snapshot[Name] is Integer)
-			throw ValueError("The terminal recipe receipt has an invalid typed identity.")
-	Event := Snapshot["event"]
-	for Name in ["origin", "key_up", "repeat", "vk", "scan"]
-		if !Event.Has(Name) || !(Event[Name] is Integer)
-			throw ValueError("The terminal recipe event is malformed.")
-	if Event["origin"] < 1 || Event["origin"] > 2 || Event["repeat"] < 0 || Event["repeat"] > 1
-		throw ValueError("The terminal recipe event provenance is unsupported.")
-	Route := Snapshot["route"]
-	_LLM_NavEventOwnerTerminalRouteValidate(Route)
-	if (Route["axis"] == 2 && Event["scan"] != Route["code"])
-			|| (Route["axis"] == 1 && Event["vk"] != Route["code"])
-		throw ValueError("The terminal recipe no longer describes its captured key.")
-	Id := Route["recipe_id"]
-	if !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id)
-		throw ValueError("The terminal recipe identity is not retained.")
-	Admission := _LLM_NavEventOwnerTerminalRouteRecipes[Id]
-	if Admission["generation"] != Snapshot.Get("route_generation", 0)
-			|| Admission["layout_id"] != Snapshot.Get("route_layout_id", 0)
-			|| !(Admission["recipe"] is Map)
-			|| (Route["kind"] != 1 && Route["kind"] != 2)
-		throw ValueError("The terminal recipe registration ownership is invalid.")
-	for Name, Value in Admission["route"]
-		if !Route.Has(Name) || Route[Name] != Value
-			throw ValueError("The terminal recipe differs from its admitted descriptor.")
-	Step := KeylayoutEmulation_StepReplayRoute(Admission["recipe"], State)
-	if Step["Next"] != KEYLAYOUT_NEUTRAL_STATE
-		throw ValueError("The terminal recipe unexpectedly entered composition.")
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original historical row owner was withdrawn.")
+	Step := OriginalLoader.Call("step_historical", Map("snapshot", Snapshot, "state", State))
 	return Map("Next", Step["Next"], "Output", Step["Output"],
 		"metadata_only", true, "cohort_complete", false, "transformed_output_enabled", false)
 }
@@ -4028,9 +4004,13 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	global _LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe
 	global _LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteCoverage
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteOwner, KEYLAYOUT_NEUTRAL_STATE
 	static IssuedModule := 0, IssuedExports := 0, OriginalExports := 0
 	static ActiveFrame := 0, RetainedFrame := 0, ActiveStop := 0, Constructing := false
 	static Scopes := Map(), NativeRegistrationDebt := false
+	static HistoricalRows := Map(), HighestNativeRecipe := 0
+	static NativeRegistrationSerial := 0, NextHistoricalStamp := 0
+	static OriginalHistoricalValidate := _LLM_NavEventOwnerTerminalRouteValidate
 	static OriginalDigitCapture := _LLM_NavEventOwnerCaptureDigitSource
 	static OriginalCandidateCapture := _LLM_NavEventOwnerCaptureTerminalCandidate
 	static OriginalCanonicalCapture := KeylayoutEmulation_CaptureCanonicalSource
@@ -4159,6 +4139,96 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		return true
 	}
 
+
+
+	StampHistorical(Snapshot) {
+		if !OwnersCurrent() || !PlainMap(Snapshot)
+			throw ValueError("The historical metadata owner was withdrawn.")
+		Route := Snapshot.Get("route", 0)
+		if Snapshot.Get("status", -1) != 0 || !PlainMap(Route)
+				|| !PlainMap(_LLM_NavEventOwnerTerminalRouteRecipes)
+				|| !HistoricalRows.Has(_LLM_NavEventOwnerTerminalRouteRecipes)
+			return 0
+		Registry := HistoricalRows[_LLM_NavEventOwnerTerminalRouteRecipes]
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || !Registry.Records.Has(Id)
+			return 0
+		Record := Registry.Records[Id]
+		if !Record.CommitCell.Committed || !EpochCurrent(Record.Epoch)
+				|| Record.Owner != _LLM_NavEventOwnerTerminalRouteOwner || Snapshot.Get("owner", 0) != Record.Owner
+				|| Snapshot.Get("route_generation", 0) != Record.Generation || Snapshot.Get("route_layout_id", 0) != Record.Layout
+				|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id) || _LLM_NavEventOwnerTerminalRouteRecipes[Id] != Record.Admission
+				|| (Record.NativeCustody && !ExportsCurrent())
+				|| Object.Prototype.HasOwnProp.Call(Record.Guard, "Call") || !Record.Guard.Call()
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Route, Record.Descriptor)
+			return 0
+		return Record.Stamp
+	}
+
+	HistoricalStep(Payload) {
+		if !OwnersCurrent() || !PlainMap(Payload) || !PlainMap(Payload.Get("snapshot", 0))
+			throw ValueError("The historical terminal step has no original owner.")
+		Snapshot := Payload["snapshot"], State := Payload.Get("state", 0)
+		if !(State is String) || State != KEYLAYOUT_NEUTRAL_STATE
+				|| !(Snapshot.Get("status", -1) is Integer) || Snapshot["status"] != 0
+				|| !PlainMap(Snapshot.Get("event", 0)) || !PlainMap(Snapshot.Get("composition_before", 0))
+				|| !(Snapshot["composition_before"].Get("dead_key_id", -1) is Integer)
+				|| Snapshot["composition_before"]["dead_key_id"] != 0
+			throw ValueError("The terminal recipe is outside the admitted neutral subset.")
+		for Name in ["owner", "route_generation", "route_layout_id", "status"]
+			if !Snapshot.Has(Name) || !(Snapshot[Name] is Integer)
+				throw ValueError("The terminal recipe receipt has an invalid typed identity.")
+		Event := Snapshot["event"]
+		for Name in ["origin", "key_up", "repeat", "vk", "scan"]
+			if !Event.Has(Name) || !(Event[Name] is Integer)
+				throw ValueError("The terminal recipe event is malformed.")
+		if Event["origin"] < 1 || Event["origin"] > 2 || Event["key_up"] != 0
+				|| Event["repeat"] < 0 || Event["repeat"] > 1
+			throw ValueError("The terminal recipe event provenance is unsupported.")
+		Route := Snapshot.Get("route", 0)
+		if !PlainMap(Route) || _LLM_NavEventOwnerTerminalRouteValidate != OriginalHistoricalValidate
+				|| Object.Prototype.HasOwnProp.Call(OriginalHistoricalValidate, "Call")
+			throw ValueError("The original terminal descriptor validator was withdrawn.")
+		OriginalHistoricalValidate.Call(Route)
+		if (Route["axis"] == 2 && Event["scan"] != Route["code"])
+				|| (Route["axis"] == 1 && Event["vk"] != Route["code"])
+			throw ValueError("The terminal recipe no longer describes its captured key.")
+		if !PlainMap(Route) || !PlainMap(_LLM_NavEventOwnerTerminalRouteRecipes)
+				|| !HistoricalRows.Has(_LLM_NavEventOwnerTerminalRouteRecipes)
+			throw ValueError("The historical terminal dictionary was not issued.")
+		Registry := HistoricalRows[_LLM_NavEventOwnerTerminalRouteRecipes]
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || !Registry.Records.Has(Id)
+			throw ValueError("The historical terminal row is not retained.")
+		Record := Registry.Records[Id]
+		if !(Snapshot.Get("admission_stamp", 0) is Integer) || Snapshot["admission_stamp"] != Record.Stamp
+				|| !Record.CommitCell.Committed || !EpochCurrent(Record.Epoch) || Record.Owner != _LLM_NavEventOwnerTerminalRouteOwner
+				|| Snapshot.Get("owner", 0) != Record.Owner || Snapshot.Get("route_generation", 0) != Record.Generation
+				|| Snapshot.Get("route_layout_id", 0) != Record.Layout || Payload.Get("state", 0) != Record.Neutral
+				|| !PlainMap(_LLM_NavEventOwnerTerminalRouteModels) || Registry.Models != _LLM_NavEventOwnerTerminalRouteModels
+				|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id)
+				|| _LLM_NavEventOwnerTerminalRouteRecipes[Id] != Record.Admission
+				|| !PlainMap(Record.Row) || (Record.NativeCustody && !ExportsCurrent())
+				|| Object.Prototype.HasOwnProp.Call(Record.Guard, "Call") || !Record.Guard.Call()
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Route, Record.Descriptor)
+			throw ValueError("The historical terminal admission was withdrawn.")
+		return Map("Next", Record.Neutral, "Output", Record.Row["output"])
+	}
+
+	HistoricalCustodyCurrent(Frame) {
+		if !NativeRegistrationDebt
+			return true
+		if !ExportsCurrent() || Frame["next_recipe"] < HighestNativeRecipe
+			return false
+		for Dictionary, Registry in HistoricalRows
+			for Id, Record in Registry.Records
+				if Record.NativeCustody && (Dictionary != Frame["recipes"] || Registry.Models != Frame["models"]
+						|| !EpochCurrent(Record.Epoch) || Frame["owner"] != Record.Owner
+						|| Frame["generation"] < Record.Generation || Frame["next_layout"] < Record.Layout)
+					return false
+		return true
+	}
+
 	CanonicalOwnersCurrent() {
 		; Source admission is deliberately separate from native retirement custody.
 		for Pair in [[OriginalCanonicalCapture, KeylayoutEmulation_CaptureCanonicalSource],
@@ -4197,10 +4267,14 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
 			if !OwnersCurrent() || !PlainMap(Frame) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
 				throw Error("The original registration capture is invalid.")
+			if !HistoricalCustodyCurrent(Frame)
+				throw Error("The retained historical native owner was withdrawn.")
 			CapturedNative := ExportsCurrent()
 			State := {DigitTried: false, DigitCaptured: false, DigitCell: 0, DigitGuard: 0, DigitModeGuard: 0,
 				CandidateTried: false, CandidateCell: 0, CandidateGuard: 0,
-				CanonicalSource: CanonicalSource,
+				NativeSerial: NativeRegistrationSerial,
+				CanonicalSource: CanonicalSource, RecordSet: Map(), CommitCell: {Committed: false}, HeldTried: false,
+				HeldAuthentic: false, HeldKeep: 0, Pruned: false,
 				Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
 				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
 				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
@@ -4210,7 +4284,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				throw Error("The original canonical source changed during frame issuance.")
 			Operations := Map("capture_digit_source", CaptureDigitSource, "seal_candidate", SealCandidate,
 				"frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
-				"native", NativeRegistration, "complete", CompleteFrame, "close", CloseFrame)
+				"native", NativeRegistration, "held", QueryFrameHeld, "protected", ProtectedHistorical,
+				"prune", PrepareHistoricalPrune, "complete", CompleteFrame, "close", CloseFrame)
 			Image := Operations.Clone()
 			Scopes[Operations] := {Image: Image, Close: CloseFrame}
 			State.Operations := Operations
@@ -4281,6 +4356,27 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 					|| !Witness.Call()
 				throw Error("The original terminal candidate changed before witness issuance.")
 			State.CandidateCell := Candidate, State.CandidateGuard := Witness
+			Registry := HistoricalRows.Has(State.Recipes) ? HistoricalRows[State.Recipes] : 0
+			for Id, Admission in Candidate["recipes"] {
+				if (IsObject(Registry) && Id <= Registry.Highest) || (NativeRegistrationDebt && Id <= HighestNativeRecipe)
+					throw ValueError("A historical terminal recipe identity cannot be reissued.")
+				Recipe := Admission["recipe"], Row := 0, Model := 0
+				if Recipe is Map {
+					Row := CanonicalCall.Call(State.CanonicalSource["read"], "find", KEYLAYOUT_NEUTRAL_STATE,
+						Recipe["scan"], Admission["route"]["required_modifiers"] == 4 ? 1 : 0)
+					Model := Recipe["model"]
+				}
+				NextHistoricalStamp += 1
+				if NextHistoricalStamp <= 0
+					throw Error("The historical admission stamp overflowed.")
+				State.RecordSet[Id] := {Stamp: NextHistoricalStamp, NativeCustody: false, Admission: Admission, Descriptor: Admission["route"].Clone(),
+					Guard: Witness, CommitCell: State.CommitCell, Row: Row, Model: Model, Neutral: KEYLAYOUT_NEUTRAL_STATE,
+					Epoch: State.Epoch, Owner: Frame["owner"], Generation: Admission["generation"],
+					Layout: Admission["layout_id"], Genuine: false}
+			}
+			GuardFrame()
+			if !Witness.Call()
+				throw Error("The candidate changed during historical row capture.")
 			return true
 		}
 
@@ -4324,8 +4420,14 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				throw Error("The registration lifetime changed before its native call.")
 			GuardFrame()
 			State.Genuine := GenuineCall
-			if GenuineCall
+			if GenuineCall {
 				NativeRegistrationDebt := true
+				NativeRegistrationSerial += 1
+				if NativeRegistrationSerial <= 0
+					throw Error("The native registration serial overflowed.")
+				for Id in State.RecordSet
+					HighestNativeRecipe := Max(HighestNativeRecipe, Id)
+			}
 			State.Raw := DllCall(Address, "UInt64", Owner, "UInt64", Generation,
 				"UInt64", LayoutId, "Ptr", Bindings, "UInt", Count, "Int")
 			return State.Raw
@@ -4336,7 +4438,104 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			if !EpochCurrent(State.Epoch) || IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
 					|| (State.Genuine && (!(State.Raw is Integer) || State.Raw != 0))
 				throw Error("The registration scope cannot certify its final closure.")
+			if !HistoricalRows.Has(State.Recipes)
+				HistoricalRows[State.Recipes] := {Records: Map(), Models: State.Models, Highest: 0}
+			Registry := HistoricalRows[State.Recipes]
+			if Registry.Models != State.Models
+				throw ValueError("The historical model dictionary was replaced.")
+			for Id, Record in State.RecordSet {
+				if Id <= Registry.Highest
+					throw ValueError("A retired historical row cannot be admitted again.")
+				Record.Genuine := State.Genuine
+				Record.NativeCustody := State.Genuine || NativeRegistrationDebt
+				if Record.NativeCustody
+					HighestNativeRecipe := Max(HighestNativeRecipe, Id)
+				Registry.Records[Id] := Record
+				Registry.Highest := Id
+			}
 			State.Completed := true
+			State.CommitCell.Committed := true
+		}
+
+
+		QueryFrameHeld(OutputBuffer) {
+			GuardFrame()
+			if !A_IsCritical || State.HeldTried || !(OutputBuffer is Buffer)
+					|| ObjGetBase(OutputBuffer) != Buffer.Prototype || OutputBuffer.Size != 512
+				throw ValueError("The original held-query output lifetime is invalid.")
+			for Name in ObjOwnProps(OutputBuffer)
+				throw ValueError("The held-query output cannot invoke an observer.")
+			State.HeldTried := true
+			if !ExportsCurrent()
+				return _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Frame["owner"], OutputBuffer, 64)
+			NativeFrame := State.Genuine && State.Raw is Integer && State.Raw == 0 && FrameNativeCurrent(State)
+			Count := 0
+			Raw := DllCall(OriginalExports["ErgoptiNav_ListTerminalHeldRecipes"],
+				"UInt64", Frame["owner"], "Ptr", OutputBuffer.Ptr, "UInt", 64, "UInt*", &Count, "Int")
+			GuardFrame()
+			if NativeFrame && !FrameNativeCurrent(State)
+				throw Error("The genuine held-query lifetime was withdrawn.")
+			if Raw == 0 && NativeFrame {
+				if !(Count is Integer) || Count < 0 || Count > 64
+					throw ValueError("The genuine held-query count is invalid.")
+				Held := Map()
+				Loop Count {
+					Id := NumGet(OutputBuffer, (A_Index - 1) * 8, "UInt64")
+					if Id <= 0 || Held.Has(Id) || !State.Recipes.Has(Id)
+						throw ValueError("The genuine held-query row is unknown or duplicated.")
+					Held[Id] := true
+				}
+				State.HeldKeep := Held, State.HeldAuthentic := true
+			}
+			return Map("status", Raw, "count", Count)
+		}
+
+		ProtectedHistorical() {
+			GuardFrame()
+			Recipes := [], Models := Map()
+			if HistoricalRows.Has(State.Recipes) && !State.HeldAuthentic {
+				for Id, Record in HistoricalRows[State.Recipes].Records {
+					if !Record.NativeCustody
+						continue
+					Recipes.Push(Id)
+					if Record.Model is Map
+						Models[ObjPtr(Record.Model)] := true
+				}
+			}
+			return Map("recipes", Recipes, "models", Models)
+		}
+
+		PrepareHistoricalPrune(Keep, KeepModels) {
+			GuardFrame()
+			if !A_IsCritical || State.Pruned || !PlainMap(Keep) || !PlainMap(KeepModels)
+				throw ValueError("The historical prune request is invalid or duplicated.")
+			if State.HeldAuthentic {
+				if !State.Genuine || !(State.Raw is Integer) || State.Raw != 0 || !FrameNativeCurrent(State)
+					throw Error("The genuine registration and held-query receipts changed.")
+				Expected := State.HeldKeep.Clone()
+				for Id in State.RecordSet
+					Expected[Id] := true
+				if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Keep, Expected)
+					throw ValueError("The prune set differs from the genuine held-query receipt.")
+			}
+			Retire := []
+			if HistoricalRows.Has(State.Recipes) {
+				Registry := HistoricalRows[State.Recipes]
+				for Id, Record in Registry.Records {
+					if Record.NativeCustody && !State.HeldAuthentic && !Keep.Has(Id)
+						throw ValueError("A supplied held reply cannot retire a genuine row.")
+					if Keep.Has(Id) {
+						if Record.NativeCustody && Record.Model is Map && !KeepModels.Has(ObjPtr(Record.Model))
+							throw ValueError("The retained genuine model was omitted from pruning custody.")
+					} else
+						Retire.Push(Id)
+				}
+				; Eligibility retires before public deletion or any later publication callback.
+				for Id in Retire
+					Registry.Records.Delete(Id)
+			}
+			State.Pruned := true
+			return true
 		}
 
 		KnownRefusal() {
@@ -4349,7 +4548,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				throw Error("The original registration scope cannot close twice.")
 			State.Closed := true
 			; Failed publication is still custody: absence of global Unknown is no ACK.
-			if !State.Completed && (State.Uncertain || (State.Genuine && !KnownRefusal()))
+			if !State.Completed && (State.Uncertain || (State.Genuine && !KnownRefusal())
+					|| (State.Mode == "custom" && NativeRegistrationSerial != State.NativeSerial))
 				RetainedFrame := State
 			ActiveFrame := 0
 			Scopes.Delete(State.Operations)
@@ -4491,6 +4691,23 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				return false
 			if ReceiptCurrent()
 				NativeRegistrationDebt := false
+			OwnedProjection := false
+			for Dictionary, Registry in HistoricalRows {
+				if _LLM_NavEventOwnerTerminalRouteRecipes == Dictionary {
+					_LLM_NavEventOwnerTerminalRouteRecipes := Map()
+					OwnedProjection := true
+				}
+				if _LLM_NavEventOwnerTerminalRouteModels == Registry.Models {
+					_LLM_NavEventOwnerTerminalRouteModels := Map()
+					OwnedProjection := true
+				}
+			}
+			if OwnedProjection
+				_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+					"generation", 0, "layout_id", 0, "registered", 0,
+					"cohort_complete", false, "transformed_output_enabled", false,
+					"unconverted", ["native terminal owner retired"])
+			HistoricalRows := Map(), HighestNativeRecipe := 0
 			State := Ticket.State
 			if !IsObject(State)
 				return true
@@ -4536,6 +4753,21 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	}
 	if Request == "owns_scope"
 		return OwnersCurrent() && ScopeCurrent(Payload)
+	if Request == "stamp_historical"
+		return StampHistorical(Payload)
+	if Request == "step_historical"
+		return HistoricalStep(Payload)
+	if Request == "frame_held" || Request == "protected_historical" || Request == "prune_historical" {
+		if !PlainMap(Payload) || !IsObject(ActiveFrame) || ActiveFrame.Frame != Payload.Get("frame", 0)
+				|| !ScopeCurrent(ActiveFrame.Operations) || !CanonicalCurrent(ActiveFrame)
+			throw ValueError("The historical frame request was not genuinely issued.")
+		Original := Scopes[ActiveFrame.Operations].Image
+		if Request == "frame_held"
+			return Original["held"].Call(Payload["buffer"])
+		if Request == "protected_historical"
+			return Original["protected"].Call()
+		return Original["prune"].Call(Payload["keep"], Payload["models"])
+	}
 	if Request == "guard_frame"
 		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
 			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
@@ -4567,8 +4799,12 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			throw Error("Navigation owner DLL export is unavailable")
 		Address := _LLM_NavEventOwnerExports[Payload]
 		; The direct ABI also owns registration storage without an AHK Frame.
-		if IssuedModule && Address == OriginalExports["ErgoptiNav_RegisterTerminalRoutes"]
+		if IssuedModule && Address == OriginalExports["ErgoptiNav_RegisterTerminalRoutes"] {
 			NativeRegistrationDebt := true
+			NativeRegistrationSerial += 1
+			if NativeRegistrationSerial <= 0
+				throw Error("The native registration serial overflowed.")
+		}
 		return Address
 	}
 	if Request != "load"

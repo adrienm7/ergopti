@@ -1513,7 +1513,7 @@ function validateTerminalRegistrationCustody(loader, authored) {
 	const body = (name) => {
 		const match = loader.match(new RegExp(`^${name}\\([^\\n]*\\) \\{\\n([\\s\\S]*?)\\n\\}`, 'm'));
 		assert.ok(match, `Missing actual preregistration helper ${name}.`);
-		return match[1];
+		return match[1].replace(/^\s*;[^\n]*$/gm, '');
 	};
 	const refresh = body('LLM_NavEventOwner_RefreshTerminalRoutes');
 	assert.doesNotMatch(
@@ -1658,7 +1658,33 @@ function validateTerminalRegistrationCustody(loader, authored) {
 	assert.match(prune, /HeldFn\.Call\(Frame\["owner"\], HeldBuffer, 64\)/);
 	assert.match(
 		prune,
-		/_LLM_NavEventOwnerNativeListTerminalHeldRecipes\(\s*Frame\["owner"\], HeldBuffer, 64\)/
+		/OriginalLoader\.Call\("frame_held", Map\("frame", Frame, "buffer", HeldBuffer\)\)/
+	);
+	assert.match(
+		authority,
+		/_LLM_NavEventOwnerNativeListTerminalHeldRecipes\(Frame\["owner"\], OutputBuffer, 64\)/
+	);
+	assert.match(
+		authority,
+		/Raw := DllCall\(OriginalExports\["ErgoptiNav_ListTerminalHeldRecipes"\],\s*"UInt64", Frame\["owner"\], "Ptr", OutputBuffer\.Ptr, "UInt", 64, "UInt\*", &Count, "Int"\)/
+	);
+	assert.match(authority, /if Raw == 0 && NativeFrame \{/);
+	assert.match(authority, /State\.HeldKeep := Held, State\.HeldAuthentic := true/);
+	assert.match(
+		authority,
+		/if !PlainMap\(Payload\) \|\| !IsObject\(ActiveFrame\) \|\| ActiveFrame\.Frame != Payload\.Get\("frame", 0\)\s*\|\| !ScopeCurrent\(ActiveFrame\.Operations\) \|\| !CanonicalCurrent\(ActiveFrame\)/
+	);
+	assert.match(
+		authority,
+		/if Request == "frame_held"\s*return Original\["held"\]\.Call\(Payload\["buffer"\]\)/
+	);
+	assert.match(
+		authority,
+		/if HistoricalRows\.Has\(State\.Recipes\) && !State\.HeldAuthentic \{\s*for Id, Record in HistoricalRows\[State\.Recipes\]\.Records \{\s*if !Record\.NativeCustody\s*continue/
+	);
+	assert.match(
+		prune,
+		/Protected := OriginalLoader\.Call\("protected_historical", Map\("frame", Frame\)\)\s*for RecipeId in Protected\["recipes"\]\s*Keep\[RecipeId\] := true/
 	);
 	assert.match(
 		prune,
@@ -1667,7 +1693,7 @@ function validateTerminalRegistrationCustody(loader, authored) {
 	assert.match(prune, /Func\.Prototype\.Call\.Call\(OriginalUnknown, Frame\)/);
 	assert.match(
 		prune,
-		/throw ValueError\("Retirement cannot borrow a successor registration owner\."\)\s+\}\s+for RecipeId in RetireRecipes/
+		/throw ValueError\("Retirement cannot borrow a successor registration owner\."\)\s+\}\s+OriginalLoader\.Call\("prune_historical", Map\("frame", Frame, "keep", Keep, "models", KeepModels\)\)\s+for RecipeId in RetireRecipes/
 	);
 	assert.match(prune, /_LLM_NavEventOwnerTerminalRegistrationRetain\(Frame\)\s+return true/);
 	for (const literal of [
@@ -1820,8 +1846,45 @@ const registrationInverses = [
 	],
 	[
 		'_LLM_NavEventOwnerTerminalRoutePrune',
+		'OriginalLoader.Call("frame_held", Map("frame", Frame, "buffer", HeldBuffer))',
+		'OriginalLoader.Call("frame_held", Map("frame", Map(), "buffer", HeldBuffer))'
+	],
+	[
+		'_LLM_NavEventOwnerNativeEnsureLoaded',
 		'_LLM_NavEventOwnerNativeListTerminalHeldRecipes(Frame["owner"],',
 		'_LLM_NavEventOwnerNativeListTerminalHeldRecipes(_LLM_NavEventOwnerTerminalRouteOwner,'
+	],
+	[
+		'_LLM_NavEventOwnerNativeEnsureLoaded',
+		'"UInt64", Frame["owner"], "Ptr", OutputBuffer.Ptr, "UInt", 64, "UInt*", &Count, "Int"',
+		'"UInt64", _LLM_NavEventOwnerTerminalRouteOwner, "Ptr", OutputBuffer.Ptr, "UInt", 64, "UInt*", &Count, "Int"'
+	],
+	['_LLM_NavEventOwnerNativeEnsureLoaded', 'if Raw == 0 && NativeFrame {', 'if Raw == 0 {'],
+	[
+		'_LLM_NavEventOwnerNativeEnsureLoaded',
+		'State.HeldKeep := Held, State.HeldAuthentic := true',
+		'State.HeldKeep := Held, State.HeldAuthentic := false'
+	],
+	['_LLM_NavEventOwnerNativeEnsureLoaded', 'ActiveFrame.Frame != Payload.Get("frame", 0)', 'false'],
+	[
+		'_LLM_NavEventOwnerNativeEnsureLoaded',
+		'return Original["held"].Call(Payload["buffer"])',
+		'; return Original["held"].Call(Payload["buffer"])\n\t\t\treturn 0'
+	],
+	[
+		'_LLM_NavEventOwnerNativeEnsureLoaded',
+		'if HistoricalRows.Has(State.Recipes) && !State.HeldAuthentic {',
+		'if false {'
+	],
+	[
+		'_LLM_NavEventOwnerTerminalRoutePrune',
+		'Protected := OriginalLoader.Call("protected_historical", Map("frame", Frame))',
+		'Protected := Map("recipes", [], "models", Map())'
+	],
+	[
+		'_LLM_NavEventOwnerTerminalRoutePrune',
+		'OriginalLoader.Call("prune_historical", Map("frame", Frame, "keep", Keep, "models", KeepModels))',
+		'Sleep(0)'
 	],
 	[
 		'_LLM_NavEventOwnerTerminalRoutePrune',
