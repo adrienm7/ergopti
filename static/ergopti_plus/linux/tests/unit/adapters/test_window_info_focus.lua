@@ -294,6 +294,30 @@ end)
 
 helpers.describe("window_info: Wayland", function()
 
+	helpers.it("(linux-focus-native-query-error) refuses unexpected compositor errors before accessible fallback", function()
+		local name = "adapters.user_hotstring_destination"
+		local saved, captures = package.loaded[name], 0
+		package.loaded[name] = {
+			capture_current = function()
+				captures = captures + 1
+				return { bus = ":1.42", path = "/controlled-fallback" }
+			end,
+		}
+		local ok, failure = pcall(function()
+			local window = under("wayland", "sway", {})
+			require("adapters.shell_runner")._set_runner(function() error("controlled unexpected compositor query error") end)
+			helpers.assert_nil(window.focused_identity(), "an unexpected native query failure cannot authorize output through a different lookup")
+			helpers.assert_eq(captures, 0)
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata, { appId = "", windowTitle = "", bundleId = "", executablePath = "" })
+			helpers.assert_nil(identity)
+			helpers.assert_eq(captures, 0, "periodic snapshot errors also remain free of accessible fallback")
+		end)
+		package.loaded[name] = saved
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
 	helpers.it("(linux-focus-coherent-poll) reserves accessible focus lookup for fresh native targeting", function()
 		local name = "adapters.user_hotstring_destination"
 		local saved, captures = package.loaded[name], 0

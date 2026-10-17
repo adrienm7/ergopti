@@ -310,7 +310,7 @@ end
 --- Periodic polling never acquires an accessible destination as a fallback.
 --- @return table info Original four-field WindowInfo shape.
 --- @return string|nil identity Native server/process/window identity.
-local function focused_snapshot()
+function M.focused_snapshot()
 	local ok, info, identity = pcall(query_focused)
 	if not ok then
 		Logger.error(LOG, "focused_snapshot(): native focus query failed.")
@@ -319,19 +319,16 @@ local function focused_snapshot()
 	return info or empty_info(), identity
 end
 
---- Returns one current metadata/identity pair for the driver's focus poll.
---- @return table info Original four-field WindowInfo shape.
---- @return string|nil identity Native server/process/window identity.
-function M.focused_snapshot()
-	return focused_snapshot()
-end
-
 --- Returns the current native window identity for asynchronous output targeting.
 --- Application names and titles cannot distinguish two windows of the same app.
 --- This driver-only API matches macOS; unsupported compositors return nil.
 --- @return string|nil Native server/process/window identity.
 function M.focused_identity()
-	local _, identity = focused_snapshot()
+	local ok, _, identity = pcall(query_focused)
+	if not ok then
+		Logger.error(LOG, "focused_identity(): native focus query failed.")
+		return nil
+	end
 	if identity == nil and DisplayServer.is_wayland() then
 		-- GNOME and KDE expose no compositor window ID. Their accessible control
 		-- still has an exact native destination; labels never substitute for it.
