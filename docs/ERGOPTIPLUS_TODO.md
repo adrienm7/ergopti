@@ -12,6 +12,36 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 completed native registration retirement
+
+The private native issuer now retains registration debt after a successful
+frame closes and after direct ABI registration. Public module zero, a supplied
+Stop callback or canonical source withdrawal cannot release that debt. Only
+the original native Stop receipt can retire it. DLL residence alone does not
+create a permanent debt after that receipt; a controlled successor can stop.
+
+Three original completed-frame regressions reproduce false Stop success.
+A first stricter proposal causes 154 failures in the broader terminal selection.
+Its first failure passes alone and fails after actual C retirement. Correcting
+the debt lifetime receives that exact successor case and all 1,097 broader
+terminal cases, zero failures, natural exit 0. Two further direct-ABI cases
+then reproduce false Stop success. The current source also receives the
+registration export through the private issuer and passes all seventeen owning
+cases, including those direct-ABI cases.
+
+The current composition completes and times all 1,099 broader terminal cases
+with zero failures and natural exit 0. Whole-entry compilation and all seventy
+E2E cases pass. The full original JavaScript runner completes all 434 checks:
+424 PASS and ten FAIL, natural exit 1. The inventory and failed check identities
+match the preceding complete run; this is not a green gate or proof that every
+underlying cause is identical. Superseded failed receipts remain failures.
+
+This is Windows C/AutoHotkey retirement software; macOS and Linux do not use
+this boundary. Historical model-store cleanup and eligibility, the capture
+source pin, authenticated event stream and production output policy remain
+follow-up software. Physical Windows and native macOS/Linux remain unqualified;
+capability flags stay false. Updated-source native CI receiving remains OPEN.
+
 ### October 17 Windows canonical registration source custody
 
 Every original registration frame now captures the original no-argument canonical
@@ -110,6 +140,14 @@ with 5,662 terminal cases and case 5,663 still active, then exits 2. The origina
 raw TAP is retained before verifier cleanup. This is incomplete receiving of
 12,846 planned cases, not a successful native suite; its later cases are UNRUN.
 The wrapper continues its other original gates without restarting that child.
+
+A second frozen-source default attempt now terminates at the same unchanged
+two-hour watchdog, natural exit 2. Exactly 5,975 cases execute and are timed out
+of 12,846 planned, with case 5,976 still active. The original raw TAP is retained
+before verifier cleanup. This remains incomplete native receiving, with later
+cases UNRUN. That lane contains the preceding nineteen source/test changes,
+before the canonical registration and completed-Stop corrections; it cannot
+qualify those later changes. Its original JavaScript and remaining gates continue.
 
 Published source `31f5d50` on CI `38969905294` completes with failure. The Windows execution
 artifact matches its published SHA256 and passes ZIP CRC checks. Its original
