@@ -50,6 +50,9 @@ global _PrefixContentGeneration := 0
 ; character verifies this token before the engine can consume it.
 global _PrefixFocusedControlToken := 0
 global _PrefixInputContextGeneration := 0
+; A_TickCount of the last physical keystroke the watcher observed, "" before
+; the first: the reference of the idle reset (_PrefixApplyIdleReset).
+global _PrefixLastKeyTick := ""
 
 ; Set when a PRIVATE expansion has written its resolved value into the buffers.
 ; After a star fire the watcher takes the engine's buffer verbatim, so
@@ -255,10 +258,12 @@ _InstallMouseClickResetHooks() {
 
 _OnMouseClickReset(*) {
 	try {
-		; A click places the cursor at an unknown position, but the next
-		; keystroke will start a fresh run — treat it as a word boundary so
-		; is_word triggers (e.g. "c★ → c'est") fire immediately.
-		_PrefixInvalidateInputContext(0, true)
+		; A click places the cursor at an unknown position. With
+		; hotstrings.click_resets_word (the default) the next keystroke starts
+		; a fresh word, so is_word triggers (e.g. "c★ → c'est") fire at once;
+		; without it the run waits for a delimiter. The unknown focus token
+		; makes _PrefixEnsureInputContext keep this verdict.
+		_PrefixInvalidateInputContext(0, HSE_ClickResetsWordCurrent())
 		if IsSet(LLM_Bridge_ResetPredictions)
 			LLM_Bridge_ResetPredictions()
 	} catch as Err {
@@ -1112,6 +1117,31 @@ _PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true) {
 	return Commit.Generation
 }
 
+; Starts a new word when the user paused longer than hotstrings.idle_reset_seconds
+; since the previous observed keystroke, then stamps this one. Both InputHook
+; callbacks call it: OnKeyDown sees every physical key (characters, Backspace,
+; navigation) first, and OnChar covers a character whose keydown it did not
+; observe; the second call of one keystroke reads a zero gap.
+; @param NowTick {Integer} Tick of the current keystroke.
+; @returns {Boolean} True when the context was reset.
+_PrefixApplyIdleReset(NowTick) {
+	global _PrefixLastKeyTick, _PrefixBuffer, _PrefixFocusedControlToken
+	global HSE_Buffer, HSE_StartIsWordBoundary
+	LastTick := _PrefixLastKeyTick
+	_PrefixLastKeyTick := NowTick
+	IdleSeconds := HSE_IdleResetSecondsCurrent()
+	if !HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds)
+		return false
+	; Nothing to forget: keep the generations and the tooltip owner untouched.
+	if (HSE_Buffer == "" and _PrefixBuffer == "" and HSE_StartIsWordBoundary)
+		return false
+	_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+	if LoggerIsDebugEnabled()
+		LoggerDebug("PrefixWatcher", "Idle reset: {1} ms without typing (limit {2} s) — new word.",
+			NowTick - LastTick, IdleSeconds)
+	return true
+}
+
 ; Verify that the next character still targets the control which owns the two
 ; buffers. An explicit token is a deterministic test seam; production callers
 ; omit it and use the WindowInfo adapter. Failure to resolve focus is fail-closed:
@@ -1278,6 +1308,9 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		; guard sits before the main dispatch try, so contain it independently: an
 		; unhandled InputHook callback error permanently silences later characters.
 		try {
+			; A character whose keydown the watcher did not observe still gets
+			; the idle rule; after OnKeyDown the gap reads zero.
+			_PrefixApplyIdleReset(A_TickCount)
 			FocusStarted := HotPath_Now()
 			ContextReady := IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext()
 			HotPath_LogIfSlow("Prefix.FocusAdmission", FocusStarted)
@@ -1581,6 +1614,9 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
+		; A long enough pause before this key starts a new word, whatever the
+		; key does next (a Backspace or a navigation key then applies on top).
+		_PrefixApplyIdleReset(A_TickCount)
 		; Detect Ctrl-modified combos that mutate the document context but
 		; do not produce a printable char observable by OnChar. Held Ctrl
 		; is read off the live keyboard state since the InputHook does

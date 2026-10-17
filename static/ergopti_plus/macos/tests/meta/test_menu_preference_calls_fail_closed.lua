@@ -224,7 +224,7 @@ local function assert_guards(source, helper_source, native_source, programmable_
 
 	-- Eight formerly direct Wrap calls now delegate through the actual strict
 	-- shared transaction. Enumerate all eight callbacks and prove that route;
-	-- the independent 61-operation census and all historical predicates remain.
+	-- the independent 62-operation census and all historical predicates remain.
 	local delegated, delegated_guarded = delegated_guards(source, helper_source or shared_wrap_source, native_source)
 	calls, guarded = calls + delegated, guarded + delegated_guarded
 
@@ -239,7 +239,9 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- additional-personal file gate and the programmable-source preference owner.
 	-- Their separate remove/weaken/fallback mutations below keep both additions
 	-- in the full inventory without granting another call a census exception.
-	helpers.assert_eq(calls, 59 + 2,
+	-- The word-reset rows (idle reset presets, free entry and click checkbox)
+	-- share one guarded publisher in menu_hotstrings_management: one call more.
+	helpers.assert_eq(calls, 59 + 3,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

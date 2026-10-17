@@ -28,6 +28,7 @@ local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local Manifest   = require("infra.manifest_reader")
+local HotstringCore = require("infra.hotstring_engine")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -91,6 +92,8 @@ M.DEFAULT_STATE = {
 	keymap                      = Manifest.default_for("hotstrings.enabled"),
 	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
+	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
+	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
 	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
@@ -439,6 +442,52 @@ function M.set_base_delay(secs)
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
 	return true
 end
+
+--- Returns the pause after which the next key starts a new word.
+--- @return number Seconds; 0 means the buffer is never reset by a pause.
+function M.get_idle_reset_seconds()
+	return CoreState.IDLE_RESET_SEC
+end
+
+--- Sets the pause after which the next key starts a new word.
+--- @param secs number hotstrings.idle_reset_seconds; 0 disables the reset.
+--- @return boolean committed False for a value that is not a non-negative number.
+function M.set_idle_reset_seconds(secs)
+	if not HotstringCore.valid_idle_reset_seconds(secs) then
+		Logger.error(LOG, "Idle reset refused: '%s' is not a non-negative number of seconds.", tostring(secs))
+		return false
+	end
+	-- Both fields at once: the same projection recompute_word_timeout makes.
+	CoreState.IDLE_RESET_SEC = secs
+	CoreState.WORD_TIMEOUT_SEC = secs
+	Logger.debug(LOG, "Idle reset: %gs.", secs)
+	return true
+end
+
+--- Returns whether a mouse click starts a new word.
+--- @return boolean
+function M.is_click_resets_word_enabled()
+	return CoreState.click_resets_word == true
+end
+
+--- Sets whether a mouse click starts a new word.
+--- @param enabled boolean hotstrings.click_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_click_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Click reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.click_resets_word = enabled
+	Logger.debug(LOG, "Click starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+-- The word-reset policy is neutral in state.lua; this module owns it and seeds
+-- it from the features manifest through its own setters, which refuse an
+-- invalid default with an ERROR and keep the neutral policy.
+M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
+M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
 
 --- Returns the side of the last shift key pressed.
 --- @return string|nil "left", "right", or nil if Shift is not held.
@@ -1445,6 +1494,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	local dt  = now - CoreState.last_key_time
 	_user_hotstring_elapsed = dt
+	-- 0 is the "no key yet" seed, not a timestamp: the first key has no pause.
+	local previous_key_ms = CoreState.last_key_time > 0 and CoreState.last_key_time * 1000 or nil
 	CoreState.last_key_time = now
 	local flags = e:getFlags()
 
@@ -1460,11 +1511,12 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
-	-- Wipe the buffer after the user pauses long enough that the next keystroke
-	-- cannot possibly belong to the same word. The pause itself stands in for
-	-- a word terminator, so the post-wipe context starts on a fresh word
-	-- boundary and word-boundary-required triggers are allowed to fire.
-	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
+	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
+	-- the pause itself stands in for a word terminator, so the post-wipe
+	-- context starts on a fresh word boundary and word-boundary-required
+	-- triggers are allowed to fire. The rule is the shared engine's; the
+	-- seconds clock is exact enough that no resolution is taken off.
+	if HotstringCore.idle_resets_word(previous_key_ms, now * 1000, CoreState.WORD_TIMEOUT_SEC, 0) then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
 		CoreState.start_is_word_boundary = true
@@ -1959,7 +2011,9 @@ mouse_tap = eventtap.new(
 		-- Canvas, AX, task cancellation and logging run only after Quartz receives
 		-- the older fence payload and the original mouse event.
 		CoreState.buffer = ""
-		CoreState.start_is_word_boundary = false
+		-- hotstrings.click_resets_word: the caret moved somewhere unobservable;
+		-- by default the next run is a new word, as on the other drivers.
+		CoreState.start_is_word_boundary = CoreState.click_resets_word == true
 		cancel_action_preview_recovery()
 		LLMBridge.set_runtime_quarantined(true)
 		local scheduled = SyntheticInput.defer_after_callback("keymap mouse reset",

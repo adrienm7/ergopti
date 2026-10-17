@@ -456,6 +456,33 @@ input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
 
+# Seconds without a keystroke after which the next key starts a new word, as
+# if a delimiter had been typed: a word-start hotstring fires again after a
+# pause instead of reading the text typed before it. 0 disables the reset (the
+# buffer is kept forever, the behaviour before 2026-10). The menu offers the
+# `preset_values` plus a free entry for any other non-negative value.
+# A pure parameter of the matcher: it types nothing by itself.
+[[features.hotstrings]]
+id = "idle_reset_seconds"
+default = 3
+recommended = 3
+input_altering = false
+type = "number"
+preset_values = [0, 1, 2, 3, 5, 10]
+description_key = "menu.hotstrings.idle_reset"
+
+# Whether a mouse click (or a touch with tap-to-click) starts a new word. Off,
+# the click still empties the buffer (the caret moved somewhere unknown) but
+# the next run is treated as the middle of a word, so word-start hotstrings
+# wait for a delimiter.
+[[features.hotstrings]]
+id = "click_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.click_resets_word"
+
 [[features.hotstrings]]
 id = "expansion_delay"
 platforms = ["hs"]
@@ -5918,6 +5945,31 @@ type = "check"
 id = "repeat_key"
 i18n = "menu.hotstrings.repeat_key_toggle"
 checked_when = ["hotstrings_repeat_enabled"]
+
+# When the hotstring engine forgets the current word: after a pause without
+# typing (the feature's preset_values, plus a free entry each
+# driver answers with its native prompt) and after a mouse click. Each driver
+# supplies the setter, the prompt and the state behind the tick.
+[[menu.hotstrings_params_group]]
+type = "---"
+
+[[menu.hotstrings_params_group]]
+type = "choice"
+id = "idle_reset"
+path = "hotstrings.idle_reset_seconds"
+i18n = "menu.hotstrings.idle_reset"
+choice_registry = "hotstrings.idle_reset"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+custom_command = "idle_reset_custom"
+custom_i18n = "menu.hotstrings.idle_reset_custom"
+custom_unit_i18n = "menu.hotstrings.idle_reset_unit"
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "click_resets_word"
+i18n = "menu.hotstrings.click_resets_word"
+checked_when = ["hotstrings_click_resets_word"]
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while

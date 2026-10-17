@@ -101,7 +101,7 @@ local function with_scope(body, source)
 	assert(os.execute("mkdir -p '" .. directory .. "'"))
 	local ok, err = pcall(function()
 		for _, name in ipairs({ "modules.hotstrings.hotstrings_config", "infra.hotstring_preferences",
-			"modules.hotstrings.repeat_key", "modules.hotstrings.magic_key", "modules.hotstrings.preview_settings",
+			"modules.hotstrings.repeat_key", "modules.hotstrings.word_reset", "modules.hotstrings.magic_key", "modules.hotstrings.preview_settings",
 			"modules.hotstrings.terminator_settings", "infra.hotstrings_scope" }) do
 			package.loaded[name] = nil
 		end
@@ -165,6 +165,7 @@ local function with_scope(body, source)
 		context.Config, context.engine = Config, engine
 		context.Preferences = require("infra.hotstring_preferences")
 		context.RepeatKey = require("modules.hotstrings.repeat_key")
+		context.WordReset = require("modules.hotstrings.word_reset")
 		context.MagicKey = require("modules.hotstrings.magic_key")
 		context.Terminators = require("modules.hotstrings.terminator_settings")
 		assert(context.Terminators.load(), "the fixture delimiters must load")
@@ -173,6 +174,7 @@ local function with_scope(body, source)
 			path = config_path, backup_suffix = context.suffix, files = context.files,
 			is_paused = function() return context.paused end,
 			config = Config, preferences = context.Preferences, repeat_key = context.RepeatKey,
+			word_reset = context.WordReset,
 			magic_key = context.MagicKey, preview_settings = require("modules.hotstrings.preview_settings"),
 			terminators = context.Terminators, dynamic = context.dynamic, preview = context.preview_port,
 		})
@@ -635,6 +637,7 @@ helpers.describe("hotstrings retained native release debt", function()
 		local scope = require("infra.hotstrings_scope").new({ path = c.config_path, backup_suffix = c.suffix,
 			files = c.files, is_paused = function() return c.paused end,
 			config = c.Config, preferences = c.Preferences, repeat_key = c.RepeatKey, magic_key = c.MagicKey,
+			word_reset = c.WordReset,
 			preview_settings = require("modules.hotstrings.preview_settings"), terminators = c.Terminators,
 			dynamic = c.dynamic, preview = c.preview_port })
 		return scope, function(value) blocked = value == true end, live, faults

@@ -63,7 +63,8 @@ const HEADER = {
 		"because 'list' is the ONLY type that moves provider DATA from the driver into the " +
 		"renderer — 'dynamic' hands the rendering straight back to platform code. " +
 		"'choice' = one enum feature (path) as one row with its values beneath it; its " +
-		"'choices' are projected from the feature's enum_values or registered owner by this generator.",
+		"'choices' are projected from the feature's enum_values or registered owner by this generator; " +
+		'an optional custom_command/custom_i18n (and custom_unit_i18n) closes them with a free-entry row.',
 	_comment4:
 		"unavailable (rows restricted by platforms only): 'hide' = not applicable where the row " +
 		"is not declared, never drawn there and carrying no reason_key; 'grey' = not yet ported " +
@@ -202,7 +203,33 @@ function indentationChoices(feature) {
 	}));
 }
 
+/** Projects the idle-reset presets (seconds, 0 = never) from their numeric feature. */
+function idleResetChoices(feature) {
+	const values = feature?.preset_values;
+	if (
+		feature?.type !== 'number' ||
+		!Array.isArray(values) ||
+		values.length < 2 ||
+		values.some(
+			(value, index) =>
+				!Number.isFinite(value) || value < 0 || (index > 0 && value <= values[index - 1])
+		) ||
+		values[0] !== 0 ||
+		!values.includes(feature.default) ||
+		!values.includes(feature.recommended)
+	)
+		throw new Error(
+			'hotstrings.idle_reset: presets need ascending non-negative values from 0 containing the defaults'
+		);
+	return values.map((value) =>
+		value === 0
+			? { value, i18n: 'menu.hotstrings.idle_reset_off' }
+			: { value, i18n: 'menu.hotstrings.idle_reset_unit', label_prefix: `${value} ` }
+	);
+}
+
 const CHOICE_REGISTRIES = {
+	'hotstrings.idle_reset': { path: 'hotstrings.idle_reset_seconds', project: idleResetChoices },
 	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
 	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },
 	'updater.check_intervals': {
@@ -337,6 +364,33 @@ function projectChoices(menu, raw) {
 				throw new Error(
 					`${where}: current_choice_suffix needs punctuation, one {1} and show_current_choice`
 				);
+			// A free-entry row closes the submenu: the driver's command prompts for a
+			// value outside the presets. Both fields or neither, and only beside a
+			// registry whose stored value can legitimately leave the preset list.
+			const hasCustomCommand = row.custom_command !== undefined;
+			const hasCustomI18n = row.custom_i18n !== undefined;
+			if (hasCustomCommand || hasCustomI18n) {
+				if (
+					!hasCustomCommand ||
+					!hasCustomI18n ||
+					typeof row.custom_command !== 'string' ||
+					!/^[a-z][a-z0-9_]*$/.test(row.custom_command) ||
+					row.custom_command === row.id ||
+					typeof row.custom_i18n !== 'string' ||
+					row.custom_i18n === '' ||
+					projectedRegistry === undefined
+				)
+					throw new Error(
+						`${where}: custom_command and custom_i18n go together on a registry-backed choice`
+					);
+			}
+			if (
+				row.custom_unit_i18n !== undefined &&
+				(!hasCustomCommand ||
+					typeof row.custom_unit_i18n !== 'string' ||
+					row.custom_unit_i18n === '')
+			)
+				throw new Error(`${where}: custom_unit_i18n names the free entry's unit key`);
 			row.choices =
 				projectedRegistry ||
 				values.map((value) =>

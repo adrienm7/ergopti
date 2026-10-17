@@ -54,7 +54,7 @@ end
 
 --- Builds one transaction over the real owners.
 --- @param options table path, backup_suffix, is_paused, and the runtime owners:
----   config, preferences, repeat_key, magic_key, terminators, dynamic (optional),
+---   config, preferences, repeat_key, word_reset, magic_key, terminators, dynamic (optional),
 ---   preview_settings with preview (optional), files, remove.
 --- @return table owner apply(mode), revert(), release(), pending(), retry_restore()
 function M.new(options)
@@ -62,9 +62,11 @@ function M.new(options)
 		and type(options.backup_suffix) == "string", "hotstrings scope requires its path and pause owner")
 	local Config, Preferences = options.config, options.preferences
 	local RepeatKey, MagicKey = options.repeat_key, options.magic_key
+	local WordReset = options.word_reset
 	local Dynamic, PreviewSettings, preview = options.dynamic, options.preview_settings, options.preview
 	local Terminators = options.terminators
 	assert(type(Config) == "table" and type(Preferences) == "table" and type(RepeatKey) == "table"
+		and type(WordReset) == "table"
 		and type(MagicKey) == "table" and type(PreviewSettings) == "table" and type(Terminators) == "table",
 		"hotstrings scope owners are incomplete")
 	local files = options.files or require("adapters.file_system")
@@ -126,6 +128,7 @@ function M.new(options)
 		if Dynamic and Dynamic.user_code_time_activation and Dynamic.user_code_time_activation() ~= nil
 			and type(programmable) ~= "table" then return nil end
 		active_snapshot = { config = config, preferences = preferences, programmable = programmable, repeat_enabled = RepeatKey.is_enabled(),
+			word_reset = WordReset.snapshot(),
 			trigger = MagicKey.get(), terminators = Terminators.snapshot() }
 		return active_snapshot
 	end
@@ -151,6 +154,7 @@ function M.new(options)
 		if secondary and secondary.restore() ~= true then return false end
 		if Preferences.restore(owner, snapshot.preferences) ~= true then return false end
 		if RepeatKey.restore_configuration(snapshot.repeat_enabled) ~= true then return false end
+		if WordReset.restore_configuration(snapshot.word_reset) ~= true then return false end
 		if Terminators.restore_configuration(snapshot.terminators) ~= true then return false end
 		local current = MagicKey.get()
 		if Config.restore_configuration(owner, snapshot.config) ~= true then return false end
@@ -190,6 +194,7 @@ function M.new(options)
 			local previous = MagicKey.get()
 			if Preferences.adopt(owner, decoded) ~= true then return false end
 			if RepeatKey.adopt_configuration(decoded) ~= true then return false end
+			if WordReset.adopt_configuration(decoded) ~= true then return false end
 			if Terminators.adopt_configuration(decoded) ~= true then return false end
 			local trigger = MagicKey.get()
 			if trigger ~= previous and Config.set_magic_key(trigger, MagicKey.default()) ~= true then return false end
@@ -239,6 +244,7 @@ function M.apply(mode, is_paused, ports)
 		config = require("modules.hotstrings.hotstrings_config"),
 		preferences = require("infra.hotstring_preferences"),
 		repeat_key = require("modules.hotstrings.repeat_key"),
+		word_reset = require("modules.hotstrings.word_reset"),
 		magic_key = require("modules.hotstrings.magic_key"),
 		terminators = require("modules.hotstrings.terminator_settings"),
 		preview_settings = require("modules.hotstrings.preview_settings"),

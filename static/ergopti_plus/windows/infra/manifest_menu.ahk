@@ -1857,6 +1857,29 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 			"checked", HasCurrent and Current == Value,
 			"action",  ((V) => (*) => Command(V))(Value)))
 	}
+	; An open catalogue closes its presets with a free-entry row whose command
+	; prompts natively; it carries the tick when the stored value is no preset.
+	; The shared Lua renderer appends the identical row.
+	CustomId := _MR_Get(Item, "custom_command")
+	if (CustomId != "") {
+		CustomI18n := _MR_Get(Item, "custom_i18n")
+		if !(Commands.Has(CustomId) and CustomI18n != "") {
+			try LoggerError("MenuRenderer", "No command '{1}' for the '{2}.{3}' free entry — choice skipped.", CustomId, ManifestKey, Id)
+			return false
+		}
+		CustomCurrent := HasCurrent and CurrentLabel == ""
+		Rows.Push(Map("separator", true))
+		Rows.Push(Map(
+			"label",   t(CustomI18n),
+			"checked", CustomCurrent,
+			"action",  ((Fn) => (*) => Fn())(Commands[CustomId])))
+		if (CustomCurrent and IsNumber(Current)) {
+			CurrentLabel := _MR_FormatFreeNumber(Current)
+			UnitI18n := _MR_Get(Item, "custom_unit_i18n")
+			if (UnitI18n != "")
+				CurrentLabel .= " " . t(UnitI18n)
+		}
+	}
 	Label := t(I18nKey) . _MR_Get(Item, "current_choice_suffix")
 	if _MR_Get(Item, "show_current_choice", false) {
 		if CurrentLabel == ""
@@ -1868,6 +1891,16 @@ _MR_ChoiceRowData(Item, ManifestKey, Commands, StateGetters) {
 		Row["disabled"] := true
 	}
 	return Row
+}
+
+; Spells a free numeric value the way Lua's "%g" does for menu captions: an
+; integral value without a fraction, any other with its shortest decimals.
+; @param Value {Number} The stored value.
+; @returns {String} The caption text.
+_MR_FormatFreeNumber(Value) {
+	if (Value = Round(Value))
+		return String(Round(Value))
+	return RTrim(RTrim(Format("{:.6f}", Value), "0"), ".")
 }
 
 ; Returns provider DATA for one published choice, using the ordinary renderer's

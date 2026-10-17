@@ -247,9 +247,17 @@ _MI_StageHotstrings() {
 	; was three copies of one checkbox before that, one per driver.
 	_HotParamCommands := Map(
 		"repeat_key", ToggleRepeatKeyEnabled,
+		; The word-reset rows: the idle choice is called with the chosen seconds,
+		; its free entry and the click checkbox with the native menu arguments,
+		; which the seams of these commands must never receive.
+		"idle_reset", (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
+		"idle_reset_custom", (*) => PromptHotstringsIdleResetSeconds(),
+		"click_resets_word", (*) => ToggleHotstringsClickResetsWord(),
 	)
 	_HotParamGetters := Map(
 		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
+		"hotstrings.idle_reset_seconds", () => HSE_IdleResetSecondsCurrent(),
+		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),
 	)
 
 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`

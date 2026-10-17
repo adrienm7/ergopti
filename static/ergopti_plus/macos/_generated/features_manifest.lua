@@ -84,6 +84,12 @@ M.features = {
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
+		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
+	},
+	{
+		path = "hotstrings.click_resets_word", id = "click_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.click_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "hs" }, recommended = 0.75, input_altering = false,
 	},
 	{

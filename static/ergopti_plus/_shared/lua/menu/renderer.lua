@@ -904,6 +904,32 @@ function M.new(deps)
 				action  = function() return fn(value) end,
 			}
 		end
+		-- An open catalogue closes its presets with a free-entry row whose command
+		-- prompts natively; it carries the tick when the stored value is no preset.
+		local custom_id = item.custom_command
+		if custom_id ~= nil then
+			local custom_fn = commands[custom_id]
+			if type(custom_id) ~= "string" or type(custom_fn) ~= "function"
+				or type(item.custom_i18n) ~= "string" then
+				Logger.error(LOG, "No command '%s' registered for the '%s.%s' free entry — choice skipped.",
+					tostring(custom_id), manifest_key, row_id)
+				return nil
+			end
+			local custom_current = current ~= nil and current_label == nil
+			sub[#sub + 1] = { separator = true }
+			sub[#sub + 1] = {
+				label   = i18n.get(item.custom_i18n),
+				checked = custom_current,
+				action  = function() return custom_fn() end,
+			}
+			if custom_current and type(current) == "number" then
+				-- The caption names a free value with its declared unit.
+				current_label = string.format("%g", current)
+				if type(item.custom_unit_i18n) == "string" then
+					current_label = current_label .. " " .. i18n.get(item.custom_unit_i18n)
+				end
+			end
+		end
 		local title = i18n.get(i18n_key) .. (item.current_choice_suffix or "")
 		-- Caption interpolation is declared alongside the shared choice, so
 		-- native consumers provide no competing mode-label policy.

@@ -74,16 +74,18 @@ helpers.describe("Registry section-delay ownership", function()
 				"group A must retain its always-active section delay")
 			helpers.assert_eq(state.resolve_mapping_delay(mapping_b), 2.5,
 				"group B must not inherit group A's colliding section name")
+			-- The word timeout is the user's idle reset (neutral 0 in this bare
+			-- state); section delays no longer resize it.
 			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 0,
-				"an enabled always-active owner still requires an infinite word timeout")
+				"section delays must not size the idle reset")
 
 			helpers.assert_eq(Registry.disable_group("group_a"), true)
 			helpers.assert_nil(state.SECTION_DELAYS.group_a,
 				"disabling a group must remove its complete section-delay ownership")
 			helpers.assert_eq(state.resolve_mapping_delay(mapping_b), 2.5,
 				"the remaining group must retain its own colliding section delay")
-			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 3.0,
-				"the word timeout must be recomputed after the infinite owner is removed")
+			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 0,
+				"removing an always-active owner must leave the idle reset unchanged")
 
 			helpers.assert_eq(Registry.enable_group("group_a"), true)
 			local reloaded_a = mapping_for(state, "atrigger")
@@ -91,7 +93,7 @@ helpers.describe("Registry section-delay ownership", function()
 			helpers.assert_eq(state.resolve_mapping_delay(reloaded_a), 0,
 				"re-enabling the group must restore its own section-delay ownership")
 			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 0,
-				"the restored always-active owner must restore the infinite timeout")
+				"restoring an always-active owner must leave the idle reset unchanged")
 		end)
 	end)
 
@@ -113,8 +115,8 @@ helpers.describe("Registry section-delay ownership", function()
 				"a removed source override must not survive a same-file reload")
 			helpers.assert_eq(state.resolve_mapping_delay(mapping), 0.4,
 				"the reloaded mapping must fall back to its group delay")
-			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 0.9,
-				"the timeout must shrink after the removed infinite override")
+			helpers.assert_eq(state.WORD_TIMEOUT_SEC, 0,
+				"a reloaded section delay must leave the idle reset unchanged")
 		end)
 	end)
 end)

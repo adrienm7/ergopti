@@ -50,6 +50,8 @@ local LOG = "menu.hotstrings_scope"
 local OWNERS = {
 	{ key = "repeat_key_enabled", setter = "set_repeat_feature_enabled", getter = "is_repeat_feature_enabled" },
 	{ key = "expansion_delay", setter = "set_base_delay", getter = "get_base_delay" },
+	{ key = "idle_reset_seconds", setter = "set_idle_reset_seconds", getter = "get_idle_reset_seconds" },
+	{ key = "click_resets_word", setter = "set_click_resets_word", getter = "is_click_resets_word_enabled" },
 	{ key = "trigger_char", setter = "set_trigger_char", getter = "get_trigger_char" },
 	{ key = "magic_key_source", setter = "set_magic_key_source", getter = "get_magic_key_source" },
 	{ key = "preview_star_enabled", setter = "set_preview_star_enabled" },

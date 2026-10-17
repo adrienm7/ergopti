@@ -2184,6 +2184,42 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.state_getters["hotstrings_repeat_enabled"] = function()
 				return RepeatKey.is_enabled()
 			end
+			-- When the engine forgets the current word: the `idle_reset` choice
+			-- (presets plus a free entry) and the `click_resets_word` checkbox.
+			-- The renderer draws both rows; these are their owners and states.
+			-- Required here, not with the module imports: the menu manifest gate pins
+			-- this file's top-level bindings.
+			local WordReset = require("modules.hotstrings.word_reset")
+			local function word_reset_changed(committed)
+				if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return committed
+			end
+			params_ctx.commands["idle_reset"] = function(seconds)
+				return word_reset_changed(WordReset.set_idle_seconds(seconds))
+			end
+			params_ctx.commands["idle_reset_custom"] = function()
+				local answer = prompt_text(i18n_safe("menu.hotstrings.idle_reset_title"),
+					i18n_safe("menu.hotstrings.idle_reset_prompt"),
+					string.format("%g", WordReset.idle_seconds()))
+				if answer == nil then return false end
+				local seconds = WordReset.parse_seconds(answer)
+				if seconds == nil then
+					Logger.warn(LOG, "Invalid idle delay '%s' — ignored.", tostring(answer))
+					show_error(i18n_safe("menu.hotstrings.idle_reset_invalid"),
+						i18n_safe("dialog.gestures.param_error_title"))
+					return false
+				end
+				return word_reset_changed(WordReset.set_idle_seconds(seconds))
+			end
+			params_ctx.commands["click_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_click_resets_word())
+			end
+			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
+				return WordReset.idle_seconds()
+			end
+			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
+				return WordReset.click_resets_word()
+			end
 			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
 				params_handlers, nil, params_ctx, params_providers)
 		end,

@@ -11,6 +11,10 @@
 #Requires AutoHotkey v2.0
 
 _PCA_Call(Char, PrefeedFn) {
+	global _PrefixLastKeyTick
+	; Scenarios preset the buffers; a stamp left by an earlier test would read
+	; as a pause and start a new word (hotstrings.idle_reset_seconds).
+	_PrefixLastKeyTick := ""
 	_OnPrefixChar(0, Char, PrefeedFn, (*) => true)
 }
 

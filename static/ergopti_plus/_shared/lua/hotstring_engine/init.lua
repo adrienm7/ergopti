@@ -380,6 +380,43 @@ function M.within_interkey_delay(result, delay_sec, resolution_ms)
 	return gap_ms ~= nil and gap_ms - resolution_ms <= limit * 1000
 end
 
+--- Whether a value is a valid `hotstrings.idle_reset_seconds`: a finite
+--- non-negative number of seconds, 0 meaning the reset is disabled.
+--- @param value any Candidate read from config.toml or a menu prompt.
+--- @return boolean
+function M.valid_idle_reset_seconds(value)
+	return type(value) == "number" and value == value and value >= 0 and value ~= math.huge
+end
+
+--- Whether the pause before the current keystroke starts a new word.
+---
+--- Without it the buffer kept the last word for as long as the user stayed
+--- away, so the first key typed after a pause was read as the middle of that
+--- word and every word-start hotstring stayed silent until a delimiter. The
+--- caller resets its buffer at a known word boundary when this is true. The
+--- Windows engine applies the same rule in HSE_IdleResetsWord.
+--- @param last_ms number|nil Monotonic time of the previous keystroke, nil before any.
+--- @param now_ms number Monotonic time of the current keystroke.
+--- As in within_interkey_delay, a gap read on a coarse clock overstates the
+--- real pause by up to its resolution, so only a gap that still reaches the
+--- delay once the resolution is taken off starts a new word: two keys typed
+--- together across a whole-second turnover must not split a word.
+--- @param idle_seconds number `hotstrings.idle_reset_seconds`; 0 disables the reset.
+--- @param resolution_ms number Resolution of the clock that stamped the keys; zero when exact.
+--- @return boolean
+function M.idle_resets_word(last_ms, now_ms, idle_seconds, resolution_ms)
+	if not M.valid_idle_reset_seconds(idle_seconds) then
+		error("idle_resets_word(): the idle delay must be a non-negative number of seconds, got "
+			.. tostring(idle_seconds), 2)
+	end
+	if type(resolution_ms) ~= "number" or resolution_ms < 0 then
+		error("idle_resets_word(): the clock resolution must be a non-negative number, got "
+			.. tostring(resolution_ms), 2)
+	end
+	if idle_seconds == 0 or last_ms == nil then return false end
+	return now_ms - last_ms - resolution_ms >= idle_seconds * 1000
+end
+
 
 
 

@@ -39,7 +39,7 @@ _PBAT_ContextResetSitesUseOneOwner() {
 		"synthetic", Synthetic, "rebuild", Rebuild)
 		Assert(Body != "", Name . " buffer-transition body must be source-visible")
 
-	Assert(InStr(Mouse, "_PrefixInvalidateInputContext(0, true)") > 0
+	Assert(InStr(Mouse, "_PrefixInvalidateInputContext(0, HSE_ClickResetsWordCurrent())") > 0
 		and InStr(Mouse, "HSE_FeedReset") == 0,
 		"mouse reset must not restore the split engine-then-preview publication")
 	Assert(InStr(Wrap, "_PrefixInvalidateInputContext(") > 0
