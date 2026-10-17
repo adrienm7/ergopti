@@ -12,6 +12,7 @@
 
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -209,7 +210,7 @@ function validate(root) {
 	const pipeline = Pipeline.open(root);
 	const job = pipeline.job('e2e-linux');
 	const body = Pipeline.step(job, STEP);
-	assert.equal(Pipeline.stepField(body, 'if'), '${{ !cancelled() }}');
+	assert.equal(Pipeline.stepField(body, 'if'), LinuxE2E.condition(STEP, '${{ !cancelled() }}'));
 	assert.equal(Pipeline.stepField(body, 'continue-on-error'), null);
 	assert.equal(Pipeline.stepField(body, 'working-directory'), null, 'npm uses the repository root');
 	assert.equal(Pipeline.stepField(body, 'timeout-minutes'), '5');
@@ -527,8 +528,14 @@ function main() {
 		const body = Pipeline.step(Pipeline.open(scratch).job('e2e-linux'), STEP);
 		for (const replace of [
 			() => '',
-			(text) => text.replace('if: ${{ !cancelled() }}', 'if: false'),
-			(text) => text.replace('if: ${{ !cancelled() }}', 'if: success()'),
+			(text) => text.replace('if: ' + LinuxE2E.condition(STEP, '${{ !cancelled() }}'), 'if: false'),
+			(text) =>
+				text.replace('if: ' + LinuxE2E.condition(STEP, '${{ !cancelled() }}'), 'if: success()'),
+			(text) =>
+				text.replace(
+					'if: ' + LinuxE2E.condition(STEP, '${{ !cancelled() }}'),
+					'if: ' + '${{ !cancelled() }}'
+				),
 			(text) =>
 				text.replace('timeout-minutes: 5', 'continue-on-error: true\n        timeout-minutes: 5'),
 			(text) => text.replace('npm run test:linux:runtime-native', 'echo skipped-native-runtime')

@@ -3,6 +3,7 @@
 /** Independent mandatory source registration checks; never grants native runtime credit. */
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -104,7 +105,7 @@ function mandatory(text) {
 	for (const [family, name] of Object.entries(expected)) {
 		assert.equal(steps.filter((step) => step.name === name).length, 1);
 		const step = Pipeline.step(body, name);
-		assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+		assert.equal(Pipeline.stepField(step, 'if'), LinuxE2E.condition(name, '${{ !cancelled() }}'));
 		assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 		assert.equal(Pipeline.stepField(step, 'working-directory'), null);
 		assert.equal(Pipeline.stepField(step, 'timeout-minutes'), '22');

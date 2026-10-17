@@ -266,6 +266,14 @@
 			"args": ["tools/test/test-macos-release-stage-native-receiving.cjs"],
 			"repro": "npm run test:macos-release-stage-native-receiving-controls",
 			"platforms": ["linux"]
+		},
+		{
+			"id": "js-0438",
+			"ordinal": 438,
+			"name": "Linux E2E matrix rows keep every former harness once and every row required by the verdict",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-e2e-shards.cjs"],
+			"repro": "npm run test:linux-e2e-shards"
 		}
 	]
 }

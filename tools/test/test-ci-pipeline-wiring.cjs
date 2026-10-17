@@ -77,6 +77,7 @@
 const pipeline = require('./ci-full-default.cjs');
 const scoped = require('./fixtures/ci-scoped-full-branches.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const macContract = require('./fixtures/macos-stage-contract.json');
 const YAML = require('yaml');
 // Initialized before early matrix admission invokes the Mac source guard.
@@ -774,9 +775,14 @@ const STEP_CONDITIONS = [
 		"env.INSTALL_KIND == 'appimage'"
 	]
 ].map(macConditionEntry);
-// test-linux runs each harness under !cancelled(), so a red one hides no other;
-// tools/test/test-linux-ci-evidence.cjs pins which of its steps those are.
+// e2e-linux runs each harness under !cancelled(), so a red one hides no other;
+// tools/test/test-linux-ci-evidence.cjs pins which of its steps those are. The
+// job is a domain matrix: each harness condition also names its own row, as
+// tools/test/fixtures/linux-e2e-shards.json assigns it.
 const HARNESS_JOB = 'e2e-linux';
+/** A Linux E2E condition narrowed to the step's own matrix row. */
+const linuxRow = (name, condition) =>
+	LinuxE2E.has(name) ? LinuxE2E.condition(name, condition) : condition;
 
 // A command whose exit status is a gate: a test runner, a verdict script, a
 // package build, an install or a launch. `|| true` after one turns its failure
@@ -3573,7 +3579,10 @@ for (const gate of WINDOWS_GATES) {
 
 const conditionKey = (rel, job, name) => `${rel} job ${job} step "${name}"`;
 const CONDITIONS = new Map(
-	STEP_CONDITIONS.map(([rel, job, name, condition]) => [conditionKey(rel, job, name), condition])
+	STEP_CONDITIONS.map(([rel, job, name, condition]) => [
+		conditionKey(rel, job, name),
+		rel === LINUX_BOX && job === HARNESS_JOB ? linuxRow(name, condition) : condition
+	])
 );
 if (CONDITIONS.size !== STEP_CONDITIONS.length) errors.push('STEP_CONDITIONS names one step twice');
 for (const job of macContract.jobs)
@@ -3604,7 +3613,9 @@ function stepProblems(files) {
 				const condition = pipeline.stepField(found.body, 'if');
 				const expected = CONDITIONS.get(where) ?? null;
 				const harness =
-					entry.rel === LINUX_BOX && candidate.id === HARNESS_JOB && condition === NOT_CANCELLED;
+					entry.rel === LINUX_BOX &&
+					candidate.id === HARNESS_JOB &&
+					condition === linuxRow(found.name, NOT_CANCELLED);
 				if (condition !== expected && !harness) {
 					problems.push(
 						expected === null
@@ -4393,8 +4404,20 @@ for (const [what, rel, from, to] of [
 	[
 		'if: false on a test-linux harness',
 		LINUX_BOX,
-		`      - name: Round-trip real events through the kernel\n        if: ${NOT_CANCELLED}\n`,
+		`      - name: Round-trip real events through the kernel\n        if: ${linuxRow('Round-trip real events through the kernel', NOT_CANCELLED)}\n`,
 		'      - name: Round-trip real events through the kernel\n        if: false\n'
+	],
+	[
+		'a Linux harness moved to every matrix row',
+		LINUX_BOX,
+		`      - name: Round-trip real events through the kernel\n        if: ${linuxRow('Round-trip real events through the kernel', NOT_CANCELLED)}\n`,
+		`      - name: Round-trip real events through the kernel\n        if: ${NOT_CANCELLED}\n`
+	],
+	[
+		'a Linux harness moved to another matrix row',
+		LINUX_BOX,
+		`      - name: Round-trip real events through the kernel\n        if: ${linuxRow('Round-trip real events through the kernel', NOT_CANCELLED)}\n`,
+		"      - name: Round-trip real events through the kernel\n        if: ${{ !cancelled() && matrix.shard == 'updater' }}\n"
 	],
 	[
 		'if: false on the Linux evidence verdict',
@@ -6440,7 +6463,7 @@ function linuxAudioPrerequisiteProblems(files) {
 	const problems = [];
 	for (const step of [setup[0], native[0]]) {
 		if (
-			pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+			pipeline.stepField(step.body, 'if') !== linuxRow(step.name, NOT_CANCELLED) ||
 			pipeline.stepField(step.body, 'working-directory') !== 'static/ergopti_plus/linux' ||
 			pipeline.stepField(step.body, 'continue-on-error') !== null
 		) {
@@ -6508,7 +6531,7 @@ for (const [what, from, to] of [
 	[
 		'disabled audio setup',
 		linuxAudioSetupBody,
-		linuxAudioSetupBody.replace(NOT_CANCELLED, 'false')
+		linuxAudioSetupBody.replace(linuxRow(LINUX_AUDIO_SETUP, NOT_CANCELLED), 'false')
 	],
 	[
 		'forgiven audio setup',
@@ -6879,7 +6902,7 @@ function linuxSimultaneousWorkflowProblems(files) {
 		wrapperFits = false;
 	}
 	if (
-		pipeline.stepField(step.body, 'if') !== NOT_CANCELLED ||
+		pipeline.stepField(step.body, 'if') !== linuxRow(step.name, NOT_CANCELLED) ||
 		pipeline.stepField(step.body, 'timeout-minutes') !== '6' ||
 		pipeline.stepField(step.body, 'continue-on-error') !== null ||
 		!wrapperFits
@@ -6914,7 +6937,8 @@ for (const [what, from, to] of [
 		LINUX_SIMULTANEOUS_SOURCE_ENTRY,
 		`${LINUX_SIMULTANEOUS_SOURCE_ENTRY} || true`
 	],
-	['disabled live step', NOT_CANCELLED, '${{ false }}'],
+	['disabled live step', linuxRow(LINUX_SIMULTANEOUS_STEP, NOT_CANCELLED), '${{ false }}'],
+	['every matrix row', linuxRow(LINUX_SIMULTANEOUS_STEP, NOT_CANCELLED), NOT_CANCELLED],
 	['changed live budget', 'timeout-minutes: 6', 'timeout-minutes: 12'],
 	[
 		'forgiven live step',
@@ -6965,7 +6989,7 @@ for (const [what, from, to] of [
 	);
 	linuxSimultaneousWorkflowRefusals++;
 }
-assert.equal(linuxSimultaneousWorkflowRefusals, 18);
+assert.equal(linuxSimultaneousWorkflowRefusals, 19);
 
 /** Retains exact ordered native calls, status admission and failing teardown. */
 function linuxSimultaneousEnrollmentProblems(source) {

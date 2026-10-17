@@ -19,11 +19,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const pipeline = require('./ci-pipeline.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const ROOT = path.resolve(__dirname, '..', '..');
 const HARDWARE = 'static/ergopti_plus/linux/tests/hardware/';
 const sha = (value) => crypto.createHash('sha256').update(value).digest('hex');
 const BLOCK =
-	'      # Non-input C qualification uses the original exact full-family owner.\n      # This separate native receipt does not qualify the deferred E2E suite.\n      - name: Qualify three actual XI2 property cookies\n        id: native_xi2_cookies\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc libx11-dev libxi-dev xvfb\n          set +e\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_property_cookies.py "$RUNNER_TEMP/linux-xi2-property-cookies" 2>&1 | tee "$RUNNER_TEMP/linux-xi2-property-cookies.log"\n          xi2_pipeline_status=("${PIPESTATUS[@]}")\n          set -e\n          if [ "${#xi2_pipeline_status[@]}" -ne 2 ]; then exit 1; fi\n          if [ "${xi2_pipeline_status[0]}" -ne 0 ]; then exit "${xi2_pipeline_status[0]}"; fi\n          exit "${xi2_pipeline_status[1]}"\n        timeout-minutes: 5\n\n      - name: Retain actual XI2 property-cookie evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-property-cookies\n            ${{ runner.temp }}/linux-xi2-property-cookies.log\n          if-no-files-found: error\n\n';
+	'      # Non-input C qualification uses the original exact full-family owner.\n      # This separate native receipt does not qualify the deferred E2E suite.\n      - name: Qualify three actual XI2 property cookies\n        id: native_xi2_cookies\n        if: ${{ !cancelled() && matrix.shard == \'input-display\' }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc libx11-dev libxi-dev xvfb\n          set +e\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_property_cookies.py "$RUNNER_TEMP/linux-xi2-property-cookies" 2>&1 | tee "$RUNNER_TEMP/linux-xi2-property-cookies.log"\n          xi2_pipeline_status=("${PIPESTATUS[@]}")\n          set -e\n          if [ "${#xi2_pipeline_status[@]}" -ne 2 ]; then exit 1; fi\n          if [ "${xi2_pipeline_status[0]}" -ne 0 ]; then exit "${xi2_pipeline_status[0]}"; fi\n          exit "${xi2_pipeline_status[1]}"\n        timeout-minutes: 5\n\n      - name: Retain actual XI2 property-cookie evidence\n        if: ${{ always() && matrix.shard == \'input-display\' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-property-cookies\n            ${{ runner.temp }}/linux-xi2-property-cookies.log\n          if-no-files-found: error\n\n';
 const PINS = {
 	c_source_sha256: '7e4f9d4c2615248787a05efa96dd8f464a8eebdd3e2267b9083e351a78c33e32',
 	header_sha256: '96b02b21619deb2148b279e2b8dc183b311f1ab66aa57c7dbcef669d285691be',
@@ -180,7 +181,10 @@ function verify(subject) {
 		'native receipt remains between original anchors'
 	);
 	for (const index of [source, cursor]) {
-		assert.strictEqual(pipeline.stepField(steps[index].body, 'if'), '${{ !cancelled() }}');
+		assert.strictEqual(
+			pipeline.stepField(steps[index].body, 'if'),
+			LinuxE2E.condition(steps[index].name, '${{ !cancelled() }}')
+		);
 		assert.strictEqual(pipeline.stepField(steps[index].body, 'continue-on-error'), null);
 	}
 	assert.strictEqual(pipeline.stepField(steps[source].body, 'timeout-minutes'), '3');
@@ -233,7 +237,7 @@ const mutations = [
 	[
 		'cancellation fence weakened',
 		'workflow',
-		'        id: native_xi2_cookies\n        if: ${{ !cancelled() }}',
+		"        id: native_xi2_cookies\n        if: ${{ !cancelled() && matrix.shard == 'input-display' }}",
 		'        id: native_xi2_cookies\n        if: always()'
 	],
 	[

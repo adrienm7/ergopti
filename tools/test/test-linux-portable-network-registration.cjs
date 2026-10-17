@@ -13,6 +13,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 const fs = require('node:fs');
 const path = require('node:path');
 const Pipeline = require('./ci-pipeline.cjs');
@@ -101,7 +102,13 @@ const step = Pipeline.step(
 	pipeline.job('e2e-linux'),
 	'Qualify actual staged portable network runtime and retirement'
 );
-assert.equal(Pipeline.stepField(step, 'if'), '${{ !cancelled() }}');
+assert.equal(
+	Pipeline.stepField(step, 'if'),
+	LinuxE2E.condition(
+		'Qualify actual staged portable network runtime and retirement',
+		'${{ !cancelled() }}'
+	)
+);
 assert.equal(Pipeline.stepField(step, 'continue-on-error'), null);
 const nativeCommand = ['npm run test:linux:portable-network-native'];
 const rawRun = Pipeline.runOf(step);

@@ -5,10 +5,15 @@
 # "Linux / <name>" in the run graph, one lane with one entry job and one exit
 # job:
 #
-#   unit tests -> E2E tests -> package -> install and launch (17) -> verdict
-#                                  5 archive installs     (evidence gate)
-#                                  9 first installs
-#                                  3 package runs
+#   unit tests -> E2E tests (5) -> package -> install and launch (17) -> verdict
+#                 domain rows                 5 archive installs     (evidence gate)
+#                                             9 first installs
+#                                             3 package runs
+#
+# The E2E column is one matrix job (e2e-linux) whose rows split its harnesses by
+# domain; tools/test/fixtures/linux-e2e-shards.json assigns each step to one row.
+# package-linux needs the whole matrix, and linux-ok requires one evidence
+# document per row.
 #
 # The driver is assembled and packaged ONCE per run, by package-linux, into the
 # artifact assets-linux. The .deb, .rpm and AppImage smokes install those exact
@@ -242,9 +247,24 @@ jobs:
     name: 'E2E tests'
     needs: [test-linux]
     runs-on: ubuntu-latest
+    # One row per domain, listed in tools/test/fixtures/linux-e2e-shards.json.
+    # Every harness step runs in exactly one row (its if: names the row); the
+    # shared setup steps and the evidence record run in every row. needs:
+    # e2e-linux waits for every row and reports failure if any row fails.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - input-display
+          - desktop-webview
+          - updater
+          - network-ai
+          - platform-metrics
     env:
       # Python-owned native children also resolve the production shared modules.
       LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
+      # The shard this matrix row runs; the evidence record reads it.
+      LINUX_E2E_SHARD: ${{ matrix.shard }}
     outputs:
       ci_predecessors: ${{ toJSON(needs) }}
       ci_source_sha: ${{ github.sha }}
@@ -285,7 +305,7 @@ jobs:
       # while a run cancelled by a newer push stops at once instead of spending
       # minutes on results nobody reads, which `always()` did.
       - name: Run virtual-keyboard E2E harness (stubbed)
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         # Exercises the hotstring engine against 8 hand-coded scenarios
         # and all shared corpus vectors (vectors.json).
         # Exit 0 = all pass, 1 = at least one failure.
@@ -340,7 +360,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Launch option-looking application ids through actual GTK desktop entries
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -359,7 +379,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Terminate real descendants after their process leader exits
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -377,7 +397,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject real ENOSPC write and buffered-close failures
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -394,7 +414,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Derive encryption keys from the actual D-Bus machine ID
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -414,7 +434,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Reject unsuccessful at-rest cryptography receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -431,7 +451,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Reject unsuccessful native process supervision receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -448,7 +468,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse incomplete native diagnostics exports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -465,7 +485,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve current SQLite device schema and its native readers
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -482,7 +502,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve native SQLite device registration and refused transactions
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -499,7 +519,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve SQLite event IDs across native collectors and invalid cursors
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -517,7 +537,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Preserve literal SQLite filesystem paths through native CLI arguments
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -535,7 +555,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject silent SQLite failures without staging typed SQL
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -552,7 +572,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject failed native SQLite migration and dashboard rows
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -569,7 +589,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve actual SQLite metric literals and application filters
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -586,7 +606,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve native decrypted migration values and foreign ownership
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -603,7 +623,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Isolate SQLite from an actual disposable user's personal init
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -638,7 +658,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Keep native shell capture failures free of caller text
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -655,7 +675,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse truncated native process names and arguments
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -672,7 +692,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Check native path existence without opening readable streams
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -689,7 +709,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Delete files using native permission and symlink receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -706,7 +726,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse truncated native paths and retain literal filenames
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -723,7 +743,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Retain native timer ownership across garbage collection
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -740,7 +760,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve process baselines after native snapshot refusal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -757,7 +777,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Retire native logger channels after failed writes or flushes
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -774,7 +794,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Stop the native event loop without retiring foreign resources
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -791,7 +811,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Retain native event-loop ownership during callback reentry
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -809,7 +829,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse non-finite native timer and deferred durations
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -827,7 +847,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse non-finite native event-loop periods before allocation
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -845,7 +865,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Isolate actual callback error objects without invoking their formatters
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -867,7 +887,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Project native modifier-hold statistics into actual dashboard consumers
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -885,7 +905,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse malformed release pages through existing strict JSON admission
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -903,7 +923,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Isolate terminal callback diagnostics with real provider TLS receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -923,7 +943,7 @@ jobs:
         timeout-minutes: 3
 
       - name: Preserve additional synthetic sources through native SQLite projections
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -945,7 +965,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve pending synthetic source labels in native live projections
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -963,7 +983,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Accumulate arbitrary ngram source keys across native SQLite conflicts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -985,7 +1005,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Encode literal synthetic source keys through native SQLite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1003,7 +1023,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Roll back refused ngram groups and trigger effects in native SQLite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1021,7 +1041,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve cumulative system-day metrics across native restarts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1048,7 +1068,7 @@ jobs:
         timeout-minutes: 3
 
       - name: Retain canonical backspace unigrams through native SQLite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1073,7 +1093,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve canonical Unicode character classes through native SQLite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1091,7 +1111,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Propagate native fallback wait refusal and retain healthy recovery
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1109,7 +1129,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Keep manual correction markers out of canonical character totals
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1127,7 +1147,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve hourly manual corrections and cumulative error histograms
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1145,7 +1165,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Project directed application transitions with independent native SQL controls
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1165,7 +1185,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Publish native layout counts in the canonical shared manifest field
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1183,7 +1203,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Recover same-revision native reads without caching a refused manifest
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1203,7 +1223,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Roll back refused raw batches before the public flush retry
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1223,7 +1243,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve absent SQL scalars at the native Reader boundary
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1241,7 +1261,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve native n-gram text through SQLite JSON projection
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1259,7 +1279,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Keep native event dates on the real local calendar day
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1278,7 +1298,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve fractional WPM through native collector and SQLite writes
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1296,7 +1316,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve supplied histogram key bytes in real SQLite
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1314,7 +1334,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Roll back native category and score edits after SQLite refusal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1332,7 +1352,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Read actual canonical XKB symbol lists outside quoted metadata
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1349,7 +1369,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Parse actual canonical XKB keys without quoted declaration collisions
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1366,7 +1386,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Parse actual canonical XKB blocks without quoted metadata collisions
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1383,7 +1403,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve UTF-8 boundaries in native provider error diagnostics
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1401,7 +1421,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse malformed structured provider completions through strict JSON
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1419,7 +1439,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse provider error envelopes before publishing completion text
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1437,7 +1457,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve complete native SQLite metadata scalar values
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1455,7 +1475,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Dispatch provider requests through verified IPv4 and IPv6 TLS
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1473,7 +1493,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Admit file watches only after native activation succeeds
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1490,7 +1510,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Hash real files across path boundaries and permission failures
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1507,7 +1527,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Hash independent byte vectors through real OpenSSL
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1524,7 +1544,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse failed native SHA-256 fallback output
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1541,7 +1561,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Split native SQLite history at calendar-day boundaries
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1558,7 +1578,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve empty native HTTP fields and existing metadata validation
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1576,7 +1596,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve asset identity in native release metadata
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1594,7 +1614,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Decode native release notes exactly once
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1612,7 +1632,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Decode native release tags from the selected JSON object
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1630,7 +1650,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Decode native release publication times at their JSON field
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1648,7 +1668,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Decode the selected release object's own prerelease Boolean
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1666,7 +1686,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject nested arrays instead of offering their release objects
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1684,7 +1704,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject interrupted conditional release responses before cache reuse
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1702,7 +1722,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse truncated native curl config URLs
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1719,7 +1739,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Keep caller HTTP credentials at their original native origin
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1736,7 +1756,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve native POST redirect method and body semantics
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1753,7 +1773,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve TLS on native HTTP redirect hops
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1770,7 +1790,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse shortened native shell commands and stdin scripts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1787,7 +1807,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preflight HTTP replacements before retiring their native owner
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1804,7 +1824,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse header injection before native HTTP owner replacement
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1821,7 +1841,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Deliver large literal POST bodies through native anonymous pipes
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1838,7 +1858,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Admit regular write destinations before truncation or append
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1857,7 +1877,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Retain native POST resources after simulated cleanup refusal
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1874,7 +1894,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Send literal at-prefixed HTTP bodies without native file loading
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1891,7 +1911,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse non-HTTP native file and protocol transports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1908,7 +1928,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Isolate native HTTP policy from inherited personal curl config
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1925,7 +1945,7 @@ jobs:
         timeout-minutes: 4
 
       - name: Refuse foreign JSON staging and preserve kernel write failures
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1942,7 +1962,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Inspect occupied JSON recovery paths without opening native endpoints
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1959,7 +1979,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve competing JSON backups at native publication
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1977,7 +1997,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Preserve release-page associations after failed native validator saves
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -1994,7 +2014,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Preserve native updater temporary-file ownership
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2012,7 +2032,7 @@ jobs:
         timeout-minutes: 22
 
       - name: Acknowledge native updater temporary-allocation refusals
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2030,7 +2050,7 @@ jobs:
         timeout-minutes: 22
 
       - name: Install native virtual audio locale prerequisites
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2049,7 +2069,7 @@ jobs:
         timeout-minutes: 10
 
       - name: Parse native virtual audio state independently of user locale
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2067,7 +2087,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Resolve native roots with literal POSIX bytes and the actual cwd
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2085,7 +2105,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject native special JSON storage sources without blocking
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2103,7 +2123,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject native special file sources in the generic and updater read ports
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2121,7 +2141,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject special native diagnostic metadata sources
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2139,7 +2159,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Reject special native build-stamp version sources
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2157,7 +2177,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve native file-read and close failure receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2175,7 +2195,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Hand off native restart relays after real zombie targets exit
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2193,7 +2213,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Enforce exact native buffered HTTP body limits
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         env:
           LUA_PATH: './?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;;'
@@ -2212,7 +2232,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve literal HTTP targets through every native curl method
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2229,7 +2249,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Retire native HTTP and digest process owners
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2246,7 +2266,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Preserve JSON stores after native read refusals
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2275,7 +2295,7 @@ jobs:
       # A STEP and not a job, deliberately: as a job it would cost a whole runner
       # (checkout + apt) for five seconds of work.
       - name: Load the uinput module
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2295,7 +2315,7 @@ jobs:
               exit 1
           fi
       - name: Round-trip real events through the kernel
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         # Root because /dev/uinput is root-owned until the udev rule that
         # install.sh --setup-perms writes is in place. `sudo env` rather than
@@ -2322,7 +2342,7 @@ jobs:
       # particular is invisible to a mock (ioctl returning 0 to a recorder says
       # nothing about whether the desktop still sees the device).
       - name: Hold the grab under an interleaved burst
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2346,7 +2366,7 @@ jobs:
       # this repository wrote, which tests the parser against its author's
       # assumptions.
       - name: Resolve real system keymaps
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2364,7 +2384,7 @@ jobs:
         timeout-minutes: 3
 
       - name: Preserve native localectl layout and variant alignment
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2381,7 +2401,7 @@ jobs:
         timeout-minutes: 1
 
       - name: Refuse malformed UTF-8 inverse plans before and after layout load
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2401,7 +2421,7 @@ jobs:
       # This fixture owns its Xvfb PID and reads actual native XKB group/map
       # receipts. It does not claim physical keyboard or native Wayland input.
       - name: Qualify actual X11 physical shortcut sources
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2423,7 +2443,7 @@ jobs:
       # This separate native receipt does not qualify the deferred E2E suite.
       - name: Qualify three actual XI2 property cookies
         id: native_xi2_cookies
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -2438,7 +2458,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Retain actual XI2 property-cookie evidence
-        if: always()
+        if: ${{ always() && matrix.shard == 'input-display' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-xi2-property-cookies-${{ github.sha }}-${{ github.run_attempt }}
@@ -2451,7 +2471,7 @@ jobs:
       # A real X server and WM qualify logical RandR placement and input focus.
       # Physical displays and evdev source-generation receipts remain separate.
       - name: Qualify actual cursor-display window switching
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         env:
           ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
           ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
@@ -2485,7 +2505,7 @@ jobs:
       # the machine-checkable half of C2: log out of X11, log into Wayland, change
       # nothing.
       - name: Detect and read the keymap on a real X11 and a real Wayland
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2549,7 +2569,7 @@ jobs:
       # No unit test can catch it: with no libayatana to load it must stub, and a
       # stub answers to whatever name the binding asks for.
       - name: The tray binding names libraries and symbols that exist
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2575,7 +2595,7 @@ jobs:
       # is Active, carries the Ergopti logo as an ABSOLUTE file path (the panel
       # resolves it in its own working directory) and serves the menu rows.
       - name: The tray icon registers with a StatusNotifier host
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2620,7 +2640,7 @@ jobs:
       # With two windows open the old desktop-wide search found two focused
       # fields and blocked every expansion; only a real bus shows that.
       - name: The secure-field probe on a real accessibility bus
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2637,7 +2657,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Launch the bounded accessibility helper with Lua interpreter options
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2662,7 +2682,7 @@ jobs:
       # daemon's own virtual keyboard, while sni_host.py checks the tray it shows:
       # the logo, and a translated menu with no raw i18n key.
       - name: The whole daemon, live — a trigger typed, a tray shown
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2701,7 +2721,7 @@ jobs:
       # and never found an update; an installed update once waited for the
       # next login.
       - name: Update to the newest release and restart
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
           ERGOPTI_UPDATER_LIVE_EVIDENCE_DIR: ${{ runner.temp }}/linux-updater-live
@@ -2723,7 +2743,7 @@ jobs:
       # A refused release check is diagnostic evidence, never a passed E2E
       # receipt. Keep its actual response and owner verdict after a failure.
       - name: Upload live updater diagnostic evidence
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-updater-live-diagnostics
@@ -2738,7 +2758,7 @@ jobs:
       # model removed between tags and chat, bounded complete receipts and
       # cancellation settlement. No external model download is needed.
       - name: Qualify native HTTP streaming receipts
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2758,7 +2778,7 @@ jobs:
       # This lane qualifies native runtime admission and installed helper paths.
       # Its four actual groups are distinct from factory models and HTTP receipts.
       - name: Qualify native managed network runtime
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2776,7 +2796,7 @@ jobs:
         timeout-minutes: 3
       # Independent NIST vectors use retained, already unlinked descriptors.
       - name: Qualify native retained FD SHA-256
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2794,7 +2814,7 @@ jobs:
 
       # Tool admissions are private and scoped; product curl remains unchanged.
       - name: Prepare authenticated managed HTTP validation tools
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2828,7 +2848,7 @@ jobs:
         timeout-minutes: 35
 
       - name: Qualify native managed HTTP public and retained output
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         env:
           ERGOPTI_MANAGED_NATIVE_EXPECTED_HEAD: ${{ github.sha }}
         run: |
@@ -2849,7 +2869,7 @@ jobs:
 
       # Actual owner-built installed-prefix archive chain; no mocked production I/O.
       - name: Qualify native updater archive pipeline
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         env:
           # Empty on manual/nonrelease runs: private runner admits package metadata.
           ERGOPTI_BUILD_VERSION: ${{ inputs.version }}
@@ -2871,7 +2891,7 @@ jobs:
 
       # Controlled metadata and real filesystem guards are separate from native provider proof.
       - name: Qualify archive crypto and bin parent source controls
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2889,7 +2909,7 @@ jobs:
 
       # This prerequisite proof is independent of official runtime/model downloads.
       - name: Qualify native runtime prerequisites
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'platform-metrics' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2912,7 +2932,7 @@ jobs:
       # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
       # backend and its connectivity probe.
       - name: AI predictions against a real Ollama
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -2948,7 +2968,7 @@ jobs:
       # hardware cannot serve" design rests on: input_mt_init_slots() advertises
       # QUINTTAP only at five slots, so a five-slot device must read back as five.
       - name: A virtual touchpad, described by the kernel and read back
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -2983,7 +3003,7 @@ jobs:
         # how a run comes back saying less than it measured — the page-error trap
         # below was skipped on its first outing for exactly that reason, so its
         # question went unanswered for a whole cycle.
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3020,7 +3040,7 @@ jobs:
       # nothing whatever about the code, so the two are separated and the test
       # step below gets a budget sized for the test.
       - name: Install WebKit2GTK and lgi
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3037,7 +3057,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Install virtual screenshot capture tools
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3053,7 +3073,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Keep virtual screenshots inside literal private paths
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3071,7 +3091,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Successful native model pulls retire stale retries
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3091,7 +3111,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Preserve literal desktop notification text
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3110,7 +3130,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Install portable network staging prerequisites
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3128,7 +3148,7 @@ jobs:
         timeout-minutes: 20
 
       - name: Qualify actual staged portable network runtime and retirement
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3144,7 +3164,7 @@ jobs:
         timeout-minutes: 10
 
       - name: The webview push reaches a real WebKit page
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3190,7 +3210,7 @@ jobs:
       # dkjson, which is not installed, so every tray window with a request of
       # its own stayed empty while the push test above stayed green.
       - name: A page's own request is answered in real WebKit
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3210,7 +3230,7 @@ jobs:
         timeout-minutes: 5
 
       - name: Typing NONE clears actual WebKit rows and retains ALL controls
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3234,7 +3254,7 @@ jobs:
       # opened on the stable channel, which hides prereleases, and every
       # release is one: the window listed nothing.
       - name: The release list window lists GitHub's releases in real WebKit
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -3262,7 +3282,7 @@ jobs:
       # StatusNotifier host. The widget called a renderer function that never
       # existed and read stats with no speed in them: it drew nothing anywhere.
       - name: The WPM widget and tray readout draw on a real display
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3309,7 +3329,7 @@ jobs:
       # run_javascript is too late by the whole page load — so this harness
       # builds the HTML itself and splices the trap in right after <head>.
       - name: What each page raises while loading
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'desktop-webview' }}
         working-directory: static/ergopti_plus/linux
         run: |
           set -euo pipefail
@@ -3338,7 +3358,7 @@ jobs:
 
       # Standard signed-APT Nix tool, one local store, existing physical phase owner.
       - name: Qualify genuine Nix installed runtime
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.shard == 'updater' }}
         env:
           ERGOPTI_NIX_EXPECTED_HEAD: ${{ github.sha }}
         run: |
@@ -3393,10 +3413,23 @@ jobs:
           mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-e2e-suite --validate-scope-receipt "$receipt")"
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-e2e-suite: qualified=false; no suite assertion count is claimed."
-              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job e2e-linux --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
+              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job e2e-linux --shard "$LINUX_E2E_SHARD" --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux-$LINUX_E2E_SHARD.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
               node tools/ci/dev-release-qualification.cjs --scope linux-simultaneous-native --receipt "$RUNNER_TEMP/stable-linux-simultaneous-native.json"
           elif [ "$mode" = full ]; then
           set -euo pipefail
+          # Each shard counts only the logs its own steps wrote; linux-ok requires
+          # one document per shard and every manifest subject exactly once.
+          record=(node tools/test/linux-ci-evidence.cjs record
+              --job e2e-linux
+              --shard "$LINUX_E2E_SHARD"
+              --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux-$LINUX_E2E_SHARD.json"
+              --sha "$GITHUB_SHA"
+              --architecture "$RUNNER_ARCH"
+              --distro ubuntu
+              --session x11-wayland-headless
+              --interpreter "$(luajit -v 2>&1 | head -1)")
+          case "$LINUX_E2E_SHARD" in
+          input-display)
           e2e_assertions=$(sed -n 's/^1\.\.\([0-9][0-9]*\)$/\1/p' "$RUNNER_TEMP/linux-e2e.log" | tail -1)
           xkb_source_assertions=$(sed -n 's/^=== \([0-9][0-9]*\) check(s), 0 failure(s) ===$/\1/p' "$RUNNER_TEMP/linux-xkb-source.log" | tail -1)
           native_family_assertions=$(sed -n 's/^Native fixture family receipts: \([0-9][0-9]*\) passed, 0 failed, 0 skipped$/\1/p' "$RUNNER_TEMP/linux-window-switch.log" | tail -1)
@@ -3404,62 +3437,74 @@ jobs:
           if [ -f "$RUNNER_TEMP/linux-window-qualification.json" ]; then
               window_switch_assertions=deferred
           fi
-          http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
-          network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
-          nix_runtime_assertions=$(node tools/test/run-linux-nix-native.cjs --evidence "$RUNNER_TEMP/linux-nix-native.log" "$GITHUB_SHA")
-          fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
-          managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
-          managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
-          updater_native_namespace_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence namespace "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
-          updater_temp_ownership_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence ownership "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
-          updater_temp_allocation_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence allocation "$RUNNER_TEMP/linux-updater-temp-allocation.log" "$GITHUB_SHA")
-          updater_archive_assertions=$(node tools/test/linux-updater-archive-evidence.cjs archive "$RUNNER_TEMP/linux-updater-archive-native.log")
-          archive_crypto_assertions=$(node tools/test/linux-updater-archive-evidence.cjs crypto "$RUNNER_TEMP/linux-archive-source-controls.log")
-          archive_bin_parent_assertions=$(node tools/test/linux-updater-archive-evidence.cjs parents "$RUNNER_TEMP/linux-archive-source-controls.log")
-          archive_snapshot_assertions=$(node tools/test/linux-updater-archive-evidence.cjs snapshot "$RUNNER_TEMP/linux-archive-source-controls.log")
-          connect_protocol_assertions=$(node tools/test/linux-updater-archive-evidence.cjs connect "$RUNNER_TEMP/linux-archive-source-controls.log")
-          node tools/test/linux-ci-evidence.cjs record \
-              --job e2e-linux \
-              --output "$RUNNER_TEMP/linux-ci-evidence/e2e-linux.json" \
-              --sha "$GITHUB_SHA" \
-              --architecture "$RUNNER_ARCH" \
-              --distro ubuntu \
-              --session x11-wayland-headless \
-              --interpreter "$(luajit -v 2>&1 | head -1)" \
+          "${record[@]}" \
               --subject uinput-roundtrip=1 \
               --subject grab-race=1 \
               --subject system-keymaps=1 \
               --subject "xkb-source-qualification=$xkb_source_assertions" \
               --subject "window-switch-receipts=$window_switch_assertions" \
               --subject "native-fixture-family=$native_family_assertions" \
+              --subject x11-display=1 \
+              --subject wayland-display=1 \
+              --subject touchpad-capability=1 \
+              --subject gesture-roundtrip=1 \
+              --subject "hotstring-e2e=$e2e_assertions"
+          ;;
+          desktop-webview)
+          "${record[@]}" \
+              --subject tray-symbols=1 \
+              --subject tray-sni-registration=1 \
+              --subject atspi-focus-probe=1 \
+              --subject daemon-live=1 \
+              --subject webview-settings=1 \
+              --subject webview-editor=1 \
+              --subject webview-roundtrip=1 \
+              --subject page-load-errors=1
+          ;;
+          updater)
+          nix_runtime_assertions=$(node tools/test/run-linux-nix-native.cjs --evidence "$RUNNER_TEMP/linux-nix-native.log" "$GITHUB_SHA")
+          updater_native_namespace_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence namespace "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_ownership_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence ownership "$RUNNER_TEMP/linux-updater-temp-ownership.log" "$GITHUB_SHA")
+          updater_temp_allocation_assertions=$(node tools/test/run-linux-updater-temp-native.cjs --evidence allocation "$RUNNER_TEMP/linux-updater-temp-allocation.log" "$GITHUB_SHA")
+          "${record[@]}" \
+              --subject "nix-installed-runtime=$nix_runtime_assertions" \
+              --subject "updater-native-namespace-cleanup=$updater_native_namespace_assertions" \
+              --subject "updater-temp-ownership=$updater_temp_ownership_assertions" \
+              --subject "updater-temp-allocation=$updater_temp_allocation_assertions"
+          ;;
+          network-ai)
+          http_stream_assertions=$(sed -n 's/^PASS native HTTP streaming receipts: \([0-9][0-9]*\) checks$/\1/p' "$RUNNER_TEMP/linux-http-stream.log" | tail -1)
+          network_runtime_assertions=$(node tools/test/linux-network-runtime-evidence.cjs "$RUNNER_TEMP/linux-network-runtime.log")
+          fd_sha256_assertions=$(node tools/test/run-linux-fd-sha256-native.cjs --evidence "$RUNNER_TEMP/linux-fd-sha256-native.log")
+          managed_http_output_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count output "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          managed_http_public_assertions=$(node tools/test/linux-managed-http-evidence.cjs --count public "$RUNNER_TEMP/linux-managed-http-native.log" "$GITHUB_SHA")
+          updater_archive_assertions=$(node tools/test/linux-updater-archive-evidence.cjs archive "$RUNNER_TEMP/linux-updater-archive-native.log")
+          archive_crypto_assertions=$(node tools/test/linux-updater-archive-evidence.cjs crypto "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_bin_parent_assertions=$(node tools/test/linux-updater-archive-evidence.cjs parents "$RUNNER_TEMP/linux-archive-source-controls.log")
+          archive_snapshot_assertions=$(node tools/test/linux-updater-archive-evidence.cjs snapshot "$RUNNER_TEMP/linux-archive-source-controls.log")
+          connect_protocol_assertions=$(node tools/test/linux-updater-archive-evidence.cjs connect "$RUNNER_TEMP/linux-archive-source-controls.log")
+          "${record[@]}" \
               --subject "http-stream-receipts=$http_stream_assertions" \
               --subject "managed-network-runtime=$network_runtime_assertions" \
-              --subject "nix-installed-runtime=$nix_runtime_assertions" \
               --subject "retained-fd-sha256=$fd_sha256_assertions" \
               --subject "managed-http-output=$managed_http_output_assertions" \
               --subject "managed-http-public=$managed_http_public_assertions" \
-              --subject "updater-native-namespace-cleanup=$updater_native_namespace_assertions" \
-              --subject "updater-temp-ownership=$updater_temp_ownership_assertions" \
-              --subject "updater-temp-allocation=$updater_temp_allocation_assertions" \
               --subject "updater-archive-pipeline=$updater_archive_assertions" \
               --subject "archive-source-crypto=$archive_crypto_assertions" \
               --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \
               --subject "archive-private-snapshot=$archive_snapshot_assertions" \
               --subject "connect-terminal-protocol-model=$connect_protocol_assertions" \
-              --subject x11-display=1 \
-              --subject wayland-display=1 \
-              --subject tray-symbols=1 \
-              --subject tray-sni-registration=1 \
-              --subject atspi-focus-probe=1 \
-              --subject daemon-live=1 \
-              --subject ollama-live=1 \
-              --subject touchpad-capability=1 \
-              --subject gesture-roundtrip=1 \
-              --subject webview-settings=1 \
-              --subject webview-editor=1 \
-              --subject webview-roundtrip=1 \
-              --subject page-load-errors=1 \
-              --subject "hotstring-e2e=$e2e_assertions"
+              --subject ollama-live=1
+          ;;
+          platform-metrics)
+          "${record[@]}" \
+              --subject native-platform-metrics=1
+          ;;
+          *)
+              echo "::error::unknown Linux E2E shard: $LINUX_E2E_SHARD" >&2
+              exit 1
+          ;;
+          esac
           else
               exit 1
           fi
@@ -3467,9 +3512,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-e2e-linux
+          name: linux-ci-evidence-e2e-linux-${{ matrix.shard }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux.json
+          path: ${{ runner.temp }}/linux-ci-evidence/e2e-linux-${{ matrix.shard }}.json
           if-no-files-found: error
 
       # ─────────────────────────────────────────────────
@@ -3504,14 +3549,14 @@ jobs:
       # under $HOME. The .deb, .rpm and AppImage smokes each prove a dependency the
       # host must NOT already have, so they keep their own runners below.
       - name: Retain the source-bound linux-e2e-suite qualification
-        if: always()
+        if: ${{ always() && matrix.shard == 'desktop-webview' }}
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-linux-e2e-suite
           path: ${{ runner.temp }}/stable-linux-e2e-suite.json
           if-no-files-found: warn
       - name: Retain the contained simultaneous qualification
-        if: always()
+        if: ${{ always() && matrix.shard == 'desktop-webview' }}
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-simultaneous-contained

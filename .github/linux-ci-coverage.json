@@ -9,6 +9,7 @@
 		},
 		"e2e-linux": {
 			"classification": "mandatory",
+			"shards": ["input-display", "desktop-webview", "updater", "network-ai", "platform-metrics"],
 			"subjects": {
 				"uinput-roundtrip": 1,
 				"grab-race": 1,
@@ -43,7 +44,8 @@
 				"page-load-errors": 1,
 				"hotstring-e2e": 100,
 				"retained-fd-sha256": 12,
-				"native-fixture-family": 5
+				"native-fixture-family": 5,
+				"native-platform-metrics": 1
 			}
 		},
 		"package-linux": {

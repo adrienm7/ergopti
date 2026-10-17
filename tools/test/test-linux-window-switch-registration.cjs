@@ -12,6 +12,7 @@
 
 'use strict';
 const { loadInventory } = require('./lib/js-feature-inventory.cjs');
+const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
 /** Admit exactly one literal Node owner, retaining the declared command token. */
 function ownsCheck(inventory, file, command = 'node') {
 	const checks = inventory.checks.filter((check) => check.args.includes(file));
@@ -114,7 +115,7 @@ function validate(root) {
 	const step = Pipeline.step(job, 'Qualify actual cursor-display window switching');
 	assert.equal(
 		Pipeline.stepField(step, 'if'),
-		'${{ !cancelled() }}',
+		LinuxE2E.condition('Qualify actual cursor-display window switching', '${{ !cancelled() }}'),
 		'native step must run unless cancelled'
 	);
 	assert.equal(
@@ -196,16 +197,27 @@ function evidenceContract() {
 			evidence = [];
 		for (const [job, contract] of Object.entries(manifest.jobs)) {
 			needs[job] = { result: 'success' };
-			evidence.push({
-				schema_version: 1,
-				job,
-				sha: expectedSha,
-				architecture: 'x86_64',
-				distro: 'owned fixture',
-				session: 'virtual X11',
-				interpreter: 'LuaJIT',
-				subjects: { ...contract.subjects }
-			});
+			// A sharded job delivers one document per matrix row.
+			for (const shard of contract.shards ?? [null])
+				evidence.push({
+					schema_version: 1,
+					job,
+					...(shard === null ? {} : { shard }),
+					sha: expectedSha,
+					architecture: 'x86_64',
+					distro: 'owned fixture',
+					session: 'virtual X11',
+					interpreter: 'LuaJIT',
+					subjects:
+						shard === null
+							? { ...contract.subjects }
+							: Object.fromEntries(
+									LinuxE2E.fixture.subjects[shard].map((subject) => [
+										subject,
+										contract.subjects[subject]
+									])
+								)
+				});
 		}
 		return { manifest, expectedSha, needs, evidence };
 	}
@@ -213,36 +225,41 @@ function evidenceContract() {
 	for (const [mutate, refusal] of [
 		[
 			(input) => {
-				delete input.evidence.find((row) => row.job === 'e2e-linux').subjects[
-					'window-switch-receipts'
-				];
+				delete input.evidence.find(
+					(row) => row.job === 'e2e-linux' && 'window-switch-receipts' in row.subjects
+				).subjects['window-switch-receipts'];
 			},
 			/has no evidence for window-switch-receipts/
 		],
 		[
 			(input) => {
-				input.evidence.find((row) => row.job === 'e2e-linux').subjects['window-switch-receipts'] =
-					33;
+				input.evidence.find(
+					(row) => row.job === 'e2e-linux' && 'window-switch-receipts' in row.subjects
+				).subjects['window-switch-receipts'] = 33;
 			},
 			/window-switch-receipts recorded 33 assertion/
 		],
 		[
 			(input) => {
-				input.evidence.find((row) => row.job === 'e2e-linux').sha = 'foreign';
+				input.evidence.find(
+					(row) => row.job === 'e2e-linux' && 'window-switch-receipts' in row.subjects
+				).sha = 'foreign';
 			},
 			/expected/
 		],
 		[
 			(input) => {
-				delete input.evidence.find((row) => row.job === 'e2e-linux').subjects[
-					'native-fixture-family'
-				];
+				delete input.evidence.find(
+					(row) => row.job === 'e2e-linux' && 'window-switch-receipts' in row.subjects
+				).subjects['native-fixture-family'];
 			},
 			/has no evidence for native-fixture-family/
 		],
 		[
 			(input) => {
-				input.evidence.find((row) => row.job === 'e2e-linux').subjects['native-fixture-family'] = 4;
+				input.evidence.find(
+					(row) => row.job === 'e2e-linux' && 'window-switch-receipts' in row.subjects
+				).subjects['native-fixture-family'] = 4;
 			},
 			/native-fixture-family recorded 4 assertion/
 		],
@@ -648,7 +665,11 @@ async function main() {
 				'.github/workflows/ci-linux.yml',
 				(source) =>
 					source.replace(
-						'Qualify actual cursor-display window switching\n        if: ${{ !cancelled() }}',
+						'Qualify actual cursor-display window switching\n        if: ' +
+							LinuxE2E.condition(
+								'Qualify actual cursor-display window switching',
+								'${{ !cancelled() }}'
+							),
 						'Qualify actual cursor-display window switching\n        if: ${{ success() }}'
 					),
 				/native step must run/
