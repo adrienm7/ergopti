@@ -316,6 +316,14 @@ function M.focused_identity()
 		Logger.error(LOG, "focused_identity(): native focus query failed.")
 		return nil
 	end
+	if identity == nil and DisplayServer.is_wayland() then
+		-- GNOME and KDE expose no compositor window ID. Their accessible control
+		-- still has an exact native destination; labels never substitute for it.
+		local captured, destination = pcall(function()
+			return require("adapters.user_hotstring_destination").capture_current()
+		end)
+		if captured and destination then return "atspi:" .. destination.bus .. ":" .. destination.path end
+	end
 	return identity
 end
 

@@ -27,13 +27,25 @@ function M.capture()
 	return { bus = snapshot.native_bus_name, path = snapshot.native_object_path }
 end
 
+--- Captures a fresh native destination through the bounded accessibility helper.
+--- @return table|nil destination Exact active non-password bus/object receipt.
+local function capture_current()
+	local snapshot, conclusive = AtspiFocus.get_snapshot()
+	if conclusive ~= true or not owned(snapshot) then return nil end
+	return { bus = snapshot.native_bus_name, path = snapshot.native_object_path }
+end
+
+--- Captures a fresh active destination without using the cached privacy receipt.
+--- @return table|nil destination Exact native bus/object identity.
+function M.capture_current() return capture_current() end
+
 --- Rechecks actual focused native identity through the existing bounded helper.
 --- @param receipt table Exact destination previously captured.
 --- @return boolean current
 function M.current(receipt)
-	local snapshot, conclusive = AtspiFocus.get_snapshot()
-	return conclusive == true and owned(snapshot) and type(receipt) == "table"
-		and receipt.bus == snapshot.native_bus_name and receipt.path == snapshot.native_object_path
+	local current = capture_current()
+	return current ~= nil and type(receipt) == "table"
+		and receipt.bus == current.bus and receipt.path == current.path
 end
 
 return M
