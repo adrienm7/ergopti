@@ -5,6 +5,7 @@ import hashlib
 import importlib.abc
 import importlib.util
 import os
+import re
 from pathlib import Path
 import shutil
 import tempfile
@@ -33,6 +34,7 @@ RECIPE_INPUTS = (
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeSignatureCompatibility.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedInstalledConfiguration.h",
     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedChildReapingCompatibility.h",
+    "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
     "static/ergopti_plus/macos/platform/network/native_http.py",
     "static/ergopti_plus/macos/platform/network/managed_http.py",
     "static/ergopti_plus/_shared/python/network_proxy_policy.py",
@@ -159,6 +161,7 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                 "OwnedRuntimeSignatureCompatibility.h",
                 "OwnedInstalledConfiguration.h",
                 "OwnedChildReapingCompatibility.h",
+                "OwnedVHDReportSocketIdentity.h",
             )
             self.assertEqual({path.name for path in module.glob("*.h")}, set(headers))
             for name in headers:
@@ -168,6 +171,14 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                 '#include "OwnedListenerEventCompatibility.h"',
                 (module / "CPOSIXCompatibility.h").read_text(),
             )
+            for header in module.glob("*.h"):
+                for required in re.findall(
+                    rb'^\s*#\s*include\s*"([^"\r\n]+)"', header.read_bytes(), re.MULTILINE
+                ):
+                    dependency = module / required.decode("ascii")
+                    self.assertTrue(
+                        dependency.is_file(), f"Missing staged quoted header: {required!r}"
+                    )
             raise CompilerBoundary()
 
         self.inspect = inspect
@@ -253,6 +264,7 @@ class StandaloneSwiftDependencies(unittest.TestCase):
             "OwnedRuntimeSignatureCompatibility.h",
             "OwnedInstalledConfiguration.h",
             "OwnedChildReapingCompatibility.h",
+            "OwnedVHDReportSocketIdentity.h",
         ):
             with self.subTest(header=name):
                 with tempfile.TemporaryDirectory(

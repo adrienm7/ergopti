@@ -25,7 +25,11 @@ const HEADERS = Object.freeze(
 		'LoopbackListenerCompatibility.h',
 		'OwnedImageAliasCompatibility.h',
 		'OwnedSuspendedImageCompatibility.h',
-		'OwnedListenerEventCompatibility.h'
+		'OwnedListenerEventCompatibility.h',
+		'OwnedRuntimeSignatureCompatibility.h',
+		'OwnedInstalledConfiguration.h',
+		'OwnedChildReapingCompatibility.h',
+		'OwnedVHDReportSocketIdentity.h'
 	].map((name) => MAC + 'launcher/Sources/CPOSIXCompatibility/include/' + name)
 );
 const RUNTIME = Object.freeze([

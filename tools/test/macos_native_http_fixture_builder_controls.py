@@ -11,6 +11,7 @@ import importlib.util
 import io
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -94,6 +95,9 @@ class BuilderControls(unittest.TestCase):
         return self.build.build()
 
     def test01WholeCompilerSourcesAndHeadersStagedExactly(self):
+        # Genuine headers make a new umbrella include observable in this control.
+        for relative in B.HEADER_INPUTS:
+            (self.repo / relative).write_bytes((ROOT / relative).read_bytes())
         build = self.qualified()
         self.assertEqual(len(self.owner.calls), 3)
         compile_args = self.owner.calls[0][0]
@@ -102,7 +106,7 @@ class BuilderControls(unittest.TestCase):
             [Path(p).name for p in B.SWIFT_INPUTS],
         )
         self.assertEqual(len(B.SWIFT_INPUTS), 5)
-        self.assertEqual(len(B.HEADER_INPUTS), 9)
+        self.assertEqual(len(B.HEADER_INPUTS), 10)
         self.assertEqual(
             tuple(Path(path).name for path in B.HEADER_INPUTS[:6]),
             (
@@ -117,6 +121,13 @@ class BuilderControls(unittest.TestCase):
         self.assertEqual(Path(B.HEADER_INPUTS[6]).name, "OwnedRuntimeSignatureCompatibility.h")
         self.assertEqual(Path(B.HEADER_INPUTS[7]).name, "OwnedInstalledConfiguration.h")
         self.assertEqual(Path(B.HEADER_INPUTS[8]).name, "OwnedChildReapingCompatibility.h")
+        self.assertEqual(Path(B.HEADER_INPUTS[9]).name, "OwnedVHDReportSocketIdentity.h")
+        include = build.root / "CPOSIXCompatibility"
+        for header in include.glob("*.h"):
+            for required in re.findall(
+                rb'^\s*#\s*include\s*"([^"\r\n]+)"', header.read_bytes(), re.MULTILINE
+            ):
+                self.assertTrue((include / required.decode("ascii")).is_file())
         for original in B.SWIFT_INPUTS:
             self.assertEqual(
                 (build.root / Path(original).name).read_bytes(), (self.repo / original).read_bytes()

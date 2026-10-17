@@ -38,6 +38,7 @@ HEADER_INPUTS = tuple(
         "OwnedRuntimeSignatureCompatibility.h",
         "OwnedInstalledConfiguration.h",
         "OwnedChildReapingCompatibility.h",
+        "OwnedVHDReportSocketIdentity.h",
     )
 )
 RUNTIME_INPUTS = (

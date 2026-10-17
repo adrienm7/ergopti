@@ -64,6 +64,20 @@ semantic raw-replay completion and measured production output remain OPEN.
 Physical Windows input and native macOS/Linux remain unqualified; no native
 capability flag changes.
 
+### October 17 standalone native HTTP header closure
+
+Both standalone HTTP compiler recipes now stage the ten current public headers,
+including OwnedVHDReportSocketIdentity.h required by the real umbrella header.
+The clock receiver enrolls the same complete recipe: 22 recipe inputs, 23 with
+the receiver itself and 20 staged images. Exact source/staging maps remain strict.
+Independent header oracles and quoted-include closure checks retain the original
+assertions, with only the deliberate nine-to-ten census correction.
+
+Source inspection reproduces the missing include before correction and receives
+the complete staged closure afterward. The earlier native compiler setup failures
+remain retained; their original compiler stderr is unavailable. Corrected native
+compilation, independent clients and managed model receiving remain UNRUN.
+
 ### October 16 media schema reader-lock admission
 
 The Linux and macOS SQLite writers no longer reserve a write transaction
