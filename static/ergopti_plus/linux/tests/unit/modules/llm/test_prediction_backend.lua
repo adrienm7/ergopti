@@ -78,7 +78,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 		focus_id = function() return calls.focus end,
-		engine = { current_buffer = function() return "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
+		engine = { current_buffer = function() return calls.buffer or "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
 		apply_prediction = function() calls.applied = calls.applied + 1; return calls.refuse_apply ~= true end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
 	})
@@ -471,4 +471,63 @@ helpers.describe("ordinary predictions retain their exact native target", functi
 			if not ok then error(err, 0) end
 		end)
 	end
+end)
+
+helpers.describe("buffer-origin ownership follows matcher retirement", function()
+	for _, origin in ipairs({"unavailable", "known"}) do
+		helpers.it("reacquires a fresh target after an empty matcher retires a " .. origin .. " origin (prediction-origin-retirement)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY)
+			local ok, err = pcall(function()
+				calls.focus = origin == "unavailable" and "" or "x11:fixture:1"
+				engine.on_char("s", "Bonjour à tous")
+				-- Escape empties the real matcher before it asks predictions to withdraw.
+				calls.buffer = ""
+				engine.withdraw()
+				calls.focus = "x11:fixture:2"
+				calls.buffer = "Fresh typing in a known target"
+				engine.on_char("t", calls.buffer)
+				scheduler.settle()
+				helpers.assert_eq(#calls.remote, 3, "only the fresh buffer may acquire the recovered native target")
+				helpers.assert_eq(calls.resets, 0, "withdrawal must preserve the caller's matcher edit")
+				helpers.assert_eq(calls.applied, 0)
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	for _, origin in ipairs({"unavailable", "known"}) do
+		helpers.it("preserves a nonempty matcher and its " .. origin .. " target lease (prediction-origin-retirement)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY)
+			local ok, err = pcall(function()
+				calls.focus = origin == "unavailable" and "" or "x11:fixture:1"
+				engine.on_char("s", "Bonjour à tous")
+				-- Backspace leaves existing context whose native origin cannot be reassigned.
+				calls.buffer = "Bonjour à tou"
+				engine.withdraw()
+				calls.focus = "x11:fixture:2"
+				engine.on_char("s", "Bonjour à tous")
+				scheduler.settle()
+				helpers.assert_eq(#calls.remote, 0, "withdrawal of an offer cannot lend retained text to a different native target")
+				helpers.assert_eq(calls.resets, 0)
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("continues prediction after Backspace retains text in the same known target (prediction-origin-retirement)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY)
+		local ok, err = pcall(function()
+			engine.on_char("s", "Bonjour à tous")
+			calls.buffer = "Bonjour à tou"
+			engine.withdraw()
+			engine.on_char("s", "Bonjour à tous")
+			scheduler.settle()
+			helpers.assert_eq(#calls.remote, 3)
+			helpers.assert_eq(calls.resets, 0)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
 end)
