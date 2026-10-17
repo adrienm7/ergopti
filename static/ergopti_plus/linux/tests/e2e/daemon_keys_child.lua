@@ -194,6 +194,16 @@ end
 if not MENU_ROWS_FILE and not WITH_LLM then
 	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
 end
+if not MENU_ROWS_FILE and WITH_LLM then
+	-- The focused-field model also owns the exact AI output target; the real
+	-- daemon must receive the same capability as the native desktop adapter.
+	package.preload["adapters.window_info"] = function()
+		return {
+			getFocused = function() return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" } end,
+			focused_identity = function() return "owned-e2e-window" end,
+		}
+	end
+end
 
 -- ERGOPTI_E2E_GESTURE_PUMP=fails: a touchpad reader whose pump throws. The
 -- same module is the action catalogue the tap-holds run their actions

@@ -94,6 +94,8 @@ local _notify = nil
 local _read_selection = nil
 local _replace_selection = nil
 local _focus_id = nil
+local _buffer_focus = nil
+local current_focus
 
 -- The tone actions' state. The generation drops a stale answer: a newer tone
 -- step, typing, a cancel or a pause make the one in flight obsolete. The memory
@@ -495,6 +497,7 @@ function M.init(opts)
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
+	_buffer_focus = nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
 	_on_live_change = type(options.on_live_change) == "function" and options.on_live_change or nil
 	_focused_window = type(options.focused_window) == "function" and options.focused_window or nil
@@ -553,6 +556,9 @@ function M.on_char(ch, buffer, output_context)
 		arm_agent(buffer, output_context)
 		return
 	end
+	-- Retain the first character's native target across debounce/manual requests.
+	-- Querying only once per buffer keeps native subprocesses off later keystrokes.
+	if _buffer_focus == nil then _buffer_focus = current_focus() end
 	-- Typing replaced the selection a tone step was about to rewrite.
 	M.drop_tone("typing")
 	-- The user went on typing: the screen answers would be dismissed at once.
@@ -676,6 +682,11 @@ function M.predict(context, output_context, override)
 		return
 	end
 
+	local focus = _buffer_focus or current_focus()
+	if focus == "" or current_focus() ~= focus then
+		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
+		return false
+	end
 	local backend, target, model, runtime_response = M.resolve_backend()
 	if not backend then return end
 
@@ -729,6 +740,7 @@ function M.predict(context, output_context, override)
 		input_chars = trigger_chars,
 		model = model,
 		profile = profile.id,
+		focus = focus,
 		live = override ~= nil and override.live == true,
 		automatic = type(output_context) == "table" and output_context.automatic == true,
 	}
@@ -761,9 +773,19 @@ function M.predict(context, output_context, override)
 		if #visible > 0 or meta.loading then show_candidates(visible, meta) end
 	end
 
+	local function request_current(verify_focus)
+		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+		if verify_focus and current_focus() ~= focus then
+			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
+			M.dismiss()
+			return false
+		end
+		return true
+	end
+
 	local dispatch
 	dispatch = function()
-		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+		if not request_current(true) then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
@@ -813,14 +835,14 @@ function M.predict(context, output_context, override)
 			-- user's copy of "basic" never got the single-line stops.
 			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
-			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if not request_current(false) then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
 			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
-			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if not request_current(true) then return end
 			if err then
 				_predicting = false
 				meta.loading = false
@@ -903,6 +925,7 @@ local function run_manual(output_context, prompt)
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
 		override and override.profile.id or "from the menu")
 	local refusal = M.predict(context, output_context, override)
+	if refusal == false then return false end
 	if type(refusal) == "string" then
 		Logger.info(LOG, "Manual prediction refused (%s).", refusal)
 		show_notice(MANUAL_REFUSAL_KEYS[refusal], refusal)
@@ -1109,7 +1132,7 @@ end
 
 --- The focused window's identity, "" when unknown.
 --- @return string
-local function current_focus()
+current_focus = function()
 	if not _focus_id then return "" end
 	local ok, id = pcall(_focus_id)
 	return (ok and type(id) == "string") and id or ""
@@ -1142,12 +1165,9 @@ local function finish_tone(generation, plan, focus, full_text, err)
 		Logger.warn(LOG, "Tone rewrite dropped: the answer holds no REWRITE line (%d chars).", #(full_text or ""))
 		return
 	end
-	-- Compared, not trusted: typing into another window would put the rewrite
-	-- where the user never selected anything. An identity the desktop cannot
-	-- tell (GNOME and KDE under Wayland) reads "" on both ends; typing, clicks
-	-- and Escape still drop the step there.
-	-- The identities hold window titles, which are private: never logged.
-	if current_focus() ~= focus then
+	-- An unreadable target cannot authorize insertion: comparing two unknown
+	-- identities would mistake a programmatic window switch for unchanged focus.
+	if focus == "" or current_focus() ~= focus then
 		Logger.info(LOG, "Tone rewrite dropped: another window took the focus while it ran.")
 		return
 	end
@@ -1199,7 +1219,16 @@ function M.shift_tone(direction, cycle)
 		return false
 	end
 	M.drop_tone("superseded")
+	local focus = current_focus()
+	if focus == "" then
+		Logger.warn(LOG, "Tone step refused: the focused window cannot be identified.")
+		return false
+	end
 	local read_ok, selection, read_err = _read_selection()
+	if current_focus() ~= focus then
+		Logger.info(LOG, "Tone step refused: focus changed while the selection was read.")
+		return false
+	end
 	if not read_ok then
 		if read_err == "no_selection" then
 			Logger.info(LOG, "Tone step ignored: nothing is selected.")
@@ -1243,7 +1272,6 @@ function M.shift_tone(direction, cycle)
 
 	local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
 	local generation = _tone_generation
-	local focus = current_focus()
 	local request_opts = {
 		runtime_response = runtime_response,
 		stream = false,
@@ -1349,7 +1377,7 @@ local function open_offer(action, label, model, focus)
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
-	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus }
+	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus or current_focus() }
 	_offer_notified = false
 	_predicting = true
 	advance_request_epoch()
@@ -1795,7 +1823,16 @@ function M.translate_selection(value)
 		Logger.debug(LOG, "Translation suppressed: secure field or excluded context.")
 		return false
 	end
+	local focus = current_focus()
+	if focus == "" then
+		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")
+		return false
+	end
 	local read_ok, selection, read_err = _read_selection()
+	if current_focus() ~= focus then
+		Logger.info(LOG, "Translation refused: focus changed while the selection was read.")
+		return false
+	end
 	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
 		if read_ok or read_err == "no_selection" then
 			Logger.info(LOG, "Translation refused: nothing is selected.")
@@ -1815,8 +1852,7 @@ function M.translate_selection(value)
 	-- and a tone step would rewrite the text being translated.
 	M.drop_vision("superseded")
 	M.drop_tone("superseded")
-	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model,
-		current_focus())
+	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus)
 	local messages = {
 		{ role = "system", content = Translate.system_prompt(config, language) },
 		{ role = "user", content = Translate.user_text(config, selection) },
@@ -2504,6 +2540,7 @@ function M.cancel()
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.withdraw(_modal_resync_owner)
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	_buffer_focus = nil
 end
 
 --- Dismisses in-flight and visible suggestions without changing the buffer.
@@ -2566,13 +2603,19 @@ function M.accept(index)
 		-- window the text would land where nothing was selected.
 		if not _replace_selection then return false end
 		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if current_focus() ~= focus then
+		if focus == "" or current_focus() ~= focus then
 			Logger.info(LOG, "Translation not inserted: another window has the focus.")
 			return false
 		end
 		ok, committed = pcall(_replace_selection, candidate.to_type)
 	else
 		if type(_apply_prediction) ~= "function" then return false end
+		local focus = _suggestion_context and _suggestion_context.focus or ""
+		if focus == "" or current_focus() ~= focus then
+			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
+			M.dismiss()
+			return false
+		end
 		ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
 	end
 	if not ok or committed ~= true then
@@ -2586,6 +2629,7 @@ function M.accept(index)
 	close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	_buffer_focus = nil
 	return true
 end
 

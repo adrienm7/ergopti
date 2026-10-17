@@ -150,6 +150,7 @@ local function scenario(opts, body)
 			-- The daemon's seams: a copy probe, the injector, the window probe
 			read_selection = function()
 				world.reads = world.reads + 1
+				if world.on_read_selection then world.on_read_selection() end
 				if world.selection == nil then return false, "", "no_selection" end
 				return true, world.selection, nil
 			end,
@@ -479,5 +480,29 @@ helpers.describe("injector: one Left arrow per user-perceived character", functi
 		for _, case in ipairs(cases) do
 			helpers.assert_eq(Injector.caret_steps(case[1]), case[2], "steps for " .. case[1])
 		end
+	end)
+end)
+
+helpers.describe("selection rewrites require a known stable native focus", function()
+	for _, missing in ipairs({"empty", "unavailable"}) do
+		helpers.it("refuses tone before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
+			scenario({selection = "merci pour ton aide"}, function(world)
+				world.focus = missing == "empty" and "" or nil
+				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+				helpers.assert_eq(world.reads, 0, "an unknown target cannot authorize a copy probe")
+				helpers.assert_eq(#world.posts, 0)
+			end)
+		end)
+	end
+
+	helpers.it("refuses a tone request when focus moves during selection capture (selection-native-focus)", function()
+		scenario({selection = "merci pour ton aide"}, function(world)
+			world.focus = "x11:10:100"
+			world.on_read_selection = function() world.focus = "x11:10:101" end
+			helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+			helpers.assert_eq(world.reads, 1)
+			helpers.assert_eq(#world.posts, 0, "the captured text is never attributed to the replacement target")
+			helpers.assert_eq(#world.emitted, 0)
+		end)
 	end)
 end)

@@ -1311,12 +1311,9 @@ local function main()
 				engine:reset()
 				return true
 			end,
-			-- Read live, not from the 250 ms focus cache: the answer is dropped when
-			-- another window took the focus while it ran.
-			focus_id = window_info and function()
-				local info = window_info.getFocused()
-				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
-			end or nil,
+			-- Retain native window or accessible ownership independently of labels;
+			-- programmatic focus changes can arrive between the periodic polls.
+			focus_id = window_info and window_info.focused_identity or nil,
 			-- The AI agent's context: the application and the window title the
 			-- user is in, read live like focus_id.
 			focused_window = window_info and function()

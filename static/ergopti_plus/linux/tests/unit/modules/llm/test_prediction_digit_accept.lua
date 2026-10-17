@@ -46,7 +46,7 @@ local function offering(count, apply_ok)
 		get_base_url = function() return "http://127.0.0.1:11434" end,
 	}
 	local engine = helpers.load_module("modules.llm.prediction_engine")
-	engine.init({
+	engine.init({ focus_id = function() return "owned-prediction-window" end,
 		overlay = {
 			show = function() state.visible = true; return true end,
 			hide = function() state.visible = false end,

@@ -27,7 +27,7 @@ package.loaded['modules.llm.profile_settings'] = {
 local engine = require('modules.llm.prediction_engine')
 local applied, resets, accepted, timeout = 0, 0, false, false
 local partial_inflight = false
-engine.init({ engine = {reset = function() resets = resets + 1 end}, apply_prediction = function(candidate)
+engine.init({ focus_id = function() return "owned-transport-target" end, engine = {reset = function() resets = resets + 1 end}, apply_prediction = function(candidate)
 	assert(candidate.to_type == ' que tout le monde aille bien')
 	applied = applied + 1
 	return true
