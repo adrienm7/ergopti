@@ -923,6 +923,21 @@ helpers.describe("native script storage cohorts", function()
 end)
 
 helpers.describe("script storage receipt finalization", function()
+	helpers.it("script-storage-cohort refused capture releases its native owner without a receipt", function()
+		local retained_storage, weak
+		storage_cohort_fixture('{"a":', function(storage)
+			retained_storage = storage
+			local owner = {}
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_nil(storage.capture_owned(owner), "malformed native source cannot issue a receipt")
+			helpers.assert_true(storage.release_owned(owner))
+			weak = setmetatable({ owner }, { __mode = "v" })
+			owner = nil
+		end)
+		collectgarbage("collect")
+		helpers.assert_nil(weak[1], "a refused capture must not retain its native owner without a receipt to finalize")
+		helpers.assert_eq(type(retained_storage.capture_owned), "function", "the native producer remains reachable during the collection proof")
+	end)
 	helpers.it("script-storage-cohort explicit forget finalizes without IO and breaks native owner cycles", function()
 		local retained_storage, retained_receipt, weak
 		storage_cohort_fixture('{"a":1}', function(storage, files, path, backup, _, read)
