@@ -1180,7 +1180,7 @@
 			"job": "test-ahk",
 			"name": "Retain the source-bound Windows qualification receipt",
 			"condition": "always()",
-			"body": "      - name: Retain the source-bound Windows qualification receipt\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-windows-shard${{ matrix.shard }}\n          path: ${{ runner.temp }}/stable-windows-native-desktop.json\n          if-no-files-found: warn"
+			"body": "      - name: Retain the source-bound Windows qualification receipt\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-windows-${{ matrix.module }}\n          path: ${{ runner.temp }}/stable-windows-native-desktop.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",

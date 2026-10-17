@@ -66,11 +66,14 @@ if !IsSet(_AHK_ONLY_FILTER)
 if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
 
-; Optional ``--shard=K/N`` split (run_all sets it); zero count runs every test.
-if !IsSet(_AHK_SHARD_INDEX)
-	global _AHK_SHARD_INDEX := 0
-if !IsSet(_AHK_SHARD_COUNT)
-	global _AHK_SHARD_COUNT := 0
+; Optional selection flags (run_all sets them): --module=<group>,
+; --list=<file> and --dump-plan=<file>. Empty means unused.
+if !IsSet(_AHK_MODULE)
+	global _AHK_MODULE := ""
+if !IsSet(_AHK_LIST_FILE)
+	global _AHK_LIST_FILE := ""
+if !IsSet(_AHK_DUMP_PLAN)
+	global _AHK_DUMP_PLAN := ""
 
 ; Only the principal runner owns parser registration. Including assertion
 ; helpers alone must not create an undeclared function dependency at load time.
@@ -576,21 +579,76 @@ global _DriverDirConcatFn := _DriverDirConcat
 ; setup/teardown — tests should be self-contained.
 Test(Name, Callback, Interactive := false) {
 	global TEST_REGISTRY
-	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+	; The registering file decides the module shard (see _TestShardGroup).
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive,
+		file: Error("", -1).File })
 }
 
 ; Keep excluded cases outside the execution plan, with explicit diagnostics;
 ; they must never contribute a fabricated successful result to the TAP footer.
-; Keeps every Count-th test starting at the Index-th (1-based). Interleaving
-; spreads the clustered slow cohorts across shards; the shards partition Tests.
-_SelectShard(Tests, Index, Count) {
-	if Count == 0
+; Module groups for CI: each runner executes one group with --module=<name>.
+; A test belongs to the first group whose pattern matches its registering file
+; (relative to tests/, lower case); "core" takes everything else, so the groups
+; partition the suite and a module's tests keep their relative order. Groups
+; follow product modules; the heaviest modules are split by file so no group
+; dominates the CI wall time.
+global TEST_MODULE_GROUPS := [
+	["meta", "^meta/"],
+	["llm-servers-a", "test_local_server_panel|test_local_server_scope_cohort|test_managed_|ollama"],
+	["llm-servers-b", "local_server"],
+	["llm", "llm|model|prediction|vision|agent|tone|translate|prompt|api_test"],
+	["config-scope-a", "global_config_scope|restore_recommended|config_transition"],
+	["config-scope-b", "scope|journal"],
+	["config", "config|toml|updater|migrat|backup|sqlite|settings"],
+	["hotstrings", "hotstring|personal|prefix|magic|capsword|tap|wrap|shortcut|text|corpus|dynamic"],
+	["keymap", "layout|altgr|keylay|keymap|digit|kana|gesture|keylogger|klr|metrics|wpm|heatmap|key_comb"],
+	["core", ""]
+]
+
+; The module group of a registering test file.
+_TestModuleOf(File) {
+	global TEST_MODULE_GROUPS
+	Relative := StrLower(StrReplace(File, "\", "/"))
+	if Position := InStr(Relative, "/windows/tests/")
+		Relative := SubStr(Relative, Position + StrLen("/windows/tests/"))
+	for Group in TEST_MODULE_GROUPS {
+		if Group[2] == "" || RegExMatch(Relative, Group[2])
+			return Group[1]
+	}
+	throw Error("The module groups must end with a catch-all.")
+}
+
+; Keeps the tests of one module group; an empty name keeps every test.
+_SelectModule(Tests, Module) {
+	global TEST_MODULE_GROUPS
+	if Module == ""
 		return Tests
-	if !(Index is Integer) || !(Count is Integer) || Index < 1 || Index > Count
-		throw ValueError("A test shard requires 1 <= index <= count.")
+	Known := false
+	for Group in TEST_MODULE_GROUPS
+		Known := Known || Group[1] == Module
+	if !Known
+		throw ValueError("Unknown test module group: " . Module)
 	Selected := []
-	for Position, Entry in Tests {
-		if Mod(Position - 1, Count) == Index - 1
+	for Entry in Tests {
+		if _TestModuleOf(Entry.file) == Module
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
+; Keeps the tests named in a UTF-8 file (one name per line), in registry order,
+; to replay an exact sequence such as the tests that ran before a failure.
+_SelectListed(Tests, ListFile) {
+	if ListFile == ""
+		return Tests
+	Wanted := Map()
+	loop parse, FileRead(ListFile, "UTF-8"), "`n", "`r" {
+		if A_LoopField != ""
+			Wanted[A_LoopField] := true
+	}
+	Selected := []
+	for Entry in Tests {
+		if Wanted.Has(Entry.name)
 			Selected.Push(Entry)
 	}
 	return Selected
@@ -816,7 +874,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
-	global _AHK_INTERACTIVE, _AHK_SHARD_INDEX, _AHK_SHARD_COUNT
+	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -829,8 +887,14 @@ RunTests() {
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
 	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
-	UnshardedCount := ActiveTests.Length
-	ActiveTests := _SelectShard(ActiveTests, _AHK_SHARD_INDEX, _AHK_SHARD_COUNT)
+	UnmodularCount := ActiveTests.Length
+	ActiveTests := _SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE)
+	if _AHK_DUMP_PLAN != "" {
+		Plan := ""
+		for Entry in ActiveTests
+			Plan .= _TestModuleOf(Entry.file) . "`t" . Entry.file . "`t" . Entry.name . "`n"
+		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
+	}
 	DeferredName := _TestDevQualificationName()
 	if DeferredName != "" {
 		for Index, Entry in ActiveTests
@@ -845,9 +909,9 @@ RunTests() {
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
-	if (_AHK_SHARD_COUNT != 0)
-		_TestPrint("# --shard " . _AHK_SHARD_INDEX . "/" . _AHK_SHARD_COUNT . " - "
-			. ActiveTests.Length . " of " . UnshardedCount . " test(s) selected.")
+	if (_AHK_MODULE != "")
+		_TestPrint("# --module " . _AHK_MODULE . " - "
+			. ActiveTests.Length . " of " . UnmodularCount . " test(s) selected.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
 		_CopyTestResultsForCi()

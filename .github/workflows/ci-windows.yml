@@ -63,12 +63,25 @@ jobs:
     name: 'Unit tests'
     runs-on: windows-latest
     # The canonical AHK suite is single-threaded and took over 90 minutes on one
-    # runner. Six VMs each run every sixth test (run_all.ahk --shard), so the
-    # shards together execute each test exactly once in about a sixth of the time.
+    # runner. Each runner executes one product module group (run_all.ahk
+    # --module, TEST_MODULE_GROUPS in tests/test_framework.ahk); the groups
+    # partition the suite, and the heaviest modules are split by file.
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6]
+        module:
+          [
+            meta,
+            llm-servers-a,
+            llm-servers-b,
+            llm,
+            config-scope-a,
+            config-scope-b,
+            config,
+            hotstrings,
+            keymap,
+            core
+          ]
 
     steps:
       - uses: actions/checkout@v4
@@ -91,7 +104,7 @@ jobs:
         if: ${{ always() && steps.native-pac-build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: windows-native-pac-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}
+          name: windows-native-pac-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
           if-no-files-found: error
           path: |
             static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
@@ -253,7 +266,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}
+          name: windows-ollama-file-component-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
           path: |
             ${{ runner.temp }}/windows-ollama-file-component/
           if-no-files-found: error
@@ -262,7 +275,7 @@ jobs:
         if: ${{ always() && env.ERGOPTI_FILE_COMPONENT_TEST_ROOT != '' && env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT != '' }}
         uses: actions/upload-artifact@v4
         with:
-          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-shard${{ matrix.shard }}
+          name: windows-ollama-file-roots-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
           path: |
             ${{ env.ERGOPTI_FILE_COMPONENT_TEST_ROOT }}/
             ${{ env.ERGOPTI_FILE_COMPONENT_SOURCE_ROOT }}/
@@ -291,7 +304,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-windows-shard${{ matrix.shard }}
+          name: assets-qualification-windows-${{ matrix.module }}
           path: ${{ runner.temp }}/stable-windows-native-desktop.json
           if-no-files-found: warn
 
@@ -300,7 +313,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: windows-ahk-native-desktop-shard${{ matrix.shard }}
+          name: windows-ahk-native-desktop-${{ matrix.module }}
           path: |
             ${{ runner.temp }}/windows-ahk-native-desktop/
             ${{ runner.temp }}/stable-windows-native-desktop.json
@@ -311,7 +324,7 @@ jobs:
         timeout-minutes: 125
         env:
           ERGOPTI_MANAGED_FIXTURE_ROOT_SCOPE: LocalMachine
-          ERGOPTI_AHK_SHARD: ${{ matrix.shard }}/6
+          ERGOPTI_AHK_MODULE: ${{ matrix.module }}
           ERGOPTI_DEV_RELEASE_RELEASE: ${{ inputs.release }}
           ERGOPTI_DEV_RELEASE_PRERELEASE: ${{ inputs.prerelease }}
           ERGOPTI_DEV_RELEASE_CHANNEL: ${{ inputs.channel }}
@@ -349,7 +362,7 @@ jobs:
           . "${{ github.workspace }}\tools\ci\ahk-tap-follower.ps1"
           $tapFollower = New-AhkTapFollower -Path $resultsFile
           $tapFailure = $null
-          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`" --shard=$env:ERGOPTI_AHK_SHARD$qualificationArgument" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
+          $proc = Start-Process -FilePath $ahk -ArgumentList "/ErrorStdOut `"$runner`" --module=$env:ERGOPTI_AHK_MODULE$qualificationArgument" -NoNewWindow -PassThru -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile
           # Retain the native handle while the asynchronous child is alive.
           $null = $proc.Handle
           $sw = [System.Diagnostics.Stopwatch]::StartNew()
@@ -512,7 +525,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: windows-ahk-execution-manifest-shard${{ matrix.shard }}
+          name: windows-ahk-execution-manifest-${{ matrix.module }}
           path: |
             ${{ runner.temp }}/windows-ahk-execution-manifest.json
             ${{ runner.temp }}/windows-ahk-suite.stdout.log
