@@ -1540,6 +1540,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # The exclusion check loads the workflow model, which parses YAML.
+          npm ci --ignore-scripts --no-audit --no-fund
           swift package dump-package --package-path static/ergopti_plus/macos/launcher \
             > "$RUNNER_TEMP/dev-release-qualification/swift-package.json"
           node tools/test/test-macos-dev-qualification-deferral.cjs \
