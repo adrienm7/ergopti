@@ -153,18 +153,6 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
-		'Receive native final-byte number-row causal refusal',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
-	],
-	[
-		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
-		'Retain native final-byte number-row causal diagnostics',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
-	],
-	[
-		'.github/workflows/ci-macos.yml',
-		'e2e-hs',
 		'Retain selected-release native ownership receiving',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],

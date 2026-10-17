@@ -47,7 +47,7 @@ function pacQualification(receipt, env = process.env, now = new Date()) {
 		mode,
 		source_sha: env.GITHUB_SHA,
 		profile_id: receipt.profile_id,
-		...(receipt.profile_id === q.STABLE_V101_PROFILE_ID
+		...(receipt.profile_id === q.STABLE_V102_PROFILE_ID
 			? { expires_at: receipt.expires_at, methods: capturedMethods(receipt.artifact.methods) }
 			: {})
 	});
@@ -70,7 +70,7 @@ function brewQualification(receipt, env = process.env, now = new Date()) {
 		q.environmentContext(env),
 		now
 	);
-	if (mode === 'deferred' && receipt.profile_id !== q.STABLE_V101_PROFILE_ID)
+	if (mode === 'deferred' && receipt.profile_id !== q.STABLE_V102_PROFILE_ID)
 		throw new TypeError('Only the current three-scope profile admits this Brew routing.');
 	const admission = Object.freeze({
 		mode,
@@ -97,7 +97,7 @@ function readBrewQualification(file) {
 function narrowPac(admission) {
 	return (
 		admission !== null &&
-		admission.profile_id === require('../ci/dev-release-qualification.cjs').STABLE_V101_PROFILE_ID
+		admission.profile_id === require('../ci/dev-release-qualification.cjs').STABLE_V102_PROFILE_ID
 	);
 }
 
@@ -495,7 +495,7 @@ function archiveAnnotation(receipt) {
 		const q = require('../ci/dev-release-qualification.cjs');
 		const fact = receipt.qualification;
 		const policy = q.validatePolicy(
-			q.parseClosedJson(fs.readFileSync(q.STABLE_V101_POLICY_PATH, 'utf8'))
+			q.parseClosedJson(fs.readFileSync(q.STABLE_V102_POLICY_PATH, 'utf8'))
 		);
 		const row = policy.scopes['macos-brew-archive'];
 		const approvedMethods = { [path.basename(row.path, '.swift')]: [row.name] };
@@ -507,7 +507,7 @@ function archiveAnnotation(receipt) {
 			fact.scope !== 'macos-brew-archive' ||
 			fact.status !== 'deferred' ||
 			fact.qualified !== false ||
-			fact.profile_id !== q.STABLE_V101_PROFILE_ID ||
+			fact.profile_id !== q.STABLE_V102_PROFILE_ID ||
 			!/^[0-9a-f]{40}$/.test(fact.source_sha) ||
 			fact.expires_at !== policy.expires_at ||
 			JSON.stringify(fact.methods) !== JSON.stringify(approvedMethods)

@@ -1035,9 +1035,9 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	);
 }
 
-// The separately approved v1.0.1 profile cannot waive an unlisted test or installation.
+// The separately approved v1.0.2 profile cannot waive an unlisted test or installation.
 {
-	const approved = q.parseClosedJson(fs.readFileSync(q.STABLE_V101_POLICY_PATH, 'utf8'));
+	const approved = q.parseClosedJson(fs.readFileSync(q.STABLE_V102_POLICY_PATH, 'utf8'));
 	const context = {
 		github_actions: 'true',
 		repository: 'adrienm7/ergopti',
@@ -1046,10 +1046,10 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		release: true,
 		prerelease: 'false',
 		channel: 'main',
-		tag: 'v1.0.1',
-		version: '1.0.1'
+		tag: 'v1.0.2',
+		version: '1.0.2'
 	};
-	const clock = '2026-10-11T14:00:00Z';
+	const clock = '2026-10-17T14:00:00Z';
 	const scopes = [
 		'macos-native-pac',
 		'macos-native-http',
@@ -1058,7 +1058,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'macos-shortcuts-discovery',
 		'macos-launch-appleevents'
 	];
-	const selected = q.authorizeQualificationProfile(q.STABLE_V101_PROFILE_ID, context, clock);
+	const selected = q.authorizeQualificationProfile(q.STABLE_V102_PROFILE_ID, context, clock);
 	assert.deepEqual(q.deferredScopes(selected), scopes);
 	assert.equal(q.stablePublicationProfile(context, clock), selected);
 	for (const scope of scopes) {
@@ -1070,7 +1070,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		for (const patch of [
 			{ qualified: true },
 			{ source_sha: 'b'.repeat(40) },
-			{ version: '1.0.2' },
+			{ version: '1.0.3' },
 			{ expires_at: '2026-10-13T07:00:00Z' },
 			{ extra: true }
 		])
@@ -1086,8 +1086,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		['release', false],
 		['prerelease', 'true'],
 		['channel', 'dev'],
-		['tag', 'v1.0.2'],
-		['version', '1.0.2']
+		['tag', 'v1.0.3'],
+		['version', '1.0.3']
 	]) {
 		const foreign = { ...context, [key]: value };
 		for (const scope of scopes)
@@ -1118,13 +1118,13 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	broad.scopes['macos-native-pac'].methods.ManagedHTTPWorkerTests = [
 		'testWorkerMustRemainMandatory'
 	];
-	assert.throws(() => q.validateStableV101Policy(broad));
+	assert.throws(() => q.validateStableV102Policy(broad));
 	const sibling = structuredClone(approved);
 	sibling.scopes['macos-brew-archive'].name = 'testOrdinaryArchiveInstall';
-	assert.throws(() => q.validateStableV101Policy(sibling));
+	assert.throws(() => q.validateStableV102Policy(sibling));
 	const extraScope = structuredClone(approved);
 	extraScope.scopes['core-js-suite'] = approved.scopes['macos-native-http'];
-	assert.throws(() => q.validateStableV101Policy(extraScope));
+	assert.throws(() => q.validateStableV102Policy(extraScope));
 	// Earlier consent and a pending proposal cannot authorize the newly added model scope.
 	for (const patch of [
 		{ authorization_quote: 'oui' },
@@ -1132,7 +1132,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		{ id: 'stable-v1-0-1-20261010-three-macos-native-scopes' },
 		{ expires_at: '2099-10-12T07:00:00Z' }
 	])
-		assert.throws(() => q.validateStableV101Policy({ ...approved, ...patch }));
+		assert.throws(() => q.validateStableV102Policy({ ...approved, ...patch }));
 	const model = approved.scopes['macos-native-model-receiving'];
 	assert.deepEqual(model.architectures, ['arm64', 'amd64']);
 	assert.deepEqual(model.profiles, ['pac-inline', 'pac-url', 'explicit-proxy']);
@@ -1146,7 +1146,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	]) {
 		const altered = structuredClone(approved);
 		Object.assign(altered.scopes['macos-native-model-receiving'], patch);
-		assert.throws(() => q.validateStableV101Policy(altered));
+		assert.throws(() => q.validateStableV102Policy(altered));
 	}
 	const shortcuts = approved.scopes['macos-shortcuts-discovery'];
 	assert.deepEqual(
@@ -1161,11 +1161,11 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	]) {
 		const altered = structuredClone(approved);
 		Object.assign(altered.scopes['macos-shortcuts-discovery'], patch);
-		assert.throws(() => q.validateStableV101Policy(altered));
+		assert.throws(() => q.validateStableV102Policy(altered));
 	}
 	const missingShortcuts = structuredClone(approved);
 	delete missingShortcuts.scopes['macos-shortcuts-discovery'];
-	assert.throws(() => q.validateStableV101Policy(missingShortcuts));
+	assert.throws(() => q.validateStableV102Policy(missingShortcuts));
 	const launchMatrix = approved.scopes['macos-launch-appleevents'];
 	assert.deepEqual(launchMatrix.scenarios, ['clean', 'karabiner_config']);
 	assert.deepEqual(launchMatrix.runners, ['macos-15', 'macos-15-intel']);
@@ -1179,7 +1179,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	]) {
 		const altered = structuredClone(approved);
 		Object.assign(altered.scopes['macos-launch-appleevents'], patch);
-		assert.throws(() => q.validateStableV101Policy(altered));
+		assert.throws(() => q.validateStableV102Policy(altered));
 	}
 	for (const scenario of launchMatrix.scenarios) {
 		for (const runner of launchMatrix.runners) {
@@ -1216,17 +1216,17 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.throws(() =>
 		q.launchQualificationReceipt(selected, 'clean', 'foreign', { source_sha: sha })
 	);
-	assert.deepEqual(q.STABLE_V101_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
-	assert.deepEqual(q.STABLE_V101_BREW_METHODS, {
+	assert.deepEqual(q.STABLE_V102_PAC_METHODS, approved.scopes['macos-native-pac'].methods);
+	assert.deepEqual(q.STABLE_V102_BREW_METHODS, {
 		HomebrewArchiveAcceptanceTests: [approved.scopes['macos-brew-archive'].name]
 	});
-	assert(Object.isFrozen(q.STABLE_V101_PAC_METHODS.ManagedHTTPWireTests));
-	assert(Object.isFrozen(q.STABLE_V101_BREW_METHODS.HomebrewArchiveAcceptanceTests));
+	assert(Object.isFrozen(q.STABLE_V102_PAC_METHODS.ManagedHTTPWireTests));
+	assert(Object.isFrozen(q.STABLE_V102_BREW_METHODS.HomebrewArchiveAcceptanceTests));
 	const notice = q.stablePublicationNotice(approved.id, context, sha, clock);
 	for (const literal of [
 		'DEFERRED / qualified:false',
 		'Native Apple Shortcuts catalogue discovery remains unqualified',
-		'v1.0.1',
+		'v1.0.2',
 		'Worker12',
 		'arm64/amd64 across pac-inline, pac-url and explicit-proxy',
 		'portable model controls',
@@ -1237,7 +1237,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		assert(notice.includes(literal));
 	assert(notice.includes(sha));
 	console.log(
-		'[OK] v1.0.1 exact six scopes, mandatory siblings, context/expiry/source/metadata refusals.'
+		'[OK] v1.0.2 exact six scopes, mandatory siblings, context/expiry/source/metadata refusals.'
 	);
 
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v101-qualification-'));
@@ -1294,7 +1294,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		// Run the real CLI entry with a fixed test clock, retaining all source and file operations.
 		const vm = require('node:vm');
 		const helper = path.resolve(
-			path.dirname(q.STABLE_V101_POLICY_PATH),
+			path.dirname(q.STABLE_V102_POLICY_PATH),
 			'../../tools/ci/dev-release-qualification.cjs'
 		);
 		const source = fs.readFileSync(helper, 'utf8');
@@ -1314,7 +1314,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			const output = [];
 			const effects = Object.create(fs);
 			effects.readFileSync = (file, ...rest) =>
-				policyOverride && path.resolve(file) === q.STABLE_V101_POLICY_PATH
+				policyOverride && path.resolve(file) === q.STABLE_V102_POLICY_PATH
 					? JSON.stringify(policyOverride)
 					: fs.readFileSync(file, ...rest);
 			const sandbox = {

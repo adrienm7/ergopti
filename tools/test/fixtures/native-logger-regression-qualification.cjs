@@ -211,7 +211,7 @@ module.exports = function run({
 		'.github/workflows/ci-macos.yml',
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
-		'.github/ci/stable_v101_macos_native_qualification_exception.json',
+		'.github/ci/stable_v102_macos_native_qualification_exception.json',
 		'tools/ci/dev-release-qualification.cjs',
 		'tools/diagnostics/native_logger_regression_xctest_evidence.cjs',
 		'tools/diagnostics/native_daemon_log_xctest_evidence.cjs',
