@@ -158,9 +158,27 @@ _HPT_EveryOverrideIsJustified() {
 }
 
 
+; The preview tooltip paints on a deferred timer at a normal cost of 7-12 ms, so
+; the 5 ms keystroke floor turned 95 % of its paints into WARNING lines: 107 of
+; the 218 errors-sink lines of 2026-10-17 said "the tooltip ran".
+_HPT_TooltipSegmentsUseTheirMeasuredThreshold() {
+	global _HOTPATH_SLOW_MS
+	for Label in ["Tooltip.Present", "Tooltip.Build"] {
+		Quiet := _HPT_ReportAndCapture(Label, 12)
+		Assert(InStr(Quiet, Label) == 0,
+			"a normal " . Label . " paint must not reach the errors sink (tooltip-threshold-2026-10-17)")
+		Loud := _HPT_ReportAndCapture(Label, 80)
+		Assert(InStr(Loud, Label) > 0,
+			"a visible " . Label . " stall must still be logged (tooltip-threshold-2026-10-17)")
+	}
+}
+
+
 Test("hotpath: an overridden segment is judged against its own threshold, not the keystroke floor (hotpath-threshold-floods-the-errors-sink)",
 	_HPT_OverriddenSegmentUsesItsOwnThreshold)
 Test("hotpath: a segment with no override still uses the global floor (hotpath-threshold-floods-the-errors-sink)",
 	_HPT_UnlistedSegmentKeepsTheGlobalFloor)
 Test("hotpath: every per-segment threshold override states its measured normal cost (hotpath-threshold-floods-the-errors-sink)",
 	_HPT_EveryOverrideIsJustified)
+Test("hotpath: tooltip paints are judged against their measured threshold (tooltip-threshold-2026-10-17)",
+	_HPT_TooltipSegmentsUseTheirMeasuredThreshold)
