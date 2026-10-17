@@ -670,20 +670,25 @@ for _HSCS_Enabled in [true, false] {
 }
 
 _HSCS_DynamicInvalidPosture() {
+	for Value in ["true", 2]
+		_HSCS_DynamicInvalidPostureFor(Value)
+}
+
+; One invalid posture per call, so the refused closure reads its parameter and
+; not the loop variable (test-ahk-loop-capture).
+_HSCS_DynamicInvalidPostureFor(Value) {
 	Launches := 0
 	Count(*) {
 		Launches += 1
 		return true
 	}
-	for Value in ["true", 2] {
-		Fixture := _ScopeOwnerFixture()
-		try {
-			AssertThrows(() => ToggleDynamicAllSections(Value, Map("live", Count, "reload", Count)),
-				"an invalid request cannot publish a partial selection")
-			AssertEqual(0, Launches)
-			AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
-		} finally _ScopeOwnerCleanup(Fixture)
-	}
+	Fixture := _ScopeOwnerFixture()
+	try {
+		AssertThrows(() => ToggleDynamicAllSections(Value, Map("live", Count, "reload", Count)),
+			"an invalid request cannot publish a partial selection")
+		AssertEqual(0, Launches)
+		AssertEqual(Fixture.source, FSReadUtf8Exact(Fixture.path))
+	} finally _ScopeOwnerCleanup(Fixture)
 }
 Test("hotstring-dynamic-menu-owner: invalid postures are refused before any write", _HSCS_DynamicInvalidPosture)
 
