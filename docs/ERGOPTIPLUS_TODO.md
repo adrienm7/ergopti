@@ -3100,6 +3100,16 @@ These are software implementations; final hardware verification remains below.
       instead of enumerating own properties), or an admission verdict reused
       within one synchronous operation; keep the deep-mutation refusals that
       `test_config_migrate` pins. `ConfigMigrateRegistryChecks` counts the calls.
+      Measured again on October 17: one compare costs about 10 ms after
+      `PlainContainer` moved to `ObjOwnPropCount` (2 100 registry nodes). The
+      32-file `hotstrings-capacity` test makes 12 217 checks (half of its
+      288 s): 99.8 % come from `AllLive` in `config_transition_runtime.ahk`,
+      which re-runs every destination guard before and after each native
+      operation (`Dispatch`, `Read`, `Delete`, moves), so a transaction pays
+      O(files x operations) deep compares. Decide whether one registry
+      liveness proof per `AllLive` call (all guards share the same shipped
+      registry) keeps the custody guarantee; that alone divides the cost by
+      the number of open files.
 - [ ] **Intermittent compiled prior-release upgrade input.** On October 17 the
       Windows "Qualify compiled prior-release upgrade and installed full save"
       step once read the pinned prior release's config without
