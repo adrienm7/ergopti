@@ -3049,6 +3049,19 @@ These are software implementations; final hardware verification remains below.
       local object is released. Ask for the tester's log: its
       `[KeyCombinations] Pair` lines, `AHK drop detected` lines and
       `Menu command refused` lines.
+- [ ] **Slow Windows tests: repeated deep registry liveness checks.** Profiled
+      on October 17 with `tools/diagnostics/ahk-line-sampler.ahk`: one
+      `local server panel` test (35 s) made about 2 000 `RegistryLive` calls of
+      about 17 ms, each a deep compare of the 39 KB migration registry. The
+      panel re-checks `Source.Current()`/`Admit()` per operation, which calls
+      `ConfigFullStateCanPersist()`, then `ConfigMigrateBoot("check_write")`
+      with three `RegistryLive` checks (lines around 1464, `ClassifyImage` and
+      the owned write predicate). The local-server and configuration-scope
+      module groups spend most of their CI time there. Options: one liveness
+      check per `check_write` call, a faster comparison (`ObjOwnPropCount`
+      instead of enumerating own properties), or an admission verdict reused
+      within one synchronous operation; keep the deep-mutation refusals that
+      `test_config_migrate` pins. `ConfigMigrateRegistryChecks` counts the calls.
 - [ ] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
       The typing watcher returns at `IsCategoryGated("Hotstrings")` before its
       wrap block, so wrapping a selection with an OS layout works only when
