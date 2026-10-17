@@ -73,6 +73,10 @@ local function fake_binding()
 	}
 
 	local gobject = {
+		g_object_unref = function(instance)
+			log.unrefs = log.unrefs or {}
+			log.unrefs[#log.unrefs + 1] = instance
+		end,
 		g_signal_connect_data = function(instance, signal, handler, data)
 			local entry = { widget = instance, signal = signal, handler = handler, data = data }
 			-- Fired the way GTK fires "activate": (the item, the user data).
@@ -415,6 +419,31 @@ end)
 -- =================================================================
 
 helpers.describe("tray indicator: destroy", function()
+	helpers.it("(tray-native-release) releases each main indicator constructor reference exactly once", function()
+		local ind, log = with_fake()
+		ind.create("id", "icon", "title")
+		ind.destroy()
+		ind.destroy()
+		helpers.assert_eq(#(log.unrefs or {}), 1,
+			"PASSIVE hides an icon but does not retire its native menu or bus registration")
+		ind.create("id", "icon", "title")
+		ind.destroy()
+		helpers.assert_eq(#log.unrefs, 2, "reloading must release the replacement too")
+		ind._set_binding_for_test(nil)
+	end)
+
+	helpers.it("(tray-native-release) releases an extra indicator and drops its stale menu pointer once", function()
+		local ind, log = with_fake()
+		local handle = ind.new_item("wpm", "icon", {})
+		local pointer = handle.ptr
+		helpers.assert_eq(ind.remove_item(handle), true)
+		helpers.assert_eq(log.unrefs, { pointer })
+		helpers.assert_eq(handle.menu, nil, "a released menu must not remain available through the handle")
+		helpers.assert_eq(ind.remove_item(handle), true)
+		helpers.assert_eq(#log.unrefs, 1, "a repeated removal cannot unref an already finalized object")
+		ind._set_binding_for_test(nil)
+	end)
+
 	helpers.it("extra-item removal returns a terminal receipt and can be repeated", function()
 		local ind = with_fake()
 		local handle = ind.new_item("wpm", "icon", {})

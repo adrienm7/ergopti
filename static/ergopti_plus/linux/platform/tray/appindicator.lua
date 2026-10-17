@@ -177,6 +177,7 @@ local function bind()
 		gulong       g_signal_connect_data(gpointer instance, const char *detailed_signal,
 		                                   GCallback c_handler, gpointer data,
 		                                   void *destroy_data, int connect_flags);
+		void         g_object_unref(gpointer object);
 
 		AppIndicator* app_indicator_new(const char *id, const char *icon_name, int category);
 		void          app_indicator_set_status(AppIndicator *self, int status);
@@ -214,8 +215,11 @@ end
 
 --- Test seam: forces the binding state without touching any library.
 --- @param value table|false|nil
+--- @return table|false|nil Previous binding state.
 function M._set_binding_for_test(value)
+	local previous = _lib
 	_lib = value
+	return previous
 end
 
 --- Whether this machine can host a tray icon.
@@ -395,8 +399,10 @@ function M.destroy()
 	if not lib or not _indicator then return end
 	-- Status PASSIVE (0) is what removes it from the panel; there is no
 	-- app_indicator_destroy, and dropping the reference alone leaves the icon on
-	-- screen until the process exits.
+	-- screen until the process exits. Release the constructor's reference too:
+	-- PASSIVE hides the icon but retains its menu and D-Bus registration.
 	lib.indicator.app_indicator_set_status(_indicator, STATUS_PASSIVE)
+	lib.gobject.g_object_unref(_indicator)
 	_indicator = nil
 	_menu = nil
 	for _, id in ipairs(_menu_actions) do _actions[id] = nil end
@@ -472,8 +478,10 @@ function M.remove_item(handle)
 		return false
 	end
 	for _, id in ipairs(handle.owned) do _actions[id] = nil end
+	lib.gobject.g_object_unref(handle.ptr)
 	handle.owned = {}
 	handle.ptr = nil
+	handle.menu = nil
 	handle.active = false
 	return true
 end
