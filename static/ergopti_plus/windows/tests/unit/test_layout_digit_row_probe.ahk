@@ -392,6 +392,48 @@ _LDRP_EffectiveRegistryRow() {
 Test("digit row: registered registry Shift callbacks preserve ten effective levels over native HKL changes (digit-row-effective-source)",
 	_KLT_WithEmulation.Bind(_LDRP_EffectiveRegistryRow))
 
+; Reported on v1.0.1: Ergopti emulated over AZERTY with "digits first" still
+; typed the AZERTY symbols on Shift. Ergopti has digits on both levels, so the
+; emulated layout owns Shift and no native swap may replace its digit.
+_LDRP_ErgoptiDigitsFirstOverAzerty() {
+	global Features, CategoryEnabled, LayerEnabled, KLE_Registered
+	State := MasterGateState()
+	Saved := [Features, CategoryEnabled, LayerEnabled, KLE_Registered, State.Clone()]
+	try {
+		Features := Map("layout", Map("emulated_layout", "ergopti", "ergopti_base", true,
+			"ergopti_alt_gr", false, "ergopti_plus", false, "direct_access_digits", "digits"))
+		CategoryEnabled := Map("Layout", true)
+		LayerEnabled := false
+		State["initialized"] := false
+		MasterGateInitialize(Features, Map("keys", Map()), (*) => true)
+		_KLT_Load("ergopti")
+		Azerty := 0x040C040C
+		AssertFalse(DigitRowIsSwapped(Azerty, false), "Ergopti's own digit row needs no swap")
+		Loop 10 {
+			Sc := A_Index + 1
+			Name := Format("SC{:03X}", Sc)
+			Digit := Mod(Sc - 1, 10) . ""
+			Resolution := _DigitRowSwapResolution(Sc, Azerty, false)
+			AssertEqual("emulated", Resolution["source"], Name . " reads the emulated layout, not the AZERTY HKL")
+			AssertFalse(Resolution["swap"], Name . " keeps the emulated Shift level")
+			AssertFalse(_KLE_DigitsOwnKey(Name, true, () => Azerty), Name . " Shift stays with the emulation")
+			AssertTrue(_KLE_BaseCriterion(Name, true, () => Azerty), Name . " Shift is owned by the emulation")
+			AssertEqual(Digit, KeylayoutEmulation_Press(Name, true, false, false),
+				Name . " Shift types Ergopti's digit, never an AZERTY symbol")
+		}
+	} finally {
+		Features := Saved[1]
+		CategoryEnabled := Saved[2]
+		LayerEnabled := Saved[3]
+		KLE_Registered := Saved[4]
+		State.Clear()
+		for Key, Value in Saved[5]
+			State[Key] := Value
+	}
+}
+Test("digit row: Ergopti emulated over AZERTY keeps its digits on Shift with digits first (digit-row-ergopti-emulated-shift)",
+	_KLT_WithEmulation.Bind(_LDRP_ErgoptiDigitsFirstOverAzerty))
+
 ; A swapped source level can be a dead-key action, not a printable symbol.
 ; Inspection preserves both states, and the registered pending-key callback
 ; must route its real press through that source's own action machine.
