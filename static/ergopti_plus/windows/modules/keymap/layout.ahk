@@ -396,8 +396,12 @@ _UIA_OnSelectionWorkerTerminal(Status, Context, Result) {
 	}
 
 	; File/log sinks never run inside the keyboard-ownership transaction.
+	; A provider slower than the deadline is the case the deadline and the backoff
+	; exist for, so it is INFO and names the application that was backed off; a
+	; worker that failed outright still warns.
 	if (LogKind = "timeout") {
-		try LoggerWarn("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider is backed off for this process.", UIASW_DEADLINE_MS)
+		try LoggerInfo("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider of '{2}' is backed off for {3} ms.",
+			UIASW_DEADLINE_MS, Context["ProcName"], _UIA_NO_TP_TTL_MS)
 	} else if (LogKind = "failed") {
 		try LoggerWarn("Layout", "UIA selection worker failed: {1}", LogDetail)
 	}
