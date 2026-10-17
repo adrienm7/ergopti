@@ -425,6 +425,14 @@
 			"cmd": "$NODE_EXECUTABLE",
 			"args": ["tools/test/test-macos-stage-roles.cjs"],
 			"repro": "node tools/test/test-macos-stage-roles.cjs"
+		},
+		{
+			"id": "js-0436",
+			"ordinal": 436,
+			"name": "Current Carbon fixture causal controls preserve historical source and exact native refusal",
+			"cmd": "$NODE_EXECUTABLE",
+			"args": ["tools/test/test-number-row-current-test-causal.cjs"],
+			"repro": "npm run test:number-row-current-test-causal"
 		}
 	]
 }

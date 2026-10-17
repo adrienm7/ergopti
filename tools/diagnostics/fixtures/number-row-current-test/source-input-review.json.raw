@@ -1,0 +1,75 @@
+{
+  "authority_limits": {
+    "actual_native_convergence_and_tis_pair": "UNRUN",
+    "controlled_private_commits_are_not_published_approvals": true,
+    "external_compiler_and_dependency_inputs": "OPEN",
+    "native_swift_compilation": "UNRUN",
+    "physical_keyboard_qualified": false,
+    "published_source_approval_issued": false,
+    "reviewed_source_was_unpublished_candidate": true,
+    "signed_application_qualified": false
+  },
+  "controlled_software_receiving": {
+    "cases": 23,
+    "genuine_git_cli_generate_and_both_projections_received": true,
+    "genuine_internal_parent_alias_admission_after": false,
+    "genuine_internal_parent_alias_admission_before": true,
+    "normal_source_admission_after": true,
+    "skips": 0
+  },
+  "evidence_sha256": {
+    "carbon-current-genuine-git-controls-v1/corrected-projections-receipt-v2.json": "705b53e9eadcc8d7cd4ce5254710a1ce1a54e8f25c0efd5723c395aa50f831b4",
+    "carbon-current-genuine-git-controls-v1/parent-alias-before.json": "d0c0602bd3441d5e58b6595b49d00594dfcc6e9f9628dd113d656700c5e5ddaf",
+    "carbon-current-genuine-git-controls-v1/parent-alias-correction-receipt-v2.json": "8ef61e2367a4718e2351bc0a1fc9fbe92b9109e2c880589442ed070902a45921",
+    "carbon-current-genuine-git-controls-v1/receipt.json": "e26a10b94a526e55284bf781faf5a3373de556e2bfaf6bfbe470a064d91219d9",
+    "carbon-diagnostic-candidate-v2/receipt.json": "71b90fa183a2cc5b210f530c48ad0f894793a798c947d917173fe7f2d332405d"
+  },
+  "historical_owner_images_unchanged_sha256": {
+    "tools/diagnostics/keyboard_geometry_xctest_receipt.py": "9cef4f9256f3604ac07d710d77c95424718012f23c6a8b472f9e5936253ac094",
+    "tools/diagnostics/number_row_current_network_causal.py": "b7ffb22ae11d1414cf465f55eb6a97e58f9badde6e96a804d64bc8ef7b683754",
+    "tools/diagnostics/number_row_native_causal.py": "d913505e2d3522d5023227b947f3c7896ba3ef4aeadfbd0c1a7042fa9686c148",
+    "tools/diagnostics/test_number_row_native_causal.py": "f058b0937e278229f2b348d07c65c8e73c575dbb12cbbde53713ab91d3df9ca2",
+    "tools/diagnostics/test_number_row_source_composition.py": "0981b0f400596680b19215ffcd2ecef20346dca8bfeae8c46a46f0a7ad68e7f1",
+    "tools/diagnostics/tis_evidence_transport.cjs": "f62344840267ab207370df974cc344fce83cbe3b758f2a25c986837a41d04269"
+  },
+  "independent_source_review": {
+    "diagnostic_classifier": "two focused read-only reviews confirm compiler source context must not be rejected; the corrected predicate retains actual error refusal",
+    "parent_alias_correction": "focused read-only review finds no concrete portability or safety regression; it remains a pathname observation fence rather than an immutable read lease"
+  },
+  "local_inputs": {
+    "package_and_dependency_files": 2,
+    "qualification_policies": 2,
+    "runtime_corpus": 1,
+    "target_sources_and_headers": 140,
+    "total": 145
+  },
+  "reviewed_images_sha256": {
+    "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+    "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift": "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a96f7",
+    "tools/diagnostics/fixtures/number-row-current-test/build-inputs.json.raw": "b34a6f3efec6b31c1b3b8ffd438aeb73b38aa3b8265bd383054bbc1353393492",
+    "tools/diagnostics/number_row_current_test_causal.py": "59638be5a82d41a517b5d5e089c2e0ffaa6f337b7c1f0503243971abedbaf544",
+    "tools/diagnostics/test_number_row_current_test_causal.py": "88b690c5f256ddff76a29cdb186337d052fc182f407c40d1161113fc93aaa020",
+    "tools/test/test-number-row-current-test-causal.cjs": "d7cfab001f15825ec57a3c0f96cd53837f54acc593c079860018dcee1bc4d60e"
+  },
+  "role": "current-carbon-source-input-admission-review-not-native-qualification",
+  "schema": 1,
+  "source_contract": {
+    "actual_located_bare_tool_and_assertion_failures_remain_refused": true,
+    "all_current_inputs_reject_internal_parent_aliases": true,
+    "complete_current_roster_enrolled_separately": true,
+    "counterfactual_assertion_line": 435,
+    "counterfactual_required_failure_count": 1,
+    "counterfactual_required_pass_count": 11,
+    "counterfactual_requires_named_active_case": true,
+    "historical_99_roster_preserved": true,
+    "numbered_compiler_source_gutters_are_not_error_diagnostics": true,
+    "positive_required_pass_count": 12,
+    "qualification_profile_for_current_selected_package": null,
+    "raw_osstatus_distinct_from_observed_selection": true,
+    "reviewed_production_predicate_unchanged": true,
+    "sole_counterfactual_change": "one exact producer predicate omission",
+    "source_selection_receiving_uses_bounded_monotonic_wait": true,
+    "tis_record_count_required": 7,
+    "unresolved_temporary_source_restoration_is_not_retired": true
+  }
+}

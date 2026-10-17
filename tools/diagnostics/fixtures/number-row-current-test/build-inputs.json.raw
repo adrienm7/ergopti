@@ -1,0 +1,1458 @@
+{
+  "local_input_count": 145,
+  "paths": [
+    {
+      "git_blob": "0fa3082a599db093b25c01a2b2764aa987be0cd1",
+      "historical_git_blob": "0fa3082a599db093b25c01a2b2764aa987be0cd1",
+      "historical_roster_member": true,
+      "historical_sha256": "f4c0c26d1315738a138e8020d0ea7793391c7d87edc3bdb6ed139b58615928e9",
+      "input_kind": "qualification-policy",
+      "mode": "100644",
+      "path": ".github/ci/dev_release_qualification_exceptions.json",
+      "sha256": "f4c0c26d1315738a138e8020d0ea7793391c7d87edc3bdb6ed139b58615928e9"
+    },
+    {
+      "git_blob": "e9cf49c3f5c76b92cfe5b0bbd9c03f9874f5eecc",
+      "historical_git_blob": "06896dfbc71360294595d0657575b68a3a1f338f",
+      "historical_roster_member": true,
+      "historical_sha256": "0b26059b9b266b2890ad340df1920b89414c88c409f4c31b332d06508ba07aa1",
+      "input_kind": "qualification-policy",
+      "mode": "100644",
+      "path": ".github/ci/stable_release_qualification_exception.json",
+      "sha256": "3e9c51bc50682eb2bec4f2d3750f8379e12938798556a8c755e1c8d864a49dd3"
+    },
+    {
+      "git_blob": "10f822f3630a396bca4e5cc3cfc21e43a768158b",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "selected-test-runtime-fixture",
+      "mode": "100644",
+      "path": "static/ergopti_plus/_shared/tests/corpus/layouts/number_row_levels.json",
+      "sha256": "cec09a9901f2b3b647af1bb46d51c3bccfed5e11c315b14115058db8b09e81b2"
+    },
+    {
+      "git_blob": "d4c218829c7e3eb9d5f1c364b44acc808223ce59",
+      "historical_git_blob": "d4c218829c7e3eb9d5f1c364b44acc808223ce59",
+      "historical_roster_member": true,
+      "historical_sha256": "65cfee19ae3ac697d044a37c333e2ea57b1ed45abb3492fcaa357e655b58ecad",
+      "input_kind": "dependency-lock",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Package.resolved",
+      "sha256": "65cfee19ae3ac697d044a37c333e2ea57b1ed45abb3492fcaa357e655b58ecad"
+    },
+    {
+      "git_blob": "3d46537c841a63a93180ddbeaf3c673e4d299478",
+      "historical_git_blob": "5164fb6736b153f449389f3770455625dcf3e613",
+      "historical_roster_member": true,
+      "historical_sha256": "8d9afd570f345e43fe1b8a1507bfb13d53ac743970f4f0a9d1e5bfadb934a552",
+      "input_kind": "package-manifest",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Package.swift",
+      "sha256": "34861f7e4a3520342f911ded13896941fa5e227c0a171b9258f38eebc8ac5b3f"
+    },
+    {
+      "git_blob": "3f7096e1e3c312d8bb32d092067142871595783f",
+      "historical_git_blob": "3f7096e1e3c312d8bb32d092067142871595783f",
+      "historical_roster_member": true,
+      "historical_sha256": "884d6ff39c5ff6ed70e4c0a724755aed88b6a46d3681b4f71f19c359b6fce381",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/CPOSIXCompatibility.c",
+      "sha256": "884d6ff39c5ff6ed70e4c0a724755aed88b6a46d3681b4f71f19c359b6fce381"
+    },
+    {
+      "git_blob": "ce85026b608e23b06e5443eb6c5cf5dc0c037a11",
+      "historical_git_blob": "ce85026b608e23b06e5443eb6c5cf5dc0c037a11",
+      "historical_roster_member": true,
+      "historical_sha256": "b940435a5c4c109db8a8c42ccd4b1fe2f5e199e5597ae15dc075e54bef0ae1c7",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/LoopbackListenerCompatibility.c",
+      "sha256": "b940435a5c4c109db8a8c42ccd4b1fe2f5e199e5597ae15dc075e54bef0ae1c7"
+    },
+    {
+      "git_blob": "d6f9360ef11e8cefc850315188f8093c832a5443",
+      "historical_git_blob": "d6f9360ef11e8cefc850315188f8093c832a5443",
+      "historical_roster_member": true,
+      "historical_sha256": "e5fdeba73d81c673b074dba640bcde9eabe295af279156af386abaf6e743350b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedImageAliasCompatibility.c",
+      "sha256": "e5fdeba73d81c673b074dba640bcde9eabe295af279156af386abaf6e743350b"
+    },
+    {
+      "git_blob": "938e17a253ee056511fd4054509651c5e653c711",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedInstalledConfiguration.cpp",
+      "sha256": "9e0ddda2a9b59c90da249f2d6cf644d2d623140e8cc154746db065eb3b7807c9"
+    },
+    {
+      "git_blob": "66f7612169e2110508a7e21aa758565783424d72",
+      "historical_git_blob": "66f7612169e2110508a7e21aa758565783424d72",
+      "historical_roster_member": true,
+      "historical_sha256": "6942f63bf87e2349c368ef597e43bb62f000ce865cfde711155053ac794484ca",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedListenerEventCompatibility.c",
+      "sha256": "6942f63bf87e2349c368ef597e43bb62f000ce865cfde711155053ac794484ca"
+    },
+    {
+      "git_blob": "7d6eaa6eee6367c6e5a1f233ef5c3c4e294ede44",
+      "historical_git_blob": "b7e82acbab95bf10229ad6d52fe6149e5aaec229",
+      "historical_roster_member": true,
+      "historical_sha256": "9acca14cc46eb881ba3902ad6a20062360d4c38de2a06fbe36461ffe0d58aaa0",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedProgramCompatibility.c",
+      "sha256": "57f2f62933ee45b237009e0fc33379b16aca4a5ee5d3f79cd6e8d068ba5ff3e5"
+    },
+    {
+      "git_blob": "57cae9cc042849b1b9febe2be0b21f3bd239da61",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedRuntimeLifecycleContract.c",
+      "sha256": "36e55af172965f9d4831401ec3e0127fbf944332d05f66805bf99cbf6bda60d6"
+    },
+    {
+      "git_blob": "0a11c22cb77815caf4e437b18e3a596d44059d5f",
+      "historical_git_blob": "0a11c22cb77815caf4e437b18e3a596d44059d5f",
+      "historical_roster_member": true,
+      "historical_sha256": "ea306b43571a0a99fc47bad695978f79020826004855999f1306df63292151bc",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedSuspendedImageCompatibility.c",
+      "sha256": "ea306b43571a0a99fc47bad695978f79020826004855999f1306df63292151bc"
+    },
+    {
+      "git_blob": "4b7832105322c575306e79ed0882942de371c65d",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/OwnedVHDReportSocketIdentity.c",
+      "sha256": "7ffaf33a12188f049087a1c12efbb68f7953859863835cb10322ca9a8f0007d2"
+    },
+    {
+      "git_blob": "a4c7c61bbd3520e42cbe5c3ee61bd3c864fd0401",
+      "historical_git_blob": "120f2da56a9e97c92fb6520b1f4b85e058254c4c",
+      "historical_roster_member": true,
+      "historical_sha256": "2b9ae8061bece5329e9b472e7657d1d80a123fb73cdf7235358027b4ba8b2117",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/CPOSIXCompatibility.h",
+      "sha256": "a99adf39f75bf83b9f934d9a19559e5f20c9d18652bc61a14bf7c4a1cb1fdb56"
+    },
+    {
+      "git_blob": "02a7a140949ba34a0e6c30dabc5573e76485f425",
+      "historical_git_blob": "02a7a140949ba34a0e6c30dabc5573e76485f425",
+      "historical_roster_member": true,
+      "historical_sha256": "5c211da1fc11c962801a7e6be2f9c145987c0ff2765b008646a15289f9d404d9",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/LoopbackListenerCompatibility.h",
+      "sha256": "5c211da1fc11c962801a7e6be2f9c145987c0ff2765b008646a15289f9d404d9"
+    },
+    {
+      "git_blob": "6f3134771dc93eadc320025323f581a45e651ca4",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedChildReapingCompatibility.h",
+      "sha256": "1274cded080f0e272f83697b0f12d267f760aedd304ac4db692be2545a4dd0e4"
+    },
+    {
+      "git_blob": "1ce9c23a5cab77d64ecd72ebae31ed8ee507285b",
+      "historical_git_blob": "1ce9c23a5cab77d64ecd72ebae31ed8ee507285b",
+      "historical_roster_member": true,
+      "historical_sha256": "c3f915f7dbc5296c5c8ac82d6b352aba2af7247a2420ef6dbbe65ec6e9e9e884",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedImageAliasCompatibility.h",
+      "sha256": "c3f915f7dbc5296c5c8ac82d6b352aba2af7247a2420ef6dbbe65ec6e9e9e884"
+    },
+    {
+      "git_blob": "74c188dbe0b6e1ca76e0077ff7ed326416d3c494",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedInstalledConfiguration.h",
+      "sha256": "05a7f4c44cbfc2d1d7cce0257e51bf0dfbb6662d13ef037387176f7e9557c0dc"
+    },
+    {
+      "git_blob": "cbb96830e6ba9c9b0c9e9eec26df6dc128054af0",
+      "historical_git_blob": "cbb96830e6ba9c9b0c9e9eec26df6dc128054af0",
+      "historical_roster_member": true,
+      "historical_sha256": "fde96306726901610bfd692f032026bab1488097c9bba745a19f285b72bd67bf",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h",
+      "sha256": "fde96306726901610bfd692f032026bab1488097c9bba745a19f285b72bd67bf"
+    },
+    {
+      "git_blob": "80314a5c75aef69f30e2a8e0ff2cdbace9272a1f",
+      "historical_git_blob": "860b892e739fdb945490fa266d5872061e1001df",
+      "historical_roster_member": true,
+      "historical_sha256": "99b96624a62246ab3b6f4a7a6c95f387e48101208ea4f31e95db9cab93eed9e5",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedProgramCompatibility.h",
+      "sha256": "19829cc5230092a5ec2d7f2a137c16a845aa51b6c9c12a40f25bc82c58703720"
+    },
+    {
+      "git_blob": "ed44655f3467ab331df17eb8c42b4ccf1f5c9ba3",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeLifecycleContract.h",
+      "sha256": "318d8bbc2deab904914888d560a6ffc5537a8e9d48ccc42d50b9ae6077997474"
+    },
+    {
+      "git_blob": "bfc1f7758088a84bf6e2bf323575c4078cc29663",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeSignatureCompatibility.h",
+      "sha256": "a7009d19a369e35ff5fd175f822b8a63e6ef5764875e4784035e2abae3f97bb1"
+    },
+    {
+      "git_blob": "38d9459d601aa4638e70323ffc0bb3a69c3b4a4b",
+      "historical_git_blob": "38d9459d601aa4638e70323ffc0bb3a69c3b4a4b",
+      "historical_roster_member": true,
+      "historical_sha256": "198e8b8e218b7b0b4609e01ef77e4246ffac4a09facf409644e4053b88dcf0ae",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedSuspendedImageCompatibility.h",
+      "sha256": "198e8b8e218b7b0b4609e01ef77e4246ffac4a09facf409644e4053b88dcf0ae"
+    },
+    {
+      "git_blob": "6624692c111c85187d947b040d851c288ace6fe6",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h",
+      "sha256": "91360676a4144f09132dd809737bd4cc98a8169bb66bd8968b36ff4a20bde509"
+    },
+    {
+      "git_blob": "9bb61b5412ca46ea09c15c3610b23722001d4f3c",
+      "historical_git_blob": "9bb61b5412ca46ea09c15c3610b23722001d4f3c",
+      "historical_roster_member": true,
+      "historical_sha256": "3f7386a84fb211d9408386d59883a86cebbab2956e8eef6c521002be16f9b4b7",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/AppDirs.generated.swift",
+      "sha256": "3f7386a84fb211d9408386d59883a86cebbab2956e8eef6c521002be16f9b4b7"
+    },
+    {
+      "git_blob": "26a940ce7763834a23d048be006464e6eb030f8b",
+      "historical_git_blob": "26a940ce7763834a23d048be006464e6eb030f8b",
+      "historical_roster_member": true,
+      "historical_sha256": "aae21c1cbdc600e51b2148a4f08ce9fa6a029787f2022d00741459d0964cb0ac",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/CatalogUpdateUserDriver.swift",
+      "sha256": "aae21c1cbdc600e51b2148a4f08ce9fa6a029787f2022d00741459d0964cb0ac"
+    },
+    {
+      "git_blob": "5d0f06d89a77f7f95646e5a0651997e0c64ab7b4",
+      "historical_git_blob": "5d0f06d89a77f7f95646e5a0651997e0c64ab7b4",
+      "historical_roster_member": true,
+      "historical_sha256": "632daf75c473f4f6afc0d5f6ada29cd5751b8fc8079a8dda583e8b294856ba18",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedChildActivity.swift",
+      "sha256": "632daf75c473f4f6afc0d5f6ada29cd5751b8fc8079a8dda583e8b294856ba18"
+    },
+    {
+      "git_blob": "07628514b44fee118c667c812a3d393e17d04113",
+      "historical_git_blob": "07628514b44fee118c667c812a3d393e17d04113",
+      "historical_roster_member": true,
+      "historical_sha256": "607cdabf2221fc1366081686ba5833d98d8a3cd4fccac2ac624e436671ca403d",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedFatalReport.swift",
+      "sha256": "607cdabf2221fc1366081686ba5833d98d8a3cd4fccac2ac624e436671ca403d"
+    },
+    {
+      "git_blob": "f67c98bdd8b5346f52ebd863bbc6e84849b3b444",
+      "historical_git_blob": "f67c98bdd8b5346f52ebd863bbc6e84849b3b444",
+      "historical_roster_member": true,
+      "historical_sha256": "4f54a6bc5d1d3e3ebb5db922b0fa75b49dedd7a2b96cff418f5e3840bda78584",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/EmbeddedProcessExitMonitor.swift",
+      "sha256": "4f54a6bc5d1d3e3ebb5db922b0fa75b49dedd7a2b96cff418f5e3840bda78584"
+    },
+    {
+      "git_blob": "35f7f398879f06c67703fb3442c424de552c5136",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/InstalledPhysicalSourceBridge.swift",
+      "sha256": "561e0014c28e2e4bdf8227b8feb7ad78aa658e5acf9d1a1d6975384f64919551"
+    },
+    {
+      "git_blob": "f22e59fb3309371819097532dfd639e971c3d333",
+      "historical_git_blob": "f22e59fb3309371819097532dfd639e971c3d333",
+      "historical_roster_member": true,
+      "historical_sha256": "df68a4f0675a5ab358a7e5e1d5e3bd380629ab2e049dc913ae87274d4bd4f3a0",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardGeometry.swift",
+      "sha256": "df68a4f0675a5ab358a7e5e1d5e3bd380629ab2e049dc913ae87274d4bd4f3a0"
+    },
+    {
+      "git_blob": "2eece30667be40528b810819830019e60d43aa24",
+      "historical_git_blob": "2eece30667be40528b810819830019e60d43aa24",
+      "historical_roster_member": true,
+      "historical_sha256": "c8c05f6dfb62086055cad8f4d0095940d48bf5c95a4dda864472ae8ecf356273",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeyboardSourceProbe.swift",
+      "sha256": "c8c05f6dfb62086055cad8f4d0095940d48bf5c95a4dda864472ae8ecf356273"
+    },
+    {
+      "git_blob": "2e169aa9017f2f43fb44784ddd95652cdc9ad16a",
+      "historical_git_blob": "2e169aa9017f2f43fb44784ddd95652cdc9ad16a",
+      "historical_roster_member": true,
+      "historical_sha256": "99caecf494cba9387a83ff14c69a1b0a8c5e91e2d0f87a9a3f204f7ad4523ffc",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/KeychainTokenWorker.swift",
+      "sha256": "99caecf494cba9387a83ff14c69a1b0a8c5e91e2d0f87a9a3f204f7ad4523ffc"
+    },
+    {
+      "git_blob": "de1b55d85249440f33f6721d52a035660c0f2848",
+      "historical_git_blob": "de1b55d85249440f33f6721d52a035660c0f2848",
+      "historical_roster_member": true,
+      "historical_sha256": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherConstants.swift",
+      "sha256": "b7e8331bba602456ce21fd3324cae990a8c60bba4b94dcffa141635c94d67b96"
+    },
+    {
+      "git_blob": "f1a09cbb0aebd422063a004a20098c7bddf93e59",
+      "historical_git_blob": "f1a09cbb0aebd422063a004a20098c7bddf93e59",
+      "historical_roster_member": true,
+      "historical_sha256": "9841f9d335d8c20b1192538e403897c20d1b9c2a0b377e235459427c0fc666e4",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LauncherLocalization.swift",
+      "sha256": "9841f9d335d8c20b1192538e403897c20d1b9c2a0b377e235459427c0fc666e4"
+    },
+    {
+      "git_blob": "9fa7e6036615b147c7962083a689007c34f41e6c",
+      "historical_git_blob": "9fa7e6036615b147c7962083a689007c34f41e6c",
+      "historical_roster_member": true,
+      "historical_sha256": "4b5e78661c68ccee442bb61f9aea7ac8ddb541cb231cc4ffe0954dcc9a6edc06",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerDatagramWorker.swift",
+      "sha256": "4b5e78661c68ccee442bb61f9aea7ac8ddb541cb231cc4ffe0954dcc9a6edc06"
+    },
+    {
+      "git_blob": "8615fbc3ebcd51d52e23d2aa35b46d8486e146fe",
+      "historical_git_blob": "8615fbc3ebcd51d52e23d2aa35b46d8486e146fe",
+      "historical_roster_member": true,
+      "historical_sha256": "c2202a13a61a6c6bf704b5379d38dc0796229f5f694c5d9a9a97340ac9fabdb2",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoggerTopics.generated.swift",
+      "sha256": "c2202a13a61a6c6bf704b5379d38dc0796229f5f694c5d9a9a97340ac9fabdb2"
+    },
+    {
+      "git_blob": "5408290831c3ecaee605d5dc7b8f46124d54a982",
+      "historical_git_blob": "5408290831c3ecaee605d5dc7b8f46124d54a982",
+      "historical_roster_member": true,
+      "historical_sha256": "5a50ea3ae94f0453802c42c145392c2bbf00af571fa5e743891be4a1872a8d9f",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/LoginStartupWorker.swift",
+      "sha256": "5a50ea3ae94f0453802c42c145392c2bbf00af571fa5e743891be4a1872a8d9f"
+    },
+    {
+      "git_blob": "4485baa5f97fc6232417742976f0e30426e43311",
+      "historical_git_blob": "980c261c18fd417f896efda44590e3fe4881b419",
+      "historical_roster_member": true,
+      "historical_sha256": "b0c188bfd62d65336c041183c312c94a7d042d8c38d65f2d9a61469a7aa5b0ad",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapDownload.swift",
+      "sha256": "de611cc1f0ae94beb20930ccb7e76e8a21ea1bc488c6dae94802298b47a90b94"
+    },
+    {
+      "git_blob": "dfe09ffca3aa11fa8937f97ce509b2b06b99b08b",
+      "historical_git_blob": "dfe09ffca3aa11fa8937f97ce509b2b06b99b08b",
+      "historical_roster_member": true,
+      "historical_sha256": "05b93d2a87b39d46f50125aa6ea8d1db775506ffb307d0e8f14d90a8b2827eba",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedBootstrapPolicy.generated.swift",
+      "sha256": "05b93d2a87b39d46f50125aa6ea8d1db775506ffb307d0e8f14d90a8b2827eba"
+    },
+    {
+      "git_blob": "1463c83459737b348e09fa42fa3c79d0656dd595",
+      "historical_git_blob": "1463c83459737b348e09fa42fa3c79d0656dd595",
+      "historical_roster_member": true,
+      "historical_sha256": "30c6b8ee1bd17a1b70fa56c7a74655d2bc7a18f5e657df59acbf26ff24dd8df6",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedCertificateAuthorities.swift",
+      "sha256": "30c6b8ee1bd17a1b70fa56c7a74655d2bc7a18f5e657df59acbf26ff24dd8df6"
+    },
+    {
+      "git_blob": "2887593d22dfd7c5d5280a31f1210f4a7152b6f7",
+      "historical_git_blob": "e17ff5af9c971d32d2a3536693f93a4e02e634cd",
+      "historical_roster_member": true,
+      "historical_sha256": "0650c5f3c6ab64b79f324dcf07331286a2c7710fec2734fec93c8d800cddd624",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedHTTPWorker.swift",
+      "sha256": "ab575a32abf59d0258c393509ca8f1067885338e655f5e53f523efc0e4f55a77"
+    },
+    {
+      "git_blob": "054552e22589b573f04b43c1f511f2a1dfeb4e4f",
+      "historical_git_blob": "054552e22589b573f04b43c1f511f2a1dfeb4e4f",
+      "historical_roster_member": true,
+      "historical_sha256": "eb25d5488da1a3e615f2eaf57128460a956f72c7fc7efc2f1b8b399d621d1177",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedImageAlias.swift",
+      "sha256": "eb25d5488da1a3e615f2eaf57128460a956f72c7fc7efc2f1b8b399d621d1177"
+    },
+    {
+      "git_blob": "47aa0c0f15dcd9ab5093045d67d1e6ef3dfe790d",
+      "historical_git_blob": "47aa0c0f15dcd9ab5093045d67d1e6ef3dfe790d",
+      "historical_roster_member": true,
+      "historical_sha256": "7d98c59a2be142132ca10cec37c3b75283fb274d94a9812033df97acd5362728",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedOllamaAPIWorker.swift",
+      "sha256": "7d98c59a2be142132ca10cec37c3b75283fb274d94a9812033df97acd5362728"
+    },
+    {
+      "git_blob": "8fc336e592bc95643460e1f25a19e9dc604d8ec3",
+      "historical_git_blob": "8fc336e592bc95643460e1f25a19e9dc604d8ec3",
+      "historical_roster_member": true,
+      "historical_sha256": "e4754f37deffbb10e421b227594ed94b7ef1258c385bebaadd52722319da4349",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedOllamaListenerFixture.swift",
+      "sha256": "e4754f37deffbb10e421b227594ed94b7ef1258c385bebaadd52722319da4349"
+    },
+    {
+      "git_blob": "525993e87af0e476ae20a21fd62609d3e7744a65",
+      "historical_git_blob": "525993e87af0e476ae20a21fd62609d3e7744a65",
+      "historical_roster_member": true,
+      "historical_sha256": "b147c365d5c6c43174a2fa8f91c186cb099168d7d8440a6dfd49d785a45cdbba",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPACSource.swift",
+      "sha256": "b147c365d5c6c43174a2fa8f91c186cb099168d7d8440a6dfd49d785a45cdbba"
+    },
+    {
+      "git_blob": "ce560e9d964aa78015b7292fa6d59ef7512b4d54",
+      "historical_git_blob": "ce560e9d964aa78015b7292fa6d59ef7512b4d54",
+      "historical_roster_member": true,
+      "historical_sha256": "0c5ad06ce34de66cafad14a8e58288ca1519abe404e23b833cf0b225c129d168",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/ManagedPTYWorker.swift",
+      "sha256": "0c5ad06ce34de66cafad14a8e58288ca1519abe404e23b833cf0b225c129d168"
+    },
+    {
+      "git_blob": "8fef5cd9e76b53d9d5b8c505c23c6fcec863f3cc",
+      "historical_git_blob": "8fef5cd9e76b53d9d5b8c505c23c6fcec863f3cc",
+      "historical_roster_member": true,
+      "historical_sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/NumberRowSourceProbe.swift",
+      "sha256": "6b09c1ba4203f7b20bdabeac2800c2547898a75b9fdd6135dfa5bb18b680cd02"
+    },
+    {
+      "git_blob": "24fb61221fb57567a70e3d3bab48064ab3776a8f",
+      "historical_git_blob": "24fb61221fb57567a70e3d3bab48064ab3776a8f",
+      "historical_roster_member": true,
+      "historical_sha256": "e499c5a78bbb851bd4e2421855b5589b8114e1544f3bf4e10fd04a34c70664a8",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift",
+      "sha256": "e499c5a78bbb851bd4e2421855b5589b8114e1544f3bf4e10fd04a34c70664a8"
+    },
+    {
+      "git_blob": "20332cb80254f7cc1e7e26261bf89fc4c0328bb6",
+      "historical_git_blob": "20332cb80254f7cc1e7e26261bf89fc4c0328bb6",
+      "historical_roster_member": true,
+      "historical_sha256": "5621ac21890e509c14f016e38cc3dd241601d51155fd60937a18c293fd639124",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedListenerEventFixture.swift",
+      "sha256": "5621ac21890e509c14f016e38cc3dd241601d51155fd60937a18c293fd639124"
+    },
+    {
+      "git_blob": "62a4583a236d5ebd636bba5ebf0593a580cb47d1",
+      "historical_git_blob": "62a4583a236d5ebd636bba5ebf0593a580cb47d1",
+      "historical_roster_member": true,
+      "historical_sha256": "b620bd72dacf4a19e8c968a7607d37369214de1bdfc3efa9b25a336dc0515b91",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedLogDirectory.swift",
+      "sha256": "b620bd72dacf4a19e8c968a7607d37369214de1bdfc3efa9b25a336dc0515b91"
+    },
+    {
+      "git_blob": "dffcd57c2634ac47426fde887226213a361e798c",
+      "historical_git_blob": "dffcd57c2634ac47426fde887226213a361e798c",
+      "historical_roster_member": true,
+      "historical_sha256": "edbd66ec384658e87be25efe781d55507a47276fd57b6c71febe7bb7a1a4b58b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedProgramNativeFixture.swift",
+      "sha256": "edbd66ec384658e87be25efe781d55507a47276fd57b6c71febe7bb7a1a4b58b"
+    },
+    {
+      "git_blob": "1bce6fd68fb8b85a6f1d22a3ec374175dd0adc35",
+      "historical_git_blob": "1bce6fd68fb8b85a6f1d22a3ec374175dd0adc35",
+      "historical_roster_member": true,
+      "historical_sha256": "d30f6b30f844210786d545a77534ca41d6b9d5cd6b89e56e9f154d578755a3b8",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedProgramWorker.swift",
+      "sha256": "d30f6b30f844210786d545a77534ca41d6b9d5cd6b89e56e9f154d578755a3b8"
+    },
+    {
+      "git_blob": "f6cfea76d0511eddd1753a37758240c8d89aa494",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBootstrapStageOwner.swift",
+      "sha256": "220262e07957c348210789a59ff9ce9083890ac76ed72d959a28b9152b2f814c"
+    },
+    {
+      "git_blob": "b313a0be73fcce11bd6006c310bae1ad1c640700",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeBuildValidationEntry.swift",
+      "sha256": "d7b9d65973485c0e83f059ce6d5cfc230e30ff800a4beaed0f5b53d5d8a1da4f"
+    },
+    {
+      "git_blob": "679a6ac188e83a7a1258f5c85940f7eec0f93377",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreExitObservation.swift",
+      "sha256": "fbc9202b67bf72ce0b3df89f8874dcc75e805b9bcbf166da605bf2de752bc703"
+    },
+    {
+      "git_blob": "5e5a41fbb5ec45c65196e0a1860a7d646c53dcd5",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreLaunchctl.swift",
+      "sha256": "74bda94c0767fe03d749d948d3d35d0c88038e25dfd2449de91b00c203d7819e"
+    },
+    {
+      "git_blob": "ea503e241116141252172376d23aeec188002a1f",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCorePlistCustody.swift",
+      "sha256": "eea7d6efb9b6f59ceafdc49d7a285e2bca0b5006999935739d2dd22d0b5d2ba4"
+    },
+    {
+      "git_blob": "c1ae8ca24b67789ddadbee7b9714bd9107a4d336",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreProvisionOwner.swift",
+      "sha256": "16bc067edc68e2b3281f32f78ca70af70dd89d70cc07979eafe5a66e011bf242"
+    },
+    {
+      "git_blob": "5bb6ae1bacc9b9d9c99b46ab05f9430c8f549eed",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeCoreServiceOwner.swift",
+      "sha256": "a6861fa2d90b31c9a4258d35d49bea7f5a2fbaf17cb82ef72831834308f1d802"
+    },
+    {
+      "git_blob": "e8e7bfdda49bdec878577801a5c89bd248ef4af9",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeFirstInstallOwner.swift",
+      "sha256": "296a1e2e105f6bd492836e0d49a5f379666398df23ad641559042578c3b99730"
+    },
+    {
+      "git_blob": "37333f223beadbdcdba1ef3b890b01997f793fd6",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeIdleServiceEntry.swift",
+      "sha256": "9c5826bdf19760ac2ac15d104221621a404944062f674422cfedf8200b2aac85"
+    },
+    {
+      "git_blob": "b1f215ea296e66e4aeb330ebc937b37189021e54",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallJournal.swift",
+      "sha256": "d7042f26f6c138eeb3d67f3bf4c30f3885a04eb9e0c428c5911fd1da3f5c5422"
+    },
+    {
+      "git_blob": "233c7fa70ff170757ff3a21fe3971a08186fda6d",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallOwner.swift",
+      "sha256": "06e14b89b499d0243f8001d210806149b197b6a62dbedd8cbf765827f2a489ef"
+    },
+    {
+      "git_blob": "53cb34837c0f444ba3fab99c7489877dd95c6a14",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstallWorker.swift",
+      "sha256": "b1c627ec48a50307c3bfc1ec012e14bfdad67e144c822de05d36fcc35d5a21df"
+    },
+    {
+      "git_blob": "10f0928eda24db0ecc373921c41b8f301f49ad98",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeInstalledPeerOwner.swift",
+      "sha256": "853ec757931931e6c27fdeded82460de169c07fa2c451404880a887a97f72329"
+    },
+    {
+      "git_blob": "83f87fa0496bc31bdb022ae6563f0fa2b92dba91",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimePublisherIdentity.swift",
+      "sha256": "4c01e7bd383da06fd96502725cc4a59ad25cbbcdb1c07c220f6713c55dfa9f05"
+    },
+    {
+      "git_blob": "2c7bbff779dea033fc3e978af50abf74466a9a38",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeServiceLifecycleLock.swift",
+      "sha256": "0298108fecb7fb0c86c8fafeb90c9f8690ac117e9df635402834c71facbe6e94"
+    },
+    {
+      "git_blob": "2426f8ace6c1f4eaa4f7bbc1c96d4b3b5a49bf2b",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedRuntimeUserConsoleOwner.swift",
+      "sha256": "834d8c8d0fb3851caf193eacc764f17498952c0a56be852d5b14624946e033fe"
+    },
+    {
+      "git_blob": "bf61d5e9b19a8b47065c29f9d115b65952d55544",
+      "historical_git_blob": "bf61d5e9b19a8b47065c29f9d115b65952d55544",
+      "historical_roster_member": true,
+      "historical_sha256": "bdb1798bbae29c43b627f257a6f6bdbdf47f89123b243976637fc5f661cc2af2",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedSuspendedImageGuardian.swift",
+      "sha256": "bdb1798bbae29c43b627f257a6f6bdbdf47f89123b243976637fc5f661cc2af2"
+    },
+    {
+      "git_blob": "bc02fffc98a7e266aedb9397b2c1eca2c907a3fa",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportClock.swift",
+      "sha256": "05ccd19a9ec3f7ef5a717e5a07a02c8f47253e1b4dff3029cc652a69cf640e08"
+    },
+    {
+      "git_blob": "2148ecca065e42a66793087a2804d6ea9af886ed",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportMainOperation.swift",
+      "sha256": "f07d3a0abb487d90e1e2948355126ccd0799163181dc2ae9b9eab4b0ee08b791"
+    },
+    {
+      "git_blob": "93a12ff6494c85d4c233d83cd880f36ceb87a597",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportObserver.swift",
+      "sha256": "ff10328f7f1ecedc4d8f733f5cd23d5de9f0e26cd8b8082a87f854d6bd783b03"
+    },
+    {
+      "git_blob": "befae297f93cdff3317c5544156332ffd0a83685",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportProtocol.swift",
+      "sha256": "7537c3802872dd1aa08cf3ca899ab9bd43b0381c4028c30fc0024146d4ef75af"
+    },
+    {
+      "git_blob": "d88380051e36b710918ddf5be833d8549668310a",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportReference.swift",
+      "sha256": "408cd3fab2d98f7096ca93e15af27ed634d1893c83305d1e665f86d0a1e2e83c"
+    },
+    {
+      "git_blob": "c807aa9b897de9173744d5724c624f9a6842c5db",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportRequestChannel.swift",
+      "sha256": "4eb1b70c037195cfe1d733a385593279b5a8fedd17f2b8ef27323601be6ce7e6"
+    },
+    {
+      "git_blob": "ec8af032c5f345905a18ab15bccaf107ec1e3243",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportStageOwner.swift",
+      "sha256": "7fd7faa1c7d6f0367dc8a0b374d81b76702caf860addeffd7e1834fa8f7801cf"
+    },
+    {
+      "git_blob": "ada699925fcd42c2ed4e90b98f158c1e7ca5e5a9",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/OwnedVirtualHIDDaemonReportWorker.swift",
+      "sha256": "5d74b6da01b5132bae0b6a04cc972eb2c6fc8a4146a45f879b5cd2c012a9fa74"
+    },
+    {
+      "git_blob": "ca3d9894c309c804e2432b1300f08f7144e73614",
+      "historical_git_blob": "ca3d9894c309c804e2432b1300f08f7144e73614",
+      "historical_roster_member": true,
+      "historical_sha256": "5ee5bc5af37117db462063f68a0bf3010e4fe3b52f75e8446bb336bf64683d4b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/POSIXCompatibility.swift",
+      "sha256": "5ee5bc5af37117db462063f68a0bf3010e4fe3b52f75e8446bb336bf64683d4b"
+    },
+    {
+      "git_blob": "5be50e0aa952518dd1e758a098cca6fc0b57d203",
+      "historical_git_blob": "5be50e0aa952518dd1e758a098cca6fc0b57d203",
+      "historical_roster_member": true,
+      "historical_sha256": "26b613cf32cb95e890f97f0c43dd502a53af2a07f2bfef3f0b6d1a11230a0905",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseGuardian.swift",
+      "sha256": "26b613cf32cb95e890f97f0c43dd502a53af2a07f2bfef3f0b6d1a11230a0905"
+    },
+    {
+      "git_blob": "584f66050ca373601c97fb44ee353464622900ec",
+      "historical_git_blob": "d04cf1fb08e90864ce282b048e3dc2328ac5bd25",
+      "historical_roster_member": true,
+      "historical_sha256": "50a155a06dfa6afcca03eb3c0e40e06e4aca1c01e1c5743d08410eab33ce1445",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift",
+      "sha256": "2f325b42eb3382ab0b7364c7770338aa2afc290dcfc310714cfe320b94f3639e"
+    },
+    {
+      "git_blob": "bcc52311bef810627cf6b3d6b3a3d0c77fa357dc",
+      "historical_git_blob": "bcc52311bef810627cf6b3d6b3a3d0c77fa357dc",
+      "historical_roster_member": true,
+      "historical_sha256": "a6793af8ceb844789b478ca8574dcb4d3793d7e81135c977b2f203d92c1dbf97",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UninstallWorker.swift",
+      "sha256": "a6793af8ceb844789b478ca8574dcb4d3793d7e81135c977b2f203d92c1dbf97"
+    },
+    {
+      "git_blob": "759a7b022edf687c74116f396cc5a620a8efb3d4",
+      "historical_git_blob": "759a7b022edf687c74116f396cc5a620a8efb3d4",
+      "historical_roster_member": true,
+      "historical_sha256": "65cae66efeeccd6c547d047fe11b19fd7f0ad9c434d6bdb2eab84f29c025d9d1",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannelFeed.swift",
+      "sha256": "65cae66efeeccd6c547d047fe11b19fd7f0ad9c434d6bdb2eab84f29c025d9d1"
+    },
+    {
+      "git_blob": "bf5514f742eb132daafc3aefe0eae1037b72ba60",
+      "historical_git_blob": "bf5514f742eb132daafc3aefe0eae1037b72ba60",
+      "historical_roster_member": true,
+      "historical_sha256": "70b0c2f5d638b0edf7da2ab73178c4713a82bf8ea62bc6c65dad69514fe32cc2",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateChannels.generated.swift",
+      "sha256": "70b0c2f5d638b0edf7da2ab73178c4713a82bf8ea62bc6c65dad69514fe32cc2"
+    },
+    {
+      "git_blob": "57fb3e644a5e275bbc53a2066765dc286a2fa082",
+      "historical_git_blob": "57fb3e644a5e275bbc53a2066765dc286a2fa082",
+      "historical_roster_member": true,
+      "historical_sha256": "21745a1d772f49561b8fcee0fe6a4e70971e7dbc45aede997e02141fc08fec1f",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdateConsentPolicy.swift",
+      "sha256": "21745a1d772f49561b8fcee0fe6a4e70971e7dbc45aede997e02141fc08fec1f"
+    },
+    {
+      "git_blob": "54f2d8f1165bf707904158b9c6e6532e7ddd3909",
+      "historical_git_blob": "54f2d8f1165bf707904158b9c6e6532e7ddd3909",
+      "historical_roster_member": true,
+      "historical_sha256": "cb5e190fc77932b0a99e6f6141fe50c7c3d17078b1e7875dbbb237612c9b1c57",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdatePromptPanel.swift",
+      "sha256": "cb5e190fc77932b0a99e6f6141fe50c7c3d17078b1e7875dbbb237612c9b1c57"
+    },
+    {
+      "git_blob": "ef249f4e35099fd76d6059a825147590c6bba8f2",
+      "historical_git_blob": "ef249f4e35099fd76d6059a825147590c6bba8f2",
+      "historical_roster_member": true,
+      "historical_sha256": "fa26c25a680336e85f0b069064a9e7563c0db3e3f7a259d61b0d7157a568fdc9",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdatePromptTexts.swift",
+      "sha256": "fa26c25a680336e85f0b069064a9e7563c0db3e3f7a259d61b0d7157a568fdc9"
+    },
+    {
+      "git_blob": "2a2c40152e55bed96857d9fdcb7b4eec4833fa1d",
+      "historical_git_blob": "2a2c40152e55bed96857d9fdcb7b4eec4833fa1d",
+      "historical_roster_member": true,
+      "historical_sha256": "0dc961f1548c7ee21c3b3bdd82b0c536c24bf9dde521f09a190e346e1446ac84",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/UpdaterCommandRouter.swift",
+      "sha256": "0dc961f1548c7ee21c3b3bdd82b0c536c24bf9dde521f09a190e346e1446ac84"
+    },
+    {
+      "git_blob": "0b743e3bc90dbdd65af1f60169e2763be84e681c",
+      "historical_git_blob": "0b743e3bc90dbdd65af1f60169e2763be84e681c",
+      "historical_roster_member": true,
+      "historical_sha256": "a2024365c1d65b727da2fc12ce1ddc7122ab7b86c21e447ef469b7f8c418d8a7",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/WindowTitles.generated.swift",
+      "sha256": "a2024365c1d65b727da2fc12ce1ddc7122ab7b86c21e447ef469b7f8c418d8a7"
+    },
+    {
+      "git_blob": "8ec49f32e05f2e179868f2a03711e438fc3cb32e",
+      "historical_git_blob": "000215a64ded650b79d35d36336fd57f5c1be200",
+      "historical_roster_member": true,
+      "historical_sha256": "93853d5fa2542f188b626d5996c211953e30452c6d827a4c7170dc12fdb490fd",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Sources/ErgoptiPlus/main.swift",
+      "sha256": "78656e761e80914aa6235ef375e7af8b68e0b04dd5d33aa3cbd7720b0bb31351"
+    },
+    {
+      "git_blob": "a7e03c67327dc3fc9997d13dfb86f0c7292ccdeb",
+      "historical_git_blob": "a7e03c67327dc3fc9997d13dfb86f0c7292ccdeb",
+      "historical_roster_member": true,
+      "historical_sha256": "c821c6f6e3c116feed3a4e2426c3582bdd6c9976ca57ecafc98b10a1d68bd8fb",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ApplicationPickerPanelTests.swift",
+      "sha256": "c821c6f6e3c116feed3a4e2426c3582bdd6c9976ca57ecafc98b10a1d68bd8fb"
+    },
+    {
+      "git_blob": "be052cb57c6bd23c7f1be7a7716724ff48c7c938",
+      "historical_git_blob": "be052cb57c6bd23c7f1be7a7716724ff48c7c938",
+      "historical_roster_member": true,
+      "historical_sha256": "ed67d204ba66ddb9c53a52f207482aa8fff5bcfb8c9fc91db9697c6f159371de",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ArchiveAcceptanceEvidence.swift",
+      "sha256": "ed67d204ba66ddb9c53a52f207482aa8fff5bcfb8c9fc91db9697c6f159371de"
+    },
+    {
+      "git_blob": "af305b05eab172998ff247cb29a261b8549c72b6",
+      "historical_git_blob": "af305b05eab172998ff247cb29a261b8549c72b6",
+      "historical_roster_member": true,
+      "historical_sha256": "463737cbe57d068403053d93395791bcd98bc079b6cc1bed3814e602619f16d4",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/BundleValidationTests.swift",
+      "sha256": "463737cbe57d068403053d93395791bcd98bc079b6cc1bed3814e602619f16d4"
+    },
+    {
+      "git_blob": "a27f56938d4a9a9d035e74a87cdbcdef48551b36",
+      "historical_git_blob": "a27f56938d4a9a9d035e74a87cdbcdef48551b36",
+      "historical_roster_member": true,
+      "historical_sha256": "3bcc017302bf5c42eb2cfe64618b0a7690ecee798e2237d74162a8d1986a7fc1",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/CatalogUpdateUserDriverTests.swift",
+      "sha256": "3bcc017302bf5c42eb2cfe64618b0a7690ecee798e2237d74162a8d1986a7fc1"
+    },
+    {
+      "git_blob": "83d479c23b7d023e87b97a8f6e786d6dce5946ab",
+      "historical_git_blob": "83d479c23b7d023e87b97a8f6e786d6dce5946ab",
+      "historical_roster_member": true,
+      "historical_sha256": "0d0e8b8d1d6a555bcd8aecfdb8853ae7df31b28b539adce5c820600697e3c1fb",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/EmbeddedFatalReportTests.swift",
+      "sha256": "0d0e8b8d1d6a555bcd8aecfdb8853ae7df31b28b539adce5c820600697e3c1fb"
+    },
+    {
+      "git_blob": "8d45ef275f56ff09f43a7bcd2d9be72b7f73f007",
+      "historical_git_blob": "8d45ef275f56ff09f43a7bcd2d9be72b7f73f007",
+      "historical_roster_member": true,
+      "historical_sha256": "e08a37391e69a591ef1adf0697b8333852a7c88336a9b745e189c90d219c499f",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianRegistrationTests.swift",
+      "sha256": "e08a37391e69a591ef1adf0697b8333852a7c88336a9b745e189c90d219c499f"
+    },
+    {
+      "git_blob": "450ba0b0926596eec3e8feabf5d0c99c312bd475",
+      "historical_git_blob": "450ba0b0926596eec3e8feabf5d0c99c312bd475",
+      "historical_roster_member": true,
+      "historical_sha256": "f173cd9dc3fbdcb1ff193c243e9d54ccf52052d90c89d396a10f34275fdde414",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/GuardianUnregistrationTests.swift",
+      "sha256": "f173cd9dc3fbdcb1ff193c243e9d54ccf52052d90c89d396a10f34275fdde414"
+    },
+    {
+      "git_blob": "69c8a2815b89892b5ac86825ca3596c72c173c6b",
+      "historical_git_blob": "69c8a2815b89892b5ac86825ca3596c72c173c6b",
+      "historical_roster_member": true,
+      "historical_sha256": "e1cc44b9fd653a5c7b85483de1a0335a3c97f2872952b9bcff8bad3db8d0654d",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+      "sha256": "e1cc44b9fd653a5c7b85483de1a0335a3c97f2872952b9bcff8bad3db8d0654d"
+    },
+    {
+      "git_blob": "2e4eb2dc4502fc5ede5b40fc3e9200c5292571f5",
+      "historical_git_blob": "2e4eb2dc4502fc5ede5b40fc3e9200c5292571f5",
+      "historical_roster_member": true,
+      "historical_sha256": "9f60f2ffadeaea85962e7df30cde6330bfd031e97567232156528e3cd7e1580b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/HomebrewAutomationConsentTests.swift",
+      "sha256": "9f60f2ffadeaea85962e7df30cde6330bfd031e97567232156528e3cd7e1580b"
+    },
+    {
+      "git_blob": "e16f5149146b77a574b9c4ba495d1f017856dd3d",
+      "historical_git_blob": "e16f5149146b77a574b9c4ba495d1f017856dd3d",
+      "historical_roster_member": true,
+      "historical_sha256": "058cd9625029e0a15f416a89a5eacdace414eacccd49c87687396d24ebff422e",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardCharacterMappingTests.swift",
+      "sha256": "058cd9625029e0a15f416a89a5eacdace414eacccd49c87687396d24ebff422e"
+    },
+    {
+      "git_blob": "e1dcf4bab8a6c8fa7a1606b4df3036a4ec279932",
+      "historical_git_blob": "e1dcf4bab8a6c8fa7a1606b4df3036a4ec279932",
+      "historical_roster_member": true,
+      "historical_sha256": "ef7565644fce667aa7a30e1ca508361b013501a6149d4f8ade515f7571f705c4",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardGeometryTests.swift",
+      "sha256": "ef7565644fce667aa7a30e1ca508361b013501a6149d4f8ade515f7571f705c4"
+    },
+    {
+      "git_blob": "160370271aed94243d59dd2e652e1feed9532fb3",
+      "historical_git_blob": "160370271aed94243d59dd2e652e1feed9532fb3",
+      "historical_roster_member": true,
+      "historical_sha256": "7a8416dcb470965a87cce4f308615939200b7de8aafdb6c072328f6b90347b7b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceProbeTests.swift",
+      "sha256": "7a8416dcb470965a87cce4f308615939200b7de8aafdb6c072328f6b90347b7b"
+    },
+    {
+      "git_blob": "d123066a55c5e468b040e1a8545bf7521ddcdf5d",
+      "historical_git_blob": "d123066a55c5e468b040e1a8545bf7521ddcdf5d",
+      "historical_roster_member": true,
+      "historical_sha256": "dd63291c327060482c5a57bc48da53a6521c391afafb2aa0b20e7629cef7a0ad",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestDiagnostics.swift",
+      "sha256": "dd63291c327060482c5a57bc48da53a6521c391afafb2aa0b20e7629cef7a0ad"
+    },
+    {
+      "git_blob": "921f9a6ce2c8fb33417bad7364f295c4fc500588",
+      "historical_git_blob": "921f9a6ce2c8fb33417bad7364f295c4fc500588",
+      "historical_roster_member": true,
+      "historical_sha256": "5b3e8603ddfdd1c9cff0683e6ffcb3fd66de81e5365e3e764465f17b98e449b3",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeyboardSourceTestTransport.swift",
+      "sha256": "5b3e8603ddfdd1c9cff0683e6ffcb3fd66de81e5365e3e764465f17b98e449b3"
+    },
+    {
+      "git_blob": "4aeeac7138c834df8d485d50c88615b58a1d8444",
+      "historical_git_blob": "4aeeac7138c834df8d485d50c88615b58a1d8444",
+      "historical_roster_member": true,
+      "historical_sha256": "65f5d2b2f6e7b822c459288e2bb16254dc5ab3f3b178031b11296489889e54f6",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/KeychainTokenWorkerTests.swift",
+      "sha256": "65f5d2b2f6e7b822c459288e2bb16254dc5ab3f3b178031b11296489889e54f6"
+    },
+    {
+      "git_blob": "f75bba9f671db0a2dce6d51a5089dbcc56daa54f",
+      "historical_git_blob": "52bb44bf30e8136cc7add2916ea4ae7e22ce4e49",
+      "historical_roster_member": true,
+      "historical_sha256": "4f480fa6bd22aad0aabdaabb742d0b96998a6342c1747d0efb0d9182386aa655",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherEnvironmentTests.swift",
+      "sha256": "9fd40a92f7e2e514a29b7747ad0ab22fe089bac5e1012e864cf3e1629962a0e8"
+    },
+    {
+      "git_blob": "46990b77e094f863bd9a7510f454498871646492",
+      "historical_git_blob": "46990b77e094f863bd9a7510f454498871646492",
+      "historical_roster_member": true,
+      "historical_sha256": "7c1c82dda758663b0e93740c55ab0139eb3dc626c6cf274a7957fb7fb8474d94",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LauncherLogTests.swift",
+      "sha256": "7c1c82dda758663b0e93740c55ab0139eb3dc626c6cf274a7957fb7fb8474d94"
+    },
+    {
+      "git_blob": "edcd7017e7c9eba0577772f58a88198b32112a80",
+      "historical_git_blob": "edcd7017e7c9eba0577772f58a88198b32112a80",
+      "historical_roster_member": true,
+      "historical_sha256": "ded61f9a65667acd2a8e445a4da758a06d6281f2a5573426dcee5f4622f7b35c",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LoggerDatagramWorkerTests.swift",
+      "sha256": "ded61f9a65667acd2a8e445a4da758a06d6281f2a5573426dcee5f4622f7b35c"
+    },
+    {
+      "git_blob": "5492074ee7a3cbbb662cdaa069465c3bafbf110f",
+      "historical_git_blob": "5492074ee7a3cbbb662cdaa069465c3bafbf110f",
+      "historical_roster_member": true,
+      "historical_sha256": "ca29b59d78c4f4e02acef564c774311cbea84d57c8b34f99fa5d4d36a9df4293",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/LoginStartupWorkerTests.swift",
+      "sha256": "ca29b59d78c4f4e02acef564c774311cbea84d57c8b34f99fa5d4d36a9df4293"
+    },
+    {
+      "git_blob": "dc6314036b8d9916c67d74b42c2c30653b89c653",
+      "historical_git_blob": "a36a7cb184fad53e0dd44844f912e0b4ad96c2ad",
+      "historical_roster_member": true,
+      "historical_sha256": "50c0ccd4135112ac43c65efe3db33664b624326966e3488f793ed4468075cebb",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedBootstrapDownloadTests.swift",
+      "sha256": "64966864219c3ac4d360f4e6e9641e15b5ab88515874dcab1806ccc83bff230f"
+    },
+    {
+      "git_blob": "c3a7b7234aedc64ca825e91d515fbf4fe3267b4d",
+      "historical_git_blob": "c3a7b7234aedc64ca825e91d515fbf4fe3267b4d",
+      "historical_roster_member": true,
+      "historical_sha256": "1b4279cb8b02de2c17a60aee3610c1a3b1cc5155bc58d6ac37119190a4722a3b",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWPADWireTests.swift",
+      "sha256": "1b4279cb8b02de2c17a60aee3610c1a3b1cc5155bc58d6ac37119190a4722a3b"
+    },
+    {
+      "git_blob": "288bae4a7a75f43f6ae4e011ff0ece011d0e2df5",
+      "historical_git_blob": "288bae4a7a75f43f6ae4e011ff0ece011d0e2df5",
+      "historical_roster_member": true,
+      "historical_sha256": "37e3001e74f5fedb419fcc3e3c08632664c9a97c08e411363208d325837b9d80",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWireTests.swift",
+      "sha256": "37e3001e74f5fedb419fcc3e3c08632664c9a97c08e411363208d325837b9d80"
+    },
+    {
+      "git_blob": "6b5960985c4ff5f28297ec0eeb4d2318fb6659be",
+      "historical_git_blob": "1b2f96dc1e9c29b5a79d8eba05d03fa0eca0b9e6",
+      "historical_roster_member": true,
+      "historical_sha256": "ef4882cc6ac6a7c578e756405cb4ae77f0f80243e96e6417f4fff69be2b54243",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWorkerTests.swift",
+      "sha256": "774549205624192feaebad02234887e1b0a418504dca95e9253cf222d79af03c"
+    },
+    {
+      "git_blob": "2c984fbf664e9c5b6a3af65d73795cc106aed6a3",
+      "historical_git_blob": "2c984fbf664e9c5b6a3af65d73795cc106aed6a3",
+      "historical_roster_member": true,
+      "historical_sha256": "07258f4035d7c76681ba5f6804378ae35de866044ad1c584c1fd69266ebef575",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedNetworkBootstrapTests.swift",
+      "sha256": "07258f4035d7c76681ba5f6804378ae35de866044ad1c584c1fd69266ebef575"
+    },
+    {
+      "git_blob": "462a5ef6b15fd9be14dc427829001db43fc51e17",
+      "historical_git_blob": "462a5ef6b15fd9be14dc427829001db43fc51e17",
+      "historical_roster_member": true,
+      "historical_sha256": "5c9678273e2883d737cdc9ea8b6a7ec31dc646540cb4fa5133ff4cb29757b450",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedOllamaAPIWorkerTests.swift",
+      "sha256": "5c9678273e2883d737cdc9ea8b6a7ec31dc646540cb4fa5133ff4cb29757b450"
+    },
+    {
+      "git_blob": "75ce8007fdbbbf0215227fd24ce89c7a9b8cde25",
+      "historical_git_blob": "75ce8007fdbbbf0215227fd24ce89c7a9b8cde25",
+      "historical_roster_member": true,
+      "historical_sha256": "cbdc0421d0479512e0e8bd50c51eff541c5782effdbb15c35432eabfd196401e",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedPACSourceTests.swift",
+      "sha256": "cbdc0421d0479512e0e8bd50c51eff541c5782effdbb15c35432eabfd196401e"
+    },
+    {
+      "git_blob": "fb275457fd3e45cace938ed90a191d196bc71011",
+      "historical_git_blob": "fb275457fd3e45cace938ed90a191d196bc71011",
+      "historical_roster_member": true,
+      "historical_sha256": "0da5f9a83258311cc5fc210ba7b44aa0801f6347887a8f5f698064f6abd00534",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedPTYWorkerTests.swift",
+      "sha256": "0da5f9a83258311cc5fc210ba7b44aa0801f6347887a8f5f698064f6abd00534"
+    },
+    {
+      "git_blob": "05cc42ed1839c6635f72615599aa338febdd5818",
+      "historical_git_blob": "05cc42ed1839c6635f72615599aa338febdd5818",
+      "historical_roster_member": true,
+      "historical_sha256": "86829d26bc3d233ad0d6353376525c70c30a0f2d51f05f2d5d16ccbf7d66a8b3",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NativeFixtureChildEnvironmentTests.swift",
+      "sha256": "86829d26bc3d233ad0d6353376525c70c30a0f2d51f05f2d5d16ccbf7d66a8b3"
+    },
+    {
+      "git_blob": "e1879c6e7985d044c41dd0dc5af6329cb0b37be6",
+      "historical_git_blob": "3bf755b30f2a8ab1a1669d387ac9289f0746a1e4",
+      "historical_roster_member": true,
+      "historical_sha256": "c5fc9a251c9de50196e0ef97ee7741ecdc3e01078cbeb7f77fabd6927a2a20c3",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/NumberRowSourceProbeTests.swift",
+      "sha256": "105820510cbe3c5c13dee94d30d7ef1ea738fa9131907ae3cc12278dc10a96f7"
+    },
+    {
+      "git_blob": "0525c56eefb2b094aca51697cb166372396f670d",
+      "historical_git_blob": "0525c56eefb2b094aca51697cb166372396f670d",
+      "historical_roster_member": true,
+      "historical_sha256": "dbc8a50dcddbfb532967a46f1c1cd103bc059dbc7b52e25024206d07c5c499e9",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedAutomationQueryWorkerTests.swift",
+      "sha256": "dbc8a50dcddbfb532967a46f1c1cd103bc059dbc7b52e25024206d07c5c499e9"
+    },
+    {
+      "git_blob": "6d44ecdfdfb8b00ce95288660b817a6d72ca322e",
+      "historical_git_blob": "6d44ecdfdfb8b00ce95288660b817a6d72ca322e",
+      "historical_roster_member": true,
+      "historical_sha256": "71423ce63bd394f8f630e0870f03635ce0ba0f485f4ccff09324b41a30a0c636",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedLogDirectoryTests.swift",
+      "sha256": "71423ce63bd394f8f630e0870f03635ce0ba0f485f4ccff09324b41a30a0c636"
+    },
+    {
+      "git_blob": "5e9d023f74407fd70c6c5722e4f880038f892ab4",
+      "historical_git_blob": "5e9d023f74407fd70c6c5722e4f880038f892ab4",
+      "historical_roster_member": true,
+      "historical_sha256": "b896fdbabfe931a4ffe42aa05dfe05096c06ee5750936b0491252717471a0185",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedProgramWorkerTests.swift",
+      "sha256": "b896fdbabfe931a4ffe42aa05dfe05096c06ee5750936b0491252717471a0185"
+    },
+    {
+      "git_blob": "6fb6d86d890b76506147e7f7635dcc642072d694",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCLIGuestOwnerTests.swift",
+      "sha256": "cd277db140380ccc4f6610d24f626c3536cbf2c7dfc05a13baf955d31ff6cbd0"
+    },
+    {
+      "git_blob": "cc678da944b1564a0f5629cace87c56b0d693207",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeConsoleConfigurationTests.swift",
+      "sha256": "d304fbcc05a9b3324d3147c1b830494460a26d69edff8994126129ecdb55a190"
+    },
+    {
+      "git_blob": "3500e7bf9b80b7bcce905962d3cb82ddfd9e25bf",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreExitObservationTests.swift",
+      "sha256": "27671c94e9e190f4f55566f966ef26b7d139020ce19022bcf8e0531425235193"
+    },
+    {
+      "git_blob": "dea62f639aa13fbb095e6ee08b264d293b7c11b1",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeCoreProvisionOwnerTests.swift",
+      "sha256": "9a22b6136786f3098615fb28749644c6bbc9690fac848956a6d40a51c1dc9a77"
+    },
+    {
+      "git_blob": "1ddcc18be30e9bbd2a753a46bc9b0cfcafa1607c",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeInstalledPeerOwnerTests.swift",
+      "sha256": "c86edf208ada491ae6fb320c49de32ba22229ae76d7b4c9f5de3ba9a9dca7c08"
+    },
+    {
+      "git_blob": "9b803d116ce7c12821665b5833001222a8f56db4",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeLifecycleInitializerCustodyTests.swift",
+      "sha256": "e363c3ccb82d3777d6c0f37c7fe3810dbe0942f9fb5340f418901a4c3f6356fd"
+    },
+    {
+      "git_blob": "717994e631b300fa500b36d1a8e039eaf222cb70",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeMaintenanceJournalAdmissionTests.swift",
+      "sha256": "ebece62a96f88e5e2d31b9a9cccfc3b2399473305cafe12dc7046e60f2777a9c"
+    },
+    {
+      "git_blob": "62ca43f0f47a1bc22edba362eac385a6e0b670a5",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeNamespaceCloseOrderTests.swift",
+      "sha256": "d080963da1910b9eb20487200d5993d72bfcfa6a09580adfc65420020973fcea"
+    },
+    {
+      "git_blob": "145f060f27d4167a2b53f555a2fcc5f7d5680c0d",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedRuntimeUserConsoleOwnerTests.swift",
+      "sha256": "85ca84d604d8d40ca109956d499360313ba344ad862b9b346e5ef9e781bab9a0"
+    },
+    {
+      "git_blob": "e77662be9869d822d972bf09c08eaf5384a71f25",
+      "historical_git_blob": "e77662be9869d822d972bf09c08eaf5384a71f25",
+      "historical_roster_member": true,
+      "historical_sha256": "e3cc74c624e45af69ff318befb2a634792dd2002124bb369028a6e3119967374",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedSuspendedImageTests.swift",
+      "sha256": "e3cc74c624e45af69ff318befb2a634792dd2002124bb369028a6e3119967374"
+    },
+    {
+      "git_blob": "6ef1e4107db2c21a6c0c199b33e634c17373ebee",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportMainOperationTests.swift",
+      "sha256": "c7b52afe1adcf27e87b944dba4dcd61a81565d61eaa0c4c7f0d6289787875b63"
+    },
+    {
+      "git_blob": "b247360ab68cbe6849866be89ec58b89c2337644",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportTests.swift",
+      "sha256": "85af76070cfc4ef012d9a7112e88db77a0bb8a2cf75b2c031c45680faaa8004c"
+    },
+    {
+      "git_blob": "4998accf170977f8370e78bcc2288a10bf9d335a",
+      "historical_git_blob": null,
+      "historical_roster_member": false,
+      "historical_sha256": null,
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/OwnedVirtualHIDDaemonReportWorkerTests.swift",
+      "sha256": "a327cc77f259e37e6b50ed77ed6911363c9b7abd18b8db56115801c84f7bae5a"
+    },
+    {
+      "git_blob": "eaa6ffdb288f3b9d7b952dc2f6fe74928f0c7507",
+      "historical_git_blob": "eaa6ffdb288f3b9d7b952dc2f6fe74928f0c7507",
+      "historical_roster_member": true,
+      "historical_sha256": "2d8659dfaaf3f261706181ae932ce7c186168670e9388c3ab5f1fbdb3c1a416e",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/POSIXCompatibilityTests.swift",
+      "sha256": "2d8659dfaaf3f261706181ae932ce7c186168670e9388c3ab5f1fbdb3c1a416e"
+    },
+    {
+      "git_blob": "c7e7b9546ca40d29adbb245ae7e6e0831e2bde46",
+      "historical_git_blob": "c7e7b9546ca40d29adbb245ae7e6e0831e2bde46",
+      "historical_roster_member": true,
+      "historical_sha256": "434f0214434a3c154b20d1aaafeb9b005e88f5735b625e1db76f98aae36bcafb",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ReleaseArchiveStagingTests.swift",
+      "sha256": "434f0214434a3c154b20d1aaafeb9b005e88f5735b625e1db76f98aae36bcafb"
+    },
+    {
+      "git_blob": "07cb765ffec67a1ee8c83161358ebec24229c2db",
+      "historical_git_blob": "8629eb092819aa0180b646a0a146dddddfc35eee",
+      "historical_roster_member": true,
+      "historical_sha256": "d3637e9c4d0e8c846e99af05ba379a6cdd7fe20856e11159ab43dc22eb94058f",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift",
+      "sha256": "cb7bc059549bb18e2e651e2f92e1576ec0ce1bd033ce4b5a43119d20fcefe4b1"
+    },
+    {
+      "git_blob": "cf01360c3118c0c390f6c1398407050df8c934a8",
+      "historical_git_blob": "cf01360c3118c0c390f6c1398407050df8c934a8",
+      "historical_roster_member": true,
+      "historical_sha256": "407809d2bcb141bfe77cf210df562b2d25ac917a8ab4096454dd713fb6c4efe6",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/SparkleArchiveUpdateAcceptanceTests.swift",
+      "sha256": "407809d2bcb141bfe77cf210df562b2d25ac917a8ab4096454dd713fb6c4efe6"
+    },
+    {
+      "git_blob": "4c96406435cb26a90b22aa83cfb1a3e394994137",
+      "historical_git_blob": "4c96406435cb26a90b22aa83cfb1a3e394994137",
+      "historical_roster_member": true,
+      "historical_sha256": "92a28189ad211dfa9be2b1e12ce259f89d9b0a6f457aca6a0871ca2299f80382",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UninstallWorkerTests.swift",
+      "sha256": "92a28189ad211dfa9be2b1e12ce259f89d9b0a6f457aca6a0871ca2299f80382"
+    },
+    {
+      "git_blob": "78f3caad23158bbf3abf598775053075c6de4744",
+      "historical_git_blob": "78f3caad23158bbf3abf598775053075c6de4744",
+      "historical_roster_member": true,
+      "historical_sha256": "91a8fe87483e24225f29e219091c122804322f3cdc4c6030f507702938bee421",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdateChannelFeedTests.swift",
+      "sha256": "91a8fe87483e24225f29e219091c122804322f3cdc4c6030f507702938bee421"
+    },
+    {
+      "git_blob": "a1f4e5e573d5034fe02d2db200a1f652f1e6c445",
+      "historical_git_blob": "a1f4e5e573d5034fe02d2db200a1f652f1e6c445",
+      "historical_roster_member": true,
+      "historical_sha256": "0882228f6c25ab76f6132fb3a804c192d9ab67ea0f8b7a73ba3bd8338b3d1ffd",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdateConsentPolicyTests.swift",
+      "sha256": "0882228f6c25ab76f6132fb3a804c192d9ab67ea0f8b7a73ba3bd8338b3d1ffd"
+    },
+    {
+      "git_blob": "b138196fb6ec459d71ef1461c155675d7a356e62",
+      "historical_git_blob": "b138196fb6ec459d71ef1461c155675d7a356e62",
+      "historical_roster_member": true,
+      "historical_sha256": "c52a49d58a89688ffe3b334ae18e8ae4baa16405cf9bb538a1f9871ee9f7c476",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/UpdaterCommandRouterTests.swift",
+      "sha256": "c52a49d58a89688ffe3b334ae18e8ae4baa16405cf9bb538a1f9871ee9f7c476"
+    },
+    {
+      "git_blob": "852ab417751f6c28fd95c82663bdd0418e0fad3e",
+      "historical_git_blob": "852ab417751f6c28fd95c82663bdd0418e0fad3e",
+      "historical_roster_member": true,
+      "historical_sha256": "1baf071c760158f7c34b6e7b8df63eaf083bd27d49fcc1d4c0637ac3f26f16fb",
+      "input_kind": "target-input",
+      "mode": "100644",
+      "path": "static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/WindowTitlePolicyTests.swift",
+      "sha256": "1baf071c760158f7c34b6e7b8df63eaf083bd27d49fcc1d4c0637ac3f26f16fb"
+    }
+  ],
+  "role": "reviewed-current-selected-carbon-local-build-input-roster",
+  "schema": 1,
+  "target_input_count": 140
+}
