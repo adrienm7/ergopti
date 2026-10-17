@@ -3062,6 +3062,13 @@ These are software implementations; final hardware verification remains below.
       instead of enumerating own properties), or an admission verdict reused
       within one synchronous operation; keep the deep-mutation refusals that
       `test_config_migrate` pins. `ConfigMigrateRegistryChecks` counts the calls.
+- [ ] **Intermittent compiled prior-release upgrade input.** On October 17 the
+      Windows "Qualify compiled prior-release upgrade and installed full save"
+      step once read the pinned prior release's config without
+      `metrics.metrics_enabled` (`Native prior Metrics enabled value differs`,
+      undefined instead of false) and passed on a rerun. Check whether the prior
+      release's first boot writes that key from a deferred save that can lose
+      the race with the smoke shutdown, and observe the profile only after it.
 - [ ] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
       The typing watcher returns at `IsCategoryGated("Hotstrings")` before its
       wrap block, so wrapping a selection with an OS layout works only when
