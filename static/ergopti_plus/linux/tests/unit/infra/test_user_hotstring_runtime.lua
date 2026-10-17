@@ -473,22 +473,33 @@ helpers.describe("programmable native Linux runtime", function()
 			end)
 		end)
 	end
-	for _, selected in ipairs({ "global", "dynamic" }) do
-		helpers.it("(user-hotstrings-native) refuses foreign inverse at zero builtin rules in actual " .. selected .. " scope", function()
-			with_runtime(function(f)
-				f.zero_builtin = true
-				with_configuration_scope(f, function(c)
-					helpers.assert_eq(c.Dynamic.get_rules_count(), 0)
-					local scope = selected == "global" and c.scope or c.dynamic_scope
-					helpers.assert_true(scope.apply(selected == "global" and "recommended" or false))
-					helpers.assert_true(f.User.reload())
-					helpers.assert_eq(scope.revert(), false)
-					helpers.assert_true(scope.pending(), "strict programmable refusal retains the inverse despite zero builtins")
-					helpers.assert_eq(f.User.is_enabled(), false)
-				end)
+	helpers.it("(user-hotstrings-native) refuses foreign inverse at zero builtin rules in actual global scope", function()
+		with_runtime(function(f)
+			f.zero_builtin = true
+			with_configuration_scope(f, function(c)
+				helpers.assert_eq(c.Dynamic.get_rules_count(), 0)
+				helpers.assert_true(c.scope.apply("recommended"))
+				helpers.assert_true(f.User.reload())
+				helpers.assert_eq(c.scope.revert(), false)
+				helpers.assert_true(c.scope.pending(), "strict programmable refusal retains the inverse despite zero builtins")
+				helpers.assert_eq(f.User.is_enabled(), false)
 			end)
 		end)
-	end
+	end)
+	-- The dynamic families never include the programmable hotstrings, which keep
+	-- their own start/cancel owner (2026-10-17): their selection leaves them as is.
+	helpers.it("(user-hotstrings-native) a dynamic family selection leaves the programmable hotstrings alone", function()
+		with_runtime(function(f)
+			f.zero_builtin = true
+			with_configuration_scope(f, function(c)
+				local before = f.User.is_enabled()
+				helpers.assert_true(c.dynamic_scope.apply(false))
+				helpers.assert_eq(f.User.is_enabled(), before, "clearing the dynamic families never switches user code")
+				helpers.assert_true(c.dynamic_scope.revert())
+				helpers.assert_eq(f.User.is_enabled(), before)
+			end)
+		end)
+	end)
 	helpers.it("(user-hotstrings-native) restores acknowledged unavailable builtin posture at zero rules without masking user refusal", function()
 		with_runtime(function(f)
 			f.zero_builtin = true

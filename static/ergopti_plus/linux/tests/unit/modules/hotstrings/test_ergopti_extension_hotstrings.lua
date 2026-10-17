@@ -499,7 +499,13 @@ helpers.describe("Single shipped source binding admission", function()
 				helpers.assert_eq(categories.magickey.sections.replace.description.en, "Transform a key into the ★ key")
 				helpers.assert_eq(categories.magickey.sections.repeat_corrections.count, 14)
 				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), false)
+				-- The category's « check all » never reaches a section an extension
+				-- binds and draws in its own submenu (2026-10-17); the section's own
+				-- toggle still opens the registered metadata-only gate.
 				helpers.assert_true(Config.set_all_sections("magickey", true))
+				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), false,
+					"a category selection leaves the extension-bound section to its extension")
+				helpers.assert_true(Config.toggle_section("magickey", "replace"))
 				helpers.assert_eq(Config.is_section_enabled("magickey", "replace"), true,
 					"the actual registered metadata-only native gate opens after exact selection ACK")
 				helpers.assert_eq(#Config.personal_file_sources(), 0, "a shipped source grants no personal adoption authority")
