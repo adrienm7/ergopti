@@ -46,7 +46,14 @@ helpers.describe("word-reset preferences", function()
 			package.loaded["infra.preferences"] = nil
 			local restarted = helpers.load_with_stubs("infra.preferences").load(path)
 			helpers.assert_eq(restarted.idle_reset_seconds, 0)
-			helpers.assert_eq(restarted.click_resets_word, true)
+			-- A save is sparse: a value equal to the manifest default deletes its
+			-- key, so the restarted state reads it as absent and the default applies.
+			helpers.assert_nil(restarted.click_resets_word, "the default click setting is stored as absent")
+			helpers.assert_eq(preferences.save(path, { idle_reset_seconds = 7.5, click_resets_word = false }, {}, {}), true)
+			package.loaded["infra.preferences"] = nil
+			local again = helpers.load_with_stubs("infra.preferences").load(path)
+			helpers.assert_eq(again.idle_reset_seconds, 7.5)
+			helpers.assert_eq(again.click_resets_word, false)
 		end)
 	end)
 
