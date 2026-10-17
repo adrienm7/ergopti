@@ -152,11 +152,17 @@ async function observe(source, root, scenario) {
 								fs.unlinkSync(path.join(probe, 'suspend_restore.marker'));
 							const logs = path.join(probe, 'ergopti_plus/logs');
 							fs.mkdirSync(logs, { recursive: true });
+							// A real boot logs the staged and the full Hotstrings menu
+							// renders; the smoke requires both, within its budget.
+							const render = (ms) =>
+								`[INFO] [BootProfile] MENU/initMenu: hotstrings menu rendered: +${ms} ms (total ${ms} ms).\n`;
 							fs.writeFileSync(
 								path.join(logs, 'ErgoptiPlus_20261004.log'),
 								warm && scenario === 'logged-error'
 									? '[ERROR] inert warm failure\n'
-									: '[INFO] inert ready\n'
+									: render(15) +
+											render(scenario === 'slow-render' ? 3200 : 40) +
+											'[INFO] inert ready\n'
 							);
 							const receipt = {
 								schema_version: 1,
@@ -594,6 +600,7 @@ async function check(source, root = ROOT) {
 		'retired-malformed',
 		'retired-duplicate',
 		'retired-missing',
+		'slow-render',
 		'ready'
 	]) {
 		const result = await observe(source, root, scenario);
@@ -621,11 +628,16 @@ async function check(source, root = ROOT) {
 		);
 		assert.equal(
 			result.warmCalls,
-			['first-early-exit', 'first-save-missing'].includes(scenario) ? 0 : 1,
+			['first-early-exit', 'first-save-missing', 'slow-render'].includes(scenario) ? 0 : 1,
 			scenario + ': the intended real runner branch must execute'
 		);
 		if (scenario.startsWith('save-'))
 			assert.match(result.diagnostics.join('\n'), /reloaded-config:.*full-save receipt/);
+		if (scenario === 'slow-render')
+			assert.match(
+				result.diagnostics.join('\n'),
+				/fresh-config: a Hotstrings menu render took 3200 ms \(budget 2000 ms/
+			);
 		if (scenario === 'first-save-missing')
 			assert.match(result.diagnostics.join('\n'), /fresh-config:.*no fresh full-save receipt/);
 		if (scenario === 'early-exit')
