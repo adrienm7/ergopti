@@ -240,6 +240,37 @@ function validate(features) {
 		if (f.cleared !== undefined && ![false, 'none', ''].includes(f.cleared)) {
 			throw new Error(`feature ${f.path}: "cleared" must be an off value (false, "none" or "")`);
 		}
+		// An open catalogue: the menu offers these values and a free entry for any
+		// other, so unlike choice_values they need not be contiguous integers.
+		if (f.preset_values !== undefined) {
+			const presets = f.preset_values;
+			if (
+				f.type !== 'number' ||
+				f.choice_values !== undefined ||
+				!Array.isArray(presets) ||
+				presets.length < 2 ||
+				presets.some(
+					(value, index) =>
+						typeof value !== 'number' ||
+						!Number.isFinite(value) ||
+						(index > 0 && value <= presets[index - 1])
+				)
+			) {
+				throw new Error(
+					`feature ${f.path}: preset_values must be strictly ascending finite numbers on a number feature without choice_values`
+				);
+			}
+			for (const platform of f.platforms) {
+				if (
+					!presets.includes(resolveDefault(f, platform)) ||
+					!presets.includes(resolveRecommended(f, platform))
+				) {
+					throw new Error(
+						`feature ${f.path}: preset_values must contain default and recommended values`
+					);
+				}
+			}
+		}
 		if (f.choice_values !== undefined) {
 			if (
 				f.type !== 'number' ||

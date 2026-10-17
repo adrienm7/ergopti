@@ -568,6 +568,137 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return true
 }
 
+; The engine global each word-reset setting publishes to.
+_EditorWordResetGlobal(Key, Value) {
+	global HSE_IdleResetSeconds, HSE_ClickResetsWord
+	if (Key == "idle_reset_seconds")
+		HSE_IdleResetSeconds := Value
+	else if (Key == "click_resets_word")
+		HSE_ClickResetsWord := Value
+	else
+		throw ValueError("Unknown word-reset setting: " . Key)
+}
+
+; One plan for both word-reset settings (hotstrings.idle_reset_seconds and
+; hotstrings.click_resets_word), through the same desired-state gateway as the
+; repeat key. The engine reads both live: no reload.
+_EditorBuildWordResetPlan(Key, Value) {
+	global Features
+	if _FeatureUsesDesiredState(Features) {
+		Plan := _FeatureBuildSinglePlan(Features, "hotstrings." . Key, Value, "")
+		Plan.publish := _EditorPublishDesiredWordReset.Bind(Plan.publish, Key, Value)
+		return Plan
+	}
+	return {
+		updates: [{ Section: "hotstrings", Key: Key, Value: Value }],
+		publish: _EditorPublishWordReset.Bind(Key, Value),
+	}
+}
+
+_EditorPublishDesiredWordReset(PublishFn, Key, Value) {
+	PublishFn.Call()
+	_EditorWordResetGlobal(Key, Value)
+}
+
+_EditorPublishWordReset(Key, Value) {
+	global Features
+	_EditorWordResetGlobal(Key, Value)
+	if IsSet(Features) && (Features is Map) && Features.Has("hotstrings")
+		Features["hotstrings"][Key] := Value
+	return true
+}
+
+; Persists one word-reset setting, publishes it to the engine and redraws the
+; tray so the tick and the caption follow.
+_EditorCommitWordReset(Key, Value, Context, WriterFn, NotifyFn, RebuildFn) {
+	global ConfigurationFile
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return _EditorCommitWordReset(Key, Value, Context, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	if !_EditorWriteToml(ConfigurationFile, Context,
+			_EditorBuildWordResetPlan.Bind(Key, Value), WriterFn, NotifyFn)
+		return false
+	try LoggerInfo("Editors", "hotstrings.{1} set to {2}.", Key, String(Value))
+	return _EditorRebuildAfterCommit(RebuildFn)
+}
+
+/**
+ * Sets the pause after which the next key starts a new word.
+ * @param {Number} Seconds Finite and non-negative; 0 disables the reset.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+SetHotstringsIdleResetSeconds(Seconds, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	if !HSE_ValidIdleResetSeconds(Seconds) {
+		try LoggerError("Editors", "Refused idle-reset delay: not a number of seconds, 0 or more.")
+		return false
+	}
+	return _EditorCommitWordReset("idle_reset_seconds", Seconds, "the idle-reset delay",
+		WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Parses a typed idle delay: a decimal point or comma, surrounding blanks
+ * allowed. Returns "" for anything that is no number of seconds, 0 or more.
+ * @param {String} Raw The prompt's text.
+ * @returns {Number|String}
+ */
+ParseHotstringsIdleResetSeconds(Raw) {
+	if !(Raw is String)
+		return ""
+	Text := StrReplace(Trim(Raw, " `t"), ",", ".")
+	if (Text == "" || !RegExMatch(Text, "^\d+(\.\d+)?$|^\.\d+$"))
+		return ""
+	Value := Text + 0
+	if (Value = Round(Value))
+		Value := Integer(Round(Value))
+	return HSE_ValidIdleResetSeconds(Value) ? Value : ""
+}
+
+/**
+ * Asks for a free idle delay, prefilled with the current one.
+ * @param {Func} PromptFn Optional seam with Ui_InputBox's signature.
+ * @param {Func} NotifyFn Optional seam called with the invalid-value message.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	InheritedCritical := A_IsCritical
+	if InheritedCritical {
+		Critical("Off")
+		try return PromptHotstringsIdleResetSeconds(PromptFn, WriterFn, NotifyFn, RebuildFn)
+		finally Critical(InheritedCritical)
+	}
+	Current := HSE_IdleResetSecondsCurrent()
+	Prefill := _MR_FormatFreeNumber(Current)
+	Prompt := t("menu.hotstrings.idle_reset_prompt")
+	Title := t("menu.hotstrings.idle_reset_title")
+	Answer := HasMethod(PromptFn, "Call") ? PromptFn.Call(Prompt, Title, "w380 h150", Prefill)
+		: Ui_InputBox(Prompt, Title, "w380 h150", Prefill)
+	if !(Answer is Object) || Answer.Result != "OK"
+		return false
+	Seconds := ParseHotstringsIdleResetSeconds(Answer.Value)
+	if (Seconds == "") {
+		try LoggerWarn("Editors", "Invalid idle-reset delay typed — ignored.")
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(t("menu.hotstrings.idle_reset_invalid"), "Icon!")
+		else
+			Ui_MsgBox(t("menu.hotstrings.idle_reset_invalid"), t("dialog.gestures.param_error_title"), "Icon!")
+		return false
+	}
+	return SetHotstringsIdleResetSeconds(Seconds, WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips whether a mouse click starts a new word.
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset("click_resets_word", !HSE_ClickResetsWordCurrent(),
+		"the click word-reset toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
 _PersonalInfoReportSaveFailure(NotifyFn := 0) {
 	try {
 		if HasMethod(NotifyFn, "Call")

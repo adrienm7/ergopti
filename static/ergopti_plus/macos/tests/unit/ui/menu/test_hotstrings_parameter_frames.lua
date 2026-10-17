@@ -370,4 +370,93 @@ helpers.describe("parameter parent is owned only by its existing shared consumer
 	end)
 end)
 
+-- The word-reset rows (hotstrings.idle_reset_seconds and hotstrings.click_resets_word):
+-- the shared renderer draws the presets, the free entry and the checkbox, and
+-- this driver answers with the keymap setters and the native prompt.
+local function with_word_reset(body, idle_seconds, prompt_answer)
+	with_frame(function(f)
+		local keymap, set = f.context.keymap, {}
+		local idle, click = idle_seconds, true
+		keymap.get_idle_reset_seconds = function() return idle end
+		keymap.set_idle_reset_seconds = function(value) set[#set + 1] = { "idle", value }; idle = value; return true end
+		keymap.is_click_resets_word_enabled = function() return click end
+		keymap.set_click_resets_word = function(value) set[#set + 1] = { "click", value }; click = value; return true end
+		f.context.do_reload = function() return true end
+		local dialog = require("infra.dialog_util")
+		local prompt, alert = dialog.text_prompt, dialog.block_alert
+		local alerts = 0
+		dialog.text_prompt = function() return f.captions("button.ok"), prompt_answer end
+		dialog.block_alert = function() alerts = alerts + 1 end
+		local ok, err = pcall(body, f, set, function() return alerts end)
+		dialog.text_prompt, dialog.block_alert = prompt, alert
+		if not ok then error(err, 0) end
+	end)
+end
+
+local function word_reset_rows(f)
+	local idle_caption = f.captions("menu.hotstrings.idle_reset")
+	local idle_row, click_row
+	for _, row in ipairs(assert(f.build()).menu) do
+		if type(row.title) == "string" and row.title:sub(1, #idle_caption) == idle_caption then idle_row = row end
+		if row.title == f.captions("menu.hotstrings.click_resets_word") then click_row = row end
+	end
+	return assert(idle_row, "the idle-reset choice must be drawn"), assert(click_row, "the click checkbox must be drawn")
+end
+
+helpers.describe("hotstrings word-reset rows", function()
+	helpers.it("lists the presets, ticks the stored one and sets a preset", function()
+		with_word_reset(function(f, set)
+			local idle, click = word_reset_rows(f)
+			local unit = f.captions("menu.hotstrings.idle_reset_unit")
+			helpers.assert_eq(idle.title, f.captions("menu.hotstrings.idle_reset") .. ": 3 " .. unit)
+			local titles = {}
+			for index, row in ipairs(idle.menu) do titles[index] = row.title end
+			helpers.assert_eq(titles, { f.captions("menu.hotstrings.idle_reset_off"), "1 " .. unit, "2 " .. unit,
+				"3 " .. unit, "5 " .. unit, "10 " .. unit, "-", f.captions("menu.hotstrings.idle_reset_custom") })
+			helpers.assert_eq(idle.menu[4].checked, true)
+			helpers.assert_true(idle.menu[8].checked ~= true, "a preset in force leaves the free entry unticked")
+			helpers.assert_eq(click.checked, true)
+			idle.menu[1].fn()
+			helpers.assert_eq(set, { { "idle", 0 } })
+			helpers.assert_eq(f.context.state.idle_reset_seconds, 0)
+			click.fn()
+			helpers.assert_eq(set[2], { "click", false })
+			helpers.assert_eq(f.context.state.click_resets_word, false)
+			helpers.assert_eq(f.calls.writes, 2, "each change is saved once")
+		end, 3)
+	end)
+
+	helpers.it("ticks the free entry for a value outside the presets and names it", function()
+		with_word_reset(function(f)
+			local idle = word_reset_rows(f)
+			helpers.assert_eq(idle.title, f.captions("menu.hotstrings.idle_reset") .. ": 4.5 "
+				.. f.captions("menu.hotstrings.idle_reset_unit"))
+			helpers.assert_eq(idle.menu[8].checked, true)
+			for index = 1, 6 do helpers.assert_true(idle.menu[index].checked ~= true) end
+		end, 4.5)
+	end)
+
+	helpers.it("stores a free value typed with a decimal comma", function()
+		with_word_reset(function(f, set, alerts)
+			local idle = word_reset_rows(f)
+			idle.menu[8].fn()
+			helpers.assert_eq(set, { { "idle", 1.5 } })
+			helpers.assert_eq(f.context.state.idle_reset_seconds, 1.5)
+			helpers.assert_eq(alerts(), 0)
+		end, 3, " 1,5 ")
+	end)
+
+	for _, answer in ipairs({ "-1", "abc", "", "inf" }) do
+		helpers.it("refuses the free value '" .. answer .. "' with an alert", function()
+			with_word_reset(function(f, set, alerts)
+				local idle = word_reset_rows(f)
+				helpers.assert_eq(idle.menu[8].fn(), false)
+				helpers.assert_eq(set, {})
+				helpers.assert_eq(alerts(), 1)
+				helpers.assert_eq(f.calls.writes, 0)
+			end, 3, answer)
+		end)
+	end
+end)
+
 return true

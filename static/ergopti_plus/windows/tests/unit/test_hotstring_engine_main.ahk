@@ -23,7 +23,7 @@
 ; ==========================
 
 HSE_TestReset() {
-    global HSE_Suppressed, _PrefixWatcherSuppressed
+    global HSE_Suppressed, _PrefixWatcherSuppressed, _PrefixLastKeyTick
     HSE_RegistryClear()
     HSE_Suppressed := 0
     ; Cancel any pending deferred PrefixWatcherSuppress(false) or HSE_Suppress(false)
@@ -41,6 +41,9 @@ HSE_TestReset() {
     ; then restores the canonical « fresh launch » boundary flag.
     HSE_HardReset()
     HSE_FeedReset(true)
+    ; A keystroke stamp left by an earlier test would read as a pause and
+    ; start a new word in the middle of this one (hotstrings.idle_reset_seconds).
+    _PrefixLastKeyTick := ""
 }
 
 

@@ -128,7 +128,15 @@ function M.new(defaults, delays_default)
 		last_key_was_complex       = false,
 		no_rescan_until            = 0,
 		lifecycle_generation       = 0,
-		WORD_TIMEOUT_SEC           = 5.0,
+		-- The pause, in seconds, after which the next key starts a new word
+		-- (hotstrings.idle_reset_seconds, 0 = never) and whether a mouse click
+		-- starts one (hotstrings.click_resets_word). Neutral here, so a bare
+		-- registry fixture keeps the buffer; keymap/init.lua seeds both from the
+		-- features manifest right after construction and owns their setters.
+		IDLE_RESET_SEC             = 0,
+		click_resets_word          = false,
+		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
+		WORD_TIMEOUT_SEC           = 0,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
 		DELAYS                     = {},
 		-- Per-section delay overrides (seconds), keyed first by owning group and
@@ -241,28 +249,15 @@ function M.new(defaults, delays_default)
 		s.DELAYS[k] = v
 	end
 
-	-- Recompute the word-inactivity timeout from the LARGEST active delay,
-	-- considering BOTH group delays and per-section overrides. A delay of 0
-	-- means "always-active" → the timeout must be infinite (0) so the buffer is
-	-- never auto-wiped before such a trigger can fire. Section delays MUST be
-	-- included: a long per-section window (e.g. comma_j = 5 s) would otherwise
-	-- be cut short by a timeout sized only to the group delays. Call again
-	-- whenever DELAYS or SECTION_DELAYS change (set_delay, load_toml).
+	-- Projects the configured idle reset onto the timeout the tap reads. The
+	-- timeout used to be derived from the LARGEST active delay (+0.5 s, or never
+	-- once any delay was 0, which every shipped configuration has), so in
+	-- practice the buffer was never wiped and a word-start hotstring typed after
+	-- a pause read the previous word. It is the user's setting now; delays and
+	-- section overrides still call this after every change, which keeps the
+	-- registry's snapshot/restore and refusal points unchanged.
 	s.recompute_word_timeout = function()
-		local has_infinite = false
-		local max_delay    = 0
-		local function consider(value)
-			if type(value) ~= "number" then return end
-			if value == 0        then has_infinite = true end
-			if value > max_delay then max_delay = value end
-		end
-		for _, delay in pairs(s.DELAYS) do consider(delay) end
-		for _, group_sections in pairs(s.SECTION_DELAYS) do
-			if type(group_sections) == "table" then
-				for _, delay in pairs(group_sections) do consider(delay) end
-			end
-		end
-		s.WORD_TIMEOUT_SEC = has_infinite and 0 or (max_delay + 0.5)
+		s.WORD_TIMEOUT_SEC = s.IDLE_RESET_SEC
 	end
 	s.recompute_word_timeout()
 

@@ -112,6 +112,8 @@
 				},
 				"magic_key_source_char": { "type": "string", "minLength": 1, "maxLength": 1 },
 				"repeat_key_enabled": { "type": "boolean" },
+				"idle_reset_seconds": { "type": "number", "minimum": 0 },
+				"click_resets_word": { "type": "boolean" },
 				"expansion_delay": { "type": "number", "minimum": 0 },
 				"preview_ai_enabled": { "type": "boolean" },
 				"preview_autocorrect_enabled": { "type": "boolean" },

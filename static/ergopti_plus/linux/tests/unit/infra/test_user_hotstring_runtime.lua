@@ -217,7 +217,7 @@ local function with_configuration_scope(f, body)
 		helpers.assert_true(Terminators.load())
 		local scope = require("infra.hotstrings_scope").new({ path = config_path, backup_suffix = ".scope-test.bak",
 			is_paused = function() return false end, config = Config, preferences = Preferences, dynamic = Dynamic,
-			repeat_key = Repeat, magic_key = require("modules.hotstrings.magic_key"), terminators = Terminators,
+			repeat_key = Repeat, word_reset = require("modules.hotstrings.word_reset"), magic_key = require("modules.hotstrings.magic_key"), terminators = Terminators,
 			preview_settings = require("modules.hotstrings.preview_settings") })
 		local dynamic_scope = require("infra.dynamic_hotstrings_scope").new({ path = config_path,
 			backup_path = config_path .. ".dynamic-test.bak", config = Config, preferences = Preferences, dynamic = Dynamic })

@@ -244,6 +244,16 @@ ReadScriptConfig(Cache) {
 					RawRepeat, "hotstrings.repeat_key_enabled")
 		else
 				HSE_RepeatEnabled := ManifestDefaultFor("hotstrings.repeat_key_enabled")
+		; When the engine forgets the current word: after a pause, after a click.
+		global HSE_IdleResetSeconds, HSE_ClickResetsWord
+		HSE_IdleResetSeconds := _FeatureStateIdleResetSeconds(
+			_FeatureStateIniGet(Cache, "hotstrings", "idle_reset_seconds"))
+		RawClick := _FeatureStateIniGet(Cache, "hotstrings", "click_resets_word")
+		if RawClick != "_"
+				HSE_ClickResetsWord := _FeatureStateValidateBoolean(
+					RawClick, "hotstrings.click_resets_word")
+		else
+				HSE_ClickResetsWord := ManifestDefaultFor("hotstrings.click_resets_word")
 		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 				HSE_AdvanceRuntimeDecisionGeneration()
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
@@ -253,6 +263,25 @@ _FeatureStateValidateBoolean(Value, Path) {
 	if !(Value is Integer) || (Value != 0 && Value != 1)
 		throw ValueError(Path . " must be a TOML boolean")
 	return Value == 1
+}
+
+; The configured idle delay, or the manifest default for an absent value. A
+; value that is no finite non-negative number is outdated configuration: one
+; WARNING, read as absent, never a boot failure.
+; @param Raw {Any} The raw TOML value, "_" when absent.
+; @returns {Number} Seconds; 0 disables the idle reset.
+_FeatureStateIdleResetSeconds(Raw) {
+	Default := ManifestDefaultFor("hotstrings.idle_reset_seconds")
+	if Raw == "_"
+		return Default
+	; HSE_ValidIdleResetSeconds's rule, restated because this reader also boots
+	; without the hotstring engine (tests/support/feature_state_boot_smoke.ahk).
+	; NaN compares unequal to itself; an infinity survives no subtraction.
+	if ((Raw is Integer) or (Raw is Float)) and Raw == Raw and Raw >= 0 and (Raw - Raw) == 0
+		return Raw
+	try LoggerWarn("Config", "hotstrings.idle_reset_seconds '{1}' is not a number of seconds, 0 or more — using {2} s.",
+		Raw is Object ? Type(Raw) : String(Raw), Default)
+	return Default
 }
 
 _FeatureStateValidateKanaOverride(Value) {

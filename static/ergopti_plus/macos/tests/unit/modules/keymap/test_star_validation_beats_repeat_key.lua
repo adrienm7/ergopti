@@ -343,7 +343,9 @@ helpers.describe("magic validation through the real keymap eventtap", function()
 			helpers.assert_true(type(effects.rows) == "table" and effects.rows[1].text == SLOW_REPLACEMENT,
 				"the control must prove that the tooltip advertised the true star mapping")
 
-			local consumed = press(STAR, 3.0)
+			-- 2.5 s: past STAR_TRIGGER (2 s) but short of the 3 s idle reset, which
+			-- would rightly start a new word and leave nothing for the ★ to complete.
+			local consumed = press(STAR, 2.5)
 			helpers.assert_eq(consumed, true,
 				"a true magic mapping must still win after STAR_TRIGGER elapsed")
 			helpers.assert_eq(#effects.emitted, 1,

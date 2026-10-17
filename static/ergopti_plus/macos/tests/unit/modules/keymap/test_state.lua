@@ -116,14 +116,25 @@ helpers.describe("State.new: delays and word timeout", function()
 		helpers.assert_eq(s.DELAYS.dynamichotstrings, 0.4)
 	end)
 
-	helpers.it("computes WORD_TIMEOUT_SEC = max_delay + 0.5", function()
+	-- The timeout was derived from the largest delay (+0.5 s, or never once one
+	-- delay was 0), so every shipped configuration kept the buffer forever and a
+	-- word-start hotstring typed after a pause read the previous word. It is the
+	-- user's hotstrings.idle_reset_seconds now, independent of the delays.
+	helpers.it("starts neutral: no idle reset until keymap seeds the setting", function()
 		local s = State.new(make_defaults(), { a = 0.3, b = 0.4 })
-		helpers.assert_eq(s.WORD_TIMEOUT_SEC, 0.9)
+		helpers.assert_eq(s.WORD_TIMEOUT_SEC, 0)
+		helpers.assert_eq(s.click_resets_word, false)
 	end)
 
-	helpers.it("uses 0 (infinite) when any delay is 0", function()
+	helpers.it("projects the configured idle reset whatever the delays", function()
 		local s = State.new(make_defaults(), { a = 0.3, b = 0 })
-		helpers.assert_eq(s.WORD_TIMEOUT_SEC, 0)
+		s.IDLE_RESET_SEC = 3
+		s.recompute_word_timeout()
+		helpers.assert_eq(s.WORD_TIMEOUT_SEC, 3,
+			"an always-active delay must no longer force an infinite timeout")
+		s.DELAYS.a = 9
+		s.recompute_word_timeout()
+		helpers.assert_eq(s.WORD_TIMEOUT_SEC, 3, "a long delay must not stretch the user's pause")
 	end)
 end)
 

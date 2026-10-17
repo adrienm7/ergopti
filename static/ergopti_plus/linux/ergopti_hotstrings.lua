@@ -781,6 +781,9 @@ local function main()
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
 	local TapHold = require("platform.remap.tap_hold_manager")
+	-- When the buffer forgets the current word: after a pause and on a click.
+	-- Required here for the same upvalue budget as TapHold.
+	local WordReset = require("modules.hotstrings.word_reset")
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
@@ -966,6 +969,15 @@ local function main()
 		-- from this. The CPU clock barely advances between keystrokes on Linux, so
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
+
+		-- A pause longer than hotstrings.idle_reset_seconds ends the word: the
+		-- buffered text was typed before it and this key starts a new one, so a
+		-- word-start hotstring fires again instead of reading stale context.
+		if WordReset.observe_key(now_ms) then
+			_last_offered = nil
+			engine:reset()
+			Logger.debug(LOG, "Idle pause — the next key starts a new word.")
+		end
 
 		-- Detect current app for per-app keylogger stats. Read from the
 		-- process_lifecycle focus cache (updated off the input path at 250 ms
@@ -1362,6 +1374,9 @@ local function main()
 			})
 		end
 		if script_actions.is_paused() then return end
+		-- A control key is a keystroke too: the idle pause is measured from it.
+		-- Whatever it does to the buffer follows, so its verdict is not needed.
+		WordReset.observe_key(math.floor(Monotonic.now_ms()))
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
 		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
 		if key_name == "tab" then
@@ -1533,7 +1548,13 @@ local function main()
 		wrap_on_type.on_pointer_down()
 		-- A click may clear or move the selection a tone step would replace.
 		if prediction_engine then prediction_engine.drop_tone("pointer click") end
-		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
+		-- The guard above emptied the buffer at an unknown position. With
+		-- hotstrings.click_resets_word the clicked caret starts a word instead,
+		-- so a word-start hotstring fires on the first word typed there.
+		local at_word_start = WordReset.click_resets_word()
+		engine:reset(at_word_start)
+		Logger.debug(LOG, "Pointer click — text privacy state invalidated, buffer reset (word start: %s).",
+			tostring(at_word_start))
 	end
 
 	-- 8.7b) Restore the word-delimiter choices.

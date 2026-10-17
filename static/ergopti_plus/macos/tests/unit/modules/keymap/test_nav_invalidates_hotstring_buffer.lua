@@ -177,7 +177,9 @@ helpers.describe("navigation invalidates hotstring buffer", function()
 
 				helpers.assert_eq(state.buffer, "",
 					"cursor movement must revoke the authoritative magic-action buffer immediately")
-				helpers.assert_eq(state.start_is_word_boundary, false)
+				-- An arrow lands mid-word; a click starts a new word under the shipped
+				-- hotstrings.click_resets_word (on), as on Windows and Linux.
+				helpers.assert_eq(state.start_is_word_boundary, action == "left-click")
 				helpers.assert_eq(state.llm_buffer, "agé",
 					"llm_reset_on_nav=false retains only the independent prompt context")
 				drain_immediate_timers(hs_stub)

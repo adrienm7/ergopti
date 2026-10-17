@@ -683,6 +683,7 @@ _LLM_Deps_State := "ready"
 #Include ../modules/keymap/llm_bridge.ahk
 #Include unit/test_llm_bridge_apply_expansion.ahk
 #Include unit/test_prefix_char_admission.ahk
+#Include unit/test_hotstring_idle_click_reset.ahk
 #Include unit/test_llm_bridge_buffer_cap.ahk
 #Include unit/test_llm_pointer_watch_transaction.ahk
 #Include unit/test_llm_tab_accept_policy.ahk
