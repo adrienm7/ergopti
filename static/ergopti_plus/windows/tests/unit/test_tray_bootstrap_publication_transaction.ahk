@@ -351,11 +351,17 @@ _TBPT_RegisterNativeFake(MenuObj, Label, Callback) {
 }
 
 _TBPT_NativeRootHasNoLoadingStep() {
-	global _MenuDispatcherEpoch, _MenuDispatchClickSequences
+	global _MenuDispatcherEpoch, _MenuDispatchClickSequences, _I18nLocale
 	SavedEpoch := _MenuDispatcherEpoch
 	SavedSequences := _MenuDispatchClickSequences
 	MenuPort := _TBPT_FakeMenu()
 	Commands := []
+	; The startup tray is labelled from the compiled startup projection, not from
+	; the live t() cache an earlier i18n test may have replaced: compare with
+	; the same authority so this test does not depend on test order.
+	Labels := Map()
+	for Row in SharedStartupTrayProjection(_I18nLocale)["commands"]
+		Labels[Row["command"]] := Row["label"]
 	try {
 		AssertTrue(_InstallNativeStartupTray((Id, *) => Commands.Push(Id), MenuPort, _TBPT_RegisterNativeFake))
 		AssertEqual(3, MenuPort.Items.Count, "only genuine native commands are published")
@@ -363,7 +369,7 @@ _TBPT_NativeRootHasNoLoadingStep() {
 		AssertFalse(MenuPort.Items.Has(t("common.loading")))
 		AssertFalse(MenuPort.Items.Has(t("menu.global.starting")))
 		for Id in ["suspend", "reload", "quit"] {
-			Item := MenuPort.Items[t("menu.global." . Id)]
+			Item := MenuPort.Items[Labels[Id]]
 			AssertTrue(Item["enabled"])
 			Item["callback"].Call()
 			AssertEqual(Id, Commands[Commands.Length])
