@@ -932,12 +932,33 @@ local function _forward_raw(ev, source)
 	end
 	if receipt.ok then
 		if ev.value == InputEvent.VALUE_UP then _output_owners[key] = nil end
-		return true
+		return true, receipt
 	end
 	_forwarded_down[key] = prior
 	M.emergency_stop(string.format("raw ownership settlement failed (code=%d value=%d): %s",
 		ev.code, ev.value, receipt.disposition))
 	return false
+end
+
+--- Whether this pass-through transition changes the aggregate desktop key.
+--- A coalesced dead-key press must not feed Compose when the desktop sees none.
+--- @param ev table Post-remap key event.
+--- @param source string Stable output source.
+--- @return boolean
+local function _capture_wire_transition(ev, source)
+	if not _intercept or not _broker or _consumed_down[source_key(source, ev.code)] then return true end
+	local view = _broker.view()
+	local down = false
+	for _, code in ipairs(view.down) do if code == ev.code then down = true; break end end
+	if ev.value == InputEvent.VALUE_DOWN then return not down end
+	local owner = _output_owners[source_key(source, ev.code)]
+	local row = owner and view.owners[owner]
+	if not row or row.state ~= "held" or not down then return false end
+	if ev.value == InputEvent.VALUE_REPEAT then return true end
+	for other, current in pairs(view.owners) do
+		if other ~= owner and current.code == ev.code and current.state == "held" then return false end
+	end
+	return true
 end
 
 local function _call_callback(label, callback, ...)
@@ -1560,6 +1581,7 @@ local function _dispatch_post_remap(ev, source)
 		or (ev.value == InputEvent.VALUE_REPEAT and held_role ~= nil)
 	local char, identity, capture_err
 	local row_plan = not is_modifier and _number_row.preview(ev, source) or nil
+	if not is_modifier and not row_plan and not _capture_wire_transition(ev, source) then capture_transition = false end
 	if row_plan then char, identity = row_plan.text, row_plan.identity
 	elseif capture_transition then char, identity, capture_err = _capture(ev.code, ev.value) end
 
@@ -1689,7 +1711,13 @@ local function _dispatch_post_remap(ev, source)
 		local delivered, row_text, row_identity = _number_row.deliver(row_plan, ev, source)
 		if not delivered then return end
 		char, identity = row_text, row_identity
-	elseif not _forward_raw(ev, source) then return end
+	else
+		local delivered, receipt = _forward_raw(ev, source)
+		if not delivered then return end
+		-- Ownership can settle without typing: duplicate downs, shared presses
+		-- and repeats of a key spent by an injection have no semantic text.
+		if receipt and receipt.native_writes == 0 then return end
+	end
 
 	-- Releases carry no meaning past modifier tracking and the hold above.
 	if not pressed then return end
