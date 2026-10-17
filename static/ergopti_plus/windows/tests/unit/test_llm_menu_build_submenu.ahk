@@ -204,7 +204,10 @@ _LBMS_ActualGroupParents() {
 	global _LLM_Menu, _LLM_Menu_Handle
 	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
 	SavedMenu := _LBMS_Fixture()
-	SavedHandle := _LLM_Menu_Handle
+	; The test publishes its own owner instead of inheriting one from an
+	; earlier test, and restores the exact prior presence.
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	SavedHandle := Menu(), _LLM_Menu_Handle := SavedHandle
 	try {
 		for Id, Key in Map("llm_trigger", "menu.llm.trigger_menu_title",
 				"llm_display", "menu.llm.display_menu_title", "llm_navigation", "menu.llm.nav_menu_title") {
@@ -229,7 +232,7 @@ _LBMS_ActualGroupParents() {
 	} finally {
 		Root["llm_menu"] := SavedRows
 		_LLM_Menu := SavedMenu
-		_LLM_Menu_Handle := SavedHandle
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
 }
 Test("llm fixed parents: actual main builder reads current shared captions and real children", _LBMS_ActualGroupParents)
@@ -326,7 +329,9 @@ Test("llm fixed parents: valid empty native navigation and missing-child refusal
 _LBMS_ActualOffGroupsAndSourceWithdrawal() {
 	global _LLM_Menu, _LLM_Menu_Handle
 	Root := _MR_GetManifestRoot(), SavedRows := Root["llm_menu"]
-	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), PriorHandle := HadHandle ? _LLM_Menu_Handle : 0
+	SavedHandle := Menu(), _LLM_Menu_Handle := SavedHandle
 	try {
 		_LLM_Menu["enabled"] := false
 		Built := LLM_Menu_BuildSubmenu()
@@ -363,14 +368,15 @@ _LBMS_ActualOffGroupsAndSourceWithdrawal() {
 	} finally {
 		Root["llm_menu"] := SavedRows
 		_LLM_Menu := SavedMenu
-		_LLM_Menu_Handle := SavedHandle
+		_LLM_Menu_Handle := HadHandle ? PriorHandle : unset
 	}
 }
 Test("llm fixed parents: real off-state and withdrawal retain unrelated native owners", _LBMS_ActualOffGroupsAndSourceWithdrawal)
 
 _LBMS_ActualWarningAnchor() {
 	global _LLM_Menu, _LLM_Menu_Handle
-	SavedMenu := _LBMS_Fixture(), SavedHandle := _LLM_Menu_Handle
+	SavedMenu := _LBMS_Fixture()
+	HadHandle := IsSet(_LLM_Menu_Handle), SavedHandle := HadHandle ? _LLM_Menu_Handle : 0
 	Destination := Menu()
 	_LLM_Menu_Handle := Destination
 	try {
@@ -389,7 +395,7 @@ _LBMS_ActualWarningAnchor() {
 	} finally {
 		Destination.Delete()
 		_LLM_Menu := SavedMenu
-		_LLM_Menu_Handle := SavedHandle
+		_LLM_Menu_Handle := HadHandle ? SavedHandle : unset
 	}
 }
 Test("llm fixed parents: retained native warning keeps its actual backend anchor", _LBMS_ActualWarningAnchor)
