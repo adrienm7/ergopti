@@ -76,6 +76,36 @@ reservation component has eight passing cases and three intended negative contro
 it is not yet connected to real capture or semantic completion.
 Physical Windows and native macOS/Linux qualification remain false or OPEN.
 
+### October 17 native Windows TLS Git installation prefix
+
+The completed hosted Windows run at5ebff1cbe4 executes12,863 cases:12,854 PASS
+and9 FAIL. Seven network fixtures fail at the native TLS constructor's directories
+phase, before root installation; two digit fixtures are corrected on later dev.
+The exact runner image records Git2.56, whose native prefix migrated from mingw64
+to ucrt64. The fixture previously hardcoded only mingw64.
+
+The original constructor expression and original directory verifier reproduce
+that UCRT-only refusal after the legacy case passes. The correction selects
+exactly one supported native prefix containing git.exe. Neither or two owners
+are refused; a credential-manager compatibility directory supplies no authority.
+Directory ancestry, source-image fences, native imports, module identity and
+OpenSSL version checks remain required. No cross-prefix DLL fallback is added.
+
+All six directory cases and their registration through the original scope-control
+owner pass with natural0, including the original AHK scope owner, one complete
+case and natural0. These directory controls start no TLS server and modify no
+trust store. All seven complete Windows VM network scenarios then execute one
+case each and finish FAIL with natural1. Native TLS initialization reaches ready,
+but the last trust-install observation remains before_add with untrusted state;
+the required root-removal and service-closure acknowledgements are not received.
+Some final assertions also reject those missing closure receipts. No scenario
+receives native success, and a later empty certificate lookup cannot replace its
+missing original cleanup acknowledgement. Updated hosted UCRT transport receiving
+remains OPEN. macOS uses its separate native HTTP wire fixture; Linux uses its
+own TLS fixture. Their native qualification and the existing macOS trust/cleanup
+failures remain OPEN. No Windows prefix receipt qualifies either platform or a
+physical device.
+
 ### October 17 canonical direct-digit fixture ownership
 
 The inactive and capacity digit scenarios previously changed public KLE globals
