@@ -1993,6 +1993,47 @@ for _TCF_Withdrawal in ["load", "unload"]
 	Test("terminal-canonical-held: " . _TCF_Withdrawal . " cannot prune original recipes or snapshots",
 		_LNTR_WithState.Bind(_TCF_HeldSourceWithdrawal.Bind(_TCF_Withdrawal)))
 
+/** Completed C registration keeps native retirement authority after Frame closure. */
+_TCH_CompletedNativeStop(Mode) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerRuntimeEpoch
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerModule
+	State := _LNTR_PortState(), OriginalPort := _LLM_NavEventOwnerPort, NativeModule := 0
+	State.Port.Delete("register_terminal_routes"), State.Port.Delete("list_terminal_held_recipes")
+	try {
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port), "the original C registration must complete")
+		AssertTrue(_LLM_NavEventOwnerModule is Integer && _LLM_NavEventOwnerModule > 0)
+		NativeModule := _LLM_NavEventOwnerModule
+		AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown, "this is completed custody, not an unknown Frame")
+		Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		Before := KeylayoutEmulation_CaptureCanonicalSource()
+		if Mode == "source-withdrawal" {
+			KeylayoutEmulation_Unload()
+			AssertFalse(Before["current"].Call(), "the canonical source is actually withdrawn")
+		}
+		if Mode == "hidden-module" {
+			_LLM_NavEventOwnerPort := 0
+			_LLM_NavEventOwnerModule := 0
+		} else
+			_LLM_NavEventOwnerPort := Map("stop", (*) => 1)
+		AssertFalse(LLM_NavEventOwner_Stop(), "public state cannot retire a completed genuine C registration")
+		AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch, "an unobserved ACK cannot advance the native lifetime")
+		AssertTrue(Recipes == _LLM_NavEventOwnerTerminalRouteRecipes, "native recipe holders remain owned")
+		_LLM_NavEventOwnerModule := NativeModule, _LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "only the original native Stop retires this lifetime")
+	} finally {
+		if NativeModule
+			_LLM_NavEventOwnerModule := NativeModule
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the actual C lifetime must retire before fixture restoration")
+		_LLM_NavEventOwnerPort := OriginalPort
+	}
+}
+
+for _TCH_StopMode in ["custom", "hidden-module", "source-withdrawal"]
+	Test("terminal-canonical-history-stop: completed genuine registration rejects " . _TCH_StopMode,
+		_LNTR_WithState.Bind(_TCH_CompletedNativeStop.Bind(_TCH_StopMode)))
+
 /** Receives the actual x64 DLL without starting a keyboard hook or emitting input. */
 _TRE_GenuineNativeCount() {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerStarted
@@ -2077,3 +2118,52 @@ _TRE_ValueError(Operation, ExpectedMessage) {
 		. "; detail=" . (IsObject(Failure) ? Failure.Message . "; extra=" . Failure.Extra . "; stack=" . Failure.Stack : "no exception"))
 	AssertEqual(ExpectedMessage, Failure.Message, "the actual refusal belongs to the count/span owner")
 }
+
+_TCH_CompletedNativeStopPermitsControlledSuccessor() {
+	_LNTR_WithState(Body)
+
+	Body() {
+		_TCH_CompletedNativeStop("custom")
+		_LNEO_LifecycleReplayOwnsTransactionAndKeepsTerminalOwnerDetached()
+	}
+}
+
+Test("terminal-canonical-history-stop: actual native retirement permits a controlled successor",
+	_TCH_CompletedNativeStopPermitsControlledSuccessor)
+
+_TCH_DirectNativeRegistrationStop(Mode) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerModule
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerTerminalRouteRecipes
+	Port := _LLM_NavEventOwnerPort, NativeModule := 0
+	try {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "prior actual C debt must retire before direct registration")
+		AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded())
+		NativeModule := _LLM_NavEventOwnerModule
+		Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(_TRE_Routes())
+		AssertEqual(0, _LLM_NavEventOwnerNativeRegisterTerminalRoutes(17, 19, 23, Bindings, 196),
+			"the original direct ABI registers actual C storage without an AHK Frame")
+		Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		if Mode == "hidden-module"
+			_LLM_NavEventOwnerModule := 0
+		else
+			_LLM_NavEventOwnerPort := Map("stop", (*) => 1)
+		AssertFalse(LLM_NavEventOwner_Stop(), "direct genuine registration requires its actual native Stop receipt")
+		AssertEqual(Epoch, _LLM_NavEventOwnerRuntimeEpoch)
+		AssertTrue(Recipes == _LLM_NavEventOwnerTerminalRouteRecipes)
+		_LLM_NavEventOwnerModule := NativeModule, _LLM_NavEventOwnerPort := 0
+		Probe := _LLM_NavEventOwnerNativeListTerminalHeldRecipes(17, Buffer(512, 0), 64)
+		AssertEqual(0, Probe["status"], "refused retirement keeps the genuine registered C owner")
+		AssertTrue(LLM_NavEventOwner_Stop(), "the exact original Stop retires direct registration")
+	} finally {
+		if NativeModule
+			_LLM_NavEventOwnerModule := NativeModule
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "direct ABI cleanup receives actual C retirement")
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+for _TCH_DirectStopMode in ["custom", "hidden-module"]
+	Test("terminal-canonical-history-stop: direct genuine registration rejects " . _TCH_DirectStopMode,
+		_LNTR_WithState.Bind(_TCH_DirectNativeRegistrationStop.Bind(_TCH_DirectStopMode)))

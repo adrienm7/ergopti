@@ -367,7 +367,7 @@ LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := fal
 					_LLM_NavEventOwnerLifecycleResumePort := _LLM_NavEventOwnerPort
 				}
 				ShouldStop := _LLM_NavEventOwnerStarted || (_LLM_NavEventOwnerPort is Map)
-					|| _LLM_NavEventOwnerModule != 0
+					|| _LLM_NavEventOwnerModule != 0 || StopScope["requires_native"].Call()
 			} catch as Err {
 				_LLM_NavEventOwnerStopping := false
 				AdmissionFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
@@ -4030,7 +4030,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
 	static IssuedModule := 0, IssuedExports := 0, OriginalExports := 0
 	static ActiveFrame := 0, RetainedFrame := 0, ActiveStop := 0, Constructing := false
-	static Scopes := Map()
+	static Scopes := Map(), NativeRegistrationDebt := false
 	static OriginalDigitCapture := _LLM_NavEventOwnerCaptureDigitSource
 	static OriginalCandidateCapture := _LLM_NavEventOwnerCaptureTerminalCandidate
 	static OriginalCanonicalCapture := KeylayoutEmulation_CaptureCanonicalSource
@@ -4324,6 +4324,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 				throw Error("The registration lifetime changed before its native call.")
 			GuardFrame()
 			State.Genuine := GenuineCall
+			if GenuineCall
+				NativeRegistrationDebt := true
 			State.Raw := DllCall(Address, "UInt64", Owner, "UInt64", Generation,
 				"UInt64", LayoutId, "Ptr", Bindings, "UInt", Count, "Int")
 			return State.Raw
@@ -4400,7 +4402,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			Ticket.Frame := RetainedFrame.Frame, Ticket.Missing := true
 		}
 		Operations := Map("guard", GuardStop, "custom", CustomStop, "native", NativeStop,
-			"accept", AcceptTeardown, "settle", SettleStop, "close", CloseStop)
+			"requires_native", RequiresNativeStop, "accept", AcceptTeardown, "settle", SettleStop, "close", CloseStop)
 		Image := Operations.Clone()
 		Scopes[Operations] := {Image: Image, Close: CloseStop}
 		Ticket.Operations := Operations
@@ -4410,6 +4412,11 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		GuardStop() {
 			if ActiveStop != Ticket || Ticket.Closed || !OwnersCurrent() || !ScopeCurrent(Ticket.Operations)
 				throw Error("The original native stop dispatcher was withdrawn.")
+		}
+
+		RequiresNativeStop() {
+			GuardStop()
+			return NativeRegistrationDebt
 		}
 
 		CustomStop() {
@@ -4467,6 +4474,9 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			GuardStop()
 			if !A_IsCritical || !_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
 				return false
+			; Completed registration retains C debt until its actual Stop receipt.
+			if NativeRegistrationDebt && !ReceiptCurrent()
+				return false
 			State := Ticket.State
 			if !IsObject(State)
 				return !IsObject(Ticket.Frame) && UnknownCurrent() && EpochCurrent(Ticket.Epoch)
@@ -4479,6 +4489,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			GuardStop()
 			if !AcceptTeardown()
 				return false
+			if ReceiptCurrent()
+				NativeRegistrationDebt := false
 			State := Ticket.State
 			if !IsObject(State)
 				return true
@@ -4549,6 +4561,16 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	}
 	if Request == "begin_stop"
 		return BuildStop(Payload)
+	if Request == "export" {
+		_LLM_NavEventOwnerNativeEnsureLoaded()
+		if !_LLM_NavEventOwnerExports.Has(Payload)
+			throw Error("Navigation owner DLL export is unavailable")
+		Address := _LLM_NavEventOwnerExports[Payload]
+		; The direct ABI also owns registration storage without an AHK Frame.
+		if IssuedModule && Address == OriginalExports["ErgoptiNav_RegisterTerminalRoutes"]
+			NativeRegistrationDebt := true
+		return Address
+	}
 	if Request != "load"
 		throw ValueError("The native owner constructor request is invalid.")
 
@@ -4605,11 +4627,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 }
 
 _LLM_NavEventOwnerNativeExport(Name) {
-	global _LLM_NavEventOwnerExports
-	_LLM_NavEventOwnerNativeEnsureLoaded()
-	if !_LLM_NavEventOwnerExports.Has(Name)
-		throw Error("Navigation owner DLL export is unavailable")
-	return _LLM_NavEventOwnerExports[Name]
+	return _LLM_NavEventOwnerNativeEnsureLoaded("export", Name)
 }
 
 _LLM_NavEventOwnerNativeRequireOk(Status, Operation) {
