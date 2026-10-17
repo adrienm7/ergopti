@@ -861,8 +861,13 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	const role = macRoleBody(body, 'managed-ollama-native', 34);
-	for (const step of Mac.selected(body, 'managed-ollama-native')) {
+	const role = macRoleBody(body, 'managed-ollama-native', 32);
+	// The clean source build runs in its own parallel cell of the same stage.
+	const producer = macRoleBody(body, 'managed-ollama-build', 9);
+	for (const step of [
+		...Mac.selected(body, 'managed-ollama-native'),
+		...Mac.selected(body, 'managed-ollama-build')
+	]) {
 		assert.match(step.body, /^          GOTOOLCHAIN: 'local'$/m);
 		assert.match(step.body, /^          ERGOPTI_RELEASE_TAG: '\$\{\{ inputs\.tag \}\}'$/m);
 		assert.match(
@@ -876,10 +881,10 @@ function checkManagedOllamaNative(body) {
 			/^          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '\$\{\{ env\.MACOS_STAGE_ARCHITECTURE \}\}'$/m
 		);
 	}
-	const acquire = pipeline.step(role, 'Acquire and verify genuine pinned upstream inputs');
+	const acquire = pipeline.step(producer, 'Acquire and verify genuine pinned upstream inputs');
 	assert.equal(
 		pipeline.stepField(acquire, 'if'),
-		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+		Mac.condition('managed-ollama-build', '${{ !cancelled() }}')
 	);
 	assert.match(
 		acquire,
@@ -887,11 +892,46 @@ function checkManagedOllamaNative(body) {
 	);
 	assert.match(acquire, /actual == identity\['sha256'\]/);
 	assert.match(acquire, /archive\.stat\(\)\.st_size == identity\['bytes'\]/);
-	const build = pipeline.step(role, 'Build and admit the actual native source asset');
+	const build = pipeline.step(producer, 'Build and admit the actual native source asset');
 	assert.equal(
 		pipeline.stepField(build, 'if'),
+		Mac.condition('managed-ollama-build', '${{ !cancelled() }}')
+	);
+	assert.equal(pipeline.stepField(build, 'id'), 'ollama-native-producer');
+	const seal = pipeline.step(producer, 'Seal the clean native source build for its receiving cell');
+	assert.equal(
+		pipeline.stepField(seal, 'if'),
+		Mac.condition(
+			'managed-ollama-build',
+			"${{ !cancelled() && steps.ollama-native-producer.outcome == 'success' }}"
+		)
+	);
+	assert.match(
+		seal,
+		/^          node tools\/ci\/managed-ollama-handoff\.cjs seal "\$RUNNER_TEMP\/managed-ollama-handoff"$/m
+	);
+	const hand = pipeline.step(producer, 'Hand the clean native source build to its receiving cell');
+	assert.match(
+		hand,
+		/^          name: managed-ollama-build-\$\{\{ env\.MACOS_STAGE_ARCHITECTURE \}\}-\$\{\{ github\.sha \}\}-\$\{\{ github\.run_id \}\}-\$\{\{ github\.run_attempt \}\}$/m
+	);
+	assert.match(hand, /^          if-no-files-found: error$/m);
+	assert.doesNotMatch(producer, /actions\/cache|GOCACHE|GOMODCACHE/);
+	const admission = pipeline.step(
+		role,
+		'Receive and admit the clean native source asset from its build cell'
+	);
+	assert.equal(pipeline.stepField(admission, 'id'), 'ollama-native-build');
+	assert.equal(
+		pipeline.stepField(admission, 'if'),
 		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
 	);
+	assert.match(
+		admission,
+		/^          node tools\/ci\/managed-ollama-handoff\.cjs receive "\$RUNNER_TEMP\/managed-ollama-handoff"$/m
+	);
+	assert.match(admission, /^          GITHUB_TOKEN: \$\{\{ github\.token \}\}$/m);
+	assert.doesNotMatch(role, /tools\/build\/build-macos-managed-ollama\.py/);
 	for (const command of [
 		'tools/build/build-macos-managed-ollama.py',
 		'tools/test/macos_managed_ollama_catalogue_test.py --native',
@@ -977,6 +1017,17 @@ for (const [from, to] of [
 	["actual == identity['sha256']", 'actual == actual'],
 	['macos_managed_ollama_catalogue_test.py --native', 'macos_managed_ollama_catalogue_test.py'],
 	['for profile in pac-inline pac-url explicit-proxy', 'for profile in pac-inline'],
+	['managed-ollama-handoff.cjs receive', 'managed-ollama-handoff.cjs seal'],
+	['managed-ollama-handoff.cjs seal', 'true managed-ollama-handoff.cjs seal'],
+	[
+		"env.MACOS_STAGE_ROLE == 'managed-ollama-build'",
+		"env.MACOS_STAGE_ROLE == 'managed-ollama-native'"
+	],
+	['id: ollama-native-producer', 'id: ollama-native-build'],
+	[
+		'managed-ollama-build-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}',
+		'managed-ollama-build-${{ env.MACOS_STAGE_ARCHITECTURE }}-latest'
+	],
 	['Executed 12 tests, with 0 failures', 'Executed 0 tests, with 0 failures'],
 	['    name: E2E tests', '    needs: package-macos\n    name: E2E tests'],
 	['    name: E2E tests', '    if: inputs.release\n    name: E2E tests'],

@@ -218,6 +218,7 @@
 		"test:linux:window-switch": "node ./tools/test/run-linux-window-switch-receipts.cjs",
 		"test:linux-window-switch-registration": "node ./tools/test/test-linux-window-switch-registration.cjs",
 		"test:linux-e2e-shards": "node ./tools/test/test-linux-e2e-shards.cjs",
+		"test:managed-ollama-handoff": "node ./tools/test/test-managed-ollama-handoff.cjs",
 		"test:linux:http-stream": "node ./tools/test/run-linux-http-stream-receipts.cjs",
 		"test:linux:runtime-native": "node ./tools/test/run-linux-runtime-native.cjs",
 		"test:linux-portable-network-runtime": "node ./tools/test/test-linux-portable-network-runtime.cjs",

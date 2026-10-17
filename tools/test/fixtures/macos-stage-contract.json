@@ -65,6 +65,10 @@
 			"id": "e2e-hs",
 			"metadata": {
 				"name": "E2E tests",
+				"permissions": {
+					"contents": "read",
+					"actions": "read"
+				},
 				"needs": ["test-hs"],
 				"runs-on": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}",
 				"timeout-minutes": "${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].timeout_minutes }}",
@@ -256,19 +260,10 @@
 					"shell": "bash"
 				},
 				{
-					"name": "Prepare genuine pinned Go toolchain",
-					"uses": "actions/setup-go@v5",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}"
-				},
-				{
-					"name": "Acquire and verify genuine pinned upstream inputs",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
-					"shell": "bash"
-				},
-				{
-					"name": "Build and admit the actual native source asset",
+					"name": "Receive and admit the clean native source asset from its build cell",
 					"id": "ollama-native-build",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"timeout-minutes": 50,
 					"shell": "bash"
 				},
 				{
@@ -324,6 +319,53 @@
 					"name": "Retain independent native Apple Shortcuts SDK observation",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+				},
+				{
+					"uses": "actions/setup-node@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}"
+				},
+				{
+					"uses": "actions/setup-python@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}"
+				},
+				{
+					"name": "Admit the canonical native toolchain and public inputs for the clean build",
+					"id": "ollama-build-toolchain",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Prepare genuine pinned Go toolchain",
+					"uses": "actions/setup-go@v5",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}"
+				},
+				{
+					"name": "Acquire and verify genuine pinned upstream inputs",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Build and admit the actual native source asset",
+					"id": "ollama-native-producer",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}",
+					"shell": "bash"
+				},
+				{
+					"name": "Seal the clean native source build for its receiving cell",
+					"id": "ollama-native-seal",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-producer.outcome == 'success') }}",
+					"timeout-minutes": 3,
+					"shell": "bash"
+				},
+				{
+					"name": "Hand the clean native source build to its receiving cell",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-seal.outcome == 'success') }}"
+				},
+				{
+					"name": "Retain the clean native source build evidence",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always() && env.ERGOPTI_OLLAMA_BUILD_ROOT != '') }}"
 				},
 				{
 					"uses": "actions/checkout@v4",

@@ -274,6 +274,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-linux-e2e-shards.cjs"],
 			"repro": "npm run test:linux-e2e-shards"
+		},
+		{
+			"id": "js-0440",
+			"ordinal": 440,
+			"name": "Managed Ollama receiving admits only this commit and run clean build from its parallel build cell",
+			"cmd": "node",
+			"args": ["tools/test/test-managed-ollama-handoff.cjs"],
+			"repro": "npm run test:managed-ollama-handoff"
 		}
 	]
 }

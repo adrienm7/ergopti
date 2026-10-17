@@ -80,7 +80,9 @@ check('push E2E includes every mandatory role and both managed architectures', (
 			['e2e-hs', 'ubuntu-latest', 360],
 			['tooltip-canvas', 'macos-15', 10],
 			['managed-ollama-native', 'macos-15', 60],
-			['managed-ollama-native', 'macos-15-intel', 60]
+			['managed-ollama-native', 'macos-15-intel', 60],
+			['managed-ollama-build', 'macos-15', 60],
+			['managed-ollama-build', 'macos-15-intel', 60]
 		]
 	);
 });
@@ -89,7 +91,7 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 	assert.deepEqual(
 		roles
 			.plan('e2e', ctx)
-			.slice(4)
+			.slice(6)
 			.map((cell) => [cell.role, cell.runner, cell.timeout_minutes]),
 		[
 			['item36-native', 'macos-latest', 25],
@@ -97,11 +99,11 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 			['lease-silence-native', 'macos-15-intel', 20]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[1].cells.length, 7);
+	assert.equal(complete(ctx).proof.chain[1].cells.length, 9);
 });
 check('release launch preserves both arches and every canonical supplied scenario', () => {
 	const ctx = { ...context, release: true, event_name: 'workflow_dispatch' };
-	assert.equal(roles.plan('e2e', ctx).length, 4);
+	assert.equal(roles.plan('e2e', ctx).length, 6);
 	assert.deepEqual(
 		roles
 			.plan('testbuild', ctx)
@@ -358,7 +360,9 @@ check('E2E human lots retain native architectures and scoped manual roles', () =
 		'Virtual-keyboard replay (stubbed)',
 		'Tooltip canvas (Apple silicon)',
 		'Managed Ollama (Apple silicon)',
-		'Managed Ollama (Intel)'
+		'Managed Ollama (Intel)',
+		'Managed Ollama build (Apple silicon)',
+		'Managed Ollama build (Intel)'
 	];
 	assert.deepEqual(roles.displayPlan('e2e', context).matrix, { lot: push });
 	assert.deepEqual(
@@ -657,6 +661,8 @@ check('role labels retain the independent authored human names without runtime m
 		['e2e', 'tooltip-canvas', 'arm64', '', 'Tooltip canvas (Apple silicon)'],
 		['e2e', 'managed-ollama-native', 'arm64', '', 'Managed Ollama (Apple silicon)'],
 		['e2e', 'managed-ollama-native', 'amd64', '', 'Managed Ollama (Intel)'],
+		['e2e', 'managed-ollama-build', 'arm64', '', 'Managed Ollama build (Apple silicon)'],
+		['e2e', 'managed-ollama-build', 'amd64', '', 'Managed Ollama build (Intel)'],
 		['e2e', 'item36-native', 'host', '', 'Archive update controls'],
 		['e2e', 'lease-silence-native', 'arm64', '', 'Lease silence (Apple silicon)'],
 		['e2e', 'lease-silence-native', 'amd64', '', 'Lease silence (Intel)'],
