@@ -73,7 +73,15 @@ local run_contract = function(helpers,load_manager,load_host)
     if controls.disconnect=='false'then return false end
     if controls.disconnect~='no_ack'then ucm.connected[id]=false end
    end,signal_handler_is_connected=function(ucm,id)return ucm.connected[id]==true end}}
-  package.loaded['adapters.event_loop']={add_idle_handler=function()end}
+  controls.idle_handlers={};controls.iterations=0
+  package.loaded.lgi.GLib.MainContext={default=function()return{iteration=function(_,blocking)
+   helpers.assert_eq(blocking,false,'Native GTK dispatch cannot block keyboard input')
+   controls.iterations=controls.iterations+1
+  end}end}
+  package.loaded['adapters.event_loop']={add_idle_handler=function(fn)
+   if controls.pump_refused then error('private event loop detail')end
+   controls.idle_handlers[#controls.idle_handlers+1]=fn
+  end}
   package.loaded['infra.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
   package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function()return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
@@ -94,6 +102,36 @@ local run_contract = function(helpers,load_manager,load_host)
   if not called then error(detail,0)end
  end
  helpers.describe('Actual native WebView acquisition and retirement debt',function()
+  helpers.it('(webview-single-pump) reopening pages retains one process-wide GTK handler',function()
+   fixture(function(m,c)
+    for _=1,25 do
+     helpers.assert_eq(m.show('metrics_typing','en'),true)
+     helpers.assert_eq(m.hide('metrics_typing'),true)
+    end
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    helpers.assert_eq(#c.idle_handlers,1,'Closed windows must not leave additional event-loop handlers behind')
+    for _,fn in ipairs(c.idle_handlers)do fn()end
+    helpers.assert_eq(c.iterations,1,'One idle tick dispatches the shared native context only once')
+    helpers.assert_eq(m.shutdown(),true)
+    for _,fn in ipairs(c.idle_handlers)do fn()end
+    helpers.assert_eq(c.iterations,1,'No native dispatch is needed while no windows are owned')
+    helpers.assert_eq(m.show('metrics_typing','en'),true)
+    helpers.assert_eq(#c.idle_handlers,1,'Reopening after shutdown reuses the retained process handler')
+    helpers.assert_eq(m.hide('metrics_typing'),true)
+   end)
+  end)
+  helpers.it('(webview-single-pump) refused event-loop integration cannot acknowledge a frozen window',function()
+   fixture(function(m,c)
+    c.pump_refused=true
+    helpers.assert_eq(m.show('metrics_typing','en'),false)
+    helpers.assert_eq(m.current_epoch('metrics_typing'),nil,'Refused acquisition must retire its native page')
+    helpers.assert_eq(c.windows[1].alive,false)
+    c.pump_refused=false
+    helpers.assert_eq(m.show('metrics_typing','en'),true,'A later request can retry integration')
+    helpers.assert_eq(#c.idle_handlers,1)
+    helpers.assert_eq(m.hide('metrics_typing'),true)
+   end)
+  end)
   for _,mode in ipairs({'ucm','register_false','register_throw','signal','present'})do
    helpers.it('(native-window-owner) acquisition refusal retains exact physical window: '..mode,function()
     fixture(function(m,c)
