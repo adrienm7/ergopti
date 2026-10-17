@@ -1354,6 +1354,38 @@ function stableV101PackageCollectorControls(repository) {
 	assert.deepEqual(result.qualification.methods, expectedPac);
 	assert.deepEqual(result.brew_qualification.methods, expectedBrew);
 	assert.equal(result.qualification.expires_at, profile.expires_at);
+	// The same admitted v1.0.2 receipt defers the named owned-runtime methods only.
+	const ownedMethods =
+		require('../ci/dev-release-qualification.cjs').STABLE_V102_OWNED_RUNTIME_METHODS;
+	assert.equal(result.owned_runtime_qualification.qualified, false);
+	assert.equal(result.owned_runtime_qualification.scope, 'macos-owned-runtime');
+	assert.deepEqual(result.owned_runtime_qualification.methods, ownedMethods);
+	const ownedPattern = new RegExp(evidence.pacSkipPattern(pac, brew));
+	for (const [suite, methods] of Object.entries(ownedMethods))
+		for (const method of methods) {
+			assert.equal(ownedPattern.test('ErgoptiPlusTests.' + suite + '/' + method), true);
+			assert.equal(ownedPattern.test('ErgoptiPlusTests.' + suite + '/' + method + 'Extra'), false);
+		}
+	const ownedExecuted = {
+		...selectedDefinitions,
+		OwnedRuntimeNamespaceCloseOrderTests: [
+			'testNativeEarlierCloseRefusalKeepsActualNamespaceLocked'
+		]
+	};
+	const ownedResult = evidence.evaluate(
+		transcript(ownedExecuted, 'Selected tests'),
+		0,
+		0,
+		undefined,
+		pac,
+		brew
+	);
+	assert.equal(ownedResult.exit_status, 1, 'an executed deferred owned-runtime case refuses');
+	assert.ok(
+		ownedResult.failures.some(
+			(failure) => failure.message === 'A deferred owned-runtime case was unexpectedly executed.'
+		)
+	);
 	const pattern = new RegExp(evidence.pacSkipPattern(pac, brew));
 	for (const [suite, methods] of Object.entries(definitions)) {
 		for (const method of methods) {

@@ -1056,7 +1056,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		'macos-brew-archive',
 		'macos-native-model-receiving',
 		'macos-shortcuts-discovery',
-		'macos-launch-appleevents'
+		'macos-launch-appleevents',
+		'macos-owned-runtime'
 	];
 	const selected = q.authorizeQualificationProfile(q.STABLE_V102_PROFILE_ID, context, clock);
 	assert.deepEqual(q.deferredScopes(selected), scopes);

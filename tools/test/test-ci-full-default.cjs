@@ -1028,7 +1028,8 @@ check(
 			'macos-brew-archive',
 			'macos-native-model-receiving',
 			'macos-shortcuts-discovery',
-			'macos-launch-appleevents'
+			'macos-launch-appleevents',
+			'macos-owned-runtime'
 		]);
 		const context = Object.fromEntries(
 			['repository', 'event_name', 'ref', 'release', 'prerelease', 'channel', 'tag', 'version'].map(

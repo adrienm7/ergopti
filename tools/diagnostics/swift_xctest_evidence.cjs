@@ -81,7 +81,10 @@ function brewQualification(receipt, env = process.env, now = new Date()) {
 			? {
 					methods: capturedMethods({
 						[path.basename(receipt.artifact.path, '.swift')]: [receipt.artifact.name]
-					})
+					}),
+					// The same approved v1.0.2 profile defers the named owned-runtime
+					// methods of this Swift step; its source, expiry and profile bind both.
+					owned_runtime_methods: capturedMethods(q.STABLE_V102_OWNED_RUNTIME_METHODS)
 				}
 			: {})
 	});
@@ -150,13 +153,38 @@ function brewQualificationDetails(admission, brewAdmission) {
 	};
 }
 
+/** The owned-runtime methods deferred by the admitted v1.0.2 Brew receipt. */
+function ownedRuntimeQualificationDetails(admission, brewAdmission) {
+	rootPattern(admission, brewAdmission);
+	if (
+		brewAdmission === null ||
+		brewAdmission.mode !== 'deferred' ||
+		!brewAdmission.owned_runtime_methods
+	)
+		return null;
+	return {
+		scope: 'macos-owned-runtime',
+		status: 'deferred',
+		qualified: false,
+		methods: brewAdmission.owned_runtime_methods,
+		source_sha: brewAdmission.source_sha,
+		profile_id: brewAdmission.profile_id,
+		expires_at: brewAdmission.expires_at
+	};
+}
+
 function pacSkipPattern(admission, brewAdmission = null) {
 	rootPattern(admission, brewAdmission);
 	if (admission === null || admission.mode !== 'deferred')
 		throw new Error('PAC execution may only be omitted under its active scope.');
 	const info = pacQualificationDetails(admission);
 	const brew = brewQualificationDetails(admission, brewAdmission);
-	const selectedMethods = { ...info.methods, ...(brew ? brew.methods : {}) };
+	const owned = ownedRuntimeQualificationDetails(admission, brewAdmission);
+	const selectedMethods = {
+		...info.methods,
+		...(brew ? brew.methods : {}),
+		...(owned ? owned.methods : {})
+	};
 	const methods = Object.entries(selectedMethods).flatMap(([suite, names]) =>
 		names.map((name) => suite + '/' + name + '$')
 	);
@@ -191,6 +219,11 @@ function isDeferredPacCase(name, admission) {
 
 function isDeferredBrewCase(name, admission, brewAdmission) {
 	const info = brewQualificationDetails(admission, brewAdmission);
+	return info !== null && methodMatches(name, info.methods);
+}
+
+function isDeferredOwnedRuntimeCase(name, admission, brewAdmission) {
+	const info = ownedRuntimeQualificationDetails(admission, brewAdmission);
 	return info !== null && methodMatches(name, info.methods);
 }
 
@@ -240,6 +273,7 @@ function evaluate(
 	const tee = exitStatus(teeStatus);
 	const pacInfo = pacQualificationDetails(admission);
 	const brewInfo = brewQualificationDetails(admission, brewAdmission);
+	const ownedInfo = ownedRuntimeQualificationDetails(admission, brewAdmission);
 	const lines = cleanTranscript(text).split('\n');
 	const failures = [];
 	const completed = [];
@@ -296,6 +330,9 @@ function evaluate(
 		if (!completed.some((test) => test.name === name))
 			failures.push({ message: 'XCTest case did not complete: ' + name });
 	for (const name of started)
+		if (isDeferredOwnedRuntimeCase(name, admission, brewAdmission))
+			failures.push({ message: 'A deferred owned-runtime case was unexpectedly executed.' });
+	for (const name of started)
 		if (isDeferredPacCase(name, admission) || isDeferredBrewCase(name, admission, brewAdmission))
 			failures.push({
 				message: isDeferredPacCase(name, admission)
@@ -340,6 +377,7 @@ function evaluate(
 	return {
 		...(pacInfo !== null ? { qualification: pacInfo } : {}),
 		...(brewInfo !== null ? { brew_qualification: brewInfo } : {}),
+		...(ownedInfo !== null ? { owned_runtime_qualification: ownedInfo } : {}),
 		schema_version: 1,
 		script_status: script,
 		tee_status: tee,

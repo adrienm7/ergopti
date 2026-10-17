@@ -22,7 +22,8 @@ const STABLE_V102_SCOPE_IDS = Object.freeze([
 	'macos-brew-archive',
 	'macos-native-model-receiving',
 	'macos-shortcuts-discovery',
-	'macos-launch-appleevents'
+	'macos-launch-appleevents',
+	'macos-owned-runtime'
 ]);
 const STABLE_V102_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
@@ -34,6 +35,49 @@ const STABLE_V102_PAC_METHODS = freeze({
 const STABLE_V102_BREW_METHODS = freeze({
 	HomebrewArchiveAcceptanceTests: [
 		'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
+	]
+});
+// Approved on 2026-10-17: the owned-runtime custody methods that first ran on
+// hosted macOS runners for v1.0.2 and fail there.
+const STABLE_V102_OWNED_RUNTIME_METHODS = freeze({
+	OwnedRuntimeCoreProvisionOwnerTests: [
+		'testCustodyEarlyAdmissionRefusalDoesNotRunInitializedSelfRetirement',
+		'testCustodyExistingMalformedLedgerRefusalRetiresInitializedSelfAndPreservesDebt',
+		'testCustodyFirstWriteRefusalRetiresInitializedSelfAndReleasesOriginalFlock',
+		'testExistingOwnedSystemConfigurationRefusesFirstStart',
+		'testModifiedRecordedPlistIsNotRemovedAfterRestart',
+		'testOwnedDirectoryPreparationCreatesOnlyClosedDataScope',
+		'testReplacedCreatedPlistSurvivesRefusedRollback',
+		'testRestartRetirementRequiresOriginalRecordedVnodeAndBytes',
+		'testServiceDebtBlocksImageLeasesWhileRecoveryNamespaceRemainsObservable',
+		'testServicePlistLateProtectionRefusalRetiresInitializedSelfExactlyOnce',
+		'testUnpublishedCreatedPlistAndLedgerRetireExactly'
+	],
+	OwnedRuntimeInstalledPeerOwnerTests: [
+		'testActualExclusiveNamespaceLockRefusesSecondOwner',
+		'testActualSharedNamespaceLocksRefuseExclusiveMutation',
+		'testDuplicatedNativeTreeDescriptorDoesNotSurviveExec',
+		'testLifecycleLockRefusesPathReplacementAndPreservesIt',
+		'testLifecycleLockRejectsWritableOrNonemptyLedger',
+		'testNativeTreeCloseRevokesAllFurtherDescriptorAccess',
+		'testPersistentInstallLedgerBlocksImageAdmissionAfterOwnerDeath',
+		'testSurvivingNativeChildRetainsNamespaceAfterParentClose'
+	],
+	OwnedRuntimeLifecycleInitializerCustodyTests: [
+		'testBootstrapStageLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt',
+		'testEarlyRefusalDoesNotInvokeInitializedSelfRetirement',
+		'testLateRefusalReleasesActualNamespaceBeforeSuccessor',
+		'testLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt'
+	],
+	OwnedRuntimeMaintenanceJournalAdmissionTests: [
+		'testActualFixedMaintenanceLedgerBlocksOriginalImageAdmission'
+	],
+	OwnedRuntimeNamespaceCloseOrderTests: [
+		'testCallerReferenceLossCannotRetireOriginalNativeNamespace',
+		'testNativeEarlierCloseRefusalKeepsActualNamespaceLocked'
+	],
+	OwnedVirtualHIDDaemonReportMainOperationTests: [
+		'testRealKernelSelfImageObservationHasCurrentOriginalBirth'
 	]
 });
 const STABLE_PROFILE_ID = 'stable-v1-20261009-macos-native-deferred';
@@ -187,24 +231,34 @@ function validateStableV102Policy(value) {
 			pac = scope === 'macos-native-pac',
 			model = scope === 'macos-native-model-receiving',
 			shortcuts = scope === 'macos-shortcuts-discovery',
-			launch = scope === 'macos-launch-appleevents';
+			launch = scope === 'macos-launch-appleevents',
+			owned = scope === 'macos-owned-runtime';
 		keys(
 			row,
-			brew
-				? ['kind', 'path', 'name', 'reason']
-				: launch
-					? ['kind', 'path', 'scenarios', 'runners', 'reason']
-					: pac
-						? ['kind', 'path', 'args', 'methods', 'reason']
-						: model
-							? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
-							: shortcuts
-								? ['kind', 'path', 'args', 'reason']
-								: ['kind', 'path', 'args', 'command', 'reason']
+			owned
+				? ['kind', 'path', 'methods', 'reason']
+				: brew
+					? ['kind', 'path', 'name', 'reason']
+					: launch
+						? ['kind', 'path', 'scenarios', 'runners', 'reason']
+						: pac
+							? ['kind', 'path', 'args', 'methods', 'reason']
+							: model
+								? ['kind', 'path', 'args', 'architectures', 'profiles', 'reason']
+								: shortcuts
+									? ['kind', 'path', 'args', 'reason']
+									: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
 			refuse('Invalid v1.0.2 scope reason.');
-		if (brew) {
+		if (owned) {
+			if (
+				row.kind !== 'swift_test_methods' ||
+				row.path !== 'Tests/ErgoptiPlusTests' ||
+				JSON.stringify(row.methods) !== JSON.stringify(STABLE_V102_OWNED_RUNTIME_METHODS)
+			)
+				refuse('Invalid exact v1.0.2 owned-runtime methods.');
+		} else if (brew) {
 			if (
 				row.kind !== 'swift_test_file' ||
 				row.path !== 'Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift' ||
@@ -599,7 +653,7 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.2) retain source-bound missing-proof receipts. Only stable v1.0.2 main push before 2026-10-20T22:00:00Z is authorized; no permission, trust or sender workaround.'
+			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. The 27 named owned-runtime custody XCTest methods remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.2) retain source-bound missing-proof receipts. Only stable v1.0.2 main push before 2026-10-20T22:00:00Z is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -841,6 +895,7 @@ module.exports = {
 	STABLE_V102_PROFILE_ID,
 	STABLE_V102_PAC_METHODS,
 	STABLE_V102_BREW_METHODS,
+	STABLE_V102_OWNED_RUNTIME_METHODS,
 	validateStableV102Policy,
 	admitCommandReceipts,
 	scopeDisposition,

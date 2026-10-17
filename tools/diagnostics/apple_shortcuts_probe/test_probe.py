@@ -1128,7 +1128,9 @@ class SDKCanonicalEnvelopeControls(unittest.TestCase):
                     subject.validate_sdk_constants(raw)
 
     def test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path(self):
-        with subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-path-") as directory:
+        with subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-path-") as raw_directory:
+            # Canonical like sdk_tool_path's answers (macOS /var -> /private/var).
+            directory = str(subject.Path(raw_directory).resolve())
             path = subject.Path(directory) / "official-lookup-model"
             path.write_bytes(b"CONTROLLED PATH MODEL; NO SDK OR COMPILER EXECUTION\n")
             alias = path.with_name("owned-lookup-alias")
