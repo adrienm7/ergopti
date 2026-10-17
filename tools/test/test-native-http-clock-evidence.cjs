@@ -28,7 +28,11 @@ const HEADERS = [
 	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/LoopbackListenerCompatibility.h',
 	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedImageAliasCompatibility.h',
 	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedSuspendedImageCompatibility.h',
-	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h'
+	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedListenerEventCompatibility.h',
+	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedRuntimeSignatureCompatibility.h',
+	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedInstalledConfiguration.h',
+	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedChildReapingCompatibility.h',
+	'static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/OwnedVHDReportSocketIdentity.h'
 ];
 const RUNTIME = [
 	'static/ergopti_plus/macos/platform/network/native_http.py',
@@ -67,7 +71,7 @@ function modeledPayload() {
 		private_cache: { device: 7, inode: 29, empty: true }
 	};
 	const sourceHashes = Object.fromEntries(
-		INPUTS.slice(0, 18).map((relative) => [relative, sources[relative]])
+		[...SWIFT, ...HEADERS, ...RUNTIME, ...OWNERS].map((relative) => [relative, sources[relative]])
 	);
 	const staged = Object.fromEntries([
 		...SWIFT.map((relative) => [path.posix.basename(relative), sources[relative]]),

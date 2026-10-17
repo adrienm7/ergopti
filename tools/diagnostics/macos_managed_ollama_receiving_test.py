@@ -6,6 +6,7 @@ import http.client
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import signal
 import ssl
@@ -73,6 +74,7 @@ class StandaloneCompilerControls(unittest.TestCase):
                 "OwnedRuntimeSignatureCompatibility.h",
                 "OwnedInstalledConfiguration.h",
                 "OwnedChildReapingCompatibility.h",
+                "OwnedVHDReportSocketIdentity.h",
             ]:
                 relative = (
                     "static/ergopti_plus/macos/launcher/Sources/CPOSIXCompatibility/include/" + name
@@ -96,12 +98,18 @@ class StandaloneCompilerControls(unittest.TestCase):
                     "OwnedRuntimeSignatureCompatibility.h",
                     "OwnedInstalledConfiguration.h",
                     "OwnedChildReapingCompatibility.h",
+                    "OwnedVHDReportSocketIdentity.h",
                 },
             )
             self.assertIn(
                 '#include "OwnedListenerEventCompatibility.h"',
                 (module / "CPOSIXCompatibility.h").read_text(),
             )
+            for header in module.glob("*.h"):
+                for required in re.findall(
+                    rb'^\s*#\s*include\s*"([^"\r\n]+)"', header.read_bytes(), re.MULTILINE
+                ):
+                    self.assertTrue((module / required.decode("ascii")).is_file())
             retained = {
                 str(path): (descriptor, expected)
                 for path, descriptor, _, expected in self.subject.outgoing_context._inputs
@@ -116,6 +124,7 @@ class StandaloneCompilerControls(unittest.TestCase):
                 "OwnedRuntimeSignatureCompatibility.h",
                 "OwnedInstalledConfiguration.h",
                 "OwnedChildReapingCompatibility.h",
+                "OwnedVHDReportSocketIdentity.h",
             ):
                 original = (
                     ROOT
