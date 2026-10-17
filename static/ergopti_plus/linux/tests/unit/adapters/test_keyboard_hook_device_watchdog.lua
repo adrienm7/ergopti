@@ -861,6 +861,41 @@ helpers.describe("Hook aggregate modifier contract: preserved red controls", fun
 		helpers.assert_eq(chars, { "a" }, "a spent repeat cannot invent text after an expansion")
 	end)
 
+	helpers.it("(linux-spent-capture-retirement) retires a captured lock before its next physical press", function()
+		local locked, down = false, false
+		local session = aggregate_consumer_session({ a = { { 58, 1, 1 }, { 30, 1, 2 } } }, {
+			process = function(code, value)
+				if code == 58 then
+					if value == 1 and not down then locked = not locked end
+					if value == 1 then down = true elseif value == 0 then down = false end
+				end
+			end,
+		})
+		session.pump()
+		local injected = session.inject_text("x")
+		session.queue("a", 30, 0, 3); session.queue("a", 58, 0, 4); session.pump()
+		session.queue("a", 58, 1, 5); session.queue("a", 58, 0, 6); session.pump()
+		local captures = session.captures; session.close()
+		helpers.assert_true(injected.ok)
+		helpers.assert_eq(locked, false, "the next CapsLock press must toggle after injection spent its prior output owner")
+		helpers.assert_eq(captures, { { 58, 1 }, { 30, 1 }, { 30, 0 }, { 58, 0 }, { 58, 1 }, { 58, 0 } },
+			"a spent output release still retires the physical transition already admitted to XKB")
+	end)
+
+	helpers.it("(linux-spent-capture-retirement) waits for the final shared spent owner before capture release", function()
+		local session = aggregate_consumer_session({ a = { { 30, 1, 1 } }, b = { { 30, 1, 2 } } })
+		session.pump()
+		local injected = session.inject_text("x")
+		session.queue("a", 30, 0, 3); session.pump()
+		local after_first = #session.captures
+		session.queue("b", 30, 0, 4); session.pump()
+		local captures, chars = session.captures, session.chars; session.close()
+		helpers.assert_true(injected.ok)
+		helpers.assert_eq(after_first, 1, "one shared source still owns the captured down")
+		helpers.assert_eq(captures, { { 30, 1 }, { 30, 0 } }, "the last physical owner retires capture once")
+		helpers.assert_eq(chars, { "a" }, "capture cleanup cannot create additional text")
+	end)
+
 	helpers.it("(linux-text-wire-custody) feeds Compose only the aggregate dead-key press", function()
 		local pending = false
 		local session = aggregate_consumer_session({

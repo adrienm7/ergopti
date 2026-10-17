@@ -953,10 +953,14 @@ local function _capture_wire_transition(ev, source)
 	if ev.value == InputEvent.VALUE_DOWN then return not down end
 	local owner = _output_owners[source_key(source, ev.code)]
 	local row = owner and view.owners[owner]
-	if not row or row.state ~= "held" or not down then return false end
-	if ev.value == InputEvent.VALUE_REPEAT then return true end
+	if not row then return false end
+	if ev.value == InputEvent.VALUE_REPEAT then return row.state == "held" and down end
+	if row.state ~= "held" and row.state ~= "spent" then return false end
+	-- Injection can spend output ownership before the physical release arrives.
+	-- XKB already saw its down; the last original owner must still retire it.
 	for other, current in pairs(view.owners) do
-		if other ~= owner and current.code == ev.code and current.state == "held" then return false end
+		if other ~= owner and current.code == ev.code
+			and (current.state == "held" or current.state == "spent") then return false end
 	end
 	return true
 end
