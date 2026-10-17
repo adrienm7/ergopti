@@ -12,6 +12,19 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 portable capture overflow constant
+
+Hosted CI39010605922 receives a new portable compilation failure after the C45
+capture change: the narrow POSIX Windows header lacks the SDK constant
+ERROR_ARITHMETIC_OVERFLOW used by the production sequence-exhaustion path.
+Add its actual SDK value534 without changing production C, native DLL bytes,
+portable refusal boundaries or any original assertion. The hosted compiler
+failure is retained. A local MinGW compile against the same narrow header also
+fails before and passes after correction, with the CRT loaded before undefining
+its built-in calling-convention macros. This is compilation on Windows, not
+execution of the Linux-only portable runner. Fresh hosted portable receiving
+remains required; native Linux and physical-device acceptance stay OPEN.
+
 ### October 17 owned native capture intervals and processed frontiers
 
 Four additive native exports bind Begin, Get, Peek and release to a monotonic
