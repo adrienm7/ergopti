@@ -441,6 +441,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-warning-gate.cjs"],
 			"repro": "npm run test:ahk-warning-gate"
+		},
+		{
+			"id": "js-0441",
+			"ordinal": 441,
+			"name": "the Windows unit matrix runs exactly the AHK module groups, once each",
+			"cmd": "node",
+			"args": ["tools/test/test-ahk-module-matrix.cjs"],
+			"repro": "node tools/test/test-ahk-module-matrix.cjs"
 		}
 	]
 }
