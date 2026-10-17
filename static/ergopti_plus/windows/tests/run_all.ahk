@@ -33,6 +33,8 @@ SetWorkingDir(A_ScriptDir)
 ;   --only <substr>  run only tests whose name contains <substr> (case-insensitive),
 ;                    e.g. AutoHotkey64.exe run_all.ahk --only "(my-slug)" to replay
 ;                    a single failing test without the whole suite.
+;   --shard=K/N      run only every N-th selected test starting at the K-th, so N
+;                    CI jobs split the suite and together run each test once.
 ; Reject malformed options before includes can initialize tests or input hooks.
 _RejectRunnerArguments(Message) {
 	FileAppend("Invalid test runner arguments: " . Message . "`n", "**")
@@ -43,6 +45,8 @@ global _AHK_DRY_RUN := false
 global _AHK_ONLY_FILTER := ""
 global _AHK_INTERACTIVE := false
 global _AHK_QUALIFICATION_PROFILE := ""
+global _AHK_SHARD_INDEX := 0
+global _AHK_SHARD_COUNT := 0
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
@@ -56,6 +60,15 @@ while (_riArgIndex <= A_Args.Length) {
 		_AHK_QUALIFICATION_PROFILE := SubStr(_riArg, 25)
 		if _AHK_QUALIFICATION_PROFILE == ""
 			_RejectRunnerArguments("--qualification-profile requires a non-empty id")
+	}
+	else if (SubStr(_riArg, 1, 8) == "--shard=") {
+		if _AHK_SHARD_COUNT != 0
+			_RejectRunnerArguments("--shard may be supplied only once")
+		if !RegExMatch(SubStr(_riArg, 9), "^([1-9][0-9]?)/([1-9][0-9]?)$", &_riShard)
+				|| Integer(_riShard[1]) > Integer(_riShard[2])
+			_RejectRunnerArguments("--shard requires K/N with 1 <= K <= N <= 99")
+		_AHK_SHARD_INDEX := Integer(_riShard[1])
+		_AHK_SHARD_COUNT := Integer(_riShard[2])
 	}
 	else if (_riArg == "--only" || SubStr(_riArg, 1, 7) == "--only=") {
 		if StrLen(_AHK_ONLY_FILTER) > 0
@@ -548,6 +561,7 @@ InstallSendNoOps()
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/test_shortcuts.ahk
 #Include unit/test_keepawake_visible_cancellation.ahk
+#Include unit/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
 ; chord syntax tests use the shared parser and registrar without binding hotkeys.

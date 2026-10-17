@@ -86,12 +86,12 @@ function checkWorkflow(body) {
 	assert.equal(pipeline.stepField(receipt, 'if'), 'always()');
 	assert.equal(pipeline.stepField(receipt, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(receipt, 'continue-on-error'), null);
-	assert.match(receipt, /name: assets-qualification-windows\n/);
+	assert.match(receipt, /name: assets-qualification-windows-shard\$\{\{ matrix\.shard \}\}\n/);
 	assert.match(receipt, /path: \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n/);
 	assert.equal(pipeline.stepField(upload, 'if'), 'always()');
 	assert.equal(pipeline.stepField(upload, 'uses'), 'actions/upload-artifact@v4');
 	assert.equal(pipeline.stepField(upload, 'continue-on-error'), null);
-	assert.match(upload, /name: windows-ahk-native-desktop\n/);
+	assert.match(upload, /name: windows-ahk-native-desktop-shard\$\{\{ matrix\.shard \}\}\n/);
 	assert.match(
 		upload,
 		/^          path: \|\n            \$\{\{ runner\.temp \}\}\/windows-ahk-native-desktop\/\n            \$\{\{ runner\.temp \}\}\/stable-windows-native-desktop\.json\n          if-no-files-found: error$/m

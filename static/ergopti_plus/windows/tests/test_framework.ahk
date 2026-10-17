@@ -66,6 +66,12 @@ if !IsSet(_AHK_ONLY_FILTER)
 if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
 
+; Optional ``--shard=K/N`` split (run_all sets it); zero count runs every test.
+if !IsSet(_AHK_SHARD_INDEX)
+	global _AHK_SHARD_INDEX := 0
+if !IsSet(_AHK_SHARD_COUNT)
+	global _AHK_SHARD_COUNT := 0
+
 ; Only the principal runner owns parser registration. Including assertion
 ; helpers alone must not create an undeclared function dependency at load time.
 global _TEST_QUALIFICATION_PARSER := 0
@@ -575,6 +581,21 @@ Test(Name, Callback, Interactive := false) {
 
 ; Keep excluded cases outside the execution plan, with explicit diagnostics;
 ; they must never contribute a fabricated successful result to the TAP footer.
+; Keeps every Count-th test starting at the Index-th (1-based). Interleaving
+; spreads the clustered slow cohorts across shards; the shards partition Tests.
+_SelectShard(Tests, Index, Count) {
+	if Count == 0
+		return Tests
+	if !(Index is Integer) || !(Count is Integer) || Index < 1 || Index > Count
+		throw ValueError("A test shard requires 1 <= index <= count.")
+	Selected := []
+	for Position, Entry in Tests {
+		if Mod(Position - 1, Count) == Index - 1
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
 _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
 	Selected := []
 	Excluded := []
@@ -795,7 +816,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
-	global _AHK_INTERACTIVE
+	global _AHK_INTERACTIVE, _AHK_SHARD_INDEX, _AHK_SHARD_COUNT
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -808,6 +829,8 @@ RunTests() {
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
 	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
+	UnshardedCount := ActiveTests.Length
+	ActiveTests := _SelectShard(ActiveTests, _AHK_SHARD_INDEX, _AHK_SHARD_COUNT)
 	DeferredName := _TestDevQualificationName()
 	if DeferredName != "" {
 		for Index, Entry in ActiveTests
@@ -822,6 +845,9 @@ RunTests() {
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
+	if (_AHK_SHARD_COUNT != 0)
+		_TestPrint("# --shard " . _AHK_SHARD_INDEX . "/" . _AHK_SHARD_COUNT . " - "
+			. ActiveTests.Length . " of " . UnshardedCount . " test(s) selected.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
 		_CopyTestResultsForCi()
