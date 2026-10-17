@@ -107,7 +107,7 @@ _LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn) {
 			return 0
 		; The same retirement steps as a root publication, for this one row only.
 		MenuDispatcher_BeginReplacement()
-		A_TrayMenu.Add(Label, Submenu)
+		TrayMenuRebindSubmenu(A_TrayMenu, Label, Submenu)
 		MenuPopulation_Publish(A_TrayMenu)
 		MenuDispatcher_PruneMenu(A_TrayMenu)
 		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
