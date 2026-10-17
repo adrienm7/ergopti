@@ -4527,6 +4527,7 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	if Request == "guard_frame"
 		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
 			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
+			&& CanonicalCurrent(ActiveFrame)
 	; UInt32 count times the forty-byte x64 descriptor fits signed64-bit arithmetic.
 	; This admission calculation adds no callable dependency to genuine Stop.
 	if Request == "route_storage_size" {
@@ -4537,7 +4538,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		return Payload * 40
 	}
 	if Request == "digit_current"
-		return IsObject(ActiveFrame) && ActiveFrame.Frame == Payload && DigitCurrent(ActiveFrame)
+		return IsObject(ActiveFrame) && ActiveFrame.Frame == Payload
+			&& CanonicalCurrent(ActiveFrame) && DigitCurrent(ActiveFrame) && CanonicalCurrent(ActiveFrame)
 	if Request == "allows_native_admission"
 		return OwnersCurrent() && !IsObject(ActiveStop) && !Constructing
 	if Request == "begin_frame" {

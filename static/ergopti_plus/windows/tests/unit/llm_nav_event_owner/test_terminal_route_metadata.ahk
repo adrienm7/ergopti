@@ -1935,6 +1935,64 @@ _TCF_MissingCanonicalRecipe() {
 Test("terminal-canonical-recipe: a model descriptor requires its original row recipe",
 	_TCF_MissingCanonicalRecipe)
 
+/** A successful held-query ACK cannot retire references for a withdrawn source. */
+_TCF_HeldSourceWithdrawal(Operation) {
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+	_LNTR_LoadFixture("b")
+	BeforeRecipes := 0, BeforeModels := 0, HeldCalls := 0
+	State.Port["list_terminal_held_recipes"] := WithdrawSource
+	Failure := 0
+	try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	catch as Err
+		Failure := Err
+	AssertTrue(IsObject(Failure), "a held-query source replacement must refuse final publication")
+	AssertEqual(1, HeldCalls, "the original held-query boundary ran exactly once")
+	AssertTrue(Recipes == _LLM_NavEventOwnerTerminalRouteRecipes)
+	AssertTrue(Models == _LLM_NavEventOwnerTerminalRouteModels)
+	AssertEqual(40, Recipes.Count, "no old recipe retires after source withdrawal")
+	AssertEqual(2, Models.Count, "both original model identities remain in custody")
+	AssertTrue(_LLM_NavEventOwnerTerminalRouteUnknown is Map)
+	Frame := _LLM_NavEventOwnerTerminalRouteUnknown
+	AssertTrue(Frame["recipes"] == Recipes), AssertTrue(Frame["models"] == Models)
+	AssertEqual(40, Frame["recipe_refs"].Count, "the retained snapshot still owns the old recipes")
+	AssertEqual(2, Frame["model_refs"].Count, "the retained snapshot still owns the old models")
+	for Id, Admission in BeforeRecipes {
+		AssertTrue(Recipes.Has(Id) && Recipes[Id] == Admission)
+		AssertTrue(Frame["recipe_refs"].Has(Id) && Frame["recipe_refs"][Id] == Admission)
+	}
+	for Id, Model in BeforeModels {
+		AssertTrue(Models.Has(Id) && Models[Id] == Model)
+		AssertTrue(Frame["model_refs"].Has(Id) && Frame["model_refs"][Id] == Model)
+	}
+	AssertTrue(_LNTR_StopFixtureState(), "canonical withdrawal cannot prevent exact original Stop")
+	AssertEqual(0, _LLM_NavEventOwnerTerminalRouteUnknown)
+	if Operation == "unload"
+		_LNTR_LoadFixture("z")
+	State.Port["list_terminal_held_recipes"] := _LNTR_Held.Bind(State)
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port),
+		"the legitimate current source registers after original retirement")
+
+	WithdrawSource(Owner, Buffer, Capacity) {
+		HeldCalls += 1
+		AssertEqual(64, Capacity), AssertEqual(512, Buffer.Size)
+		BeforeRecipes := Recipes.Clone(), BeforeModels := Models.Clone()
+		AssertEqual(40, BeforeRecipes.Count), AssertEqual(2, BeforeModels.Count)
+		if Operation == "load"
+			_LNTR_LoadFixture("z")
+		else
+			KeylayoutEmulation_Unload()
+		return Map("status", 0, "count", 0)
+	}
+}
+
+for _TCF_Withdrawal in ["load", "unload"]
+	Test("terminal-canonical-held: " . _TCF_Withdrawal . " cannot prune original recipes or snapshots",
+		_LNTR_WithState.Bind(_TCF_HeldSourceWithdrawal.Bind(_TCF_Withdrawal)))
+
 /** Receives the actual x64 DLL without starting a keyboard hook or emitting input. */
 _TRE_GenuineNativeCount() {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerStarted
