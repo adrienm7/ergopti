@@ -38,14 +38,15 @@ function cell(role, runner, architecture, timeout, scenario = '') {
 function plan(stage, context) {
 	validateContext(context);
 	if (stage === 'unit') return [cell('lua-unit-meta', 'ubuntu-latest', 'stubbed', 360)];
+	// Each managed-ollama-build cell runs the clean native source build of the
+	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
+	// travel through tools/ci/managed-ollama-handoff.cjs.
 	if (stage === 'e2e') {
 		const rows = [
 			cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),
 			cell('tooltip-canvas', 'macos-15', 'arm64', 10),
 			cell('managed-ollama-native', 'macos-15', 'arm64', 60),
 			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60),
-			// The clean native source build of each managed-ollama-native cell runs
-			// beside it; tools/ci/managed-ollama-handoff.cjs carries its sealed bytes.
 			cell('managed-ollama-build', 'macos-15', 'arm64', 60),
 			cell('managed-ollama-build', 'macos-15-intel', 'amd64', 60)
 		];
