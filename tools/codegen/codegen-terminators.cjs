@@ -80,6 +80,23 @@ function luaEscape(s) {
 }
 
 /**
+ * Returns the locale key of a built-in slot's label. A built-in slot never
+ * carries display text: the drivers resolve the key in the active language, so
+ * a literal here would show one language to every user.
+ * @param {object} def - One non-separator TERMINATOR_DEFS entry.
+ * @returns {string} The slot's `terminators.label_<key>` locale key.
+ */
+function requireLabelKey(def) {
+	const expected = `terminators.label_${def.key}`;
+	if (def.label !== undefined || def.label_key !== expected) {
+		throw new Error(
+			`terminator "${def.key}" must declare label_key "${expected}" and no literal label`
+		);
+	}
+	return expected;
+}
+
+/**
  * Writes content to a file, creating parent directories as needed.
  * For .ahk files enforces UTF-8 BOM + LF line endings.
  * @param {string} filePath - Absolute path to write.
@@ -120,11 +137,11 @@ function generateAhk() {
 		const charsArr = def.chars.map((c) => `"${ahkEscape(c)}"`).join(', ');
 		const enabled = def.default_enabled ? 'true' : 'false';
 		const consume = def.consume ? 'true' : 'false';
-		const label = ahkEscape(def.label || def.key);
+		const labelKey = requireLabelKey(def);
 		return (
 			`        Map("key", "${def.key}", ` +
 			`"chars", [${charsArr}], ` +
-			`"label", "${label}", ` +
+			`"label_key", "${ahkEscape(labelKey)}", ` +
 			`"default_enabled", ${enabled}, ` +
 			`"consume", ${consume})`
 		);
@@ -339,10 +356,10 @@ function generateLua() {
 		const charsArr = def.chars.map((c) => `"${luaEscape(c)}"`).join(', ');
 		const enabled = def.default_enabled ? 'true' : 'false';
 		const consume = def.consume ? 'true' : 'false';
-		const label = luaEscape(def.label || def.key);
+		const labelKey = requireLabelKey(def);
 		return (
 			`\t{ key = "${def.key}", chars = { ${charsArr} }, ` +
-			`label = "${label}", default_enabled = ${enabled}, consume = ${consume} }`
+			`label_key = "${luaEscape(labelKey)}", default_enabled = ${enabled}, consume = ${consume} }`
 		);
 	}).join(',\n');
 

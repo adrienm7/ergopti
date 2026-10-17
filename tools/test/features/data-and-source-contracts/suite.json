@@ -489,6 +489,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs"],
 			"repro": "node tools/test/test-hardening-b-no-user-data-under-driver-dir.cjs"
+		},
+		{
+			"id": "js-0437",
+			"ordinal": 437,
+			"name": "word-expander catalogue rows resolve a translated label key on every driver (no French literal)",
+			"cmd": "node",
+			"args": ["tools/test/test-terminator-labels-localized.cjs"],
+			"repro": "node tools/test/test-terminator-labels-localized.cjs"
 		}
 	]
 }

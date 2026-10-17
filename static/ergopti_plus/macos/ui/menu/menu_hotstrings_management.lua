@@ -257,10 +257,9 @@ function M.build_management(ctx)
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
 
-				local lbl = def.label or ""
-				lbl = lbl:gsub("Guillemets fermants", "Guillemet fermant")
-				lbl = lbl:gsub("tiret bas", "underscore")
-				lbl = lbl:gsub("Tiret bas", "Underscore")
+				-- The catalogue carries a locale key, never display text: resolving
+				-- it here follows the active language on every menu rebuild.
+				local lbl = i18n.get(def.label_key)
 				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {

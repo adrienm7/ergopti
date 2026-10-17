@@ -1454,11 +1454,15 @@ local function _manifest_hotstring_rows(ctx, config)
 					for _, boundary in ipairs(boundaries) do sub[#sub + 1] = boundary end
 				elseif def.key then
 					local key = def.key
+					-- A built-in slot carries a locale key, never display text, so the
+					-- row follows the active language; only a custom slot carries the
+					-- literal label its user typed.
+					local text = def.custom and def.label or i18n_safe(def.label_key)
 					-- The live magic key, not the ★ the catalogue was written with.
 					-- The label is shipped as a literal star; a user who changed the
 					-- key saw the delimiter list still naming a character that is no
 					-- longer their trigger, in every language.
-					local label = (def.label or key):gsub("★", MagicKey.get())
+					local label = text:gsub("★", MagicKey.get())
 					-- A consumed delimiter is swallowed by the expansion; an unconsumed
 					-- one is typed after it. The difference is visible only in the
 					-- output, so the row has to say which it is — a space that vanishes

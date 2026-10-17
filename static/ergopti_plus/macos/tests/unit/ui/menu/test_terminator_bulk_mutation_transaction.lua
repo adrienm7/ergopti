@@ -75,8 +75,8 @@ local function run_action(label, outcome, options)
 		expansion_delay = 0.1,
 	}
 	local defs = {
-		{ key = "space", chars = { " " }, label = "Space", default_enabled = true },
-		{ key = "slash", chars = { "/" }, label = "Slash", default_enabled = false },
+		{ key = "space", chars = { " " }, label_key = "terminators.label_space", default_enabled = true },
+		{ key = "slash", chars = { "/" }, label_key = "terminators.label_slash", default_enabled = false },
 		{ key = "custom_x", chars = { "x" }, label = "Custom", custom = true },
 	}
 	local last_changes = nil
@@ -247,7 +247,7 @@ helpers.describe("word-expander terminator mutations are transactional", functio
 
 	helpers.it("retains one built-in bit when its individual mutation is refused", function()
 		for _, outcome in ipairs(FAILURE_OUTCOMES) do
-			local fixture = run_action("Space", outcome)
+			local fixture = run_action(i18n.get("terminators.label_space"), outcome)
 			helpers.assert_eq(fixture.result, false, outcome)
 			helpers.assert_eq(fixture.calls.batches, 0, outcome)
 			helpers.assert_eq(fixture.calls.singles, 1, outcome)

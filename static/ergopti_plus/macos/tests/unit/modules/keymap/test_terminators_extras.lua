@@ -55,12 +55,14 @@ helpers.describe("Terminators get_terminator_defs", function()
 		helpers.assert_true(#term.get_terminator_defs() > 0)
 	end)
 
-	helpers.it("each non-separator def has key, chars[], and label fields", function()
+	helpers.it("each built-in def has key, chars[] and a locale label key", function()
 		for _, d in ipairs(term.get_terminator_defs()) do
-			if d.type ~= "separator" then
+			if d.type ~= "separator" and not d.custom then
 				helpers.assert_true(type(d.key) == "string" and d.key ~= "")
 				helpers.assert_true(type(d.chars) == "table" and #d.chars >= 1)
-				helpers.assert_true(type(d.label) == "string")
+				-- A literal label would show one language to every user.
+				helpers.assert_eq(d.label_key, "terminators.label_" .. d.key, d.key)
+				helpers.assert_eq(d.label, nil, d.key)
 			end
 		end
 	end)

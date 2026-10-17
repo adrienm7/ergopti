@@ -43,9 +43,10 @@ local function with_frame(body, paused)
 						DEFAULT_STATE = { expansion_delay = 0.1 },
 						DELAYS_DEFAULT = { STAR_TRIGGER = 0.1, autocorrection = 0.1,
 							llm_prediction = 0.3, dynamichotstrings = 0.4 },
-						get_terminator_defs = function() return { { key = "first", label = "First" },
-							{ type = "separator" }, { key = "second", label = "Second" } } end,
-						is_terminator_enabled = function(key) return key == "first" or key == "custom_test" end,
+						get_terminator_defs = function() return {
+							{ key = "space", label_key = "terminators.label_space" },
+							{ type = "separator" }, { key = "tab", label_key = "terminators.label_tab" } } end,
+						is_terminator_enabled = function(key) return key == "space" or key == "custom_test" end,
 					},
 					applyTriggerChar = function(value) return value end,
 					save_prefs = function() calls.writes = calls.writes + 1; return true end,
@@ -94,8 +95,12 @@ helpers.describe("hotstrings parameter complete shared frames", function()
 			helpers.assert_eq(preview[1].checked, true); helpers.assert_eq(preview[2].checked == true, false)
 			local word = children(menu, f.captions("menu.hotstrings.word_expanders"))
 			helpers.assert_eq(#word, 10)
-			helpers.assert_eq(word[5].title, "First"); helpers.assert_eq(word[6].title, "-")
-			helpers.assert_eq(word[7].title, "Second"); helpers.assert_eq(word[8].title, "-")
+			-- Built-in rows resolve their locale key; a literal catalogue label
+			-- showed French to every user.
+			helpers.assert_eq(word[5].title, f.captions("terminators.label_space"))
+			helpers.assert_true(word[5].title ~= "terminators.label_space")
+			helpers.assert_eq(word[6].title, "-")
+			helpers.assert_eq(word[7].title, f.captions("terminators.label_tab")); helpers.assert_eq(word[8].title, "-")
 			helpers.assert_eq(word[9].menu[1].title, f.captions("menu.hotstrings.delete_delimiter"))
 			helpers.assert_eq(word[10].title, f.captions("menu.hotstrings.add_delimiter"))
 			helpers.assert_eq(f.calls.writes, 0); helpers.assert_eq(f.calls.redraws, 0)
