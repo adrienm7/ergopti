@@ -44,6 +44,8 @@ local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
+local ok_luv, luv = pcall(require, "luv")
+if not ok_luv then luv = nil end
 
 local LOG = "adapters.shell_runner"
 
@@ -345,9 +347,55 @@ end
 
 --- Reports whether an executable is resolvable on PATH.
 --- @param binary string Executable name, e.g. "xclip".
+--- @param external_only boolean|nil True when the caller requires an external tool.
 --- @return boolean True when the binary exists and is executable.
-function M.has_command(binary)
-	if type(binary) ~= "string" or binary == "" then return false end
+function M.has_command(binary, external_only)
+	if type(binary) ~= "string" or binary == "" or binary:find("\0", 1, true) then return false end
+	if _test_runner then return M.run("command -v " .. M.quote(binary) .. " >/dev/null 2>&1") end
+	if external_only == true and luv
+		and type(luv.fs_access) == "function" and type(luv.fs_stat) == "function" then
+		-- A picker checks many external tools while the keyboard loop waits.
+		-- Native access avoids one shell child per capability. Read PATH and the
+		-- filesystem on every request: installations and permissions can change.
+		local function executable(path)
+			if not luv.fs_access(path, "X") then return false end
+			local attributes = luv.fs_stat(path)
+			return attributes ~= nil and attributes.type == "file"
+		end
+		if binary:find("/", 1, true) then return executable(binary) end
+		local path = os.getenv("PATH")
+		if path ~= nil then
+			for directory in (path .. ":"):gmatch("(.-):") do
+				if executable((directory == "" and "." or directory) .. "/" .. binary) then return true end
+			end
+			return false
+		end
+		-- An unset PATH uses the shell's system default; an empty PATH above
+		-- deliberately searches only the current directory.
+	end
+	if external_only == true then
+		-- The shell initializes its own default when PATH was not inherited.
+		-- Inspect external files explicitly: command -v also admits builtins
+		-- such as ".", and empty PATH components must still search cwd.
+		return M.run(table.concat({
+			-- Keep the process diagnostic's first word independent of caller bytes.
+			"command :",
+			"ergopti_probe_binary=" .. M.quote(binary),
+			'case "$ergopti_probe_binary" in',
+			'  */*) [ -f "$ergopti_probe_binary" ] && [ -x "$ergopti_probe_binary" ]; exit $? ;;',
+			"esac",
+			"ergopti_probe_path=$PATH",
+			"while :; do",
+			'  ergopti_probe_directory=${ergopti_probe_path%%:*}',
+			'  ergopti_probe_candidate=${ergopti_probe_directory:-.}/$ergopti_probe_binary',
+			'  if [ -f "$ergopti_probe_candidate" ] && [ -x "$ergopti_probe_candidate" ]; then exit 0; fi',
+			'  case "$ergopti_probe_path" in',
+			'    *:*) ergopti_probe_path=${ergopti_probe_path#*:} ;;',
+			"    *) exit 1 ;;",
+			"  esac",
+			"done",
+		}, "\n"))
+	end
 	return M.run("command -v " .. M.quote(binary) .. " >/dev/null 2>&1")
 end
 
@@ -419,8 +467,6 @@ end
 
 -- libuv owns the child, its pipes and its deadline; without it there is no
 -- asynchronous child at all, and callers must not fall back to a blocking one
-local ok_luv, luv = pcall(require, "luv")
-if not ok_luv then luv = nil end
 M.HAS_ASYNC = luv ~= nil
 
 -- What an asynchronous child may print before it is stopped: the callers read
