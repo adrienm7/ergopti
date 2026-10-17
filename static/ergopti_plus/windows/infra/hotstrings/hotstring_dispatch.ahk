@@ -564,8 +564,13 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	Owner["RunnerClaimed"] := false
 	_HSE_TerminalOwner := Owner
 	if !LLM_NavEventOwner_BeginTerminalCapture(Owner["Id"], Owner.Get("Port", 0)) {
-		Owner["Pending"] := false
-		_HSE_TerminalOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			Owner["Pending"] := false
+			; Admission callbacks may publish a successor before refusing this owner.
+			if _HSE_TerminalOwner == Owner
+				_HSE_TerminalOwner := 0
+		} finally Critical(PreviousCritical)
 		_HSE_ClearTerminalOutputOwnership(Owner)
 		return false
 	}

@@ -551,4 +551,39 @@ _THTO_RawCallbackPreparesWithoutDirectSend() {
 Test("terminal raw callbacks use the same paced owner (ahk2-07)",
 	_THTO_RawCallbackPreparesWithoutDirectSend)
 
+/** Refused capture admission cannot withdraw a successor transaction. */
+_THTO_BeginRefusalKeepsSuccessor(Mode) {
+	global _HSE_TerminalOwner, _THTO_Runner
+	_THTO_Reset()
+	Owner := _THTO_MakeOwner()
+	Successor := Map("Id", Owner["Id"] + 1, "Pending", true)
+	Calls := 0
+	Begin(Token) {
+		global _HSE_TerminalOwner
+		Calls += 1
+		AssertEqual(Owner["Id"], Token)
+		AssertTrue(_HSE_TerminalOwner == Owner,
+			"the original transaction must own capture admission before reentry")
+		_HSE_TerminalOwner := Successor
+		if Mode == "throw"
+			throw Error("injected capture refusal after successor publication")
+		return 0
+	}
+	Owner["Port"]["begin_terminal"] := Begin
+	try {
+		AssertFalse(_HSE_BeginOwnedTerminalTransaction(Owner, _THTO_Schedule))
+		AssertEqual(1, Calls, "the refusal must come from the actual Begin callout")
+		AssertTrue(_HSE_TerminalOwner == Successor,
+			"a refused predecessor must preserve the exact published successor")
+		AssertTrue(Successor["Pending"])
+		AssertFalse(Owner["Pending"])
+		AssertFalse(Owner["CaptureAdmitted"])
+		AssertEqual(0, _THTO_Runner, "a refused predecessor must not schedule output")
+	} finally _THTO_Reset()
+}
+Test("terminal capture: refused Begin preserves successor (terminal-capture-begin-owner)",
+	_THTO_BeginRefusalKeepsSuccessor.Bind("refuse"))
+Test("terminal capture: throwing Begin preserves successor (terminal-capture-begin-owner)",
+	_THTO_BeginRefusalKeepsSuccessor.Bind("throw"))
+
 OutputHostResolverConfigure()
