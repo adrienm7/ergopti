@@ -39,13 +39,6 @@ sleep 1
 openbox >/dev/null 2>&1 &
 PIDS="${PIDS} $!"
 sleep 1
-# The matcher must observe exactly what two real source keyboards emit.
-if ! luajit tests/hardware/run_hook_text_custody.lua; then
-	# shellcheck disable=SC2086
-	kill ${PIDS} 2>/dev/null
-	exit 1
-fi
-
 # Native virtual-keyboard custody runs before the timed tray/daemon host. Its
 # two explicit sources and output use real production FFI ports, then retire.
 luajit tests/hardware/run_modifier_custody.lua
@@ -93,6 +86,13 @@ fi
 # A Cerebras-style API on loopback for the AI phase, answering with ASCII-escaped
 # JSON as Python servers do.
 LLM_READY="$(mktemp -u)"
+
+# The matcher must observe exactly what two real source keyboards emit.
+if ! luajit tests/hardware/run_hook_text_custody.lua; then
+	# shellcheck disable=SC2086
+	kill ${PIDS} 2>/dev/null
+	exit 1
+fi
 
 # The kernel prerequisites need XKB but no focused editor. Starting the bounded
 # editor before them let its 30-second lifetime expire before daemon admission.
