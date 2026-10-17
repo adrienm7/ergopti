@@ -1213,20 +1213,6 @@ local function _manifest_hotstring_rows(ctx, config)
 		return rows
 	end
 
-	--- Every known category id, sorted: the scope of the whole-tree « all
-	--- sections » checkbox, switched in ONE write. The row it replaced looped
-	--- `toggle_group` until 2026-08-05, which never touched the section keys and
-	--- ended each category in a full `load_all()` — magickey.toml alone is 305 KB —
-	--- inside a menu callback.
-	--- @return table Array of category ids.
-	local function all_category_ids()
-		local ids = {}
-		local categories = type(config.get_categories) == "function" and config.get_categories() or nil
-		for id in pairs(categories or {}) do ids[#ids + 1] = id end
-		table.sort(ids)
-		return ids
-	end
-
 	--- Renders a delay for a menu label: "750 ms", or the infinity sign for 0.
 	---
 	--- Zero does not mean "fire instantly" — it means the trigger never expires,
@@ -2229,12 +2215,11 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
-	-- The « all sections » checkbox is a `check` declaration, built by the shared
-	-- renderer, so this driver supplies only its behaviour and its tick.
+	-- No whole-tree « all sections » row: it switched on the packs of every
+	-- language at once. Each submenu owns the bulk rows of its own content.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
 	local function hotstrings_on() return _hotstrings_on(ctx) end
-	local whole_tree = all_sections_row(all_category_ids())
 
 	--- Restores or clears the Hotstrings scope at once.
 	--- @param mode string "recommended" or "clear".
@@ -2246,7 +2231,6 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.commands = {
 		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
 		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
-		["hotstrings_all_sections"] = whole_tree and whole_tree.action or nil,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
@@ -2278,7 +2262,6 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
-	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
 
 	local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
 	if not personal_choices_admitted then return nil end

@@ -204,7 +204,7 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 		helpers.assert_eq(calls.error_notices, 0)
 	end)
 
-	helpers.it("routes the reachable whole-tree action through one atomic registry call", function()
+	helpers.it("routes the reachable language action through one atomic registry call", function()
 		local calls = {
 			mutations = 0,
 			legacy = 0,
@@ -221,8 +221,8 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			state = { hotstrings = { alpha = true, beta = true }, keymap = true },
 			keymap = {
 				get_sections = function(group) return { { name = group .. "_one" } } end,
-				-- Every section on, so the « all sections » checkbox is ticked and
-				-- its click switches the whole tree off.
+				-- Every section on, so the language « all sections » checkbox is
+				-- ticked and its click switches the whole language off.
 				is_section_enabled = function() return true end,
 				set_groups_sections_enabled = function(changes, enabled)
 					calls.mutations = calls.mutations + 1
@@ -237,11 +237,11 @@ helpers.describe("hotstring menu mutations: publish only exact commitments", fun
 			updateMenu = function() calls.updates = calls.updates + 1 end,
 		}
 
-		local action = hotstrings.all_sections_switch(ctx).action
+		local action = hotstrings.build_language_bulk_actions(ctx, { "alpha", "beta" })[1].action
 		local ok, err = pcall(action)
 		package.loaded["infra.notifications"] = previous_notifications
 		package.loaded["ui.menu.keymap_lifecycle"] = nil
-		helpers.assert_true(ok, "whole-tree callback must contain a failed batch: " .. tostring(err))
+		helpers.assert_true(ok, "language callback must contain a failed batch: " .. tostring(err))
 		helpers.assert_eq(calls.mutations, 1,
 			"one click must present the full plan to one registry transaction")
 		helpers.assert_eq(calls.legacy, 0,

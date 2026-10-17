@@ -130,7 +130,7 @@ const PERSONAL_REGIONS = [
 		file: 'windows/ui/menu/menu_hotstrings.ahk',
 		from: '_HS_PersonalRows(Options := unset) {',
 		to: '\n\t\tPersonalActiveCount :=',
-		tokens: ['_HS_CategoryMenu(', 'HotstringsPersonalScopeApply(Enabled, Options)']
+		tokens: ['_HS_CategoryMenu(', 'HS_TogglePersonalAllSections(Enabled, Options)']
 	},
 	{
 		driver: 'macos',

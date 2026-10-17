@@ -3,9 +3,9 @@
 ; ==============================================================================
 ; MODULE: Hotstring Scope Menu Bindings
 ; DESCRIPTION:
-; Standard category submenus bind the shared explicit commands to the atomic
-; category owner. Language and whole-tree section controls retain their separate
-; checkbox contract. Native providers supply source files and section data;
+; Standard category submenus bind the shared explicit commands to the category
+; selection owner. Language section controls retain their separate checkbox
+; contract; the Hotstrings menu has no whole-tree control. Native providers supply source files and section data;
 ; the shared declaration and renderer own category row labels and ordering.
 ; ==============================================================================
 
@@ -83,16 +83,23 @@ _HS_AllSectionsRow(AllOn, Apply) {
 		Map("hotstring_scope_all_on", (*) => AllOn ? true : false))
 }
 
+; A bundled category's « check all » / « uncheck all »: its own sections and gate.
+_HS_CategorySelectionApply(Targets, Enabled) {
+	if Targets.Length != 1
+		throw ValueError("A category submenu selects exactly its own category.")
+	return ToggleCategoryAllSections(Targets[1], Enabled)
+}
+
 /**
  * Builds one category through the shared command and provider declaration.
  * @param {String} V1Cat Native category id.
  * @param {String} TomlPath The category's resolved bundled source.
  * @param {Array} Sections Native section rows, in source order.
- * @param {Func} Apply The journal-backed category transaction.
+ * @param {Func} Apply The submenu's selection transaction (Targets, Enabled).
  * @param {Menu} TargetMenu Optional empty native menu held by repaint callbacks.
  * @returns {Menu} The rendered category submenu.
  */
-_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := HotstringsCategoryScopeApply, TargetMenu := unset) {
+_HS_CategoryMenu(V1Cat, TomlPath, Sections, Apply := _HS_CategorySelectionApply, TargetMenu := unset) {
 	Commands := Map(
 		"hotstring_category_enable_all", (*) => Apply([V1Cat], true),
 		"hotstring_category_disable_all", (*) => Apply([V1Cat], false))

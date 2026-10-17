@@ -471,8 +471,8 @@ const publicationCases = [
 		actual: true,
 		expected: false,
 		lua_parse_exit: 0,
-		before: '\n\t--- Every known category id',
-		after: '\n\tlanguage_rows = function() return {} end\n\t--- Every known category id'
+		before: '\n\t--- Renders a delay for a menu label',
+		after: '\n\tlanguage_rows = function() return {} end\n\t--- Renders a delay for a menu label'
 	},
 	{
 		name: 'canonical-renderer-import-shadowed-in-real-owner',

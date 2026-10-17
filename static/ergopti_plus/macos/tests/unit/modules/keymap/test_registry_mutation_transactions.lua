@@ -344,6 +344,24 @@ helpers.describe("hotstring category scope: runtime and persistence acknowledgem
 		end
 	end
 
+	-- hotstrings-submenu-live-2026-10-17: Ergopti binds magic key's « replace »
+	-- and repeat corrections; they are drawn, and switched, in its own submenu,
+	-- so the category's « check all » never reaches them.
+	helpers.it("(hotstring-category-owner) excluded bound sections keep their own choice", function()
+		local _, registry = fresh_registry()
+		registry.register_lua_group("magickey", "Magic key", { { name = "own" }, { name = "replace" } })
+		for _, name in ipairs({ "own", "replace" }) do
+			hs.settings.set("ergopti.hotstrings_section_magickey_" .. name, false)
+		end
+		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, function() return true end,
+			{ magickey = { replace = true } }), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_own"), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_replace"), false,
+			"the extension's bound section is not this submenu's")
+		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, nil, "replace"), false,
+			"a malformed exclusion refuses before any write")
+	end)
+
 	helpers.it("(hotstring-category-owner) rejects an unknown sibling before publication", function()
 		local state, registry = fresh_registry()
 		registry.register_lua_group("rolls", "Rolls", { { name = "hc" } })

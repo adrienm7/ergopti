@@ -74,7 +74,7 @@ helpers.describe("menu keymap lifecycle: strict start commitment", function()
 			-- Explicit category scope commands select desired choices without starting
 			-- input capture. The four category routes and the extension selection
 			-- publisher's runtime enable keep the gate.
-			{ marker = "function M.all_sections_switch", expected = 5, label = "common hotstrings" },
+			{ marker = "function M.build_language_bulk_actions", expected = 4, label = "common hotstrings" },
 			-- Personal scope selection preserves stopped capture; only a live section
 			-- enable still requires the strict start gate, covered by callback tests.
 			{ marker = "function M.build_custom", expected = 1, label = "custom hotstrings" },

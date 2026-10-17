@@ -28,14 +28,23 @@ _CTFP_CategoryProducersRetainBooleanIntent() {
 		"category writes use the canonical sparse baseline before typed serialization")
 	Assert(RegExMatch(Collector, 'Section:\s*"category_enabled"[^\r\n]+Value:\s*TOML_Bool\(') > 0,
 		"full-save category values retain Boolean intent until sparse normalization")
-	for Name in ["ToggleAllHotstrings", "ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
+	for Name in ["ToggleCategoryAllSections", "HS_TogglePersonalAllSections"] {
 		Body := _DriverFuncBody(Name)
 		Assert(Body != "" && InStr(Body, "_ConfigCommitHotstringIntent(") > 0,
 			"section selection must use its independent transaction: " . Name)
 	}
-	Sections := _DriverFuncBody("_ConfigBuildHotstringIntentPlan")
-	Assert(Sections != "" && InStr(Sections, '"category_enabled"') == 0,
-		"selecting children must not write their master gates")
+	; A category submenu's « check all » switches that category's own gate, as
+	; the shared category scope does (its tick is unclickable). Every other
+	; selection and the Hotstrings master are never written.
+	Sections := _StripFullLineComments(_DriverFuncBody("_ConfigBuildHotstringIntentPlan"))
+	Assert(Sections != "", "the section selection builder must exist")
+	Assert(StrSplit(Sections, '"category_enabled"').Length == 2
+		&& InStr(Sections, '_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Gate), Bool)') > 0,
+		"selecting children writes at most the one selected category gate")
+	Assert(StrSplit(Sections, "Gate := Selector").Length == 2
+		&& InStr(Sections, "Gate := Selector") > InStr(Sections, 'case "category":')
+		&& InStr(Sections, "Gate := Selector") < InStr(Sections, 'case "dynamic":'),
+		"only the category selection names a gate")
 }
 Test("config: every category producer retains foreign Boolean intent "
 	. "(config-typed-foreign-categories)", _CTFP_CategoryProducersRetainBooleanIntent)

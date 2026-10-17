@@ -5681,16 +5681,10 @@ type = "group"
 id = "hotstrings_params"
 i18n = "menu.hotstrings.params"
 
-# One checkbox for every section of every category, where a « Tout activer » /
-# « Tout désactiver » pair of commands used to be: two rows and two keys for one
-# control, whose state the user could only guess. Ticked when every category and
-# every one of its sections is on; a click switches them all to the other side.
-[[menu.hotstrings_menu]]
-type = "check"
-id = "hotstrings_all_sections"
-i18n = "menu.hotstrings.enable_all_sections"
-checked_when = ["hotstrings_all_sections_enabled"]
-
+# No whole-tree « all sections » row (removed 2026-10-17): it switched on the
+# packs of every language and the programmable hotstrings at once. Each
+# category, language, dynamic, personal and extension submenu owns the bulk
+# rows for its own sections.
 [[menu.hotstrings_menu]]
 type = "---"
 

@@ -156,6 +156,12 @@ helpers.describe("dynamic hotstring bulk transaction", function()
 					helpers.assert_eq(Codec.decode(read(c.path)).hotstrings.dynamic[id].enabled,
 						enabled and true or nil, "neutral family selection stays sparse: " .. id)
 				end
+				-- hotstrings-submenu-live-2026-10-17: the programmable hotstrings run
+				-- the user's own code and keep their own switch.
+				helpers.assert_eq(c.Preferences.get("hotstrings.dynamic.user_code.enabled"), false,
+					"a bulk click of the families never enables the programmable hotstrings")
+				helpers.assert_nil(Codec.decode(read(c.path)).hotstrings.dynamic.user_code,
+					"and never writes their preference")
 				helpers.assert_eq(c.Preferences.get("hotstrings.dynamic.enabled"), enabled)
 				helpers.assert_eq(c.Dynamic.is_enabled(), enabled)
 				helpers.assert_eq(fires(c.engine), enabled, "ordinary prefix matcher adopts the same cohort")

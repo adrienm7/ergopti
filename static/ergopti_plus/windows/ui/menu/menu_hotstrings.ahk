@@ -1000,7 +1000,7 @@ _HS_PersonalRows(Options := unset) {
 		if !(PersonalRows is Array)
 			return []
 		_HS_CategoryMenu("Personal", "", PersonalRows,
-			(_Targets, Enabled) => HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)
+			(_Targets, Enabled) => HS_TogglePersonalAllSections(Enabled, Options), PersonalMenu)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0

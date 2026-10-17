@@ -241,7 +241,9 @@ local function assert_guards(source, helper_source, native_source, programmable_
 	-- in the full inventory without granting another call a census exception.
 	-- The word-reset rows (idle reset presets, free entry and click checkbox)
 	-- share one guarded publisher in menu_hotstrings_management: one call more.
-	helpers.assert_eq(calls, 59 + 3,
+	-- The whole-tree « all sections » writer (setAllSectionsFn) left with its
+	-- row on 2026-10-17: one call less, not new slack.
+	helpers.assert_eq(calls, 59 + 3 - 1,
 		"the reviewed post-retirement census must enumerate every remaining save call")
 	helpers.assert_eq(guarded, calls,
 		"every menu preference writer must stop success-only effects on false, nil, or throw; unguarded: "

@@ -2357,14 +2357,6 @@
 			"i18n": "menu.hotstrings.params"
 		},
 		{
-			"type": "check",
-			"id": "hotstrings_all_sections",
-			"i18n": "menu.hotstrings.enable_all_sections",
-			"checked_when": [
-				"hotstrings_all_sections_enabled"
-			]
-		},
-		{
 			"type": "---"
 		},
 		{
