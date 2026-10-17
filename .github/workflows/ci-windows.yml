@@ -60,7 +60,7 @@ jobs:
   # 1) AHK unit, native and contract tests
   # ─────────────────────────────────────────────────
   test-ahk:
-    name: 'Unit tests (${{ matrix.shard }}/6)'
+    name: 'Unit tests'
     runs-on: windows-latest
     # The canonical AHK suite is single-threaded and took over 90 minutes on one
     # runner. Six VMs each run every sixth test (run_all.ahk --shard), so the
