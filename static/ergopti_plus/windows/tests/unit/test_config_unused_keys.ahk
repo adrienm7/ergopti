@@ -505,6 +505,45 @@ _CUK_WebPreviewLifecycle() {
 Test("config cleanup webview: changed files require refresh, one backup and no stale action (config-cleanup-webview)",
 	_CUK_WebPreviewLifecycle)
 
+_CUK_DeferredCleanArm(State, Callback, Period) {
+	global MENU_COMMAND_DEFERRAL_RETRY_MS
+	AssertEqual(MENU_COMMAND_DEFERRAL_RETRY_MS, Period)
+	AssertFalse(State.Retry is Object, "one confirmation schedules one retry")
+	State.Retry := Callback
+}
+
+; A confirmation that interrupts a configuration write used to run at once and
+; be refused (write_failed) with the setting kept; it now waits for the write.
+_CUK_CleanWaitsForRunningWrite() {
+	Dir := _CUK_NewDir()
+	try {
+		Path := _CUK_WriteFixture(Dir)
+		Before := FSReadUtf8Exact(Path)
+		Host := ConfigCleanupWindow()
+		Host.Session := ConfigCleanupSession(Path)
+		Evals := []
+		Host.DefineProp("Eval", {Call: (Self, Js) => Evals.Push(Js)})
+		Host.Deliver("ready")
+		AssertEqual("ready", Host.Session.State["status"])
+		Retry := {Retry: 0}
+		Lease := _ConfigWriteLeaseTryAcquire(Path, "concurrent-writer")
+		AssertTrue(Lease is Object, "the regression needs a real write in progress")
+		try {
+			Host.Deliver(Map("action", "clean", "session", Host.Session.Token), 0,
+				_CUK_DeferredCleanArm.Bind(Retry))
+			AssertEqual("ready", Host.Session.State["status"], "a write in progress must defer the cleanup, not refuse it")
+			AssertEqual(Before, FSReadUtf8Exact(Path))
+			AssertTrue(Retry.Retry is Object, "the cleanup is scheduled for when the write ends")
+		} finally _ConfigWriteLeaseRelease(Lease)
+		Retry.Retry.Call()
+		AssertEqual("removed", Host.Session.State["status"], "the deferred cleanup runs once the write has ended")
+		AssertEqual(2, Evals.Length, "the page hears the preview and the deferred outcome")
+		Host.Session.Close()
+	} finally DirDelete(Dir, true)
+}
+Test("config cleanup webview: a confirmation during a configuration write waits for it (cleanup-during-write)",
+	_CUK_CleanWaitsForRunningWrite)
+
 _CUK_WebPreviewCancelAndLongList() {
 	Dir := _CUK_NewDir()
 	try {
