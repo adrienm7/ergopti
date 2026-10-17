@@ -61,18 +61,59 @@ LLM_Menu_ServiceBuilds() {
 	return _LLM_Menu_GetBuildCoordinator().Service()
 }
 
-; An LLM repaint replaces only its detached submenu. Re-project the complete
-; root through the generation fence, but retain every sibling submenu already
-; built by InitSubMenus. The generic root worker invalidates and rebuilds those
-; siblings, including a recursive personal/extensions scan that the LLM state
-; cannot affect.
+; An LLM repaint replaces only its detached submenu. When the settled root
+; already shows the IA row, only that row's child is swapped, under the same
+; generation fence: the LLM state reaches no sibling row, and re-staging the
+; whole root re-rendered every feature menu (the hotstrings one included) on
+; each local-server observation, which kept the input thread busy for seconds
+; (llm-repaint-swaps-only-its-row-2026-10-17). Without such a row the complete
+; root is re-projected, reusing every sibling submenu built by InitSubMenus.
 _LLM_Menu_PublishRoot(Submenu, PublishAuthorizeFn) {
 	global _LLM_Menu_Handle
 	if !(Submenu is Menu) || _LLM_Menu_Handle != Submenu
 		return false
+	Replaced := _LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn)
+	if Replaced != -1
+		return Replaced
 	try LoggerDebug("LLM",
 		"Publishing IA submenu through retained root projection.")
 	return initMenu(_LLM_Menu_PreparedRootCurrent.Bind(Submenu, PublishAuthorizeFn), false, Submenu)
+}
+
+/**
+ * Swaps the IA row's child in the published root, leaving every sibling row as is.
+ * @param {Menu} Submenu The staged IA child this build owns.
+ * @param {Func} PublishAuthorizeFn The root generation fence of this projection.
+ * @returns {Integer} 1 when swapped, 0 when the fence refused it, -1 when the
+ *     published root has no IA submenu row to swap (the caller re-stages the root).
+ */
+_LLM_Menu_ReplacePublishedRow(Submenu, PublishAuthorizeFn) {
+	if _TrayRootFirstPublicationPending()
+		return -1
+	Label := t("menu.llm.title")
+	PreviousCritical := Critical("On")
+	try {
+		Position := -1
+		loop TrayMenuItemCount(A_TrayMenu) {
+			if TrayMenuItemCaption(A_TrayMenu, A_Index - 1) == Label {
+				Position := A_Index - 1
+				break
+			}
+		}
+		; A disabled top-level row or a root still being bootstrapped has no IA child.
+		if Position < 0 || !TrayMenuSubmenuHandle(A_TrayMenu.Handle, Position)
+			return -1
+		if !_LLM_Menu_PreparedRootCurrent(Submenu, PublishAuthorizeFn)
+			return 0
+		; The same retirement steps as a root publication, for this one row only.
+		MenuDispatcher_BeginReplacement()
+		A_TrayMenu.Add(Label, Submenu)
+		MenuPopulation_Publish(A_TrayMenu)
+		MenuDispatcher_PruneMenu(A_TrayMenu)
+		TrayMenu_ApplyPauseGreying(A_IsSuspended, A_TrayMenu, [Label])
+		try LoggerDebug("LLM", "IA submenu swapped in the published root.")
+		return 1
+	} finally Critical(PreviousCritical)
 }
 
 /** Preserves the original root ticket and the exact candidate at its final claim. */
