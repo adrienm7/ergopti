@@ -107,6 +107,38 @@ end
 
 helpers.describe("window_info: X11", function()
 
+	helpers.it("(linux-focus-coherent-poll) retains one window's metadata and identity while focus changes", function()
+		local shell = helpers.load_module("adapters.shell_runner")
+		local display = helpers.load_module("infra.display_server")
+		display._set_for_test(display.X11, "coherent focus fixture")
+		local queries, id = 0, "1"
+		shell._set_runner(function(command)
+			if command:find("getactivewindow", 1, true) then
+				queries = queries + 1
+				local captured = id
+				id = "2"
+				return captured .. "\n"
+			end
+			if command:find("getwindowname '1'", 1, true) then return "Private window\n" end
+			if command:find("getwindowname '2'", 1, true) then return "Public window\n" end
+			if command:find("getwindowpid", 1, true) then return "1337\n" end
+			if command:find("/proc/1337/comm", 1, true) then return "browser\n" end
+			return ""
+		end)
+		local ok, failure = pcall(function()
+			local window = helpers.load_module("adapters.window_info")
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata, { appId = "browser", windowTitle = "Private window", bundleId = "", executablePath = "" })
+			helpers.assert_eq(identity, "x11:1337:1")
+			helpers.assert_eq(queries, 1, "the snapshot must not mix a later window with the first title")
+			local current = window.focused_identity()
+			helpers.assert_eq(current, "x11:1337:2", "asynchronous output must query fresh focus after an earlier snapshot")
+			helpers.assert_eq(queries, 2)
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
 	helpers.it("(linux-focus-window-identity) distinguishes identically titled windows of one process", function()
 		local id = "0x1"
 		local Shell = helpers.load_module("adapters.shell_runner")
@@ -261,6 +293,38 @@ end)
 -- =================================================================
 
 helpers.describe("window_info: Wayland", function()
+
+	helpers.it("(linux-focus-coherent-poll) reserves accessible focus lookup for fresh native targeting", function()
+		local name = "adapters.user_hotstring_destination"
+		local saved, captures = package.loaded[name], 0
+		local saved_lifecycle = package.loaded["adapters.process_lifecycle"]
+		package.loaded[name] = {
+			capture_current = function()
+				captures = captures + 1
+				return { bus = ":1.42", path = "/control/" .. captures }
+			end,
+		}
+		local ok, failure = pcall(function()
+			local window = under("wayland", "GNOME", {})
+			helpers.assert_eq(window.getFocused(), { appId = "", windowTitle = "", bundleId = "", executablePath = "" })
+			helpers.assert_eq(captures, 0, "metadata consumers must not acquire an unnecessary accessible destination")
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata.appId, "")
+			helpers.assert_nil(identity, "unsupported compositors retain unknown native identity during metadata polling")
+			local lifecycle = helpers.load_module("adapters.process_lifecycle")
+			lifecycle.start()
+			for tick = 1, 5 do lifecycle.tick(tick) end
+			lifecycle.stop()
+			helpers.assert_eq(captures, 0, "periodic lifecycle polling must not spawn an additional accessible helper")
+			helpers.assert_eq(window.focused_identity(), "atspi::1.42:/control/1")
+			helpers.assert_eq(window.focused_identity(), "atspi::1.42:/control/2", "asynchronous targeting cannot reuse a previous accessible snapshot")
+			helpers.assert_eq(captures, 2)
+		end)
+		package.loaded[name] = saved
+		package.loaded["adapters.process_lifecycle"] = saved_lifecycle
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
 
 	for _, case in ipairs({
 		{ desktop = "sway", probe = "command -v 'swaymsg'", query = "swaymsg -t get_tree",

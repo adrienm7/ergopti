@@ -89,10 +89,9 @@ local FOCUS_KEY_SEPARATOR = "\1"
 --- One question, one answer, wherever the answer has to come from.
 --- @return string appId, string windowTitle, string nativeIdentity
 local function _focused_identity()
-	local ok, info = pcall(WindowInfo.getFocused)
+	local ok, info, native = pcall(WindowInfo.focused_snapshot)
 	if not ok or type(info) ~= "table" then return "", "", "" end
-	local identified, native = pcall(WindowInfo.focused_identity)
-	if not identified or type(native) ~= "string" then native = "" end
+	if type(native) ~= "string" then native = "" end
 	return info.appId or "", info.windowTitle or "", native
 end
 
