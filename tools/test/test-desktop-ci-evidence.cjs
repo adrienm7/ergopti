@@ -861,7 +861,7 @@ for (const [job, platform] of [
 }
 /** Requires actual native Ollama inputs and receiving before Brew can fail. */
 function checkManagedOllamaNative(body) {
-	const role = macRoleBody(body, 'managed-ollama-native', 36);
+	const role = macRoleBody(body, 'managed-ollama-native', 34);
 	for (const step of Mac.selected(body, 'managed-ollama-native')) {
 		assert.match(step.body, /^          GOTOOLCHAIN: 'local'$/m);
 		assert.match(step.body, /^          ERGOPTI_RELEASE_TAG: '\$\{\{ inputs\.tag \}\}'$/m);
