@@ -490,7 +490,6 @@ helpers.describe("programmable native Linux runtime", function()
 	-- their own start/cancel owner (2026-10-17): their selection leaves them as is.
 	helpers.it("(user-hotstrings-native) a dynamic family selection leaves the programmable hotstrings alone", function()
 		with_runtime(function(f)
-			f.zero_builtin = true
 			with_configuration_scope(f, function(c)
 				local before = f.User.is_enabled()
 				helpers.assert_true(c.dynamic_scope.apply(false))
