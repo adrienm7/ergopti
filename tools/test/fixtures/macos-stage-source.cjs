@@ -9,6 +9,7 @@ const stage = Object.freeze({
 	'e2e-hs': 'e2e-hs',
 	'tooltip-canvas': 'e2e-hs',
 	'managed-ollama-native': 'e2e-hs',
+	'managed-ollama-build': 'e2e-hs',
 	'item36-native': 'e2e-hs',
 	'lease-silence-native': 'e2e-hs',
 	'package-macos': 'package-macos',

@@ -162,6 +162,9 @@ jobs:
 
   e2e-hs:
     name: E2E tests
+    permissions:
+      contents: read
+      actions: read
     needs:
       - test-hs
     runs-on: ${{ fromJSON(needs.test-hs.outputs.e2e_metadata)[matrix.lot].runner }}
@@ -916,7 +919,10 @@ jobs:
           set -euo pipefail
           "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/test/macos_managed_ollama_explicit_stream_test.py
         timeout-minutes: 2
-      - name: Prepare genuine pinned Go toolchain
+      # The clean source build runs in the parallel "Managed Ollama build" cell
+      # of this architecture. Receive it only as its sealed bytes, bound to this
+      # commit, run and the bridge sources of this checkout.
+      - name: Receive and admit the clean native source asset from its build cell
         env:
           GOTOOLCHAIN: 'local'
           ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
@@ -924,83 +930,14 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ steps.ollama-toolchain.outputs.version }}
-          check-latest: false
-          cache: false
-      - name: Acquire and verify genuine pinned upstream inputs
-        env:
-          GOTOOLCHAIN: 'local'
-          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
-          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
-          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          test ! -e "$ERGOPTI_OLLAMA_SOURCE"
-          test ! -e "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE"
-          git init "$ERGOPTI_OLLAMA_SOURCE"
-          git -C "$ERGOPTI_OLLAMA_SOURCE" remote add origin https://github.com/ollama/ollama.git
-          git -C "$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
-          git -C "$ERGOPTI_OLLAMA_SOURCE" checkout --detach FETCH_HEAD
-          test "$(git -C "$ERGOPTI_OLLAMA_SOURCE" rev-parse HEAD)" = "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
-          test -z "$(git -C "$ERGOPTI_OLLAMA_SOURCE" status --porcelain --untracked-files=all)"
-          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
-            --output "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" "$ERGOPTI_OLLAMA_OFFICIAL_URL"
-          python3 - <<'PY'
-          import hashlib
-          import json
-          import os
-          from pathlib import Path
-          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
-          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
-          archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
-          assert archive.stat().st_size == identity['bytes']
-          with archive.open('rb') as stream:
-              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
-          assert actual == identity['sha256']
-          receipt = {'filename': archive.name, 'sha256': actual, 'bytes': archive.stat().st_size}
-          with (Path(os.environ['ERGOPTI_OLLAMA_BUILD_ROOT']) / 'official-input-receipt.json').open('x', encoding='utf-8') as stream:
-              json.dump(receipt, stream, sort_keys=True)
-              stream.write('\n')
-          PY
-      - name: Build and admit the actual native source asset
-        env:
-          GOTOOLCHAIN: 'local'
-          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
-          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
-          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+          GITHUB_TOKEN: ${{ github.token }}
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
         id: ollama-native-build
         shell: bash
         run: |
           set -euo pipefail
-          {
-            ollama_native_go="$(command -v go)"
-            python3 tools/build/build-macos-managed-ollama.py \
-              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
-              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
-              --go "$ollama_native_go" --output "$ERGOPTI_OLLAMA_BUILD_ROOT/assets"
-            python3 tools/test/macos_managed_ollama_catalogue_test.py --native \
-              --source "$ERGOPTI_OLLAMA_SOURCE" --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
-              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
-              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go"
-            python3 tools/build/stage-macos-managed-ollama-catalogue.py \
-              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
-              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
-              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
-              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go" \
-              --release "$ERGOPTI_RELEASE" --release-tag "$ERGOPTI_RELEASE_TAG" \
-              --release-version "$ERGOPTI_RELEASE_VERSION" --release-channel "$ERGOPTI_RELEASE_CHANNEL" \
-              --output "$ERGOPTI_OLLAMA_CATALOGUE"
-          } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
+          node tools/ci/managed-ollama-handoff.cjs receive "$RUNNER_TEMP/managed-ollama-handoff"
+        timeout-minutes: 50
       - name: Receive actual native model create, pull, inference and retirement
         env:
           GOTOOLCHAIN: 'local'
@@ -1247,6 +1184,220 @@ jobs:
           retention-days: 7
           if-no-files-found: error
           path: ${{ runner.temp }}/group3-apple-shortcuts-probe-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}
+
+      # Retained original role: managed-ollama-build
+      # The clean native source build of the receiving managed-ollama-native
+      # cell runs here, in parallel with that cell's Swift and XCTest
+      # qualification, from a fresh Go cache as before. It seals its exact
+      # outputs; the receiving cell admits them only for this commit, run,
+      # architecture and bridge sources (tools/ci/managed-ollama-handoff.cjs).
+      - uses: actions/setup-node@v4
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}
+        with:
+          node-version-file: '.node-version'
+      - uses: actions/setup-python@v5
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}
+        with:
+          python-version: '3.13'
+      - name: Admit the canonical native toolchain and public inputs for the clean build
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' }}
+        id: ollama-build-toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import platform
+          import re
+          import tempfile
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          official = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())
+          architecture = {'arm64': 'arm64', 'x86_64': 'amd64'}[platform.machine()]
+          assert platform.system() == 'Darwin'
+          assert architecture == os.environ['ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE']
+          assert official['version'] == contract['version']
+          assert set(contract['assets']) == {'macos-arm64', 'macos-amd64'}
+          identity = official['assets'][contract['official_asset_key']]
+          version = contract['go_version']
+          assert re.fullmatch(r'go[0-9]+\.[0-9]+\.[0-9]+', version)
+          root = Path(tempfile.mkdtemp(prefix='managed-ollama-native-', dir=os.environ['RUNNER_TEMP']))
+          values = {
+              'ERGOPTI_OLLAMA_BUILD_ROOT': str(root),
+              'ERGOPTI_OLLAMA_SOURCE': str(root / 'source'),
+              'ERGOPTI_OLLAMA_SOURCE_COMMIT': contract['source_commit'],
+              'ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE': str(root / identity['filename']),
+              'ERGOPTI_OLLAMA_OFFICIAL_URL': 'https://github.com/ollama/ollama/releases/download/v' + official['version'] + '/' + identity['filename'],
+              'ERGOPTI_OLLAMA_ASSET': str(root / 'assets' / contract['assets']['macos-' + architecture]['filename']),
+              'ERGOPTI_OLLAMA_CATALOGUE': str(root / 'staged/_shared/modules/llm/managed_ollama_release.json'),
+          }
+          with (root / 'public-inputs.json').open('x', encoding='utf-8') as stream:
+              json.dump({'contract': contract, 'official_identity': identity, 'architecture': architecture, 'tested_sha': os.environ['GITHUB_SHA'], 'inputs': values}, stream, sort_keys=True)
+              stream.write('\n')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+              stream.write('version=' + version[2:] + '\n')
+          with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
+              for key, value in values.items():
+                  assert '\n' not in value and '\r' not in value
+                  stream.write(key + '=' + value + '\n')
+          PY
+      - name: Prepare genuine pinned Go toolchain
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ steps.ollama-build-toolchain.outputs.version }}
+          check-latest: false
+          cache: false
+      - name: Acquire and verify genuine pinned upstream inputs
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ! -e "$ERGOPTI_OLLAMA_SOURCE"
+          test ! -e "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE"
+          git init "$ERGOPTI_OLLAMA_SOURCE"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" remote add origin https://github.com/ollama/ollama.git
+          git -C "$ERGOPTI_OLLAMA_SOURCE" fetch --depth=1 --no-tags origin "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          git -C "$ERGOPTI_OLLAMA_SOURCE" checkout --detach FETCH_HEAD
+          test "$(git -C "$ERGOPTI_OLLAMA_SOURCE" rev-parse HEAD)" = "$ERGOPTI_OLLAMA_SOURCE_COMMIT"
+          test -z "$(git -C "$ERGOPTI_OLLAMA_SOURCE" status --porcelain --untracked-files=all)"
+          curl --proto '=https' --proto-redir '=https' --fail --location --retry 3 --max-time 600 \
+            --output "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" "$ERGOPTI_OLLAMA_OFFICIAL_URL"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          contract = json.loads(Path('static/ergopti_plus/_shared/modules/llm/managed_ollama_runtime.json').read_text())
+          identity = json.loads(Path('static/ergopti_plus/_shared/modules/llm/ollama_release.json').read_text())['assets'][contract['official_asset_key']]
+          archive = Path(os.environ['ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE'])
+          assert archive.stat().st_size == identity['bytes']
+          with archive.open('rb') as stream:
+              actual = hashlib.file_digest(stream, 'sha256').hexdigest()
+          assert actual == identity['sha256']
+          receipt = {'filename': archive.name, 'sha256': actual, 'bytes': archive.stat().st_size}
+          with (Path(os.environ['ERGOPTI_OLLAMA_BUILD_ROOT']) / 'official-input-receipt.json').open('x', encoding='utf-8') as stream:
+              json.dump(receipt, stream, sort_keys=True)
+              stream.write('\n')
+          PY
+      - name: Build and admit the actual native source asset
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled()) }}
+        id: ollama-native-producer
+        shell: bash
+        run: |
+          set -euo pipefail
+          {
+            ollama_native_go="$(command -v go)"
+            python3 tools/build/build-macos-managed-ollama.py \
+              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
+              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --go "$ollama_native_go" --output "$ERGOPTI_OLLAMA_BUILD_ROOT/assets"
+            python3 tools/test/macos_managed_ollama_catalogue_test.py --native \
+              --source "$ERGOPTI_OLLAMA_SOURCE" --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
+              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go"
+            python3 tools/build/stage-macos-managed-ollama-catalogue.py \
+              --repository "$GITHUB_WORKSPACE" --source "$ERGOPTI_OLLAMA_SOURCE" \
+              --official-archive "$ERGOPTI_OLLAMA_OFFICIAL_ARCHIVE" \
+              --producer-receipt "$ERGOPTI_OLLAMA_ASSET.provenance.json" \
+              --archive "$ERGOPTI_OLLAMA_ASSET" --go "$ollama_native_go" \
+              --release "$ERGOPTI_RELEASE" --release-tag "$ERGOPTI_RELEASE_TAG" \
+              --release-version "$ERGOPTI_RELEASE_VERSION" --release-channel "$ERGOPTI_RELEASE_CHANNEL" \
+              --output "$ERGOPTI_OLLAMA_CATALOGUE"
+          } 2>&1 | tee "$RUNNER_TEMP/managed-ollama-producer-build.log"
+      - name: Seal the clean native source build for its receiving cell
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-producer.outcome == 'success') }}
+        id: ollama-native-seal
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/ci/managed-ollama-handoff.cjs seal "$RUNNER_TEMP/managed-ollama-handoff"
+        timeout-minutes: 3
+      - name: Hand the clean native source build to its receiving cell
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-seal.outcome == 'success') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-ollama-build-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          path: ${{ runner.temp }}/managed-ollama-handoff
+      - name: Retain the clean native source build evidence
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-build' && (always() && env.ERGOPTI_OLLAMA_BUILD_ROOT != '') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: managed-ollama-build-evidence-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          retention-days: ${{ inputs.release && 7 || 1 }}
+          path: |
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/public-inputs.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/official-input-receipt.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/assets
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/staged
+            ${{ runner.temp }}/managed-ollama-producer-build.log
 
       # ─────────────────────────────────────────────────
       # 1) Hammerspoon unit and contract tests

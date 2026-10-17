@@ -43,7 +43,11 @@ function plan(stage, context) {
 			cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),
 			cell('tooltip-canvas', 'macos-15', 'arm64', 10),
 			cell('managed-ollama-native', 'macos-15', 'arm64', 60),
-			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60)
+			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60),
+			// The clean native source build of each managed-ollama-native cell runs
+			// beside it; tools/ci/managed-ollama-handoff.cjs carries its sealed bytes.
+			cell('managed-ollama-build', 'macos-15', 'arm64', 60),
+			cell('managed-ollama-build', 'macos-15-intel', 'amd64', 60)
 		];
 		if (context.event_name === 'workflow_dispatch' && !context.release)
 			rows.push(
@@ -96,6 +100,8 @@ function roleLot(stage, role, architecture, scenario) {
 			return 'Tooltip canvas (Apple silicon)';
 		case 'e2e/managed-ollama-native':
 			return 'Managed Ollama (' + native() + ')';
+		case 'e2e/managed-ollama-build':
+			return 'Managed Ollama build (' + native() + ')';
 		case 'e2e/item36-native':
 			assert.equal(architecture, 'host');
 			return 'Archive update controls';

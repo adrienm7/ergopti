@@ -289,17 +289,37 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 		'Retain installed Shortcuts Events metadata diagnostic',
 		"${{ always() && github.event_name == 'workflow_dispatch' && !inputs.release }}"
 	],
-	[MACOS_BOX, 'managed-ollama-native', 'Prepare genuine pinned Go toolchain', NOT_CANCELLED],
+	// The clean source build runs in its own parallel cell and hands its sealed
+	// bytes to the receiving cell, which admits them under the original build id.
+	[MACOS_BOX, 'managed-ollama-build', 'Prepare genuine pinned Go toolchain', NOT_CANCELLED],
 	[
 		MACOS_BOX,
-		'managed-ollama-native',
+		'managed-ollama-build',
 		'Acquire and verify genuine pinned upstream inputs',
 		NOT_CANCELLED
 	],
 	[
 		MACOS_BOX,
-		'managed-ollama-native',
+		'managed-ollama-build',
 		'Build and admit the actual native source asset',
+		NOT_CANCELLED
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-build',
+		'Seal the clean native source build for its receiving cell',
+		"${{ !cancelled() && steps.ollama-native-producer.outcome == 'success' }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-build',
+		'Hand the clean native source build to its receiving cell',
+		"${{ !cancelled() && steps.ollama-native-seal.outcome == 'success' }}"
+	],
+	[
+		MACOS_BOX,
+		'managed-ollama-native',
+		'Receive and admit the clean native source asset from its build cell',
 		NOT_CANCELLED
 	],
 	[
@@ -3320,8 +3340,10 @@ function topJobProblems(files) {
 }
 
 /**
- * Rejects permissions outside each exact role: three Common custody jobs
- * may read Actions evidence, and release alone may write repository contents.
+ * Rejects permissions outside each exact role: three Common custody jobs, and
+ * the macOS caller with its E2E stage (whose managed Ollama cells receive the
+ * parallel clean build artifact), may read Actions evidence; release alone may
+ * write repository contents.
  * @param {Array<{rel: string, text: string}>} files The pipeline.
  * @returns {string[]}
  */
@@ -3330,7 +3352,9 @@ function permissionProblems(files) {
 	const evidenceReaders = new Set([
 		`${ENTRY}:core`,
 		`${COMMON_BOX}:common-e2e`,
-		`${COMMON_BOX}:common-unit-verdict`
+		`${COMMON_BOX}:common-unit-verdict`,
+		`${ENTRY}:macos`,
+		`${MACOS_BOX}:e2e-hs`
 	]);
 	for (const entry of files) {
 		const lines = entry.text.split('\n');
@@ -7431,14 +7455,15 @@ for (const name of [
 	);
 }
 
-// Model receiving owns one successful producer, independently of earlier refusals.
+// Model receiving owns one successful admission of the parallel clean build,
+// independently of earlier refusals.
 {
 	const files = pipeline.rawFiles();
 	const source = files.find((file) => file.rel === MACOS_BOX);
 	const jobs = pipeline.jobsOfText(source.text, MACOS_BOX).filter((job) => job.id === 'e2e-hs');
 	assert.equal(jobs.length, 1, 'one current native model receiving job');
 	const owner = jobs[0];
-	const buildName = 'Build and admit the actual native source asset';
+	const buildName = 'Receive and admit the clean native source asset from its build cell';
 	const modelName = 'Receive actual native model create, pull, inference and retirement';
 	const build = pipeline.step(owner.body, buildName);
 	const model = pipeline.step(owner.body, modelName);
@@ -7463,12 +7488,8 @@ for (const name of [
 		assert.throws(() => pipeline.validateRaw(mutated), pattern, label);
 	}
 	for (const [label, replacement, pattern] of [
-		['missing producer id', '', /native producer exact build id/],
-		[
-			'foreign producer id',
-			'        id: unrelated-native-build\n',
-			/native producer exact build id/
-		],
+		['missing producer id', '', /native admission build id/],
+		['foreign producer id', '        id: unrelated-native-build\n', /native admission build id/],
 		['duplicate producer id field', id + id, /step key 'id'.*appears 2 times/]
 	])
 		refuses(label, id.trimEnd(), replacement.trimEnd(), pattern);
@@ -7485,14 +7506,14 @@ for (const name of [
 		'producer id stolen by model receiver',
 		model,
 		model.replace(modelId, id),
-		/native producer unique build id/
+		/native admission unique build id/
 	);
 	const together = build + '\n' + model;
 	refuses(
 		'receiver precedes producer',
 		together,
 		model + '\n' + build,
-		/native producer precedes model receiving/
+		/native admission precedes model receiving/
 	);
 	for (const changed of [
 		'',

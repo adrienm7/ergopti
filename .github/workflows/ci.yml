@@ -378,6 +378,10 @@ jobs:
     needs: [validate, prepare-common]
     if: needs.validate.outputs.lane_macos == 'true'
     uses: ./.github/workflows/ci-macos.yml
+    # Its E2E stage awaits the parallel managed Ollama build artifact.
+    permissions:
+      contents: read
+      actions: read
     with:
       release: ${{ needs.validate.outputs.release == 'true' }}
       version: ${{ needs.validate.outputs.version }}

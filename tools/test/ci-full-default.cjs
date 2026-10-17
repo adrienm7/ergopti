@@ -118,18 +118,36 @@ const FULL_STEPS = [
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Prepare genuine pinned Go toolchain',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Acquire and verify genuine pinned upstream inputs',
-		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
 		'Build and admit the actual native source asset',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled()) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
+		'Seal the clean native source build for its receiving cell',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-producer.outcome == 'success') }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
+		'Hand the clean native source build to its receiving cell',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-build' && (!cancelled() && steps.ollama-native-seal.outcome == 'success') }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
+		'Receive and admit the clean native source asset from its build cell',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],
 	[
@@ -504,18 +522,43 @@ function validateRaw(files) {
 				'mandatory TOML check command'
 			);
 		}
+		// The clean producer runs in its own build cell; the receiving cell admits
+		// its sealed handoff under the original build id, before model receiving.
 		if (name === 'Build and admit the actual native source asset') {
 			requireEqual(
 				raw.stepField(body, 'id'),
-				'ollama-native-build',
+				'ollama-native-producer',
 				'native producer exact build id'
+			);
+			const members = raw.steps(job.body);
+			requireEqual(
+				members.filter((member) => raw.stepField(member.body, 'id') === 'ollama-native-producer')
+					.length,
+				1,
+				'native producer unique build id'
+			);
+			requireEqual(
+				members.findIndex((member) => member.name === name) <
+					members.findIndex(
+						(member) => member.name === 'Seal the clean native source build for its receiving cell'
+					),
+				true,
+				'native producer precedes its sealed handoff'
+			);
+		}
+		if (name === 'Receive and admit the clean native source asset from its build cell') {
+			requireEqual(raw.stepField(body, 'id'), 'ollama-native-build', 'native admission build id');
+			requireEqual(
+				raw.runOf(body)?.join('\n'),
+				'set -euo pipefail\nnode tools/ci/managed-ollama-handoff.cjs receive "$RUNNER_TEMP/managed-ollama-handoff"',
+				'native admission exact command'
 			);
 			const members = raw.steps(job.body);
 			requireEqual(
 				members.filter((member) => raw.stepField(member.body, 'id') === 'ollama-native-build')
 					.length,
 				1,
-				'native producer unique build id'
+				'native admission unique build id'
 			);
 			requireEqual(
 				members.findIndex((member) => member.name === name) <
@@ -524,7 +567,7 @@ function validateRaw(files) {
 							member.name === 'Receive actual native model create, pull, inference and retirement'
 					),
 				true,
-				'native producer precedes model receiving'
+				'native admission precedes model receiving'
 			);
 		}
 		if (name === 'Receive selected-release shell corpus and native guardian cancellation') {
