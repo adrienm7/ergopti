@@ -117,6 +117,24 @@ AHK v2's `Func` is a class, not the v1 string resolver: `Func("Callback")`
 raises `ValueError: Invalid base`. Return a local wrapper's `.Bind()` when the
 real callback is outside an isolated test include graph.
 
+The default-config boots only reach the staged first tray render, which skips
+most user data. A full render's cost and any module reached by it must be
+proved with the smoke's `realistic-hotstrings` fixture (several 35 KB personal
+files, programmable hotstrings on), which bounds every logged Hotstrings render.
+
+### project-ahk-menu-render-reads-admitted-snapshots
+
+A tray render runs on the only AutoHotkey thread, so hotstring expansion waits
+for it. Per-row questions must be answered from state admitted at registration,
+never by re-reading or reparsing a source: personal-file owners keep the parse
+discovery admitted (`Record["parsed"]`), and only a candidate patch reparses.
+One TOML parse per section and field made the menu take 9-45 s (2026-10-17).
+An AI submenu repaint swaps only its own row in a settled root
+(`_LLM_Menu_ReplacePublishedRow`); re-staging the root re-renders every feature
+menu. A module whose function the first render reaches must have its globals
+initialised before tray staging: `user_code.ahk` is included early in
+`ErgoptiPlus.ahk` for that reason.
+
 ### project-compiled-first-launch-extraction-takes-seconds
 
 The compiled exe's first launch expands its bundle of several hundred files
