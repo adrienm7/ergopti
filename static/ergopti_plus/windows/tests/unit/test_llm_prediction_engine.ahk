@@ -959,20 +959,39 @@ Test("_LLM_Engine_MaxAttempts: scales up with larger n", _MaxAttempts_ScalesWith
 
 _ResolveProfileForApp_ReturnsDefaultWhenNoOverrides() {
 	global _LLM_Engine
-	; Use try in case the key is absent — Map.Delete() throws "Item has no value"
-	; when the key does not exist in some AHK v2 builds.
-	try _LLM_Engine.Delete("app_profile_overrides")
-	result := _LLM_Engine_ResolveProfileIdForApp("basic")
-	AssertEqual("basic", result)
+	; The absent key is this case's fixture; the engine's own map returns for
+	; the tests that read it afterwards.
+	HadOverrides := _LLM_Engine.Has("app_profile_overrides")
+	SavedOverrides := HadOverrides ? _LLM_Engine["app_profile_overrides"] : ""
+	try {
+		if HadOverrides
+			_LLM_Engine.Delete("app_profile_overrides")
+		result := _LLM_Engine_ResolveProfileIdForApp("basic")
+		AssertEqual("basic", result)
+	} finally {
+		if HadOverrides
+			_LLM_Engine["app_profile_overrides"] := SavedOverrides
+		else if _LLM_Engine.Has("app_profile_overrides")
+			_LLM_Engine.Delete("app_profile_overrides")
+	}
 }
 Test("_LLM_Engine_ResolveProfileIdForApp: returns default when no overrides map", _ResolveProfileForApp_ReturnsDefaultWhenNoOverrides)
 
 
 _ResolveProfileForApp_ReturnsDefaultForEmptyMap() {
 	global _LLM_Engine
-	_LLM_Engine["app_profile_overrides"] := Map()
-	result := _LLM_Engine_ResolveProfileIdForApp("basic")
-	AssertEqual("basic", result)
+	HadOverrides := _LLM_Engine.Has("app_profile_overrides")
+	SavedOverrides := HadOverrides ? _LLM_Engine["app_profile_overrides"] : ""
+	try {
+		_LLM_Engine["app_profile_overrides"] := Map()
+		result := _LLM_Engine_ResolveProfileIdForApp("basic")
+		AssertEqual("basic", result)
+	} finally {
+		if HadOverrides
+			_LLM_Engine["app_profile_overrides"] := SavedOverrides
+		else
+			_LLM_Engine.Delete("app_profile_overrides")
+	}
 }
 Test("_LLM_Engine_ResolveProfileIdForApp: returns default when overrides map is empty", _ResolveProfileForApp_ReturnsDefaultForEmptyMap)
 
@@ -1275,37 +1294,50 @@ Test("_LLM_AllSlotsPlaceholder: checks array of slots", _LLM_TestAllSlotsPlaceho
 ; ===================================================
 ; ===================================================
 
+; Each case states all four sources LLM_Engine_IsBusy reads and restores them,
+; so a case neither inherits a busy source nor leaves a one-key engine or a
+; live async entry behind for the tests that follow it.
+_LLM_EngineIsBusy_Case(TimerActive, Streams, OllamaAsync, RemoteAsync) {
+	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Remote_Async
+	Saved := {
+		Engine: _LLM_Engine, Streams: _LLM_Ollama_ActiveStreams,
+		OllamaAsync: _LLM_Ollama_Async, RemoteAsync: _LLM_Remote_Async
+	}
+	try {
+		_LLM_Engine := Map("timer_active", TimerActive)
+		_LLM_Ollama_ActiveStreams := Streams
+		_LLM_Ollama_Async := OllamaAsync
+		_LLM_Remote_Async := RemoteAsync
+		return LLM_Engine_IsBusy()
+	} finally {
+		_LLM_Engine := Saved.Engine
+		_LLM_Ollama_ActiveStreams := Saved.Streams
+		_LLM_Ollama_Async := Saved.OllamaAsync
+		_LLM_Remote_Async := Saved.RemoteAsync
+	}
+}
+
 _LLM_EngineIsBusy_TimerActive() {
-	global _LLM_Engine
-	_LLM_Engine := Map("timer_active", true)
-	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when debounce timer is active")
+	AssertTrue(_LLM_EngineIsBusy_Case(true, [], Map(), Map()),
+		"engine is busy when debounce timer is active")
 }
 Test("LLM_Engine_IsBusy: detects active debounce timer", _LLM_EngineIsBusy_TimerActive)
 
 _LLM_EngineIsBusy_ActiveStreams() {
-	global _LLM_Engine, _LLM_Ollama_ActiveStreams
-	_LLM_Engine := Map("timer_active", false)
-	_LLM_Ollama_ActiveStreams := [1]
-	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when streams are active")
+	AssertTrue(_LLM_EngineIsBusy_Case(false, [1], Map(), Map()),
+		"engine is busy when streams are active")
 }
 Test("LLM_Engine_IsBusy: detects active streams", _LLM_EngineIsBusy_ActiveStreams)
 
 _LLM_EngineIsBusy_ActiveOllamaAsync() {
-	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async
-	_LLM_Engine := Map("timer_active", false)
-	_LLM_Ollama_ActiveStreams := []
-	_LLM_Ollama_Async := Map(1, Map("cancelled", false))
-	AssertTrue(LLM_Engine_IsBusy(), "engine is busy when Ollama async request is active")
+	AssertTrue(_LLM_EngineIsBusy_Case(false, [], Map(1, Map("cancelled", false)), Map()),
+		"engine is busy when Ollama async request is active")
 }
 Test("LLM_Engine_IsBusy: detects active Ollama async", _LLM_EngineIsBusy_ActiveOllamaAsync)
 
 _LLM_EngineIsBusy_Idle() {
-	global _LLM_Engine, _LLM_Ollama_ActiveStreams, _LLM_Ollama_Async, _LLM_Remote_Async
-	_LLM_Engine := Map("timer_active", false)
-	_LLM_Ollama_ActiveStreams := []
-	_LLM_Ollama_Async := Map()
-	_LLM_Remote_Async := Map()
-	AssertFalse(LLM_Engine_IsBusy(), "engine is not busy when idle")
+	AssertFalse(_LLM_EngineIsBusy_Case(false, [], Map(), Map()),
+		"engine is not busy when idle")
 }
 Test("LLM_Engine_IsBusy: false when idle", _LLM_EngineIsBusy_Idle)
 
@@ -1364,53 +1396,72 @@ Test("LLM_Engine_FirePrediction: a stale timer against a non-Map engine is a no-
 ; still paint it when the screen is empty.
 _LLM_EngineShowLoading_SuppressedWhenPredictionVisible() {
 	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
-	_LLM_Engine := Map("inline_autotype", false)
-	_Stub_LlmTooltipVisible := true    ; a real prediction is on screen…
-	_Stub_LlmTooltipLoading := false   ; …not the loading spinner
-	_Stub_LlmTooltipCalls := []
-	_LLM_Engine_ShowLoadingTooltip()
-	shown := false
-	for c in _Stub_LlmTooltipCalls {
-		if (c.HasOwnProp("loading") and c.loading)
-			shown := true
+	Saved := {
+		Engine: _LLM_Engine, Calls: _Stub_LlmTooltipCalls,
+		Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading
 	}
-	AssertFalse(shown, "loading spinner must NOT replace a prediction already on screen")
+	try {
+		_LLM_Engine := Map("inline_autotype", false)
+		_Stub_LlmTooltipVisible := true    ; a real prediction is on screen…
+		_Stub_LlmTooltipLoading := false   ; …not the loading spinner
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_ShowLoadingTooltip()
+		shown := false
+		for c in _Stub_LlmTooltipCalls {
+			if (c.HasOwnProp("loading") and c.loading)
+				shown := true
+		}
+		AssertFalse(shown, "loading spinner must NOT replace a prediction already on screen")
+	} finally {
+		_LLM_Engine := Saved.Engine
+		_Stub_LlmTooltipCalls := Saved.Calls
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipLoading := Saved.Loading
+	}
 }
 Test("LLM engine: loading spinner suppressed while a prediction is visible", _LLM_EngineShowLoading_SuppressedWhenPredictionVisible)
 
 
 _LLM_EngineShowLoading_ShownWhenScreenEmpty() {
 	global _LLM_Engine, _Stub_LlmTooltipCalls, _Stub_LlmTooltipVisible, _Stub_LlmTooltipLoading
-	_LLM_Engine := Map(
-		"inline_autotype", false,
-		"request_id", 41,
-		"active_request_signature", "sig-A")
-	_Stub_LlmTooltipVisible := false   ; nothing on screen
-	_Stub_LlmTooltipLoading := false
-	_Stub_LlmTooltipCalls := []
-	_LLM_Engine_ShowLoadingTooltip()
-	shown := false
-	LoadingCall := 0
-	for c in _Stub_LlmTooltipCalls {
-		if (c.HasOwnProp("loading") and c.loading) {
-			shown := true
-			LoadingCall := c
-		}
+	Saved := {
+		Engine: _LLM_Engine, Calls: _Stub_LlmTooltipCalls,
+		Visible: _Stub_LlmTooltipVisible, Loading: _Stub_LlmTooltipLoading
 	}
-	AssertTrue(shown, "loading spinner must paint when the screen is empty")
-	AssertTrue(IsObject(LoadingCall) && LoadingCall.meta.Has("render_guard")
-			&& HasMethod(LoadingCall.meta["render_guard"], "Call"),
-		"deferred loading must carry the exact request identity to publication")
-	LoadingGuard := LoadingCall.meta["render_guard"]
-	AssertTrue(LoadingGuard.Call(),
-		"loading identity must accept the request which scheduled it")
-	_LLM_Engine["request_id"] := 42
-	_LLM_Engine["active_request_signature"] := "sig-B"
-	AssertFalse(LoadingGuard.Call(),
-		"loading identity must reject after a later keystroke cancels its request")
-	; Leave the toggles in the default state so later suites are unaffected.
-	_Stub_LlmTooltipVisible := false
-	_Stub_LlmTooltipLoading := false
+	try {
+		_LLM_Engine := Map(
+			"inline_autotype", false,
+			"request_id", 41,
+			"active_request_signature", "sig-A")
+		_Stub_LlmTooltipVisible := false   ; nothing on screen
+		_Stub_LlmTooltipLoading := false
+		_Stub_LlmTooltipCalls := []
+		_LLM_Engine_ShowLoadingTooltip()
+		shown := false
+		LoadingCall := 0
+		for c in _Stub_LlmTooltipCalls {
+			if (c.HasOwnProp("loading") and c.loading) {
+				shown := true
+				LoadingCall := c
+			}
+		}
+		AssertTrue(shown, "loading spinner must paint when the screen is empty")
+		AssertTrue(IsObject(LoadingCall) && LoadingCall.meta.Has("render_guard")
+				&& HasMethod(LoadingCall.meta["render_guard"], "Call"),
+			"deferred loading must carry the exact request identity to publication")
+		LoadingGuard := LoadingCall.meta["render_guard"]
+		AssertTrue(LoadingGuard.Call(),
+			"loading identity must accept the request which scheduled it")
+		_LLM_Engine["request_id"] := 42
+		_LLM_Engine["active_request_signature"] := "sig-B"
+		AssertFalse(LoadingGuard.Call(),
+			"loading identity must reject after a later keystroke cancels its request")
+	} finally {
+		_LLM_Engine := Saved.Engine
+		_Stub_LlmTooltipCalls := Saved.Calls
+		_Stub_LlmTooltipVisible := Saved.Visible
+		_Stub_LlmTooltipLoading := Saved.Loading
+	}
 }
 Test("LLM engine: loading spinner shown when no prediction is visible", _LLM_EngineShowLoading_ShownWhenScreenEmpty)
 
