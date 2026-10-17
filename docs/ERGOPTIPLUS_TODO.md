@@ -35,6 +35,15 @@ and natural exit0. BOM/LF and strict conventions also pass. The metadata fixture
 now loads its unchanged three-key XML through the original loader rather than
 assigning a parsed model and incomplete modifier table directly.
 
+Five additional cases expose admission through a substituted graph index,
+keycode, cloned model, inactive-source recipe or missing model recipe. Each
+fails on its corresponding original source image and passes after correction.
+The frame now seals the initial neutral base/Shift recipe against its private
+canonical graph row, including model identity, scan, index, keycode and output.
+Natural modifier and direct-digit descriptors cannot substitute for a model
+recipe. This does not yet retain an immutable historical graph-row ledger or
+authenticate event-time Caps, Option, HKL or the winning callback.
+
 Broader composed receiving and native qualification remain separate.
 
 ### October 16 media schema reader-lock admission

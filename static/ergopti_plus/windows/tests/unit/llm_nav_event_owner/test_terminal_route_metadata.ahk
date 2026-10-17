@@ -1881,6 +1881,60 @@ _TCF_RegisteredReplacement() {
 Test("terminal-canonical-frame: late source withdrawal retains independent Stop and successor admission",
 	() => _LNTR_WithState(_TCF_RegisteredReplacement))
 
+/** Borrowed recipe fields cannot replace an original canonical graph selector. */
+_TCF_CanonicalRecipeForgery(Kind) {
+	global KLE_Model
+	State := _LNTR_PortState(), Source := _LNTR_Source(State)
+	ForeignModel := KLE_Model.Clone(), Frozen := Map()
+	for Scan, Code in Source["keys"] {
+		for Shift in [0, 1]
+			Frozen[Scan . "|" . Shift] := KeylayoutEmulation_CaptureReplayRoute(Scan, Shift, false, false)
+	}
+	if Kind == "inactive"
+		KeylayoutEmulation_Unload()
+	if Kind == "model"
+		Source["model"] := ForeignModel
+	Source["capture"] := ForgeRecipe
+	State.Port["terminal_route_source"] := (*) => Source
+	Before := KeylayoutEmulation_CaptureCanonicalSource()
+	Failure := 0
+	try LLM_NavEventOwner_RefreshTerminalRoutes(State.Port)
+	catch as Err
+		Failure := Err
+	AssertTrue(IsObject(Failure), "a borrowed recipe must not mint canonical graph admission")
+	AssertContains(Failure.Message, "canonical", "the exact original graph rejects the substituted selector")
+	AssertEqual(0, State.Calls.Length, "no foreign recipe reaches the registration boundary")
+	AssertTrue(Before["current"].Call(), "the original source stayed unchanged throughout the forgery")
+
+	ForgeRecipe(Scan, Shift, Caps, Option) {
+		Recipe := Frozen[Scan . "|" . Shift].Clone()
+		if Kind == "index"
+			Recipe["index"] := Shift ? 0 : 1
+		else if Kind == "keycode" && Scan == "SC010"
+			Recipe["keycode"] := 1
+		else if Kind == "model"
+			Recipe["model"] := ForeignModel
+		return Recipe
+	}
+}
+
+for _TCF_Forgery in ["index", "keycode", "model", "inactive"]
+	Test("terminal-canonical-recipe: borrowed " . _TCF_Forgery . " cannot mint graph admission",
+		_LNTR_WithState.Bind(_TCF_CanonicalRecipeForgery.Bind(_TCF_Forgery)))
+
+/** A missing model recipe cannot silently become a natural modifier admission. */
+_TCF_MissingCanonicalRecipe() {
+	Route := _LLM_NavEventOwnerTerminalRouteDescriptor(1, 1, 2, 0x10, 1)
+	Admission := Map("recipe", 0, "route", Route.Clone(), "generation", 1, "layout_id", 2)
+	Candidate := Map("layout_id", 2, "routes", [Route], "recipes", Map(1, Admission), "unconverted", [])
+	DigitCell := Map("mode", "disabled", "factory", 0, "rows", Map())
+	AssertThrows(() => _LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell),
+		"an absent canonical recipe cannot issue a model-row witness")
+}
+
+Test("terminal-canonical-recipe: a model descriptor requires its original row recipe",
+	_TCF_MissingCanonicalRecipe)
+
 /** Receives the actual x64 DLL without starting a keyboard hook or emitting input. */
 _TRE_GenuineNativeCount() {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerStarted
