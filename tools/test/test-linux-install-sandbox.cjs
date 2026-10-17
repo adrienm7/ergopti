@@ -72,13 +72,14 @@ function stub(dir, name, body) {
 function runInstaller(scenario) {
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-install-'));
 	const home = path.join(sandbox, 'home');
+	const configRoot = path.join(home, scenario.configRootName || '.config');
 	const stubs = path.join(sandbox, 'stubs');
 	const callLog = path.join(sandbox, 'calls.log');
 	const state = path.join(sandbox, 'state');
 	fs.mkdirSync(home);
 	fs.mkdirSync(stubs);
 	fs.mkdirSync(state);
-	if (scenario.seed) scenario.seed(home);
+	if (scenario.seed) scenario.seed(home, configRoot);
 	const log = `echo "$(basename "$0") $*" >> ${JSON.stringify(bashPath(callLog))}`;
 
 	// Privilege is recorded and never performed — except the package manager,
@@ -147,6 +148,7 @@ function runInstaller(scenario) {
 	}
 
 	const env = {
+		...(scenario.configRootName ? { XDG_CONFIG_HOME: bashPath(configRoot) } : {}),
 		...(scenario.gnome ? { XDG_CURRENT_DESKTOP: 'ubuntu:GNOME' } : {}),
 		HOME: bashPath(home),
 		PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
@@ -174,6 +176,7 @@ function runInstaller(scenario) {
 		status: result.status,
 		output: `${result.stdout || ''}${result.stderr || ''}`,
 		home,
+		configRoot,
 		stubs,
 		calls,
 		cleanup: () => fs.rmSync(sandbox, { recursive: true, force: true })
@@ -181,6 +184,51 @@ function runInstaller(scenario) {
 }
 
 const errors = [];
+
+// Runtime configuration and systemd use the same XDG config root. A legacy
+// canonical pack there must retire before the new installed bundle replaces it.
+{
+	const legacyPack = '[legacy]\nvalue = "old canonical value"\n';
+	const run = runInstaller({
+		desktopProvided: true,
+		configRootName: 'config with spaces',
+		seed(home, configRoot) {
+			for (const file of [
+				path.join(home, '.local/lib/ergopti/_shared/modules/hotstrings/legacy.toml'),
+				path.join(configRoot, 'ergopti/hotstrings/legacy.toml')
+			]) {
+				fs.mkdirSync(path.dirname(file), { recursive: true });
+				fs.writeFileSync(file, legacyPack);
+			}
+		}
+	});
+	try {
+		if (run.status !== 0) errors.push(`XDG config install failed: ${run.output.slice(-1800)}`);
+		for (const relative of [
+			'systemd/user/ergopti-hotstrings.service',
+			'autostart/ergopti-hotstrings.desktop',
+			'ergopti/hotstrings/.ergopti-canonical-packs-v2'
+		]) {
+			if (!fs.existsSync(path.join(run.configRoot, relative)))
+				errors.push(`XDG config installation did not publish ${relative}`);
+		}
+		const hotstrings = path.join(run.configRoot, 'ergopti/hotstrings');
+		if (fs.existsSync(path.join(hotstrings, 'legacy.toml')))
+			errors.push('XDG config legacy canonical pack still masks the updated bundle');
+		const backup = path.join(
+			hotstrings,
+			'.ergopti-migrations/canonical-seeds/legacy.toml.legacy-seed'
+		);
+		if (!fs.existsSync(backup) || fs.readFileSync(backup, 'utf8') !== legacyPack)
+			errors.push('XDG config migration did not retain the old canonical bytes');
+		for (const relative of ['.config/systemd/user', '.config/ergopti/hotstrings']) {
+			if (fs.existsSync(path.join(run.home, relative)))
+				errors.push(`XDG config install wrote to the unused default root: ${relative}`);
+		}
+	} finally {
+		run.cleanup();
+	}
+}
 
 // Both startup formats must quote the same installed wrapper, even on a fresh
 // install where no menu-generated Desktop entry exists yet.
