@@ -420,6 +420,18 @@ never (`test_llm_nav_cycle_windows.ahk`, `test-windows-llm-nav-cycle.cjs`).
 Action: when the DLL is next rebuilt, drop the cycle routes from its contract
 together with the parked table.
 
+### project-nav-owner-start-registers-before-its-epoch
+
+`LLM_NavEventOwner_EnsureStarted` publishes a new
+`_LLM_NavEventOwnerRuntimeEpoch` only after the native start returned, and the
+native start already registered the terminal routes. Anything stamped with the
+runtime epoch during that start (the historical terminal rows) therefore holds
+the previous epoch, and a strict `EpochCurrent` check withdraws it at the first
+terminal hotstring capture. Start moves those rows to the published epoch
+through the loader's `publish_start_epoch` request. Action: state created
+inside Start that must outlive it joins the published epoch explicitly; test
+it through a started owner (`start-epoch-custody`), not a bare refresh.
+
 ### project-llm-tap-hold-tab-is-the-users-tab
 
 The recommended AltGr taps Tab (`_shared/tap_hold/defaults.toml`), and a

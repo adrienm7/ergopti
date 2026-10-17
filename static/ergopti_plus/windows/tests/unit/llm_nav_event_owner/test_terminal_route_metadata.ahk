@@ -2524,3 +2524,85 @@ _TCH_CompletedStopReleasesOwnedProjections() {
 
 Test("terminal-canonical-history-release: genuine Stop releases completed owned projections",
 	_LNTR_WithState.Bind(_TCH_CompletedStopReleasesOwnedProjections))
+
+; Native start registers the terminal routes before Start publishes its runtime
+; epoch, exactly as _LLM_NavEventOwnerNativeStart does after ErgoptiNav_Start.
+_TCH_StartRegistration(Native, Registration, Hwnd, WakeMessage) {
+	Result := _LNEO_PortStart(Native, Hwnd, WakeMessage)
+	Native.StartRefresh := LLM_NavEventOwner_RefreshTerminalRoutes(Registration.Port)
+	return Result
+}
+
+/**
+ * The first terminal capture after a driver start refreshes the routes again.
+ * Rows registered by Start belong to the lifetime that Start publishes; they
+ * must not read as a withdrawn historical owner (start-epoch-custody).
+ */
+_TCH_StartRegistrationSurvivesPublication() {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerRuntimeEpoch
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	_LNEO_Teardown()
+	Native := _LNEO_NewNativeState()
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Registration := _LNTR_PortState()
+		Registration.Port.Delete("register_terminal_routes")
+		Registration.Port.Delete("list_terminal_held_recipes")
+		Native.StartRefresh := "not_called"
+		Native.Port["start"] := _TCH_StartRegistration.Bind(Native, Registration)
+		Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		AssertTrue(LLM_NavEventOwner_EnsureStarted(Native.Port), "the owner starts with its route registration")
+		AssertTrue(Native.StartRefresh, "Start crossed the actual native route registration")
+		AssertEqual(Epoch + 1, _LLM_NavEventOwnerRuntimeEpoch, "Start published a new runtime epoch")
+		Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		Output := "not_called"
+		try Output := LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"]
+		catch as Err
+			Output := Err.Message
+		; Capture admission refreshes the routes first (BeginTerminalCapture).
+		Refreshed := "not_called"
+		try Refreshed := LLM_NavEventOwner_RefreshTerminalRoutes(Registration.Port)
+		catch as Err
+			Refreshed := Err.Message
+		AssertEqual(true, Refreshed, "the first capture refresh after Start keeps the retained native owner")
+		AssertEqual("a", Output, "a row registered by Start stays readable in the epoch Start published")
+		AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes.Count > 0)
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the actual C registration retires before fixture restoration")
+		_LLM_NavEventOwnerPort := Port
+		_LNEO_Teardown()
+	}
+}
+
+Test("terminal-canonical-history-epoch: Start registration survives its epoch publication (start-epoch-custody)",
+	_LNTR_WithState.Bind(_TCH_StartRegistrationSurvivesPublication))
+
+/** Only a publishing Start moves retained rows; a forged call cannot revive them. */
+_TCH_StartEpochPublicationRequiresStart() {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerRuntimeEpoch
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		Epoch := _LLM_NavEventOwnerRuntimeEpoch
+		_LLM_NavEventOwnerRuntimeEpoch := Epoch + 1
+		try {
+			PreviousCritical := Critical("On")
+			try AssertThrows(() => _LLM_NavEventOwnerNativeEnsureLoaded("publish_start_epoch",
+				Map("from", Epoch, "to", Epoch + 1)), "no Start is publishing this epoch")
+			finally Critical(PreviousCritical)
+			AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+				"a refused publication leaves the row in its original epoch")
+		} finally _LLM_NavEventOwnerRuntimeEpoch := Epoch
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+Test("terminal-canonical-history-epoch: start epoch publication requires an active Start (start-epoch-custody)",
+	_LNTR_WithState.Bind(_TCH_StartEpochPublicationRequiresStart))

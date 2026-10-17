@@ -168,6 +168,7 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 	global _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
 	global _LLM_NavEventOwnerServiceFn
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
 	StartTicket := 0
 	StartEpoch := 0
 	PreviousCritical := Critical("On")
@@ -234,6 +235,12 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 			_LLM_NavEventOwnerWakeFn := _LLM_NavEventOwnerOnWake
 			_LLM_NavEventOwnerServiceFn := _LLM_NavEventOwnerService
 			try {
+				; The routes registered during this start join the published epoch.
+				if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+						|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+					throw Error("The original start epoch owner was withdrawn.")
+				OriginalLoader.Call("publish_start_epoch",
+					Map("from", StartEpoch, "to", PublishedEpoch))
 				OnMessage(_LLM_NavEventOwnerWakeMessage,
 					_LLM_NavEventOwnerWakeFn)
 				_LLM_NavEventOwnerSetServiceTimer(true)
@@ -4229,6 +4236,28 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		return true
 	}
 
+	; Native start registers the terminal routes after ErgoptiNav_Start but before
+	; Start publishes its runtime epoch. Those rows belong to the lifetime being
+	; published, so they move with it; every other epoch change is a Stop, which
+	; retires all rows. Without this, the first capture after a start reads its
+	; own startup rows as a withdrawn historical owner.
+	PublishStartEpoch(Payload) {
+		if !OwnersCurrent() || !A_IsCritical || !_LLM_NavEventOwnerStarting
+				|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+				|| _LLM_NavEventOwnerTerminalRouteRefreshing || Constructing
+				|| IsObject(ActiveFrame) || IsObject(RetainedFrame) || IsObject(ActiveStop)
+				|| IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+			throw Error("The start epoch cannot be published over an open registration.")
+		if !PlainMap(Payload) || !(Payload.Get("from", "") is Integer) || !(Payload.Get("to", "") is Integer)
+				|| Payload["from"] < 0 || Payload["to"] != Payload["from"] + 1 || !EpochCurrent(Payload["to"])
+			throw ValueError("The published start epoch is invalid.")
+		for Dictionary, Registry in HistoricalRows
+			for Id, Record in Registry.Records
+				if Record.Epoch == Payload["from"]
+					Record.Epoch := Payload["to"]
+		return true
+	}
+
 	CanonicalOwnersCurrent() {
 		; Source admission is deliberately separate from native retirement custody.
 		for Pair in [[OriginalCanonicalCapture, KeylayoutEmulation_CaptureCanonicalSource],
@@ -4786,6 +4815,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 			&& CanonicalCurrent(ActiveFrame) && DigitCurrent(ActiveFrame) && CanonicalCurrent(ActiveFrame)
 	if Request == "allows_native_admission"
 		return OwnersCurrent() && !IsObject(ActiveStop) && !Constructing
+	if Request == "publish_start_epoch"
+		return PublishStartEpoch(Payload)
 	if Request == "begin_frame" {
 		if !((Payload is Integer) && Payload == 0)
 			throw ValueError("Frame construction accepts no supplied authority.")
