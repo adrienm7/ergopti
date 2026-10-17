@@ -231,3 +231,55 @@ _LSS_RefusalReceipt(Sink) {
 for Sink in ["main", "errors", "topical"]
 	Test("Logger: refusal evidence keeps " . Sink . " ownership and private data intact (AHK-090)",
 		_LSS_RefusalReceipt.Bind(Sink))
+
+; Timers kept logging while the startup smoke shut down, so lines arrived during
+; each flush and one successor flush left them queued (logger-shutdown-burst).
+_LSS_BurstFlush(State, Force := false) {
+	global _LOGGER_PENDING
+	Flushed := _LoggerFlush(Force)
+	if State.bursts > 0 {
+		State.bursts -= 1
+		_LOGGER_PENDING.Push("burst-line-" . State.bursts)
+	}
+	return Flushed
+}
+
+_LSS_ShutdownDrainsBurst() {
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
+	global LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES
+	Saved := [_LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING, LOGGER_LOG_PATH,
+		LOGGER_ERRORS_LOG_PATH, _LOGGER_SUB_PATHS, _LOGGER_PATH_DATE, _LOGGER_FLUSH_ACTIVE,
+		_LOGGER_FORCE_FLUSH_PENDING, _LOGGER_DROPPED_LINES]
+	Path := _FSWL_Path()
+	try {
+		_LOGGER_PENDING := ["first-line"]
+		_LOGGER_PENDING_ERRORS := []
+		_LOGGER_SUB_PENDING := Map()
+		LOGGER_LOG_PATH := Path
+		LOGGER_ERRORS_LOG_PATH := ""
+		_LOGGER_SUB_PATHS := Map()
+		_LOGGER_PATH_DATE := ""
+		_LOGGER_FLUSH_ACTIVE := false
+		_LOGGER_FORCE_FLUSH_PENDING := false
+		_LOGGER_DROPPED_LINES := 0
+		; Three flushes each see a new line arrive: more than one successor flush.
+		State := {bursts: 3}
+		AssertTrue(LoggerPrepareShutdown(, _LSS_BurstFlush.Bind(State)),
+			"lines logged during the shutdown flushes must still be drained")
+		AssertEqual(0, State.bursts)
+		AssertEqual(0, _LOGGER_PENDING.Length)
+		Written := FileRead(Path, "UTF-8")
+		for Line in ["first-line", "burst-line-2", "burst-line-1", "burst-line-0"]
+			AssertTrue(InStr(Written, Line) > 0, Line . " reached the sink")
+	} finally {
+		try FileDelete(Path)
+		_LOGGER_PENDING := Saved[1], _LOGGER_PENDING_ERRORS := Saved[2]
+		_LOGGER_SUB_PENDING := Saved[3], LOGGER_LOG_PATH := Saved[4]
+		LOGGER_ERRORS_LOG_PATH := Saved[5], _LOGGER_SUB_PATHS := Saved[6]
+		_LOGGER_PATH_DATE := Saved[7], _LOGGER_FLUSH_ACTIVE := Saved[8]
+		_LOGGER_FORCE_FLUSH_PENDING := Saved[9], _LOGGER_DROPPED_LINES := Saved[10]
+	}
+}
+Test("Logger: shutdown drains lines logged during its own flushes (logger-shutdown-burst)",
+	_LSS_ShutdownDrainsBurst)
