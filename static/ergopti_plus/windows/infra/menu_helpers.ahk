@@ -205,6 +205,10 @@ _HS_BubbleSort(Array) {
 		}
 	}
 }
+; Formatted menu counts, owned here so every includer (the driver and the
+; test runner) starts with the cache; menu_init.ahk clears it on rebuild.
+global _FmtCountCache := Map()
+
 FmtCount(N) {
 		global _FmtCountCache
 		if _FmtCountCache.Has(N)
