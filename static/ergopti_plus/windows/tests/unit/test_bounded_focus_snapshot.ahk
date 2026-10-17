@@ -835,3 +835,46 @@ _BFS_RejectedNativeAcquisitionRetainsCloseDebt() {
 Test("metrics focus: rejected native acquisition retains close debt "
 	. "(focus-process-native-reject-cleanup)",
 	_BFS_RejectedNativeAcquisitionRetainsCloseDebt)
+
+; Alt+Tab and a lock screen are ordinary transitions: the warning they raised
+; was 3 of the errors-sink lines of 2026-10-17 and 59 over five days, each
+; followed by "recovered". An unreadable process, class or title still warns.
+_BFS_CaptureFocusReport(Reason) {
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT
+	Saved := [LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING,
+		_LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH]
+	LOGGER_RING_BUFFER := [], LOGGER_RING_CURSOR := 0, LOGGER_MIN_LEVEL := "DEBUG"
+	_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
+	LOGGER_LOG_PATH := "", LOGGER_ERRORS_LOG_PATH := ""
+	_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_LEVEL := "", _LOGGER_DEDUP_COUNT := 0
+	_LoggerRefreshFastFlags()
+	try {
+		_MF_ReportFocusProbeResult({ published: true, diagnostic_changed: true, became_valid: false },
+			{ valid: false, failure_reason: Reason, process_name: "" })
+		Out := ""
+		for _, Line in LOGGER_RING_BUFFER
+			Out .= Line . "`n"
+		return Out
+	} finally {
+		LOGGER_RING_BUFFER := Saved[1], LOGGER_RING_CURSOR := Saved[2], LOGGER_MIN_LEVEL := Saved[3]
+		_LOGGER_PENDING := Saved[4], _LOGGER_PENDING_ERRORS := Saved[5]
+		LOGGER_LOG_PATH := Saved[6], LOGGER_ERRORS_LOG_PATH := Saved[7]
+		_LoggerRefreshFastFlags()
+	}
+}
+
+_BFS_TransientFocusLossIsInfo() {
+	for Reason in ["focus_changed", "no_foreground_window"] {
+		Out := _BFS_CaptureFocusReport(Reason)
+		Assert(InStr(Out, "Bounded focus snapshot unavailable (" . Reason . ")") > 0, "the transition stays logged: " . Out)
+		Assert(InStr(Out, "[WARNING]") == 0, Reason . " is an ordinary desktop transition, not a warning: " . Out)
+	}
+	for Reason in ["process_unavailable", "title_unavailable", "native_error"] {
+		Out := _BFS_CaptureFocusReport(Reason)
+		Assert(InStr(Out, "[WARNING]") > 0, Reason . " must still warn: " . Out)
+	}
+}
+Test("metrics focus: an ordinary focus transition is logged at INFO (focus-transient-info)",
+	_BFS_TransientFocusLossIsInfo)

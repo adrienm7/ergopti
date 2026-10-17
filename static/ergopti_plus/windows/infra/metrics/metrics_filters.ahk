@@ -418,13 +418,25 @@ MF_GetFocusSnapshot() {
 	return MetricsFocusCache.state
 }
 
+; Focus moving during the capture (Alt+Tab) and no foreground window at all (a
+; lock screen, the desktop, a tray menu) are ordinary desktop transitions the
+; next refresh resolves: they are INFO. The other reasons, a process, class or
+; title the driver cannot read, stay WARNING because they need a look.
+global MF_FOCUS_TRANSIENT_FAILURES := Map("focus_changed", true, "no_foreground_window", true)
+
 _MF_ReportFocusProbeResult(PublishResult, Candidate) {
 	if !PublishResult.published
 		return
 	if !Candidate.valid && PublishResult.diagnostic_changed {
-		try LoggerWarn("MetricsFilters",
-			"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
-			Candidate.failure_reason)
+		if MF_FOCUS_TRANSIENT_FAILURES.Has(Candidate.failure_reason) {
+			try LoggerInfo("MetricsFilters",
+				"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
+				Candidate.failure_reason)
+		} else {
+			try LoggerWarn("MetricsFilters",
+				"Bounded focus snapshot unavailable ({1}); privacy filtering is fail-closed.",
+				Candidate.failure_reason)
+		}
 	} else if Candidate.valid && PublishResult.became_valid {
 		try LoggerInfo("MetricsFilters", "Bounded focus snapshot recovered ({1}).",
 			Candidate.process_name)
