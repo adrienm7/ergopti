@@ -2526,6 +2526,11 @@ function M.withdraw(resync_owner)
 	M.drop_vision("withdrawn")
 	M.drop_agent_triage("withdrawn")
 	M.dismiss(resync_owner)
+	-- An empty matcher retires the typing context as well as its offer. Retained
+	-- text must keep its original target even if a fresh focus query now succeeds.
+	if _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() == "" then
+		_buffer_focus = nil
+	end
 end
 
 
