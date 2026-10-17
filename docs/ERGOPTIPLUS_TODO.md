@@ -103,6 +103,57 @@ receivers and their assertions remain unchanged. Actual published approval,
 native CI enrollment, consumed compiler/dependency inputs and paired Swift/TIS
 receiving remain OPEN. Neither signed application nor physical input is qualified.
 
+### October 17 Windows verification and hosted manifest receiving
+
+The original local Windows default child reaches its unchanged two-hour watchdog
+with 5,662 terminal cases and case 5,663 still active, then exits 2. The original
+raw TAP is retained before verifier cleanup. This is incomplete receiving of
+12,846 planned cases, not a successful native suite; its later cases are UNRUN.
+The wrapper continues its other original gates without restarting that child.
+
+Published source `31f5d50` on CI `38969905294` completes with failure. The Windows execution
+artifact matches its published SHA256 and passes ZIP CRC checks. Its original
+manifest reports all 12,844 planned, executed and timed cases: 12,837 PASS and
+seven native TLS-constructor failures. This hosted result does not close the
+local watchdog failure or qualify a physical Windows device. Hosted Linux E2E
+passes the published reader-lock correction; personal Linux remains unavailable.
+Both hosted macOS managed lanes retain failures in current causal admission,
+PAC/WPAD, independent HTTP compilation and native model receiving.
+
+One isolated replay of the original native collector case passes owned-window
+UIA, render and cleanup with the same collector bytes as the failed installed
+5f4f3c74c7 collection. UIA completes in 2,770 ms and render in 2,855 ms. This
+single worker-control selection is not the original 31-case suite, an installed
+application receipt or physical acceptance. The installed failure and its cause
+remain OPEN; no deadline or assertion is relaxed.
+
+The original current Root JavaScript run finishes with 424 PASS and ten FAIL,
+with all 434 starts paired to terminal results. Raw child transcripts identify
+seven symlink creation refusals and one mandatory native Linux output refusal.
+The installer case ends with an absent service file; a separate unchanged-source
+replay reaches the original Linux source-build toolchain refusal on Windows.
+That replay does not retroactively prove the earlier child's cause. The Brew
+receiver also reaches an unavailable POSIX UID getter and native C compiler
+requirements; its remaining failure causes are not fully classified. All ten
+remain failures. No native capability, assertion, timeout or gate is relaxed.
+The original Lua gate exits naturally with 19,249 PASS and 948 FAIL. All 2,449
+tracked Lua images match the previous received image, including its three working
+overrides. Exact structured and multiline failure comparison finds no new failure
+identity, while one prior failure now passes. The complete detailed failure census
+still contains an inherited config-scope failure with no timing record. The red
+runner remains red and native macOS qualification stays OPEN. A first empty-reader
+comparison is quarantined as invalid; the corrected reader refuses empty input,
+missing identities and ambiguous multiline boundaries in eight controls.
+
+The two inactive local branches `codex/groups-247-windows-before-main` and
+`codex/groups-247-windows-delivery` are archived in a verified incremental Git
+bundle, then removed locally. Its 445,500 bytes have SHA256
+75f42b79005837a4b0b2f7bc5675ec029d34bd365e158657ac49379067378cac.
+Recovery requires the retained `31f5d50` history. The active branch, every registered
+worktree and all remote refs are preserved. Historical unmatched patches remain
+available for semantic review; local ref cleanup does not declare their final
+behavior or native receiving complete.
+
 ### October 17 standalone native HTTP header closure
 
 Both standalone HTTP compiler recipes now stage the ten current public headers,
