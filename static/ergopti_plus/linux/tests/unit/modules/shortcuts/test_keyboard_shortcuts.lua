@@ -1193,3 +1193,97 @@ helpers.describe("keyboard collision claim source", function()
 		drop_config(); if not ok then error(why, 0) end
 	end)
 end)
+
+helpers.describe("keyboard shortcuts: live deferred admission", function()
+	for _, gate in ipairs({ "master", "paused", "inhibited", "reader failure", "reader replacement" }) do
+		helpers.it("(ordinary-live-admission) cancels an ordinary action after " .. gate, function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local gestures = require("modules.gestures.manager")
+			local execute = gestures.execute_action
+			local pending, fired, refuse = nil, 0, false
+			local admission = { master = true, paused = false, inhibited = false }
+			local options = {
+				defer = function(callback) pending = callback; return true end,
+				admission = function()
+					if refuse then error("admission reader unavailable") end
+					return admission
+				end,
+			}
+			gestures.execute_action = function() fired = fired + 1 end
+			local checked, failure = pcall(function()
+				local detail = chord("j", { ctrl = true })
+				helpers.assert_true(shortcuts.consume(detail, options))
+				pending()
+				helpers.assert_eq(fired, 1, "an admitted ordinary chord still executes")
+				helpers.assert_true(shortcuts.consume(detail, options))
+				if gate == "master" then admission.master = false
+				elseif gate == "paused" then admission.paused = true
+				elseif gate == "inhibited" then admission.inhibited = true
+				elseif gate == "reader failure" then refuse = true
+				else options.admission = function() return admission end end
+				pending()
+				pending()
+				helpers.assert_eq(fired, 1, "pending input cannot outlive its live admission")
+			end)
+			gestures.execute_action = execute
+			drop_config()
+			if not checked then error(failure, 0) end
+		end)
+	end
+
+	for _, gate in ipairs({ "master", "paused" }) do
+		helpers.it("(ordinary-live-admission) keeps script control available through " .. gate, function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "script_pause_toggle" })
+			local gestures = require("modules.gestures.manager")
+			local execute, pending, fired = gestures.execute_action, nil, 0
+			local admission = { master = true, paused = false, inhibited = false }
+			gestures.execute_action = function() fired = fired + 1 end
+			local checked, failure = pcall(function()
+				helpers.assert_true(shortcuts.consume(chord("j", { ctrl = true }), {
+					defer = function(callback) pending = callback; return true end,
+					admission = function() return admission end,
+				}))
+				admission[gate] = gate == "paused"
+				pending()
+				helpers.assert_eq(fired, 1, "script control remains the user's way back from pause")
+			end)
+			gestures.execute_action = execute
+			drop_config()
+			if not checked then error(failure, 0) end
+		end)
+	end
+end)
+
+helpers.describe("keyboard shortcuts: admission callback boundaries", function()
+	for _, phase in ipairs({ "capture", "queue acknowledgement", "execution log" }) do
+		helpers.it("(ordinary-live-admission) rechecks pause at " .. phase, function()
+			local shortcuts = load_over_config({ ["shortcuts.keyboard.ctrl_j"] = "select_line" })
+			local gestures, logger = require("modules.gestures.manager"), require("logger.shim")
+			local execute, debug_log = gestures.execute_action, logger.debug
+			local pending, fired, queued = nil, 0, 0
+			local admission = { master = true, paused = phase == "capture", inhibited = false }
+			gestures.execute_action = function() fired = fired + 1 end
+			logger.debug = function(tag, message, ...)
+				if phase == "execution log" and message:find("Keyboard shortcut fired", 1, true) then admission.paused = true end
+				return debug_log(tag, message, ...)
+			end
+			local checked, failure = pcall(function()
+				local consumed = shortcuts.consume(chord("j", { ctrl = true }), {
+					defer = function(callback)
+						pending, queued = callback, queued + 1
+						if phase == "queue acknowledgement" then admission.paused = true end
+						return true
+					end,
+					admission = function() return admission end,
+				})
+				helpers.assert_eq(consumed, phase == "execution log", "a pause before queue admission keeps the key native")
+				helpers.assert_eq(queued, phase == "capture" and 0 or 1)
+				if pending then pending() end
+				helpers.assert_eq(fired, 0, "no callback may deliver an ordinary action through a pause")
+			end)
+			gestures.execute_action, logger.debug = execute, debug_log
+			drop_config()
+			if not checked then error(failure, 0) end
+		end)
+	end
+end)
