@@ -1063,11 +1063,15 @@ for (const [from, to] of [
 	assert.throws(() => checkCompiledUpgradeGate(changed));
 }
 
-/** A fresh-clone boot must be an unconditional native Windows gate. */
+/**
+ * A fresh-clone boot is a native Windows gate owned by exactly one module
+ * runner of the unit matrix, never disabled.
+ */
 function checkFreshSourceBoot(body) {
 	const step = pipeline.step(body, 'Test fresh Git clone bootstrap and warm startup');
 	assert.equal(pipeline.stepField(step, 'shell'), 'pwsh');
-	assert.equal(pipeline.stepField(step, 'if'), null);
+	assert.equal(pipeline.stepField(step, 'if'), "matrix.module == 'hotstrings'");
+	assert.match(body, /^ +hotstrings,$/m, 'the owning module must stay in the unit matrix');
 	assert.equal(pipeline.stepField(step, 'continue-on-error'), null);
 	const run = pipeline.runOf(step).join('\n');
 	assert.match(run, /\$env:ERGOPTI_AHK_EXE = \$ahk/);
@@ -1259,10 +1263,9 @@ for (const [from, to] of [
 for (const [from, to] of [
 	['node tools/test/test-ahk-fresh-clone-startup.cjs', 'echo skipped source boot'],
 	['$env:ERGOPTI_AHK_EXE = $ahk', '$env:UNUSED_AHK_EXE = $ahk'],
-	[
-		'- name: Test fresh Git clone bootstrap and warm startup',
-		'- name: Test fresh Git clone bootstrap and warm startup\n        if: false'
-	],
+	["if: matrix.module == 'hotstrings'", 'if: false'],
+	["if: matrix.module == 'hotstrings'", "if: matrix.module == 'nonexistent'"],
+	[' hotstrings,', ' nonexistent,'],
 	[
 		'- name: Test fresh Git clone bootstrap and warm startup',
 		'- name: Test fresh Git clone bootstrap and warm startup\n        continue-on-error: true'
