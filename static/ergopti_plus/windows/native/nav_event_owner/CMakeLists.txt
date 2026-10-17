@@ -41,6 +41,19 @@ target_compile_definitions(ergopti_nav_event_owner_test PRIVATE
 	ERGOPTI_NAV_TESTING=1)
 target_link_libraries(ergopti_nav_event_owner_test PRIVATE user32)
 
+add_executable(ergopti_terminal_capture_owned_test
+	terminal_capture_owned_test.c
+	editor_replace_test.c
+	editor_replace.c
+	replay_route_core.c
+	terminal_output_plan.c
+	hook_trace.c
+)
+target_compile_features(ergopti_terminal_capture_owned_test PRIVATE c_std_11)
+target_compile_definitions(ergopti_terminal_capture_owned_test PRIVATE
+	ERGOPTI_NAV_TESTING=1)
+target_link_libraries(ergopti_terminal_capture_owned_test PRIVATE user32)
+
 add_executable(ergopti_replay_route_core_test
 	replay_route_core.c
 	replay_route_core_test.c
@@ -61,6 +74,9 @@ add_executable(ergopti_hook_trace_test
 target_compile_features(ergopti_hook_trace_test PRIVATE c_std_11)
 
 if(MSVC)
+	set_property(TARGET ergopti_terminal_capture_owned_test PROPERTY
+		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+	target_compile_options(ergopti_terminal_capture_owned_test PRIVATE /W4 /WX /wd5105)
 	set_property(TARGET ergopti_nav_owner PROPERTY
 		MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 	set_property(TARGET ergopti_nav_event_owner_test PROPERTY
@@ -82,6 +98,8 @@ endif()
 
 include(CTest)
 if(BUILD_TESTING)
+	add_test(NAME ergopti_terminal_capture_owned_test
+		COMMAND ergopti_terminal_capture_owned_test)
 	add_test(NAME ergopti_hook_trace_test COMMAND ergopti_hook_trace_test)
 	add_test(NAME ergopti_terminal_output_plan_test
 		COMMAND ergopti_terminal_output_plan_test)

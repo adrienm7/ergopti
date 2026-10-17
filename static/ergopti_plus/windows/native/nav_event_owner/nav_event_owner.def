@@ -28,6 +28,10 @@ EXPORTS
 	ErgoptiNav_PreviewTerminalOutput
 	ErgoptiNav_PeekTerminalRoute
 	ErgoptiNav_BeginTerminalCapture
+	ErgoptiNav_BeginTerminalCaptureOwned
+	ErgoptiNav_ReleaseTerminalCaptureOwned
+	ErgoptiNav_GetTerminalCaptureOwned
+	ErgoptiNav_PeekTerminalRouteOwned
 	ErgoptiNav_CommitTerminalCapture
 	ErgoptiNav_AbortTerminalCapture
 	ErgoptiNav_GetTerminalCapture

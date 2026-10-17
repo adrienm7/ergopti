@@ -172,6 +172,7 @@ typedef struct NavState {
 	uint8_t terminal_output_test_admitted;
 #endif
 	uint64_t terminal_next_sequence;
+	uint64_t terminal_capture_base_sequence;
 	uint64_t terminal_clock_epoch;
 	uint32_t terminal_clock_tick;
 	uint8_t terminal_clock_started;
@@ -179,6 +180,8 @@ typedef struct NavState {
 	uint8_t terminal_modifiers_uncertain;
 	uint8_t terminal_routes_uncertain;
 	uint64_t terminal_token;
+	/* Capture identity survives semantic reset and is never recycled. */
+	uint64_t terminal_capture_serial;
 	uint8_t terminal_release_active;
 	uint8_t terminal_replay_modifiers_lr;
 	uint32_t terminal_phase;
@@ -361,6 +364,7 @@ static int32_t NavResetSemanticStateLocked(NavState *state)
 	state->terminal_output_test_admitted = 0;
 #endif
 	state->terminal_next_sequence = 0;
+	state->terminal_capture_base_sequence = 0;
 	state->terminal_clock_epoch = 0;
 	state->terminal_clock_tick = 0;
 	state->terminal_clock_started = 0;
@@ -989,6 +993,13 @@ static bool NavCaptureTerminalEventLocked(
 	if (message != WM_KEYDOWN && message != WM_SYSKEYDOWN
 			&& message != WM_KEYUP && message != WM_SYSKEYUP)
 		return false;
+	/* An interval cannot authenticate a wrapped sequence or silently lose an edge. */
+	if (NavHasTerminalDebtLocked(state) && state->terminal_next_sequence == UINT64_MAX) {
+		state->terminal_phase = ERGOPTI_NAV_TERMINAL_FAULTED;
+		state->terminal_last_os_error = ERROR_ARITHMETIC_OVERFLOW;
+		state->last_os_error = ERROR_ARITHMETIC_OVERFLOW;
+		return true;
+	}
 	key_up = message == WM_KEYUP || message == WM_SYSKEYUP;
 	memset(&incoming, 0, sizeof(incoming));
 	incoming.vk = (uint16_t)event->vkCode;
@@ -3006,7 +3017,8 @@ static uint32_t NavSendTerminalInputsSystem(
 /** Builds one replay batch from the oldest captured physical edges. */
 static uint32_t NavBuildTerminalReplayBatchLocked(
 	const NavState *state,
-	INPUT events[NAV_TERMINAL_REPLAY_BATCH])
+	INPUT events[NAV_TERMINAL_REPLAY_BATCH],
+	uint64_t processed_through)
 {
 	uint32_t index;
 	uint32_t total = state->terminal_prefix_queued + state->terminal_queued;
@@ -3014,6 +3026,8 @@ static uint32_t NavBuildTerminalReplayBatchLocked(
 	memset(events, 0, sizeof(INPUT) * NAV_TERMINAL_REPLAY_BATCH);
 	for (index = 0; index < count; ++index) {
 		const NavTerminalKeyEdge *edge = &state->terminal_events[index];
+		/* A fresh physical tail must be observed before this owner can replay it. */
+		if (edge->sequence > processed_through) return index;
 		/* The caller settles an accepted DOWN's UP without emitting it. */
 		if (edge->output_settled || edge->raw_forbidden) return index;
 		events[index].type = INPUT_KEYBOARD;
@@ -3097,6 +3111,8 @@ static int32_t NavFinishTerminalReleaseLocked(int32_t status)
 /** Replays one capture after its caller claimed exclusive release ownership. */
 static int32_t NavReleaseTerminalCaptureOwned(
 	uint64_t token,
+	uint64_t capture_serial,
+	uint64_t processed_through,
 	uint32_t release_kind,
 	NavTerminalSendFn send_fn,
 	void *context)
@@ -3108,8 +3124,11 @@ static int32_t NavReleaseTerminalCaptureOwned(
 
 	for (;;) {
 		EnterCriticalSection(&g_nav_state.lock);
-		if (g_nav_state.terminal_token != token) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+		if (g_nav_state.terminal_token != token
+				|| g_nav_state.terminal_capture_serial != capture_serial) {
+			/* A stale sender cannot retire a successor's release ownership. */
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
 		}
 		if (g_nav_state.terminal_phase == ERGOPTI_NAV_TERMINAL_FAULTED) {
 			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OS_ERROR);
@@ -3127,11 +3146,12 @@ static int32_t NavReleaseTerminalCaptureOwned(
 		g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_REPLAYING;
 		while (g_nav_state.terminal_prefix_queued == 0 && g_nav_state.terminal_queued != 0
 				&& g_nav_state.terminal_events[0].output_settled
-				&& g_nav_state.terminal_events[0].key_up) {
+				&& g_nav_state.terminal_events[0].key_up
+				&& g_nav_state.terminal_events[0].sequence <= processed_through) {
 			NavConsumeTerminalOutputHeadLocked(&g_nav_state);
 			++g_nav_state.terminal_replayed;
 		}
-		count = NavBuildTerminalReplayBatchLocked(&g_nav_state, events);
+		count = NavBuildTerminalReplayBatchLocked(&g_nav_state, events, processed_through);
 		if (count == 0) {
 			if (NavHasTransformedTerminalHoldLocked(&g_nav_state)
 					|| g_nav_state.terminal_prefix_queued != 0 || g_nav_state.terminal_queued != 0) {
@@ -3152,8 +3172,11 @@ static int32_t NavReleaseTerminalCaptureOwned(
 			sent = 0;
 
 		EnterCriticalSection(&g_nav_state.lock);
-		if (g_nav_state.terminal_token != token) {
-			return NavFinishTerminalReleaseLocked(ERGOPTI_NAV_STATUS_OWNER_MISMATCH);
+		if (g_nav_state.terminal_token != token
+				|| g_nav_state.terminal_capture_serial != capture_serial) {
+			/* A stale sender cannot retire a successor's release ownership. */
+			LeaveCriticalSection(&g_nav_state.lock);
+			return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
 		}
 		if (sent != 0) {
 			NavConsumeTerminalReplayLocked(&g_nav_state, sent);
@@ -3192,12 +3215,15 @@ static int32_t NavReleaseTerminalCaptureOwned(
  * acknowledge it twice; the release flag also keeps shutdown and new capture
  * admission fenced until the owner has finished its final acknowledgement.
  */
-static int32_t NavReleaseTerminalCapture(
+static int32_t NavReleaseTerminalCaptureBound(
 	uint64_t token,
+	uint64_t expected_serial,
+	uint64_t processed_through,
 	uint32_t release_kind,
 	NavTerminalSendFn send_fn,
 	void *context)
 {
+	uint64_t capture_serial;
 	if (!NavEnsureInitialized())
 		return ERGOPTI_NAV_STATUS_OS_ERROR;
 	if (token == 0 || send_fn == NULL
@@ -3205,9 +3231,14 @@ static int32_t NavReleaseTerminalCapture(
 				&& release_kind != ERGOPTI_NAV_TERMINAL_RELEASE_ABORT))
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	EnterCriticalSection(&g_nav_state.lock);
-	if (g_nav_state.terminal_token != token) {
+	if (g_nav_state.terminal_token != token
+			|| (expected_serial != 0 && g_nav_state.terminal_capture_serial != expected_serial)) {
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	if (expected_serial != 0 && processed_through > g_nav_state.terminal_next_sequence) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	}
 	if (g_nav_state.terminal_release_active || g_nav_state.terminal_output.active) {
 		LeaveCriticalSection(&g_nav_state.lock);
@@ -3222,10 +3253,23 @@ static int32_t NavReleaseTerminalCapture(
 		LeaveCriticalSection(&g_nav_state.lock);
 		return idle_status;
 	}
+	capture_serial = g_nav_state.terminal_capture_serial;
 	g_nav_state.terminal_release_active = 1;
 	LeaveCriticalSection(&g_nav_state.lock);
 
-	return NavReleaseTerminalCaptureOwned(token, release_kind, send_fn, context);
+	return NavReleaseTerminalCaptureOwned(token, capture_serial, processed_through, release_kind, send_fn, context);
+}
+
+
+
+/** Preserves the original self-draining release contract for legacy callers. */
+static int32_t NavReleaseTerminalCapture(
+	uint64_t token,
+	uint32_t release_kind,
+	NavTerminalSendFn send_fn,
+	void *context)
+{
+	return NavReleaseTerminalCaptureBound(token, 0, UINT64_MAX, release_kind, send_fn, context);
 }
 
 
@@ -3353,8 +3397,8 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ListTerminalHeldRecipes(
 
 
 /** Reads the exact FIFO suffix without acknowledging any SendInput prefix. */
-ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
-	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot)
+static int32_t NavPeekTerminalRoute(
+	uint64_t token, uint64_t expected_serial, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot)
 {
 	if (token == 0 || out_snapshot == NULL)
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
@@ -3365,7 +3409,8 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	}
-	if (g_nav_state.terminal_token != token) {
+	if (g_nav_state.terminal_token != token
+			|| (expected_serial != 0 && g_nav_state.terminal_capture_serial != expected_serial)) {
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
 	}
@@ -3379,6 +3424,24 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
 		sizeof(out_snapshot->route));
 	LeaveCriticalSection(&g_nav_state.lock);
 	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRoute(
+	uint64_t token, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot)
+{
+	return NavPeekTerminalRoute(token, 0, index, out_snapshot);
+}
+
+
+
+/** Refuses a reused token before reading another capture interval. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRouteOwned(
+	uint64_t token, uint64_t expected_serial, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot)
+{
+	if (expected_serial == 0) return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	return NavPeekTerminalRoute(token, expected_serial, index, out_snapshot);
 }
 
 
@@ -3731,15 +3794,23 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CancelTerminalOutput(
 
 
 
-/** Implements ErgoptiNav_BeginTerminalCapture. */
-ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
-	uint64_t token)
+/** Issues a capture interval atomically after all admission and output checks. */
+static int32_t NavBeginTerminalCapture(
+	uint64_t token, uint64_t *out_serial)
 {
 	if (!NavEnsureInitialized())
 		return ERGOPTI_NAV_STATUS_OS_ERROR;
 	if (token == 0)
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	EnterCriticalSection(&g_nav_state.lock);
+	if (out_serial != NULL && NavTerminalOutputAliasesStorageLocked(out_serial, sizeof(*out_serial))) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	}
+	if (g_nav_state.terminal_capture_serial == UINT64_MAX) {
+		LeaveCriticalSection(&g_nav_state.lock);
+		return ERGOPTI_NAV_STATUS_INVALID_STATE;
+	}
 	if (!g_nav_state.running || g_nav_state.suspended
 			|| g_nav_state.draining || g_nav_state.transition
 			|| g_nav_state.terminal_routes.composition.dead_key_id != 0
@@ -3747,6 +3818,8 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_BUSY;
 	}
+	++g_nav_state.terminal_capture_serial;
+	g_nav_state.terminal_capture_base_sequence = g_nav_state.terminal_next_sequence;
 	g_nav_state.terminal_token = token;
 	g_nav_state.terminal_phase = ERGOPTI_NAV_TERMINAL_CAPTURING;
 	g_nav_state.terminal_prefix_queued = 0;
@@ -3755,8 +3828,40 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 	g_nav_state.terminal_last_os_error = ERROR_SUCCESS;
 	g_nav_state.terminal_release_kind = ERGOPTI_NAV_TERMINAL_RELEASE_NONE;
 	memset(g_nav_state.terminal_events, 0, sizeof(g_nav_state.terminal_events));
+	if (out_serial != NULL) *out_serial = g_nav_state.terminal_capture_serial;
 	LeaveCriticalSection(&g_nav_state.lock);
 	return ERGOPTI_NAV_STATUS_OK;
+}
+
+
+
+/** Preserves legacy admission while advancing the same capture identity. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
+	uint64_t token)
+{
+	return NavBeginTerminalCapture(token, NULL);
+}
+
+
+
+/** Returns the exact identity of the capture admitted by this call. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCaptureOwned(
+	uint64_t token, uint64_t *out_serial)
+{
+	if (out_serial == NULL) return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	return NavBeginTerminalCapture(token, out_serial);
+}
+
+
+
+/** Replays only the caller's declared sequence frontier in the expected interval. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ReleaseTerminalCaptureOwned(
+	uint64_t token, uint64_t expected_serial, uint64_t processed_through, uint8_t committed)
+{
+	if (expected_serial == 0 || committed > 1) return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	return NavReleaseTerminalCaptureBound(token, expected_serial, processed_through,
+		committed ? ERGOPTI_NAV_TERMINAL_RELEASE_COMMIT : ERGOPTI_NAV_TERMINAL_RELEASE_ABORT,
+		NavSendTerminalInputsSystem, NULL);
 }
 
 
@@ -3787,23 +3892,32 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_AbortTerminalCapture(
 
 
 
-/** Implements ErgoptiNav_GetTerminalCapture. */
-ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCapture(
-	uint64_t token,
-	ErgoptiNav_TerminalCaptureSnapshot *out_snapshot)
+/** Reads accounting and optional owned bounds under the same validated lock. */
+static int32_t NavGetTerminalCapture(
+	uint64_t token, uint64_t expected_serial,
+	ErgoptiNav_TerminalCaptureSnapshot *out_snapshot,
+	ErgoptiNav_TerminalCaptureOwnedSnapshot *out_owned)
 {
 	if (!NavEnsureInitialized())
 		return ERGOPTI_NAV_STATUS_OS_ERROR;
-	if (token == 0 || out_snapshot == NULL)
+	if (token == 0 || (out_snapshot == NULL) == (out_owned == NULL))
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	EnterCriticalSection(&g_nav_state.lock);
-	if (NavTerminalOutputAliasesStorageLocked(out_snapshot, sizeof(*out_snapshot))) {
+	if (NavTerminalOutputAliasesStorageLocked(
+			out_owned != NULL ? (const void *)out_owned : (const void *)out_snapshot,
+			out_owned != NULL ? sizeof(*out_owned) : sizeof(*out_snapshot))) {
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
 	}
-	if (g_nav_state.terminal_token != token) {
+	if (g_nav_state.terminal_token != token
+			|| (expected_serial != 0 && g_nav_state.terminal_capture_serial != expected_serial)) {
 		LeaveCriticalSection(&g_nav_state.lock);
 		return ERGOPTI_NAV_STATUS_OWNER_MISMATCH;
+	}
+	if (out_owned != NULL) {
+		out_snapshot = &out_owned->capture;
+		out_owned->capture_base_sequence = g_nav_state.terminal_capture_base_sequence;
+		out_owned->captured_through_sequence = g_nav_state.terminal_next_sequence;
 	}
 	out_snapshot->token = g_nav_state.terminal_token;
 	out_snapshot->phase = g_nav_state.terminal_phase;
@@ -3815,6 +3929,26 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCapture(
 	return ERGOPTI_NAV_STATUS_OK;
 }
 
+
+
+
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCapture(
+	uint64_t token,
+	ErgoptiNav_TerminalCaptureSnapshot *out_snapshot)
+{
+	return NavGetTerminalCapture(token, 0, out_snapshot, NULL);
+}
+
+
+
+/** Refuses a reused token before reading another capture interval. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCaptureOwned(
+	uint64_t token, uint64_t expected_serial,
+	ErgoptiNav_TerminalCaptureOwnedSnapshot *out_snapshot)
+{
+	if (expected_serial == 0) return ERGOPTI_NAV_STATUS_INVALID_ARGUMENT;
+	return NavGetTerminalCapture(token, expected_serial, NULL, out_snapshot);
+}
 
 
 

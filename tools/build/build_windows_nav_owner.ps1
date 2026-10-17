@@ -650,9 +650,11 @@ $replayTestSourcePath = Join-Path $sourceDir "replay_route_core_test.c"
 $headerPath = Join-Path $sourceDir "nav_event_owner.h"
 $definitionPath = Join-Path $sourceDir "nav_event_owner.def"
 $testSourcePath = Join-Path $sourceDir "nav_event_owner_test.c"
+$captureTestSourcePath = Join-Path $sourceDir "terminal_capture_owned_test.c"
 $editorTestSourcePath = Join-Path $sourceDir "editor_replace_test.c"
 $cmakePath = Join-Path $sourceDir "CMakeLists.txt"
 $testExePath = Join-Path $buildDir "ergopti_nav_event_owner_test.exe"
+$captureTestExePath = Join-Path $buildDir "ergopti_terminal_capture_owned_test.exe"
 $outputTestExePath = Join-Path $buildDir "ergopti_terminal_output_plan_test.exe"
 $traceTestExePath = Join-Path $buildDir "ergopti_hook_trace_test.exe"
 $replayTestExePath = Join-Path $buildDir "ergopti_replay_route_core_test.exe"
@@ -663,7 +665,7 @@ $manifestSchemaVersion = 1
 $vendorDllRelativePath = "static/ergopti_plus/windows/vendor/ergopti_nav_owner.dll"
 $buildScriptRelativePath = "tools/build/build_windows_nav_owner.ps1"
 
-foreach ($requiredSource in @($sourcePath, $editorSourcePath, $traceSourcePath, $traceTestSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $cmakePath)) {
+foreach ($requiredSource in @($sourcePath, $editorSourcePath, $traceSourcePath, $traceTestSourcePath, $replaySourcePath, $replayTestSourcePath, $outputSourcePath, $outputTestSourcePath, $headerPath, $definitionPath, $testSourcePath, $captureTestSourcePath, $cmakePath)) {
 	if (-not (Test-Path -LiteralPath $requiredSource -PathType Leaf)) {
 		throw "Required native source is missing: $requiredSource"
 	}
@@ -783,6 +785,22 @@ try {
 	) + $commonLinkerFlags
 	Invoke-CheckedNative -Label "Compiling the hook-free native core test" -Executable "cl.exe" -Arguments $testArguments
 	Invoke-CheckedNative -Label "Running the hook-free native core test" -Executable $testExePath -Arguments @()
+
+	# The capture owner includes the production core and original fixture owner.
+	# Compiling either included translation unit separately would duplicate state.
+	$captureTestArguments = $commonCompilerFlags + @(
+		"/DERGOPTI_NAV_TESTING=1",
+		$captureTestSourcePath,
+		$editorTestSourcePath,
+		$editorSourcePath,
+		$replaySourcePath,
+		$outputSourcePath,
+		$traceSourcePath,
+		"/Fe:$captureTestExePath",
+		"/link"
+	) + $commonLinkerFlags
+	Invoke-CheckedNative -Label "Compiling the capture interval core test" -Executable "cl.exe" -Arguments $captureTestArguments
+	Invoke-CheckedNative -Label "Running the capture interval core test" -Executable $captureTestExePath -Arguments @()
 
 	Invoke-CheckedNative -Label "Compiling the x64 navigation event owner DLL" -Executable "cl.exe" -Arguments $dllArguments
 }

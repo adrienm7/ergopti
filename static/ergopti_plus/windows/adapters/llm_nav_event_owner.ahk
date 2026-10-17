@@ -4833,6 +4833,8 @@ _LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 		"ErgoptiNav_Start", "ErgoptiNav_Stop", "ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
 		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop", "ErgoptiNav_BeginTerminalCapture",
 		"ErgoptiNav_CommitTerminalCapture", "ErgoptiNav_AbortTerminalCapture", "ErgoptiNav_GetTerminalCapture",
+		"ErgoptiNav_BeginTerminalCaptureOwned", "ErgoptiNav_GetTerminalCaptureOwned",
+		"ErgoptiNav_PeekTerminalRouteOwned", "ErgoptiNav_ReleaseTerminalCaptureOwned",
 		"ErgoptiNav_StartHookTrace", "ErgoptiNav_ReadHookTrace", "ErgoptiNav_StopHookTrace",
 		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute", "ErgoptiNav_ListTerminalHeldRecipes",
 		"ErgoptiNav_PreviewTerminalOutput", "ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",

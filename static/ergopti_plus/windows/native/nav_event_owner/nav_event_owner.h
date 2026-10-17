@@ -253,6 +253,13 @@ typedef struct ErgoptiNav_TerminalCaptureSnapshot {
 	uint32_t release_kind;
 } ErgoptiNav_TerminalCaptureSnapshot;
 
+/** Atomic interval bounds accompany native accounting, never semantic completion. */
+typedef struct ErgoptiNav_TerminalCaptureOwnedSnapshot {
+	ErgoptiNav_TerminalCaptureSnapshot capture;
+	uint64_t capture_base_sequence;
+	uint64_t captured_through_sequence;
+} ErgoptiNav_TerminalCaptureOwnedSnapshot;
+
 /** Immutable queued event metadata; reading never acknowledges keyboard output. */
 typedef struct ErgoptiNav_TerminalRouteSnapshot {
 	uint64_t token;
@@ -322,6 +329,10 @@ ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalOutputPreview) == 48, "Outpu
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalOutputPreview, planner_status) == 40, "Output preview status offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalRouteSnapshot) == 184, "Terminal route snapshot ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalRouteSnapshot, route) == 16, "Terminal route offset changed.");
+ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureOwnedSnapshot) == 44, "owned capture snapshot size");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture) == 0, "owned capture accounting offset");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, capture_base_sequence) == 28, "owned capture base offset");
+ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureOwnedSnapshot, captured_through_sequence) == 36, "owned capture tail offset");
 ERGOPTI_NAV_STATIC_ASSERT(sizeof(ErgoptiNav_TerminalCaptureSnapshot) == 28, "Terminal snapshot ABI size changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, token) == 0, "Terminal token offset changed.");
 ERGOPTI_NAV_STATIC_ASSERT(offsetof(ErgoptiNav_TerminalCaptureSnapshot, phase) == 8, "Terminal phase offset changed.");
@@ -477,6 +488,22 @@ ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CancelTerminalOutput(
 /** Starts one bounded physical-keyboard capture for terminal paced output. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCapture(
 	uint64_t token);
+
+/** Atomically admits one nonrecycled interval; refusal leaves out_serial unchanged. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_BeginTerminalCaptureOwned(
+	uint64_t token, uint64_t *out_serial);
+
+/** Refuses another interval before replay; unseen sequence tails remain BUSY. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_ReleaseTerminalCaptureOwned(
+	uint64_t token, uint64_t expected_serial, uint64_t processed_through, uint8_t committed);
+
+/** Reads native accounting and exact sequence bounds under one interval lock. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_GetTerminalCaptureOwned(
+	uint64_t token, uint64_t expected_serial, ErgoptiNav_TerminalCaptureOwnedSnapshot *out_snapshot);
+
+/** Reads the unchanged184-byte route only for the expected capture interval. */
+ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_PeekTerminalRouteOwned(
+	uint64_t token, uint64_t expected_serial, uint32_t index, ErgoptiNav_TerminalRouteSnapshot *out_snapshot);
 
 /** Replays every captured edge after the canonical terminal edit commits. */
 ERGOPTI_NAV_API int32_t ERGOPTI_NAV_CALL ErgoptiNav_CommitTerminalCapture(
