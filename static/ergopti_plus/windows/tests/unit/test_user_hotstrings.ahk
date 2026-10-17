@@ -701,6 +701,12 @@ _UCHRepairOfferWaitsForBoot() {
 		AssertEqual(Shown + 1, TestMsgBoxCount(), "the deferred offer still opens once the driver is ready")
 		AssertFalse(_UserHotstringsRepairPending)
 		AssertFalse(FSStrictExists(UserHotstringsSourcePath()), "a declined offer creates nothing")
+		; The boot owns the deferred offer: right after it publishes "ready", it
+		; schedules the offer that stayed pending, without any polling timer.
+		Boot := FileRead(A_ScriptDir . "\..\ErgoptiPlus.ahk", "UTF-8")
+		Ready := InStr(Boot, '`n_DriverBootPhase := "ready"')
+		Offer := InStr(Boot, "`nUserHotstringsOfferPendingRepair()")
+		AssertTrue(Ready > 0 && Offer > Ready, "the boot offers a pending repair once it is ready")
 	} finally {
 		SetTimer(_UserHotstringsOfferRepair, 0)
 		_ConfigDir := Saved[1], _UserHotstringsRepairPending := Saved[2]
