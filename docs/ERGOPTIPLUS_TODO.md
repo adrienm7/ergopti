@@ -44,7 +44,25 @@ Natural modifier and direct-digit descriptors cannot substitute for a model
 recipe. This does not yet retain an immutable historical graph-row ledger or
 authenticate event-time Caps, Option, HKL or the winning callback.
 
-Broader composed receiving and native qualification remain separate.
+Two actual held-query cases expose premature reference retirement after Load
+or Unload withdraws the captured source. Both original cases fail with twenty
+recipes where forty must remain. The admission-only guards now refuse before
+pruning or replacing retained snapshots. All forty recipe identities and both
+model identities remain in their original dictionaries and retained snapshots
+until exact original Stop, after which a legitimate successor can register.
+All eleven new cases pass with a complete timed manifest and natural exit0.
+
+The final composition passes the broader terminal selection: all1,093 cases
+execute and are timed, with zero failures and natural exit0. Entry/include
+compilation and all seventy actual E2E cases also pass on this composition.
+The full unfiltered JavaScript suite finishes naturally with424 PASS and10
+FAIL out of434 checks. Its inventory and ten failed check identities match the
+preceding complete run; this is a failure census, not proof of cause equivalence
+or a green gate. Full Windows default receiving remains active separately.
+A capture-lifetime source pin, immutable historical graph-row admission,
+semantic raw-replay completion and measured production output remain OPEN.
+Physical Windows input and native macOS/Linux remain unqualified; no native
+capability flag changes.
 
 ### October 16 media schema reader-lock admission
 
