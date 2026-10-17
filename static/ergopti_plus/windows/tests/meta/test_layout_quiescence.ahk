@@ -253,8 +253,9 @@ Test("ErgoptiPlus: the layout poll waits for a pending reload and retries if it 
 _T_LayoutPollNativeRetryCase(Origin, Elapsed, ExpectedAttempts) {
 	global _T_LPR, _LAST_KEYBOARD_HKL, _PENDING_KEYBOARD_HKL, _LayoutPollRetry
 	SavedPort := _T_LPR
-	SavedLast := _LAST_KEYBOARD_HKL
-	SavedPending := _PENDING_KEYBOARD_HKL
+	; The entry script owns these globals; the runner may not have set them yet.
+	SavedLast := IsSet(_LAST_KEYBOARD_HKL) ? _LAST_KEYBOARD_HKL : unset
+	SavedPending := IsSet(_PENDING_KEYBOARD_HKL) ? _PENDING_KEYBOARD_HKL : unset
 	SavedRetry := _T_LPR_Begin("accept", 1000)
 	try {
 		_LayoutPollRetry := _LayoutPollNewRetry(0x200)
@@ -275,8 +276,8 @@ _T_LayoutPollNativeRetryCase(Origin, Elapsed, ExpectedAttempts) {
 	} finally {
 		_LayoutPollRetry := SavedRetry
 		_T_LPR := SavedPort
-		_LAST_KEYBOARD_HKL := SavedLast
-		_PENDING_KEYBOARD_HKL := SavedPending
+		_LAST_KEYBOARD_HKL := IsSet(SavedLast) ? SavedLast : unset
+		_PENDING_KEYBOARD_HKL := IsSet(SavedPending) ? SavedPending : unset
 	}
 }
 

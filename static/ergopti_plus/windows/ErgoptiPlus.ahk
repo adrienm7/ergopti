@@ -1215,7 +1215,6 @@ global _DriverUiCleanupReady := true
 LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu publication.")
 if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
-global _FmtCountCache := Map()
 global _DriverInputInitPending := true
 global _DriverMenuReady := false
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated)
