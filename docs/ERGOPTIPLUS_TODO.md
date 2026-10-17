@@ -12,6 +12,53 @@ facts go to docs/memory), and the numbers of the others never change.
 
 ## Delivery checkpoint
 
+### October 17 immutable historical terminal admission
+
+Historical diagnostic stepping now belongs to a private ledger of the exact
+admitted canonical graph rows. Replacing public recipe, descriptor or model
+objects cannot mint another admission; mutating a retained model cannot change
+the admitted output. Retired rows stay ineligible even if their original public
+objects are reinserted. A private lifetime stamp prevents a decoded diagnostic
+copy from binding to a later admission after genuine Stop and numeric reuse.
+That stamp is not authentication of a native input event or FIFO delivery.
+
+Only the original native held-query receipt can release genuine historical
+custody. Supplied callbacks, including an opaque callback which performs a real
+C registration before reporting refusal, retain native debt. Genuine Stop
+retires matching owned public projections; it does not clear foreign maps.
+All previous metadata assertions are retained, with twenty-six new cases.
+
+The exact private composition passes43 owning cases, the unchanged10 metadata,
+91 custody and19 retirement selections in separate fresh processes, then all
+1,125 broader terminal cases, complete and timed, natural exit0. These overlapping
+selections are not added into a fabricated total. Causal original-red receipts
+are retained for public substitution, mutable output, pruned re-admission,
+supplied held replies, counter reuse and opaque native effects. An earlier
+epoch probe failed before its target precondition and is not causal evidence.
+The exact official-worktree composition also completes and times all1,125
+terminal cases, zero failures, natural exit0. Whole-entry compilation and all70
+E2E cases pass. Its original full JavaScript run completes434 checks:423 PASS
+and11 FAIL, natural exit1. The added failure exposes a source guard still requiring
+the old direct held-query call. The guard now verifies the private frame-bound
+query, original native export and historical retention/prune boundaries. All49
+negative source controls pass after that correction, including a comment-only
+mutation. The original full run remains failed; the ten preceding failure
+identities remain OPEN, without assuming equal underlying causes.
+
+Separately, the frozen nineteen-path validation lane retires naturally with
+exit1 and unchanged source. Its Windows default run remains incomplete at5,975
+executed/timed cases out of12,846, original watchdog exit2. Its full JavaScript
+run completes424 PASS and10 FAIL. Windows-host portable macOS Lua completes
+1,604 modules with19,249 PASS and948 FAIL. Those results concern the earlier
+source tranche; none qualifies the later ledger, native capture or a real Mac.
+
+This is Windows C/AutoHotkey historical metadata software. Other drivers do not
+use this ABI. Capture-lifetime source pinning, authenticated event delivery,
+full cohort conversion and production output policy remain unfinished.
+All production, physical Windows and native macOS/Linux qualifications remain
+false or OPEN. The incomplete default suite and failed full JavaScript results
+remain retained; targeted successes do not turn those gates green.
+
 ### October 17 completed native registration retirement
 
 The private native issuer now retains registration debt after a successful

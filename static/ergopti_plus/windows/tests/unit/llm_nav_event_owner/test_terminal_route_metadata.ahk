@@ -2167,3 +2167,358 @@ _TCH_DirectNativeRegistrationStop(Mode) {
 for _TCH_DirectStopMode in ["custom", "hidden-module"]
 	Test("terminal-canonical-history-stop: direct genuine registration rejects " . _TCH_DirectStopMode,
 		_LNTR_WithState.Bind(_TCH_DirectNativeRegistrationStop.Bind(_TCH_DirectStopMode)))
+
+/** Historical admission cannot be reissued by editing its public metadata. */
+_TCH_PublicForgery(Kind) {
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+	Dictionary := _LLM_NavEventOwnerTerminalRouteRecipes, Admission := Dictionary[17]
+	Recipe := Admission["recipe"], RecipeImage := Recipe.Clone(), Descriptor := Admission["route"]
+	try {
+		if Kind == "index"
+			Recipe["index"] := 1
+		else if Kind == "keycode"
+			Recipe["keycode"] := 1
+		else if Kind == "model"
+			Recipe["model"] := Recipe["model"].Clone()
+		else if Kind == "admission"
+			Dictionary[17] := Admission.Clone()
+		else if Kind == "dictionary"
+			_LLM_NavEventOwnerTerminalRouteRecipes := Dictionary.Clone()
+		else if Kind == "descriptor"
+			Admission["route"] := Descriptor.Clone()
+		AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+			"public metadata cannot reissue a private historical row")
+	} finally {
+		_LLM_NavEventOwnerTerminalRouteRecipes := Dictionary
+		Dictionary[17] := Admission, Admission["route"] := Descriptor
+		for Name, Value in RecipeImage
+			Recipe[Name] := Value
+	}
+}
+
+for _TCH_Forgery in ["index", "keycode", "model", "admission", "dictionary", "descriptor"]
+	Test("terminal-canonical-history: edited " . _TCH_Forgery . " cannot reissue an old row",
+		_LNTR_WithState.Bind(_TCH_PublicForgery.Bind(_TCH_Forgery)))
+
+/** Historical output uses the sealed scalar row, not a mutable parsed model. */
+_TCH_FrozenModelOutput() {
+	global KLE_Model
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+	Entry := Keylayout_KeyEntry(KLE_Model, 0, 0), Original := Entry["Value"]
+	AssertEqual("a", Original)
+	try {
+		Entry["Value"] := "x"
+		AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"],
+			"model mutation cannot change a sealed historical glyph")
+	} finally Entry["Value"] := Original
+}
+
+Test("terminal-canonical-history: model mutation cannot replace the sealed glyph",
+	() => _LNTR_WithState(_TCH_FrozenModelOutput))
+
+/** Reintroducing the original public cell cannot undo acknowledged retirement. */
+_TCH_RetiredCannotResurrect() {
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+	Admission := _LLM_NavEventOwnerTerminalRouteRecipes[17]
+	_LNTR_LoadFixture("z")
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	AssertFalse(_LLM_NavEventOwnerTerminalRouteRecipes.Has(17), "the actual held census pruned this row")
+	try {
+		_LLM_NavEventOwnerTerminalRouteRecipes[17] := Admission
+		AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+			"a retired row remains ineligible after exact public-cell reinsertion")
+	} finally _LLM_NavEventOwnerTerminalRouteRecipes.Delete(17)
+}
+
+Test("terminal-canonical-history: reinserting the exact pruned admission cannot resurrect it",
+	() => _LNTR_WithState(_TCH_RetiredCannotResurrect))
+
+/** Retained rows remain readable across a genuine source change and detached edits. */
+_TCH_DetachedHistoricalRead() {
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+	First := LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")
+	AssertEqual("a", First["Output"])
+	First["Output"] := "x"
+	_LNTR_LoadFixture("z"), State.HeldIds := [17]
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Second := LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")
+	AssertEqual("a", Second["Output"], "retained source A cannot be interpreted through B")
+	AssertTrue(First != Second), AssertTrue(Second["metadata_only"])
+	AssertFalse(Second["cohort_complete"]), AssertFalse(Second["transformed_output_enabled"])
+}
+
+Test("terminal-canonical-history: detached reads preserve held source A after LoadB",
+	() => _LNTR_WithState(_TCH_DetachedHistoricalRead))
+
+
+/** A supplied held-query answer cannot retire a previous genuine C registration. */
+_TCH_UnverifiedHeldRetainsGenuineRows(Mode) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerModule
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes")
+		Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port),
+			"source A must cross the original actual C registration and held-query boundary")
+		AssertTrue(_LLM_NavEventOwnerModule is Integer && _LLM_NavEventOwnerModule > 0)
+		Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"])
+		Dictionary := _LLM_NavEventOwnerTerminalRouteRecipes, Admission := Dictionary[17]
+		_LNTR_LoadFixture("b")
+		Successor := _LNTR_PortState()
+		if Mode == "genuine-successor"
+			Successor.Port.Delete("register_terminal_routes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port),
+			"the successor receives its explicit registration and supplied empty held reply")
+		AssertTrue(Dictionary.Has(17),
+			"an unverified held reply cannot retire a genuinely issued historical row")
+		AssertTrue(Dictionary[17] == Admission, "the exact genuine admission remains retained")
+		AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"],
+			"source A remains readable until genuine native retirement is received")
+		if Successor.Port.Has("register_terminal_routes")
+			Successor.Port.Delete("register_terminal_routes")
+		Successor.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port),
+			"the original C successor and actual empty held receipt may now retire A")
+		AssertFalse(Dictionary.Has(17), "genuine current registration and held receipt retire the obsolete row")
+		AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+			"retired diagnostic metadata cannot regain stepping permission")
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the genuine native registration retires before fixture restoration")
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+for _TCH_HeldSuccessor in ["controlled-successor", "genuine-successor"]
+	Test("terminal-canonical-history-native: supplied held ACK retains old genuine rows after " . _TCH_HeldSuccessor,
+		_LNTR_WithState.Bind(_TCH_UnverifiedHeldRetainsGenuineRows.Bind(_TCH_HeldSuccessor)))
+
+/** Retired diagnostic holders cannot reopen an acknowledged native lifetime. */
+_TCH_NativeStopRejectsRestoredDictionary() {
+	global _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"])
+		Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the actual C owner must acknowledge retirement")
+		_LLM_NavEventOwnerTerminalRouteRecipes := Recipes, _LLM_NavEventOwnerTerminalRouteModels := Models
+		AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none"),
+			"restoring exact public holders cannot resurrect an acknowledged native lifetime")
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+Test("terminal-canonical-history-native: acknowledged Stop rejects restored exact dictionaries",
+	_LNTR_WithState.Bind(_TCH_NativeStopRejectsRestoredDictionary))
+
+_TCH_NativeRecipeCounterCannotRewind(Mode, ClearDictionary := false) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteRecipes
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		_LNTR_LoadFixture("b")
+		Successor := _LNTR_PortState()
+		if Mode == "genuine-successor"
+			Successor.Port.Delete("register_terminal_routes")
+		if ClearDictionary
+			_LLM_NavEventOwnerTerminalRouteRecipes.Clear()
+		_LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+		AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port),
+			"public counter rewind cannot reissue an already genuine recipe identity")
+		AssertEqual(0, Successor.Calls.Length, "no supplied registration callback may cross the identity refusal")
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the original C lifetime retires independently of invalid admission counters")
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+for _TCH_RewindMode in ["controlled-successor", "genuine-successor"]
+	Test("terminal-canonical-history-native: recipe counter rewind refuses " . _TCH_RewindMode,
+		_LNTR_WithState.Bind(_TCH_NativeRecipeCounterCannotRewind.Bind(_TCH_RewindMode)))
+
+for _TCH_ClearedRewind in ["controlled-successor", "genuine-successor"]
+	Test("terminal-canonical-history-native: cleared public holders cannot reissue IDs through " . _TCH_ClearedRewind,
+		_LNTR_WithState.Bind(_TCH_NativeRecipeCounterCannotRewind.Bind(_TCH_ClearedRewind, true)))
+
+_TCH_HistoricalOwnerSubset(Mode) {
+	State := _LNTR_PortState()
+	AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(State.Port))
+	Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+	if Mode == "status"
+		Snapshot["status"] := 1
+	else if Mode == "origin"
+		Snapshot["event"]["origin"] := 3
+	else if Mode == "up"
+		Snapshot["event"]["key_up"] := 1
+	else
+		Snapshot["composition_before"]["dead_key_id"] := 1
+	AssertThrows(() => _LLM_NavEventOwnerNativeEnsureLoaded("step_historical",
+		Map("snapshot", Snapshot, "state", "none")), "the original historical owner enforces its complete neutral subset")
+}
+
+for _TCH_SubsetMode in ["status", "origin", "up", "composition"]
+	Test("terminal-canonical-history-owner: original historical owner refuses invalid " . _TCH_SubsetMode,
+		_LNTR_WithState.Bind(_TCH_HistoricalOwnerSubset.Bind(_TCH_SubsetMode)))
+
+_TCH_NativeVersionCountersCannotRewind(Mode) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		; Retain exact original holders while the public projections are withdrawn.
+		Holders := [_LLM_NavEventOwnerTerminalRouteRecipes.Clone(), _LLM_NavEventOwnerTerminalRouteModels.Clone()]
+		_LNTR_LoadFixture("b")
+		_LLM_NavEventOwnerTerminalRouteRecipes.Clear(), _LLM_NavEventOwnerTerminalRouteModels.Clear()
+		if Mode == "generation"
+			_LLM_NavEventOwnerTerminalRouteGeneration := 0
+		else
+			_LLM_NavEventOwnerTerminalRouteNextLayout := 1
+		Successor := _LNTR_PortState()
+		AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port),
+			"withdrawn public projections cannot rewind a genuinely issued version identity")
+		AssertEqual(0, Successor.Calls.Length, "private version custody refuses before a supplied registration")
+		AssertEqual(2, Holders.Length)
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "genuine Stop remains independent of invalid admission counters")
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+for _TCH_VersionCounter in ["generation", "layout"]
+	Test("terminal-canonical-history-counter: withdrawn projections cannot rewind " . _TCH_VersionCounter,
+		_LNTR_WithState.Bind(_TCH_NativeVersionCountersCannotRewind.Bind(_TCH_VersionCounter)))
+
+_TCH_ForwardGenuineRegistration(Refuse, Owner, Generation, Layout, Bindings, Count) {
+	AssertEqual(0, _LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, Layout, Bindings, Count),
+		"the supplied callback actually enters the original C registration ABI")
+	return Refuse ? -11 : 0
+}
+
+_TCH_OpaqueNativeRegistrationCustody(Refuse) {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteRecipes
+	Port := _LLM_NavEventOwnerPort
+	try {
+		AssertTrue(_LLM_NavEventOwnerNativeEnsureLoaded())
+		Opaque := _LNTR_PortState()
+		Opaque.Port["register_terminal_routes"] := _TCH_ForwardGenuineRegistration.Bind(Refuse)
+		if Refuse {
+			AssertFalse(LLM_NavEventOwner_RefreshTerminalRoutes(Opaque.Port),
+				"the supplied refusal remains a refusal even though C actually accepted")
+			_LNTR_LoadFixture("b")
+			Successor := _LNTR_PortState()
+			AssertThrows(() => LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port),
+				"a supplied no-accept claim cannot release an observed original C call")
+			AssertEqual(0, Successor.Calls.Length)
+		} else {
+			AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Opaque.Port))
+			Snapshot := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+			AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"])
+			_LNTR_LoadFixture("b")
+			Successor := _LNTR_PortState()
+			AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Successor.Port))
+			AssertTrue(_LLM_NavEventOwnerTerminalRouteRecipes.Has(17),
+				"opaque registration that enters C still requires genuine retirement")
+			AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"])
+		}
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop(), "the original C call retires before opaque fixture restoration")
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+for _TCH_OpaqueRefuse in [false, true]
+	Test("terminal-canonical-history-opaque: original C call survives a supplied " . (_TCH_OpaqueRefuse ? "refusal" : "retirement reply"),
+		_LNTR_WithState.Bind(_TCH_OpaqueNativeRegistrationCustody.Bind(_TCH_OpaqueRefuse)))
+
+_TCH_StoppedSnapshotCannotBindSuccessorEpoch() {
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		Old := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		AssertEqual("a", LLM_NavEventOwner_StepTerminalRoute(Old, "none")["Output"])
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		_LLM_NavEventOwnerTerminalRouteRecipes := Map(), _LLM_NavEventOwnerTerminalRouteModels := Map()
+		_LLM_NavEventOwnerTerminalRouteGeneration := 0
+		_LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+		_LLM_NavEventOwnerTerminalRouteNextLayout := 1
+		_LNTR_LoadFixture("b")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port),
+			"a new actual C lifetime legitimately reuses its reset numeric tuple")
+		Current := _LLM_NavEventOwnerTerminalRouteDecode(_LNTR_Receipt(), 901)
+		AssertEqual("b", LLM_NavEventOwner_StepTerminalRoute(Current, "none")["Output"])
+		AssertThrows(() => LLM_NavEventOwner_StepTerminalRoute(Old, "none"),
+			"old decoded metadata cannot bind to a different lifetime with equal numeric fields")
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+Test("terminal-canonical-history-epoch: stopped metadata cannot bind a reused successor tuple",
+	_LNTR_WithState.Bind(_TCH_StoppedSnapshotCannotBindSuccessorEpoch))
+
+_TCH_CompletedStopReleasesOwnedProjections() {
+	global _LLM_NavEventOwnerPort, _LLM_NavEventOwnerTerminalRouteRecipes
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Port := _LLM_NavEventOwnerPort
+	try {
+		Native := _LNTR_PortState()
+		Native.Port.Delete("register_terminal_routes"), Native.Port.Delete("list_terminal_held_recipes")
+		AssertTrue(LLM_NavEventOwner_RefreshTerminalRoutes(Native.Port))
+		AssertEqual(20, _LLM_NavEventOwnerTerminalRouteRecipes.Count)
+		AssertEqual(1, _LLM_NavEventOwnerTerminalRouteModels.Count)
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		AssertEqual(0, _LLM_NavEventOwnerTerminalRouteRecipes.Count,
+			"acknowledged completed registration releases its owned recipe projection")
+		AssertEqual(0, _LLM_NavEventOwnerTerminalRouteModels.Count,
+			"acknowledged completed registration releases its owned model projection")
+		AssertEqual(0, LLM_NavEventOwner_TerminalRouteCoverage()["registered"])
+	} finally {
+		_LLM_NavEventOwnerPort := 0
+		AssertTrue(LLM_NavEventOwner_Stop())
+		_LLM_NavEventOwnerPort := Port
+	}
+}
+
+Test("terminal-canonical-history-release: genuine Stop releases completed owned projections",
+	_LNTR_WithState.Bind(_TCH_CompletedStopReleasesOwnedProjections))
