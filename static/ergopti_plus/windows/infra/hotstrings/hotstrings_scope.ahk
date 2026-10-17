@@ -360,6 +360,12 @@ class HotstringsScopeFiles {
 			} else {
 				if Entry.HasOwnProp("IsVirtual") && Entry.IsVirtual
 					continue
+				; Only extension packs live under hotstrings.groups/modules on Windows.
+				; A native category is category_enabled.<group> and its sections are
+				; static manifest paths; inventorying it here wrote the macOS/Linux
+				; spelling into config.toml, where the loader ignores it as unused.
+				if !Entry.IsExtension
+					continue
 				Paths.Push("hotstrings.groups." . Entry.Key)
 				for Section in this.sections.Call(Entry)
 					Paths.Push("hotstrings.modules." . Entry.Key . "." . Section.Name)

@@ -75,6 +75,44 @@ _HotstringsScopeRoundTrip() {
 }
 Test("hotstrings-scope: all stores publish together and restore exact bytes after native refusal", _HotstringsScopeRoundTrip)
 
+; Native categories are category_enabled.<group> on Windows; the macOS/Linux
+; hotstrings.groups/modules spelling belongs to extension packs only. A restore
+; that inventoried native categories there wrote keys the loader then ignored
+; and reported as unused on every start.
+_HotstringsScopeNativeGroupsStayNative() {
+	Fixture := _HotstringsScopeFixture()
+	Bundle := 0, Refusal := 0
+	Launch(_Success, Borrowed, Refused) {
+		Bundle := Borrowed
+		Refusal := Refused
+		return true
+	}
+	Fixture.options["reload"] := Launch
+	try {
+		Owner := HotstringsScopeFiles(Fixture.options, "recommended")
+		for Path in Owner.Inventory() {
+			AssertFalse(InStr(Path, "hotstrings.groups.") == 1 || InStr(Path, "hotstrings.modules.") == 1,
+				"a native category must not be inventoried under the extension namespace: " . Path)
+		}
+		Fixture.options["stamp"] := "recommended"
+		Receipt := (_HS_ScopeCommands(Fixture.options)["scope_restore"])()
+		AssertEqual(Receipt["status"], "pending")
+		Config := TOML_ParseFreshFile(Fixture.path)
+		AssertFalse(Config.Has("hotstrings.groups") && Config["hotstrings.groups"].Has("autocorrection"),
+			"the restore must not write [hotstrings.groups] autocorrection")
+		AssertFalse(Config.Has("hotstrings.modules.autocorrection"),
+			"the restore must not write [hotstrings.modules.autocorrection]")
+		Refusal.Call("native refusal")
+		AssertEqual(FSReadUtf8Exact(Fixture.path), Fixture.source)
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("hotstrings-scope: a restore keeps native categories out of the extension namespace (native-groups-unused-keys)",
+	_HotstringsScopeNativeGroupsStayNative)
+
 ; The Hotstrings menu declares both rows and registers them from the same
 ; provider, so a click reaches the scope owner the round trip above proves.
 _HotstringsScopeManifestRows() {
