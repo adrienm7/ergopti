@@ -37,6 +37,8 @@ SetWorkingDir(A_ScriptDir)
 ;                    test_framework.ahk); the CI runs one group per runner.
 ;   --list=<file>    run only the tests named in <file>, one per line, in order.
 ;   --dump-plan=<f>  append "group<TAB>file<TAB>name" for each selected test.
+;   --reverse        run the selected tests backwards to expose tests that rely
+;                    on state an earlier test left behind.
 ; Reject malformed options before includes can initialize tests or input hooks.
 _RejectRunnerArguments(Message) {
 	FileAppend("Invalid test runner arguments: " . Message . "`n", "**")
@@ -50,6 +52,7 @@ global _AHK_QUALIFICATION_PROFILE := ""
 global _AHK_MODULE := ""
 global _AHK_LIST_FILE := ""
 global _AHK_DUMP_PLAN := ""
+global _AHK_REVERSE := false
 _riArgIndex := 1
 while (_riArgIndex <= A_Args.Length) {
 	_riArg := A_Args[_riArgIndex]
@@ -57,6 +60,8 @@ while (_riArgIndex <= A_Args.Length) {
 		_AHK_DRY_RUN := true
 	else if (_riArg == "--interactive")
 		_AHK_INTERACTIVE := true
+	else if (_riArg == "--reverse")
+		_AHK_REVERSE := true
 	else if (SubStr(_riArg, 1, 24) == "--qualification-profile=") {
 		if _AHK_QUALIFICATION_PROFILE != ""
 			_RejectRunnerArguments("--qualification-profile may be supplied only once")
