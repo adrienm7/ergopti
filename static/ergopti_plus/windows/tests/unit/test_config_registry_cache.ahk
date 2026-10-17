@@ -162,3 +162,68 @@ _CRC_RequireSource(State, Value) {
 	return Value
 }
 Test("registry cache: checksum-valid invalid schema reparses the authoritative file", _CRC_InvalidCachedSchemaReparses)
+
+; Every driver update changes the cache identity, so the first boot after one
+; logged a WARNING for an expected miss (13 errors-sink lines since 2026-10-03).
+; A stale cache is INFO; a tampered or malformed one still warns.
+_CRC_CaptureLoad(SourcePath, CachePath, Code, Parse, Validate) {
+	global LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL
+	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH
+	global _LOGGER_DEDUP_KEY, _LOGGER_DEDUP_LEVEL, _LOGGER_DEDUP_COUNT
+	Saved := [LOGGER_RING_BUFFER, LOGGER_RING_CURSOR, LOGGER_MIN_LEVEL, _LOGGER_PENDING,
+		_LOGGER_PENDING_ERRORS, LOGGER_LOG_PATH, LOGGER_ERRORS_LOG_PATH]
+	LOGGER_RING_BUFFER := [], LOGGER_RING_CURSOR := 0, LOGGER_MIN_LEVEL := "DEBUG"
+	_LOGGER_PENDING := [], _LOGGER_PENDING_ERRORS := []
+	LOGGER_LOG_PATH := "", LOGGER_ERRORS_LOG_PATH := ""
+	_LOGGER_DEDUP_KEY := "", _LOGGER_DEDUP_LEVEL := "", _LOGGER_DEDUP_COUNT := 0
+	_LoggerRefreshFastFlags()
+	try {
+		ConfigRegistryCacheLoad(SourcePath, CachePath, Code, Parse, Validate)
+		Out := ""
+		for _, Line in LOGGER_RING_BUFFER
+			Out .= Line . "`n"
+		return Out
+	} finally {
+		LOGGER_RING_BUFFER := Saved[1], LOGGER_RING_CURSOR := Saved[2], LOGGER_MIN_LEVEL := Saved[3]
+		_LOGGER_PENDING := Saved[4], _LOGGER_PENDING_ERRORS := Saved[5]
+		LOGGER_LOG_PATH := Saved[6], LOGGER_ERRORS_LOG_PATH := Saved[7]
+		_LoggerRefreshFastFlags()
+	}
+}
+
+_CRC_StaleIsInfoCorruptionWarns() {
+	global _ConfigRegistryCachePending
+	Saved := _ConfigRegistryCachePending
+	Directory := A_Temp . "\ergopti-registry-stale-" . A_ScriptHwnd . "-" . A_TickCount
+	DirCreate(Directory)
+	SourcePath := Directory . "\registry.toml"
+	CachePath := Directory . "\registry.cache"
+	State := {Parsed: 0, Validated: 0}
+	Parse := (Source, Label) => _CRC_Parse(State, Source)
+	Validate := (Model) => _CRC_Validate(State, Model)
+	try {
+		FileAppend("original", SourcePath, "UTF-8-RAW")
+		ConfigRegistryCacheLoad(SourcePath, CachePath, CryptoSha256("parser-one"), Parse, Validate)
+		AssertTrue(ConfigRegistryCacheFlushPending())
+		Stale := _CRC_CaptureLoad(SourcePath, CachePath, CryptoSha256("parser-two"), Parse, Validate)
+		AssertTrue(InStr(Stale, "Registry parse cache is stale") > 0, "the stale miss is still logged: " . Stale)
+		AssertTrue(InStr(Stale, "[WARNING]") == 0, "a cache from the previous driver build is an expected miss: " . Stale)
+		_ConfigRegistryCachePending := false
+		Text := FileRead(CachePath, "UTF-8-RAW")
+		FileDelete(CachePath)
+		Lines := StrSplit(Text, "`n")
+		Lines[3] := Format("{:064}", 0)
+		Tampered := ""
+		for Line in Lines
+			Tampered .= (A_Index == 1 ? "" : "`n") . Line
+		FileAppend(Tampered, CachePath, "UTF-8-RAW")
+		Corrupt := _CRC_CaptureLoad(SourcePath, CachePath, CryptoSha256("parser-one"), Parse, Validate)
+		AssertTrue(InStr(Corrupt, "[WARNING]") > 0 && InStr(Corrupt, "Registry parse cache refused") > 0,
+			"a tampered cache must still warn: " . Corrupt)
+	} finally {
+		_ConfigRegistryCachePending := Saved
+		DirDelete(Directory, true)
+	}
+}
+Test("registry cache: a stale cache is an INFO miss, a tampered one warns (registry-cache-stale-info)",
+	_CRC_StaleIsInfoCorruptionWarns)

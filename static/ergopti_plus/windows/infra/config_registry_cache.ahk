@@ -12,6 +12,10 @@
 
 global _ConfigRegistryCachePending := false
 
+/** A well-formed cache built for another parser or registry: an expected miss. */
+class ConfigRegistryCacheStale extends Error {
+}
+
 /** Encodes the closed typed TOML model without evaluating cached source code. */
 class ConfigRegistryCodec {
 	static MAX_BYTES := 4194304
@@ -186,9 +190,10 @@ ConfigRegistryCacheCodeIdentity() {
 /** Strict envelope parsing is separate from typed model/schema validation. */
 ConfigRegistryCacheDecode(Text, Identity) {
 	Lines := StrSplit(Text, "`n")
-	if Lines.Length != 5 || Lines[1] != "ERGOPTI_REGISTRY_CACHE_V1"
-			|| Lines[2] != Identity || Lines[5] != ""
-		throw Error("Registry cache identity or envelope does not match")
+	if Lines.Length != 5 || Lines[1] != "ERGOPTI_REGISTRY_CACHE_V1" || Lines[5] != ""
+		throw Error("Registry cache envelope is malformed")
+	if Lines[2] != Identity
+		throw ConfigRegistryCacheStale("Registry cache was built from another parser or registry")
 	if !RegExMatch(Lines[3], "^[0-9a-f]{64}$") || !RegExMatch(Lines[4], "^[A-Za-z0-9+/]*={0,2}$")
 		throw Error("Registry cache checksum or payload encoding is invalid")
 	Bytes := CryptoBase64Decode(Lines[4])
@@ -221,6 +226,10 @@ ConfigRegistryCacheLoad(Path, CachePath, CodeIdentity := unset, ParseFn := 0, Va
 			try LoggerInfo("ConfigMigration", "Registry parse cache hit, validated in {1} ms.", TickElapsed(Started))
 			return Registry
 		}
+	} catch ConfigRegistryCacheStale as Err {
+		; Every driver update or registry edit changes the identity: an expected
+		; miss, not a fault. A malformed or tampered cache below still warns.
+		try LoggerInfo("ConfigMigration", "Registry parse cache is stale: {1}; parsing the authoritative source.", Err.Message)
 	} catch as Err {
 		try LoggerWarn("ConfigMigration", "Registry parse cache refused: {1}; parsing the authoritative source.", Err.Message)
 	}
