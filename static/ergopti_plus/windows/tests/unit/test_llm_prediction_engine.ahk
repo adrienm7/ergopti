@@ -1063,6 +1063,10 @@ _RequestId_BumpsOnFirePrediction() {
 	before := _LLM_Engine.Has("request_id") ? _LLM_Engine["request_id"] : 0
 	; Enable just long enough to get past the guard, then call directly
 	LLM_Engine_SetEnabled(true)
+	; The password-field gate defaults on and fails closed without a focused
+	; field; this test is about the request id, so it owns that precondition
+	; instead of inheriting it from an earlier test.
+	_LLM_Engine["disable_password_fields"] := false
 	; Seed a stale cache so FirePrediction does NOT enter the cache-hit path
 	_LLM_Engine["last_ctx"]     := "different ctx"
 	_LLM_Engine["last_results"] := []
