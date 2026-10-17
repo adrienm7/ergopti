@@ -307,6 +307,9 @@ _TDL_FiredHotstringLeavesNoText() {
 	static REPLACEMENT := "zqx private replacement"
 	HSE_TestReset()
 	_TDL_ResetLog()
+	; The real foreground may be a terminal, whose deferred owner path declines
+	; here; pin an ordinary application so the immediate fire path runs.
+	SimulateRegularApp()
 	try {
 		CreateHotstring("*?", TRIGGER, REPLACEMENT)
 		HSE_FeedReset(true)
