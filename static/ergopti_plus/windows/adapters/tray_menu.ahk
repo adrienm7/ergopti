@@ -157,6 +157,27 @@ TrayMenuIsSeparatorAt(TargetMenu, Position) {
 	return (State & MF_SEPARATOR) != 0
 }
 
+; Points an existing, already declared row of a native menu at a new submenu.
+; AHK's Menu.Add updates a row whose name exists instead of appending one; this
+; adapter owns that native rebinding so callers never place rows themselves.
+; @param TargetMenu {Menu} A rendered AHK menu that already holds the row.
+; @param Label {String} Exact caption of the existing row.
+; @param Submenu {Menu} The submenu the row opens from now on.
+TrayMenuRebindSubmenu(TargetMenu, Label, Submenu) {
+	if !(TargetMenu is Menu) || !(Submenu is Menu) || Type(Label) != "String" || Label == ""
+		throw ValueError("Rebinding a submenu requires a native menu, a caption and a submenu")
+	Count := TrayMenuItemCount(TargetMenu)
+	loop Count {
+		if TrayMenuItemCaption(TargetMenu, A_Index - 1) == Label {
+			TargetMenu.Add(Label, Submenu)
+			if TrayMenuItemCount(TargetMenu) != Count
+				throw Error("Rebinding the submenu of '" . Label . "' appended a row")
+			return
+		}
+	}
+	throw ValueError("No existing row named '" . Label . "' to rebind")
+}
+
 /** Ends native navigation before a failed or reentered popup can be painted. */
 TrayMenuCancelNavigation() {
 	return DllCall("EndMenu", "int") != 0

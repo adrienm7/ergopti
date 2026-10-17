@@ -74,3 +74,26 @@ _TMSP_NormaliserKeepsSubmenuRows() {
 }
 Test("tray menu: the separator normaliser keeps a row that opens a submenu of eight rows (submenu-read-as-separator-2026-10-01)",
 	_TMSP_NormaliserKeepsSubmenuRows)
+
+; The AI row swap rebinds the submenu of the declared row in place: the row
+; count stays the same, the row now opens the new submenu, and a missing row or
+; an invalid argument is refused rather than appended (tray-rebind-submenu).
+_TMSP_RebindKeepsTheRow() {
+	Parent := Menu()
+	Old := _TMSP_SubMenu(2), New := _TMSP_SubMenu(3)
+	try {
+		Parent.Add("first", (*) => "")
+		Parent.Add("AI", Old)
+		Parent.Add("last", (*) => "")
+		TrayMenuRebindSubmenu(Parent, "AI", New)
+		AssertEqual(3, TrayMenuItemCount(Parent), "rebinding never appends a row")
+		AssertEqual("AI", TrayMenuItemCaption(Parent, 1), "the row keeps its place")
+		AssertEqual(New.Handle, TrayMenuSubmenuHandle(Parent.Handle, 1), "the row opens the new submenu")
+		AssertThrows(() => TrayMenuRebindSubmenu(Parent, "missing", New))
+		AssertThrows(() => TrayMenuRebindSubmenu(Parent, "", New))
+		AssertThrows(() => TrayMenuRebindSubmenu(Parent, "AI", "not a menu"))
+		AssertEqual(3, TrayMenuItemCount(Parent), "a refused rebind leaves the menu unchanged")
+	} finally Parent.Delete()
+}
+Test("tray menu: rebinding a row's submenu keeps the row and refuses a missing row (tray-rebind-submenu)",
+	_TMSP_RebindKeepsTheRow)
