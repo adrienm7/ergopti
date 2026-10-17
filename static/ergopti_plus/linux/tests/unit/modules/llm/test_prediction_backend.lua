@@ -18,7 +18,7 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 --- @param backend string "api" or "ollama"
 --- @param entry table|nil The active API entry.
 --- @return table engine, table calls, table scheduler, function restore
-local function load(backend, entry, stored_settings, without_local_model)
+local function load(backend, entry, stored_settings, without_local_model, asynchronous)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
@@ -26,7 +26,7 @@ local function load(backend, entry, stored_settings, without_local_model)
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls = { ollama = {}, remote = {}, notices = {} }
+	local calls = { ollama = {}, remote = {}, notices = {}, cancelled = 0, applied = 0, resets = 0 }
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
@@ -39,11 +39,15 @@ local function load(backend, entry, stored_settings, without_local_model)
 	package.loaded["modules.llm.api_remote"] = {
 		provider = function() return { default_model = "qwen-default" } end,
 		serves = function(_, use) return use == "chat" end,
-		chat = function(target, model, _, opts, _, on_done)
-			calls.remote[#calls.remote + 1] = { target = target, model = model, opts = opts }
-			on_done(" que tout le monde aille bien " .. #calls.remote, nil)
+		chat = function(target, model, _, opts, on_chunk, on_done)
+			calls.remote[#calls.remote + 1] = { target = target, model = model, opts = opts, chunk = on_chunk, done = on_done }
+			if not asynchronous then on_done(" que tout le monde aille bien " .. #calls.remote, nil) end
 		end,
-		cancel = function() end,
+		cancel = function()
+			calls.cancelled = calls.cancelled + 1
+			if calls.on_cancel then calls.on_cancel() end
+			return calls.cancel_refused ~= true
+		end,
 	}
 	package.loaded["modules.llm.api_entries"] = { active = function() return entry end }
 	package.loaded["modules.llm.profiles"] = {
@@ -73,7 +77,8 @@ local function load(backend, entry, stored_settings, without_local_model)
 	local engine = helpers.load_module("modules.llm.prediction_engine")
 	engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
-		engine = { current_buffer = function() return "Bonjour à tous" end },
+		engine = { current_buffer = function() return "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
+		apply_prediction = function() calls.applied = calls.applied + 1; return calls.refuse_apply ~= true end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
 	})
 	return engine, calls, scheduler, function()
@@ -322,4 +327,86 @@ helpers.describe("backend publication rechecks actual admission after dismissal"
 			end)
 		end)
 	end
+end)
+
+helpers.describe("acceptance retires the originating prediction request", function()
+
+	helpers.it("does not send remaining variants after accepting the first paced candidate (acceptance-retires-request)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous")
+			helpers.assert_eq(#calls.remote, 1)
+			helpers.assert_eq(#engine.get_suggestions(), 1, "the first candidate is available during pacing")
+			helpers.assert_eq(engine.accept(1), true)
+			scheduler.settle()
+			helpers.assert_eq(#calls.remote, 1, "acceptance retires the remaining paid requests")
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 0)
+			helpers.assert_eq(calls.applied, 1)
+			helpers.assert_eq(calls.resets, 1)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("ignores streamed completion and synchronous cancellation callbacks after insertion (acceptance-retires-request)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous")
+			local request = calls.remote[1]
+			request.chunk(" que tout le monde aille bien")
+			helpers.assert_eq(#engine.get_suggestions(), 1, "a real streaming partial must be offered")
+			calls.on_cancel = function() request.done(" que tout le monde aille mieux", nil) end
+			helpers.assert_eq(engine.accept(1), true)
+			request.chunk(" demain")
+			request.done(" que tout le monde aille bien demain", nil)
+			scheduler.settle()
+			helpers.assert_eq(calls.cancelled, 1, "the originating HTTP owner is withdrawn")
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 0, "late callbacks cannot resurrect an accepted offer")
+			helpers.assert_eq(#calls.remote, 1)
+			helpers.assert_eq(calls.applied, 1)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	for _, mode in ipairs({ "refused", "raised" }) do
+		helpers.it("keeps the committed offer retired when transport cancellation " .. mode .. " (acceptance-retires-request)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
+			local ok, err = pcall(function()
+				engine.predict("Bonjour à tous")
+				calls.remote[1].chunk(" que tout le monde aille bien")
+				calls.cancel_refused = true
+				if mode == "raised" then calls.on_cancel = function() error("owned transport cancellation failure", 0) end end
+				helpers.assert_eq(engine.accept(1), true, "a completed physical edit cannot be retried")
+				calls.remote[1].done(" que tout le monde aille bien demain", nil)
+				scheduler.settle()
+				helpers.assert_eq(#engine.get_suggestions(), 0)
+				helpers.assert_eq(engine.is_predicting(), false)
+				helpers.assert_eq(calls.resets, 1)
+				helpers.assert_eq(calls.applied, 1)
+				helpers.assert_eq(#calls.remote, 1)
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("keeps an uncommitted streaming offer available when insertion refuses (acceptance-retires-request)", function()
+		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous")
+			calls.remote[1].chunk(" que tout le monde aille bien")
+			calls.refuse_apply = true
+			helpers.assert_eq(engine.accept(1), false)
+			helpers.assert_eq(calls.cancelled, 0)
+			helpers.assert_eq(engine.is_predicting(), true)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+			helpers.assert_eq(calls.resets, 0)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
 end)
