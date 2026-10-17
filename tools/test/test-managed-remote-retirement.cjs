@@ -424,6 +424,35 @@ console.log(
 	'PASS: actual fixture bodies retire admitted clients and reject late accepted clients.'
 );
 
+const tlsPhaseResult = spawnSync(
+	powershell,
+	[
+		'-NoLogo',
+		'-NoProfile',
+		'-NonInteractive',
+		'-ExecutionPolicy',
+		'Bypass',
+		'-File',
+		path.join(__dirname, 'test_managed_remote_tls_initialization.ps1'),
+		'-FixturePath',
+		path.join(
+			__dirname,
+			'../../static/ergopti_plus/windows/tests/fixtures/managed_remote_transport.ps1'
+		)
+	],
+	{ encoding: 'utf8', windowsHide: true }
+);
+assert.ifError(tlsPhaseResult.error);
+assert.equal(tlsPhaseResult.status, 0, tlsPhaseResult.stdout + tlsPhaseResult.stderr);
+assert.equal(tlsPhaseResult.stderr, '', 'The actual native TLS phase producer must be quiet.');
+assert.deepEqual(tlsPhaseResult.stdout.trim().split(/\r?\n/), [
+	'PASS native TLS phase is read-only and initially unentered',
+	'PASS native TLS precondition refusal retains its phase and original error'
+]);
+console.log(
+	'PASS: actual native TLS initialization reports its closed phase without changing refusal.'
+);
+
 /** Exercise the actual cleanup owner without a process or filesystem mutation. */
 function stagingCleanupControls() {
 	const directory = '/owned-staging-control';

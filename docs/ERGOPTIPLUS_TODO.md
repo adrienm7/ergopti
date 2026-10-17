@@ -78,6 +78,43 @@ the complete staged closure afterward. The earlier native compiler setup failure
 remain retained; their original compiler stderr is unavailable. Corrected native
 compilation, independent clients and managed model receiving remain UNRUN.
 
+### October 16 closed native TLS initialization facts
+
+The seven hosted Windows transport failures currently expose only the broad
+native_tls constructor boundary and an InvalidOperationException. The fixture
+now retains a read-only closed phase through its exact DLL source fences,
+loading, dependency checks, OpenSSL initialization and certificate admission.
+The failed-state receiver prints that phase as supplementary technical data;
+it cannot grant readiness or acknowledge cleanup. Original exceptions, TLS
+policy and all existing native assertions are preserved.
+
+The actual failed-state regression first fails on the original receiver with
+one executed case and natural exit1. The fixed receiver passes both new AHK
+cases with natural exit0, including private/unknown-value refusal. The native
+producer test compiles the original C# type: the unchanged test refuses the
+old producer, then receives the read-only initial phase and the unchanged
+precondition error from the corrected producer. That test is enrolled in the
+existing managed-retirement JavaScript owner. One standalone execution passes
+its original TCP retirement/staging controls and the new producer. A separate
+frozen grouped execution later times out at the original 15-second owned-output
+child, before the new producer. Both unchanged child inputs match the immutable
+reference; that reference and one isolated current replay pass without changing
+the deadline. The grouped failure remains retained and unexplained.
+
+A separate actual constructor probe reaches ready with the same local Git
+OpenSSL images as the earlier successful probe. It retains exactly two DLL
+references and two source fences, then observes zero of each after ordinary
+disposal; private DER clearing and source integrity pass. No listener, trust
+store, input driver or download is acquired by these constructor controls.
+They do not explain or close the hosted constructor refusal, qualify managed
+transport, or replace default-suite and updated-source CI receiving. The
+canonical sealer's check passes for all twenty-one unchanged inputs against
+5f4f3c74c7; its native and official receiving fields stay false. The original scoped run finishes naturally with failure: the native default
+child reaches its unchanged two-hour watchdog with 5,662 terminal cases of
+12,846 planned, and its original JavaScript suite completes 423 PASS and ten
+FAIL across all 433 cases. Those failures remain retained; updated-source CI
+and complete native transport receiving remain OPEN.
+
 ### October 16 media schema reader-lock admission
 
 The Linux and macOS SQLite writers no longer reserve a write transaction

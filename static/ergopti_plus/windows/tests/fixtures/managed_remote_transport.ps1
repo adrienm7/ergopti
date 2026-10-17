@@ -187,7 +187,7 @@ $Events = @()
 $RootInstalled = $false
 $State = @{ version = 1; state = 'starting'; phase = 'untrusted'; sequence = 0;
     root_store_scope = $OwnedRootStoreScope; root_install_stage = 'none'; root_removed = $false; service_stopped = $false;
-    startup_phase = 'admission'; startup_constructor_phase = 'not_entered' }
+    startup_phase = 'admission'; startup_constructor_phase = 'not_entered'; tls_initialization_phase = 'not_entered' }
 # Observe only real exception identity domains; never exception messages or stacks.
 function Get-OwnedStartupExceptionChain {
     param([Exception]$Failure)
@@ -334,6 +334,9 @@ public class ErgoptiFixtureNetworkStream : NetworkStream {
 
 public sealed class ErgoptiFixtureOpenSsl : IDisposable
 {
+    private static string initializationPhase = "not_entered";
+    public static string InitializationPhase { get { return initializationPhase; } }
+
     private sealed class ImageFence : IDisposable
     {
         public readonly string Path;
@@ -647,32 +650,41 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
     }
     public ErgoptiFixtureOpenSsl(X509Certificate2 leaf, RSACng key)
     {
+        initializationPhase = "preconditions";
         if (Environment.OSVersion.Platform != PlatformID.Win32NT || IntPtr.Size != 8 ||
             leaf == null || key == null || !key.Key.IsEphemeral)
             throw new InvalidOperationException("Native in-memory TLS fixture prerequisite unavailable.");
         KeyEphemeral = key.Key.IsEphemeral;
         nativeDirectory = Path.GetFullPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Git", "mingw64", "bin"));
         systemDirectory = Path.GetFullPath(Environment.GetFolderPath(Environment.SpecialFolder.System));
+        initializationPhase = "directories";
         VerifyDirectory(nativeDirectory);
         string cryptoPath = Path.Combine(nativeDirectory, "libcrypto-3-x64.dll");
         string sslPath = Path.Combine(nativeDirectory, "libssl-3-x64.dll");
         byte[] privateDer = null;
         try {
+            initializationPhase = "source_fences";
             ImageFence crypto = Fence(cryptoPath);
             ImageFence ssl = Fence(sslPath);
             CryptoImageHash = crypto.Hash;
             SslImageHash = ssl.Hash;
+            initializationPhase = "crypto_image";
             cryptoModule = LoadImage(cryptoPath);
+            initializationPhase = "ssl_image";
             sslModule = LoadImage(sslPath);
+            initializationPhase = "dependency_images";
             VerifyLoadedImports();
+            initializationPhase = "identity";
             VersionCall major = Export<VersionCall>(cryptoModule, "OPENSSL_version_major");
             VersionCall version = Export<VersionCall>(cryptoModule, "OpenSSL_version_num");
             Version = version();
             if (major() != 3 || Version < 0x30000000u || Version >= 0x40000000u)
                 throw new InvalidOperationException("Native OpenSSL3 identity refused.");
+            initializationPhase = "initialize";
             InitializeCall initialize = Export<InitializeCall>(sslModule, "OPENSSL_init_ssl");
             if (initialize(0x00000080ul, IntPtr.Zero) != 1)
                 throw new InvalidOperationException("Native TLS configuration-free initialization refused.");
+            initializationPhase = "exports";
             MethodCall method = Export<MethodCall>(sslModule, "TLS_server_method");
             NewCall contextNew = Export<NewCall>(sslModule, "SSL_CTX_new");
             contextFree = Export<FreeCall>(sslModule, "SSL_CTX_free");
@@ -696,16 +708,19 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
             bioWrite = Export<IoCall>(cryptoModule, "BIO_write");
             clearError = Export<ClearErrorCall>(cryptoModule, "ERR_clear_error");
             lastError = Export<LastErrorCall>(cryptoModule, "ERR_peek_last_error");
+            initializationPhase = "context";
             context = contextNew(method());
             if (context == IntPtr.Zero || control(context, 123, 0x0303, IntPtr.Zero) != 1 ||
                 control(context, 124, 0x0303, IntPtr.Zero) != 1)
                 throw new InvalidOperationException("Native TLS1.2 server context refused.");
+            initializationPhase = "certificate";
             byte[] publicDer = leaf.Export(X509ContentType.Cert);
             System.Runtime.InteropServices.GCHandle publicPin = System.Runtime.InteropServices.GCHandle.Alloc(publicDer, System.Runtime.InteropServices.GCHandleType.Pinned);
             try {
                 if (certificate(context, publicDer.Length, publicPin.AddrOfPinnedObject()) != 1)
                     throw new CryptographicException("Native TLS fixture certificate refused.");
             } finally { publicPin.Free(); Array.Clear(publicDer, 0, publicDer.Length); }
+            initializationPhase = "private_key";
             privateDer = key.Key.Export(CngKeyBlobFormat.Pkcs8PrivateBlob);
             if (privateDer.Length < 1 || privateDer.Length > 65536)
                 throw new CryptographicException("Native TLS private DER ceiling refused.");
@@ -715,7 +730,9 @@ public sealed class ErgoptiFixtureOpenSsl : IDisposable
                     throw new CryptographicException("Native TLS fixture key match refused.");
             } finally { privatePin.Free(); PrivateDerCleared = ClearPrivateDer(privateDer); }
             if (!PrivateDerCleared) throw new CryptographicException("Native TLS private DER clearing refused.");
+            initializationPhase = "source_receiving";
             VerifySources();
+            initializationPhase = "ready";
         } catch {
             if (privateDer != null) PrivateDerCleared = ClearPrivateDer(privateDer);
             Dispose();
@@ -1342,6 +1359,7 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     $State.startup_phase = 'constructor'
     $Fixture = [ErgoptiManagedRemoteFixture]::new($Identity, ($Mode -ceq 'ServeUpdater'))
     $State.startup_constructor_phase = [ErgoptiManagedRemoteFixture]::StartupPhase
+    $State.tls_initialization_phase = [ErgoptiFixtureOpenSsl]::InitializationPhase
     $State.startup_phase = 'open_events'
     $State.root_thumbprint = $Fixture.Root.Thumbprint
     $State.root_subject = $Fixture.Root.Subject
@@ -1428,6 +1446,9 @@ public sealed class ErgoptiManagedRemoteFixture : IDisposable
     try {
         if ($State.startup_phase -ceq 'constructor') {
             $State.startup_constructor_phase = [ErgoptiManagedRemoteFixture]::StartupPhase
+        }
+        if ('ErgoptiFixtureOpenSsl' -as [type]) {
+            $State.tls_initialization_phase = [ErgoptiFixtureOpenSsl]::InitializationPhase
         }
     } catch { }
 } finally {

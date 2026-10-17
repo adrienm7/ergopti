@@ -81,6 +81,16 @@ _ManagedRemoteFixtureStartupDiagnostic(StartupState) {
 	return StartupFact . " truncated=" . (StartupTruncated ? "true" : "false")
 }
 
+; Native TLS progress is supplementary data, never a readiness or cleanup ACK.
+_ManagedRemoteFixtureTlsDiagnostic(State) {
+	if !(State is Map) || Type(State.Get("version", "")) != "Integer" || State["version"] != 1
+		return ""
+	Phase := State.Get("tls_initialization_phase", "")
+	if Type(Phase) != "String" || !RegExMatch(Phase, "\A(?:not_entered|preconditions|directories|source_fences|crypto_image|ssl_image|dependency_images|identity|initialize|exports|context|certificate|private_key|source_receiving|ready)\z")
+		return ""
+	return "phase=" . Phase
+}
+
 _ManagedRemoteFixtureEmitDiagnostic(State) {
 	try {
 		Fact := _ManagedRemoteFixtureDiagnostic(State)
@@ -93,6 +103,13 @@ _ManagedRemoteFixtureEmitDiagnostic(State) {
 			_TestPrint("::notice title=Windows native startup diagnostic::" . StartupFact)
 	} catch Any {
 		; Optional startup reporting cannot replace the original refusal.
+	}
+	try {
+		TlsFact := _ManagedRemoteFixtureTlsDiagnostic(State)
+		if TlsFact != ""
+			_TestPrint("::notice title=Windows native TLS initialization diagnostic::" . TlsFact)
+	} catch Any {
+		; Optional TLS progress cannot replace the original refusal.
 	}
 }
 
@@ -2653,3 +2670,52 @@ _ManagedRemoteStartupFailedStateRoute() {
 }
 Test("managed remote native: actual failed state consumes startup facts and preserves refusal",
 	_ManagedRemoteScopeWithEnvironment.Bind("CurrentUser", "", "", _ManagedRemoteStartupFailedStateRoute))
+
+_ManagedRemoteTlsPhaseClosedProjection() {
+	TlsPhases := ["not_entered", "preconditions", "directories", "source_fences", "crypto_image",
+		"ssl_image", "dependency_images", "identity", "initialize", "exports", "context",
+		"certificate", "private_key", "source_receiving", "ready"]
+	for Phase in TlsPhases {
+		State := Map("version", 1, "tls_initialization_phase", Phase, "private", "PRIVATE_MESSAGE_AND_PATH")
+		AssertEqual("phase=" . Phase, _ManagedRemoteFixtureTlsDiagnostic(State))
+	}
+	for Invalid in [Map(), 0, Map("version", "1", "tls_initialization_phase", "ready"),
+		Map("version", 2, "tls_initialization_phase", "ready"), Map("version", 1),
+		Map("version", 1, "tls_initialization_phase", ""), Map("version", 1, "tls_initialization_phase", 0),
+		Map("version", 1, "tls_initialization_phase", "PRIVATE_MESSAGE_AND_PATH"),
+		Map("version", 1, "tls_initialization_phase", "ready`nPRIVATE_MESSAGE_AND_PATH"),
+		Map("version", 1, "tls_initialization_phase", "ready ")] {
+		AssertEqual("", _ManagedRemoteFixtureTlsDiagnostic(Invalid), "only closed native TLS phases may reach the console")
+	}
+}
+Test("managed remote native: startup TLS phase admits only closed scalar facts (managed-fixture-tls-phase-closed)",
+	_ManagedRemoteTlsPhaseClosedProjection)
+
+_ManagedRemoteTlsPhaseFailedStateRoute() {
+	global TEST_RESULTS_FILE
+	Fixture := _ManagedRemoteFixtureOwner()
+	Directory := _SR_AcquireCaptureDirectory()
+	Fixture.Capture := Map("TmpFile", Directory . "output.tmp", "CaptureDir", Directory)
+	State := '{"version":1,"state":"failed","root_store_scope":"CurrentUser","service_failure_stage":"fixture_boundary","service_failure_kind":"other","service_failure_hresult":-2146233087,"tls_initialization_phase":"dependency_images","private":"PRIVATE_MESSAGE_AND_PATH"}'
+	FileAppend(State, Fixture.Capture["TmpFile"], "UTF-8-RAW")
+	Offset := FileGetSize(TEST_RESULTS_FILE)
+	Caught := 0
+	try {
+		try Fixture.ReadState()
+		catch as Failure
+			Caught := Failure
+		AssertTrue(IsObject(Caught), "the TLS phase cannot turn the failed fixture into readiness")
+		AssertEqual("Actual managed-network fixture reported native failure.", Caught.Message)
+		Transcript := FileOpen(TEST_RESULTS_FILE, "r", "UTF-8")
+		try {
+			Transcript.Seek(Offset, 0)
+			Output := Transcript.Read()
+		} finally Transcript.Close()
+		AssertContains(Output, "stage=fixture_boundary kind=other hresult=-2146233087")
+		AssertContains(Output, "Windows native TLS initialization diagnostic::phase=dependency_images")
+		AssertFalse(InStr(Output, "PRIVATE_"))
+		AssertFalse(Fixture.GracefulReceiptVerified, "phase reporting cannot acknowledge native retirement")
+	} finally AssertTrue(Fixture.Close(), "only the controlled capture is retired")
+}
+Test("managed remote native: startup TLS phase survives actual failed-state routing (managed-fixture-tls-phase-route)",
+	_ManagedRemoteScopeWithEnvironment.Bind("CurrentUser", "", "", _ManagedRemoteTlsPhaseFailedStateRoute))
