@@ -84,11 +84,17 @@ class PersonalFileControls {
 			global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 			ExactContent := Packs[Index].Get("content", "")
 			try {
-				TOML_ParseDocument(ExactContent, &ParsedRecords, &PhysicalRecords)
+				Document := TOML_ParseDocument(ExactContent, &ParsedRecords, &PhysicalRecords)
 				for PhysicalRecord in PhysicalRecords {
 					if PhysicalRecord.Kind == "opaque"
 						throw Error("The source has an unaddressable TOML record.")
 				}
+				; The adopted owner answers every metadata-availability question of
+				; this exact content from this one parse. A menu render asks four
+				; per section, and reparsing a whole personal file for each one
+				; made the tray take seconds to minutes (perf-personal-metadata-2026-10-17).
+				Record["parsed"] := Map("content", ExactContent, "document", Document,
+					"records", ParsedRecords, "physical", PhysicalRecords)
 			} catch {
 				Record["admitted"] := false
 				Record["exclusive"] := false
@@ -211,6 +217,11 @@ class PersonalFileAdoptedOwner {
 		if !(this.content is String) || !(this.content == Record["content"])
 			|| PersonalFileControls.Physical(this.path) != this.physical
 			throw Error("The adopted personal source is unreadable.")
+		; Discovery parsed exactly these bytes; an owner without that parse was
+		; never admitted, so its absence is a contract breach, not a cache miss.
+		if !Record.Has("parsed") || !(Record["parsed"]["content"] == this.content)
+			throw Error("The adopted personal source has no parse of its admitted content.")
+		this.parsed := Record["parsed"]
 		this.parsedContent := PersonalFileControls.ParseContent(this.content)
 		this.config := this.ReadMetadata(this.parsedContent)
 		this.groups := Stored.Get("hotstrings.groups", Map())
@@ -316,10 +327,15 @@ class PersonalFileAdoptedOwner {
 
 	/** Refuse source metadata whose exact spelling aliases a folded native owner. */
 	MetadataAvailable(Section, Field, Content := unset) {
-		Source := IsSet(Content) ? Content : this.content
 		Target := Section == "" ? ["_meta"] : ["_meta", "sections", Section]
 		try {
-			Document := TOML_ParseDocument(Source, &Records, &Physical)
+			; The owner's own content is immutable for its generation and was parsed
+			; once at discovery; only a candidate patch needs a fresh parse.
+			if IsSet(Content)
+				Document := TOML_ParseDocument(Content, &Records, &Physical)
+			else
+				Document := this.parsed["document"], Records := this.parsed["records"],
+					Physical := this.parsed["physical"]
 			for Record in Physical {
 				if Record.Kind != "header"
 					continue
