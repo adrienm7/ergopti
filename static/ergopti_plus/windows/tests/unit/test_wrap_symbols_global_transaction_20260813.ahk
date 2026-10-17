@@ -711,3 +711,46 @@ _WSGT20260813_ControlReadiness(Path) {
 }
 Test("wrap symbols: retained actual command rechecks declared native readiness (wrap-controls)",
 	() => _WSGT20260813_WithControls(_WSGT20260813_ControlReadiness))
+
+; Reported on v1.0.1: the guillemets could not be changed from the tray. The
+; catalogue spells them "« " with their space, and every built-in validator
+; required a single character, so the toggle, the Quotes group actions and the
+; global "uncheck all" were refused with only a log line.
+_WSGT20260813_GuillemetsBody(Path) {
+	global _WS_BUILTIN_GROUPS, _WS_Disabled, _WS_Custom, _WSGT20260813_Contents
+	Guillemet := Chr(0xAB) . " "
+	Group := 0
+	for Candidate in _WS_BUILTIN_GROUPS {
+		for Pair in Candidate["pairs"] {
+			if Pair["left"] == Guillemet
+				Group := Candidate
+		}
+	}
+	AssertTrue(IsObject(Group), "the shared catalogue must still spell the guillemets with their space")
+	Lefts := []
+	for Pair in Group["pairs"]
+		Lefts.Push(Pair["left"])
+	Seams := [_WSGT20260813_WriteSuccess, _WSGT20260813_ReplaceSuccess,
+		_WSGT20260813_DeleteSuccess, _WSGT20260813_RebuildSuccess]
+
+	AssertEqual(1, _WS_MenuToggle(Guillemet, Seams*), "toggling the guillemets must commit")
+	AssertTrue(_WS_Disabled.Has(Guillemet))
+	AssertFalse(WrapSymbols_IsEnabled(Guillemet))
+	AssertEqual(1, _WS_MenuSetGroup(Lefts, true, Seams*), "checking the whole Quotes group must commit")
+	AssertFalse(_WS_Disabled.Has(Guillemet))
+	AssertEqual(1, _WS_MenuSetGroup(Lefts, false, Seams*), "unchecking the whole Quotes group must commit")
+	AssertTrue(_WS_Disabled.Has(Guillemet))
+	AssertEqual(1, _WS_MenuSetAll(false, Seams*), "the global uncheck all must commit")
+	Content := _WSGT20260813_Contents[_WSGT20260813_Contents.Length]
+	AssertTrue(InStr(Content, "char = " . Chr(0x22) . Guillemet . Chr(0x22)) > 0,
+		"the staged TOML keeps the exact spaced guillemet")
+
+	; The saved file must load back the same disabled value.
+	FileAppend(Content, Path, "UTF-8-RAW")
+	_WS_Disabled := Map()
+	_WS_Custom := []
+	_WS_Load()
+	AssertTrue(_WS_Disabled.Has(Guillemet), "a reload keeps the guillemets disabled")
+}
+Test("wrap symbols: the spaced guillemets toggle, group and global actions commit (wrap-guillemets-length)",
+	() => _WSGT20260813_WithControls(_WSGT20260813_GuillemetsBody))
