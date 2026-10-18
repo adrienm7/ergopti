@@ -207,7 +207,7 @@ describe("Diagnostic snapshot: Linux collector", function()
 	it("emits one INFO line carrying every shared field", function()
 		local contract = read_contract()
 		local lines = {}
-		local Logger = require("logger")
+		local Logger = require("logger.shim")
 		local previous_level = Logger.get_level()
 		Logger.set_level(10)
 		Logger.ring_buffer_clear()
