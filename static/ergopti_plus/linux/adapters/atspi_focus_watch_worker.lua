@@ -17,6 +17,10 @@ local M = {}
 --- @param control_path string Private refresh request FIFO.
 --- @return boolean completed
 function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
+	-- libatspi may synchronously deliver Lua listeners from a GetState/GetRole
+	-- FFI call. Compiled FFI reentry panics, so only this dedicated child uses
+	-- the interpreter; merely importing the module leaves the daemon JIT alone.
+	require("jit").off()
 	local ffi = require("ffi")
 	ffi.cdef([[
 		int open(const char *path, int flags, ...);
