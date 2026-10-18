@@ -79,15 +79,15 @@ final class InputSourceUpgradeWorkerTests: XCTestCase {
 	}
 
 	func testInvalidArgvCannotReachLookupOrPublishAResult() {
-		let prefix = ["ErgoptiPlus", kInputSourceUpgradeFlag]
-		for arguments in [
-			["ErgoptiPlus"], ["ErgoptiPlus", "--foreign", "old", "new"],
-			prefix, prefix + ["old"], prefix + ["old", "new", "extra"],
-			prefix + ["", "new"], prefix + ["old", ""],
-			prefix + ["bad\0old", "new"], prefix + ["old", "bad\0new"],
-			prefix + [String(repeating: "x", count: kMaximumKeyboardSourceIDBytes + 1), "new"],
-			prefix + ["old", String(repeating: "x", count: kMaximumKeyboardSourceIDBytes + 1)]
-		] {
+		let prefix: [String] = ["ErgoptiPlus", kInputSourceUpgradeFlag]
+		let oversized = String(repeating: "x", count: kMaximumKeyboardSourceIDBytes + 1)
+		// An explicitly typed vector keeps the Intel type checker within its budget.
+		var vectors: [[String]] = [["ErgoptiPlus"], ["ErgoptiPlus", "--foreign", "old", "new"], prefix]
+		for suffix: [String] in [["old"], ["old", "new", "extra"], ["", "new"], ["old", ""],
+			["bad\0old", "new"], ["old", "bad\0new"], [oversized, "new"], ["old", oversized]] {
+			vectors.append(prefix + suffix)
+		}
+		for arguments in vectors {
 			XCTAssertEqual(InputSourceUpgradeWorker.run(arguments: arguments, upgrade: { _ in
 				XCTFail("Invalid argv must not reach lookup or native effects")
 				return .missing
