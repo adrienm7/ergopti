@@ -172,7 +172,7 @@ _THS_InvalidNamespaceRefuses() {
 			AssertTrue(TapHoldKeyReport(Path, Defaults) is String, "a blocked source is never a neutral import page")
 			AssertThrows(() => TapHoldImportImage(Path, Defaults, ["caps_lock"]))
 			for Mode in ["clear", "recommended"]
-				AssertThrows(() => TapHoldScopeOwner(Path, Defaults, Mode).Build())
+				AssertThrows(ObjBindMethod(TapHoldScopeOwner(Path, Defaults, Mode), "Build"))
 			AssertTrue(FSUtf8ExactMatches(Path, Source), "all refused consumers preserve the malformed container")
 		}
 	} finally _THS_Cleanup(Fixture)
