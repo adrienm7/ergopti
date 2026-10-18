@@ -256,7 +256,10 @@ const mutations = [
 	['a harness run in every row', withIf('AI predictions against a real Ollama', NOT_CANCELLED)],
 	[
 		'a harness disabled in its row',
-		withIf('AI predictions against a real Ollama', "${{ false && matrix.shard == 'network-ai' }}")
+		withIf(
+			'AI predictions against a real Ollama',
+			"${{ false && matrix.shard == 'input-display' }}"
+		)
 	],
 	[
 		'a shared step narrowed to one row',

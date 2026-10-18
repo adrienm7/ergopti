@@ -2932,7 +2932,7 @@ jobs:
       # OpenAI-compatible endpoint, the dialect Cerebras speaks — the remote
       # backend and its connectivity probe.
       - name: AI predictions against a real Ollama
-        if: ${{ !cancelled() && matrix.shard == 'network-ai' }}
+        if: ${{ !cancelled() && matrix.shard == 'input-display' }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-linux-e2e-suite.json"
@@ -3451,7 +3451,8 @@ jobs:
               --subject wayland-display=1 \
               --subject touchpad-capability=1 \
               --subject gesture-roundtrip=1 \
-              --subject "hotstring-e2e=$e2e_assertions"
+              --subject "hotstring-e2e=$e2e_assertions" \
+              --subject ollama-live=1
           ;;
           desktop-webview)
           "${record[@]}" \
@@ -3496,8 +3497,7 @@ jobs:
               --subject "archive-source-crypto=$archive_crypto_assertions" \
               --subject "archive-source-bin-parent=$archive_bin_parent_assertions" \
               --subject "archive-private-snapshot=$archive_snapshot_assertions" \
-              --subject "connect-terminal-protocol-model=$connect_protocol_assertions" \
-              --subject ollama-live=1
+              --subject "connect-terminal-protocol-model=$connect_protocol_assertions"
           ;;
           platform-metrics)
           "${record[@]}" \

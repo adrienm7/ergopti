@@ -26,7 +26,8 @@
 			"Qualify actual cursor-display window switching",
 			"Detect and read the keymap on a real X11 and a real Wayland",
 			"A virtual touchpad, described by the kernel and read back",
-			"A gesture written to uinput comes back as a gesture"
+			"A gesture written to uinput comes back as a gesture",
+			"AI predictions against a real Ollama"
 		],
 		"desktop-webview": [
 			"Launch option-looking application ids through actual GTK desktop entries",
@@ -101,7 +102,6 @@
 			"Qualify native managed HTTP public and retained output",
 			"Qualify native updater archive pipeline",
 			"Qualify archive crypto and bin parent source controls",
-			"AI predictions against a real Ollama",
 			"Successful native model pulls retire stale retries"
 		],
 		"platform-metrics": [
@@ -184,7 +184,8 @@
 			"wayland-display",
 			"touchpad-capability",
 			"gesture-roundtrip",
-			"hotstring-e2e"
+			"hotstring-e2e",
+			"ollama-live"
 		],
 		"desktop-webview": [
 			"tray-symbols",
@@ -212,8 +213,7 @@
 			"archive-source-crypto",
 			"archive-source-bin-parent",
 			"archive-private-snapshot",
-			"connect-terminal-protocol-model",
-			"ollama-live"
+			"connect-terminal-protocol-model"
 		],
 		"platform-metrics": ["native-platform-metrics"]
 	},
