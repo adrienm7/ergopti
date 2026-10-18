@@ -400,6 +400,7 @@ return {
 	"tests.unit.modules.keylogger.test_suggestion_counters",
 	"tests.unit.modules.keylogger.test_system_metrics",
 	"tests.unit.modules.keylogger.test_text_crypto",
+	"tests.unit.modules.keylogger.test_cipher_posture",
 	"tests.unit.modules.keylogger.test_text_migration",
 	"tests.unit.modules.keylogger.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",

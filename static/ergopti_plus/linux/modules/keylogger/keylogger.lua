@@ -435,8 +435,7 @@ function M.init(opts)
 	-- off while get_privacy_state() reported the manifest's value, which is the
 	-- "the box is ticked and nothing is encrypted" defect this feature replaced.
 	if _encrypt_enabled and not TextCipher.is_available() then
-		Logger.error(LOG, "At-rest encryption is configured on but no key can be derived — staying off.")
-		_encrypt_enabled = false
+		Logger.error(LOG, "At-rest encryption is configured on but unavailable — retaining ON and refusing plaintext persistence.")
 	end
 	TextCipher.set_enabled(_encrypt_enabled)
 	-- Resume only a pass a previous run left unfinished. Starting one
