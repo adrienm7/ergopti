@@ -105,8 +105,8 @@ _AccentedShortcutKeysCached(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode, D
 
 ; Registration covers native accents even when digits currently hide them.
 ; The live criterion decides each press, so switching back needs no reload.
-_AccentedShortcutRegistrationKeys(Hkl, ScanCodeFn := AccentedShortcutDirectScanCode) {
-	return _AccentedShortcutKeysCached(Hkl, ScanCodeFn, false)
+_AccentedShortcutRegistrationKeys(Hkl) {
+	return _AccentedShortcutKeysCached(Hkl, AccentedShortcutDirectScanCode, false)
 }
 
 _AccentedShortcutForegroundLayout() {
