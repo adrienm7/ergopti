@@ -993,13 +993,22 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 ; if the accumulator is still empty but the stdout file is non-empty (flush
 ; lag), it re-arms itself as a one-shot timer instead of Sleep()ing so the AHK
 ; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
-_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
+_LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, ReadFn := 0) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
 	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
 		return
+	if !IsObject(ReadFn)
+		ReadFn := _LLM_Ollama_ReadStreamText
+	try chunk := ReadFn.Call(handle.TmpStdout, state, true)
+	catch as Err {
+		state["failed"] := true
+		state["stream_error"] := "Final stream output read failed: " . Err.Message
+	}
+	; File I/O can pump cancellation before any returned bytes are admitted.
+	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+		return
 	try {
-		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state, true)
-		if chunk != ""
+		if !state.Get("failed", false) && chunk != ""
 			_LLM_Ollama_ConsumeStreamChunk(chunk, state, on_partial)
 	} catch as Err {
 		state["failed"] := true
@@ -1012,7 +1021,7 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	; into one FileRead-sized allocation on the AHK timer thread.
 	if !state.Get("failed", false) && state.Get("stream_bytes_pending", false) {
 		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial,
-			on_success, on_fail), -1)
+			on_success, on_fail, ReadFn), -1)
 		return
 	}
 	retries := state.Has("flush_retries") ? state["flush_retries"] : 0
@@ -1026,10 +1035,12 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		state["failed"] := true
 		state["stream_error"] := "Final stream size check failed: " . Err.Message
 	}
+	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+		return
 	if (!state.Get("failed", false) and state["acc"] == "" and more_to_read
 			and retries < _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES) {
 		state["flush_retries"] := retries + 1
-		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
+		SetTimer(() => _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail, ReadFn), -_LLM_OLLAMA_STREAM_FLUSH_RETRY_MS)
 		return
 	}
 	; Flush any leftover (last JSON line that did not end with \n).
