@@ -483,6 +483,57 @@ helpers.describe("prediction dismissal retains request ownership", function()
 	end
 end)
 
+helpers.describe("prediction completion rechecks native admission", function()
+	for _, boundary in ipairs({ "privacy", "focus" }) do
+		for _, transition in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("preserves " .. transition .. " acquired during " .. boundary .. " (completion-owner)", function()
+				local armed, transferred = false, false
+				local engine, calls, scheduler, restore
+				local owner = { pending = function() return false end }
+				local function transfer()
+					if not armed then return end
+					armed = false
+					if transition == "scope" then transferred = engine.acquire_configuration(owner)
+					elseif transition == "shutdown" then transferred = engine.shutdown_runtime()
+					else
+						engine.dismiss()
+						calls.focus = "x11:fixture:2"
+						engine.predict("Successor context", { app_id = "successor-app" }, { num_predictions = 1 })
+						scheduler.settle()
+						transferred = #calls.remote == 2
+						if transferred then calls.remote[2].chunk(" successor completion remains visible now") end
+					end
+				end
+				engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true, {
+					guard = function() if boundary == "privacy" then transfer() end; return false end,
+				})
+				local download = package.loaded["modules.llm.model_download"]
+				package.loaded["modules.llm.model_download"] = { shutdown = function() return true end }
+				local ok, err = pcall(function()
+					engine.predict("Original context", nil, { num_predictions = 1 })
+					helpers.assert_eq(#calls.remote, 1)
+					if boundary == "focus" then calls.on_focus = transfer end
+					armed = true
+					calls.remote[1].done(" obsolete original completion must stay retired", nil)
+					helpers.assert_eq(transferred, true, "The actual native reader must transfer admission")
+					if transition == "successor" then
+						helpers.assert_eq(engine.is_predicting(), true, "An old completion cannot dismiss its successor")
+						helpers.assert_eq(#engine.get_suggestions(), 1)
+						helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+					else
+						helpers.assert_eq(#engine.get_suggestions(), 0, "Revoked native admission cannot publish an old completion")
+					end
+					helpers.assert_eq(calls.applied, 0)
+					helpers.assert_eq(#calls.outputs, 0)
+				end)
+				package.loaded["modules.llm.model_download"] = download
+				restore()
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+end)
+
 helpers.describe("ordinary predictions retain their exact native target", function()
 	for _, boundary in ipairs({ "privacy", "focus" }) do
 		for _, transition in ipairs({ "scope", "shutdown" }) do
