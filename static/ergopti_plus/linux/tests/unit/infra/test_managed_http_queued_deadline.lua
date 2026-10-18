@@ -5,6 +5,8 @@
 --- DESCRIPTION:
 --- Preserves independent managed-network controls and actual production imports.
 --- Source registration alone does not qualify native or installed behavior.
+--- One fixture serves both the plain retry path and the aggregate-cancel
+--- path, which calls cancel() before the predecessor settles.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -209,6 +211,44 @@ helpers.describe("queued deadline ownership: refusal and exact retry", function(
   helpers.assert_eq(#results, 1)
   helpers.assert_eq(results[1].error, "timeout")
   helpers.assert_true(not state.deadlines[2].token:is_settled())
+  state.complete_request(1, "late\nERGOPTI_HTTP_STATUS:200\n")
+  state.ack_closes()
+  helpers.assert_eq(#state.requests, 1)
+  helpers.assert_eq(client.cancel("queued-debt"), false, "public cancellation must reach the precise refused queued timer")
+  local refusal
+  helpers.assert_eq(client.get("http://127.0.0.1:9000/models", {}, { owner = "queued-debt" }, function(value) refusal = value end), false)
+  helpers.assert_eq(refusal.error, "previous request cancellation failed")
+  helpers.assert_eq(#state.requests, 1)
+  helpers.assert_eq(#state.deadlines, 2)
+  state.refuse_deadline_index = nil
+  helpers.assert_true(client.cancel("queued-debt"))
+  helpers.assert_true(not state.deadlines[2].token:is_settled(), "accepted native close is still pending physical ACK")
+  local refused_owned = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "queued-debt" }, function() end)
+  helpers.assert_true(not refused_owned.started and refused_owned:is_settled())
+  helpers.assert_eq(#state.requests, 1)
+  helpers.assert_eq(#state.deadlines, 2)
+  state.deadlines[2].ack()
+  local successor = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "queued-debt" }, function() end)
+  helpers.assert_true(successor.started)
+  helpers.assert_eq(#state.requests, 2)
+  state.complete_request(2, "fresh\nERGOPTI_HTTP_STATUS:200\n")
+  state.ack_closes()
+  helpers.assert_true(successor:is_settled())
+  helpers.assert_eq(#results, 1)
+ end)
+
+ helpers.it("refuses aggregate cancellation while the expired queued timer is unacknowledged", function()
+  local client, state = fresh_client({ defer_close = true, defer_deadline_index = 2 })
+  local results = {}
+  helpers.assert_true(client.get("http://127.0.0.1:9000/models", {}, { owner = "queued-debt", timeout_ms = 5000 }, function() end))
+  helpers.assert_true(client.get("http://127.0.0.1:9000/models", {}, { owner = "queued-debt", timeout_ms = 1000 }, function(result) results[#results + 1] = result end))
+  state.refuse_deadline_index = 2
+  state.time = 1001
+  state.fire_deadlines()
+  helpers.assert_eq(#results, 1)
+  helpers.assert_eq(results[1].error, "timeout")
+  helpers.assert_true(not state.deadlines[2].token:is_settled())
+  helpers.assert_eq(client.cancel("queued-debt"), false, "queued timer refusal cannot be masked by predecessor signal acceptance")
   state.complete_request(1, "late\nERGOPTI_HTTP_STATUS:200\n")
   state.ack_closes()
   helpers.assert_eq(#state.requests, 1)
