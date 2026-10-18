@@ -334,3 +334,5 @@ _PTIOP_MetadataPatchPublishesOnlyFromSameDirectoryStage() {
 }
 Test("hcw-personal-meta-transaction: success uses one same-directory atomic replace",
 	_PTIOP_MetadataPatchPublishesOnlyFromSameDirectoryStage)
+
+#Include test_personal_editor_modal_owner.ahk
