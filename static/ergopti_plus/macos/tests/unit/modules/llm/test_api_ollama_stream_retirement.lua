@@ -35,9 +35,9 @@ local function with_stream(callback)
 		local original_spawn = runner.spawn
 		local original_after = scheduler.after
 		local fixture = { tasks = {}, handles = {}, business_done = {}, timers = {}, failures = 0,
-			successes = 0, partials = 0, start_mode = "true" }
+			successes = 0, partials = 0, partial_values = {}, start_mode = "true" }
 
-		hs.task.new = function(_, done, _, args)
+		hs.task.new = function(_, done, chunk, args)
 			local environment = { HOME = "/Users/fixture" }
 			local task = { done = done, running = false, terminate_calls = 0 }
 			for index, arg in ipairs(args) do
@@ -60,6 +60,7 @@ local function with_stream(callback)
 				self.running = false
 				self.done(code or 15, "", "")
 			end
+			function task:emit(text) return chunk(self, text, "") end
 			fixture.tasks[#fixture.tasks + 1] = task
 			return task
 		end
@@ -77,7 +78,10 @@ local function with_stream(callback)
 			stream("fixture-model", "", "typed context", "", 0.2, 8, 1, false,
 				function() fixture.successes = fixture.successes + 1 end,
 				function() fixture.failures = fixture.failures + 1 end, {},
-				function() fixture.partials = fixture.partials + 1 end)
+				function(text)
+					fixture.partials = fixture.partials + 1
+					fixture.partial_values[#fixture.partial_values + 1] = text
+				end)
 		end
 		function fixture.slot() return upvalue(api.cancel_streaming, "_active_stream_task") end
 		local outcome = table.pack(xpcall(function() callback(api, fixture) end, debug.traceback))
@@ -94,6 +98,69 @@ local function with_stream(callback)
 end
 
 helpers.describe("Ollama stream retirement ownership", function()
+	helpers.it("(ollama-stream-provider-error) refuses explicit failure after valid partial output", function()
+		with_stream(function(_, fixture)
+			fixture.request()
+			local task, handle = fixture.tasks[1], fixture.handles[1]
+			task:emit('{"message":{"content":" and a useful continuation"},"done":false}\n')
+			helpers.assert_eq(fixture.partials, 1, "a real parsed token reached the partial observer")
+			task:emit('{"error":"fixture inference failed"}\n')
+			task:emit('{"message":{"content":"must not publish"},"done":true}\n')
+			helpers.assert_eq(fixture.partials, 1, "failure suppresses subsequent token publication")
+			helpers.assert_eq(handle.isSettled(), false, "native task ownership lasts through transport settlement")
+			task:complete(0)
+			helpers.assert_eq(fixture.failures, 1, "provider failure overrides accumulated text")
+			helpers.assert_eq(fixture.successes, 0, "partial text cannot be reported as a successful response")
+			helpers.assert_eq(fixture.slot(), nil)
+			helpers.assert_eq(exists(task.payload), false)
+		end)
+	end)
+
+	helpers.it("(ollama-stream-provider-error) refuses an unterminated final error record", function()
+		with_stream(function(_, fixture)
+			fixture.request()
+			local task = fixture.tasks[1]
+			task:emit('{"message":{"content":" and a useful continuation"},"done":false}\n')
+			task:emit('{"error":"fixture inference failed"}')
+			task:complete(0)
+			helpers.assert_eq(fixture.failures, 1, "EOF must not hide the final provider error")
+			helpers.assert_eq(fixture.successes, 0)
+		end)
+	end)
+
+	helpers.it("(ollama-stream-provider-error) refuses a malformed record after valid partial output", function()
+		with_stream(function(_, fixture)
+			fixture.request()
+			local task = fixture.tasks[1]
+			task:emit('{"message":{"content":" and a useful continuation"},"done":false}\n')
+			task:emit('{not JSON}\n')
+			task:complete(0)
+			helpers.assert_eq(fixture.failures, 1, "a broken record cannot become a successful partial answer")
+			helpers.assert_eq(fixture.successes, 0)
+		end)
+	end)
+
+	for _, framing in ipairs({
+		{ name = "LF", ending = "\n" },
+		{ name = "CRLF", ending = "\r\n" },
+		{ name = "whitespace", ending = "\n \t\r\n" },
+		{ name = "EOF", ending = "" },
+	}) do
+		helpers.it("(ollama-stream-final-record) preserves valid tokens with " .. framing.name .. " framing", function()
+			with_stream(function(_, fixture)
+				fixture.request()
+				local task = fixture.tasks[1]
+				task:emit('{"message":{"content":" and a useful"},"done":false}\n')
+				if framing.name == "whitespace" then task:emit(" \t\r\n") end
+				task:emit('{"message":{"content":" continuation"},"done":true}' .. framing.ending)
+				task:complete(0)
+				helpers.assert_eq(fixture.partial_values[#fixture.partial_values], " and a useful continuation")
+				helpers.assert_eq(fixture.failures, 0)
+				helpers.assert_eq(fixture.successes, 1)
+			end)
+		end)
+	end
+
 	helpers.it("(stream-pending-retirement) retains the task and payload until exact completion", function()
 		with_stream(function(api, fixture)
 			fixture.request()

@@ -1699,13 +1699,15 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 
 	local accumulated = ""
 	local line_buf    = ""
+	local stream_failed = false
 	local task = nil
 	local task_completed = false
 
 	-- Parse one complete NDJSON line and append its content to accumulated
 	local function process_line(line)
+		if stream_failed or line:match("^%s*$") then return end
 		local obj, _ = JsonCodec.decode(line)
-		if type(obj) ~= "table" then return end
+		if type(obj) ~= "table" or obj.error ~= nil then stream_failed = true; return end
 		if type(obj.message) == "table" and type(obj.message.content) == "string" then
 			local token = obj.message.content
 			if token ~= "" then
@@ -1731,6 +1733,7 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if not chunk or chunk == "" then return true end
 		-- Generation check: discard chunks from a stream that has been superseded
 		if my_generation ~= _stream_generation then return false end
+		if stream_failed then return true end
 		line_buf = line_buf .. chunk
 		flush_lines()
 		return true
@@ -1767,6 +1770,16 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 		if remaining and remaining ~= "" then
 			line_buf = line_buf .. remaining
 			flush_lines()
+		end
+		if line_buf ~= "" then
+			local final_line = line_buf
+			line_buf = ""
+			process_line(final_line)
+		end
+		if stream_failed then
+			Logger.warn(LOG, "[%s] #%d STREAM provider or protocol failure — discarding partial output.", model_name, req_id)
+			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+			return
 		end
 
 		if accumulated == "" then
