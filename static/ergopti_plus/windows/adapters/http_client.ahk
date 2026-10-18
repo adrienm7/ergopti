@@ -80,6 +80,17 @@ global _SYSTEM_PROXY_PAC_CONFIG := ""
 ; =======================================================
 ; =======================================================
 
+; Reject malformed response bytes before StrGet can repair them into text.
+; @param Bytes {Buffer|Integer} The readable UTF-8 byte span.
+; @param ByteCount {Integer} The positive number of admitted bytes.
+; @returns {Boolean} Whether Windows accepts every byte as strict UTF-8.
+HTTPIsValidUtf8(Bytes, ByteCount) {
+	static CP_UTF8 := 65001, MB_ERR_INVALID_CHARS := 0x8
+	return DllCall("Kernel32\MultiByteToWideChar", "UInt", CP_UTF8,
+		"UInt", MB_ERR_INVALID_CHARS, "Ptr", Bytes, "Int", ByteCount,
+		"Ptr", 0, "Int", 0, "Int") != 0
+}
+
 _HTTP_CurlNextRequestId() {
 	global _HTTP_CURL_REQUEST_COUNTER
 	PreviousCritical := Critical("On")

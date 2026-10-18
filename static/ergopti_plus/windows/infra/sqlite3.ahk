@@ -23,6 +23,7 @@
 ; ==============================================================================
 
 #Requires Autohotkey v2.0+
+#Include ../adapters/sqlite_native.ahk
 
 
 
@@ -633,7 +634,7 @@ SQLite_Query(db, sql, YieldOps := 0) {
 										default:
 												tp := DllCall(text_fn,
 														"Ptr", pstmt, "Int", idx, "Ptr")
-												byte_count := DllCall(bytes_fn, "Ptr", pstmt, "Int", idx, "Int")
+												byte_count := SQLiteNativeColumnBytes(bytes_fn, pstmt, idx)
 												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp, byte_count)
 								}
 						}
@@ -727,7 +728,7 @@ SQLite_EachRow(db, sql, consumer, YieldEvery := 0, Failure := 0) {
 										default:
 												tp := DllCall(text_fn,
 														"Ptr", pstmt, "Int", idx, "Ptr")
-												byte_count := DllCall(bytes_fn, "Ptr", pstmt, "Int", idx, "Int")
+												byte_count := SQLiteNativeColumnBytes(bytes_fn, pstmt, idx)
 												row[col_names[A_Index]] := SQLite_Utf8ToStr(tp, byte_count)
 								}
 						}

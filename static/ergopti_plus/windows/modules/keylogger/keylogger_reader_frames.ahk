@@ -47,7 +47,7 @@ _KLR_RebuildIndex(State, Ledger) {
 		; the remaining incomplete line after locating LF, not this sum.
 		if Pending.Size < Required
 			Pending.Size := Min(KLRRebuildConst.MAX_FRAME_BYTES + Count, Max(Required, Max(1, Pending.Size * 2)))
-		DllCall("ntdll\RtlMoveMemory", "Ptr", Pending.Ptr + Used, "Ptr", Buf, "UPtr", Count)
+		FSBufferMove(Pending.Ptr + Used, Buf, Count)
 		Used := Required
 		Cursor += Count
 		Index["read_bytes"] += Count
@@ -67,7 +67,7 @@ _KLR_RebuildIndex(State, Ledger) {
 			_KLR_RebuildFrameScan(StrGet(Pending, -Complete, "UTF-8"), Start, Start + Complete, Index)
 			Used -= Complete
 			if Used
-				DllCall("ntdll\RtlMoveMemory", "Ptr", Pending, "Ptr", Pending.Ptr + Complete, "UPtr", Used)
+				FSBufferMove(Pending, Pending.Ptr + Complete, Used)
 		}
 		if Used > KLRRebuildConst.MAX_FRAME_BYTES
 			throw KLRRebuildRefusal("a ledger incomplete physical line exceeds the frame carry bound")
@@ -141,7 +141,7 @@ _KLR_RebuildFrameState(Text, Index) {
 		StrPut(Closer, Buf.Ptr + Size, 4, "UTF-8")
 		Index["probe_calls"] += 1
 		Index["probe_bytes"] += Size + StrLen(Closer)
-		if DllCall(SQLiteConst.DLL . "\sqlite3_complete", "Ptr", Buf, "Int") {
+		if SQLiteNativeIsComplete(Buf) {
 			Index["lexical"] := State
 			return Size - StrLen(Prefix)
 		}
