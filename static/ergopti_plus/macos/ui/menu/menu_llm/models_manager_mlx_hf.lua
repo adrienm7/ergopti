@@ -715,6 +715,7 @@ function M.install(ctx)
 			end
 			if flow.webview_close_requested == true then return false end
 			flow.webview_close_requested = true
+			local native_metatable = getmetatable(webview)
 			local ok, accepted = xpcall(function()
 				if type(webview.delete) ~= "function" then
 					error("HuggingFace token webview has no delete method")
@@ -724,6 +725,13 @@ function M.install(ctx)
 			-- The close callback is stronger settlement evidence than a misleading
 			-- nil/false/throwing delete return from a mutating native implementation.
 			if flow.webview == nil then return true end
+			-- A failed factory can precede callback installation. Native GC strips
+			-- the userdata metatable even then; a nil return alone proves nothing.
+			if flow.webview == webview and native_metatable ~= nil
+				and getmetatable(webview) == nil then
+				after_webview_settled()
+				return true
+			end
 			if ok ~= true or accepted == false or accepted == nil then
 				flow.webview_close_requested = false
 				Logger.error(LOG,
