@@ -223,6 +223,63 @@ helpers.describe("owned SQLite collector flush", function()
 		end)
 	end)
 
+
+	it("(sqlite-range-date-boundary) excluded days never regain live characters or physical keys", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "selected")
+			k.record_physical_key("selected", 30, 1000)
+			for _, bounds in ipairs({ { "2020-01-01", "2020-01-01" }, { "2100-01-01", "2100-01-01" } }) do
+				local payload = assert(k.get_range_payload(bounds[1], bounds[2], { "selected" }))
+				helpers.assert_nil(next(payload.today), "Excluded live input must stay outside the requested dates")
+			end
+			local today = os.date("%Y-%m-%d")
+			local payload = assert(k.get_range_payload(today, today, { "selected" }))
+			helpers.assert_eq(payload.today.selected.c.a.c, 1)
+			helpers.assert_eq(payload.today.selected.sc_kb["30"].c, 1)
+		end)
+	end)
+
+
+	it("(sqlite-range-date-boundary) a missing projection owner refuses instead of merging unrestricted RAM", function()
+		local name = "modules.keylogger.sqlite_reader"
+		local previous, preload = package.loaded[name], package.preload[name]
+		package.loaded[name] = nil
+		package.preload[name] = function() error("deliberately absent projection owner") end
+		local ok, err = xpcall(function()
+			with_collector(function(k)
+				k.on_keydown("a", 1000, "selected")
+				local payload, reason = k.get_range_payload("2020-01-01", "2020-01-01")
+				helpers.assert_nil(payload)
+				helpers.assert_eq(reason, "SQLite projection unavailable")
+				helpers.assert_eq(k._pending_buffer_count_for_test(), 1)
+			end)
+		end, debug.traceback)
+		package.loaded[name], package.preload[name] = previous, preload
+		if not ok then error(err, 0) end
+	end)
+
+
+	it("(sqlite-range-date-boundary) one captured day owns both SQL and RAM across midnight", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "selected")
+			local native_date, captures = os.date, 0
+			os.date = function(format, timestamp)
+				if format == "%Y-%m-%d" and timestamp == nil then
+					captures = captures + 1
+					return captures == 1 and "2026-10-18" or "2026-10-19"
+				end
+				return native_date(format, timestamp)
+			end
+			local ok, err = xpcall(function()
+				local payload = assert(k.get_range_payload("2026-10-18", "2026-10-18", { "selected" }))
+				helpers.assert_eq(payload.today.selected.c.a.c, 1)
+				helpers.assert_eq(captures, 1, "SQL and RAM must share the original local date")
+			end, debug.traceback)
+			os.date = native_date
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	it("healthy reset returns a real ACK and retires its UI generation", function()
 		with_collector(function(k)
 			local generation = k.get_flush_status().generation
