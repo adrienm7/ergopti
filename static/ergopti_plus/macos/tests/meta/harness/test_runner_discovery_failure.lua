@@ -37,6 +37,7 @@ helpers.describe("Runner refuses incomplete discovery", function()
 		{ mode = "native-empty", diagnostic = "no test modules discovered" },
 		{ mode = "failed", diagnostic = "command output did not complete: exit 23" },
 		{ mode = "refused", diagnostic = "controlled discovery refusal" },
+		{ mode = "group-empty", diagnostic = 'no test modules discovered for group "ui"' },
 	}
 	for _, scenario in ipairs(scenarios) do
 		helpers.it("(discovery-fail-closed) rejects " .. scenario.mode .. " inventories", function()
@@ -49,8 +50,10 @@ helpers.describe("Runner refuses incomplete discovery", function()
 			if scenario.mode == "failed" then
 				helpers.assert_true(output:find("DISCOVERY PIPE CLOSED failed", 1, true) ~= nil,
 					"a failed enumeration must still release its process handle")
+			end
+			if scenario.mode == "failed" or scenario.mode == "group-empty" then
 				helpers.assert_nil(output:find(">>> Loading", 1, true),
-					"partial enumeration must be rejected before any test module executes")
+					"incomplete coverage must be rejected before any test module executes")
 			end
 		end)
 	end

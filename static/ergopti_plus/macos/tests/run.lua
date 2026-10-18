@@ -211,6 +211,8 @@ end
 if module_group then
 	local total = #discovered_modules
 	discovered_modules = ModuleGroups.select(discovered_modules, module_group)
+	assert(#discovered_modules > 0,
+		string.format("no test modules discovered for group %q", module_group))
 	print(string.format("Module group %q: %d of %d module(s)", module_group, #discovered_modules, total))
 end
 local modules_to_load, narrowed, case_filter = OnlySelector.select_modules(
