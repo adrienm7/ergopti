@@ -99,7 +99,7 @@ end
 --- @param path string Absolute path to a .toml file.
 --- @return string
 local function category_of(path)
-	local stem = path:match("([^/\\]+)%.toml$")
+	local stem = path:match("([^/]+)%.toml$")
 	return stem or "unknown"
 end
 
