@@ -21,10 +21,23 @@ local function executable(source)
 		at = last + 1
 	end
 	while at <= #source do
+		-- Plain code runs up to the next byte that can open a comment, a long
+		-- bracket or a string: copy it whole. The anchored match below reads the
+		-- bracket in place; copying the rest of the source for every `[` made
+		-- this scan quadratic in the driver size.
+		local special = source:find("[%-%[\"']", at)
+		if not special then
+			output[#output + 1] = source:sub(at)
+			break
+		end
+		if special > at then
+			output[#output + 1] = source:sub(at, special - 1)
+			at = special
+		end
 		local char = source:sub(at, at)
 		local comment = source:sub(at, at + 1) == "--"
 		local start = comment and at + 2 or at
-		local equals = source:sub(start, start) == "[" and source:sub(start):match("^%[(=*)%[") or nil
+		local equals = source:sub(start, start) == "[" and source:match("^%[(=*)%[", start) or nil
 		if equals then
 			local close, last = source:find("]" .. equals .. "]", start + #equals + 2, true)
 			mask(last or #source)
@@ -33,11 +46,12 @@ local function executable(source)
 			mask(newline and newline - 1 or #source)
 		elseif char == '"' or char == "'" then
 			local quote, last = char, at + 1
+			local stops = quote == '"' and '[\\"]' or "[\\']"
 			while last <= #source do
-				local char = source:sub(last, last)
-				if char == "\\" then last = last + 2
-				elseif char == quote then break
-				else last = last + 1 end
+				local stop = source:find(stops, last)
+				if not stop then last = #source + 1; break end
+				if source:sub(stop, stop) == "\\" then last = stop + 2
+				else last = stop; break end
 			end
 			local literal = source:sub(at + 1, last - 1)
 			mask(math.min(last, #source), literal == "menu.wrap_mutation" and "__WRAP_MUTATION_MODULE__"
