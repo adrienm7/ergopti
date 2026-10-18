@@ -3245,7 +3245,11 @@ local function _manifest_metrics_rows(ctx, k)
 				Logger.error(LOG, "No setter for privacy flag '%s' — the row does nothing.", key)
 				return
 			end
-			setter(not privacy(key)())
+			local result = setter(not privacy(key)())
+			-- Encryption returns its posture, so false can also acknowledge OFF.
+			-- Re-read the owner after either outcome; never publish an optimistic tick.
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return result
 		end
 	end
 
