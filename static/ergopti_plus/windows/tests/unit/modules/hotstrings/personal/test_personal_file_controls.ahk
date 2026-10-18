@@ -7,11 +7,11 @@
 ; launch alone is injected. Generic provenance-only loader assertions stay intact.
 ; ==============================================================================
 
-_PFC_Fixture(FixtureRootSpelling := "temp") {
+_PFC_Fixture(FixtureRootSpelling := "temp", InitialSource := unset) {
 	global ScriptInformation, ConfigurationFile, _HotstringRegistrar, CategoryEnabled
 	if FixtureRootSpelling != "temp" && FixtureRootSpelling != "long" && FixtureRootSpelling != "dot"
 		throw ValueError("Unknown fixture native root spelling")
-	Fixture := _ScopeOwnerFixture()
+	Fixture := IsSet(InitialSource) ? _ScopeOwnerFixture(InitialSource) : _ScopeOwnerFixture()
 	Fixture.savedInfo := ScriptInformation, Fixture.savedConfig := ConfigurationFile
 	Fixture.savedOwners := PersonalFileControls.owners, Fixture.savedInventory := PersonalFileControls.inventory
 	Fixture.savedRegistrar := _HotstringRegistrar, Fixture.savedGate := CategoryEnabled["Hotstrings"]
@@ -32,10 +32,12 @@ _PFC_Fixture(FixtureRootSpelling := "temp") {
 		. '[_meta]`ndelay = 0.25`npriority = 61`ncolor = "123456"`nunknown = "keep"`n'
 		. '[_meta.sections.live]`ndelay = 0.5`npriority = 67`nshow_tooltip = false`n'
 	Assert(FSWriteDurable(Fixture.file, Fixture.content))
-	Fixture.source := '[category_enabled]`nhotstrings = true`n[private]`ncredential = "keep"`n'
-		. '[hotstrings.modules.' . TOML_RenderKey(Fixture.descriptor["id"]) . ']`nquiet = false`n'
-	Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
-	Assert(FSWriteDurable(Fixture.path, Fixture.source))
+	if !IsSet(InitialSource) {
+		Fixture.source := '[category_enabled]`nhotstrings = true`n[private]`ncredential = "keep"`n'
+			. '[hotstrings.modules.' . TOML_RenderKey(Fixture.descriptor["id"]) . ']`nquiet = false`n'
+		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
+	}
 	AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the actual dynamic personal-file configuration remains admitted by its genuine native boot owner")
 	ScriptInformation := Fixture.savedInfo.Clone()
 	ScriptInformation["PersonalHotstringsDir"] := Fixture.root
@@ -694,26 +696,26 @@ Test("personal-file-metadata: a file row renders from the admitted parse (perf-p
 ; The fresh adopted owner must read the same authored choices when registering.
 _PFC_SemanticActivation(Shape, Mode) {
 	global HSE_RegistryByGroup, _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
-	Fixture := _PFC_Fixture()
+	Id := PersonalFileDescribe(["a__b.toml"])["id"], Key := TOML_RenderKey(Id)
+	FileEnabled := Mode != "file-off", SectionEnabled := Mode == "all-on"
+	FileLiteral := FileEnabled ? "true" : "false"
+	SectionLiteral := SectionEnabled ? "true" : "false"
+	switch Shape {
+		case "dotted": Source := "hotstrings.groups." . Key . " = " . FileLiteral
+			. "`nhotstrings.modules." . Key . ".quiet = " . SectionLiteral . "`n"
+		case "inline": Source := "hotstrings = { groups = { " . Key . " = " . FileLiteral
+			. " }, modules = { " . Key . " = { quiet = " . SectionLiteral . " } } }`n"
+		case "quoted": Source := '["hotstrings"."groups"]`n' . Key . " = " . FileLiteral
+			. '`n["hotstrings"."modules".' . Key . ']`nquiet = ' . SectionLiteral . "`n"
+		default: throw ValueError("Unknown personal activation source shape")
+	}
+	Source .= '[category_enabled]`nhotstrings = true`n[future]`ntext = "001" # exact foreign data`n'
+	; The scope fixture boots this exact image once. Replacing a READY image
+	; and calling boot again violates the native source-construction contract.
+	Fixture := _PFC_Fixture("temp", Source)
+	Source := Fixture.source
 	try {
-		Id := Fixture.descriptor["id"], Key := TOML_RenderKey(Id)
-		FileEnabled := Mode != "file-off", SectionEnabled := Mode == "all-on"
-		FileLiteral := FileEnabled ? "true" : "false"
-		SectionLiteral := SectionEnabled ? "true" : "false"
-		switch Shape {
-			case "dotted": Source := "hotstrings.groups." . Key . " = " . FileLiteral
-				. "`nhotstrings.modules." . Key . ".quiet = " . SectionLiteral . "`n"
-			case "inline": Source := "hotstrings = { groups = { " . Key . " = " . FileLiteral
-				. " }, modules = { " . Key . " = { quiet = " . SectionLiteral . " } } }`n"
-			case "quoted": Source := '["hotstrings"."groups"]`n' . Key . " = " . FileLiteral
-				. '`n["hotstrings"."modules".' . Key . ']`nquiet = ' . SectionLiteral . "`n"
-			default: throw ValueError("Unknown personal activation source shape")
-		}
-		Source := _CMJFixtureCurrentSource(Source . '[category_enabled]`nhotstrings = true`n'
-			. '[future]`ntext = "001" # exact foreign data`n')
-		AssertTrue(FSWriteDurable(Fixture.path, Source))
-		Boot := ConfigMigrateBoot(Fixture.path)
-		AssertEqual("current", Boot["status"], "the actual boot owner admits this authored source")
+		AssertEqual(Id, Fixture.descriptor["id"], "the authored choices target the actually discovered file")
 		Cache := ParseConfigTomlFile(Fixture.path)
 		AssertTrue(Cache["future"]["text"] is String)
 		AssertEqual("001", Cache["future"]["text"])
