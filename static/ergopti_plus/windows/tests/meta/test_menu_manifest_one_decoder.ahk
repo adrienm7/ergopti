@@ -21,7 +21,7 @@
 ; _MG_LoadSubCategories (infra/master_gates.ahk) is the one documented exception:
 ; its non-memoized re-read is a deliberate fail-fast contract -- an invalid
 ; canonical manifest must throw on EVERY call -- pinned by
-; tests/unit/test_master_gates.ahk, and it runs per live category toggle, never
+; tests/unit/infra/config/persistence/test_master_gates.ahk, and it runs per live category toggle, never
 ; on the boot path.
 ; ==============================================================================
 
@@ -30,7 +30,7 @@
 ; Functions allowed to name and open the shared menu manifest themselves.
 _MM1D_ALLOWED_OWNERS := Map(
 	"_MM_GetManifestRoot",  "the single shared accessor, cached for the process lifetime",
-	"_MG_LoadSubCategories", "deliberate fail-fast non-memoization, pinned by tests/unit/test_master_gates.ahk",
+	"_MG_LoadSubCategories", "deliberate fail-fast non-memoization, pinned by tests/unit/infra/config/persistence/test_master_gates.ahk",
 )
 
 

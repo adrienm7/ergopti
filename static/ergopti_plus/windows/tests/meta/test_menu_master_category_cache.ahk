@@ -180,7 +180,7 @@ _MMCC_CheckMasterGatesLoaderStillFailFast() {
 	Assert(Body != "", "_MG_LoadSubCategories must exist in the driver source")
 
 	Assert(InStr(Body, "_MR_GetManifestRoot") == 0,
-		"_MG_LoadSubCategories must NOT be routed through the menu-renderer cache -- its non-memoization is deliberate (an invalid canonical manifest must throw on EVERY call) and is pinned by tests/unit/test_master_gates.ahk")
+		"_MG_LoadSubCategories must NOT be routed through the menu-renderer cache -- its non-memoization is deliberate (an invalid canonical manifest must throw on EVERY call) and is pinned by tests/unit/infra/config/persistence/test_master_gates.ahk")
 	Assert(InStr(Body, "throw Error(") > 0,
 		"_MG_LoadSubCategories must keep throwing on an invalid manifest instead of falling back to a default table")
 }
