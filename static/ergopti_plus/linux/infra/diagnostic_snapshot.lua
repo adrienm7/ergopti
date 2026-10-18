@@ -215,6 +215,33 @@ function M.collect(ctx, env)
 	}
 end
 
+--- Collects environment facts before input admission without logging a snapshot.
+--- The one-shot emitter accepts only the ready phase's cached metadata: machine
+--- identity and paths cannot be replaced, and no probe runs under the grab.
+--- @param ctx table See M.collect; source location is needed during preparation.
+--- @param env table|nil Probe override.
+--- @return function emit(final_ctx) Logs once and returns the formatted message.
+function M.prepare(ctx, env)
+	local values, emitted = M.collect(ctx, env), false
+	return function(final_ctx)
+		assert(not emitted, "Diagnostic snapshot preparation already emitted")
+		emitted = true -- Reserve before any logger callback can reenter.
+		if final_ctx ~= nil then
+			assert(type(final_ctx) == "table", "Diagnostic snapshot metadata must be a table")
+			for _, name in ipairs({ "locale", "keyboard_layout", "log_level" }) do
+				if final_ctx[name] ~= nil then values[name] = final_ctx[name] end
+			end
+			if final_ctx.features_enabled ~= nil or final_ctx.features_total ~= nil then
+				values.features_enabled = Snapshot.features_ratio(final_ctx.features_enabled, final_ctx.features_total)
+			end
+			if final_ctx.boot_ms ~= nil then values.boot_ms = string.format("%.0f", final_ctx.boot_ms) end
+		end
+		local message = Snapshot.format(values)
+		Logger.info(Snapshot.MODULE, "%s", message)
+		return message
+	end
+end
+
 --- Collects and logs the snapshot line.
 --- @param ctx table See M.collect.
 --- @param env table|nil Probe override.
