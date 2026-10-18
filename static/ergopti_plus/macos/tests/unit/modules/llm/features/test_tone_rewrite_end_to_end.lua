@@ -23,6 +23,7 @@
 local helpers = require("tests.helpers")
 local json = require("json")
 local Rewrite = require("llm.rewrite")
+local Scope = require("tests.support.modules.llm.selection_translation_scope")
 
 local ENTRY_ID = "tone-cerebras"
 local MODEL = "qwen-3.8-27b"
@@ -75,7 +76,9 @@ local function make_synthetic(world)
 		return true
 	end
 	function synthetic.emit_key_strokes() error("the tone actions never type key by key") end
-	function synthetic.begin(owner, effect) return { owner = owner, effect = effect } end
+	function synthetic.begin(owner, effect)
+		return { owner = owner, effect = effect, complete_callbacks = {}, dispatched_callbacks = {} }
+	end
 	function synthetic.begin_batch(tx) return { tx = tx } end
 	function synthetic.keyStroke(_, mods, key)
 		record(mods, key)
@@ -86,8 +89,26 @@ local function make_synthetic(world)
 		world.selection = world.pasted
 		return true
 	end
-	function synthetic.seal() return true end
-	function synthetic.cancel() return true end
+	function synthetic.on_complete(tx, callback)
+		if tx.completed then callback(tx, tx.status)
+		else tx.complete_callbacks[#tx.complete_callbacks + 1] = callback end
+	end
+	function synthetic.on_dispatched(tx, callback)
+		tx.dispatched_callbacks[#tx.dispatched_callbacks + 1] = callback
+	end
+	function synthetic.seal(tx)
+		if tx.sealed then return false end
+		tx.sealed, tx.completed, tx.status = true, true, "complete"
+		for _, callback in ipairs(tx.dispatched_callbacks) do callback(tx, nil, "dispatched") end
+		for _, callback in ipairs(tx.complete_callbacks) do callback(tx, tx.status) end
+		return true
+	end
+	function synthetic.cancel(tx)
+		if tx.completed then return false end
+		tx.sealed, tx.completed, tx.status = true, true, "cancelled"
+		for _, callback in ipairs(tx.complete_callbacks) do callback(tx, tx.status) end
+		return true
+	end
 	return synthetic
 end
 
@@ -113,6 +134,15 @@ local function build_world(selection)
 
 	-- The pasteboard of the document model, on the hs stub every module shares
 	local hs_stub = _G.hs
+	world.clock_ns = 0
+	hs_stub.timer.absoluteTime = function() return world.clock_ns end
+	local native_timer_new = hs_stub.timer.new
+	hs_stub.timer.new = function(delay, callback)
+		return native_timer_new(delay, function()
+			world.clock_ns = world.clock_ns + math.ceil(delay * 1e9)
+			callback()
+		end)
+	end
 	-- The application the exclusion filter reads
 	local front_app = {
 		title = function() return "ToneApp" end,
@@ -323,8 +353,21 @@ local function assert_replacement(strokes, steps)
 	end
 end
 
+--- Keeps construction, native callbacks and assertions in one restored scope.
+--- @param name string Scenario name.
+--- @param scenario function Complete production-pipeline scenario.
+local function case(name, scenario)
+	helpers.it(name, function()
+		return helpers.with_fresh_modules({
+			"modules.llm.tone_rewrite", "adapters.event_provenance", "llm.translate",
+		}, function()
+			return Scope.run(scenario)
+		end)
+	end)
+end
+
 helpers.describe("tone rewrite of the selection end to end (llm-tone)", function()
-	helpers.it("climbs the ladder from the original, stops at the top and wraps with _cycle", function()
+	case("climbs the ladder from the original, stops at the top and wraps with _cycle", function()
 		local world = build_world("merci pour ton aide")
 
 		helpers.assert_eq(swipe(world, "llm_tone_more_formal"), true)
@@ -362,7 +405,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		assert_request(world, world.posts[3], "tone_familiar", "merci pour ton aide")
 	end)
 
-	helpers.it("goes down the ladder and stops at the most familiar register", function()
+	case("goes down the ladder and stops at the most familiar register", function()
 		local world = build_world("Merci pour votre aide.")
 		swipe(world, "llm_tone_more_familiar")
 		assert_request(world, world.posts[1], "tone_familiar", "Merci pour votre aide.")
@@ -376,7 +419,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 
 	-- One arrow press moves over one composed character: counting codepoints
 	-- moved the caret one step too far for 👍🏽 and left a character outside
-	helpers.it("reselects an emoji with a skin tone as one character", function()
+	case("reselects an emoji with a skin tone as one character", function()
 		local world = build_world("merci")
 		swipe(world, "llm_tone_more_familiar")
 		local before = #world.keys + 1
@@ -384,7 +427,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		assert_replacement(strokes_since(world, before), #"Merci " + 1 + #" !")
 	end)
 
-	helpers.it("does nothing when nothing is selected", function()
+	case("does nothing when nothing is selected", function()
 		local world = build_world("")
 		swipe(world, "llm_tone_more_formal")
 		helpers.assert_eq(#world.posts, 0, "no request")
@@ -393,7 +436,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(world.clipboard, USER_CLIPBOARD, "the clipboard is restored")
 	end)
 
-	helpers.it("refuses like a manual prediction when the AI is off", function()
+	case("refuses like a manual prediction when the AI is off", function()
 		local world = build_world("merci pour ton aide")
 		world.engine.set_llm_enabled(false)
 		swipe(world, "llm_tone_more_formal")
@@ -402,7 +445,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.manual_prediction.disabled"))
 	end)
 
-	helpers.it("types nothing when the focus moved before the answer", function()
+	case("types nothing when the focus moved before the answer", function()
 		local world = build_world("merci pour ton aide")
 		swipe(world, "llm_tone_more_formal")
 		world.focus = "8:202"
@@ -413,7 +456,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(world.tone.get_memory(), nil)
 	end)
 
-	helpers.it("types nothing when the selection changed before the answer", function()
+	case("types nothing when the selection changed before the answer", function()
 		local world = build_world("merci pour ton aide")
 		swipe(world, "llm_tone_more_formal")
 		world.selection = "une autre phrase"
@@ -424,7 +467,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(world.tone.get_memory(), nil)
 	end)
 
-	helpers.it("ignores the answer of a superseded step", function()
+	case("ignores the answer of a superseded step", function()
 		local world = build_world("merci pour ton aide")
 		swipe(world, "llm_tone_more_formal")
 		swipe(world, "llm_tone_more_familiar")
@@ -438,7 +481,7 @@ helpers.describe("tone rewrite of the selection end to end (llm-tone)", function
 		helpers.assert_eq(#world.document, 1)
 	end)
 
-	helpers.it("types nothing when the answer holds no rewrite", function()
+	case("types nothing when the answer holds no rewrite", function()
 		local world = build_world("merci pour ton aide")
 		swipe(world, "llm_tone_more_formal")
 		answer(world, world.posts[1], "Sorry, I cannot help with that.")
