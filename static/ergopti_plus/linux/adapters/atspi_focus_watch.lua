@@ -118,7 +118,7 @@ function M.new(options)
 	local active, ready, failed = false, false, false
 	local receipt, last_at, sequence, request = nil, nil, 0, 0
 	local pending, received = "", false
-	local answered_request = -1
+	local answered_request, answered_at = -1, nil
 	local cleanup_ok = true
 
 	local function publish(snapshot)
@@ -160,7 +160,7 @@ function M.new(options)
 		active, ready, failed = true, false, false
 		operation = nil
 		receipt, last_at, sequence, request, pending, received = nil, nil, 0, 0, "", false
-		answered_request = -1
+		answered_request, answered_at = -1, nil
 		watcher.started_at = now_ms()
 		local ok, owned = pcall(create_transport)
 		if not ok or type(owned) ~= "table" then fail("transport unavailable"); return false end
@@ -214,7 +214,7 @@ function M.new(options)
 			return true
 		end
 		if kind == "ready" or message.request ~= request or kind == "heartbeat" then return true end
-		answered_request = request
+		answered_request, answered_at = request, message.at_ms
 		publish(kind == "snapshot" and candidate or nil)
 		return true
 	end
@@ -270,10 +270,17 @@ function M.new(options)
 		request = request + 1
 		if not transport.request(request) then fail("admission request refused"); return nil end
 		local deadline = now_ms() + barrier_ms
-		while now_ms() <= deadline do
+		while true do
+			-- The scheduler may resume a one-millisecond pause after the budget.
+			-- Drain once without waiting, accepting only a response the worker
+			-- actually emitted before the deadline and whose source lease holds.
 			watcher.pump()
 			if failed then return nil end
-			if answered_request == request then return watcher.snapshot() end
+			if answered_request == request then
+				if answered_at <= deadline and now_ms() - answered_at <= lease_ms then return watcher.snapshot() end
+				break
+			end
+			if now_ms() > deadline then break end
 			pause()
 		end
 		publish(nil)
