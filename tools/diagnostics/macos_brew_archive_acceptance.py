@@ -155,8 +155,12 @@ NESTED_SANDBOX_EXCEPTION = (
 # Homebrew's Sandbox#run starts that launcher inside a pseudo-terminal
 # (PTY.open in brew's own process). Opening the pty pair writes the /dev/ptmx
 # multiplexer and the allocated /dev/ttysNNN device, which the base write
-# denial refuses ("can't get Master/Slave device"). Only those devices open.
-BREW_PTY_EXCEPTION = '(allow file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'
+# denial refuses ("can't get Master/Slave device"). Its forked child then opens
+# /dev/tty, the controlling terminal of that pty (EPERM in hosted run
+# 39139741547). Only those devices open.
+BREW_PTY_EXCEPTION = (
+    '(allow file-write* (literal "/dev/ptmx") (literal "/dev/tty") (regex #"^/dev/ttys[0-9]+$"))'
+)
 SANDBOX_POLICIES = ("sandbox.sb", "sandbox-brew.sb")
 
 

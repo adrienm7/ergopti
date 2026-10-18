@@ -1148,7 +1148,8 @@ class NestedHomebrewSandboxControls(unittest.TestCase):
             brew,
             base
             + '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))\n'
-            + '(allow file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))\n',
+            + '(allow file-write* (literal "/dev/ptmx") (literal "/dev/tty")'
+            + ' (regex #"^/dev/ttys[0-9]+$"))\n',
         )
         self.assertNotIn("no-sandbox", base)
         self.assertNotIn("process-exec", base)
