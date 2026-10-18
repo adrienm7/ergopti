@@ -662,3 +662,163 @@ helpers.describe("Corrupt wrap reservation configuration refusal", function()
 		end)
 	end)
 end)
+
+
+--- Executes actual daemon constructors and callbacks over explicit boundary ports.
+--- The real ScriptActions, capture gate and Wrap owners retain their own state.
+--- @param body function|string Assertion over the connected owners, or early-startup probe.
+local function with_daemon_wrap(body)
+	local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+	local source = file:read("*a"); assert(file:close())
+	local function span(first_marker, last_marker)
+		local first = assert(source:find(first_marker, 1, true), first_marker)
+		local last = assert(source:find(last_marker, first + #first_marker, true), last_marker)
+		return source:sub(first, last - 1)
+	end
+	local function evaluate(code, environment)
+		local chunk
+		if loadstring then
+			chunk = assert(loadstring(code, "genuine-daemon-wrap")); setfenv(chunk, environment)
+		else
+			chunk = assert(load(code, "genuine-daemon-wrap", "t", environment))
+		end
+		return chunk()
+	end
+	local manager_name, clipboard_name = "modules.shortcuts.manager", "adapters.clipboard"
+	local previous_manager, previous_clipboard = package.loaded[manager_name], package.loaded[clipboard_name]
+	local ok, err = pcall(function()
+		local state = { primary = "baseline", typed = {}, reads = 0, resets = 0, invalidations = 0, automation = 0 }
+		local shortcuts = helpers.load_module(manager_name)
+		shortcuts.init({ enabled = true, persist = false })
+		assert(shortcuts.set_wrap_on_type_enabled(true))
+		local noop = function() end
+		local env = {
+			type = type, math = math, tostring = tostring, require = require, package = { loaded = {} },
+			LOG = "Main.fixture", Logger = helpers.make_logger_stub(), privacy_owners = {},
+			opts = { dry_run = false }, shortcuts = shortcuts,
+			ScriptActions = require("modules.shortcuts.script_actions"), InputCaptureGate = require("infra.input_capture_gate"),
+			keylogger = { cancel_hold_intervals = noop, set_private_window = noop,
+				is_private_window = function() return false end, set_window_title = noop, on_app_focus = noop,
+				observe_hold_focus = function()
+					if state.on_focus_observe then state.on_focus_observe() end
+				end },
+			MagicKeySource = { cancel_capture = noop, on_key = function()
+				state.automation = state.automation + 1; return false
+			end },
+			TapHold = { set_paused = noop }, shutdown = { request = noop }, perform_reload = noop,
+			engine = { reset = function() state.resets = state.resets + 1 end },
+			Monotonic = { now_ms = function() return 1000 end },
+			WordReset = { click_resets_word = function() return true end },
+			injector = { inject = function(_, text) state.typed[#state.typed + 1] = text; return { ok = true } end },
+			script_chords = { on_key = function() return false end },
+			tap_keys = { on_key = function() return false end }, consume_bound_chord = function() return false end,
+		}
+		env.script_actions = evaluate(span("local script_actions = ScriptActions.new({", "\n\t-- A control can change")
+			.. "\nreturn script_actions", env)
+		local reset = assert(source:match("reset_text = function(.-)\n\t\tend,"))
+		local reset_text = evaluate("return function" .. reset .. "\nend", env)
+		env.secure_focus_guard = { blocks_text = function() return false end, prime = reset_text,
+			invalidate = function() state.invalidations = state.invalidations + 1; reset_text() end }
+		evaluate(span("input_capture_gate = InputCaptureGate.new({", "\n\tlocal on_char"), env)
+		state.early_pause = function() env.script_actions.toggle_pause() end
+		state.early_gate = env.input_capture_gate
+		if body == "early" then
+			state.early_pause(); state.early_pause()
+			assert(state.early_gate.acquire("settings", 1)); assert(state.early_gate.release("settings", 1))
+			return
+		end
+		package.loaded[clipboard_name] = { read_primary = function()
+			state.reads = state.reads + 1; return true, state.primary
+		end }
+		env.wrap_on_type = evaluate(span('local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({',
+			"\n\t-- The script-management chords") .. "\nreturn wrap_on_type", env)
+		local focus = assert(source:match("process_lifecycle%.onFocusChange%((function%(appName, windowTitle%).-\n\t\tend)%)"))
+		state.focus = evaluate("return " .. focus, env)
+		state.click = evaluate(span("local function on_click()", "\n\t-- 8.7b) Restore") .. "\nreturn on_click", env)
+		state.consume = evaluate(span("local on_consume = input_capture_gate.guard(function(detail)",
+			"\n\t-- Bind the same privacy owner") .. "\nreturn on_consume", env)
+		state.wrap, state.actions, state.gate = env.wrap_on_type, env.script_actions, env.input_capture_gate
+		body(state)
+	end)
+	package.loaded[manager_name], package.loaded[clipboard_name] = previous_manager, previous_clipboard
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("wrap on type: genuine daemon lifetime wiring", function()
+	helpers.it("keeps normal mouse selection through the actual privacy reset callback", function()
+		with_daemon_wrap(function(state)
+			state.click()
+			helpers.assert_eq(state.invalidations, 1)
+			helpers.assert_true(state.resets >= 1)
+			helpers.assert_true(state.wrap.selection_window_open())
+			state.primary = "selected"
+			helpers.assert_true(state.consume(symbol("(")))
+			helpers.assert_eq(state.typed, { "(selected)" })
+		end)
+	end)
+
+	helpers.it("retires the pre-pause window and admits a fresh mouse selection after resume", function()
+		with_daemon_wrap(function(state)
+			state.click(); state.primary = "previous selection"
+			state.actions.toggle_pause(); state.actions.toggle_pause()
+			helpers.assert_eq(state.actions.is_paused(), false)
+			helpers.assert_eq(state.wrap.on_key(symbol("(")), false)
+			helpers.assert_eq(state.typed, {})
+			state.click(); state.primary = "fresh selection"
+			helpers.assert_true(state.wrap.on_key(symbol("(")))
+			helpers.assert_eq(state.typed, { "(fresh selection)" })
+		end)
+	end)
+
+	helpers.it("retires the previous application's window before the first focus observer", function()
+		with_daemon_wrap(function(state)
+			state.click(); state.primary = "previous application"
+			state.on_focus_observe = function() helpers.assert_eq(state.wrap.selection_window_open(), false) end
+			state.focus("org.example.next", "Normal editor")
+			helpers.assert_eq(state.wrap.on_key(symbol("(")), false)
+			helpers.assert_eq(state.typed, {})
+			state.click(); state.primary = "new application"
+			helpers.assert_true(state.wrap.on_key(symbol("(")))
+			helpers.assert_eq(state.typed, { "(new application)" })
+		end)
+	end)
+
+	helpers.it("retires the pre-capture window and preserves exact capture release ownership", function()
+		with_daemon_wrap(function(state)
+			state.click(); state.primary = "previous global selection"
+			helpers.assert_true(state.gate.acquire("settings", 2))
+			helpers.assert_eq(state.gate.release("settings", 1), false)
+			helpers.assert_true(state.gate.blocks_text())
+			local reads, automation = state.reads, state.automation
+			local consumed, reason = state.consume(symbol("("))
+			helpers.assert_nil(consumed)
+			helpers.assert_eq(reason, "input capture blocked")
+			helpers.assert_eq(state.reads, reads)
+			helpers.assert_eq(state.automation, automation)
+			helpers.assert_true(state.gate.release("settings", 2))
+			helpers.assert_eq(state.gate.blocks_text(), false)
+			helpers.assert_eq(state.wrap.on_key(symbol("(")), false)
+			helpers.assert_eq(state.typed, {})
+			state.click(); state.primary = "fresh global selection"
+			helpers.assert_true(state.consume(symbol("(")))
+			helpers.assert_eq(state.typed, { "(fresh global selection)" })
+		end)
+	end)
+
+	helpers.it("does not read PRIMARY or open a global window for a pointer inside captured UI", function()
+		with_daemon_wrap(function(state)
+			helpers.assert_true(state.gate.acquire("settings", 1))
+			state.click()
+			helpers.assert_eq(state.reads, 0)
+			helpers.assert_eq(state.wrap.selection_window_open(), false)
+			state.primary = "UI selection"
+			helpers.assert_true(state.gate.release("settings", 1))
+			helpers.assert_eq(state.wrap.on_key(symbol("(")), false)
+			helpers.assert_eq(state.typed, {})
+		end)
+	end)
+
+	helpers.it("allows early pause and capture callbacks before the Wrap owner is published", function()
+		with_daemon_wrap("early")
+	end)
+end)
