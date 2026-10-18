@@ -116,6 +116,12 @@ def private_environment(root):
     return environment
 
 
+# The full policy refuses the owned send as procNotFound (-600), observed on
+# macOS 15 where the sandbox hides the target, or as a documented AppleEvent
+# permission refusal (-1742, -1743). The receiver is proven live around it.
+DENIED_STATUSES = (-600, -1742, -1743)
+
+
 def sandbox_profile(root):
     """Allow reads but contain every descendant write and network connection."""
     escaped = json.dumps(str(root))
@@ -1730,7 +1736,7 @@ def appleevent_sender_fact(value):
         if phase == "consent-status":
             admitted = send not in (0, -1744) and (read, size, match) == (None, None, None)
         elif phase == "denied-status":
-            admitted = send not in (-1742, -1743) and (read, size, match) == (None, None, None)
+            admitted = send not in DENIED_STATUSES and (read, size, match) == (None, None, None)
         elif phase == "reply-read":
             admitted = (
                 send == 0 and read is not None and read != 0 and size is None and match is None
@@ -1936,7 +1942,7 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
             + identity_detail,
         )
     if control == "full-policy-denial":
-        expected = ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
+        expected = tuple(f"native_appleevent_status={status}\n" for status in DENIED_STATUSES)
         message = "Full native policy did not report a documented AppleEvent refusal"
     else:
         expected = ("native_appleevent_status=-1744\n",)
@@ -2164,10 +2170,12 @@ def _admit_appleevent_boundary(children, repository):
         children, receiver, group, "denied", [*sender, "denied"], confined=True
     )
     require(
-        refused.stdout in ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
+        refused.stdout
+        in tuple(f"native_appleevent_status={status}\n" for status in DENIED_STATUSES)
         and not refused.stderr,
         "Full native policy did not report a documented AppleEvent refusal",
     )
+    # A dead receiver would also answer -600; the same live process rules it out.
     same_live_receiver("after-full-policy-denial")
     undelivered("after-full-policy-denial")
     children.settle(receiver)
