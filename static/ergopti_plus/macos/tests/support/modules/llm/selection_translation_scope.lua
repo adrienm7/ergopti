@@ -146,6 +146,10 @@ local OWNED = {
 	"tests.support.modules.llm.selection_translation_destination",
 	"ui.tooltip",
 }
+local OWNED_GLOBALS = {
+	"ERGOPTI_GESTURES_RECEIVED_FIRST_FRAME", "ERGOPTI_TOUCH_DEVICES",
+	"ERGOPTI_TOUCH_WATCHERS", "ERGOPTI_TOUCH_WATCHER_TOKENS", "lfs",
+}
 local M = {}
 
 --- Runs construction, timers and assertions inside the same owned stub scope.
@@ -161,7 +165,19 @@ function M.run(scenario)
 		if type(name) == "string" and (name:match("^modules%.") or name:match("^adapters%.")
 			or name:match("^infra%.") or name:match("^ui%.")) then own(name) end
 	end
-	return helpers.with_stub_scope(names, scenario)
+	-- Fresh native modules must initialize their own maps, not mutate a prior
+	-- world's retained device/watchers or LuaFileSystem's published table.
+	local globals = {}
+	for index, name in ipairs(OWNED_GLOBALS) do
+		globals[index] = rawget(_G, name)
+		rawset(_G, name, nil)
+	end
+	local outcome = table.pack(xpcall(function()
+		return helpers.with_stub_scope(names, scenario)
+	end, debug.traceback))
+	for index, name in ipairs(OWNED_GLOBALS) do rawset(_G, name, globals[index]) end
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 return M
