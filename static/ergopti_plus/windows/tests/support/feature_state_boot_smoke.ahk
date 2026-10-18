@@ -117,6 +117,8 @@ try {
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
 		case "kana_auto_lower", "kana_auto_upper", "kana_auto_mixed":
 			_FeatureStateSmokeKanaAutomatic(A_Args[1])
+		case "logger_dotted", "logger_inline", "logger_quoted":
+			_FeatureStateSmokeLoggerSemantic(A_Args[1])
 		case "outdated_source_key":
 			_FeatureStateSmokeOutdatedSourceKey()
 		case "retired_source_scan":
@@ -553,4 +555,41 @@ _FeatureStateSmokeKanaAutomatic(Fixture) {
 		if !(Actual is String) || StrCompare(Actual, "auto", true) != 0
 			throw Error("An admitted automatic Kana spelling must publish the canonical runtime sentinel.")
 	} finally try FileDelete(TempConfig)
+}
+
+_FeatureStateSmokeLoggerSemantic(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, _LOGGER_FLUSH_TIMER_STARTED
+	Root := A_Temp . "\ergopti_logger_semantic_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The native logger fixture requires a fresh private root.")
+	DirCreate(Root)
+	try {
+		Source := Map(
+			"logger_dotted", 'script.log_level = "ERROR"`n',
+			"logger_inline", 'script = { log_level = "ERROR" }`n',
+			"logger_quoted", '["script"]`nlog_level = "ERROR"`n')[Fixture]
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The private native logger source could not be created.")
+		Cache := ConfigTomlDecodeSnapshot(Source).Cache
+		Value := IniCacheGet(Cache, "script", "log_level")
+		ExpectedType := ""
+		if !TomlConfigValueMatchesManifest("script", "log_level", Value, &ExpectedType, '"ERROR"')
+			throw Error("The real typed config boundary must admit this logger source.")
+		LoggerInit()
+		if StrCompare(LOGGER_MIN_LEVEL, "ERROR", true) != 0
+			throw Error("The actual logger did not apply its admitted semantic threshold.")
+		if !LoggerPrepareShutdown()
+			throw Error("The native logger fixture did not settle its owned disk writes.")
+		if StrCompare(Source, FSReadUtf8Exact(ConfigurationFile), true) != 0
+			throw Error("Logger initialization rewrote the private configuration source.")
+	} finally {
+		if _LOGGER_FLUSH_TIMER_STARTED {
+			SetTimer(_LoggerFlush, 0)
+			OnExit(_LoggerOnExitFlush, 0)
+			_LoggerRepeatDisable()
+		}
+		DirDelete(Root, true)
+	}
 }
