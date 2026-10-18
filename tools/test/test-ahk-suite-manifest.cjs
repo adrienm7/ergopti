@@ -942,7 +942,7 @@ const SNAPSHOT16_RUNNER = 'static/ergopti_plus/windows/tests/run_all.ahk';
 const SNAPSHOT16_OWNER =
 	'static/ergopti_plus/_shared/ahk/tap_hold/buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_TEST =
-	'static/ergopti_plus/windows/tests/unit/test_buffered_data_snapshot_owner.ahk';
+	'static/ergopti_plus/windows/tests/unit/infra/test_buffered_data_snapshot_owner.ahk';
 const SNAPSHOT16_FIXED_IMAGES = {
 	[SNAPSHOT16_OWNER]: 'c2c26f6b4a8d3bd9c86153b17ffcc919a1ad47ec57c45043dfd5cd8ba2589ab1',
 	[SNAPSHOT16_TEST]: 'bada83f6a7d6a17c7f0a39c995ba6b8551c114a9a905474c45ba78ae31bc28c9'

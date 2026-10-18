@@ -27,7 +27,7 @@ High-frequency events (per keystroke, per frame) → `debug` only.
 cosmetic: **a `START` with no matching `SUCCESS` in a log is the primary signal
 of a silent failure**, and the whole convention exists to make that visible.
 
-`tests/meta/test_logger_pairing.ahk` checks this. An unpaired lifecycle call
+`tests/meta/infra/logger/test_logger_pairing.ahk` checks this. An unpaired lifecycle call
 fails the suite.
 
 Practical consequence: if a function can return early between `start` and

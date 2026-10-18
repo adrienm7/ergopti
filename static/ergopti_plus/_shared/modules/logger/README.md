@@ -7,7 +7,7 @@ Cross-driver specification and test vectors for the 8-variant logger contract.
 Three implementations must conform: `windows/lib/logger.ahk` (1 077 l),
 `macos/lib/logger.lua` (1 145 l) and `_shared/lua/logger/init.lua` (281 l, the
 platform-neutral core). Conformance to the **line format** is verified by replaying
-`test_vectors.json` from each driver suite — `windows/tests/unit/test_logger.ahk` and
+`test_vectors.json` from each driver suite — `windows/tests/unit/infra/logger/test_logger.ahk` and
 `macos/tests/unit/lib/test_logger.lua`. There is no `_shared/core/domain/Logger.spec.js`;
 that file has never existed, and no behavioural corpus covers the rest of the spec
 (severity filtering, ring order, forced flush, dedup, date rollover) — adding one is
