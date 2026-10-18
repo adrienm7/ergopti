@@ -867,6 +867,79 @@ Test("synthetic unicode-ledger: clipboard dispatch preserves a supplementary end
 ; ======= Native Notepad completion ownership ====
 ; ================================================
 
+global _HNP_Capture := 0
+
+/** Records the native keyboard capture a Notepad owner holds during its edit. */
+_HNP_CaptureBegin(Token) {
+	global _HNP_Capture
+	_HNP_Capture["Begun"].Push(Token)
+	return 1
+}
+
+_HNP_CaptureRelease(Committed, Token) {
+	global _HNP_Capture
+	_HNP_Capture["Released"].Push({ Token: Token, Committed: Committed })
+	return 1
+}
+
+_HNP_CaptureSnapshot(Token) {
+	return Map("token", Token, "phase", 0, "queued", 0, "replayed", 0,
+		"last_os_error", 0, "release_kind", 0)
+}
+
+/** Installs a recording capture port; the fixture never starts the real hook. */
+_HNP_InstallCapture() {
+	global _HNP_Capture
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerPort, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced
+	Saved := { Capture: _HNP_Capture, Started: _LLM_NavEventOwnerStarted,
+		Port: _LLM_NavEventOwnerPort, Flags: [_LLM_NavEventOwnerQuarantined,
+			_LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending,
+			_LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending,
+			_LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced] }
+	_HNP_Capture := Map("Begun", [], "Released", [])
+	_LLM_NavEventOwnerStarted := true
+	_LLM_NavEventOwnerQuarantined := false, _LLM_NavEventOwnerStarting := false
+	_LLM_NavEventOwnerStartRollbackPending := false, _LLM_NavEventOwnerStopping := false
+	_LLM_NavEventOwnerStopPending := false, _LLM_NavEventOwnerPendingStopRecovery := false
+	_LLM_NavEventOwnerLifecycleQuiesced := false
+	_LLM_NavEventOwnerPort := Map("begin_terminal", _HNP_CaptureBegin,
+		"commit_terminal", _HNP_CaptureRelease.Bind(true),
+		"abort_terminal", _HNP_CaptureRelease.Bind(false),
+		"get_terminal", _HNP_CaptureSnapshot)
+	return Saved
+}
+
+_HNP_RestoreCapture(Saved) {
+	global _HNP_Capture
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerPort, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced
+	_HNP_Capture := Saved.Capture
+	_LLM_NavEventOwnerStarted := Saved.Started
+	_LLM_NavEventOwnerPort := Saved.Port
+	_LLM_NavEventOwnerQuarantined := Saved.Flags[1]
+	_LLM_NavEventOwnerStarting := Saved.Flags[2]
+	_LLM_NavEventOwnerStartRollbackPending := Saved.Flags[3]
+	_LLM_NavEventOwnerStopping := Saved.Flags[4]
+	_LLM_NavEventOwnerStopPending := Saved.Flags[5]
+	_LLM_NavEventOwnerPendingStopRecovery := Saved.Flags[6]
+	_LLM_NavEventOwnerLifecycleQuiesced := Saved.Flags[7]
+}
+
+/** Every capture a Notepad owner admitted is released exactly once, by its own token. */
+_HNP_AssertCaptureBalanced() {
+	global _HNP_Capture
+	AssertEqual(_HNP_Capture["Begun"].Length, _HNP_Capture["Released"].Length,
+		"every admitted Notepad capture must be released once")
+	for Index, Token in _HNP_Capture["Begun"]
+		AssertEqual(Token, _HNP_Capture["Released"][Index].Token,
+			"a Notepad capture must be released by the owner that admitted it")
+}
+
 _HNP_Run(Body) {
 	global _HSE_TerminalOwner, _LLM_Bridge_Buffer, _PrefixPrivateResidue
 	global _LLM_Bridge_Active, _LLM_Bridge_ContentGeneration, _LLM_Bridge_PrefixObserver, _LLM_Live
@@ -888,6 +961,7 @@ _HNP_Run(Body) {
 		Context: _PrefixInputContextGeneration, Cache: _OUTPUT_HOST_CACHE,
 		Identity: _OUTPUT_HOST_IDENTITY_PROBE, Metadata: _OUTPUT_HOST_METADATA_PROBE,
 		Title: _OUTPUT_HOST_TITLE_PROBE, Serial: _OUTPUT_HOST_RESOLVE_SERIAL }
+	SavedCapture := _HNP_InstallCapture()
 	try {
 		_LLM_Bridge_Active := true
 		_LLM_Live := _LLM_Live.Clone()
@@ -895,10 +969,12 @@ _HNP_Run(Body) {
 		_PrefixRenderTimer := 0
 		_PrefixRenderScheduledGeneration := -1
 		_AHK04_RunIsolated(_HNP_InvokeAndSettle.Bind(Body))
+		_HNP_AssertCaptureBalanced()
 	}
 	finally {
 		try TimerCancel(_PrefixRenderTimer)
 		finally {
+			_HNP_RestoreCapture(SavedCapture)
 			_PrefixRenderTimer := Saved.RenderTimer
 			_PrefixRenderScheduledGeneration := Saved.RenderGeneration
 			_PrefixRenderQueuedWallMs := Saved.RenderWall
@@ -1142,6 +1218,123 @@ _HNP_InitiatingPrefixDoesNotRevoke() {
 }
 Test("Notepad pending owner: initiating prefix bookkeeping preserves immutable admission (notepad-pending)",
 	_HNP_InitiatingPrefixDoesNotRevoke)
+
+/** Keys typed during the asynchronous edit are held from dispatch to completion. */
+_HNP_CaptureSpansTheEdit(Ok) {
+	_HNP_Run(_Body)
+	_Body() {
+		global _HNP_Capture, HSE_Buffer
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		AssertTrue(Owner is Map, "native dispatch must return its pending owner")
+		AssertEqual(1, _HNP_Capture["Begun"].Length,
+			"the keystroke that schedules the edit must admit the keyboard capture")
+		AssertEqual(Owner["Id"], _HNP_Capture["Begun"][1], "the capture belongs to this owner")
+		AssertEqual(0, _HNP_Capture["Released"].Length,
+			"a pending edit keeps holding the keys typed after it")
+		_HNP_Settle(State, Ok)
+		AssertEqual(1, _HNP_Capture["Released"].Length, "completion releases the capture once")
+		AssertEqual(Ok, _HNP_Capture["Released"][1].Committed,
+			"the release reports whether the expansion was committed")
+		AssertEqual(Ok ? "xxZ" : "xxab", HSE_Buffer,
+			"the held keys replay after the canonical commit or refusal")
+		State["Requests"][1].Callback.Call(Ok, "duplicate completion")
+		AssertEqual(1, _HNP_Capture["Released"].Length, "a duplicate completion cannot release twice")
+	}
+}
+Test("Notepad pending owner: a committed edit holds later keys until it completes (hsfix-notepad-capture)",
+	_HNP_CaptureSpansTheEdit.Bind(true))
+Test("Notepad pending owner: a refused edit releases the keys it held (hsfix-notepad-capture)",
+	_HNP_CaptureSpansTheEdit.Bind(false))
+
+/** Without capture a key could land inside the edit; the expansion is declined instead. */
+_HNP_RefusedCaptureDeclines() {
+	_HNP_Run(_Body)
+	_Body() {
+		global _HNP_Capture, _LLM_NavEventOwnerPort, HSE_Buffer, _PrefixWatcherSuppressed
+		global _HSE_TerminalOwner, _HSE_FireLogQueue
+		_LLM_NavEventOwnerPort["begin_terminal"] := (Token) => 0
+		Lines := []
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		try {
+			State := Map("Requests", [])
+			AssertEqual(false, _HNP_Dispatch(State), "a refused capture declines the expansion")
+		} finally LoggerClearTestSink()
+		AssertEqual(0, State["Requests"].Length, "no native edit is scheduled without capture")
+		AssertEqual("xxab", HSE_Buffer, "the typed trigger stays in the engine")
+		AssertFalse(_HSE_TerminalOwner is Map, "the declined owner is not left pending")
+		AssertEqual(0, _PrefixWatcherSuppressed, "the declined owner releases suppression")
+		AssertEqual(0, Keylogger.synth_active, "the declined owner releases its synthetic marker")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "a declined expansion is not a fire")
+		AssertEqual(0, _HNP_Capture["Released"].Length, "a capture never admitted is never released")
+		Warned := false
+		for Line in Lines {
+			AssertFalse(InStr(Line, "[ERROR]"), "a refused capture is not an error: " . Line)
+			Warned := Warned || InStr(Line, "[WARNING] [HSE] Notepad expansion declined")
+		}
+		AssertTrue(Warned, "the declined expansion is reported")
+	}
+}
+Test("Notepad pending owner: a refused keyboard capture declines without sending (hsfix-notepad-capture)",
+	_HNP_RefusedCaptureDeclines)
+
+/**
+ * A key whose edge passed the hook just before capture admission is visible and
+ * fed after the trigger; the worker refuses to edit around it. Screen and engine
+ * agree, so the refusal is reported as a warning and the preview follows HSE.
+ */
+_HNP_PreCaptureKeyYields() {
+	_HNP_Run(_Body)
+	_Body() {
+		global HSE_Buffer, _PrefixBuffer, _HSE_FireLogQueue
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		_HSE_RetainNotepadPrefixChar(Owner, "b")
+		_PrefixBuffer := "xxa"
+		; The inputhook's pending branch: HSE was fed, the owner records the suffix.
+		HSE_Buffer .= "y"
+		Owner["TrailingText"] .= "y"
+		Owner["TrailingChars"].Push("y")
+		_PrefixAppendTypedChar("y")
+		AssertFalse(State["Requests"][1].Opts["admission"].Call(),
+			"a visible later key revokes the original edit")
+		Lines := []
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		try _HNP_Settle(State, false)
+		finally LoggerClearTestSink()
+		AssertFalse(Owner["FinalSucceeded"], "the refused edit is not an expansion")
+		AssertEqual("xxaby", HSE_Buffer, "HSE keeps the typed text the document shows")
+		AssertEqual("xxaby", _PrefixBuffer, "the preview follows the typed text again")
+		AssertEqual(0, _HSE_FireLogQueue.Length, "a refused edit is not a fire")
+		Warned := false
+		for Line in Lines {
+			AssertFalse(InStr(Line, "[ERROR]"), "yielding to typed keys is not an error: " . Line)
+			Warned := Warned || InStr(Line, "[WARNING] [HSE] Notepad expansion yielded")
+		}
+		AssertTrue(Warned, "the yielded expansion is reported")
+	}
+}
+Test("Notepad pending owner: a key typed before capture yields without an error (hsfix-notepad-capture)",
+	_HNP_PreCaptureKeyYields)
+
+/** A real failure keeps its ERROR even when the user typed nothing. */
+_HNP_UnexplainedRefusalStaysAnError() {
+	_HNP_Run(_Body)
+	_Body() {
+		State := Map("Requests", [])
+		Owner := _HNP_Dispatch(State)
+		Lines := []
+		LoggerSetTestSink((Line) => Lines.Push(Line))
+		try _HNP_Settle(State, false)
+		finally LoggerClearTestSink()
+		Errored := false
+		for Line in Lines
+			Errored := Errored || InStr(Line, "[ERROR] [HSE] Notepad expansion did not complete")
+		AssertTrue(Errored, "a refusal no typed key explains stays visible as an error")
+	}
+}
+Test("Notepad pending owner: an unexplained refusal stays an error (hsfix-notepad-capture)",
+	_HNP_UnexplainedRefusalStaysAnError)
 
 ; ==================================================
 ; ======= Native raw-callback preparation ==========
