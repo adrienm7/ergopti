@@ -1304,6 +1304,49 @@ class NativeFixtureNameControls(unittest.TestCase):
             children.run.assert_not_called()
 
 
+class InstalledCaskfileControls(unittest.TestCase):
+    """Homebrew 7 receipt layout: .metadata/<version>/<timestamp>/Casks/<token>.{json,rb}."""
+
+    def write(self, caskroom, relative):
+        path = caskroom / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}\n", encoding="utf-8")
+        return path
+
+    def test_json_receipt_of_a_steps_only_cask_is_admitted(self):
+        with TemporaryDirectory() as directory:
+            caskroom = Path(directory) / "ergoptiplus"
+            (caskroom / "71.36.1").mkdir(parents=True)
+            # A cask without uninstall flight blocks gets only a JSON caskfile,
+            # which the former *.rb search refused as an absent receipt.
+            receipt = self.write(
+                caskroom, ".metadata/71.36.1/20261018163000.123/Casks/ergoptiplus.json"
+            )
+            self.assertEqual(list(caskroom.rglob("*.rb")), [])
+            self.assertEqual(probe.installed_caskfiles(caskroom, "71.36.1"), [receipt])
+            legacy = self.write(
+                caskroom, ".metadata/71.36.1/20261018163000.123/Casks/ergoptiplus.rb"
+            )
+            self.assertEqual(probe.installed_caskfiles(caskroom, "71.36.1"), [receipt, legacy])
+
+    def test_other_versions_tokens_or_locations_are_no_receipt(self):
+        with TemporaryDirectory() as directory:
+            caskroom = Path(directory) / "ergoptiplus"
+            for relative in (
+                ".metadata/71.36.0/20261018163000.123/Casks/ergoptiplus.json",
+                ".metadata/71.36.1/20261018163000.123/Casks/ergoptiplus@dev.json",
+                ".metadata/71.36.1/Casks/ergoptiplus.json",
+                ".metadata/71.36.1/20261018163000.123/ergoptiplus.json",
+                "71.36.1/ergoptiplus.rb",
+                ".metadata/71.36.1/20261018163000.123/Casks/ergoptiplus.txt",
+            ):
+                self.write(caskroom, relative)
+            (caskroom / ".metadata/71.36.1/20261018163000.456/Casks/ergoptiplus.json").mkdir(
+                parents=True
+            )
+            self.assertEqual(probe.installed_caskfiles(caskroom, "71.36.1"), [])
+
+
 class ConsentFreeBoundaryControls(unittest.TestCase):
     """The AppleEvent proof needs no consent request, prompt approval or opt-in."""
 

@@ -2488,11 +2488,27 @@ def verify_installed(children, version, source):
     children.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True)
     caskroom = children.root / "prefix/Caskroom/ergoptiplus"
     require((caskroom / version).is_dir(), "Actual Brew Caskroom lacks expected version")
-    require(
-        any(path.is_file() for path in caskroom.rglob("*.rb")),
-        "Actual Brew Caskroom receipt is absent",
-    )
+    require(installed_caskfiles(caskroom, version), "Actual Brew Caskroom receipt is absent")
     return {"version": version, "bundle": tree_receipt(app), "caskroom": tree_receipt(caskroom)}
+
+
+def installed_caskfiles(caskroom, version):
+    """Find the installed caskfile Homebrew records for exactly this version.
+
+    Homebrew 7 (Cask::Installer#save_caskfile) writes
+    .metadata/<version>/<timestamp>/Casks/<token>.json, or <token>.rb only for
+    casks with uninstall flight blocks, and Caskroom.cask_installed_caskfile
+    reads either. A file of another version or location is no receipt.
+    """
+    found = []
+    for timestamped in sorted((caskroom / ".metadata" / version).glob("*")):
+        if timestamped.is_symlink() or not timestamped.is_dir():
+            continue
+        for extension in ("json", "rb"):
+            caskfile = timestamped / "Casks" / (caskroom.name + "." + extension)
+            if caskfile.is_file() and not caskfile.is_symlink():
+                found.append(caskfile)
+    return found
 
 
 def host_receipt(source, host, prefix):
