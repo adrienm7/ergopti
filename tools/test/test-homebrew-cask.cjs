@@ -322,7 +322,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
 	// The consent-free AppleEvent boundary retired every consent request and UI control.
-	assert.match(result.stderr, /Ran 116 tests in /);
+	assert.match(result.stderr, /Ran 117 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -1552,9 +1552,15 @@ check('AppleEvent boundary proves the deny rule without consent or delivery', ()
 			boundary,
 			/result\.stdout == "native_appleevent_status=-1744\\n" and not result\.stderr/
 		);
+		assert.match(candidate.helper, /\nDENIED_STATUSES = \(-600, -1742, -1743\)\n/);
 		assert.match(
 			boundary,
-			/refused\.stdout in \("native_appleevent_status=-1742\\n", "native_appleevent_status=-1743\\n"\)/
+			/refused\.stdout\s+in tuple\(f"native_appleevent_status=\{status\}\\n" for status in DENIED_STATUSES\)/
+		);
+		// A live receiver after the denial is what attributes -600 to the deny rule.
+		assert.ok(
+			boundary.indexOf('same_live_receiver("after-full-policy-denial")') >
+				boundary.indexOf('refused = _run_appleevent_sender(')
 		);
 		for (const checkpoint of [
 			'after-unconfined-consent',
@@ -1573,6 +1579,10 @@ check('AppleEvent boundary proves the deny rule without consent or delivery', ()
 		assert.match(
 			executable,
 			/\} else if \(status == errAEEventWouldRequireUserConsent\) \{\s*result = 0;\s*\} else if \(status == noErr\) \{/
+		);
+		assert.match(
+			executable,
+			/status == errAETargetAddressNotPermitted \|\| status == errAEEventNotPermitted \|\|\s*status == procNotFound\) result = 0;/
 		);
 		assert.equal((executable.match(/result = 0;/g) || []).length, 2);
 		assert.equal((executable.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
@@ -1594,6 +1604,13 @@ check('AppleEvent boundary proves the deny rule without consent or delivery', ()
 			'result.stdout == "native_appleevent_status=0\\n"'
 		],
 		['helper', 'undelivered("after-full-policy-denial")', 'pass'],
+		[
+			'helper',
+			'DENIED_STATUSES = (-600, -1742, -1743)',
+			'DENIED_STATUSES = (-600, -609, -1742, -1743)'
+		],
+		['helper', '    same_live_receiver("after-full-policy-denial")', '    pass'],
+		['sender', ' ||\n            status == procNotFound) result = 0;', ') result = 0;'],
 		['helper', '        "delivered_events": 0,', '        "delivered_events": None,'],
 		['sender', 'status == errAEEventWouldRequireUserConsent', 'status == noErr'],
 		[

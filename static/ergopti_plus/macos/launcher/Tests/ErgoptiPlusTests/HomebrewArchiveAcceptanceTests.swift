@@ -151,7 +151,7 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		XCTAssertEqual(boundary["unconfined_status"] as? Int, -1744)
 		XCTAssertEqual(boundary["deny_removal_status"] as? Int, -1744)
 		let denied = try XCTUnwrap(boundary["denied_status"] as? Int)
-		XCTAssertTrue([-1742, -1743].contains(denied), "Full policy must return the sandbox refusal")
+		XCTAssertTrue([-600, -1742, -1743].contains(denied), "Full policy must return the sandbox refusal")
 		XCTAssertEqual(boundary["delivered_events"] as? Int, 0)
 		XCTAssertEqual(boundary["receiver_retired"] as? Bool, true)
 		let cases = try XCTUnwrap(receipt["cases"] as? [String: Bool])

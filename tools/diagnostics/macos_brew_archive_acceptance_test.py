@@ -948,7 +948,8 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.assertFalse((Path(directory) / "appleevent-delivered.1").exists())
 
     def test_two_consent_gated_routes_precede_each_documented_refusal(self):
-        for status in (-1742, -1743):
+        # -600 is the hosted macOS 15 full-policy outcome: the sandbox hides the target.
+        for status in (-600, -1742, -1743):
             with self.subTest(status=status), TemporaryDirectory() as directory:
                 children, receipt = self.invoke(directory, outcome=status)
                 self.assertEqual(
@@ -1015,12 +1016,42 @@ class AppleEventBoundaryControls(unittest.TestCase):
             self.assertFalse((Path(directory) / "appleevent-delivered.1").exists())
 
     def test_arbitrary_nonzero_native_status_cannot_satisfy_policy_refusal(self):
-        for status in (-1744, -600, -609, -1712, 0):
+        for status in (-1744, -601, -609, -1708, -1712, 0):
             with self.subTest(status=status), TemporaryDirectory() as directory:
                 with self.assertRaisesRegex(
                     probe.AppleEventBoundaryError, "documented AppleEvent refusal"
                 ):
                     self.invoke(directory, outcome=status)
+
+    def test_hidden_target_refusal_requires_the_same_live_receiver_afterwards(self):
+        # A dead receiver also answers procNotFound; only a live one attributes
+        # -600 to the deny rule.
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "sandbox.sb").write_text(self.policy)
+            children = self.model(root, outcome=-600)
+            acquire = children.start
+
+            def start(arguments):
+                child = acquire(arguments)
+                children.groups[child].observe_exit.side_effect = [None] * 4 + [
+                    Mock(si_pid=73136, si_code=21, si_status=68)
+                ]
+                return child
+
+            children.start = start
+            with (
+                patch.object(probe.uuid, "uuid4", return_value=self.nonce),
+                patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
+                patch.multiple(probe.os, CLD_EXITED=21, CLD_KILLED=22, CLD_DUMPED=23, create=True),
+            ):
+                with self.assertRaisesRegex(
+                    probe.AppleEventBoundaryError,
+                    "no longer live: checkpoint=after-full-policy-denial,",
+                ):
+                    probe.admit_appleevent_boundary(children, root)
+            self.assertEqual(len(children.sender_calls), 3)
+            self.assertEqual(list(root.glob("appleevent-delivered*")), [])
 
     def test_missing_consent_or_deny_removal_prerequisite_cannot_count_as_denial(self):
         for phase in (1, 2):
@@ -1412,6 +1443,14 @@ class SenderFactControls(unittest.TestCase):
                 error_size="unobserved",
                 error="unobserved",
             ),
+            self.line(
+                phase="denied-status",
+                send=-600,
+                read="unobserved",
+                error_read="unobserved",
+                error_size="unobserved",
+                error="unobserved",
+            ),
             self.line(error_read=-1701),
             None,
             b"unowned bytes",
@@ -1460,6 +1499,20 @@ class SenderFactControls(unittest.TestCase):
                 accepted = probe.run_appleevent_sender(children, [], control, confined=True)
                 self.assertEqual(accepted.stdout, expected)
                 children.run.assert_called_with([], check=False, confined=True)
+                if control == "full-policy-denial":
+                    for status in (-600, -1742):
+                        refusal = "native_appleevent_status=" + str(status) + "\n"
+                        children.run.return_value = subprocess.CompletedProcess([], 0, refusal, "")
+                        self.assertEqual(
+                            probe.run_appleevent_sender(children, [], control).stdout, refusal
+                        )
+                else:
+                    # A hidden target never proves the consent step.
+                    children.run.return_value = subprocess.CompletedProcess(
+                        [], 0, "native_appleevent_status=-600\n", ""
+                    )
+                    with self.assertRaises(probe.AdmissionError):
+                        probe.run_appleevent_sender(children, [], control)
                 # A consented delivery (0) never satisfies any control.
                 for stdout, stderr in (
                     ("", ""),
@@ -3118,9 +3171,9 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
             + json.dumps(packet, separators=(",", ":"))
             + "\n"
         )
-        phase = "Owned AppleEvent outcome admission failed: phase=denied-status, send=-600, read=unobserved, length=unobserved, match=unobserved, error_read=unobserved, error_length=unobserved, error_value=unobserved\n"
+        phase = "Owned AppleEvent outcome admission failed: phase=denied-status, send=-609, read=unobserved, length=unobserved, match=unobserved, error_read=unobserved, error_length=unobserved, error_value=unobserved\n"
         self.assertEqual(probe._appleevent_sender_diagnostic(root), packet)
-        self.assertEqual(probe.appleevent_sender_marker_fact(phase)["send_osstatus"], -600)
+        self.assertEqual(probe.appleevent_sender_marker_fact(phase)["send_osstatus"], -609)
         with self.assertRaises(probe.AdmissionError):
             probe._appleevent_sender_diagnostic(root + phase)
         self.assertEqual(probe.appleevent_sender_marker_fact(root + phase), {})
@@ -3495,7 +3548,7 @@ class PhysicalFixtureRootControls(unittest.TestCase):
                 self.assertEqual(alias.resolve(strict=True), physical)
                 with patch.object(tempfile, "tempdir", str(alias)):
                     suite = unittest.TestLoader().loadTestsFromTestCase(AppleEventBoundaryControls)
-                    self.assertEqual(suite.countTestCases(), 8)
+                    self.assertEqual(suite.countTestCases(), 9)
                     for name in (
                         "test_observed_symlink_cannot_admit_a_host_cache_or_tap",
                         "test_missing_declared_format_fails_before_cask_install",
@@ -3508,7 +3561,7 @@ class PhysicalFixtureRootControls(unittest.TestCase):
                     )
                     result = unittest.TestResult()
                     suite.run(result)
-                self.assertEqual(result.testsRun, 11)
+                self.assertEqual(result.testsRun, 12)
                 self.assertEqual(result.skipped, [])
                 self.assertEqual(result.failures, [])
                 self.assertEqual(result.errors, [])

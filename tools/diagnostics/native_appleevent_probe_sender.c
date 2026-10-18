@@ -307,7 +307,11 @@ int main(int argc, char **argv) {
         }
     }
     if (strcmp(argv[3], "denied") == 0) {
-        if (status == errAETargetAddressNotPermitted || status == errAEEventNotPermitted) result = 0;
+        // The full sandbox policy can hide the target entirely (procNotFound);
+        // the parent proves the same receiver stayed live, so -600 is the
+        // deny rule's refusal and never a dead target.
+        if (status == errAETargetAddressNotPermitted || status == errAEEventNotPermitted ||
+            status == procNotFound) result = 0;
     } else if (status == errAEEventWouldRequireUserConsent) {
         result = 0;
     } else if (status == noErr) {
