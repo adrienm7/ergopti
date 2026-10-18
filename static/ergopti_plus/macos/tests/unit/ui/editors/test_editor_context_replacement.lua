@@ -11,7 +11,8 @@
 local helpers = require("tests.helpers")
 
 local function with_editor(module_name, callback)
-	local previous_hs = rawget(_G, "hs")
+	local previous_hs, previous_lfs = rawget(_G, "hs"), rawget(_G, "lfs")
+	rawset(_G, "lfs", nil)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			module_name,
@@ -21,6 +22,13 @@ local function with_editor(module_name, callback)
 			"infra.i18n",
 			"hs",
 			"tests.stubs.hs",
+			"adapters.webview_result", "infra.fs_dir", "infra.text_utils", "platform.remap.lease_helper",
+			"program_providers", "adapters.task_environment", "compat.utf8", "diagnostics.runtime_log",
+			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
+			"infra.deferred_work", "infra.launcher_environment", "adapters.timer_scheduler", "app_dirs",
+			"lfs", "program_provider_picker", "diagnostics.operation_reporter", "infra.config_paths",
+			"infra.log_folders", "program_parameter", "text_utils", "adapters.program_providers",
+			"adapters.file_system", "json",
 		}, function()
 			local state = {
 				bridges = {},
@@ -99,6 +107,7 @@ local function with_editor(module_name, callback)
 		end)
 	end, debug.traceback)
 	_G.hs = previous_hs
+	rawset(_G, "lfs", previous_lfs)
 	if not ok then error(err, 0) end
 end
 
@@ -461,6 +470,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 			} })
 			helpers.assert_eq(state.deletes, 0,
 				"a stale cancel must not close the re-entrant context")
+			local queued_close = bridge.callback
 			bridge.callback({ body = {
 				action = "cancel",
 				edit_id = context_c.edit_id,
@@ -476,7 +486,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 			view_d.options.on_navigation("didFinishNavigation")
 			local context_d = latest_init_payload(state, hs_stub)
 			view.options.on_close()
-			bridge.callback({ body = {
+			queued_close({ body = {
 				action = "cancel",
 				edit_id = context_c.edit_id,
 				epoch = context_c.epoch,
