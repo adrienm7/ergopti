@@ -47,6 +47,8 @@ local _webview     = nil
 local _webview_committed = false
 local _focus_owner = nil
 local _usercontent = nil
+local _closing_webview = false
+local _opening_webview = false
 
 
 
@@ -252,32 +254,30 @@ end
 --- Closes and cleans up the paths editor webview.
 --- @return boolean committed
 local function close_webview()
-	_focus_owner = nil
-	if not _webview then
-		_webview_committed = false
-		_usercontent = nil
-		return true
-	end
+	if _closing_webview then return false end
+	_closing_webview = true
+	_focus_owner, _webview_committed = nil, false
 	local owned = _webview
-	local owned_usercontent = _usercontent
-	if type(owned.delete) ~= "function" then
-		Logger.error(LOG, "Paths editor close refused; owned WebView has no delete method.")
-		return false
+	if owned then
+		local ok, result = pcall(function() return owned:delete() end)
+		if not ok or result == false then
+			pcall(Logger.error, LOG, "Paths editor close did not commit; exact WebView retained: %s.", tostring(result))
+			_closing_webview = false
+			return false
+		end
+		if _webview == owned then _webview = nil end
 	end
-	_webview_committed = false
-	local ok, err = xpcall(function() owned:delete() end, debug.traceback)
-	if not ok then
-		-- Native deletion may synchronously deliver on_close before raising. Restore
-		-- both exact owners so cancel and open requests remain retryable.
-		_webview = owned
-		_usercontent = owned_usercontent
-		Logger.error(LOG, "Paths editor close did not commit; exact WebView retained: %s.",
-			tostring(err))
-		return false
+	local bridge = _usercontent
+	if bridge then
+		local ok, result = pcall(function() return bridge:setCallback(nil) end)
+		if not ok or result ~= bridge then
+			pcall(Logger.error, LOG, "Paths editor callback cleanup remains pending: %s.", tostring(result))
+			_closing_webview = false
+			return false
+		end
+		if _usercontent == bridge then _usercontent = nil end
 	end
-	if _webview == owned then _webview = nil end
-	_webview_committed = false
-	if _usercontent == owned_usercontent then _usercontent = nil end
+	_closing_webview = false
 	return true
 end
 
@@ -489,6 +489,8 @@ end
 --- Builds or focuses the paths editor after public lifecycle validation.
 --- @return boolean opened
 local function open_editor_impl()
+	if _closing_webview then return false, true end
+	if _webview == nil and _usercontent ~= nil and close_webview() ~= true then return false, true end
 	if _webview then
 		if _webview_committed ~= true then
 			if close_webview() ~= true then return false, true end
@@ -509,6 +511,8 @@ local function open_editor_impl()
 		return false
 	end
 
+	-- Retain the bound controller even if native creation never publishes a window.
+	_usercontent = uc
 	uc:setCallback(function(message)
 		if _webview_committed ~= true or _usercontent ~= uc then return end
 		if message and type(message.body) == "table" then
@@ -551,10 +555,10 @@ local function open_editor_impl()
 		assets_dir    = ASSETS_DIR,
 		on_close      = function()
 			closed = true
-			if _webview ~= candidate then return end
-			_webview     = nil
+			if _closing_webview or _webview ~= candidate then return end
+			_webview = nil
 			_webview_committed = false
-			if _usercontent == uc then _usercontent = nil end
+			close_webview()
 		end,
 		on_navigation = function(action)
 			if action == "didFinishNavigation" then
@@ -566,7 +570,7 @@ local function open_editor_impl()
 			return true
 		end,
 		on_webview_created = function(owned)
-			if _webview ~= nil or _usercontent ~= nil then return false end
+			if _webview ~= nil or _usercontent ~= uc then return false end
 			candidate = owned
 			_webview = owned
 			_webview_committed = false
@@ -578,7 +582,6 @@ local function open_editor_impl()
 		end,
 	})
 	if webview == nil or webview ~= candidate or closed then
-		if candidate == nil and _usercontent == uc then _usercontent = nil end
 		Logger.error(LOG, "Paths editor webview could not be created.")
 		return false
 	end
@@ -589,13 +592,17 @@ end
 --- Opens the paths editor as a webview form.
 --- @return boolean opened
 function M.open_editor()
+	if _opening_webview or _closing_webview then return false end
 	if not require_state("open_editor") then return false end
+	_opening_webview = true
 	local ok, opened_or_err, cleanup_attempted = xpcall(open_editor_impl, debug.traceback)
-	if ok and opened_or_err == true then return true end
-	if cleanup_attempted ~= true then close_webview() end
-	if not ok then
-		Logger.error(LOG, "Paths editor open failed: %s.", tostring(opened_or_err))
+	if ok and opened_or_err == true then
+		_opening_webview = false
+		return true
 	end
+	if cleanup_attempted ~= true then close_webview() end
+	if not ok then pcall(Logger.error, LOG, "Paths editor open failed: %s.", tostring(opened_or_err)) end
+	_opening_webview = false
 	return false
 end
 

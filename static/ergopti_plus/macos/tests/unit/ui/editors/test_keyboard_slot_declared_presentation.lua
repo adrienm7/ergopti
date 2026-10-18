@@ -33,7 +33,7 @@ local function fixture(callback, cleanup_failures)
 					usercontent = { new = function()
 						state.bridges = state.bridges + 1
 						local content = {}
-						function content:setCallback(fn) self.callback = fn end
+						function content:setCallback(fn) self.callback = fn; return self end
 						state.contents[#state.contents + 1] = content
 						return content
 					end },

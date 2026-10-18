@@ -37,7 +37,7 @@ local function with_editor(module_name, callback)
 				local bridge = { name = name, callback = nil }
 				function bridge:setCallback(fn)
 					self.callback = fn
-					return true
+					return self
 				end
 				state.bridges[#state.bridges + 1] = bridge
 				return bridge
@@ -120,7 +120,8 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				confirmed_a[#confirmed_a + 1] = id
 			end)
 			local bridge_a = state.bridges[1]
-			helpers.assert_type(bridge_a.callback, "function")
+			local queued_callback = bridge_a.callback
+			helpers.assert_type(queued_callback, "function")
 
 			picker.open({ title = "Target B", items = {} }, function(id)
 				confirmed_b[#confirmed_b + 1] = id
@@ -134,7 +135,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				"the superseded picker must be torn down before B is published")
 			state.views[1].options.on_close()
 
-			bridge_a.callback({ body = { action = "confirm", id = "stale-a" } })
+			queued_callback({ body = { action = "confirm", id = "stale-a" } })
 			helpers.assert_eq(#confirmed_a, 0,
 				"a queued message from the superseded bridge must not invoke callback A")
 			helpers.assert_eq(#confirmed_b, 0)
