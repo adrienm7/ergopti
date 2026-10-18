@@ -82,6 +82,57 @@ helpers.describe("input_access: telling the user", function()
 
 end)
 
+helpers.describe("input_access: a tray launch stays visible", function()
+
+	--- A tray adapter double that records what the user would see.
+	local function fake_tray(backend)
+		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false }
+		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
+		function tray.getBackend() return backend end
+		function tray.setMenu(items) tray.menu = items end
+		function tray.pump() tray.pumps = tray.pumps + 1 end
+		function tray.destroy() tray.destroyed = true end
+		return tray
+	end
+
+	helpers.it("keeps the icon, names the failure and exits only on Quit", function()
+		-- The AppImage catalogue launches the app without the input group and
+		-- fails it when no window or tray icon appears; exiting after the
+		-- notification left nothing on screen.
+		local Access = helpers.load_module("infra.input_access")
+		local tray = fake_tray("appindicator")
+		local naps = 0
+		local status = Access.report({
+			i18n = { init = function() end, get = function(key)
+				return key == "menu.global.quit" and "🚪 Leave" or "<" .. key .. ">"
+			end },
+			tray = tray,
+			print = function() end,
+			sleep_ms = function()
+				naps = naps + 1
+				if naps == 3 then tray.menu[2].fn() end
+			end,
+		}, "denied")
+		helpers.assert_eq(status, 78)
+		helpers.assert_eq(#tray.calls, 1, "the icon is shown")
+		helpers.assert_eq(tray.menu[1].title, "<startup.linux_input_access_label>")
+		helpers.assert_eq(tray.menu[1].disabled, true)
+		helpers.assert_eq(tray.menu[2].title, "Leave", "the Quit row drops the menu emoji")
+		helpers.assert_eq(tray.pumps, 3, "the menu is served until Quit is clicked")
+		helpers.assert_true(tray.destroyed, "the icon is removed before the exit")
+	end)
+
+	helpers.it("returns at once when no tray backend can show an icon", function()
+		local Access = helpers.load_module("infra.input_access")
+		local tray = fake_tray(nil)
+		local status = Access.report({ tray = tray, print = function() end,
+			sleep_ms = function() error("must not wait without an icon") end }, "denied")
+		helpers.assert_eq(status, 78)
+		helpers.assert_eq(tray.menu, nil)
+	end)
+
+end)
+
 helpers.describe("input_access: only a denied node means re-login", function()
 
 	helpers.it("recognises EACCES and nothing else", function()
@@ -108,12 +159,14 @@ helpers.describe("input_access: the service does not loop on it", function()
 			"systemd would restart the daemon every 3 s and repeat the notification")
 	end)
 
-	helpers.it("is what the daemon exits with at both access checks", function()
+	helpers.it("is what the daemon reports at every access check", function()
 		local src = read("ergopti_hotstrings.lua")
 		local _, sites = src:gsub('input_access"%)%.report%(', "")
 		local _, named = src:gsub("InputAccess%.report%(", "")
-		helpers.assert_eq(sites + named, 2,
-			"the unreadable keyboard and the unwritable /dev/uinput must both report and exit through input_access")
+		helpers.assert_eq(sites + named, 3,
+			"the absent keyboard, the unreadable keyboard and the unwritable /dev/uinput must all report through input_access")
+		local _, held = src:gsub("tray = opts%.tray and tray_menu or nil", "")
+		helpers.assert_eq(held, 2, "both access exits must keep the tray icon up when --tray is set")
 		helpers.assert_true(src:find("InputAccess.is_denied(device)", 1, true) ~= nil,
 			"the keyboard check must distinguish a denied node from an absent one")
 	end)
