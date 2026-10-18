@@ -436,10 +436,13 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 			},
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
 		})
-		local signal = { SIGINT = 2, SIGTERM = 15, SIGHUP = 1,
-			signal = function(number, callback) state.handlers[number] = callback; return true end }
-		local env = setmetatable({ shutdown = coordinator, require = function(name)
-			helpers.assert_eq(name, "posix.signal"); return signal
+		local env = setmetatable({ shutdown = coordinator, privacy_owners = {}, require = function(name)
+			helpers.assert_eq(name, "infra.signal_handlers")
+			return { stop = function() return true end, start = function(opts)
+				state.handlers[2] = function() opts.on_term(2) end
+				state.handlers[15] = function() opts.on_term(15) end
+				return true
+			end }
 		end, Logger = { info = function() end, debug = function() end, error = function() end },
 			injector = { close_fast_channel = function() state.closes = state.closes + 1; return true end },
 			tooltip_preview = false, llm_overlay = false, perform_reload = function() end,
@@ -591,5 +594,311 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 			helpers.assert_eq(calls.close, 0)
 			helpers.assert_eq(writer.has_output_debt(), false)
 		end)
+	end)
+end)
+
+helpers.describe("shutdown coordinator: final native phase", function()
+	local function fixture()
+		local state = { external = false, final = false, stops = 0, loops = 0, observer = nil }
+		local final = { name = "signal handlers", stop = function()
+			state.stops = state.stops + 1; return state.final
+		end, when_settled = function(callback) state.observer = callback end }
+		local coordinator = ShutdownCoordinator.new({
+			pre_wait = { { name = "external", wait_for_ack = true, stop = function()
+				if state.on_external then state.on_external() end
+				return state.external
+			end } },
+			final_wait = { final },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() state.loops = state.loops + 1 end },
+		})
+		return state, final, coordinator
+	end
+
+	helpers.it("(signal-final-phase) retains signal handlers while external cleanup is pending", function()
+		local state, _, coordinator = fixture()
+		coordinator.request("TERM"); coordinator.poll(); coordinator.request("TERM again")
+		helpers.assert_eq(state.stops, 0)
+		state.external = true
+		helpers.assert_eq(coordinator.poll(), false, "final native retirement has its own physical ACK")
+		helpers.assert_eq(state.stops, 1)
+		helpers.assert_eq(state.loops, 0)
+		helpers.assert_true(coordinator.is_pending())
+		state.final = true
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(state.loops, 1)
+	end)
+
+	helpers.it("(signal-final-phase) pins final cleanup before an earlier owner replaces it", function()
+		local state, final, coordinator = fixture()
+		state.on_external = function()
+			final.stop = function() return true end
+			final.when_settled = function(callback) callback() end
+		end
+		coordinator.request("TERM")
+		state.external = true
+		helpers.assert_eq(coordinator.poll(), false)
+		helpers.assert_true(type(state.observer) == "function")
+		state.observer()
+		helpers.assert_true(coordinator.is_pending(), "observer notification cannot replace a physical ACK")
+		state.final = true
+		state.observer(); state.observer()
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.loops, 1)
+	end)
+
+	helpers.it("(signal-final-phase) final callbacks cannot recursively skip the retirement phase", function()
+		local coordinator, calls, loops, reentered = nil, 0, 0, nil
+		coordinator = ShutdownCoordinator.new({ pre_wait = {},
+			final_wait = { { name = "signals", stop = function()
+				calls = calls + 1; reentered = coordinator.poll(); return calls > 1
+			end } },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() loops = loops + 1 end },
+		})
+		coordinator.request("TERM")
+		helpers.assert_eq(reentered, false)
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(loops, 0)
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(loops, 1)
+	end)
+end)
+
+
+helpers.describe("shutdown coordinator: final phase refusals", function()
+	helpers.it("(signal-final-phase) a final cleanup exception remains retryable native debt", function()
+		local retired, loops = false, 0
+		local coordinator = ShutdownCoordinator.new({ pre_wait = {}, final_wait = { { name = "signals", stop = function()
+			if not retired then error("unknown native signal retirement") end
+			return true
+		end } }, keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() loops = loops + 1 end } })
+		helpers.assert_true(coordinator.request("TERM")); helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(coordinator.poll(), false); helpers.assert_eq(loops, 0)
+		retired = true; helpers.assert_true(coordinator.poll()); helpers.assert_eq(loops, 1)
+	end)
+
+	for _, registry in ipairs({ false, "signals", { { name = "signals" } } }) do
+		helpers.it("(signal-final-phase) rejects invalid final registry " .. type(registry), function()
+			local accepted = pcall(ShutdownCoordinator.new, { pre_wait = {}, final_wait = registry,
+				keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+				event_loop = { stop = function() end } })
+			helpers.assert_eq(accepted, false)
+		end)
+	end
+end)
+
+helpers.describe("native signal owner", function()
+	local function fixture(options)
+		options = options or {}
+		local state = { handles = {}, loads = 0, starts = 0, stops = 0, closes = 0, callbacks = {}, delivered = {} }
+		local uv = {}
+		function uv.new_signal()
+			local index = #state.handles + 1
+			if options.allocation == index then
+				if options.receipt == "throw" then error("simulated constructor throw") end
+				if options.receipt == "false" then return false end
+				return nil
+			end
+			local handle = { closing = false }
+			state.handles[index] = handle
+			return handle
+		end
+		function uv.signal_start(handle, name, callback)
+			state.starts = state.starts + 1; handle.callback = callback; handle.signal = name
+			if options.start == state.starts then
+				if options.receipt == "throw" then error("simulated start throw after receiving exact handle") end
+				if options.receipt == "false" then return false end
+				return nil
+			end
+			return 0
+		end
+		function uv.signal_stop(handle)
+			helpers.assert_eq(handle.closing, false, "signal_stop on closing native watchers asserts in libuv")
+			state.stops = state.stops + 1
+			if options.stop_failure then
+				if options.receipt == "throw" then error("simulated signal_stop throw") end
+				if options.receipt == "false" then return false end
+				return nil
+			end
+			return 0
+		end
+		function uv.is_closing(handle)
+			if options.probe_failure then error("simulated ownership probe throw") end
+			return handle.closing
+		end
+		function uv.close(handle, callback)
+			state.closes = state.closes + 1
+			if options.close_before then options.close_before = false; error("simulated close refusal") end
+			handle.closing = true; state.callbacks[#state.callbacks + 1] = callback
+			if options.close_after then options.close_after = false; error("simulated close throw after native acceptance") end
+		end
+		local env = setmetatable({ require = function(name)
+			state.loads = state.loads + 1; helpers.assert_eq(name, "luv")
+			if options.missing then error("explicit missing native dependency") end
+			return uv
+		end }, { __index = _G })
+		local path = helpers.driver_root() .. "/infra/signal_handlers.lua"
+		local chunk = assert(loadfile(path))
+		if setfenv then setfenv(chunk, env) else chunk = assert(loadfile(path, "t", env)) end
+		local owner = chunk()
+		local function start()
+			return owner.start({ on_term = function(number) state.delivered[#state.delivered + 1] = number end,
+				on_hup = function(number) state.delivered[#state.delivered + 1] = number end })
+		end
+		local function acknowledge()
+			local callbacks = state.callbacks; state.callbacks = {}
+			for _, callback in ipairs(callbacks) do callback(); callback() end
+		end
+		return owner, state, uv, start, acknowledge
+	end
+
+	helpers.it("(signal-native-owner) loads without native libraries and refuses missing luv before acquisition", function()
+		local owner, state, _, start = fixture({ missing = true })
+		helpers.assert_eq(state.loads, 0)
+		helpers.assert_true(owner.is_settled())
+		local admitted, why = start()
+		helpers.assert_eq(admitted, false); helpers.assert_contains(why, "luv")
+		helpers.assert_eq(#state.handles, 0); helpers.assert_true(owner.stop())
+	end)
+
+	helpers.it("(signal-native-owner) admits zero native receipts and retires once only on exact close callbacks", function()
+		local owner, state, uv, start, acknowledge = fixture()
+		helpers.assert_true(start()); helpers.assert_eq(#state.handles, 3)
+		for _, handle in ipairs(state.handles) do handle.callback() end
+		helpers.assert_eq(state.delivered, { 2, 15, 1 })
+		for _, name in ipairs({ "signal_stop", "close", "is_closing" }) do uv[name] = function() error("foreign export replacement") end end
+		helpers.assert_eq(start(), false, "duplicate start cannot replace the admitted generation")
+		helpers.assert_eq(owner.stop(), false); helpers.assert_eq(owner.stop(), false)
+		helpers.assert_eq(state.stops, 3); helpers.assert_eq(state.closes, 3)
+		for _, handle in ipairs(state.handles) do handle.callback() end
+		helpers.assert_eq(state.delivered, { 2, 15, 1 }, "late callbacks cannot dispatch after retirement begins")
+		acknowledge(); helpers.assert_true(owner.is_settled()); helpers.assert_true(owner.stop())
+	end)
+
+	for _, receipt in ipairs({ "nil", "false", "throw" }) do
+		for index = 1, 3 do
+			helpers.it("(signal-native-owner) constructor " .. index .. " " .. receipt .. " retains partial ownership", function()
+				local owner, state, _, start, acknowledge = fixture({ allocation = index, receipt = receipt })
+				local admitted, why = start()
+				helpers.assert_eq(admitted, false); helpers.assert_contains(why, "allocation")
+				helpers.assert_eq(#state.handles, index - 1)
+				if index > 1 then helpers.assert_eq(owner.is_settled(), false) end
+				acknowledge()
+				helpers.assert_eq(owner.is_settled(), receipt ~= "throw", "an unobservable thrown acquisition cannot prove retirement")
+				if receipt == "throw" then helpers.assert_eq(start(), false) end
+			end)
+			helpers.it("(signal-native-owner) start " .. index .. " " .. receipt .. " waits for every known handle", function()
+				local owner, state, _, start, acknowledge = fixture({ start = index, receipt = receipt })
+				local admitted, why = start()
+				helpers.assert_eq(admitted, false); helpers.assert_contains(why, "activation")
+				helpers.assert_eq(#state.handles, index); helpers.assert_eq(owner.is_settled(), false)
+				for _, handle in ipairs(state.handles) do handle.callback() end
+				helpers.assert_eq(#state.delivered, 0)
+				acknowledge(); helpers.assert_true(owner.is_settled())
+			end)
+		end
+		helpers.it("(signal-native-owner) signal_stop " .. receipt .. " cannot acknowledge a missing close callback", function()
+			local owner, state, _, start, acknowledge = fixture({ stop_failure = true, receipt = receipt })
+			helpers.assert_true(start()); helpers.assert_eq(owner.stop(), false)
+			helpers.assert_eq(state.stops, 3); helpers.assert_eq(owner.is_settled(), false)
+			acknowledge(); helpers.assert_true(owner.stop())
+		end)
+	end
+
+	for _, fault in ipairs({ "close_before", "close_after", "probe_failure" }) do
+		helpers.it("(signal-native-owner) retains and retries " .. fault .. " without guessing native settlement", function()
+			local options = { [fault] = true }
+			local owner, _, _, start, acknowledge = fixture(options)
+			helpers.assert_true(start()); helpers.assert_eq(owner.stop(), false)
+			options.probe_failure = false
+			acknowledge()
+			if fault ~= "close_after" then helpers.assert_eq(owner.is_settled(), false); helpers.assert_eq(owner.stop(), false) end
+			acknowledge(); helpers.assert_true(owner.is_settled())
+		end)
+	end
+
+	for _, name in ipairs({ "new_signal", "signal_start", "signal_stop", "is_closing", "close" }) do
+		helpers.it("(signal-native-owner) refuses missing " .. name .. " before native acquisition", function()
+			local owner, state, uv, start = fixture()
+			uv[name] = nil
+			local admitted, why = start()
+			helpers.assert_eq(admitted, false); helpers.assert_contains(why, name)
+			helpers.assert_eq(#state.handles, 0); helpers.assert_true(owner.is_settled())
+		end)
+	end
+
+	helpers.it("(signal-native-owner) rejects incomplete callbacks before probing native support", function()
+		local owner, state = fixture()
+		helpers.assert_eq(owner.start({ on_term = function() end }), false)
+		helpers.assert_eq(state.loads, 0); helpers.assert_true(owner.is_settled())
+	end)
+
+	for _, refused in ipairs({ true, false }) do
+		helpers.it("(signal-native-admission) actual Main " .. (refused and "refusal" or "success") .. " precedes input acquisition", function()
+			local owner, native, _, _, acknowledge = fixture(refused and { start = 2, receipt = "false" } or {})
+			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+			local source = file:read("*a"); file:close()
+			local installer = assert(source:match("(local function install_signal_handlers%(%).-)%s*%-%- ========================================="))
+			local first = assert(source:find("-- Admit graceful terminal signals", 1, true))
+			local marker = "local fast_channel_ready = injector.open_fast_channel()"
+			local last = assert(source:find(marker, 1, true))
+			helpers.assert_true(first < last, "native signal admission must precede output acquisition")
+			local state = { opens = 0, loops = 0, runs = 0 }
+			local private = {}
+			local env = setmetatable({ privacy_owners = private, require = function(name)
+				helpers.assert_eq(name, "infra.signal_handlers"); return owner
+			end, Logger = { info = function() end, error = function() end },
+				BootProfiler = { stage = function() end },
+				injector = { open_fast_channel = function() state.opens = state.opens + 1; return true end },
+			}, { __index = _G })
+			local function compile(body)
+				if setfenv then return setfenv(assert(loadstring(body, "actual Main signal admission")), env) end
+				return assert(load(body, "actual Main signal admission", "t", env))
+			end
+			env.shutdown = ShutdownCoordinator.new({ pre_wait = {},
+				final_wait = compile("return " .. assert(source:match("final_wait%s*=%s*(%b{})")))(),
+				keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+				event_loop = { stop = function() state.loops = state.loops + 1 end },
+			})
+			env.event_loop = { run = function(opts)
+				state.runs = state.runs + 1; helpers.assert_true(env.shutdown.is_pending())
+				acknowledge(); opts.onIdle()
+			end }
+			local accepted, why = pcall(compile(installer .. "\n" .. source:sub(first, last + #marker - 1)))
+			if refused then
+				helpers.assert_eq(accepted, false); helpers.assert_contains(tostring(why), "refusing input capture")
+				helpers.assert_eq(state.opens, 0); helpers.assert_eq(state.runs, 1)
+				helpers.assert_eq(#native.handles, 2); helpers.assert_true(owner.is_settled())
+			else
+				helpers.assert_true(accepted, tostring(why)); helpers.assert_eq(state.opens, 1)
+				helpers.assert_eq(state.runs, 0)
+				owner.stop = function() return true end
+				env.shutdown.request("TERM")
+				helpers.assert_true(env.shutdown.is_pending(), "public replacement cannot acknowledge the retained signal owner")
+				acknowledge(); helpers.assert_true(env.shutdown.poll())
+			end
+			helpers.assert_eq(state.loops, 1)
+		end)
+	end
+
+	helpers.it("(signal-native-owner) stale close and terminal callbacks cannot retire or dispatch a later installation", function()
+		local owner, state, _, start, acknowledge = fixture()
+		helpers.assert_true(start()); local stale = state.handles[1].callback
+		owner.stop(); local stale_close = state.callbacks[1]; acknowledge()
+		helpers.assert_true(start()); stale_close(); stale()
+		helpers.assert_eq(owner.is_settled(), false); helpers.assert_eq(#state.delivered, 0)
+		owner.stop(); acknowledge(); helpers.assert_true(owner.is_settled())
+	end)
+end)
+
+helpers.describe("native signal regression child", function()
+	helpers.it("(signal-native-child) actual TERM/INT/HUP and partial startup retire without POSIX", function()
+		local uv = require("luv")
+		local executable = assert(uv.exepath(), "native interpreter identity must be available")
+		local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+		local result = os.execute(quote(executable) .. " " .. quote(helpers.driver_root() .. "/tests/fixtures/native_signal_shutdown.lua"))
+		helpers.assert_true(result == true or result == 0, "native signal ownership child must pass")
 	end)
 end)
