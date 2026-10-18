@@ -2415,12 +2415,15 @@ end
 --- Closes an answer surface that ends with no answer, unless the user or a
 --- newer request already replaced it.
 --- @param session number What open_answer_surface returned.
+--- @return number|nil revision The committed close owner, absent after failed or superseded cleanup.
 function M.close_answer_surface(session)
 	if session ~= fetch_request_counter then return end
 	local reset_ok, reset_result = xpcall(M.reset, debug.traceback)
 	if not reset_ok or reset_result ~= true then
 		Logger.error(LOG, "Answer surface close did not commit (result: %s).", tostring(reset_result))
+		return nil
 	end
+	return fetch_request_counter
 end
 
 --- Shows the notice of a live-mode transition the user asked for.

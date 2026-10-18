@@ -300,7 +300,7 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		draft_answers(generation, engine, session, config, answer_set, screen)
 	end
 	local function on_fail(reason, detail)
-		if not is_current(generation, "transcription") then return end
+		if not is_current(generation, "transcription") or engine.current_request_revision() ~= session then return end
 		if reason == "cancelled" then
 			engine.close_answer_surface(session)
 			return
@@ -309,9 +309,14 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		if Offer.is_missing(reason, detail) then
 			-- Named, with its Download button, instead of the vague failure
 			Logger.warn(LOG, "Screen reading failed: the local server does not hold model %s.", detail.model)
-			engine.close_answer_surface(session)
+			if not is_current(generation, "model failure") or engine.current_request_revision() ~= session then return end
+			local consent_revision = engine.close_answer_surface(session)
+			if consent_revision == nil then return end
 			Offer.offer(detail.model, { current = function()
+				local script = package.loaded["modules.shortcuts.script_control"]
+				if script and type(script.is_paused) == "function" and script.is_paused() then return false end
 				return is_current(generation, "model consent") and engine.get_llm_enabled() == true
+					and engine.current_request_revision() == consent_revision
 			end })
 			return
 		end
