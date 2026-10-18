@@ -266,12 +266,20 @@ local function _json_decode(s)
 	end
 	-- Minimal JSON parser sufficient for fixture-based tests
 	local pos = 1
-	local function skip_ws() while pos <= #s and s:sub(pos, pos):match("%s") do pos = pos + 1 end end
+	-- Runs are skipped and copied with string.find (C) rather than byte by byte:
+	-- tests decode the 21 locale catalogues through this stub many times.
+	local function skip_ws()
+		if pos > #s then return end
+		pos = s:find("%S", pos) or (#s + 1)
+	end
 	local parse_value
 	local function parse_string()
 		assert(s:sub(pos, pos) == '"') ; pos = pos + 1
 		local buf = {}
 		while pos <= #s do
+			local stop = s:find('["\\]', pos)
+			if not stop then break end
+			if stop > pos then buf[#buf + 1] = s:sub(pos, stop - 1) ; pos = stop end
 			local c = s:sub(pos, pos)
 			if c == '"' then pos = pos + 1 ; return table.concat(buf) end
 			if c == '\\' then
@@ -284,7 +292,7 @@ local function _json_decode(s)
 				elseif e == '"' or e == '\\' or e == '/' then buf[#buf + 1] = e
 				else buf[#buf + 1] = '\\' ; buf[#buf + 1] = e end
 				pos = pos + 2
-			else buf[#buf + 1] = c ; pos = pos + 1 end
+			end
 		end
 		error("unterminated string")
 	end
