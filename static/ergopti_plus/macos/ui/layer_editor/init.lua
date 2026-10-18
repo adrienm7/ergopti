@@ -164,17 +164,35 @@ end
 
 --- Closes one session's window; a stale session closes nothing.
 --- @param session table
+--- @return boolean committed True after the window and bridge are released.
 local function close_session(session)
-	if _session ~= session then return end
-	_session = nil
+	if _session ~= session then return false end
+	if session.closing then return false end
+	session.retired = true
+	session.closing = true
 	local webview = session.webview
-	session.webview = nil
 	if webview then
 		local ok, err = pcall(function() webview:delete() end)
-		if not ok then Logger.error(LOG, "The layer editor window could not be closed: %s.", tostring(err)) end
+		if not ok then
+			session.closing = false
+			Logger.error(LOG, "The layer editor window could not be closed; exact owner retained: %s.", tostring(err))
+			return false
+		end
+		session.webview = nil
 	end
-	if session.usercontent then pcall(function() session.usercontent:setCallback(nil) end) end
+	if session.usercontent then
+		local ok, err = pcall(function() session.usercontent:setCallback(nil) end)
+		if not ok then
+			session.closing = false
+			Logger.error(LOG, "The layer editor bridge could not be released; exact owner retained: %s.", tostring(err))
+			return false
+		end
+		session.usercontent = nil
+	end
+	session.closing = false
+	_session = nil
 	Logger.info(LOG, "Layer editor closed.")
+	return true
 end
 
 --- Hands the saved layer's wheel bindings, which Hammerspoon runs rather than
@@ -291,6 +309,10 @@ end
 --- @param body any The posted payload.
 function M._on_message(session, body)
 	if _session ~= session then return end
+	if session.retired then
+		if type(body) == "table" and body.action == "cancel" then close_session(session) end
+		return
+	end
 	if body == "ready" then
 		push_init(session)
 	elseif type(body) ~= "table" then
@@ -324,6 +346,9 @@ function M.open(opts)
 	if type(karabiner) ~= "table" or type(karabiner.regenerate) ~= "function" then
 		Logger.error(LOG, "The layer editor needs the remap facade to apply what it saves.")
 		return false
+	end
+	if _session and _session.retired then
+		if close_session(_session) ~= true then return false end
 	end
 	if _session then
 		_session.karabiner = karabiner
@@ -359,7 +384,7 @@ function M.open(opts)
 			return true
 		end,
 		on_close      = function()
-			if _session == session then
+			if _session == session and not session.closing then
 				session.webview = nil
 				close_session(session)
 			end
@@ -380,8 +405,10 @@ function M.open(opts)
 end
 
 --- Closes the editor if it is open.
+--- @return boolean committed True when no native resource remains owned.
 function M.close()
-	if _session then close_session(_session) end
+	if _session then return close_session(_session) end
+	return true
 end
 
 return M
