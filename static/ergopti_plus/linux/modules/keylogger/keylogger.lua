@@ -1032,7 +1032,13 @@ end
 --- @return table Metrics prefetch payload matching the macOS/Windows schema.
 function M.get_dashboard_payload(opts)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
 	local options = type(opts) == "table" and opts or {}
+	local categories = {}
+	if SqliteWriter and SqliteWriter.is_available() then
+		categories = SqliteReader.read_user_categories(_sqlite_path, _device_id)
+		if categories == nil then return nil, "SQLite projection unavailable" end
+	end
 	local manifest = add_live_manifest_delta(persisted_manifest())
 	local prefetch = nil
 	if options.include_prefetch ~= false then
@@ -1040,6 +1046,7 @@ function M.get_dashboard_payload(opts)
 	end
 	return {
 		metrics_manifest = manifest,
+		user_categories  = categories,
 		app_icons        = {},
 		_prefetch_data   = prefetch,
 		driver_meta      = { os = "linux", heatmap_id = "sc_kb" },

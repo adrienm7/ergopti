@@ -104,7 +104,7 @@ local function with_stubbed_sqlite(responder, body)
 end
 
 helpers.describe("linux-sqlite-readonly", function()
-	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today" }) do
+	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today", "read_user_categories" }) do
 		helpers.it("linux-sqlite-readonly: " .. method .. " opens every source through native readonly JSON", function()
 			local statements, commands = with_stubbed_sqlite(function() return "[]" end, function(reader)
 				local result = reader[method]("/db/metrics.sqlite", "2026-10-03", "2026-10-03", {})
@@ -118,6 +118,47 @@ helpers.describe("linux-sqlite-readonly", function()
 			end
 		end)
 	end
+end)
+
+helpers.describe("linux-sqlite-category-projection", function()
+	helpers.it("category projection joins all overrides in one readonly command with exact device quoting", function()
+		local app, category = "owned ' été app\0tail", "Productivity\r\n\0tail"
+		local statements = with_stubbed_sqlite(function()
+			return Json.encode({ { app_json = Json.encode(app), score_json = Json.encode("-2"), category_json = Json.encode(category) },
+				{ app_json = Json.encode("zero"), score_json = Json.encode("0"), category_json = "null" } })
+		end, function(reader)
+			local categories = reader.read_user_categories("/db/metrics.sqlite", "local ' device")
+			helpers.assert_eq(categories[app], { type = category, score = -2 })
+			helpers.assert_eq(categories.zero, { type = "Unknown", score = 0 })
+		end)
+		helpers.assert_eq(#statements, 1, "Category count cannot multiply CLI requests")
+		helpers.assert_contains(statements[1], "owned.device_id = 'local '' device'")
+		helpers.assert_contains(statements[1], "LEFT JOIN agg_app_day")
+	end)
+	helpers.it("category projection distinguishes an accepted empty map from native query refusal", function()
+		with_stubbed_sqlite(function() return "[]" end, function(reader)
+			helpers.assert_eq(reader.read_user_categories("/db/metrics.sqlite", "local"), {})
+		end)
+		with_stubbed_sqlite(function() return { body = "[]", status = 1 } end, function(reader)
+			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", "local"))
+		end)
+	end)
+	helpers.it("invalid category metadata cannot publish a partially accepted override map", function()
+		for _, value in ipairs({ "private-invalid-score", "2\0tail", "1e999" }) do
+			with_stubbed_sqlite(function()
+				return Json.encode({ { app_json = Json.encode("first"), score_json = Json.encode("1"), category_json = Json.encode("Productivity") },
+					{ app_json = Json.encode("second"), score_json = Json.encode(value), category_json = "null" } })
+			end, function(reader)
+				helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", "local"))
+			end)
+		end
+	end)
+	helpers.it("category projection rejects an absent device before opening SQLite", function()
+		local statements = with_stubbed_sqlite(function() error("must not dispatch") end, function(reader)
+			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", ""))
+		end)
+		helpers.assert_eq(#statements, 0)
+	end)
 end)
 
 helpers.describe("linux-sqlite-calendar-split", function()

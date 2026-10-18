@@ -113,6 +113,22 @@ H.describe("metrics flush bridge", function()
 			F.settle()
 			H.assert_eq(#F.pushed, 0)
 		end)
+		H.it(app .. " refuses an unavailable category projection and recovers after a fresh read", function()
+			local F = fixture(app)
+			local available = F.K.get_dashboard_payload
+			F.K.get_dashboard_payload = function()
+				F.c.reads = F.c.reads + 1
+				return nil, "SQLite projection unavailable"
+			end
+			F.B.on_message("ready", F.state, F.context)
+			F.settle()
+			H.assert_eq(F.c.reads, 1)
+			H.assert_eq(#F.pushed, 0, "An unavailable category owner cannot publish a fresh empty dashboard")
+			F.K.get_dashboard_payload = available
+			local reply = F.B.on_message("ready", F.state, F.context)
+			H.assert_eq(reply.metrics_manifest.day.app.chars, 17)
+			H.assert_eq(F.c.reads, 2, "Refusal must not seed the typing ready cache")
+		end)
 	end
 	for _, mode in ipairs({ "immediate", "deferred" }) do
 		H.it("(range-projection-unavailable) " .. mode .. " nil projection cannot publish or poison the next read", function()
