@@ -1201,6 +1201,7 @@ class Receiver:
             and inference["eval_duration"] > 0,
             "actual_native_inference",
         )
+        return inference["eval_count"]
 
     def run(self):
         self.prepare()
@@ -1290,7 +1291,7 @@ class Receiver:
                 (receiving / "blobs" / name.replace(":", "-")).read_bytes() == data,
                 "exact_blob_publication",
             )
-        self.receive_inference(model_name)
+        inference_eval_count = self.receive_inference(model_name)
         self.stage = "cancel"
         with patch.dict(os.environ, self.api_environment, clear=True):
             self.owner()
@@ -1341,7 +1342,7 @@ class Receiver:
             model_sha256=GGUF_SHA256,
             blob_sha256={name: hashlib.sha256(data).hexdigest() for name, data in blobs.items()},
             progress_rows=len(rows),
-            inference_eval_count=inference["eval_count"],
+            inference_eval_count=inference_eval_count,
             native_pull_retired=True,
             native_cancel_retired=True,
             native_sockets=snapshot["active"],
