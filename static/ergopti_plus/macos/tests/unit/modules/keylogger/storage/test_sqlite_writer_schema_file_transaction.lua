@@ -15,16 +15,32 @@ local helpers = require("tests.helpers")
 local function observe(schedule, check)
 	helpers.with_stub_scope({ "infra.logger", "modules.keylogger.sqlite_writer", "modules.keylogger.text_cipher" }, function()
 		local state = { opens = 0, reads = 0, closes = 0, db_opens = 0, db_closes = 0, errors = {} }
+		state.file_exists = schedule.existing_partial == true
+		state.meta_exists = schedule.existing_partial == true
+		state.schema_applied = false
 		local logger = helpers.make_logger_stub()
 		logger.error = function(_, format, ...) state.errors[#state.errors + 1] = string.format(format, ...) end
 		package.loaded["infra.logger"] = logger
 		local writer = helpers.load_with_stubs("modules.keylogger.sqlite_writer", {
-			fs = { attributes = function() return nil end },
+			fs = { attributes = function() return state.file_exists and { mode = "file" } or nil end },
 			sqlite3 = { OK = 0, DONE = 101, ROW = 100,
 				open = function()
 					state.db_opens = state.db_opens + 1
-					return { exec = function() return 0 end,
-						nrows = function() return function() return nil end end,
+					state.file_exists = true
+					return { exec = function(_, sql)
+						if sql:find("CREATE TABLE schema_fixture", 1, true) then
+							state.schema_applied, state.meta_exists = true, true
+						end
+						if sql:find("ALTER TABLE events_llm", 1, true) and not state.schema_applied then return 1 end
+						return 0
+					end,
+						nrows = function(_, sql)
+							local row
+							if sql:find("sqlite_master", 1, true) and state.meta_exists then row = { name = "meta" } end
+							if sql:find("key='schema_version'", 1, true) and state.schema_applied then row = { value = "1" } end
+							return function() local result = row; row = nil; return result end
+						end,
+						errmsg = function() return "missing canonical table" end,
 						prepare = function() return { bind_values = function() return 0 end,
 							step = function() return 101 end, finalize = function() return 0 end } end,
 						close = function() state.db_closes = state.db_closes + 1; return 0 end }
@@ -68,6 +84,24 @@ local function observe(schedule, check)
 end
 
 helpers.describe("sqlite-schema-file-transaction", function()
+	helpers.it("sqlite-bootstrap-completion: reuses a completed schema on reopen", function()
+		observe({}, function(writer, state)
+			helpers.assert_true(writer.open_db())
+			helpers.assert_true(writer.close_db())
+			helpers.assert_true(writer.open_db())
+			helpers.assert_eq(state.reads, 1, "completed schema must not be reapplied on reopen")
+			helpers.assert_true(writer.close_db())
+		end)
+	end)
+
+	helpers.it("sqlite-bootstrap-completion: repairs a previous process's partial schema", function()
+		observe({ existing_partial = true }, function(writer, state)
+			helpers.assert_true(writer.open_db(), "a file with meta but no schema version is an unfinished bootstrap")
+			helpers.assert_eq(state.reads, 1, "unfinished bootstrap must reapply the canonical schema")
+			helpers.assert_true(writer.close_db())
+		end)
+	end)
+
 	for _, phase in ipairs({ "open", "read", "close" }) do
 		for _, failure in ipairs({ "nil", "throw" }) do
 			helpers.it("sqlite-schema-file: rejects " .. phase .. " " .. failure, function()
