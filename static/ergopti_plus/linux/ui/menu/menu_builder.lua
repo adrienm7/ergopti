@@ -570,6 +570,8 @@ local function _build_layouts(ctx)
 						LayoutRegistry.select(id, function(selected, _, detail)
 							if not selected then
 								Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
+							elseif type(ctx.on_menu_changed) == "function" then
+								ctx.on_menu_changed()
 							end
 						end)
 					end,

@@ -288,6 +288,7 @@ return {
 	"tests.unit.infra.logger.test_logger_sink",
 	"tests.unit.ui.menu.structure.test_menu_builder_group_calls",
 	"tests.unit.ui.menu.structure.test_menu_choice_row",
+	"tests.unit.ui.menu.structure.test_custom_layout_selection",
 	"tests.unit.ui.menu.structure.test_menu_matches_manifest",
 	"tests.unit.ui.menu.structure.test_menu_prompt_cancel",
 	"tests.unit.ui.menu.structure.test_menu_no_double_separator",
