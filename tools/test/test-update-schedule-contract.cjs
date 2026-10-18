@@ -67,10 +67,10 @@ const PORTS = [
 	},
 	{
 		port: 'windows/modules/updater/schedule.ahk',
-		test: 'windows/tests/unit/test_updater_schedule_vectors.ahk',
+		test: 'windows/tests/unit/modules/updater/test_updater_schedule_vectors.ahk',
 		wiring: {
 			file: 'windows/tests/run_all.ahk',
-			needle: '#Include unit/test_updater_schedule_vectors.ahk'
+			needle: '#Include unit/modules/updater/test_updater_schedule_vectors.ahk'
 		}
 	}
 ];
