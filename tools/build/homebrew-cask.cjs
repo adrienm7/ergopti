@@ -25,13 +25,17 @@
  *    About menu, automatic checks), and brew upgrade updates it with the rest
  *    of the user's casks, so the cask does not declare auto_updates. brew
  *    quits the app before replacing the bundle (its Lua files load from it)
- *    and relaunches it when it was running. After a Sparkle update, the next
+ *    and, from Homebrew 7, reopens the apps it quit once the upgrade succeeds.
+ *    The launcher is quit first: it stops its embedded Hammerspoon, so only
+ *    the launcher is reopened. After a Sparkle update, the next
  *    brew upgrade reinstalls the same version once, since brew only knows the
  *    version it installed.
  * 3. livecheck reads the channel's Sparkle appcast, the feed the app itself
  *    follows, so brew livecheck and the app agree on the newest version.
- * 4. The postflight clears the quarantine flag: the app is not notarised, and
- *    Gatekeeper would otherwise refuse to open it.
+ * 4. The postflight steps clear the quarantine flag: the app is not
+ *    notarised, and Gatekeeper would otherwise refuse to open it. Homebrew 7
+ *    deprecates Ruby flight blocks for declarative steps run in its sandbox,
+ *    which denies launching apps, hence reopening is left to brew itself.
  *
  * USAGE:  node tools/build/homebrew-cask.cjs <tag> <sha256> <tap-dir> [declared-asset]
  *         Prints the path of the cask it wrote, relative to <tap-dir>.
@@ -61,10 +65,6 @@ const APP_NAME = 'ErgoptiPlus.app';
 
 // Launcher bundle identifier (tools/build/build_macos_app.sh BUNDLE_ID)
 const BUNDLE_ID = 'com.ergoptiplus.app';
-
-// Left by uninstall_preflight when the app was running, read by postflight
-// to relaunch the upgraded app; zap removes its directory
-const RELAUNCH_MARKER = `#{Dir.home}/Library/Caches/${BUNDLE_ID}/brew-relaunch`;
 
 // Base cask token; channels other than the most stable one add @<id>
 const TOKEN_BASE = 'ergoptiplus';
@@ -143,27 +143,18 @@ function renderCask(tag, sha256, assetName = ASSET_NAME) {
 		'',
 		`  app "${APP_NAME}"`,
 		'',
-		'  # A running app loads its Lua files from the bundle: it is quit before the',
-		'  # bundle is replaced, and relaunched after an upgrade if it was running.',
-		'  uninstall_preflight do',
-		`    running = system_command("/usr/bin/pgrep", args: ["-f", "/${APP_NAME.replaceAll('.', '[.]')}/Contents/"],`,
-		'                                               must_succeed: false).success?',
-		'    if running',
-		`      FileUtils.mkdir_p(File.dirname("${RELAUNCH_MARKER}"))`,
-		`      FileUtils.touch("${RELAUNCH_MARKER}")`,
-		'    end',
-		'  end',
-		'',
-		`  uninstall quit: ["${BUNDLE_ID}.hammerspoon", "${BUNDLE_ID}"]`,
+		'  # A running app loads its Lua files from the bundle: brew quits it before the',
+		'  # bundle is replaced and reopens it after an upgrade. Quitting the launcher',
+		'  # stops its embedded Hammerspoon, so only the launcher is reopened; the',
+		'  # second identifier stops a Hammerspoon left without its launcher.',
+		`  uninstall quit: ["${BUNDLE_ID}", "${BUNDLE_ID}.hammerspoon"]`,
 		'',
 		'  # The app is not notarised: without this, Gatekeeper refuses to open it.',
-		'  postflight do',
-		'    system_command "/usr/bin/xattr",',
-		`                   args: ["-dr", "com.apple.quarantine", "#{appdir}/${APP_NAME}"]`,
-		`    if File.exist?("${RELAUNCH_MARKER}")`,
-		`      FileUtils.rm_f("${RELAUNCH_MARKER}")`,
-		`      system_command "/usr/bin/open", args: ["#{appdir}/${APP_NAME}"]`,
-		'    end',
+		'  postflight_steps do',
+		'    run "/usr/bin/xattr",',
+		`        args:           ["-dr", "com.apple.quarantine", "{{appdir}}/${APP_NAME}"],`,
+		'        must_succeed:   false,',
+		`        writable_paths: ["{{appdir}}/${APP_NAME}"]`,
 		'  end',
 		'',
 		'  zap trash: [',
@@ -216,6 +207,5 @@ module.exports = {
 	ASSET_NAME,
 	APP_NAME,
 	BUNDLE_ID,
-	MINIMUM_MACOS,
-	RELAUNCH_MARKER
+	MINIMUM_MACOS
 };

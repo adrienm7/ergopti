@@ -12,9 +12,10 @@
  *    tag ergoptiplus, each conflicting with the other, so installing one
  *    channel's cask replaces the other's app instead of adding a second one.
  * 2. brew upgrade updates the app with the user's other casks: no cask
- *    declares auto_updates, brew quits both bundle identifiers before replacing
- *    the bundle and relaunches the app only when it was running. livecheck
- *    reads the same appcast the app follows.
+ *    declares auto_updates, brew quits the launcher, then any orphaned
+ *    Hammerspoon, before replacing the bundle, and reopens what it quit. Only
+ *    Homebrew 7 declarative steps are used, never deprecated Ruby flight
+ *    blocks. livecheck reads the same appcast the app follows.
  * 3. Names repeated from the build (bundle id, app, asset, minimum macOS) and
  *    from the release workflow (appcast branch, generator call, tap
  *    repository) must match their owners, or the cask downloads or installs
@@ -125,29 +126,34 @@ check(
 				/auto_updates/,
 				'auto_updates would make brew upgrade skip the app'
 			);
+			// Homebrew 7 reopens the apps its quit stanza closed; the launcher
+			// first, since quitting it stops its embedded Hammerspoon.
 			assert.ok(
-				cask.text.includes(`uninstall quit: ["${Cask.BUNDLE_ID}.hammerspoon", "${Cask.BUNDLE_ID}"]`)
+				cask.text.includes(`uninstall quit: ["${Cask.BUNDLE_ID}", "${Cask.BUNDLE_ID}.hammerspoon"]`)
 			);
-			const marker = `"${Cask.RELAUNCH_MARKER}"`;
-			const preflight = cask.text.slice(
-				cask.text.indexOf('uninstall_preflight do'),
-				cask.text.indexOf('uninstall quit:')
+			// Homebrew 7 deprecates Ruby flight blocks (`odeprecated "#{dsl_key}",
+			// "#{dsl_key}_steps"` in cask/dsl.rb), and its step sandbox denies lsopen.
+			assert.doesNotMatch(
+				cask.text,
+				/^\s*(?:uninstall_)?(?:preflight|postflight)\b(?!_steps)/m,
+				'no deprecated flight block'
 			);
-			assert.ok(
-				preflight.includes(`FileUtils.touch(${marker})`) && preflight.includes('if running'),
-				'the marker is left only when the app was running'
+			assert.doesNotMatch(cask.text, /system_command|FileUtils|\/usr\/bin\/open|#\{appdir\}/);
+			const postflight = cask.text.slice(
+				cask.text.indexOf('  postflight_steps do\n'),
+				cask.text.indexOf('\n  end\n', cask.text.indexOf('  postflight_steps do\n')) + 7
 			);
-			const postflight = cask.text.slice(cask.text.indexOf('postflight do'));
-			assert.ok(
-				postflight.includes(`if File.exist?(${marker})`) &&
-					postflight.includes(`FileUtils.rm_f(${marker})`) &&
-					postflight.includes(`"/usr/bin/open", args: ["#{appdir}/${Cask.APP_NAME}"]`),
-				'postflight relaunches only on the marker, and consumes it'
+			assert.equal(
+				postflight,
+				'  postflight_steps do\n' +
+					'    run "/usr/bin/xattr",\n' +
+					`        args:           ["-dr", "com.apple.quarantine", "{{appdir}}/${Cask.APP_NAME}"],\n` +
+					'        must_succeed:   false,\n' +
+					`        writable_paths: ["{{appdir}}/${Cask.APP_NAME}"]\n` +
+					'  end\n',
+				'the quarantine step writes only the installed app'
 			);
-			assert.ok(
-				Cask.RELAUNCH_MARKER.includes(`/Library/Caches/${Cask.BUNDLE_ID}/`),
-				'zap must remove the marker'
-			);
+			assert.equal((cask.text.match(/_steps do$/gm) || []).length, 1);
 		}
 		const base = `https://raw.githubusercontent.com/${Cask.SOURCE_REPOSITORY}/${Cask.APPCAST_BRANCH}/`;
 		assert.ok(dev.text.includes(`url "${base}appcast-dev.xml"`));
@@ -158,34 +164,6 @@ check(
 		);
 	}
 );
-
-check('running-app detection treats the application bundle name literally', () => {
-	for (const tag of ['v1.2.3', 'v0.0.0-dev.142']) {
-		for (const archive of require(
-			path.join(ROOT, 'tools/build/macos-release-publication.cjs')
-		).bindings()) {
-			const cask = Cask.renderCask(tag, SHA, archive.name);
-			const match = cask.text.match(
-				/system_command\("\/usr\/bin\/pgrep", args: \["-f", ("[^"\n]*")\]/
-			);
-			assert.ok(match, 'The actual generated pgrep argument is present');
-			// These literals and character classes have the same meaning in pgrep's ERE.
-			const running = new RegExp(JSON.parse(match[1]));
-			for (const command of [
-				'/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus',
-				'/Volumes/Owned/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon'
-			])
-				assert.equal(running.test(command), true, 'An actual app requests relaunch');
-			for (const command of [
-				'/Applications/ErgoptiPlusXapp/Contents/MacOS/Foreign',
-				'/Applications/ErgoptiPlus-app/Contents/MacOS/Foreign',
-				'/Applications/ErgoptiPlusZapp/Contents/MacOS/Foreign',
-				'/Applications/ErgoptiPlus.app.backup/Contents/MacOS/Foreign'
-			])
-				assert.equal(running.test(command), false, 'A foreign app cannot request relaunch');
-		}
-	}
-});
 
 check('bundle names match build_macos_app.sh', () => {
 	assert.ok(BUILD_SCRIPT.includes(`BUNDLE_ID="${Cask.BUNDLE_ID}"`));
@@ -198,7 +176,7 @@ check('bundle names match build_macos_app.sh', () => {
 	assert.strictEqual(Cask.MINIMUM_MACOS, MACOS_SYMBOLS[minimum[1]]);
 	assert.ok(dev.text.includes(`app "${Cask.APP_NAME}"`));
 	assert.ok(
-		dev.text.includes(`"#{appdir}/${Cask.APP_NAME}"`),
+		dev.text.includes(`"{{appdir}}/${Cask.APP_NAME}"`),
 		'the quarantine flag is cleared on the installed app'
 	);
 });
@@ -322,7 +300,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
 	// The consent-free AppleEvent boundary retired every consent request and UI control.
-	assert.match(result.stderr, /Ran 118 tests in /);
+	assert.match(result.stderr, /Ran 120 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
