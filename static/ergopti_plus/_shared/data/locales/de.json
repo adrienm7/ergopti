@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Gebündelt — Vorhersagen in Stapeln (große Modelle)",
 	"prompt_editor.mode.parallel": "Standard — parallele Vorhersagen",
 	"prompt_editor.placeholder_prompt": "Hier ist ein Text, setzen Sie ihn fort: {context}",
+	"prompt_editor.save_failed": "Dein Prompt-Profil konnte nicht gespeichert werden. Der Editor bleibt geöffnet, damit du es erneut versuchen kannst.",
 	"prompt_editor.title_edit": "Profil bearbeiten",
 	"prompt_editor.title_new": "Neues Profil",
 	"script_control.pause_failed": "Das Skript konnte nicht pausiert werden; der vorherige Zustand wurde beibehalten.",

@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Wsadowy — predykcje w partiach (duże modele)",
 	"prompt_editor.mode.parallel": "Standardowy — równoległe predykcje",
 	"prompt_editor.placeholder_prompt": "Oto tekst, kontynuuj go: {context}",
+	"prompt_editor.save_failed": "Nie udało się zapisać profilu instrukcji. Edytor pozostaje otwarty, aby można było spróbować ponownie.",
 	"prompt_editor.title_edit": "Edytuj profil",
 	"prompt_editor.title_new": "Nowy profil",
 	"script_control.pause_failed": "Nie udało się wstrzymać skryptu; zachowano poprzedni stan.",
