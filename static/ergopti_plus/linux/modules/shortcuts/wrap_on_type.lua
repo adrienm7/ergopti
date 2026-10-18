@@ -66,10 +66,16 @@ function M.new(opts)
 	-- nil while no selection can exist; otherwise the PRIMARY content read when
 	-- the window opened ("" when nothing, or nothing readable, was published).
 	local baseline = nil
+	-- Native reads and policy callbacks may reenter a selection event. Only its
+	-- current generation may publish a baseline or authorize replacement text.
+	local generation = 0
 
 	--- Opens the selection window, remembering what PRIMARY held before it.
-	local function open_window()
+	local function open_window(owner)
 		local ok, text = opts.read_primary()
+		if owner ~= generation then return end
+		local active = opts.is_active()
+		if owner ~= generation or not active then return end
 		baseline = (ok and type(text) == "string") and text or ""
 	end
 
@@ -85,6 +91,7 @@ function M.new(opts)
 	--- replaced any selection, as a key reaching on_key would: the window ends,
 	--- or a later wrap symbol would type the deleted text back from PRIMARY.
 	function controller.end_selection_window()
+		generation = generation + 1
 		baseline = nil
 	end
 
@@ -92,8 +99,12 @@ function M.new(opts)
 	--- selection, or clear one. The baseline is taken on EVERY press, so a
 	--- deselecting click makes the old selection the baseline.
 	function controller.on_pointer_down()
-		if not opts.is_active() then baseline = nil return end
-		open_window()
+		generation = generation + 1
+		local owner = generation
+		baseline = nil
+		local active = opts.is_active()
+		if owner ~= generation or not active then return end
+		open_window(owner)
 	end
 
 	--- Decides one key press from the keyboard hook's consumption callback.
@@ -102,17 +113,24 @@ function M.new(opts)
 	---   must not reach the application.
 	function controller.on_key(detail)
 		if type(detail) ~= "table" then return false end
+		generation = generation + 1
+		local owner = generation
 		local mods = type(detail.mods) == "table" and detail.mods or {}
 		local control = EvdevCodes.CONTROL_NAME_OF[detail.code]
 
 		-- The keys that make or extend a selection keep the window open.
 		if control and NAVIGATION[control] and mods.shift and not mods.alt and not mods.meta then
-			if baseline == nil and opts.is_active() then open_window() end
+			if baseline == nil then
+				local active = opts.is_active()
+				if owner == generation and active then open_window(owner) end
+			end
 			return false
 		end
 		local char = type(detail.char) == "string" and detail.char or ""
 		if mods.ctrl and not mods.alt and not mods.meta and char:lower() == "a" then
-			if opts.is_active() then open_window() else baseline = nil end
+			baseline = nil
+			local active = opts.is_active()
+			if owner == generation and active then open_window(owner) end
 			return false
 		end
 
@@ -123,18 +141,22 @@ function M.new(opts)
 		if window == nil then return false end
 		if mods.ctrl or mods.alt or mods.meta then return false end
 		local pair = opts.get_pair(char)
-		if type(pair) ~= "table" then return false end
-		if not opts.is_active() then return false end
+		if owner ~= generation or type(pair) ~= "table" then return false end
+		local left, right = pair.left, pair.right
+		local active = opts.is_active()
+		if owner ~= generation or not active then return false end
 
 		local ok, selected = opts.read_primary()
-		if not ok or type(selected) ~= "string" or selected == "" then return false end
+		if owner ~= generation or not ok or type(selected) ~= "string" or selected == "" then return false end
 		if selected == window then
 			Logger.debug(LOG, "PRIMARY unchanged since the selection window opened — typing '%s'.", char)
 			return false
 		end
 
-		Logger.debug(LOG, "Wrapping a %d-byte selection in %s…%s.", #selected, pair.left, pair.right)
-		local typed_ok, typed = pcall(opts.type_text, pair.left .. selected .. pair.right)
+		Logger.debug(LOG, "Wrapping a %d-byte selection in %s…%s.", #selected, left, right)
+		active = opts.is_active()
+		if owner ~= generation or not active then return false end
+		local typed_ok, typed = pcall(opts.type_text, left .. selected .. right)
 		if not typed_ok then
 			Logger.error(LOG, "Selection wrap raised before typing: %s — the symbol is typed instead.",
 				tostring(typed))
