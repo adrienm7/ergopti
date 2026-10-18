@@ -65,6 +65,12 @@ const STAMPING_BUILDS = {
 const PACKAGERS = ['deb', 'rpm', 'appimage', 'flatpak'].map(
 	(kind) => `tools/build/build-linux-${kind}.sh`
 );
+// A packager CI reaches through a wrapper: the AppImage is built inside an
+// ubuntu:22.04 container (glibc ceiling of the AppImage catalogue), whose
+// script then runs build-linux-appimage.sh on the stamped bundle.
+const PACKAGER_WRAPPERS = {
+	'tools/build/build-linux-appimage.sh': ['bash tools/build/appimage-oldest-lts.sh build']
+};
 const PKGBUILD_REL = 'tools/build/PKGBUILD';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
@@ -236,7 +242,8 @@ function checkWorkflow(text, rel) {
 				}
 			}
 			for (const packager of PACKAGERS) {
-				if (!step.run.includes(`bash ${packager}`)) continue;
+				const invocations = [`bash ${packager}`, ...(PACKAGER_WRAPPERS[packager] || [])];
+				if (!invocations.some((invocation) => step.run.includes(invocation))) continue;
 				packagers++;
 				if (!assembledLinux) {
 					errors.push(
@@ -437,6 +444,14 @@ for (const script of Object.keys(STAMPING_BUILDS)) {
 for (const packager of PACKAGERS) {
 	if (!/write_build_stamp\.sh"?\s+verify\s/.test(read(packager))) {
 		errors.push(`${packager} no longer verifies the build stamp in the tree it packages`);
+	}
+}
+for (const [packager, wrappers] of Object.entries(PACKAGER_WRAPPERS)) {
+	for (const wrapper of wrappers) {
+		const script = wrapper.split(/\s+/)[1];
+		if (!read(script).includes(`bash ${packager}`)) {
+			errors.push(`${script} no longer runs ${packager}, yet CI counts it as that packager`);
+		}
 	}
 }
 

@@ -170,6 +170,7 @@ assert.ok(
 );
 if (process.platform === 'linux') {
 	const { spawnSync } = require('node:child_process');
+	const { bashExecutable } = require('../lib/git-bash.cjs');
 	const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-no-trust-'));
 	try {
 		const prefix = path.join(sandbox, 'usr');
@@ -194,7 +195,7 @@ if (process.platform === 'linux') {
 		const env = { ...process.env };
 		for (const name of ['CURL_CA_BUNDLE', 'SSL_CERT_FILE', 'SSL_CERT_DIR']) delete env[name];
 		const observed = spawnSync(
-			'bash',
+			bashExecutable(),
 			[
 				'-c',
 				'set -euo pipefail; source "$1" "$2" "$3"; echo "started:${CURL_CA_BUNDLE:-none}"',

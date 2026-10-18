@@ -354,6 +354,7 @@
 		"test:llm-stop-sequences-single-source": "node ./tools/test/test-llm-stop-sequences-single-source.cjs",
 		"test:shared-toml-codec-purity": "node ./tools/test/test-shared-toml-codec-purity.cjs",
 		"test:linux-package-layout": "node ./tools/test/test-linux-package-layout.cjs",
+		"test:linux-appimage-portability": "node ./tools/test/test-linux-appimage-portability.cjs",
 		"test:linux-install-sandbox": "node ./tools/test/test-linux-install-sandbox.cjs",
 		"test:linux-source-toolchain": "node ./tools/test/test-linux-source-toolchain.cjs",
 		"test:opensuse-first-install-tooling": "node ./tools/test/test-opensuse-first-install-tooling.cjs",
