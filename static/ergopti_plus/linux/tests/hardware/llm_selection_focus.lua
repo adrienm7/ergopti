@@ -71,7 +71,7 @@ local selection_owner
 
 local function initialize()
 	assert(not selection_owner or selection_owner.stop(), "the previous range owner must settle")
-	selection_owner = Selection.new({ focus_id = focus_id, privacy_guard = Guard.blocks_text })
+	selection_owner = Selection.new({ focus_id = focus_id, privacy_guard = Guard.blocks_text, capture_text_owner = Guard.capture_text_owner })
 	callback, applied, request, reads = nil, 0, 0, 0
 	scheduler = require("tests.fakes").timer_scheduler()
 	local function type_text(text)
@@ -90,7 +90,8 @@ local function initialize()
 		cancel_selection = function() return selection_owner.cancel() end,
 		replace_selection = function(text, receipt, authorized, callback)
 			return selection_owner.replace(receipt, text, authorized, function(value)
-				return { ok = type_text(value) }
+				local committed = type_text(value)
+				return { ok = committed, cleanup_ok = committed }
 			end, callback)
 		end,
 		apply_prediction = function(candidate) return type_text(candidate.to_type) end,

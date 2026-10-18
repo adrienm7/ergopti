@@ -1391,6 +1391,7 @@ local function main()
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
 		privacy_owners.selection = require("adapters.selection_transaction").new({
+			capture_text_owner = secure_focus_guard.capture_text_owner,
 			focus_id = secure_focus_guard.focused_text_identity,
 			-- Selection reads and writes share the daemon's exact field identity.
 			privacy_guard = secure_focus_guard.blocks_text,
@@ -1425,8 +1426,8 @@ local function main()
 				local result = injector.inject(candidate.deletes, candidate.to_type, false, nil, publication)
 				return type(result) == "table" and result.ok == true and publication.cached()
 			end,
-			-- Selection output is bound to the exact original native range, even
-			-- when an application moves it without any physical input event.
+			-- Revalidate the original range before injection, then retain its exact
+			-- field and originating action across blocking output phases.
 			read_selection = function(focus, authorized, callback)
 				if opts.dry_run then callback(false, "", "dry run"); return false end
 				return privacy_owners.selection.read(focus, authorized, callback)
@@ -1434,8 +1435,8 @@ local function main()
 			cancel_selection = function() return privacy_owners.selection.cancel() end,
 			replace_selection = function(text, receipt, authorized, callback)
 				if opts.dry_run then callback(false); return false end
-				return privacy_owners.selection.replace(receipt, text, authorized, function(value)
-					return injector.inject_selected(value, false)
+				return privacy_owners.selection.replace(receipt, text, authorized, function(value, publication)
+					return injector.inject_selected(value, false, publication)
 				end, function(committed)
 					if committed then
 						-- The buffer no longer describes the physically replaced line.
