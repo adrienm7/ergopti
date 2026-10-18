@@ -622,12 +622,9 @@ local function install_signal_handlers()
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
-		-- The coordinator owns the final SQLite flush and its native ACK.
-		-- Signal callbacks never dispatch an independent persistence attempt.
-		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
-		-- before that point can strand held keys because the hook restores them
-		-- through the same uinput device.
-		injector.close_fast_channel()
+		-- Native retirement may still be pending after request() returns.
+		-- Keep output available until the coordinator releases the event loop;
+		-- the normal clean-exit path then closes it exactly once.
 	end
 
 	-- Each installation is checked: a handler that silently failed to install
