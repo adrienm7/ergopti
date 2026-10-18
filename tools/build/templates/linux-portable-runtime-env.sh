@@ -37,7 +37,10 @@ ERGOPTI_SYSTEM_CA_FILES=("/etc/ssl/certs/ca-certificates.crt" "/etc/pki/tls/cert
 
 # Respect explicit trust configuration. Otherwise select a recipient system
 # bundle from curl's documented build-time autodetection candidates; never
-# ship a frozen CA store or disable certificate verification.
+# ship a frozen CA store or disable certificate verification. A machine with
+# no bundle still starts the app: only HTTPS needs one, and curl then fails
+# each request with its own certificate error. Refusing here kept a sandbox
+# without /etc/ssl from showing the tray at all.
 if [ -z "${CURL_CA_BUNDLE:-}" ] && [ -z "${SSL_CERT_FILE:-}" ] && [ -z "${SSL_CERT_DIR:-}" ]; then
   ERGOPTI_SYSTEM_CA_FOUND=false
   for ERGOPTI_SYSTEM_CA_FILE in "${ERGOPTI_SYSTEM_CA_FILES[@]}"; do
@@ -48,7 +51,6 @@ if [ -z "${CURL_CA_BUNDLE:-}" ] && [ -z "${SSL_CERT_FILE:-}" ] && [ -z "${SSL_CE
     fi
   done
   if [ "$ERGOPTI_SYSTEM_CA_FOUND" != true ]; then
-    echo "Recipient system certificate bundle unavailable for the native package." >&2
-    return 1
+    echo "Recipient system certificate bundle unavailable for the native package: HTTPS requests will fail." >&2
   fi
 fi

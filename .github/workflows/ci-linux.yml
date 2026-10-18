@@ -3593,10 +3593,9 @@ jobs:
         run: node tools/ci/ci-stage-status.cjs admit-build linux
 
       - name: Install LuaJIT
-        # Three readers: the assembly smoke below boots the driver with it,
-        # build-linux-appimage.sh copies the BUILD HOST's luajit into the image
-        # (without it the AppImage falls back to a luajit the target must
-        # already have), and the tarball smoke runs the installed tree with it.
+        # The assembly smoke below boots the driver with it and the tarball
+        # smoke runs the installed tree with it. The AppImage bundles the
+        # luajit of its own build container instead, see the next step.
         run: |
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y luajit lua-luv curl binutils pkg-config \
             libglib2.0-dev glib-networking dconf-gsettings-backend \
@@ -3607,6 +3606,15 @@ jobs:
         env:
           ERGOPTI_BUILD_COMMIT: ${{ github.sha }}
         run: bash tools/build/build-linux-driver.sh
+
+      - name: Build the native files and the AppImage on the oldest supported LTS
+        # In an ubuntu:22.04 container, the release the AppImage catalogue tests
+        # on: built here, the bundled luajit needed GLIBC_2.38 and the image
+        # died there before showing its tray. The container also rebuilds the
+        # driver's archive backend in the bundle, before every package below
+        # is made from it. check-elf-glibc-ceiling.cjs refuses a newer need.
+        shell: bash
+        run: bash tools/build/appimage-oldest-lts.sh build
 
       - name: Package latest XKB files
         shell: bash
@@ -3637,38 +3645,29 @@ jobs:
           echo "... $bundle_entries entries"
 
       - name: Install the packaging toolchains
-        # rpmbuild is not on the runner image. appimagetool ships AS an AppImage,
-        # and an AppImage mounts itself through FUSE, which the runner does not
-        # have — so it is unpacked once and its AppRun is put on PATH instead.
+        # rpmbuild is not on the runner image. appimagetool runs in the AppImage
+        # build container above.
         shell: bash
         run: |
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y rpm
           rpmbuild --version
-          curl -fsSL --retry 3 --retry-delay 5 -o "$RUNNER_TEMP/appimagetool" \
-              https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
-          chmod +x "$RUNNER_TEMP/appimagetool"
-          (cd "$RUNNER_TEMP" && ./appimagetool --appimage-extract >/dev/null)
-          sudo ln -sf "$RUNNER_TEMP/squashfs-root/AppRun" /usr/local/bin/appimagetool
-          test -x /usr/local/bin/appimagetool
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y flatpak flatpak-builder
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 ||
               echo "::notice::no apparmor_restrict_unprivileged_userns knob here — continuing"
           flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y flathub org.freedesktop.Platform//24.08 org.freedesktop.Sdk//24.08
 
-      - name: Build the .deb, the .rpm, the AppImage and the Flatpak
-        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild,
-        # appimagetool and flatpak-builder respectively, which is how four
-        # packagers stayed unexercised while CI reported them green. The AppImage
-        # picks up the luajit installed above and bundles it; the Flatpak
-        # compiles its own inside the sandbox.
+      - name: Build the .deb, the .rpm and the Flatpak
+        # No --skip-* flag anywhere: those return before dpkg-deb, rpmbuild
+        # and flatpak-builder respectively, which is how the packagers stayed
+        # unexercised while CI reported them green. The Flatpak compiles its
+        # own luajit inside the sandbox.
         shell: bash
         run: |
           set -euo pipefail
           bash tools/build/build-linux-deb.sh
           bash tools/build/build-linux-rpm.sh
-          bash tools/build/build-linux-appimage.sh
           bash tools/build/build-linux-flatpak.sh
 
       - name: The staged payload carries the driver and the shared data tree
@@ -4380,6 +4379,21 @@ jobs:
         # there is no display here for a tray to appear in.
         shell: bash
         run: ./squashfs-root/AppRun --help
+
+      - name: Every bundled ELF file loads on the oldest supported LTS
+        if: env.INSTALL_KIND == 'appimage'
+        # The AppImage catalogue runs it on Ubuntu 22.04; one file needing a
+        # newer GLIBC_ version kills the launch before any icon appears.
+        shell: bash
+        run: node tools/build/check-elf-glibc-ceiling.cjs squashfs-root pkg
+
+      - name: It shows its tray icon on Ubuntu 22.04, offline
+        if: env.INSTALL_KIND == 'appimage'
+        # What the AppImage catalogue does with firejail: no network, a desktop
+        # launch by a user outside the input group, and a pass only when a
+        # window or a tray icon appears.
+        shell: bash
+        run: bash tools/build/appimage-oldest-lts.sh smoke "$(find pkg -name '*.AppImage' -type f | head -1)"
 
       - name: The bundled shared data tree resolves and opens
         if: env.INSTALL_KIND == 'appimage'
