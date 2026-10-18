@@ -9,7 +9,7 @@
  * proportion that is, and refuses to let it fall.
  *
  * ROOT CAUSE ENCODED:
- * test_adapter_contract_vectors.lua hard-codes the vectors in Lua and its
+ * test_adapter_contract_vectors_*.lua hard-code the vectors in Lua and their
  * docstring promised: "When the JS vectors are updated the Lua mirrors must be
  * updated to match — the tests will fail until they are synchronised, making
  * drift immediately visible."
@@ -41,10 +41,18 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const PORTS = path.join(ROOT, 'static/ergopti_plus/_shared/core/ports');
-const MIRROR = path.join(
-	ROOT,
-	'static/ergopti_plus/macos/tests/unit/adapters/contracts/test_adapter_contract_vectors.lua'
-);
+// The Lua mirror is split by port family into test_adapter_contract_vectors_*.lua.
+const MIRROR_DIR = path.join(ROOT, 'static/ergopti_plus/macos/tests/unit/adapters/contracts');
+const MIRROR_FILES = fs.existsSync(MIRROR_DIR)
+	? fs
+			.readdirSync(MIRROR_DIR)
+			.filter((f) => /^test_adapter_contract_vectors_\w+\.lua$/.test(f))
+			.map((f) => path.join(MIRROR_DIR, f))
+	: [];
+const MIRROR =
+	MIRROR_FILES.length > 0
+		? MIRROR_FILES[0]
+		: path.join(MIRROR_DIR, 'test_adapter_contract_vectors_*.lua');
 
 // Measured 2026-08-01. Raise as ids are added to the Lua tests; never lower.
 const BASELINE_TRACEABLE = 61;
@@ -55,7 +63,7 @@ if (!fs.existsSync(MIRROR)) {
 	console.error(`\x1b[31m[ERROR] mirror missing: ${MIRROR}\x1b[0m`);
 	process.exit(1);
 }
-const mirror = fs.readFileSync(MIRROR, 'utf8');
+const mirror = MIRROR_FILES.map((f) => fs.readFileSync(f, 'utf8')).join('\n');
 
 const perPort = [];
 let total = 0;
