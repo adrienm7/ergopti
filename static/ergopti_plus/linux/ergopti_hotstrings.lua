@@ -1450,16 +1450,19 @@ local function main()
 			cancel_selection = function() return privacy_owners.selection.cancel() end,
 			replace_selection = function(text, receipt, authorized, callback)
 				if opts.dry_run then callback(false); return false end
-				return privacy_owners.selection.replace(receipt, text, authorized, function(value, publication)
-					return injector.inject_selected(value, false, publication)
-				end, function(committed)
-					if committed then
-						-- The buffer no longer describes the physically replaced line.
-						_undoable = nil
-						engine:reset()
-					end
+				local invalidated = false
+				local function invalidate_document()
+					if invalidated then return end
+					invalidated = true
+					_undoable = nil
+					engine:reset()
+				end
+				return privacy_owners.selection.replace_staged(receipt, text, authorized, function(value, publication)
+					return injector.prepare_selected(value, publication)
+				end, function(committed, physical)
+					if committed or (type(physical) == "table" and physical.payload_written == true) then invalidate_document() end
 					callback(committed)
-				end)
+				end, invalidate_document)
 			end,
 			-- Retain the exact active text control: programmatic field changes can
 			-- happen inside one native window without any pointer or keyboard event.

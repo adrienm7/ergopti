@@ -16,19 +16,23 @@ function M.with(body)
 	text_owner.with(function(guard, field)
 		local names = { "adapters.selection_transaction", "adapters.atspi_focus", "modules.hotstrings.injector",
 			"adapters.clipboard", "adapters.shell_runner", "infra.display_server", "adapters.keyboard_layout",
-			"adapters.keyboard_hook", "logger.shim" }
+			"adapters.keyboard_hook", "logger.shim", "modules.hotstrings.selected_output", "infra.monotonic" }
 		local saved = {}
 		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
 		local state = { allowed = true, guard = guard, field = field, wire = {}, held = {}, writes = {},
-			clipboard = "SAVED", starts = 0, emits = 0, resets = 0, stopped = 0 }
+			clipboard = "SAVED", starts = 0, emits = 0, resets = 0, stopped = 0, now = 0,
+			selection = { first = 0, last = 3, text = "btw" }, requests = {} }
+		package.loaded["infra.monotonic"] = { now_ms = function() return state.now end }
+		package.loaded["modules.hotstrings.selected_output"] = nil
 		local function boundary(name)
 			if state.on_boundary then state.on_boundary(name) end
 		end
 		local native = { cached_snapshot = function()
 			return { native_bus_name = field.bus, native_object_path = field.path, role = field.role }
 		end }
-		function native.start_selection_capture(expected, _, callback)
+		function native.start_selection_capture(expected, options, callback)
 			state.starts = state.starts + 1
+			state.requests[#state.requests + 1] = options
 			local settled, listeners = false, {}
 			local operation = {}
 			function operation:is_settled() return settled end
@@ -36,8 +40,10 @@ function M.with(body)
 			function operation:on_settled(fn) listeners[#listeners + 1] = fn; return true end
 			state.deliver = function()
 				settled = true
-				callback({ bus = expected.bus, path = expected.path, role = expected.role,
-					first = 0, last = 3, text = "btw" })
+				local selected = options.span and state.inserted or state.selection
+				if selected then callback({ bus = expected.bus, path = expected.path, role = expected.role,
+					first = selected.first, last = selected.last, text = selected.text })
+				else callback(nil) end
 				for _, fn in ipairs(listeners) do fn() end
 			end
 			return operation
@@ -97,6 +103,22 @@ function M.with(body)
 				end,
 			})
 			state.authorized = function() boundary("authorized"); return state.allowed end
+			function state.staged(token, text, construct)
+				text = text or "☃"
+				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				local called, committed, result = false, false, nil
+				local accepted = state.owner.replace_staged(token, text, state.authorized, construct or injector.prepare_selected, function(value, physical)
+					called, committed, result = true, value, physical
+				end)
+				for _ = 1, 3 do
+					if called then break end
+					local deliver = assert(state.deliver, "native request must be retained")
+					state.deliver = nil
+					deliver()
+				end
+				helpers.assert_true(called, "staged completion must run")
+				return committed, result, accepted
+			end
 			function state.read()
 				local token
 				helpers.assert_true(state.owner.read(guard.focused_text_identity(), state.authorized, function(accepted, _, _, receipt)
@@ -105,18 +127,44 @@ function M.with(body)
 				state.deliver()
 				return assert(token)
 			end
-			function state.emit(text, publication)
-				state.emits = state.emits + 1
+			function state.construct(text, publication)
 				state.publication = publication
-				return injector.inject_selected(text, false, publication)
+				local stage = injector.prepare_selected(text, publication)
+				local payload = stage.payload
+				stage.payload = function() state.emits = state.emits + 1; return payload() end
+				return stage
 			end
 			function state.replace(token, emit, text)
 				local called, committed = false, false
-				local accepted = state.owner.replace(token, text or "☃", state.authorized, emit or state.emit, function(value)
+				text = text or "☃"
+				state.inserted = { first = 0, last = assert(require("compat.utf8").len(text)), text = text }
+				local construct = state.construct
+				if emit then
+					construct = function(value, publication)
+						local known_cleanup = false
+						return {
+							prepare = function() return publication.current() end,
+							payload = function()
+								state.emits = state.emits + 1
+								local result = emit(value, publication)
+								known_cleanup = type(result) == "table" and result.cleanup_ok == true
+									and result.failed_phase ~= "clipboard restoration"
+								if type(result) == "table" and result.cleanup_ok ~= nil then
+									result.native_cleanup_ok = known_cleanup
+									result.payload_written = result.ok == true
+								end
+								return result
+							end,
+							reselect = function() return { ok = true, cleanup_ok = true, native_cleanup_ok = true } end,
+							close = function() return known_cleanup end,
+						}
+					end
+				end
+				local accepted = state.owner.replace_staged(token, text, state.authorized, construct, function(value)
 					called, committed = true, value
 					if value then state.resets = state.resets + 1 end
 				end)
-				if accepted and not called then state.deliver() end
+				for _ = 1, 2 do if accepted and not called then state.deliver() end end
 				helpers.assert_true(called, "replacement completion must run")
 				return committed
 			end

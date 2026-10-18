@@ -212,7 +212,7 @@ end
 --- @return boolean True when the whole string was typed.
 local function send_text_native(tx, text, prepared)
 	if not (_uinput and _uinput.is_open()) then return false end
-	if not KeyboardLayout.is_ready() then return false end
+	if not prepared and not KeyboardLayout.is_ready() then return false end
 
 	if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= layout_plan_current
 		or KeyboardLayout.plan_view ~= layout_plan_view then return false end
@@ -536,8 +536,9 @@ end
 --- @param body function Called as body(transaction).
 --- @param publication table|nil Retained programmable publication owner.
 --- @param prepared table|nil Ordinary replacement guards checked before any output reservation.
+--- @param data_attempt function|nil Private mutation latch after admission, before native ACK.
 --- @return table Commit result.
-local function run_transaction(label, body, publication, prepared)
+local function run_transaction(label, body, publication, prepared, data_attempt)
 	if prepared then
 		local checked, reason = pcall(prepared.current)
 		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
@@ -553,6 +554,7 @@ local function run_transaction(label, body, publication, prepared)
 				if prepared then prepared.cached() end
 			end
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
+			if value == EVDEV_VALUE_DOWN and data_attempt then data_attempt(code, phase) end
 			return native_tx.emit(code, value, phase)
 		end,
 	}, { __index = native_tx })
@@ -985,36 +987,25 @@ function M.caret_steps(text)
 	return steps
 end
 
---- Types a text over the focused selection, then selects exactly what it typed.
----
---- Shift+Left per caret step, in the same transaction and on the same channel
---- as the text, so a keystroke from elsewhere cannot land between them. The
---- tone actions keep their rewrite selected this way, so the next step applies
---- to it.
---- @param text string Non-empty text to type.
---- @param is_private boolean|nil True when `text` must not be logged.
---- @param publication table|nil Original action and exact field admission guards.
---- @return table Commit result { ok, error?, cleanup_ok }.
-function M.inject_selected(text, is_private, publication)
-	if type(text) ~= "string" or text == "" then
-		Logger.error(LOG, "inject_selected(): text is %s, expected a non-empty string.", type(text))
-		return { ok = false, error = "invalid arguments", cleanup_ok = true }
-	end
+--- Reserves a selected rewrite route before preparation and native range checks.
+--- @param text string Non-empty private replacement.
+--- @param publication table Original action and exact field authority.
+--- @return table stage Explicit preparation, payload and reselection lifetime.
+function M.prepare_selected(text, publication)
 	local steps = M.caret_steps(text)
-	local result = run_transaction("inject_selected()", function(tx)
-		if not send_text(tx, text, is_private) then error(tx.error(), 0) end
-		-- The typed text must reach the application before it is selected back.
-		sleep_ms(INTER_PHASE_DELAY_MS)
-		require_publication(publication, false)
-		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
-		for _ = 1, steps do
-			must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
-			must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
-		end
-		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
-	end, publication)
-	if result.ok then Logger.done(LOG, "inject_selected(): done (%d step(s) selected).", steps) end
-	return result
+	return require("modules.hotstrings.selected_output").new(text, publication, {
+		channel = _uinput, current_channel = function() return _uinput end,
+		run = run_transaction, native = send_text_native, sleep = sleep_ms,
+		reselect = function(tx)
+			must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
+			for _ = 1, steps do
+				must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
+				must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
+			end
+			must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
+		end,
+		settle = function() sleep_ms(INTER_PHASE_DELAY_MS) end,
+	})
 end
 
 return M
