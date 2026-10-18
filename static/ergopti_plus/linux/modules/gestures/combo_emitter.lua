@@ -25,7 +25,7 @@
 --- no way to tell a wrong one from an unused one.
 --- `tests/unit/modules/gestures/engine/test_combo_emitter.lua` asserts that EVERY combo the
 --- generated catalogue contains resolves, and
---- `tests/unit/modules/shortcuts/actions/test_action_handlers_declared.lua` presses every declared
+--- `tests/unit/modules/shortcuts/actions/test_action_handlers_declared_every_action.lua` presses every declared
 --- modifier chord, so the bound is enforced rather than assumed: add an action
 --- or a chord key with a new name and the suite says so.
 ---
