@@ -80,16 +80,22 @@ local CommandLines = require("tests.support.command_lines")
 local only_filter = nil
 local module_group = nil
 if arg then
-	for i = 1, #arg do
-		if arg[i] == "--module" then
-			module_group = arg[i + 1]
-		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-module=") then
-			module_group = arg[i]:gsub("^%-%-module=", "")
-		elseif arg[i] == "--only" then
-			only_filter = arg[i + 1]
-		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
-			only_filter = arg[i]:gsub("^%-%-only=", "")
+	local index = 1
+	while index <= #arg do
+		local option, value = arg[index]:match("^(%-%-[%w%-]+)=(.*)$")
+		local separated = option == nil
+		option = option or arg[index]
+		if option ~= "--only" and option ~= "--module" then
+			io.stderr:write("tests/run.lua: unknown argument " .. tostring(arg[index]) .. "\n")
+			os.exit(2)
 		end
+		if separated then value = arg[index + 1] end
+		if type(value) ~= "string" or value == "" or (separated and value:sub(1, 2) == "--") then
+			io.stderr:write("tests/run.lua: " .. option .. " requires a nonempty value\n")
+			os.exit(2)
+		end
+		if option == "--only" then only_filter = value else module_group = value end
+		index = index + (separated and 2 or 1)
 	end
 end
 
