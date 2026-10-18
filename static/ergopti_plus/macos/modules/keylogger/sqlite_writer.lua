@@ -68,7 +68,7 @@ local _terminal_db_close_debt = nil
 
 --- A file close can consume its descriptor before reporting failure. Retain its
 --- exact owner as unresolved debt, but never retry that ambiguous close.
-local _media_schema_close_debt = nil
+local _schema_close_debt = nil
 
 --- Per-device sequential event id counter.
 local _next_event_id = 1
@@ -138,17 +138,35 @@ local _now_ts = require("modules.keylogger.timestamp").now_ts
 --- resolver (Paths.shared) so the shared root lives in exactly one place.
 local _SCHEMA_SQL_PATH = Paths.shared("data/db/schema.sql")
 
+--- Read and retire one schema stream before admitting its SQL.
+--- @param path string Canonical schema path.
+--- @param label string Non-sensitive schema label for diagnostics.
+--- @return string|nil body Full DDL only after read and close both succeed.
+local function _read_schema_file(path, label)
+	local opened, file, open_error = pcall(io.open, path, "r")
+	if not opened or file == nil then
+		Logger.error(LOG, "Cannot open %s: %s.", label, tostring(opened and open_error or file))
+		return nil
+	end
+	local read_ok, body, read_error = pcall(file.read, file, "*a")
+	local close_ok, closed, close_error = pcall(file.close, file)
+	if not read_ok or type(body) ~= "string" then
+		Logger.error(LOG, "Cannot read %s: %s.", label, tostring(read_ok and read_error or body))
+	end
+	if not close_ok or closed ~= true then
+		_schema_close_debt = file
+		Logger.error(LOG, "Cannot close %s; exact owner retained without retry: %s.",
+			label, tostring(close_ok and close_error or closed))
+		return nil
+	end
+	if not read_ok or type(body) ~= "string" then return nil end
+	return body
+end
+
 --- Read the canonical schema.sql from disk.
 --- @return string|nil The full DDL text, or nil on IO error.
 local function _read_schema_sql()
-	local fh, err = io.open(_SCHEMA_SQL_PATH, "r")
-	if not fh then
-		Logger.error(LOG, "Cannot open schema.sql at %s: %s.",
-			_SCHEMA_SQL_PATH, tostring(err))
-		return nil
-	end
-	local body = fh:read("*a"); fh:close()
-	return body
+	return _read_schema_file(_SCHEMA_SQL_PATH, "schema.sql")
 end
 
 
@@ -223,27 +241,7 @@ local function _initialize_db(db, existed)
 		Logger.success(LOG, "Schema applied (version 1).")
 	end
 
-	local media_opened, media_file, media_open_error = pcall(io.open,
-		Paths.shared("data/db/media_schema.sql"), "r")
-	local media_schema = nil
-	if not media_opened or media_file == nil then
-		Logger.error(LOG, "Cannot open semantic media schema: %s.",
-			tostring(media_opened and media_open_error or media_file))
-	else
-		local read_ok, body, read_error = pcall(media_file.read, media_file, "*a")
-		local close_ok, closed, close_error = pcall(media_file.close, media_file)
-		if not read_ok or type(body) ~= "string" then
-			Logger.error(LOG, "Cannot read semantic media schema: %s.",
-				tostring(read_ok and read_error or body))
-		end
-		if not close_ok or closed ~= true then
-			_media_schema_close_debt = media_file
-			Logger.error(LOG, "Semantic media schema close failed; exact owner retained without retry: %s.",
-				tostring(close_ok and close_error or closed))
-		elseif read_ok and type(body) == "string" then
-			media_schema = body
-		end
-	end
+	local media_schema = _read_schema_file(Paths.shared("data/db/media_schema.sql"), "semantic media schema")
 	if media_schema == nil then
 		return false
 	end
@@ -340,7 +338,7 @@ end
 --- @return boolean True on success, false on unrecoverable error.
 function M.open_db()
 	if not _require_init("open_db") then return false end
-	if _db ~= nil or _startup_db_debt ~= nil or _terminal_db_close_debt ~= nil or _media_schema_close_debt ~= nil then
+	if _db ~= nil or _startup_db_debt ~= nil or _terminal_db_close_debt ~= nil or _schema_close_debt ~= nil then
 		Logger.error(LOG, "Cannot reopen SQLite while a database or startup cleanup is owned.")
 		return false
 	end
@@ -371,7 +369,7 @@ end
 function M.close_db()
 	if _terminal_db_close_debt ~= nil then return false end
 	local db = _startup_db_debt or _db
-	if db == nil then return _media_schema_close_debt == nil end
+	if db == nil then return _schema_close_debt == nil end
 	local closed, retryable = _close_owned_db(db)
 	if not closed then
 		if not retryable then
@@ -382,7 +380,7 @@ function M.close_db()
 	end
 	if _db == db then _db = nil end
 	if _startup_db_debt == db then _startup_db_debt = nil end
-	return _db == nil and _startup_db_debt == nil and _media_schema_close_debt == nil
+	return _db == nil and _startup_db_debt == nil and _schema_close_debt == nil
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.
