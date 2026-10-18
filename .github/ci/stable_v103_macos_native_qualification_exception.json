@@ -12,8 +12,15 @@
 	"channel": "main",
 	"tag": "v1.0.3",
 	"version": "1.0.3",
-	"authorization_note": "Explicit human authorization on 2026-10-18 (\"v1.0.3 depuis dev complet\": publish v1.0.3 from current dev with the same macOS native scopes deferred one last time, exception limited to v1.0.3) because v1.0.2 expands hotstrings in terminals after 750-960 ms and dev fixes it. The native PAC/WPAD and independent HTTP client qualifications passed on hosted runners on both architectures and are mandatory again. Only the scopes listed here, still red or never run on hosted runners, remain DEFERRED/qualified:false; drop each one as soon as it is green. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"authorization_note": "Explicit human authorization on 2026-10-18 (\"v1.0.3 depuis dev complet\": publish v1.0.3 from current dev with the same macOS native scopes deferred one last time, exception limited to v1.0.3) because v1.0.2 expands hotstrings in terminals after 750-960 ms and dev fixes it. The native PAC/WPAD qualification passed on hosted runners on both architectures and is mandatory again; the independent HTTP wire clients, green on tmp/macos-deferred, timed out in the v1.0.3 release run 39144577314 and are deferred like on v1.0.2. Only the scopes listed here, still red or never run on hosted runners, remain DEFERRED/qualified:false; drop each one as soon as it is green. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
 	"scopes": {
+		"macos-native-http": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["e2e-hs", "Receive actual independent managed HTTP native clients"],
+			"command": "static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py",
+			"reason": "Only independent native wire clients are DEFERRED and qualified:false: in the v1.0.3 release run 39144577314 the package step full-URL PAC-URL fallback client (RealNativeClientReceiving.test01RealHTTPXFullURLPACURLFallbackAndVerifiedPhysicalChildEOF) deterministically timed out with \"Managed network request failed: deadline\"; owned-process/client-only tests remain mandatory at both call sites."
+		},
 		"macos-brew-archive": {
 			"kind": "swift_test_file",
 			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",

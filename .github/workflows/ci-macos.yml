@@ -935,7 +935,7 @@ jobs:
           fi
           status=0
           if [ "$mode" = deferred ]; then
-              test "$profile" = stable-v1-0-2-20261017-six-macos-native-scopes
+              test "$profile" = stable-v1-0-2-20261017-six-macos-native-scopes || test "$profile" = stable-v1-0-3-20261018-macos-native-scopes
               "$ERGOPTI_NATIVE_HTTP_PYTHON" tools/diagnostics/macos_owned_process_native_test.py || status=1
               "$ERGOPTI_NATIVE_HTTP_PYTHON" static/ergopti_plus/macos/tests/support/native_http_receiving_test.py --client-only || status=1
               echo "[DEFERRED] macos-native-http: only wire receiver omitted; owned-process and client-only remain mandatory; qualified=false."
