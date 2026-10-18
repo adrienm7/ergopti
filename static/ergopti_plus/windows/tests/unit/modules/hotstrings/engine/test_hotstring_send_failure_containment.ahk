@@ -88,6 +88,7 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 	PreviousSettle := CBClipboardOwner.settle_hook
 	Token := 0
 	Job := 0
+	RetiredTimer := 0
 	try {
 		CBClipboardOwner.settle_hook := 0
 		State := Map("restore_action", RestoreAction, "context_action", ContextAction,
@@ -99,6 +100,7 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 			"callback", _SCFC_Deliver.Bind(State), "started", Started,
 			"foreground", 101, "clipboard", "owned snapshot", "clear_sequence", 100,
 			"owner_token", Token, "expected_change", 0, "timer", (*) => 0)
+		RetiredTimer := Job["timer"]
 		_SelectionCaptureJob := Job
 		Sequence := () => 101
 		_SelectionCaptureFinish(Job, "captured text", Deliver, Reason,
@@ -111,6 +113,7 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 			AssertEqual(0, State["delivery_active"])
 		}
 		AssertEqual("", Job["clipboard"], "snapshot reference must retire")
+		AssertEqual(0, Job["timer"], "the bound timer reference must retire")
 		AssertFalse(CBClipboardOwner.restore_debt)
 		AssertEqual(0, CBClipboardOwner.active.Count)
 		if Reason == "superseded by input"
@@ -127,8 +130,8 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 		AssertEqual(Expected, State["deliveries"], "stale completion must not redeliver")
 		AssertEqual(Restores, State["restores"], "stale completion must not restore")
 	} finally {
-		if IsObject(Job)
-			SetTimer(Job["timer"], 0)
+		if IsObject(RetiredTimer)
+			SetTimer(RetiredTimer, 0)
 		SetTimer(CB_RetryRestoreDebt, 0)
 		; Only this fixture's exact owned token may be retired on assertion failure.
 		if Token and CBClipboardOwner.active.Has(Token)
@@ -304,3 +307,175 @@ for Boundary in ["snapshot", "clear", "sequence", "send"] {
 }
 Test("hotstrings: ordinary selection startup retains its native timer (selection-startup-revocation)",
 	_SCSC_Startup.Bind("none", "none"))
+
+class _SCL_Callback {
+	__New(State) {
+		this.State := State
+	}
+	Call(Text) {
+		this.State["deliveries"] += 1
+		this.State["text"] := Text
+		if this.State["throw"]
+			throw Error("injected selection callback failure")
+	}
+	__Delete() {
+		this.State["deleted"] += 1
+	}
+}
+
+_SCL_TimerLifetime(Reason) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	AssertFalse(CBClipboardOwner.restore_debt)
+	PreviousId := _SelectionCaptureNextId
+	PreviousGeneration := CBClipboardOwner.generation
+	PreviousSuspended := A_IsSuspended
+	PreviousSettle := CBClipboardOwner.settle_hook
+	State := Map("boundary", "none", "action", "none", "revoked", false,
+		"saves", 0, "clears", 0, "sequences", 0, "sends", 0, "restores", 0,
+		"deliveries", 0, "text", "", "deleted", 0, "throw", Reason == "callback error")
+	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
+		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
+		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+	Job := 0
+	RetiredTimer := 0
+	OnReady := _SCL_Callback(State)
+	try {
+		CBClipboardOwner.settle_hook := 0
+		Suspend(false)
+		AssertTrue(GetSelectionAsync(OnReady, Ports))
+		OnReady := 0
+		Job := _SelectionCaptureJob
+		RetiredTimer := Job["timer"]
+		if Reason == "cancelled" {
+			_SelectionCaptureFinish(Job, "", false, "cancelled",
+				Ports["restore"], Ports["sequence"])
+		} else {
+			_SelectionCaptureFinish(Job, "captured selection", true, "ready",
+				Ports["restore"], Ports["sequence"],
+				(*) => Map("foreground", 101, "elapsed", 0, "idle", 0))
+		}
+		AssertFalse(IsObject(_SelectionCaptureJob))
+		AssertEqual(0, Job["timer"], "retirement must detach the exact bound callback")
+		AssertEqual(Reason == "cancelled" ? 0 : 1, State["deliveries"])
+		AssertEqual(Reason == "cancelled" ? "" : "captured selection", State["text"])
+		AssertEqual(0, CBClipboardOwner.active.Count)
+		AssertFalse(CBClipboardOwner.restore_debt)
+		RetiredTimer.Call()
+		AssertEqual(Reason == "cancelled" ? 0 : 1, State["deliveries"],
+			"a captured retired callback must remain inert")
+		Job := 0
+		AssertEqual(0, State["deleted"], "the retained original timer still owns the callback")
+		RetiredTimer := 0
+		AssertEqual(1, State["deleted"],
+			"native timer cancellation and job detachment must release the last owner")
+	} finally {
+		if IsObject(Job) {
+			if IsObject(RetiredTimer)
+				SetTimer(RetiredTimer, 0)
+			Job["timer"] := 0
+			Job["callback"] := 0
+			CB_EndOwnedTransaction(Job["owner_token"])
+		}
+		SetTimer(CB_RetryRestoreDebt, 0)
+		if CBClipboardOwner.restore_debt is Map {
+			CB_EndOwnedTransaction(CBClipboardOwner.restore_debt["owner_token"])
+			CBClipboardOwner.restore_debt := 0
+		}
+		CBClipboardOwner.settle_hook := PreviousSettle
+		CBClipboardOwner.generation := PreviousGeneration
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+
+for Reason in ["completed", "cancelled", "callback error"] {
+	Test("hotstrings: selection " . Reason . " releases its bound timer (selection-timer-release)",
+		_SCL_TimerLifetime.Bind(Reason))
+}
+
+_SCO_Sequence(State) {
+	State["sequences"] += 1
+	return State["external"] and State["sequences"] > 1 ? 43 : 42
+}
+
+_SCO_Settle(State, Ports) {
+	global _SelectionCaptureJob
+	; A new command can enter at the central owner's real settlement boundary.
+	CBClipboardOwner.settle_hook := 0
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	AssertFalse(CBClipboardOwner.restore_debt)
+	State["successor_started"] := GetSelectionAsync((*) => 0, Ports)
+	State["successor"] := _SelectionCaptureJob
+}
+
+_SCO_StartupSettlement(ExternalCopy) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	AssertFalse(CBClipboardOwner.restore_debt)
+	PreviousId := _SelectionCaptureNextId
+	PreviousGeneration := CBClipboardOwner.generation
+	PreviousSuspended := A_IsSuspended
+	PreviousSettle := CBClipboardOwner.settle_hook
+	State := Map("boundary", "send", "action", "cancel", "revoked", false,
+		"saves", 0, "clears", 0, "sequences", 0, "sends", 0, "restores", 0,
+		"job", 0, "successor", 0, "successor_started", false, "external", ExternalCopy)
+	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
+		"sequence", _SCO_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
+		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+	try {
+		Suspend(false)
+		CBClipboardOwner.settle_hook := ExternalCopy ? 0 : _SCO_Settle.Bind(State, Ports)
+		AssertFalse(GetSelectionAsync((*) => 0, Ports))
+		AssertTrue(State["revoked"])
+		AssertEqual("", State["job"]["clipboard"])
+		AssertEqual(0, State["job"]["timer"])
+		if ExternalCopy {
+			AssertEqual(0, State["restores"], "the newer clipboard sequence must win")
+			AssertFalse(IsObject(_SelectionCaptureJob))
+		} else {
+			AssertEqual(1, State["restores"])
+			AssertTrue(State["successor_started"])
+			AssertTrue(_SelectionCaptureJob == State["successor"],
+				"old startup cleanup must preserve the successor admitted during settlement")
+			AssertTrue(_SelectionCaptureJob["id"] > State["job"]["id"])
+			AssertTrue(IsObject(_SelectionCaptureJob["timer"]))
+			AssertEqual(1, CBClipboardOwner.active.Count)
+			_SelectionCapturePoll(State["job"])
+			AssertTrue(_SelectionCaptureJob == State["successor"])
+			_SelectionCaptureFinish(_SelectionCaptureJob, "", false, "cancelled",
+				Ports["restore"], Ports["sequence"])
+		}
+		AssertEqual(0, CBClipboardOwner.active.Count)
+		AssertFalse(CBClipboardOwner.restore_debt)
+	} finally {
+		CBClipboardOwner.settle_hook := 0
+		for Job in [State["job"], State["successor"]] {
+			if !IsObject(Job)
+				continue
+			if IsObject(Job["timer"])
+				SetTimer(Job["timer"], 0)
+			Job["timer"] := 0
+			Job["callback"] := 0
+			CB_EndOwnedTransaction(Job["owner_token"])
+		}
+		SetTimer(CB_RetryRestoreDebt, 0)
+		if CBClipboardOwner.restore_debt is Map {
+			CB_EndOwnedTransaction(CBClipboardOwner.restore_debt["owner_token"])
+			CBClipboardOwner.restore_debt := 0
+		}
+		CBClipboardOwner.settle_hook := PreviousSettle
+		CBClipboardOwner.generation := PreviousGeneration
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+
+Test("hotstrings: startup rollback yields to a newer clipboard (selection-startup-owner-settlement)",
+	_SCO_StartupSettlement.Bind(true))
+Test("hotstrings: startup rollback preserves its settlement successor (selection-startup-owner-settlement)",
+	_SCO_StartupSettlement.Bind(false))
