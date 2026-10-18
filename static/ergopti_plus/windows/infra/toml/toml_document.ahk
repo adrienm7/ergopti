@@ -444,11 +444,11 @@ TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
 
 
 ; Only an explicit assignment or namespace replacement owns a physical value.
-; The same case-insensitive native Maps select the actual flat writer targets;
-; semantic source admission independently rejects collapsed namespace aliases.
+; Flat native Maps and TOML section identities are case-sensitive. Share this
+; predicate with model replacement so retained physical siblings match the model.
 _TOML_RecordSectionDropped(Section, Prefixes) {
 	for Prefix in Prefixes {
-		if Section = Prefix || InStr(Section, Prefix . ".") == 1
+		if Section == Prefix || InStr(Section, Prefix . ".", true) == 1
 			return true
 	}
 	return false

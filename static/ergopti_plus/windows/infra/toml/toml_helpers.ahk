@@ -925,13 +925,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 			if (ExactSectionPrefixes.Length > 0) {
 					KeptOrder := []
 					for _, SecName in order {
-							DropSection := false
-							for _, Prefix in ExactSectionPrefixes {
-									if (SecName = Prefix or InStr(SecName, Prefix . ".") = 1) {
-											DropSection := true
-											break
-									}
-							}
+							DropSection := _TOML_RecordSectionDropped(SecName, ExactSectionPrefixes)
 							if DropSection
 									Sections.Delete(SecName)
 							else

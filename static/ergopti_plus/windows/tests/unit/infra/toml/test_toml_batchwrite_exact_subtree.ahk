@@ -283,3 +283,41 @@ _TBES_ConfigDeletionAncestorVector(Vector) {
 for _TBES_ConfigDeletionVector in _TBES_ConfigDeletionAncestorVectors()
 	Test("toml config deletion ancestry: " . _TBES_ConfigDeletionVector.Id,
 		_TBES_ConfigDeletionAncestorVector.Bind(_TBES_ConfigDeletionVector))
+
+_TBES_CaseDistinctNamespace(BuildOnly) {
+	Path := _CTU_NewPath()
+	Foreign := '[Records]`nkeep = "001" # exact case root`n'
+		. '[Records.active]`nvalue = false # exact case child`n'
+	Source := '[records]`nold = false`n[records.active]`nvalue = 1`n' . Foreign
+	try {
+		AssertTrue(FSWrite(Path, Source))
+		for Updates in [[{ Section: "records.active", Key: "value", Value: 2 }], []] {
+			if BuildOnly {
+				Before := FSReadUtf8Exact(Path)
+				Candidate := TOML_BuildUpdatedContent(Path, Updates, ["records"])
+				AssertEqual("ok", Candidate["status"], "a case-distinct sibling remains an admissible source")
+				AssertEqual(Before, FSReadUtf8Exact(Path), "detached replacement never publishes")
+				AssertTrue(FSWrite(Path, Candidate["content"]))
+			} else {
+				AssertTrue(TOML_BatchWrite(Path, Updates, ["records"]))
+			}
+			Saved := FSReadUtf8Exact(Path)
+			AssertContains(Saved, Foreign, "replacing a namespace preserves case-distinct physical siblings")
+			Data := TOML_ParseFreshFile(Path)
+			AssertTrue(Data.Has("Records") && Data.Has("Records.active"))
+			AssertTrue(Data["Records"]["keep"] is String)
+			AssertEqual("001", Data["Records"]["keep"])
+			AssertFalse(Data["Records.active"]["value"])
+			AssertFalse(Data.Has("records"), "the replaced old root must not survive")
+			if Updates.Length {
+				AssertEqual(2, Data["records.active"]["value"])
+			} else {
+				AssertFalse(Data.Has("records.active"), "an empty replacement removes the exact subtree")
+			}
+		}
+	} finally FSDelete(Path)
+}
+Test("TOML: detached exact replacement preserves case twins (toml-exact-prefix-case)",
+	_TBES_CaseDistinctNamespace.Bind(true))
+Test("TOML: published exact replacement preserves case twins (toml-exact-prefix-case)",
+	_TBES_CaseDistinctNamespace.Bind(false))
