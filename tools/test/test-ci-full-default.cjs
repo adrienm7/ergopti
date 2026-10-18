@@ -531,6 +531,8 @@ for (const [rel, id, name] of [
 	],
 	[MAC, 'e2e-hs', 'Qualify actual selected number-row Carbon XCTest controls'],
 	[MAC, 'e2e-hs', 'Retain selected number-row Carbon XCTest diagnostics'],
+	[MAC, 'e2e-hs', 'Qualify actual input-source AppleScript XCTest controls'],
+	[MAC, 'e2e-hs', 'Retain input-source AppleScript XCTest diagnostics'],
 	[MAC, 'e2e-hs', 'Observe the actual no-prompt SDK permission API independently'],
 	[MAC, 'e2e-hs', 'Qualify actual SDK accepted-owner and deadline XCTest controls'],
 	[MAC, 'e2e-hs', 'Qualify actual native PAC and WPAD XCTest controls'],
