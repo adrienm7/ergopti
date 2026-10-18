@@ -567,18 +567,7 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 		completionHandler: @escaping (URLRequest?) -> Void) {
 		// HTTPX receives the original redirect and handles credential stripping,
 		// hop limits and the next complete request URL before native dispatch.
-		// Declining alone kept the redirect body flowing before its headers
-		// reached the caller, so a held body stalled the successor. Publish the
-		// redirect head here and retire the task; no redirect body is delivered.
-		if !receivedHeaders, failure == nil {
-			let headers = response.allHeaderFields.map { [String(describing: $0.key), String(describing: $0.value)] }
-			if json(tag: 72, object: ["version": 1, "status": response.statusCode, "headers": headers]) {
-				receivedHeaders = true
-			}
-			failure = "protocol"
-		}
 		completionHandler(nil)
-		task.cancel()
 	}
 
 	func urlSession(_ session: URLSession, dataTask: URLSessionDataTask,
