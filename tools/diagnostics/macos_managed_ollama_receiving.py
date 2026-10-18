@@ -95,7 +95,10 @@ RECEIVER_FAILURE_CODES = frozenset(
 )
 # Closed, text-free classes for daemon pull error rows; the raw text can name
 # private hosts and paths and is never published.
+# Order matters: error texts name blob URLs that contain "sha256", so the
+# transport classes are matched before the digest class.
 PULL_ERROR_CLASSES = (
+    ("dns", ("no such host", "lookup ")),
     ("certificate", ("certificate", "x509", "tls")),
     ("proxy", ("proxy",)),
     ("deadline", ("timeout", "deadline")),
