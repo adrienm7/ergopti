@@ -72,7 +72,7 @@ local function emit(index,code,value)
 	assert(await(function() pump();return #rows>before end,1000),'real source transition never reached output')
 end
 local function bitmap(slot)
-	return assert(Reader.pressed_keys(slot,767),'native key bitmap unavailable')
+	return (assert(Reader.pressed_keys(slot,767),'native key bitmap unavailable'))
 end
 local function caps_state()
 	local leds=assert(Reader.active_leds('keyboard:'..paths[1],1))
@@ -100,6 +100,7 @@ local ok,failure=xpcall(function()
 	keyboards[1].set_led(paths[1],0,1)
 	assert(Reader.active_leds('keyboard:'..paths[1],1)[0]==true,'real source LED_NUM did not turn on')
 	emit(1,79,1);emit(1,79,0)
+	record('positive-control-observed',{matcher=table.concat(chars),sink_native_text=table.concat(sink_chars),rows=rows,state=caps_state()})
 	assert(table.concat(chars)=='1' and table.concat(sink_chars)=='1','native NumLock positive controls disagree')
 	record('positive-control',{matcher=table.concat(chars),rows=rows,state=caps_state()})
 	chars,rows,sink_chars={},{},{}
