@@ -45,7 +45,7 @@ end
 --- @param body function
 --- @return table lines
 local function capture_logs(body)
-	local Logger = require("logger")
+	local Logger = require("logger.shim")
 	local lines = {}
 	local previous_level = Logger.get_level()
 	Logger.set_level(10)
@@ -192,24 +192,26 @@ end)
 
 describe("Driver version: the crash dump names the version and the app dir", function()
 	it("writes both lines although the daemon passes no context", function()
-		local Paths = require("infra.paths")
-		local Version = require("infra.version")
-		local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
-		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-		local parts = {}
-		io.open = function()
-			return {
-				write = function(_, s) parts[#parts + 1] = s; return true end,
-				close = function() return true end,
-			}
-		end
-		os.execute = function() return true end
-		io.popen = function() return nil end
-		local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")
-		io.open, os.execute, io.popen = real_open, real_exec, real_popen
-		if not ok then error(err, 0) end
-		local body = table.concat(parts)
-		assert_true(body:find("Version:   " .. Version.VERSION .. " (" .. Version.SOURCE .. ")", 1, true) ~= nil, body)
-		assert_true(body:find("App dir:   " .. Paths.driver_root(), 1, true) ~= nil, body)
+		require("tests.support.modules.diagnostics.crash_admission").with_admission(function(redact)
+			local Paths = require("infra.paths")
+			local Version = require("infra.version")
+			local Reporter = helpers.load_module("modules.diagnostics.crash_reporter")
+			local real_open, real_exec, real_popen = io.open, os.execute, io.popen
+			local parts = {}
+			io.open = function()
+				return {
+					write = function(_, s) parts[#parts + 1] = s; return true end,
+					close = function() return true end,
+				}
+			end
+			os.execute = function() return true end
+			io.popen = function() return nil end
+			local ok, err = pcall(Reporter.dump, "ergopti_hotstrings", "boom")
+			io.open, os.execute, io.popen = real_open, real_exec, real_popen
+			if not ok then error(err, 0) end
+			local body = table.concat(parts)
+			assert_true(body:find("Version:   " .. Version.VERSION .. " (" .. Version.SOURCE .. ")", 1, true) ~= nil, body)
+			assert_true(body:find("App dir:   " .. redact(Paths.driver_root()), 1, true) ~= nil, body)
+		end)
 	end)
 end)
