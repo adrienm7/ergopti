@@ -82,6 +82,9 @@
                 --set LUA_PATH "$out/lib/ergopti/?.lua;$out/lib/ergopti/?/init.lua;$out/lib/ergopti/_shared/lua/?.lua;$out/lib/ergopti/_shared/lua/?/init.lua;;" \
                 --prefix PATH : ${nixpkgs.lib.makeBinPath (with pkgs; [
                   xclip wl-clipboard xdotool libxkbcommon libnotify curl
+                  # Metrics must not borrow key derivation, SQLite or directory
+                  # creation commands from the user's optional login profile.
+                  openssl sqlite coreutils
                 ])} \
                 --prefix LD_LIBRARY_PATH : ${nixpkgs.lib.makeLibraryPath (with pkgs; [
                   # BEGIN GENERATED LINUX NATIVE REQUIREMENTS

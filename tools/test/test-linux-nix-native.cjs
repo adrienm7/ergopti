@@ -112,6 +112,28 @@ const out = '/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-ergopti-plus-dev';
 check('one native store output', () =>
 	assert.equal(outputReceipt([{ drvPath: out + '.drv', outputs: { out } }]), out)
 );
+check('Nix metrics commands belong to the installed executable closure (nix-metrics-cli)', () => {
+	const flake = fs.readFileSync(path.join(root, 'tools/build/nix/flake.nix'), 'utf8');
+	const wrapper = flake.match(
+		/--prefix PATH : \$\{nixpkgs\.lib\.makeBinPath \(with pkgs; \[([\s\S]*?)\]\)\}/
+	);
+	assert.ok(wrapper, 'The actual installed launcher must declare its executable closure.');
+	const packages = wrapper[1]
+		.replace(/#[^\n]*/g, '')
+		.trim()
+		.split(/\s+/);
+	for (const [provider, operation] of [
+		['openssl', 'derive the configured at-rest key'],
+		['sqlite', 'persist and read the metrics database'],
+		['coreutils', 'create the private metrics data directory']
+	]) {
+		assert.equal(
+			packages.filter((name) => name === provider).length,
+			1,
+			`The installed launcher must provide ${provider} to ${operation}, without borrowing host PATH.`
+		);
+	}
+});
 for (const value of [
 	[],
 	[{ drvPath: out + '.drv', outputs: { out: '/workspace/fake-ergopti' } }],
