@@ -446,6 +446,43 @@ helpers.describe("acceptance retires the originating prediction request", functi
 
 end)
 
+helpers.describe("prediction dismissal retains request ownership", function()
+	for _, cancellation in ipairs({ "acknowledged", "refused", "raised" }) do
+		helpers.it("preserves a successor when old cancellation is " .. cancellation .. " (dismissal-owner)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
+			local ok, err = pcall(function()
+				engine.predict("Original context", { app_id = "original-app" }, { num_predictions = 1 })
+				local original = calls.remote[1]
+				original.chunk(" original completion is available now")
+				helpers.assert_eq(#engine.get_suggestions(), 1)
+				calls.on_cancel = function()
+					calls.on_cancel = nil
+					-- Native cancellation can dispatch another user action before returning.
+					engine.dismiss()
+					calls.focus = "x11:fixture:2"
+					engine.predict("Successor context", { app_id = "successor-app" }, { num_predictions = 1 })
+					scheduler.settle()
+					helpers.assert_eq(#calls.remote, 2)
+					calls.remote[2].chunk(" successor completion remains visible now")
+					if cancellation == "raised" then error("old cancellation failed after native dispatch", 0) end
+				end
+				calls.cancel_refused = cancellation == "refused"
+				engine.dismiss()
+				original.chunk(" obsolete extra text")
+				original.done(" obsolete original completion must stay retired", nil)
+				scheduler.settle()
+				helpers.assert_eq(engine.is_predicting(), true, "Old dismissal cannot retire a newer transport")
+				helpers.assert_eq(#engine.get_suggestions(), 1, "The successor keeps its own offer")
+				helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+				helpers.assert_eq(calls.applied, 0)
+				helpers.assert_eq(calls.resets, 0)
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
+
 helpers.describe("ordinary predictions retain their exact native target", function()
 	for _, boundary in ipairs({ "privacy", "focus" }) do
 		for _, transition in ipairs({ "scope", "shutdown" }) do

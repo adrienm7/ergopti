@@ -2666,11 +2666,20 @@ function M.dismiss(resync_owner)
 		AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, false)
 	end
 	advance_request_epoch(resync_owner)
-	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
-	if _predicting and _inflight_backend then _inflight_backend.cancel() end
-	_inflight_backend = nil
-	_predicting = false
-	clear_offer()
+	local retired_epoch, timer = _request_epoch, _rate_timer
+	local backend = _predicting and _inflight_backend or nil
+	_rate_timer, _inflight_backend, _predicting = nil, nil, false
+	-- Native cancellation can dispatch another user action synchronously. Detach
+	-- the old state first, then leave any successor request and offer untouched.
+	clear_offer(true)
+	if timer then _scheduler.cancel(timer) end
+	if backend then
+		local ok, cancelled = pcall(backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "Dismissed prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
+	if _request_epoch == retired_epoch then hide_overlay() end
 end
 
 
