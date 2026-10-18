@@ -296,6 +296,7 @@ end
 --- both Left, a physical Backspace and the layer's are each one key to the
 --- kernel, and the first release must not lift it under the others.
 local output_holders = setmetatable({}, { __mode = "k" })
+local source_holds = setmetatable({}, { __mode = "k" })
 
 --- Retains producer custody separately from the stable public event shape.
 local function hold_row(self, out, code, value)
@@ -919,7 +920,7 @@ end
 --- @return string|table|nil tap What to run after them: a catalogue action, or
 ---   { type_text } for text the layout cannot type
 --- @return string|nil binding Exact tap_hold__ source of a catalogue action.
-function M:process(code, value, now_ms, receipt)
+local function process(self, code, value, now_ms, receipt)
 	local config = self.by_code[code]
 	local out = {}
 	if value == DOWN then
@@ -1113,6 +1114,53 @@ function M:process(code, value, now_ms, receipt)
 	return pass(self, code, value)
 end
 
+--- Each native source owns its own standalone hold. A concurrent same-code
+--- press adds a modifier reference but cannot inherit the first source's tap.
+--- Its UP can retire only the state admitted by its own original DOWN.
+function M:process(code, value, now_ms, receipt)
+	local source = type(receipt) == "table" and rawget(receipt, "source") or nil
+	local generation = source and rawget(receipt, "generation") or nil
+	local native_owner = source and rawget(receipt, "source_owner") or nil
+	local scoped = type(source) == "string" and source ~= "" and type(generation) == "number"
+	if scoped and native_owner and rawget(receipt, "source_current") ~= true then return {} end
+	local groups = source_holds[self]
+	if scoped and not groups then groups = {}; source_holds[self] = groups end
+	local group = groups and groups[code]
+	if scoped and group then
+		local own = group[source]
+		if own and (own.generation ~= generation or not rawequal(own.native_owner, native_owner)) then return {} end
+		if value == DOWN then
+			if own then return {} end
+			local original = self.held[code]
+			if not original or original.undecided then return {} end
+			local out, state = {}, { down_at = now_ms, cancelled = true, emitted = {},
+				layer = original.layer, hold_pending = original.hold_pending }
+			for _, other in pairs(group) do other.state.cancelled = true end
+			for _, mod in ipairs(original.emitted) do
+				press(self, out, mod); state.emitted[#state.emitted + 1] = mod
+			end
+			if state.layer then self.layer_depth = self.layer_depth + 1 end
+			group[source] = { state = state, generation = generation, native_owner = native_owner }
+			self.physical_down[code] = true
+			return out
+		elseif not own then return {}
+		elseif value == UP then
+			self.held[code], group[source] = own.state, nil
+			local out, tap, binding = process(self, code, value, now_ms, receipt)
+			if source_holds[self] ~= groups or groups[code] ~= group then return out, tap, binding end
+			local _, remaining = next(group)
+			if remaining then self.held[code], self.physical_down[code] = remaining.state, true
+			else groups[code] = nil end
+			return out, tap, binding
+		end
+	end
+	local out, tap, binding = process(self, code, value, now_ms, receipt)
+	if scoped and source_holds[self] == groups and value == DOWN and self.held[code] and not group then
+		groups[code] = { [source] = { state = self.held[code], generation = generation, native_owner = native_owner } }
+	end
+	return out, tap, binding
+end
+
 --- A click, its release or a wheel turn: it makes every held tap-hold key a
 --- chord.
 function M:activity()
@@ -1144,16 +1192,20 @@ function M:tick(now_ms)
 		end
 		if tap ~= nil then out[#out + 1] = { tap = tap, binding = binding, owner = pending } end
 	end
-	for code, state in pairs(self.held) do
-		local config = self.by_code[code]
-		if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
-			state.hold_pending = nil
-			local first = #out + 1
-			for _, mod in ipairs(config.mods) do
-				press(self, out, mod)
-				state.emitted[#state.emitted + 1] = mod
+	for code, primary in pairs(self.held) do
+		local group = source_holds[self] and source_holds[self][code]
+		local states = group or { { state = primary } }
+		for _, owner in pairs(states) do
+			local state, config = owner.state, self.by_code[code]
+			if state.hold_pending and now_ms - state.down_at > config.threshold_ms then
+				state.hold_pending = nil
+				local first = #out + 1
+				for _, mod in ipairs(config.mods) do
+					press(self, out, mod)
+					state.emitted[#state.emitted + 1] = mod
+				end
+				for index = first, #out do out[index].owner = code end
 			end
-			for index = first, #out do out[index].owner = code end
 		end
 	end
 	return out
@@ -1162,6 +1214,7 @@ end
 --- Releases everything this engine holds down and forgets its state.
 --- @return table events Key-ups, in the reverse of the order they went down.
 function M:release_all()
+	source_holds[self] = nil
 	local out = {}
 	-- Every key this engine holds down, once, whoever of it holds it.
 	-- Keys the hand still holds stay down: they are the kernel's to release.

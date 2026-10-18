@@ -522,7 +522,37 @@ local _dispatch_owned_rows
 local _deliver_owned_rows
 local function _combination_source(source)
 	local receipt = M.physical_source_receipt()
-	return { source = source, generation = receipt.generation, ready = receipt.ready, physical = _physical_sources[source] == true }
+	local slot = keyboard_slot(source)
+	local owner = _input_source_owners and _input_source_owners[slot]
+	local observer = owner and _input_source_observers[slot]
+	local current = owner and _input_reader_ports.source_owner_current(owner, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	-- A source publication may mint another lease for the SAME native opening.
+	-- Keep its original opaque identity while both that lease and the published
+	-- cohort remain current; a closed/reopened descriptor fails the old join.
+	local cache = _source_recovery.remap_sources
+	if not cache or cache.session ~= _capture_session then
+		cache = { session = _capture_session, sources = _input_source_owners, owners = {} }
+		_source_recovery.remap_sources = cache
+	elseif cache.sources ~= _input_source_owners then
+		local retained = {}
+		for _, path in ipairs(_devices) do retained[path] = cache.owners[path] end
+		cache.sources, cache.owners = _input_source_owners, retained
+	end
+	local original = cache.owners[source]
+	if current == true then
+		local original_current = original and (rawequal(original.owner, owner) or
+			_input_reader_ports.source_owner_current(original.owner, original.observer,
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+				_input_reader_ports.retire_source) == true)
+		if not original_current then
+			original = { owner = owner, observer = observer }
+			cache.owners[source] = original
+		end
+	end
+	return { source = source, generation = receipt.generation, ready = receipt.ready,
+		physical = _physical_sources[source] == true,
+		source_owner = original and original.owner or owner, source_current = current }
 end
 
 local function _input_exports_current()
