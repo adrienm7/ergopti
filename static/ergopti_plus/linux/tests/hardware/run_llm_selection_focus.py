@@ -1,190 +1,304 @@
 #!/usr/bin/env python3
 # tests/hardware/run_llm_selection_focus.py
-"""Prove async AI targeting against same-process, identically titled X11 windows."""
+"""Qualify exact AI text destinations on real GTK/AT-SPI and XTest output."""
 
-import ctypes
-import ctypes.util
 import json
 import os
 import pathlib
 import selectors
+import shutil
+import signal
 import subprocess
+import sys
+import tempfile
+import time
+
+
+TITLE = "ergopti-owned-identical-ai-title"
+
+
+def stop(process):
+    if process.poll() is None:
+        process.terminate()
+    try:
+        process.wait(timeout=3)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=3)
+
+
+def gtk(root):
+    import gi
+
+    gi.require_version("Gtk", "3.0")
+    from gi.repository import GLib, Gtk
+
+    windows, fields = [], []
+    for count in (3, 1):
+        window = Gtk.Window(title=TITLE)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        for _ in range(count):
+            entry = Gtk.Entry()
+            fields.append(entry)
+            box.pack_start(entry, True, True, 0)
+        window.add(box)
+        windows.append(window)
+    fields[2].set_visibility(False)
+    current = [0]
+
+    def state(*_):
+        data = {"focused": current[0], "texts": [entry.get_text() for entry in fields]}
+        (root / "state.json").write_text(json.dumps(data))
+
+    def control():
+        request = json.loads((root / "control.json").read_text())
+        if request.get("reset"):
+            for entry, text in zip(fields, ("ORIGIN", "SECOND", "SECRET", "OTHER")):
+                entry.set_text(text)
+        current[0] = request["target"]
+        windows[0 if current[0] < 3 else 1].present()
+        fields[current[0]].grab_focus()
+        state()
+        return True
+
+    for entry in fields:
+        entry.connect("changed", state)
+    for window in windows:
+        window.show_all()
+    control()
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, control)
+    GLib.timeout_add_seconds(120, Gtk.main_quit)
+    Gtk.main()
+
+
+def session(root):
+    driver = pathlib.Path(__file__).resolve().parents[2]
+    processes = []
+    worker = None
+    with (root / "wm.log").open("w") as wm_log, (root / "gtk.log").open("w") as gtk_log:
+        wm = subprocess.Popen(["openbox"], stdout=wm_log, stderr=wm_log)
+        processes.append(wm)
+        (root / "control.json").write_text(json.dumps({"target": 0, "reset": True}))
+        app = subprocess.Popen(
+            [
+                os.environ.get("ERGOPTI_ATSPI_GTK_PYTHON", "/usr/bin/python3"),
+                __file__,
+                "--gtk",
+                str(root),
+            ],
+            stdout=gtk_log,
+            stderr=gtk_log,
+        )
+        processes.append(app)
+        try:
+            deadline = time.monotonic() + 5
+            while True:
+                visible = subprocess.run(
+                    ["xdotool", "search", "--onlyvisible", "--name", TITLE],
+                    capture_output=True,
+                    timeout=2,
+                )
+                if visible.returncode == 0 and len(visible.stdout.splitlines()) == 2:
+                    break
+                assert app.poll() is None, "owned GTK app exited before mapping both windows"
+                assert time.monotonic() < deadline, "owned GTK windows did not map"
+                time.sleep(0.05)
+            time.sleep(1)
+            worker_env = dict(os.environ)
+            worker_env["LUA_PATH"] = (
+                "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"
+                + os.environ.get("LUA_PATH", ";;")
+            )
+            with (root / "worker.log").open("w") as worker_log:
+                worker = subprocess.Popen(
+                    ["luajit", "tests/hardware/llm_selection_focus.lua"],
+                    cwd=driver,
+                    env=worker_env,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=worker_log,
+                    text=True,
+                    bufsize=1,
+                )
+                processes.append(worker)
+
+                def command(text):
+                    worker.stdin.write(text + "\n")
+                    worker.stdin.flush()
+                    with selectors.DefaultSelector() as selector:
+                        selector.register(worker.stdout, selectors.EVENT_READ)
+                        assert selector.select(10), "owned AI worker exceeded its command deadline"
+                        line = worker.stdout.readline()
+                    assert line.startswith("RECEIPT:"), (
+                        "owned AI worker failed: " + line + (root / "worker.log").read_text()
+                    )
+                    return json.loads(line.removeprefix("RECEIPT:"))
+
+                def focus(target, reset=False):
+                    (root / "control.json").write_text(
+                        json.dumps({"target": target, "reset": reset})
+                    )
+                    app.send_signal(signal.SIGUSR1)
+                    time.sleep(0.2)
+                    state = json.loads((root / "state.json").read_text())
+                    assert state["focused"] == target
+                    return state["texts"]
+
+                def unchanged(expected):
+                    time.sleep(0.1)
+                    actual = json.loads((root / "state.json").read_text())["texts"]
+                    assert actual == expected, (
+                        "AI typed into an unowned native field",
+                        expected,
+                        actual,
+                    )
+
+                cases = 0
+                for mode in ("tone", "prediction", "translation"):
+                    for name, target in (
+                        ("same-field", 0),
+                        ("other-field", 1),
+                        ("password", 2),
+                        ("other-window", 3),
+                    ):
+                        before = focus(0, True)
+                        initial = command("reset")
+                        assert (
+                            initial["role"] == 61 and initial["active_scope"] and initial["target"]
+                        )
+                        started = command("start-" + mode)
+                        assert started["requests"] == 1, (mode, started)
+                        focus(target)
+                        moved = command("probe")
+                        if target < 3:
+                            assert initial["window"] == moved["window"], (
+                                "field switch must stay inside one native window"
+                            )
+                        else:
+                            assert initial["window"] != moved["window"], (
+                                "second identical-title GTK window must differ"
+                            )
+                        assert initial["bus"] == moved["bus"], (
+                            "all fields and windows belong to the same native process"
+                        )
+                        assert moved["cached_verdict"] == "insecure", (
+                            "programmatic change deliberately bypasses the cached verdict"
+                        )
+                        result = command("finish")
+                        assert result["applied"] == (0 if target else 1), (mode, name, result)
+                        if target == 2:
+                            assert moved["role"] == 40 and "target" not in moved, (
+                                "native password must never own AI output"
+                            )
+                        elif target:
+                            assert moved["target"] != initial["target"], (
+                                "each native text control owns a different target"
+                            )
+                        if target:
+                            assert not result["offered"], (
+                                "stale completion must not publish a selectable offer"
+                            )
+                            unchanged(before)
+                        else:
+                            time.sleep(0.1)
+                            texts = json.loads((root / "state.json").read_text())["texts"]
+                            assert texts[0] != before[0] and texts[1:] == before[1:], (
+                                "positive native output must reach only its own field"
+                            )
+                        cases += 1
+                    before = focus(0, True)
+                    command("reset")
+                    focus(2)
+                    refused = command("start-" + mode)
+                    assert (
+                        refused["role"] == 40 and refused["requests"] == 0 and refused["reads"] == 0
+                    ), refused
+                    unchanged(before)
+                    cases += 1
+                    if mode != "tone":
+                        for target in (1, 2):
+                            before = focus(0, True)
+                            command("reset")
+                            command("start-" + mode)
+                            assert command("offer")["offered"]
+                            focus(target)
+                            result = command("accept")
+                            assert not result["accepted"] and result["applied"] == 0, result
+                            unchanged(before)
+                            cases += 1
+                    if mode != "prediction":
+                        focus(0, True)
+                        command("reset")
+                        command("start-" + mode)
+                        command("offer")
+                        assert command("start-" + mode)["requests"] == 1, (
+                            "second request must wait for pacing"
+                        )
+                        before = focus(1)
+                        result = command("advance")
+                        assert result["requests"] == 1, (
+                            "pacing must recheck native text destination before sending"
+                        )
+                        unchanged(before)
+                        cases += 1
+                for stage in ("completion", "acceptance"):
+                    before = focus(0, True)
+                    command("reset")
+                    command("start-prediction")
+                    if stage == "acceptance":
+                        assert command("offer")["offered"]
+                    app.send_signal(signal.SIGSTOP)
+                    try:
+                        result = command("finish" if stage == "completion" else "accept")
+                        assert result["applied"] == 0 and not result.get("accepted"), result
+                    finally:
+                        app.send_signal(signal.SIGCONT)
+                    unchanged(before)
+                    cases += 1
+                focus(0, True)
+                timing = command("benchmark")
+                durations = sorted(timing["probe_ms"])
+                assert len(durations) == 20 and durations[-1] < 1000
+                print(
+                    f"Native fresh AT-SPI destination: median={durations[10]:.1f}ms max={durations[-1]:.1f}ms (20 probes)"
+                )
+                app.send_signal(signal.SIGSTOP)
+                try:
+                    timeout = command("deadline")
+                    assert "deadline_target" not in timeout, (
+                        "a wedged native application cannot authorize output"
+                    )
+                    assert 900 <= timeout["deadline_ms"] < 1800, timeout
+                finally:
+                    app.send_signal(signal.SIGCONT)
+                print(f"Native wedged AT-SPI refusal: {timeout['deadline_ms']:.1f}ms")
+                print(
+                    f"PASS native GTK AI text focus: {cases} cases; correct controls type; changed fields/windows and passwords refuse request/output"
+                )
+        finally:
+            if app.poll() is None:
+                app.send_signal(signal.SIGCONT)
+            for process in reversed(processes):
+                stop(process)
 
 
 def main():
-    driver = pathlib.Path(__file__).resolve().parents[2]
-    x11 = ctypes.CDLL(ctypes.util.find_library("X11"))
-    display_t, window_t = ctypes.c_void_p, ctypes.c_ulong
-    x11.XOpenDisplay.argtypes, x11.XOpenDisplay.restype = [ctypes.c_char_p], display_t
-    x11.XDefaultRootWindow.argtypes, x11.XDefaultRootWindow.restype = [display_t], window_t
-    x11.XCreateSimpleWindow.argtypes = [
-        display_t,
-        window_t,
-        ctypes.c_int,
-        ctypes.c_int,
-        ctypes.c_uint,
-        ctypes.c_uint,
-        ctypes.c_uint,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-    ]
-    x11.XCreateSimpleWindow.restype = window_t
-    x11.XInternAtom.argtypes, x11.XInternAtom.restype = (
-        [display_t, ctypes.c_char_p, ctypes.c_int],
-        ctypes.c_ulong,
-    )
-    x11.XChangeProperty.argtypes = [
-        display_t,
-        window_t,
-        ctypes.c_ulong,
-        ctypes.c_ulong,
-        ctypes.c_int,
-        ctypes.c_int,
-        ctypes.c_void_p,
-        ctypes.c_int,
-    ]
-    x11.XStoreName.argtypes = [display_t, window_t, ctypes.c_char_p]
-    x11.XMapWindow.argtypes = [display_t, window_t]
-    x11.XSelectInput.argtypes = [display_t, window_t, ctypes.c_long]
-    x11.XSetInputFocus.argtypes = [display_t, window_t, ctypes.c_int, ctypes.c_ulong]
-    x11.XSync.argtypes = [display_t, ctypes.c_int]
-    x11.XPending.argtypes, x11.XPending.restype = [display_t], ctypes.c_int
-    x11.XNextEvent.argtypes = [display_t, ctypes.c_void_p]
-    x11.XCloseDisplay.argtypes = [display_t]
-
-    class KeyEvent(ctypes.Structure):
-        _fields_ = [
-            ("type", ctypes.c_int),
-            ("serial", ctypes.c_ulong),
-            ("send_event", ctypes.c_int),
-            ("display", display_t),
-            ("window", window_t),
-        ]
-
-    class Event(ctypes.Union):
-        _fields_ = [("key", KeyEvent), ("padding", ctypes.c_long * 24)]
-
-    read_fd, write_fd = os.pipe()
-    server = subprocess.Popen(
-        ["Xvfb", "-displayfd", str(write_fd), "-screen", "0", "800x600x24", "-nolisten", "tcp"],
-        pass_fds=(write_fd,),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    os.close(write_fd)
-    display, observer = None, None
-    try:
-        with os.fdopen(read_fd) as ready, selectors.DefaultSelector() as selector:
-            selector.register(ready, selectors.EVENT_READ)
-            assert selector.select(10), "owned Xvfb did not publish a display"
-            name = ":" + ready.readline().strip()
-        display = x11.XOpenDisplay(name.encode())
-        assert display
-        root = x11.XDefaultRootWindow(display)
-
-        def atom(value):
-            return x11.XInternAtom(display, value.encode(), 0)
-
-        def property_value(window, property_name, property_type, value):
-            native = ctypes.c_ulong(value)
-            x11.XChangeProperty(
-                display,
-                window,
-                atom(property_name),
-                atom(property_type),
-                32,
-                0,
-                ctypes.byref(native),
-                1,
-            )
-
-        property_value(root, "_NET_SUPPORTED", "ATOM", atom("_NET_ACTIVE_WINDOW"))
-        windows = []
-        for x in (0, 300):
-            window = x11.XCreateSimpleWindow(display, root, x, 0, 200, 100, 0, 0, 0)
-            x11.XStoreName(display, window, b"Owned identical AI title")
-            property_value(window, "_NET_WM_PID", "CARDINAL", os.getpid())
-            x11.XSelectInput(display, window, 1)  # KeyPressMask, independent target oracle.
-            x11.XMapWindow(display, window)
-            windows.append(window)
-
-        def focus(window):
-            property_value(root, "_NET_ACTIVE_WINDOW", "WINDOW", window)
-            x11.XSetInputFocus(display, window, 1, 0)
-            x11.XSync(display, 0)
-
-        def events():
-            x11.XSync(display, 0)
-            pressed = []
-            while x11.XPending(display):
-                event = Event()
-                x11.XNextEvent(display, ctypes.byref(event))
-                if event.key.type == 2:
-                    pressed.append(event.key.window)
-            return pressed
-
-        env = dict(os.environ, DISPLAY=name, XDG_SESSION_TYPE="x11", WAYLAND_DISPLAY="")
-        env["LUA_PATH"] = (
-            "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;"
-            + env.get("LUA_PATH", ";")
-        )
-        observer = subprocess.Popen(
-            ["luajit", "tests/hardware/llm_selection_focus.lua"],
-            cwd=driver,
-            env=env,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-
-        def command(value):
-            observer.stdin.write(value + "\n")
-            observer.stdin.flush()
-            with selectors.DefaultSelector() as selector:
-                selector.register(observer.stdout, selectors.EVENT_READ)
-                assert selector.select(10), "native AI focus command timed out"
-            line = observer.stdout.readline()
-            assert line, "native AI focus child ended before replying"
-            return json.loads(line)
-
-        for suffix in ("", "-prediction"):
-            focus(windows[0])
-            first = command("start" + suffix)
-            assert first["started"] and first["request"] == 1
-            assert command("finish" + suffix)["applied"] == 1
-            positive = events()
-            assert positive and set(positive) == {windows[0]}, (
-                "the matching native target must receive real XTest input"
-            )
-
-            focus(windows[0])
-            second = command("start" + suffix)
-            focus(windows[1])  # Programmatic focus change: no pointer/control-key event.
-            assert not events(), "switching native focus must not synthesize keyboard input"
-            switched = command("probe")
-            result = command("finish" + suffix)
-            wrong = events()
-            assert first["app"] == second["app"] == switched["app"]
-            assert first["title"] == second["title"] == switched["title"]
-            assert result["applied"] == 0 and not wrong, (
-                "AI rewrote another same-app, same-title native window",
-                suffix,
-                result,
-                wrong,
-                windows[1],
-            )
-        print(
-            "PASS native same-app/title AI focus: matching tone/prediction targets type; switched targets receive zero output"
-        )
-    finally:
-        if observer is not None:
-            observer.terminate()
-            observer.communicate(timeout=5)
-        if display is not None:
-            x11.XCloseDisplay(display)
-        server.terminate()
-        server.wait(timeout=5)
+    if "--gtk" in sys.argv:
+        gtk(pathlib.Path(sys.argv[-1]))
+        return 0
+    if "--session" in sys.argv:
+        session(pathlib.Path(sys.argv[-1]))
+        return 0
+    for tool in ("xvfb-run", "dbus-run-session", "openbox", "xdotool", "luajit"):
+        if shutil.which(tool) is None:
+            print(f"ENVIRONMENT: {tool} is missing", file=sys.stderr)
+            return 2
+    with tempfile.TemporaryDirectory(prefix="ergopti-ai-text-focus-") as temp:
+        return subprocess.run(
+            ["xvfb-run", "-a", "dbus-run-session", sys.executable, __file__, "--session", temp],
+            timeout=120,
+        ).returncode
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -97,7 +97,7 @@ local function scenario(opts, body)
 		local world = { posts = {}, ollama = {}, notices = {}, reads = 0, focus = "editor\1Draft",
 			selection = opts.selection, preferences = preferences, emitted = {} }
 		package.loaded["adapters.secure_field_detector"] = {
-			isSecureField = function() return false end,
+			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
@@ -484,6 +484,25 @@ helpers.describe("injector: one Left arrow per user-perceived character", functi
 end)
 
 helpers.describe("selection rewrites require a known stable native focus", function()
+	helpers.it("explains a tone refusal when privacy cannot admit its text field (selection-native-focus)", function()
+		scenario({ selection = "merci pour ton aide", secure = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+		end)
+	end)
+	helpers.it("refuses a paced tone request after its native field changes (selection-native-focus)", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			helpers.assert_eq(#world.posts, 1, "the second request must wait for pacing")
+			world.focus = "atspi::1.42:/different-field"
+			world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1, "a stale selected field cannot be sent after the timer fires")
+		end)
+	end)
 	for _, missing in ipairs({"empty", "unavailable"}) do
 		helpers.it("refuses tone before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
 			scenario({selection = "merci pour ton aide"}, function(world)
@@ -491,6 +510,8 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
 				helpers.assert_eq(world.reads, 0, "an unknown target cannot authorize a copy probe")
 				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)
 	end

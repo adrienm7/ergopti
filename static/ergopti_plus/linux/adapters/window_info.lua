@@ -319,6 +319,19 @@ function M.focused_snapshot()
 	return info or empty_info(), identity
 end
 
+--- Captures the exact active text control for asynchronous AI input and output.
+--- A native window ID cannot distinguish controls within the same window.
+--- Each call uses one fresh bounded accessibility probe; cached or unavailable
+--- evidence, password controls and inactive scopes never authorize text.
+--- @return string|nil Unique native accessibility bus/object identity.
+function M.focused_text_identity()
+	local captured, destination = pcall(function()
+		return require("adapters.user_hotstring_destination").capture_current()
+	end)
+	if not captured or not destination then return nil end
+	return "atspi:" .. destination.bus .. ":" .. destination.path
+end
+
 --- Returns the current native window identity for asynchronous output targeting.
 --- Application names and titles cannot distinguish two windows of the same app.
 --- This driver-only API matches macOS; unsupported compositors return nil.

@@ -201,6 +201,7 @@ if not MENU_ROWS_FILE and WITH_LLM then
 		return {
 			getFocused = function() return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" } end,
 			focused_identity = function() return "owned-e2e-window" end,
+			focused_text_identity = function() return "owned-e2e-text-field" end,
 		}
 	end
 end

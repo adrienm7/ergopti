@@ -128,6 +128,16 @@ helpers.describe("Linux manual prediction trigger (llm-manual-prediction-feedbac
 		restore()
 		if not ok then error(err, 0) end
 	end)
+	helpers.it("explains a manual prediction refused by its native text destination", function()
+		local engine, seen = fixture({ buffer = "hello wor", model = "m" })
+		engine.predict = function() return false end
+		local ok, err = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), false)
+			helpers.assert_eq(seen.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("answers the llm_generate_prediction action", function()
 		local engine, seen = fixture({ buffer = "abc", model = "m" })
