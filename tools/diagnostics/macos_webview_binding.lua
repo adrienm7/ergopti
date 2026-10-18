@@ -3,9 +3,11 @@
 local directory = assert(debug.getinfo(1, "S").source:match("^@(.+)/[^/]+$"))
 local json = require("hs.json")
 local config = assert(json.read(directory .. "/webview-config.json"))
-local probe = { views = {}, controllers = {}, timers = {}, features = {}, finished = false }
+local probe = { views = {}, controllers = {}, timers = {}, features = {}, evaluations = {}, finished = false }
 _G.ERGOPTI_WEBVIEW_BINDING_PROBE = probe
 local finish
+local WebViewResult
+local UI
 
 local function console_check()
 	local text = hs.console.getConsole()
@@ -15,6 +17,7 @@ local function console_check()
 	for _, pattern in ipairs({ "NOREF/REFNIL", "error invoking _gc", "NSInternalInconsistencyException" }) do
 		assert(not text:find(pattern, 1, true), "native console reported " .. pattern)
 	end
+	assert(not text:find("%f[%a]ERROR%f[%A]"), "production factory reported an error")
 end
 
 local function cleanup()
@@ -25,8 +28,7 @@ local function cleanup()
 	end
 	for view in pairs(probe.views) do
 		if getmetatable(view) ~= nil then
-			-- Cleanup is separate from the measured visible delete() path. The
-			-- public hide() takes orderOut, so delete() cannot enter a fade callback.
+			assert(view:deleteOnClose() == false, "product cleanup rearmed recursive native GC")
 			assert(view:hide() == view, "cleanup hide refused")
 			assert(view:isVisible() == false, "cleanup window is still visible")
 			view:delete()
@@ -42,17 +44,21 @@ finish = function(failure)
 	local cleaned, cleanup_error = xpcall(cleanup, debug.traceback)
 	local console_ok, console_error = xpcall(console_check, debug.traceback)
 	local receipt = {
-		schema_version = 1, contract = "native.webview-binding", nonce = config.nonce,
+		schema_version = 2, contract = "native.webview-binding", nonce = config.nonce,
 		status = not failure and cleaned and console_ok and "ok" or "error",
 		error = failure, cleanup_error = not cleaned and tostring(cleanup_error) or nil,
 		console_error = not console_ok and tostring(console_error) or nil,
 		pid = hs.processInfo.processID, version = hs.processInfo.version,
 		source_revision = config.source_revision,
 		runtime = "native Hammerspoon", features = probe.features,
+		window_identity = probe.window_identity,
+		scope = "production ui.ui_builder.show_webview; native WebView/UCC bindings",
 		cleanup = { windows_consumed = cleaned, callbacks_detached = cleaned,
 			timers_stopped = next(probe.timers) == nil, console_checked = console_ok },
 		ucc_userdata_gc = "unmeasured; controllers deliberately retained",
 	}
+	assert(json.write(probe.evaluations, config.output_dir .. "/evaluations.json", true, true),
+		"JavaScript completion evidence publication refused")
 	assert(json.write(receipt, config.output_dir .. "/result.json.tmp", true, true), "result staging refused")
 	assert(os.rename(config.output_dir .. "/result.json.tmp", config.output_dir .. "/result.json"),
 		"result publication refused")
@@ -79,18 +85,25 @@ local function await(condition, body)
 	end)
 end
 
-local function view_for(controller, title, x)
+local function view_for(controller, title, x, closed, navigated)
 	local frame = { x = x, y = 80, w = 260, h = 160 }
-	-- The native constructor treats an explicit third nil as a controller and
-	-- rejects it. Absence must remain actual argument absence at this boundary.
 	local view
-	if controller ~= nil then view = hs.webview.new(frame, {}, controller)
-	else view = hs.webview.new(frame, {}) end
-	assert(view, "native webview construction refused")
-	assert(type(view) == "userdata", "actual native webview unavailable")
-	probe.views[view] = true
-	assert(view:deleteOnClose(true) == view and view:deleteOnClose() == true, "native opt-in refused")
-	view:windowStyle({ "titled", "closable" }):windowTitle(title)
+	local created = UI.show_webview({ frame = frame, title = title,
+		style_masks = { "titled", "closable" }, focus = false, inject_i18n = false,
+		delete_on_close = true, usercontent = controller,
+		html_string = "<!doctype html><html><body>Native product binding observation</body></html>",
+		on_webview_created = function(candidate)
+			assert(type(candidate) == "userdata", "actual product WebView unavailable")
+			assert(candidate:deleteOnClose() == false, "factory left recursive native GC enabled before publication")
+			view = candidate
+			probe.views[view] = true
+			return true
+		end,
+		on_close = function() guarded(function() if closed then closed() end end) end,
+		on_navigation = navigated,
+	})
+	assert(created and rawequal(created, view), "product factory did not publish its exact candidate")
+	assert(view:deleteOnClose() == false, "product factory rearmed recursive native GC")
 	return view
 end
 
@@ -116,23 +129,18 @@ local function callback_release()
 end
 
 local function message_identity(controller)
-	local a, b = view_for(controller, "Binding A", 80), view_for(controller, "Binding B", 360)
-	local ready, seen, closes = {}, {}, { a = 0, b = 0 }
+	local ready, seen, evaluated, closes = {}, {}, {}, { a = 0, b = 0 }
+	local views = {}
 	local rebound_seen = false
-	for name, view in pairs({ a = a, b = b }) do
-		view:navigationCallback(function(action)
+	for index, name in ipairs({ "a", "b" }) do
+		views[name] = view_for(controller, "Binding " .. name, 80 + (index - 1) * 280, function()
+			closes[name] = closes[name] + 1
+		end, function(action)
 			if action == "didFinishNavigation" then ready[name] = true end
 			return true
 		end)
-		view:windowCallback(function(action, exact)
-			if action == "closing" then
-				assert(rawequal(exact, view), "closing callback borrowed another native view")
-				closes[name] = closes[name] + 1
-			end
-		end)
-		view:html("<!doctype html><html><body>Native binding observation</body></html>")
-		view:show()
 	end
+	local a, b = views.a, views.b
 	assert(controller:setCallback(function(message)
 		guarded(function()
 			assert(message.name == "ergopti_binding", "foreign message port")
@@ -145,12 +153,19 @@ local function message_identity(controller)
 	local function post(view, kind)
 		view:evaluateJavaScript("window.webkit.messageHandlers.ergopti_binding.postMessage(" ..
 			assert(json.encode({ nonce = config.nonce, kind = kind })) .. ")", function(_, error)
-			guarded(function() assert(error == nil, "native JavaScript message failed") end)
+			guarded(function()
+				local details = { kind = kind, value_type = type(error), metatable_type = type(getmetatable(error)) }
+				details.value = error
+				probe.evaluations[#probe.evaluations + 1] = details
+				assert(not WebViewResult.is_error(error), "native JavaScript message failed: " ..
+					assert(json.encode(details), "native error serialization refused"))
+				evaluated[kind] = true
+			end)
 		end)
 	end
 	await(function() return ready.a and ready.b end, function()
 		post(a, "initial-a")
-		await(function() return seen["initial-a"] end, function()
+		await(function() return seen["initial-a"] and evaluated["initial-a"] end, function()
 			assert(seen["initial-a"].admitted, "healthy native A message refused")
 			assert(controller:setCallback(nil) == controller, "initial callback detach refused")
 			-- Reuse the real controller with a distinct B closure. Route on the
@@ -171,15 +186,25 @@ local function message_identity(controller)
 			end) == controller, "successor callback bind refused")
 			post(a, "stale-a")
 			post(b, "current-b")
-			await(function() return seen["stale-a"] and seen["current-b"] end, function()
+			await(function() return seen["stale-a"] and seen["current-b"]
+				and evaluated["stale-a"] and evaluated["current-b"] end, function()
 				assert(not seen["stale-a"].admitted, "previous view message adopted successor authority")
 				assert(seen["current-b"].admitted, "healthy native B message refused")
 				assert(rebound_seen, "successor native callback never ran")
+				-- Measure each business owner independently: a callback captured by
+				-- the factory is not a native source-identity argument.
+				assert(a:hide() == a, "A hide refused")
+				a:delete()
+				assert(getmetatable(a) == nil and closes.a == 1 and closes.b == 0 and b:isVisible(),
+					"A close callback affected the B owner")
+				assert(b:hide() == b, "B hide refused")
+				b:delete()
+				assert(getmetatable(b) == nil and closes.a == 1 and closes.b == 1,
+					"B close callback affected the A owner")
 				cleanup()
-				assert(closes.a == 1 and closes.b == 1, "native A/B close callbacks were not exact-once")
 				probe.features.message_identity = { initial_a_exact = true, current_b_exact = true,
 					rebound_b_callback = rebound_seen,
-					stale_a_rejected = true, current_b_accepted = true, a_closes = closes.a, b_closes = closes.b }
+					stale_a_rejected = true, current_b_accepted = true, a_close_preserved_b = true, a_closes = closes.a, b_closes = closes.b }
 				later(function() console_check(); finish() end)
 			end)
 		end)
@@ -187,34 +212,54 @@ local function message_identity(controller)
 end
 
 guarded(function()
+	local root = assert(config.production_root)
+	package.path = root .. "/macos/?.lua;" .. root .. "/macos/?/init.lua;"
+		.. root .. "/_shared/lua/?.lua;" .. root .. "/_shared/lua/?/init.lua;" .. package.path
+	local Logger = require("infra.logger")
+	local policy = assert(io.open(root .. "/_shared/modules/diagnostics/redaction.json", "rb"))
+	local raw_policy = assert(policy:read("*a")); assert(policy:close())
+	Logger.initialize_privacy(raw_policy)
+	WebViewResult = require("adapters.webview_result")
+	UI = require("ui.ui_builder")
+	local Owner = require("ui.webview_close_owner")
+	assert(debug.getinfo(UI.show_webview, "S").source == "@" .. root .. "/macos/ui/ui_builder.lua",
+		"factory did not load from frozen production source")
+	assert(debug.getinfo(Owner.new, "S").source == "@" .. root .. "/macos/ui/webview_close_owner.lua",
+		"close owner did not load from frozen production source")
 	assert(hs.processInfo.version == config.expected_version, "unexpected native runtime")
 	assert(hs.screen.mainScreen(), "no native GUI screen")
 	local timeout = hs.timer.doAfter(45, function() finish("native binding deadline exceeded") end)
 	probe.timers[assert(timeout)] = true
-	local view = view_for(nil, "Visible delete wrapper", 80)
-	local closes = 0
-	view:windowCallback(function(action, exact)
-		guarded(function()
-			if action == "closing" then
-				assert(rawequal(exact, view), "visible delete closed a foreign owner")
-				closes = closes + 1
-			end
-		end)
+	local closes, explicit, user = { explicit = 0, user = 0 }
+	explicit = view_for(nil, "Product explicit close", 80, function()
+		closes.explicit = closes.explicit + 1
 	end)
-	view:show()
+	user = view_for(nil, "Product native close button", 360, function()
+		closes.user = closes.user + 1
+	end)
 	later(function()
-		assert(view:isVisible() == true, "wrapper control was not visibly presented")
-		-- Deliberately use the public no-argument wrapper, including its native
-		-- fadeOut(0) completion. Do not substitute hide(), _delete or manual GC.
-		view:delete()
-		await(function() return getmetatable(view) == nil end, function()
-			assert(closes == 1, "visible delete callback was not exact-once")
-			console_check()
-			probe.features.visible_wrapper_delete = {
-				visible_before = true, delete_on_close = true, exact_close_count = closes,
-				userdata_consumed = true, runloop_continued = true,
-			}
-			message_identity(callback_release())
+		assert(explicit:isVisible() and user:isVisible(), "product windows were not visibly presented")
+		local explicit_window, user_window = assert(explicit:hswindow()), assert(user:hswindow())
+		local explicit_id, user_id = explicit_window:id(), user_window:id()
+		assert(math.type(explicit_id) == "integer" and explicit_id > 0, "explicit native window identity missing")
+		assert(math.type(user_id) == "integer" and user_id > 0 and user_id ~= explicit_id,
+			"native user window identity missing or aliased")
+		assert(explicit_window:application():pid() == hs.processInfo.processID
+			and user_window:application():pid() == hs.processInfo.processID, "foreign native window host")
+		probe.window_identity = { explicit = explicit_id, user = user_id, host_pid = hs.processInfo.processID }
+		explicit:delete()
+		await(function() return getmetatable(explicit) == nil end, function()
+			assert(closes.explicit == 1 and closes.user == 0 and user:isVisible(), "explicit close damaged its successor")
+			probe.features.explicit_product_close = { visible_before = true, native_auto_delete_disabled = true,
+				exact_close_count = closes.explicit, userdata_consumed = true, runloop_continued = true,
+				sibling_survived = true }
+			assert(user_window:close() == true, "native close-button request refused; no delete fallback")
+			await(function() return getmetatable(user) == nil end, function()
+				assert(closes.user == 1, "native user close callback was not exact-once")
+				probe.features.user_product_close = { visible_before = true, native_auto_delete_disabled = true,
+					native_close_button_requested = true, exact_close_count = closes.user, userdata_consumed = true }
+				message_identity(callback_release())
+			end)
 		end)
 	end)
 end)

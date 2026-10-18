@@ -17,21 +17,31 @@ def healthy():
     """Model a receipt only to exercise strict supervisor refusals on mutated facts."""
     return {
         "status": "ok",
-        "schema_version": 1,
+        "schema_version": 2,
         "contract": "native.webview-binding",
         "nonce": "owned-nonce",
         "pid": 711,
         "version": "1.1.1",
         "source_revision": "a" * 40,
         "runtime": "native Hammerspoon",
+        "scope": "production ui.ui_builder.show_webview; native WebView/UCC bindings",
+        "window_identity": {"explicit": 101, "user": 202, "host_pid": 711},
         "ucc_userdata_gc": "unmeasured; controllers deliberately retained",
         "features": {
-            "visible_wrapper_delete": {
+            "explicit_product_close": {
                 "visible_before": True,
-                "delete_on_close": True,
+                "native_auto_delete_disabled": True,
                 "exact_close_count": 1,
                 "userdata_consumed": True,
                 "runloop_continued": True,
+                "sibling_survived": True,
+            },
+            "user_product_close": {
+                "visible_before": True,
+                "native_auto_delete_disabled": True,
+                "native_close_button_requested": True,
+                "exact_close_count": 1,
+                "userdata_consumed": True,
             },
             "callback_release": {
                 "held_before_detach": True,
@@ -44,6 +54,7 @@ def healthy():
                 "current_b_exact": True,
                 "stale_a_rejected": True,
                 "current_b_accepted": True,
+                "a_close_preserved_b": True,
                 "a_closes": 1,
                 "b_closes": 1,
             },
@@ -64,6 +75,8 @@ class BindingSupervisorControls(unittest.TestCase):
         self.temporary = TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
+        for name in ("launch.stdout", "launch.stderr"):
+            (self.root / name).write_text("")
         self.group = Mock()
         self.group.process.pid = 711
         self.group.observe_exit.return_value = None
@@ -98,6 +111,17 @@ class BindingSupervisorControls(unittest.TestCase):
                 self.publish(result)
                 with self.assertRaisesRegex(ValueError, "identities"):
                     self.observe()
+
+    def test_native_window_identities_are_distinct_owned_integers(self):
+        for field, value in (("explicit", True), ("user", 101), ("user", 0), ("host_pid", 712)):
+            result = healthy()
+            result["window_identity"][field] = value
+            self.publish(result)
+            with (
+                self.subTest(field=field, value=value),
+                self.assertRaisesRegex(ValueError, "identities"),
+            ):
+                self.observe()
 
     def test_missing_or_false_feature_never_qualifies(self):
         original = healthy()
@@ -146,6 +170,33 @@ class BindingSupervisorControls(unittest.TestCase):
         with patch.object(probe.time, "sleep"), self.assertRaisesRegex(ValueError, "exited after"):
             self.observe()
 
+    def test_real_gc_overflow_in_stderr_refuses_an_otherwise_healthy_receipt(self):
+        self.publish()
+        recorded = (
+            "2026-10-18 22:15:47.777 Hammerspoon[2276:10763] BREADCRUMB: "
+            "hs.webview:error invoking _gc for deleteOnClose:C stack overflow\n"
+        )
+        for text in (recorded, "*** Assertion failure in -[LuaSkin pushLuaRef:ref:]\n"):
+            with self.subTest(text=text):
+                (self.root / "launch.stderr").write_text(text)
+                with (
+                    patch.object(probe.time, "sleep"),
+                    self.assertRaisesRegex(ValueError, "Native runtime error"),
+                ):
+                    self.observe()
+
+    def test_native_error_after_result_remains_refusing(self):
+        self.publish()
+
+        def later(_delay):
+            (self.root / "launch.stderr").write_text(
+                "LuaSkin: error, state ERRRUN: C stack overflow\n"
+            )
+
+        with patch.object(probe.time, "sleep", side_effect=later):
+            with self.assertRaisesRegex(ValueError, "C stack overflow"):
+                self.observe()
+
     def test_missing_native_output_reaches_deadline_instead_of_skip(self):
         with patch.object(probe.time, "monotonic", side_effect=[0, 2]):
             with self.assertRaisesRegex(ValueError, "deadline"):
@@ -186,11 +237,13 @@ class BindingSupervisorControls(unittest.TestCase):
         def acquire(_arguments, _native, register, **_options):
             register(self.group)
 
+        owned_output = self.root / "owned-observation"
+        owned_output.mkdir()
         with patch.object(canvas.owner, "acquire_owned", side_effect=acquire):
             result = canvas.owned_observation(
                 Path("/owned/Hammerspoon"),
                 self.root / "init.lua",
-                self.root,
+                owned_output,
                 lambda _: (_ for _ in ()).throw(ValueError("native assertion")),
                 Mock(),
             )
@@ -209,6 +262,8 @@ class BindingSupervisorControls(unittest.TestCase):
             self.assertEqual(executable, Path("/owned/Hammerspoon"))
             self.assertIs(native, self.group)
             self.assertEqual(destination, output / "webview-binding")
+            for name in ("launch.stdout", "launch.stderr"):
+                (destination / name).write_text("")
             settings = json.loads((config.parent / "webview-config.json").read_text())
             value = healthy()
             value["nonce"] = settings["nonce"]
@@ -233,7 +288,7 @@ class BindingSupervisorControls(unittest.TestCase):
             return receipt
 
         with patch.object(probe, "revision", return_value="a" * 40):
-            return probe.qualify(
+            return probe.qualify_product(
                 self.root,
                 Path("/owned/Hammerspoon"),
                 scratch,
@@ -277,6 +332,31 @@ class BindingSupervisorControls(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "observation is incomplete"):
             self.qualify_with_boundary(mutate)
 
+    def test_error_retained_after_owner_retirement_cannot_leave_a_green_receipt(self):
+        def mutate(_receipt, config):
+            output = json.loads((config.parent / "webview-config.json").read_text())["output_dir"]
+            (Path(output) / "launch.stderr").write_text(
+                "Hammerspoon BREADCRUMB: hs.webview:error invoking _gc for deleteOnClose:C stack overflow\n"
+            )
+
+        with self.assertRaisesRegex(ValueError, "C stack overflow"):
+            self.qualify_with_boundary(mutate)
+        receipt = json.loads((self.root / "output/webview-binding/supervisor.json").read_text())
+        self.assertEqual(receipt["status"], "error")
+
+    def test_final_log_collection_cannot_publish_errors_with_a_green_status(self):
+        failure = {
+            "source": "launch.stderr",
+            "line": 1,
+            "text": "Native error during final collection",
+        }
+        with patch.object(probe, "native_errors", side_effect=[[], [failure]]):
+            with self.assertRaisesRegex(ValueError, "final log admission"):
+                self.qualify_with_boundary()
+        receipt = json.loads((self.root / "output/webview-binding/supervisor.json").read_text())
+        self.assertEqual(receipt["status"], "error")
+        self.assertEqual(receipt["native_log_errors"], [failure])
+
     def test_cli_has_no_fake_native_or_skip_admission_flags(self):
         runner = Path(probe.__file__).with_name("macos_tooltip_canvas.py")
         for flag in ("--fake-native", "--skip-webview-binding"):
@@ -299,6 +379,223 @@ class BindingSupervisorControls(unittest.TestCase):
             self.assertEqual(result.returncode, 2)
             self.assertIn("unrecognized arguments: " + flag, result.stderr)
             self.assertFalse((self.root / "not-created").exists())
+
+
+def raw_observed():
+    """Model a completed raw observation only; its stderr must still prove the defect."""
+    return {
+        "schema_version": 1,
+        "contract": "native.webview-raw-delete",
+        "status": "observed",
+        "nonce": "raw-nonce",
+        "source_revision": "a" * 40,
+        "pid": 711,
+        "version": "1.1.1",
+        "runtime": "native Hammerspoon",
+        "features": {
+            "visible_before": True,
+            "native_opt_in": True,
+            "close_callback_count": 1,
+            "userdata_consumed": True,
+            "runloop_continued": True,
+        },
+        "cleanup": {"windows_consumed": True, "timers_stopped": True},
+        "ucc_userdata_gc": "unmeasured; no controller constructed",
+    }
+
+
+def recorded_raw_errors(pid=711):
+    """Use the two actual CI39171054196 error bodies with a test-owned PID."""
+    return [
+        {
+            "source": "launch.stderr",
+            "line": number,
+            "text": f"2026-10-18 22:15:47.777 Hammerspoon[{pid}:10763] BREADCRUMB: " + body,
+        }
+        for number, body in enumerate(
+            (
+                "hs.webview:error invoking _gc for deleteOnClose:C stack overflow",
+                "logForLuaSkin: error, state ERRRUN: C stack overflow",
+            ),
+            1,
+        )
+    ]
+
+
+class RawControlAdmission(unittest.TestCase):
+    """Pure negative-control admission; no modeled failure qualifies product behavior."""
+
+    def setUp(self):
+        self.temporary = TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.group = Mock()
+        self.group.process.pid = 711
+        self.group.observe_exit.return_value = None
+        self.publish()
+
+    def publish(self, value=None):
+        (self.root / "result.json").write_text(
+            json.dumps(raw_observed() if value is None else value)
+        )
+        (self.root / "launch.stdout").write_text("")
+        (self.root / "launch.stderr").write_text(
+            "\n".join(e["text"] for e in recorded_raw_errors()) + "\n"
+        )
+
+    def observe(self):
+        return probe.supervise_raw(
+            self.group, self.root, "1.1.1", "raw-nonce", "a" * 40, Mock(), timeout=1
+        )
+
+    def test_only_the_exact_recorded_stderr_pair_is_expected(self):
+        probe.known_raw_failure(recorded_raw_errors(), 711)
+        for errors in (
+            [],
+            recorded_raw_errors()[:1],
+            recorded_raw_errors() * 2,
+            recorded_raw_errors(712),
+            [dict(recorded_raw_errors()[0], source="launch.stdout")],
+        ):
+            with self.subTest(errors=errors), self.assertRaises(ValueError):
+                probe.known_raw_failure(errors, 711)
+
+    def test_unknown_native_failure_is_never_folded_into_the_known_defect(self):
+        errors = recorded_raw_errors() + [
+            {"source": "launch.stderr", "line": 3, "text": "Hammerspoon: unknown native error"}
+        ]
+        with self.assertRaisesRegex(ValueError, "unknown failure"):
+            probe.known_raw_failure(errors, 711)
+
+    def test_expected_failure_still_requires_completed_visible_native_observation(self):
+        for field, value in (
+            ("native_opt_in", False),
+            ("close_callback_count", 2),
+            ("userdata_consumed", False),
+        ):
+            result = raw_observed()
+            result["features"][field] = value
+            self.publish(result)
+            with (
+                self.subTest(field=field),
+                self.assertRaisesRegex(ValueError, "observation or schema"),
+            ):
+                self.observe()
+
+    def test_valid_raw_transcript_keeps_its_receipt_and_two_liveness_checks(self):
+        with patch.object(probe.time, "sleep"):
+            result = self.observe()
+        self.assertEqual(result["result"]["status"], "observed")
+        self.assertEqual(self.group.observe_exit.call_count, 2)
+
+    def test_premature_raw_exit_is_not_an_expected_negative_success(self):
+        self.group.observe_exit.side_effect = [None, object()]
+        with patch.object(probe.time, "sleep"), self.assertRaisesRegex(ValueError, "exited after"):
+            self.observe()
+
+    def qualify(self, mutate=None):
+        scratch, output = self.root / "scratch", self.root / "output"
+        scratch.mkdir()
+        output.mkdir()
+
+        def observed(executable, config, destination, _operation, native):
+            self.assertEqual(executable, Path("/owned/Hammerspoon"))
+            self.assertIs(native, self.group)
+            self.assertEqual(destination, output / "webview-raw-delete")
+            settings = json.loads((config.parent / "webview-config.json").read_text())
+            (destination / "launch.stdout").write_text("")
+            (destination / "launch.stderr").write_text(
+                "\n".join(e["text"] for e in recorded_raw_errors()) + "\n"
+            )
+            value = raw_observed()
+            value.update(nonce=settings["nonce"], source_revision=settings["source_revision"])
+            receipt = {
+                "status": "ok",
+                "operation_error": None,
+                "cleanup_errors": [],
+                "native_execution": "executed",
+                "native_process_observed": True,
+                "result": value,
+                "native_owner": {
+                    "closed": True,
+                    "reservation_lost": False,
+                    "live_group_members": [],
+                    "worker_pid": 711,
+                    "group_id": 711,
+                },
+            }
+            if mutate:
+                mutate(receipt)
+            return receipt
+
+        with patch.object(probe, "revision", return_value="a" * 40):
+            return probe.qualify_raw(
+                self.root,
+                Path("/owned/Hammerspoon"),
+                scratch,
+                output,
+                "1.1.1",
+                Mock(),
+                observed,
+                self.group,
+            )
+
+    def test_raw_qualification_is_explicitly_negative_and_keeps_its_own_artifact(self):
+        result = self.qualify()
+        self.assertEqual(result["status"], "expected_native_failure")
+        self.assertEqual(len(result["native_log_errors"]), 2)
+        self.assertTrue((self.root / "output/webview-raw-delete/supervisor.json").is_file())
+        self.assertFalse((self.root / "output/webview-binding").exists())
+
+    def test_raw_retirement_debt_is_never_an_expected_negative_success(self):
+        def mutate(receipt):
+            receipt["native_owner"]["closed"] = False
+
+        with self.assertRaisesRegex(ValueError, "retirement is incomplete"):
+            self.qualify(mutate)
+        result = json.loads((self.root / "output/webview-raw-delete/supervisor.json").read_text())
+        self.assertEqual(result["status"], "error")
+
+    def test_final_raw_collection_rejects_a_new_error_outside_the_pinned_pair(self):
+        extra = {"source": "launch.stderr", "line": 3, "text": "Unrelated native error"}
+        with patch.object(
+            probe,
+            "native_errors",
+            side_effect=[recorded_raw_errors(), recorded_raw_errors() + [extra]],
+        ):
+            with self.assertRaisesRegex(ValueError, "final classification"):
+                self.qualify()
+        result = json.loads((self.root / "output/webview-raw-delete/supervisor.json").read_text())
+        self.assertEqual(result["status"], "error")
+        self.assertEqual(len(result["native_log_errors"]), 3)
+
+    def test_orchestrator_runs_two_roles_and_preserves_distinct_owners(self):
+        order = []
+        raw = {"status": "expected_native_failure", "native_owner": {"worker_pid": 711}}
+        product = {"status": "ok", "native_owner": {"worker_pid": 712}}
+        with (
+            patch.object(probe, "qualify_raw", side_effect=lambda *_: order.append("raw") or raw),
+            patch.object(
+                probe, "qualify_product", side_effect=lambda *_: order.append("product") or product
+            ),
+        ):
+            result = probe.qualify(*([None] * 8))
+        self.assertEqual(order, ["raw", "product"])
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(result["raw_negative_control"]["status"], "expected_native_failure")
+        self.assertNotEqual(
+            result["native_owner"]["worker_pid"],
+            result["raw_negative_control"]["native_owner"]["worker_pid"],
+        )
+
+    def test_unrecognized_raw_failure_cannot_start_product_observation(self):
+        with (
+            patch.object(probe, "qualify_raw", side_effect=ValueError("unknown native failure")),
+            patch.object(probe, "qualify_product") as product,
+        ):
+            with self.assertRaisesRegex(ValueError, "unknown native failure"):
+                probe.qualify(*([None] * 8))
+        product.assert_not_called()
 
 
 if __name__ == "__main__":
