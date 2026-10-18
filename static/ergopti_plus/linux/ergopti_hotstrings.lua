@@ -1631,9 +1631,22 @@ local function main()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
 		read_primary = require("adapters.clipboard").read_primary,
-		type_text = function(text)
+		type_text = function(text, owner)
 			if opts.dry_run then return false end
-			local result = injector.inject(0, text, false)
+			if type(owner) ~= "table" or type(owner.current) ~= "function"
+				or type(owner.cached) ~= "function" then return false end
+			local current, cached = owner.current, owner.cached
+			if not current() then return false end
+			local destination = secure_focus_guard.capture_text_owner()
+			if not destination or not current() then return false end
+			local function retained(check)
+				return owner.current == current and owner.cached == cached and check()
+			end
+			local publication = {
+				current = function() return retained(current) and destination.current() and retained(current) end,
+				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
+			}
+			local result = injector.inject(0, text, false, nil, publication)
 			if type(result) ~= "table" or result.ok ~= true then return false end
 			-- The caret moved over replaced text: what the engine buffered no longer
 			-- describes the line.

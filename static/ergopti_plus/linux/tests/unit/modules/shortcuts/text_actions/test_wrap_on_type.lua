@@ -720,6 +720,7 @@ local function with_daemon_wrap(body, options)
 		local reset = assert(source:match("reset_text = function(.-)\n\t\tend,"))
 		local reset_text = evaluate("return function" .. reset .. "\nend", env)
 		env.secure_focus_guard = { blocks_text = function() return false end, prime = reset_text,
+			capture_text_owner = function() return { current = function() return true end, cached = function() return true end } end,
 			invalidate = function() state.invalidations = state.invalidations + 1; reset_text() end }
 		evaluate(span("input_capture_gate = InputCaptureGate.new({", "\n\tlocal on_char"), env)
 		state.early_pause = function() env.script_actions.toggle_pause() end

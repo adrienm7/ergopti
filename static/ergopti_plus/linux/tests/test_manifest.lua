@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.modules.shortcuts.text_actions.test_wrap_output_owner",
 	"tests.unit.ui.editors.numeric_prompt.test_request_lifetime",
 	"tests.unit.modules.diagnostics.test_crash_privacy",
 	"tests.unit.adapters.processes.test_owned_process_deadline",
