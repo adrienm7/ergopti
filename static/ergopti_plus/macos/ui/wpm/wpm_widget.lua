@@ -282,7 +282,7 @@ update_widget_body = function(generation)
 		_canvas_geom.compact_h     = compact_h
 
 		-- The pill's top-left is the anchor; the graph keeps its bottom-right.
-		if not _pos_x then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
+		if not _pos_x or not _pos_y then _pos_x, _pos_y = WPMModel.default_anchor(canon, full_frame) end
 		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
 
 		if not _canvas then

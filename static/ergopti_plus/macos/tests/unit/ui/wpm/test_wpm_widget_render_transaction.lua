@@ -11,7 +11,8 @@ local helpers = require("tests.helpers")
 
 --- Exercises a fresh widget with independently observable native capabilities.
 --- @param callback function Receives the widget and its native state.
-local function with_widget(callback)
+--- @param position table|nil Persisted coordinates keyed by storage setting.
+local function with_widget(callback, position)
 	helpers.with_stub_scope({ "ui.wpm.wpm_widget", "ui.wpm.shared", "ui.tooltip",
 		"modules.keylogger", "infra.logger", "infra.paths", "infra.timings", "adapters.timer_scheduler",
 		"adapters.graphics_renderer", "adapters.storage" }, function()
@@ -28,7 +29,7 @@ local function with_widget(callback)
 		end
 		package.loaded["infra.logger"] = logger
 		package.loaded["infra.paths"] = { shared = helpers.shared }
-		package.loaded["adapters.storage"] = { get = function() return nil end,
+		package.loaded["adapters.storage"] = { get = function(key) return position and position[key] end,
 			set = function() end, delete = function() end }
 		package.loaded["modules.keylogger"] = { get_live_stats = function()
 			phase("stats")
@@ -97,6 +98,28 @@ local function with_widget(callback)
 end
 
 helpers.describe("WPM widget render lifecycle", function()
+	helpers.it("(wpm-widget-partial-position) preserves valid zero and negative coordinates", function()
+		with_widget(function(widget, state)
+			helpers.assert_eq(widget.start(false), true)
+			helpers.assert_eq(state.canvases[1].current_frame.x, -120)
+			helpers.assert_eq(state.canvases[1].current_frame.y, 0)
+			helpers.assert_eq(widget.stop(), true)
+		end, { ["wpm_widget.pos_x"] = "-120", ["wpm_widget.pos_y"] = "0" })
+	end)
+	for _, graph in ipairs({ false, true }) do
+		for _, invalid_y in ipairs({ false, "invalid" }) do
+			helpers.it("(wpm-widget-partial-position) recovers an incomplete pair; graph="
+				.. tostring(graph) .. "; y=" .. tostring(invalid_y), function()
+				with_widget(function(widget, state)
+					helpers.assert_eq(widget.start(graph), true)
+					local frame = state.canvases[1].current_frame
+					helpers.assert_type(frame.y, "number", "both persisted coordinates must form one usable anchor")
+					helpers.assert_true(frame.y > 0)
+					helpers.assert_eq(widget.stop(), true)
+				end, { ["wpm_widget.pos_x"] = 120, ["wpm_widget.pos_y"] = invalid_y or nil })
+			end)
+		end
+	end
 	for _, failure in ipairs({ "stats", "zero", "throw" }) do
 		helpers.it("(wpm-widget-render-owner) rolls back failed first render: " .. failure, function()
 			with_widget(function(widget, state)
