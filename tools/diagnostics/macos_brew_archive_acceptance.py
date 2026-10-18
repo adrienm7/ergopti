@@ -144,6 +144,22 @@ def sandbox_profile(root):
     )
 
 
+# Homebrew applies its own sandbox (/usr/bin/sandbox-exec) around downloads,
+# extraction and cask steps, and macOS refuses sandbox_apply inside ours. Only
+# Brew's policy lets that one executable start outside ours so it can apply
+# Homebrew's profile, which itself denies appleevent-send and lsopen. Brew's own
+# process, where `uninstall quit:` runs osascript, keeps every base denial.
+NESTED_SANDBOX_EXCEPTION = (
+    '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))'
+)
+SANDBOX_POLICIES = ("sandbox.sb", "sandbox-brew.sb")
+
+
+def brew_sandbox_profile(root):
+    """Differ from the base policy only by Homebrew's nested sandbox launcher."""
+    return sandbox_profile(root) + NESTED_SANDBOX_EXCEPTION + "\n"
+
+
 def _validate_appleevent_terminal(packet):
     """Admit only bounded, constructed facts from the exact unreaped native child."""
     keys = {
@@ -998,13 +1014,14 @@ class Children:
         if not any(entry.get("pid") == process.pid for entry in self.debt):
             self.record_debt({"kind": "process-group", "pid": process.pid})
 
-    def start(self, arguments, *, confined=False):
+    def start(self, arguments, *, confined=False, policy="sandbox.sb"):
         """Acquire an asynchronous native child and every input/capture needed to retire it."""
+        require(policy in SANDBOX_POLICIES, "Unadmitted native sandbox policy")
         self.sequence += 1
         output = self.root / f"child-{self.sequence}.stdout"
         errors = self.root / f"child-{self.sequence}.stderr"
         if confined:
-            arguments = ["/usr/bin/sandbox-exec", "-f", str(self.root / "sandbox.sb"), *arguments]
+            arguments = ["/usr/bin/sandbox-exec", "-f", str(self.root / policy), *arguments]
         with output.open("wb") as out, errors.open("wb") as err:
 
             def register(group):
@@ -1028,7 +1045,7 @@ class Children:
             )
         return group.process
 
-    def run(self, arguments, *, check=True, confined=False, timeout=180):
+    def run(self, arguments, *, check=True, confined=False, timeout=180, policy="sandbox.sb"):
         """Capture into owned files, cap diagnostics, preserve exact exit status."""
         if self.evidence is not None:
             self.evidence.record("command.begin", command=Path(arguments[0]).name)
@@ -1042,7 +1059,7 @@ class Children:
                 raise  # No child input has yet been acquired.
             except Exception:
                 pass  # Optional telemetry must not alter acquisition or its primary.
-        process = self.start(arguments, confined=confined)
+        process = self.start(arguments, confined=confined, policy=policy)
         output, errors = self.captures[process]
         failure = None
         try:
@@ -1415,6 +1432,16 @@ def admit_sandbox(children):
         [sys.executable, "-I", str(network_probe)], confined=True, check=False, timeout=10
     )
     require(result.returncode == 73, "Native outbound containment did not prove EPERM refusal")
+    (root / "sandbox-brew.sb").write_text(
+        brew_sandbox_profile(root), encoding="utf-8", newline="\n"
+    )
+    # The base policy must refuse a nested sandbox and Brew's must allow it, so
+    # the exception is the only difference and Homebrew's own sandbox can start.
+    nested = ["/usr/bin/sandbox-exec", "-p", "(version 1)\n(allow default)\n", "/usr/bin/true"]
+    result = children.run(nested, confined=True, check=False)
+    require(result.returncode != 0, "Base native policy allowed a nested sandbox")
+    result = children.run(nested, confined=True, check=False, policy="sandbox-brew.sb")
+    require(result.returncode == 0, "Brew native policy refused Homebrew's nested sandbox")
 
 
 def admit_appleevent_boundary(children, repository):
@@ -2294,7 +2321,7 @@ def admit_brew(children, source, host):
 def invoke_brew(children, command, *, check=True):
     """Recheck native process absence immediately before every generated hook."""
     refuse_foreign_running_apps()
-    return children.run(command, confined=True, check=check)
+    return children.run(command, confined=True, check=check, policy="sandbox-brew.sb")
 
 
 def signed_bundle(children, version):
