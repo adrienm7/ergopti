@@ -401,8 +401,10 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "gesture reader",
+			wait_for_ack = true,
 			stop = function()
-				if gestures and type(gestures.stop_reading) == "function" then gestures.stop_reading() end
+				if gestures and type(gestures.stop_reading) == "function" then return gestures.stop_reading() == true end
+				return true
 			end,
 		},
 		{
@@ -942,6 +944,7 @@ local function main()
 		on_pause_change = function(paused)
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keylogger.cancel_hold_intervals() end
+			if paused and gestures then gestures.release_clicks() end
 			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
