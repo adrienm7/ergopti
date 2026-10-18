@@ -1200,35 +1200,106 @@ class NestedHomebrewSandboxControls(unittest.TestCase):
 class NativeFixtureNameControls(unittest.TestCase):
     """The signed fixture uses the name form the producer's ditto ZIP restores."""
 
+    def build(self, root, *, codesign_mode=0o755, chmod_applies=True):
+        """Run the actual fixture builder over modeled codesign and file-mode ports."""
+        events, links, modes = [], [], {}
+
+        def run(arguments, **options):
+            events.append(tuple(arguments[1:3]))
+            if "--sign" in arguments:
+                # codesign_allocate recreates the Mach-O as 0777 minus the umask.
+                modes["executable"] = codesign_mode
+
+        def chmod(path, mode):
+            events.append(("chmod", path.name, mode))
+            if chmod_applies:
+                modes["executable"] = mode
+
+        children = SimpleNamespace(root=root, run=Mock(side_effect=run))
+        with (
+            patch.object(
+                probe.shutil,
+                "copyfile",
+                side_effect=lambda _source, target: Path(target).write_bytes(b"owned"),
+            ),
+            patch.object(
+                probe.Path,
+                "symlink_to",
+                autospec=True,
+                side_effect=lambda link, target: links.append((link.name, target)),
+            ),
+            patch.object(probe.Path, "chmod", autospec=True, side_effect=chmod),
+            patch.object(probe, "file_mode", side_effect=lambda _path: modes["executable"]),
+        ):
+            app = probe.signed_bundle(children, "71.36.1")
+        return app, events, links
+
     def test_fixture_resource_uses_the_decomposed_native_name(self):
         name = probe.RESOURCE_NAME
         self.assertEqual(name, unicodedata.normalize("NFD", name))
         # The precomposed spelling is what ditto renamed, failing the producer check.
         self.assertNotEqual(name, unicodedata.normalize("NFC", name))
-        self.assertEqual(unicodedata.normalize("NFC", name), "données.txt")
+        self.assertEqual(unicodedata.normalize("NFC", name), "donn\u00e9es.txt")
         with TemporaryDirectory() as directory:
-            root = Path(directory).resolve(strict=True)
-            links = []
-            children = SimpleNamespace(root=root, run=Mock())
-            with (
-                patch.object(
-                    probe.shutil,
-                    "copyfile",
-                    side_effect=lambda _source, target: Path(target).write_bytes(b"owned"),
-                ),
-                patch.object(
-                    probe.Path,
-                    "symlink_to",
-                    autospec=True,
-                    side_effect=lambda link, target: links.append((link.name, target)),
-                ),
-            ):
-                app = probe.signed_bundle(children, "71.36.1")
+            app, _events, links = self.build(Path(directory).resolve(strict=True))
             resources = app / "Contents/Resources"
             self.assertEqual(os.listdir(resources), [name])
             self.assertEqual((resources / name).read_bytes(), probe.RESOURCE)
             self.assertEqual(links, [("owned-link", name)])
-            self.assertEqual(children.run.call_count, 2)
+
+    def test_distinctive_executable_mode_is_applied_after_codesign_rewrites_it(self):
+        self.assertEqual(probe.FIXTURE_EXECUTABLE_MODE, 0o751)
+        with TemporaryDirectory() as directory:
+            _app, events, _links = self.build(Path(directory).resolve(strict=True))
+        # The old order (chmod, sign) left codesign's 0755 in the signed source.
+        self.assertEqual(
+            events,
+            [
+                ("--force", "--sign"),
+                ("chmod", "OwnedFixture", 0o751),
+                ("--verify", "--deep"),
+            ],
+        )
+        # A mode change that does not take refuses before the source is admitted.
+        with TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(probe.AdmissionError, "distinctive fixture mode"):
+                self.build(Path(directory).resolve(strict=True), chmod_applies=False)
+
+    def test_installed_mode_reports_installed_source_and_expected_bits(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            app = root / "apps" / probe.BUNDLE
+            source = root / "source" / probe.BUNDLE
+            for bundle in (app, source):
+                (bundle / "Contents/Resources").mkdir(parents=True)
+                (bundle / "Contents/Info.plist").write_bytes(
+                    probe.plistlib.dumps({"CFBundleShortVersionString": "71.36.1"})
+                )
+                (bundle / "Contents/Resources" / probe.RESOURCE_NAME).write_bytes(probe.RESOURCE)
+            children = SimpleNamespace(root=root, run=Mock())
+            for installed, original in (
+                (0o755, 0o755),
+                (0o755, 0o751),
+                (0o751, 0o755),
+                (0o700, 0o751),
+            ):
+                modes = {app: installed, source: original}
+                with (
+                    self.subTest(installed=oct(installed), source=oct(original)),
+                    patch.object(probe.os, "readlink", return_value=probe.RESOURCE_NAME),
+                    patch.object(
+                        probe,
+                        "file_mode",
+                        side_effect=lambda path: modes[path.parent.parent.parent],
+                    ),
+                ):
+                    with self.assertRaisesRegex(
+                        probe.AdmissionError,
+                        f"^Installed executable mode changed: installed={installed:#o}, "
+                        f"source={original:#o}, expected=0o751$",
+                    ):
+                        probe.verify_installed(children, "71.36.1", source)
+            children.run.assert_not_called()
 
 
 class ConsentFreeBoundaryControls(unittest.TestCase):
