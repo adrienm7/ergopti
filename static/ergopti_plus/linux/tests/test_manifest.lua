@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.editors.numeric_prompt.test_request_lifetime",
 	"tests.unit.adapters.processes.test_owned_process_deadline",
 	"tests.unit.ui.editors.prompt_editor.test_profile_roundtrip",
 	"tests.unit.modules.hotstrings.injector.test_hotstring_undo_owner",
