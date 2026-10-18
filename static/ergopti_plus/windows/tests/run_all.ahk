@@ -549,6 +549,12 @@ InstallSendNoOps()
 #Include unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
+#Include unit/modules/updater/test_updater_release_fetch.ahk
+#Include unit/modules/updater/test_updater_request_pause.ahk
+#Include unit/modules/updater/test_updater_transport_ownership.ahk
+#Include unit/modules/updater/test_updater_tray_root.ahk
+#Include unit/modules/updater/test_updater_install_deadlines.ahk
+#Include unit/modules/updater/test_updater_channel_bundle.ahk
 #Include unit/modules/updater/test_updater_managed_failure.ahk
 #Include unit/modules/updater/test_release_install.ahk
 #Include unit/infra/lifecycle/test_uninstall.ahk
@@ -1157,6 +1163,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/platform/network/test_network_pac_source_contract.ahk
 #Include unit/platform/network/test_managed_routes_native.ahk
 #Include unit/platform/network/test_managed_remote_transport.ahk
+#Include unit/platform/network/test_managed_remote_cleanup_diagnostics.ahk
+#Include unit/platform/network/test_managed_remote_fixture_scope.ahk
+#Include unit/platform/network/test_managed_remote_readiness_diagnostics.ahk
 #Include unit/modules/updater/test_updater_managed_transport.ahk
 #Include unit/modules/updater/test_updater_curl_artifact.ahk
 #Include unit/modules/updater/test_updater_curl_capture.ahk
