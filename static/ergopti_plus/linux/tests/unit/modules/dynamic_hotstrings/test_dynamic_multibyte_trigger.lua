@@ -100,17 +100,20 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 				Dynamic.reset_rules()
 				Dynamic.register_date_rules("★")
 				local count = 0
+				local gate_clears, wrap_clears = 0, 0
+				local privacy_owners = { end_wrap_selection = function() gate_clears = gate_clears + 1 end }
+				local wrap_on_type = { end_selection_window = function() wrap_clears = wrap_clears + 1 end }
 				for _, marker in ipairs({ "on_text_injected = function()", "reset_text = function()",
 					"on_block = function()", "process_lifecycle.onFocusChange(function(appName, windowTitle)" }) do
 					local start = assert(source:find(marker, 1, true), "actual callback must exist") + #marker
 					local prefix = assert(source:sub(start):match("^(.-engine:reset%b())"), "callback reset must exist")
 					local compile = loadstring or load
-					local callback = assert(compile("return function(engine)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
+					local callback = assert(compile("return function(engine, privacy_owners, wrap_on_type)\nlocal keylogger = require(\"modules.keylogger.keylogger\")\nlocal _undoable, _last_offered, tooltip_preview, llm_overlay\n"
 						.. prefix .. "\nend", "@actual-unknown-reset-prefix"))()
 					local engine = Core.new()
 					helpers.assert_true(engine:load_mappings({ { trigger = "date", replacement = "owned-result", is_word = true } }))
 					engine:reset(false)
-					callback(engine)
+					callback(engine, privacy_owners, wrap_on_type)
 					helpers.assert_eq(engine:buffer_starts_at_word_boundary(), false, marker)
 					for _, character in ipairs({ "d", "a", "t", "e" }) do engine:on_char(character) end
 					local ordinary = engine:candidates()
@@ -122,6 +125,8 @@ helpers.describe("Linux owned unknown-context reset boundaries", function()
 					count = count + 1
 				end
 				helpers.assert_eq(count, 4)
+				helpers.assert_true(gate_clears >= 1, "the actual capture-gate prefix must revoke its wrap owner")
+				helpers.assert_true(wrap_clears >= 1, "the actual focus prefix must close its selection window")
 				Dynamic.reset_rules()
 			end)
 		end, debug.traceback)
