@@ -90,9 +90,9 @@ local TERMINAL_APP_NAMES = {
 -- Serialised clipboard save/restore state. Two clipboard sends within
 -- CLIPBOARD_RESTORE_DELAY_S of each other must NOT each save() — the second would
 -- capture the first's still-injected payload as "the user's clipboard" and both
--- restores would then clobber the real original. On an overlapping send we cancel
--- the pending restore but KEEP the first-captured original (mirrors the
--- keymap/utils.lua paste discipline). Declared ABOVE M.send so the restore closures
+-- restores would then clobber the real original. Native handoff and host grace
+-- refuse overlaps. If grace has elapsed but restoration is still queued, a new
+-- send keeps the first-captured original. Declared ABOVE M.send so the restore closures
 -- capture them correctly (F-L8).
 local _paste_saved_original = nil
 local _paste_pending_timer = nil
@@ -100,6 +100,9 @@ local _paste_timer_cleanup = nil
 local _paste_owns_clipboard = false
 local _paste_recovery_only = false
 local _paste_generation = 0
+local _paste_transaction = nil
+local _paste_native_pending = false
+local _paste_restore_after = nil
 
 --- Reports whether one application identity is a terminal input host.
 --- @param bundle_id string|nil macOS bundle identifier.
@@ -170,11 +173,20 @@ local function release_clipboard()
 	_paste_saved_original = nil
 	_paste_owns_clipboard = false
 	_paste_recovery_only = false
+	_paste_transaction = nil
+	_paste_native_pending = false
+	_paste_restore_after = nil
 	_paste_generation = _paste_generation + 1
+end
+
+local function paste_settling()
+	return _paste_native_pending or (_paste_restore_after ~= nil
+		and TimerScheduler.awake_time() < _paste_restore_after)
 end
 
 local function restore_clipboard()
 	if not _paste_owns_clipboard then return true end
+	if paste_settling() then return false, "native paste is still settling", true end
 	local ok_restore, restored = pcall(Clipboard.restore, _paste_saved_original)
 	if not ok_restore or restored ~= true then
 		return false, ok_restore and "Clipboard.restore returned " .. tostring(restored) or restored
@@ -206,10 +218,12 @@ local function schedule_restore()
 			end
 			_paste_pending_timer = nil
 			if generation ~= _paste_generation or not _paste_owns_clipboard then return end
-			local restored, restore_error = restore_clipboard()
+			local restored, restore_error, waiting = restore_clipboard()
 			if restored then return end
-			_paste_recovery_only = true
-			Logger.error(LOG, "Clipboard restore refused; ownership retained — %s", tostring(restore_error))
+			if not waiting then
+				_paste_recovery_only = true
+				Logger.error(LOG, "Clipboard restore refused; ownership retained — %s", tostring(restore_error))
+			end
 			queue_restore_retry()
 		end)
 	timer_handle = timer_or_error
@@ -227,6 +241,12 @@ queue_restore_retry = function()
 	if not _paste_owns_clipboard then return true end
 	local scheduled, timer_error = schedule_restore()
 	if scheduled then return true end
+	-- A zero-delay fallback cannot replace the host's remaining paste interval.
+	-- Keep the exact snapshot until the terminal callback or a later send retries.
+	if paste_settling() then
+		Logger.error(LOG, "Clipboard paste settlement timer could not be armed — %s", tostring(timer_error))
+		return false
+	end
 	if type(SyntheticInput.defer_after_callback) == "function" then
 		local generation = _paste_generation
 		local callback_ran = false
@@ -278,8 +298,12 @@ function M.send(text, opts, callback)
 	end
 
 	local ok, err
+	local producer
+	local completion_owned = false
+	local terminal_received = false
 	if mode == "clipboard" then
 		ok, err = pcall(function()
+			assert(not paste_settling(), "previous native clipboard paste is still settling")
 			if _paste_recovery_only then
 				local restored, restore_error = restore_clipboard()
 				if not restored then
@@ -287,7 +311,7 @@ function M.send(text, opts, callback)
 					error("previous clipboard recovery remains pending: " .. tostring(restore_error), 0)
 				end
 			end
-			-- If a restore is still pending from a previous clipboard send, cancel it
+			-- If a restore is still pending after the previous paste's grace, cancel it
 			-- but KEEP the first-captured original; only capture the user's clipboard
 			-- when no send is in flight (otherwise we'd save our own injected payload).
 			if _paste_owns_clipboard then
@@ -308,30 +332,72 @@ function M.send(text, opts, callback)
 			_paste_recovery_only = true
 			local ok_write, written = pcall(function() return Clipboard.write(text) end)
 			if not ok_write or written ~= true then
-				local restored, restore_error = restore_clipboard()
-				if not restored then queue_restore_retry() end
-				error("clipboard payload refused (restore=" .. tostring(restore_error) .. ")", 0)
+				error("clipboard payload refused: " .. tostring(written), 0)
 			end
 
 			local restore_armed, timer_error = schedule_restore()
 			if not restore_armed then
-				local restored, restore_error = restore_clipboard()
-				if not restored then queue_restore_retry() end
-				error("clipboard restore timer refused: " .. tostring(timer_error)
-					.. " (restore=" .. tostring(restore_error) .. ")", 0)
+				error("clipboard restore timer refused: " .. tostring(timer_error), 0)
 			end
 
-			local ok_emit, emitted = pcall(
-				SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US)
-			if not ok_emit or emitted ~= true then
-				stop_restore_timer()
-				local restored, restore_error = restore_clipboard()
-				if not restored then queue_restore_retry() end
-				error("synthetic paste keystroke refused (restore="
-					.. tostring(restore_error) .. ")", 0)
-			end
 			_paste_recovery_only = false
+			producer = SyntheticInput.begin("text_sender.clipboard", "action")
+			_paste_transaction = producer
+			_paste_native_pending = true
+			local generation = _paste_generation
+			local dispatched = false
+			SyntheticInput.on_dispatched(producer, function(_, _, status)
+				if status == "dispatched" then dispatched = true end
+			end)
+			SyntheticInput.on_complete(producer, function(_, status)
+				if _paste_transaction ~= producer or generation ~= _paste_generation then return end
+				terminal_received = true
+				_paste_transaction = nil
+				_paste_native_pending = false
+				if dispatched or status == "complete" then
+					_paste_restore_after = TimerScheduler.awake_time() + CLIPBOARD_RESTORE_DELAY_S
+					queue_restore_retry()
+				else
+					local restored, restore_error = restore_clipboard()
+					if not restored then
+						_paste_recovery_only = true
+						Logger.error(LOG, "Cancelled clipboard paste restore refused — %s", tostring(restore_error))
+						queue_restore_retry()
+					end
+				end
+			end)
+			completion_owned = true
+			local ok_emit, emitted = pcall(
+				SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US, producer)
+			if not ok_emit or emitted ~= true then
+				error("synthetic paste keystroke refused: " .. tostring(emitted), 0)
+			end
+			assert(SyntheticInput.seal(producer) == true, "synthetic paste seal refused")
 		end)
+		if not ok then
+			if producer ~= nil then
+				local cancelled, cancel_error = pcall(SyntheticInput.cancel, producer)
+				if not cancelled then
+					Logger.error(LOG, "Clipboard paste cancellation failed — %s", tostring(cancel_error))
+				end
+				-- Before callback registration, no native batch has been emitted.
+				if not completion_owned then
+					_paste_transaction = nil
+					_paste_native_pending = false
+				end
+			end
+			-- A synchronous terminal callback already owns its one rollback/retry.
+			if not terminal_received then
+				local restored, restore_error, waiting = restore_clipboard()
+				if not restored then
+					if not waiting then
+						_paste_recovery_only = true
+						Logger.error(LOG, "Clipboard paste rollback refused — %s", tostring(restore_error))
+					end
+					queue_restore_retry()
+				end
+			end
+		end
 	else
 		ok, err = pcall(function()
 			assert(SyntheticInput.emit_key_strokes(text),
