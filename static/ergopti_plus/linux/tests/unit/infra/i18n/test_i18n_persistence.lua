@@ -73,19 +73,32 @@ helpers.describe("i18n persistence", function()
 
   helpers.describe("locale persistence", function()
     helpers.it("set_locale + get_locale round-trips", function()
-      local i18n = helpers.load_module("infra.i18n")
-      i18n.init()
-      local before = i18n.get_locale()
-      helpers.assert_true(type(before) == "string" and #before > 0,
-        string.format("initial locale: %s", tostring(before)))
+      -- An in-memory store that acknowledges every write: the round trip must
+      -- not depend on whichever storage adapter an earlier test file left loaded.
+      local saved_storage = package.loaded["adapters.storage"]
+      local stored = {}
+      package.loaded["adapters.storage"] = {
+        get = function(key) return stored[key] end,
+        set = function(key, value) stored[key] = value; return true end,
+      }
+      local ok, err = pcall(function()
+        local i18n = helpers.load_module("infra.i18n")
+        i18n.init()
+        local before = i18n.get_locale()
+        helpers.assert_true(type(before) == "string" and #before > 0,
+          string.format("initial locale: %s", tostring(before)))
 
-      -- Switch to "en" and verify.
-      i18n.set_locale("en")
-      helpers.assert_eq(i18n.get_locale(), "en", "locale changed to en")
+        -- Switch to "en" and verify.
+        i18n.set_locale("en")
+        helpers.assert_eq(i18n.get_locale(), "en", "locale changed to en")
 
-      -- Switch back to the original and ensure it persists.
-      i18n.set_locale(before)
-      helpers.assert_eq(i18n.get_locale(), before, "locale restored")
+        -- Switch back to the original and ensure it persists.
+        i18n.set_locale(before)
+        helpers.assert_eq(i18n.get_locale(), before, "locale restored")
+      end)
+      package.loaded["adapters.storage"] = saved_storage
+      package.loaded["infra.i18n"] = nil
+      if not ok then error(err, 0) end
     end)
 
 		helpers.it("does not publish a locale whose durable write failed", function()

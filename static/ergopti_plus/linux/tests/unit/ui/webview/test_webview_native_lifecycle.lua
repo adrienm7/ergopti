@@ -9,7 +9,7 @@ local run_contract = function(helpers,load_manager,load_host)
   local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0,ucms={},replies={}}
   local manager
   local noop=function()end
-  package.loaded['logger.shim']={success=noop,info=noop,debug=noop,warn=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
+  package.loaded['logger.shim']={success=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
   local window_type=setmetatable({},{__call=function(_,properties)
    controls.constructor_calls=controls.constructor_calls+1
    local window={properties=properties,visible=false,alive=true}
