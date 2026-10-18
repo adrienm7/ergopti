@@ -208,6 +208,7 @@ local function parse_http_url(url)
 		authority = authority,
 		origin = scheme .. "://" .. host:lower() .. ":" .. port,
 		path = path,
+		query = tail:match("^[^?#]*(%?[^#]*)") or "",
 	}
 end
 
@@ -215,17 +216,30 @@ end
 --- @param path string Absolute URL path.
 --- @return string normalized
 local function normalize_url_path(path)
-	local parts = {}
-	for part in path:gmatch("[^/]+") do
-		if part == ".." then
-			if #parts > 0 then table.remove(parts) end
-		elseif part ~= "." and part ~= "" then
-			parts[#parts + 1] = part
+	-- RFC 3986 section 5.2.4 moves complete segments, including empty ones:
+	-- repeated slashes identify different resources and must remain intact.
+	local output = ""
+	while path ~= "" do
+		if path:sub(1, 3) == "../" then
+			path = path:sub(4)
+		elseif path:sub(1, 2) == "./" then
+			path = path:sub(3)
+		elseif path:sub(1, 3) == "/./" then
+			path = path:sub(3)
+		elseif path == "/." then
+			path = "/"
+		elseif path:sub(1, 4) == "/../" or path == "/.." then
+			path = path == "/.." and "/" or path:sub(4)
+			output = output:gsub("/?[^/]*$", "")
+		elseif path == "." or path == ".." then
+			path = ""
+		else
+			local segment, remaining = path:match("^(/?[^/]*)(.*)$")
+			output = output .. segment
+			path = remaining
 		end
 	end
-	local normalized = "/" .. table.concat(parts, "/")
-	if path:sub(-1) == "/" and normalized ~= "/" then normalized = normalized .. "/" end
-	return normalized
+	return output
 end
 
 --- Resolves one Location value against the current absolute URL.
@@ -249,15 +263,21 @@ local function resolve_redirect(current_url, location)
 		resolved = current.scheme .. ":" .. location
 	elseif location:sub(1, 1) == "/" then
 		resolved = current.scheme .. "://" .. current.authority .. location
-	elseif location:sub(1, 1) == "?" or location:sub(1, 1) == "#" then
+	elseif location:sub(1, 1) == "?" then
 		resolved = current.scheme .. "://" .. current.authority .. current.path .. location
+	elseif location:sub(1, 1) == "#" then
+		resolved = current.scheme .. "://" .. current.authority .. current.path .. current.query .. location
 	else
 		local relative_path, suffix = location:match("^([^?#]*)(.*)$")
 		local base_dir = current.path:match("^(.*)/") or ""
 		resolved = current.scheme .. "://" .. current.authority
-			.. normalize_url_path(base_dir .. "/" .. relative_path) .. suffix
+			.. base_dir .. "/" .. relative_path .. suffix
 	end
 
+	local prefix, path, suffix = resolved:match("^([%a][%w+%.%-]*://[^/?#]+)([^?#]*)(.*)$")
+	-- Query and fragment references inherit the base path byte-for-byte.
+	local inherits_path = location:sub(1, 1) == "?" or location:sub(1, 1) == "#"
+	if prefix and not inherits_path then resolved = prefix .. normalize_url_path(path) .. suffix end
 	local next_parts, next_err = parse_http_url(resolved)
 	if not next_parts then return nil, nil, next_err end
 	return resolved, current, next_parts
