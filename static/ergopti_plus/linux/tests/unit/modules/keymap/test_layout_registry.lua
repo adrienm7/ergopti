@@ -523,3 +523,132 @@ require("test.layout_installed_extension_manager_contract")(helpers, Json, {
 	probe_receipt = OK_RUN,
 	install_receipt = INSTALLED_RUN,
 })
+
+--- Isolates terminal registry shutdown from every other module's runner lifetime.
+--- @param options table Existing registry filesystem/transport fixture options.
+--- @param body function Receives the real registry and controlled physical helper ACK.
+local function with_shutdown_owner(options, body)
+	local modules = { "modules.keymap.layout_registry", "adapters.process_runner", "adapters.http_client", "adapters.file_digest" }
+	local previous = {}
+	for _, name in ipairs(modules) do previous[name] = package.loaded[name] end
+	local physical = { settled = true, stops = 0, http_cancels = 0, digest_cancels = 0 }
+	package.loaded["adapters.process_runner"] = {
+		shutdown = function() physical.stops = physical.stops + 1; return physical.settled end,
+		is_settled = function() return physical.settled end,
+	}
+	package.loaded["adapters.http_client"] = { cancel = function(owner)
+		helpers.assert_eq(owner, "layout_registry")
+		physical.http_cancels = physical.http_cancels + 1
+		if physical.on_cancel then physical.on_cancel() end
+		return true -- Logical cancellation deliberately does not acknowledge helpers.
+	end }
+	package.loaded["adapters.file_digest"] = { cancel = function(owner)
+		helpers.assert_eq(owner, "layout_registry"); physical.digest_cancels = physical.digest_cancels + 1; return true
+	end }
+	local ok, err = xpcall(function()
+		local registry, deps, state = manager(options)
+		body(registry, deps, state, physical)
+	end, debug.traceback)
+	for _, name in ipairs(modules) do package.loaded[name] = previous[name] end
+	if not ok then error(err, 0) end
+end
+
+helpers.describe("registry workflows lose publication authority at terminal shutdown", function()
+	for _, phase in ipairs({ "probe", "installer" }) do
+		helpers.it("(layout-helper-shutdown) fences a select callback during " .. phase, function()
+			with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+				layouts = { ergol = entry_of("ergol") } }) } }, function(registry, deps, state, physical)
+				local pending, stages, callbacks = nil, 0, 0
+				deps.run = function(_, args, _, done)
+					stages = stages + 1
+					if args[1] == "-c" and phase == "installer" then done(OK_RUN) else pending = done end
+					return true
+				end
+				helpers.assert_true(registry.select("ergol", function() callbacks = callbacks + 1 end, deps))
+				local busy = registry.snapshot(deps).busy
+				helpers.assert_type(busy, "table")
+				physical.settled = false
+				physical.on_cancel = function() pending(phase == "probe" and OK_RUN or INSTALLED_RUN) end
+				helpers.assert_eq(registry.shutdown(), false)
+				pending(phase == "probe" and OK_RUN or INSTALLED_RUN)
+				helpers.assert_eq(stages, phase == "probe" and 1 or 2, "cancelled probe cannot start an installer")
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_eq(registry.snapshot(deps).active, "")
+				helpers.assert_eq(registry.snapshot(deps).busy, busy, "logical cancellation cannot clear physical debt")
+				helpers.assert_eq(pcall(registry._reset), false, "test reset cannot erase terminal ownership")
+				physical.settled = true
+				helpers.assert_true(registry.shutdown())
+				helpers.assert_nil(registry.snapshot(deps).busy)
+				helpers.assert_eq(callbacks, 0)
+				helpers.assert_eq(physical.http_cancels, 1); helpers.assert_eq(physical.digest_cancels, 1)
+			end)
+		end)
+	end
+
+	helpers.it("(layout-helper-shutdown) retired uninstall cannot delete files or publish a new record", function()
+		local record = Json.encode({ schema_version = 1, layouts = { ergol = entry_of("ergol") } })
+		with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = record,
+			[LOCAL_DIR .. "ergol.keylayout"] = "original layout" } }, function(registry, deps, state, physical)
+			local pending, callbacks = nil, 0
+			deps.run = function(_, args, _, done) if args[1] == "-c" then done(OK_RUN) else pending = done end; return true end
+			helpers.assert_true(registry.uninstall("ergol", function() callbacks = callbacks + 1 end, deps))
+			physical.settled = false
+			helpers.assert_eq(registry.shutdown(), false)
+			pending(INSTALLED_RUN)
+			helpers.assert_eq(state.files[LOCAL_DIR .. "installed.json"], record)
+			helpers.assert_eq(state.files[LOCAL_DIR .. "ergol.keylayout"], "original layout")
+			helpers.assert_eq(#state.deleted, 0); helpers.assert_eq(callbacks, 0)
+			physical.settled = true; helpers.assert_true(registry.shutdown())
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) cancelled catalogue reply cannot cache or restart installation", function()
+		with_shutdown_owner({}, function(registry, deps, state, physical)
+			local pending, requests, callbacks, writes = nil, 0, 0, 0
+			deps.transport.get = function(_, _, _, done) requests = requests + 1; pending = done end
+			deps.write = function() writes = writes + 1; return true end
+			helpers.assert_true(registry.install("ergol", function() callbacks = callbacks + 1 end, deps))
+			helpers.assert_eq(requests, 1)
+			physical.on_cancel = function() pending(200, INDEX_TEXT, nil, { etag = '"late"' }) end
+			helpers.assert_true(registry.shutdown())
+			pending(200, INDEX_TEXT, nil, { etag = '"late"' })
+			helpers.assert_eq(writes, 0); helpers.assert_eq(requests, 1)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+			for _, method in ipairs({ "install", "select", "uninstall" }) do
+				helpers.assert_eq(registry[method]("ergol", function() callbacks = callbacks + 1 end, deps), false)
+			end
+			helpers.assert_eq(registry.refresh(function() callbacks = callbacks + 1 end, deps), false)
+			helpers.assert_eq(callbacks, 0, "closed admission cannot publish a late business callback")
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) cancelled digest cannot advance acquisition or start conversion", function()
+		with_shutdown_owner({ served = { [INDEX_URL] = INDEX_TEXT, [ERGOL_URL] = registry_file("ergol/ergol.keylayout") } }, function(registry, deps, state)
+			local pending, callbacks, writes = nil, 0, 0
+			local write = deps.write
+			deps.write = function(...) writes = writes + 1; return write(...) end
+			deps.transport.sha256 = function(_, done) pending = done end
+			helpers.assert_true(registry.install("ergol", function() callbacks = callbacks + 1 end, deps))
+			helpers.assert_type(pending, "function")
+			local before = writes
+			helpers.assert_true(registry.shutdown())
+			pending(entry_of("ergol").sha256, nil)
+			helpers.assert_eq(writes, before)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+		end)
+	end)
+
+	helpers.it("(layout-helper-shutdown) source read reentry cannot acquire an operation after shutdown", function()
+		with_shutdown_owner({ files = { [LOCAL_DIR .. "installed.json"] = Json.encode({ schema_version = 1,
+			layouts = { ergol = entry_of("ergol") } }) } }, function(registry, deps, state)
+			local read, stopped, callbacks = deps.read, false, 0
+			deps.read = function(path)
+				if not stopped then stopped = true; helpers.assert_true(registry.shutdown()) end
+				return read(path)
+			end
+			helpers.assert_eq(registry.select("ergol", function() callbacks = callbacks + 1 end, deps), false)
+			helpers.assert_eq(#state.runs, 0); helpers.assert_eq(callbacks, 0)
+			helpers.assert_nil(registry.snapshot(deps).busy)
+		end)
+	end)
+end)
