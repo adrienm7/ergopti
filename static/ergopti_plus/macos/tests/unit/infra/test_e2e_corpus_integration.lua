@@ -24,8 +24,11 @@ local function check_corpus(mode)
 	local pipe = assert(io.popen(command, "r"), "E2E probe must start")
 	local output = assert(pipe:read("*a"))
 	local closed, _, status = pipe:close()
-	local opens, reads, closes, vector = output:match("PROBE opens=(%d+) reads=(%d+) closes=(%d+) vector=(%S+)")
+	local opens, reads, closes, boot_runs, vector =
+		output:match("PROBE opens=(%d+) reads=(%d+) closes=(%d+) boot_runs=(%d+) vector=(%S+)")
 	helpers.assert_eq(tonumber(opens), 1, output)
+	-- Only a loaded corpus may reach the boot scenarios, which the E2E job owns.
+	helpers.assert_eq(tonumber(boot_runs), mode == "success" and 1 or 0, output)
 	helpers.assert_eq(closed and 0 or status, mode == "success" and 0 or 1, output)
 	helpers.assert_eq(tonumber(reads), mode == "missing" and 0 or 1, output)
 	helpers.assert_eq(tonumber(closes), mode == "missing" and 0 or 1, output)
