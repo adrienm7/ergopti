@@ -940,6 +940,7 @@ local function observe_periodic_settlement(owner, timer)
 		owner.timer = nil
 		owner.stop_error_reported = false
 		release_periodic_cleanup(owner)
+		if owner.on_native_settled then owner.on_native_settled() end
 		if owner._marker == IDLE_WAITER_MARKER then
 			_idle_waiter_cleanup[owner] = nil
 			if owner.settling == true then finish_idle_waiter(owner) end
@@ -1999,6 +2000,11 @@ function M.cancel(tx)
 	-- suffix so pause/reload cannot strand a partial replacement on screen.
 	for _, batch in ipairs(tx.batches) do
 		local owner = batch.paced_owner
+		if owner and owner.guarded_pair == true and batch.status == "queued" then
+			-- A pending/uncertain Down owns its release and exact timer retirement.
+			owner.publication_cancelled = true
+			return false
+		end
 		if owner and owner.committed == true and batch.status == "queued" then
 			if tx.publication ~= nil then
 				owner.publication_cancelled = true
@@ -3034,6 +3040,139 @@ start_unowned_fifo_head = function()
 end
 
 
+-- Scope these helpers below Lua’s active-local limit in the main adapter chunk.
+do
+	--- Publishes one guarded terminal only after its periodic capability settled.
+	--- @param batch table Exact guarded batch.
+	--- @param owner table Exact periodic owner.
+	local function finish_guarded_pair(batch, owner)
+		if owner.guarded_settling ~= true or owner.timer ~= nil or batch.status ~= "queued" then return end
+		if owner.publication_cancelled then batch.tx.cancelled = true end
+		finish_serial_batch(batch, owner, owner.terminal_status, owner.terminal_detail)
+	end
+
+
+	--- Fences the exact recurring owner before requesting its native stop.
+	--- The settlement callback may finish synchronously; no global state follows it.
+	--- @param batch table Exact guarded batch.
+	--- @param owner table Exact periodic owner.
+	--- @param status string dispatched|failed.
+	--- @param detail string|nil Native failure detail.
+	local function settle_guarded_pair(batch, owner, status, detail)
+		owner.guarded_settling = true
+		owner.terminal_status, owner.terminal_detail = status, detail
+		invalidate_periodic_owner(owner, status)
+		finish_guarded_pair(batch, owner)
+	end
+
+
+	--- Posts one clipboard pair outside event taps, retaining every uncertain Up.
+	--- @param batch table FIFO batch with one exact native key pair.
+	--- @param owner table Guarded periodic owner.
+	local function pump_guarded_pair(batch, owner)
+		if owner.pumping or owner.guarded_settling then return end
+		owner.pumping = true
+		local ran, failure = xpcall(function()
+			if owner.awaiting_settlement then
+				settle_guarded_pair(batch, owner, owner.failure and "failed" or "dispatched", owner.failure)
+				return
+			end
+			if not owner.release_due then
+				-- This is the final native probe before Down. Everything between the
+				-- check and post is RAM-only, including conservative release ownership.
+				if owner.publication_cancelled or not publication_allowed(batch.tx.publication, false) then
+					discard_batch_records(batch)
+					settle_guarded_pair(batch, owner, "failed", "clipboard publication is no longer current")
+					return
+				end
+				if owner.publication_cancelled or batch.status ~= "queued" then return end
+				owner.release_due = true
+				batch.native_down_attempted = true
+				owner.ordinal = 2
+				local posted, detail = pcall(owner.events[1].post, owner.events[1])
+				if not posted then owner.failure = tostring(detail) end
+				-- A throwing post may already have delivered Down. Publish a conservative
+				-- epoch after its unique attempt; a purely reversible refusal has none.
+				local published, epoch_error = pcall(publish_action_epoch, batch)
+				if not published then owner.failure = owner.failure or tostring(epoch_error) end
+			end
+			-- Up compensates an attempted Down regardless of cancellation, clipboard
+			-- ownership, or the ordinary five-attempt posting budget. Never replay Down.
+			local released, release_error = pcall(owner.events[2].post, owner.events[2])
+			if not released then
+				owner.failure = owner.failure or tostring(release_error)
+				if not owner.release_error_reported then
+					owner.release_error_reported = true
+					pcall(defer_diagnostic, "error", "Guarded key-up cleanup remains pending: %s.", tostring(release_error))
+				end
+				return
+			end
+			if owner.failure then
+				pcall(defer_diagnostic, "error", "Guarded native key pair failed: %s.", owner.failure)
+			end
+			owner.release_due = false
+			owner.ordinal = 3
+			owner.awaiting_settlement = true
+		end, debug.traceback)
+		owner.pumping = false
+		if not ran then
+			owner.failure = owner.failure or tostring(failure)
+			if not owner.release_due and not owner.guarded_settling then
+				discard_unposted_suffix(batch, owner.ordinal)
+				settle_guarded_pair(batch, owner, "failed", owner.failure)
+			end
+		end
+	end
+
+
+	--- Enqueues one guarded pair under a pre-acquired non-adoptable FIFO owner.
+	--- This private macOS extension never joins the ambient callback collector.
+	--- @param modifiers table Native modifiers.
+	--- @param key string|number Native key.
+	--- @param tx table Explicit transaction with full and cached publication guards.
+	--- @return boolean accepted
+	function M.emit_guarded_key_stroke(modifiers, key, tx)
+		tx = require_transaction(tx)
+		assert(tx.publication ~= nil, "guarded key pair requires publication authority")
+		local batch = M.begin_batch(tx)
+		local owner
+		local ok, failure = xpcall(function()
+			M.keyStroke(batch, modifiers, key)
+			owner = {
+				_marker = PACED_OWNER_MARKER, guarded_pair = true,
+				tx = tx, batch = batch, events = batch.events, ordinal = 1,
+				generation = 0, status = "prepared", committed = false,
+			}
+			owner.pump = function() pump_guarded_pair(batch, owner) end
+			owner.on_native_settled = function() finish_guarded_pair(batch, owner) end
+			owner.token = M.retain(tx)
+			batch.paced_owner = owner
+			assert(acquire_periodic_owner(owner, M.PERIODIC_OWNER_TICK_SEC),
+				"guarded key pair periodic owner refused")
+			assert(not tx.cancelled and not tx.completed and not tx.failed
+				and batch.status == "building" and owner.generation == 0
+				and not owner.cleanup_requested and owner.timer ~= nil,
+				"guarded key pair admission changed while acquiring its owner")
+			owner.committed, owner.status = true, "queued"
+			batch.mode, batch.status = "paced", "queued"
+			_pending_count = _pending_count + 1
+			batch.pending_counted = true
+			_deferred_tail = _deferred_tail + 1
+			_deferred_queue[_deferred_tail] = batch
+		end, debug.traceback)
+		if not ok then
+			if owner then invalidate_paced_owner(owner, "refused") end
+			if batch.status == "building" then M.discard_batch(batch)
+			else discard_batch_records(batch) end -- a native constructor may finish after reentrant cancellation
+			error(failure, 0)
+		end
+		return true
+	end
+
+
+end
+
+
 --- Finishes one fully target-posted paced batch and advances the global FIFO.
 --- @param batch table Paced batch.
 local function finish_paced_batch(batch)
@@ -3078,6 +3217,10 @@ end
 pump_paced_batch = function(batch)
 	if batch.status ~= "queued" then return end
 	local owner = batch.paced_owner
+	if owner and owner.guarded_pair == true then
+		owner.pump()
+		return
+	end
 	assert(type(owner) == "table" and owner._marker == PACED_OWNER_MARKER
 		and owner.committed == true,
 		"adapters.synthetic_input: queued paced batch has no committed owner")

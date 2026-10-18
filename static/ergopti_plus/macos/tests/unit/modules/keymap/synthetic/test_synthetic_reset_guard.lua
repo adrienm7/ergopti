@@ -63,7 +63,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
 		text_transform = 'input.begin("shortcuts.text.transform", "action", publication)',
 		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
-		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action")',
+		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action", {',
 	}
 
 	helpers.it("enumerates the complete non-vacuous class", function()
@@ -179,7 +179,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 	end)
 
 	helpers.it("text sender observes its exact paste producer before dispatch and terminal cleanup", function()
-		-- test_text_sender_paste_handoff drives this owner through the real broker,
+		-- test_text_sender_paste_handoff drives this owner through the real FIFO timer,
 		-- including delayed handoff, cancellation, grace and exactly-once restore.
 		local source = read_unit("local _paste_transaction = nil")
 		local begin_pos = source:find(producers.text_sender_paste, 1, true)
@@ -187,7 +187,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		local dispatched_pos = source:find("SyntheticInput.on_dispatched(producer", begin_pos, true)
 		local completion_pos = source:find("SyntheticInput.on_complete(producer", begin_pos, true)
 		local emit_pos = source:find(
-			"SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US, producer", begin_pos, true)
+			"SyntheticInput.emit_guarded_key_stroke, PASTE_MODIFIER, PASTE_KEY, producer", begin_pos, true)
 		local seal_pos = source:find("SyntheticInput.seal(producer)", begin_pos, true)
 		local cancel_pos = source:find("SyntheticInput.cancel, producer", begin_pos, true)
 		helpers.assert_true(dispatched_pos and completion_pos and emit_pos and seal_pos and cancel_pos,
