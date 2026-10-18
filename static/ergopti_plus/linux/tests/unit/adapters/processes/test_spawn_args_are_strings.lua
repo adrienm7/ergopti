@@ -140,7 +140,11 @@ helpers.describe("ShellRunner: argv typing", function()
 		local sites = {
 			{ file = "adapters/curl_http_client.lua", binary = "curl" },
 			{ file = "adapters/file_digest.lua", binary = "sha256sum" },
-			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)" },
+			-- process_runner validates, then hands the argv to OwnedProcess, which
+			-- validates again before its own native spawn.
+			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)",
+				spawn = "pcall(OwnedProcess.start," },
+			{ file = "adapters/owned_process.lua", binary = "the owned process", spawn = "pcall(native.spawn," },
 			{ file = "adapters/system_proxy.lua", binary = "the native proxy lookup helper" },
 		}
 		local checked = 0
@@ -154,18 +158,18 @@ helpers.describe("ShellRunner: argv typing", function()
 			-- The CALL, not the availability probe: both modules also test
 			-- `type(luv.spawn) ~= "function"` near the top, and matching that
 			-- would compare the ordering against the wrong line.
-			local spawn_at = src:find("pcall(luv.spawn,", 1, true)
+			local spawn_at = src:find(site.spawn or "pcall(luv.spawn,", 1, true)
 			helpers.assert_true(validate_at ~= nil,
 				site.file .. " must validate its argv via ShellRunner.validate_spawn_args")
 			helpers.assert_true(spawn_at ~= nil,
 				site.file .. " must still spawn " .. site.binary
-				.. " through pcall(luv.spawn, …) -- otherwise the assertion above "
+				.. " through " .. (site.spawn or "pcall(luv.spawn,") .. " … -- otherwise the assertion above "
 				.. "is vacuous")
 			helpers.assert_true(validate_at < spawn_at,
 				site.file .. " must validate BEFORE luv.spawn, so a refusal costs no "
 				.. "process (keylogger-worker-timings-must-be-strings)")
 		end
-		helpers.assert_eq(checked, 4, "every spawn site must have been inspected")
+		helpers.assert_eq(checked, 5, "every spawn site must have been inspected")
 	end)
 
 	-- The three drivers must agree on this contract, or the next audit fixes it
