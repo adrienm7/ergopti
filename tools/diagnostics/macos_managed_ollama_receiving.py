@@ -1270,14 +1270,20 @@ class Receiver:
             for key in ("done", "done_reason", "eval_count", "prompt_eval_count")
             if type(inference.get(key)) in (bool, int, str) and len(str(inference.get(key))) <= 32
         }
-        self.receipt["inference_facts"]["eval_duration_type"] = type(
-            inference.get("eval_duration")
-        ).__name__
+        for key in ("eval_duration", "total_duration"):
+            self.receipt["inference_facts"][key + "_type"] = type(inference.get(key)).__name__
+        # Ollama omits a zero eval_duration (omitempty): a one-token answer can
+        # be timed entirely as prompt evaluation (hosted runs 39136718994).
+        # The generated token count and the request's total duration prove it.
+        eval_duration = inference.get("eval_duration", 0)
         require(
             inference.get("done") is True
+            and inference.get("done_reason") == "length"
             and inference.get("eval_count") == 1
-            and type(inference.get("eval_duration")) is int
-            and inference["eval_duration"] > 0,
+            and type(eval_duration) is int
+            and eval_duration >= 0
+            and type(inference.get("total_duration")) is int
+            and inference["total_duration"] > 0,
             "actual_native_inference",
         )
         self.stage = "cancel"
