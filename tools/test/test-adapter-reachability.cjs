@@ -25,7 +25,7 @@
  *
  * WHY IT DOES NOT DELETE THEM:
  * two of the nine (notifier, tooltip_renderer) are named by
- * linux/tests/unit/meta/test_port_adapter_presence.lua, which asserts that each
+ * linux/tests/meta/architecture/test_port_adapter_presence.lua, which asserts that each
  * declared port HAS an adapter file. So the nine are not accidents: they exist
  * because the architecture declares the port. Removing them means shrinking
  * `contracts.json` to the ports with real traffic and superseding ADR-001 with

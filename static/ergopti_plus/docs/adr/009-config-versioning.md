@@ -140,4 +140,4 @@ placeholder stamped with the current version.
   reference replay, interpreter wiring),
   `static/ergopti_plus/windows/tests/unit/infra/config/migration/test_config_migrate.ahk`,
   `static/ergopti_plus/macos/tests/unit/infra/config/test_config_migrate.lua`,
-  `static/ergopti_plus/linux/tests/unit/infra/test_config_migrate.lua`
+  `static/ergopti_plus/linux/tests/unit/infra/config/test_config_migrate.lua`

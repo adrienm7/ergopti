@@ -117,6 +117,7 @@ end
 -- ===================================
 
 local TEST_DIRS = {
+	"tests/meta",
 	"tests/unit",
 }
 

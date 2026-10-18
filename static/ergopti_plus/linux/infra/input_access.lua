@@ -31,7 +31,7 @@
 local M = {}
 
 --- sysexits.h EX_CONFIG. Pinned by ergopti-hotstrings.service's
---- RestartPreventExitStatus= (tests/unit/infra/test_input_access.lua).
+--- RestartPreventExitStatus= (tests/unit/infra/lifecycle/test_input_access.lua).
 M.EXIT_ACCESS = 78
 
 M.TITLE_KEY = "startup.linux_input_access_title"

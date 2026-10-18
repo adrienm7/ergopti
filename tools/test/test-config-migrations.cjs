@@ -1122,7 +1122,7 @@ for (const include of [
 }
 for (const [driver, id, runnerPath] of [
 	['macos', 'hs', 'tests/unit/infra/config/test_config_migrate.lua'],
-	['linux', 'linux', 'tests/unit/infra/test_config_migrate.lua']
+	['linux', 'linux', 'tests/unit/infra/config/test_config_migrate.lua']
 ]) {
 	const runner = readSource(shared('..', driver, ...runnerPath.split('/')));
 	if (
