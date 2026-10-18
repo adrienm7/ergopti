@@ -473,7 +473,7 @@ LoggerInit() {
 		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
 				try {
 						; The ordinary boot reader admits dotted/inline/quoted namespaces.
-						Content := FileRead(ConfigurationFile, "UTF-8")
+						Content := FSReadStrict(ConfigurationFile)
 						Cache := ConfigTomlDecodeSnapshot(Content).Cache
 						Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
 						if LOGGER_SEVERITY.Has(Value) {
