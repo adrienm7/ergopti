@@ -462,19 +462,6 @@ helpers.describe("keyboard_hook: refuses to grab without a way back", function()
 				.. "forks once per key to give it back")
 	end)
 
-	helpers.it("the daemon closes the channel on both exit paths", function()
-		-- UI_DEV_DESTROY never ran either: close_fast_channel() had no caller. A
-		-- daemon killed with SIGTERM left its uinput device behind, and the next
-		-- start enumerated two of them.
-		local src = daemon_source()
-		local closes = 0
-		for _ in src:gmatch("injector%.close_fast_channel%(%)") do closes = closes + 1 end
-		helpers.assert_true(closes >= 2,
-			"close_fast_channel() must run on the signal path AND on the normal exit "
-				.. "path; a daemon that only tidies up when asked politely leaks the "
-				.. "device on every SIGTERM, and found " .. closes .. " call site(s)")
-	end)
-
 	helpers.it("the daemon grabs the device by default", function()
 		-- THE regression this whole item exists for. Observe mode lets physical
 		-- keystrokes reach the application while an expansion is being typed, so

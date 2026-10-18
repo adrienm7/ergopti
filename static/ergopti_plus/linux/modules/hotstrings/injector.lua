@@ -541,8 +541,9 @@ function M.output_broker()
 end
 
 --- Closes the non-forking channel, if one is open.
+--- @return boolean acknowledged True when absent or strictly retired; false retains cleanup debt.
 function M.close_fast_channel()
-	if not _uinput then return end
+	if not _uinput then return true end
 	local Broker = require("adapters.modifier_broker")
 	if Broker.for_channel(_uinput) then
 		local acknowledged = _uinput.close() == true

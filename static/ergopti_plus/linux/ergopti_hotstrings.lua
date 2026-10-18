@@ -2580,7 +2580,7 @@ local function main()
 	if shutdown.is_pending() then error("Native shutdown cleanup remains unacknowledged after event-loop return", 0) end
 	if tooltip_preview then tooltip_preview.destroy() end
 	if llm_overlay then llm_overlay.hide() end
-	injector.close_fast_channel()
+	if injector.close_fast_channel() ~= true then error("Final output retirement remains unacknowledged", 0) end
 	if file_watchers then file_watchers.stop() end
 	if process_lifecycle then process_lifecycle.stop() end
 	if tray_menu then tray_menu.destroy() end
