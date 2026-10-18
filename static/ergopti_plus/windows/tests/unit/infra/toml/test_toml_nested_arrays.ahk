@@ -53,6 +53,8 @@ Test("TOML: numeric continuation remains an array (toml-nested-array-number)",
 	_TNA_Multiline.Bind("[1]", [1]))
 Test("TOML: quoted continuation remains an array (toml-nested-array-string)",
 	_TNA_Multiline.Bind('["a"]', ["a"]))
+Test("TOML: literal continuation remains an array (toml-literal-array-recovery)",
+	_TNA_Multiline.Bind("['a']", ["a"]))
 Test("TOML: Boolean continuation remains an array (toml-nested-array-boolean)",
 	_TNA_Multiline.Bind("[true]", [true]))
 Test("TOML: empty continuation remains an array (toml-nested-array-empty)",
@@ -63,7 +65,9 @@ Test("TOML: incomplete nested opener remains a value (toml-nested-array-opener)"
 _TNA_RecoveryBoundary() {
 	for Header in ["[later_section]", "[a.b]", '[a."quoted.key"]', "[[later_section]]",
 		'["later"."section"]', '[[ "later"."section" ]]',
-		'["a[b]".section]', '[["a]b".section]]'] {
+		'["a[b]".section]', '[["a]b".section]]',
+		"[later.'section']", "['later'.section]", "[[ 'later'.'section' ]]",
+		"[later.'quoted.key']", "[later.'a]b']", "[later.'a[b']"] {
 		AssertTrue(TOML_ArrayRecoveryHeader(Header), "unambiguous headers must remain recoverable")
 		Source := "[sample]`nitems = [`n" . Header . "`nflag = true`n"
 		Parsed := _ParseTomlFileImpl("nested-recovery-fixture", false, false, Source)
@@ -78,7 +82,7 @@ _TNA_RecoveryBoundary() {
 	}
 	for ValueLine in ["[", "[]", "[1]", "[true]", '["a"]', "[[2]]",
 		"[1e3]", "[0xff]", "[+inf]", "[nan]", "[2020-01-01]", '["a", "b"],',
-		'["a]"]', '["a[b]"]'] {
+		'["a]"]', '["a[b]"]', "['a']", "[ 'a]b' ]", "['a[b']"] {
 		AssertFalse(TOML_ArrayRecoveryHeader(ValueLine),
 			"value-shaped continuations must not discard the pending array: " . ValueLine)
 	}
