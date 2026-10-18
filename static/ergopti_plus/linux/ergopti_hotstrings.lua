@@ -1411,9 +1411,19 @@ local function main()
 			end,
 			triggers      = { "//", ";;", "--" },
 			overlay       = llm_overlay,
-			apply_prediction = function(candidate)
-				local result = injector.inject(candidate.deletes, candidate.to_type, false)
-				return type(result) == "table" and result.ok == true
+			apply_prediction = function(candidate, context, authorized)
+				if type(context) ~= "table" or type(context.focus) ~= "string" or context.focus == ""
+					or type(authorized) ~= "function" or not authorized() then return false end
+				local destination = secure_focus_guard.capture_text_owner(context.focus)
+				if not destination or not authorized() then return false end
+				-- The offer and the original field must both survive clipboard I/O.
+				-- Per-key authorization remains RAM-only; neither guard borrows a successor.
+				local publication = {
+					current = function() return authorized() and destination.current() and authorized() end,
+					cached = function() return authorized() and destination.cached() and authorized() end,
+				}
+				local result = injector.inject(candidate.deletes, candidate.to_type, false, nil, publication)
+				return type(result) == "table" and result.ok == true and publication.cached()
 			end,
 			-- Selection output is bound to the exact original native range, even
 			-- when an application moves it without any physical input event.

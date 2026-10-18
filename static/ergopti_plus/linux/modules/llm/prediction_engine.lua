@@ -2776,7 +2776,30 @@ local function accept_candidate(index, complete)
 			and _request_epoch == epoch and _suggestion_context == context
 			and _suggestions[tonumber(index)] == candidate
 	end
-	if global_privacy_blocks() then
+	local continuation_current, continuation_context, continuation_apply
+	if not candidate.on_accept and not candidate.replaces_selection then
+		-- These are original request identities, captured before privacy/focus
+		-- callbacks can cancel, pause or publish a successor offer.
+		local context, epoch, runtime, engine, apply, paused = _suggestion_context, _request_epoch,
+			_runtime_owner, _engine, _apply_prediction, _is_paused
+		local focus = context and context.focus
+		local function retained()
+			return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+				and rawequal(_runtime_owner, runtime) and rawequal(_engine, engine)
+				and rawequal(_suggestion_context, context) and context ~= nil and context.focus == focus
+				and rawequal(_suggestions[tonumber(index)], candidate) and _apply_prediction == apply and _is_paused == paused
+		end
+		continuation_current = function()
+			if not retained() then return false end
+			local checked, is_paused = pcall(paused)
+			return checked and is_paused == false and retained()
+		end
+		continuation_context, continuation_apply = context, apply
+		if not continuation_current() then return false end
+	end
+	local blocked = global_privacy_blocks()
+	if continuation_current and not continuation_current() then return false end
+	if blocked then
 		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
 		if current() then M.dismiss() end
 		return false
@@ -2832,14 +2855,17 @@ local function accept_candidate(index, complete)
 		end
 		return completed ~= false
 	else
-		if type(_apply_prediction) ~= "function" then return false end
-		local focus = context and context.focus or ""
-		if focus == "" or current_focus() ~= focus or not current() then
+		if type(continuation_apply) ~= "function" then return false end
+		local focus = continuation_context.focus or ""
+		local observed = current_focus()
+		if not continuation_current() then return false end
+		if focus == "" or observed ~= focus then
 			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
 			if current() then M.dismiss() end
 			return false
 		end
-		ok, committed = pcall(_apply_prediction, candidate, context)
+		ok, committed = pcall(continuation_apply, candidate, continuation_context, continuation_current)
+		if not continuation_current() then complete(ok and committed == true); return ok and committed == true end
 	end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
