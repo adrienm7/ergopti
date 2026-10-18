@@ -273,11 +273,13 @@ end
 --- @param lib table
 --- @param items table
 --- @param owned table Receives the action ids the menu registers.
+--- @param inherited_disabled boolean|nil An unavailable ancestor revokes descendant actions.
 --- @return userdata GtkMenu
-local function build_menu(lib, items, owned)
+local function build_menu(lib, items, owned, inherited_disabled)
 	local menu = lib.gtk.gtk_menu_new()
 
 	for _, item in ipairs(items or {}) do
+		local disabled = inherited_disabled or item.disabled
 		local widget
 		if item.separator or item.title == "-" then
 			widget = lib.gtk.gtk_separator_menu_item_new()
@@ -289,12 +291,14 @@ local function build_menu(lib, items, owned)
 		end
 
 		if type(item.menu) == "table" and #item.menu > 0 then
-			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned))
-		elseif type(item.fn) == "function" then
+			lib.gtk.gtk_menu_item_set_submenu(widget, build_menu(lib, item.menu, owned, disabled))
+		elseif not disabled and type(item.fn) == "function" then
+			-- dbusmenu Event can activate an insensitive GTK item directly.
+			-- Unavailable rows therefore never receive an action capability.
 			on_activate(lib, widget, item.fn, owned)
 		end
 
-		if item.disabled then
+		if disabled then
 			lib.gtk.gtk_widget_set_sensitive(widget, 0)
 		end
 
