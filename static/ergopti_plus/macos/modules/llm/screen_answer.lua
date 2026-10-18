@@ -261,11 +261,16 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		show_notice("llm.vision.capture_failed")
 		return
 	end
-	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
-	if not engine then return end
+	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
+	if not engine or engine.admit_answer_request("Screen reading") ~= true then return end
+	if not is_current(generation, "capture admission") then return end
 	local session = engine.open_answer_surface("Screen reading")
 	if not session then
 		Logger.warn(LOG, "Screen reading stopped: the prediction tooltip could not be opened.")
+		return
+	end
+	if not is_current(generation, "loading surface") then
+		engine.close_answer_surface(session)
 		return
 	end
 	local body = Vision.build_request(backend.format, {
@@ -308,13 +313,23 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		end
 		fail("the vision model gave no answer (" .. tostring(reason) .. ")")
 	end
+	-- Capture and loading UI cross independent callback boundaries. Admission
+	-- and generation must still belong to this image at the private POST boundary.
+	local function may_dispatch()
+		if is_current(generation, "vision dispatch")
+			and engine.admit_answer_request("Screen reading") == true then return true end
+		engine.close_answer_surface(session)
+		return false
+	end
 	if backend.kind == "local" then
 		local Ollama = dependency("modules.llm.api_ollama", "request_vision")
 		if not Ollama then return fail("the local backend is unavailable") end
+		if not may_dispatch() then return end
 		Ollama.request_vision(body, on_text, on_fail)
 	else
 		local Remote = dependency("modules.llm.api_remote", "request_vision")
 		if not Remote then return fail("the remote backend is unavailable") end
+		if not may_dispatch() then return end
 		Remote.request_vision(backend.provider, model, body, on_text, on_fail)
 	end
 end
