@@ -68,9 +68,17 @@ linux/
   _generated/                 Codegen output
   tests/
     helpers.lua               Assertion + describe/it harness
-    run.lua                   Auto-discovers test_*.lua under tests/unit
-    unit/                     unit + meta tests
+    run.lua                   Runs tests/meta and tests/unit against test_manifest.lua
+    test_manifest.lua         Every test module, checked against discovery
+    meta/<topic>/             Source checks and harness self-tests: architecture,
+                              boot, corpus (shared vector replays), harness
+    unit/<area>/<part>/       Behaviour tests, filed like the driver: adapters/,
+                              infra/, modules/<module>/, platform/remap/, ui/
+    support/                  Fixtures and harness modules tests require;
+                              support/<area>/<name>_fixture.lua for split files
+    fakes/ fixtures/          Port fakes and static inputs
     e2e/run_e2e.lua           corpus-driven end-to-end harness
+    hardware/ distro/         Native probes, never run by the unit suite
   vendor/                     Bundled third-party Lua libs (not in git)
 ```
 
@@ -103,7 +111,16 @@ luajit ergopti_hotstrings.lua --dry-run --verbose
 ```bash
 cd static/ergopti_plus/linux
 luajit tests/run.lua
+luajit tests/run.lua --only "case name substring"
+luajit tests/run.lua --module=infra
 ```
+
+`--module` runs one group of `tests/support/module_groups.lua` (meta, core,
+infra, input, modules, ui); CI runs each group as its own job, and together
+they are exactly the whole suite (`tests/meta/harness/test_module_groups.lua`).
+Put a new test in the folder of the code it exercises and add it to
+`tests/test_manifest.lua`; split a test file along its describes before it
+passes about 800 lines.
 
 Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 
