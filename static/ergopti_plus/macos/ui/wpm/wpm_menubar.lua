@@ -207,11 +207,16 @@ end
 function M.stop()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _menubar then return true end
+	if not _running and not _timer and not _menubar then
+		-- A sink may cancel startup before it acquires its first native handle.
+		_generation = _generation + 1
+		return true
+	end
 	_running = false
 	_generation = _generation + 1
 	local generation, handle, item = _generation, _timer, _menubar
 	local timer_stopped = release_timer(handle)
+	if generation ~= _generation then return false end
 	if item then
 		local ok = pcall(item.delete, item)
 		if not ok then
@@ -228,7 +233,7 @@ function M.stop()
 		return false
 	end
 	Logger.info(LOG, "WPM menubar widget stopped.")
-	return true
+	return generation == _generation and not _running
 end
 
 function M.is_running()

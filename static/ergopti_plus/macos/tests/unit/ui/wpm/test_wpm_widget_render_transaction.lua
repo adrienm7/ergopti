@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local with_menubar = require("tests.support.wpm_menubar_fixture")
 
 --- Exercises a fresh widget with independently observable native capabilities.
 --- @param callback function Receives the widget and its native state.
@@ -45,7 +46,11 @@ local function with_widget(callback, position)
 				state.timers[#state.timers + 1] = handle
 				return handle, true
 			end,
-			cancel = function(handle) handle.active = false; return true end,
+			cancel = function(handle)
+				if state.refuse_timer_once then state.refuse_timer_once = false; return false end
+				handle.active = false
+				return true
+			end,
 		}
 		package.loaded["adapters.graphics_renderer"] = { createWindow = function(frame)
 			if state.canvas_failure == "zero" then return 0 end
@@ -86,7 +91,11 @@ local function with_widget(callback, position)
 				new = function(_, run)
 					local tap = { run = run, enabled = false }
 					function tap:start() self.enabled = true; return self end
-					function tap:stop() self.enabled = false; return self end
+					function tap:stop()
+						if state.refuse_tap_once then state.refuse_tap_once = false; return self end
+						self.enabled = false
+						return self
+					end
 					function tap:isEnabled() return self.enabled end
 					state.taps[#state.taps + 1] = tap
 					return tap
@@ -98,6 +107,127 @@ local function with_widget(callback, position)
 end
 
 helpers.describe("WPM widget render lifecycle", function()
+	helpers.it("(wpm-menubar-stop-owner) timer failure logging preserves a restarted native item", function()
+		with_menubar(function(menubar, state)
+			helpers.assert_eq(menubar.start(), true)
+			local scheduler = package.loaded["adapters.timer_scheduler"]
+			local cancel, refused = scheduler.cancel, false
+			scheduler.cancel = function(handle)
+				if not refused then refused = true; return false end
+				return cancel(handle)
+			end
+			state.on_log = function(_, message)
+				if not message:find("timer cleanup failed", 1, true) then return end
+				state.on_log = nil
+				helpers.assert_eq(menubar.start(), true)
+			end
+			helpers.assert_eq(menubar.stop(), false)
+			helpers.assert_eq(menubar.is_running(), true)
+			helpers.assert_type(state.timers[2].timer, "table")
+			helpers.assert_eq(state.items[#state.items].deleted, false,
+				"retired cleanup cannot delete the successor's native item")
+			helpers.assert_eq(menubar.stop(), true)
+		end)
+	end)
+	for _, capability in ipairs({ "timer", "tap" }) do
+		helpers.it("(wpm-widget-stop-owner) cleanup failure logging preserves a restarted owner: " .. capability, function()
+			with_widget(function(widget, state)
+				helpers.assert_eq(widget.start(false), true)
+				state["refuse_" .. capability .. "_once"] = true
+				state.on_phase = function(name)
+					if not name:find("cleanup failed", 1, true) then return end
+					state.on_phase = nil
+					helpers.assert_eq(widget.start(false), true)
+				end
+				helpers.assert_eq(widget.stop(), false)
+				helpers.assert_eq(widget.is_running(), true)
+				helpers.assert_eq(state.timers[1].active, false)
+				helpers.assert_eq(state.taps[1].enabled, false)
+				helpers.assert_eq(state.timers[2].active, true)
+				helpers.assert_eq(state.taps[2].enabled, true, "retired cleanup cannot stop a successor tap")
+				helpers.assert_eq(state.canvases[#state.canvases].deleted, false,
+					"retired cleanup cannot delete a successor surface")
+				helpers.assert_eq(widget.stop(), true)
+			end)
+		end)
+	end
+	helpers.it("(wpm-widget-start-owner) a stop during startup logging revokes acquisition", function()
+		with_widget(function(widget, state)
+			state.on_phase = function(name)
+				if name ~= "Starting floating WPM widget…" then return end
+				state.on_phase = nil
+				helpers.assert_eq(widget.stop(), true)
+			end
+			helpers.assert_eq(widget.start(false), false)
+			helpers.assert_eq(widget.is_running(), false)
+			helpers.assert_eq(#state.timers, 0)
+			helpers.assert_eq(#state.canvases, 0)
+		end)
+	end)
+	helpers.it("(wpm-menubar-start-owner) a stop during startup logging revokes acquisition", function()
+		with_menubar(function(menubar, state)
+			state.on_log = function(_, message)
+				if message ~= "Starting WPM menubar widget…" then return end
+				state.on_log = nil
+				helpers.assert_eq(menubar.stop(), true)
+			end
+			helpers.assert_eq(menubar.start(), false)
+			helpers.assert_eq(menubar.is_running(), false)
+			helpers.assert_eq(#state.timers, 0)
+			helpers.assert_eq(#state.items, 0)
+		end)
+	end)
+	for _, boundary in ipairs({ "Stopping floating WPM widget…", "Floating WPM widget stopped." }) do
+		helpers.it("(wpm-widget-stop-owner) retains a successor started by " .. boundary, function()
+			with_widget(function(widget, state)
+				helpers.assert_eq(widget.start(false), true)
+				state.on_phase = function(name)
+					if name ~= boundary then return end
+					state.on_phase = nil
+					helpers.assert_eq(widget.start(false), true)
+				end
+				helpers.assert_eq(widget.stop(), false)
+				helpers.assert_eq(widget.is_running(), true)
+				helpers.assert_eq(state.timers[1].active, false)
+				helpers.assert_eq(state.timers[2].active, true)
+				helpers.assert_eq(state.canvases[1].deleted, true)
+				helpers.assert_eq(state.canvases[2].deleted, false)
+				helpers.assert_eq(widget.stop(), true)
+			end)
+		end)
+	end
+	helpers.it("(wpm-widget-start-owner) a start log cannot replace its committed successor", function()
+		with_widget(function(widget, state)
+			state.on_phase = function(name)
+				if name ~= "Starting floating WPM widget…" then return end
+				state.on_phase = nil
+				helpers.assert_eq(widget.start(false), true)
+			end
+			helpers.assert_eq(widget.start(false), false)
+			helpers.assert_eq(widget.is_running(), true)
+			helpers.assert_eq(#state.timers, 1)
+			helpers.assert_eq(state.timers[1].active, true)
+			helpers.assert_eq(state.canvases[1].deleted, false)
+			helpers.assert_eq(widget.stop(), true)
+		end)
+	end)
+	helpers.it("(wpm-menubar-stop-owner) terminal logging cannot certify a restarted menubar as stopped", function()
+		with_menubar(function(menubar, state)
+			helpers.assert_eq(menubar.start(), true)
+			state.on_log = function(_, message)
+				if message ~= "WPM menubar widget stopped." then return end
+				state.on_log = nil
+				helpers.assert_eq(menubar.start(), true)
+			end
+			helpers.assert_eq(menubar.stop(), false)
+			helpers.assert_eq(menubar.is_running(), true)
+			helpers.assert_nil(state.timers[1].timer)
+			helpers.assert_type(state.timers[2].timer, "table")
+			helpers.assert_eq(state.items[1].deleted, true)
+			helpers.assert_eq(state.items[2].deleted, false)
+			helpers.assert_eq(menubar.stop(), true)
+		end)
+	end)
 	helpers.it("(wpm-widget-partial-position) preserves valid zero and negative coordinates", function()
 		with_widget(function(widget, state)
 			helpers.assert_eq(widget.start(false), true)
