@@ -145,8 +145,39 @@ def proxy_connection_failure_projection(source):
     return source
 
 
+# Closed inverse for the reviewed redirect-head publication repair.
+REDIRECT_HEAD_INVERSE = (
+    "\t\t// Declining alone kept the redirect body flowing before its headers\n"
+    "\t\t// reached the caller, so a held body stalled the successor. Publish the\n"
+    "\t\t// redirect head here and retire the task; no redirect body is delivered.\n"
+    "\t\tif !receivedHeaders, failure == nil {\n"
+    "\t\t\tlet headers = response.allHeaderFields.map"
+    " { [String(describing: $0.key), String(describing: $0.value)] }\n"
+    '\t\t\tif json(tag: 72, object: ["version": 1, "status": response.statusCode,'
+    ' "headers": headers]) {\n'
+    "\t\t\t\treceivedHeaders = true\n"
+    "\t\t\t}\n"
+    '\t\t\tfailure = "protocol"\n'
+    "\t\t}\n"
+    "\t\tcompletionHandler(nil)\n"
+    "\t\ttask.cancel()\n",
+    "\t\tcompletionHandler(nil)\n",
+)
+
+
+def redirect_head_projection(source):
+    """Invert the complete reviewed redirect repair, or keep a source without it."""
+    new, old = REDIRECT_HEAD_INVERSE
+    if "redirect head here" not in source:
+        return source
+    if source.count(new) != 1:
+        raise ValueError("Redirect head enrollment refused")
+    return source.replace(new, old, 1)
+
+
 def native_failure_stage_projection(source):
     """Invert one complete closed overlay, preserving unrelated source bytes."""
+    source = redirect_head_projection(source)
     source = proxy_connection_failure_projection(source)
     if not any(marker in source for marker in NATIVE_FAILURE_STAGE_MARKERS):
         return source
