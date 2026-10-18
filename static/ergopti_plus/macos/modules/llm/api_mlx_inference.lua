@@ -32,6 +32,7 @@ local JsonCodec      = require("adapters.json_codec")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
+local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 -- MLX log channel; every MLX line lands in ErgoptiPlus_mlx.log.
 local LOG            = "llm.api_mlx"
 
@@ -600,6 +601,28 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	local t0_req        = TimerScheduler.now()
 	local task = nil
 	local task_completed = false
+	local failure_requested = false
+	local terminal_notified = false
+	local failure_observed = false
+	local function report_failure()
+		if terminal_notified or my_generation ~= _ctx.stream.generation then return end
+		terminal_notified = true
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
+	end
+	local function retire_failed_task(owned_task)
+		failure_requested = true
+		if not failure_observed and type(owned_task.onSettled) == "function" then
+			failure_observed = true
+			local ok, registered = pcall(owned_task.onSettled, function()
+				pcall(os.remove, tmp_path)
+				report_failure()
+			end)
+			if not ok or registered ~= true then failure_observed = false end
+		end
+		local settled, state = StreamRetirement.cancel(_ctx.stream, owned_task)
+		if settled then report_failure() end
+		return settled, state
+	end
 
 	-- Decode one complete SSE event payload and append its token to accumulated.
 	-- Framing is handled separately so multi-line data fields reach the JSON
@@ -760,18 +783,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 					if not task then return end
 					Logger.warn(LOG, "[%s] #%d STREAM idle timeout (%gs) — terminating hung task.",
 						model_name, req_id, STREAM_HARD_TIMEOUT_SEC)
-					local terminate_ok, terminate_result = xpcall(task.terminate, debug.traceback)
-					if not terminate_ok or terminate_result ~= true then
+					local _, state = retire_failed_task(task)
+					if state == "refused" then
 						Logger.error(LOG, "[%s] #%d STREAM timeout termination did not commit (result: %s).",
-							tostring(model_name), req_id, tostring(terminate_result))
+							tostring(model_name), req_id, state)
 						if _ctx.stream.task == task then arm_stream_idle_watchdog() end
 						return
 					end
-					if _ctx.stream.task == task then
-						_ctx.stream.task       = nil
-						_ctx.stream.has_chunks = false
-					end
-					if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 				end, debug.traceback)
 				if not callback_ok then
 					Logger.error(LOG, "[%s] #%d STREAM watchdog callback raised: %s",
@@ -792,6 +810,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- Streaming callback: fired each time curl writes a chunk to stdout
 	local function on_chunk(_, chunk, stderr_chunk)
 		if not chunk or chunk == "" then return true end
+		if failure_requested then return false end
 		-- Generation check: if a newer request superseded us, discard chunks silently
 		if my_generation ~= _ctx.stream.generation then return false end
 		-- First chunk received — server is alive (logged once for diagnostics).
@@ -804,18 +823,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			-- The old deadline was already revoked and its replacement never became
 			-- native ownership. Keep no unbounded stream behind a successful chunk.
 			local owned_task = _ctx.stream.task
-			_ctx.stream.generation = _ctx.stream.generation + 1
 			if owned_task then
-				local stop_ok, stop_result = xpcall(function() return owned_task.terminate() end, debug.traceback)
-				if stop_ok and stop_result == true and _ctx.stream.task == owned_task then
-					_ctx.stream.task = nil
-				elseif not stop_ok or stop_result ~= true then
+				local _, state = retire_failed_task(owned_task)
+				if state == "refused" then
 					Logger.error(LOG, "[%s] #%d STREAM task retained after watchdog loss: %s",
-						tostring(model_name), req_id, tostring(stop_result))
+						tostring(model_name), req_id, state)
 				end
+			else
+				report_failure()
 			end
-			_ctx.stream.has_chunks = false
-			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 			return false
 		end
 		Logger.debug(LOG, "[%s] #%d STREAM chunk (%d bytes): '%s'",
@@ -870,6 +886,7 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 			end
 		end
 
+		if failure_requested then report_failure(); return end
 		-- SIGTERM (15) means this stream was explicitly terminated (mid-flight cancel)
 		if exit_code == 15 then
 			Logger.debug(LOG, "[%s] #%d STREAM: terminated mid-flight — no callbacks.", model_name, req_id)
@@ -965,25 +982,15 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	_ctx.stream.task = task
 	local start_ok, start_result = xpcall(function() return task.start() end, debug.traceback)
 	if not start_ok or start_result ~= true then
-		if not start_ok then
-			local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-			if stop_ok and stop_result == true then
-				if _ctx.stream.task == task then _ctx.stream.task = nil end
-			else
-				Logger.error(LOG, "[%s] #%d STREAM ambiguous task retained for cancellation retry: %s",
-					tostring(model_name), req_id, tostring(stop_result))
-			end
-		elseif _ctx.stream.task == task then
-			_ctx.stream.task = nil
-		end
-		local removed, remove_err = pcall(os.remove, tmp_path)
+		local settled = retire_failed_task(task)
+		local removed, remove_err = true, nil
+		if settled then removed, remove_err = pcall(os.remove, tmp_path) end
 		if not removed then
 			Logger.error(LOG, "[%s] #%d STREAM payload cleanup failed: %s",
 				tostring(model_name), req_id, tostring(remove_err))
 		end
 		Logger.error(LOG, "[%s] #%d STREAM task start did not commit (result: %s).",
 			tostring(model_name), req_id, tostring(start_result))
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 	if task_completed then return end
@@ -1008,17 +1015,13 @@ function M.post_and_parse_streaming(model_name, system_prompt, full_text, tail_t
 	-- server — connection accepted but no further tokens — is terminated and
 	-- surfaced via on_fail instead of freezing the UI on a stuck spinner.
 	if arm_stream_idle_watchdog() ~= true then
-		_ctx.stream.generation = _ctx.stream.generation + 1
-		local stop_ok, stop_result = xpcall(function() return task.terminate() end, debug.traceback)
-		if stop_ok and stop_result == true and _ctx.stream.task == task then
-			_ctx.stream.task = nil
+		local settled, state = retire_failed_task(task)
+		if settled then
 			pcall(os.remove, tmp_path)
-		elseif not stop_ok or stop_result ~= true then
+		elseif state == "refused" then
 			Logger.error(LOG, "[%s] #%d STREAM task retained after initial watchdog failure: %s",
-				tostring(model_name), req_id, tostring(stop_result))
+				tostring(model_name), req_id, state)
 		end
-		_ctx.stream.has_chunks = false
-		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
 end
