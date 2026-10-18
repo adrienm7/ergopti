@@ -15,7 +15,7 @@
 --- ROOT CAUSE ENCODED:
 --- Not "three files forgot to call the helper" but "the escape rule had no owner
 --- the checker could see". The pre-existing guard
---- (tests/unit/lib/test_applescript_escaping.lua) enumerates its call sites BY
+--- (tests/unit/infra/text_and_paths/test_applescript_escaping.lua) enumerates its call sites BY
 --- SYMBOL NAME — `pickConfigDir`, `_terminal_cmd` — and
 --- `helpers.read_driver_source(symbol)` returns only the files whose body
 --- contains that literal string. Those are exactly the two files that were

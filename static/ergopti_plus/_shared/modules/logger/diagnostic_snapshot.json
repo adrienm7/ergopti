@@ -1,5 +1,5 @@
 {
-	"_comment": "Cross-driver diagnostic snapshot contract (SPEC.md section 12). Every driver logs exactly one INFO line built from these fields, in this order, once boot completes. Replayed by windows/tests/unit/test_diagnostic_snapshot.ahk, macos/tests/unit/lib/test_diagnostic_snapshot.lua, linux/tests/unit/infra/test_diagnostic_snapshot.lua and tools/test/test-diagnostic-snapshot-parity.cjs.",
+	"_comment": "Cross-driver diagnostic snapshot contract (SPEC.md section 12). Every driver logs exactly one INFO line built from these fields, in this order, once boot completes. Replayed by windows/tests/unit/test_diagnostic_snapshot.ahk, macos/tests/unit/infra/logger/test_diagnostic_snapshot.lua, linux/tests/unit/infra/test_diagnostic_snapshot.lua and tools/test/test-diagnostic-snapshot-parity.cjs.",
 	"_format": "'Diagnostic snapshot (' + fields joined by one space + ').'. Each field renders as name=value. A missing or empty value renders as the unknown token. CR, LF and TAB become one space, a double quote becomes a single quote, and a value that then contains a space is wrapped in double quotes.",
 
 	"module": "Diagnostics",

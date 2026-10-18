@@ -1120,22 +1120,17 @@ for (const include of [
 		fail('wiring', `windows/tests/run_all.ahk must hold "${include}"`);
 	}
 }
-for (const [driver, id] of [
-	['macos', 'hs'],
-	['linux', 'linux']
+for (const [driver, id, runnerPath] of [
+	['macos', 'hs', 'tests/unit/infra/config/test_config_migrate.lua'],
+	['linux', 'linux', 'tests/unit/infra/test_config_migrate.lua']
 ]) {
-	const runner = readSource(
-		shared('..', driver, 'tests', 'unit', 'infra', 'test_config_migrate.lua')
-	);
+	const runner = readSource(shared('..', driver, ...runnerPath.split('/')));
 	if (
 		!runner.includes(
 			`require("test.config_migrate_contract").register(helpers, { driver = "${id}" })`
 		)
 	) {
-		fail(
-			'wiring',
-			`${driver}/tests/unit/infra/test_config_migrate.lua must register the contract for driver "${id}"`
-		);
+		fail('wiring', `${driver}/${runnerPath} must register the contract for driver "${id}"`);
 	}
 }
 
