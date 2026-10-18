@@ -331,6 +331,7 @@ def run(repo, app, output):
             "macos_tooltip_canvas_observer.py",
             "macos_webview_binding.py",
             "macos_webview_binding.lua",
+            "macos_webview_raw_delete.lua",
             "hs_native_bootstrap_probe.py",
             "hs_native_bootstrap.lua",
             "hs_script_scope_native.lua",

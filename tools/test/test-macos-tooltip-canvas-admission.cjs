@@ -162,7 +162,7 @@ const root = path.resolve(__dirname, '..', '..');
 const calls = [];
 const silent = { log: () => {}, error: () => {} };
 const completed = { status: 0, stdout: '', stderr: 'Ran 54 tests in 0.01s\n\nOK\n' };
-const bindingCompleted = { ...completed, stderr: 'Ran 18 tests in 0.01s\n\nOK\n' };
+const bindingCompleted = { ...completed, stderr: 'Ran 33 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
@@ -223,7 +223,14 @@ for (const receipt of [
 	{ ...bindingCompleted, error: new Error('Binding interpreter unavailable') },
 	{ ...bindingCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
 	{ ...bindingCompleted, stderr: 'Ran 17 tests in 0.01s\n\nOK\n' },
-	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK (skipped=1)\n' }
+	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 20 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 22 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 32 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK (skipped=1)\n' }
 ]) {
 	assert.equal(
 		run({
@@ -243,6 +250,7 @@ for (const file of [
 	'tools/diagnostics/macos_webview_binding.lua',
 	'tools/diagnostics/macos_webview_binding.py',
 	'tools/diagnostics/macos_webview_binding_test.py',
+	'tools/diagnostics/macos_webview_raw_delete.lua',
 	'tools/diagnostics/macos_owned_process.py',
 	'tools/test/run-macos-tooltip-canvas-tests.cjs'
 ]) {
