@@ -47,6 +47,25 @@ end
 local _model_browser_chooser = nil
 local _custom_model_session = nil
 
+--- Releases one retired dialog's exact native script callback.
+--- @param session table Exact custom-model session.
+--- @return boolean released
+local function release_custom_model_controller(session)
+	local controller = session.usercontent
+	if controller == nil then return true end
+	if session.releasing then return false end
+	session.retired = true
+	session.releasing = true
+	local ok, receipt = xpcall(function() return controller:setCallback(nil) end, debug.traceback)
+	session.releasing = false
+	if not ok or receipt ~= controller then
+		Logger.error(LOG, "Custom model script callback release refused: %s.", tostring(receipt))
+		return false
+	end
+	if session.usercontent == controller then session.usercontent = nil end
+	return true
+end
+
 --- Closes the exact fallback chooser before a replacement is allocated.
 --- @return boolean settled True only when native deletion committed.
 local function close_model_browser_chooser()
@@ -73,14 +92,16 @@ end
 --- @param session table Exact dialog session.
 --- @return boolean settled True only when native deletion committed.
 local function close_custom_model_session(session)
-	if _custom_model_session ~= session then return false end
+	if _custom_model_session ~= session or session.closing or session.releasing then return false end
 	local webview = session.webview
 	if webview then
 		if type(webview.delete) ~= "function" then
 			Logger.error(LOG, "Custom model dialog close refused; owned WebView has no delete method.")
 			return false
 		end
+		session.closing = true
 		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+		session.closing = false
 		if not ok then
 			-- Native deletion may deliver on_close synchronously before raising. Restore
 			-- the exact owner so callbacks and replacement requests remain retryable.
@@ -91,8 +112,9 @@ local function close_custom_model_session(session)
 			return false
 		end
 	end
-	if _custom_model_session == session then _custom_model_session = nil end
 	session.webview = nil
+	if not release_custom_model_controller(session) then return false end
+	if _custom_model_session == session then _custom_model_session = nil end
 	return true
 end
 
@@ -281,7 +303,7 @@ function M.build(ctx)
 		_custom_model_session = session
 
 		uc:setCallback(function(message)
-			if _custom_model_session ~= session then return false end
+			if _custom_model_session ~= session or session.retired or session.closing then return false end
 			local body = message and message.body
 			if type(body) ~= "table" then return false end
 			if body.action == "cancel" then
@@ -309,7 +331,7 @@ function M.build(ctx)
 
 		local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 		if not ok_ui or not ui_builder then
-			if _custom_model_session == session then _custom_model_session = nil end
+			close_custom_model_session(session)
 			Logger.error(LOG, "Failed to load ui_builder for custom model dialog.")
 			return false
 		end
@@ -360,7 +382,7 @@ function M.build(ctx)
 		local masks = hs.webview.windowMasks
 		local geo = ui_builder.get_app_geometry("token_prompt")
 		if not geo then
-			if _custom_model_session == session then _custom_model_session = nil end
+			close_custom_model_session(session)
 			return false
 		end
 		local webview = ui_builder.show_webview({
@@ -372,9 +394,9 @@ function M.build(ctx)
 			inject_i18n = false,
 			delete_on_close = true,
 			on_close    = function()
-				if _custom_model_session == session then
-					_custom_model_session = nil
+				if _custom_model_session == session and not session.closing then
 					session.webview = nil
+					if release_custom_model_controller(session) then _custom_model_session = nil end
 				end
 			end,
 			on_navigation = function(action)
@@ -404,7 +426,7 @@ function M.build(ctx)
 			return false
 		end
 		if not webview then
-			_custom_model_session = nil
+			close_custom_model_session(session)
 			Logger.error(LOG, "show_webview returned nil for custom model dialog.")
 			return false
 		end
