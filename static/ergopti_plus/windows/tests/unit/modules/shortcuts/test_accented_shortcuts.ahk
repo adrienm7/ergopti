@@ -242,8 +242,9 @@ _ACS_NumberRowPolicyCache() {
 		AssertEqual("", AccentedShortcutResolve("^SC003", Digits), "Ctrl+2 must keep its native chord")
 
 		Names := []
-		Count := AccentedShortcuts_Register([1], (Name, *) => Names.Push(Name), (Args*) => 0,
-			(Hkl) => _AccentedShortcutRegistrationKeys(Hkl, _ACS_AzertyScanCode))
+		; The fake native profile is already cached. Keep the production default
+		; KeysFn so this also proves registration selects the native inventory.
+		Count := AccentedShortcuts_Register([1], (Name, *) => Names.Push(Name), (Args*) => 0)
 		AssertEqual(18, Count, "digits mode must still register the three hidden native accent positions")
 		AssertEqual(18, Names.Length)
 
