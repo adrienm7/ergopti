@@ -470,7 +470,8 @@ class WebViewHost {
 		_DispatchMessage(CallbackEpoch, Payload) {
 				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
 						return
-				try this.Opts["OnMessage"](this, Payload)
+				; Timer callbacks report failures through the global error owner.
+				this.Opts["OnMessage"](this, Payload)
 		}
 
 		; ── NavigationCompleted callback ─────────────────────────────────────────
@@ -495,7 +496,8 @@ class WebViewHost {
 		_DispatchReady(CallbackEpoch) {
 				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
 						return
-				try this.Opts["OnReady"](this)
+				; Preserve initialization failures for the global timer error owner.
+				this.Opts["OnReady"](this)
 		}
 
 		; ── Queue-based eval ─────────────────────────────────────────────────────

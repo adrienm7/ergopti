@@ -250,3 +250,38 @@ _UIWH_SingletonCloseOwnership() {
 }
 Test("WebView host: close removes only its registered singleton (webview-singleton-close-owner)",
 	_UIWH_SingletonCloseOwnership)
+
+_UIWH_FailingCallback(Calls, Failure, Params*) {
+	Calls.Push(Params.Length)
+	throw Failure
+}
+
+_UIWH_DispatchFailure(IsReady) {
+	Calls := []
+	Failure := Error("Private bridge callback failure")
+	Host := WebViewHost()
+	Host.Opts := Map("OnReady", _UIWH_FailingCallback.Bind(Calls, Failure),
+		"OnMessage", _UIWH_FailingCallback.Bind(Calls, Failure))
+	Caught := 0
+	try {
+		if IsReady
+			Host._DispatchReady(Host.Epoch)
+		else
+			Host._DispatchMessage(Host.Epoch, Map("action", "save"))
+	} catch Any as Err {
+		Caught := Err
+	}
+	AssertEqual(1, Calls.Length, "the admitted callback executes exactly once")
+	AssertEqual(IsReady ? 1 : 2, Calls[1], "the callback receives its complete contract")
+	AssertTrue(Caught == Failure, "the original failure must reach the timer's global error owner")
+	Host._Reset()
+	if IsReady
+		Host._DispatchReady(Host.Epoch - 1)
+	else
+		Host._DispatchMessage(Host.Epoch - 1, Map())
+	AssertEqual(1, Calls.Length, "a retired callback stays inert")
+}
+Test("WebView host: message callback failures reach the error owner (webview-callback-error)",
+	_UIWH_DispatchFailure.Bind(false))
+Test("WebView host: ready callback failures reach the error owner (webview-callback-error)",
+	_UIWH_DispatchFailure.Bind(true))
