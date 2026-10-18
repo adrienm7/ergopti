@@ -212,3 +212,27 @@ _KLEnc_WriterPlaintextWhenOff() {
 	AssertContains(rows[1], "visible", "with encryption off the text is stored in clear, as before")
 }
 Test("KL_BuildInserts: stores plaintext when encryption is off (unchanged default)", _KLEnc_WriterPlaintextWhenOff)
+
+
+; Invalid stored IVs must use the same explicit refusal as a wrong-length IV.
+; A cached key reaches hex conversion directly, without a missing-key shortcut.
+_KLEnc_MalformedIv(IvHex) {
+	global KL_ENC_KeyBuffer, KL_ENC_DerivationFailed
+	SavedKey := KL_ENC_KeyBuffer
+	SavedFailed := KL_ENC_DerivationFailed
+	try {
+		KL_ENC_KeyBuffer := Buffer(KL_ENC_KEY_BYTES, 0)
+		KL_ENC_DerivationFailed := false
+		Envelope := KL_ENC_MARKER . KL_ENC_SEPARATOR . IvHex . KL_ENC_SEPARATOR
+			. "AAAAAAAAAAAAAAAAAAAAAA=="
+		AssertEqual("", KL_Enc_Decrypt(Envelope),
+			"malformed IVs must be refused before hex conversion can throw")
+	} finally {
+		KL_ENC_KeyBuffer := SavedKey
+		KL_ENC_DerivationFailed := SavedFailed
+	}
+}
+Test("cipher-malformed-iv: refuses nonhex letters", _KLEnc_MalformedIv.Bind("gggggggggggggggggggggggggggggggg"))
+Test("cipher-malformed-iv: refuses a nonhex final byte", _KLEnc_MalformedIv.Bind("0000000000000000000000000000000g"))
+Test("cipher-malformed-iv: refuses embedded punctuation", _KLEnc_MalformedIv.Bind("000000000000000000000000000000-1"))
+Test("cipher-malformed-iv: keeps wrong-length refusal", _KLEnc_MalformedIv.Bind("000000000000000000000000000000"))
