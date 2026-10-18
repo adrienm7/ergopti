@@ -26,9 +26,6 @@
 #Requires AutoHotkey v2.0
 
 
-
-
-
 ; ==============================================
 ; ==============================================
 ; ======= 1/ Exactly one writer exists =========
@@ -118,3 +115,53 @@ Test("meta paths: the shared writer fails loudly rather than skipping",
 	_PFSW_WriterFailsLoudly)
 Test("meta paths: every caller skips the reload when the write failed",
 	_PFSW_CallersSkipReloadOnFailure)
+
+; via SetTimer(-1), as ui/onboarding/webview.ahk already documents.
+; F-29  _PathsEdWeb_Save left FileOpen unprotected with no else on `if f`, so a
+; failed write was silent, the log claimed success, and Reload() dropped
+; The guarantee is unchanged — a failed config-directory write must be surfaced,
+; and must not be followed by a Reload() that hides it. Only its LOCATION moved:
+; the write block was extracted into the shared _PathsFile_Write after an
+; unhardened verbatim TWIN was found in the action picker's ConfirmPath, still
+; carrying the original unprotected FileOpen. Scoping this assertion to one
+; function body was what let that twin exist unnoticed.
+;
+; So this now follows the guarantee transitively, and asserts strictly MORE than
+; before: the caller must branch on the writer's result and skip the reload, AND
+; the writer itself must catch and log. See also
+; tests/meta/infra/config/persistence/test_paths_file_single_writer.ahk, which pins that exactly one
+; writer exists — re-duplicating the hardened block would satisfy this test but
+; fail that one.
+_A0720WV_PathsEditorSurfacesWriteFailure() {
+	Body := _DriverFuncBody("_PathsEdWeb_Save")
+	Assert(Body != "", "_PathsEdWeb_Save must exist in ui/paths_editor/init.ahk")
+
+	GuardPos := InStr(Body, "if !_PathsFile_Write")
+	Assert(GuardPos > 0,
+		"_PathsEdWeb_Save must branch on the shared writer's result — a write that failed must not fall through")
+
+	; The original assertions, re-pointed at the code that now performs the write.
+	Writer := _DriverFuncBody("_PathsFile_Write")
+	Assert(Writer != "", "_PathsFile_Write must exist — it is the single writer both editors call")
+	CommitPos := InStr(Writer, "ConfigTransitionCommitOwned(")
+	StrictPos := InStr(Writer,
+		'ConfigTransitionResultIs(CommitResult, "committed_new")')
+	ReloadPos := InStr(Writer, "ReloadPreservingSuspend(0, OwnerBundle,")
+	; One rollback helper serves a refused launch and a later refusal alike.
+	RollbackPos := InStr(Writer, "_PathsFile_RollbackRefusedReload(OwnerBundle)")
+	RollbackBody := _DriverFuncBody("_PathsFile_RollbackRefusedReload")
+	Assert(ReloadPos > 0,
+		"the shared writer must own the success-path reload so its config lease cannot be released between paths.toml and Reload")
+	Assert(CommitPos > 0 && StrictPos > CommitPos && ReloadPos > StrictPos
+		&& RollbackPos > ReloadPos
+		&& InStr(RollbackBody, "ConfigTransitionRollbackOwned(") > 0,
+		"the paths editor must strictly commit its WAL before Reload and roll all-old on a refused Reload")
+	Assert(InStr(Writer, "ConfigTransitionLogFailure") > 0,
+		"a refused transition must be logged with its typed evidence")
+	Assert(InStr(Writer, "FileOpen(") == 0,
+		"the paths.toml writer must not bypass the crash-recoverable transition with raw I/O")
+	Assert(InStr(Writer, "return false") > 0,
+		"the writer must report failure to its callers, or the branch above cannot work")
+}
+Test("paths-editor: a failed config-directory write is surfaced (F-29)",
+	_A0720WV_PathsEditorSurfacesWriteFailure)

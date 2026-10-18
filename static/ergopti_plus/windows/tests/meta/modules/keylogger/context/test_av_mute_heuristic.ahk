@@ -18,3 +18,16 @@ _TAV_Check() {
 }
 
 Test("Keylogger: AV mute uses heuristic without double-call", _TAV_Check)
+
+; av-mute-heuristic-and-doc-mismatch: the volume probe uses winmm waveOutGetVolume.
+_ATG_AvVolumeUsesWinmm() {
+	; Scoped to the keylogger module tree: the winmm-vs-COM invariant is specific
+	; to keylogger_av_state, and other modules may legitimately use COM, so a
+	; whole-tree scan would false-trip the CoCreateInstance absence check.
+	Src := _StripFullLineComments(_DriverDirConcat("modules/keylogger"))
+	Assert(InStr(Src, "waveOutGetVolume") > 0,
+		"the volume probe must read winmm waveOutGetVolume — the documented MMDevice/IAudioEndpointVolume COM path was never the implementation (av-mute-heuristic-and-doc-mismatch)")
+	Assert(InStr(Src, "CoCreateInstance") = 0,
+		"keylogger_av_state must not claim a CoCreateInstance COM path in live code — the impl is the lightweight winmm probe (av-mute-heuristic-and-doc-mismatch)")
+}
+Test("keylogger_av: master-volume probe uses the winmm path, code matches docs (av-mute-heuristic-and-doc-mismatch)", _ATG_AvVolumeUsesWinmm)

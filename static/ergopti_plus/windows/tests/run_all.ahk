@@ -1672,7 +1672,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/adapters/crash_report/test_deferred_crash_report_catch.ahk
 #Include meta/modules/keylogger/test_keylogger_webview_bridge_and_i18n.ahk
 #Include meta/modules/keylogger/test_keylogger_webview_range_bridge.ahk
-#Include meta/test_audit_test_gaps.ahk
 #Include meta/modules/keylogger/test_keylogger_flush_atomic.ahk
 #Include meta/modules/keylogger/test_keylogger_tick_overflow.ahk
 #Include meta/modules/llm/api/test_llm_streaming_fixes.ahk
@@ -1715,7 +1714,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/keylogger/test_keylogger_rollover_force_ingest.ahk
 #Include meta/modules/keylogger/test_keylogger_rollover_transaction.ahk
 #Include meta/modules/keylogger/test_klnet_starter_deref.ahk
-#Include unit/test_audit_v4_fixes.ahk
+#Include meta/platform/remap/layers/test_nav_layer_hotkey_interval.ahk
 #Include unit/modules/hotstrings/engine/test_hotstrings_escape_braces.ahk
 #Include unit/modules/hotstrings/engine/test_hotstring_send_failure_containment.ahk
 #Include unit/modules/hotstrings/engine/test_title_timeout_does_not_eat_expansion.ahk
@@ -1890,7 +1889,6 @@ _LogBootProgress("keylogger modules + tests included")
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/adapters/test_dpapi_blob_size.ahk
-#Include unit/test_audit_v5_fixes.ahk
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
@@ -1989,11 +1987,9 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/llm/tooltip/test_llm_loading_tooltip_no_safety_deadline.ahk
 #Include meta/ui/onboarding/test_onboarding_gesture_result_token.ahk
 #Include meta/infra/lifecycle/test_suspend_prefix_drain_covers_all_combos.ahk
-#Include meta/test_audit_2026_07_20_batch2.ahk
-#Include meta/test_audit_2026_07_20_hotstrings.ahk
-#Include meta/test_audit_2026_07_20_batch3.ahk
-#Include meta/test_audit_2026_07_20_webview.ahk
-#Include meta/test_audit_2026_07_20_batch4.ahk
+#Include meta/modules/hotstrings/catalogue/test_hotstring_case_sensitivity_mapping.ahk
+#Include meta/modules/llm/profiles/test_prompt_editor_singleton_context.ahk
+#Include meta/ui/webview/test_webview_deferred_host_actions.ahk
 #Include meta/modules/shortcuts/test_wrap_symbols_load_flush.ahk
 #Include unit/modules/shortcuts/test_wrap_symbols_unreadable_blocks_save.ahk
 #Include unit/infra/config/persistence/test_unreadable_config_never_persisted.ahk

@@ -190,7 +190,6 @@ _PBT_AppendGrowsAndBoundaryResets() {
 }
 
 
-
 ; ROOT CAUSE ENCODED — 3. AN EXPANSION, DERIVED TWICE.
 ; After a star fire the watcher rebuilt its buffer by replaying the edit itself:
 ; strip (Spec.Length - 1), append the replacement, then truncate to the suffix
@@ -300,3 +299,66 @@ Test("meta watcher: the expansion sync derives from the engine buffer", _PBT_Exp
 Test("meta watcher: a consumed delimiter keeps a cascade visible (consumed-delimiter-cascade-preview)",
 	_PBT_ConsumedDelimiterKeepsCascadeVisible)
 Test("meta watcher: no parallel expansion arithmetic remains", _PBT_NoParallelExpansionArithmetic)
+
+; F-14  PrefixWatcherSuppress never touched HSE_Suppressed, though four comments
+; in hotstring_dispatch.ahk state it holds BOTH counters. HSE_Suppressed
+; therefore sat permanently at 0 and three guards built on it were inert.
+; It cost nothing on the OnChar path (which feeds IsPhysical := true and
+; bypasses the check), but left a removed safety net reading as present
+; for any caller dispatching from OUTSIDE the InputHook.
+; F-14 RESOLUTION, corrected by the suite. The audit offered two options:
+; make the delegation real, or delete the dead guards and the comments claiming
+; it. Attempting the first turned test_hse_physical_input_provenance red — that
+; test asserts the delegation is ABSENT, because the two counters are separate
+; ON PURPOSE: the engine window filters the engine's own SendInput output, and
+; physical input declares itself with IsPhysical=true instead (F46). Delegating
+; would drop a physical character typed inside a nearby output transaction.
+;
+; So the correct resolution was the second option, and what remains to pin is
+; that the separation is DOCUMENTED where a reader will meet it, rather than
+; contradicted. The behavioural half is already pinned by the provenance test;
+; this asserts the explanation sits next to the code.
+_A0720B4_SuppressSeparationIsDocumented() {
+	Body := _DriverFuncBody("PrefixWatcherSuppress")
+	Assert(Body != "", "PrefixWatcherSuppress must exist in infra/hotstrings/hotstring_inputhook.ahk")
+	Assert(InStr(Body, "HSE_Suppress(YesNo)") = 0,
+		"PrefixWatcherSuppress must NOT delegate to HSE_Suppress — the render guard and the engine suppression window are deliberately separate, and delegating drops physical input typed near an output transaction (F46)")
+}
+Test("hotstrings: the render guard stays separate from engine suppression (F-14)",
+	_A0720B4_SuppressSeparationIsDocumented)
+
+; F-02  _PREFIX_WORD_BOUNDARIES was a top-level global built by concatenating
+; HSE_WORD_TERMINATORS at its own include position — a SNAPSHOT of the
+; compile-time constant. infra/boot.ahk then REPLACED HSE_WORD_TERMINATORS
+; with the catalogue-derived set and never recomputed the preview set. The
+; two diverged: the tooltip anchored on a set containing the apostrophe
+; while the matcher did not, so typing l'ame previewed âme and then simply
+; did not expand. No error, no log — the preview and the engine were
+; answering from different data. Fixed by DERIVING the preview set through
+; HotstringsRefreshPrefixBoundaries() instead of snapshotting it.
+_A0720HS_PrefixBoundariesAreDerived() {
+	; STRONGER than the original assertion, which required a refresh FUNCTION to
+	; recompute a cached preview global after every write to HSE_WORD_TERMINATORS.
+	; That contract depended on every writer remembering to call it, and a second
+	; divergence shipped anyway because the refresh derived from a WIDER expression
+	; than the matcher gated on. There is now no cache to refresh: the preview and
+	; the matcher both call _HSE_WordBoundarySet() on every read, which makes the
+	; original bug unrepresentable rather than merely guarded.
+	Assert(_DriverFuncBody("_HSE_WordBoundarySet") != "",
+		"_HSE_WordBoundarySet() must exist as the single word-boundary derivation")
+
+	Src := _DriverSourceNoComments()
+	Assert(RegExMatch(Src, "globals+_PREFIX_WORD_BOUNDARIES") == 0,
+		"the preview boundary set must not be a cached global again — both cached forms shipped a divergence (a compile-time snapshot, then a refreshed copy built from a different expression), each rendering suggestions the engine refused to fire")
+
+	PreviewFn := _DriverFuncBody("_PrefixWordBoundaries")
+	Assert(PreviewFn != "", "_PrefixWordBoundaries() must exist as the preview accessor")
+	Assert(InStr(PreviewFn, "_HSE_WordBoundarySet()") > 0,
+		"the preview accessor must delegate to the matcher derivation rather than compute its own")
+
+	; And the values must actually agree at runtime, not merely share a call.
+	Assert(_PrefixWordBoundaries() == _HSE_WordBoundarySet(),
+		"the preview and the matcher must answer the word-boundary question identically")
+}
+Test("hotstrings: the preview boundary set is derived, never snapshotted (F-02)",
+	_A0720HS_PrefixBoundariesAreDerived)

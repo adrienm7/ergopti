@@ -15,8 +15,6 @@
 #Requires AutoHotkey v2.0
 
 
-
-
 ; =================================================
 ; =================================================
 ; ======= 1/ _SR_Poll suspend guard ===============
@@ -58,9 +56,6 @@ _SRPSG_TreePollHasSuspendGuard() {
 }
 Test("shell_runner: _SR_TreePoll has A_IsSuspended guard before completion dispatch",
 	_SRPSG_TreePollHasSuspendGuard)
-
-
-
 
 
 ; =========================================================
@@ -212,9 +207,6 @@ Test("shell_runner: tree poller timer and flag have one Critical owner (shellrun
 	_SRPSG_TreePollerTransitionsAreCentralized)
 
 
-
-
-
 ; =========================================================
 ; =========================================================
 ; ======= 3/ STARTING cancellation ownership =============
@@ -323,3 +315,30 @@ _SRPSG_StartingCancellationOwnsCompleteNativeBundle() {
 }
 Test("shell_runner: STARTING cancellation adopts before claim/publication/resume (shellrunner-tree-starting-owner-class)",
 	_SRPSG_StartingCancellationOwnsCompleteNativeBundle)
+
+; F-10  _SR_Poll used to delete its task key after yielding in FileRead. A
+; Has-then-Delete guard prevented Map.Delete from throwing but did not make
+; completion and terminate one atomic winner: OnDone could still fire from
+; the stale snapshot after terminate had retired ownership. The poll now
+; claims the exact ObjPtr before any exit lookup, file I/O, or callback.
+_A0720B2_SRPollClaimsBeforeYielding() {
+	Body := _DriverFuncBody("_SR_Poll")
+	Assert(Body != "", "_SR_Poll must exist in adapters/shell_runner.ahk")
+	ClaimPos := InStr(Body, "_SR_LegacyObserveCompletion(task_id, task)")
+	FinishPos := InStr(Body, "_SR_LegacyFinishCompletion(")
+	Assert(ClaimPos > 0,
+		"_SR_Poll must atomically claim the exact task from its stale snapshot")
+	Assert(FinishPos > ClaimPos,
+		"_SR_Poll must claim ownership before output capture and OnDone dispatch")
+	Assert(InStr(Body, "_SR_ActiveTasks.Delete(task_id)") = 0,
+		"_SR_Poll must not perform a Has-then-Delete itself because that does not stop OnDone after a concurrent terminate")
+	ClaimBody := _DriverFuncBody("_SR_LegacyClaimCompletion")
+	Assert(ClaimBody != "", "the exact-identity claim must exist")
+	ObservationBody := _DriverFuncBody("_SR_LegacyObserveCompletion")
+	Assert(ObservationBody != "", "native observation must exist")
+	AssertContains(ObservationBody, "_SR_LegacyClaimCompletion(TaskId, State)",
+		"native observation must delegate to the exact-identity claim before returning")
+	Assert(InStr(ClaimBody, "_SR_LegacyRegistryOwnsLocked") > 0,
+		"the completion claim must verify exact live identity before deletion")
+}
+Test("shell-runner: _SR_Poll claims exact ownership before yielding (F-10)", _A0720B2_SRPollClaimsBeforeYielding)

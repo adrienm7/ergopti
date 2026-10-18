@@ -68,3 +68,21 @@ _MetaCheckGrDrawBitmapTypeGuard() {
 
 Test("meta perf+correctness: GR_DrawBitmap uses HasMethod callable guard (perf-gr-drawbitmap, fix-gr-drawbitmap-closure)",
 	_MetaCheckGrDrawBitmapTypeGuard)
+
+; Regression: GR_DrawBitmap missing finally — GDI resources leaked on exception
+TestAuditV4_GrDrawBitmapFinally() {
+	RunBody := _DriverFuncBody("_GRDrawBitmapRun")
+	ReleaseBody := _DriverFuncBody("_GRBitmapRelease")
+
+	; The bug class includes acquisition failures before painting, so the owner
+	; must cover the whole native transaction rather than only DrawFn.
+	AssertTrue(InStr(RunBody, "} finally {")
+		and InStr(RunBody, "_GRBitmapSettle(Receipt, Native)"),
+		"the complete bitmap transaction must settle its receipt in finally")
+	AssertTrue(InStr(ReleaseBody, "Native.SelectObject")
+		and InStr(ReleaseBody, "Native.DeleteObject")
+		and InStr(ReleaseBody, "Native.DeleteMemoryDC")
+		and InStr(ReleaseBody, "Native.ReleaseScreenDC"),
+		"the receipt must restore selection and release every native dependency")
+}
+Test("graphics renderer: GR_DrawBitmap GDI cleanup guaranteed by try/finally", TestAuditV4_GrDrawBitmapFinally)

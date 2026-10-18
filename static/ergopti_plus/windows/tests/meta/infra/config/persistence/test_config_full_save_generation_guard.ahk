@@ -524,3 +524,22 @@ _CFGFM_PendingSnapshotReceivesReleaseInterruption() {
 
 Test("config full save meta: pending/path snapshot survives same-gap settlement "
 	. "(config-full-save-snapshot-interruption)", _CFGFM_PendingSnapshotReceivesReleaseInterruption)
+
+; Regression: SaveFullConfig returns without rescheduling when !_DriverReady
+TestAuditV4_SaveFullConfigReschedule() {
+	Src := _DriverSourceConcat()
+
+	; The bug: boot timer is one-shot (-500 ms); if SaveFullConfig runs before
+	; _DriverReady is set, it returns immediately, silently dropping the save.
+	; The fix: preserve a generation and arm the coalesced deferred wrapper.
+	GuardPos := InStr(Src, "if !_DriverReady")
+	AssertTrue(GuardPos > 0, "SaveFullConfig must guard on !_DriverReady")
+
+	; Verify the durable coordinator owns the wake-up inside the guard block.
+	GuardBlock := SubStr(Src, GuardPos, 400)
+	AssertTrue(
+		InStr(GuardBlock, "_ConfigArmFullSaveRetry("),
+		"SaveFullConfig must reschedule itself when !_DriverReady — one-shot timer is not re-fired otherwise"
+	)
+}
+Test("config full save: SaveFullConfig reschedules when _DriverReady is not yet set", TestAuditV4_SaveFullConfigReschedule)

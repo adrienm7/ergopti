@@ -97,3 +97,26 @@ Test("meta network_info: every _NI_QueryWlan exit publishes its result to the ca
 	_NISW_EveryExitPublishesItsResult)
 Test("meta network_info: both WLAN accessors share the single cached query point",
 	_NISW_BothAccessorsShareTheQuery)
+
+; Regression: NI_ADAPTER_OFFSET_OPER_STATUS was hardcoded to 56 -- wrong on x64 (should be 104)
+; and wrong on x86 (should be 68) (network_info.ahk)
+TestAuditV5_NetworkInfoDynamicOffsets() {
+	Src := _DriverDirConcat("adapters")
+
+	; The bug: NI_ADAPTER_OFFSET_OPER_STATUS := 56 is the DnsSuffix pointer on x64
+	; (OperStatus is at offset 104). On x86 OperStatus is at 68. Both were wrong.
+	; The fix: ternary expression based on A_PtrSize.
+	AssertFalse(
+		InStr(Src, "NI_ADAPTER_OFFSET_OPER_STATUS          := 56"),
+		"NI_ADAPTER_OFFSET_OPER_STATUS must not be hardcoded to 56 (correct x64 offset is 104)"
+	)
+	AssertTrue(
+		InStr(Src, "A_PtrSize == 8) ? 104 : 68"),
+		"NI_ADAPTER_OFFSET_OPER_STATUS must use (A_PtrSize == 8) ? 104 : 68"
+	)
+	AssertTrue(
+		InStr(Src, "A_PtrSize == 8) ? 72  : 40"),
+		"NI_ADAPTER_OFFSET_FRIENDLY_NAME must use (A_PtrSize == 8) ? 72 : 40"
+	)
+}
+Test("network info: NI_ADAPTER_OFFSET_OPER_STATUS and FRIENDLY_NAME are dynamic (A_PtrSize ternary)", TestAuditV5_NetworkInfoDynamicOffsets)

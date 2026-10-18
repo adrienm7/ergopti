@@ -48,3 +48,34 @@ _THECE_ConsumedDelimitersGuard() {
 		"hotstring_engine_main.ahk must guard EndChar append with !InStr(HSE_CONSUMED_DELIMITERS, EndChar) to avoid double-emitting consumed delimiters")
 }
 Test("hotstring_engine_main: EndChar is not appended when it is in HSE_CONSUMED_DELIMITERS", _THECE_ConsumedDelimitersGuard)
+
+;
+; F-04  HSE_TypoNbspStripped is set during end-char candidate DISCOVERY, before a
+; winner is known, but read by the dispatcher as if it described the WINNER.
+; When the star path won, the stale-but-true flag added one extra BackSpace
+; and ate the character typed before the trigger (a b Ê Shift+comma emitted
+; aU, instead of abU,). Silent because the emit and the buffer applied the
+_A0720HS_NbspFlagDescribesTheWinner() {
+	Body := _DriverFuncBody("HSE_FindMatchAtEnd")
+	Assert(Body != "", "HSE_FindMatchAtEnd must exist in infra/hotstrings/hotstring_match.ahk")
+
+	SetPos := InStr(Body, "HSE_TypoNbspStripped := true")
+	Assert(SetPos > 0, "prerequisite: the end-char probe must still record the NBSP strip")
+
+	; Search AFTER the set: the function already resets the flag on entry, so a
+	; naive first-occurrence search finds that reset and proves nothing.
+	ClearPos := InStr(Body, "HSE_TypoNbspStripped := false", , SetPos)
+	Assert(ClearPos > SetPos,
+		"HSE_FindMatchAtEnd must clear HSE_TypoNbspStripped when the STAR path wins — the flag is set during candidate DISCOVERY but read by the dispatcher as if it described the WINNER, so a star win carried a stale true and the extra BackSpace deleted the character typed before the trigger")
+
+	ReturnPos := InStr(Body, "return BestMatch")
+	Assert(ReturnPos > ClearPos,
+		"the clear must happen before the function returns, at the one point where the winning candidate is known")
+
+	; The clear must be conditional on a star win, not unconditional — clearing it
+	; always would break the legitimate end-char case that consumed the NBSP.
+	Assert(RegExMatch(Body, 'BestEndChar\s*==\s*""') > 0,
+		"the clear must be gated on BestEndChar being empty (a star win); clearing unconditionally would drop the BackSpace the genuine end-char path needs")
+}
+Test("hotstrings: the NBSP-strip flag describes the winning candidate (F-04)",
+	_A0720HS_NbspFlagDescribesTheWinner)

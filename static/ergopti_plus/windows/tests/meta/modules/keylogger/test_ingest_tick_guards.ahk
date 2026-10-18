@@ -19,8 +19,6 @@
 #Requires AutoHotkey v2.0
 
 
-
-
 ; ===================================================
 ; ===================================================
 ; ======= 1/ Source scan helpers ====================
@@ -52,3 +50,14 @@ _ITG_IngestHasIdleGuards() {
 		"KL_IngestOnce must check INGEST_LIVE_PUSH_IDLE_MS before calling KLWV_NotifyIngest (ingest-prefetch-blocks-keyboard-thread)")
 }
 Test("keylogger: KL_IngestOnce has idle guards for heavy tasks (ingest-tick-blocks-keyboard-thread)", _ITG_IngestHasIdleGuards)
+
+; pending-entries-cross-thread-race: the ingest drain swaps and clears under Critical.
+_ATG_IngestDrainIsAtomic() {
+	Body := _DriverFuncBody("KL_IngestOnce")
+	Assert(Body != "", "KL_IngestOnce() must exist in keylogger.ahk")
+	Assert(InStr(Body, "Critical(") > 0,
+		"KL_IngestOnce must wrap the pending-entries drain in Critical() so the keystroke hook cannot append between snapshot and clear (pending-entries-cross-thread-race)")
+	Assert(InStr(Body, "_pending_entries := []") > 0,
+		"KL_IngestOnce must clear _pending_entries by reassignment inside the Critical section (atomic swap-and-clear, not read-then-clear) (pending-entries-cross-thread-race)")
+}
+Test("keylogger: KL_IngestOnce drains _pending_entries atomically under Critical (pending-entries-cross-thread-race)", _ATG_IngestDrainIsAtomic)
