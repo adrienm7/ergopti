@@ -114,6 +114,55 @@ helpers.describe("AT-SPI focus watcher: current native authority", function()
 		state.now = state.now + 1001
 		assert_false(state.watch.pump())
 		helpers.assert_nil(state.watch.snapshot())
+		helpers.assert_nil(state.cancelled, "stale authority cannot cancel a potentially healthy resident")
+	end)
+
+	helpers.it("discards aged backlog without killing a healthy resident's fresh admission", function()
+		local state = fixture()
+		state.ready()
+		state.message("snapshot")
+		state.now = state.now + 1500
+		state.message("heartbeat")
+		helpers.assert_true(state.watch.pump(), "the newest source heartbeat proves the resident remains available")
+		helpers.assert_nil(state.watch.snapshot(), "a new heartbeat cannot renew an old field verdict")
+		helpers.assert_nil(state.cancelled, "an aged queued answer must not terminate the live owner")
+		state.answer = true
+		helpers.assert_eq(state.watch.barrier().role, 61, "only a fresh matching request may reopen input")
+	end)
+
+	helpers.it("recovers from parent scheduling silence using a causally fresh resident response", function()
+		local state = fixture()
+		state.ready()
+		state.now = state.now + 1500
+		assert_false(state.watch.pump())
+		helpers.assert_nil(state.watch.snapshot())
+		helpers.assert_nil(state.cancelled)
+		state.answer = true
+		helpers.assert_eq(state.watch.barrier().role, 61)
+		helpers.assert_eq(state.started, 1, "recovery must keep the same exact resident child")
+	end)
+
+	helpers.it("withholds an aged answer for the current request even when a fresh heartbeat follows", function()
+		local state = fixture()
+		state.ready()
+		helpers.assert_nil(state.watch.barrier())
+		local captured_at = state.now
+		state.now = state.now + 1500
+		state.message("snapshot", { at_ms = captured_at })
+		state.message("heartbeat")
+		helpers.assert_true(state.watch.pump())
+		helpers.assert_nil(state.watch.snapshot(), "neither stale matching answers nor heartbeats admit input")
+		helpers.assert_nil(state.cancelled)
+		state.answer = true
+		helpers.assert_eq(state.watch.barrier().role, 61)
+	end)
+
+	helpers.it("keeps malformed aged frames fatal instead of treating them as harmless stale data", function()
+		local state = fixture()
+		state.ready()
+		state.message("snapshot", { role = "invalid" })
+		state.now = state.now + 1500
+		assert_false(state.watch.pump())
 		helpers.assert_true(state.cancelled)
 	end)
 
@@ -240,7 +289,10 @@ helpers.describe("AT-SPI focus watcher: native lifecycle", function()
 		state.watch.start()
 		state.now = state.now + 1001
 		assert_false(state.watch.pump())
-		helpers.assert_true(state.cancelled)
+		helpers.assert_nil(state.cancelled, "an unready but live listener may still complete startup")
+		state.message("ready")
+		state.message("snapshot")
+		helpers.assert_true(state.watch.pump())
 		local other = fixture()
 		other.ready()
 		other.running = false

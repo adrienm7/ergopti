@@ -182,32 +182,39 @@ function M.new(options)
 	end
 
 	local function consume(message)
+		local now = now_ms()
 		if type(message) ~= "table" or type(message.sequence) ~= "number" or message.sequence % 1 ~= 0
 			or message.sequence ~= sequence + 1 or type(message.at_ms) ~= "number"
-			or message.at_ms ~= message.at_ms or message.at_ms > now_ms() or now_ms() - message.at_ms > lease_ms
+			or message.at_ms ~= message.at_ms or message.at_ms < 0 or message.at_ms > now
 			or type(message.request) ~= "number" or message.request % 1 ~= 0 or message.request < 0
 			or message.request > request then return false end
-		sequence = message.sequence
 		if last_at and message.at_ms < last_at then return false end
-		last_at = message.at_ms
-		if message.kind == "ready" then
+		local kind, candidate = message.kind, nil
+		if kind == "snapshot" then
+			if not ready or type(message.role) ~= "number" or message.role < 0 or message.role % 1 ~= 0
+				or type(message.active_scope) ~= "boolean" then return false end
+			if message.active_scope == true and type(message.bus) == "string" and message.bus:match("^:%d+%.%d+$")
+				and type(message.path) == "string" and message.path:match("^/[%w_/]+$") then
+				candidate = { role = message.role, bus = message.bus, path = message.path }
+			end
+		elseif kind ~= "ready" and kind ~= "heartbeat" and kind ~= "unknown" then return false end
+		sequence, last_at = message.sequence, message.at_ms
+		if kind == "ready" then
 			-- Both ends are open now. Unlink the private names before admitting
 			-- input, so an unclean daemon death leaves no FIFO or directory.
 			if transport.cleanup() ~= true then return false end
 			ready = true
+		end
+		if now - message.at_ms > lease_ms then
+			-- A busy daemon can accumulate honest old frames while its resident
+			-- remains healthy. Retire their authority, retaining the exact owner
+			-- so only a new matching admission request can restore the verdict.
+			publish(nil)
 			return true
 		end
-		if message.request ~= request then return true end
-		if message.kind == "heartbeat" then return true end
-		if message.kind == "unknown" then answered_request = request; publish(nil); return true end
-		if message.kind ~= "snapshot" or not ready or type(message.role) ~= "number"
-			or message.role < 0 or message.role % 1 ~= 0 or type(message.active_scope) ~= "boolean" then return false end
-		if message.active_scope ~= true or type(message.bus) ~= "string" or not message.bus:match("^:%d+%.%d+$")
-			or type(message.path) ~= "string" or not message.path:match("^/[%w_/]+$") then
-			publish(nil); return true
-		end
+		if kind == "ready" or message.request ~= request or kind == "heartbeat" then return true end
 		answered_request = request
-		publish({ role = message.role, bus = message.bus, path = message.path })
+		publish(kind == "snapshot" and candidate or nil)
 		return true
 	end
 
@@ -238,10 +245,9 @@ function M.new(options)
 			end
 			if failed then break end
 		end
-		if not failed and (last_at == nil or now_ms() - last_at > lease_ms) then
-			if received or (watcher.started_at and now_ms() - watcher.started_at > lease_ms) then fail("listener stalled") end
-		end
-		return ready and not failed
+		local fresh = last_at ~= nil and now_ms() - last_at <= lease_ms
+		if not fresh then publish(nil) end
+		return ready and not failed and fresh
 	end
 
 	--- Invalidates locally before requesting a fresh resident traversal.
@@ -276,7 +282,7 @@ function M.new(options)
 	--- Returns the last live, exact focused-control receipt without native work.
 	--- @return table|nil receipt
 	function watcher.snapshot()
-		if not ready or failed or not receipt then return nil end
+		if not ready or failed or not receipt or last_at == nil or now_ms() - last_at > lease_ms then return nil end
 		return { role = receipt.role, bus = receipt.bus, path = receipt.path }
 	end
 
@@ -292,7 +298,7 @@ function M.new(options)
 			if failed then return false end
 			uv.sleep(1)
 		end
-		fail("listener startup deadline")
+		publish(nil)
 		return false
 	end
 
