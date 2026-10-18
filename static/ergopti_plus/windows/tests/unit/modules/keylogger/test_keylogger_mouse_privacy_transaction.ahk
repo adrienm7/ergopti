@@ -444,6 +444,7 @@ _KLMS_ParkPrivacyFailure() {
 	for Field in Fields
 		Saved[Field] := KLMouse.%Field%
 	SavedInitialized := Keylogger.initialized
+	SavedMouseMode := A_CoordModeMouse
 	Recorder := {Calls: []}
 	try {
 		Keylogger.initialized := true
@@ -457,6 +458,7 @@ _KLMS_ParkPrivacyFailure() {
 		for Field, Value in Saved
 			KLMouse.%Field% := Value
 		Keylogger.initialized := SavedInitialized
+		CoordMode("Mouse", SavedMouseMode)
 	}
 }
 Test("mouse-privacy-query-failure: park polling fails closed", _KLMS_ParkPrivacyFailure)
