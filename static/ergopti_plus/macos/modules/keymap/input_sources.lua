@@ -1003,32 +1003,33 @@ local function upgrade_active_list_async(legacy_active, on_done)
 		"on run",
 		"\tset disabled to {}",
 		"\tset enabled to {}",
+		"\tset targetSources to {}",
 	}
-	-- Disable each legacy id, then enable its migrated equivalent. The last
-	-- migrated id is also selected so the active layout follows the upgrade.
-	local last_new
+	-- A known missing replacement must not remove a working legacy source.
+	-- Retain every target before the first mutation, including later entries.
 	for _, old in ipairs(legacy_active) do
 		local new_id = migrate_legacy_id(old)
-		last_new = new_id
+		table.insert(lines, text_utils.applescript_format("\tset targetSrc to my findSource(\"%s\")", new_id))
+		table.insert(lines, '\tif targetSrc is missing value then return "MISS"')
+		table.insert(lines, "\tset end of targetSources to targetSrc")
+	end
+	-- Use the retained native references throughout the mutation phase. A later
+	-- lookup cannot discover a predictable missing target after old sources moved.
+	for index, old in ipairs(legacy_active) do
 		table.insert(lines, text_utils.applescript_format("\tset oldSrc to my findSource(\"%s\")", old))
 		table.insert(lines, "\tif oldSrc is not missing value then")
 		table.insert(lines, "\t\tset nativeStatus to current application's TISDisableInputSource(oldSrc)")
 		table.insert(lines, '\t\tif nativeStatus is not 0 then return "TISDisableInputSource:" & (nativeStatus as text)')
 		table.insert(lines, "\t\tset end of disabled to oldSrc")
 		table.insert(lines, "\tend if")
-		table.insert(lines, text_utils.applescript_format("\tset newSrc to my findSource(\"%s\")", new_id))
-		table.insert(lines, "\tif newSrc is not missing value then")
-		table.insert(lines, "\t\tset nativeStatus to current application's TISEnableInputSource(newSrc)")
-		table.insert(lines, '\t\tif nativeStatus is not 0 then return "TISEnableInputSource:" & (nativeStatus as text)')
-		table.insert(lines, "\t\tset end of enabled to newSrc")
-		table.insert(lines, "\tend if")
+		table.insert(lines, string.format("\tset newSrc to item %d of targetSources", index))
+		table.insert(lines, "\tset nativeStatus to current application's TISEnableInputSource(newSrc)")
+		table.insert(lines, '\tif nativeStatus is not 0 then return "TISEnableInputSource:" & (nativeStatus as text)')
+		table.insert(lines, "\tset end of enabled to newSrc")
 	end
-	if last_new then
-		table.insert(lines, text_utils.applescript_format("\tset selSrc to my findSource(\"%s\")", last_new))
-		table.insert(lines, '\tif selSrc is missing value then return "MISS"')
-		table.insert(lines, "\tset nativeStatus to current application's TISSelectInputSource(selSrc)")
-		table.insert(lines, '\tif nativeStatus is not 0 then return "TISSelectInputSource:" & (nativeStatus as text)')
-	end
+	table.insert(lines, "\tset selSrc to last item of targetSources")
+	table.insert(lines, "\tset nativeStatus to current application's TISSelectInputSource(selSrc)")
+	table.insert(lines, '\tif nativeStatus is not 0 then return "TISSelectInputSource:" & (nativeStatus as text)')
 	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
 	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
 	-- Lua pattern below matched nothing — enabled_n stayed nil, the > 0 test
@@ -1038,8 +1039,8 @@ local function upgrade_active_list_async(legacy_active, on_done)
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
 	return run_osascript_isolated_async(script, function(process_ok, out, reason)
-		-- A missing intermediate replacement is skipped by the native script.
-		-- One enabled source cannot acknowledge a request to upgrade several.
+		-- Process exit alone cannot acknowledge the complete native operation.
+		-- Every requested replacement must be present in the enabled count.
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
 		local _disabled_n, enabled_n = out_text:match("^(%d+)%s*/%s*(%d+)$")
 		local upgraded = process_ok == true and tonumber(enabled_n) == requested_upgrades
