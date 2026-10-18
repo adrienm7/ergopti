@@ -52,7 +52,7 @@ local RuntimeGuard = require("infra.runtime_guard")
 -- compatibility but supplies no evidence that these authority exports are original.
 local original_reader_load = package.loaded["adapters.evdev_reader"] == nil
 local EvdevReader = require("adapters.evdev_reader")
-local INPUT_READER_PORT_NAMES = { "capture_event", "event_view", "event_current", "source_current",
+local INPUT_READER_PORT_NAMES = { "capture_event", "event_view", "event_current", "source_current", "reconcile_sources",
 	"capture_source_owner", "source_owner_current", "retire_source", "open", "close", "grab", "ungrab", "use_ffi_backend", "_set_backend", "_reset_backend" }
 local _input_reader_ports = {}
 for _, name in ipairs(INPUT_READER_PORT_NAMES) do
@@ -121,6 +121,7 @@ local _running  = false
 -- One captured publisher and one in-flight source transaction belong to a start.
 local _capture_session, _capture_options, _capture_republisher = nil, nil, nil
 local _source_reconciliation = nil
+local _source_recovery = {}
 local _number_row = { retired = {}, suppressed = {}, mode = "native" }
 
 -- Every owned keyboard and observed pointer path. The first keyboard remains in
@@ -973,21 +974,35 @@ local function _call_callback(label, callback, ...)
 	end)
 end
 
-local function _resynchronise(source)
+local function _resynchronise(source, snapshot, cohort)
 	local pressed = {}
-	for key, current in pairs(_physical_down) do
-		if current.source ~= source then pressed[key] = current end
+	if cohort then
+		for _, peer in ipairs(cohort) do
+			if peer.source ~= source then
+				for code in pairs(peer.keys) do
+					pressed[source_key(peer.source, code)] = { source = peer.source, code = code, held_origin = peer.held }
+				end
+			end
+		end
+	else
+		for key, current in pairs(_physical_down) do
+			if current.source ~= source then pressed[key] = current end
+		end
 	end
 
 	local slot = keyboard_slot(source)
-	local held_receipt = EvdevReader.capture_pressed_keys and EvdevReader.capture_pressed_keys(slot, KEY_MAX) or nil
-	local held_view = held_receipt and EvdevReader.pressed_keys_view(held_receipt) or nil
+	local held_receipt = snapshot and snapshot.held
+		or EvdevReader.capture_pressed_keys and EvdevReader.capture_pressed_keys(slot, KEY_MAX) or nil
+	local held_view = not snapshot and held_receipt and EvdevReader.pressed_keys_view(held_receipt) or nil
 	local source_keys, key_err
-	if held_view then
+	if snapshot then source_keys = snapshot.keys
+	elseif held_view then
 		source_keys = {}
 		for _, code in ipairs(held_view.down) do source_keys[code] = true end
 	else source_keys, key_err = EvdevReader.pressed_keys(slot, KEY_MAX) end
-	local leds, led_err = EvdevReader.active_leds(slot, LED_CAPSL)
+	local leds, led_err
+	if snapshot then leds = snapshot.leds
+	else leds, led_err = EvdevReader.active_leds(slot, LED_CAPSL) end
 	if not source_keys or not leds then
 		return false, string.format("state query failed for %s: %s; %s", source,
 			tostring(key_err), tostring(led_err))
@@ -1029,16 +1044,20 @@ local function _resynchronise(source)
 	for _, current in ipairs(ordered) do
 		local key = current.key
 		local role = _modifier_role(current.code)
-		if current.code ~= EvdevCodes.KEY_CAPSLOCK and (not role or not captured[current.code]) then
-			captured[current.code] = true
-			local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
-			if capture_err then return false, tostring(capture_err) end
+		-- Already-consumed presses remain physical cleanup debt, but the output
+		-- no longer holds them. Replaying their modifiers here would invent text.
+		if not consumed[key] then
+			if current.code ~= EvdevCodes.KEY_CAPSLOCK and (not role or not captured[current.code]) then
+				captured[current.code] = true
+				local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
+				if capture_err then return false, tostring(capture_err) end
+			end
+			_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN, role)
+			-- Reconciliation saw an already-held key, not a fresh admitted DOWN.
+			_pressed_at[key] = _on_hold_admission == nil and Monotonic.now_ms() or nil
+			_hold_owners[key] = _on_hold_admission == nil
+				and { token = _legacy_hold_owner, callback = nil } or nil
 		end
-		_track_modifier(current.source, current.code, InputEvent.VALUE_DOWN, role)
-		-- Reconciliation saw an already-held key, not a fresh admitted DOWN.
-		_pressed_at[key] = _on_hold_admission == nil and Monotonic.now_ms() or nil
-		_hold_owners[key] = _on_hold_admission == nil
-			and { token = _legacy_hold_owner, callback = nil } or nil
 		if consumed[key] then _consumed_down[key] = true end
 	end
 	if leds[LED_CAPSL] == true then
@@ -1047,7 +1066,9 @@ local function _resynchronise(source)
 		if down_err or up_err then return false, tostring(down_err or up_err) end
 	end
 
-	if held_receipt and not EvdevReader.pressed_keys_current(held_receipt) then return false, "held source query revoked" end
+	if snapshot then
+		if snapshot.current() ~= true then return false, "pending source query revoked" end
+	elseif held_receipt and not EvdevReader.pressed_keys_current(held_receipt) then return false, "held source query revoked" end
 	if _intercept then
 		for key, forwarded in pairs(_forwarded_down) do
 			if not pressed[key] then
@@ -2040,10 +2061,9 @@ local function _dispatch_event(ev, source)
 					"input-desync callback", _on_desync) then return end
 			end
 		elseif ev.code == SYN_REPORT and _sync_dropped[source] then
-			_sync_dropped[source] = nil
-			local synced, sync_err = _resynchronise(source)
+			local synced, sync_err = _source_recovery.run({ source })
 			if not synced then M.emergency_stop("evdev resynchronisation failed: " .. tostring(sync_err))
-			else _number_row.construct() end
+			else _sync_dropped[source] = nil; _number_row.construct() end
 		end
 		return
 	end
@@ -3151,6 +3171,75 @@ local function _acquire_pointers(paths, tx)
 	return true
 end
 
+--- Reconciles native state under one unpublished cohort, without dropping the grab.
+--- Recorder-only callers retain their raw-input path but acquire no native rights.
+--- @param paths table Sources whose state must be restored.
+--- @param consume_held boolean|nil Whether a modal already delivered their held keys.
+--- @param existing table|nil Original cohort captured before a modal released it.
+--- @return boolean restored
+--- @return string|nil reason
+function _source_recovery.run(paths, consume_held, existing)
+	if not existing and (not original_reader_load or not _input_source_owners or not _capture_session or not _intercept) then
+		for _, path in ipairs(paths) do
+			if consume_held then
+				local held = EvdevReader.pressed_keys(keyboard_slot(path), KEY_MAX)
+				for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
+			end
+			local restored, reason = _resynchronise(path)
+			if not restored then return false, reason end
+		end
+		return true
+	end
+	if _source_reconciliation and _source_reconciliation ~= existing then return false, "source reconciliation is already pending" end
+	local tx, selected = existing or _begin_source_transaction(), {}
+	for _, path in ipairs(paths) do selected[path] = true end
+	tx.changed, tx.native_complete = true, true
+	tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers = {}, {}, {}, {}
+	local called, accepted = pcall(function()
+		if not _source_transaction_current(tx) then return false end
+		local slots = {}
+		for _, path in ipairs(_devices) do slots[#slots + 1] = keyboard_slot(path) end
+		for _, path in ipairs(_pointer_devices) do
+			if not _capture_source_member(tx, path, pointer_slot, false) then return false end
+		end
+		return _input_reader_ports.reconcile_sources(slots, function(snapshots)
+			if not _source_transaction_current(tx) then return false end
+			if #snapshots ~= #slots then return false end
+			local selected_snapshot
+			for index, snapshot in ipairs(snapshots) do
+				if snapshot.slot ~= slots[index] or snapshot.source ~= _devices[index]
+					or not snapshot.lease or type(snapshot.observer) ~= "function" then return false end
+				tx.sources[snapshot.slot], tx.source_observers[snapshot.slot] = snapshot.lease, snapshot.observer
+			end
+			for _, snapshot in ipairs(snapshots) do
+				if selected[snapshot.source] then
+					selected_snapshot = selected_snapshot or snapshot
+					if consume_held then
+						for code in pairs(snapshot.keys) do _consumed_down[source_key(snapshot.source, code)] = true end
+					end
+				end
+			end
+			if not selected_snapshot or not _resynchronise(selected_snapshot.source, selected_snapshot, snapshots)
+				or not _source_transaction_current(tx) then return false end
+			-- activate() retired the remapper's old private issuer epoch too.
+			if tx.engine then
+				local issuer = _input_ports.capture_input_owner(tx.engine)
+				if not issuer or not _input_ports.input_owner_current(issuer) or not _source_transaction_current(tx) then return false end
+				_remapper_input_owner, tx.issuer = issuer, issuer
+			end
+			if tx.publisher then
+				local published, acknowledged = pcall(tx.publisher)
+				if not published or acknowledged ~= true or not _source_transaction_current(tx) then return false end
+			end
+			return _source_transaction_current(tx)
+		end) == true and _publish_source_transaction(tx)
+	end)
+	if not called or accepted ~= true then _retire_source_transaction(tx, "native state reconciliation refused") end
+	if _source_reconciliation == tx then _source_reconciliation = nil end
+	if called and accepted == true then return true end
+	return false, "native state reconciliation refused"
+end
+
 --- Re-checks which device should be read, and switches when it has changed.
 ---
 --- Two events make this necessary, and neither announces itself on the
@@ -3726,6 +3815,10 @@ function M.while_released(fn, opts)
 		if type(observer) ~= "function" then return true end
 		return _call_callback("modal restoration observer", observer, stage, receipt)
 	end
+	if _source_reconciliation then
+		observe("refused", { ok = false, reason = "reconciliation_pending" })
+		return nil, "source reconciliation is already pending"
+	end
 	if not _running or not _intercept then
 		if _remapper and _remapper.has_combinations then
 			if _release_remapped() ~= true or _remapper:activate() ~= true then
@@ -3741,16 +3834,23 @@ function M.while_released(fn, opts)
 		observe("refused", { ok = false, reason = "release_failed" })
 		return nil, "combination key retirement refused"
 	end
-	local released, release_err = _release_forwarded_sources(paths)
-	if not released then
-		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
+	local modal_tx = original_reader_load and _input_source_owners and _capture_session and _begin_source_transaction() or nil
+	local function stop_modal(reason)
+		if modal_tx then
+			_retire_source_transaction(modal_tx, reason)
+			if _source_reconciliation == modal_tx then _source_reconciliation = nil end
+		else M.emergency_stop(reason) end
+	end
+	local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
+	if not release_call or not released then
+		stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
 		observe("refused", { ok = false, reason = "release_failed" })
 		return nil, "virtual key retirement refused"
 	end
 	for _, path in ipairs(paths) do
 		local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
 		if not called or acknowledged ~= true then
-			M.emergency_stop("could not release the keyboard before a dialog: " .. path)
+			stop_modal("could not release the keyboard before a dialog: " .. path)
 			observe("refused", { ok = false, reason = "ungrab_failed" })
 			return nil, "keyboard release refused"
 		end
@@ -3770,15 +3870,13 @@ function M.while_released(fn, opts)
 			repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
 			_pending_events[slot] = nil
 			if EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
-			local held = EvdevReader.pressed_keys(slot, KEY_MAX)
-			for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
-			if not _resynchronise(path) then return false, "resynchronisation_failed" end
 		end
+		if not _source_recovery.run(paths, true, modal_tx) then return false, "resynchronisation_failed" end
 		return true
 	end)
 	if not restored_call or restored ~= true then
 		restore_reason = restored_call and restore_reason or "restoration_failed"
-		M.emergency_stop("could not restore keyboard capture after a dialog: " .. tostring(restore_reason))
+		stop_modal("could not restore keyboard capture after a dialog: " .. tostring(restore_reason))
 		observe("refused", { ok = false, reason = restore_reason })
 		if err then error(err, 0) end
 		return (table.unpack or unpack)(results, 1, results.n)

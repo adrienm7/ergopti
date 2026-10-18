@@ -1095,6 +1095,79 @@ helpers.describe("actual shared-output handoff dependencies: green controls", fu
 end)
 
 -- Controlled actual Reader/Hook lifecycle; no kernel or physical claim.
+helpers.describe("native source state restoration", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+
+	for _, code in ipairs({ 42, 29 }) do
+		helpers.it("(linux-native-reconciliation) keeps a modal-consumed modifier out of matcher text " .. code, function()
+			local chars, wire, held = {}, {}, {}
+			Fixture.with_session({ position_bits = true, after_sync = function(_, key, value)
+				if key == 42 or key == 29 then held[key] = value ~= 0 end
+				if key == 30 and value == 1 and not held[29] then wire[#wire + 1] = held[42] and "A" or "a" end
+			end }, function(s)
+				s.hook.stop(); assert(s.hook.set_remapper(nil))
+				s.start_options.onChar = function(char) chars[#chars + 1] = char end
+				s.hook.start(s.start_options); assert(s.hook.isRunning())
+				s.edge("a", code, 1, 1); s.edge("a", 30, 1, 2); s.edge("a", 30, 0, 3)
+				helpers.assert_true(held[code], "the independent output model actually saw the modifier down")
+				helpers.assert_eq(chars, wire)
+				helpers.assert_eq(s.hook.while_released(function() return "completed" end), "completed")
+				helpers.assert_true(s.held[s.paths.a][code], "the original physical key is still held")
+				helpers.assert_eq(held[code], false, "modal entry retired its virtual output")
+				s.edge("a", 30, 1, 4); s.edge("a", 30, 0, 5)
+				helpers.assert_eq(chars, wire, "the matcher must follow output, not a consumed physical modifier")
+				s.edge("a", code, 0, 6)
+				s.edge("a", code, 1, 7); s.edge("a", 30, 1, 8); s.edge("a", 30, 0, 9); s.edge("a", code, 0, 10)
+				helpers.assert_eq(chars, wire, "a fresh physical press restores the modifier normally")
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "SYN_DROPPED", "modal" }) do
+		helpers.it("(linux-native-reconciliation) restores logical input admission after " .. boundary, function()
+			local session, published
+			local options = { position_bits = true, on_capture_reacquired = function()
+				published = true
+				helpers.assert_eq(session.hook.capture_input_owner(), nil)
+				helpers.assert_eq(session.hook.start(session.start_options), false)
+				return true
+			end }
+			Fixture.with_session(options, function(s)
+				session = s
+				local old = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+				if boundary == "SYN_DROPPED" then
+					s.event("a", 0, 3, 0, 2); s.event("a", 0, 0, 0, 3)
+				else
+					helpers.assert_eq(s.hook.while_released(function() return "completed" end), "completed")
+				end
+				helpers.assert_true(s.hook.isRunning())
+				for _, path in pairs(s.paths) do helpers.assert_true(s.reader.is_grabbed("keyboard:" .. path)) end
+				helpers.assert_true(published)
+				helpers.assert_eq(s.reader.source_owner_current(old), false)
+				s.pair(); helpers.assert_eq(s.armed, true, "the original logical consumer uses the restored native cohort")
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "query", "restore", "publisher" }) do
+		helpers.it("(linux-native-reconciliation) closes original sources when recovery " .. boundary .. " refuses", function()
+			local session, recovering
+			local options = { position_bits = true, on_capture_reacquired = function() return boundary ~= "publisher" end,
+				on_capture_reset = function()
+					if recovering and boundary == "restore" then session.hook.stop() end
+				end }
+			Fixture.with_session(options, function(s)
+				session, recovering = s, true
+				options.short_key_query = boundary == "query"
+				s.event("a", 0, 3, 0, 1); s.event("a", 0, 0, 0, 2)
+				helpers.assert_eq(s.hook.isRunning(), false)
+				for _, path in pairs(s.paths) do helpers.assert_eq(s.reader.is_open("keyboard:" .. path), false) end
+				helpers.assert_eq(s.hook.capture_input_owner(), nil)
+			end)
+		end)
+	end
+end)
+
 helpers.describe("managed source cohort reconciliation", function()
 	helpers.it("authenticates pre-event input and cleanup currencies separately", function()
 require('tests.support.input_owner_fixture').with_session({}, function(s)

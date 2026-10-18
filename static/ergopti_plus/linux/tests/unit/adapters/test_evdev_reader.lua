@@ -555,10 +555,15 @@ local function controlled_native_reader(rows, options, body)
 			if options.before_open then options.before_open(reader) end
 			return options.fds and options.fds[log.opens] or options.fd or 7
 		end,
-		ioctl = function(_, request)
+		ioctl = function(_, request, buffer)
 			log.grabs = log.grabs + 1
 			if options.before_ioctl then options.before_ioctl(reader) end
 			if options.grab_fails and request == 0x40044590 then return -1 end
+			if options.native_bitmaps and (request % 256 == 0x18 or request % 256 == 0x19) then
+				local count = math.floor(request / 0x10000) % 0x4000
+				buffer.bytes = string.rep("\0", count)
+				return count
+			end
 			return 0
 		end,
 		read = function(_, buffer)
@@ -709,13 +714,14 @@ helpers.describe("evdev_reader: controlled native-origin receipts", function()
 	end)
 
 	helpers.it("revokes old receipts on ungrab even after the same descriptor is grabbed again", function()
-		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, nil, function(reader)
+		controlled_native_reader({ encoded(1, 42, 1), encoded(1, 30, 1) }, { native_bitmaps = true }, function(reader)
 			reader.open("/dev/input/event3"); reader.grab()
 			local cap = assert(reader.capture_event((assert(reader.read_event()))))
 			helpers.assert_eq(reader.ungrab(), true)
 			helpers.assert_eq(reader.source_current(cap), false)
 			helpers.assert_eq(reader.grab(), true)
 			helpers.assert_eq(reader.source_current(cap), false)
+			helpers.assert_true(reader.reconcile_sources({ reader.KEYBOARD }, function() return true end))
 			helpers.assert_eq(type(reader.capture_event((assert(reader.read_event())))), "table")
 			reader.close()
 		end)
@@ -1013,11 +1019,11 @@ local function controlled_held_reader(options, body)
 	local saved_ffi, saved_preload = package.loaded.ffi, package.preload.ffi
 	local codec = require("infra.input_event")
 	local reader
-	local log = { queries = 0, opens = 0, closes = 0 }
-	local function bitmap(count)
+	local log = { queries = 0, led_queries = 0, opens = 0, closes = 0 }
+	local function bitmap(count, codes)
 		local values = {}
 		for index = 1, count do values[index] = 0 end
-		for _, code in ipairs(options.down or { 29, 42 }) do
+		for _, code in ipairs(codes or options.down or { 29, 42 }) do
 			local index = math.floor(code / 8) + 1
 			if index <= count then values[index] = values[index] + 2 ^ (code % 8) end
 		end
@@ -1029,6 +1035,13 @@ local function controlled_held_reader(options, body)
 		open = function() log.opens = log.opens + 1; return log.opens + 6 end,
 		close = function() log.closes = log.closes + 1; return options.close_fails and -1 or 0 end,
 		ioctl = function(_, request, buffer)
+			if request % 256 == 0x19 then
+				log.led_queries = log.led_queries + 1
+				local count = math.floor(request / 0x10000) % 0x4000
+				if options.before_led_query then options.before_led_query(reader) end
+				buffer.bytes = options.led_bytes or bitmap(count, options.leds or { 1 })
+				return options.led_copied == nil and count or options.led_copied
+			end
 			if request % 256 == 0x18 then
 				log.queries = log.queries + 1
 				local count = math.floor(request / 0x10000) % 0x4000
@@ -1069,6 +1082,113 @@ local function controlled_held_reader(options, body)
 end
 
 helpers.describe("evdev_reader: controlled fresh native held-state receipts", function()
+
+	helpers.it("(linux-native-reconciliation) refuses partial or ambiguous cohort lists before native queries", function()
+		controlled_held_reader(nil, function(reader, _, log)
+			assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
+			assert(reader.ungrab("a")); assert(reader.grab("a"))
+			for _, slots in ipairs({ { [1] = "a", [3] = "b" }, { "a", rogue = "b" },
+				{ [0] = "b", [1] = "a" }, { "a", "a" } }) do
+				helpers.assert_eq(reader.reconcile_sources(slots, function() error("invalid cohort admitted") end), false)
+			end
+			helpers.assert_eq(log.queries, 0); helpers.assert_eq(log.led_queries, 0)
+			helpers.assert_eq(reader.source_owner_current(reader.capture_source_owner("a")), false)
+			assert(reader.close("a"))
+		end)
+	end)
+
+	helpers.it("(linux-native-reconciliation) commits fresh source and held leases only after a native report and restore ACK", function()
+		controlled_held_reader({ rows = { encoded(0, 3, 0), encoded(1, 30, 1), encoded(0, 0, 0) } }, function(reader)
+			assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
+			local old = assert(reader.capture_source_owner("a"))
+			assert(reader.read_event("a"))
+			helpers.assert_eq(reader.source_owner_current(old), false)
+			helpers.assert_eq(reader.reconcile_sources({ "a" }, function() error("before native report") end), false)
+			local ignored = assert(reader.read_event("a"))
+			helpers.assert_eq(reader.capture_event(ignored, "a"), nil)
+			assert(reader.read_event("a"))
+			local fresh, held
+			helpers.assert_true(reader.reconcile_sources({ "a" }, function(snapshots)
+				local snapshot = snapshots[1]
+				fresh, held = snapshot.lease, snapshot.held
+				helpers.assert_eq(snapshot.keys, { [29] = true, [42] = true })
+				helpers.assert_eq(snapshot.leds, { [1] = true })
+				helpers.assert_eq(reader.source_owner_current(fresh), false)
+				helpers.assert_eq(reader.pressed_keys_current(held), false)
+				helpers.assert_eq(reader.capture_source_owner("a"), nil)
+				helpers.assert_eq(reader.close("a"), false)
+				helpers.assert_eq(reader.ungrab("a"), false)
+				helpers.assert_eq(reader.reconcile_sources({ "a" }, function() return true end), false)
+				snapshot.keys[42] = nil
+				return true
+			end))
+			helpers.assert_eq(reader.source_owner_current(fresh), true)
+			helpers.assert_eq(reader.source_owner_current(old), false)
+			helpers.assert_eq(reader.pressed_keys_view(held).down, { 29, 42 }, "detached restore input never rewrites native evidence")
+			assert(reader.close("a"))
+		end)
+	end)
+
+	for _, mode in ipairs({ "refuses", "throws", "truthy" }) do
+		helpers.it("(linux-native-reconciliation) withholds every staged lease when restoration " .. mode, function()
+			controlled_held_reader(nil, function(reader)
+				assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
+				assert(reader.ungrab("a")); assert(reader.grab("a"))
+				local pending
+				helpers.assert_eq(reader.reconcile_sources({ "a" }, function(snapshots)
+					pending = snapshots[1]
+					if mode == "throws" then error("controlled restore exception") end
+					return mode == "truthy" and 1 or false
+				end), false)
+				helpers.assert_eq(reader.source_owner_current(pending.lease), false)
+				helpers.assert_eq(reader.pressed_keys_current(pending.held), false)
+				helpers.assert_eq(reader.source_owner_current(reader.capture_source_owner("a")), false)
+				helpers.assert_true(reader.is_grabbed("a"), "reconciliation never drops physical custody")
+				helpers.assert_true(reader.reconcile_sources({ "a" }, function() return true end), "an explicit fresh retry can recover")
+				helpers.assert_eq(reader.source_owner_current(pending.lease), false, "a refused transaction never borrows a later ACK")
+				assert(reader.close("a"))
+			end)
+		end)
+	end
+
+	for _, invalid in ipairs({ { copied = 95 }, { led_copied = 1 }, { led_bytes = "\0" } }) do
+		helpers.it("(linux-native-reconciliation) refuses incomplete native key or LED evidence", function()
+			controlled_held_reader(invalid, function(reader)
+				assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
+				assert(reader.ungrab("a")); assert(reader.grab("a"))
+				local restored = false
+				helpers.assert_eq(reader.reconcile_sources({ "a" }, function() restored = true; return true end), false)
+				helpers.assert_eq(restored, false)
+				helpers.assert_eq(reader.source_owner_current(reader.capture_source_owner("a")), false)
+				assert(reader.close("a"))
+			end)
+		end)
+	end
+
+	helpers.it("(linux-native-reconciliation) restores a regrabbed cohort atomically and refuses authority port reentry", function()
+		controlled_held_reader(nil, function(reader)
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.open("/controlled/native-" .. slot, slot)); assert(reader.grab(slot)) end
+			local old_a, old_b = reader.capture_source_owner("a"), reader.capture_source_owner("b")
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.ungrab(slot)); assert(reader.grab(slot)) end
+			local pending
+			helpers.assert_eq(reader.reconcile_sources({ "a", "b" }, function(snapshots)
+				pending = snapshots
+				for _, snapshot in ipairs(snapshots) do helpers.assert_eq(reader.source_owner_current(snapshot.lease), false) end
+				return false
+			end), false)
+			for _, snapshot in ipairs(pending) do helpers.assert_eq(reader.source_owner_current(snapshot.lease), false) end
+			local original = reader.capture_source_owner
+			helpers.assert_eq(reader.reconcile_sources({ "a", "b" }, function()
+				reader.capture_source_owner = function() return {} end
+				return true
+			end), false)
+			reader.capture_source_owner = original
+			helpers.assert_true(reader.reconcile_sources({ "a", "b" }, function(snapshots) pending = snapshots; return true end))
+			for _, snapshot in ipairs(pending) do helpers.assert_eq(reader.source_owner_current(snapshot.lease), true) end
+			helpers.assert_eq(reader.source_owner_current(old_a), false); helpers.assert_eq(reader.source_owner_current(old_b), false)
+			assert(reader.close("a")); assert(reader.close("b"))
+		end)
+	end)
 
 	helpers.it("issues detached opaque full-key state including nonzero Ctrl and Shift", function()
 		controlled_held_reader(nil, function(reader)
@@ -1211,6 +1331,7 @@ helpers.describe("evdev_reader: controlled fresh native held-state receipts", fu
 			local cap = assert(reader.capture_pressed_keys())
 			assert(reader.ungrab()); assert(reader.grab())
 			helpers.assert_eq(reader.pressed_keys_current(cap), false)
+			helpers.assert_true(reader.reconcile_sources({ reader.KEYBOARD }, function() return true end))
 			local next_cap = assert(reader.capture_pressed_keys())
 			options.close_fails = true; helpers.assert_eq(reader.close(), false)
 			helpers.assert_eq(reader.pressed_keys_current(next_cap), false)

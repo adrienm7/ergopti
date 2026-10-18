@@ -124,7 +124,11 @@ function M.evdev_reader(opts)
 	function fake.event_view() return nil end
 	function fake.source_current() return false end
 	function fake.capture_source_owner() return nil end
-	function fake.source_owner_current() return false end
+	function fake.source_owner_current(_, observer, capture, current, retire)
+		if observer == nil and capture == nil and current == nil and retire == nil then return false end
+		return false, false, false -- No native input, cleanup or per-open identity.
+	end
+	function fake.reconcile_sources(_slots, _restore, _originals) return false end
 	function fake.retire_source() return false end
 	function fake.capture_pressed_keys() return nil end
 	function fake.pressed_keys_current() return false end
