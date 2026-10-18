@@ -1955,21 +1955,12 @@ local function main()
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then
-						webview_manager.set_daemon_state({
-							engine = engine, keylogger = keylogger,
-							config = hotstrings_config, llm = prediction_engine,
-							gestures = gestures, shortcuts = shortcuts,
-							dyn_hotstrings = dyn_hotstrings, magic_key = MagicKey,
-							input_capture_gate = input_capture_gate,
-							is_paused = script_actions.is_paused,
-							layout = new_layout,
-							on_reload = function() perform_reload("the paths editor") end,
-							on_config_changed = function()
-								if rebuild_tray_menu then rebuild_tray_menu() end
-							end,
-							restart_after_update = function() return restart_on_installed_release() end,
-							restart = restart_daemon,
-						})
+						-- The bridge owns more ports than the layout; retain its current
+						-- callbacks without mutating any in-flight state's snapshot.
+						local state = {}
+						for key, value in pairs(webview_manager.get_daemon_state()) do state[key] = value end
+						state.layout = new_layout
+						webview_manager.set_daemon_state(state)
 					end
 					-- So the tick moves to the row the user just chose. Without it the
 					-- menu still marks the old layout and the change reads as ignored.
