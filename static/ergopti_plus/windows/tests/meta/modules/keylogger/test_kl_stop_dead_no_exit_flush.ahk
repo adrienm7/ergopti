@@ -12,7 +12,7 @@
 ; SILENTLY DROPS the colliding rows - permanent, invisible data loss.
 ;
 ; The OnExit(Ergopti_OnShutdown) -> KL_Stop flush seam (the other half of this
-; finding) is guarded by meta/test_no_onexit_keylogger_flush.ahk. THIS test
+; finding) is guarded by meta/modules/keylogger/test_no_onexit_keylogger_flush.ahk. THIS test
 ; guards the id-reuse defence: KL_Init must NOT trust state.json alone - it must
 ; scan data.sql for the highest id already persisted for this device and resolve
 ; next_event_id to one past it. The fix adds the pure helpers KL_ScanMaxEventId

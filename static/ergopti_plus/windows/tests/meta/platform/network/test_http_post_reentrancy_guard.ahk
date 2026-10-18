@@ -20,7 +20,7 @@
 ; the latent risk instead. No WinHttp mocking seam exists to force genuine
 ; message-pump reentrancy in the headless test harness, so this is a
 ; source-scan test, matching the existing precedent in
-; tests/meta/test_http_cancel_aborts.ahk.
+; tests/meta/platform/network/test_http_cancel_aborts.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

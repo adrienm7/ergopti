@@ -955,7 +955,7 @@ global _AhkSubDir := ""
 ; call, and those tests replace the push/timer boundaries with local seams.
 #Include ../modules/keylogger/keylogger_webview.ahk
 ; keylogger_clipboard.ahk defines _KL_Clip_CharCountFromBuffer + KLClipConst,
-; both exercised functionally by meta/test_clipboard_ram_leak.ahk. It contains
+; both exercised functionally by meta/adapters/input/test_clipboard_ram_leak.ahk. It contains
 ; only class + function definitions at top level (the Hotkey()/OnClipboardChange
 ; calls live inside KL_Clip_Start), so it is headless-safe. Without this include
 ; the test's direct call to _KL_Clip_CharCountFromByteSize is a load-time

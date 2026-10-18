@@ -25,7 +25,7 @@
 ;      dropping a guard turns every menu build into an exception;
 ;   3. the sibling _MG_LoadSubCategories (infra/master_gates.ahk) must NOT get the
 ;      same treatment -- its non-memoization is a deliberate fail-fast contract
-;      pinned by tests/unit/test_master_gates.ahk.
+;      pinned by tests/unit/infra/config/persistence/test_master_gates.ahk.
 ;
 ; SCOPE: source introspection via _DriverFuncBody, plus a behavioural check
 ; against the real shared menu_manifest.json.

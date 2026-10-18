@@ -5,7 +5,7 @@
 ; DESCRIPTION:
 ; Static source guard for the CB_SaveAll/CB_RestoreAll error-sentinel fix in
 ; adapters/clipboard.ahk — the sibling of CB_Save/CB_Restore's existing
-; sentinel, guarded by tests/meta/test_clipboard_sentinel.ahk.
+; sentinel, guarded by tests/meta/adapters/input/test_clipboard_sentinel.ahk.
 ;
 ; ROOT CAUSE ENCODED:
 ; CB_SaveAll() previously returned "" on clipboard-lock failure, which is
