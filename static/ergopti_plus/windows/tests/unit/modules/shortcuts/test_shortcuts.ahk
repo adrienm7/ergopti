@@ -649,3 +649,36 @@ TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
 }
 Test("Shortcuts/win: open only the resolved Downloads target (downloads-known-folder)",
 	TestShortcuts_OpenDownloadsKeepsResolvedTarget)
+
+; The selector accepts mixed-case aliases and both machine labels. Normalize
+; the same accepted forms before the registry publisher sees its LastKey value.
+TestShortcuts_RegJumpNormalizesAcceptedAliases() {
+	Vectors := [
+		["HKLM\Software", "HKEY_LOCAL_MACHINE\Software"],
+		["hklm\Software", "HKEY_LOCAL_MACHINE\Software"],
+		["Computer\HKCU\Software", "HKEY_CURRENT_USER\Software"],
+		["computer\hKcR\.txt", "HKEY_CLASSES_ROOT\.txt"],
+		["Ordinateur\HKCC\System", "HKEY_CURRENT_CONFIG\System"],
+		["ordinateur\hku\.DEFAULT", "HKEY_USERS\.DEFAULT"],
+		["Computer\HKEY_LOCAL_MACHINE\Software\", "HKEY_LOCAL_MACHINE\Software"],
+		["HKCU\Software\HKCU\Computer", "HKEY_CURRENT_USER\Software\HKCU\Computer"]
+	]
+	for Vector in Vectors
+		AssertEqual(Vector[2], _RegJumpNormalizePath(Vector[1]), "accepted registry target: " . Vector[1])
+}
+Test("Shortcuts/win: normalize case-insensitive registry roots (regjump-root-normalization)",
+	TestShortcuts_RegJumpNormalizesAcceptedAliases)
+
+TestShortcuts_RegJumpCommitsNormalizedTarget() {
+	Targets := []
+	Commit(Target, Ports*) {
+		Targets.Push(Target)
+		AssertEqual(4, Ports.Length, "normalization must retain the native registry, window and launch ports")
+		return true
+	}
+	AssertTrue(RegJump("computer\hklm\Software\Ergopti", Commit))
+	AssertEqual("HKEY_LOCAL_MACHINE\Software\Ergopti", Targets[1],
+		"the real RegJump entry must pass the normalized root to its publisher")
+}
+Test("Shortcuts/win: publish the normalized registry target (regjump-root-normalization)",
+	TestShortcuts_RegJumpCommitsNormalizedTarget)
