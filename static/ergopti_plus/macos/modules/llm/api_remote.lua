@@ -1421,6 +1421,21 @@ M.__top_level_keys_for_test = top_level_keys
 -- created at the first request of the key, then every message names it
 local _backboard_assistants = {}
 
+--- Revalidates an optional action owner immediately before native dispatch.
+--- @param label string Request kind for diagnostics.
+--- @param current function|nil Original action authority.
+--- @param fail function Receives a cancellation reason.
+--- @return boolean admitted
+local function request_authorized(label, current, fail)
+	if current == nil then return true end
+	if type(current) ~= "function" then error("api_remote." .. label .. " request: current must be a function") end
+	local checked, admitted = pcall(current)
+	if not checked then Logger.error(LOG, "%s request authority check failed: %s.", label, tostring(admitted)) end
+	if checked and admitted == true then return true end
+	fail("cancelled")
+	return false
+end
+
 --- Calls back with the Backboard assistant of a key, creating it first when
 --- this session has none. A failed creation caches nothing: the next request
 --- tries again.
@@ -1429,8 +1444,9 @@ local _backboard_assistants = {}
 --- @param token string Decrypted key.
 --- @param on_id function Receives the assistant id.
 --- @param on_fail function Receives (reason, response|nil).
+--- @param current function|nil Original action authority.
 --- @return boolean dispatched True when the id was known or its creation was sent.
-local function ensure_backboard_assistant(client, base, token, on_id, on_fail)
+local function ensure_backboard_assistant(client, base, token, on_id, on_fail, current)
 	local cache_key = base .. "\0" .. token
 	local cached = _backboard_assistants[cache_key]
 	if cached then
@@ -1445,6 +1461,7 @@ local function ensure_backboard_assistant(client, base, token, on_id, on_fail)
 		return false
 	end
 	Logger.info(LOG, "Backboard assistant requested for this key -> %s.", redact_url(request.url))
+	if not request_authorized("Backboard", current, on_fail) then return false end
 	return client.post(request.url, build_headers("backboard", token), encoded, function(r)
 		Logger.pcall(LOG, function()
 			if type(r) ~= "table" or r.ok ~= true then
@@ -1478,8 +1495,9 @@ end
 --- @param spec table { model = "<llm_provider>/<model_name>", system, text, questions? }
 --- @param on_response function Receives the HTTP response of the message.
 --- @param on_fail function Receives (reason, detail) when no message could be sent.
+--- @param current function|nil Original action authority, including assistant creation.
 --- @return boolean dispatched
-local function post_backboard_message(client, base, token, spec, on_response, on_fail)
+local function post_backboard_message(client, base, token, spec, on_response, on_fail, current)
 	if not Formats.backboard_split_model(spec.model) then
 		Logger.error(LOG, "Backboard request refused: model '%s' names no provider (<llm_provider>/<model_name>).",
 			tostring(spec.model))
@@ -1497,10 +1515,11 @@ local function post_backboard_message(client, base, token, spec, on_response, on
 			on_fail("encode_failed", failure_detail("encode_failed", nil))
 			return
 		end
+		if not request_authorized("Backboard", current, on_fail) then return end
 		client.post(request.url, build_headers("backboard", token), encoded, on_response)
 	end, function(reason, r)
 		on_fail(reason, failure_detail(reason, r))
-	end)
+	end, current)
 end
 
 --- Sends a provider's readiness probe: its models list, or for Backboard the
@@ -2412,13 +2431,7 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		-- Keychain resolution, body encoding and log sinks can outlive or revoke
 		-- the action that captured this private request. Check its own authority
 		-- at the actual transport boundary, independently of provider selection.
-		if current then
-			local checked, admitted = pcall(current)
-			if not checked then
-				Logger.error(LOG, "%s request authority check failed: %s.", label, tostring(admitted))
-			end
-			if not checked or admitted ~= true then return fail("cancelled") end
-		end
+		if not request_authorized(label, current, fail) then return end
 		client.post(url, build_headers(provider.format, token), encoded, function(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
@@ -2471,10 +2484,11 @@ end
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param use string|nil The use it serves (default: System 2).
+--- @param current function|nil Original action authority until HTTP dispatch.
 --- @return boolean sent True when the key resolution started.
-function M.request_chat(provider_id, model, body, on_text, on_fail, use)
+function M.request_chat(provider_id, model, body, on_text, on_fail, use, current)
 	return request_prebuilt(_vision_client, "Agent", use or ProviderUses.SYSTEM2, provider_id, model, body,
-		on_text, on_fail, true)
+		on_text, on_fail, true, current)
 end
 
 --- Sends one Backboard message to a provider with its stored API key, for the
@@ -2485,10 +2499,14 @@ end
 --- @param on_answer function Receives the decoded answer.
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param use string|nil The use it serves (default: System 2).
+--- @param current function|nil Original action authority until the message dispatch.
 --- @return boolean sent True when the key resolution started.
-function M.request_backboard(provider_id, spec, on_answer, on_fail, use)
+function M.request_backboard(provider_id, spec, on_answer, on_fail, use, current)
 	if type(on_answer) ~= "function" or type(on_fail) ~= "function" or type(spec) ~= "table" then
 		error("api_remote.request_backboard: a spec, on_answer and on_fail are required")
+	end
+	if current ~= nil and type(current) ~= "function" then
+		error("api_remote.request_backboard: current must be a function")
 	end
 	local fail = failure_callback(on_fail)
 	if M.provider_format(provider_id) ~= "backboard" then
@@ -2517,7 +2535,7 @@ function M.request_backboard(provider_id, spec, on_answer, on_fail, use)
 				Logger.info(LOG, "Agent answer of provider '%s' received in %dms.", provider_id, ms)
 				ApiCommon.protected_call(on_answer, "on_answer", decoded)
 			end)
-		end, function(reason) fail(reason) end)
+		end, function(reason) fail(reason) end, current)
 	end)
 end
 
@@ -2530,7 +2548,8 @@ end
 --- @param body table decisions_body().
 --- @param on_answers function Receives the `answers` object.
 --- @param fail function Receives (reason, detail).
-local function post_decisions(client, provider_id, base, token, body, on_answers, fail)
+--- @param current function|nil Original action authority.
+local function post_decisions(client, provider_id, base, token, body, on_answers, fail, current)
 	local encoded, encode_error = JsonCodec.encode(body)
 	if not encoded then
 		Logger.error(LOG, "Decisions request body encode failed: %s.", tostring(encode_error))
@@ -2540,6 +2559,7 @@ local function post_decisions(client, provider_id, base, token, body, on_answers
 	local t0 = TimerScheduler.now()
 	Logger.info(LOG, "Decisions request to provider '%s' (model %s, %d byte(s)) -> %s.",
 		provider_id, tostring(body.model), #encoded, redact_url(base))
+	if not request_authorized("Decisions", current, fail) then return end
 	client.post(base, build_headers("decisions", token), encoded, function(r)
 		Logger.pcall(LOG, function()
 			local ms = math.floor((TimerScheduler.now() - t0) * 1000)
@@ -2571,10 +2591,14 @@ end
 --- @param questions table { [id] = { type, instructions, criteria } }
 --- @param on_answers function Receives the `answers` object.
 --- @param on_fail function Receives a short reason when no answer came back.
+--- @param current function|nil Original action authority until HTTP dispatch.
 --- @return boolean sent True when the key resolution started.
-function M.request_decisions(provider_id, model, state, questions, on_answers, on_fail)
+function M.request_decisions(provider_id, model, state, questions, on_answers, on_fail, current)
 	if type(on_answers) ~= "function" or type(on_fail) ~= "function" then
 		error("api_remote.request_decisions: on_answers and on_fail must be functions")
+	end
+	if current ~= nil and type(current) ~= "function" then
+		error("api_remote.request_decisions: current must be a function")
 	end
 	local fail = failure_callback(on_fail)
 	if M.provider_format(provider_id) ~= "decisions" then
@@ -2584,7 +2608,7 @@ function M.request_decisions(provider_id, model, state, questions, on_answers, o
 	return with_provider_key("Agent", provider_id, ProviderUses.SYSTEM1, fail, function(_, _, token, base)
 		post_decisions(_vision_client, provider_id, base, token, Formats.decisions_body(model, state, questions),
 			function(answers) ApiCommon.protected_call(on_answers, "on_answers", answers) end,
-			function(reason) fail(reason) end)
+			function(reason) fail(reason) end, current)
 	end)
 end
 
