@@ -246,18 +246,14 @@ describe("Diagnostic snapshot: the daemon boot emits it after ready", function()
 	local src = fh:read("*a")
 	fh:close()
 
-	-- Startup now finishes its preparation before it grabs the keyboards
-	-- (fix(linux): finish startup preparation before grabbing keyboards), and
-	-- the snapshot, whose probes can block, is part of that preparation: it
-	-- carries the elapsed preparation time, before input capture and ready.
-	it("logs the snapshot during preparation, before the daemon reports ready", function()
-		local emit = src:find("\temit_diagnostic_snapshot(BootProfiler.elapsed_ms(), opts,", 1, true)
+	it("logs the snapshot once the daemon reports ready", function()
 		local ready = src:find('Logger.success(LOG, "Daemon ready', 1, true)
 		local complete = src:find("BootProfiler.complete()", 1, true)
+		local emit = src:find("\temit_diagnostic_snapshot(boot_ms, opts,", 1, true)
 		assert_true(ready ~= nil and complete ~= nil and emit ~= nil,
-			"the snapshot call, the ready line and the boot total must all exist")
-		assert_true(emit < ready and ready < complete,
-			"the snapshot precedes ready, and the boot total closes after ready")
+			"the ready line, the boot total and the snapshot call must all exist")
+		assert_true(ready < complete and complete < emit,
+			"the snapshot follows ready and carries the frozen boot total")
 	end)
 
 	it("closes every boot stage it opens", function()
