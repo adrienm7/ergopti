@@ -2999,6 +2999,21 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **AppImage catalog retest of v1.0.3 is still red (October 18).** The bot
+      (AppImage/appimage.github.io#10422, run 39164737606) now reports glibc
+      2.34 (fine) but the app exits at start with "Error: no keyboard device
+      detected. Specify one with --device." The catalog has no input device:
+      the daemon must start without any keyboard (show the tray icon and the
+      "keyboard access unavailable" state, retry or wait for a device) instead
+      of exiting; the offline ubuntu:22.04 smoke had a device or input group
+      difference — reproduce with no /dev/input device at all. Then release
+      and comment `/retest`.
+- [ ] **Site deployment on main fails (October 18).** Workflow "Deploy site"
+      on main fails in job "Receive tested site without write permission",
+      step "Admit exact completed producer" (exit 1) after v1.0.3; read
+      `gh run view <id> --log-failed` for the latest main run and fix the
+      producer admission (likely the new release run shape or the renamed
+      AppImage asset).
 - [ ] **Next release with nothing deferred (state on October 18, after
       v1.0.3).** v1.0.3 still deferred the seven v1.0.2 macOS native scopes
       (`.github/ci/stable_v103_macos_native_qualification_exception.json`,
