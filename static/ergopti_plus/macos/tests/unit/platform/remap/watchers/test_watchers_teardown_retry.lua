@@ -6,6 +6,8 @@
 --- Exercises the exact native handles owned by the input-source and app-switch
 --- watchers. Every stop is forced to fail once, proving that callbacks become
 --- inert immediately while the same capabilities remain available for retry.
+--- Previous-app history also distinguishes equal display names by bundle ID;
+--- otherwise activating an app clone never records the application it replaced.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -810,6 +812,33 @@ end)
 -- =========================================
 
 helpers.describe("watchers app-switch teardown is exact and retryable", function()
+	helpers.it("(same-name-app-history) tracks distinct bundle identities with the same display name", function()
+		helpers.with_stub_scope({
+			"tests.stubs.hs", "platform.remap.watchers", "modules.keymap.control_sentinels",
+			"adapters.synthetic_input", "adapters.input_source_broker", "infra.logger",
+			"adapters.timer_scheduler", "adapters.shell_runner", "adapters.hotkey_registrar",
+			"adapters.key_state", "adapters.mouse_control", "adapters.task_lifecycle",
+			"platform.remap.ke_paths", "platform.remap.lease_contract", "platform.remap.ke_variables",
+		}, function()
+			local h = fresh_harness()
+			helpers.assert_true(h.watchers.start_alt_tab_apps_hotkey() ~= nil)
+			local clone = {
+				bundleID = function() return "com.example.clone" end,
+				name = function() return "Front" end,
+			}
+			local watcher = h.app_watchers[1]
+			watcher.callback("Front", 1, clone)
+			-- Duplicate activation of that exact application must not overwrite
+			-- the previously active app with itself.
+			watcher.callback("Front", 1, clone)
+			helpers.assert_eq(h.hotkeys[1].callback(), true,
+				"a distinct app with the same display name must enter switch history")
+			helpers.assert_eq(h.launches, { "com.example.front" },
+				"the previous application's bundle ID must survive display-name collisions")
+			helpers.assert_eq(h.watchers.stop_alt_tab_apps_tracker(), true)
+		end)
+	end)
+
 	helpers.it("recovers an inactive watcher retained after start and rollback refusal", function()
 		local h = fresh_harness()
 		h.app_watcher_start_refuse_once = true
