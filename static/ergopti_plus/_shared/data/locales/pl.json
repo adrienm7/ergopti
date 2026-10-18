@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "Nie wpisano jeszcze nic, co AI mogłaby kontynuować.",
 	"llm.manual_prediction.paused": "Ergopti+ jest wstrzymany: nie wygenerowano sugestii.",
 	"llm.prompt_prediction.unknown_prompt": "Prompt wybrany dla tego skrótu już nie istnieje: wybierz inny.",
+	"llm.text_target_unavailable": "AI nie jest dostępna w bieżącym polu tekstowym. Kliknij inne pole tekstowe i spróbuj ponownie.",
 	"llm.tone.most_formal": "Tekst jest już w najbardziej formalnym tonie.",
 	"llm.tone.most_familiar": "Tekst jest już w najbardziej potocznym tonie.",
 	"llm.live.on": "Tryb na żywo włączony: {1}",

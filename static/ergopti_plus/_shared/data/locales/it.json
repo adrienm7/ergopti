@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "Non è ancora stato digitato nulla che l'IA possa continuare.",
 	"llm.manual_prediction.paused": "Ergopti+ è in pausa: nessun suggerimento generato.",
 	"llm.prompt_prediction.unknown_prompt": "Il prompt scelto per questa scorciatoia non esiste più: scegline un altro.",
+	"llm.text_target_unavailable": "L'IA non è disponibile nel campo di testo attuale. Fai clic in un altro campo di testo e riprova.",
 	"llm.tone.most_formal": "Il testo è già nel registro più formale.",
 	"llm.tone.most_familiar": "Il testo è già nel registro più colloquiale.",
 	"llm.live.on": "Modalità in diretta attiva: {1}",

@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "AI が続きを書けるテキストがまだ入力されていません。",
 	"llm.manual_prediction.paused": "Ergopti+ は一時停止中です：提案は生成されませんでした。",
 	"llm.prompt_prediction.unknown_prompt": "このショートカットに選んだプロンプトはもう存在しません。別のプロンプトを選んでください。",
+	"llm.text_target_unavailable": "現在のテキスト欄では AI を利用できません。別のテキスト欄をクリックして、もう一度お試しください。",
 	"llm.tone.most_formal": "テキストはすでに最も丁寧な文体です。",
 	"llm.tone.most_familiar": "テキストはすでに最もくだけた文体です。",
 	"llm.live.on": "ライブモード オン：{1}",

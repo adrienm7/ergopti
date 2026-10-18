@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "AI가 이어서 쓸 텍스트가 아직 입력되지 않았습니다.",
 	"llm.manual_prediction.paused": "Ergopti+가 일시 정지되었습니다: 제안이 생성되지 않았습니다.",
 	"llm.prompt_prediction.unknown_prompt": "이 단축키에 선택한 프롬프트가 더 이상 없습니다. 다른 프롬프트를 선택하세요.",
+	"llm.text_target_unavailable": "현재 텍스트 입력란에서는 AI를 사용할 수 없습니다. 다른 텍스트 입력란을 클릭한 후 다시 시도하세요.",
 	"llm.tone.most_formal": "텍스트가 이미 가장 격식 있는 말투입니다.",
 	"llm.tone.most_familiar": "텍스트가 이미 가장 친근한 말투입니다.",
 	"llm.live.on": "실시간 모드 켜짐: {1}",

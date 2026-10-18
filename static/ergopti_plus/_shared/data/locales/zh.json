@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "尚未输入可供 AI 续写的文字。",
 	"llm.manual_prediction.paused": "Ergopti+ 已暂停：未生成建议。",
 	"llm.prompt_prediction.unknown_prompt": "为此快捷方式选择的提示词已不存在：请另选一个。",
+	"llm.text_target_unavailable": "当前文本框无法使用 AI。请点击另一个文本框后重试。",
 	"llm.tone.most_formal": "文本已是最正式的语气。",
 	"llm.tone.most_familiar": "文本已是最口语的语气。",
 	"llm.live.on": "实时模式已开启：{1}",
