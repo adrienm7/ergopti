@@ -881,7 +881,8 @@ function M.predict(context, output_context, override)
 			M.drop_agent_triage("a prediction needs the backend")
 		end
 		_inflight_backend = backend
-		backend.chat(target, model, messages, {
+		local dispatch_index, terminal_seen = request_index, false
+		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
 			-- A batch asks once, at the builder's temperature. Sequential variants
@@ -908,6 +909,7 @@ function M.predict(context, output_context, override)
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
+			terminal_seen = true
 			if not request_current(true) then return end
 			if err then
 				_predicting = false
@@ -931,6 +933,17 @@ function M.predict(context, output_context, override)
 			meta.loading = false
 			if #candidates > 0 then publish() else clear_offer() end
 		end)
+		-- A backend can refuse admission while its earlier native transport is
+		-- still settling. A synchronous completion may already own the next
+		-- variant, so only an unacknowledged, current dispatch retires loading.
+		if dispatched == false and not terminal_seen and dispatch_index == request_index and request_current(false) then
+			_inflight_backend = nil
+			_predicting = false
+			meta.loading = false
+			Logger.warn(LOG, "Prediction could not be dispatched: backend unavailable.")
+			if not request_current(false) then return end
+			if #candidates > 0 then publish() else clear_offer() end
+		end
 	end
 	dispatch()
 end

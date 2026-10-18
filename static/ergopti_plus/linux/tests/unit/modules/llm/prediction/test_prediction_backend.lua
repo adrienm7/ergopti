@@ -489,6 +489,192 @@ helpers.describe("prediction dismissal retains request ownership", function()
 	end
 end)
 
+helpers.describe("prediction dispatch admission is explicit", function()
+	for _, completed in ipairs({ 0, 1 }) do
+		for _, starts_successor in ipairs({ false, true }) do
+			helpers.it("retains " .. (starts_successor and "successor" or "completed variants") .. " through a warning sink after " .. completed .. " variants (dispatch-refusal-logger)", function()
+				local previous_logger = package.loaded["logger.shim"]
+				local logger = dofile(helpers.driver_root() .. "/../_shared/lua/logger/init.lua")
+				package.loaded["logger.shim"] = logger
+				local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
+				local ok, err = pcall(function()
+					local backend = package.loaded["modules.llm.api_remote"]
+					local chat, attempts, warnings = backend.chat, 0, 0
+					backend.chat = function(...)
+						attempts = attempts + 1
+						if attempts == completed + 1 then return false end
+						return chat(...)
+					end
+					logger.set_sink(function(line, variant)
+						if variant ~= "warn" or not line:find("Prediction could not be dispatched", 1, true) then return end
+						warnings = warnings + 1
+						if not starts_successor then return end
+						engine.predict("Successor context", nil, { num_predictions = 1 })
+						scheduler.settle()
+						local successor = calls.remote[#calls.remote]
+						if successor then successor.chunk(" successor completion remains visible now") end
+					end)
+					engine.predict("Original context", nil, { num_predictions = completed + 1 })
+					if completed > 0 then calls.remote[1].done(" first completion remains available now", nil) end
+					scheduler.settle()
+					helpers.assert_eq(warnings, 1, "The real shared logger sink must observe dispatch refusal")
+					if starts_successor then
+						helpers.assert_eq(#calls.remote, completed + 1)
+						local messages = calls.remote[#calls.remote].messages
+						helpers.assert_eq(messages[#messages].content, "Successor context")
+						helpers.assert_eq(engine.is_predicting(), true)
+						helpers.assert_eq(#engine.get_suggestions(), 1, "Old refusal cleanup cannot hide the successor")
+						helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+					else
+						helpers.assert_eq(engine.is_predicting(), false)
+						helpers.assert_eq(#engine.get_suggestions(), completed)
+						if completed > 0 then helpers.assert_eq(engine.get_suggestions()[1].to_type, " first completion remains available now") end
+					end
+					helpers.assert_eq(calls.cancelled, 0, "Warning callbacks cannot acquire old native transport ownership")
+				end)
+				logger.set_sink(nil)
+				restore()
+				package.loaded["logger.shim"] = previous_logger
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+
+	helpers.it("retires loading when the real remote backend cannot settle prior ownership (dispatch-refusal)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
+		local previous_http = package.loaded["adapters.http_client"]
+		local posts, cancels, refuse_cancel = {}, 0, true
+		local ok, err = pcall(function()
+			package.loaded["adapters.http_client"] = {
+				post = function(_, _, body, callback)
+					posts[#posts + 1] = { body = body, callback = callback }
+					return true
+				end,
+				cancel = function() cancels = cancels + 1; return not refuse_cancel end,
+			}
+			local remote = helpers.load_module("modules.llm.api_remote")
+			remote._reset_for_test()
+			engine.predict("Original context", nil, { num_predictions = 1 })
+			helpers.assert_eq(#posts, 1)
+			engine.dismiss()
+			helpers.assert_eq(engine.is_predicting(), false)
+			local before = cancels
+			engine.predict("Successor context", nil, { num_predictions = 1 })
+			scheduler.settle()
+			helpers.assert_eq(#posts, 1, "The old native transport still owns its physical request")
+			helpers.assert_eq(cancels, before + 1, "Only the backend's admission attempt may cancel old ownership")
+			helpers.assert_eq(engine.is_predicting(), false, "A refused dispatch cannot leave loading forever")
+			helpers.assert_eq(#engine.get_suggestions(), 0)
+			posts[1].callback({ ok = true, status = 200, body = '{"choices":[{"message":{"content":" obsolete completion stays retired"}}]}' })
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(remote.is_active(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 0)
+			refuse_cancel = false
+			engine.predict("Recovery context", nil, { num_predictions = 1 })
+			scheduler.settle()
+			helpers.assert_eq(#posts, 2, "Fresh prediction recovers after the native owner settles")
+			posts[2].callback({ ok = true, status = 200, body = '{"choices":[{"message":{"content":" recovery completion remains available now"}}]}' })
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+		end)
+		package.loaded["adapters.http_client"] = previous_http
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps completed variants when the next dispatch is refused (dispatch-refusal)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
+		local ok, err = pcall(function()
+			local backend = package.loaded["modules.llm.api_remote"]
+			local chat, attempts = backend.chat, 0
+			backend.chat = function(...)
+				attempts = attempts + 1
+				if attempts == 2 then return false end
+				return chat(...)
+			end
+			engine.predict("Original context", nil, { num_predictions = 2 })
+			calls.remote[1].done(" first completion remains available now", nil)
+			scheduler.settle()
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_eq(calls.cancelled, 0, "Refused dispatch does not own a transport to cancel")
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+			helpers.assert_eq(engine.get_suggestions()[1].to_type, " first completion remains available now")
+			helpers.assert_eq(engine.accept(1), true)
+			helpers.assert_eq(calls.applied, 1)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	for _, requested in ipairs({ 1, 2 }) do
+		helpers.it("preserves synchronous terminal completion before false with " .. requested .. " variants (dispatch-refusal)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY, nil, nil, true)
+			local ok, err = pcall(function()
+				local backend = package.loaded["modules.llm.api_remote"]
+				local chat = backend.chat
+				backend.chat = function(target, model, messages, options, chunk, done)
+					chat(target, model, messages, options, chunk, done)
+					if #calls.remote == 1 then done(" first completion remains available now", nil); return false end
+				end
+				engine.predict("Original context", nil, { num_predictions = requested })
+				if requested == 2 then
+					helpers.assert_eq(engine.is_predicting(), true, "The terminal callback already owns its next variant")
+					scheduler.settle()
+					helpers.assert_eq(#calls.remote, 2)
+					calls.remote[2].done(" second completion remains available now", nil)
+				end
+				helpers.assert_eq(engine.is_predicting(), false)
+				helpers.assert_eq(#engine.get_suggestions(), requested)
+				helpers.assert_eq(calls.cancelled, 0)
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
+	helpers.it("preserves a successor created before the old backend returns false (dispatch-refusal)", function()
+		local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
+		local ok, err = pcall(function()
+			local backend = package.loaded["modules.llm.api_remote"]
+			local chat, attempts = backend.chat, 0
+			backend.chat = function(...)
+				attempts = attempts + 1
+				if attempts ~= 1 then return chat(...) end
+				engine.dismiss()
+				engine.predict("Successor context", nil, { num_predictions = 1 })
+				return false
+			end
+			engine.predict("Original context", nil, { num_predictions = 1 })
+			scheduler.settle()
+			helpers.assert_eq(attempts, 2)
+			helpers.assert_eq(#calls.remote, 1)
+			local messages = calls.remote[1].messages
+			helpers.assert_eq(messages[#messages].content, "Successor context")
+			calls.remote[1].chunk(" successor completion remains visible now")
+			helpers.assert_eq(engine.is_predicting(), true)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+			helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+			helpers.assert_eq(calls.cancelled, 1, "Only explicit dismissal may cancel the retired request")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps legacy nil dispatch pending until its terminal callback (dispatch-refusal)", function()
+		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
+		local ok, err = pcall(function()
+			engine.predict("Original context", nil, { num_predictions = 1 })
+			helpers.assert_eq(engine.is_predicting(), true)
+			calls.remote[1].done(" first completion remains available now", nil)
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+end)
+
 helpers.describe("prediction start rechecks native admission", function()
 	helpers.it("admits unchanged native ownership through unrelated callbacks (start-owner)", function()
 		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
