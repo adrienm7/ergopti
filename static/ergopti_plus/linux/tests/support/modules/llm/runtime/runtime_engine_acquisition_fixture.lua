@@ -250,7 +250,7 @@ local function with_managed_responses(body)
 					function(text, err) self.responses[#self.responses + 1] = err or "done:" .. text end)
 			end
 			function world:respond()
-				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"}}\n'); post.done({ ok = true, status = 200 })
+				local post = assert(self.posts[#self.posts]); post.chunk('{"message":{"content":"stale"},"done":true}\n'); post.done({ ok = true, status = 200 })
 			end
 			function world:begin_app()
 				local state = engine_port.state()
