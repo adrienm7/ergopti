@@ -892,7 +892,7 @@ jobs:
           native_pac_skip_args=()
           pac_evidence_args=()
           if [ "$mode" = deferred ]; then
-              if [ "$profile" = stable-v1-0-2-20261017-six-macos-native-scopes ]; then
+              if [ "$profile" = stable-v1-0-2-20261017-six-macos-native-scopes ] || [ "$profile" = stable-v1-0-3-20261018-macos-native-scopes ]; then
                   native_pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$receipt")")
                   pac_evidence_args=(--pac-qualification-receipt "$receipt")
                   echo "[DEFERRED] macos-native-pac: only exact native wire methods omitted; Worker controls remain mandatory; qualified=false."
@@ -1908,6 +1908,10 @@ jobs:
                   test "$brew_mode" = deferred
                   test "$brew_profile" = "$profile"
                   pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt")")
+                  brew_evidence_args=(--brew-qualification-receipt "$brew_receipt")
+              elif [ "$profile" = stable-v1-0-3-20261018-macos-native-scopes ]; then
+                  # Brew and owned-runtime may each be deferred or mandatory here.
+                  pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --package-skip-pattern "$pac_receipt" "$brew_receipt")")
                   brew_evidence_args=(--brew-qualification-receipt "$brew_receipt")
               elif [ "$profile" = stable-v1-20261009-macos-native-deferred ]; then
                   pac_skip_args=(--skip "$(node tools/diagnostics/swift_xctest_evidence.cjs --pac-skip-pattern "$pac_receipt")")
