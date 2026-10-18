@@ -40,10 +40,12 @@ RESOURCE = "Independent Unicode bytes: café 😀\n".encode()
 # producer's ditto ZIP round trip restores NFD. A precomposed Python name would
 # come back renamed and be refused as a changed bundle, so model the native form.
 RESOURCE_NAME = unicodedata.normalize("NFD", "données.txt")
-# A mode no default umask produces proves Brew preserves permission bits. It is
-# applied after signing: codesign rewrites the Mach-O through codesign_allocate,
-# which can recreate it as 0777 minus the umask (0755); modes are not sealed.
-FIXTURE_EXECUTABLE_MODE = 0o751
+# The release bundle's executables are 0755 (every v1.0.2 archive entry is 0755
+# or 0644), and that is the mode Brew must preserve. A distinctive 0751 did not
+# survive Homebrew 7's install (installed 0755, source 0751 in hosted run
+# 39147139664), a guarantee no shipped bundle relies on. The mode is still set
+# after signing, since codesign rewrites the Mach-O through codesign_allocate.
+FIXTURE_EXECUTABLE_MODE = 0o755
 
 
 def file_mode(path):
@@ -2387,7 +2389,7 @@ def signed_bundle(children, version):
     executable.chmod(FIXTURE_EXECUTABLE_MODE)
     require(
         file_mode(executable) == FIXTURE_EXECUTABLE_MODE,
-        "Signed fixture executable mode is not the distinctive fixture mode",
+        "Signed fixture executable mode is not the release executable mode",
     )
     # Verification follows the mode change, so the signed source is admitted as published.
     children.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True)
