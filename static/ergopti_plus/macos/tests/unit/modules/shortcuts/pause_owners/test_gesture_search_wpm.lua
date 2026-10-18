@@ -43,10 +43,11 @@ local function load_real_wpm_surface(module_name)
 		get_active_source = function() return "none" end,
 		get_source_color = function() return nil end,
 		format_mpm_label = function(value) return tostring(value) end,
+		unit_label = function() return "WPM" end,
 	}
-	package.loaded["infra.paths"] = { shared = function() return nil end }
-	-- The shared tree is unreachable here, so the timings registry is too: this
-	-- test is about pause ownership, not about where a refresh rate comes from.
+	-- A healthy idle surface still needs its canonical display configuration.
+	-- Keep only the scheduler timings controlled by this ownership fixture.
+	package.loaded["infra.paths"] = { shared = helpers.shared }
 	package.loaded["infra.timings"] = {
 		sec = function() return 0.2 end,
 		ms = function() return 200 end,
