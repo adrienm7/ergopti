@@ -722,14 +722,14 @@ function M.predict(context, output_context, override)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
+	if _is_secure_context() then
+		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
+		return false
+	end
 	local function admission_current()
 		return not _runtime_closed and _scope_owner == nil and not _predicting
 			and request == _request_epoch and app_epoch == _runtime_app_epoch
 			and engine == _engine and owner == _runtime_owner
-	end
-	if _is_secure_context() then
-		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
-		return false
 	end
 
 	if not admission_current() then return false end
