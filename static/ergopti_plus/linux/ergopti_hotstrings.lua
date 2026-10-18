@@ -381,6 +381,11 @@ local shutdown = ShutdownCoordinator.new({
 			stop = TimerScheduler.cancelAll,
 		},
 	},
+	final_wait = {
+		{ name = "signal handlers", stop = function()
+			return not privacy_owners.signals_stop or privacy_owners.signals_stop() == true
+		end },
+	},
 	keyboard_hook = keyboard_hook,
 	event_loop = event_loop,
 })
@@ -613,38 +618,20 @@ end
 -- =========================================
 
 local function install_signal_handlers()
-	local ok, signal = pcall(require, "posix.signal")
-	if not ok or not signal then
-		Logger.debug(LOG, "posix.signal unavailable — signal handlers not installed.")
-		return
-	end
-
+	local signals = require("infra.signal_handlers")
+	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
 		-- Native retirement may still be pending after request() returns.
-		-- Keep output available until the coordinator releases the event loop;
-		-- the normal clean-exit path then closes it exactly once.
+		-- Output closes only in the normal clean-exit path after all ACKs.
 	end
-
-	-- Each installation is checked: a handler that silently failed to install
-	-- turns a clean systemd stop into a lost metrics batch with nothing in the log.
-	local installed = {}
-	local function install(name, number, handler)
-		local ok, err = pcall(signal.signal, number, handler)
-		if ok then
-			installed[#installed + 1] = name
-		else
-			Logger.error(LOG, "Signal handler for %s could not be installed: %s.", name, tostring(err))
-		end
-	end
-	install("INT",  signal.SIGINT,  on_term)
-	install("TERM", signal.SIGTERM, on_term)
-
-	-- SIGHUP → hot reload.
-	install("HUP",  signal.SIGHUP,  function(_) perform_reload("SIGHUP") end)
-
-	Logger.debug(LOG, "Signal handlers installed (%s).", table.concat(installed, ", "))
+	return signals.start({
+		on_term = on_term,
+		on_hup = function()
+			if not shutdown.is_requested() then perform_reload("SIGHUP") end
+		end,
+	})
 end
 
 
@@ -1688,6 +1675,20 @@ local function main()
 	-- ordering is the whole point: between a grab and an open channel the daemon
 	-- owns the keyboard and can only give keys back one fork at a time, which is
 	-- the state the grab was held back for in the first place.
+	-- Admit graceful terminal signals before acquiring output or grabbing input.
+	-- A partial installation owns its close debt until the native callbacks run.
+	do
+		local installed, signal_error = install_signal_handlers()
+		if installed ~= true then
+			Logger.error(LOG, "Signal handler admission refused: %s.", tostring(signal_error))
+			shutdown.request("signal handler startup refused", "signal handler startup refused")
+			if shutdown.is_pending() then
+				event_loop.run({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+			end
+			if shutdown.is_pending() then error("Startup signal cleanup remains unacknowledged", 0) end
+			error("Native signal handlers unavailable; refusing input capture", 0)
+		end
+	end
 	BootProfiler.stage("input hooks")
 	local fast_channel_ready = injector.open_fast_channel()
 	Logger.info(LOG, "Output channel: /dev/uinput %s (keystrokes are injected directly, not through ydotool).",
@@ -2128,9 +2129,7 @@ local function main()
 	end
 	BootProfiler.stage_done("tray", (opts.tray and tray_menu) and "tray icon shown" or "headless")
 
-	-- 8.10) Install signal handlers.
 	BootProfiler.stage("services")
-	install_signal_handlers()
 
 	-- 8.9b) Initialise the preview tooltip.
 	--

@@ -15,11 +15,13 @@ local Logger = require("logger.shim")
 local LOG = "infra.shutdown_coordinator"
 
 --- Builds one shutdown owner.
---- @param opts table { pre_wait, keyboard_hook, event_loop }
+--- @param opts table { pre_wait, final_wait (optional strict-ACK registry), keyboard_hook, event_loop }
 --- @return table
 function M.new(opts)
 	if type(opts) ~= "table" then error("shutdown coordinator options must be a table", 2) end
 	local pre_wait = opts.pre_wait
+	local final_wait = opts.final_wait
+	if final_wait == nil then final_wait = {} end
 	local keyboard_hook = opts.keyboard_hook
 	local event_loop = opts.event_loop
 	if type(pre_wait) ~= "table" then error("shutdown pre_wait registry must be a table", 2) end
@@ -30,6 +32,13 @@ function M.new(opts)
 	if type(event_loop) ~= "table" or type(event_loop.stop) ~= "function" then
 		error("shutdown event_loop contract is incomplete", 2)
 	end
+	if type(final_wait) ~= "table" then error("shutdown final_wait registry must be a table", 2) end
+	for index, owner in ipairs(final_wait) do
+		if type(owner) ~= "table" or type(owner.name) ~= "string" or owner.name == ""
+			or type(owner.stop) ~= "function" then
+			error(string.format("shutdown final_wait owner %d is invalid", index), 2)
+		end
+	end
 	for index, owner in ipairs(pre_wait) do
 		if type(owner) ~= "table" or type(owner.name) ~= "string" or owner.name == ""
 			or type(owner.stop) ~= "function" then
@@ -39,16 +48,11 @@ function M.new(opts)
 
 	local requested, complete, polling = false, false, false
 	local registering, input_stopped = false, false
-	local pending, native_claims = {}, {}
+	local pending, native_claims, final_claims = {}, {}, {}
+	local final_started = false
 	local coordinator = {}
 
-	local function finish()
-		if not complete and not registering and not polling and input_stopped and next(pending) == nil then
-			complete = true
-			event_loop.stop()
-			Logger.done(LOG, "Shutdown quiescence complete.")
-		end
-	end
+	local finish
 
 	--- Rechecks one immutable native claim without recursively borrowing its acknowledgment.
 	--- @param claim table Captured cleanup and observer callbacks.
@@ -61,6 +65,29 @@ function M.new(opts)
 		finish()
 	end
 
+
+	-- Terminal signal watchers must survive the external cleanup barrier: a second
+	-- TERM while native owners retire still belongs to this transaction.
+	finish = function()
+		if complete or registering or polling or not input_stopped or next(pending) ~= nil then return end
+		if not final_started then
+			final_started, registering = true, true
+			for _, claim in ipairs(final_claims) do
+				native_claims[#native_claims + 1] = claim
+				pending[claim] = true
+				acknowledge(claim)
+				if pending[claim] and type(claim.when_settled) == "function" then
+					pcall(claim.when_settled, function() acknowledge(claim) end)
+				end
+			end
+			registering = false
+			if next(pending) ~= nil then return end
+		end
+		complete = true
+		event_loop.stop()
+		Logger.done(LOG, "Shutdown quiescence complete.")
+	end
+
 	--- Quiesces every registered owner exactly once.
 	--- @param reason string Human-readable shutdown trigger.
 	--- @param emergency_reason string|nil Passed to the hook's emergency stop.
@@ -70,6 +97,10 @@ function M.new(opts)
 		requested, polling, registering = true, true, true
 		-- Pin both polling and observer owners before diagnostics or earlier cleanup can reenter.
 		local owners, claims, waits_for_native = {}, {}, false
+		for index, owner in ipairs(final_wait) do
+			final_claims[index] = { name = owner.name, stop = owner.stop, when_settled = owner.when_settled }
+		end
+		if #final_claims > 0 then waits_for_native = true end
 		for index, owner in ipairs(pre_wait) do
 			owners[index] = owner
 			if owner.wait_for_ack == true or type(owner.when_settled) == "function" then
