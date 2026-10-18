@@ -305,12 +305,23 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
-			name = "AI agent files",
-			stop = function()
-				-- The calendar files handed to xdg-open, and the learnt thresholds.
-				require("modules.llm.agent_connectors").cleanup()
-				require("modules.llm.agent_learning").flush()
-			end,
+			name = "AI agent tools",
+			wait_for_ack = true,
+			stop = (function()
+				local resolved, connectors, stop
+				return function()
+					if not resolved then
+						resolved = true
+						connectors = package.loaded["modules.llm.agent_connectors"]
+						stop = connectors and connectors.shutdown
+					end
+					return not connectors or stop() == true
+				end
+			end)(),
+		},
+		{
+			name = "AI agent learning",
+			stop = function() require("modules.llm.agent_learning").flush() end,
 		},
 		{
 			name = "LLM model download",

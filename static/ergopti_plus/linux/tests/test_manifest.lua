@@ -480,6 +480,7 @@ return {
 	"tests.unit.modules.llm.remote.test_remote_providers",
 	"tests.unit.modules.llm.agent.test_agent_flow",
 	"tests.unit.modules.llm.agent.test_agent_connectors",
+	"tests.unit.modules.llm.agent.test_agent_connector_lifecycle",
 	"tests.unit.modules.llm.agent.test_agent_settings",
 	"tests.unit.modules.llm.agent.test_agent_auto",
 	"tests.unit.modules.llm.features.test_translate_selection",
