@@ -16,7 +16,7 @@ require("logger")
 --- @param scenario function Complete dialog and deferred native cleanup scenario.
 local function with_windows(scenario)
 	helpers.with_stub_scope({
-		"ui.permission_dialog", "ui.ui_builder", "adapters.timer_scheduler", "infra.deferred_work",
+		"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
@@ -46,7 +46,7 @@ local function with_windows(scenario)
 				open_settings = function() return true end, on_closed = on_closed or function() h.closed = h.closed + 1 end })
 		end
 		function h.drain()
-			while #h.deferred > 0 do table.remove(h.deferred, 1)() end
+			h.drain_native_close()
 		end
 		scenario(h)
 	end)
@@ -63,6 +63,7 @@ helpers.describe("permission native window reference lifetime", function()
 				helpers.assert_true(h.retained[first])
 				helpers.assert_eq(h.closed, 0)
 				first:user_close()
+				h.drain()
 				helpers.assert_eq(h.dialog.is_open(), false)
 				helpers.assert_nil(next(h.script_refs), "native script callback must be unreferenced")
 				helpers.assert_nil(h.retained[first], "closed native window must release its own Lua reference")
@@ -96,6 +97,7 @@ helpers.describe("permission native window reference lifetime", function()
 				helpers.assert_true(h.show("login_items"))
 			end))
 			h.windows[1]:user_close()
+			h.drain()
 			helpers.assert_nil(h.retained[h.windows[1]])
 			helpers.assert_true(h.retained[h.windows[2]])
 			helpers.assert_true(h.dialog.is_open("login_items"))
@@ -108,13 +110,14 @@ helpers.describe("permission native window reference lifetime", function()
 			helpers.assert_true(h.show())
 			h.release_refuses = true
 			h.windows[1]:user_close()
+			h.drain()
 			helpers.assert_nil(h.retained[h.windows[1]])
 			helpers.assert_not_nil(next(h.script_refs))
 			helpers.assert_eq(h.show(), false)
 			h.release_refuses = false
 			helpers.assert_true(h.dialog.close())
 			helpers.assert_nil(next(h.script_refs))
-			helpers.assert_eq(h.windows[1].deletes, 0, "controller cleanup must not reuse a retired native window")
+			helpers.assert_eq(h.windows[1].deletes, 1, "controller cleanup cannot repeat the deferred window deletion")
 			helpers.assert_eq(h.closed, 1)
 		end)
 	end)
@@ -138,6 +141,7 @@ helpers.describe("permission native window reference lifetime", function()
 				html_string = "<html></html>" })
 			helpers.assert_not_nil(window)
 			window:user_close()
+			h.drain()
 			helpers.assert_true(h.retained[window], "automatic retirement is an explicit opt-in only")
 			window:delete()
 			helpers.assert_nil(h.retained[window])

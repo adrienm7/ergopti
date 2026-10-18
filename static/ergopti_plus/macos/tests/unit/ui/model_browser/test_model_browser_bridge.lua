@@ -71,7 +71,11 @@ local function install_hs_stubs()
 			allowTextEntry  = function(self) return self end,
 			allowGestures   = function(self) return self end,
 			allowNewWindows = function(self) return self end,
-			deleteOnClose   = function(self) return self end,
+			deleteOnClose   = function(self, value)
+				if value == nil then return self.delete_on_close == true end
+				self.delete_on_close = value
+				return self
+			end,
 			windowCallback  = function(self, callback)
 				self.window_callback = callback
 				return self
@@ -95,12 +99,14 @@ local function install_hs_stubs()
 			delete          = function(self)
 				state.deletes = state.deletes + 1
 				if state.delete_throws then error("synthetic webview delete refusal") end
+				setmetatable(self, nil)
 				return self
 			end,
 			hswindow        = function() return nil end,
 			frame           = function(self) return { x = 0, y = 0, w = 880, h = 560 } end,
 			evaluations = {},
 		}
+		setmetatable(webview, {})
 		state.webviews[#state.webviews + 1] = webview
 		return webview
 	end

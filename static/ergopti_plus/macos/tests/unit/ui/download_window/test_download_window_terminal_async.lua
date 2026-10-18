@@ -11,7 +11,7 @@ local helpers = require("tests.helpers")
 
 local MODULES = {
 	"ui.download_window",
-	"ui.ui_builder",
+	"ui.ui_builder", "ui.webview_close_owner",
 	"infra.logger",
 	"adapters.shell_runner",
 }
@@ -24,25 +24,30 @@ local function make_webview_overrides(state)
 		end,
 		webview = {
 			new = function()
-				local webview = {}
+				local webview = setmetatable({}, {})
 				for _, method in ipairs({
 					"windowTitle", "windowStyle", "level", "allowTextEntry",
 					"allowGestures", "allowNewWindows", "shadow",
-					"navigationCallback", "html", "show", "deleteOnClose",
+					"navigationCallback", "html", "show",
 				}) do webview[method] = function(self) return self end end
 				webview.windowCallback = function(self, callback)
 					state.window_callback = callback
 					return self
 				end
+				function webview:deleteOnClose(value)
+					if value == nil then return self.delete_on_close == true end
+					self.delete_on_close = value
+					return self
+				end
 				webview.frame = function() return { x = 0, y = 0, w = 460, h = 380 } end
 				webview.evaluateJavaScript = function() end
-				webview.delete = function() end
+				webview.delete = function(self) setmetatable(self, nil) end
 				webview.hswindow = function() return nil end
 				return webview
 			end,
 			usercontent = {
 				new = function()
-					return { setCallback = function(_self, fn) state.bridge = fn end }
+					return { setCallback = function(self, fn) state.bridge = fn; return self end }
 				end,
 			},
 		},

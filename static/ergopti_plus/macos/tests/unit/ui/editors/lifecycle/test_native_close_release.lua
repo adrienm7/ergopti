@@ -18,7 +18,7 @@ local EDITORS = {
 local function with_native_editor(name, scenario)
 	return helpers.with_stub_scope({
 		"ui.hotstring_editor", "ui.hotstring_editor.save_validation", "ui.hotstrings_config_window",
-		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "adapters.timer_scheduler",
+		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler",
 		"adapters.webview_result", "infra.deferred_work", "infra.paths", "infra.fs_dir", "infra.notifications",
 		"infra.toml.reader", "infra.toml.writer", "modules.hotstrings.hotstrings_config",
 		"modules.hotstrings.hotstrings_config_schema", "adapters.hotkey_registrar", "chord",
@@ -55,7 +55,7 @@ local function with_native_editor(name, scenario)
 		})
 		if name == "ui.hotstring_editor" then editor.init(helpers.shared("modules/hotstrings/defaults.toml"), {}) end
 		function h.open() return editor.open({}, function() return true end) end
-		function h.drain() while #h.deferred > 0 do table.remove(h.deferred, 1)() end end
+		function h.drain() h.drain_native_close() end
 		scenario(editor, h)
 	end)
 end
@@ -80,8 +80,9 @@ helpers.describe("editors release their closed native windows", function()
 				helpers.assert_true(h.open())
 				local first = h.windows[1]
 				first:user_close()
+				h.drain()
 				helpers.assert_nil(h.retained[first], "native udRef survives dropping the controller's Lua owner")
-				helpers.assert_eq(first.deletes, 0, "the native close owns automatic release")
+				helpers.assert_eq(first.deletes, 1, "user close owns one deferred native delete")
 				helpers.assert_true(h.open())
 				local successor = h.windows[2]
 				helpers.assert_true(h.retained[successor])

@@ -18,7 +18,7 @@ local function with_window(module_name, scenario)
 	helpers.with_stub_scope({
 		"ui.download_window", "ui.download_window.javascript", "ui.download_window.pending_queue",
 		"ui.metrics_typing", "ui.metrics_typing.projection", "ui.metrics_typing.snapshot",
-		"ui.ui_builder", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
+		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
@@ -45,8 +45,8 @@ local function with_window(module_name, scenario)
 					return controller
 				end } },
 			timer = { absoluteTime = function() return 1000000000 end, secondsSinceEpoch = function() return 1 end,
-				new = function(_, receive)
-					local timer = { active = false, receive = receive }
+				new = function(delay, receive)
+					local timer = { active = false, receive = receive, delay = delay }
 					function timer:start() self.active = true; return self end
 					function timer:stop() self.active = false; return self end
 					function timer:running() return self.active end
@@ -71,7 +71,7 @@ local function with_window(module_name, scenario)
 			return window.close()
 		end
 		function h.drain()
-			while #h.deferred > 0 do table.remove(h.deferred, 1)() end
+			h.drain_native_close()
 		end
 		scenario(window, h)
 	end)
@@ -84,8 +84,9 @@ helpers.describe("discarded UI windows release native references", function()
 				helpers.assert_true(h.show())
 				local first = h.windows[1]
 				first:user_close()
+				h.drain()
 				helpers.assert_nil(h.retained[first], "dropping the Lua owner cannot release native udRef")
-				helpers.assert_eq(first.deletes, 0, "native close owns automatic retirement")
+				helpers.assert_eq(first.deletes, 1, "user close owns one deferred native delete")
 				helpers.assert_nil(next(h.script_refs))
 				helpers.assert_true(h.show())
 				local successor = h.windows[2]
@@ -132,6 +133,7 @@ helpers.describe("discarded UI windows release native references", function()
 			end))
 			local first = h.windows[1]
 			first:user_close()
+			h.drain()
 			helpers.assert_eq(#h.windows, 2)
 			helpers.assert_nil(h.retained[first])
 			helpers.assert_true(h.retained[h.windows[2]])

@@ -22,6 +22,7 @@ local I18nSeed = require("webview.i18n_seed")
 local DeferredWork = require("infra.deferred_work")
 local TimerScheduler = require("adapters.timer_scheduler")
 local JsonCodec = require("adapters.json_codec")
+local WebviewCloseOwner = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 --- Monotonic milliseconds for webview open, load and close durations.
 --- @return number
@@ -74,14 +75,17 @@ local function settle_factory_cleanup()
 		return false
 	end
 	_factory_cleanup_closing = webview
-	local ok, err = xpcall(function() webview:delete() end, debug.traceback)
-	if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
-	if not ok then
+	local metadata = getmetatable(webview)
+	local ok, result = xpcall(function() return webview:delete() end, debug.traceback)
+	local consumed = metadata ~= nil and getmetatable(webview) == nil
+	if not consumed and (not ok or result == false) then
 		_factory_cleanup_owner = webview
-		Logger.error(LOG, "WebView factory cleanup did not commit; exact owner retained: %s.",
-			tostring(err))
+		pcall(Logger.error, LOG, "WebView factory cleanup did not commit; exact owner retained: %s.",
+			tostring(result))
+		if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
 		return false
 	end
+	if _factory_cleanup_closing == webview then _factory_cleanup_closing = nil end
 	if _factory_cleanup_owner == webview then _factory_cleanup_owner = nil end
 	return true
 end
@@ -832,7 +836,7 @@ end
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
 ---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception;
----        delete_on_close = true releases native references on user close.
+---        delete_on_close = true defers native deletion after user close.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
@@ -864,7 +868,7 @@ function M.show_webview(opts)
 		Logger.warn(LOG, "WebView factory construction re-entry refused; candidate still in progress.")
 		return nil
 	end
-	if settle_factory_cleanup() ~= true then return nil end
+	if WebviewCloseOwner.retry_cleanup() ~= true or settle_factory_cleanup() ~= true then return nil end
 	-- Open, first load and close are timed: a blank or slow window is otherwise
 	-- indistinguishable in the log from a window that was never requested.
 	local view_label = title_live and title_label
@@ -888,6 +892,14 @@ function M.show_webview(opts)
 		return nil 
 	end
 	_factory_build_owner = wv
+	if opts.delete_on_close == true then
+		local disarmed, detail = xpcall(function() WebviewCloseOwner.disarm(wv) end, debug.traceback)
+		if not disarmed then
+			Logger.error(LOG, "Required webview close policy failed: %s.", tostring(detail))
+			abandon_factory_candidate(wv, "close policy")
+			return nil
+		end
+	end
 	local caller_owns_webview = false
 	if type(opts.on_webview_created) == "function" then
 		local acquired_ok, acquired = xpcall(function()
@@ -970,9 +982,6 @@ function M.show_webview(opts)
 	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
 		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
 	end
-	if opts.delete_on_close == true and not apply_required_webview_mutation(function()
-		assert(wv:deleteOnClose(true) == wv, "native automatic close cleanup was not acknowledged")
-	end, "automatic close cleanup") then return abandon_required_mutation() end
 	-- Hammerspoon's webview window becomes key only while it allows text entry
 	-- (libwebview.m canBecomeKeyWindow): without it a click never brings the
 	-- window of the inactive app in front, and the window stays buried.
@@ -988,18 +997,24 @@ function M.show_webview(opts)
 	end) then return abandon_required_mutation() end
 
 	-- Bind closing cleanup callback
-	if type(opts.on_close) == "function" then
-		if not apply_webview_mutation(function()
-			wv:windowCallback(function(action)
-				if action == "closing" or action == "closed" then
-					if action == "closing" then
-						Logger.info(LOG, "Webview '%s' closed after %.1f s open.", view_label,
-							(now_ms() - opened_ms) / 1000)
-					end
-					opts.on_close()
-				end
-			end)
-		end) then return abandon_required_mutation() end
+	if type(opts.on_close) == "function" or opts.delete_on_close == true then
+		local bind_close = opts.delete_on_close == true and apply_required_webview_mutation or apply_webview_mutation
+		if not bind_close(function()
+			local function closed()
+				pcall(function()
+					Logger.info(LOG, "Webview '%s' closed after %.1f s open.", view_label,
+						(now_ms() - opened_ms) / 1000)
+				end)
+				if type(opts.on_close) == "function" then opts.on_close() end
+			end
+			if opts.delete_on_close == true then
+				WebviewCloseOwner.bind(wv, closed)
+			else
+				wv:windowCallback(function(action)
+					if action == "closing" or action == "closed" then closed() end
+				end)
+			end
+		end, "automatic close cleanup") then return abandon_required_mutation() end
 	end
 
 	-- Bind navigation callback; also inject i18n strings after every navigation

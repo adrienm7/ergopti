@@ -30,7 +30,7 @@ local function with_window(module_name, scenario)
 			"infra.fs_dir", "keycodes", "lfs", "module_source_directory", "module_source_identity", "modules.keymap.layout",
 			"toml_codec.basic_string", "toml_codec.bom", "toml_codec.key_path", "toml_codec.leaf_rows",
 			"toml_codec.record_scanner", "toml_codec.writer",
-			"adapters.webview_result", "ui.ui_builder", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
+			"adapters.webview_result", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 			"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 			"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 			"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
@@ -79,8 +79,8 @@ local function with_window(module_name, scenario)
 						return controller
 					end } },
 				timer = { absoluteTime = function() return 1000000000 end, secondsSinceEpoch = function() return 1 end,
-					new = function(_, receive)
-						local timer = { active = false, receive = receive }
+					new = function(delay, receive)
+						local timer = { active = false, receive = receive, delay = delay }
 						function timer:start() self.active = true; return self end
 						function timer:stop() self.active = false; return self end
 						function timer:running() return self.active end
@@ -115,7 +115,7 @@ local function with_window(module_name, scenario)
 				return true
 			end
 			function h.drain()
-				while #h.deferred > 0 do table.remove(h.deferred, 1)() end
+				h.drain_native_close()
 			end
 			scenario(window, h)
 		end)
@@ -131,8 +131,9 @@ helpers.describe("editor close retires native references", function()
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
 				local first = h.windows[1]
 				first:user_close()
+				h.drain()
 				helpers.assert_nil(h.retained[first], "dropping an editor's Lua owner cannot release native udRef")
-				helpers.assert_eq(first.deletes, 0, "user close must own automatic native destruction")
+				helpers.assert_eq(first.deletes, 1, "user close owns one deferred native delete")
 				helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
 				local successor = h.windows[2]
 				helpers.assert_true(h.retained[successor])
@@ -166,6 +167,7 @@ end)
 --- Decorates only this native layout-manager world with observable GC metatables.
 local function with_refused_layout(scenario)
 	with_window("ui.layout_manager", function(editor, h)
+		h.policy_refuses_after_call = 2
 		local create = hs.webview.new
 		hs.webview.new = function(...)
 			local view = create(...)
@@ -256,7 +258,7 @@ end)
 
 --- Closes through native chrome or the actual editor action before fade settlement.
 local function close_callback_editor(h, mode)
-	if mode == "native" then h.windows[1]:user_close() else h.close() end
+	if mode == "native" then h.windows[1]:user_close() else h.close() end; h.drain()
 	h.drain()
 	helpers.assert_nil(next(h.retained), "window GC must settle independently of controller callbacks")
 end

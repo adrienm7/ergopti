@@ -843,7 +843,7 @@ local function install_natives(hs, env, arch, machine_root)
 	hs.webview.windowMasks = { borderless = 0, titled = 1, closable = 2, miniaturizable = 4, resizable = 8,
 		utility = 16, nonactivating = 128, HUD = 8192, fullSizeContentView = 32768 }
 	hs.webview.new = function(frame)
-		local webview = handle({})
+		local webview = require("tests.e2e.boot.webview_policy").bind(handle({}))
 		webview.hswindow = function() return handle({ id = function() return 99 end }) end
 		webview.frame = function(self, new_frame)
 			if new_frame then return self end
