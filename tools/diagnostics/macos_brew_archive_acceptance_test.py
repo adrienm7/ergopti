@@ -666,6 +666,7 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "RUBYOPT": "private",
                 "HOMEBREW_FORCE_VENDOR_RUBY": "1",
                 "HOMEBREW_ARTIFACT_DOMAIN": "https://foreign.invalid",
+                "HOMEBREW_AVOID_NESTED_SANDBOXING": "1",
             },
         ):
             environment = probe.private_environment(PurePosixPath("/owned-fixture"))
@@ -674,10 +675,162 @@ class ArchiveAcceptanceControls(unittest.TestCase):
         self.assertNotIn("RUBYOPT", environment)
         self.assertNotIn("HOMEBREW_FORCE_VENDOR_RUBY", environment)
         self.assertNotIn("HOMEBREW_ARTIFACT_DOMAIN", environment)
+        self.assertNotIn("HOMEBREW_AVOID_NESTED_SANDBOXING", environment)
         self.assertEqual(environment["HOMEBREW_NO_AUTO_UPDATE"], "1")
         self.assertEqual(environment["HOMEBREW_TEMP"], "/owned-fixture/temp")
         self.assertEqual(environment["HOME"], "/owned-fixture/home")
         self.assertEqual(environment["HOMEBREW_DOWNLOAD_CONCURRENCY"], "2")
+
+    def test_nested_sandbox_opt_in_is_scoped_to_confined_owned_brew_commands(self):
+        root = Path("/owned-fixture")
+        child = SimpleNamespace(root=root, run=Mock(return_value="observed"))
+        command = [str(root / "prefix/bin/brew"), "install", "--cask", "ergoptiplus"]
+        with patch.object(probe, "refuse_foreign_running_apps") as foreign:
+            result = probe.invoke_brew(child, command, check=False)
+        self.assertEqual(result, "observed")
+        foreign.assert_called_once_with()
+        child.run.assert_called_once_with(
+            ["/usr/bin/env", "HOMEBREW_AVOID_NESTED_SANDBOXING=1", *command],
+            confined=True,
+            check=False,
+        )
+        self.assertEqual(command[0], str(root / "prefix/bin/brew"))
+
+    def test_nested_sandbox_opt_in_refuses_a_foreign_brew_entrypoint(self):
+        child = SimpleNamespace(root=PurePosixPath("/owned-fixture"), run=Mock())
+        with patch.object(probe, "refuse_foreign_running_apps"):
+            with self.assertRaisesRegex(probe.AdmissionError, "owned Brew entrypoint"):
+                probe.invoke_brew(child, ["/opt/homebrew/bin/brew", "install", "ergoptiplus"])
+        child.run.assert_not_called()
+
+    def test_nested_sandbox_opt_in_stays_inside_the_existing_child_sandbox_boundary(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = probe.Children(root)
+            acquired = []
+
+            def acquire(arguments, _native, register, **options):
+                acquired.append((arguments, options["env"].copy()))
+                group = SimpleNamespace(process=Mock())
+                register(group)
+                return group
+
+            def start(arguments, *, confined):
+                return owner.start(arguments, confined=confined)
+
+            with (
+                patch.object(probe, "acquire_owned", side_effect=acquire),
+                patch.object(owner, "run", side_effect=start),
+            ):
+                command = [str(root / "prefix/bin/brew"), "install", "--cask", "ergoptiplus"]
+                probe.run_confined_brew(owner, command)
+                owner.start(["/usr/bin/true"])
+            self.assertEqual(
+                acquired[0][0],
+                [
+                    "/usr/bin/sandbox-exec",
+                    "-f",
+                    str(root / "sandbox.sb"),
+                    "/usr/bin/env",
+                    "HOMEBREW_AVOID_NESTED_SANDBOXING=1",
+                    *command,
+                ],
+            )
+            self.assertEqual(acquired[1][0], ["/usr/bin/true"])
+            for _arguments, environment in acquired:
+                self.assertNotIn("HOMEBREW_AVOID_NESTED_SANDBOXING", environment)
+
+    def test_nested_sandbox_admission_retains_official_decision_and_effective_groups(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            brew = root / "prefix/bin/brew"
+            receipt = {"avoid_nested_sandboxing": True, "default_prefix": False, "groups": [61]}
+            child = SimpleNamespace(
+                root=root,
+                run=Mock(return_value=subprocess.CompletedProcess([], 0, json.dumps(receipt), "")),
+            )
+            self.assertEqual(probe.admit_brew_sandbox(child, brew), receipt)
+            arguments = child.run.call_args.args[0]
+            self.assertEqual(
+                arguments,
+                [
+                    "/usr/bin/env",
+                    "HOMEBREW_AVOID_NESTED_SANDBOXING=1",
+                    str(brew),
+                    "ruby",
+                    str(root / "brew-sandbox.rb"),
+                ],
+            )
+            self.assertEqual(child.run.call_args.kwargs, {"confined": True})
+            source = (root / "brew-sandbox.rb").read_text()
+            self.assertIn('require "sandbox"', source)
+            self.assertIn("Sandbox.respond_to?(:avoid_nested_sandboxing?)", source)
+            self.assertIn("admitted = Sandbox.avoid_nested_sandboxing?", source)
+            self.assertIn("groups: Process.groups", source)
+            self.assertIn("default_prefix: Homebrew.default_prefix?", source)
+
+    def test_nested_sandbox_admission_refuses_missing_or_negative_official_evidence(self):
+        for receipt in (
+            {},
+            {"avoid_nested_sandboxing": False, "default_prefix": False, "groups": [61]},
+            {"avoid_nested_sandboxing": 1, "default_prefix": False, "groups": [61]},
+            {"avoid_nested_sandboxing": True, "default_prefix": True, "groups": [61]},
+            {"avoid_nested_sandboxing": True, "default_prefix": False},
+        ):
+            with self.subTest(receipt=receipt), TemporaryDirectory() as directory:
+                root = Path(directory)
+                child = SimpleNamespace(
+                    root=root,
+                    run=Mock(
+                        return_value=subprocess.CompletedProcess([], 0, json.dumps(receipt), "")
+                    ),
+                )
+                with self.assertRaisesRegex(
+                    probe.AdmissionError, "official nested sandbox admission"
+                ):
+                    probe.admit_brew_sandbox(child, root / "prefix/bin/brew")
+                self.assertEqual(child.run.call_count, 1, "A refusal must not retry unconfined")
+
+    def test_nested_sandbox_admission_preserves_official_group_refusal_without_retry(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            refusal = probe.AdmissionError("Refusing to skip the sandbox: privileged `staff` group")
+            child = SimpleNamespace(root=root, run=Mock(side_effect=refusal))
+            with self.assertRaises(probe.AdmissionError) as caught:
+                probe.admit_brew_sandbox(child, root / "prefix/bin/brew")
+            self.assertIs(caught.exception, refusal)
+            self.assertEqual(child.run.call_count, 1)
+            self.assertIs(child.run.call_args.kwargs["confined"], True)
+
+    def test_nested_sandbox_refusal_precedes_brew_namespace_and_install_commands(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source/bin/brew"
+            source.parent.mkdir(parents=True)
+            source.write_bytes(b"Independent copied Brew entrypoint\n")
+            child = SimpleNamespace(root=root, environment=probe.private_environment(root))
+            refusal = probe.AdmissionError("Refusing to skip the sandbox: privileged `staff` group")
+            child.run = Mock(side_effect=[subprocess.CompletedProcess([], 0, "", ""), refusal])
+            # This portable control models only the host-library link acquisition;
+            # it never claims that the fake entrypoint or sandbox ran natively.
+            with patch.object(probe.Path, "symlink_to") as link:
+                with self.assertRaises(probe.AdmissionError) as caught:
+                    probe.admit_brew(child, source, root / "source")
+            self.assertIs(caught.exception, refusal)
+            link.assert_called_once()
+            self.assertEqual(child.run.call_count, 2)
+            self.assertEqual(child.run.call_args_list[0].args[0][:2], ["/usr/bin/git", "clone"])
+            self.assertEqual(
+                child.run.call_args_list[1].args[0],
+                [
+                    "/usr/bin/env",
+                    "HOMEBREW_AVOID_NESTED_SANDBOXING=1",
+                    str(root / "prefix/bin/brew"),
+                    "ruby",
+                    str(root / "brew-sandbox.rb"),
+                ],
+            )
+            self.assertFalse((root / "brew-paths.rb").exists())
 
     def test_tree_receipt_detects_signed_byte_mode_symlink_or_missing_artifact_regression(self):
         with TemporaryDirectory() as directory:

@@ -2195,6 +2195,43 @@ def _admit_appleevent_boundary(children, repository):
     }
 
 
+def run_confined_brew(children, command, **options):
+    """Opt in only inside the unchanged outer sandbox and only for the owned CLI."""
+    require(
+        Path(command[0]) == children.root / "prefix/bin/brew",
+        "Nested sandbox opt-in requires the owned Brew entrypoint",
+    )
+    return children.run(
+        ["/usr/bin/env", "HOMEBREW_AVOID_NESTED_SANDBOXING=1", *command],
+        confined=True,
+        **options,
+    )
+
+
+def admit_brew_sandbox(children, brew):
+    """Require Homebrew itself to admit custom-prefix, unprivileged nested use."""
+    probe = children.root / "brew-sandbox.rb"
+    probe.write_text(
+        'require "json"\nrequire "sandbox"\n'
+        'abort "Actual Brew lacks official nested sandbox support" '
+        "unless Sandbox.respond_to?(:avoid_nested_sandboxing?)\n"
+        "admitted = Sandbox.avoid_nested_sandboxing?\n"
+        'abort "Actual Brew did not admit the existing outer sandbox" unless admitted\n'
+        "puts JSON.generate({avoid_nested_sandboxing: admitted, "
+        "default_prefix: Homebrew.default_prefix?, groups: Process.groups})\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    receipt = json.loads(run_confined_brew(children, [str(brew), "ruby", str(probe)]).stdout)
+    require(
+        receipt.get("avoid_nested_sandboxing") is True
+        and receipt.get("default_prefix") is False
+        and isinstance(receipt.get("groups"), list),
+        "Actual Brew official nested sandbox admission is absent or refused",
+    )
+    return receipt
+
+
 def admit_brew(children, source, host):
     """Copy only the actual entrypoint and own all mutable Brew namespaces."""
     root = children.root
@@ -2227,6 +2264,7 @@ def admit_brew(children, source, host):
     )
     (prefix / "Library/Homebrew").symlink_to(host / "Library/Homebrew", target_is_directory=True)
     children.environment["PATH"] = str(prefix / "bin") + os.pathsep + children.environment["PATH"]
+    sandbox = admit_brew_sandbox(children, copied)
     probe = root / "brew-paths.rb"
     probe.write_text(
         'require "json"\nrequire "tap"\nrequire "cask/config"\nrequire "cask/caskroom"\n'
@@ -2237,7 +2275,7 @@ def admit_brew(children, source, host):
         encoding="utf-8",
         newline="\n",
     )
-    paths = json.loads(children.run([str(copied), "ruby", str(probe)], confined=True).stdout)
+    paths = json.loads(run_confined_brew(children, [str(copied), "ruby", str(probe)]).stdout)
     expected = {
         "prefix": prefix,
         "repository": prefix,
@@ -2260,10 +2298,10 @@ def admit_brew(children, source, host):
         )
     require(Path(paths.get("ruby", "")).is_file(), "Brew did not admit an existing Ruby runtime")
     require(
-        children.run([str(copied), "--prefix"], confined=True).stdout == str(prefix) + "\n",
+        run_confined_brew(children, [str(copied), "--prefix"]).stdout == str(prefix) + "\n",
         "Actual copied Brew --prefix disagrees with its Ruby namespace",
     )
-    version = children.run([str(copied), "--version"], confined=True).stdout.strip()
+    version = run_confined_brew(children, [str(copied), "--version"]).stdout.strip()
     require(
         version.startswith("Homebrew ") and len(version) > len("Homebrew "),
         "Actual Brew version is absent",
@@ -2287,14 +2325,19 @@ def admit_brew(children, source, host):
     return (
         copied,
         expected["tap"],
-        {"version": version, "entrypoint_sha256": digest(source), "paths": paths},
+        {
+            "version": version,
+            "entrypoint_sha256": digest(source),
+            "paths": paths,
+            "sandbox": sandbox,
+        },
     )
 
 
 def invoke_brew(children, command, *, check=True):
     """Recheck native process absence immediately before every generated hook."""
     refuse_foreign_running_apps()
-    return children.run(command, confined=True, check=check)
+    return run_confined_brew(children, command, check=check)
 
 
 def signed_bundle(children, version):
