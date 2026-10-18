@@ -240,7 +240,8 @@ local function build_world(selection, ui_locale, options)
 	CoreState.backend = "api"
 	CoreState.active_profile_id = "advanced"
 	local api = core.api_remote
-	api.set_entries({ { id = ENTRY_ID, provider = "cerebras", token = options and options.token or "translate-token", model = MODEL } })
+	api.set_entries({ { id = ENTRY_ID, provider = options and options.provider or "cerebras",
+		token = options and options.token or "translate-token", model = options and options.model or MODEL } })
 	api.set_active_entry_id(ENTRY_ID)
 	local _, ready_index = get_upvalue(api.is_ready, "_is_ready")
 	assert(ready_index, "the remote readiness flag must be reachable")
