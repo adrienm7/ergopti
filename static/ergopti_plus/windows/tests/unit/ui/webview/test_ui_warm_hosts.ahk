@@ -319,3 +319,166 @@ Test("WebView host: closing releases a pending timer's host (webview-timer-relea
 	_UIWH_TimerLifetime.Bind(false))
 Test("WebView host: closing releases an expired timer's host (webview-timer-release)",
 	_UIWH_TimerLifetime.Bind(true))
+
+; Exercise native WM_CLOSE against a private real HWND while controller creation
+; yields. Only Chromium acquisition is replaced; GUI close/hide/destroy are real.
+_UIWH_RecordBuildClose(State, *) {
+	State["close_observed"] := true
+}
+
+_UIWH_BuildCancel(State, Phase) {
+	if State["phase"] != Phase
+		return
+	AssertTrue(DllCall("PostMessageW", "Ptr", State["hwnd"], "UInt", 0x10,
+		"Ptr", 0, "Ptr", 0, "Int"), "the private native parent receives WM_CLOSE")
+	Started := A_TickCount
+	while !State["close_observed"] && A_TickCount - Started < 2000
+		Sleep(1)
+	State["alive_during_await"] := WMHandleExists(State["hwnd"])
+	State["hidden_during_await"] := !DllCall("IsWindowVisible", "Ptr", State["hwnd"], "Int")
+	Host := State["host"]
+	; Even callbacks arriving with the post-cancel epoch must remain inert while
+	; the native parent still exists and ResetDone has intentionally not fired.
+	Host._DispatchMessage(Host.Epoch, Map())
+	Host._DispatchReady(Host.Epoch)
+	Host._OnNavigationCompleted(0, 0)
+	Host._OnWebMessage(0, {TryGetWebMessageAsString: (*) => "ready"})
+	Host.Eval("privateFixture();")
+	State["ready_during_cancel"] := Host.Ready
+	State["queued_during_cancel"] := Host.Queue.Length
+}
+
+_UIWH_BuildShow(State, Host, Window, Options) {
+	State["host"] := Host
+	State["window"] := Window
+	Window.Show("Hide w220 h140")
+	State["hwnd"] := Window.Hwnd
+	Window.OnEvent("Close", _UIWH_RecordBuildClose.Bind(State), -1)
+	_UIWH_BuildCancel(State, "show")
+}
+
+_UIWH_BuildCreate(State, Host, PlaceholderHwnd, Loader) {
+	State["creates"] += 1
+	_UIWH_BuildCancel(State, State["phase"] == "create-error" ? "create-error" : "create")
+	if State["phase"] == "create-error"
+		throw Error("Private cancelled controller acquisition failure.")
+	return State["controller"]
+}
+
+class _UIWH_BuildController {
+	__New(State) {
+		this.State := State
+	}
+	CoreWebView2 {
+		get {
+			this.State["core_reads"] += 1
+			_UIWH_BuildCancel(this.State, "core")
+			return _UIWH_BuildView(this.State)
+		}
+	}
+	Fill() {
+		this.State["fills"] += 1
+		_UIWH_BuildCancel(this.State, "fill")
+	}
+	Close() {
+		this.State["closes"] += 1
+		this.State["parent_alive_at_dispose"] := WMHandleExists(this.State["hwnd"])
+	}
+}
+
+class _UIWH_BuildView {
+	Settings := {}
+	__New(State) {
+		this.State := State
+	}
+	WebMessageReceived(Callback) {
+		return {}
+	}
+	NavigationCompleted(Callback) {
+		return {}
+	}
+	SetVirtualHostNameToFolderMapping(*) {
+	}
+	Navigate(Url) {
+		this.State["navigates"] += 1
+		_UIWH_BuildCancel(this.State, "navigate")
+	}
+}
+
+_UIWH_BuildCallback(State, *) {
+	State["callbacks"] += 1
+}
+
+_UIWH_CloseDuringBuild(Phase) {
+	SavedShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
+	SavedCreate := WebViewHost.Prototype.GetOwnPropDesc("_CreateController")
+	SavedInstances := WebViewHost._Instances
+	SavedManifest := WebViewHost._ManifestCache
+	SavedSuspended := A_IsSuspended
+	SavedCritical := A_IsCritical
+	State := Map("phase", Phase, "close_observed", false, "creates", 0, "core_reads", 0,
+		"closes", 0, "fills", 0, "navigates", 0, "callbacks", 0, "host", 0, "window", 0)
+	State["controller"] := _UIWH_BuildController(State)
+	WebViewHost.Prototype.DefineProp("_ShowWindow", {Call: _UIWH_BuildShow.Bind(State)})
+	WebViewHost.Prototype.DefineProp("_CreateController", {Call: _UIWH_BuildCreate.Bind(State)})
+	WebViewHost._Instances := Map()
+	WebViewHost._ManifestCache := Map()
+	try {
+		Suspend(false)
+		Critical("Off")
+		Host := WebViewHost.TryOpen("private-build-close", Map("Title", "Private build fixture",
+			"SkipI18nSeed", true, "OnMessage", _UIWH_BuildCallback.Bind(State),
+			"OnReady", _UIWH_BuildCallback.Bind(State)))
+		if Phase == "live" {
+			AssertTrue(IsObject(Host), "the live acquisition still succeeds")
+			AssertTrue(WebViewHost._Instances[Host.AppId] == Host)
+			AssertFalse(Host.ResetDone)
+			AssertEqual(1, State["creates"])
+			AssertEqual(1, State["core_reads"])
+			AssertEqual(1, State["navigates"])
+			AssertEqual(1, State["fills"])
+			Host.Close()
+		} else {
+			AssertTrue(State["close_observed"], "the real native Close event must run")
+			AssertTrue(State["alive_during_await"], "close cannot destroy the parent of an in-flight native creation")
+			AssertTrue(State["hidden_during_await"], "cancelled UI disappears while native acquisition finishes")
+			AssertTrue(IsObject(Host), "user cancellation handles the request without opening a fallback")
+			AssertTrue(Host.ResetDone, "a late native result cannot resurrect a cancelled host")
+			AssertFalse(Host.BuildActive)
+			AssertFalse(State["ready_during_cancel"])
+			AssertEqual(0, State["queued_during_cancel"])
+			AssertEqual(0, State["callbacks"], "cancelled messages and readiness cannot publish")
+			AssertEqual(Phase == "show" ? 0 : 1, State["creates"])
+			AssertEqual(Phase == "show" || Phase == "create" || Phase == "create-error" ? 0 : 1,
+				State["core_reads"], "a cancelled controller cannot publish a CoreWebView2")
+			AssertEqual(Phase == "navigate" || Phase == "fill" ? 1 : 0, State["navigates"])
+			AssertEqual(Phase == "fill" ? 1 : 0, State["fills"])
+		}
+		ExpectedCloses := Phase == "show" || Phase == "create-error" ? 0 : 1
+		AssertEqual(ExpectedCloses, State["closes"], "every acquired late controller is closed exactly once")
+		if ExpectedCloses
+			AssertTrue(State["parent_alive_at_dispose"], "controller teardown precedes native parent destruction")
+		AssertFalse(WMHandleExists(State["hwnd"]))
+		AssertEqual(0, Host.Gui)
+		AssertEqual(0, WebViewHost._Instances.Count, "a cancelled request cannot publish a singleton")
+		Host.Close()
+		AssertEqual(ExpectedCloses, State["closes"], "repeated close is idempotent")
+	} finally {
+		if IsObject(State["host"])
+			State["host"].Close()
+		if IsObject(State["window"])
+			try State["window"].Destroy()
+		State["host"] := 0
+		State["window"] := 0
+		State["controller"] := 0
+		WebViewHost.Prototype.DefineProp("_ShowWindow", SavedShow)
+		WebViewHost.Prototype.DefineProp("_CreateController", SavedCreate)
+		WebViewHost._Instances := SavedInstances
+		WebViewHost._ManifestCache := SavedManifest
+		Suspend(SavedSuspended)
+		Critical(SavedCritical)
+	}
+}
+for _UIWH_BuildPhase in ["show", "create", "core", "navigate", "fill", "create-error", "live"]
+	Test("WebView host: native parent survives close during " . _UIWH_BuildPhase
+		. " acquisition (webview-build-close-ownership)", _UIWH_CloseDuringBuild.Bind(_UIWH_BuildPhase))
