@@ -48,6 +48,8 @@ M.KEY_RIGHTALT   = 100   -- AltGr
 M.KEY_LEFTMETA   = 125
 M.KEY_RIGHTMETA  = 126
 M.KEY_CAPSLOCK   = 58
+M.KEY_NUMLOCK    = 69
+M.KEY_SCROLLLOCK = 70
 -- A key no layout binds to an action, tapped inside a modifier chord so that
 -- releasing the modifier is not read as a lone Alt tap (which opens the menu
 -- bar in Firefox and other apps with access keys).

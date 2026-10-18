@@ -221,6 +221,9 @@ local SYN_REPORT = 0
 local SYN_DROPPED = 3
 local KEY_MAX = 0x2FF
 local LED_CAPSL = 1
+local _locks = { last_led = 2, codes = { [0] = EvdevCodes.KEY_NUMLOCK,
+	[LED_CAPSL] = EvdevCodes.KEY_CAPSLOCK, [2] = EvdevCodes.KEY_SCROLLLOCK }, keys = {} }
+for _, code in pairs(_locks.codes) do _locks.keys[code] = true end
 
 -- Modifier tracking — updated by _dispatch_event() on each press/release.
 -- Split by ROLE, not by key: shift and AltGr select a level of the layout and
@@ -363,32 +366,40 @@ local function _reset_capture_state()
 	if _test_capture_event then return true end
 	return XkbCapture.reset_state()
 end
---- Seeds the capture state's CapsLock from the keyboard's LED.
----
---- A fresh XKB state starts unlocked, and the capture state learns CapsLock only
---- from key presses. Started (or re-acquired after a hotplug) while CapsLock was
---- already on, the daemon therefore believed it off: typed triggers were read in
---- the wrong case, and the injector — which releases a locked CapsLock around a
---- replacement — typed it inverted. The LED is read at acquisition to match
---- the lock state last published by the desktop. EVIOCGRAB prevents competing
---- input consumers, but does not prevent the desktop from updating these LEDs.
---- @param path string|nil The keyboard source just acquired.
---- @return boolean True when the state now matches the LED.
-local function _seed_caps_lock(path)
-	if not path then return false end
-	local leds, led_err = EvdevReader.active_leds(keyboard_slot(path), LED_CAPSL)
-	if not leds then
-		Logger.warn(LOG, "CapsLock state of %s unreadable — assuming off (%s).", path, tostring(led_err))
-		return false
-	end
-	if leds[LED_CAPSL] == true then
-		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_DOWN)
-		_capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_UP)
-		Logger.debug(LOG, "CapsLock is on at acquisition — capture state locked to match.")
+--- Restores the lock actions of a fresh capture state from observed LEDs.
+--- Held lock keys must not also be replayed: that would toggle their state twice.
+--- @param leds table Native LED states, indexed by Linux LED code.
+--- @return boolean acknowledged All requested capture transitions succeeded.
+--- @return string|nil reason
+function _locks.seed_leds(leds)
+	for led = 0, _locks.last_led do
+		if leds[led] == true then
+			local code = _locks.codes[led]
+			local _, _, down_err = _capture(code, InputEvent.VALUE_DOWN)
+			if down_err then return false, tostring(down_err) end
+			local _, _, up_err = _capture(code, InputEvent.VALUE_UP)
+			if up_err then return false, tostring(up_err) end
+		end
 	end
 	return true
 end
 
+--- Seeds a newly reset capture state from the acquired keyboard's lock LEDs.
+--- The desktop may update LEDs even while EVIOCGRAB excludes other readers.
+--- EVIOCGLED observes the source; it does not prove a desktop-wide lock state
+--- when that source has no LED capability or the desktop has not updated it.
+--- @param path string|nil The keyboard source just acquired.
+--- @return boolean acknowledged
+--- @return string|nil reason
+function _locks.seed(path)
+	if not path then return false, "keyboard source is unavailable" end
+	local leds, led_err = EvdevReader.active_leds(keyboard_slot(path), _locks.last_led)
+	if not leds then
+		Logger.warn(LOG, "Lock state of %s unreadable (%s).", path, tostring(led_err))
+		return false, led_err
+	end
+	return _locks.seed_leds(leds)
+end
 
 
 
@@ -1002,7 +1013,7 @@ local function _resynchronise(source, snapshot, cohort)
 	else source_keys, key_err = EvdevReader.pressed_keys(slot, KEY_MAX) end
 	local leds, led_err
 	if snapshot then leds = snapshot.leds
-	else leds, led_err = EvdevReader.active_leds(slot, LED_CAPSL) end
+	else leds, led_err = EvdevReader.active_leds(slot, _locks.last_led) end
 	if not source_keys or not leds then
 		return false, string.format("state query failed for %s: %s; %s", source,
 			tostring(key_err), tostring(led_err))
@@ -1047,7 +1058,7 @@ local function _resynchronise(source, snapshot, cohort)
 		-- Already-consumed presses remain physical cleanup debt, but the output
 		-- no longer holds them. Replaying their modifiers here would invent text.
 		if not consumed[key] then
-			if current.code ~= EvdevCodes.KEY_CAPSLOCK and (not role or not captured[current.code]) then
+			if not _locks.keys[current.code] and (not role or not captured[current.code]) then
 				captured[current.code] = true
 				local _, _, capture_err = _capture(current.code, InputEvent.VALUE_DOWN)
 				if capture_err then return false, tostring(capture_err) end
@@ -1060,11 +1071,8 @@ local function _resynchronise(source, snapshot, cohort)
 		end
 		if consumed[key] then _consumed_down[key] = true end
 	end
-	if leds[LED_CAPSL] == true then
-		local _, _, down_err = _capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_DOWN)
-		local _, _, up_err = _capture(EvdevCodes.KEY_CAPSLOCK, InputEvent.VALUE_UP)
-		if down_err or up_err then return false, tostring(down_err or up_err) end
-	end
+	local seeded, seed_err = _locks.seed_leds(leds)
+	if not seeded then return false, seed_err end
 
 	if snapshot then
 		if snapshot.current() ~= true then return false, "pending source query revoked" end
@@ -3361,7 +3369,11 @@ function M.check_device()
 				Logger.error(LOG, "Cannot reset XKB state after keyboard acquisition: %s.", tostring(reset_err))
 				return false
 			end
-			_seed_caps_lock(_devices[1])
+			local seeded, seed_err = _locks.seed(_devices[1])
+			if tx.managed and not seeded then
+				Logger.error(LOG, "Cannot restore lock state after keyboard acquisition: %s.", tostring(seed_err))
+				return false
+			end
 			-- A source/capture change retires every old repeat callback, but the
 			-- application still never saw its consumed down. Keep that debt only
 			-- on committed source/key owners until an actual release arrives.
@@ -3642,7 +3654,11 @@ function M.start(opts)
 			Logger.error(LOG, "start(): failed to open or grab the complete keyboard source set.")
 			return false
 		end
-		_seed_caps_lock(_devices[1])
+		local seeded, seed_err = _locks.seed(_devices[1])
+		if tx.managed and not seeded then
+			Logger.error(LOG, "Cannot seed keyboard lock state: %s.", tostring(seed_err))
+			return false
+		end
 	
 		-- The pointer is opened last and its failure is not fatal: a machine with no
 		-- pointer, or one whose node this user cannot read, still expands hotstrings.
@@ -3974,11 +3990,11 @@ M.DEVICE_CHECK_TICKS = DEVICE_CHECK_TICKS
 
 --- @param intercept boolean Whether to run the pass-through branch.
 --- @return integer Number of events drained.
---- Test seam: runs the CapsLock seeding against an already-open source.
+--- Test seam: runs lock LED seeding against an already-open source.
 --- @param path string
 --- @return boolean
 function M._seed_caps_lock_for_test(path)
-	return _seed_caps_lock(path)
+	return _locks.seed(path)
 end
 
 function M._test_drive(events, callbacks, intercept)

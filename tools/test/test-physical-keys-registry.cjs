@@ -346,6 +346,7 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 		LEFTMETA: 'MetaLeft',
 		RIGHTMETA: 'MetaRight',
 		CAPSLOCK: 'CapsLock',
+		NUMLOCK: 'NumLock',
 		BACKSPACE: 'Backspace',
 		TAB: 'Tab',
 		ENTER: 'Enter',
@@ -357,17 +358,58 @@ const find = (pred) => codes.filter((c) => pred(keys[c]));
 	};
 	const consts = {};
 	for (const m of src.matchAll(/^M\.KEY_([A-Z]+)\s*=\s*(\d+)/gm)) consts[m[1]] = Number(m[2]);
-	let n = 0;
-	for (const [name, num] of Object.entries(consts)) {
-		const code = NAMED[name];
-		if (!code)
-			fail(`evdev_codes.lua: KEY_${name} has no expected registry key — extend this test's table`);
-		else if (keys[code].evdev !== num)
-			fail(
-				`evdev_codes.lua: KEY_${name} = ${num} but registry ${code}.evdev = ${keys[code].evdev}`
-			);
-		n++;
+	// ScrollLock is deliberately not a bindable registry position: HID names it
+	// as an unregistered PC key. Its Linux input-event-codes.h ABI is still 70.
+	const KERNEL_ONLY = { SCROLLLOCK: { code: 'ScrollLock', evdev: 70, usage: 0x47 } };
+	const unregisteredHid = JSON.parse(read('_shared/data/keycodes/hid_usages.json')).unregistered;
+
+	/** Compares every parsed named constant without exempting kernel-only locks. */
+	function namedEvdevErrors(values) {
+		const failures = [];
+		for (const [name, num] of Object.entries(values)) {
+			const code = NAMED[name];
+			const kernel = KERNEL_ONLY[name];
+			if (code) {
+				if (keys[code].evdev !== num)
+					failures.push(
+						`evdev_codes.lua: KEY_${name} = ${num} but registry ${code}.evdev = ${keys[code].evdev}`
+					);
+			} else if (kernel) {
+				const hid = unregisteredHid[kernel.code];
+				if (keys[kernel.code] !== undefined || !hid || hid.page !== 7 || hid.usage !== kernel.usage)
+					failures.push(`evdev_codes.lua: KEY_${name} is not its declared unregistered HID key`);
+				if (num !== kernel.evdev)
+					failures.push(
+						`evdev_codes.lua: KEY_${name} = ${num} but Linux ABI ${kernel.code} = ${kernel.evdev}`
+					);
+			} else {
+				failures.push(
+					`evdev_codes.lua: KEY_${name} has no expected registry key — extend this test's table`
+				);
+			}
+		}
+		return failures;
 	}
+
+	for (const name of ['NUMLOCK', 'SCROLLLOCK']) {
+		if (!Object.hasOwn(consts, name))
+			fail(`evdev_codes.lua: KEY_${name} was not parsed and compared`);
+	}
+	for (const failure of namedEvdevErrors(consts)) fail(failure);
+	// Exercise the same comparator: permitting the added names must never
+	// accidentally turn them into unchecked exceptions or accept swapped codes.
+	for (const [name, wrong] of [
+		['NUMLOCK', 68],
+		['SCROLLLOCK', 69]
+	]) {
+		if (
+			!namedEvdevErrors({ ...consts, [name]: wrong }).some((error) =>
+				error.includes(`KEY_${name} = ${wrong}`)
+			)
+		)
+			fail(`evdev_codes.lua: wrong KEY_${name} was accepted by the parity control`);
+	}
+	let n = Object.keys(consts).length;
 	const CONTROL = {
 		enter: ['Enter', 'NumpadEnter'],
 		escape: ['Escape'],
