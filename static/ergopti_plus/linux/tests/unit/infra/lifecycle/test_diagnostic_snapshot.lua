@@ -313,7 +313,10 @@ describe("snapshot preparation before capture (snapshot-prepared-ready)", functi
 			assert_true(message:find("features_enabled=3/5", 1, true) ~= nil)
 			assert_true(message:find("os=" .. Snapshot.render_value("Prepared Linux"), 1, true) ~= nil)
 			assert_true(not message:find("forged", 1, true) and not message:find("untrusted path", 1, true))
-			assert_eq(pcall(prepared, {}), false, "one preparation cannot publish twice after logger reentry")
+			local republished, refusal = pcall(prepared, {})
+			assert_eq(republished, false, "one preparation cannot publish twice after logger reentry")
+			assert_true(tostring(refusal):find("already emitted", 1, true) ~= nil,
+				"the second publication is refused as already emitted, not by an unrelated error")
 			assert_eq(#lines, 1)
 		end)
 	end)
