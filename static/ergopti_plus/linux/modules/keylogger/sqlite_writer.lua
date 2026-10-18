@@ -359,6 +359,13 @@ function M.open_db(db_path)
 		return false
 	end
 
+	-- Bootstrap and schema admission belong to the open store. Repointing it
+	-- would reuse the old admission and a later refusal would lose that owner.
+	if _db_path ~= nil and _db_path ~= db_path then
+		Logger.error(LOG, "Cannot switch SQLite stores before explicitly closing the current store.")
+		return false
+	end
+
 	if not _check_sqlite3() then return false end
 
 	_db_path = db_path
