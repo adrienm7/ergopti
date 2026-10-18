@@ -13,7 +13,7 @@
  *
  * ROOT CAUSE ENCODED (incident of 2026-09-30):
  * The first-run commit gained a second notice (the navigation layer import);
- * tests/meta/test_onboarding_no_appstate.ahk still counted one and failed
+ * tests/meta/ui/onboarding/test_onboarding_no_appstate.ahk still counted one and failed
  * Windows CI run 642 (fixed by 0951955a8).
  *
  * FEATURES & RATIONALE:
@@ -51,9 +51,9 @@ const WINDOWS_REL = 'static/ergopti_plus/windows';
 const MIN_MIRRORED = 35;
 const MIN_FILES = 10;
 const REQUIRED = [
-	{ file: 'tests/meta/test_onboarding_no_appstate.ahk', actual: 'NoticeCount' },
-	{ file: 'tests/meta/test_onboarding_no_appstate.ahk', actual: 'Notices' },
-	{ file: 'tests/meta/test_onboarding_no_appstate.ahk', actual: 'Listed' }
+	{ file: 'tests/meta/ui/onboarding/test_onboarding_no_appstate.ahk', actual: 'NoticeCount' },
+	{ file: 'tests/meta/ui/onboarding/test_onboarding_no_appstate.ahk', actual: 'Notices' },
+	{ file: 'tests/meta/ui/onboarding/test_onboarding_no_appstate.ahk', actual: 'Listed' }
 ];
 
 // ============================================

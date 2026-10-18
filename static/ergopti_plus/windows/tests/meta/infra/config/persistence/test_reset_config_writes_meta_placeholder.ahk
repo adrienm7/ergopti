@@ -25,7 +25,7 @@
 ;
 ; SCOPE: source introspection only -- exercising a real reset needs a live driver
 ; boot and a WebView2 runtime unavailable in the headless harness (same rationale
-; as tests/meta/test_onbweb_singleton_guard.ahk).
+; as tests/meta/ui/onboarding/test_onbweb_singleton_guard.ahk).
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

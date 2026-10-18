@@ -13,7 +13,7 @@
 ;
 ; SCOPE: source introspection. Opening the notice shows and focuses a real
 ; window, which the headless runner may not do; the present helper itself is
-; exercised in tests/unit/test_window_manager_present_window.ahk.
+; exercised in tests/unit/ui/windows/test_window_manager_present_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

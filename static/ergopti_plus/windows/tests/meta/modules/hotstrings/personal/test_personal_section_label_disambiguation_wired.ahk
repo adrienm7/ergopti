@@ -18,7 +18,7 @@
 ; Source-scan rather than behavioral: driving a real duplicate-description
 ; scenario end-to-end needs a live Menu() + i18n + ScriptInformation harness;
 ; the disambiguation LOGIC itself is covered behaviorally by
-; tests/unit/test_menu_helpers.ahk. This test only pins that the render/toggle
+; tests/unit/ui/menu/test_menu_helpers.ahk. This test only pins that the render/toggle
 ; call sites actually consume the disambiguated map.
 ; ==============================================================================
 

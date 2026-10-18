@@ -259,7 +259,10 @@ function assertNativePolicyFamilyIsolation(source) {
 	);
 }
 const nativePolicySource = fs.readFileSync(
-	path.join(repository, 'static/ergopti_plus/windows/tests/unit/test_native_dialog_titles.ahk'),
+	path.join(
+		repository,
+		'static/ergopti_plus/windows/tests/unit/ui/windows/test_native_dialog_titles.ahk'
+	),
 	'utf8'
 );
 assertNativePolicyFamilyIsolation(nativePolicySource);

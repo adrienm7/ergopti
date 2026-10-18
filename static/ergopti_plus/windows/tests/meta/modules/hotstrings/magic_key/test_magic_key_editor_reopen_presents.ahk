@@ -12,7 +12,7 @@
 ;
 ; SCOPE: source introspection. The editor blocks in InputHook.Wait and the
 ; helper focuses a real window, neither of which the headless runner may do;
-; the helper itself is exercised in tests/unit/test_window_manager_present_window.ahk.
+; the helper itself is exercised in tests/unit/ui/windows/test_window_manager_present_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0

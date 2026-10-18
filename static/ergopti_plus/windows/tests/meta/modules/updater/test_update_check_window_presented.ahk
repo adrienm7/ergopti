@@ -11,7 +11,7 @@
 ;
 ; SCOPE: source introspection. The window hosts WebView2 or a native Gui and the
 ; helper focuses a real window, which the headless runner may not do; the helper
-; itself is exercised in tests/unit/test_window_manager_present_window.ahk.
+; itself is exercised in tests/unit/ui/windows/test_window_manager_present_window.ahk.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
