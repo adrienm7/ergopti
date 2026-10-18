@@ -8,7 +8,8 @@
 --- ==============================================================================
 
 local mode = assert(arg[1], "a discovery probe mode is required")
-assert(mode == "empty" or mode == "failed" or mode == "refused" or mode == "native-empty",
+assert(mode == "empty" or mode == "failed" or mode == "refused" or mode == "native-empty"
+	or mode == "group-empty",
 	"invalid discovery probe mode")
 local source = debug.getinfo(1, "S").source:gsub("^@", ""):gsub("\\", "/")
 local root = assert(source:match("^(.*)/tests/support/discovery_runner_probe%.lua$"))
@@ -30,6 +31,11 @@ io.popen = function(command, ...)
 	local lines = {}
 	if mode == "failed" then
 		lines[1] = root .. "/tests/meta/harness/test_runner_fixture_selection.lua"
+	elseif mode == "group-empty" then
+		local relative = command:find("/tests/meta", 1, true)
+			and "tests/meta/harness/test_runner_fixture_selection.lua"
+			or "tests/unit/modules/keymap/layout/test_input_sources_bounded_mutations.lua"
+		lines[1] = root .. "/" .. relative
 	end
 	return {
 		lines = function()
@@ -47,5 +53,5 @@ io.popen = function(command, ...)
 	}
 end
 
-arg = {}
+arg = mode == "group-empty" and { "--module", "ui" } or {}
 dofile(root .. "/tests/run.lua")
