@@ -84,6 +84,28 @@ async function fetchRelease(channel) {
 	}
 }
 
+/** The Linux download. No "linux" in it: the AppImage catalogue warns on one. */
+export const LINUX_APPIMAGE_ASSET = 'ErgoptiPlus-x86_64.AppImage';
+
+/** The releases page, which lists every published asset of every release. */
+export const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
+
+/**
+ * Download link for an asset, or the page that lists it when the selected
+ * release does not carry it. A renamed asset (the Linux AppImage dropped
+ * "linux" from its name for the AppImage catalogue) is missing from every
+ * release published before the rename; the page then still lets the visitor
+ * download what exists instead of a dead "#" link.
+ *
+ * @param {{tag: string, url: (name: string) => string | null} | null | undefined} release
+ * @param {string} name
+ * @returns {string}
+ */
+export function assetUrlOrPage(release, name) {
+	if (!release) return RELEASES_PAGE;
+	return release.url(name) ?? `${RELEASES_PAGE}/tag/${encodeURIComponent(release.tag)}`;
+}
+
 /**
  * Returns a reactive store-like object wrapping the async release fetch.
  * Components `await` this once on mount and receive a plain object with:

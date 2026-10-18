@@ -21,6 +21,7 @@ FEATURES & RATIONALE:
 	import { fly } from 'svelte/transition';
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
 	import WindowChrome from './WindowChrome.svelte';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
 	import { ui, setOS } from './state.svelte.js';
 	import { t } from './i18n.svelte.js';
 
@@ -109,7 +110,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-x86_64.AppImage') ?? '#');
+	let urlLinux = $derived(assetUrlOrPage(ui.release, LINUX_APPIMAGE_ASSET));
 
 	// A single download button, driven by the OS toggle. The previous layout
 	// showed a second *download* button for a different OS — so picking Linux

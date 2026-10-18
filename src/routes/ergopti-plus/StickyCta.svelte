@@ -12,6 +12,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 
 <script>
 	import { onMount } from 'svelte';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { t } from './i18n.svelte.js';
 
@@ -20,7 +21,7 @@ competes with the final call-to-action. OS-aware, like the hero button.
 		ui.osStyle === 'macos'
 			? (ui.release?.url('ErgoptiPlus.app.zip') ?? '#')
 			: ui.osStyle === 'linux'
-				? (ui.release?.url('ErgoptiPlus-x86_64.AppImage') ?? '#')
+				? assetUrlOrPage(ui.release, LINUX_APPIMAGE_ASSET)
 				: (ui.release?.url('ErgoptiPlus.exe') ?? '#')
 	);
 	let label = $derived(

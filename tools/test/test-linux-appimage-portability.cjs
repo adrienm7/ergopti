@@ -218,9 +218,10 @@ passed++;
 for (const [relative, minimum] of [
 	['.github/workflows/ci-linux.yml', 2],
 	['.github/workflows/ci.yml', 3],
-	['src/routes/ergopti-plus/Hero.svelte', 1],
-	['src/routes/ergopti-plus/Platforms.svelte', 1],
-	['src/routes/ergopti-plus/StickyCta.svelte', 1],
+	['src/lib/js/getGitHubRelease.js', 1],
+	['src/routes/ergopti-plus/Hero.svelte', 0],
+	['src/routes/ergopti-plus/Platforms.svelte', 0],
+	['src/routes/ergopti-plus/StickyCta.svelte', 0],
 	['tools/test/browser/site-artifact-smoke.playwright.cjs', 1]
 ]) {
 	const text = read(relative);
@@ -234,6 +235,25 @@ for (const [relative, minimum] of [
 	);
 }
 assert.ok(!/linux/i.test(APPIMAGE_ASSET));
+passed++;
+
+// The website's Linux buttons never point at "#": a release published before
+// the rename has no asset by the new name, so they open its release page.
+const releaseHelper = read('src/lib/js/getGitHubRelease.js');
+assert.ok(releaseHelper.includes(`export const LINUX_APPIMAGE_ASSET = '${APPIMAGE_ASSET}';`));
+assert.match(
+	releaseHelper,
+	/if \(!release\) return RELEASES_PAGE;\n\treturn release\.url\(name\) \?\? `\$\{RELEASES_PAGE\}\/tag\/\$\{encodeURIComponent\(release\.tag\)\}`;/
+);
+for (const relative of [
+	'src/routes/ergopti-plus/Hero.svelte',
+	'src/routes/ergopti-plus/Platforms.svelte',
+	'src/routes/ergopti-plus/StickyCta.svelte'
+]) {
+	const text = read(relative);
+	assert.ok(text.includes('assetUrlOrPage(ui.release, LINUX_APPIMAGE_ASSET)'), relative);
+	assert.ok(!/AppImage'\) \?\? '#'/.test(text), `${relative} falls back to "#"`);
+}
 passed++;
 
 console.log(`Linux AppImage portability: ${passed} checks passed.`);
