@@ -35,6 +35,7 @@ local Monotonic = require("infra.monotonic")
 local reload_gate = require("reload_gate")
 local FileSystem = require("adapters.file_system")
 local RuntimeLog = require("diagnostics.runtime_log")
+local Shell = require("adapters.shell_runner")
 local LOG = "file_watchers"
 
 
@@ -74,6 +75,15 @@ local _luv_handles = {}
 
 -- Pump-mode entries: { path = string, last_mtime = number, filter = function, is_dir = bool }
 local _pump_entries = {}
+
+-- Personal coverage is an independent owner even when another root overlaps it.
+local _personal_root, _personal_dirty, _personal_retry_at = nil, false, nil
+local _personal_file = false
+local _personal_epoch, _personal_revision = 0, 0
+local _personal_entries, _personal_retiring = {}, {}
+local _personal_anchor, _personal_rebind = nil, false
+local _reconcile_personal
+local _personal_metadata
 
 -- Callback invoked on debounced change detection.
 local _on_reload = nil
@@ -116,22 +126,37 @@ local GIT_SETTLE_MAX_DEFERRALS = 120   -- 120 * _debounce_sec = 60s of a quiet-b
 -- =========================================
 -- =========================================
 
+--- Removes directory separators without changing Linux filename identity.
+--- Case and backslashes are literal; an all-slash path still names the root.
+--- @param path string Directory path.
+--- @return string path without trailing separators, or the filesystem root.
+local function _directory_path(path)
+	local normalized = path:gsub("/+$", "")
+	return normalized == "" and "/" or normalized
+end
+
+--- Recognizes regular files from the supported POSIX, luv and GNU stat ports.
+local function _personal_regular_file(attributes)
+	if not attributes then return false end
+	return attributes.kind == "regular" or attributes.kind == "file"
+		or attributes.kind == "regular file" or attributes.kind == "regular empty file"
+end
+
 --- Returns the mtime of a path as a number (epoch seconds), or nil on error.
---- Uses posix.stat() when available, falls back to a shell invocation.
+--- Uses a complete posix timespec when available, otherwise GNU date.
 --- @param path string Absolute or relative path.
 --- @return number|nil mtime in seconds, or nil.
 local function _mtime(path)
 	if posix and posix.stat then
 		local ok, st = pcall(posix.stat, path)
 		if ok and st and type(st) == "table" then
-			-- posix.stat returns { mtime = { sec = ..., nsec = ... } } on many builds,
-			-- or { mtime = number } on others. Normalise to a single number.
-			if type(st.mtime) == "table" and st.mtime.sec then
-				return tonumber(st.mtime.sec) + (tonumber(st.mtime.nsec) or 0) * 1e-9
-			elseif type(st.mtime) == "number" then
-				return st.mtime
-			elseif type(st.modification) == "number" then
-				return st.modification
+			-- Scalar receipts on luaposix builds contain only whole seconds.
+			-- A missing nanosecond field cannot certify subsecond precision either.
+			if type(st.mtime) == "table" then
+				local seconds, nanoseconds = tonumber(st.mtime.sec), tonumber(st.mtime.nsec)
+				if seconds and nanoseconds then
+					return seconds + nanoseconds * 1e-9
+				end
 			end
 		end
 	end
@@ -255,6 +280,15 @@ local function _check_deadline()
 		return
 	end
 
+	if _personal_dirty then
+		local epoch = _personal_epoch
+		local reconciled = _reconcile_personal()
+		if epoch ~= _personal_epoch then return end
+		if reconciled then _personal_retry_at = nil else _personal_retry_at = _now_ms() + _debounce_sec * 1000 end
+		-- Coverage is observational: refusal never withholds an accepted source
+		-- burst. Actual activity while staging still extends the shared settle.
+		if _reload_deadline and _now_ms() < _reload_deadline then return end
+	end
 	_reload_deadline = nil
 	-- Name what changed. The paths were gathered for the settle heuristic and then
 	-- thrown away, so a reload in the log could never be traced back to a file.
@@ -394,6 +428,18 @@ local function _pump_check_all()
 			end
 		end
 	end
+	for _, entry in pairs(_personal_entries) do
+		local observed = not _personal_file or _personal_regular_file(_personal_metadata(entry.path))
+		local mtime = observed and _mtime(entry.path) or nil
+		if mtime ~= entry.last_mtime then
+			entry.last_mtime = mtime
+			changed[#changed + 1] = entry.path
+			if entry.kind == "directory" or mtime == nil then
+				_personal_dirty = true
+				_personal_revision = _personal_revision + 1
+			end
+		end
+	end
 	if #changed > 0 then
 		_schedule_reload("mtime poll", changed)
 	end
@@ -409,51 +455,314 @@ end
 -- ==========================================
 -- ==========================================
 
---- Recursively scans personal_dir for .toml files, arming watchers on each
---- directory and per-file. Guards against symlink cycles and depth bombs.
---- @param dir string Absolute directory path.
---- @param depth number Current recursion depth.
---- @param visited table Set of canonical directory paths already entered.
-local function _scan_personal_dir(dir, depth, visited)
-	depth = depth or 1
-	if depth > SCAN_MAX_DEPTH then
-		Logger.warn(LOG, "Personal hotstrings scan hit max depth %d at '%s' — not descending further (directory cycle?).",
-			SCAN_MAX_DEPTH, dir)
-		return
+--- Uses the shared checked command owner; partial failed output is never empty data.
+local function _personal_command(command)
+	local called, completed, output, detail = pcall(Shell.exec_checked, command)
+	if not called or completed ~= true or type(output) ~= "string" then
+		return nil, called and detail or "personal filesystem command refused"
 	end
+	return output
+end
 
-	if not _is_dir(dir) then
-		Logger.debug(LOG, "Personal hotstrings dir '%s' is not a directory — skipping.", dir)
-		return
+--- Keeps the existing POSIX no-follow / shell-follow directory policy.
+_personal_metadata = function(path)
+	if posix and type(posix.stat) == "function" then
+		local called, attributes = pcall(posix.stat, path)
+		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
+			return nil, "personal filesystem metadata is unavailable: " .. path
+		end
+		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type or attributes.mode }
 	end
-
-	local canonical = dir:gsub("[/\\]+$", ""):lower()
-	if visited[canonical] then
-		Logger.warn(LOG, "Personal hotstrings scan revisited '%s' — skipping to break a directory cycle.", dir)
-		return
+	if luv and type(luv.fs_stat) == "function" then
+		local called, attributes = pcall(luv.fs_stat, path)
+		if not called or type(attributes) ~= "table" or attributes.dev == nil or attributes.ino == nil then
+			return nil, "personal native filesystem metadata is unavailable: " .. path
+		end
+		return { dev = attributes.dev, ino = attributes.ino, kind = attributes.type }
 	end
-	visited[canonical] = true
+	local content, detail = _personal_command("LC_ALL=C stat -L -c '%d:%i:%F' -- " .. Shell.quote(path) .. " 2>/dev/null")
+	if not content then return nil, detail end
+	local device, inode, kind = content:match("^(%d+):(%d+):([^\r\n]+)\n$")
+	if not device then return nil, "personal filesystem metadata is malformed: " .. path end
+	return { dev = device, ino = inode, kind = kind }
+end
 
-	-- Watch the directory itself (catches new .toml files).
-	if luv then
-		_arm_luv_watcher(dir, _is_toml)
+--- A refused directory listing retains all admitted coverage for explicit retry.
+local function _personal_list(path)
+	local entries
+	if posix and type(posix.dir) == "function" then
+		local called, result = pcall(posix.dir, path)
+		if not called or type(result) ~= "table" then return nil, "personal directory enumeration refused: " .. path end
+		entries = result
 	else
-		_add_pump_entry(dir, _is_toml, true)
+		local content, detail = _personal_command("ls -1A --zero -- " .. Shell.quote(path) .. " 2>/dev/null")
+		if not content then return nil, detail end
+		if content ~= "" and content:sub(-1) ~= "\0" then return nil, "personal directory enumeration has incomplete NUL framing" end
+		entries = {}
+		for name in content:gmatch("([^%z]*)%z") do entries[#entries + 1] = name end
 	end
+	local result, seen = {}, {}
+	for _, name in ipairs(entries) do
+		if type(name) ~= "string" or name == "" or name:find("/", 1, true) or seen[name] then
+			return nil, "personal directory enumeration returned an invalid entry"
+		end
+		seen[name] = true
+		if name ~= "." and name ~= ".." then result[#result + 1] = name end
+	end
+	return result
+end
 
-	-- Scan entries.
-	for _, fname in ipairs(_list_dir(dir)) do
-		local fpath = dir .. "/" .. fname
-		if _is_dir(fpath) then
-			_scan_personal_dir(fpath, depth + 1, visited)
-		elseif _is_toml(fname) then
-			-- Per-file watcher.
-			if luv then
-				_arm_luv_watcher(fpath, function() return true end)
-			else
-				_add_pump_entry(fpath, function() return true end, false)
+local function _same_personal_binding(entry, attributes)
+	return entry and entry.dev == attributes.dev and entry.ino == attributes.ino and entry.kind == attributes.kind
+end
+
+--- Close requests remain pinned until the actual native callback acknowledges them.
+local function _retire_personal(entry)
+	entry.active, entry.staging = false, false
+	if not entry.handle or entry.retired then return true end
+	_personal_retiring[entry] = true
+	if entry.close_requested then return false end
+	if entry.started and not entry.stopped then
+		local called, status, detail = pcall(entry.stop, entry.handle)
+		if not called or status == nil or status == false then
+			Logger.warn(LOG, "Personal watcher stop remains owned for '%s': %s.", entry.path, tostring(called and detail or status))
+			return false
+		end
+		entry.stopped = true
+	end
+	entry.close_requested = true
+	local called, status, detail = pcall(entry.close, entry.handle, function()
+		entry.retired = true
+		_personal_retiring[entry] = nil
+	end)
+	if not called or status == false or detail ~= nil then
+		entry.close_requested = false
+		Logger.warn(LOG, "Personal watcher close remains owned for '%s': %s.", entry.path, tostring(called and detail or status))
+		return false
+	end
+	return entry.retired == true
+end
+
+local function _retry_personal_retirement()
+	for entry in pairs(_personal_retiring) do _retire_personal(entry) end
+end
+
+local function _personal_rename(events)
+	if type(events) ~= "table" then return false end
+	if events.rename == true then return true end
+	for _, event in ipairs(events) do if event == "rename" then return true end end
+	return false
+end
+
+--- Admits only this exact active lexical binding and its original session.
+local function _personal_event(entry, err, filename, events)
+	if entry.epoch ~= _personal_epoch or _personal_root == nil or entry.retired or entry.close_requested then return end
+	if entry.anchor_name and err then
+		Logger.warn(LOG, "Personal parent fs_event error on '%s': %s.", entry.path, tostring(err))
+		if entry.active and _personal_anchor == entry then
+			_personal_anchor = nil
+			_retire_personal(entry)
+			_personal_dirty, _personal_rebind = true, true
+			_personal_revision = _personal_revision + 1
+			_personal_retry_at = _now_ms() + _debounce_sec * 1000
+		elseif entry.staging then
+			entry.anchor_failed = true
+		end
+		return
+	end
+	if entry.anchor_name then
+		-- Observe only this admitted lexical root, never its parent's siblings.
+		if type(filename) == "string" and filename ~= "" then
+			if filename ~= entry.anchor_name then return end
+		elseif not _personal_rename(events) then
+			return
+		end
+	end
+	if not entry.active then
+		if entry.staging then
+			_personal_revision = _personal_revision + 1
+			if not err then
+				local changed = entry.path
+				if entry.kind == "directory" and type(filename) == "string" and filename ~= "" then changed = entry.path .. "/" .. filename end
+				_schedule_reload("personal staging activity: " .. changed, { changed })
 			end
 		end
+		return
+	end
+	if (entry.anchor_name and _personal_anchor ~= entry) or (not entry.anchor_name and _personal_entries[entry.path] ~= entry) then return end
+	if err then
+		Logger.warn(LOG, "Personal fs_event error on '%s': %s.", entry.path, tostring(err))
+		return
+	end
+	local changed, topology = entry.path, false
+	if entry.anchor_name then
+		changed, topology = _personal_root, true
+		-- A deleted directory can reuse its inode before this event is drained.
+		-- Rebind its sources rather than retaining watches on the old objects.
+		if _personal_rename(events) then _personal_rebind = true end
+	elseif entry.kind == "directory" then
+		if type(filename) == "string" and filename ~= "" then
+			changed = entry.path .. "/" .. filename
+			local previous = _personal_entries[changed]
+			if _is_toml(filename) then
+				topology = _personal_rename(events)
+			elseif previous and previous.kind == "directory" then
+				topology = true
+			else
+				local attributes = _personal_metadata(changed)
+				if not attributes or attributes.kind ~= "directory" then return end
+				topology = true
+			end
+		elseif type(events) == "table" and next(events) ~= nil then
+			topology = true
+		else
+			return
+		end
+	else
+		topology = _personal_rename(events)
+	end
+	if topology then
+		_personal_dirty = true
+		_personal_revision = _personal_revision + 1
+	end
+	_schedule_reload("personal source: " .. changed, { changed })
+end
+
+--- Arms new directories before enumerating them; queued events cannot fall into a gap.
+local function _new_personal_entry(path, attributes, epoch, anchor_name)
+	local entry = { path = path, dev = attributes.dev, ino = attributes.ino, kind = attributes.kind,
+		epoch = epoch, active = false, staging = true, anchor_name = anchor_name }
+	if not luv then
+		entry.last_mtime = _mtime(path)
+		if entry.last_mtime == nil then return nil, "personal polling timestamp is unavailable: " .. path end
+		return entry
+	end
+	entry.stop, entry.close = luv.fs_event_stop, luv.close
+	local called, handle = pcall(luv.new_fs_event)
+	if not called or not handle then return nil, "personal watcher allocation refused: " .. path end
+	entry.handle = handle
+	local protected, activated, detail = pcall(luv.fs_event_start, handle, path, FS_EVENT_FLAGS, function(err, filename, events)
+		_personal_event(entry, err, filename, events)
+	end)
+	if not protected or activated == nil or activated == false then
+		_retire_personal(entry)
+		return nil, "personal watcher activation refused: " .. path .. ": " .. tostring(protected and detail or activated)
+	end
+	entry.started = true
+	if entry.anchor_failed then _retire_personal(entry); return nil, "personal parent watcher failed during activation: " .. path end
+	return entry
+end
+
+--- Keeps one native parent binding across removal/replacement of the admitted root.
+--- Refusal remains retryable without discarding healthy recursive coverage.
+local function _ensure_personal_anchor(epoch)
+	if not luv or _personal_root == "/" then return true end
+	local parent, name = _personal_root:match("^(.*)/([^/]+)$")
+	if not parent then parent, name = ".", _personal_root elseif parent == "" then parent = "/" end
+	local attributes = _personal_metadata(parent)
+	if not attributes or attributes.kind ~= "directory" then return false end
+	if _personal_anchor and _personal_anchor.path == parent and _same_personal_binding(_personal_anchor, attributes) then return true end
+	local entry, detail = _new_personal_entry(parent, attributes, epoch, name)
+	if not entry then
+		Logger.warn(LOG, "Personal parent watcher admission refused for '%s': %s.", parent, tostring(detail))
+		return false
+	end
+	if epoch ~= _personal_epoch then _retire_personal(entry); return false end
+	local previous = _personal_anchor
+	_personal_anchor = entry
+	entry.staging, entry.active = false, true
+	if previous then _retire_personal(previous) end
+	return true
+end
+
+--- Produces a complete census, keeping ambiguous or refused subtrees unjudged.
+local function _personal_census(path, depth, desired, staged, previous, epoch)
+	if depth > SCAN_MAX_DEPTH then
+		Logger.warn(LOG, "Personal hotstrings scan hit max depth %d at '%s' — not descending further (directory cycle?).", SCAN_MAX_DEPTH, path)
+		return true
+	end
+	local attributes, detail = _personal_metadata(path)
+	if not attributes then return false, detail end
+	local function admit(target, image)
+		local entry = previous[target]
+		if not _same_personal_binding(entry, image) then
+			entry, detail = _new_personal_entry(target, image, epoch)
+			if not entry then return false end
+			staged[#staged + 1] = entry
+		end
+		desired[target] = entry
+		return true
+	end
+	if _personal_file then
+		-- A selected file never authorizes its siblings or a replacement directory.
+		if path ~= _personal_root or not _personal_regular_file(attributes) then return false, "selected TOML file is unavailable: " .. path end
+		if not admit(path, attributes) then return false, detail end
+		local after
+		after, detail = _personal_metadata(path)
+		if not after or not _same_personal_binding(desired[path], after) then return false, detail or "selected TOML file changed during admission" end
+		return true
+	end
+	if attributes.kind ~= "directory" then return false, "personal directory is unavailable: " .. path end
+	if not admit(path, attributes) then return false, detail end
+	local entries
+	entries, detail = _personal_list(path)
+	if not entries then return false, detail end
+	for _, name in ipairs(entries) do
+		local child = path .. "/" .. name
+		local image
+		image, detail = _personal_metadata(child)
+		if not image then return false, detail end
+		if image.kind == "directory" then
+			local accepted
+			accepted, detail = _personal_census(child, depth + 1, desired, staged, previous, epoch)
+			if not accepted then return false, detail end
+		elseif _is_toml(name) then
+			if not admit(child, image) then return false, detail end
+			local after
+			after, detail = _personal_metadata(child)
+			if not after or not _same_personal_binding(desired[child], after) then return false, detail or "personal file changed during admission" end
+		end
+	end
+	local after
+	after, detail = _personal_metadata(path)
+	if not after or not _same_personal_binding(desired[path], after) then return false, detail or "personal directory changed during admission" end
+	return true
+end
+
+_reconcile_personal = function()
+	if _personal_root == nil then _personal_dirty = false; return true end
+	local epoch, revision, previous = _personal_epoch, _personal_revision, _personal_entries
+	local anchored = _ensure_personal_anchor(epoch)
+	if epoch ~= _personal_epoch then return false end
+	local desired, staged = {}, {}
+	local called, accepted, detail = pcall(_personal_census, _personal_root, 1, desired, staged, _personal_rebind and {} or previous, epoch)
+	if not called or not accepted or epoch ~= _personal_epoch or previous ~= _personal_entries or revision ~= _personal_revision then
+		for _, entry in ipairs(staged) do _retire_personal(entry) end
+		Logger.warn(LOG, "Personal watcher coverage remains unchanged; reconciliation refused: %s.", tostring(called and detail or accepted))
+		return false
+	end
+	local changed = false
+	for path, entry in pairs(desired) do if previous[path] ~= entry then changed = true end end
+	for path, entry in pairs(previous) do if desired[path] ~= entry then changed = true end end
+	_personal_entries, _personal_dirty, _personal_rebind = desired, not anchored, false
+	for _, entry in pairs(desired) do entry.staging, entry.active = false, true end
+	for path, entry in pairs(previous) do if desired[path] ~= entry then _retire_personal(entry) end end
+	return anchored, changed
+end
+
+--- Repairs coverage on a bounded independent deadline, never once per idle pump.
+local function _retry_personal_coverage()
+	if not _personal_retry_at or _now_ms() < _personal_retry_at or _reload_deadline then return end
+	local epoch = _personal_epoch
+	local accepted, changed = _reconcile_personal()
+	if epoch ~= _personal_epoch then return end
+	if accepted then _personal_retry_at = nil else _personal_retry_at = _now_ms() + _debounce_sec * 1000 end
+	if changed then
+		-- A successful census may repair source coverage while the optional
+		-- parent binding is still refused and retains its own retry deadline.
+		-- Files could change while their refused bindings were unobserved. Admit
+		-- one fresh consumer read through the existing settle/generation owner.
+		_schedule_reload("personal coverage repaired", { _personal_root })
 	end
 end
 
@@ -469,7 +778,7 @@ end
 --- @param opts table
 ---   .hotstrings_dir  string  Absolute path to the main hotstrings TOML directory.
 ---   .base_dir        string  Absolute path to the project root (for .lua watching).
----   .personal_dir    string  Absolute path to personal hotstrings (recursive .toml scan).
+---   .personal_dir    string  Personal hotstrings directory or an existing selected TOML file.
 ---   .on_reload       function()  Called after the debounce window when a change is detected.
 ---   .now_ms          function() → number  Optional wall-clock source (ms) for tests.
 function M.start(opts)
@@ -477,6 +786,7 @@ function M.start(opts)
 	local hotstrings_dir = opts.hotstrings_dir
 	local base_dir       = opts.base_dir
 	local personal_dir   = opts.personal_dir or ""
+	assert(personal_dir == "" or _personal_root == nil, "Personal watchers are already armed")
 	_on_reload           = opts.on_reload
 	_base_dir            = base_dir
 	if type(opts.now_ms) == "function" then _now_ms = opts.now_ms end
@@ -516,8 +826,18 @@ function M.start(opts)
 
 	-- ── 9.2) Personal hotstrings (recursive .toml scan) ──
 	if personal_dir ~= "" then
-		local clean_dir = personal_dir:gsub("[/\\]+$", "")
-		_scan_personal_dir(clean_dir, 1, {})
+		local clean_dir = _directory_path(personal_dir)
+		local is_directory = _is_dir(clean_dir)
+		local is_file = not is_directory and _is_toml(clean_dir) and _personal_regular_file(_personal_metadata(clean_dir))
+		if is_directory or is_file then
+			_personal_epoch = _personal_epoch + 1
+			_personal_root, _personal_dirty = clean_dir, true
+			_personal_file = is_file == true
+			local epoch = _personal_epoch
+			local reconciled = _reconcile_personal()
+			if epoch ~= _personal_epoch then return false end
+			if not reconciled then _personal_retry_at = _now_ms() + _debounce_sec * 1000 end
+		end
 	end
 
 	-- ── 9.3) Project .lua files ──
@@ -547,6 +867,8 @@ function M.start(opts)
 	end
 
 	local watcher_count = luv and #_luv_handles or #_pump_entries
+	for _ in pairs(_personal_entries) do watcher_count = watcher_count + 1 end
+	if _personal_anchor then watcher_count = watcher_count + 1 end
 	Logger.success(LOG, "File watchers armed: %d handle(s) (%s).", watcher_count, backend_label)
 end
 
@@ -557,18 +879,27 @@ end
 --- fire within the luv event loop automatically. In pump mode, both the
 --- deadline check AND mtime polling run.
 function M.pump()
+	_retry_personal_retirement()
 	-- Always check the debounce deadline (both backends).
 	_check_deadline()
+	_retry_personal_coverage()
 
 	-- Pump-mode mtime polling (no-op when luv handles the watching).
 	if luv then return end
-	if #_pump_entries == 0 then return end
+	if #_pump_entries == 0 and next(_personal_entries) == nil then return end
 	_pump_check_all()
 end
 
 --- Stops all file watchers and clears state. Safe to call at any time,
 --- including before start() or after a prior stop(). Idempotent.
 function M.stop()
+	_personal_epoch = _personal_epoch + 1
+	_personal_root, _personal_dirty, _personal_retry_at, _personal_rebind = nil, false, nil, false
+	_personal_file = false
+	if _personal_anchor then _retire_personal(_personal_anchor); _personal_anchor = nil end
+	for _, entry in pairs(_personal_entries) do _retire_personal(entry) end
+	_personal_entries = {}
+	_retry_personal_retirement()
 	-- Close luv handles.
 	for _, entry in ipairs(_luv_handles) do
 		pcall(function() luv.fs_event_stop(entry.handle) end)
@@ -585,7 +916,9 @@ function M.stop()
 	_base_dir = nil
 
 	_on_reload = nil
-	Logger.debug(LOG, "All file watchers stopped.")
+	local retired = next(_personal_retiring) == nil
+	Logger.debug(LOG, retired and "All file watchers stopped." or "File watchers deactivated; Personal native retirement remains owned.")
+	return retired
 end
 
 --- Returns true when luv (inotify) backend is active.

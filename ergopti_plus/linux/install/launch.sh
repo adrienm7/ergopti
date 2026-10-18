@@ -65,14 +65,21 @@ if "$SESSION_START"; then
 	lock_root="${XDG_RUNTIME_DIR:-$HOME/.cache}/ergopti"
 	install -d -m 700 "$lock_root"
 	exec 9>"$lock_root/ergopti.lock"
-	# Keep the lock descriptor across exec; it belongs to this exact daemon.
-	if flock --nonblock --conflict-exit-code 75 9; then
+	# BusyBox and util-linux share -n and report contention with status 1.
+	# BusyBox also uses 1 for native errors, which print a diagnostic. Preserve
+	# those errors instead of silently reporting an already-running instance.
+	# The lock remains on our open file description when this child exits.
+	if lock_diagnostic="$(flock -n 9 2>&1)"; then
+		if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
 		:
 	else
 		status=$?
-		if [ "$status" -eq 75 ]; then exit 0; fi
+		if [ "$status" -eq 1 ] && [ -z "$lock_diagnostic" ]; then exit 0; fi
+		if [ -n "$lock_diagnostic" ]; then printf '%s\n' "$lock_diagnostic" >&2; fi
 		exit "$status"
 	fi
+	# LuaJIT restricts inheritance before loading modules that launch children.
+	export ERGOPTI_SESSION_LOCK_FD=9
 fi
 
 exec luajit "$DRIVER_ROOT/ergopti_hotstrings.lua" "$@"

@@ -8,6 +8,42 @@
 ; ==============================================================================
 
 
+; Publish the terminal ownership lease before any other subsystem drains into
+; the keylogger. The global shutdown handler calls this before the deferred
+; hotstring fire queue, and KL_Stop repeats it for direct callers.
+KL_BeginShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if !Keylogger._shutting_down {
+			Keylogger._shutting_down := true
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
+}
+
+; Rolls back the reversible shutdown lease when an OnExit gate refuses before
+; any producer is stopped. Durable rows already drained remain consumed, while
+; future keylogger callbacks receive a fresh lifecycle generation.
+KL_CancelShutdown() {
+	ShutdownCritical := Critical("On")
+	try {
+		if !Keylogger.initialized
+			return false
+		if Keylogger._shutting_down {
+			Keylogger._shutting_down := false
+			Keylogger.lifecycle_generation += 1
+		}
+		return true
+	} finally {
+		Critical(ShutdownCritical)
+	}
+}
+
 KL_TimerGroupStart(Owner, TimerSpecs, TimerFn := SetTimer,
 		GroupName := "keylogger") {
 	if !IsObject(Owner)

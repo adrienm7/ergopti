@@ -48,6 +48,17 @@ FSReadBytesStrict(Path) {
 	return FileRead(Path, "RAW")
 }
 
+; Opens an owned native file without changing flags, encoding, or failure behavior.
+; @param Path {String} File path.
+; @param Flags {String|Integer} Native access, sharing and translation flags.
+; @param Encoding {String} Optional encoding; omission retains the native default.
+; @return {File|0} Native file result; native exceptions remain visible.
+FSOpenStrict(Path, Flags, Encoding := unset) {
+	if IsSet(Encoding)
+		return FileOpen(Path, Flags, Encoding)
+	return FileOpen(Path, Flags)
+}
+
 ; Reads the entire contents of a file as a UTF-8 string.
 ; @param Path {String} Absolute path to the file.
 ; @return {String|false} File contents on success, false on any error.
@@ -913,7 +924,7 @@ FSIsReparsePoint(Path) {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_FILE_SYSTEM := Map(
     "read",   FSRead,
@@ -1081,4 +1092,23 @@ FSConfigDeleteStrict(Path, AdmissionFn := 0) {
 				return false
 		return Delete.Call(Path)
 	} finally Critical(PreviousCritical)
+}
+
+
+/** Writes a strict UTF-8 stage and retains the original close-before-move order. */
+FSWriteUtf8ReplaceStrict(Path, Text) {
+	Utf8ReplacementStream := FileOpen(Path . ".tmp", "w", "UTF-8-RAW")
+	try Utf8ReplacementStream.Write(Text)
+	finally Utf8ReplacementStream.Close()
+	FileMove(Path . ".tmp", Path, true)
+}
+
+/** Encodes the complete UTF-8 image without its additional terminator byte. */
+FSUtf8Bytes(Content) {
+	Size := StrPut(Content, "UTF-8") - 1
+	Bytes := Buffer(Size, 0)
+	Encoded := Buffer(Size + 1, 0)
+	StrPut(Content, Encoded, "UTF-8")
+	DllCall("RtlMoveMemory", "Ptr", Bytes.Ptr, "Ptr", Encoded.Ptr, "UPtr", Size)
+	return Bytes
 }

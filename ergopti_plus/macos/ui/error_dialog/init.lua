@@ -191,6 +191,17 @@ local function send(session, message)
 	return true
 end
 
+--- Invalidates action ownership before native cancellation can reenter the bridge.
+--- @param session table Exact retained page session.
+local function cancel_action(session)
+	session.action_epoch = (session.action_epoch or 0) + 1
+	local epoch = session.action_epoch
+	local previous = session.action_request
+	session.action_request = nil
+	if previous then previous.cancel() end
+	return epoch
+end
+
 --- Forgets the session and frees the policy for the next window.
 --- @param session table
 local function retire(session)
@@ -199,6 +210,7 @@ local function retire(session)
 	_busy = false
 	_folded = 0
 	_generation = _generation + 1
+	cancel_action(session)
 	local controller = session.controller
 	session.controller = nil
 	if controller then
@@ -240,6 +252,8 @@ end
 --- @param name string
 local function perform(session, name)
 	if name == "close" then return close(session) end
+	local epoch = cancel_action(session)
+	if _session ~= session or session.action_epoch ~= epoch then return end
 	local Report = require("ui.healthcheck.report")
 	local action
 	local shared
@@ -254,8 +268,23 @@ local function perform(session, name)
 	else
 		action = { action = "open_path", id = session.open_id }
 	end
-	local result = Report.perform(action, session.paths, session.documents, session.redaction.context, nil, session.snapshot)
-	send(session, { type = "action", action = name, ok = result.ok == true, missing = result.missing == true })
+	local snapshot, generation = session.snapshot, session.generation
+	local revision = snapshot.export_revision
+	local function current()
+		return package.loaded["ui.error_dialog"] == M and _session == session and session.action_epoch == epoch and session.generation == generation
+			and session.snapshot == snapshot and snapshot.export_revision == revision
+	end
+	local completed = false
+	local request = Report.perform(action, session.paths, session.documents, session.redaction.context, nil, snapshot, {
+		current = current,
+		complete = function(result)
+			if not current() then return end
+			completed = true
+			session.action_request = nil
+			send(session, { type = "action", action = name, ok = result.ok == true, missing = result.missing == true })
+		end,
+	})
+	if current() and not completed then session.action_request = request else request.cancel() end
 end
 
 --- Handles one message of the session's page.
@@ -501,21 +530,32 @@ end
 --- for a window that shows a failure of its own (the update-check window): the
 --- same diagnostics report, redacted, the same prefilled issue form.
 --- @param record table { kind = "error", module, message, time }
---- @return boolean reported
-function M.report(record)
-	if _scope_owner ~= nil or _scope_busy then return false end
+--- @param complete function Receives the actual report outcome.
+--- @param current function Exact originating action owner.
+--- @return table|nil request Cancellable report request.
+function M.report(record, complete, current)
+	assert(type(current) == "function" and type(complete) == "function",
+		"Error reporting needs its current owner and completion")
+	if _scope_owner ~= nil or _scope_busy or current() ~= true then return nil end
+	local generation = _scope_generation
+	local function owned()
+		return _scope_owner == nil and not _scope_busy and generation == _scope_generation and current() == true
+			and package.loaded["ui.error_dialog"] == M
+	end
 	local ok_report, fields = pcall(build_report, record)
+	if not owned() then return nil end
 	if not ok_report then
-		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module),
-			tostring(fields))
-		return false
+		Logger.error(LOG, "The report of '%s' could not be built: %s.", tostring(record and record.module), tostring(fields))
+		if owned() then complete(false) end
+		return nil
 	end
 	local shared = require("healthcheck.share").document(fields.snapshot, fields.documents.schema,
 		require("infra.i18n").get(fields.documents.schema.share_policy.notice_key))
-	local result = require("ui.healthcheck.report").perform(
+	return require("ui.healthcheck.report").perform(
 		{ action = "report", text = shared.text, fields = shared.fields },
-		fields.paths, fields.documents, fields.redaction.context, nil, fields.snapshot)
-	return result.ok == true
+		fields.paths, fields.documents, fields.redaction.context, nil, fields.snapshot, {
+			current = owned, complete = function(result) if owned() then complete(result.ok == true, result.missing == true) end end,
+		})
 end
 
 --- Test seam: forgets the policy, the decisions and the window.

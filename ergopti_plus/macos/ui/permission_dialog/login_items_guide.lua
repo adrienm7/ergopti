@@ -105,19 +105,38 @@ local function settings_opener(remap)
 	end
 end
 
---- Ends a guide: stops its poll, then closes the steps when asked. The guide
---- is released first, so the dialog's close report finds nothing to end.
+--- Ends a guide only after its dialog and native poll acknowledge cleanup.
+--- A refused close keeps the original poll for retry; a refused timer stop
+--- stays owned until the scheduler reports actual settlement.
 --- @param guide table The running guide.
 --- @param close_dialog boolean Whether the steps must close as well.
 --- @return boolean settled True when the poll stopped and the steps closed.
 local function finish(guide, close_dialog)
 	if _guide ~= guide then return true end
-	_guide = nil
-	local settled = TimerScheduler.cancel(guide.timer) == true
-	if not settled then
-		Logger.warn(LOG, "The Login Items approval poll did not settle on cancel.")
+	if guide.finishing then return false end
+	guide.closing = true
+	guide.close_dialog = guide.close_dialog or close_dialog
+	guide.finishing = true
+	if guide.close_dialog then
+		local ok, closed = pcall(PermissionDialog.close, KIND)
+		if not ok or closed ~= true then
+			guide.finishing = false
+			Logger.warn(LOG, "The Login Items steps did not close; their original poll retains the retry.")
+			return false
+		end
+		guide.close_dialog = false
 	end
-	if close_dialog and PermissionDialog.close(KIND) ~= true then settled = false end
+	local settled = TimerScheduler.cancel(guide.timer) == true
+	guide.finishing = false
+	if settled then
+		_guide = nil
+	elseif not guide.awaiting_timer then
+		guide.awaiting_timer = true
+		TimerScheduler.onSettled(guide.timer, function()
+			if _guide == guide then _guide = nil end
+		end)
+		Logger.warn(LOG, "The Login Items approval poll did not settle on cancel; its owner is retained.")
+	end
 	return settled
 end
 
@@ -125,7 +144,7 @@ end
 --- button, or another permission taking the dialog.
 --- @param guide table The guide that showed them.
 local function on_steps_closed(guide)
-	if _guide ~= guide then return end
+	if _guide ~= guide or guide.finishing then return end
 	Logger.warn(LOG,
 		"The Login Items steps closed after %d s before the guardian was approved; the Tap-Holds menu keeps them.",
 		guide.elapsed)
@@ -136,6 +155,7 @@ end
 --- @param guide table The running guide.
 --- @return boolean offered True when the steps are open or waiting to open.
 local function present(guide)
+	if guide.closing then return false end
 	if PermissionDialog.is_open(ACCESSIBILITY) then
 		if not guide.queued then
 			guide.queued = true
@@ -157,11 +177,25 @@ local function present(guide)
 	return true
 end
 
---- Runs one poll: closes the steps once the guardian no longer needs them,
---- shows steps that waited behind Accessibility, and stops at the deadline.
+--- Runs one poll: closes steps when Tap-Holds are off or the guardian no longer
+--- needs them, shows queued steps after Accessibility, and stops at the deadline.
 --- @param guide table The running guide.
 local function tick(guide)
 	if _guide ~= guide then return end
+	if guide.closing then
+		finish(guide, false)
+		return
+	end
+	local readable, tap_holds_enabled = pcall(guide.remap.get_tap_holds_enabled)
+	if not readable or tap_holds_enabled ~= true then
+		if readable then
+			Logger.info(LOG, "Tap-Holds are off; the Login Items steps closed.")
+		else
+			Logger.warn(LOG, "Tap-Holds state is unreadable; the Login Items steps closed.")
+		end
+		finish(guide, true)
+		return
+	end
 	guide.elapsed = guide.elapsed + M.POLL_SECONDS
 	local state = read_state(guide.remap)
 	if state == READY then
@@ -197,7 +231,13 @@ local function start(remap, trigger)
 		Logger.info(LOG, "No Login Items steps to show (%s): the remap guardian is '%s'.", trigger, state)
 		return false
 	end
-	if _guide ~= nil then return present(_guide) end
+	if _guide ~= nil then
+		if _guide.closing then
+			finish(_guide, false)
+			return false
+		end
+		return present(_guide)
+	end
 
 	Logger.start(LOG, "Waiting for the remap guardian's Login Items approval (%s, up to %d s)…",
 		trigger, M.DEADLINE_SECONDS)

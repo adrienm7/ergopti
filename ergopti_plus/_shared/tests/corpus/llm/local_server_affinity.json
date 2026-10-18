@@ -1,0 +1,413 @@
+{
+	"_comment": "Independent literal configured endpoint affinity and oMLX response vectors. Common OpenAI payloads are not product identity evidence.",
+	"affinity_cases": [
+		{
+			"name": "explicit catalogue provider owns custom endpoint",
+			"provider": "omlx",
+			"base_url": "http://localhost:19423/custom",
+			"server": "omlx",
+			"matches": true
+		},
+		{
+			"name": "generic canonical localhost",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/v1",
+			"server": "omlx",
+			"matches": true
+		},
+		{
+			"name": "generic openai IPv4 alias and trailing slash",
+			"provider": "openai",
+			"base_url": "http://127.0.0.1:8000/v1/",
+			"server": "omlx",
+			"matches": true
+		},
+		{
+			"name": "generic IPv6 loopback alias",
+			"provider": "openai_compat",
+			"base_url": "http://[::1]:8000/v1",
+			"server": "omlx",
+			"matches": true
+		},
+		{
+			"name": "generic hostname case",
+			"provider": "openai",
+			"base_url": "HTTP://LOCALHOST:8000/v1",
+			"server": "omlx",
+			"matches": true
+		},
+		{
+			"name": "generic other declared server",
+			"provider": "openai_compat",
+			"base_url": "http://127.0.0.1:1234/v1",
+			"server": "lmstudio",
+			"matches": true
+		},
+		{
+			"name": "different port",
+			"provider": "openai_compat",
+			"base_url": "http://127.0.0.1:19423/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "foreign host",
+			"provider": "openai_compat",
+			"base_url": "http://local.example:8000/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "different base path",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/other/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "case sensitive path",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/V1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "userinfo",
+			"provider": "openai_compat",
+			"base_url": "http://inert@localhost:8000/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "query",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/v1?key=inert",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "fragment",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/v1#other",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "backslash",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000\\v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "whitespace",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/v1 ",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "control",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:8000/v1\n",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "invalid port",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:0/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "oversized port",
+			"provider": "openai_compat",
+			"base_url": "http://localhost:65536/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "wrong scheme",
+			"provider": "openai_compat",
+			"base_url": "https://localhost:8000/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "empty configured endpoint",
+			"provider": "openai_compat",
+			"base_url": "",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "other registered provider is not generic",
+			"provider": "anthropic",
+			"base_url": "http://localhost:8000/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "unknown server cannot gain exact capability",
+			"provider": "foreign",
+			"base_url": "http://localhost:8000/v1",
+			"server": "foreign",
+			"matches": false
+		},
+		{
+			"name": "invalid provider type",
+			"provider": false,
+			"base_url": "http://localhost:8000/v1",
+			"server": "omlx",
+			"matches": false
+		},
+		{
+			"name": "invalid endpoint type",
+			"provider": "openai",
+			"base_url": false,
+			"server": "omlx",
+			"matches": false
+		}
+	],
+	"omlx_models_body": "{\"object\":\"list\",\"data\":[{\"id\":\"mlx-community/Qwen3-8B-4bit\",\"object\":\"model\",\"owned_by\":\"omlx\"},{\"id\":\"gemma-3-4b-it-4bit\",\"object\":\"model\",\"owned_by\":\"omlx\"}]}",
+	"omlx_model_ids": ["mlx-community/Qwen3-8B-4bit", "gemma-3-4b-it-4bit"],
+	"entry_auth_cases": [
+		{
+			"name": "canonical keyless OpenAI",
+			"provider": "openai",
+			"token": "",
+			"base_url": "http://127.0.0.1:8000/v1",
+			"allowed": true
+		},
+		{
+			"name": "nondefault keyless compatible",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://localhost:19423/custom/v1",
+			"allowed": true
+		},
+		{
+			"name": "IPv6 keyless compatible",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://[::1]:19423/v1",
+			"allowed": true
+		},
+		{
+			"name": "remote empty key refused",
+			"provider": "openai",
+			"token": "",
+			"base_url": "https://api.openai.com/v1",
+			"allowed": false
+		},
+		{
+			"name": "foreign HTTP empty key refused",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://local.example:8000/v1",
+			"allowed": false
+		},
+		{
+			"name": "userinfo cannot grant keyless capability",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://inert@localhost:8000/v1",
+			"allowed": false
+		},
+		{
+			"name": "query cannot grant keyless capability",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://localhost:8000/v1?other=1",
+			"allowed": false
+		},
+		{
+			"name": "fragment cannot grant keyless capability",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://localhost:8000/v1#other",
+			"allowed": false
+		},
+		{
+			"name": "invalid loopback port refused",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "http://localhost:65536/v1",
+			"allowed": false
+		},
+		{
+			"name": "empty generic context refused",
+			"provider": "openai_compat",
+			"token": "",
+			"base_url": "",
+			"allowed": false
+		},
+		{
+			"name": "local URL cannot grant unrelated provider",
+			"provider": "anthropic",
+			"token": "",
+			"base_url": "http://localhost:8000/v1",
+			"allowed": false
+		},
+		{
+			"name": "provided generic credential retained",
+			"provider": "openai",
+			"token": "inert-token",
+			"base_url": "http://localhost:19423/v1",
+			"allowed": true
+		},
+		{
+			"name": "nonstring credential refused",
+			"provider": "openai",
+			"token": false,
+			"base_url": "http://localhost:8000/v1",
+			"allowed": false
+		}
+	],
+	"configured_view_cases": [
+		{
+			"name": "canonical endpoints are already declared",
+			"entries": [
+				{
+					"id": "canonical",
+					"provider": "openai_compat",
+					"base_url": "http://127.0.0.1:8000/v1",
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "nondefault known generic views retain configured order",
+			"entries": [
+				{
+					"id": "first",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert-token"
+				},
+				{
+					"id": "second",
+					"provider": "openai_compat",
+					"base_url": "http://[::1]:19424/owned/v1",
+					"token": ""
+				}
+			],
+			"expected_order": ["configured:first", "configured:second"],
+			"expected_views": {
+				"configured:first": {
+					"id": "configured:first",
+					"entry_id": "first",
+					"provider": "openai",
+					"label": "OpenAI",
+					"base_url": "http://localhost:19423/v1"
+				},
+				"configured:second": {
+					"id": "configured:second",
+					"entry_id": "second",
+					"provider": "openai_compat",
+					"label": "OpenAI-compatible",
+					"base_url": "http://[::1]:19424/owned/v1"
+				}
+			}
+		},
+		{
+			"name": "different owned base path is truthfully generic",
+			"entries": [
+				{
+					"id": "path",
+					"provider": "openai",
+					"base_url": "http://localhost:8000/other/v1",
+					"token": ""
+				}
+			],
+			"expected_order": ["configured:path"],
+			"expected_views": {
+				"configured:path": {
+					"id": "configured:path",
+					"entry_id": "path",
+					"provider": "openai",
+					"label": "OpenAI",
+					"base_url": "http://localhost:8000/other/v1"
+				}
+			}
+		},
+		{
+			"name": "foreign remote secret never enters search",
+			"entries": [
+				{
+					"id": "foreign",
+					"provider": "openai",
+					"base_url": "https://api.openai.com/v1",
+					"token": "inert-foreign"
+				},
+				{
+					"id": "invalid",
+					"provider": "openai_compat",
+					"base_url": "http://inert@localhost:19423/v1",
+					"token": "inert"
+				},
+				{
+					"id": "query",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1?token=inert",
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "unrelated and exact local providers are not generic views",
+			"entries": [
+				{
+					"id": "local",
+					"provider": "omlx",
+					"base_url": "http://localhost:19423/v1",
+					"token": ""
+				},
+				{
+					"id": "other",
+					"provider": "anthropic",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert"
+				},
+				{
+					"id": "unknown",
+					"provider": "future",
+					"base_url": "http://localhost:19423/v1",
+					"token": "inert"
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		},
+		{
+			"name": "invalid entry authority is refused",
+			"entries": [
+				{
+					"id": "",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": ""
+				},
+				{
+					"id": "bad-token",
+					"provider": "openai",
+					"base_url": "http://localhost:19423/v1",
+					"token": false
+				},
+				{
+					"id": "bad-base",
+					"provider": "openai",
+					"base_url": false,
+					"token": ""
+				}
+			],
+			"expected_order": [],
+			"expected_views": {}
+		}
+	]
+}

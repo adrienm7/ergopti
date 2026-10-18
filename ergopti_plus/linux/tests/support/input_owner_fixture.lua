@@ -67,6 +67,7 @@ function M.with_session(options, body)
 				if options.caps_led and request % 256 == 0x19 then
 					argument.bytes = "\2" .. argument.bytes:sub(2)
 				end
+				if request % 256 == 0x19 then return argument.count end
 			end
 			return 0
 		end,
@@ -213,6 +214,7 @@ function M.with_session(options, body)
 			end
 		end))
 		s.start_options = { intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
+			onChar = options.on_char,
 			onCaptureReacquired = options.on_capture_reacquired }
 		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())

@@ -145,7 +145,7 @@ function M.on_message(payload, state)
 		local logs_dir = nil
 		if type(payload.logsDir) == "string" then
 			if not config_paths or type(config_paths.normalize_logs_dir) ~= "function"
-				or type(config_paths.set_logs_dir) ~= "function" then
+				or type(config_paths.set_paths) ~= "function" then
 				Logger.error(LOG, "The logs folder cannot be saved without its writer; editor remains open.")
 				return { saved = false }
 			end
@@ -168,18 +168,13 @@ function M.on_message(payload, state)
 			end
 			logs_dir = payload.logsDir
 		end
-		local saved = config_paths and type(config_paths.set_config_dir) == "function"
-			and config_paths.set_config_dir(payload.configDir) == true
+		local saved = config_paths and type(config_paths.set_paths) == "function"
+			and config_paths.set_paths(payload.configDir, logs_dir) == true
 		if not saved then
         Logger.error(LOG, "Configuration directory was not persisted; editor remains open.")
 			return { saved = false }
 		end
 		if logs_dir ~= nil then
-			local logs_saved, logs_err = config_paths.set_logs_dir(logs_dir)
-			if logs_saved ~= true then
-				Logger.error(LOG, "Logs folder was not persisted (%s); editor remains open.", tostring(logs_err))
-				return { saved = false }
-			end
 			-- The daemon outlives this editor's reload, so the running sink is
 			-- moved now; until it is, every opener names the folder it writes.
 			local sink = dependency(state, "logger_sink", "infra.logger_sink")

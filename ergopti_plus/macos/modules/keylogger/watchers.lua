@@ -33,7 +33,7 @@ local LOG     = "keylogger.watchers"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
 -- collected mid-run, which kills the subprocess so its completion callback never
--- fires. Canonical spelling recognised by tests/unit/meta/test_gc_retention.lua;
+-- fires. Canonical spelling recognised by tests/meta/lua_safety/test_gc_retention.lua;
 -- entries are released when the callback runs or the launch is refused.
 local _active_tasks = {}
 
@@ -730,6 +730,104 @@ function M.stop_hardware_watchers()
 		Logger.error(LOG, "Hardware watcher cleanup remains pending.")
 	end
 	return settled
+end
+
+--- A bound actor observes existing writers; binding does not activate sensors.
+local PhysicalLifecycle = require("keylogger.physical_lifecycle_observation")
+local _physical_lifecycle = PhysicalLifecycle.new("system", function()
+	return require("adapters.physical_observation_clock").now()
+end, function(reason) Logger.error(LOG, "Physical lifecycle observer retired: %s.", tostring(reason)) end)
+
+local function physical_lifecycle_snapshot(initial)
+	if initial then
+		local generation, refresh_generation = _hardware_generation, _context_refresh_generation
+		local state, pause_port, hardware = _state, _is_paused, _hardware_watchers_enabled
+		local enabled = state and state.is_enabled
+		local refreshing = next(_context_refresh_timers) ~= nil
+		local function cleanup_pending()
+			return not hardware and (_wifi_watcher ~= nil or _battery_watcher ~= nil
+				or _spaces_watcher ~= nil or _audio_watcher_active or _audio_callback_installed)
+		end
+		local cleanup_owed = cleanup_pending()
+		if type(pause_port) ~= "function" then return {} end
+		local function stable()
+			return generation == _hardware_generation and refresh_generation == _context_refresh_generation
+				and rawequal(state, _state) and rawequal(pause_port, _is_paused)
+				and enabled == (state and state.is_enabled) and hardware == _hardware_watchers_enabled
+				and refreshing == (next(_context_refresh_timers) ~= nil)
+				and cleanup_owed == cleanup_pending()
+		end
+		local paused = pause_port()
+		if not stable() then return {} end
+		local paused_after = pause_port()
+		if not stable() or paused ~= paused_after then return {} end
+		return { enabled = enabled, paused = paused, hardware_committed = hardware,
+			hardware_generation = generation, context_refresh_generation = refresh_generation,
+			settled = not refreshing and not cleanup_owed }
+	end
+	local generation, refresh_generation = _hardware_generation, _context_refresh_generation
+	local paused = _is_paused and _is_paused()
+	if generation ~= _hardware_generation or refresh_generation ~= _context_refresh_generation then return {} end
+	return { enabled = _state and _state.is_enabled, paused = paused,
+		hardware_committed = _hardware_watchers_enabled, hardware_generation = generation,
+		context_refresh_generation = refresh_generation }
+end
+local function physical_system_source(event)
+	return require("adapters.physical_lifecycle_event").classify(event)
+end
+
+--- Binds a dormant lifecycle consumer; no hardware handle or state is acquired.
+---@param owner table Exact observer owner.
+---@param capacity integer Positive native receipt budget.
+---@param receive function Literal-true receipt acknowledger.
+---@param on_refused function|nil Receives terminal reason and the exact source token.
+---@param initial_snapshot boolean|nil Opt-in readonly state at an actual observed clock point.
+---@return table|nil token Exact observer token.
+---@return string|nil reason Explicit binding refusal.
+---@return table|nil scope Exact callback current, detach and post-frame retirement ports.
+function M.bind_physical_lifecycle_observer(owner, capacity, receive, on_refused, initial_snapshot)
+	if initial_snapshot ~= nil and type(initial_snapshot) ~= "boolean" then return nil, "Invalid initial lifecycle observation option" end
+	if math.type(capacity) ~= "integer" then return nil, "Invalid native lifecycle receipt budget" end
+	return _physical_lifecycle.bind(owner, capacity, receive, on_refused,
+		initial_snapshot == true and function() return physical_lifecycle_snapshot(true) end or nil)
+end
+
+--- Detaches only the exact lifecycle owner and token.
+---@param owner table Exact observer owner.
+---@param token table Exact observer token.
+---@return boolean detached Whether the owned observer was detached.
+function M.unbind_physical_lifecycle_observer(owner, token) return _physical_lifecycle.unbind(owner, token) end
+
+local original_init, original_start, original_stop, original_caffeinate =
+	M.init, M.init_hardware_watchers, M.stop_hardware_watchers, M.caffeinate_cb
+--- Observes the existing init writer only while explicitly bound.
+---@param state table Existing core state.
+---@param ... any Unchanged legacy arguments.
+---@return boolean initialized Unchanged legacy result.
+function M.init(...) return _physical_lifecycle.run("initialization", original_init, physical_lifecycle_snapshot, ...) end
+--- Observes the existing init hardware watchers writer only while explicitly bound.
+---@param ... any Unchanged legacy arguments.
+---@return boolean committed Unchanged legacy result.
+function M.init_hardware_watchers(...) return _physical_lifecycle.run("hardware_start", original_start, physical_lifecycle_snapshot, ...) end
+--- Observes the existing stop hardware watchers writer only while explicitly bound.
+---@param ... any Unchanged legacy arguments.
+---@return boolean settled Unchanged legacy result.
+function M.stop_hardware_watchers(...) return _physical_lifecycle.run("hardware_stop", original_stop, physical_lifecycle_snapshot, ...) end
+--- Observes the existing caffeinate cb writer only while explicitly bound.
+---@param event any Existing native event.
+---@param ... any Unchanged legacy arguments.
+---@return boolean handled Unchanged legacy result.
+function M.caffeinate_cb(event, ...)
+	return _physical_lifecycle.run(physical_system_source(event), original_caffeinate, physical_lifecycle_snapshot, event, ...)
+end
+
+--- Observes current-generation system boundaries before the root enabled guard.
+---@param event any Actual native callback event.
+---@param callback function Existing generation-qualified callback invocation.
+---@param ... any Original callback arguments.
+---@return any result Unchanged legacy invocation result tuple.
+function M.observe_caffeinate_callback(event, callback, ...)
+	return _physical_lifecycle.bridge(physical_system_source(event), callback, physical_lifecycle_snapshot, event, ...)
 end
 
 return M

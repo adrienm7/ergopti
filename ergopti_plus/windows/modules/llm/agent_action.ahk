@@ -229,8 +229,10 @@ LLM_Agent_CommitSetting(Key, Value) {
 	if !LLM_Option_TryNormalize(Key, Value, &Normalized)
 		throw ValueError("LLM_Agent_CommitSetting: invalid value for " . String(Key) . ".")
 	Commit := HasMethod(_LLM_Agent_CommitFn, "Call") ? _LLM_Agent_CommitFn : LLM_Menu_CommitMutation
-	if !Commit.Call("the AI agent '" . Key . "' setting",
-			_LLM_Agent_SetCandidate.Bind(Key, Normalized), _LLM_Agent_ApplyCommitted.Bind(Key))
+	Previous := LLM_Agent_Setting(Key)
+	Committed := Commit.Call("the AI agent '" . Key . "' setting",
+			_LLM_Agent_SetCandidate.Bind(Key, Normalized), _LLM_Agent_ApplyCommitted.Bind(Key, Previous))
+	if !(Committed is Integer) || Committed != true
 		return false
 	LLM_Agent_RefreshTray()
 	return true
@@ -292,7 +294,12 @@ _LLM_Agent_SetCandidate(Key, Value, Candidate) {
 ; Live tail of a committed agent setting: the agent reads the menu state, which
 ; the transaction already published.
 ; @returns {Integer} True, the transaction's success contract.
-_LLM_Agent_ApplyCommitted(Key, Candidate) {
+_LLM_Agent_ApplyCommitted(Key, Previous, Candidate) {
+	global _LLM_Agent_Generation
+	; Durable source/mode withdrawals retire every held requester, including ABA.
+	; A no-op or a refused transaction never revokes an accepted request.
+	if (Key == "agent_system2" || Key == "agent_mode") && Candidate[Key] != Previous
+		_LLM_Agent_Generation += 1
 	LoggerDebug("LLM", "AI agent setting '{1}' committed.", Key)
 	return true
 }
@@ -533,6 +540,8 @@ _LLM_Agent_OnActionsFail(Flow, Failure := "") {
 ; Shows a notice of a manual flow and retires its spinner; the automatic mode
 ; only logs, the user asked nothing.
 _LLM_Agent_Notify(Flow, Key) {
+	if !_LLM_Agent_IsCurrent(Flow) || A_IsSuspended
+		return
 	_LLM_Agent_HideOwnTooltip(Flow)
 	if !Flow["auto"]
 		_LLM_Menu_ShowManualPredictionNotice(Key)

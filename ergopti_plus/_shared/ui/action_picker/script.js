@@ -795,7 +795,9 @@ function openParamEditor(entry) {
 			? paramStrings.captureKey
 			: entry.parameter === 'shortcut'
 				? paramStrings.captureShortcut
-				: '';
+				: program
+					? entry.hint || ''
+					: '';
 	el('param-error').hidden = true;
 	el('param-input').hidden = choosing || vision || language || program;
 	el('param-choice').hidden = !choosing;
@@ -877,10 +879,11 @@ function updateProgramProvider() {
 	el('param-error').hidden = true;
 }
 
-// Called only by the still-owned native page after a refused identity check.
-function programProviderRefused() {
+// Called only by the still-owned native page after identity or availability refusal.
+function programProviderRefused(reason) {
 	if (!editing || editing.parameter !== 'program') return;
-	el('param-error').textContent = programProviderStrings.changed || '';
+	el('param-error').textContent =
+		typeof reason === 'string' && reason !== '' ? reason : programProviderStrings.changed || '';
 	el('param-error').hidden = false;
 }
 

@@ -337,6 +337,11 @@ return_delay_ms = 200
 # AHK: keylogger.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
 ingest_tick_ms = 5000
 
+# Hard deadline for one private SQLite child, including its stdin feed.
+# Linux: reservation, transactional flush and commit-receipt resolution are
+# separate owned phases; no new phase starts before physical cleanup ACK.
+sqlite_operation_timeout_ms = 1000
+
 # Keystroke delay above this value is treated as a "thinking pause".
 # AHK: keylogger.ahk / keylogger_walker.ahk THINK_PAUSE_MS.
 # HS: aggregator.lua THINK_PAUSE_THRESHOLD_MS.
@@ -485,6 +490,13 @@ focus_settle_ms = 250
 # Hard deadline for one libatspi tree query. The verdict is already unknown and
 # fail-closed while this helper runs, so expiry affects availability, not privacy.
 atspi_probe_timeout_ms = 1000
+# Retry failed context observations after retirement, independently of execution deadlines.
+context_retry_ms = 1000
+
+# Maximum wait for one already-running accessibility worker to answer an input
+# admission barrier. A busy application withholds automation and metrics; input
+# callbacks wait no longer than this budget before physical pass-through resumes.
+focus_barrier_timeout_ms = 20
 
 
 # ──────────────────────────────────────────────────────────────────────
@@ -542,6 +554,9 @@ hesitation_cooldown_ms = 10000
 # ──────────────────────────────────────────────────────────────────────
 
 [ui]
+
+# Linux diagnostics owns an asynchronous desktop launcher until its exit/EOF receipt.
+desktop_open_timeout_ms = 30000
 
 # Native document challenge, bridge ACK and initialization share the original budget.
 # Linux Versions and network progress documents refuse unavailable prerequisites.

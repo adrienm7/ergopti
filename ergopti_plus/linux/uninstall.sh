@@ -10,6 +10,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 source "$SCRIPT_DIR/install/desktop_entry.sh"
 PREFIX="${HOME}/.local"
+CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
 CONFIRMED=false
 CHECK_ONLY=false
 WAIT_OWNER=
@@ -65,7 +66,7 @@ if [ -n "$WAIT_OWNER" ]; then
 fi
 
 remove_native_startup() {
-	local entry="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ergopti.desktop"
+	local entry="${CONFIG_ROOT}/autostart/ergopti.desktop"
 	if [ -f "$entry" ] && [ ! -L "$entry" ] \
 		&& grep -Fxq "$(ergopti_desktop_exec /usr/bin/ergopti)" "$entry"; then
 		rm -- "$entry"
@@ -127,8 +128,8 @@ while [ "$ancestor" != / ]; do
 	ancestor="$(dirname -- "$ancestor")"
 done
 MANIFEST="$LIBRARY/.ergopti-owned-files"
-UNIT="$HOME/.config/systemd/user/ergopti-hotstrings.service"
-AUTOSTART="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ergopti-hotstrings.desktop"
+UNIT="$CONFIG_ROOT/systemd/user/ergopti-hotstrings.service"
+AUTOSTART="$CONFIG_ROOT/autostart/ergopti-hotstrings.desktop"
 [ -f "$MANIFEST" ] && [ ! -L "$MANIFEST" ] || { echo 'Installation ownership manifest is missing.' >&2; exit 1; }
 OWNED=()
 REMOVE_UNIT=false

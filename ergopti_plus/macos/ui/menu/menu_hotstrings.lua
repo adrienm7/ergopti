@@ -140,13 +140,15 @@ end
 --- Returns only actionable section names for one registry group.
 --- @param keymap_api table|nil
 --- @param group_name string
+--- @param excluded table|nil { section = true } drawn by another submenu.
 --- @return table
-local function section_names_for(keymap_api, group_name)
+local function section_names_for(keymap_api, group_name, excluded)
 	local sections = keymap_api and type(keymap_api.get_sections) == "function"
 		and keymap_api.get_sections(group_name) or nil
 	local names = {}
 	for _, section in ipairs(type(sections) == "table" and sections or {}) do
-		if HotstringLanguages.section_actionable(ManifestReader.features(), group_name, section) then
+		if not (excluded and excluded[section.name])
+			and HotstringLanguages.section_actionable(ManifestReader.features(), group_name, section) then
 			names[#names + 1] = section.name
 		end
 	end
@@ -202,41 +204,6 @@ local function toggleSectionFn(ctx, group_name, sec_name, sec_label)
 	end
 end
 
---- Force every section of EVERY hotstring group on or off (whole-tree bulk
---- action for the top of the Hotstrings menu). Enabling lifts each group gate so
---- the activation is immediately effective.
---- @param ctx table Context.
---- @param enable boolean true = enable everything, false = disable everything.
---- @return function
-local function setAllSectionsFn(ctx, enable)
-	return function()
-		local km = ctx.keymap
-		if enable and not KeymapLifecycle.ensure_started(ctx, "enable all hotstring sections") then return end
-		local changes = {}
-		for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
-			local name = ctx.get_group_name and ctx.get_group_name(f) or f
-			local section_names = section_names_for(km, name)
-			if enable or #section_names > 0 then
-				changes[#changes + 1] = {
-					name = name,
-					sections = section_names,
-					enable_group = enable,
-				}
-			end
-		end
-		KeymapLifecycle.commit_mutation(ctx, "set all hotstring sections", function()
-			if not km or type(km.set_groups_sections_enabled) ~= "function" then return false end
-			return km.set_groups_sections_enabled(changes, enable)
-		end, function()
-			if enable then
-				for _, change in ipairs(changes) do ctx.state.hotstrings[change.name] = true end
-			end
-			if ctx.save_prefs() ~= true then return false end
-			ctx.updateMenu()
-		end)
-	end
-end
-
 --- Force every section of a SET of groups on or off — one language pack's
 --- « tout activer » / « tout désactiver ». One batch, so the whole language
 --- commits or rolls back together; enabling lifts each group gate as the
@@ -249,11 +216,13 @@ local function setGroupListSectionsFn(ctx, group_names, enable)
 	return function()
 		local km = ctx.keymap
 		if enable and not KeymapLifecycle.ensure_started(ctx, "enable language sections") then return end
+		-- An extension's bound sections belong to its own submenu.
+		local _, bound = M.bound_sections(ctx)
 		local changes = {}
 		for _, name in ipairs(group_names) do
 			changes[#changes + 1] = {
 				name = name,
-				sections = section_names_for(km, name),
+				sections = section_names_for(km, name, bound[name]),
 				enable_group = enable,
 			}
 		end
@@ -638,8 +607,10 @@ function M.build_groups(ctx, only, counts)
 			end
 			local toml_path = toml_path_for_group(ctx, name)
 			local render_ctx = { commands = {
-				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true),
-				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false),
+				-- The submenu's own sections: an extension's bound ones are drawn,
+				-- and switched, in that extension's submenu (2026-10-17).
+				["hotstring_category_enable_all"] = Custom.category_scope_fn(ctx, { name }, true, nil, bound_by_group),
+				["hotstring_category_disable_all"] = Custom.category_scope_fn(ctx, { name }, false, nil, bound_by_group),
 			} }
 			-- The renderer owns the head and separator order. A rendered child is
 			-- attached as `submenu` so its native commands are not rendered twice.
@@ -659,24 +630,6 @@ function M.build_groups(ctx, only, counts)
 		::continue_group::
 	end
 	return items
-end
-
---- The whole-tree « all sections » switch of the main Hotstrings menu: its tick
---- and its behaviour, since the manifest declares the row itself as a `check`.
---- Ticked when every hotstring group and every one of its sections is on; the
---- action switches them all to the other side, and is nil while paused.
---- @param ctx table Context.
---- @return table { checked = boolean, action = function|nil }
-function M.all_sections_switch(ctx)
-	local names = {}
-	for _, f in ipairs(type(ctx.hotfiles) == "table" and ctx.hotfiles or {}) do
-		names[#names + 1] = ctx.get_group_name and ctx.get_group_name(f) or f
-	end
-	local all_on = Custom.all_sections_on(ctx, names)
-	return {
-		checked = all_on,
-		action  = not ctx.paused and setAllSectionsFn(ctx, not all_on) or nil,
-	}
 end
 
 --- The one « all sections » checkbox at the top of a language submenu, for

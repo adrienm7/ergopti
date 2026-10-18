@@ -1,0 +1,693 @@
+﻿; static/ergopti_plus/windows/tests/unit/platform/remap/tap_hold/test_tap_hold_loader.ahk
+
+; ==============================================================================
+; MODULE: Tap-Hold Loader Tests
+; DESCRIPTION:
+; Unit-tests for LoadTapHoldToml and the five convenience accessors:
+; TapHoldIsConfigured, TapHoldTapAction, TapHoldDuration, TapHoldHoldModifier,
+; TapHoldHoldLayer. Exercises the TOML parsing, value coercion, and default
+; fallback behaviour without touching the live file system at runtime.
+; ==============================================================================
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 1/ LoadTapHoldToml =======
+; ==================================
+; ==================================
+
+_TH_TmpPath() => A_ScriptDir . "\test_tap_hold_tmp.toml"
+
+_TH_Write(Content) {
+	Path := _TH_TmpPath()
+	if FileExist(Path) {
+		FileDelete(Path)
+	}
+	FileAppend(Content, Path, "UTF-8")
+	return Path
+}
+
+_TH_Clean() {
+	global _TomlFileCache
+	Path := _TH_TmpPath()
+	if FileExist(Path)
+		FileDelete(Path)
+	; Evict the cached content so the next test reads fresh from disk
+	if _TomlFileCache.Has(Path)
+		_TomlFileCache.Delete(Path)
+}
+
+_TH_MissingFileReturnsEmptyScaffold() {
+	TH := LoadTapHoldToml(A_ScriptDir . "\does_not_exist_tap_hold.toml")
+	AssertEqual("Map", Type(TH))
+	AssertTrue(TH.Has("keys"))
+	AssertEqual(0, TH["keys"].Count)
+	AssertFalse(TH.Has("layers"), "layer bindings are not tap-hold data")
+}
+Test("LoadTapHoldToml: missing file returns empty scaffold", _TH_MissingFileReturnsEmptyScaffold)
+
+_TH_ParsesSingleKeyEntry() {
+	Path := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = "enter"' . "`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertTrue(TH["keys"].Has("caps_lock"))
+	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
+	AssertEqual(0.35, TH["keys"]["caps_lock"]["time_activation_seconds"])
+}
+Test("LoadTapHoldToml: parses a single key entry", _TH_ParsesSingleKeyEntry)
+
+_TH_ParsesHoldModifier() {
+	Path := _TH_Write(
+		"[tap_hold.keys.left_ctrl]`r`n"
+		. 'hold_modifier = "ctrl"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual("ctrl", TH["keys"]["left_ctrl"]["hold_modifier"])
+}
+Test("LoadTapHoldToml: parses hold_modifier", _TH_ParsesHoldModifier)
+
+_TH_ParsesHoldLayer() {
+	Path := _TH_Write(
+		"[tap_hold.keys.space]`r`n"
+		. 'hold_layer = "nav"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual("nav", TH["keys"]["space"]["hold_layer"])
+}
+Test("LoadTapHoldToml: parses hold_layer", _TH_ParsesHoldLayer)
+
+; Every hold-layer variant tests TapHoldHoldLayer(...) != "", so any other
+; layer name, a typo included, held the navigation layer. A hold_layer outside
+; [tap_hold.hold_picker].layers is refused where it is read: the error names it,
+; the key's hold is dropped (a default hold_modifier with it: the user chose a
+; layer), and its tap is kept (tap-hold-unknown-layer-2026-09-25).
+_TH_UnknownHoldLayerDropsTheHoldOnly() {
+	DefaultsPath := A_ScriptDir . "\test_tap_hold_tmp_defaults.toml"
+	for _, Source in ["user", "defaults"] {
+		UserText := "[tap_hold.keys.space]`n" . 'hold_layer = "nav"' . "`n"
+		DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
+			. 'hold_modifier = "ctrl"' . "`n"
+		if (Source == "user")
+			UserText .= "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n" . 'hold_layer = "navv"' . "`n"
+		else
+			DefaultsText := "[tap_hold.keys.caps_lock]`n" . 'tap_action = "enter"' . "`n"
+				. 'hold_layer = "navv"' . "`n"
+		; Restoring a preset is explicit: its selected records become user input.
+		if Source == "defaults"
+			UserText .= DefaultsText
+		Path := _TH_Write(UserText)
+		if FileExist(DefaultsPath)
+			FileDelete(DefaultsPath)
+		FileAppend(DefaultsText, DefaultsPath, "UTF-8")
+		Captured := []
+		LoggerSetTestSink((Line) => Captured.Push(Line))
+		try {
+			TH := LoadTapHoldToml(Path, DefaultsPath)
+		} finally {
+			LoggerClearTestSink()
+			_TH_Clean()
+			if FileExist(DefaultsPath)
+				FileDelete(DefaultsPath)
+			if _TomlFileCache.Has(DefaultsPath)
+				_TomlFileCache.Delete(DefaultsPath)
+		}
+		Entry := TH["keys"]["caps_lock"]
+		AssertFalse(Entry.Has("hold_layer"), Source . ": an unknown hold_layer must not reach the layer variants")
+		AssertEqual("", Entry.Get("hold_modifier", ""), Source . ": the key must hold nothing")
+		AssertEqual("enter", Entry["tap_action"], Source . ": the key's tap must be kept")
+		AssertEqual("nav", TH["keys"]["space"]["hold_layer"], Source . ": a known layer must still load")
+		Logged := false
+		for _, Line in Captured {
+			if (InStr(Line, "[ERROR]") and InStr(Line, "navv") and InStr(Line, "caps_lock"))
+				Logged := true
+		}
+		AssertTrue(Logged, Source . ": the refusal must be logged as an ERROR naming the layer and the key")
+	}
+}
+Test("LoadTapHoldToml: an unknown hold_layer drops the hold and keeps the tap (tap-hold-unknown-layer-2026-09-25)",
+	_TH_UnknownHoldLayerDropsTheHoldOnly)
+
+_TH_ParsesMultipleKeysIndependently() {
+	Path := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = "backspace"' . "`r`n"
+		. "[tap_hold.keys.right_ctrl]`r`n"
+		. 'tap_action = "tab"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual(2, TH["keys"].Count)
+	AssertEqual("backspace", TH["keys"]["caps_lock"]["tap_action"])
+	AssertEqual("tab",       TH["keys"]["right_ctrl"]["tap_action"])
+}
+Test("LoadTapHoldToml: parses multiple keys independently", _TH_ParsesMultipleKeysIndependently)
+
+; Layer bindings moved to layers.toml (platform/remap/layers_loader.ahk). The
+; old [tap_hold.layers.<id>.mappings] table was loaded and written back by this
+; driver and read by no other, so it looked configurable and did nothing.
+_TH_LayerSectionsAreNotTapHoldData() {
+	Path := _TH_Write(
+		"[tap_hold.layers.nav.mappings]`r`n"
+		. 'h = "arrow_left"' . "`r`n"
+		. "[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = "enter"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertFalse(TH.Has("layers"), "[tap_hold.layers.*] must not become tap-hold state")
+	AssertEqual(1, TH["keys"].Count)
+	AssertEqual("enter", TH["keys"]["caps_lock"]["tap_action"])
+}
+Test("LoadTapHoldToml: [tap_hold.layers.*] is not tap-hold data", _TH_LayerSectionsAreNotTapHoldData)
+
+_TH_IgnoresUnrecognisedSectionHeaders() {
+	Path := _TH_Write(
+		"[some_other_section]`r`n"
+		. 'foo = "bar"' . "`r`n"
+		. "[tap_hold.keys.lalt]`r`n"
+		. 'tap_action = "one_shot_shift"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual(1, TH["keys"].Count)
+	AssertFalse(TH["keys"].Has("some_other_section"))
+}
+Test("LoadTapHoldToml: ignores unrecognised section headers", _TH_IgnoresUnrecognisedSectionHeaders)
+
+_TH_IgnoresBlankLinesAndComments() {
+	Path := _TH_Write(
+		"; This is a comment`r`n"
+		. "`r`n"
+		. "[tap_hold.keys.tab]`r`n"
+		. "; another comment`r`n"
+		. 'tap_action = "alt_tab_monitor"' . "`r`n"
+	)
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertEqual("alt_tab_monitor", TH["keys"]["tab"]["tap_action"])
+}
+Test("LoadTapHoldToml: ignores blank lines and comments", _TH_IgnoresBlankLinesAndComments)
+
+_TH_ParsesInlineCommentsBeforeCoercion() {
+	Path := _TH_Write(
+		"[tap_hold.keys.tab] # configured key`r`n"
+		. "enabled = true # active`r`n"
+		. 'tap_action = "alt#tab" # hash inside string' . "`r`n"
+		. "time_activation_seconds = 0.35 # seconds`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertTrue(TH["keys"].Has("tab"),
+		"an inline comment must not invalidate the section header")
+	Entry := TH["keys"]["tab"]
+	AssertEqual(true, Entry["enabled"])
+	AssertEqual("alt#tab", Entry["tap_action"],
+		"a hash inside quotes must remain part of the value")
+	AssertEqual(0.35, Entry["time_activation_seconds"])
+}
+Test("TapHoldLoader: inline comments precede coercion (AHK-133)",
+	_TH_ParsesInlineCommentsBeforeCoercion)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 2/ TapHoldIsConfigured =======
+; ======================================
+; ======================================
+
+_TH_IsConfiguredFalseWhenEmpty() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertFalse(TapHoldIsConfigured(TH, "caps_lock"))
+}
+Test("TapHoldIsConfigured: false when keys map is empty", _TH_IsConfiguredFalseWhenEmpty)
+
+_TH_IsConfiguredTrueWhenTapAction() {
+	TH := Map("keys", Map("caps_lock", Map("tap_action", "enter")), "layers", Map())
+	AssertTrue(TapHoldIsConfigured(TH, "caps_lock"))
+}
+Test("TapHoldIsConfigured: true when tap_action present", _TH_IsConfiguredTrueWhenTapAction)
+
+_TH_IsConfiguredTrueWhenHoldModifier() {
+	TH := Map("keys", Map("lshift", Map("hold_modifier", "shift")), "layers", Map())
+	AssertTrue(TapHoldIsConfigured(TH, "lshift"))
+}
+Test("TapHoldIsConfigured: true when hold_modifier present", _TH_IsConfiguredTrueWhenHoldModifier)
+
+_TH_IsConfiguredTrueWhenHoldLayer() {
+	TH := Map("keys", Map("space", Map("hold_layer", "nav")), "layers", Map())
+	AssertTrue(TapHoldIsConfigured(TH, "space"))
+}
+Test("TapHoldIsConfigured: true when hold_layer present", _TH_IsConfiguredTrueWhenHoldLayer)
+
+_TH_IsConfiguredFalseWhenNoneOfThreeKeys() {
+	TH := Map("keys", Map("lalt", Map("time_activation_seconds", 0.2)), "layers", Map())
+	AssertFalse(TapHoldIsConfigured(TH, "lalt"))
+}
+Test("TapHoldIsConfigured: false when entry exists but has none of the three keys", _TH_IsConfiguredFalseWhenNoneOfThreeKeys)
+
+_TH_DisabledEntriesStayInactiveAcrossAccessors() {
+	Path := _TH_Write(
+		"[tap_hold.keys.caps_lock]`r`n"
+		. "enabled = false`r`n"
+		. 'tap_action = "enter"' . "`r`n"
+		. "time_activation_seconds = 0.35`r`n"
+		. "[tap_hold.keys.left_ctrl]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_modifier = "ctrl"' . "`r`n"
+		. "[tap_hold.keys.space]`r`n"
+		. "enabled = false`r`n"
+		. 'hold_layer = "nav"' . "`r`n")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	for KeyId in ["caps_lock", "left_ctrl", "space"] {
+		AssertTrue(TapHoldIsConfigured(TH, KeyId),
+			KeyId . " must retain its stored configuration for the menu")
+		AssertFalse(TapHoldIsEnabled(TH, KeyId),
+			KeyId . " must expose its disabled schema state")
+		AssertFalse(TapHoldIsActive(TH, KeyId),
+			KeyId . " must remain inactive when its schema flag is false")
+	}
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
+	AssertEqual("", TapHoldHoldModifier(TH, "left_ctrl"))
+	AssertEqual("", TapHoldHoldLayer(TH, "space"))
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+		TapHoldDuration(TH, "caps_lock"))
+}
+Test("TapHoldLoader: enabled=false disables every accessor (AHK-132)",
+	_TH_DisabledEntriesStayInactiveAcrossAccessors)
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 3/ TapHoldTapAction =======
+; ===================================
+; ===================================
+
+; Defaults overlay regression (LoadTapHoldToml with DefaultsFilePath)
+TestTapHold_DefaultsOverlay() {
+	; When defaults supplied, missing user keys inherit; user overrides win.
+	; Test uses the loader's inherit logic (simulated via missing file case + seed).
+	TH := LoadTapHoldToml("Z:\\does_not_exist_user.toml", "Z:\\does_not_exist_defaults.toml")
+	AssertTrue(TH.Has("keys"))
+	; Real defaults test would seed a defaults file, but for unit we verify scaffold + merge path.
+}
+Test("TapHoldLoader: defaults overlay returns scaffold when no files", TestTapHold_DefaultsOverlay)
+
+; Error/edge: invalid TOML, bad values, inherit_defaults=false
+TestTapHold_InvalidTomlGraceful() {
+	Path := _TH_Write("[tap_hold.keys.bad]`r`n tap_action = 123`r`n")  ; non-string
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	; Parser should coerce or skip bad; at minimum not crash and return map.
+	AssertTrue(Type(TH) == "Map")
+}
+Test("TapHoldLoader: invalid value types do not crash (graceful)", TestTapHold_InvalidTomlGraceful)
+
+TestTapHold_InvalidSchemaTypesFailClosed() {
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _TH_Write(
+			"[tap_hold.keys.caps_lock]`r`n"
+			. "enabled = 1`r`n"
+			. "tap_action = true`r`n"
+			. "time_activation_seconds = false`r`n"
+			. "[tap_hold.keys.left_ctrl]`r`n"
+			. "hold_modifier = 1`r`n"
+			. "[tap_hold.keys.space]`r`n"
+			. "hold_layer = false`r`n"
+			. "[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n")
+		TH := LoadTapHoldToml(Path)
+		for KeyId in ["caps_lock", "left_ctrl", "space"] {
+			AssertFalse(TapHoldIsActive(TH, KeyId),
+				KeyId . " must fail closed after a schema type violation")
+			AssertEqual("", TapHoldTapAction(TH, KeyId))
+			AssertEqual("", TapHoldHoldModifier(TH, KeyId))
+			AssertEqual("", TapHoldHoldLayer(TH, KeyId))
+		}
+		AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS,
+			TapHoldDuration(TH, "caps_lock"))
+		AssertTrue(TapHoldIsActive(TH, "tab"),
+			"one invalid entry must not suppress later valid sections")
+		Errors := 0
+		for Line in Captured
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+		AssertTrue(Errors >= 5,
+			"every rejected tap-hold field must remain visible in the logs")
+	} finally {
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: schema type violations fail closed (AHK-134)",
+	TestTapHold_InvalidSchemaTypesFailClosed)
+
+; A field no tap-hold key has disabled the whole key with an ERROR at every
+; boot, as if it were a wrong-typed known field. It is an outdated entry: one
+; WARNING, the field ignored, the rest of the key applied (config-outdated-tap-hold).
+TestTapHold_UnknownFieldIsOutdated() {
+	Captured := []
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		; The same valid key the AHK-134 fixture proves active.
+		Path := _TH_Write("[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n"
+			. "retired_field = 1`r`n")
+		TH := LoadTapHoldToml(Path)
+		AssertTrue(TapHoldIsActive(TH, "tab"), "an unknown field must not disable its key")
+		AssertEqual("alt_tab_monitor", TapHoldTapAction(TH, "tab"))
+		AssertFalse(TH["keys"]["tab"].Has("retired_field"), "the unknown field is ignored")
+		Warned := false, Errors := 0
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+			if (InStr(Line, "[WARNING]", true) and InStr(Line, "retired_field") and InStr(Line, "tap_hold.keys.tab"))
+				Warned := true
+		}
+		AssertEqual(0, Errors, "an outdated field is never an ERROR")
+		AssertTrue(Warned, "the outdated field is named in a WARNING with its key")
+	} finally {
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: an unknown field is warned and ignored, its key kept (config-outdated-tap-hold)",
+	TestTapHold_UnknownFieldIsOutdated)
+
+
+_TH_OutdatedFileWarningVectors() {
+	global _SharedDir
+	Vectors := JsonParse(FSReadUtf8Exact(_SharedDir .
+		"\tests\corpus\config_outdated\file_warning_vectors.json"))
+	AssertEqual(12, Vectors.Length, "every independent warning observation executes")
+	Lines := []
+	Warn := (Message, Args*) => Lines.Push(Format(Message, Args*))
+	for Vector in Vectors {
+		First := ConfigOutdatedReportInFile(Vector["file"], Vector["path"], Vector["detail"], Warn)
+		AssertEqual(Vector["first"], First, Vector["id"])
+		AssertEqual(Vector["reports"], Lines.Length, Vector["id"])
+		if First
+			AssertEqual(Format("Outdated entry '{1}' in '{2}' ignored ({3}); the config cleanup only covers "
+				. "config.toml, so fix or delete it in that file.",
+				Vector["path"], Vector["file"], Vector["detail"]), Lines[Lines.Length], Vector["id"])
+	}
+	AssertEqual(7, Lines.Length, "interleaved reads retain the process-lifetime identities")
+}
+Test("TapHoldLoader: independent file warnings retain process-lifetime identities",
+	_TH_OutdatedFileWarningVectors)
+
+
+_TH_OutdatedCallbackObservation(Events, FilePath, EntryPath, Detail, Message, Args*) {
+	Events["critical"] := A_IsCritical
+	Events["calls"] += 1
+	Events["message"] := Format(Message, Args*)
+	Events["again"] := ConfigOutdatedReportInFile(FilePath, EntryPath, Detail,
+		(*) => Events["calls"] += 1)
+	Events["after_reentry"] := A_IsCritical
+}
+
+_TH_OutdatedCallbackDoesNotOwnCritical() {
+	Before := A_IsCritical
+	try {
+		for Mode in ["Off", "On"] {
+			Critical(Mode)
+			CallerCritical := A_IsCritical
+			Events := Map("calls", 0, "critical", -1, "after_reentry", -1, "again", -1, "message", "")
+			FilePath := A_ScriptDir . "\outdated-callback-" . Mode . ".toml"
+			EntryPath := "tap_hold.keys.tab.future_callback"
+			Detail := "the catalogue does not own this field"
+			Warn := _TH_OutdatedCallbackObservation.Bind(Events, FilePath, EntryPath, Detail)
+			First := ConfigOutdatedReportInFile(FilePath, EntryPath, Detail, Warn)
+			After := A_IsCritical
+			AssertTrue(First, "the first callback report is admitted")
+			AssertFalse(Events["again"], "reentry already sees the claimed report")
+			AssertEqual(1, Events["calls"], "the warning callback runs once even if it reenters")
+			AssertEqual(CallerCritical, Events["critical"], "the callback inherits its caller's Critical state")
+			AssertEqual(CallerCritical, Events["after_reentry"], "the duplicate path restores Critical too")
+			AssertEqual(CallerCritical, After, "reporting leaves no Critical owner after its callback")
+			AssertTrue(InStr(Events["message"], EntryPath, true) > 0, "the callback observes its entry")
+		}
+	} finally Critical(Before)
+}
+Test("TapHoldLoader: shared warning callbacks preserve Critical and process-lifetime reentry",
+	_TH_OutdatedCallbackDoesNotOwnCritical)
+
+_TH_OutdatedFieldsWarnOnceAcrossActualReads() {
+	global _TomlFileCache, _LOGGER_REPEAT_ENABLED
+	Captured := [], PreviousRepeat := _LOGGER_REPEAT_ENABLED
+	; Timed logger suppression must not stand in for the persisted-entry policy.
+	_LOGGER_REPEAT_ENABLED := false
+	LoggerSetTestSink((Line) => Captured.Push(Line))
+	try {
+		Path := _TH_Write("[tap_hold.keys.tab]`r`n"
+			. 'tap_action = "alt_tab_monitor"' . "`r`n"
+			. "time_activation_seconds = 0.2`r`n"
+			. "retired_once_field = 1`r`n"
+			. 'future_once_array = ["none", "experimental"]' . "`r`n"
+			. 'future_once_table = { label = "kept", enabled = false }' . "`r`n")
+		Stored := FileRead(Path, "RAW")
+		loop 3 {
+			if _TomlFileCache.Has(Path)
+				_TomlFileCache.Delete(Path)
+			TH := LoadTapHoldToml(Path)
+			AssertTrue(TapHoldIsActive(TH, "tab"), "every actual read keeps the valid key")
+			AssertEqual("alt_tab_monitor", TapHoldTapAction(TH, "tab"))
+			for Key in ["retired_once_field", "future_once_array", "future_once_table"]
+				AssertFalse(TH["keys"]["tab"].Has(Key), "obsolete fields never become native bindings")
+			LoggerWarn("TapHoldLoader", "Interleaved file-read fixture warning {1}.", A_Index)
+		}
+		Counts := Map("retired_once_field", 0, "future_once_array", 0, "future_once_table", 0)
+		Errors := 0
+		for Line in Captured {
+			if InStr(Line, "[ERROR]", true)
+				Errors += 1
+			for Key in Counts {
+				if InStr(Line, "[WARNING]", true) && InStr(Line, "." . Key, true) {
+					Counts[Key] += 1
+					AssertTrue(InStr(Line, Path, true) > 0, "the warning names its actual persisted file")
+					AssertTrue(InStr(Line, "tap_hold.keys.tab", true) > 0, "the warning names its entry")
+				}
+			}
+		}
+		AssertEqual(0, Errors, "unknown values remain warnings even when arrays or inline tables")
+		for Key, Count in Counts
+			AssertEqual(1, Count, "three real reads must warn once for " . Key)
+		After := FileRead(Path, "RAW")
+		AssertEqual(Stored.Size, After.Size, "obsolete values and their byte layout remain stored")
+		loop Stored.Size
+			AssertEqual(NumGet(Stored, A_Index - 1, "UChar"), NumGet(After, A_Index - 1, "UChar"),
+				"unowned byte " . A_Index . " is preserved")
+	} finally {
+		_LOGGER_REPEAT_ENABLED := PreviousRepeat
+		LoggerClearTestSink()
+		_TH_Clean()
+	}
+}
+Test("TapHoldLoader: repeated real reads warn once and preserve future values byte-for-byte",
+	_TH_OutdatedFieldsWarnOnceAcrossActualReads)
+
+TestTapHold_InheritDefaultsFalse() {
+	Path := _TH_Write(
+		"[tap_hold]`r`n"
+		. "inherit_defaults = false`r`n"
+		. "[tap_hold.keys.caps_lock]`r`n"
+		. 'tap_action = ""' . "`r`n"  ; empty to disable
+	)
+	TH := LoadTapHoldToml(Path, "some_defaults.toml")
+	_TH_Clean()
+	; With inherit false, even if defaults had values, user empty wins (no keys populated beyond user).
+	AssertTrue(TH["keys"].Count == 1 or TH["keys"].Count == 0)  ; depends on parse of empty
+}
+Test("TapHoldLoader: inherit_defaults=false skips defaults overlay", TestTapHold_InheritDefaultsFalse)
+
+; Accessor edges
+TestTapHold_TapActionUnknownReturnsEmpty() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertEqual("", TapHoldTapAction(TH, "nonexistent"))
+}
+Test("TapHoldTapAction: unknown key returns empty string", TestTapHold_TapActionUnknownReturnsEmpty)
+
+TestTapHold_DurationDefault() {
+	TH := Map("keys", Map("x", Map("tap_action", "y")), "layers", Map())
+	; Accessor must source its fallback from the single constant, not a literal
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "x"))
+}
+Test("TapHoldDuration: falls back when time_activation_seconds absent", TestTapHold_DurationDefault)
+
+; Pause guard for tap-hold dispatch (project_suspend_pause_invariant).
+;
+; This asserted AssertTrue(true) under the message "tap_hold must respect full
+; pause silence" — the invariant named, and nothing checking it. The guard is
+; real and lives in platform/remap/constants.ahk, so the test now pins the
+; four dispatch entry points that must consult A_IsSuspended.
+;
+; Every one of them can emit a keystroke. A tap-hold that fires while the user
+; has deliberately suspended the script types into whatever they are doing, and
+; the failure is silent from the driver's side — nothing errors, the keystroke
+; simply arrives.
+TestTapHold_DispatchGatesOnSuspend() {
+	Gated := ["TapHoldOwnImmediateModifier", "TapHoldSyntheticKeyDown",
+		"TapHoldSyntheticKeyUp", "TapHoldDispatchTap"]
+	for Fn in Gated {
+		Body := _DriverFuncBody(Fn)
+		Assert(Body != "", Fn . "() must exist in the driver source — the pause guard moved")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Fn . "() must check A_IsSuspended before acting. It can emit a keystroke, and one "
+			. "that fires while the script is suspended types into whatever the user is doing "
+			. "— with nothing erroring on the driver's side (project_suspend_pause_invariant)")
+	}
+}
+Test("TapHoldLoader: every dispatch entry point gates on suspend (full invariant)", TestTapHold_DispatchGatesOnSuspend)
+
+; Error path: bad TOML in tap_hold must not crash loader
+TestTapHold_BadTomlGraceful() {
+	Path := _TH_Write("garbage not toml")
+	TH := LoadTapHoldToml(Path)
+	_TH_Clean()
+	AssertTrue(TH.Has("keys") and TH["keys"].Count == 0, "bad tap_hold toml must return empty scaffold")
+}
+Test("TapHoldLoader: malformed TOML returns empty without crash", TestTapHold_BadTomlGraceful)
+
+_TH_TapActionEmptyForUnknownKey() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"))
+}
+Test("TapHoldTapAction: returns empty string for unknown key", _TH_TapActionEmptyForUnknownKey)
+
+_TH_TapActionReturnsConfiguredValue() {
+	TH := Map("keys", Map("caps_lock", Map("tap_action", "backspace")), "layers", Map())
+	AssertEqual("backspace", TapHoldTapAction(TH, "caps_lock"))
+}
+Test("TapHoldTapAction: returns configured value", _TH_TapActionReturnsConfiguredValue)
+
+_TH_UnknownTapActionDisablesEntry() {
+	TH := Map("keys", Map("caps_lock", Map(
+		"tap_action", "__audit_unknown_action__",
+		"hold_modifier", "ctrl")), "layers", Map())
+	AssertFalse(TapHoldIsEnabled(TH, "caps_lock"),
+		"an action absent from GESTURE_ACTIONS must disable the full tap-hold entry")
+	AssertFalse(TapHoldIsActive(TH, "caps_lock"),
+		"an invalid tap action must not leave the key armed")
+	AssertEqual("", TapHoldTapAction(TH, "caps_lock"),
+		"an invalid tap action must not be exposed to a dispatch hotkey")
+	AssertEqual("", TapHoldHoldModifier(TH, "caps_lock"),
+		"an invalid tap action must not leave a sibling hold modifier armed")
+}
+Test("TapHoldLoader: unknown tap actions fail closed (AHK-151)",
+	_TH_UnknownTapActionDisablesEntry)
+
+_TH_TapActionEmptyWhenKeyAbsent() {
+	TH := Map("keys", Map("lalt", Map("hold_layer", "nav")), "layers", Map())
+	AssertEqual("", TapHoldTapAction(TH, "lalt"))
+}
+Test("TapHoldTapAction: returns empty string when tap_action key absent", _TH_TapActionEmptyWhenKeyAbsent)
+
+
+
+
+
+; ==================================
+; ==================================
+; ======= 4/ TapHoldDuration =======
+; ==================================
+; ==================================
+
+_TH_DurationDefaultForUnknownKey() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "caps_lock"))
+}
+Test("TapHoldDuration: returns the single-sourced default for unknown key", _TH_DurationDefaultForUnknownKey)
+
+_TH_DurationDefaultWhenAbsent() {
+	TH := Map("keys", Map("lalt", Map("tap_action", "backspace")), "layers", Map())
+	AssertEqual(TAPHOLD_DEFAULT_ACTIVATION_SECONDS, TapHoldDuration(TH, "lalt"))
+}
+Test("TapHoldDuration: returns the single-sourced default when time_activation_seconds absent", _TH_DurationDefaultWhenAbsent)
+
+; Pin the canonical default value in exactly one place. This is the regression
+; for sourcing TapHoldDuration's fallback from a single named constant instead of
+; the 0.2 literal it used to duplicate across both return branches.
+_TH_DefaultActivationConstantValue() {
+	AssertEqual(0.2, TAPHOLD_DEFAULT_ACTIVATION_SECONDS)
+}
+Test("tap_hold: TAPHOLD_DEFAULT_ACTIVATION_SECONDS is the single 0.2 source", _TH_DefaultActivationConstantValue)
+
+_TH_DurationReturnsConfiguredValue() {
+	TH := Map("keys", Map("caps_lock", Map("time_activation_seconds", 0.35)), "layers", Map())
+	AssertEqual(0.35, TapHoldDuration(TH, "caps_lock"))
+}
+Test("TapHoldDuration: returns configured value", _TH_DurationReturnsConfiguredValue)
+
+
+
+
+
+; ======================================
+; ======================================
+; ======= 5/ TapHoldHoldModifier =======
+; ======================================
+; ======================================
+
+_TH_HoldModifierEmptyForUnknownKey() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertEqual("", TapHoldHoldModifier(TH, "lctrl"))
+}
+Test("TapHoldHoldModifier: returns empty string for unknown key", _TH_HoldModifierEmptyForUnknownKey)
+
+_TH_HoldModifierReturnsConfiguredValue() {
+	TH := Map("keys", Map("lctrl", Map("hold_modifier", "ctrl")), "layers", Map())
+	AssertEqual("ctrl", TapHoldHoldModifier(TH, "lctrl"))
+}
+Test("TapHoldHoldModifier: returns configured value", _TH_HoldModifierReturnsConfiguredValue)
+
+_TH_HoldModifierEmptyWhenAbsent() {
+	TH := Map("keys", Map("lctrl", Map("tap_action", "tab")), "layers", Map())
+	AssertEqual("", TapHoldHoldModifier(TH, "lctrl"))
+}
+Test("TapHoldHoldModifier: returns empty string when hold_modifier absent", _TH_HoldModifierEmptyWhenAbsent)
+
+
+
+
+
+; ===================================
+; ===================================
+; ======= 6/ TapHoldHoldLayer =======
+; ===================================
+; ===================================
+
+_TH_HoldLayerEmptyForUnknownKey() {
+	TH := Map("keys", Map(), "layers", Map())
+	AssertEqual("", TapHoldHoldLayer(TH, "space"))
+}
+Test("TapHoldHoldLayer: returns empty string for unknown key", _TH_HoldLayerEmptyForUnknownKey)
+
+_TH_HoldLayerReturnsConfiguredValue() {
+	TH := Map("keys", Map("space", Map("hold_layer", "nav")), "layers", Map())
+	AssertEqual("nav", TapHoldHoldLayer(TH, "space"))
+}
+Test("TapHoldHoldLayer: returns configured value", _TH_HoldLayerReturnsConfiguredValue)
+
+_TH_HoldLayerEmptyWhenAbsent() {
+	TH := Map("keys", Map("lalt", Map("tap_action", "backspace")), "layers", Map())
+	AssertEqual("", TapHoldHoldLayer(TH, "lalt"))
+}
+Test("TapHoldHoldLayer: returns empty string when hold_layer absent", _TH_HoldLayerEmptyWhenAbsent)

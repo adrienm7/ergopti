@@ -36,6 +36,7 @@ import Sparkle
 
 
 
+
 // ==================================
 // ==================================
 // ======= 1/ App-Level State =======
@@ -89,6 +90,9 @@ func launcherChildEnvironment(
 	// identity from its own executable and Info.plist.
 	environment.removeValue(forKey: "__CFBundleIdentifier")
 	environment.removeValue(forKey: "XPC_SERVICE_NAME")
+	// Only the original Fresh issuer may add its private route after this ordinary
+	// inheritance boundary; inherited text cannot select the first native loader.
+	environment.removeValue(forKey: "ERGOPTI_INSTALLED_CAPTURE_CONTROL")
 	environment["ERGOPTI_LAUNCHER_PID"] = String(launcherPid)
 	environment.removeValue(forKey: "ERGOPTI_LAUNCHER_BUNDLE_ID")
 	environment.removeValue(forKey: kLoggerDatagramPortEnvironment)
@@ -1126,6 +1130,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 // spawned by Hammerspoon owns no GUI/application lifecycle.
 installPrivateProcessUmask()
 
+// Explicit diagnostic only. The genuine signed helper query refuses unavailable profiles before admin staging.
+if OwnedVirtualHIDDaemonReportMainOperation.handles(arguments: CommandLine.arguments) {
+	let reportResult = DispatchSemaphore(value: 0)
+	DispatchQueue.global(qos: .userInitiated).async {
+		Darwin.exit(OwnedVirtualHIDDaemonReportMainOperation.run(arguments: CommandLine.arguments))
+		reportResult.signal()
+	}
+	while reportResult.wait(timeout: .now() + 0.02) == .timedOut { RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02)) }
+}
+
+
 if OwnedSuspendedImageGuardian.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedSuspendedImageGuardian.run(arguments: CommandLine.arguments))
 }
@@ -1135,6 +1150,9 @@ if ManagedOllamaAPIWorker.handles(arguments: CommandLine.arguments) {
 }
 
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
+if OwnedListenerEventFixture.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(OwnedListenerEventFixture.run(arguments: CommandLine.arguments))
+}
 if ManagedOllamaListenerFixture.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(ManagedOllamaListenerFixture.run(arguments: CommandLine.arguments))
 }

@@ -22,6 +22,29 @@ local Timings = require("infra.timings")
 local KUtils    = require("keylogger.utils")
 local AggHelper = require("keylogger.aggregator_helpers")
 local LOG       = "keylogger.aggregator"
+local media_policy = nil
+local media_policy_loading, media_policy_handle = false, nil
+
+--- Loads the reviewed media catalogue for admitted raw replay only.
+---@return table policy
+function M.media_policy()
+	if media_policy then return media_policy end
+	assert(not media_policy_loading and media_policy_handle == nil, "Media catalogue preparation or cleanup remains pending")
+	media_policy_loading = true
+	local opened, file = pcall(io.open, Paths.shared("data/keycodes/metrics_media_keys.json"), "r")
+	if not opened then error("Media catalogue acquisition failed", 0) end
+	if not file then media_policy_loading = false; error("Media catalogue is unavailable", 0) end
+	media_policy_handle = file -- Retain the exact acquired handle before read or close.
+	local read, content = pcall(file.read, file, "*a")
+	local closed, accepted = pcall(file.close, file)
+	if not closed or accepted ~= true then error("Media catalogue cleanup remains pending", 0) end
+	media_policy_handle, media_policy_loading = nil, false
+	assert(read and type(content) == "string", "Media catalogue read failed")
+	local catalogue, decode_error = JsonCodec.decode(content)
+	assert(not decode_error and type(catalogue) == "table", "Media catalogue is invalid")
+	media_policy = require("keylogger.media_store").policy(catalogue)
+	return media_policy
+end
 
 local S = require("modules.keylogger.aggregator.state")
 

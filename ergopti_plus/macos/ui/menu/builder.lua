@@ -423,7 +423,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- from the day it was written — the manifest declared two bulk commands, a
 	-- params group, four section headers and five list rows, and this file read
 	-- none of it. The repository carries a drift gate
-	-- (tests/meta/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
+	-- (tests/meta/menu/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
 	-- was to notice when the two descriptions disagreed, because nothing else
 	-- could.
 	local hotstrings_menu = {}
@@ -567,13 +567,8 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
 	hs_ctx.section_label = function(key) return section_labels[key] end
-	-- The « all sections » checkbox is a `check` declaration, so the renderer
-	-- builds the row and this driver supplies only its tick and behaviour.
-	-- Taken from the hotstrings module rather than reimplemented: it owns the
-	-- section walk, and a second copy of that walk is exactly the kind of
-	-- duplicate this migration exists to remove.
-	local all_sections = type(menu_mods.hotstrings.all_sections_switch) == "function"
-		and menu_mods.hotstrings.all_sections_switch(ctx) or nil
+	-- No whole-tree « all sections » row: it switched on the packs of every
+	-- language at once. Each submenu owns the bulk rows of its own content.
 	hs_ctx.commands = {
 		-- The category switch, first row of the submenu. It used to be the
 		-- parent row's `action`, which AppKit never sends for an item that
@@ -596,24 +591,9 @@ local function build_hotstrings_rows(ctx, menu_mods)
 			return ctx.apply_preference_scope("hotstrings", mode) == true
 		end
 	end
-	-- Registered only when the module provides it: an unregistered command is
-	-- reported by the renderer and its row is not drawn, where an empty stand-in
-	-- drew a row that did nothing when clicked.
-	if all_sections then
-		hs_ctx.commands["hotstrings_all_sections"] = function()
-			if type(all_sections.action) ~= "function" then
-				Logger.warn(LOG, "All-sections switch refused: the script is paused.")
-				return false
-			end
-			return all_sections.action()
-		end
-	end
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = function() return master_on end
-	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function()
-		return all_sections ~= nil and all_sections.checked == true
-	end
 
 	local providers = {
 		["hotstring_categories_standard"] = function() return std_groups end,

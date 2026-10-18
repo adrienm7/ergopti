@@ -35,7 +35,7 @@ K.record_synthetic_output("owned-collector", "xx", "owned-extension", math.floor
 K.record_synthetic_output("owned-collector", "xx", "llm", math.floor(Clock.now_ms()))
 K.record_synthetic_output("owned-collector", "x", "other", math.floor(Clock.now_ms()))
 K.record_hotstring("owned-collector", "", "x", math.floor(Clock.now_ms()), "static", 0)
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 assert(today == os.date("%Y-%m-%d"), "fixture must not cross a local midnight")
 -- The collector deliberately excludes synthetic words. This separate admitted
 -- Writer row checks the shared Reader helper's additional word-family boundary.

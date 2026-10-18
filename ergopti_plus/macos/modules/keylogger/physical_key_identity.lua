@@ -98,4 +98,13 @@ function M.resolve(page, usage, keyboard_type)
 	return record[keyboard_type]
 end
 
+--- Creates the optional semantic media policy from a source-admitted catalogue.
+--- The existing numeric resolver and default legacy accounting stay unchanged.
+--- A caller must supply this policy explicitly before accepting media delivery.
+---@param catalogue table Reviewed shared metrics media identity document.
+---@return table policy Media-only identity and aggregation interface.
+function M.media_policy(catalogue)
+	return require("keylogger.media_identity").new(catalogue)
+end
+
 return M

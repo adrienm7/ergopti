@@ -58,7 +58,7 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 				|| !HasMethod(Ticket.Get("is_current", 0), "Call")
 			throw TypeError("Models probe requires a captured target, observer and ticket.")
 		Id := Target.Get("id", ""), Url := Target.Get("base_url", ""), Token := Target.Get("token", "")
-		if A_IsSuspended || !LocalServerAuthTokenAllowed(Id, Token, this.Options["servers"])
+		if A_IsSuspended || !LocalServerAuthEntryTokenAllowed(Target.Get("provider", Id), Token, Url, this.Options["servers"])
 				|| !this.Options["servers"].Has(Id) || !_HTTP_CurlScalarIsSafe(Token)
 				|| !_HTTP_CurlScalarIsSafe(Url) || !RegExMatch(Url, "i)^https?://[^[:space:]]+$")
 			return false
@@ -109,11 +109,17 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 			if !this._IsCurrent(Record) || A_IsSuspended
 				return false
 			Accepted := Http.Send()
+			if !Accepted && Http.HasOwnProp("NativeDispatchRefused") && Http.NativeDispatchRefused == true
+				this._Deliver(Record, Map("ok", false, "status", 0, "body", "", "models", [], "probe_error", true))
 			if !this._IsCurrent(Record) || A_IsSuspended
 				Accepted := false
 			return Accepted
 		} catch as Err {
-			this._Report("dispatch", Err, Id)
+			try this._Report("dispatch", Err, Id)
+			finally {
+				if !A_IsSuspended
+					this._Deliver(Record, Map("ok", false, "status", 0, "body", "", "models", [], "probe_error", true))
+			}
 			return false
 		} finally {
 			Record["building"] := false
@@ -225,10 +231,19 @@ class LocalServerModelsOwner extends _LocalServerModelsTimerNativeAdapter {
 				this._CancelRecord(Record)
 				return
 			}
+			if Http.HasOwnProp("NativeDispatchRefused") && Http.NativeDispatchRefused == true {
+				if !this._Deliver(Record, Map("ok", false, "status", 0, "body", "", "models", [], "probe_error", true)) && A_IsSuspended
+					return
+				; Logical unavailability cannot release an unsettled exact child.
+				this._CancelRecord(Record)
+				return
+			}
 			if Http.WaitForResponse(0) {
 				if A_IsSuspended
 					return
 				Receipt := Map("ok", Http.Status == 200, "status", Http.Status, "body", Http.ResponseText)
+				if Http.Status == 0 && Http.HasOwnProp("NativeDispatchRefused") && Http.NativeDispatchRefused == true
+					Receipt["probe_error"] := true
 				Models := LocalServerAuthModelsReceipt(Receipt)
 				Receipt["ok"] := Models is Array
 				Receipt["models"] := Models is Array ? Models : []

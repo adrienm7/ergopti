@@ -82,7 +82,7 @@ This communicates "this option exists but is not active" without hiding it.
 
 The canonical algorithm is implemented in `tint.js:mixTint()`. Every driver
 MUST use this exact formula. Test coverage is provided via
-`macos/tests/unit/ui/test_tooltip_tint_contract.lua` on the Hammerspoon side;
+`macos/tests/unit/ui/tooltip/test_tooltip_tint_contract.lua` on the Hammerspoon side;
 the reference vectors live in `tint.js:tintTestVectors()`.
 
 ### Algorithm

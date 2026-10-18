@@ -1024,11 +1024,6 @@ _ConfigSeedPersonalHotstring(FeaturesTarget, SectionName) {
 	return true
 }
 
-; Section selection persists independently of every category's runtime master.
-ToggleAllHotstrings(Value) {
-	return _ConfigCommitHotstringIntent("all", "", Value, "the bulk hotstring toggle")
-}
-
 IsCategoryAllEnabled(Categories) {
 	if (Categories.Length == 0)
 		return true
@@ -1156,51 +1151,111 @@ _ConfigPublishDesiredState(Desired, RuntimePatches, CandidateCategories := 0, Ca
 	} finally Critical(PreviousCritical)
 }
 
-; Select every section of one category while retaining its independent master.
-ToggleCategoryAllSections(V1Cat, Enable) {
+/**
+ * « Check all » / « uncheck all » of one category submenu: the sections that
+ * submenu draws, never a section an extension draws in its own submenu, and
+ * the category gate with them, as the shared category scope plans it.
+ * @param {String} V1Cat Native category id.
+ * @param {Integer} Enable Explicit Boolean posture.
+ * @param {Map} Options Optional "live" and "reload" ports for isolated tests.
+ * @returns {Integer} True once written and applied (live) or reloading.
+ */
+ToggleCategoryAllSections(V1Cat, Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("category", V1Cat, Enable,
-		"the '" . V1Cat . "' section toggle")
+		"the '" . V1Cat . "' section toggle", IsSet(Options) ? Options : Map())
 }
 
 /**
- * Publishes the dynamic families through the conditional reload journal.
- * This category follows the Hotstrings master and owns no additional gate.
- * @param {Integer} Enabled Explicit Boolean posture for every dynamic family.
- * @param {Map} Options Existing journal/lifecycle ports for isolated tests.
- * @returns {Map} Pending or terminal receipt; native refusal restores exact bytes.
+ * « Check all » / « uncheck all » of the dynamic hotstrings submenu. The
+ * programmable hotstrings run the user's own code through their own start and
+ * cancellation owner, so only their dedicated row switches them.
+ * @param {Integer} Enable Explicit Boolean posture for every dynamic family.
+ * @param {Map} Options Optional "live" and "reload" ports for isolated tests.
+ * @returns {Integer} True once written and applied (live) or reloading.
  */
-HotstringsDynamicScopeApply(Enabled, Options := unset) {
-	if !IsSet(Options)
-		Options := Map()
-	Operations() {
-		if !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
-			throw TypeError("A dynamic hotstring scope requires an explicit Boolean target.")
-		return _ConfigBuildHotstringIntentPlan("dynamic", "", Enabled).updates
-	}
-	return ConfigScopeCommitOperations("hotstrings", Enabled ? "enable_all" : "disable_all", Operations, Options)
+ToggleDynamicAllSections(Enable, Options := unset) {
+	return _ConfigCommitHotstringIntent("dynamic", "", Enable,
+		"the dynamic-hotstring section toggle", IsSet(Options) ? Options : Map())
 }
 
 ; Select one language pack in a single transaction without changing its masters.
-ToggleLanguageAllSections(Pack, Enable) {
+ToggleLanguageAllSections(Pack, Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("language", Pack, Enable,
-		"the '" . Pack["id"] . "' language toggle")
+		"the '" . Pack["id"] . "' language toggle", IsSet(Options) ? Options : Map())
 }
 
 ; Personal section paths come from discovered TOML names; selection remains
 ; editable while the Hotstrings or Personal master is disabled.
-HS_TogglePersonalAllSections(Enable) {
+HS_TogglePersonalAllSections(Enable, Options := unset) {
 	return _ConfigCommitHotstringIntent("personal", "", Enable,
-		"the personal-hotstring section toggle")
+		"the personal-hotstring section toggle", IsSet(Options) ? Options : Map())
 }
 
-; Section selection never changes a master checkbox. Users may prepare every
-; desired section while all native activation remains disabled.
-_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context) {
-	global ConfigurationFile
-	if !ConfigCommitBuilt(ConfigurationFile, Context,
-			_ConfigBuildHotstringIntentPlan.Bind(Kind, Selector, !!Enable))
+/**
+ * The manifest paths of the sections a bundled category's own submenu draws:
+ * every declared section except those a layout extension binds, which its
+ * « Hotstrings <extension> » submenu draws instead (InitSubMenus).
+ * @param {String} V1Cat Native category id.
+ * @returns {Array} Canonical v2 section paths, in manifest order.
+ */
+_HS_CategoryOwnSectionPaths(V1Cat) {
+	global _LegacyTopCategoryMap
+	if !_LegacyTopCategoryMap.Has(V1Cat)
+		throw Error("Unknown hotstring category: " . V1Cat)
+	Bound := HotstringsBoundSections(V1Cat)
+	Paths := []
+	for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[V1Cat]) {
+		Parts := StrSplit(Entry["path"], ".")
+		if !Bound.Has(StrLower(Parts[Parts.Length]))
+			Paths.Push(Entry["path"])
+	}
+	return Paths
+}
+
+/**
+ * Whether the in-process rebuild applies every switched path, as it does for
+ * one section's checkbox; a gate flip follows ToggleCategoryAllFeatures' rule.
+ * @param {Array} Paths Switched v2 section paths.
+ * @param {String} FlippedGate Category whose gate changes, or "".
+ * @returns {Integer} True when no path needs a reload.
+ */
+_HS_SelectionAppliesLive(Paths, FlippedGate := "") {
+	if FlippedGate != "" && !_IsLiveHotstringCategory(FlippedGate)
 		return false
-	return ReloadPreservingSuspend()
+	for Path in Paths {
+		Parts := StrSplit(Path, ".")
+		if Parts.Length != 3 || Parts[1] != "hotstrings" || Path == "hotstrings.dynamic.user_code"
+			return false
+		if Parts[2] == "personal"
+			continue
+		if _HS_IsReloadOnlyGroup(_HS_DeriveLiveToggleGroup(Parts[2], Parts[3]))
+			return false
+	}
+	return true
+}
+
+; Section selection never changes the Hotstrings master. A selection the live
+; rebuild covers applies in-process, like one section's checkbox: a reload
+; restarted the whole driver for every bulk click (2026-10-17: one click took
+; the driver away for minutes and every click queued behind it was refused).
+_ConfigCommitHotstringIntent(Kind, Selector, Enable, Context, Options := unset) {
+	global ConfigurationFile
+	if !IsSet(Options)
+		Options := Map()
+	if !(Enable is Integer) || (Enable != 0 && Enable != 1)
+		throw TypeError("A hotstring selection requires an explicit Boolean posture.")
+	Plan := 0
+	Build() {
+		Plan := _ConfigBuildHotstringIntentPlan(Kind, Selector, Enable)
+		return Plan
+	}
+	if !ConfigCommitBuilt(ConfigurationFile, Context, Build)
+		return false
+	if !Plan.live
+		return Options.Get("reload", ReloadPreservingSuspend).Call()
+	try LoggerInfo("Menu", "Hotstring selection ({1}) of {2} section(s) applied in-process.",
+		Context, Plan.paths.Length)
+	return Options.Get("live", RebuildHotstringsLive).Call()
 }
 
 ; Scope enumeration and personal discovery occur under the same owner as write
@@ -1209,24 +1264,27 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	global Features, TapHold, CategoryEnabled, _LegacyTopCategoryMap, ScriptInformation
 	Desired := _HSDeepCloneMap(MasterGateDesiredFeatures(Features))
 	Entries := []
+	Gate := ""
 	switch Kind {
-		case "all":
-			for Path in _CollectAllHotstringsV2Paths(Desired)
-				Entries.Push(Map("path", Path, "value", Bool))
 		case "category":
-			if !_LegacyTopCategoryMap.Has(Selector)
-				throw Error("Unknown hotstring category: " . Selector)
-			for Entry in ManifestFeaturesForSection(_LegacyTopCategoryMap[Selector])
-				Entries.Push(Map("path", Entry["path"], "value", Bool))
+			; The submenu's own sections and its gate, which the shared category
+			; scope switches with them: that gate is drawn only as the parent row's
+			; tick, which no tray can click.
+			for Path in _HS_CategoryOwnSectionPaths(Selector)
+				Entries.Push(Map("path", Path, "value", Bool))
+			Gate := Selector
 		case "dynamic":
 			; Discover the canonical families inside the admitted lease, independent
 			; of a menu preview or the mixed legacy tray map. There is no extra gate.
+			; The programmable hotstrings keep their own start/cancel owner.
 			for Entry in ManifestFeaturesForSection("hotstrings.dynamic")
-				Entries.Push(Map("path", Entry["path"], "value", Bool))
-		case "language":
-			for Category in Selector["categories"] {
-				for Entry in ManifestFeaturesForSection("hotstrings." . Category["v2"])
+				if Entry["path"] != "hotstrings.dynamic.user_code"
 					Entries.Push(Map("path", Entry["path"], "value", Bool))
+		case "language":
+			; Each category's own sections, as its submenu draws them.
+			for Category in Selector["categories"] {
+				for Path in _HS_CategoryOwnSectionPaths(Category["v1"])
+					Entries.Push(Map("path", Path, "value", Bool))
 			}
 		case "personal":
 			PersonalPath := ScriptInformation.Get("PersonalTomlPath", "")
@@ -1247,8 +1305,20 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	Updates := []
 	if _ConfigStageFeatureEntries(Desired, Entries, Updates) != Entries.Length
 		throw Error("A hotstring scope feature could not be resolved.")
+	CandidateCategories := 0, FlippedGate := ""
+	if Gate != "" {
+		if !CategoryEnabled.Has(Gate)
+			throw Error("Unknown category gate: " . Gate)
+		if CategoryEnabled[Gate] != Bool {
+			CandidateCategories := CategoryEnabled.Clone()
+			CandidateCategories[Gate] := Bool
+			FlippedGate := Gate
+			Updates.Push(_ConfigSparseOperation("category_enabled", _CategoryEnabledKey(Gate), Bool))
+		}
+	}
 	Projected := _HSDeepCloneMap(Desired)
-	ApplyMasterGatesToFeatures(Projected, Map(), IsCategoryGated)
+	ApplyMasterGatesToFeatures(Projected, Map(), CandidateCategories is Map
+		? (Name) => _ConfigCandidateCategoryEnabled(CandidateCategories, Name) : IsCategoryGated)
 	CandidateFeatures := _HSDeepCloneMap(Features)
 	RuntimePatches := []
 	NewPersonalRoot := false
@@ -1274,7 +1344,19 @@ _ConfigBuildHotstringIntentPlan(Kind, Selector, Bool) {
 	}
 	if NewPersonalRoot
 		RuntimePatches.Push({ target: Features["hotstrings"], key: "personal", value: CandidateFeatures["hotstrings"]["personal"] })
-	return { updates: Updates, publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches) }
+	if FlippedGate != "" {
+		; A gate zeroes or restores every section of its category, the ones an
+		; extension draws included, exactly as ToggleCategoryAllFeatures projects.
+		Root := SubStr(_LegacyTopCategoryMap[FlippedGate], StrLen("hotstrings.") + 1)
+		if !Projected["hotstrings"].Has(Root) || !Features["hotstrings"].Has(Root)
+			throw Error("Unknown hotstring category state: " . FlippedGate)
+		RuntimePatches.Push({ target: Features["hotstrings"], key: Root, value: Projected["hotstrings"][Root] })
+	}
+	Paths := []
+	for Entry in Entries
+		Paths.Push(Entry["path"])
+	return { updates: Updates, paths: Paths, live: _HS_SelectionAppliesLive(Paths, FlippedGate),
+		publish: _ConfigPublishDesiredState.Bind(Desired, RuntimePatches, CandidateCategories) }
 }
 
 _CategoryEnabledKey(Category) {
@@ -1538,15 +1620,33 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				return CONFIG_SAVE_FAILED
 			if State.requested_generation <= State.settled_generation
 				return CONFIG_SAVE_OK
+			; A timer may acknowledge and clear the binding as soon as Critical
+			; ends. Capture the path admission with the pending observation.
+			; Both helpers inspect native data and lexical path keys only.
+			BoundPath := _ConfigFullSaveBoundPath()
+			BoundPathKey := State.bound_path_key
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			BoundPathMatches := BoundPath != "" && (SelectedPath is String)
+				&& _ConfigFullSavePathMatches(SelectedPath)
 		} finally Critical(PreviousCritical)
-		BoundPath := _ConfigFullSaveBoundPath()
 		; A deferred generation belongs to the path that accepted it. Re-reading
 		; ConfigurationFile here used to silently rebase old-path work onto a newly
 		; selected config directory. Refuse before collecting live state: that state
 		; may already describe the new path and must never overwrite the old file.
-		if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+		if (BoundPath = "" || !BoundPathMatches) {
 			try LoggerError("ConfigIO", "Refusing to rebase a pending full save from '{1}' onto '{2}'. Settle the original path before publishing a config relocation.",
-				BoundPath, ConfigurationFile)
+				BoundPath, (SelectedPath is String) ? SelectedPath : "<invalid configuration path>")
+			return CONFIG_SAVE_FAILED
+		}
+		; Preserve live relocation refusal before any readiness or lease retry.
+		PreviousCritical := Critical("On")
+		try {
+			SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+			SelectedPathMatches := (SelectedPath is String)
+				&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+		} finally Critical(PreviousCritical)
+		if !SelectedPathMatches {
+			try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
 			return CONFIG_SAVE_FAILED
 		}
 		if !_DriverReady {
@@ -1575,9 +1675,21 @@ SaveFullConfig(WriterFn := 0, TimerFn := 0, RegisterRequest := true,
 				? CONFIG_SAVE_DEFERRED
 				: CONFIG_SAVE_FAILED
 		}
-		TargetGeneration := _ConfigFullSaveCapture()
 		Result := CONFIG_SAVE_FAILED
 		try {
+				; The binding may have settled while this caller acquired its lease.
+				; Compare the selected path independently of that cleared binding.
+				PreviousCritical := Critical("On")
+				try {
+					SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+					SelectedPathMatches := (SelectedPath is String)
+						&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+				} finally Critical(PreviousCritical)
+				if !SelectedPathMatches {
+					try LoggerError("ConfigIO", "Refusing a full save after the selected configuration path changed.")
+					return CONFIG_SAVE_FAILED
+				}
+				TargetGeneration := _ConfigFullSaveCapture()
 				if PublicationDebt {
 					Reconciled := _ConfigPublicationReconcileFullSave(BoundPath, OwnerToken)
 					if !Reconciled
@@ -1689,6 +1801,13 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 		Settled := State.settled_generation
 		Required := State.terminal_required_generation
 		BoundPath := State.bound_path
+		BoundPathKey := State.bound_path_key
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		; The live binding may clear when this native-data snapshot ends.
+		; Optional or settled work must not inspect an unused selected path.
+		BoundPathMatches := Requested > Settled && Required > Settled
+			&& BoundPath != "" && (SelectedPath is String)
+			&& _ConfigFullSavePathMatches(SelectedPath)
 		if ActualMandatoryDebt && (Requested <= Settled || Required <= Settled)
 			return false
 	} finally Critical(PreviousCritical)
@@ -1701,13 +1820,34 @@ _ConfigFullSaveSettleTerminal(OwnerBundle, WriterFn := 0, TimerFn := 0,
 	; required generation pending, which correctly refuses process death.
 	if Required <= Settled
 		return _ConfigFullSaveAbandonThrough(Requested)
-	if (BoundPath = "" || !_ConfigFullSavePathMatches(ConfigurationFile)) {
+	if (BoundPath = "" || !BoundPathMatches) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused because the active configuration path no longer matches the accepted generation path.")
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	OwnerToken := _ConfigWriteLeaseSelectOwner(OwnerBundle, BoundPath)
 	if !(OwnerToken is Object) {
 		try LoggerError("ConfigIO", "Terminal full-save drain refused a bundle that did not own config.toml.")
+		return false
+	}
+	; The admitted terminal owner prevents a subsequent real relocation.
+	PreviousCritical := Critical("On")
+	try {
+		SelectedPath := IsSet(ConfigurationFile) ? ConfigurationFile : 0
+		SelectedPathMatches := (SelectedPath is String)
+			&& _ConfigWriteLeaseKey(SelectedPath) == BoundPathKey
+	} finally Critical(PreviousCritical)
+	if !SelectedPathMatches {
+		try LoggerError("ConfigIO", "Refusing mandatory terminal full save after the selected configuration path changed.")
 		return false
 	}
 	Result := _ConfigDrainFullSave(WriterFn, TimerFn, OwnerToken, CollectFn)

@@ -37,14 +37,14 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 		}
 		if Quote != "" {
 			if StrLen(Quote) == 3 && Triple == Quote {
-				Run := 3
-				while SubStr(Text, Position + Run, 1) == Char
-					Run += 1
-				if Run > 5
+				QuoteRun := 3
+				while SubStr(Text, Position + QuoteRun, 1) == Char
+					QuoteRun += 1
+				if QuoteRun > 5
 					throw ValueError("Invalid TOML multiline string closure")
-				SpanEnd := Position + Run - 1
-				Result .= SubStr(Text, Position, Run)
-				Position += Run
+				SpanEnd := Position + QuoteRun - 1
+				Result .= SubStr(Text, Position, QuoteRun)
+				Position += QuoteRun
 				Quote := ""
 				continue
 			}
@@ -59,8 +59,16 @@ _TOML_DocumentToken(Text, &Position, Separator, &Separated := 0, &SpanStart := 0
 			else if StrLen(Quote) == 1 && (Char == Chr(10) || Char == Chr(13))
 				throw ValueError("A single-line TOML string contains a newline")
 		} else if Char == "#" {
-			while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
-				Position += 1
+			; Leave the LF to the original separator/container processing. Native
+			; search is forward only for an integer cursor and stops at NUL, so
+			; keep the original loop when there is no match or another cursor type.
+			if Type(Position) == "Integer" && Position > 0
+					&& (CommentNewline := InStr(Text, Chr(10), true, Position))
+				Position := CommentNewline
+			else {
+				while Position <= Length && SubStr(Text, Position, 1) != Chr(10)
+					Position += 1
+			}
 			continue
 		} else if (Triple == Chr(34) . Chr(34) . Chr(34))
 				|| (Triple == Chr(39) . Chr(39) . Chr(39)) {
@@ -832,6 +840,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	NewTables.CaseSense := "On"
 	HeaderAdmission := Map()
 	HeaderAdmission.CaseSense := "On"
+	NewLeaves := []
 	for Name, Parts in Owned {
 		Desired := _TOML_DocumentLookup(Expected, Parts)
 		if !Desired["found"]
@@ -850,19 +859,39 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 		loop Parts.Length - 1
 			SectionParts.Push(Parts[A_Index])
 		Identity := _TOML_ConfigPathName(SectionParts)
-		; New sections need explicit headers for the still-live native flat reader.
-		; The semantic parser decides whether that declaration is legal: existing
-		; dotted or inline namespaces may already have closed the requested table.
-		; Explicit replacements first release only their classified physical owners.
-		if SectionParts.Length && !HeaderAdmission.Has(Identity) {
+		if SectionParts.Length
 			HeaderAdmission[Identity] := false
-			try {
-				TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+		NewLeaves.Push({ Parts: Parts, Desired: Desired, SectionParts: SectionParts, Identity: Identity })
+	}
+	; New sections need explicit headers for the still-live native flat reader.
+	; The semantic parser decides whether that declaration is legal: existing
+	; dotted or inline namespaces may already have closed the requested table.
+	; Explicit replacements first release only their classified physical owners.
+	; One parse admits every header at once: parsing only adds declarations, so
+	; headers legal together are each legal alone. A refusal falls back to one
+	; parse per header, which a bulk change of 20 new sections paid every time.
+	if HeaderAdmission.Count {
+		Batch := ""
+		for Identity in HeaderAdmission
+			Batch .= "`n[" . Identity . "]`n"
+		try {
+			TOML_ParseDocument(HeaderSource . Batch)
+			for Identity in HeaderAdmission
 				HeaderAdmission[Identity] := true
-			} catch ValueError {
-				; Existing physical ownership remains the only legal insertion route.
+		} catch ValueError {
+			for Identity in HeaderAdmission {
+				try {
+					TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
+					HeaderAdmission[Identity] := true
+				} catch ValueError {
+					; Existing physical ownership remains the only legal insertion route.
+				}
 			}
 		}
+	}
+	for Leaf in NewLeaves {
+		Parts := Leaf.Parts, Desired := Leaf.Desired
+		SectionParts := Leaf.SectionParts, Identity := Leaf.Identity
 		if SectionParts.Length && HeaderAdmission[Identity] {
 			if !NewTables.Has(Identity)
 				NewTables[Identity] := []

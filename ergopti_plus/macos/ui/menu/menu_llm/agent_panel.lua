@@ -43,6 +43,9 @@ local ProviderUses = require("modules.llm.provider_uses")
 
 local LOG = "menu_llm.agent_panel"
 
+-- Each successfully applied system choice revokes older presence/Download intents.
+local _selection_epochs = setmetatable({}, { __mode = "k" })
+
 -- The two systems: their setting, runtime setter and provider use
 local SYSTEMS = {
 	agent_system1 = { key = "llm_agent_system1", setter = "set_llm_agent_system1",
@@ -128,19 +131,41 @@ local function refresh_menu(ctx)
 	if not ok then Logger.error(LOG, "Menu refresh after a local model listing raised: %s.", tostring(err)) end
 end
 
+--- Captures one system choice before resolving models or reading native state.
+--- @param ctx table Panel context.
+--- @param system table System descriptor.
+--- @param value string Expected selection.
+--- @return function current
+local function selection_current(ctx, system, value)
+	local state, manager = ctx.state, ctx.settings_mgr
+	local epochs = _selection_epochs[state]
+	local epoch = epochs and epochs[system.key] or 0
+	return function()
+		local observed = _selection_epochs[state]
+		return ctx.state == state and ctx.settings_mgr == manager and state[system.key] == value
+			and (observed and observed[system.key] or 0) == epoch
+	end
+end
+
 --- Asks the local server whether it holds the local model a setting names,
 --- and offers the download of a missing one.
 --- @param ctx table Panel context.
+--- @param system table System descriptor.
 --- @param value string The setting just applied.
-local function offer_missing_local_model(ctx, value)
+local function offer_missing_local_model(ctx, system, value)
+	local current = selection_current(ctx, system, value)
+	if not current() then return end
 	local model = local_model_of(value)
-	if model == nil then return end
+	if model == nil or not current() then return end
 	local Ollama = require("modules.llm.api_ollama")
 	local before = Ollama.local_model_installed(model)
+	if not current() then return end
 	Ollama.verify_local_model(model, function(installed, reason)
+		if not current() then return end
 		if installed ~= before then refresh_menu(ctx) end
+		if not current() then return end
 		if installed == false then
-			require("modules.llm.local_model_offer").offer(model)
+			require("modules.llm.local_model_offer").offer(model, { current = current })
 		elseif installed == nil then
 			Logger.warn(LOG, "Whether local model '%s' is installed is unknown (%s).", model, tostring(reason))
 		end
@@ -166,7 +191,12 @@ local function apply(ctx, key, value, setter)
 	local committed = ctx.settings_mgr.apply_setting_transaction({
 		key = key, value = value, runtime_fn = setter, publish_setting = false,
 	}) == true
-	if not committed then Logger.warn(LOG, "Agent setting '%s' was not applied.", key) end
+	if not committed then Logger.warn(LOG, "Agent setting '%s' was not applied.", key)
+	elseif key == "llm_agent_system1" or key == "llm_agent_system2" then
+		local epochs = _selection_epochs[ctx.state] or {}
+		_selection_epochs[ctx.state] = epochs
+		epochs[key] = (epochs[key] or 0) + 1
+	end
 	return committed
 end
 
@@ -209,7 +239,7 @@ local function prompt_model(ctx, system, parsed)
 		return false
 	end
 	if not apply(ctx, system.key, value, system.setter) then return false end
-	offer_missing_local_model(ctx, value)
+	offer_missing_local_model(ctx, system, value)
 	return true
 end
 
@@ -245,8 +275,9 @@ end
 --- @param ctx table Panel context.
 --- @param system table SYSTEMS entry.
 --- @return table rows
-local function system_rows(ctx, system)
-	local value = ctx.state[system.key] or ""
+local function system_rows(ctx, system, selection)
+	local value = selection.value
+	local selection_is_current = selection.current
 	local parsed = value ~= "" and Vision.parse(value) or nil
 	local off = ManifestMenu.check_row("agent_system_controls", "agent_system_off", {
 		agent_system_off = function() return apply(ctx, system.key, "", system.setter) end,
@@ -278,7 +309,7 @@ local function system_rows(ctx, system)
 		else
 			row.action = function()
 				if not apply(ctx, system.key, id, system.setter) then return false end
-				offer_missing_local_model(ctx, id)
+				offer_missing_local_model(ctx, system, id)
 				return true
 			end
 		end
@@ -316,7 +347,7 @@ local function system_rows(ctx, system)
 	end
 	if installed == false then
 		local download = ManifestMenu.template_rows("agent_download_frame", {
-			["agent_download_model"] = function() return require("modules.llm.local_model_offer").install(model) end,
+			["agent_download_model"] = function() return require("modules.llm.local_model_offer").install(model, { current = selection_is_current }) end,
 		})
 		if not download or #download ~= 1 or type(download[1].action) ~= "function" then return nil end
 		download[1].label = download[1].label:gsub("{1}", function() return model end)
@@ -372,6 +403,11 @@ function M.build(ctx)
 		or type(ctx.settings_mgr.apply_setting_transaction) ~= "function" then
 		error("agent_panel.build: a state and a settings manager are required")
 	end
+	local selections = {}
+	for id, system in pairs(SYSTEMS) do
+		local value = ctx.state[system.key] or ""
+		selections[id] = { value = value, current = selection_current(ctx, system, value) }
+	end
 	if type(rawget(ManifestMenu.get_root(), "agent_menu")) ~= "table" then return nil end
 	for _, key in ipairs({ "agent_panel_frame", "agent_system1_frame", "agent_system2_frame",
 		"agent_excluded_apps_frame", "agent_download_frame" }) do
@@ -421,8 +457,8 @@ function M.build(ctx)
 		end
 	end
 	local submenu = ManifestMenu.build("agent_menu", "AI agent", {
-		agent_system1 = dynamic("agent_system1", function() return system_rows(ctx, SYSTEMS.agent_system1) end),
-		agent_system2 = dynamic("agent_system2", function() return system_rows(ctx, SYSTEMS.agent_system2) end),
+		agent_system1 = dynamic("agent_system1", function() return system_rows(ctx, SYSTEMS.agent_system1, selections.agent_system1) end),
+		agent_system2 = dynamic("agent_system2", function() return system_rows(ctx, SYSTEMS.agent_system2, selections.agent_system2) end),
 		agent_disabled_apps = dynamic("agent_disabled_apps", function() return disabled_apps_rows(ctx) end),
 	}, nil, {
 		commands = { agent_mode = function(id) return set_mode(ctx, id) end },

@@ -246,6 +246,9 @@ LLM_AuxBegin(Kind, Context := 0) {
 			"cancel", 0,
 			"finalizer", 0,
 			"cleanup_claimed", false)
+		; The lexical origin capability must survive this explicit context projection.
+		if Context.Has("origin_custody")
+			Owner["origin_custody"] := Context["origin_custody"]
 		_LLM_AuxOwners[Kind] := Owner
 	} finally Critical(PreviousCritical)
 	if Retired is Map
@@ -553,6 +556,8 @@ global _LLM_Ollama_WarmupGeneration := 0
 ; Tracks the current in-flight warmup WinHTTP object so overlapping retries can
 ; abort the previous request before issuing a new one — prevents object leaks
 global _LLM_Ollama_WarmupHttp := 0
+; Closed observation of one admitted request; never a fresh acquisition receipt.
+global _LLM_Ollama_WarmupPendingFn := 0
 ; Warmup uses a shorter ceiling than real predictions — a hung warmup must not
 ; block the server for 3 min while the user is typing real requests.
 global LLM_OLLAMA_WARMUP_TIMEOUT := 90000

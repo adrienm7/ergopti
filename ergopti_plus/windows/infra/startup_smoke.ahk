@@ -108,13 +108,16 @@ StartupSmokeAwaitObserver(Directory, Nonce, TimeoutMs := 10000, PollMs := 10) {
 		throw ValueError("Invalid startup smoke nonce.")
 	StartedAt := A_TickCount
 	AckPath := Directory . "\ack.txt"
-	while !TickExpired(StartedAt, TimeoutMs) {
+	; A timer can keep Sleep suspended past the deadline. Observe a published
+	; acknowledgment at the resumed polling boundary before refusing the wait.
+	loop {
 		if FileExist(AckPath) {
 			if FSReadStrict(AckPath) != Nonce
 				throw Error("The startup observer acknowledgment belongs to another run.")
 			return true
 		}
+		if TickExpired(StartedAt, TimeoutMs)
+			throw Error("The startup observer did not acknowledge readiness before the timeout.")
 		Sleep(PollMs)
 	}
-	throw Error("The startup observer did not acknowledge readiness before the timeout.")
 }

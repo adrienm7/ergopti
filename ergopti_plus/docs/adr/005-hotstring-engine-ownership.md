@@ -78,5 +78,5 @@ propagated to both driver implementations.
 ## Evidence in the codebase
 
 - Domain specs: `static/ergopti_plus/_shared/core/domain/HotstringMatcher.spec.js`, `Expander.spec.js`, `Registry.spec.js`, `Terminators.spec.js`
-- Hammerspoon driver tests: `static/ergopti_plus/macos/tests/unit/modules/keymap/test_expander.lua`, `test_registry.lua`, `test_terminators.lua`
+- Hammerspoon driver tests: `static/ergopti_plus/macos/tests/unit/modules/keymap/expansion/test_expander.lua`, `test_registry.lua`, `test_terminators.lua`
 - Domain spec documentation: `static/ergopti_plus/_shared/core/domain/SPEC.md`

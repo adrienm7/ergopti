@@ -38,6 +38,11 @@ func TestMain(m *testing.M) {
 			os.Stdout.Write(length[:])
 			os.Stdout.Write(append([]byte{tag}, []byte(payload)...))
 		}
+		if mode == "stage-terminal" {
+			frame('C', os.Getenv("ERGOPTI_TEST_FAILURE_STAGE_TERMINAL"))
+			status, _ := strconv.Atoi(os.Getenv("ERGOPTI_TEST_FAILURE_STAGE_STATUS"))
+			os.Exit(status)
+		}
 		if mode == "stall-header" {
 			time.Sleep(10 * time.Second)
 			os.Exit(9)

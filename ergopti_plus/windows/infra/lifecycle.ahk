@@ -1255,6 +1255,9 @@ Ergopti_OnShutdown(reason, code) {
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try HealthCheck_StopWindowControl()
+		catch as Err
+			try LoggerError("Lifecycle", "Diagnostics window control teardown failed: {1}.", Err.Message)
 		try _HC_Close()
 		try WebView_StopBrowserWarmup()
 		catch as Err
@@ -1279,6 +1282,9 @@ Ergopti_OnShutdown(reason, code) {
 			; Ordinary Exit has no reload-success callback to protect. Every refusal
 			; gate has accepted, so best-effort teardown is terminal here.
 			try _GestureUnhook()
+		try MenuDispatcher_Shutdown()
+		catch as Err
+			try LoggerError("Lifecycle", "Registered menu teardown failed: {1}.", Err.Message)
 		return 0
 		} finally {
 			if OwnShutdownBundle

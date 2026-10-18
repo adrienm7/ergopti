@@ -44,7 +44,17 @@ end
 --- @return boolean
 function M.under_unit(cgroup)
 	cgroup = cgroup or read_file("/proc/self/cgroup") or ""
-	return cgroup:find("/" .. M.UNIT, 1, true) ~= nil
+	-- A similarly named scope or service cannot restart this process. Match an
+	-- exact ancestor in either hierarchy format, including delegated subgroups.
+	for line in cgroup:gmatch("[^\n]+") do
+		local path = line:match("^%d+:[^:]*:(/.*)$")
+		if path then
+			for component in path:gmatch("[^/]+") do
+				if component == M.UNIT then return true end
+			end
+		end
+	end
+	return false
 end
 
 --- The detached relay command for a daemon not run by systemd.

@@ -1,0 +1,594 @@
+﻿; tests/unit/ui/windows/test_native_dialog_titles.ahk
+;
+; ==============================================================================
+; MODULE: Native Dialog Caption Regression
+; DESCRIPTION:
+; Executes the actual native caption owner and actual generated policy in private
+; AHK children. Visible message/input captions are captured independently of the
+; shared composer, alongside body, timeout and exact default-text receipts.
+; Calls precede both owner #Includes, exercising their pre-bootstrap availability.
+; Snapshot every native property before file I/O pumps the timeout dialog away.
+; Return the capture callback before awaiting actual native timeout retirement.
+; An expired-window mutation must reproduce the original exact native exception.
+; ==============================================================================
+
+/**
+ * Settles one exact process tree before inspecting its completion observations.
+ * @param {string} Executable - The native executable.
+ * @param {Array} Args - Structured arguments.
+ * @param {object} Ownership - Retains the fixture if exact child retirement fails.
+ * @param {integer} ExpectedCode - Zero for real probes, two only for the expiry mutation.
+ * @param {integer} TimeoutMs - Bound derived from the owned child observations.
+ * @returns {string} Captured ASCII completion acknowledgement.
+ */
+_NDT_RunChild(Executable, Args, Ownership, ExpectedCode := 0, TimeoutMs := 15000) {
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	Handle := ShellRunner_SpawnTreeOwned(Executable, Args, OnDone)
+	try {
+		AssertTrue(Handle.start(), "the exact native-dialog child must start")
+		Started := A_TickCount
+		while !Receipt.Calls && TickElapsed(Started) < TimeoutMs {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Receipt.Calls, "the native-dialog child completes exactly once")
+		AssertEqual(ExpectedCode, Receipt.Code, "the actual native caption owner parses and runs: "
+			. Receipt.Output . Receipt.Errors)
+		AssertEqual("", Receipt.Errors, "native dialog receipts contain no hidden errors")
+		return Receipt.Output
+	} finally {
+		Settled := Handle.terminate()
+		if !Settled
+			Ownership.CanRetire := false
+		AssertTrue(Settled, "the exact native-dialog process tree is retired")
+	}
+}
+
+/**
+ * Finds the production caption owner by its public symbol, surviving file moves.
+ * @returns {string} The sole source owning every native dialog delegate.
+ */
+_NDT_NativeDialogOwner() {
+	global _StaticDir
+	Owners := []
+	Loop Files, _StaticDir . "\ergopti_plus\windows\*.ahk", "R" {
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
+			continue
+		Source := FileRead(A_LoopFileFullPath, "UTF-8")
+		if !_DriverFindFunctionDefinition(&Source, "Ui_MsgBox")
+			continue
+		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, "Ui_InputBox")),
+			"the public input delegate belongs to the same native caption owner")
+		AssertTrue(IsObject(_DriverFindFunctionDefinition(&Source, "Ui_DirSelect")),
+			"the public folder delegate belongs to the same native caption owner")
+		Owners.Push(A_LoopFileFullPath)
+	}
+	AssertEqual(1, Owners.Length, "the native caption delegates have one production owner")
+	return Owners[1]
+}
+
+
+/**
+ * Parses the actual dialog include graph before opening any native window.
+ * Strict stdout retains #Warn diagnostics rather than filtering them away.
+ */
+_NDT_NativeOwnersParseWithoutWarnings() {
+	global _StaticDir
+	Root := A_Temp . "\ergopti_dialog_parse_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the native parse fixture must be privately owned")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	try {
+		Artifact := _StaticDir . "\ergopti_plus\windows\_generated\window_titles.ahk"
+		Owner := _NDT_NativeDialogOwner()
+		Harness := Root . "\parse_dialog_owners.ahk"
+		FileAppend('#Requires AutoHotkey v2.0' . "`n"
+			. '#SingleInstance Off' . "`n"
+			. '#Warn All, StdOut' . "`n"
+			. 'Thread("NoTimers", false)' . "`n"
+			. 'FileAppend("dialog-owners-parsed", "*", "UTF-8-RAW")' . "`n"
+			. 'ExitApp(0)' . "`n"
+			. '#Include ' . Artifact . "`n"
+			. '#Include ' . Owner . "`n", Harness, "UTF-8")
+		AssertEqual("dialog-owners-parsed", _NDT_RunChild(A_AhkPath,
+			["/ErrorStdOut", Harness], Ownership),
+			"the real native owners preserve Thread() and parse with no #Warn output")
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+Test("native dialogs: actual owners parse without shadowing built-in Thread", _NDT_NativeOwnersParseWithoutWarnings)
+
+
+/**
+ * Builds a private probe which includes the real dialog owner without copying it.
+ * Its timer records observations only; assertions belong to the completed parent.
+ * @param {string} Artifact - Privately generated shared policy.
+ * @param {string} Owner - Actual production native-dialog owner.
+ * @returns {string} Complete AHK child source.
+ */
+_NDT_ProbeSource(Artifact, Owner) {
+	return "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#Warn All, StdOut`n"
+		. 'OnError(_NDTProbeError)' . "`n"
+		. 'global _NDTReceipt := ""' . "`n"
+		. 'global _NDTSnapshot := 0' . "`n"
+		. '_NDTReceipt := A_Args[1] . "\message"' . "`n"
+		. 'SetTimer(_NDTCapture, 20)' . "`n"
+		. 'MessageResult := Ui_MsgBox("Preserved message body", "Navigation layer", "YesNo Default2 Icon! T0.5")' . "`n"
+		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
+		. 'FileAppend(MessageResult, A_Args[1] . "\message.result", "UTF-8-RAW")' . "`n"
+		. '_NDTReceipt := A_Args[1] . "\input"' . "`n"
+		. 'SetTimer(_NDTCapture, 20)' . "`n"
+		. 'InputResult := Ui_InputBox("Preserved input body", "Navigation layer", "w320 h180 Password T0.5", " Secret value ")' . "`n"
+		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
+		. 'FileAppend(InputResult.Result . "``n" . InputResult.Value, A_Args[1] . "\input.result", "UTF-8-RAW")' . "`n"
+		. '_NDTReceipt := A_Args[1] . "\unnamed"' . "`n"
+		. 'SetTimer(_NDTCapture, 20)' . "`n"
+		. 'UnnamedResult := Ui_MsgBox("Preserved unnamed body", , "T0.5")' . "`n"
+		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
+		. 'FileAppend(UnnamedResult, A_Args[1] . "\unnamed.result", "UTF-8-RAW")' . "`n"
+		. '_NDTReceipt := A_Args[1] . "\cancelled"' . "`n"
+		. 'SetTimer(_NDTCapture, 20)' . "`n"
+		. 'CancelledResult := Ui_InputBox("Preserved cancelled body", "Navigation layer", "w320 h180 T2", " Secret value ")' . "`n"
+		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. '_NDTPersist()' . "`n"
+		. 'FileAppend(CancelledResult.Result . "``n" . CancelledResult.Value, A_Args[1] . "\cancelled.result", "UTF-8-RAW")' . "`n"
+		. 'FileAppend("dialogs-written", "*", "UTF-8-RAW")' . "`nExitApp(0)`n"
+		. '_NDTCapture() {' . "`n"
+		. 'global _NDTReceipt, _NDTSnapshot' . "`n"
+		. 'for Hwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
+		. 'if Hwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", Hwnd)' . "`ncontinue`n"
+		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
+		. 'Body := WinGetText("ahk_id " . Hwnd)' . "`n"
+		. 'Buttons := ""' . "`n"
+		. 'Password := ""' . "`n"
+		. 'if InStr(_NDTReceipt, "\message") {' . "`n"
+		. 'YesButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 6, "Ptr")' . "`n"
+		. 'NoButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 7, "Ptr")' . "`n"
+		. 'DefaultId := SendMessage(0x400, 0, 0, , "ahk_id " . Hwnd) & 0xFFFF' . "`n"
+		. 'Buttons := (YesButton ? "yes" : "missing") . "|" . (NoButton ? "no" : "missing") . "|" . DefaultId' . "`n}`n"
+		. 'if InStr(_NDTReceipt, "\input") {' . "`n"
+		. 'InputControlHwnd := ControlGetHwnd("Edit1", "ahk_id " . Hwnd)' . "`n"
+		. 'Password := (WinGetStyle("ahk_id " . InputControlHwnd) & 0x20) ? "password" : "plain"' . "`n}`n"
+		. 'SetTimer(_NDTCapture, 0)' . "`n"
+		. 'if InStr(_NDTReceipt, "\cancelled")' . "`n"
+		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
+		. '_NDTSnapshot := {Hwnd: Hwnd, Caption: Caption, Body: Body, Buttons: Buttons, Password: Password}' . "`n"
+		. 'return' . "`n}`n}`n"
+		. '_NDTPersist() {' . "`n"
+		. 'global _NDTReceipt, _NDTSnapshot' . "`n"
+		. 'if !IsObject(_NDTSnapshot)' . "`n"
+		. 'throw Error("The actual native dialog must publish its complete snapshot")' . "`n"
+		. 'Captured := _NDTSnapshot' . "`n"
+		. 'if InStr(_NDTReceipt, "\message") && A_Args[2] == "delay" {' . "`n"
+		. 'Sleep(700)' . "`n"
+		. 'FileAppend(DllCall("IsWindow", "Ptr", Captured.Hwnd) ? "live" : "retired", _NDTReceipt . ".retirement", "UTF-8-RAW")' . "`n}`n"
+		. 'FileAppend(Captured.Caption, _NDTReceipt . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(Captured.Body, _NDTReceipt . ".body", "UTF-8-RAW")' . "`n"
+		. 'if Captured.Buttons != ""' . "`n"
+		. 'FileAppend(Captured.Buttons, _NDTReceipt . ".buttons", "UTF-8-RAW")' . "`n"
+		. 'if Captured.Password != ""' . "`n"
+		. 'FileAppend(Captured.Password, _NDTReceipt . ".password", "UTF-8-RAW")' . "`n"
+		. '_NDTSnapshot := 0' . "`n}`n"
+		. '_NDTProbeError(Err, *) {' . "`n"
+		. 'FileAppend(Err.Message, "*", "UTF-8-RAW")' . "`nExitApp(2)`n}`n"
+		. '#Include ' . Artifact . "`n"
+		. '#Include ' . Owner . "`n"
+}
+
+
+/**
+ * Builds a real IFileDialog probe with exact caption, filter and result receipts.
+ * Native observations finish before any file I/O or owned dialog cancellation.
+ * @param {string} Artifact - Actual privately generated shared caption policy.
+ * @param {string} Owner - Actual native caption owner, including the file picker.
+ * @returns {string} Complete native child source.
+ */
+_NDT_FilePickerProbeSource(Artifact, Owner) {
+	return '#Requires AutoHotkey v2.0' . "`n"
+		. '#SingleInstance Off' . "`n"
+		. '#Warn All, StdOut' . "`n"
+		. 'OnError(_NFPError)' . "`n"
+		. 'global _NFPRoot := A_Args[1]' . "`n"
+		. 'global _NFPMode := ""' . "`n"
+		. 'global _NFPOwnedFile := _NFPRoot . "\selected.txt"' . "`n"
+		. 'FileAppend("Owned fixture contents", _NFPOwnedFile, "UTF-8-RAW")' . "`n"
+		. 'CanonicalBuffer := Buffer(65536, 0)' . "`n"
+		. 'CanonicalLength := DllCall("GetLongPathNameW", "Str", _NFPOwnedFile, "Ptr", CanonicalBuffer, "UInt", 32768, "UInt")' . "`n"
+		. 'if !CanonicalLength || CanonicalLength >= 32768' . "`n"
+		. 'throw Error("The privately owned fixture path must resolve")' . "`n"
+		. '_NFPOwnedFile := StrGet(CanonicalBuffer, CanonicalLength, "UTF-16")' . "`n"
+		. 'FileAppend(_NFPOwnedFile, _NFPRoot . "\owned.path", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "baseline"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPBaseline := FileSelect(35, _NFPOwnedFile, "Owned native baseline", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(Type(_NFPBaseline) . "|" . _NFPBaseline, _NFPRoot . "\baseline.result", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "selected"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPSelected := Ui_FileSelect(35, _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(_NFPSelected, _NFPRoot . "\selected.result", "UTF-8-RAW")' . "`n"
+		. '_NFPMode := "cancelled"' . "`n"
+		. 'SetTimer(_NFPCapture, 20)' . "`n"
+		. '_NFPCancelled := Ui_FileSelect("M35", _NFPOwnedFile, "Navigation layer", "Owned files (*.txt)")' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'FileAppend(Type(_NFPCancelled) . "|" . (_NFPCancelled is Array ? _NFPCancelled.Length : "wrong-shape"), _NFPRoot . "\cancelled.result", "UTF-8-RAW")' . "`n"
+		. 'FileAppend("file-picker-written", "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(0)' . "`n"
+		. '_NFPCapture() {' . "`n"
+		. 'global _NFPRoot, _NFPMode' . "`n"
+		. 'for Hwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
+		. 'if Hwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", Hwnd)' . "`n"
+		. 'continue' . "`n"
+		. 'if WinGetClass("ahk_id " . Hwnd) != "#32770"' . "`n"
+		. 'continue' . "`n"
+		. 'Caption := WinGetTitle("ahk_id " . Hwnd)' . "`n"
+		. 'FilterDescription := ""' . "`n"
+		. 'PickerControlCount := 0' . "`n"
+		. 'PickerControlShapes := ""' . "`n"
+		. 'PickerTypeCombo := 0' . "`n"
+		. 'for ControlHwnd in WinGetControlsHwnd("ahk_id " . Hwnd) {' . "`n"
+		. 'ControlClass := WinGetClass("ahk_id " . ControlHwnd)' . "`n"
+		. 'PickerControlCount += 1' . "`n"
+		. 'PickerControlId := DllCall("GetDlgCtrlID", "Ptr", ControlHwnd, "Int")' . "`n"
+		. 'if ControlClass == "ComboBox" && PickerControlId == 1136 {' . "`n"
+		. 'if PickerTypeCombo' . "`n"
+		. 'throw Error("The owned native picker must have one file-type ComboBox")' . "`n"
+		. 'PickerTypeCombo := ControlHwnd' . "`n"
+		. '}' . "`n"
+		. 'if PickerControlCount <= 24 {' . "`n"
+		. 'PickerControlShapes .= (PickerControlShapes == "" ? "" : "|") . SubStr(ControlClass, 1, 48) . ":" . PickerControlId' . "`n"
+		. '}' . "`n"
+		. '}' . "`n"
+		. 'if !PickerTypeCombo || !DllCall("IsChild", "Ptr", Hwnd, "Ptr", PickerTypeCombo) || WinGetClass("ahk_id " . PickerTypeCombo) != "ComboBox"' . "`n"
+		. 'throw Error("The owned native picker requires its file-type ComboBox")' . "`n"
+		. 'PickerTypeItems := ControlGetItems(PickerTypeCombo)' . "`n"
+		. 'PickerTypeIndex := ControlGetIndex(PickerTypeCombo)' . "`n"
+		. 'PickerTypeChoice := ControlGetChoice(PickerTypeCombo)' . "`n"
+		. 'PickerTypeReceipt := "items=" . PickerTypeItems.Length . ",truncated=" . Max(0, PickerTypeItems.Length - 4) . ",selected=" . PickerTypeIndex' . "`n"
+		. 'for PickerTypeItemIndex, PickerTypeItem in PickerTypeItems {' . "`n"
+		. 'FilterDescription .= PickerTypeItem . "|"' . "`n"
+		. 'if PickerTypeItemIndex <= 4' . "`n"
+		. 'PickerTypeReceipt .= "|" . PickerTypeItemIndex . ":" . SubStr(StrReplace(StrReplace(PickerTypeItem, "``r", "\r"), "``n", "\n"), 1, 128)' . "`n"
+		. '}' . "`n"
+		. 'PickerTypeReceipt .= "|choice:" . SubStr(StrReplace(StrReplace(PickerTypeChoice, "``r", "\r"), "``n", "\n"), 1, 128)' . "`n"
+		. 'SetTimer(_NFPCapture, 0)' . "`n"
+		. 'if _NFPMode == "selected" {' . "`n"
+		. 'OpenButton := DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 1, "Ptr")' . "`n"
+		. 'if !OpenButton || !DllCall("IsWindowEnabled", "Ptr", OpenButton)' . "`n"
+		. 'throw Error("The native picker requires its enabled default Open button")' . "`n"
+		. 'PostMessage(0xF5, 0, 0, , "ahk_id " . OpenButton)' . "`n}`n"
+		. 'else' . "`n"
+		. 'PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)' . "`n"
+		. 'FileAppend(Caption, _NFPRoot . "\" . _NFPMode . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(FilterDescription, _NFPRoot . "\" . _NFPMode . ".filter", "UTF-8-RAW")' . "`n"
+		. 'PickerDiagnostic := "controls=" . PickerControlCount . ",truncated=" . Max(0, PickerControlCount - 24) . ";" . PickerControlShapes' . "`n"
+		. 'FileAppend(PickerDiagnostic, _NFPRoot . "\" . _NFPMode . ".controls", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(PickerTypeReceipt, _NFPRoot . "\" . _NFPMode . ".types", "UTF-8-RAW")' . "`n"
+		. 'return' . "`n"
+		. '}' . "`n"
+		. '}' . "`n"
+		. '_NFPError(ProbeError, *) {' . "`n"
+		. 'FileAppend(ProbeError.Message, "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(2)' . "`n"
+		. '}' . "`n"
+		. '#Include ' . Artifact . "`n"
+		. '#Include ' . Owner . "`n"
+}
+
+
+/** Checks actual generated statement boundaries without opening any native UI. */
+_NDT_FilePickerProbeStatementSeparators() {
+	Probe := _NDT_FilePickerProbeSource("Owned policy", "Owned caption owner")
+	StrReplace(Probe, "128)" . "`n", "", , &StatementBoundaries)
+	AssertEqual(2, StatementBoundaries,
+		"both bounded filter receipt statements require real generated LF separators")
+	AssertFalse(InStr(Probe, "128)" . Chr(96) . "n") > 0,
+		"a literal backtick-n cannot separate generated native AHK statements")
+	AssertContains(Probe, '"' . Chr(96) . 'r", "\r"',
+		"the child still escapes captured carriage returns inside its own string literal")
+	AssertContains(Probe, '"' . Chr(96) . 'n", "\n"',
+		"the child still escapes captured linefeeds inside its own string literal")
+}
+Test("native file picker: generated receipt statements retain LF and escaped text", _NDT_FilePickerProbeStatementSeparators)
+
+
+
+
+/**
+ * Captures real SHBrowseForFolderW captions, body and option-dependent controls.
+ * Persistence follows actual modal completion, preserving strict HWND retirement.
+ * @param {string} Artifact - Privately generated shared title policy.
+ * @param {string} Owner - Actual native dialog and folder callback owner.
+ * @returns {string} Complete private native folder probe.
+ */
+_NDT_FolderPickerProbeSource(Artifact, Owner) {
+		return '#Requires AutoHotkey v2.0' . "`n"
+		. '#SingleInstance Off' . "`n"
+		. '#Warn All, StdOut' . "`n"
+		. 'OnError(_NDFFailure)' . "`n"
+		. 'global _NDFRoot := A_Args[1]' . "`n"
+		. 'global _NDFMode := ""' . "`n"
+		. 'global _NDFSnapshot := 0' . "`n"
+		. '_NDFFolder := _NDFRoot . "\owned_folder"' . "`n"
+		. 'DirCreate(_NDFFolder)' . "`n"
+		. '_NDFCanonicalBuffer := Buffer(65536, 0)' . "`n"
+		. '_NDFCanonicalLength := DllCall("GetLongPathNameW", "Str", _NDFFolder, "Ptr", _NDFCanonicalBuffer, "UInt", 32768, "UInt")' . "`n"
+		. 'if !_NDFCanonicalLength || _NDFCanonicalLength >= 32768' . "`n"
+		. 'throw Error("The privately owned folder must resolve")' . "`n"
+		. '_NDFFolder := StrGet(_NDFCanonicalBuffer, _NDFCanonicalLength, "UTF-16")' . "`n"
+		. 'FileAppend(_NDFFolder, _NDFRoot . "\owned.path", "UTF-8-RAW")' . "`n"
+		. '_NDFMode := "selected"' . "`n"
+		. 'SetTimer(_NDFCapture, 20)' . "`n"
+		. '_NDFSelected := Ui_DirSelect("*" . _NDFFolder, 1, "ErgoptiPlus — preserved folder body", "Navigation layer", 0)' . "`n"
+		. 'SetTimer(_NDFCapture, 0)' . "`n"
+		. '_NDFPersist()' . "`n"
+		. 'FileAppend(_NDFSelected, _NDFRoot . "\selected.result", "UTF-8-RAW")' . "`n"
+		. '_NDFMode := "cancelled"' . "`n"
+		. 'SetTimer(_NDFCapture, 20)' . "`n"
+		. '_NDFCancelled := Ui_DirSelect("*" . _NDFFolder, 3, "ErgoptiPlus — preserved folder body", "Navigation layer", 0)' . "`n"
+		. 'SetTimer(_NDFCapture, 0)' . "`n"
+		. '_NDFPersist()' . "`n"
+		. 'FileAppend(Type(_NDFCancelled) . "|" . _NDFCancelled, _NDFRoot . "\cancelled.result", "UTF-8-RAW")' . "`n"
+		. 'FileAppend("folders-written", "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(0)' . "`n"
+		. '_NDFCapture() {' . "`n"
+		. 'global _NDFMode, _NDFSnapshot' . "`n"
+		. 'for FolderHwnd in WinGetList("ahk_pid " . DllCall("GetCurrentProcessId", "UInt")) {' . "`n"
+		. 'if FolderHwnd == A_ScriptHwnd || !DllCall("IsWindowVisible", "Ptr", FolderHwnd)' . "`n"
+		. 'continue' . "`n"
+		. 'Lease := DllCall("GetPropW", "Ptr", FolderHwnd, "Str", "NativeFolderPickerLease", "Ptr")' . "`n"
+		. 'if !Lease' . "`n"
+		. 'continue' . "`n"
+		. 'ConfirmButton := DllCall("GetDlgItem", "Ptr", FolderHwnd, "Int", 1, "Ptr")' . "`n"
+		. 'if !ConfirmButton || !DllCall("IsWindowEnabled", "Ptr", ConfirmButton)' . "`n"
+		. 'continue' . "`n"
+		. 'Caption := WinGetTitle("ahk_id " . FolderHwnd)' . "`n"
+		. 'Body := WinGetText("ahk_id " . FolderHwnd)' . "`n"
+		. 'EditCount := 0' . "`n"
+		. 'for FolderControlHwnd in WinGetControlsHwnd("ahk_id " . FolderHwnd) {' . "`n"
+		. 'if WinGetClass("ahk_id " . FolderControlHwnd) == "Edit" && DllCall("IsWindowVisible", "Ptr", FolderControlHwnd)' . "`n"
+		. 'EditCount += 1' . "`n"
+		. '}' . "`n"
+		. '_NDFSnapshot := {Hwnd: FolderHwnd, Caption: Caption, Body: Body, Lease: Lease, Edits: EditCount}' . "`n"
+		. 'SetTimer(_NDFCapture, 0)' . "`n"
+		. 'if _NDFMode == "selected"' . "`n"
+		. 'PostMessage(0xF5, 0, 0, , "ahk_id " . ConfirmButton)' . "`n"
+		. 'else' . "`n"
+		. 'PostMessage(0x10, 0, 0, , "ahk_id " . FolderHwnd)' . "`n"
+		. 'return' . "`n"
+		. '}' . "`n"
+		. '}' . "`n"
+		. '_NDFPersist() {' . "`n"
+		. 'global _NDFRoot, _NDFMode, _NDFSnapshot' . "`n"
+		. 'if !IsObject(_NDFSnapshot)' . "`n"
+		. 'throw Error("The actual native folder must publish its caption and body")' . "`n"
+		. 'CapturedFolder := _NDFSnapshot' . "`n"
+		. 'FileAppend(CapturedFolder.Caption, _NDFRoot . "\" . _NDFMode . ".title", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(CapturedFolder.Body, _NDFRoot . "\" . _NDFMode . ".body", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(CapturedFolder.Lease, _NDFRoot . "\" . _NDFMode . ".lease", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(CapturedFolder.Edits, _NDFRoot . "\" . _NDFMode . ".edits", "UTF-8-RAW")' . "`n"
+		. 'FileAppend(DllCall("IsWindow", "Ptr", CapturedFolder.Hwnd) ? "live" : "retired", _NDFRoot . "\" . _NDFMode . ".retirement", "UTF-8-RAW")' . "`n"
+		. '_NDFSnapshot := 0' . "`n"
+		. '}' . "`n"
+		. '_NDFFailure(FolderProbeError, *) {' . "`n"
+		. 'FileAppend(FolderProbeError.Message, "*", "UTF-8-RAW")' . "`n"
+		. 'ExitApp(2)' . "`n"
+		. '}' . "`n"
+		. '#Include ' . Artifact . "`n"
+		. '#Include ' . Owner . "`n"
+}
+
+/** Returns fresh independent expected captions for every supported policy variant. */
+_NDT_PolicyCases() {
+	return [
+		{Prefix: "ErgoptiPlus", Separator: " — ", Expected: "ErgoptiPlus — Navigation layer"},
+		{Prefix: "", Separator: " — ", Expected: "Navigation layer"},
+		{Prefix: "Other product", Separator: ": ", Expected: "Other product: Navigation layer"},
+		{Prefix: 'Quoted "product" ``name``', Separator: "", Expected: 'Quoted "product" ``name``Navigation layer'},
+		{Prefix: "Other `; product", Separator: " `; ", Expected: "Other `; product `; Navigation layer"}
+	]
+}
+
+
+/**
+ * Owns generated artifacts and exact child retirement for one native UI family.
+ * @param {string} Family - Distinct privately owned fixture namespace.
+ * @param {Func} CheckPolicy - Performs every original assertion for one policy.
+ */
+_NDT_RunPolicyFamily(Family, CheckPolicy) {
+	global _StaticDir
+	Root := A_Temp . "\ergopti_native_" . Family . "_" . A_ScriptHwnd . "_" . A_TickCount
+	AssertFalse(DirExist(Root), "the native-dialog fixture must be privately owned")
+	DirCreate(Root)
+	Ownership := {CanRetire: true}
+	Cases := _NDT_PolicyCases()
+	try {
+		Policies := "["
+		for Index, Spec in Cases {
+			if Index > 1
+				Policies .= ","
+			Policies .= '{"prefix":' . JsonStringLiteral(Spec.Prefix)
+				. ',"separator":' . JsonStringLiteral(Spec.Separator) . '}'
+		}
+		FileAppend(Policies . "]", Root . "\policies.json", "UTF-8-RAW")
+		Bootstrap := Root . "\generate.cjs"
+		FileAppend('const fs = require("node:fs"); const path = require("node:path");' . "`n"
+			. 'const root = process.argv[2]; const generator = require(process.argv[3]);' . "`n"
+			. 'const policies = require(path.join(root, "policies.json"));' . "`n"
+			. 'for (const [index, policy] of policies.entries()) {' . "`n"
+			. 'const target = path.join(root, String(index + 1)); const source = path.join(target, generator.SOURCE);' . "`n"
+			. 'fs.mkdirSync(path.dirname(source), {recursive:true});' . "`n"
+			. 'fs.writeFileSync(source, JSON.stringify({window_title:policy, apps:{}}));' . "`n"
+			. 'generator.main(target); } process.stdout.write(String(policies.length));' . "`n",
+			Bootstrap, "UTF-8-RAW")
+		Generator := _StaticDir . "\..\tools\codegen\codegen-window-titles.cjs"
+		AssertEqual("5", _NDT_RunChild("node.exe", [Bootstrap, Root, Generator], Ownership),
+			"the actual generator owns every private dialog policy")
+		Owner := _NDT_NativeDialogOwner()
+		for Index, Spec in Cases {
+			Fixture := Root . "\" . Index
+			Artifact := Fixture . "\static\ergopti_plus\windows\_generated\window_titles.ahk"
+			CheckPolicy.Call(Index, Spec, Fixture, Artifact, Owner, Ownership)
+		}
+	} finally {
+		if Ownership.CanRetire
+			DirDelete(Root, true)
+	}
+}
+
+
+/** Preserves all actual message/input, timeout and expired-read assertions. */
+_NDT_CheckDialogPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	Harness := Fixture . "\native_dialogs.ahk"
+	FileAppend(_NDT_ProbeSource(Artifact, Owner), Harness, "UTF-8")
+	AssertEqual("dialogs-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", Harness, Fixture, Index == 1 ? "delay" : "immediate"], Ownership), "native dialogs acknowledge private receipts with ASCII stdout")
+	for Kind in ["message", "input", "unnamed", "cancelled"] {
+		Caption := Fixture . "\" . Kind . ".title"
+		Body := Fixture . "\" . Kind . ".body"
+		AssertTrue(FileExist(Caption), "an actual visible native " . Kind . " window was captured")
+		Expected := Kind == "unnamed" ? Spec.Prefix : Spec.Expected
+		AssertEqual(Expected, FileRead(Caption, "UTF-8"),
+			"actual " . Kind . " caption follows independent private policy " . Index)
+		Assert(InStr(FileRead(Body, "UTF-8"), "Preserved " . Kind . " body") > 0,
+			"branding never changes the native dialog body")
+	}
+	AssertEqual("Timeout", FileRead(Fixture . "\message.result", "UTF-8"),
+		"message button/options forwarding preserves the native timeout result")
+	if Index == 1 {
+		AssertEqual("retired", FileRead(Fixture . "\message.retirement", "UTF-8"),
+			"native observations survive persistence after the exact dialog has timed out")
+		; Move one native read across the actual modal completion boundary.
+		; The same T0.5 result acknowledges retirement before persistence,
+		; so the original target exception must reject the independent read.
+		MutantRoot := Fixture . "\expired_read"
+		DirCreate(MutantRoot)
+		Mutant := StrReplace(_NDT_ProbeSource(Artifact, Owner),
+			'Captured := _NDTSnapshot',
+			'Captured := _NDTSnapshot' . "`n"
+				. 'if InStr(_NDTReceipt, "\message")' . "`n"
+				. 'WinGetText("ahk_id " . Captured.Hwnd)', , &Mutations)
+		AssertEqual(1, Mutations, "the expiry mutation changes one exact native observation")
+		MutantHarness := MutantRoot . "\expired_read.ahk"
+		FileAppend(Mutant, MutantHarness, "UTF-8")
+		AssertEqual("Target window not found.", _NDT_RunChild(A_AhkPath,
+			["/ErrorStdOut", MutantHarness, MutantRoot, "immediate"], Ownership, 2),
+			"the independent expired-window mutation reproduces the original rejected target query")
+	}
+	AssertEqual("yes|no|7", FileRead(Fixture . "\message.buttons", "UTF-8"),
+		"the native message retains Yes/No buttons and the second default button")
+	AssertEqual("Timeout`n Secret value ", FileRead(Fixture . "\input.result", "UTF-8"),
+		"password/size/timeout forwarding preserves result and exact default text")
+	AssertEqual("password", FileRead(Fixture . "\input.password", "UTF-8"),
+		"the actual native input control preserves password masking")
+	AssertEqual("Timeout", FileRead(Fixture . "\unnamed.result", "UTF-8"),
+		"an omitted caption preserves native options and return values")
+	AssertEqual("Cancel`n Secret value ", FileRead(Fixture . "\cancelled.result", "UTF-8"),
+		"closing the native input window preserves cancellation and exact entered text")
+}
+
+
+/** Preserves all actual file captions, filters, selection and cancellation assertions. */
+_NDT_CheckFilePickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	PickerRoot := Fixture . "\file_picker"
+	DirCreate(PickerRoot)
+	PickerHarness := PickerRoot . "\file_picker.ahk"
+	FileAppend(_NDT_FilePickerProbeSource(Artifact, Owner), PickerHarness, "UTF-8")
+	AssertEqual("file-picker-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", PickerHarness, PickerRoot], Ownership),
+		"the actual native file picker completes without hidden errors")
+	AssertEqual("String|", FileRead(PickerRoot . "\baseline.result", "UTF-8"),
+		"the independently observed direct native baseline cancels with its original String result")
+	AssertContains(FileRead(PickerRoot . "\baseline.types", "UTF-8"), "items=2,truncated=0,selected=1|",
+		"the direct native baseline contains exactly two filters and selects the first")
+	for Kind in ["selected", "cancelled"] {
+		AssertEqual(Spec.Expected, FileRead(PickerRoot . "\" . Kind . ".title", "UTF-8"),
+			"the real file picker caption follows independent policy " . Index)
+		; Windows renders the native friendly name and pattern together.
+		; Compare exact native observations against the direct built-in baseline.
+		AssertEqual(FileRead(PickerRoot . "\baseline.filter", "UTF-8"),
+			FileRead(PickerRoot . "\" . Kind . ".filter", "UTF-8"),
+			"the actual native picker retains the exact friendly labels (" . Kind
+				. ", policy " . Index . ", owned HWND control classes/IDs: "
+				. FileRead(PickerRoot . "\" . Kind . ".controls", "UTF-8")
+				. "; owned file-type ComboBox items/selection: "
+				. FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8") . ")")
+		AssertEqual(FileRead(PickerRoot . "\baseline.types", "UTF-8"),
+			FileRead(PickerRoot . "\" . Kind . ".types", "UTF-8"),
+			"the owned native file-type control selects the supplied friendly name")
+	}
+	AssertEqual(FileRead(PickerRoot . "\owned.path", "UTF-8"),
+		FileRead(PickerRoot . "\selected.result", "UTF-8"),
+		"native options, initial file and default name select the exact privately owned path")
+	AssertEqual("Array|0", FileRead(PickerRoot . "\cancelled.result", "UTF-8"),
+		"multiselect cancellation retains the original empty native Array shape")
+}
+
+
+/** Preserves all actual folder captions, controls, leases and retirement assertions. */
+_NDT_CheckFolderPickerPolicy(Index, Spec, Fixture, Artifact, Owner, Ownership) {
+	FolderRoot := Fixture . "\folder_picker"
+	DirCreate(FolderRoot)
+	FolderHarness := FolderRoot . "\folder_picker.ahk"
+	FileAppend(_NDT_FolderPickerProbeSource(Artifact, Owner), FolderHarness, "UTF-8")
+	AssertEqual("folders-written", _NDT_RunChild(A_AhkPath,
+		["/ErrorStdOut", FolderHarness, FolderRoot], Ownership),
+		"actual folder callbacks complete without hidden errors")
+	for Kind in ["selected", "cancelled"] {
+		AssertEqual(Spec.Expected, FileRead(FolderRoot . "\" . Kind . ".title", "UTF-8"),
+			"the real folder caption follows independent shared policy " . Index)
+		Assert(InStr(FileRead(FolderRoot . "\" . Kind . ".body", "UTF-8"),
+			"ErgoptiPlus — preserved folder body") > 0, "caption changes never rewrite the explanatory folder body")
+		Assert(Integer(FileRead(FolderRoot . "\" . Kind . ".lease", "UTF-8")) > 0,
+			"the visible native folder carries its exact initialization lease")
+		AssertEqual("retired", FileRead(FolderRoot . "\" . Kind . ".retirement", "UTF-8"),
+			"native selection and cancellation acknowledge actual modal HWND retirement")
+	}
+	AssertEqual(FileRead(FolderRoot . "\owned.path", "UTF-8"),
+		FileRead(FolderRoot . "\selected.result", "UTF-8"),
+		"initial-only navigation selects the exact independently canonical native folder")
+	AssertEqual("String|", FileRead(FolderRoot . "\cancelled.result", "UTF-8"),
+		"folder cancellation preserves its original empty String result")
+	AssertEqual("0", FileRead(FolderRoot . "\selected.edits", "UTF-8"),
+		"option1 retains the native dialog without an edit box")
+	Assert(Integer(FileRead(FolderRoot . "\cancelled.edits", "UTF-8")) > 0,
+		"option3 retains the native edit-box control")
+}
+
+
+/** Actual message/input qualification remains independent of either picker. */
+_NDT_ActualNativeCaptionsAndResults() {
+	_NDT_RunPolicyFamily("dialogs", _NDT_CheckDialogPolicy)
+}
+Test("native dialogs: actual captions and results follow customized shared policy (shared-window-titles)",
+	_NDT_ActualNativeCaptionsAndResults)
+
+
+/** An exact file-filter refusal cannot prevent the real folder family from running. */
+_NDT_ActualNativeFilePickerCaptionsAndResults() {
+	_NDT_RunPolicyFamily("file_picker", _NDT_CheckFilePickerPolicy)
+}
+Test("native file picker: actual captions, filters and results follow customized shared policy (shared-window-titles)",
+	_NDT_ActualNativeFilePickerCaptionsAndResults)
+
+
+
+
+/** Every folder policy executes through the actual owned SHBrowseForFolderW ABI. */
+_NDT_ActualNativeFolderPickerCaptionsAndResults() {
+	_NDT_RunPolicyFamily("folder_picker", _NDT_CheckFolderPickerPolicy)
+}
+Test("native folder picker: actual captions, leases and retirement follow customized shared policy (shared-window-titles)",
+	_NDT_ActualNativeFolderPickerCaptionsAndResults)

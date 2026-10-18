@@ -102,7 +102,7 @@
 		"not. Windows ships modules/llm/ollama_webview.ahk, 532 lines, loading the",
 		"SAME _shared/ui/download_window/index.html at the same 460x380 geometry. Its",
 		"display API has zero live callers — the module went dormant when the install",
-		"moved to winget, and tests/meta/test_ollama_webview_msgsub_retained.ahk",
+		"moved to winget, and tests/meta/modules/llm/servers/test_ollama_webview_msgsub_retained.ahk",
 		"records that as a deliberate, maintained state rather than an oversight. So",
 		"Windows has the capability, at a different path, switched off on purpose.",
 		"Also worth knowing before anyone consolidates the three: Linux's is a",

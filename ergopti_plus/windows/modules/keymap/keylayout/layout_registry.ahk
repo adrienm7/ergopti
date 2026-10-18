@@ -106,6 +106,19 @@ LayoutRegistry_Settings() {
 	return _LayoutRegistryDefaults
 }
 
+/** Reads a fresh canonical keycode table without adopting the public cache. */
+_LayoutRegistryReadKeycodes(SharedRoot := unset) {
+	global _SharedDir
+	if !IsSet(SharedRoot)
+		SharedRoot := _SharedDir
+	if !(SharedRoot is String) || SharedRoot == ""
+		throw ValueError("The original shared keycode root is unavailable.")
+	Path := SharedRoot . "\modules\layouts\mac_keycodes.json"
+	if !FileExist(Path)
+		throw Error("Required shared file is missing: " . Path)
+	return JsonParse(FSReadStrict(Path))
+}
+
 /**
  * The shared physical-key table every consumer converts a .keylayout with.
  * @returns {Map} Parsed mac_keycodes.json.
@@ -113,7 +126,7 @@ LayoutRegistry_Settings() {
 LayoutRegistry_Keycodes() {
 	global _LayoutRegistryKeycodes
 	if !IsObject(_LayoutRegistryKeycodes)
-		_LayoutRegistryKeycodes := _LayoutRegistryReadJson("modules\layouts\mac_keycodes.json")
+		_LayoutRegistryKeycodes := _LayoutRegistryReadKeycodes()
 	return _LayoutRegistryKeycodes
 }
 

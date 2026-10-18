@@ -273,7 +273,7 @@ local function with_remap(options, body)
 			end
 			calls.resolved_revision = calls.layout_revision
 			append("resolve:" .. calls.layout_revision)
-			return 1
+			return 1, "ansi"
 		end,
 	}
 	package.loaded["platform.remap.generator"] = {

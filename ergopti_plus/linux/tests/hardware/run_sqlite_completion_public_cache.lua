@@ -17,7 +17,7 @@ local K=require("modules.keylogger.keylogger")
 local W=require("modules.keylogger.sqlite_writer")
 K.init({sqlite_path=root.."/metrics.sqlite",log_dir=root.."/logs"})
 assert(K.is_enabled() and W.is_available())
-K.record_synthetic_output("owned-cache","abc","llm",1000); K.flush()
+K.record_synthetic_output("owned-cache","abc","llm",1000); require("tests.support.sqlite_flush_native").flush(K)
 local date=assert(W.query_rows("SELECT date FROM agg_app_day;"))[1]
 local app=assert(W.query_rows("SELECT app FROM agg_app_day;"))[1]
 assert(W.upsert_errors("owned-extra",{date=date,app=app,bs_total=7}))

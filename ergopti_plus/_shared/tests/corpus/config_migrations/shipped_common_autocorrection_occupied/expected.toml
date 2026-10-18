@@ -4,6 +4,10 @@ schema_version = 12
 [hotstrings.autocorrection]
 names = { enabled = false, time_activation_seconds = 0.4, future = "preserved inline owner" }
 
+[hotstrings.autocorrection.caps]
+enabled = true
+time_activation_seconds = 0.875
+
 [hotstrings.autocorrection.abbreviations]
 time_activation_seconds = 0.875
 
@@ -15,6 +19,7 @@ enabled = true
 time_activation_seconds = 0.875
 
 [hotstrings.modules.autocorrection]
+caps = true
 names = false
 technical_terms = true
 

@@ -189,12 +189,14 @@ M.DEFAULT_STATE = {
 -- Cached result of the last async server health check.
 -- nil = not yet checked, true = server responded, false = server unreachable.
 local _llm_health_status = nil
+local _llm_health_origin = nil
 local _llm_health_generation = 0
 
 --- Revokes every pending health writer and clears the shared display value.
 local function invalidate_llm_health()
 	_llm_health_generation = _llm_health_generation + 1
 	_llm_health_status = nil
+	_llm_health_origin = nil
 end
 
 --- Revokes pending health callbacks and resets the display to not-yet-checked.
@@ -224,15 +226,21 @@ local function probe_llm_health(state, refresh_fn)
 	local backend_at_dispatch = backend
 	local url
 	if backend == "ollama" then
-		url = "http://127.0.0.1:11434/api/version"
+		url = OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
 	else
 		-- The MLX health probe follows the configured port via api_mlx.get_base_url()
 		-- (the single source of truth) — no hardcoded port literal.
 		url = ApiMlx.get_base_url() .. "/v1/models"
 	end
 
+	if _llm_health_origin ~= url then _llm_health_status = nil end
+	_llm_health_origin = url
 	hs.http.asyncGet(url, {}, function(status)
 		if generation ~= _llm_health_generation then return end
+		local current_url = backend_at_dispatch == "ollama"
+			and OllamaEndpoint.get_base_url() .. EnableAdmission.VERSION_PATH
+			or ApiMlx.get_base_url() .. "/v1/models"
+		if url ~= current_url then return end
 		if state.llm_backend ~= backend_at_dispatch or state.llm_enabled ~= true then return end
 		-- Any HTTP response (even 4xx) means the server is reachable
 		_llm_health_status = (type(status) == "number" and status > 0)
@@ -327,8 +335,7 @@ local function start_detached_sweep(label, executable, args)
 	return true
 end
 
---- Kills the orphan helper processes spawned for the local LLM backends (the
---- expander + http server + the `ollama serve` wrapper). Called by the root
+--- Retires the owned Ollama daemon and sweeps the local expander/HTTP helpers. Called by the root
 --- teardown shared by every controlled reload and quit path, so the quit entry
 --- points can never drift. Stock Karabiner processes are never owned by Ergopti.
 --- The sweeps are asynchronous: this runs on the Hammerspoon main thread during
@@ -336,14 +343,12 @@ end
 --- @return boolean started True when every sweep was dispatched.
 function M.terminate_helper_processes()
 	M.reset_llm_health_status()
-	local all_started = true
+	local ApiOllama = require("modules.llm.api_ollama")
+	local ok, settled = pcall_log("owned Ollama retirement", ApiOllama.stop_owned_server)
+	local all_started = ok == true and settled == true
 	for _, sweep in ipairs({
 		{ label = "expander", pattern = "ergopti_plus_expander" },
 		{ label = "http-server", pattern = "ergopti_plus_http_server" },
-		-- The `ollama serve` wrapper is spawned through a /bin/sh pipeline, so
-		-- terminating its hs.task only reaps the shell; the server itself must be
-		-- matched here. Same shape api_ollama uses to kill a stale one at launch.
-		{ label = "ollama-serve", pattern = "[o]llama serve" },
 	}) do
 		if not start_detached_sweep(sweep.label, PKILL_BIN, { "-f", sweep.pattern }) then
 			all_started = false
@@ -1015,6 +1020,7 @@ local function create_menu(deps)
 						local_server_rows = function(activate_api)
 								return LocalServerPanel.rows({
 										state = state, paused = paused, keymap = keymap, update_menu = update_menu,
+										is_paused = deps.script_control and deps.script_control.is_paused,
 										WarmupCtrl = WarmupCtrl, activate_api = activate_api,
 								})
 						end,
@@ -2099,11 +2105,11 @@ local function create_menu(deps)
 		-- The local models the agent and the screen reading name are
 		-- downloaded by this menu's models manager, in its download window;
 		-- a completed download changes what the AI agent menu shows.
-		require("modules.llm.local_model_offer").set_installer(function(model, on_done)
+		require("modules.llm.local_model_offer").set_installer(function(model, on_done, is_current)
 				return models_mgr.pull_ollama_model(model, function()
 						on_done(true)
 						if type(update_menu) == "function" then pcall_log("update_menu(local model pulled)", update_menu) end
-				end, function(reason) on_done(false, reason) end)
+				end, function(reason) on_done(false, reason) end, { is_current = is_current })
 		end)
 		-- A repaired MLX runtime restarts the model it could not load, as
 		-- selecting that model does; the repair offer owns the button.

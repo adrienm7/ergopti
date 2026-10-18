@@ -44,7 +44,63 @@ ffi.cdef[[
 	void g_source_destroy(void*);
 	void g_source_unref(void*);
 	unsigned int g_idle_add(ErgoptiProbeSource, void*);
+	typedef void (*ErgoptiTrayWeakNotify)(void*, void*);
+	void g_object_weak_ref(void*, ErgoptiTrayWeakNotify, void*);
 ]]
+
+local function check_native_lifecycle()
+	-- PASSIVE only hides an item. A forgotten constructor reference leaves the
+	-- indicator, its current menu and its D-Bus registration alive after teardown.
+	-- Count native finalizers, not Lua collection or recorded unref calls.
+	local native = assert(Indicator._set_binding_for_test(nil))
+	local native_gtk, native_gobject, native_indicator = native.gtk, native.gobject, native.indicator
+	local created, finalized = 0, 0
+	local weak_notify = ffi.cast("ErgoptiTrayWeakNotify", function() finalized = finalized + 1 end)
+	local function observe(pointer)
+		assert(pointer ~= nil, "native tray object allocation must succeed")
+		created = created + 1
+		native_gobject.g_object_weak_ref(pointer, weak_notify, nil)
+		return pointer
+	end
+	Indicator._set_binding_for_test({
+		ffi = ffi, gobject = native_gobject,
+		gtk = setmetatable({ gtk_menu_new = function() return observe(native_gtk.gtk_menu_new()) end }, {
+			__index = function(_, key) return native_gtk[key] end,
+		}),
+		indicator = setmetatable({ app_indicator_new = function(...)
+			return observe(native_indicator.app_indicator_new(...))
+		end }, { __index = function(_, key) return native_indicator[key] end }),
+	})
+	for cycle = 1, 3 do
+		assert(Indicator.create("ergopti-lifecycle-probe", "input-keyboard", "Lifecycle probe"))
+		for revision = 1, 10 do
+			assert(Indicator.set_menu({ { title = "Revision " .. revision, fn = function() end } }))
+		end
+		local extra = assert(Indicator.new_item("ergopti-extra-probe", "input-keyboard", {
+			{ title = "Extra probe", fn = function() end },
+		}))
+		assert(Indicator.remove_item(extra))
+		assert(Indicator.remove_item(extra), "repeated removal must not unref a finalized item")
+		Indicator.destroy()
+		Indicator.destroy()
+		for _ = 1, 300 do
+			Indicator.pump()
+			if created == finalized then break end
+			os.execute("sleep 0.01")
+		end
+		assert(created == finalized, string.format(
+			"native tray teardown leaked objects after cycle %d: created=%d finalized=%d", cycle, created, finalized))
+	end
+	weak_notify:free()
+	Indicator._set_binding_for_test(native)
+	print("ok   native tray indicators and menus finalized across rebuilds and reloads")
+end
+
+if arg and arg[1] == "--lifecycle-only" then
+	check_native_lifecycle()
+	os.exit(0)
+end
+
 local glib = ffi.load("libglib-2.0.so.0")
 local source = glib.g_idle_source_new()
 -- A positive source ID keeps this entirely native callback pending.
@@ -114,4 +170,5 @@ while os.time() < deadline do
 	os.execute("sleep 0.05")
 end
 TrayMenu.destroy()
+check_native_lifecycle()
 os.exit(0)

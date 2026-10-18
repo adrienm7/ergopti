@@ -37,3 +37,4 @@
 #Include probes.ahk
 #Include report.ahk
 #Include actions.ahk
+#Include collection.ahk

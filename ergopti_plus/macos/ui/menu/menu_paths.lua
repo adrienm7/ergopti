@@ -23,6 +23,7 @@
 --- ==============================================================================
 
 local M = {}
+local Json = require("json")
 local WebviewResult = require("adapters.webview_result")
 local hs     = hs
 local Logger = require("infra.logger")
@@ -211,6 +212,11 @@ local function pick_dir(current, prompt)
 
 	local ok, r2, raw = hs.osascript.applescript(script)
 	Logger.debug(LOG, "Folder picker completed (ok=%s, result_type=%s).", tostring(ok), type(r2))
+	-- A refused native script returns its diagnostic in raw, not a directory.
+	if ok ~= true then
+		Logger.error(LOG, "Native configuration-folder picker failed; diagnostic content withheld.")
+		return nil
+	end
 
 	if type(r2) == "string" and r2 ~= "" then
 		local p = r2:match("^(.-)%s*$")
@@ -454,8 +460,12 @@ local function handle_message(body)
 			if not owner_is_current(owner) then return end
 			Logger.success(LOG, "Folder picker completed.")
 			if picked and picked ~= "" then
-				local encoded_ok, encoded = pcall(hs.json.encode, picked)
-				if not encoded_ok or type(encoded) ~= "string" then
+				-- The native JSON extension accepts tables only; preserve this exact directory string.
+				local encoded_ok, encoded = pcall(function()
+					if type(picked) ~= "string" or not utf8.len(picked) then return nil end
+					return Json.quote(picked)
+				end)
+				if not encoded_ok or type(encoded) ~= "string" or encoded == "" then
 					report_delivery_failure(owner, "encoding failed")
 					return
 				end

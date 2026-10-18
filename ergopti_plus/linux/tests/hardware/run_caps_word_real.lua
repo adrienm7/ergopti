@@ -121,7 +121,9 @@ local function run()
 	end
 	Reader.read_event = function(slot)
 		local event, status, reason = original_read(slot)
-		if event and status == "event" and slot == "keyboard:" .. sources[1].node then
+		-- SYN_REPORT closes the kernel frame but cannot mint an original key receipt.
+		if event and status == "event" and event.type == Input.EV_KEY
+			and slot == "keyboard:" .. sources[1].node then
 			local receipt = Reader.capture_event(event, slot)
 			local view = receipt and Reader.event_view(receipt)
 			assert(view and Reader.event_current(receipt, event, slot), "original receipt observer cannot mint a native event")

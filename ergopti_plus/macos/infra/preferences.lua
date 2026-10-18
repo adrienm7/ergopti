@@ -70,6 +70,7 @@ local BindingPublication = require("config_binding_publication")
 local PersonalFiles = require("hotstrings.personal_files")
 local PersonalAdoption = require("infra.personal_file_adoption")
 local Agent     = require("llm.agent")
+local HotstringCore = require("infra.hotstring_engine")
 local WrapPreferences = require("menu.wrap_preferences")
 local UserModels = require("config_user_models")
 local RecordList = require("toml_codec.record_list")
@@ -96,7 +97,11 @@ local KEY_MAP = {
 	keymap                               = { sec = "hotstrings", key = "enabled"                      },
 	repeat_key_enabled                   = { sec = "hotstrings", key = "repeat_key_enabled"           },
 	expansion_delay                      = { sec = "hotstrings"                                        },
-	personal_info                        = { sec = "hotstrings", path = "modules", key = "personal_info" },
+	idle_reset_seconds                   = { sec = "hotstrings"                                        },
+	click_resets_word                    = { sec = "hotstrings"                                        },
+	arrow_resets_word                    = { sec = "hotstrings"                                        },
+	shortcut_resets_word                 = { sec = "hotstrings"                                        },
+	personal_info                       = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
@@ -512,6 +517,23 @@ local SCALAR_VALUE_RULES = {
 	dynamichotstrings_user_code_time_activation_seconds = function(value)
 		if type(value) == "number" and value == value and value >= 0 and value < math.huge then return true end
 		return false, "the activation interval is not a finite non-negative number"
+	end,
+	-- The engine's own rule: a finite non-negative number of seconds, 0 = never.
+	idle_reset_seconds = function(value)
+		if HotstringCore.valid_idle_reset_seconds(value) then return true end
+		return false, "the idle reset is not a finite non-negative number of seconds"
+	end,
+	click_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the click reset is not a boolean"
+	end,
+	arrow_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the arrow reset is not a boolean"
+	end,
+	shortcut_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the shortcut reset is not a boolean"
 	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end

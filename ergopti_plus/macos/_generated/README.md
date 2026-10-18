@@ -10,8 +10,8 @@ Run the corresponding npm script to regenerate.
 
 There is **no** `terminators.lua` here. The terminator catalogue is generated once,
 shared, at `_shared/lua/keymap/terminators_catalogue.lua`, and this driver reaches it
-through the hand-written shim `modules/keymap/terminators.lua` (which adds the i18n
-labels). The AHK side gets its own generated copy at `windows/_generated/terminators.ahk`.
+through the hand-written shim `modules/keymap/terminators.lua`; its built-in slots
+carry `label_key` locale keys that the menu resolves. The AHK side gets its own generated copy at `windows/_generated/terminators.ahk`.
 
 ### `features_manifest.lua` — `description_key` is AHK-only consumed
 

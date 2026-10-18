@@ -89,7 +89,7 @@ end
 
 --- POSIX single-quote escape: close, insert an escaped quote, reopen.
 --- Identical to `adapters/shell_runner.lua`'s QUOTE_ESCAPE; pinned by
---- `tests/unit/meta/test_logger_sink.lua` so the two cannot drift.
+--- `tests/unit/infra/logger/test_logger_sink.lua` so the two cannot drift.
 local QUOTE_ESCAPE = "'\\''"
 
 

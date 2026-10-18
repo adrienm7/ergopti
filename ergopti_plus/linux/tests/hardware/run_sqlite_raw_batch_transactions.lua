@@ -43,15 +43,15 @@ assert(Writer.exec_sql("CREATE TRIGGER owned_partial AFTER INSERT ON events_typi
 	.. "WHEN (SELECT COUNT(*) FROM events_typing)=2 BEGIN SELECT RAISE(FAIL,'owned late refusal'); END;"))
 Keylogger.record_synthetic_output("owned-a", "a", "other", 1000)
 Keylogger.record_synthetic_output("owned-b", "b", "other", 1000)
-Keylogger.flush()
+require("tests.support.sqlite_flush_native").flush(Keylogger)
 check("refused actual collector batch preserves pending entries without durable raw fragments", function()
 	assert(Keylogger._pending_buffer_count_for_test() == 2)
 	assert(scalar("SELECT COUNT(*) FROM events_typing;") == 0, "refused INSERT leaked durable raw rows")
 	assert(scalar("SELECT COUNT(*) FROM ngram_chars;") == 0)
 	assert(Writer.get_meta("linux_next_event_id") == "3", "ID reservation must remain a separate acknowledged transaction")
 end)
-assert(Writer.exec_sql("DROP TRIGGER owned_partial;"))
-Keylogger.flush()
+assert(require("tests.support.sqlite_flush_native").control(Writer, "DROP TRIGGER owned_partial;"))
+require("tests.support.sqlite_flush_native").flush(Keylogger)
 check("healthy actual collector retry preserves raw payloads and derived conservation", function()
 	assert(Keylogger._pending_buffer_count_for_test() == 0)
 	assert(scalar("SELECT COUNT(*) FROM events_typing;") == 2, "raw retry duplicated committed fragments")
@@ -63,14 +63,51 @@ check("healthy actual collector retry preserves raw payloads and derived conserv
 		local events = assert(Json.decode(packed[1]))
 		assert(#events == 1 and events[1][1] == char and events[1][2] == 0 and events[1][3].st == "other")
 	end
-	assert(Writer.get_meta("linux_next_event_id") == "5")
+	assert(Writer.get_meta("linux_next_event_id") == "3", "data retry must reuse the exact reserved IDs")
 end)
 local accepted = assert(Writer.query_rows("SELECT id,app,hex(events_json) FROM events_typing ORDER BY id;"))
-Keylogger.flush()
+require("tests.support.sqlite_flush_native").flush(Keylogger)
 check("second healthy collector flush cannot repeat accepted raw or derived entries", function()
 	assert(table.concat(Writer.query_rows("SELECT id,app,hex(events_json) FROM events_typing ORDER BY id;"), "\n") == table.concat(accepted, "\n"))
 	assert(scalar("SELECT SUM(c) FROM ngram_chars;") == 2)
 end)
+
+-- Refusing a derived row must roll back the raw source and every earlier
+-- derivative on that same connection. Retrying also includes new arrivals.
+for index, fault in ipairs({
+	{ table_name = "ngram_chars", phase = "BEFORE", refusal = "ABORT" },
+	{ table_name = "agg_app_day_hourly", phase = "AFTER", refusal = "FAIL" },
+}) do
+	local app = "derived-atomic-" .. index
+	local now = math.floor(require("infra.monotonic").now_ms())
+	assert(Writer.exec_sql("CREATE TABLE IF NOT EXISTS derived_side_effect(app TEXT);"))
+	assert(Writer.exec_sql("CREATE TRIGGER derived_refusal " .. fault.phase .. " INSERT ON " .. fault.table_name
+		.. " WHEN NEW.app='" .. app .. "' BEGIN INSERT INTO derived_side_effect VALUES (NEW.app);"
+		.. " SELECT RAISE(" .. fault.refusal .. ",'controlled derived refusal'); END;"))
+	Keylogger.on_keydown("a", now, app)
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	check("derived " .. fault.phase .. " " .. fault.refusal .. " preserves the complete raw/derived batch", function()
+		assert(Keylogger._pending_buffer_count_for_test() == 1, "derived refusal consumed unacknowledged raw source")
+		assert(scalar("SELECT COUNT(*) FROM events_typing WHERE app='" .. app .. "';") == 0, "derived refusal committed a raw prefix")
+		assert(scalar("SELECT COALESCE(SUM(c),0) FROM ngram_chars WHERE app='" .. app .. "';") == 0, "derived refusal committed an ngram prefix")
+		assert(scalar("SELECT COUNT(*) FROM derived_side_effect WHERE app='" .. app .. "';") == 0, "FAIL trigger effect escaped rollback")
+	end)
+	assert(require("tests.support.sqlite_flush_native").control(Writer, "DROP TRIGGER derived_refusal;"))
+	Keylogger.on_keydown("b", now + 100, app)
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
+	check("healthy retry after derived " .. fault.refusal .. " conserves old and new input exactly once", function()
+		assert(Keylogger._pending_buffer_count_for_test() == 0)
+		assert(scalar("SELECT COUNT(*) FROM events_typing WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(c) FROM ngram_chars WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(letter) FROM agg_app_day_chars_class WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(c) FROM agg_app_day_hourly WHERE app='" .. app .. "';") == 2)
+		require("tests.support.sqlite_flush_native").flush(Keylogger)
+		assert(scalar("SELECT COUNT(*) FROM events_typing WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(c) FROM ngram_chars WHERE app='" .. app .. "';") == 2)
+		assert(scalar("SELECT SUM(letter) FROM agg_app_day_chars_class WHERE app='" .. app .. "';") == 2)
+	end)
+end
 
 local fixtures = {
 	{ table_name = "events_typing", method = "insert_typing_events", column = "text",
@@ -135,6 +172,6 @@ local function remove_owned(path)
 	else assert(uv.fs_unlink(path)) end
 end
 remove_owned(root)
-assert(checks == 12, "all four raw batch adapters and public controls must execute")
+assert(checks == 16, "all raw adapters, derived refusals and recovery controls must execute")
 print(string.format("Native SQLite raw batch transactions: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

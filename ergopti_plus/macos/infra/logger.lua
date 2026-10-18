@@ -18,7 +18,7 @@
 --- retention purge and errors/topical fan-out. The split is not cosmetic: the
 --- core's half is replayed against a cross-driver corpus so all three drivers are
 --- held to ONE implementation of those rules, and this half is pinned as
---- behaviour by tests/unit/lib/test_logger_file_sinks.lua.
+--- behaviour by tests/unit/infra/logger/test_logger_file_sinks.lua.
 ---
 --- FEATURES & RATIONALE:
 --- 1. Level Filtering: Avoids console noise in production while preserving full
@@ -213,7 +213,7 @@ end
 -- Everything the core deliberately has no opinion about stays here: the unified
 -- daily file, the errors-only mirror, the topical fan-out, the level-aware flush
 -- policy, and the print() tee. That half is pinned by
--- tests/unit/lib/test_logger_file_sinks.lua as BEHAVIOUR rather than as source
+-- tests/unit/infra/logger/test_logger_file_sinks.lua as BEHAVIOUR rather than as source
 -- text, which is what made this migration provable instead of merely plausible.
 --
 -- LIFETIME: the core is required under a BARE name, so tests/run.lua's

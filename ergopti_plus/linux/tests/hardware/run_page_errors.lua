@@ -163,18 +163,26 @@ local function inspect(app_name, entry, expected_action, label)
 	local webview = WebKit.WebView()
 	window:add(webview)
 	window:show_all()
+	local finished = false
+	webview.on_load_changed = function(_, event)
+		if event == WebKit.LoadEvent.FINISHED or event == "FINISHED" then finished = true end
+	end
 	webview:load_html(trapped, "file:///")
 
 	local loaded = false
 	for _ = 1, WAIT_ATTEMPTS do
 		while Gtk.events_pending() do Gtk.main_iteration_do(false) end
-		if eval_sync(webview, "document.readyState") == "complete" then loaded = true ; break end
+		-- A newly-created WebView already has a complete about:blank document.
+		-- Wait for the requested load before asking about its page entry points.
+		if finished and eval_sync(webview, "document.readyState") == "complete" then loaded = true ; break end
 		os.execute("sleep " .. tostring(WAIT_SECONDS))
 	end
 	check(loaded, app_name .. ": the page finished loading")
 	if not loaded then window:destroy() ; return end
 
-	local errors = eval_sync(webview, "String((window.__errs||[]).join(' | ') || 'none')")
+	check(eval_sync(webview, "String(Array.isArray(window.__errs))") == "true",
+		app_name .. ": the page installed its error trap")
+	local errors = eval_sync(webview, "String(window.__errs.join(' | ') || 'none')")
 	local defined = eval_sync(webview, "typeof window." .. entry)
 
 	check(errors == "none", string.format(

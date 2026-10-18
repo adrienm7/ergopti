@@ -38,6 +38,7 @@ local SqliteCommand = require("modules.keylogger.sqlite_command")
 local TextCipher    = require("modules.keylogger.text_cipher")
 local EventIdPolicy = require("sqlite.event_id_policy")
 local Json          = require("json")
+local MediaStore    = require("keylogger.media_store")
 
 -- How many session durations one application-day keeps. Read from the shared
 -- accumulator rather than restated, because the walk caps the array it hands
@@ -62,6 +63,18 @@ local _available = nil
 
 -- Whether the schema has been bootstrapped for the current db_path.
 local _bootstrapped = false
+
+-- Source-admitted media policy is separate from native capture admission.
+local _media_policy = nil
+-- A failed terminal observation may follow COMMIT. Retain its exact pipe owner
+-- and block replacement rather than replaying caller-owned events ambiguously.
+local _media_terminal_debt = nil
+
+-- Pure formatters shared by standalone upserts and the atomic typing batch.
+local _derived_sql = {}
+local _raw_sql = {}
+local _flush_owner = nil
+local unpack_values = table.unpack or unpack
 
 
 -- =========================================
@@ -98,7 +111,8 @@ end
 --- Runs a SQL statement against the database via the sqlite3 CLI.
 --- @param sql string Complete SQL statement(s) to execute.
 --- @return boolean True on success.
-local function _exec(sql)
+local function _exec(sql, media_owned)
+	if _flush_owner and not _flush_owner:is_settled() then return false end
 	if not _db_path or not _available then return false end
 
 	-- The script carries the characters the user typed, so it travels on stdin.
@@ -118,9 +132,27 @@ local function _exec(sql)
 		Logger.error(LOG, "Cannot spawn the sqlite3 CLI.")
 		return false
 	end
-	local output = pipe:read("*a")
-	pipe:close()
+	local output
+	if media_owned then
+		local read_ok, body = pcall(pipe.read, pipe, "*a")
+		local close_ok, closed = pcall(pipe.close, pipe)
+		if not read_ok or type(body) ~= "string" or not close_ok or closed ~= true then
+			_media_terminal_debt = { pipe = pipe, close_acknowledged = close_ok and closed == true }
+			_db_path = nil
+			Logger.error(LOG, "Semantic media terminal observation failed; exact owner and pending events remain unresolved.")
+			return false
+		end
+		output = body
+	else
+		output = pipe:read("*a")
+		pipe:close()
+	end
 	local accepted, err_out, receipt_error = SqliteCommand.read_exit_receipt(output)
+	if media_owned and ((not accepted and (receipt_error == "missing SQLite exit receipt"
+		or receipt_error == "invalid SQLite exit receipt")) or (accepted and err_out ~= "")) then
+		_media_terminal_debt = { pipe = pipe, close_acknowledged = true }
+		_db_path = nil
+	end
 
 	if err_out ~= "" then
 		-- These statements select nothing, and stderr is merged into stdout, so
@@ -176,17 +208,8 @@ end
 --- Reserves consecutive event IDs durably across independent writer processes.
 --- @param count number Number of IDs required.
 --- @return number|nil First reserved ID after the transaction commits.
-local function _reserve_event_ids(count)
-	count = math.max(1, math.floor(tonumber(count) or 1))
-	if not M.is_available() then return nil end
-	-- Read and advance the shared cursor under one native write lock. A cached
-	-- cursor reused another collector's IDs, and INSERT OR IGNORE then silently
-	-- discarded acknowledged raw rows. The exit receipt also covers COMMIT:
-	-- an emitted SELECT result alone never acknowledges the reservation.
-	-- SQLite CAST accepts numeric prefixes and clamps overflowing integers. Admit
-	-- decimal positive cursor text before casting, and keep the advanced cursor
-	-- within Lua's exact integer range. A rejected UPDATE emits no allocated ID.
-	local first = tonumber(_query_scalar(string.format([[
+local function _reservation_sql(count)
+	return string.format([[
 BEGIN IMMEDIATE;
 INSERT OR IGNORE INTO meta (key, value) VALUES ('linux_next_event_id', '1');
 UPDATE meta SET value = CAST(value AS INTEGER) + %d
@@ -199,7 +222,20 @@ WHERE key = 'linux_next_event_id'
 SELECT CAST(value AS INTEGER) - %d FROM meta
 WHERE key = 'linux_next_event_id' AND changes() = 1;
 COMMIT;
-]], count, count, EventIdPolicy.MAX_EXACT_LUA_CURSOR, count, count)))
+]], count, count, EventIdPolicy.MAX_EXACT_LUA_CURSOR, count, count)
+end
+
+local function _reserve_event_ids(count)
+	count = math.max(1, math.floor(tonumber(count) or 1))
+	if not M.is_available() then return nil end
+	-- Read and advance the shared cursor under one native write lock. A cached
+	-- cursor reused another collector's IDs, and INSERT OR IGNORE then silently
+	-- discarded acknowledged raw rows. The exit receipt also covers COMMIT:
+	-- an emitted SELECT result alone never acknowledges the reservation.
+	-- SQLite CAST accepts numeric prefixes and clamps overflowing integers. Admit
+	-- decimal positive cursor text before casting, and keep the advanced cursor
+	-- within Lua's exact integer range. A rejected UPDATE emits no allocated ID.
+	local first = tonumber(_query_scalar(_reservation_sql(count)))
 	if not first then Logger.error(LOG, "Event ID reservation was not acknowledged.") end
 	return first
 end
@@ -227,6 +263,35 @@ local function _read_schema()
 	local content = fh:read("*a")
 	fh:close()
 	return content
+end
+
+--- Reads packaged media data through the existing classified native file port.
+local function _read_media_resource(relative)
+	local path = require("infra.paths").shared(relative)
+	if type(path) ~= "string" then return nil end
+	local body, status = require("adapters.file_system").read_with_status(path)
+	if status ~= "ok" or type(body) ~= "string" then
+		Logger.error(LOG, "Cannot read packaged semantic media resource.")
+		return nil
+	end
+	return body
+end
+
+--- Admits only the committed five-key policy and additive schema before writes.
+local function _ensure_media_schema()
+	local schema = _read_media_resource("data/db/media_schema.sql")
+	local catalogue = _read_media_resource("data/keycodes/metrics_media_keys.json")
+	if schema == nil or catalogue == nil then return false end
+	local ok, policy, transaction = pcall(function()
+		return MediaStore.policy(Json.decode(catalogue)), MediaStore.schema_transaction(schema)
+	end)
+	if not ok then
+		Logger.error(LOG, "Semantic media schema or catalogue admission refused.")
+		return false
+	end
+	if not _exec(transaction, true) then return false end
+	_media_policy = policy
+	return true
 end
 
 --- Upgrades databases created before Linux was accepted by devices.os.
@@ -272,11 +337,23 @@ function M.is_available()
 	return _available == true and _db_path ~= nil
 end
 
+--- Reports the separate capability required for owned asynchronous flushes.
+--- A minimal daemon without luv may still read the last committed database.
+--- @return boolean
+function M.flush_transport_available()
+	return require("infra.sqlite_batch_process").is_available() == true
+end
+
 --- Opens (or creates) the SQLite database at the given path and bootstraps the
 --- canonical schema on first open.
 --- @param db_path string Absolute path to the .sqlite file (e.g. ~/.local/share/ergopti/metrics.sqlite).
 --- @return boolean True on success.
 function M.open_db(db_path)
+	if _flush_owner and not _flush_owner:is_settled() then return false end
+	if _media_terminal_debt ~= nil then
+		Logger.error(LOG, "Cannot reopen SQLite while semantic media terminal ownership is unresolved.")
+		return false
+	end
 	if type(db_path) ~= "string" or db_path == "" then
 		Logger.error(LOG, "open_db(): db_path must be a non-empty string.")
 		return false
@@ -325,12 +402,24 @@ function M.open_db(db_path)
 		return false
 	end
 
+	if not _ensure_media_schema() then
+		_media_policy = nil
+		_db_path = nil
+		return false
+	end
+
 	Logger.debug(LOG, "SQLite database open: %s", _db_path)
 	return true
 end
 
 --- Closes the database connection (no-op for CLI-based backend, but cleans up state).
 function M.close_db()
+	if _flush_owner and not _flush_owner:is_settled() then return false end
+	if _media_terminal_debt ~= nil then
+		Logger.error(LOG, "Semantic media terminal cleanup remains unresolved; ambiguous pipe close is not retried.")
+		return false
+	end
+	_media_policy = nil
 	_db_path = nil
 	_bootstrapped = false
 	Logger.debug(LOG, "SQLite database closed.")
@@ -388,6 +477,62 @@ COMMIT;
 	return accepted
 end
 
+--- Stores already admitted semantic media entries in one native transaction.
+--- This port grants no native capture authority and never mutates pending input.
+--- @param device_id string Persisted collector partition, not a fabricated source device.
+--- @param events table Caller-owned admitted media press/release entries.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+--- @return boolean committed Exact terminal COMMIT and pipe-close acknowledgement.
+function M.insert_media_events(device_id, events, threshold_ms)
+	if not M.is_available() or _media_policy == nil or _media_terminal_debt ~= nil then return false end
+	local ok, plan = pcall(function()
+		assert(type(events) == "table" and #events > 0, "Media batch requires events")
+		local captured = {}
+		for key in pairs(events) do
+			assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= #events, "Media batch must be dense")
+		end
+		for index = 1, #events do
+			local source = events[index]
+			assert(type(source) == "table", "Media event is missing")
+			local event = {}
+			for key, value in pairs(source) do event[key] = value end
+			captured[index] = event
+			MediaStore.raw_sql(device_id, index, event, Json.encode)
+		end
+		local batch = { media_ngram = {}, media_hold = {} }
+		MediaStore.replay(_media_policy, batch, captured, threshold_ms)
+		local derived = {}
+		for _, row in pairs(batch.media_ngram) do derived[#derived + 1] = MediaStore.press_sql(device_id, row) end
+		for _, row in pairs(batch.media_hold) do derived[#derived + 1] = MediaStore.hold_sql(device_id, row) end
+		return { events = captured, derived = derived }
+	end)
+	if not ok then
+		Logger.error(LOG, "Semantic media input admission refused.")
+		return false
+	end
+	local first_id = _reserve_event_ids(#plan.events)
+	if not first_id then return false end
+	local statements = {}
+	for index, event in ipairs(plan.events) do
+		statements[#statements + 1] = MediaStore.raw_sql(device_id, first_id + index - 1, event, Json.encode)
+	end
+	for _, sql in ipairs(plan.derived) do statements[#statements + 1] = sql end
+	statements[#statements + 1] = "UPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';"
+	return _exec("BEGIN IMMEDIATE;\n" .. table.concat(statements, "\n") .. "\nCOMMIT;", true)
+end
+
+--- Rebuilds only one collector's semantic projections under the shared SQL lock.
+--- @param device_id string Exact collector partition.
+--- @param threshold_ms integer Shared inclusive tap threshold.
+--- @return boolean committed
+function M.rebuild_media(device_id, threshold_ms)
+	if not M.is_available() or _media_policy == nil or _media_terminal_debt ~= nil then return false end
+	local ok, sql = pcall(MediaStore.rebuild_sql, device_id, threshold_ms)
+	if not ok then return false end
+	return _exec("BEGIN IMMEDIATE;\n" .. sql
+		.. "\nUPDATE meta SET value=CAST(value AS INTEGER)+1 WHERE key='rev';\nCOMMIT;", true)
+end
+
 --- Inserts a batch of keystroke events into the events_typing table.
 --- Each event is a single keystroke row.
 ---
@@ -398,11 +543,8 @@ end
 ---
 --- @param device_id  string   Device identifier.
 --- @param events     table    Array of { ts, date, app, text, wpm?, layout? } event tables.
-function M.insert_typing_events(device_id, events)
-	if not M.is_available() then return end
-	if type(events) ~= "table" or #events == 0 then return end
-	local first_id = _reserve_event_ids(#events)
-	if not first_id then return false end
+--- @param derived table|nil Optional { ngrams, daily } rows committed with their raw source.
+_raw_sql.typing = function(device_id, events, first_id, derived)
 
 	local parts = {}
 	for i, ev in ipairs(events) do
@@ -449,16 +591,48 @@ function M.insert_typing_events(device_id, events)
 		.. "VALUES %s;",
 		table.concat(parts, ",")
 	)
+	if derived ~= nil then
+		local composed, statements = pcall(function()
+			assert(type(derived) == "table" and type(derived.ngrams) == "table" and type(derived.daily) == "table")
+			local out = { sql }
+			for _, group in ipairs(derived.ngrams) do
+				out[#out + 1] = assert(_derived_sql.ngrams(device_id, group.date, group.app, group.ngrams, group.table_name))
+			end
+			local families = {
+				chars_class = "chars_class", errors = "errors", hourly = "hourly", hourly_min5 = "hourly_min5",
+				app_buckets = "app_bucket", bursts = "burst", sessions = "session", ergo = "ergo", layouts = "layout",
+			}
+			for family, rows in pairs(derived.daily) do
+				local formatter = assert(_derived_sql[assert(families[family])])
+				assert(type(rows) == "table")
+				for _, row in ipairs(rows) do out[#out + 1] = assert(formatter(device_id, row)) end
+			end
+			return table.concat(out, "\n")
+		end)
+		if not composed then
+			Logger.error(LOG, "Typing batch derived SQL composition refused; pending source remains unacknowledged.")
+			return false
+		end
+		sql = statements
+	end
+	return sql
+end
+
+--- Commits one canonical raw typing batch and returns its native receipt.
+function M.insert_typing_events(device_id, events, derived)
+	if not M.is_available() then return end
+	if type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.typing(device_id, events, first_id, derived)
+	if not sql then return false end
 	return _exec_raw_batch(sql)
 end
 
 --- Inserts canonical hotstring events matching the macOS/Windows table shape.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,app,kind,trigger,replacement,h_type,net_saved_chars}.
-function M.insert_hotstring_events(device_id, events)
-	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
-	local first_id = _reserve_event_ids(#events)
-	if not first_id then return false end
+_raw_sql.hotstrings = function(device_id, events, first_id)
 	local parts = {}
 	for i, ev in ipairs(events) do
 		parts[#parts + 1] = string.format(
@@ -474,9 +648,19 @@ function M.insert_hotstring_events(device_id, events)
 			tonumber(ev.net_saved_chars) or 0
 		)
 	end
-	return _exec_raw_batch("INSERT OR IGNORE INTO events_hotstring "
+	return "INSERT OR IGNORE INTO events_hotstring "
 		.. "(device_id,id,ts,date,app,kind,trigger,replacement,h_type,net_saved_chars) VALUES "
-		.. table.concat(parts, ",") .. ";")
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw hotstrings batch and returns its native receipt.
+function M.insert_hotstring_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.hotstrings(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
 end
 
 --- Inserts shortcut firings — the actions a user triggers that type no text.
@@ -492,10 +676,7 @@ end
 --- @param device_id string
 --- @param events table Array of { ts, date, app, key }.
 --- @return boolean|nil
-function M.insert_shortcut_events(device_id, events)
-	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
-	local first_id = _reserve_event_ids(#events)
-	if not first_id then return false end
+_raw_sql.shortcuts = function(device_id, events, first_id)
 	local parts = {}
 	for i, ev in ipairs(events) do
 		parts[#parts + 1] = string.format(
@@ -507,18 +688,25 @@ function M.insert_shortcut_events(device_id, events)
 			_sql_escape(ev.key or "")
 		)
 	end
-	return _exec_raw_batch("INSERT OR IGNORE INTO events_shortcut "
+	return "INSERT OR IGNORE INTO events_shortcut "
 		.. "(device_id,id,ts,date,app,key) VALUES "
-		.. table.concat(parts, ",") .. ";")
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw shortcuts batch and returns its native receipt.
+function M.insert_shortcut_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.shortcuts(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
 end
 
 --- Inserts foreground transitions in the shared events_app_switch format.
 --- @param device_id string Device identifier.
 --- @param events table Array of {ts,date,prev_app,next_app,duration_ms}.
-function M.insert_app_switch_events(device_id, events)
-	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
-	local first_id = _reserve_event_ids(#events)
-	if not first_id then return false end
+_raw_sql.switches = function(device_id, events, first_id)
 	local parts = {}
 	for i, ev in ipairs(events) do
 		parts[#parts + 1] = string.format(
@@ -531,9 +719,19 @@ function M.insert_app_switch_events(device_id, events)
 			tonumber(ev.duration_ms) or 0
 		)
 	end
-	return _exec_raw_batch("INSERT OR IGNORE INTO events_app_switch "
+	return "INSERT OR IGNORE INTO events_app_switch "
 		.. "(device_id,id,ts,date,prev_app,next_app,duration_ms) VALUES "
-		.. table.concat(parts, ",") .. ";")
+		.. table.concat(parts, ",") .. ";"
+end
+
+--- Commits one canonical raw switches batch and returns its native receipt.
+function M.insert_app_switch_events(device_id, events)
+	if not M.is_available() or type(events) ~= "table" or #events == 0 then return end
+	local first_id = _reserve_event_ids(#events)
+	if not first_id then return false end
+	local sql = _raw_sql.switches(device_id, events, first_id)
+	if not sql then return false end
+	return _exec_raw_batch(sql)
 end
 
 --- Upserts per-app daily aggregate counters into agg_app_day.
@@ -541,8 +739,7 @@ end
 --- @param date      string "YYYY-MM-DD".
 --- @param app       string Application name.
 --- @param fields    table  Field→value map (e.g. {chars=500, time_ms=120000}).
-function M.upsert_app_day(device_id, date, app, fields)
-	if not M.is_available() then return end
+_derived_sql.app_day = function(device_id, date, app, fields)
 	if type(fields) ~= "table" then return end
 
 	local allowed = {
@@ -584,6 +781,14 @@ function M.upsert_app_day(device_id, date, app, fields)
 		tonumber(fields.llm_suggested) or 0,
 		table.concat(sets, ", ")
 	)
+	return sql
+end
+
+--- Commits one canonical app day upsert and returns its native receipt.
+function M.upsert_app_day(device_id, date, app, fields)
+	if not M.is_available() then return end
+	local sql = _derived_sql.app_day(device_id, date, app, fields)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -595,8 +800,8 @@ end
 --- keystroke of the morning forward.
 --- @param row table { date, app, letter, digit, punct, space, other,
 ---        first_typed_min?, last_typed_min? }
-function M.upsert_chars_class(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.chars_class = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local function quoted_or_null(value)
 		if type(value) ~= "string" or value == "" then return "NULL" end
 		return "'" .. _sql_escape(value) .. "'"
@@ -618,6 +823,14 @@ function M.upsert_chars_class(device_id, row)
 		math.floor(tonumber(row.punct) or 0), math.floor(tonumber(row.space) or 0),
 		math.floor(tonumber(row.other) or 0),
 		quoted_or_null(row.first_typed_min), quoted_or_null(row.last_typed_min))
+	return sql
+end
+
+--- Commits one canonical chars class upsert and returns its native receipt.
+function M.upsert_chars_class(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.chars_class(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -627,8 +840,8 @@ end
 --- the longest correction of the day does not get longer by being flushed twice.
 --- @param row table { date, app, bs_total, cascade_count, cascade_max_len,
 ---        recovery_sum_ms, recovery_count }
-function M.upsert_errors(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.errors = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_errors "
 		.. "(device_id, date, app, bs_total, cascade_count, cascade_max_len, recovery_sum_ms, recovery_count) "
@@ -645,6 +858,14 @@ function M.upsert_errors(device_id, row)
 		math.floor(tonumber(row.cascade_max_len) or 0),
 		math.floor(tonumber(row.recovery_sum_ms) or 0),
 		math.floor(tonumber(row.recovery_count) or 0))
+	return sql
+end
+
+--- Commits one canonical errors upsert and returns its native receipt.
+function M.upsert_errors(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.errors(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -661,8 +882,8 @@ end
 
 --- Upserts one hour of the activity histogram.
 --- @param row table { date, app, hour, c, e, em, es, e_buckets? }
-function M.upsert_hourly(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.hourly = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_hourly (device_id, date, app, hour, c, e, em, es, e_buckets_json) "
 		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,%d,'%s') "
@@ -674,13 +895,21 @@ function M.upsert_hourly(device_id, row)
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
 		math.floor(tonumber(row.em) or 0), math.floor(tonumber(row.es) or 0),
 		_sql_escape(Json.encode(row.e_buckets or {})))
+	return sql
+end
+
+--- Commits one canonical hourly upsert and returns its native receipt.
+function M.upsert_hourly(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.hourly(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
 --- Upserts one five-minute slot of the fine-grained activity histogram.
 --- @param row table { date, app, slot, c, e, es, e_buckets? }
-function M.upsert_hourly_min5(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.hourly_min5 = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_hourly_min5 (device_id, date, app, slot, c, e, es, e_buckets_json) "
 		.. "VALUES ('%s','%s','%s','%s',%d,%d,%d,'%s') "
@@ -691,6 +920,14 @@ function M.upsert_hourly_min5(device_id, row)
 		_sql_escape(tostring(row.slot or "")),
 		math.floor(tonumber(row.c) or 0), math.floor(tonumber(row.e) or 0),
 		math.floor(tonumber(row.es) or 0), _sql_escape(Json.encode(row.e_buckets or {})))
+	return sql
+end
+
+--- Commits one canonical hourly min5 upsert and returns its native receipt.
+function M.upsert_hourly_min5(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.hourly_min5(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -700,8 +937,8 @@ end
 --- five seconds, so the dashboard's "ignore pauses longer than…" control reads
 --- one row and gets a total rather than a slice.
 --- @param row table { date, app, bucket_ms, time_sum, credited }
-function M.upsert_app_bucket(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.app_bucket = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_buckets (device_id, date, app, bucket_ms, time_sum, credited) "
 		.. "VALUES ('%s','%s','%s',%d,%d,%d) "
@@ -711,6 +948,14 @@ function M.upsert_app_bucket(device_id, row)
 		math.floor(tonumber(row.bucket_ms) or 0),
 		math.floor(tonumber(row.time_sum) or 0),
 		math.floor(tonumber(row.credited) or 0))
+	return sql
+end
+
+--- Commits one canonical app bucket upsert and returns its native receipt.
+function M.upsert_app_bucket(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.app_bucket(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -721,8 +966,8 @@ end
 --- each flush only knows about the bursts it saw.
 --- @param row table { date, app, count_total, max_cpm, max_chars, length_buckets,
 ---        inter_count, inter_sum, inter_sumsq }
-function M.upsert_burst(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.burst = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local parts = {}
 	for label, count in pairs(row.length_buckets or {}) do
 		if type(count) == "number" and count > 0 then
@@ -754,6 +999,14 @@ function M.upsert_burst(device_id, row)
 		math.floor(tonumber(row.inter_count) or 0),
 		math.floor(tonumber(row.inter_sum) or 0),
 		math.floor(tonumber(row.inter_sumsq) or 0))
+	return sql
+end
+
+--- Commits one canonical burst upsert and returns its native receipt.
+function M.upsert_burst(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.burst(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -796,8 +1049,8 @@ local TITLE_CAP_PER_APP_DAY =
 --- Lowest (c + ms) first, so a window the user glanced at loses to one they
 --- worked in.
 --- @param row table { date, app, title, c, ms }
-function M.upsert_title(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.title = function(device_id, row)
+	if type(row) ~= "table" then return end
 	if type(row.title) ~= "string" or row.title == "" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_titles (device_id, date, app, title, c, ms) "
@@ -814,6 +1067,14 @@ function M.upsert_title(device_id, row)
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		math.floor(TITLE_CAP_PER_APP_DAY))
+	return sql
+end
+
+--- Commits one canonical title upsert and returns its native receipt.
+function M.upsert_title(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.title(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -862,8 +1123,8 @@ end
 --- because the sampler holds one accumulating day in memory — adding would
 --- count every earlier minute again on each flush.
 --- @param row table The accumulated day from system_metrics.
-function M.upsert_system_day(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.system_day = function(device_id, row)
+	if type(row) ~= "table" then return end
 	if type(row.date) ~= "string" or row.date == "" then return end
 	local function number_or_null(value)
 		local n = tonumber(value)
@@ -893,6 +1154,14 @@ function M.upsert_system_day(device_id, row)
 		math.floor(tonumber(row.awake_ms) or 0),
 		math.floor(tonumber(row.passive_count) or 0),
 		math.floor(tonumber(row.night_wake_count) or 0))
+	return sql
+end
+
+--- Commits one canonical system day upsert and returns its native receipt.
+function M.upsert_system_day(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.system_day(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -902,8 +1171,8 @@ end
 --- whose whole design is dual-role keys: the average alone cannot say whether a
 --- key is being used both ways or neither.
 --- @param row table { date, app, keycode, sum_ms, count, max_ms, tap_count, hold_count }
-function M.upsert_kc_hold(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.kc_hold = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local keycode = tonumber(row.keycode)
 	if not keycode then return end
 	local sql = string.format(
@@ -921,6 +1190,14 @@ function M.upsert_kc_hold(device_id, row)
 		math.floor(tonumber(row.sum_ms) or 0), math.floor(tonumber(row.count) or 0),
 		math.floor(tonumber(row.max_ms) or 0),
 		math.floor(tonumber(row.tap_count) or 0), math.floor(tonumber(row.hold_count) or 0))
+	return sql
+end
+
+--- Commits one canonical kc hold upsert and returns its native receipt.
+function M.upsert_kc_hold(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.kc_hold(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -930,8 +1207,8 @@ end
 --- day spent switching between two of them is two rows, and a column would have
 --- to pick one and call the rest of the day a lie.
 --- @param row table { date, app, layout, count }
-function M.upsert_layout(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.layout = function(device_id, row)
+	if type(row) ~= "table" then return end
 	if type(row.layout) ~= "string" or row.layout == "" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_layouts (device_id, date, app, layout, count) "
@@ -940,6 +1217,14 @@ function M.upsert_layout(device_id, row)
 		.. "count = count + excluded.count;",
 		_sql_escape(device_id), _sql_escape(row.date), _sql_escape(row.app),
 		_sql_escape(row.layout), math.floor(tonumber(row.count) or 0))
+	return sql
+end
+
+--- Commits one canonical layout upsert and returns its native receipt.
+function M.upsert_layout(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.layout(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -949,8 +1234,8 @@ end
 --- A day's longest same-finger run does not get longer by being flushed twice.
 --- @param row table { date, app, same_finger_streak_max, same_hand_streak_max,
 ---        auto_repeat_count, focus_to_first_key_sum_ms, focus_to_first_key_count }
-function M.upsert_ergo(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.ergo = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_ergo (device_id, date, app, same_finger_streak_max, "
 		.. "same_hand_streak_max, auto_repeat_count, focus_to_first_key_sum_ms, "
@@ -967,6 +1252,14 @@ function M.upsert_ergo(device_id, row)
 		math.floor(tonumber(row.auto_repeat_count) or 0),
 		math.floor(tonumber(row.focus_to_first_key_sum_ms) or 0),
 		math.floor(tonumber(row.focus_to_first_key_count) or 0))
+	return sql
+end
+
+--- Commits one canonical ergo upsert and returns its native receipt.
+function M.upsert_ergo(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.ergo(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -976,8 +1269,8 @@ end
 --- which application the user leaves to reach another, and a count keyed on the
 --- destination alone cannot answer that.
 --- @param row table { date, app_from, app_to, count }
-function M.upsert_switch_to(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.switch_to = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local sql = string.format(
 		"INSERT INTO agg_app_day_switches_to (device_id, date, app_from, app_to, count) "
 		.. "VALUES ('%s','%s','%s','%s',%d) "
@@ -986,6 +1279,14 @@ function M.upsert_switch_to(device_id, row)
 		_sql_escape(device_id), _sql_escape(row.date),
 		_sql_escape(row.app_from), _sql_escape(row.app_to),
 		math.floor(tonumber(row.count) or 0))
+	return sql
+end
+
+--- Commits one canonical switch to upsert and returns its native receipt.
+function M.upsert_switch_to(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.switch_to(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -996,8 +1297,8 @@ end
 --- without bound, and the dashboard only plots a sample of them.
 --- @param row table { date, app, count_total, longest_ms, longest_chars,
 ---        total_active_ms, durations }
-function M.upsert_session(device_id, row)
-	if not M.is_available() or type(row) ~= "table" then return end
+_derived_sql.session = function(device_id, row)
+	if type(row) ~= "table" then return end
 	local parts = {}
 	for _, duration in ipairs(row.durations or {}) do
 		parts[#parts + 1] = string.format("%d", math.floor(tonumber(duration) or 0))
@@ -1022,6 +1323,14 @@ function M.upsert_session(device_id, row)
 		math.floor(tonumber(row.longest_chars) or 0),
 		math.floor(tonumber(row.total_active_ms) or 0),
 		_sql_escape(durations_json))
+	return sql
+end
+
+--- Commits one canonical session upsert and returns its native receipt.
+function M.upsert_session(device_id, row)
+	if not M.is_available() then return end
+	local sql = _derived_sql.session(device_id, row)
+	if not sql then return end
 	return _exec(sql)
 end
 
@@ -1049,8 +1358,7 @@ M.NGRAM_TABLES = NGRAM_TABLES
 --- @param app       string Application name.
 --- @param ngrams    table  { [token] = count|{c=count,sources={source=count}} } map.
 --- @param table_name string|nil One of NGRAM_TABLES; defaults to ngram_chars.
-function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
-	if not M.is_available() then return end
+_derived_sql.ngrams = function(device_id, date, app, ngrams, table_name)
 	if type(ngrams) ~= "table" then return end
 	local target = table_name or "ngram_chars"
 	if not NGRAM_TABLES[target] then
@@ -1109,6 +1417,14 @@ function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
 		.. number_map_merge_sql("esrc_json") .. ";",
 		table.concat(parts, ",")
 	)
+	return sql
+end
+
+--- Commits one canonical ngrams upsert and returns its native receipt.
+function M.upsert_ngrams(device_id, date, app, ngrams, table_name)
+	if not M.is_available() then return end
+	local sql = _derived_sql.ngrams(device_id, date, app, ngrams, table_name)
+	if not sql then return end
 	return _exec_raw_batch(sql)
 end
 
@@ -1116,8 +1432,8 @@ end
 --- from ngram_chars: one key may emit different glyphs by layout/modifier, but
 --- the scancode is the invariant physical location used by the heatmap.
 --- @param scancodes table { [evdev_code] = count }.
-function M.upsert_scancodes(device_id, date, app, scancodes)
-	if not M.is_available() or type(scancodes) ~= "table" then return end
+_derived_sql.scancodes = function(device_id, date, app, scancodes)
+	if type(scancodes) ~= "table" then return end
 	local parts = {}
 	for scancode, count in pairs(scancodes) do
 		local code = tonumber(scancode)
@@ -1127,10 +1443,189 @@ function M.upsert_scancodes(device_id, date, app, scancodes)
 				math.floor(code), math.floor(count))
 		end
 	end
-	if #parts == 0 then return true end
-	return _exec("INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
+	if #parts == 0 then return "" end
+	return "INSERT INTO ngram_scancodes (device_id, date, app, scancode, c) VALUES "
 		.. table.concat(parts, ",")
-		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;")
+		.. " ON CONFLICT(device_id, date, app, scancode) DO UPDATE SET c = c + excluded.c;"
+end
+
+--- Commits one canonical scancodes upsert and returns its native receipt.
+function M.upsert_scancodes(device_id, date, app, scancodes)
+	if not M.is_available() then return end
+	local sql = _derived_sql.scancodes(device_id, date, app, scancodes)
+	if not sql then return end
+	if sql == "" then return true end
+	return _exec(sql)
+end
+
+--- Starts an immutable flush snapshot with one raw/derived transaction.
+--- Reservation gaps are harmless; acknowledged IDs and SQL remain stable across
+--- data-write retries. Only a unique durable marker resolves a lost COMMIT reply.
+--- @param device_id string Device identifier.
+--- @param payload table { raw = { typing, hotstrings, shortcuts, switches }, upserts }.
+--- @return table|nil Owned logical operation; nil refuses before SQL dispatch.
+function M.start_flush(device_id, payload)
+	if not M.is_available() or (_flush_owner and not _flush_owner:is_settled()) then return nil end
+	assert(type(device_id) == "string" and device_id ~= "")
+	assert(type(payload) == "table" and type(payload.raw) == "table" and type(payload.upserts) == "table")
+	local Process = require("infra.sqlite_batch_process")
+	if not Process.is_available() then return nil end
+	local timeout_ms = require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms")
+	local function array(values)
+		assert(type(values) == "table", "Invalid SQLite flush array")
+		local length, entries = #values, 0
+		for key, value in pairs(values) do
+			assert(type(key) == "number" and key % 1 == 0 and key >= 1 and key <= length
+				and type(value) == "table", "Invalid SQLite flush entry")
+			entries = entries + 1
+		end
+		assert(entries == length, "Sparse SQLite flush array")
+	end
+	array(payload.upserts)
+	for _, entry in ipairs(payload.upserts) do
+		assert(type(entry.kind) == "string" and type(_derived_sql[entry.kind]) == "function"
+			and type(entry.args) == "table", "Invalid SQLite flush intent")
+	end
+	local path, count = _db_path, 0
+	local families = { "typing", "hotstrings", "shortcuts", "switches" }
+	for _, name in ipairs(families) do
+		array(payload.raw[name])
+		count = count + #payload.raw[name]
+	end
+	count = math.max(1, count)
+	local operation, state = {}, { phase = "reservation", child = nil, stopped = false, done = false }
+	local owner = "sqlite-flush:" .. tostring(operation)
+	local sql, token, first_id
+
+	local function dispatch(phase, body)
+		state.phase = phase
+		state.read_safe = false
+		local called, child = pcall(Process.start, path, body, { owner = owner, timeout_ms = timeout_ms })
+		if not called then state.phase = "uncertain"; return end
+		state.child = child
+		if not child then state.phase = phase .. "_retry" end
+	end
+
+	local function finish(committed, reason)
+		state.done = true
+		operation.result = { committed = committed == true, error = reason }
+		-- The receipt has been consumed; no callback or diagnostic retains SQL.
+		sql, payload = nil, nil
+	end
+
+	local function compose()
+		local statements, cursor = {}, first_id
+		for _, name in ipairs(families) do
+			local rows = payload.raw[name]
+			if #rows > 0 then
+				statements[#statements + 1] = assert(_raw_sql[name](device_id, rows, cursor))
+				cursor = cursor + #rows
+			end
+		end
+		for _, entry in ipairs(payload.upserts) do
+			local formatter = assert(_derived_sql[entry.kind])
+			local args = { device_id }
+			for _, value in ipairs(entry.args) do args[#args + 1] = value end
+			local statement = formatter(unpack_values(args))
+			assert(type(statement) == "string", "Invalid SQLite flush statement")
+			if statement ~= "" then statements[#statements + 1] = statement end
+		end
+		statements[#statements + 1] = "UPDATE meta SET value = CAST(value AS INTEGER) + 1 WHERE key = 'rev';"
+		statements[#statements + 1] = "INSERT INTO meta(key,value) VALUES ('" .. token .. "','committed');"
+		return ".output /dev/null\nBEGIN IMMEDIATE;\n" .. table.concat(statements, "\n")
+			.. "\nCOMMIT;\n.output stdout\nSELECT 1;\n"
+	end
+
+	local function resolve()
+		dispatch("resolve", "SELECT COUNT(*) FROM meta WHERE key='" .. token .. "' AND value='committed';")
+	end
+
+	local function cleanup()
+		state.committed = true
+		dispatch("cleanup", "DELETE FROM meta WHERE key='" .. token .. "';")
+		if state.phase == "cleanup_retry" then finish(true) end
+	end
+
+	function operation:is_settled() return state.done end
+	function operation:phase() return state.phase end
+	function operation:is_read_safe()
+		return (state.done and state.committed == true) or state.read_safe == true
+			or state.phase == "reservation_retry" or state.phase == "commit_retry"
+			or state.phase == "compose_retry"
+	end
+	function operation:is_retryable()
+		return not state.done and not state.stopped and state.phase:match("_retry$") ~= nil and state.child == nil
+	end
+	function operation:has_native_operation() return state.child ~= nil end
+	function operation:cancel()
+		state.stopped = true
+		if state.child then state.child:cancel() end
+		return self:is_settled()
+	end
+	function operation:retry()
+		if not self:is_retryable() or state.stopped then return false end
+		if state.phase == "reservation_retry" then dispatch("reservation", _reservation_sql(count))
+		elseif state.phase == "commit_retry" then dispatch("commit", sql)
+		elseif state.phase == "resolve_retry" then resolve()
+		elseif state.phase == "cleanup_retry" then cleanup()
+		elseif state.phase == "compose_retry" then
+			local composed, body = pcall(compose)
+			if composed then sql = body; dispatch("commit", sql) end
+		end
+		return true
+	end
+	function operation:pump()
+		if state.done or state.phase == "uncertain" then return state.done end
+		if not state.child then
+			if state.stopped then
+				finish(state.committed, state.committed and nil or "SQLite persistence stopped without a conclusive commit receipt")
+			end
+			return state.done
+		end
+		local result = state.child:poll()
+		if not result then return false end
+		-- poll() admits only exact child/pipe/group/timer settlement. A failed
+		-- process can have committed; outcome is resolved on a fresh connection.
+		state.child = nil
+		if state.phase == "reservation" then
+			local digits = result.ok and type(result.output) == "string" and result.output:match("^([1-9]%d*)\n$")
+			local value = digits and tonumber(digits)
+			if not value or value % 1 ~= 0 or value > EventIdPolicy.MAX_EXACT_LUA_CURSOR - count then
+				state.phase = "reservation_retry"
+				if state.stopped then finish(false, "SQLite ID reservation was not acknowledged") end
+				return state.done
+			end
+			first_id = value
+			token = "linux_flush_commit:" .. string.format("%.0f:%.0f", first_id, count)
+			local composed, body = pcall(compose)
+			if not composed then
+				state.phase = "compose_retry"
+				if state.stopped then finish(false, "SQLite flush composition was refused") end
+				return state.done
+			end
+			sql = body
+			if state.stopped then finish(false, "SQLite flush stopped before its data transaction")
+			else dispatch("commit", sql) end
+		elseif state.phase == "commit" then
+			if result.ok and result.output == "1\n" then cleanup() else resolve() end
+		elseif state.phase == "resolve" then
+			if not result.ok or (result.output ~= "0\n" and result.output ~= "1\n") then
+				state.phase = "resolve_retry"
+				if state.stopped then finish(false, "SQLite COMMIT outcome remains unknown after native retirement") end
+			elseif result.output == "1\n" then cleanup()
+			elseif state.stopped then state.read_safe = true; finish(false, "SQLite flush was rolled back before shutdown")
+			else state.phase = "commit_retry" end
+		elseif state.phase == "cleanup" then
+			-- Failed marker retirement leaves harmless durable evidence, never a
+			-- reason to replay already committed data. Physical retirement is ACK.
+			finish(true)
+		end
+		return state.done
+	end
+
+	_flush_owner = operation
+	dispatch("reservation", _reservation_sql(count))
+	return operation
 end
 
 --- Runs an arbitrary SQL script through the same stdin path as every write.

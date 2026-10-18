@@ -58,8 +58,12 @@ local OWNED_MODULES = {
 
 --- Runs native construction and every retained callback before restoring state.
 --- @param run function Receives the scoped fixture constructors and observers.
-return function(run)
+return function(run, dependencies)
 	return helpers.with_stub_scope(OWNED_MODULES, function()
+		if dependencies ~= nil then
+			assert(type(dependencies) == "table" and type(dependencies.files) == "table", "fixture file port is required")
+			package.loaded["adapters.file_system"] = dependencies.files
+		end
 		local RealConfig = helpers.load_with_stubs("platform.remap.config")
 
 		local REAL_ONBOARDING_CACHE_PATH = "/__ergopti_hs011_integration__/Karabiner-Elements.dmg"
@@ -144,6 +148,9 @@ return function(run)
 			package.loaded["platform.remap.config"] = {
 				load_available_actions = function()
 					if options.empty_data then return {} end
+					if type(options.real_action_catalogue_path) == "string" then
+						return RealConfig.load_available_actions(options.real_action_catalogue_path)
+					end
 					return { { id = "none" } }
 				end,
 				load_tap_hold_keys = function() return { { id = "left_shift" } } end,
@@ -168,7 +175,7 @@ return function(run)
 						combo_symmetric = false,
 					}
 				end,
-				save_user_config = function(state)
+				save_user_config = function(state, path)
 					calls.save = calls.save + 1
 					calls.saved_enabled[#calls.saved_enabled + 1] = state.enabled == true
 					calls.saved_payloads[#calls.saved_payloads + 1] = clone_payload(state)
@@ -180,6 +187,7 @@ return function(run)
 					if configured == "nil" then return nil end
 					if configured == "false" then return false end
 					if configured == "true" then return true end
+					if options.real_user_config_writes == true then return RealConfig.save_user_config(state, path) end
 					return calls.save_succeeds
 				end,
 				build_default_state = function()
@@ -196,7 +204,7 @@ return function(run)
 						combo_symmetric = false,
 					}
 				end,
-				resolve_layout_actions = function() return 0 end,
+				resolve_layout_actions = function() return 0, "ansi" end,
 			}
 			-- Controlled source port for the shared copy planner. The original save
 			-- callback and its failure/counter contract remain the publication port.
@@ -206,8 +214,9 @@ return function(run)
 			local copy_config = package.loaded["platform.remap.config"]
 			local original_save = copy_config.save_user_config
 			calls.copy_source = ""
-			copy_config.save_user_config = function(state)
-				local accepted = original_save(state)
+			copy_config.save_user_config = function(state, ...)
+				local result = table.pack(original_save(state, ...))
+				local accepted = result[1]
 				if accepted == true then
 					calls.copy_source = CopyCodec.encode({ mod_combos = {
 						enabled = state.mod_combos_enabled, config = state.mod_combos_config,
@@ -215,7 +224,7 @@ return function(run)
 						symmetric = state.combo_symmetric,
 					} })
 				end
-				return accepted
+				return table.unpack(result, 1, result.n)
 			end
 			copy_config.prepare_copy_taps_to_chords = function(entries, _, path)
 				if calls.copy_read then calls.copy_read() end

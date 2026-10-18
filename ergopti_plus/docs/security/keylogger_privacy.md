@@ -125,7 +125,7 @@ The header comment in `keylogger.ahk` section 13 referenced a `TODO_UIA` note th
 ## 6. Test Coverage
 
 - **Corpus:** `static/ergopti_plus/_shared/tests/corpus/security/keylogger_no_persist_vectors.json` — 10 vectors covering SEC-001 to SEC-010.
-- **HS unit tests:** `static/ergopti_plus/macos/tests/unit/modules/keylogger/test_keylogger_privacy.lua` — 12 test cases directly derived from the corpus vectors, covering: secure field guard (3 cases), system auth guard (2 cases), private browsing guard (1 case), normal-field baseline (1 case), buffer flush on field transition (1 case), and filter toggle integrity (3 cases).
+- **HS unit tests:** `static/ergopti_plus/macos/tests/unit/modules/keylogger/lifecycle/test_keylogger_privacy.lua` — 12 test cases directly derived from the corpus vectors, covering: secure field guard (3 cases), system auth guard (2 cases), private browsing guard (1 case), normal-field baseline (1 case), buffer flush on field transition (1 case), and filter toggle integrity (3 cases).
 
 ---
 

@@ -14,19 +14,19 @@
 
 
 
-; Render the runtime-registered personal shortcuts at the bottom of the
-; Raccourcis menu when any have been declared by personal_shortcuts.ahk
-; (separator + nested submenu of per-name toggles). Reads from the
+; Collect runtime-registered personal shortcut DATA without a native destination.
+; Literal zero means absent registry; a present empty child Array remains valid.
+; The central declared frame receiver owns separator and group rendering. Reads from the
 ; ``_PersonalShortcutsRegistry`` global populated by RegisterPersonalFeature
 ; so no Features v1 Map access is required.
-_AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
+_PersonalShortcutRows() {
 	global _PersonalShortcutsRegistry
 	if !_PersonalShortcutsRegistry.Has("__Order") {
-		return
+		return 0
 	}
 	Names := _PersonalShortcutsRegistry["__Order"]
 	if (Names.Length == 0) {
-		return
+		return 0
 	}
 
 	; One nested row per registered personal shortcut, drawn by the renderer.
@@ -42,11 +42,7 @@ _AppendPersonalShortcutsSubmenuIfAny(ShortcutsMenu) {
 			PersonalRows.Push(Row)
 		}
 	}
-	FrameRows := MenuRenderer_TemplateRows("personal_shortcuts_frame", Map(), Map(), Map("personal_shortcuts_registered", PersonalRows))
-	if !(FrameRows is Array)
-		return 0
-	MenuRenderer_AppendTemplate(ShortcutsMenu, "personal_shortcuts_frame", Map(), Map(),
-		Map("personal_shortcuts_registered", PersonalRows))
+	return PersonalRows
 }
 
 
@@ -251,9 +247,23 @@ _MI_StageHotstrings() {
 	; was three copies of one checkbox before that, one per driver.
 	_HotParamCommands := Map(
 		"repeat_key", ToggleRepeatKeyEnabled,
+		; The word-reset rows: the idle choice is called with the chosen seconds,
+		; its free entry and the click checkbox with the native menu arguments,
+		; which the seams of these commands must never receive.
+		"idle_reset", (Seconds) => SetHotstringsIdleResetSeconds(Seconds),
+		"idle_reset_custom", (*) => PromptHotstringsIdleResetSeconds(),
+		"click_resets_word", (*) => ToggleHotstringsClickResetsWord(),
+		"arrow_resets_word", (*) => ToggleHotstringsWordResetFlag("arrow_resets_word"),
+		"shortcut_resets_word", (*) => ToggleHotstringsWordResetFlag("shortcut_resets_word"),
+		"tap_hold_resets_word", (*) => ToggleHotstringsWordResetFlag("tap_hold_resets_word"),
 	)
 	_HotParamGetters := Map(
 		"hotstrings_repeat_enabled", () => ReadFeatureStateV2("hotstrings.repeat_key_enabled").Get("enabled", false),
+		"hotstrings.idle_reset_seconds", () => HSE_IdleResetSecondsCurrent(),
+		"hotstrings_click_resets_word", () => HSE_ClickResetsWordCurrent(),
+		"hotstrings_arrow_resets_word", () => HSE_WordResetFlagCurrent("arrow_resets_word"),
+		"hotstrings_shortcut_resets_word", () => HSE_WordResetFlagCurrent("shortcut_resets_word"),
+		"hotstrings_tap_hold_resets_word", () => HSE_WordResetFlagCurrent("tap_hold_resets_word"),
 	)
 
 	; word_expanders left _HotDynHandlers: its manifest row is `type = "list"`
@@ -277,19 +287,13 @@ _MI_StageHotstrings() {
 		"hotstring_extensions",          (*) => _HS_ExtensionRows(),
 	)
 
-	; The bulk rows were ONE `dynamic` row that expanded to two, then two
-	; `command` rows « tout activer » / « tout désactiver ». They are one `check`
-	; row now: ticked when every section is on, and a click switches the whole
-	; tree to the other side. Read once per build, like every tick here.
-	HotstringsAllSectionsOn := _HS_AllHotstringsOn()
 	; « Restore recommended » and « Clear » come from the tested terminal
-	; provider, so the rows reach the same scope owner as its unit tests.
+	; provider, so the rows reach the same scope owner as its unit tests. There
+	; is no whole-tree « all sections » row: each submenu owns its bulk rows.
 	_HotCommands := _HS_ScopeCommands()
 	_HotCommands["hotstrings_toggle"] := MenuRenderer_CategoryGateCommand("Hotstrings")
-	_HotCommands["hotstrings_all_sections"] := (*) => ToggleAllHotstrings(!HotstringsAllSectionsOn)
 	_HotGetters := Map(
-		"hotstrings_enabled",              () => IsCategoryGated("Hotstrings"),
-		"hotstrings_all_sections_enabled", () => HotstringsAllSectionsOn,
+		"hotstrings_enabled", () => IsCategoryGated("Hotstrings"),
 	)
 
 	_HotGroupBuilders := Map(

@@ -73,6 +73,20 @@ global LLM_NAV_EVENT_OWNER_REPAINT_MAX_ATTEMPTS := 3
 global LLM_NAV_EVENT_OWNER_PROFILE_MAX_ATTEMPTS := 3
 global _LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
 global _LLM_NavEventOwnerReportTimes := Map()
+global _LLM_NavEventOwnerTerminalRouteOwner := A_ScriptHwnd
+global _LLM_NavEventOwnerTerminalRouteGeneration := 0
+global _LLM_NavEventOwnerTerminalRouteNextRecipe := 0
+global _LLM_NavEventOwnerTerminalRouteNextLayout := 1
+global _LLM_NavEventOwnerTerminalRouteRefreshing := false
+; An uncertain native registration retains its original candidate and owner.
+; No current-registration readback/settlement contract exists yet.
+global _LLM_NavEventOwnerTerminalRouteUnknown := 0
+global _LLM_NavEventOwnerTerminalRouteRecipes := Map()
+global _LLM_NavEventOwnerTerminalRouteModels := Map()
+global _LLM_NavEventOwnerTerminalRouteCoverage := Map(
+	"generation", 0, "layout_id", 0, "registered", 0,
+	"cohort_complete", false, "transformed_output_enabled", false,
+	"unconverted", ["unregistered terminal route cohorts"])
 
 _LLM_NavEventOwnerPortFn(Name, Port := 0) {
 	global _LLM_NavEventOwnerPort
@@ -154,6 +168,7 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 	global _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
 	global _LLM_NavEventOwnerServiceFn
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
 	StartTicket := 0
 	StartEpoch := 0
 	PreviousCritical := Critical("On")
@@ -220,6 +235,12 @@ LLM_NavEventOwner_EnsureStarted(Port := 0, AllowLifecycleResume := false) {
 			_LLM_NavEventOwnerWakeFn := _LLM_NavEventOwnerOnWake
 			_LLM_NavEventOwnerServiceFn := _LLM_NavEventOwnerService
 			try {
+				; The routes registered during this start join the published epoch.
+				if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+						|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+					throw Error("The original start epoch owner was withdrawn.")
+				OriginalLoader.Call("publish_start_epoch",
+					Map("from", StartEpoch, "to", PublishedEpoch))
 				OnMessage(_LLM_NavEventOwnerWakeMessage,
 					_LLM_NavEventOwnerWakeFn)
 				_LLM_NavEventOwnerSetServiceTimer(true)
@@ -297,149 +318,197 @@ _LLM_NavEventOwnerRollbackStart(StartTicket, FailureDetail,
 	return false
 }
 
-LLM_NavEventOwner_Stop(PreserveResumeIntent := false,
-		ForceLifecycleReset := false) {
+LLM_NavEventOwner_Stop(PreserveResumeIntent := false, ForceLifecycleReset := false) {
 	global _LLM_NavEventOwnerProfileFailures
 	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerQuarantined
 	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartCancelled
-	global _LLM_NavEventOwnerStartRollbackPending
-	global _LLM_NavEventOwnerActiveStartTicket
+	global _LLM_NavEventOwnerStartRollbackPending, _LLM_NavEventOwnerActiveStartTicket
 	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
-	global _LLM_NavEventOwnerRuntimeEpoch
-	global _LLM_NavEventOwnerPort
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerPort
 	global _LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn
 	global _LLM_NavEventOwnerServiceFn, _LLM_NavEventOwnerServiceArmed
-	global _LLM_NavEventOwnerRecords
-	global _LLM_NavEventOwnerProfileOwners
-	global _LLM_NavEventOwnerActiveProfileToken
-	global _LLM_NavEventOwnerProfileEffectActive
-	global _LLM_NavEventOwnerShutdownFenced
-	global _LLM_NavEventOwnerClaimedReceipt
-	global _LLM_NavEventOwnerPendingRepaints
-	global _LLM_NavEventOwnerRepaintFailures
+	global _LLM_NavEventOwnerRecords, _LLM_NavEventOwnerProfileOwners
+	global _LLM_NavEventOwnerActiveProfileToken, _LLM_NavEventOwnerProfileEffectActive
+	global _LLM_NavEventOwnerShutdownFenced, _LLM_NavEventOwnerClaimedReceipt
+	global _LLM_NavEventOwnerPendingRepaints, _LLM_NavEventOwnerRepaintFailures
 	global _LLM_NavEventOwnerPreparedPlans, _LLM_NavEventOwnerCommittedPlan
-	global _LLM_NavEventOwnerLifecycleResumePlan
-	global _LLM_NavEventOwnerLifecycleResumePort
-	global _LLM_NavEventOwnerLifecycleQuiesced
-	global _LLM_NavEventOwnerModule
+	global _LLM_NavEventOwnerLifecycleResumePlan, _LLM_NavEventOwnerLifecycleResumePort
+	global _LLM_NavEventOwnerLifecycleQuiesced, _LLM_NavEventOwnerModule
 	global _LLM_NavEventOwnerLastQuarantineStopAttemptTick
-	PreserveLifecycle := false
-	PreviousCritical := Critical("On")
-	try {
-		if _LLM_NavEventOwnerStarting {
-			_LLM_NavEventOwnerStartCancelled := true
-			return false
-		}
-		if _LLM_NavEventOwnerStopping
-			return false
-		_LLM_NavEventOwnerStopping := true
-		WasPending := _LLM_NavEventOwnerStopPending
-		PreserveLifecycle := !ForceLifecycleReset
-			&& (PreserveResumeIntent
-				|| _LLM_NavEventOwnerLifecycleQuiesced)
-		if PreserveLifecycle
-				&& !(_LLM_NavEventOwnerLifecycleResumePlan is Array)
-				&& _LLM_NavEventOwnerCommittedPlan is Array {
-			_LLM_NavEventOwnerLifecycleResumePlan :=
-				_LLM_NavEventOwnerCommittedPlan
-			_LLM_NavEventOwnerLifecycleResumePort :=
-				_LLM_NavEventOwnerPort
-		}
-		ShouldStop := _LLM_NavEventOwnerStarted
-			|| (_LLM_NavEventOwnerPort is Map)
-			|| _LLM_NavEventOwnerModule != 0
-	} finally Critical(PreviousCritical)
-	StopResult := 1
-	StopFailure := ""
-	if ShouldStop {
-		try StopResult := _LLM_NavEventOwnerCall("stop",
-			_LLM_NavEventOwnerNativeStop)
-		catch as Err {
-			StopResult := 0
-			StopFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
-		}
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalNativeStop := _LLM_NavEventOwnerNativeStop
+	StopScope := 0, PreserveLifecycle := false, AdmissionFailure := ""
+
+	GuardScope() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original native stop constructor was withdrawn.")
+		if !OriginalLoader.Call("owns_scope", StopScope)
+			throw Error("The native stop scope was not genuinely issued.")
 	}
-	Stopped := ((StopResult is Integer) && StopResult == 1)
-		|| (StopResult is Map && StopResult.Get("stopped", false) == true)
-	StopPending := StopResult is Map
-		&& StopResult.Get("pending", false) == true
-		&& StopResult.Get("stopped", false) != true
-	if StopPending {
-		; The stop signal is committed and native dispatch is draining fail-open.
-		; Keep wake/service/records connected until a later nonblocking retry joins
-		; the thread; publishing Started here would certify a runtime which can no
-		; longer accept new ownership.
+
+	try {
 		PreviousCritical := Critical("On")
 		try {
-			_LLM_NavEventOwnerStarted := false
-			_LLM_NavEventOwnerQuarantined := true
-			_LLM_NavEventOwnerStopPending := true
-			_LLM_NavEventOwnerStopping := false
+			if _LLM_NavEventOwnerStarting {
+				_LLM_NavEventOwnerStartCancelled := true
+				return false
+			}
+			if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
+				return false
+			_LLM_NavEventOwnerStopping := true
+			try {
+				if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+						|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+					throw Error("The original native stop constructor was withdrawn.")
+				RetirementFrame := _LLM_NavEventOwnerTerminalRouteUnknown
+				StopScope := OriginalLoader.Call("begin_stop", RetirementFrame)
+				GuardScope()
+				WasPending := _LLM_NavEventOwnerStopPending
+				PreserveLifecycle := !ForceLifecycleReset
+					&& (PreserveResumeIntent || _LLM_NavEventOwnerLifecycleQuiesced)
+				if PreserveLifecycle && !(_LLM_NavEventOwnerLifecycleResumePlan is Array)
+						&& _LLM_NavEventOwnerCommittedPlan is Array {
+					_LLM_NavEventOwnerLifecycleResumePlan := _LLM_NavEventOwnerCommittedPlan
+					_LLM_NavEventOwnerLifecycleResumePort := _LLM_NavEventOwnerPort
+				}
+				ShouldStop := _LLM_NavEventOwnerStarted || (_LLM_NavEventOwnerPort is Map)
+					|| _LLM_NavEventOwnerModule != 0 || StopScope["requires_native"].Call()
+			} catch as Err {
+				_LLM_NavEventOwnerStopping := false
+				AdmissionFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
+			}
 		} finally Critical(PreviousCritical)
-		if !WasPending
-			try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
-		return false
-	}
-	if !Stopped {
-		PreviousCritical := Critical("On")
-		try _LLM_NavEventOwnerStopping := false
-		finally Critical(PreviousCritical)
-		if StopFailure == ""
-			StopFailure := "stage=native_stop outcome=refused result_type="
-				. Type(StopResult) . " result_code="
-				. (StopResult is Integer ? StopResult : "unavailable")
-		_LLM_NavEventOwnerReport(StopFailure)
-		return false
-	}
-	; Keep the service and wake route alive until the native thread has actually
-	; acknowledged Stop. A refused teardown may still own suppressed receipts and
-	; must not be published as inert by disconnecting its only drain paths.
-	PreviousCritical := Critical("On")
-	try {
-		_LLM_NavEventOwnerSetServiceTimer(false)
-		if IsObject(_LLM_NavEventOwnerWakeFn)
-			try OnMessage(_LLM_NavEventOwnerWakeMessage,
-				_LLM_NavEventOwnerWakeFn, 0)
-		_LLM_NavEventOwnerRuntimeEpoch += 1
-		_LLM_NavEventOwnerStarted := false
-		_LLM_NavEventOwnerQuarantined := false
-		_LLM_NavEventOwnerStarting := false
-		_LLM_NavEventOwnerStopPending := false
-		_LLM_NavEventOwnerStartCancelled := false
-		_LLM_NavEventOwnerStartRollbackPending := false
-		_LLM_NavEventOwnerActiveStartTicket := 0
-		_LLM_NavEventOwnerPort := 0
-		_LLM_NavEventOwnerWakeFn := 0
-		_LLM_NavEventOwnerServiceFn := 0
-		_LLM_NavEventOwnerServiceArmed := false
-		_LLM_NavEventOwnerRecords := Map()
-		_LLM_NavEventOwnerProfileOwners := Map()
-		_LLM_NavEventOwnerActiveProfileToken := 0
-		_LLM_NavEventOwnerProfileEffectActive := false
-		_LLM_NavEventOwnerShutdownFenced := false
-		_LLM_NavEventOwnerClaimedReceipt := 0
-		_LLM_NavEventOwnerPendingRepaints := Map()
-		_LLM_NavEventOwnerRepaintFailures := Map()
-		_LLM_NavEventOwnerProfileFailures := Map()
-		_LLM_NavEventOwnerPreparedPlans := Map()
-		_LLM_NavEventOwnerCommittedPlan := 0
-		_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
-		if !PreserveLifecycle {
-			_LLM_NavEventOwnerLifecycleResumePlan := 0
-			_LLM_NavEventOwnerLifecycleResumePort := 0
-			_LLM_NavEventOwnerLifecycleQuiesced := false
+		if AdmissionFailure != "" {
+			_LLM_NavEventOwnerReport(AdmissionFailure)
+			return false
 		}
+		StopResult := 1, StopFailure := ""
+		if ShouldStop {
+			try {
+				; Snapshot and construction already precede this first Port.Get.
+				SelectionCritical := Critical("On")
+				try {
+					GuardScope()
+					StopFn := _LLM_NavEventOwnerPortFn("stop")
+					GuardScope()
+					UseCustomStop := HasMethod(StopFn, "Call")
+					if UseCustomStop
+						StopScope["custom"].Call()
+				} finally Critical(SelectionCritical)
+				if UseCustomStop {
+					StopResult := StopFn.Call()
+				} else {
+					DispatchCritical := Critical("On")
+					try {
+						GuardScope()
+						if _LLM_NavEventOwnerNativeStop != OriginalNativeStop
+								|| Object.Prototype.HasOwnProp.Call(OriginalNativeStop, "Call")
+							throw Error("The original native stop helper was withdrawn.")
+						StopResult := OriginalNativeStop.Call(StopScope["native"])
+					} finally Critical(DispatchCritical)
+				}
+			} catch as Err {
+				StopResult := 0
+				StopFailure := _LLM_NavEventOwnerStopExceptionDetail(Err)
+			}
+		}
+		try {
+			Stopped := ((StopResult is Integer) && StopResult == 1)
+				|| (StopResult is Map && StopResult.Get("stopped", false) == true)
+			StopPending := StopResult is Map && StopResult.Get("pending", false) == true
+				&& StopResult.Get("stopped", false) != true
+		} catch as Err {
+			PreviousCritical := Critical("On")
+			try _LLM_NavEventOwnerStopping := false
+			finally Critical(PreviousCritical)
+			_LLM_NavEventOwnerReport(_LLM_NavEventOwnerStopExceptionDetail(Err))
+			return false
+		}
+		if StopPending {
+			PreviousCritical := Critical("On")
+			try {
+				_LLM_NavEventOwnerStarted := false
+				_LLM_NavEventOwnerQuarantined := true
+				_LLM_NavEventOwnerStopPending := true
+				_LLM_NavEventOwnerStopping := false
+			} finally Critical(PreviousCritical)
+			if !WasPending
+				try LoggerDebug("LLM.nav", "stage=native_stop outcome=pending.")
+			return false
+		}
+		if !Stopped {
+			PreviousCritical := Critical("On")
+			try _LLM_NavEventOwnerStopping := false
+			finally Critical(PreviousCritical)
+			if StopFailure == ""
+				StopFailure := "stage=native_stop outcome=refused result_type=" . Type(StopResult)
+					. " result_code=" . (StopResult is Integer ? StopResult : "unavailable")
+			_LLM_NavEventOwnerReport(StopFailure)
+			return false
+		}
+		PreviousCritical := Critical("On")
+		try {
+			try {
+				GuardScope()
+				if !StopScope["accept"].Call()
+					throw Error("Genuine retained registration requires an actual native stop receipt.")
+				GuardScope()
+				if !StopScope["settle"].Call()
+					throw Error("The retained terminal source could not be retired.")
+			} catch as Err {
+				_LLM_NavEventOwnerReport(_LLM_NavEventOwnerStopExceptionDetail(Err))
+				return false
+			}
+			_LLM_NavEventOwnerSetServiceTimer(false)
+			if IsObject(_LLM_NavEventOwnerWakeFn)
+				try OnMessage(_LLM_NavEventOwnerWakeMessage, _LLM_NavEventOwnerWakeFn, 0)
+			_LLM_NavEventOwnerRuntimeEpoch += 1
+			_LLM_NavEventOwnerStarted := false
+			_LLM_NavEventOwnerQuarantined := false
+			_LLM_NavEventOwnerStarting := false
+			_LLM_NavEventOwnerStopPending := false
+			_LLM_NavEventOwnerStartCancelled := false
+			_LLM_NavEventOwnerStartRollbackPending := false
+			_LLM_NavEventOwnerActiveStartTicket := 0
+			_LLM_NavEventOwnerPort := 0
+			_LLM_NavEventOwnerWakeFn := 0
+			_LLM_NavEventOwnerServiceFn := 0
+			_LLM_NavEventOwnerServiceArmed := false
+			_LLM_NavEventOwnerRecords := Map()
+			_LLM_NavEventOwnerProfileOwners := Map()
+			_LLM_NavEventOwnerActiveProfileToken := 0
+			_LLM_NavEventOwnerProfileEffectActive := false
+			_LLM_NavEventOwnerShutdownFenced := false
+			_LLM_NavEventOwnerClaimedReceipt := 0
+			_LLM_NavEventOwnerPendingRepaints := Map()
+			_LLM_NavEventOwnerRepaintFailures := Map()
+			_LLM_NavEventOwnerProfileFailures := Map()
+			_LLM_NavEventOwnerPreparedPlans := Map()
+			_LLM_NavEventOwnerCommittedPlan := 0
+			_LLM_NavEventOwnerLastQuarantineStopAttemptTick := 0
+			if !PreserveLifecycle {
+				_LLM_NavEventOwnerLifecycleResumePlan := 0
+				_LLM_NavEventOwnerLifecycleResumePort := 0
+				_LLM_NavEventOwnerLifecycleQuiesced := false
+			}
+		} finally {
+			_LLM_NavEventOwnerStopping := false
+			Critical(PreviousCritical)
+		}
+		Unloaded := true
+		try Unloaded := _LLM_NavEventOwnerNativeUnload()
+		catch
+			Unloaded := false
+		if ShouldStop && Unloaded
+			try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
+		return Unloaded
 	} finally {
-		_LLM_NavEventOwnerStopping := false
-		Critical(PreviousCritical)
+		if StopScope is Map
+			; Original issuer cleanup only; no public own.Call or mutable scope method.
+			Func.Prototype.Call.Call(OriginalLoader, "close_scope", StopScope)
 	}
-	Unloaded := true
-	try Unloaded := _LLM_NavEventOwnerNativeUnload()
-	catch
-		Unloaded := false
-	if ShouldStop && Unloaded
-		try LoggerDebug("LLM.nav", "stage=native_stop outcome=stopped.")
-	return Unloaded
 }
 
 ; Callers hold Critical across this check and their terminal-recovery admission
@@ -2278,28 +2347,1277 @@ _LLM_NavEventOwnerPublishCurrentProfileSurface(
 	return (Status is Integer) && Status == 1
 }
 
+/**
+ * Refreshes authoritative terminal-route metadata without enabling typed replay.
+ * @param {Map|Integer} Port - Optional source and native-registration boundaries.
+ * @returns {Boolean} True only after the exact native registration ACK.
+ */
+LLM_NavEventOwner_RefreshTerminalRoutes(Port := 0) {
+	global _LLM_NavEventOwnerTerminalRouteRefreshing
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalNativeRegister := _LLM_NavEventOwnerNativeRegisterTerminalRoutes
+	static OriginalUnknown := _LLM_NavEventOwnerTerminalRegistrationUnknown
+
+	GuardScope() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original registration constructor was withdrawn.")
+		if !OriginalLoader.Call("owns_scope", NativeScope)
+			throw Error("The registration scope was not genuinely issued.")
+		NativeScope["guard"].Call()
+	}
+
+	RetainUnknown() {
+		; Retention is mandatory cleanup, not native admission. Skip foreign own.Call.
+		Func.Prototype.Call.Call(OriginalLoader, "retain_frame", Frame)
+		Func.Prototype.Call.Call(OriginalUnknown, Frame)
+	}
+
+	CheckCurrent(CheckModels := true, CheckIds := true) {
+		try {
+			GuardScope()
+			Current := _LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels, CheckIds)
+		} catch as Err {
+			RetainUnknown()
+			throw Err
+		}
+		if !Current
+			RetainUnknown()
+		return Current
+	}
+
+	PreviousCritical := Critical("On")
+	try {
+		if _LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+			return false
+		if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+			throw Error("Uncertain terminal registration retains its original native owner.")
+		_LLM_NavEventOwnerTerminalRouteRefreshing := true
+		try {
+			if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+					|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+				throw Error("The original registration constructor was withdrawn.")
+			NativeScope := OriginalLoader.Call("begin_frame")
+			GuardScope()
+			Frame := NativeScope["frame"]
+			try {
+				GuardScope()
+				NativeScope["capture_digit_source"].Call()
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+				SourceFn := _LLM_NavEventOwnerPortFn("terminal_route_source", Port)
+				GuardScope()
+				Source := HasMethod(SourceFn, "Call") ? SourceFn.Call() : _LLM_NavEventOwnerTerminalRouteSource()
+				GuardScope()
+				if !(Source is Map) || ObjGetBase(Source) != Map.Prototype
+					throw ValueError("The terminal source must be an original plain Map.")
+				for Name in ObjOwnProps(Source)
+					throw ValueError("The terminal source cannot invoke a map observer.")
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				CheckCurrent()
+				throw Err
+			}
+			_LLM_NavEventOwnerTerminalRouteGeneration += 1
+			if _LLM_NavEventOwnerTerminalRouteGeneration <= 0
+				throw Error("Terminal route registration generation overflowed.")
+			Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+			Frame["generation"] := Generation
+			try {
+				GuardScope()
+				Candidate := _LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame, NativeScope["guard"])
+			} catch as Err {
+				CheckCurrent(false, false)
+				throw Err
+			}
+			Frame["candidate"] := Candidate
+			NativeScope["seal_candidate"].Call()
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source)
+			if !CheckCurrent(false)
+				throw ValueError("The terminal source changed during recipe capture.")
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+			GuardScope()
+			Bindings := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+			GuardScope()
+			Witness := _LLM_NavEventOwnerTerminalRouteMarshal(Candidate["routes"])
+			Frame["bindings"] := Witness
+			try {
+				GuardScope()
+				RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+			} catch as Err {
+				CheckCurrent()
+				throw Err
+			}
+			Frame["native_attempted"] := true
+			try {
+				GuardScope()
+				if HasMethod(RegisterFn, "Call") {
+					NativeScope["custom"].Call()
+					Status := RegisterFn.Call(Frame["owner"], Generation, Candidate["layout_id"], Bindings, Candidate["routes"].Length)
+				} else {
+					GuardScope()
+					if _LLM_NavEventOwnerNativeRegisterTerminalRoutes != OriginalNativeRegister
+							|| Object.Prototype.HasOwnProp.Call(OriginalNativeRegister, "Call")
+						throw Error("The original native registration helper was withdrawn.")
+					Status := OriginalNativeRegister.Call(Frame["owner"], Generation,
+						Candidate["layout_id"], Bindings, Candidate["routes"].Length, NativeScope["native"])
+				}
+			} catch as Err {
+				RetainUnknown()
+				throw Err
+			}
+			try {
+				GuardScope()
+				_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+				GuardScope()
+				if !_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Bindings, Witness)
+					throw ValueError("The registration callback changed the native descriptor bytes.")
+			} catch as Err {
+				RetainUnknown()
+				throw Err
+			}
+			GuardScope()
+			if !(Status is Integer) || !_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+				RetainUnknown()
+				throw Error("Terminal route registration returned an unknown ACK.")
+			}
+			if Status == -11
+				return false
+			GuardScope()
+			_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route registration")
+			for RecipeId, Admission in Candidate["recipes"]
+				Frame["recipes"][RecipeId] := Admission
+			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+				"generation", Generation, "layout_id", Candidate["layout_id"], "registered", Candidate["routes"].Length,
+				"cohort_complete", false, "transformed_output_enabled", false, "unconverted", Candidate["unconverted"])
+			Frame["coverage"] := _LLM_NavEventOwnerTerminalRouteCoverage
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+			GuardScope()
+			_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame)
+			if !CheckCurrent()
+				throw ValueError("The original registration owner changed during retirement.")
+			GuardScope()
+			NativeScope["complete"].Call()
+			return true
+		} finally {
+			try {
+				if IsSet(NativeScope)
+					Func.Prototype.Call.Call(OriginalLoader, "close_scope", NativeScope)
+			} finally _LLM_NavEventOwnerTerminalRouteRefreshing := false
+		}
+	} finally Critical(PreviousCritical)
+}
+
+/** Exact private authority retained before source/registration callbacks. */
+_LLM_NavEventOwnerTerminalRegistrationCapture() {
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	Owner := _LLM_NavEventOwnerTerminalRouteOwner
+	Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+	Recipes := _LLM_NavEventOwnerTerminalRouteRecipes, Models := _LLM_NavEventOwnerTerminalRouteModels
+	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage
+	NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe, NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+	if !(NextRecipe is Integer) || NextRecipe < 0 || !(NextLayout is Integer) || NextLayout <= 0
+			|| !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation < 0
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipes)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Models)
+			|| !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Coverage)
+		throw ValueError("The terminal registration authority is malformed.")
+	for RecipeId in Recipes
+		if !(RecipeId is Integer) || RecipeId <= 0 || RecipeId > NextRecipe
+			throw ValueError("The terminal recipe identity owner precedes its retained references.")
+	Frame := Map("digit_source", 0, "owner", Owner, "generation", Generation, "recipes", Recipes,
+		"models", Models, "coverage", Coverage, "recipe_refs", Recipes.Clone(),
+		"model_refs", Models.Clone(), "candidate", 0, "bindings", 0, "native_attempted", false,
+		"next_recipe", NextRecipe, "next_layout", NextLayout)
+	_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+	return Frame
+}
+
+_LLM_NavEventOwnerTerminalRegistrationPlainMap(Value) {
+	if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+		return false
+	for Name in ["Get", "Has", "Clone", "__Item", "__Enum", "Count"]
+		if Object.Prototype.HasOwnProp.Call(Value, Name)
+			return false
+	return true
+}
+
+/** No callback may exchange dictionary cells and still retire their old holders. */
+_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Owned, Snapshot) {
+	if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Owned) || Owned.Count != Snapshot.Count
+		return false
+	for Id, Value in Snapshot
+		if !Owned.Has(Id) || Type(Owned[Id]) != Type(Value) || !(Owned[Id] == Value)
+			return false
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame, CheckModels := true, CheckIds := true) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			|| !OriginalLoader.Call("digit_current", Frame)
+		return false
+	global _LLM_NavEventOwnerTerminalRouteOwner, _LLM_NavEventOwnerTerminalRouteGeneration
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	return _LLM_NavEventOwnerTerminalRouteOwner is Integer
+		&& _LLM_NavEventOwnerTerminalRouteOwner == Frame["owner"]
+		&& _LLM_NavEventOwnerTerminalRouteGeneration is Integer
+		&& _LLM_NavEventOwnerTerminalRouteGeneration == Frame["generation"]
+		&& _LLM_NavEventOwnerTerminalRouteRecipes == Frame["recipes"]
+		&& _LLM_NavEventOwnerTerminalRouteModels == Frame["models"]
+		&& _LLM_NavEventOwnerTerminalRouteCoverage == Frame["coverage"]
+		&& (!CheckIds || (_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe == Frame["next_recipe"]
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout == Frame["next_layout"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationPlainMap(Frame["models"])
+		&& _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["recipes"], Frame["recipe_refs"])
+		&& (!CheckModels || _LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Frame["models"], Frame["model_refs"]))
+		&& _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels)
+}
+
+/** Only this build's contiguous recipe IDs and one new model may advance owners. */
+_LLM_NavEventOwnerTerminalRegistrationAdvance(Frame, Candidate, Source) {
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe, _LLM_NavEventOwnerTerminalRouteNextLayout
+	ExpectedRecipe := Frame["next_recipe"] + Candidate["routes"].Length
+	NewModel := Source["active"] && Source.Get("model", 0) is Map
+		&& !Frame["model_refs"].Has(ObjPtr(Source["model"]))
+	ExpectedLayout := Frame["next_layout"] + (NewModel ? 1 : 0)
+	Valid := _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextRecipe == ExpectedRecipe
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+		&& _LLM_NavEventOwnerTerminalRouteNextLayout == ExpectedLayout
+	for Index, Route in Candidate["routes"]
+		if Route["recipe_id"] != Frame["next_recipe"] + Index
+			Valid := false
+	if !Valid {
+		_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame)
+		throw ValueError("A callback changed the terminal registration identity owners.")
+	}
+	Frame["next_recipe"] := ExpectedRecipe, Frame["next_layout"] := ExpectedLayout
+}
+
+/** Keep selected original object references even if a callback mutates a cell. */
+_LLM_NavEventOwnerTerminalRegistrationRetain(Frame) {
+	Frame["recipe_refs"] := Frame["recipes"].Clone()
+	Frame["model_refs"] := Frame["models"].Clone()
+	Routes := Map(), Models := Map()
+	for Id, Admission in Frame["recipes"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			throw ValueError("A retained terminal recipe cell is malformed.")
+		Recipe := Admission["recipe"]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
+			throw ValueError("A retained terminal route is not a plain Map.")
+		Binding := Admission.Get("binding", 0)
+		if (Admission["route"]["kind"] == 6) != (Binding is Map)
+				|| (Binding is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Binding))
+			throw ValueError("A direct-digit admission lost its retained binding fields.")
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission["route"])
+				|| (Recipe is Map && !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe))
+			throw ValueError("The retained terminal route/model recipe is malformed.")
+		Routes[Id] := Map("binding", Binding, "binding_fields", Binding is Map ? Binding.Clone() : 0,
+			"route", Admission["route"], "recipe", Recipe,
+			"model", Recipe is Map ? Recipe.Get("model", 0) : 0,
+			"route_fields", Admission["route"].Clone(),
+			"recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
+			"generation", Admission["generation"], "layout_id", Admission["layout_id"])
+	}
+	for Id, Identity in Frame["models"] {
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] <= 1
+				|| Identity["id"] > Frame["next_layout"]
+			throw ValueError("A retained terminal model cell is malformed.")
+		Models[Id] := Map("model", Identity["model"], "id", Identity["id"])
+	}
+	Frame["route_objects"] := Routes, Frame["model_objects"] := Models
+}
+
+_LLM_NavEventOwnerTerminalRegistrationObjectsCurrent(Frame, CheckModels) {
+	if !CheckModels && !_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame)
+		return false
+	for Id, Expected in Frame["route_objects"] {
+		if !Frame["recipes"].Has(Id)
+			return false
+		Admission := Frame["recipes"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Admission)
+			return false
+		for Name in ["route", "recipe", "generation", "layout_id"]
+			if Type(Admission.Get(Name, "")) != Type(Expected[Name]) || !(Admission.Get(Name, "") == Expected[Name])
+				return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Expected["route"], Expected["route_fields"])
+			return false
+		Binding := Expected["binding"]
+		if Binding is Map {
+			if Admission.Get("binding", 0) != Binding
+					|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Binding, Expected["binding_fields"])
+				return false
+		} else if Admission.Has("binding")
+			return false
+		Recipe := Expected["recipe"]
+		if Recipe is Map && (!_LLM_NavEventOwnerTerminalRegistrationPlainMap(Recipe)
+				|| Recipe.Get("model", 0) != Expected["model"]
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Recipe, Expected["recipe_fields"]))
+			return false
+	}
+	; A partial builder may add its captured identity, but cannot mutate old cells.
+	for Id, Expected in Frame["model_objects"] {
+		if !Frame["models"].Has(Id)
+			return false
+		Identity := Frame["models"][Id]
+		if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				|| Identity.Get("model", 0) != Expected["model"]
+				|| !(Identity.Get("id", 0) is Integer) || Identity["id"] != Expected["id"]
+			return false
+	}
+	return true
+}
+
+/** Preserve old cells and the one actual allocation before recapturing snapshots. */
+_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent(Frame) {
+	Models := Frame["models"], Original := Frame["model_refs"]
+	for Id, Identity in Original
+		if !Models.Has(Id) || Models[Id] != Identity
+			return false
+	Key := Frame.Get("build_model_key", 0)
+	NewModel := Key != 0 && !Original.Has(Key)
+	if Models.Count != Original.Count + (NewModel ? 1 : 0)
+		return false
+	if Key != 0 {
+		if !Models.Has(Key) || Models[Key] != Frame["build_model_cell"]
+			return false
+		if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Models[Key], Frame["build_model_fields"])
+			return false
+	}
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRegistrationRequire(Frame) {
+	if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+		throw ValueError("A callback withdrew the original terminal registration authority.")
+}
+
+_LLM_NavEventOwnerTerminalRegistrationBytesCurrent(Actual, Expected) {
+	if !(Actual is Buffer) || Actual.Size != Expected.Size
+		return false
+	Loop Expected.Size
+		if NumGet(Actual, A_Index - 1, "UChar") != NumGet(Expected, A_Index - 1, "UChar")
+			return false
+	return true
+}
+
+/** Only documented native registration refusals prove no candidate was accepted. */
+_LLM_NavEventOwnerTerminalRegistrationStatusKnown(Status) {
+	return Status == 0 || Status == -1 || Status == -2 || Status == -3
+		|| Status == -4 || Status == -5 || Status == -6 || Status == -9 || Status == -11
+}
+
+/** Retains original references without restoring a foreign dictionary or guessing ACK. */
+_LLM_NavEventOwnerTerminalRegistrationUnknown(Frame) {
+	global _LLM_NavEventOwnerTerminalRouteUnknown
+	if !IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+		_LLM_NavEventOwnerTerminalRouteUnknown := Frame
+	return false
+}
+
+/**
+ * Retains current registrations and exact native held identities only. The
+ * registration ACK establishes a debt-free boundary; Critical prevents this
+ * script from starting capture between publication and the held-identity query.
+ * A failed or malformed query retains every reference for a later safe retry.
+ */
+_LLM_NavEventOwnerTerminalRoutePrune(Candidate, Source, Port, Frame := 0) {
+	global _LLM_NavEventOwnerTerminalRouteOwner
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	static OriginalUnknown := _LLM_NavEventOwnerTerminalRegistrationUnknown
+	GuardFrame() {
+		if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+				|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+			throw Error("The original held-query constructor was withdrawn.")
+		if !OriginalLoader.Call("guard_frame", Frame)
+			throw Error("The original held-query Frame was withdrawn.")
+		if !(Source is Map) || ObjGetBase(Source) != Map.Prototype
+			throw Error("The held-query source is not a plain Map.")
+		for Name in ObjOwnProps(Source)
+			throw Error("The held-query source cannot invoke a map observer.")
+	}
+	RetainUnknown() {
+		Func.Prototype.Call.Call(OriginalUnknown, Frame)
+	}
+	if !(Frame is Map)
+		throw ValueError("Held-query pruning requires its already issued Frame.")
+	try {
+		GuardFrame()
+		_LLM_NavEventOwnerTerminalRegistrationRequire(Frame)
+		GuardFrame()
+		HeldFn := _LLM_NavEventOwnerPortFn("list_terminal_held_recipes", Port)
+		GuardFrame()
+		if !HasMethod(HeldFn, "Call") {
+			GuardFrame()
+			RegisterFn := _LLM_NavEventOwnerPortFn("register_terminal_routes", Port)
+			GuardFrame()
+			if HasMethod(RegisterFn, "Call")
+				return false
+		}
+		HeldBuffer := Buffer(64 * 8, 0)
+		GuardFrame()
+		Reply := HasMethod(HeldFn, "Call") ? HeldFn.Call(Frame["owner"], HeldBuffer, 64)
+			: OriginalLoader.Call("frame_held", Map("frame", Frame, "buffer", HeldBuffer))
+		GuardFrame()
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			RetainUnknown()
+			throw ValueError("Held-query callback withdrew the original registration authority.")
+		}
+		if !(Reply is Map) || ObjGetBase(Reply) != Map.Prototype
+			throw Error("Held terminal recipe query returned a malformed ACK.")
+		for Name in ObjOwnProps(Reply)
+			throw Error("Held terminal recipe query cannot invoke a map observer.")
+		if !(Reply.Get("status", "") is Integer)
+			throw Error("Held terminal recipe query returned a malformed ACK.")
+		if Reply["status"] != 0
+			throw Error("Held terminal recipe query refused with status " . Reply["status"] . ".")
+		if !(Reply.Get("count", "") is Integer) || Reply["count"] < 0 || Reply["count"] > 64
+			throw Error("Held terminal recipe query returned an invalid count.")
+		GuardFrame()
+		Keep := Map(), Held := Map()
+		for RecipeId in Candidate["recipes"]
+			Keep[RecipeId] := true
+		Loop Reply["count"] {
+			RecipeId := NumGet(HeldBuffer, (A_Index - 1) * 8, "UInt64")
+			if RecipeId <= 0 || Held.Has(RecipeId) || !_LLM_NavEventOwnerTerminalRouteRecipes.Has(RecipeId)
+				throw Error("Held terminal recipe query returned an unknown or duplicate identity.")
+			Held[RecipeId] := true, Keep[RecipeId] := true
+		}
+		GuardFrame()
+		Protected := OriginalLoader.Call("protected_historical", Map("frame", Frame))
+		for RecipeId in Protected["recipes"]
+			Keep[RecipeId] := true
+		KeepModels := Protected["models"]
+		if Source.Get("model", 0) is Map
+			KeepModels[ObjPtr(Source["model"])] := true
+		RetireRecipes := []
+		for RecipeId, Admission in _LLM_NavEventOwnerTerminalRouteRecipes {
+			if !Keep.Has(RecipeId) {
+				RetireRecipes.Push(RecipeId)
+				continue
+			}
+			Recipe := Admission.Get("recipe", 0)
+			if Recipe is Map && Recipe.Get("model", 0) is Map
+				KeepModels[ObjPtr(Recipe["model"])] := true
+		}
+		RetireModels := []
+		for Identity in _LLM_NavEventOwnerTerminalRouteModels
+			if !KeepModels.Has(Identity)
+				RetireModels.Push(Identity)
+		GuardFrame()
+		if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame) {
+			RetainUnknown()
+			throw ValueError("Retirement cannot borrow a successor registration owner.")
+		}
+		OriginalLoader.Call("prune_historical", Map("frame", Frame, "keep", Keep, "models", KeepModels))
+		for RecipeId in RetireRecipes
+			_LLM_NavEventOwnerTerminalRouteRecipes.Delete(RecipeId)
+		for Identity in RetireModels
+			_LLM_NavEventOwnerTerminalRouteModels.Delete(Identity)
+		GuardFrame()
+		_LLM_NavEventOwnerTerminalRegistrationRetain(Frame)
+		return true
+	} catch Error as Err {
+		try {
+			GuardFrame()
+			if !_LLM_NavEventOwnerTerminalRegistrationCurrent(Frame)
+				RetainUnknown()
+		} catch {
+			RetainUnknown()
+		}
+		_LLM_NavEventOwnerReport("Terminal route recipe retirement deferred: " . Err.Message)
+		return false
+	}
+}
+
+/** Returns diagnostic coverage, never permission for partial transformed output. */
+LLM_NavEventOwner_TerminalRouteCoverage() {
+	global _LLM_NavEventOwnerTerminalRouteCoverage
+	Coverage := _LLM_NavEventOwnerTerminalRouteCoverage.Clone()
+	Coverage["unconverted"] := Coverage["unconverted"].Clone()
+	return Coverage
+}
+
+/** Captures a diagnostic binding lease and an independent private current check. */
+_LLM_NavEventOwnerCaptureDigitSource() {
+	static OriginalSource := DigitRow_BindingSource
+	static OriginalCapture := DigitRow_CaptureBinding
+	static OriginalMode := NumberRowEffectiveMode
+	static OriginalSelf := _LLM_NavEventOwnerCaptureDigitSource
+	static NativeCall := Func.Prototype.Call
+	static NativeBind := Func.Prototype.Bind
+	static OriginalPlainMap := _LLM_NavEventOwnerTerminalRegistrationPlainMap
+	static OriginalRefsCurrent := _LLM_NavEventOwnerTerminalRegistrationRefsCurrent
+
+	FunctionsCurrent() {
+		for Pair in [[OriginalSource, DigitRow_BindingSource],
+			[OriginalCapture, DigitRow_CaptureBinding], [OriginalMode, NumberRowEffectiveMode],
+			[OriginalSelf, _LLM_NavEventOwnerCaptureDigitSource],
+			[OriginalPlainMap, _LLM_NavEventOwnerTerminalRegistrationPlainMap],
+			[OriginalRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationRefsCurrent],
+			[NativeCall, Func.Prototype.Call], [NativeBind, Func.Prototype.Bind]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	RequireFunctions() {
+		if !FunctionsCurrent()
+			throw Error("The original direct-digit source accessor was withdrawn.")
+	}
+
+	ReadMode() {
+		RequireFunctions()
+		Value := NativeCall.Call(OriginalMode)
+		RequireFunctions()
+		if !(Value is String) || !(Value == "native" || Value == "symbols" || Value == "digits")
+			throw ValueError("The direct-digit source mode is invalid.")
+		return Value
+	}
+
+	Mode := ReadMode(), Factory := 0, Rows := Map(), Images := Map()
+	if Mode == "digits" {
+		RequireFunctions()
+		Factory := NativeCall.Call(OriginalSource)
+		RequireFunctions()
+		if !((Factory is Integer && Factory == 0) || Factory is BoundFunc)
+			throw ValueError("The direct-digit source factory is invalid.")
+		if Factory is BoundFunc {
+			Loop 10 {
+				Scan := A_Index + 1
+				RequireFunctions()
+				Row := NativeCall.Call(OriginalCapture, Factory, Scan)
+				RequireFunctions()
+				if !NativeCall.Call(OriginalPlainMap, Row) || Row.Count != 8
+						|| Row.Get("source", 0) != Factory
+						|| !(Row.Get("scan", "") is Integer) || Row["scan"] != Scan
+						|| !(Row.Get("digit", 0) is String) || !RegExMatch(Row["digit"], "^[0-9]$")
+						|| !(Row.Get("down", 0) is BoundFunc) || !(Row.Get("up", 0) is BoundFunc)
+						|| !(Row.Get("criterion", 0) is String) || Row["criterion"] == ""
+						|| !(Row.Get("input_level", "") is Integer) || Row["input_level"] != 2
+						|| !(Row.Get("metadata_only", "") is Integer) || Row["metadata_only"] != true
+					throw ValueError("The original direct-digit binding was not captured completely.")
+				Rows[Scan] := Row
+				Images[Scan] := Row.Clone()
+			}
+		}
+	}
+	Cell := Map("mode", Mode, "factory", Factory, "rows", Rows)
+	CellImage := Cell.Clone()
+	RowRefs := Rows.Clone()
+
+	Current() {
+		if !FunctionsCurrent()
+			return false
+		if !NativeCall.Call(OriginalRefsCurrent, Cell, CellImage)
+				|| !NativeCall.Call(OriginalRefsCurrent, Rows, RowRefs)
+			return false
+		if !NativeCall.Call(OriginalPlainMap, Rows) || !NativeCall.Call(OriginalPlainMap, Images)
+			return false
+		if Mode != "digits"
+			return Rows.Count == 0 && Images.Count == 0
+		if NativeCall.Call(OriginalSource) != Factory || !FunctionsCurrent()
+			return false
+		if Factory is Integer
+			return Factory == 0 && Rows.Count == 0 && Images.Count == 0
+		if Rows.Count != 10 || Images.Count != 10
+			return false
+		Loop 10 {
+			Scan := A_Index + 1
+			if !Rows.Has(Scan) || !Images.Has(Scan)
+					|| !NativeCall.Call(OriginalRefsCurrent, Rows[Scan], Images[Scan])
+				return false
+			Observed := NativeCall.Call(OriginalCapture, Factory, Scan)
+			if !FunctionsCurrent() || !NativeCall.Call(OriginalRefsCurrent, Observed, Images[Scan])
+				return false
+		}
+		return FunctionsCurrent() && NativeCall.Call(OriginalRefsCurrent, Cell, CellImage)
+			&& NativeCall.Call(OriginalRefsCurrent, Rows, RowRefs)
+	}
+
+	ModeCurrent() {
+		; Policy Maps may run an observer. Complete that observation before the
+		; source-only witnesses and the caller's complete registration checks.
+		return FunctionsCurrent() && ReadMode() == Mode && Current()
+	}
+
+	RequireFunctions()
+	Guard := NativeCall.Call(NativeBind, Current)
+	ModeGuard := NativeCall.Call(NativeBind, ModeCurrent)
+	RequireFunctions()
+	if !ModeGuard.Call()
+		throw Error("The direct-digit source changed during capture.")
+	; The loader retains this exact guard privately. The public Frame receives
+	; only Cell; copying or replacing that Map cannot replace its private witness.
+	return Map("source", Cell, "current", Guard, "mode_current", ModeGuard)
+}
+
+/** Freezes pending admissions before any registration callback can observe them. */
+_LLM_NavEventOwnerCaptureTerminalCandidate(Candidate, DigitCell, CanonicalSource := 0) {
+	global KEYLAYOUT_NEUTRAL_STATE
+	static OriginalPlain := _LLM_NavEventOwnerTerminalRegistrationPlainMap
+	static OriginalRefs := _LLM_NavEventOwnerTerminalRegistrationRefsCurrent
+	static OriginalSelf := _LLM_NavEventOwnerCaptureTerminalCandidate
+	static NativeCall := Func.Prototype.Call, NativeBind := Func.Prototype.Bind
+
+	FunctionsCurrent() {
+		for Pair in [[OriginalPlain, _LLM_NavEventOwnerTerminalRegistrationPlainMap],
+			[OriginalRefs, _LLM_NavEventOwnerTerminalRegistrationRefsCurrent],
+			[OriginalSelf, _LLM_NavEventOwnerCaptureTerminalCandidate],
+			[NativeCall, Func.Prototype.Call], [NativeBind, Func.Prototype.Bind]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	PlainArray(Value) {
+		if !(Value is Array) || ObjGetBase(Value) != Array.Prototype
+			return false
+		for Name in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	RequireCanonicalRecipe(Recipe, Route) {
+		; Only the original frame supplies this private loader-issued witness.
+		; Digit bindings and natural modifiers have their own non-KLE sources.
+		if !NativeCall.Call(OriginalPlain, CanonicalSource)
+				|| !(CanonicalSource.Get("active", 0) is Integer) || CanonicalSource["active"] != 1
+				|| !(CanonicalSource.Get("model", 0) is Map)
+				|| Recipe.Get("model", 0) != CanonicalSource["model"]
+				|| !(Recipe.Get("layout_id", 0) is String)
+				|| !(Recipe["layout_id"] == CanonicalSource.Get("layout_name", 0))
+				|| !(Recipe.Get("scan", 0) is String) || !RegExMatch(Recipe["scan"], "^SC[0-9A-F]{3}$")
+				|| !(Recipe.Get("index", "") is Integer) || !(Recipe.Get("keycode", "") is Integer)
+			throw ValueError("The pending recipe does not belong to the captured canonical source.")
+		Reader := CanonicalSource.Get("read", 0)
+		if !(Reader is BoundFunc) || Object.Prototype.HasOwnProp.Call(Reader, "Call")
+			throw ValueError("The original canonical graph reader was withdrawn.")
+		Modifiers := Route.Get("required_modifiers", -1)
+		if !(Modifiers is Integer) || (Modifiers != 0 && Modifiers != 4)
+			throw ValueError("The pending canonical recipe has an unsupported modifier family.")
+		Row := NativeCall.Call(Reader, "find", KEYLAYOUT_NEUTRAL_STATE, Recipe["scan"], Modifiers == 4 ? 1 : 0)
+		if !NativeCall.Call(OriginalPlain, Row) || Row["before_id"] != 0 || Row["after_id"] != 0
+				|| (Row["kind"] != 1 && Row["kind"] != 2) || !(Row["output"] is String)
+				|| Row["index"] != Recipe["index"] || Row["keycode"] != Recipe["keycode"]
+				|| Route.Get("kind", 0) != Row["kind"] || Route.Get("axis", 0) != 2
+				|| Route.Get("code", 0) != Integer("0x" . SubStr(Row["scan"], 3))
+			throw ValueError("The pending recipe differs from its exact canonical graph row.")
+		for Name in ["required_prefixes", "prefix_bit", "effective_modifiers_lr", "target_vk", "target_scan",
+			"required_dead_key_id", "next_dead_key_id"]
+			if !Route.Has(Name) || !(Route[Name] is Integer) || Route[Name] != 0
+				throw ValueError("The pending canonical recipe changed its neutral descriptor.")
+	}
+
+	if !FunctionsCurrent() || !NativeCall.Call(OriginalPlain, Candidate)
+			|| !NativeCall.Call(OriginalPlain, DigitCell)
+			|| !PlainArray(Candidate.Get("routes", 0))
+			|| !PlainArray(Candidate.Get("unconverted", 0))
+			|| !NativeCall.Call(OriginalPlain, Candidate.Get("recipes", 0))
+		throw ValueError("The pending terminal candidate has an invalid shape.")
+	Routes := Candidate["routes"], Recipes := Candidate["recipes"], Reasons := Candidate["unconverted"]
+	if Routes.Length < 1 || Recipes.Count != Routes.Length
+		throw ValueError("The pending terminal candidate is incomplete.")
+	RouteRefs := Routes.Clone(), RecipeRefs := Recipes.Clone(), ReasonImage := Reasons.Clone()
+	CandidateImage := Candidate.Clone(), Records := Map(), RouteImages := [], Digits := Map()
+	for Index, Route in Routes {
+		if !NativeCall.Call(OriginalPlain, Route)
+			throw ValueError("A pending native descriptor is not a plain Map.")
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || Id <= 0 || !Recipes.Has(Id) || Records.Has(Id)
+			throw ValueError("A pending recipe identity is invalid or duplicated.")
+		Admission := Recipes[Id]
+		if !NativeCall.Call(OriginalPlain, Admission)
+				|| !NativeCall.Call(OriginalPlain, Admission.Get("route", 0))
+				|| !NativeCall.Call(OriginalRefs, Admission["route"], Route)
+			throw ValueError("A pending admission does not retain its exact native descriptor.")
+		Recipe := Admission.Get("recipe", 0), Binding := Admission.Get("binding", 0)
+		if Recipe is Map && !NativeCall.Call(OriginalPlain, Recipe)
+			throw ValueError("A pending model recipe is not a plain Map.")
+		Kind := Route.Get("kind", 0)
+		if !(Kind is Integer) || Kind < 1 || Kind > 6
+			throw ValueError("A pending canonical admission has an invalid route kind.")
+		if Kind <= 3 {
+			if !(Recipe is Map)
+				throw ValueError("A pending canonical model descriptor requires its original recipe.")
+			RequireCanonicalRecipe(Recipe, Route)
+		} else if !(Recipe is Integer) || Recipe != 0
+			throw ValueError("A natural or digit admission cannot borrow a canonical model recipe.")
+		if Route.Get("kind", 0) == 6 {
+			Scan := Route.Get("code", 0)
+			if !(Scan is Integer) || Scan < 0x02 || Scan > 0x0B || Digits.Has(Scan)
+					|| !(Recipe is Integer) || Recipe != 0
+					|| DigitCell.Get("mode", "") != "digits"
+					|| !(DigitCell.Get("factory", 0) is BoundFunc)
+					|| !NativeCall.Call(OriginalPlain, DigitCell.Get("rows", 0))
+					|| !DigitCell["rows"].Has(Scan)
+					|| !NativeCall.Call(OriginalRefs, Binding, DigitCell["rows"][Scan])
+				throw ValueError("A pending digit admission lost its canonical binding source.")
+			Digits[Scan] := true
+		} else if Admission.Has("binding")
+			throw ValueError("Only direct-digit admissions may retain binding metadata.")
+		RouteImages.Push(Route.Clone())
+		Records[Id] := Map("admission", Admission, "fields", Admission.Clone(),
+			"route", Admission["route"], "route_fields", Admission["route"].Clone(),
+			"recipe", Recipe, "recipe_fields", Recipe is Map ? Recipe.Clone() : 0,
+			"binding", Binding, "binding_fields", Binding is Map ? Binding.Clone() : 0)
+	}
+	ExpectedDigits := DigitCell["mode"] == "digits" && DigitCell["factory"] is BoundFunc ? 10 : 0
+	if Digits.Count != ExpectedDigits
+		throw ValueError("The pending direct-digit source family is incomplete.")
+	for Reason in Reasons
+		if !(Reason is String)
+			throw ValueError("A pending coverage explanation is not text.")
+
+	Current() {
+		if !FunctionsCurrent() || !NativeCall.Call(OriginalRefs, Candidate, CandidateImage)
+				|| !NativeCall.Call(OriginalRefs, Recipes, RecipeRefs)
+				|| !PlainArray(Routes) || Routes.Length != RouteRefs.Length
+				|| !PlainArray(Reasons) || Reasons.Length != ReasonImage.Length
+			return false
+		for Index, Expected in RouteRefs
+			if !Routes.Has(Index) || Routes[Index] != Expected
+					|| !NativeCall.Call(OriginalRefs, Routes[Index], RouteImages[Index])
+				return false
+		for Index, Reason in ReasonImage
+			if !Reasons.Has(Index) || !(Reasons[Index] is String) || !(Reasons[Index] == Reason)
+				return false
+		for Id, Record in Records {
+			Admission := Recipes[Id]
+			if Admission != Record["admission"]
+					|| !NativeCall.Call(OriginalRefs, Admission, Record["fields"])
+					|| !NativeCall.Call(OriginalRefs, Record["route"], Record["route_fields"])
+				return false
+			if Record["recipe"] is Map
+					&& !NativeCall.Call(OriginalRefs, Record["recipe"], Record["recipe_fields"])
+				return false
+			if Record["binding"] is Map
+					&& !NativeCall.Call(OriginalRefs, Record["binding"], Record["binding_fields"])
+				return false
+		}
+		return FunctionsCurrent()
+	}
+
+	if !FunctionsCurrent()
+		throw Error("The original terminal candidate witness constructor was withdrawn.")
+	Guard := NativeCall.Call(NativeBind, Current)
+	if !FunctionsCurrent() || !Guard.Call()
+		throw Error("The pending terminal candidate changed during witness capture.")
+	return Guard
+}
+
+
+_LLM_NavEventOwnerTerminalRouteSource() {
+	global KLE_Model, KLE_Id, KLE_KeyCodes, KLE_State
+	Caps := GetKeyState("CapsLock", "T") ? 1 : 0
+	if !IsSet(KLE_Model) || !(KLE_Model is Map)
+		return Map("active", false, "caps", Caps)
+	return Map("active", KeylayoutEmulation_LayerIsActive("ergopti_base") ? 1 : 0,
+		"caps", Caps, "model", KLE_Model, "layout_name", KLE_Id,
+		"keys", KLE_KeyCodes.Clone(), "composition_state", KLE_State,
+		"capture", KeylayoutEmulation_CaptureReplayRoute,
+		"eligible", _KLE_BaseCriterion)
+}
+
+_LLM_NavEventOwnerTerminalRouteNextRecipeId() {
+	global _LLM_NavEventOwnerTerminalRouteNextRecipe
+	_LLM_NavEventOwnerTerminalRouteNextRecipe += 1
+	if _LLM_NavEventOwnerTerminalRouteNextRecipe <= 0
+		throw Error("Terminal route recipe identity overflowed.")
+	return _LLM_NavEventOwnerTerminalRouteNextRecipe
+}
+
+_LLM_NavEventOwnerTerminalRouteLayoutId(Model) {
+	global _LLM_NavEventOwnerTerminalRouteNextLayout
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Identity := ObjPtr(Model)
+	if _LLM_NavEventOwnerTerminalRouteModels.Has(Identity)
+		return _LLM_NavEventOwnerTerminalRouteModels[Identity]["id"]
+	_LLM_NavEventOwnerTerminalRouteNextLayout += 1
+	if _LLM_NavEventOwnerTerminalRouteNextLayout <= 1
+		throw Error("Terminal route layout identity overflowed.")
+	Id := _LLM_NavEventOwnerTerminalRouteNextLayout
+	; Retaining the model also prevents an object pointer from being reused for
+	; another layout while old native snapshots still name its recipes.
+	_LLM_NavEventOwnerTerminalRouteModels[Identity] := Map("model", Model, "id", Id)
+	return Id
+}
+
+_LLM_NavEventOwnerTerminalRouteDescriptor(RecipeId, RouteId, Axis, Code,
+		Kind, Modifiers := 0, EffectiveLR := 0, TargetVk := 0, TargetScan := 0) {
+	return Map("recipe_id", RecipeId, "route_id", RouteId,
+		"required_prefixes", 0, "prefix_bit", 0,
+		"required_dead_key_id", 0, "next_dead_key_id", 0,
+		"code", Code, "target_vk", TargetVk, "target_scan", TargetScan,
+		"axis", Axis, "kind", Kind, "required_modifiers", Modifiers,
+		"effective_modifiers_lr", EffectiveLR)
+}
+
+_LLM_NavEventOwnerTerminalRouteBuild(Source, Generation, Frame := 0, ScopeGuard := unset) {
+	global KEYLAYOUT_NEUTRAL_STATE
+	global _LLM_NavEventOwnerTerminalRouteModels
+	Guard() {
+		if IsSet(ScopeGuard)
+			ScopeGuard.Call()
+	}
+	Guard()
+	if !(Source is Map) || !Source.Has("active") || !Source.Has("caps")
+			|| !(Source["active"] is Integer) || Source["active"] < 0 || Source["active"] > 1
+			|| !(Source["caps"] is Integer) || Source["caps"] < 0 || Source["caps"] > 1
+			|| !(Generation is Integer) || Generation <= 0
+		throw ValueError("Terminal route source ownership is invalid.")
+	Guard()
+	LayoutId := Source["active"] && Source.Has("model") && Source["model"] is Map
+		? _LLM_NavEventOwnerTerminalRouteLayoutId(Source["model"]) : 1
+	if Frame is Map {
+		Frame["build_model_key"] := 0
+		if Source["active"] && Source.Has("model") && Source["model"] is Map {
+			Key := ObjPtr(Source["model"]), Identity := _LLM_NavEventOwnerTerminalRouteModels[Key]
+			Guard()
+			if !_LLM_NavEventOwnerTerminalRegistrationPlainMap(Identity)
+				throw ValueError("The allocated terminal model identity is malformed.")
+			Frame["build_model_key"] := Key
+			Frame["build_model_cell"] := Identity
+			Frame["build_model_fields"] := Identity.Clone()
+		}
+	}
+	Routes := []
+	Recipes := Map()
+	Unconverted := ["CapsLock", "AltGr", "dead-key sequences", "tap-hold transforms",
+		"shortcut chords", "prefix layers", "direct-digit overrides", "pre-registration holds"]
+	DigitRows := 0
+	if Frame is Map && IsSet(ScopeGuard) {
+		Guard()
+		Cell := Frame["digit_source"]
+		if Cell["mode"] == "digits" && Cell["factory"] is BoundFunc
+			DigitRows := Cell["rows"]
+	}
+	AppendDirectDigits() {
+		if !(DigitRows is Map)
+			return
+		Guard()
+		; Marshal rejects an oversized composed registry before either registration boundary.
+		Loop 10 {
+			Guard()
+			Scan := A_Index + 1
+			Binding := DigitRows[Scan].Clone()
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Guard()
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(Id, Routes.Length + 1, 2, Scan, 6)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", 0, "binding", Binding, "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
+	NaturalScans := Map()
+	for Modifier in [[0xA2, 0x01, 0x01D], [0xA3, 0x02, 0x11D],
+			[0xA4, 0x04, 0x038], [0xA5, 0x08, 0x138], [0xA0, 0x10, 0x02A],
+			[0xA1, 0x20, 0x036], [0x5B, 0x40, 0x15B], [0x5C, 0x80, 0x15C]] {
+		NaturalScans[Modifier[3]] := true
+		for Axis in [2, 1] {
+			Guard()
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Guard()
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
+				Id, Routes.Length + 1, Axis, Axis == 2 ? Modifier[3] : Modifier[1],
+				4, 0, Modifier[2], Axis == 1 ? Modifier[1] : 0, Axis == 2 ? Modifier[3] : 0)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", 0, "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
+	if !Source["active"] || Source["caps"] {
+		Unconverted.Push(Source["caps"] ? "CapsLock active at registration" : "KLE base inactive")
+		AppendDirectDigits()
+		return Map("layout_id", LayoutId, "routes", Routes,
+			"recipes", Recipes, "unconverted", Unconverted)
+	}
+	for Name in ["model", "layout_name", "keys", "composition_state", "capture", "eligible"]
+		if !Source.Has(Name)
+			throw ValueError("The authoritative KLE source is incomplete.")
+	if !(Source["model"] is Map) || !(Source["keys"] is Map)
+			|| !(Source["layout_name"] is String) || Source["layout_name"] == ""
+			|| !(Source["composition_state"] is String)
+			|| !HasMethod(Source["capture"], "Call") || !HasMethod(Source["eligible"], "Call")
+		throw ValueError("The authoritative KLE source is malformed.")
+	if Source["composition_state"] != KEYLAYOUT_NEUTRAL_STATE {
+		Unconverted.Push("KLE composition active at registration")
+		AppendDirectDigits()
+		return Map("layout_id", LayoutId, "routes", Routes,
+			"recipes", Recipes, "unconverted", Unconverted)
+	}
+	Names := ""
+	for Sc, _ in Source["keys"] {
+		if !(Sc is String) || !RegExMatch(Sc, "i)^SC[0-9A-F]{3}$")
+			throw ValueError("The authoritative KLE scan identity is malformed.")
+		Names .= Sc . "`n"
+	}
+	Loop Parse, Sort(RTrim(Names, "`n")), "`n" {
+		Sc := A_LoopField
+		if Sc == ""
+			continue
+		if NaturalScans.Has(Integer("0x" . SubStr(Sc, 3))) {
+			Unconverted.Push(Sc . ":natural modifier identity")
+			continue
+		}
+		for Shift in [0, 1] {
+			Guard()
+			Scan := Integer("0x" . SubStr(Sc, 3))
+			if DigitRows is Map && !Shift && Scan >= 0x02 && Scan <= 0x0B {
+				Unconverted.Push(Sc . ":base:direct-digit source, output unconverted")
+				continue
+			}
+			Eligible := Source["eligible"].Call(Sc, Shift)
+			Guard()
+			if !Eligible {
+				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":another owner")
+				continue
+			}
+			Guard()
+			Recipe := Source["capture"].Call(Sc, Shift, false, false)
+			Guard()
+			if !(Recipe is Map) || !Recipe.Has("model") || !(Recipe["model"] is Map)
+					|| ObjPtr(Recipe["model"]) != ObjPtr(Source["model"])
+					|| Recipe.Get("layout_id", 0) != Source["layout_name"]
+					|| Recipe.Get("scan", 0) != Sc
+				throw ValueError("KLE registration changed its model during capture.")
+			; A borrowed recipe can observe Has/Get/__Item; authenticate after those reads.
+			RecipeModel := Recipe["model"], RecipeIndex := Recipe["index"], RecipeCode := Recipe["keycode"]
+			Guard()
+			Resolved := Keylayout_Resolve(RecipeModel, RecipeIndex, RecipeCode)
+			Guard()
+			if Resolved["Kind"] != "text" {
+				Unconverted.Push(Sc . (Shift ? ":Shift" : ":base") . ":" . Resolved["Kind"])
+				continue
+			}
+			Guard()
+			Id := _LLM_NavEventOwnerTerminalRouteNextRecipeId()
+			Kind := RegExMatch(Resolved["Text"], "^[0-9]$") ? 2 : 1
+			Guard()
+			Route := _LLM_NavEventOwnerTerminalRouteDescriptor(
+				Id, Routes.Length + 1, 2, Integer("0x" . SubStr(Sc, 3)), Kind, Shift ? 4 : 0)
+			Routes.Push(Route)
+			Recipes[Id] := Map("recipe", Recipe.Clone(), "route", Route.Clone(),
+				"generation", Generation, "layout_id", LayoutId)
+		}
+	}
+	Guard()
+	AppendDirectDigits()
+	return Map("layout_id", LayoutId, "routes", Routes,
+		"recipes", Recipes, "unconverted", Unconverted)
+}
+
+_LLM_NavEventOwnerTerminalRouteValidate(Route) {
+	if !(Route is Map)
+		throw ValueError("A typed terminal route is required.")
+	Limits := Map("recipe_id", 0x7FFFFFFFFFFFFFFF, "route_id", 0xFFFFFFFF,
+		"required_prefixes", 0xFFFFFFFF, "prefix_bit", 0xFFFFFFFF,
+		"required_dead_key_id", 0xFFFFFFFF, "next_dead_key_id", 0xFFFFFFFF,
+		"code", 0x1FF, "target_vk", 0xFF, "target_scan", 0x1FF,
+		"axis", 2, "kind", 6, "required_modifiers", 15, "effective_modifiers_lr", 255)
+	for Name, Maximum in Limits
+		if !Route.Has(Name) || !(Route[Name] is Integer)
+				|| Route[Name] < 0 || Route[Name] > Maximum
+			throw ValueError("The terminal route contains an invalid typed field.")
+	if Route["recipe_id"] == 0 || Route["route_id"] == 0 || Route["code"] == 0
+			|| Route["axis"] == 0 || Route["kind"] == 0
+			|| (Route["axis"] == 1 && Route["code"] > 255)
+			|| (Route["target_vk"] != 0 && Route["target_scan"] != 0)
+		throw ValueError("The terminal route key identity is invalid.")
+	if Route["kind"] == 6 {
+		; Source intent cannot inherit KLE text or guess a host output identity.
+		if Route["axis"] != 2 || Route["code"] < 0x02 || Route["code"] > 0x0B
+				|| Route["target_vk"] || Route["target_scan"]
+				|| Route["required_modifiers"] || Route["required_prefixes"]
+				|| Route["prefix_bit"] || Route["effective_modifiers_lr"]
+				|| Route["required_dead_key_id"] || Route["next_dead_key_id"]
+			throw ValueError("The direct-digit source descriptor is invalid.")
+		return true
+	}
+	Transform := Route["kind"] == 4 || Route["kind"] == 5
+	if Transform {
+		if Route["required_modifiers"] || Route["required_prefixes"]
+				|| Route["required_dead_key_id"] || Route["next_dead_key_id"]
+			throw ValueError("A held terminal transform cannot depend on a chord.")
+		if Route["kind"] == 4 {
+			if !Route["effective_modifiers_lr"] || Route["prefix_bit"]
+				throw ValueError("The terminal modifier transform is invalid.")
+		} else if Route["effective_modifiers_lr"] || !Route["prefix_bit"]
+				|| (Route["prefix_bit"] & (Route["prefix_bit"] - 1))
+			throw ValueError("The terminal prefix transform is invalid.")
+	} else if Route["effective_modifiers_lr"] || Route["prefix_bit"]
+			|| (Route["kind"] == 3 && !Route["required_dead_key_id"] && !Route["next_dead_key_id"])
+		throw ValueError("The terminal character transition is invalid.")
+	return true
+}
+
+_LLM_NavEventOwnerTerminalRouteMarshal(Routes) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original terminal route storage owner was withdrawn.")
+	if !(Routes is Array)
+		throw ValueError("A typed terminal route registry is required.")
+	Loop Routes.Length
+		if !Routes.Has(A_Index)
+			throw ValueError("The terminal route registry contains a missing entry.")
+	StorageBytes := OriginalLoader.Call("route_storage_size", Routes.Length)
+	Bindings := Buffer(StorageBytes, 0)
+	Ids := Map()
+	Families := Map()
+	Selectors := Map()
+	for Index, Route in Routes {
+		if !Routes.Has(Index)
+			throw ValueError("The terminal route registry contains a missing entry.")
+		_LLM_NavEventOwnerTerminalRouteValidate(Route)
+		if Ids.Has(Route["route_id"])
+			throw ValueError("The terminal route registry repeats an identity.")
+		Ids[Route["route_id"]] := true
+		Family := Route["axis"] . "|" . Route["code"]
+		Transform := Route["kind"] == 4 || Route["kind"] == 5
+		if Families.Has(Family) && (Families[Family] || Transform)
+			throw ValueError("The terminal route registry overlaps a held transform.")
+		Families[Family] := Transform
+		Selector := Family . "|" . Route["required_modifiers"] . "|"
+			. Route["required_prefixes"] . "|" . Route["required_dead_key_id"]
+		if Selectors.Has(Selector)
+			throw ValueError("The terminal route registry repeats an event selector.")
+		Selectors[Selector] := true
+		Offset := (Index - 1) * 40
+		NumPut("UInt64", Route["recipe_id"], "UInt", Route["route_id"],
+			"UInt", Route["required_prefixes"], "UInt", Route["prefix_bit"],
+			"UInt", Route["required_dead_key_id"], "UInt", Route["next_dead_key_id"],
+			"UShort", Route["code"], "UShort", Route["target_vk"],
+			"UShort", Route["target_scan"], "UChar", Route["axis"],
+			"UChar", Route["kind"], "UChar", Route["required_modifiers"],
+			"UChar", Route["effective_modifiers_lr"], Bindings, Offset)
+	}
+	return Bindings
+}
+
+_LLM_NavEventOwnerTerminalRouteRead(BufferSource, Offset) {
+	Route := Map("recipe_id", NumGet(BufferSource, Offset, "UInt64"),
+		"route_id", NumGet(BufferSource, Offset + 8, "UInt"),
+		"required_prefixes", NumGet(BufferSource, Offset + 12, "UInt"),
+		"prefix_bit", NumGet(BufferSource, Offset + 16, "UInt"),
+		"required_dead_key_id", NumGet(BufferSource, Offset + 20, "UInt"),
+		"next_dead_key_id", NumGet(BufferSource, Offset + 24, "UInt"),
+		"code", NumGet(BufferSource, Offset + 28, "UShort"),
+		"target_vk", NumGet(BufferSource, Offset + 30, "UShort"),
+		"target_scan", NumGet(BufferSource, Offset + 32, "UShort"),
+		"axis", NumGet(BufferSource, Offset + 34, "UChar"),
+		"kind", NumGet(BufferSource, Offset + 35, "UChar"),
+		"required_modifiers", NumGet(BufferSource, Offset + 36, "UChar"),
+		"effective_modifiers_lr", NumGet(BufferSource, Offset + 37, "UChar"))
+	_LLM_NavEventOwnerTerminalRouteValidate(Route)
+	return Route
+}
+
+_LLM_NavEventOwnerTerminalRouteComposition(BufferSource, Offset) {
+	return Map("generation", NumGet(BufferSource, Offset, "UInt64"),
+		"layout_id", NumGet(BufferSource, Offset + 8, "UInt64"),
+		"dead_key_id", NumGet(BufferSource, Offset + 16, "UInt"))
+}
+
+/** Decodes the exact native FIFO metadata ABI without authorizing output. */
+_LLM_NavEventOwnerTerminalRouteDecode(Receipt, ExpectedToken := 0) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if !(Receipt is Buffer) || Receipt.Size != 184
+		throw ValueError("The terminal route receipt ABI size is invalid.")
+	Token := NumGet(Receipt, 0, "UInt64")
+	Sequence := NumGet(Receipt, 8, "UInt64")
+	Status := NumGet(Receipt, 64, "Int")
+	if Token <= 0 || Sequence <= 0 || (ExpectedToken != 0 && Token != ExpectedToken)
+			|| Status < -10 || Status > 2
+		throw ValueError("The terminal route receipt identity is invalid.")
+	Event := Map("timestamp", NumGet(Receipt, 120, "UInt64"),
+		"source_id", NumGet(Receipt, 128, "UInt64"),
+		"vk", NumGet(Receipt, 136, "UShort"), "scan", NumGet(Receipt, 138, "UShort"),
+		"origin", NumGet(Receipt, 140, "UChar"), "key_up", NumGet(Receipt, 141, "UChar"),
+		"repeat", NumGet(Receipt, 142, "UChar"))
+	if Event["timestamp"] < 0 || Event["source_id"] < 0
+			|| Event["vk"] > 255 || Event["scan"] > 511 || (!Event["vk"] && !Event["scan"])
+			|| Event["origin"] < 1 || Event["origin"] > 4
+			|| Event["key_up"] > 1 || Event["repeat"] > 1
+			|| (Event["key_up"] && Event["repeat"])
+		throw ValueError("The terminal route event provenance is invalid.")
+	Snapshot := Map("token", Token, "sequence", Sequence, "status", Status,
+		"owner", NumGet(Receipt, 16, "UInt64"),
+		"observed_generation", NumGet(Receipt, 24, "UInt64"),
+		"observed_layout_id", NumGet(Receipt, 32, "UInt64"),
+		"route_generation", NumGet(Receipt, 40, "UInt64"),
+		"route_layout_id", NumGet(Receipt, 48, "UInt64"),
+		"prefixes_before", NumGet(Receipt, 56, "UInt"),
+		"prefixes_after", NumGet(Receipt, 60, "UInt"),
+		"modifiers_lr_before", NumGet(Receipt, 68, "UChar"),
+		"modifiers_lr_after", NumGet(Receipt, 69, "UChar"),
+		"composition_before", _LLM_NavEventOwnerTerminalRouteComposition(Receipt, 72),
+		"composition_after", _LLM_NavEventOwnerTerminalRouteComposition(Receipt, 96),
+		"event", Event, "metadata_only", true,
+		"cohort_complete", false, "transformed_output_enabled", false)
+	for Name in ["owner", "observed_generation", "observed_layout_id",
+			"route_generation", "route_layout_id"]
+		if Snapshot[Name] < 0
+			throw ValueError("The terminal route registration identity overflowed.")
+	for Name in ["composition_before", "composition_after"] {
+		Composition := Snapshot[Name]
+		if Composition["generation"] < 0 || Composition["layout_id"] < 0
+				|| (Composition["dead_key_id"] == 0
+					&& (Composition["generation"] != 0 || Composition["layout_id"] != 0))
+				|| (Composition["dead_key_id"] != 0
+					&& (Composition["generation"] <= 0 || Composition["layout_id"] <= 0))
+			throw ValueError("The terminal route composition ownership is invalid.")
+	}
+	RecipeId := NumGet(Receipt, 144, "UInt64")
+	if Status == 0 || RecipeId != 0 {
+		if Snapshot["owner"] <= 0 || Snapshot["route_generation"] <= 0
+				|| Snapshot["route_layout_id"] <= 0
+				|| Snapshot["observed_generation"] < Snapshot["route_generation"]
+				|| (Status == 0 && Event["origin"] > 2) || Status == 1
+			throw ValueError("The terminal route admission ownership is invalid.")
+		Snapshot["route"] := _LLM_NavEventOwnerTerminalRouteRead(Receipt, 144)
+	} else
+		Snapshot["route"] := 0
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original historical metadata owner was withdrawn.")
+	; A derived stamp binds decoded diagnostic copies to one admitted lifetime.
+	Snapshot["admission_stamp"] := OriginalLoader.Call("stamp_historical", Snapshot)
+	return Snapshot
+}
+
+/** Peeks one zero-based FIFO metadata entry without consuming native ACK debt. */
+LLM_NavEventOwner_PeekTerminalRoute(Token, Index, Port := 0) {
+	if !(Token is Integer) || Token <= 0 || !(Index is Integer) || Index < 0
+		throw ValueError("A terminal route token and zero-based index are required.")
+	Receipt := Buffer(184, 0)
+	Fn := _LLM_NavEventOwnerPortFn("peek_terminal_route", Port)
+	Status := HasMethod(Fn, "Call") ? Fn.Call(Token, Index, Receipt)
+		: _LLM_NavEventOwnerNativePeekTerminalRoute(Token, Index, Receipt)
+	if !(Status is Integer)
+		throw Error("Terminal route peek returned a malformed ACK.")
+	if Status == 4 || Status == 8
+		return 0
+	_LLM_NavEventOwnerNativeRequireOk(Status, "Terminal route metadata peek")
+	return _LLM_NavEventOwnerTerminalRouteDecode(Receipt, Token)
+}
+
+/**
+ * Resolves admitted metadata through its original retained canonical graph row.
+ * @param {Map} Snapshot - Decoded FIFO receipt while its queue or hold still owns
+ *   the recipe. Retired diagnostic copies intentionally lose stepping permission.
+ * @param {String} State - Explicit neutral composition state of this subset.
+ * @returns {Map} Canonical diagnostic Next/Output, never a delivery permission.
+ */
+LLM_NavEventOwner_StepTerminalRoute(Snapshot, State) {
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original historical row owner was withdrawn.")
+	Step := OriginalLoader.Call("step_historical", Map("snapshot", Snapshot, "state", State))
+	return Map("Next", Step["Next"], "Output", Step["Output"],
+		"metadata_only", true, "cohort_complete", false, "transformed_output_enabled", false)
+}
+
+_LLM_NavEventOwnerNativeRegisterTerminalRoutes(Owner, Generation, LayoutId, Bindings, Count,
+		NativeOperation := unset) {
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+		throw Error("Native terminal registration cannot cross stop admission.")
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original native registration constructor was withdrawn.")
+	if !OriginalLoader.Call("allows_native_admission")
+		throw Error("Native terminal registration cannot cross private stop admission.")
+	if !(Owner is Integer) || Owner <= 0 || !(Generation is Integer) || Generation <= 0
+			|| !(LayoutId is Integer) || LayoutId <= 0 || !(Bindings is Buffer)
+			|| Bindings.Size != OriginalLoader.Call("route_storage_size", Count)
+		throw ValueError("The terminal route native registration ABI is invalid.")
+	if IsSet(NativeOperation)
+		return NativeOperation.Call(Owner, Generation, LayoutId, Bindings, Count)
+	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_RegisterTerminalRoutes"),
+		"UInt64", Owner, "UInt64", Generation, "UInt64", LayoutId,
+		"Ptr", Bindings, "UInt", Count, "Int")
+}
+
+_LLM_NavEventOwnerNativeListTerminalHeldRecipes(Owner, Ids, Capacity) {
+	if !(Owner is Integer) || Owner <= 0 || !(Capacity is Integer)
+			|| Capacity < 0 || Capacity > 64 || !(Ids is Buffer) || Ids.Size != Capacity * 8
+		throw ValueError("The held terminal recipe output buffer is invalid.")
+	Count := 0
+	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_ListTerminalHeldRecipes"),
+		"UInt64", Owner, "Ptr", Ids.Ptr, "UInt", Capacity, "UInt*", &Count, "Int")
+	return Map("status", Status, "count", Count)
+}
+
+_LLM_NavEventOwnerNativePeekTerminalRoute(Token, Index, Receipt) {
+	return DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_PeekTerminalRoute"),
+		"UInt64", Token, "UInt", Index, "Ptr", Receipt, "Int")
+}
+
 ; Native adapter functions are implemented below the domain-facing bridge so
 ; unit tests can replace each boundary through a Map port without loading the
 ; DLL or installing a hook.
 _LLM_NavEventOwnerNativeStart(Hwnd, WakeMessage) {
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	static OriginalLoader := _LLM_NavEventOwnerNativeEnsureLoaded
+	if _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+		throw Error("Native start cannot cross stop admission.")
+	if _LLM_NavEventOwnerNativeEnsureLoaded != OriginalLoader
+			|| Object.Prototype.HasOwnProp.Call(OriginalLoader, "Call")
+		throw Error("The original native start constructor was withdrawn.")
+	if !OriginalLoader.Call("allows_native_admission")
+		throw Error("Native start cannot cross private stop admission.")
 	_LLM_NavEventOwnerNativeEnsureLoaded()
 	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Start"),
 		"UInt64", Hwnd, "UInt", WakeMessage, "Int")
-	if Status != 0 {
-		DllCall(_LLM_NavEventOwnerNativeExport(
-			"ErgoptiNav_Stop"), "Int")
-	}
-	_LLM_NavEventOwnerNativeRequireOk(Status,
+	; Read the original Win32 error before Stop resets native semantic state.
+	try _LLM_NavEventOwnerNativeRequireOk(Status,
 		"Navigation owner start")
+	catch as StartError {
+		try DllCall(_LLM_NavEventOwnerNativeExport(
+			"ErgoptiNav_Stop"), "Int")
+		catch as CleanupError {
+			StartError.NativeCleanupError := CleanupError
+			StartError.Message .= "; native stop cleanup failed: " . CleanupError.Message
+		}
+		throw StartError
+	}
+	if !LLM_NavEventOwner_RefreshTerminalRoutes()
+		throw Error("Terminal route metadata registration was not admitted at startup.")
 	return 1
 }
 
-_LLM_NavEventOwnerNativeStop() {
+_LLM_NavEventOwnerNativeStop(NativeOperation := unset) {
 	global _LLM_NavEventOwnerModule
 	if !_LLM_NavEventOwnerModule
 		return 1
-	Status := DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop"),
-		"Int")
+	Status := IsSet(NativeOperation) ? NativeOperation.Call()
+		: DllCall(_LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop"), "Int")
 	if Status == 9
 		return Map("stopped", false, "pending", true)
 	if Status == 10 {
@@ -2349,7 +3667,27 @@ _LLM_NavEventOwnerNativeCanStop() {
 	return CanStop == 1 ? 1 : 0
 }
 
+/**
+ * Admits native capture for one terminal hotstring transaction.
+ * Admission runs synchronously inside the completing key's OnChar callback, so it
+ * must stay a constant-time native call. It deliberately does not refresh the
+ * terminal routes: a custody-checked registration rebuild re-validates the whole
+ * canonical layout source and cost 300 ms to 900 ms per expansion, long enough
+ * for keys typed meanwhile to interleave with the paced output. Captured edges
+ * are replayed untransformed, so no hotstring transaction reads those routes;
+ * Start registers them, and a future route reader owns refreshing them off the
+ * keystroke path.
+ * @param {Integer} Token Terminal transaction identity.
+ * @returns {Integer} 1 when admitted, 0 when the owner is busy or registering.
+ */
 _LLM_NavEventOwnerNativeBeginTerminalCapture(Token) {
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	; A registration in progress or of uncertain native custody still refuses the
+	; capture, exactly as the former inline refresh did.
+	if _LLM_NavEventOwnerTerminalRouteRefreshing
+		return 0
+	if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+		throw Error("Uncertain terminal registration retains its original native owner.")
 	Status := DllCall(_LLM_NavEventOwnerNativeExport(
 		"ErgoptiNav_BeginTerminalCapture"), "UInt64", Token, "Int")
 	if Status == 5
@@ -2683,61 +4021,900 @@ _LLM_NavEventOwnerNativeTestDispatch(Event) {
 		"seq", NumGet(Result, 4, "UInt64"))
 }
 
-_LLM_NavEventOwnerNativeEnsureLoaded() {
+_LLM_NavEventOwnerNativeEnsureLoaded(Request := "load", Payload := 0) {
 	global _LLM_NavEventOwnerModule, _LLM_NavEventOwnerExports, _VendorDir
+	global _LLM_NavEventOwnerRuntimeEpoch, _LLM_NavEventOwnerStarting
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	global _LLM_NavEventOwnerTerminalRouteGeneration, _LLM_NavEventOwnerTerminalRouteNextRecipe
+	global _LLM_NavEventOwnerTerminalRouteNextLayout, _LLM_NavEventOwnerTerminalRouteCoverage
+	global _LLM_NavEventOwnerTerminalRouteRecipes, _LLM_NavEventOwnerTerminalRouteModels
+	global _LLM_NavEventOwnerTerminalRouteOwner, KEYLAYOUT_NEUTRAL_STATE
+	static IssuedModule := 0, IssuedExports := 0, OriginalExports := 0
+	static ActiveFrame := 0, RetainedFrame := 0, ActiveStop := 0, Constructing := false
+	static Scopes := Map(), NativeRegistrationDebt := false
+	static HistoricalRows := Map(), HighestNativeRecipe := 0
+	static NativeRegistrationSerial := 0, NextHistoricalStamp := 0
+	static OriginalHistoricalValidate := _LLM_NavEventOwnerTerminalRouteValidate
+	static OriginalDigitCapture := _LLM_NavEventOwnerCaptureDigitSource
+	static OriginalCandidateCapture := _LLM_NavEventOwnerCaptureTerminalCandidate
+	static OriginalCanonicalCapture := KeylayoutEmulation_CaptureCanonicalSource
+	static OriginalCanonicalOwner := _KLE_CanonicalSourceOwner
+	static CanonicalCall := Func.Prototype.Call
+	static OriginalOwners := [
+		_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
+		_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
+		_LLM_NavEventOwnerNativeStart,
+		_LLM_NavEventOwnerNativeRequireOk, _LLM_NavEventOwnerPortFn,
+		_LLM_NavEventOwnerTerminalRegistrationCapture, _LLM_NavEventOwnerTerminalRegistrationRetain,
+		_LLM_NavEventOwnerTerminalRegistrationPlainMap, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationUnknown,
+		_LLM_NavEventOwnerTerminalRegistrationRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent, _LLM_NavEventOwnerTerminalRegistrationBytesCurrent,
+		_LLM_NavEventOwnerTerminalRegistrationStatusKnown, _LLM_NavEventOwnerTerminalRoutePrune,
+		_LLM_NavEventOwnerTerminalRegistrationAdvance, _LLM_NavEventOwnerTerminalRouteBuild,
+		_LLM_NavEventOwnerTerminalRouteMarshal,
+		_LLM_NavEventOwnerTerminalRouteSource, _LLM_NavEventOwnerTerminalRouteValidate,
+		_LLM_NavEventOwnerTerminalRouteNextRecipeId, _LLM_NavEventOwnerTerminalRouteDescriptor,
+		_LLM_NavEventOwnerTerminalRouteLayoutId, Keylayout_Resolve,
+		_LLM_NavEventOwnerNativeListTerminalHeldRecipes,
+		LLM_NavEventOwner_RefreshTerminalRoutes, LLM_NavEventOwner_Stop]
+
+	OwnersCurrent() {
+		Current := [_LLM_NavEventOwnerNativeEnsureLoaded, _LLM_NavEventOwnerNativeExport,
+			_LLM_NavEventOwnerNativeRegisterTerminalRoutes, _LLM_NavEventOwnerNativeStop,
+			_LLM_NavEventOwnerNativeStart,
+			_LLM_NavEventOwnerNativeRequireOk, _LLM_NavEventOwnerPortFn,
+			_LLM_NavEventOwnerTerminalRegistrationCapture, _LLM_NavEventOwnerTerminalRegistrationRetain,
+			_LLM_NavEventOwnerTerminalRegistrationPlainMap, _LLM_NavEventOwnerTerminalRegistrationCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationRequire, _LLM_NavEventOwnerTerminalRegistrationUnknown,
+			_LLM_NavEventOwnerTerminalRegistrationRefsCurrent, _LLM_NavEventOwnerTerminalRegistrationObjectsCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationBuildModelsCurrent, _LLM_NavEventOwnerTerminalRegistrationBytesCurrent,
+			_LLM_NavEventOwnerTerminalRegistrationStatusKnown, _LLM_NavEventOwnerTerminalRoutePrune,
+			_LLM_NavEventOwnerTerminalRegistrationAdvance, _LLM_NavEventOwnerTerminalRouteBuild,
+			_LLM_NavEventOwnerTerminalRouteMarshal,
+			_LLM_NavEventOwnerTerminalRouteSource, _LLM_NavEventOwnerTerminalRouteValidate,
+			_LLM_NavEventOwnerTerminalRouteNextRecipeId, _LLM_NavEventOwnerTerminalRouteDescriptor,
+			_LLM_NavEventOwnerTerminalRouteLayoutId, Keylayout_Resolve,
+			_LLM_NavEventOwnerNativeListTerminalHeldRecipes,
+			LLM_NavEventOwner_RefreshTerminalRoutes, LLM_NavEventOwner_Stop]
+		for Index, Owner in OriginalOwners
+			if Owner != Current[Index] || !(Owner is Func)
+					|| Object.Prototype.HasOwnProp.Call(Owner, "Call")
+				return false
+		return true
+	}
+
+	PlainMap(Value) {
+		if !(Value is Map) || ObjGetBase(Value) != Map.Prototype
+			return false
+		for Name in ObjOwnProps(Value)
+			return false
+		return true
+	}
+
+	EpochCurrent(Value) {
+		return Value is Integer && Value >= 0 && _LLM_NavEventOwnerRuntimeEpoch is Integer
+			&& _LLM_NavEventOwnerRuntimeEpoch >= 0 && Value == _LLM_NavEventOwnerRuntimeEpoch
+	}
+
+	ExportsCurrent() {
+		if !OwnersCurrent() || !(IssuedModule is Integer) || IssuedModule <= 0
+				|| !(_LLM_NavEventOwnerModule is Integer) || _LLM_NavEventOwnerModule <= 0
+				|| _LLM_NavEventOwnerModule != IssuedModule
+				|| !PlainMap(IssuedExports) || _LLM_NavEventOwnerExports != IssuedExports
+			return false
+		if IssuedExports.Count != OriginalExports.Count || IssuedExports.CaseSense != OriginalExports.CaseSense
+			return false
+		for Name, Address in OriginalExports
+			if !(Address is Integer) || Address <= 0 || !IssuedExports.Has(Name)
+					|| !(IssuedExports[Name] is Integer) || IssuedExports[Name] != Address
+				return false
+		return true
+	}
+
+	CountersCurrent(State) {
+		return _LLM_NavEventOwnerTerminalRouteGeneration is Integer
+			&& _LLM_NavEventOwnerTerminalRouteGeneration >= State.Generation
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextRecipe >= State.NextRecipe
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout is Integer
+			&& _LLM_NavEventOwnerTerminalRouteNextLayout >= State.NextLayout
+	}
+
+	FrameNativeCurrent(State) {
+		return IsObject(State) && State.Genuine && ExportsCurrent()
+			&& State.Module is Integer && State.Module > 0 && State.Module == IssuedModule
+			&& State.Exports == IssuedExports && EpochCurrent(State.Epoch) && CountersCurrent(State)
+	}
+
+	RequiresNativeReceipt(State) {
+		return State.Genuine || State.Module > 0 || IssuedModule > 0
+	}
+
+	FrameCustodyCurrent(State) {
+		if !IsObject(State)
+			return false
+		; Unissued controlled ports own no C lifetime. Their validated Stop ACK
+		; retires local references even after a source invalidated its old epoch.
+		if !RequiresNativeReceipt(State)
+			return State.Module is Integer && State.Module == 0
+				&& State.Exports is Integer && State.Exports == 0
+		if !EpochCurrent(State.Epoch) || !CountersCurrent(State)
+			return false
+		if State.Genuine
+			return FrameNativeCurrent(State)
+		return State.Module is Integer && State.Module >= 0
+			&& (State.Module == 0 ? State.Exports is Integer && State.Exports == 0
+				: ExportsCurrent() && State.Module == IssuedModule && State.Exports == IssuedExports)
+	}
+
+	ScopeCurrent(Operations) {
+		if !PlainMap(Operations) || !Scopes.Has(Operations)
+			return false
+		Image := Scopes[Operations].Image
+		if Operations.Count != Image.Count || Operations.CaseSense != Image.CaseSense
+			return false
+		for Name, Value in Image {
+			if !Operations.Has(Name) || Type(Operations[Name]) != Type(Value) || Operations[Name] != Value
+				return false
+			if Name != "frame" && (!(Value is Func) || Object.Prototype.HasOwnProp.Call(Value, "Call"))
+				return false
+		}
+		return true
+	}
+
+
+
+	StampHistorical(Snapshot) {
+		if !OwnersCurrent() || !PlainMap(Snapshot)
+			throw ValueError("The historical metadata owner was withdrawn.")
+		Route := Snapshot.Get("route", 0)
+		if Snapshot.Get("status", -1) != 0 || !PlainMap(Route)
+				|| !PlainMap(_LLM_NavEventOwnerTerminalRouteRecipes)
+				|| !HistoricalRows.Has(_LLM_NavEventOwnerTerminalRouteRecipes)
+			return 0
+		Registry := HistoricalRows[_LLM_NavEventOwnerTerminalRouteRecipes]
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || !Registry.Records.Has(Id)
+			return 0
+		Record := Registry.Records[Id]
+		if !Record.CommitCell.Committed || !EpochCurrent(Record.Epoch)
+				|| Record.Owner != _LLM_NavEventOwnerTerminalRouteOwner || Snapshot.Get("owner", 0) != Record.Owner
+				|| Snapshot.Get("route_generation", 0) != Record.Generation || Snapshot.Get("route_layout_id", 0) != Record.Layout
+				|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id) || _LLM_NavEventOwnerTerminalRouteRecipes[Id] != Record.Admission
+				|| (Record.NativeCustody && !ExportsCurrent())
+				|| Object.Prototype.HasOwnProp.Call(Record.Guard, "Call") || !Record.Guard.Call()
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Route, Record.Descriptor)
+			return 0
+		return Record.Stamp
+	}
+
+	HistoricalStep(Payload) {
+		if !OwnersCurrent() || !PlainMap(Payload) || !PlainMap(Payload.Get("snapshot", 0))
+			throw ValueError("The historical terminal step has no original owner.")
+		Snapshot := Payload["snapshot"], State := Payload.Get("state", 0)
+		if !(State is String) || State != KEYLAYOUT_NEUTRAL_STATE
+				|| !(Snapshot.Get("status", -1) is Integer) || Snapshot["status"] != 0
+				|| !PlainMap(Snapshot.Get("event", 0)) || !PlainMap(Snapshot.Get("composition_before", 0))
+				|| !(Snapshot["composition_before"].Get("dead_key_id", -1) is Integer)
+				|| Snapshot["composition_before"]["dead_key_id"] != 0
+			throw ValueError("The terminal recipe is outside the admitted neutral subset.")
+		for Name in ["owner", "route_generation", "route_layout_id", "status"]
+			if !Snapshot.Has(Name) || !(Snapshot[Name] is Integer)
+				throw ValueError("The terminal recipe receipt has an invalid typed identity.")
+		Event := Snapshot["event"]
+		for Name in ["origin", "key_up", "repeat", "vk", "scan"]
+			if !Event.Has(Name) || !(Event[Name] is Integer)
+				throw ValueError("The terminal recipe event is malformed.")
+		if Event["origin"] < 1 || Event["origin"] > 2 || Event["key_up"] != 0
+				|| Event["repeat"] < 0 || Event["repeat"] > 1
+			throw ValueError("The terminal recipe event provenance is unsupported.")
+		Route := Snapshot.Get("route", 0)
+		if !PlainMap(Route) || _LLM_NavEventOwnerTerminalRouteValidate != OriginalHistoricalValidate
+				|| Object.Prototype.HasOwnProp.Call(OriginalHistoricalValidate, "Call")
+			throw ValueError("The original terminal descriptor validator was withdrawn.")
+		OriginalHistoricalValidate.Call(Route)
+		if (Route["axis"] == 2 && Event["scan"] != Route["code"])
+				|| (Route["axis"] == 1 && Event["vk"] != Route["code"])
+			throw ValueError("The terminal recipe no longer describes its captured key.")
+		if !PlainMap(Route) || !PlainMap(_LLM_NavEventOwnerTerminalRouteRecipes)
+				|| !HistoricalRows.Has(_LLM_NavEventOwnerTerminalRouteRecipes)
+			throw ValueError("The historical terminal dictionary was not issued.")
+		Registry := HistoricalRows[_LLM_NavEventOwnerTerminalRouteRecipes]
+		Id := Route.Get("recipe_id", 0)
+		if !(Id is Integer) || !Registry.Records.Has(Id)
+			throw ValueError("The historical terminal row is not retained.")
+		Record := Registry.Records[Id]
+		if !(Snapshot.Get("admission_stamp", 0) is Integer) || Snapshot["admission_stamp"] != Record.Stamp
+				|| !Record.CommitCell.Committed || !EpochCurrent(Record.Epoch) || Record.Owner != _LLM_NavEventOwnerTerminalRouteOwner
+				|| Snapshot.Get("owner", 0) != Record.Owner || Snapshot.Get("route_generation", 0) != Record.Generation
+				|| Snapshot.Get("route_layout_id", 0) != Record.Layout || Payload.Get("state", 0) != Record.Neutral
+				|| !PlainMap(_LLM_NavEventOwnerTerminalRouteModels) || Registry.Models != _LLM_NavEventOwnerTerminalRouteModels
+				|| !_LLM_NavEventOwnerTerminalRouteRecipes.Has(Id)
+				|| _LLM_NavEventOwnerTerminalRouteRecipes[Id] != Record.Admission
+				|| !PlainMap(Record.Row) || (Record.NativeCustody && !ExportsCurrent())
+				|| Object.Prototype.HasOwnProp.Call(Record.Guard, "Call") || !Record.Guard.Call()
+				|| !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Route, Record.Descriptor)
+			throw ValueError("The historical terminal admission was withdrawn.")
+		return Map("Next", Record.Neutral, "Output", Record.Row["output"])
+	}
+
+	HistoricalCustodyCurrent(Frame) {
+		if !NativeRegistrationDebt
+			return true
+		if !ExportsCurrent() || Frame["next_recipe"] < HighestNativeRecipe
+			return false
+		for Dictionary, Registry in HistoricalRows
+			for Id, Record in Registry.Records
+				if Record.NativeCustody && (Dictionary != Frame["recipes"] || Registry.Models != Frame["models"]
+						|| !EpochCurrent(Record.Epoch) || Frame["owner"] != Record.Owner
+						|| Frame["generation"] < Record.Generation || Frame["next_layout"] < Record.Layout)
+					return false
+		return true
+	}
+
+	; Native start registers the terminal routes after ErgoptiNav_Start but before
+	; Start publishes its runtime epoch. Those rows belong to the lifetime being
+	; published, so they move with it; every other epoch change is a Stop, which
+	; retires all rows. Without this, the first capture after a start reads its
+	; own startup rows as a withdrawn historical owner.
+	PublishStartEpoch(Payload) {
+		if !OwnersCurrent() || !A_IsCritical || !_LLM_NavEventOwnerStarting
+				|| _LLM_NavEventOwnerStopping || _LLM_NavEventOwnerStopPending
+				|| _LLM_NavEventOwnerTerminalRouteRefreshing || Constructing
+				|| IsObject(ActiveFrame) || IsObject(RetainedFrame) || IsObject(ActiveStop)
+				|| IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+			throw Error("The start epoch cannot be published over an open registration.")
+		if !PlainMap(Payload) || !(Payload.Get("from", "") is Integer) || !(Payload.Get("to", "") is Integer)
+				|| Payload["from"] < 0 || Payload["to"] != Payload["from"] + 1 || !EpochCurrent(Payload["to"])
+			throw ValueError("The published start epoch is invalid.")
+		for Dictionary, Registry in HistoricalRows
+			for Id, Record in Registry.Records
+				if Record.Epoch == Payload["from"]
+					Record.Epoch := Payload["to"]
+		return true
+	}
+
+	CanonicalOwnersCurrent() {
+		; Source admission is deliberately separate from native retirement custody.
+		for Pair in [[OriginalCanonicalCapture, KeylayoutEmulation_CaptureCanonicalSource],
+			[OriginalCanonicalOwner, _KLE_CanonicalSourceOwner], [CanonicalCall, Func.Prototype.Call]]
+			if !(Pair[1] is Func) || Pair[1] != Pair[2]
+					|| Object.Prototype.HasOwnProp.Call(Pair[1], "Call")
+				return false
+		return true
+	}
+
+	CanonicalCurrent(State) {
+		if !CanonicalOwnersCurrent() || !IsObject(State) || !PlainMap(State.CanonicalSource)
+			return false
+		Guard := State.CanonicalSource.Get("current", 0)
+		return Guard is BoundFunc && !Object.Prototype.HasOwnProp.Call(Guard, "Call")
+			&& CanonicalCall.Call(Guard) && CanonicalOwnersCurrent()
+	}
+
+	BuildFrame() {
+		if Constructing || !OwnersCurrent() || !A_IsCritical
+				|| !_LLM_NavEventOwnerTerminalRouteRefreshing || _LLM_NavEventOwnerStopping
+				|| _LLM_NavEventOwnerStopPending || IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+				|| IsObject(ActiveFrame) || IsObject(RetainedFrame) || IsObject(ActiveStop)
+			throw Error("The native registration scope cannot be issued.")
+		Constructing := true
+		try {
+			if !CanonicalOwnersCurrent()
+				throw Error("The original canonical source capture owner was withdrawn.")
+			; Capture even the inactive cell before any borrowed registration callout.
+			CanonicalSource := CanonicalCall.Call(OriginalCanonicalCapture)
+			if !CanonicalOwnersCurrent() || !PlainMap(CanonicalSource)
+				throw Error("The original canonical source capture was not issued.")
+			; Capture is invoked here, after the original-callable guard, never supplied.
+			if !OwnersCurrent()
+				throw Error("The original registration capture owner was withdrawn.")
+			Frame := _LLM_NavEventOwnerTerminalRegistrationCapture()
+			if !OwnersCurrent() || !PlainMap(Frame) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
+				throw Error("The original registration capture is invalid.")
+			if !HistoricalCustodyCurrent(Frame)
+				throw Error("The retained historical native owner was withdrawn.")
+			CapturedNative := ExportsCurrent()
+			State := {DigitTried: false, DigitCaptured: false, DigitCell: 0, DigitGuard: 0, DigitModeGuard: 0,
+				CandidateTried: false, CandidateCell: 0, CandidateGuard: 0,
+				NativeSerial: NativeRegistrationSerial,
+				CanonicalSource: CanonicalSource, RecordSet: Map(), CommitCell: {Committed: false}, HeldTried: false,
+				HeldAuthentic: false, HeldKeep: 0, Pruned: false,
+				Frame: Frame, Epoch: _LLM_NavEventOwnerRuntimeEpoch,
+				Recipes: Frame["recipes"], Models: Frame["models"], Mode: "unselected",
+				Genuine: false, Uncertain: false, Completed: false, Raw: "unobserved", Closed: false, Operations: 0,
+				Module: CapturedNative ? IssuedModule : 0, Exports: CapturedNative ? IssuedExports : 0,
+				Generation: Frame["generation"], NextRecipe: Frame["next_recipe"], NextLayout: Frame["next_layout"]}
+			if !CanonicalCurrent(State)
+				throw Error("The original canonical source changed during frame issuance.")
+			Operations := Map("capture_digit_source", CaptureDigitSource, "seal_candidate", SealCandidate,
+				"frame", Frame, "guard", GuardFrame, "custom", CustomRegistration,
+				"native", NativeRegistration, "held", QueryFrameHeld, "protected", ProtectedHistorical,
+				"prune", PrepareHistoricalPrune, "complete", CompleteFrame, "close", CloseFrame)
+			Image := Operations.Clone()
+			Scopes[Operations] := {Image: Image, Close: CloseFrame}
+			State.Operations := Operations
+			; All closure/image allocation succeeds before the active identity publishes.
+			ActiveFrame := State
+			return Operations
+		} finally Constructing := false
+
+		GuardFrame() {
+			if ActiveFrame != State || State.Closed || !OwnersCurrent() || !ScopeCurrent(State.Operations)
+				throw Error("The original registration dispatcher was withdrawn.")
+			if !CanonicalCurrent(State) {
+				if State.Mode != "unselected" || Frame["native_attempted"]
+					State.Uncertain := true
+				throw Error("The original canonical source changed during registration.")
+			}
+			if State.DigitCaptured && !DigitCurrent(State, false) {
+				if State.Mode != "unselected" || Frame["native_attempted"]
+					State.Uncertain := true
+				throw Error("The original direct-digit source changed during registration.")
+			}
+		}
+
+		CaptureDigitSource() {
+			GuardFrame()
+			if State.DigitTried
+				throw Error("The registration frame already attempted source capture.")
+			State.DigitTried := true
+			if _LLM_NavEventOwnerCaptureDigitSource != OriginalDigitCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalDigitCapture, "Call")
+				throw Error("The original direct-digit capture helper was withdrawn.")
+			Issued := OriginalDigitCapture.Call()
+			GuardFrame()
+			if _LLM_NavEventOwnerCaptureDigitSource != OriginalDigitCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalDigitCapture, "Call")
+					|| !PlainMap(Issued) || Issued.Count != 3
+					|| !PlainMap(Issued.Get("source", 0))
+					|| !(Issued.Get("current", 0) is BoundFunc)
+					|| Object.Prototype.HasOwnProp.Call(Issued["current"], "Call")
+					|| !(Issued.Get("mode_current", 0) is BoundFunc)
+					|| Object.Prototype.HasOwnProp.Call(Issued["mode_current"], "Call")
+				throw Error("The original direct-digit source capture was not issued.")
+			; Private witnesses publish together only after complete pure capture.
+			State.DigitCell := Issued["source"], State.DigitGuard := Issued["current"]
+			State.DigitModeGuard := Issued["mode_current"]
+			if !State.DigitModeGuard.Call()
+				throw Error("The direct-digit source changed before issuance.")
+			GuardFrame()
+			Frame["digit_source"] := State.DigitCell
+			State.DigitCaptured := true
+			return State.DigitCell
+		}
+
+		SealCandidate() {
+			GuardFrame()
+			if !State.DigitCaptured || State.CandidateTried || State.Mode != "unselected"
+				throw Error("The original candidate witness cannot be issued twice.")
+			State.CandidateTried := true
+			if _LLM_NavEventOwnerCaptureTerminalCandidate != OriginalCandidateCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
+				throw Error("The original candidate witness constructor was withdrawn.")
+			Candidate := Frame["candidate"]
+			Witness := OriginalCandidateCapture.Call(Candidate, State.DigitCell, State.CanonicalSource)
+			GuardFrame()
+			if _LLM_NavEventOwnerCaptureTerminalCandidate != OriginalCandidateCapture
+					|| Object.Prototype.HasOwnProp.Call(OriginalCandidateCapture, "Call")
+					|| !(Witness is BoundFunc) || Object.Prototype.HasOwnProp.Call(Witness, "Call")
+					|| !Witness.Call()
+				throw Error("The original terminal candidate changed before witness issuance.")
+			State.CandidateCell := Candidate, State.CandidateGuard := Witness
+			Registry := HistoricalRows.Has(State.Recipes) ? HistoricalRows[State.Recipes] : 0
+			for Id, Admission in Candidate["recipes"] {
+				if (IsObject(Registry) && Id <= Registry.Highest) || (NativeRegistrationDebt && Id <= HighestNativeRecipe)
+					throw ValueError("A historical terminal recipe identity cannot be reissued.")
+				Recipe := Admission["recipe"], Row := 0, Model := 0
+				if Recipe is Map {
+					Row := CanonicalCall.Call(State.CanonicalSource["read"], "find", KEYLAYOUT_NEUTRAL_STATE,
+						Recipe["scan"], Admission["route"]["required_modifiers"] == 4 ? 1 : 0)
+					Model := Recipe["model"]
+				}
+				NextHistoricalStamp += 1
+				if NextHistoricalStamp <= 0
+					throw Error("The historical admission stamp overflowed.")
+				State.RecordSet[Id] := {Stamp: NextHistoricalStamp, NativeCustody: false, Admission: Admission, Descriptor: Admission["route"].Clone(),
+					Guard: Witness, CommitCell: State.CommitCell, Row: Row, Model: Model, Neutral: KEYLAYOUT_NEUTRAL_STATE,
+					Epoch: State.Epoch, Owner: Frame["owner"], Generation: Admission["generation"],
+					Layout: Admission["layout_id"], Genuine: false}
+			}
+			GuardFrame()
+			if !Witness.Call()
+				throw Error("The candidate changed during historical row capture.")
+			return true
+		}
+
+		CustomRegistration() {
+			GuardFrame()
+			if !State.DigitCaptured || !(State.CandidateGuard is BoundFunc) || State.Mode != "unselected"
+				throw Error("The registration scope already selected its boundary or lacks source capture.")
+			State.Mode := "custom"
+		}
+
+		NativeRegistration(Owner, Generation, LayoutId, Bindings, Count) {
+			GuardFrame()
+			if !State.DigitCaptured || !(State.CandidateGuard is BoundFunc)
+					|| State.Mode != "unselected" || !EpochCurrent(State.Epoch)
+					|| !_LLM_NavEventOwnerTerminalRouteRefreshing
+				throw Error("The original native registration scope was withdrawn.")
+			State.Mode := "default"
+			; Never repair or downgrade a revoked genuine issuance through public exports.
+			if IssuedModule && !ExportsCurrent()
+				throw Error("The issued native registration export image was withdrawn.")
+			if !OwnersCurrent()
+				throw Error("The original native loader owner was withdrawn.")
+			_LLM_NavEventOwnerNativeEnsureLoaded()
+			GenuineCall := ExportsCurrent()
+			if GenuineCall {
+				State.Module := IssuedModule, State.Exports := IssuedExports
+				if !(_LLM_NavEventOwnerTerminalRouteGeneration is Integer)
+						|| !(_LLM_NavEventOwnerTerminalRouteNextRecipe is Integer)
+						|| !(_LLM_NavEventOwnerTerminalRouteNextLayout is Integer)
+					throw Error("The native registration counter owners are invalid.")
+				State.Generation := _LLM_NavEventOwnerTerminalRouteGeneration
+				State.NextRecipe := _LLM_NavEventOwnerTerminalRouteNextRecipe
+				State.NextLayout := _LLM_NavEventOwnerTerminalRouteNextLayout
+				Address := OriginalExports["ErgoptiNav_RegisterTerminalRoutes"]
+			} else {
+				if IssuedModule || !OwnersCurrent()
+					throw Error("The issued native registration export image changed.")
+				Address := _LLM_NavEventOwnerNativeExport("ErgoptiNav_RegisterTerminalRoutes")
+			}
+			if !EpochCurrent(State.Epoch) || (IssuedModule && !ExportsCurrent())
+				throw Error("The registration lifetime changed before its native call.")
+			GuardFrame()
+			State.Genuine := GenuineCall
+			if GenuineCall {
+				NativeRegistrationDebt := true
+				NativeRegistrationSerial += 1
+				if NativeRegistrationSerial <= 0
+					throw Error("The native registration serial overflowed.")
+				for Id in State.RecordSet
+					HighestNativeRecipe := Max(HighestNativeRecipe, Id)
+			}
+			State.Raw := DllCall(Address, "UInt64", Owner, "UInt64", Generation,
+				"UInt64", LayoutId, "Ptr", Bindings, "UInt", Count, "Int")
+			return State.Raw
+		}
+
+		CompleteFrame() {
+			GuardFrame()
+			if !EpochCurrent(State.Epoch) || IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+					|| (State.Genuine && (!(State.Raw is Integer) || State.Raw != 0))
+				throw Error("The registration scope cannot certify its final closure.")
+			if !HistoricalRows.Has(State.Recipes)
+				HistoricalRows[State.Recipes] := {Records: Map(), Models: State.Models, Highest: 0}
+			Registry := HistoricalRows[State.Recipes]
+			if Registry.Models != State.Models
+				throw ValueError("The historical model dictionary was replaced.")
+			for Id, Record in State.RecordSet {
+				if Id <= Registry.Highest
+					throw ValueError("A retired historical row cannot be admitted again.")
+				Record.Genuine := State.Genuine
+				Record.NativeCustody := State.Genuine || NativeRegistrationDebt
+				if Record.NativeCustody
+					HighestNativeRecipe := Max(HighestNativeRecipe, Id)
+				Registry.Records[Id] := Record
+				Registry.Highest := Id
+			}
+			State.Completed := true
+			State.CommitCell.Committed := true
+		}
+
+
+		QueryFrameHeld(OutputBuffer) {
+			GuardFrame()
+			if !A_IsCritical || State.HeldTried || !(OutputBuffer is Buffer)
+					|| ObjGetBase(OutputBuffer) != Buffer.Prototype || OutputBuffer.Size != 512
+				throw ValueError("The original held-query output lifetime is invalid.")
+			for Name in ObjOwnProps(OutputBuffer)
+				throw ValueError("The held-query output cannot invoke an observer.")
+			State.HeldTried := true
+			if !ExportsCurrent()
+				return _LLM_NavEventOwnerNativeListTerminalHeldRecipes(Frame["owner"], OutputBuffer, 64)
+			NativeFrame := State.Genuine && State.Raw is Integer && State.Raw == 0 && FrameNativeCurrent(State)
+			Count := 0
+			Raw := DllCall(OriginalExports["ErgoptiNav_ListTerminalHeldRecipes"],
+				"UInt64", Frame["owner"], "Ptr", OutputBuffer.Ptr, "UInt", 64, "UInt*", &Count, "Int")
+			GuardFrame()
+			if NativeFrame && !FrameNativeCurrent(State)
+				throw Error("The genuine held-query lifetime was withdrawn.")
+			if Raw == 0 && NativeFrame {
+				if !(Count is Integer) || Count < 0 || Count > 64
+					throw ValueError("The genuine held-query count is invalid.")
+				Held := Map()
+				Loop Count {
+					Id := NumGet(OutputBuffer, (A_Index - 1) * 8, "UInt64")
+					if Id <= 0 || Held.Has(Id) || !State.Recipes.Has(Id)
+						throw ValueError("The genuine held-query row is unknown or duplicated.")
+					Held[Id] := true
+				}
+				State.HeldKeep := Held, State.HeldAuthentic := true
+			}
+			return Map("status", Raw, "count", Count)
+		}
+
+		ProtectedHistorical() {
+			GuardFrame()
+			Recipes := [], Models := Map()
+			if HistoricalRows.Has(State.Recipes) && !State.HeldAuthentic {
+				for Id, Record in HistoricalRows[State.Recipes].Records {
+					if !Record.NativeCustody
+						continue
+					Recipes.Push(Id)
+					if Record.Model is Map
+						Models[ObjPtr(Record.Model)] := true
+				}
+			}
+			return Map("recipes", Recipes, "models", Models)
+		}
+
+		PrepareHistoricalPrune(Keep, KeepModels) {
+			GuardFrame()
+			if !A_IsCritical || State.Pruned || !PlainMap(Keep) || !PlainMap(KeepModels)
+				throw ValueError("The historical prune request is invalid or duplicated.")
+			if State.HeldAuthentic {
+				if !State.Genuine || !(State.Raw is Integer) || State.Raw != 0 || !FrameNativeCurrent(State)
+					throw Error("The genuine registration and held-query receipts changed.")
+				Expected := State.HeldKeep.Clone()
+				for Id in State.RecordSet
+					Expected[Id] := true
+				if !_LLM_NavEventOwnerTerminalRegistrationRefsCurrent(Keep, Expected)
+					throw ValueError("The prune set differs from the genuine held-query receipt.")
+			}
+			Retire := []
+			if HistoricalRows.Has(State.Recipes) {
+				Registry := HistoricalRows[State.Recipes]
+				for Id, Record in Registry.Records {
+					if Record.NativeCustody && !State.HeldAuthentic && !Keep.Has(Id)
+						throw ValueError("A supplied held reply cannot retire a genuine row.")
+					if Keep.Has(Id) {
+						if Record.NativeCustody && Record.Model is Map && !KeepModels.Has(ObjPtr(Record.Model))
+							throw ValueError("The retained genuine model was omitted from pruning custody.")
+					} else
+						Retire.Push(Id)
+				}
+				; Eligibility retires before public deletion or any later publication callback.
+				for Id in Retire
+					Registry.Records.Delete(Id)
+			}
+			State.Pruned := true
+			return true
+		}
+
+		KnownRefusal() {
+			return State.Raw is Integer && (State.Raw == -1 || State.Raw == -2 || State.Raw == -3
+				|| State.Raw == -4 || State.Raw == -5 || State.Raw == -6 || State.Raw == -9 || State.Raw == -11)
+		}
+
+		CloseFrame() {
+			if ActiveFrame != State || State.Closed
+				throw Error("The original registration scope cannot close twice.")
+			State.Closed := true
+			; Failed publication is still custody: absence of global Unknown is no ACK.
+			if !State.Completed && (State.Uncertain || (State.Genuine && !KnownRefusal())
+					|| (State.Mode == "custom" && NativeRegistrationSerial != State.NativeSerial))
+				RetainedFrame := State
+			ActiveFrame := 0
+			Scopes.Delete(State.Operations)
+			State.Operations := 0
+		}
+	}
+
+	DigitCurrent(State, ObserveMode := true) {
+		StateCurrent() {
+			return IsObject(State) && ActiveFrame == State && !State.Closed
+				&& OwnersCurrent() && ScopeCurrent(State.Operations) && PlainMap(State.Frame)
+		}
+		if !StateCurrent()
+			return false
+		if !State.DigitCaptured
+			return State.Mode == "unselected" && !State.Frame["native_attempted"]
+		Cell := State.DigitCell, Pure := State.DigitGuard, Policy := State.DigitModeGuard
+		SourceCurrent() {
+			return StateCurrent() && PlainMap(Cell) && State.DigitCell == Cell
+				&& State.Frame.Get("digit_source", 0) == Cell
+				&& State.DigitGuard == Pure && State.DigitModeGuard == Policy
+				&& Pure is BoundFunc && Policy is BoundFunc
+				&& !Object.Prototype.HasOwnProp.Call(Pure, "Call")
+				&& !Object.Prototype.HasOwnProp.Call(Policy, "Call")
+		}
+		if !SourceCurrent() || !(ObserveMode ? Policy.Call() : Pure.Call()) || !SourceCurrent()
+			return false
+		if State.CandidateGuard is BoundFunc {
+			Witness := State.CandidateGuard, Candidate := State.CandidateCell
+			if !PlainMap(Candidate) || State.Frame.Get("candidate", 0) != Candidate
+					|| Object.Prototype.HasOwnProp.Call(Witness, "Call") || !Witness.Call()
+					|| !SourceCurrent() || State.CandidateCell != Candidate
+					|| State.Frame.Get("candidate", 0) != Candidate || State.CandidateGuard != Witness
+				return false
+		}
+		return SourceCurrent()
+	}
+
+	BuildStop(Snapshot) {
+		if Constructing || !OwnersCurrent() || !A_IsCritical || !_LLM_NavEventOwnerStopping
+				|| _LLM_NavEventOwnerStarting || _LLM_NavEventOwnerTerminalRouteRefreshing
+				|| IsObject(ActiveFrame) || IsObject(ActiveStop) || !EpochCurrent(_LLM_NavEventOwnerRuntimeEpoch)
+			throw Error("The native stop scope cannot be issued.")
+		Ticket := {Frame: Snapshot, Snapshot: Snapshot, Missing: false,
+			Epoch: _LLM_NavEventOwnerRuntimeEpoch, Mode: "unselected",
+			Called: false, Raw: "unobserved", Genuine: false, Module: 0, Exports: 0,
+			Closed: false, Operations: 0, State: RetainedFrame}
+		if IsObject(RetainedFrame) && Snapshot is Integer && Snapshot == 0 {
+			; The real Frame remains private even if its public publication failed.
+			Ticket.Frame := RetainedFrame.Frame, Ticket.Missing := true
+		}
+		Operations := Map("guard", GuardStop, "custom", CustomStop, "native", NativeStop,
+			"requires_native", RequiresNativeStop, "accept", AcceptTeardown, "settle", SettleStop, "close", CloseStop)
+		Image := Operations.Clone()
+		Scopes[Operations] := {Image: Image, Close: CloseStop}
+		Ticket.Operations := Operations
+		ActiveStop := Ticket
+		return Operations
+
+		GuardStop() {
+			if ActiveStop != Ticket || Ticket.Closed || !OwnersCurrent() || !ScopeCurrent(Ticket.Operations)
+				throw Error("The original native stop dispatcher was withdrawn.")
+		}
+
+		RequiresNativeStop() {
+			GuardStop()
+			return NativeRegistrationDebt
+		}
+
+		CustomStop() {
+			GuardStop()
+			if Ticket.Mode != "unselected"
+				throw Error("The stop scope already selected its boundary.")
+			Ticket.Mode := "custom"
+		}
+
+		UnknownCurrent() {
+			if Ticket.Missing
+				return Ticket.Snapshot is Integer && Ticket.Snapshot == 0
+					&& _LLM_NavEventOwnerTerminalRouteUnknown is Integer && _LLM_NavEventOwnerTerminalRouteUnknown == 0
+			return Type(_LLM_NavEventOwnerTerminalRouteUnknown) == Type(Ticket.Snapshot)
+				&& _LLM_NavEventOwnerTerminalRouteUnknown == Ticket.Snapshot
+		}
+
+		NativeStop() {
+			GuardStop()
+			if Ticket.Mode != "unselected" || !_LLM_NavEventOwnerStopping
+					|| _LLM_NavEventOwnerTerminalRouteRefreshing || !EpochCurrent(Ticket.Epoch)
+					|| !UnknownCurrent()
+				throw Error("The original native stop scope was withdrawn.")
+			Ticket.Mode := "default", Ticket.Called := true
+			if IssuedModule && !ExportsCurrent()
+				throw Error("The issued native stop export image was withdrawn.")
+			Ticket.Genuine := ExportsCurrent()
+			if IsObject(Ticket.State)
+					&& (RetainedFrame != Ticket.State || Ticket.State.Frame != Ticket.Frame
+						|| !FrameCustodyCurrent(Ticket.State))
+				throw Error("The retained native registration lifetime changed.")
+			if Ticket.Genuine {
+				Ticket.Module := IssuedModule, Ticket.Exports := IssuedExports
+				Address := OriginalExports["ErgoptiNav_Stop"]
+			} else {
+				if IssuedModule || !OwnersCurrent()
+					throw Error("The issued native stop export image changed.")
+				Address := _LLM_NavEventOwnerNativeExport("ErgoptiNav_Stop")
+			}
+			Ticket.Raw := DllCall(Address, "Int")
+			return Ticket.Raw
+		}
+
+		ReceiptCurrent() {
+			return ActiveStop == Ticket && !Ticket.Closed && A_IsCritical
+				&& _LLM_NavEventOwnerStopping && !_LLM_NavEventOwnerTerminalRouteRefreshing
+				&& ScopeCurrent(Ticket.Operations) && Ticket.Mode == "default"
+				&& Ticket.Called && Ticket.Genuine && Ticket.Raw is Integer
+				&& (Ticket.Raw == 0 || Ticket.Raw == 10) && EpochCurrent(Ticket.Epoch)
+				&& ExportsCurrent() && Ticket.Module is Integer && Ticket.Module > 0
+				&& Ticket.Module == IssuedModule && Ticket.Exports == IssuedExports
+		}
+
+		AcceptTeardown() {
+			GuardStop()
+			if !A_IsCritical || !_LLM_NavEventOwnerStopping || _LLM_NavEventOwnerTerminalRouteRefreshing
+				return false
+			; Completed registration retains C debt until its actual Stop receipt.
+			if NativeRegistrationDebt && !ReceiptCurrent()
+				return false
+			State := Ticket.State
+			if !IsObject(State)
+				return !IsObject(Ticket.Frame) && UnknownCurrent() && EpochCurrent(Ticket.Epoch)
+			return RetainedFrame == State && State.Frame == Ticket.Frame
+				&& UnknownCurrent() && FrameCustodyCurrent(State) && EpochCurrent(Ticket.Epoch)
+				&& (!RequiresNativeReceipt(State) || ReceiptCurrent())
+		}
+
+		SettleStop() {
+			GuardStop()
+			if !AcceptTeardown()
+				return false
+			if ReceiptCurrent()
+				NativeRegistrationDebt := false
+			OwnedProjection := false
+			for Dictionary, Registry in HistoricalRows {
+				if _LLM_NavEventOwnerTerminalRouteRecipes == Dictionary {
+					_LLM_NavEventOwnerTerminalRouteRecipes := Map()
+					OwnedProjection := true
+				}
+				if _LLM_NavEventOwnerTerminalRouteModels == Registry.Models {
+					_LLM_NavEventOwnerTerminalRouteModels := Map()
+					OwnedProjection := true
+				}
+			}
+			if OwnedProjection
+				_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+					"generation", 0, "layout_id", 0, "registered", 0,
+					"cohort_complete", false, "transformed_output_enabled", false,
+					"unconverted", ["native terminal owner retired"])
+			HistoricalRows := Map(), HighestNativeRecipe := 0
+			State := Ticket.State
+			if !IsObject(State)
+				return true
+			_LLM_NavEventOwnerTerminalRouteCoverage := Map(
+				"generation", 0, "layout_id", 0, "registered", 0,
+				"cohort_complete", false, "transformed_output_enabled", false,
+				"unconverted", ["native terminal owner retired"])
+			if _LLM_NavEventOwnerTerminalRouteRecipes == State.Recipes
+				_LLM_NavEventOwnerTerminalRouteRecipes := Map()
+			if _LLM_NavEventOwnerTerminalRouteModels == State.Models
+				_LLM_NavEventOwnerTerminalRouteModels := Map()
+			if !Ticket.Missing
+				_LLM_NavEventOwnerTerminalRouteUnknown := 0
+			RetainedFrame := 0
+			return true
+		}
+
+		CloseStop() {
+			if ActiveStop != Ticket || Ticket.Closed
+				throw Error("The original stop scope cannot close twice.")
+			Ticket.Closed := true
+			ActiveStop := 0
+			Scopes.Delete(Ticket.Operations)
+			Ticket.Operations := 0, Ticket.Frame := 0, Ticket.State := 0
+		}
+	}
+
+	; Retention grants no native authority and survives a withdrawn callable.
+	if Request == "retain_frame" {
+		if !IsObject(ActiveFrame) || ActiveFrame.Closed || ActiveFrame.Frame != Payload
+			return false
+		ActiveFrame.Uncertain := true
+		return true
+	}
+
+	; Cleanup uses only an issued scope identity and its private original closure.
+	; It grants no native receipt and can unwind after a public callable withdrawal.
+	if Request == "close_scope" {
+		if !Scopes.Has(Payload)
+			return false
+		Func.Prototype.Call.Call(Scopes[Payload].Close)
+		return true
+	}
+	if Request == "owns_scope"
+		return OwnersCurrent() && ScopeCurrent(Payload)
+	if Request == "stamp_historical"
+		return StampHistorical(Payload)
+	if Request == "step_historical"
+		return HistoricalStep(Payload)
+	if Request == "frame_held" || Request == "protected_historical" || Request == "prune_historical" {
+		if !PlainMap(Payload) || !IsObject(ActiveFrame) || ActiveFrame.Frame != Payload.Get("frame", 0)
+				|| !ScopeCurrent(ActiveFrame.Operations) || !CanonicalCurrent(ActiveFrame)
+			throw ValueError("The historical frame request was not genuinely issued.")
+		Original := Scopes[ActiveFrame.Operations].Image
+		if Request == "frame_held"
+			return Original["held"].Call(Payload["buffer"])
+		if Request == "protected_historical"
+			return Original["protected"].Call()
+		return Original["prune"].Call(Payload["keep"], Payload["models"])
+	}
+	if Request == "guard_frame"
+		return OwnersCurrent() && IsObject(ActiveFrame) && PlainMap(Payload)
+			&& ActiveFrame.Frame == Payload && ScopeCurrent(ActiveFrame.Operations)
+			&& CanonicalCurrent(ActiveFrame)
+	; UInt32 count times the forty-byte x64 descriptor fits signed64-bit arithmetic.
+	; This admission calculation adds no callable dependency to genuine Stop.
+	if Request == "route_storage_size" {
+		if !OwnersCurrent()
+			throw Error("The original terminal route storage owner was withdrawn.")
+		if !(Payload is Integer) || Payload < 0 || Payload > 0xFFFFFFFF
+			throw ValueError("The terminal route descriptor count is invalid.")
+		return Payload * 40
+	}
+	if Request == "digit_current"
+		return IsObject(ActiveFrame) && ActiveFrame.Frame == Payload
+			&& CanonicalCurrent(ActiveFrame) && DigitCurrent(ActiveFrame) && CanonicalCurrent(ActiveFrame)
+	if Request == "allows_native_admission"
+		return OwnersCurrent() && !IsObject(ActiveStop) && !Constructing
+	if Request == "publish_start_epoch"
+		return PublishStartEpoch(Payload)
+	if Request == "begin_frame" {
+		if !((Payload is Integer) && Payload == 0)
+			throw ValueError("Frame construction accepts no supplied authority.")
+		return BuildFrame()
+	}
+	if Request == "begin_stop"
+		return BuildStop(Payload)
+	if Request == "export" {
+		_LLM_NavEventOwnerNativeEnsureLoaded()
+		if !_LLM_NavEventOwnerExports.Has(Payload)
+			throw Error("Navigation owner DLL export is unavailable")
+		Address := _LLM_NavEventOwnerExports[Payload]
+		; The direct ABI also owns registration storage without an AHK Frame.
+		if IssuedModule && Address == OriginalExports["ErgoptiNav_RegisterTerminalRoutes"] {
+			NativeRegistrationDebt := true
+			NativeRegistrationSerial += 1
+			if NativeRegistrationSerial <= 0
+				throw Error("The native registration serial overflowed.")
+		}
+		return Address
+	}
+	if Request != "load"
+		throw ValueError("The native owner constructor request is invalid.")
+
+	; A real issuance is immutable for this process, including ordinary load calls.
+	; Public module zero or a foreign export image must never issue a new lifetime.
+	if IssuedModule {
+		if !ExportsCurrent()
+			throw Error("The process-resident native issuance was withdrawn.")
+		return true
+	}
+	; Preserve controlled unissued adapter calls; these confer no genuine authority.
 	if _LLM_NavEventOwnerModule
 		return true
+	if !OwnersCurrent()
+		throw Error("The original native loader owner was withdrawn.")
 	if A_PtrSize != 8
 		throw Error("Navigation owner requires a 64-bit process")
 	Path := _VendorDir . "\ergopti_nav_owner.dll"
 	Module := DllCall("Kernel32\LoadLibraryW", "Str", Path, "Ptr")
-	if !Module
+	if !(Module is Integer) || Module <= 0
 		throw Error("Navigation owner DLL could not be loaded")
 	Names := [
-		"ErgoptiEditor_Begin", "ErgoptiEditor_Poll",
-		"ErgoptiEditor_Decide", "ErgoptiEditor_Close",
-		"ErgoptiNav_Start", "ErgoptiNav_Stop",
-		"ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
-		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop",
-		"ErgoptiNav_BeginTerminalCapture",
-		"ErgoptiNav_CommitTerminalCapture",
-		"ErgoptiNav_AbortTerminalCapture",
-		"ErgoptiNav_GetTerminalCapture",
-		"ErgoptiNav_BeginOwnerSwap",
-		"ErgoptiNav_CommitOwnerSwap", "ErgoptiNav_AbortOwnerSwap",
-		"ErgoptiNav_ClaimOwner",
-		"ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
-		"ErgoptiNav_BeginProfileSwap",
-		"ErgoptiNav_CommitProfileSwap",
-		"ErgoptiNav_AbortProfileSwap",
-		"ErgoptiNav_ProfilePendingMask",
-		"ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
-		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"
-	]
+		"ErgoptiEditor_Begin", "ErgoptiEditor_Poll", "ErgoptiEditor_Decide", "ErgoptiEditor_Close",
+		"ErgoptiNav_Start", "ErgoptiNav_Stop", "ErgoptiNav_PreparePlan", "ErgoptiNav_CommitPlan",
+		"ErgoptiNav_SetSuspended", "ErgoptiNav_CanStop", "ErgoptiNav_BeginTerminalCapture",
+		"ErgoptiNav_CommitTerminalCapture", "ErgoptiNav_AbortTerminalCapture", "ErgoptiNav_GetTerminalCapture",
+		"ErgoptiNav_BeginTerminalCaptureOwned", "ErgoptiNav_GetTerminalCaptureOwned",
+		"ErgoptiNav_PeekTerminalRouteOwned", "ErgoptiNav_ReleaseTerminalCaptureOwned",
+		"ErgoptiNav_StartHookTrace", "ErgoptiNav_ReadHookTrace", "ErgoptiNav_StopHookTrace",
+		"ErgoptiNav_RegisterTerminalRoutes", "ErgoptiNav_PeekTerminalRoute", "ErgoptiNav_ListTerminalHeldRecipes",
+		"ErgoptiNav_PreviewTerminalOutput", "ErgoptiNav_PlanTerminalOutput", "ErgoptiNav_BeginTerminalOutputAttempt",
+		"ErgoptiNav_AcknowledgeTerminalOutput", "ErgoptiNav_ConsumeTerminalOutput", "ErgoptiNav_CancelTerminalOutput",
+		"ErgoptiNav_SerializeTerminalOutputAttempt", "ErgoptiNav_BeginOwnerSwap", "ErgoptiNav_CommitOwnerSwap",
+		"ErgoptiNav_AbortOwnerSwap", "ErgoptiNav_ClaimOwner", "ErgoptiNav_GetOwner", "ErgoptiNav_PollReceipt",
+		"ErgoptiNav_BeginProfileSwap", "ErgoptiNav_CommitProfileSwap", "ErgoptiNav_AbortProfileSwap",
+		"ErgoptiNav_ProfilePendingMask", "ErgoptiNav_CompleteReceipt", "ErgoptiNav_PendingForToken",
+		"ErgoptiNav_GetLastOsError", "ErgoptiNav_TestDispatch"]
 	Exports := Map()
 	try {
 		for Name in Names {
-			Address := DllCall("Kernel32\GetProcAddress", "Ptr", Module,
-				"AStr", Name, "Ptr")
-			if !Address
+			Address := DllCall("Kernel32\GetProcAddress", "Ptr", Module, "AStr", Name, "Ptr")
+			if !(Address is Integer) || Address <= 0
 				throw Error("Navigation owner DLL export is missing")
 			Exports[Name] := Address
 		}
+		if !OwnersCurrent()
+			throw Error("The original native loader owner was withdrawn.")
+		Detached := Exports.Clone()
 	} catch as Err {
 		DllCall("Kernel32\FreeLibrary", "Ptr", Module, "Int")
 		throw Err
 	}
-	_LLM_NavEventOwnerModule := Module
-	_LLM_NavEventOwnerExports := Exports
+	_LLM_NavEventOwnerModule := Module, _LLM_NavEventOwnerExports := Exports
+	IssuedModule := Module, IssuedExports := Exports, OriginalExports := Detached
 	return true
 }
 
 _LLM_NavEventOwnerNativeExport(Name) {
-	global _LLM_NavEventOwnerExports
-	_LLM_NavEventOwnerNativeEnsureLoaded()
-	if !_LLM_NavEventOwnerExports.Has(Name)
-		throw Error("Navigation owner DLL export is unavailable")
-	return _LLM_NavEventOwnerExports[Name]
+	return _LLM_NavEventOwnerNativeEnsureLoaded("export", Name)
 }
 
 _LLM_NavEventOwnerNativeRequireOk(Status, Operation) {

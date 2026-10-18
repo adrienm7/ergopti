@@ -74,8 +74,8 @@ def verify_snapshots(result):
     check("healthy public retry clears pending keys", lambda: same(result["pending_accepted"], 0))
     check("retry accepts exactly two per-app raw batches", lambda: same(len(raw), 2))
     check(
-        "retry uses only independently reserved accepted IDs",
-        lambda: same([r[0] for r in raw], [3, 4]),
+        "retry reuses its independently acknowledged reserved IDs",
+        lambda: same([r[0] for r in raw], [1, 2]),
     )
     check(
         "raw event quantity conserves four supplied keys",
@@ -103,11 +103,9 @@ def verify_snapshots(result):
     def date_and_ts():
         for row in raw:
             assert row[5] == result["local_day"]
-            assert (
-                result["bounds"]["accepted_before"] <= row[6] <= result["bounds"]["accepted_after"]
-            )
+            assert result["bounds"]["refused_before"] <= row[6] <= result["bounds"]["refused_after"]
 
-    check("accepted retry groups local date with actually observed UTC instant", date_and_ts)
+    check("immutable retry retains its original observed local date and UTC instant", date_and_ts)
 
     def conservation():
         count = accepted.execute("SELECT SUM(c) FROM ngram_chars").fetchone()[0]

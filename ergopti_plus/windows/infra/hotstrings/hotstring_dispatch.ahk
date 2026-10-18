@@ -381,11 +381,14 @@ _HSE_DispatchTerminalRawCallback(Spec, EndChar, OutputHost, SchedulerFn := 0,
 
 _HSE_ReleaseTerminalCapture(Owner, Committed) {
 	global _HSE_TerminalReplayPending, _HSE_TerminalReplaying
+	; Only the paced burst erases and re-types the characters that were visible
+	; before capture; the native Notepad edit leaves them in place, already fed.
+	ReplayTrailing := Committed && !Owner.Get("NativeLiteral", false)
 	Replay := Map("Token", Owner["Id"], "Committed", Committed,
 		"Port", Owner.Get("Port", 0),
-		"TrailingText", Committed ? Owner.Get("TrailingText", "") : "",
+		"TrailingText", ReplayTrailing ? Owner.Get("TrailingText", "") : "",
 		"UserCodeOwned", Owner.Get("UserCodeOwned", false),
-		"TrailingChars", Committed ? Owner.Get("TrailingChars", []) : [],
+		"TrailingChars", ReplayTrailing ? Owner.Get("TrailingChars", []) : [],
 		"ObservedChars", [],
 		"ReplayVisibleFn", Owner.Get("ReplayVisibleFn", 0))
 	_HSE_TerminalReplayPending := Replay
@@ -564,8 +567,13 @@ _HSE_BeginOwnedTerminalTransaction(Owner, SchedulerFn := 0) {
 	Owner["RunnerClaimed"] := false
 	_HSE_TerminalOwner := Owner
 	if !LLM_NavEventOwner_BeginTerminalCapture(Owner["Id"], Owner.Get("Port", 0)) {
-		Owner["Pending"] := false
-		_HSE_TerminalOwner := 0
+		PreviousCritical := Critical("On")
+		try {
+			Owner["Pending"] := false
+			; Admission callbacks may publish a successor before refusing this owner.
+			if _HSE_TerminalOwner == Owner
+				_HSE_TerminalOwner := 0
+		} finally Critical(PreviousCritical)
 		_HSE_ClearTerminalOutputOwnership(Owner)
 		return false
 	}
@@ -624,7 +632,7 @@ _HSE_NewNotepadOwner(Spec, Replacement, EndCharPart, EraseUnits, Backspaces,
 		"Backspaces", Backspaces, "BufferSnapshot", Snapshot,
 		"DeletedText", EraseUnits ? SubStr(Snapshot, StrLen(Snapshot) - EraseUnits + 1) : "",
 		"PlainInsertedText", Replacement . EndCharPart, "EndCharPart", EndCharPart,
-		"FinalizerClaimed", false,
+		"FinalizerClaimed", false, "CaptureAdmitted", false,
 		"OnlyText", true, "TrailingText", "", "TrailingChars", [],
 		"Hwnd", OutputHost["Hwnd"], "Pid", OutputHost["Pid"],
 		"RegistryGeneration", DispatchState["RegistryGeneration"],
@@ -747,6 +755,7 @@ _HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
 	global HSE_RegistryGeneration, HSE_RuntimeDecisionGeneration
 	global _PrefixInputContextGeneration, _PrefixDeferredGeneration
 	AppendTrigger := false
+	Yielded := false
 	PreviousCritical := Critical("On")
 	try {
 		if Owner["CompletionClaimed"]
@@ -754,13 +763,20 @@ _HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
 		Owner["CompletionClaimed"] := true
 		Owner["Pending"] := false
 		Owner["FinalSucceeded"] := (Ok is Integer) && Ok == true && Owner["Committed"]
-		AppendTrigger := !Owner["Committed"] && !Owner.Get("Recovered", false)
-			&& Owner.Has("PendingPrefixChar") && HSE_Buffer == Owner["BufferSnapshot"]
-			&& _PrefixContentGeneration == Owner["ContentGeneration"]
+		Unchanged := !Owner["Committed"] && !Owner.Get("Recovered", false)
 			&& HSE_RegistryGeneration == Owner["RegistryGeneration"]
 			&& HSE_RuntimeDecisionGeneration == Owner["DecisionGeneration"]
 			&& _PrefixInputContextGeneration == Owner["InputGeneration"]
 			&& _PrefixDeferredGeneration == Owner["LifecycleGeneration"]
+		; A key that passed the native hook just before capture admission is
+		; already on screen and fed after the trigger. The worker never edits
+		; around it, so a refusal leaves the document and HSE in agreement: the
+		; expansion yielded to typing, it did not fail.
+		Yielded := Unchanged && Owner["TrailingText"] != ""
+			&& HSE_Buffer == Owner["BufferSnapshot"] . Owner["TrailingText"]
+		AppendTrigger := Unchanged && Owner.Has("PendingPrefixChar")
+			&& (Yielded || (HSE_Buffer == Owner["BufferSnapshot"]
+				&& _PrefixContentGeneration == Owner["ContentGeneration"]))
 		if AppendTrigger
 			Owner["RefusalContentGeneration"] := _PrefixSetBuffer(_PrefixWordTail(HSE_Buffer))
 		if _HSE_TerminalOwner == Owner
@@ -769,7 +785,10 @@ _HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
 	try {
 		if AppendTrigger && _PrefixContentGeneration == Owner["RefusalContentGeneration"]
 			_PrefixScheduleRender()
-		if !Owner["FinalSucceeded"]
+		if Yielded
+			LoggerWarn("HSE", "Notepad expansion yielded to {1} character(s) typed before its keyboard capture: {2}.",
+				_TextCodepointLength(Owner["TrailingText"]), ErrorMessage)
+		else if !Owner["FinalSucceeded"]
 			LoggerError("HSE", "Notepad expansion did not complete its canonical commit: {1}.", ErrorMessage)
 		else if ErrorMessage != ""
 			LoggerWarn("HSE", "Notepad expansion completed with a non-retryable warning: {1}.", ErrorMessage)
@@ -777,6 +796,10 @@ _HSE_CompleteNotepadOwner(Owner, Ok := true, ErrorMessage := "") {
 		if !Owner["OutputOwnershipReleased"] {
 			Owner["OutputOwnershipReleased"] := true
 			_HSE_ClearTerminalOutputOwnership(Owner)
+			; Keys held during the edit replay only now, after its canonical commit
+			; or refusal, so they land after the expansion and never revoke it.
+			if Owner["CaptureAdmitted"]
+				_HSE_ReleaseTerminalCapture(Owner, Owner["FinalSucceeded"])
 		}
 	}
 	return Owner["FinalSucceeded"]
@@ -801,6 +824,23 @@ _HSE_BeginOwnedNotepadTransaction(Owner, SendFn := unset) {
 		_HSE_CompleteNotepadOwner(Owner, false, "another hotstring output owns completion")
 		return false
 	}
+	; The worker edits a few polls after this keystroke. A key typed meanwhile
+	; would revoke its admission or land inside the edit, so the native hook holds
+	; physical input from here until completion, exactly as for a terminal.
+	if !LLM_NavEventOwner_BeginTerminalCapture(Owner["Id"], Owner.Get("Port", 0)) {
+		PreviousCritical := Critical("On")
+		try {
+			Owner["Pending"] := false
+			Owner["CompletionClaimed"] := true
+			if _HSE_TerminalOwner == Owner
+				_HSE_TerminalOwner := 0
+		} finally Critical(PreviousCritical)
+		Owner["OutputOwnershipReleased"] := true
+		_HSE_ClearTerminalOutputOwnership(Owner)
+		LoggerWarn("HSE", "Notepad expansion declined: the keyboard capture that orders later keys after it was refused.")
+		return false
+	}
+	Owner["CaptureAdmitted"] := true
 	Opts := Map("mode", "native", "erase_before", Owner["Backspaces"],
 		"deleted_text", Owner["DeletedText"],
 		"admission", _HSE_NotepadOwnerIsCurrent.Bind(Owner),

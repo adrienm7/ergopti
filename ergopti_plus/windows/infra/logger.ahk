@@ -140,6 +140,11 @@ global _LOGGER_FORCE_FLUSH_PENDING := False
 global _LOGGER_APPEND_DEBTS := Map()
 global _LOGGER_APPEND_DEBT_REPAIRS := Map()
 global _LOGGER_APPEND_OWNERS := Map()
+; The stage of the latest refused append, from a closed set (never log text),
+; so a shutdown refusal can say why queued lines stayed unwritten.
+global _LOGGER_LAST_APPEND_FAILURE := "none"
+; Successor flushes LoggerPrepareShutdown runs while lines keep arriving.
+global LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES := 8
 
 ; Hard ceiling on a pending queue, enforced only on the requeue path. A failed
 ; A failed append re-injects its whole snapshot ahead of lines emitted meanwhile,
@@ -605,6 +610,7 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 	FileObject := 0
 	Boundary := 0
 	RollbackSucceeded := false
+	Stage := "owner"
 	; Native sharing protects file identity, but a replacement can reuse its path.
 	; Reserve the debt key until the exact writer has closed or transferred debt.
 	Key := StrLower(Path)
@@ -615,28 +621,35 @@ _LoggerAppendComplete(Path, Blob, ForceFlush := false, OpenFn := 0,
 		_LOGGER_APPEND_OWNERS[Key] := true
 	} finally Critical(PreviousCritical)
 	try {
+		Stage := "privacy_config"
 		Config := _LoggerPrivacyConfig()
 		if !(Config is Map)
-			return false
+			return _LoggerRefuseAppend(Stage)
+		Stage := "redaction"
 		Blob := _LoggerPrivacyBlob(Blob, Config, SourceRecords)
+		Stage := "debt_repair"
 		if !_LoggerRepairAppendDebt(Path, ResolvedFlush, ResolvedTruncate)
-			return false
+			return _LoggerRefuseAppend(Stage)
 		; Another writer must not commit bytes that this owner's rollback can erase
+		Stage := "open"
 		FileObject := ResolvedOpen.Call(Path, "a-w", "UTF-8-RAW")
 		if !IsObject(FileObject)
-			return false
+			return _LoggerRefuseAppend(Stage)
+		Stage := "write"
 		Boundary := FileObject.Pos
 		; Include the new-file BOM in the same checked native receipt and rollback
 		; boundary as the payload; FileOpen must not buffer it independently.
 		Payload := (Boundary = 0 ? Chr(0xFEFF) : "") . Blob
 		if !_FSWriteUtf8Bytes(FileObject, Payload, WriteFn)
 			throw Error("logger native append was incomplete")
+		Stage := "flush"
 		if ForceFlush && ResolvedFlush.Call(FileObject) != true
 			throw Error("logger stable flush failed")
 		FileObject.Close()
 		FileObject := 0
 		return true
 	} catch {
+		_LoggerRefuseAppend(Stage)
 		if IsObject(FileObject)
 			try RollbackSucceeded := ResolvedTruncate.Call(FileObject, Boundary,
 				ResolvedFlush) == true
@@ -745,20 +758,30 @@ _LoggerRepairShutdownDebts() {
 ; Optional refusal evidence contains only a detached snapshot of native owner
 ; counters; inspecting it never flushes, repairs, or releases logger ownership.
 ; @param Refusal {Map|Integer} Receives primitive refusal evidence, or zero on success.
+; @param FlushFn {Func|Integer} Test seam replacing _LoggerFlush; zero uses it.
 ; @returns {Boolean} True only after the existing durable shutdown boundary.
-LoggerPrepareShutdown(&Refusal := 0) {
+LoggerPrepareShutdown(&Refusal := 0, FlushFn := 0) {
 	Refusal := 0
+	Flush := HasMethod(FlushFn, "Call") ? FlushFn : _LoggerFlush
 	if !_LoggerRepairShutdownDebts() {
 		Refusal := _LoggerShutdownRefusalSnapshot("repair")
 		return false
 	}
-	if !_LoggerFlush(true) {
+	if !Flush.Call(true) {
 		Refusal := _LoggerShutdownRefusalSnapshot("flush")
 		return false
 	}
-	if _LoggerHasPendingDebt() && !_LoggerFlush(true) {
-		Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
-		return false
+	; Timers still running at shutdown can log while a flush writes outside
+	; Critical, so one successor flush could leave a burst queued. Drain again
+	; within a fixed bound; a sink that refuses every append still ends in the
+	; pending-debt refusal below.
+	loop LOGGER_SHUTDOWN_SUCCESSOR_FLUSHES {
+		if !_LoggerHasPendingDebt()
+			break
+		if !Flush.Call(true) {
+			Refusal := _LoggerShutdownRefusalSnapshot("successor_flush")
+			return false
+		}
 	}
 	if _LoggerHasPendingDebt() {
 		Refusal := _LoggerShutdownRefusalSnapshot("pending_debt")
@@ -769,8 +792,15 @@ LoggerPrepareShutdown(&Refusal := 0) {
 
 ; Sample existing ownership and queue counts at the refusing caller's boundary.
 ; Paths, queue names, message bodies, file objects, and handles never leave here.
+; Records the closed stage of a refused append and returns false.
+_LoggerRefuseAppend(Stage) {
+	global _LOGGER_LAST_APPEND_FAILURE
+	_LOGGER_LAST_APPEND_FAILURE := Stage
+	return false
+}
+
 _LoggerShutdownRefusalSnapshot(Phase) {
-	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING
+	global _LOGGER_FLUSH_ACTIVE, _LOGGER_FORCE_FLUSH_PENDING, _LOGGER_LAST_APPEND_FAILURE
 	global _LOGGER_APPEND_OWNERS, _LOGGER_APPEND_DEBTS, _LOGGER_APPEND_DEBT_REPAIRS
 	global _LOGGER_PENDING, _LOGGER_PENDING_ERRORS, _LOGGER_SUB_PENDING
 	PreviousCritical := Critical("On")
@@ -788,7 +818,8 @@ _LoggerShutdownRefusalSnapshot(Phase) {
 			"main_lines", _LOGGER_PENDING.Length,
 			"error_lines", _LOGGER_PENDING_ERRORS.Length,
 			"topical_queues", _LOGGER_SUB_PENDING.Count,
-			"topical_lines", TopicalLines)
+			"topical_lines", TopicalLines,
+			"last_append_failure", _LOGGER_LAST_APPEND_FAILURE)
 	} finally {
 		Critical(PreviousCritical)
 	}

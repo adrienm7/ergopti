@@ -115,6 +115,7 @@ global _MenuDispatchClickSequences := Map()
 ; the click and _OnMenuCommandWmCommand returns before arming the retry, so the
 ; item is permanently dead with nothing logged at any level.
 global _MenuDispatchOwnerHandles := Map()
+global MENU_DISPATCH_OWNER_PROPERTY := "__ErgoptiMenuDispatcherOwner"
 
 ; Hard ceiling on retry delay (ms) — long enough for any reasonable AHK
 ; dispatch latency, short enough that the user doesn't perceive the
@@ -330,17 +331,94 @@ _MenuDispatchCollectLiveIds(HMENU, LiveSet, Seen) {
 ; what makes the ownership set complete, and an incomplete set is exactly how
 ; the prune came to delete live registrations in the first place.
 _MenuDispatchTrackOwner(MenuObj) {
-		global _MenuDispatchOwnerHandles
-		try {
-				HMENU := MenuObj.Handle
-				if (HMENU) {
-						_MenuDispatchOwnerHandles[HMENU] := true
-				}
-		} catch as Err {
-				; The prune then falls back to pure tray reachability for this menu,
-				; which is the pre-fix behaviour — worth a line, not worth failing over.
-				try LoggerDebug("MenuDispatcher", "Could not record the owning menu handle: {1}", Err.Message)
+		global _MenuDispatchOwnerHandles, MENU_DISPATCH_OWNER_PROPERTY
+		HMENU := MenuObj.Handle
+		if !HMENU
+				throw Error("A registered menu requires a native handle.")
+		; The ledger must not keep old menus alive. The shared opaque receipt has
+		; no Menu or callback reference, and a recycled handle cannot inherit it.
+		if Object.Prototype.HasOwnProp.Call(MenuObj, MENU_DISPATCH_OWNER_PROPERTY) {
+				Receipt := _MenuDispatchOwnerReceipt(MenuObj)
+				if !(Receipt is Object)
+						throw Error("The registered menu lifetime receipt is invalid.")
+		} else {
+				Receipt := {}
+				Object.Prototype.DefineProp.Call(MenuObj, MENU_DISPATCH_OWNER_PROPERTY, {Value: Receipt})
 		}
+		_MenuDispatchOwnerHandles[HMENU] := Receipt
+}
+
+/** Reads only the native object's own data receipt, without invoking a getter. */
+_MenuDispatchOwnerReceipt(MenuObj) {
+		global MENU_DISPATCH_OWNER_PROPERTY
+		if !Object.Prototype.HasOwnProp.Call(MenuObj, MENU_DISPATCH_OWNER_PROPERTY)
+				return false
+		Descriptor := Object.Prototype.GetOwnPropDesc.Call(MenuObj, MENU_DISPATCH_OWNER_PROPERTY)
+		return Object.Prototype.HasOwnProp.Call(Descriptor, "Value") ? Descriptor.Value : false
+}
+
+/** Resolves a live registered Menu only when its lifetime receipt still matches. */
+_MenuDispatchResolveOwner(Handle, Receipt) {
+		if !(Receipt is Object) || DllCall("GetMenuItemCount", "ptr", Handle, "int") < 0
+				return false
+		NativeOwner := MenuFromHandle(Handle)
+		return NativeOwner is Menu && _MenuDispatchOwnerReceipt(NativeOwner) == Receipt ? NativeOwner : false
+}
+
+/**
+ * Releases registered menus only after the driver's last shutdown refusal gate.
+ * All admitted objects stay strongly held until deletion and ordinary pruning
+ * finish. Flat deletion detaches borrowed children without deleting their rows.
+ * @param {Menu} RootMenu Explicitly owned root; the production default is the tray.
+ */
+MenuDispatcher_Shutdown(RootMenu := unset) {
+		global _MenuDispatchOwnerHandles
+		PreviousCritical := Critical("On")
+		try {
+				Root := IsSet(RootMenu) ? RootMenu : A_TrayMenu
+				if !(Root is Menu)
+						throw TypeError("Terminal menu retirement requires its owned root.")
+				Registry := _MenuDispatchOwnerHandles
+				Owners := [[Root, Root.Handle, _MenuDispatchOwnerReceipt(Root)]], Stale := []
+				for Handle, Receipt in Registry {
+						NativeOwner := _MenuDispatchResolveOwner(Handle, Receipt)
+						if NativeOwner && NativeOwner != Root
+								Owners.Push([NativeOwner, Handle, Receipt])
+						else if !NativeOwner
+								Stale.Push([Handle, Receipt])
+				}
+				; Retire stale bookkeeping without touching an unauthenticated menu.
+				for Entry in Stale
+						if Registry.Has(Entry[1]) && Registry[Entry[1]] == Entry[2]
+								Registry.Delete(Entry[1])
+				Failure := 0
+				for Entry in Owners {
+						try {
+								NativeOwner := Entry[1], Handle := Entry[2], Receipt := Entry[3]
+								if NativeOwner != Root && _MenuDispatchOwnerReceipt(NativeOwner) != Receipt
+										throw Error("A registered menu changed ownership during terminal retirement.")
+								Menu.Prototype.Delete.Call(NativeOwner)
+								if DllCall("GetMenuItemCount", "ptr", Handle, "int") != 0
+										throw Error("A registered menu retained native rows during terminal retirement.")
+								if Registry.Has(Handle) && Registry[Handle] == Receipt
+										&& _MenuDispatchOwnerReceipt(NativeOwner) == Receipt
+										Registry.Delete(Handle)
+						} catch as Err {
+								if !Failure
+										Failure := Err
+						}
+				}
+				try {
+						if _MenuDispatchOwnerHandles != Registry
+								throw Error("The dispatch registry changed during terminal menu retirement.")
+						MenuDispatcher_PruneMenu(Root)
+				} catch as Err {
+						if !Failure
+								Failure := Err
+				}
+				if Failure
+						throw Failure
+		} finally Critical(PreviousCritical)
 }
 
 ; Add a menu item that participates in the dispatch bypass. Behaves like

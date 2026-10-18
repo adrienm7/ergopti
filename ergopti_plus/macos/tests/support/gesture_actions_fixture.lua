@@ -22,6 +22,8 @@ local OWNERS = {
 	"brightness_actions",
 	"brightness_actions_data",
 	"config_binding_identity",
+	-- Shared binding admission captures this real ordered-pair dependency.
+	"tap_hold.key_combinations",
 	"config_binding_publication",
 	"config_keyboard_publication",
 	"_generated.gesture_emit_actions",
@@ -77,6 +79,7 @@ local OWNERS = {
 	"toml_codec.bom",
 	"toml_codec.key_path",
 	"toml_codec.reader",
+	"toml_codec.record_scanner",
 	"wrap_pair",
 }
 

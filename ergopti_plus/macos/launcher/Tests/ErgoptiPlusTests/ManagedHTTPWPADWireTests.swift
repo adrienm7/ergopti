@@ -13,13 +13,15 @@ final class ManagedHTTPWPADWireTests: XCTestCase {
 		let fixture = try ManagedWireFixture()
 		defer {
 			do { try fixture.close() }
-			catch { XCTFail("WPAD receiving fixture did not restore owned trust and private keychain") }
+			catch { XCTFail("WPAD receiving fixture did not retire its peers and processes") }
 		}
 		let host = try XCTUnwrap(fixture.profile["host"] as? String)
 		let port = try XCTUnwrap(fixture.profile["origin_port"] as? Int)
 		let ports = try XCTUnwrap(fixture.profile["ports"] as? [String: Int])
 		let refused = try XCTUnwrap(ports["refused"])
 		let pacURL = try XCTUnwrap(fixture.profile["pac_url"] as? String)
+		// Trust arrives through the product SSL_CERT_FILE channel, never system trust.
+		let anchors = ["SSL_CERT_FILE": try XCTUnwrap(fixture.profile["ca_file"] as? String)]
 		let settings: [String: Any] = [kCFNetworkProxiesProxyAutoDiscoveryEnable as String: 1,
 			kCFNetworkProxiesHTTPSEnable as String: 1, kCFNetworkProxiesHTTPSProxy as String: "127.0.0.1",
 			kCFNetworkProxiesHTTPSPort as String: refused]
@@ -34,7 +36,8 @@ final class ManagedHTTPWPADWireTests: XCTestCase {
 			let status = ManagedHTTPWorker.execute(request, maximumSelections: 128,
 				started: ProcessInfo.processInfo.systemUptime - (expired ? 21 : 0),
 				settingsProvider: { settings as CFDictionary },
-				discoveryMetadataProvider: { reads += 1; return metadata }, output: collector.append)
+				discoveryMetadataProvider: { reads += 1; return metadata }, environment: anchors,
+				output: collector.append)
 			return (status, try collector.frames(), reads)
 		}
 
@@ -63,7 +66,6 @@ final class ManagedHTTPWPADWireTests: XCTestCase {
 			"Invalid discovery never falls back to DIRECT or the configured fixed relay")
 		XCTAssertEqual(before["active"] as? Int, 0)
 
-		XCTAssertEqual(try fixture.command(["command": "trust", "enabled": true])["trusted"] as? Bool, true)
 		for path in ["/alpha?case=one", "/beta?case=two"] {
 			let result = try execute(path, metadata: metadata)
 			if result.0 != 0 {

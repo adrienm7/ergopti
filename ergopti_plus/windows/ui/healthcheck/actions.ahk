@@ -114,6 +114,10 @@ HealthCheck_ValidateAction(Message, Context) {
 	Schema := Context["schema"]
 	Limit := Schema["max_export_bytes"]
 	switch Action, true {
+		case "collect_windows", "collection_cancel", "collection_guided", "collection_skip", "collection_open":
+			if Context["driver"] != "windows" || Message.Count != 1
+				return _HCActions_Refuse("unknown_action")
+			return Map("action", Map("action", Action))
 		case "copy":
 			if !_HCActions_BoundedText(Message.Get("text", ""), Limit)
 				return _HCActions_Refuse("bad_text")

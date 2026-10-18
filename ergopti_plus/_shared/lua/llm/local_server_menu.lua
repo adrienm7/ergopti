@@ -8,6 +8,20 @@
 local M = {}
 local Discovery = require("llm.local_server_discovery")
 
+--- Matches the actual captured entry when supplied by a native source owner.
+--- @param options table
+--- @param id string
+--- @return boolean
+local function active_matches(options, id)
+	local active = options.active
+	if type(active) ~= "table" then return false end
+	if type(options.entry_id) == "function" then
+		local entry_id = options.entry_id(id)
+		return type(entry_id) == "string" and entry_id ~= "" and active.id == entry_id
+	end
+	return active.provider == id
+end
+
 --- The authority displayed beside a configured server address.
 --- @param base_url string
 --- @return string
@@ -30,7 +44,7 @@ local function server_items(options, id, verdict)
 	for _, model in ipairs(verdict.models) do
 		local active = options.active
 		items[#items + 1] = { label = model,
-			checked = options.backend == "api" and active ~= nil and active.provider == id and active.model == model,
+			checked = options.backend == "api" and active_matches(options, id) and active.model == model,
 			disabled = disabled, action = action("select", model) }
 	end
 	items[#items + 1] = { separator = true }
@@ -49,6 +63,12 @@ end
 --- @return table
 function M.rows(options)
 	local rows = { { separator = true }, { label = options.tr("menu.llm.local_servers.header"), disabled = true } }
+	local unavailable = false
+	for _, id in ipairs(options.order) do
+		local result = options.result(id)
+		if result and result.status == Discovery.STATUS_UNAVAILABLE then unavailable = true end
+	end
+	if unavailable then rows[#rows + 1] = { label = options.tr("healthcheck.status.failed"), disabled = true } end
 	for _, id in ipairs(options.detected) do
 		local verdict = options.result(id)
 		local label = options.servers[id].label .. " 🖥️ — " .. M.host_of(verdict.base_url)
@@ -56,10 +76,10 @@ function M.rows(options)
 			label = options.format("menu.llm.local_servers.needs_key", label)
 		end
 		rows[#rows + 1] = { label = label,
-			checked = options.backend == "api" and options.active ~= nil and options.active.provider == id,
+			checked = options.backend == "api" and active_matches(options, id),
 			items = server_items(options, id, verdict) }
 	end
-	if #options.detected == 0 then
+	if #options.detected == 0 and not unavailable then
 		local labels = {}
 		for _, id in ipairs(options.order) do labels[#labels + 1] = options.servers[id].label end
 		local key = options.sweeping and "menu.llm.local_servers.searching" or "menu.llm.local_servers.none"

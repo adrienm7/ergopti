@@ -192,14 +192,14 @@ _TextSenderKeystroke(Mods, Key, Blind := false) {
 	global _TextSenderKeyIsDown
 	Prefix := ""
 	AltGr := false
-	for _, Mod in Mods {
-		if (StrLower(Trim(Mod)) == "altgr") {
+	for _, ModifierKey in Mods {
+		if (StrLower(Trim(ModifierKey)) == "altgr") {
 			AltGr := true
 			continue
 		}
-		Symbol := _TextSenderModifierPrefix(Mod)
+		Symbol := _TextSenderModifierPrefix(ModifierKey)
 		if (Symbol == "") {
-			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", Mod, Key)
+			LoggerWarn("TextSender", "TextPressKey: unknown modifier token '{1}' for key '{2}' - ignored.", ModifierKey, Key)
 			continue
 		}
 		Prefix .= Symbol
@@ -1046,7 +1046,7 @@ TextPressKey(Key, Modifiers, LogFailure := true, Transaction := unset) {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_TEXT_SENDER := Map(
     "send",       TextSend,

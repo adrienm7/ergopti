@@ -46,6 +46,10 @@
 
 local M = {}
 local original_output_observer_factory, original_capture_output = nil, nil
+local kernel_backends = setmetatable({}, { __mode = "k" })
+local kernel_declared = setmetatable({}, { __mode = "k" })
+local original_kernel_capture, original_kernel_ports = nil, nil
+local kernel_sources = setmetatable({}, { __mode = "k" })
 
 local Logger = require("logger.shim")
 local LOG = "adapters.uinput_writer"
@@ -355,6 +359,212 @@ end
 --- interpreter: plain Lua 5.4 (what developers run) has no ffi, LuaJIT (what CI
 --- and the daemon run) does, and neither should fail to LOAD the module.
 --- @return table|nil backend, string|nil err
+--- Internal implementation fragment for adapters/uinput_writer.lua.
+--- SOURCE DRAFT: not installed, imported, compiled or exercised.
+--- The factory is called only inside build_ffi_backend, before native open.
+--- Its owner_current argument is the Writer's private original-fd/generation join.
+--- It observes metadata only: no input read, grab, event injection or output grant.
+
+local function build_kernel_node_ports(ffi)
+	if not ffi.abi("64bit") or (ffi.arch ~= "x64" and ffi.arch ~= "arm64") then return nil end
+	if not kernel_declared[ffi] then
+	ffi.cdef([[
+		typedef struct { int64_t tv_sec; uint32_t tv_nsec; int32_t reserved; } ErgoptiStatxTime107;
+		typedef struct {
+			uint32_t mask, blksize; uint64_t attributes;
+			uint32_t nlink, uid, gid; uint16_t mode, spare0;
+			uint64_t ino, size, blocks, attributes_mask;
+			ErgoptiStatxTime107 atime, btime, ctime, mtime;
+			uint32_t rdev_major, rdev_minor, dev_major, dev_minor;
+			uint64_t mnt_id; uint32_t dio_mem_align, dio_offset_align;
+			uint64_t subvol; uint32_t atomic_write_unit_min, atomic_write_unit_max;
+			uint32_t atomic_write_segments_max, spare1; uint64_t spare3[9];
+		} ErgoptiStatx107;
+		int statx(int dirfd, const char *pathname, int flags, unsigned int mask, ErgoptiStatx107 *buf);
+		int openat(int dirfd, const char *pathname, int flags, ...);
+		long pread(int fd, void *buf, unsigned long count, long offset);
+	]])
+	kernel_declared[ffi] = true
+	end
+	if ffi.sizeof("ErgoptiStatx107") ~= 256 or ffi.offsetof("ErgoptiStatx107", "mode") ~= 28
+		or ffi.offsetof("ErgoptiStatx107", "ino") ~= 32
+		or ffi.offsetof("ErgoptiStatx107", "rdev_major") ~= 128
+		or ffi.offsetof("ErgoptiStatx107", "rdev_minor") ~= 132 then return nil end
+	-- These are additional optional ports; existing ordinary Writer ports stay intact.
+	local ports = { openat = ffi.C.openat, statx = ffi.C.statx, pread = ffi.C.pread,
+		close = ffi.C.close, ioctl = ffi.C.ioctl, new = ffi.new, string = ffi.string, errno = ffi.errno }
+	local function ports_current()
+		return ffi.C.openat == ports.openat and ffi.C.statx == ports.statx and ffi.C.pread == ports.pread
+			and ffi.C.close == ports.close and ffi.C.ioctl == ports.ioctl
+			and ffi.new == ports.new and ffi.string == ports.string and ffi.errno == ports.errno
+	end
+	local O_PATH, O_NOFOLLOW, O_CLOEXEC, O_DIRECTORY = 2097152, 131072, 524288, 65536
+	local DIR_FLAGS = O_PATH + O_NOFOLLOW + O_CLOEXEC + O_DIRECTORY
+	local AT_FDCWD, NOFOLLOW, EMPTY_PATH = -100, 256, 4096
+	local TYPE_MASK, INO_MASK = 1, 256
+	local UI_GET_SYSNAME_64 = 0x8040552c -- _IOC(_IOC_READ, 'U', 44, 64), asm-generic.
+	local metadata_debt, busy = false, false
+	local function current(owner_current)
+		local ok, value = pcall(function()
+			if owner_current() ~= true then return false end
+			local matched = ports_current()
+			return matched and owner_current() == true
+		end)
+		return ok and value == true and not metadata_debt
+	end
+	local function stat(dirfd, name, flags)
+		local buffer = ports.new("ErgoptiStatx107[1]")
+		if ports.statx(dirfd, name, flags, TYPE_MASK + INO_MASK, buffer) ~= 0 then return nil end
+		local value = buffer[0]
+		local mask = tonumber(value.mask)
+		if mask % 2 ~= 1 or math.floor(mask / INO_MASK) % 2 ~= 1 then return nil end
+		return { ino = ports.new("uint64_t", value.ino), dev_major = tonumber(value.dev_major),
+			dev_minor = tonumber(value.dev_minor), kind = math.floor(tonumber(value.mode) / 4096) * 4096,
+			rdev_major = tonumber(value.rdev_major), rdev_minor = tonumber(value.rdev_minor) }
+	end
+	local function same(a, b)
+		return a and b and a.ino == b.ino and a.dev_major == b.dev_major and a.dev_minor == b.dev_minor
+			and a.kind == b.kind and a.rdev_major == b.rdev_major and a.rdev_minor == b.rdev_minor
+	end
+	local function sysname(fd)
+		local buffer = ports.new("unsigned char[64]")
+		local count = tonumber(ports.ioctl(fd, UI_GET_SYSNAME_64, buffer))
+		-- Kernel length includes NUL; count == capacity is ambiguous truncation.
+		if not count or count % 1 ~= 0 or count <= 1 or count >= 64 then return nil end
+		local bytes = ports.string(buffer, count)
+		if bytes:sub(-1) ~= "\0" then return nil end
+		local name = bytes:sub(1, -2)
+		if name:find("\0", 1, true) or not name:match("^input[0-9]+$") then return nil end
+		return name
+	end
+	local function close_once(entry)
+		if entry.close_attempted then return false end
+		entry.close_attempted = true
+		local ok, result = pcall(ports.close, entry.fd)
+		if not ok or result ~= 0 then metadata_debt = true; return false end
+		entry.closed = true
+		return true
+	end
+	local function retire_record(record)
+		if record.retired then return record.closed == true end
+		record.retired = true
+		local closed = true
+		for index = #record.entries, 1, -1 do
+			if not close_once(record.entries[index]) then closed = false end
+		end
+		record.closed = closed
+		return closed
+	end
+	local function decimal(value)
+		return value == "0" or value:match("^[1-9][0-9]*$") ~= nil
+	end
+	local function device_numbers(fd)
+		local buffer = ports.new("unsigned char[65]")
+		local count = tonumber(ports.pread(fd, buffer, 65, 0))
+		if not count or count % 1 ~= 0 or count <= 0 or count > 64 then return nil end
+		local bytes = ports.string(buffer, count)
+		local a, b = bytes:match("^([0-9]+):([0-9]+)\n$")
+		if not a or not decimal(a) or not decimal(b) then return nil end
+		local major, minor = tonumber(a), tonumber(b)
+		if not major or not minor or major > 4294967295 or minor > 4294967295 then return nil end
+		-- Refuse a prefix-only read; the held regular metadata fd must reach EOF.
+		if ports.pread(fd, buffer, 1, count) ~= 0 then return nil end
+		return major, minor
+	end
+	local function named_current(record)
+		for _, entry in ipairs(record.entries) do
+			if entry.closed or entry.close_attempted or not same(entry.identity, stat(entry.fd, "", EMPTY_PATH))
+				or not same(entry.identity, stat(entry.parent, entry.name, NOFOLLOW)) then return false end
+		end
+		return true
+	end
+	local function acquire(fd, owner_current, path)
+		if busy or metadata_debt or type(path) ~= "string" or #path > 1024
+			or not path:match("^/dev/input/event[0-9]+$") or not current(owner_current) then return nil, "kernel-node-unavailable" end
+		busy = true
+		local record = { entries = {}, owner_current = owner_current, fd = fd, path = path }
+		local disposition = "refused"
+		local function open_entry(parent, name, flags, kind)
+			if not current(owner_current) then return nil end
+			local opened, value = pcall(ports.openat, parent, name, flags)
+			if not opened then metadata_debt = true; return nil end
+			local error_number = value ~= nil and tonumber(value) < 0 and ports.errno() or nil
+			value = tonumber(value)
+			if value and value < 0 then return nil, error_number == 2 and "missing" or "refused" end
+			if not value or value % 1 ~= 0 or value < 0 or value > 2147483647 then return nil end
+			local entry = { fd = value, parent = parent, name = name }
+			record.entries[#record.entries + 1] = entry -- Retain before any observer.
+			entry.identity = stat(value, "", EMPTY_PATH)
+			if not entry.identity or entry.identity.kind ~= kind
+				or not same(entry.identity, stat(parent, name, NOFOLLOW)) or not current(owner_current) then return nil end
+			return entry
+		end
+		local ok, accepted = pcall(function()
+			record.sysname = sysname(fd)
+			if not record.sysname or not current(owner_current) then return false end
+			local root = open_entry(AT_FDCWD, "/", DIR_FLAGS, 0x4000)
+			if not root then return false end
+			local dev = open_entry(root.fd, "dev", DIR_FLAGS, 0x4000)
+			local input = dev and open_entry(dev.fd, "input", DIR_FLAGS, 0x4000)
+			local event = path:match("(event[0-9]+)$")
+			record.node = input and open_entry(input.fd, event, O_PATH + O_NOFOLLOW + O_CLOEXEC, 0x2000)
+			if not record.node then return false end
+			local sys = open_entry(root.fd, "sys", DIR_FLAGS, 0x4000)
+			local devices = sys and open_entry(sys.fd, "devices", DIR_FLAGS, 0x4000)
+			local virtual = devices and open_entry(devices.fd, "virtual", DIR_FLAGS, 0x4000)
+			local inputs = virtual and open_entry(virtual.fd, "input", DIR_FLAGS, 0x4000)
+			local owned = inputs and open_entry(inputs.fd, record.sysname, DIR_FLAGS, 0x4000)
+			if not owned then return false end
+			local child, refusal = open_entry(owned.fd, event, DIR_FLAGS, 0x4000)
+			if not child then
+				-- Missing only this event child under the held original Writer inputN
+				-- can prove a foreign node. Permission/stat/read errors never do.
+				if refusal == "missing" and named_current(record) and sysname(fd) == record.sysname and current(owner_current) then
+					disposition = "nonmatch"
+				end
+				return false
+			end
+			record.dev = child and open_entry(child.fd, "dev", O_NOFOLLOW + O_CLOEXEC, 0x8000)
+			if not record.dev then return false end
+			local major, minor = device_numbers(record.dev.fd)
+			if not major or not minor then return false end
+			if major ~= record.node.identity.rdev_major or minor ~= record.node.identity.rdev_minor then
+				if named_current(record) and sysname(fd) == record.sysname and current(owner_current) then disposition = "nonmatch" end
+				return false
+			end
+			return named_current(record) and sysname(fd) == record.sysname and current(owner_current)
+		end)
+		if not ok or accepted ~= true then
+			local closed = retire_record(record)
+			busy = false
+			return nil, ok and closed and not metadata_debt and disposition or "refused"
+		end
+		busy = false
+		return record, "matched"
+	end
+	local function observe(record)
+		if busy or not record or record.retired or metadata_debt then return false end
+		busy = true
+		local ok, value = pcall(function()
+			if not current(record.owner_current) or sysname(record.fd) ~= record.sysname or not named_current(record) then return false end
+			local major, minor = device_numbers(record.dev.fd)
+			return major == record.node.identity.rdev_major and minor == record.node.identity.rdev_minor
+				and named_current(record) and sysname(record.fd) == record.sysname and current(record.owner_current)
+		end)
+		busy = false
+		return ok and value == true and not record.retired
+	end
+	local function retire(record)
+		if busy or not record then return false end
+		busy = true
+		local closed = retire_record(record)
+		busy = false
+		return closed
+	end
+	-- Private metadata ports: caller retains records; none is an output capability.
+	return { acquire = acquire, current = observe, retire = retire, ports_current = ports_current, closed = function() return not metadata_debt end }
+end
+
 local function build_ffi_backend()
 	local ok_ffi, ffi = pcall(require, "ffi")
 	if not ok_ffi or type(ffi) ~= "table" then
@@ -377,7 +587,7 @@ local function build_ffi_backend()
 	-- cannot substitute a syscall after the native channel is acknowledged.
 	local native_open, native_close = ffi.C.open, ffi.C.close
 	local native_ioctl, native_write, cast = ffi.C.ioctl, ffi.C.write, ffi.cast
-	return {
+	local backend = {
 		open = function(path, flags)
 			local fd = native_open(path, flags)
 			if fd < 0 then return nil, "open failed" end
@@ -400,6 +610,9 @@ local function build_ffi_backend()
 			return native_close(fd) == 0
 		end,
 	}
+	local admitted, metadata = pcall(build_kernel_node_ports, ffi)
+	if admitted and metadata then kernel_backends[backend] = metadata end
+	return backend
 end
 
 --- Binds the production FFI backend.
@@ -886,5 +1099,68 @@ M.UI_DEV_DESTROY = UI_DEV_DESTROY
 M.UINPUT_PATH = UINPUT_PATH
 
 original_output_observer_factory, original_capture_output = M.capture_output_observer, M.capture_output
+
+
+--- Private native observation issuer, bound to the original open Writer.
+--- A scripted transport/backend or detached output view cannot construct it.
+function M.capture_kernel_source()
+	if M.capture_kernel_source ~= original_kernel_capture or M.capture_output ~= original_capture_output then return nil end
+	local capability, factory = original_capture_output()
+	local owned = _output
+	local metadata = owned and kernel_backends[owned.backend]
+	if not capability or not owned or owned.capability ~= capability
+		or factory ~= original_output_observer_factory or not metadata or not output_current(capability) then return nil end
+	local retired, records, unresolved = false, {}, false
+	local function current()
+		return not retired and not unresolved and M.capture_kernel_source == original_kernel_capture
+			and M.capture_output == original_capture_output and _output == owned
+			and output_current(capability) and kernel_backends[owned.backend] == metadata
+			and metadata.ports_current() and metadata.closed()
+	end
+	local function retire_node(node)
+		if not records[node] then return false end
+		records[node] = nil -- Physical close is attempted only once by metadata.retire.
+		local called, value = pcall(metadata.retire, node)
+		if not called or value ~= true then unresolved = true; return false end
+		return true
+	end
+	local issuer = {}
+	issuer.owner_current = current
+	issuer.acquire_path = function(path)
+		if not current() then return nil, "refused" end
+		local called, node, disposition = pcall(metadata.acquire, owned.fd, current, path)
+		if not called then unresolved = true; return nil, "refused" end
+		if node then records[node] = true end -- Stage before any subsequent observer.
+		if not current() then
+			if node then retire_node(node) end
+			return nil, "refused"
+		end
+		return node, disposition
+	end
+	issuer.current = function(node)
+		return records[node] == true and current() and metadata.current(node, current) == true
+	end
+	issuer.retire = retire_node
+	issuer.closed = function() return not unresolved and metadata.closed() end
+	issuer.close = function()
+		retired = true
+		local closed = not unresolved
+		for node in pairs(records) do if not retire_node(node) then closed = false end end
+		return closed and metadata.closed()
+	end
+	local token = {}
+	local expected = {}
+	for name, port in pairs(issuer) do expected[name] = port end
+	kernel_sources[token] = { ports = issuer, expected = expected }
+	return token
+end
+function M.kernel_source_ports(token)
+	if M.capture_kernel_source ~= original_kernel_capture or M.kernel_source_ports ~= original_kernel_ports then return nil end
+	local record = kernel_sources[token]
+	if not record then return nil end
+	for name, port in pairs(record.expected) do if record.ports[name] ~= port then return nil end end
+	return record.ports
+end
+original_kernel_capture, original_kernel_ports = M.capture_kernel_source, M.kernel_source_ports
 
 return M

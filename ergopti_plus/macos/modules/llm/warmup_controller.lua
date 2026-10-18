@@ -332,14 +332,20 @@ function M.schedule_warmup_with_retry(reason)
 			Logger.error(LOG, "[WARMUP-LOOP] Active profile resolution failed — %s.", tostring(profile))
 			return
 		end
-		local warmup_ok, warmup_err = xpcall(function()
-			_core_llm.warmup_model(current, profile)
+		local warmup_ok, warmup_err, acquired = xpcall(function()
+			return _core_llm.warmup_model(current, profile)
 		end, debug.traceback)
 		if my_gen ~= _warmup_gen then return end
 		if not warmup_ok then
 			Logger.error(LOG, "[WARMUP-LOOP] Warmup attempt failed — %s.", tostring(warmup_err))
 		end
-		arm_attempt(next_interval, next_interval)
+		-- Only an explicit retained-request observation defers attempt backoff.
+		-- Other backends keep their existing policy when no observation is supplied.
+		if warmup_ok and warmup_err == true and acquired == false then
+			arm_attempt(current_interval, current_interval)
+		else
+			arm_attempt(next_interval, next_interval)
+		end
 	end
 	return arm_attempt(WARMUP_INITIAL_DELAY_SEC, WARMUP_RETRY_BASE_SEC)
 end

@@ -135,7 +135,8 @@ function M.load(ctx)
 						blocked[#blocked + 1] = { path = fpath, label = table.concat(relative, "/"), reason = "linked-directory" }
 					elseif a.mode == "directory" then
 						table.insert(items, { type = "dir", name = fname, path = fpath })
-					elseif (a.mode == "file" or a.mode == "link") and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml") then
+					elseif (a.mode == "file" or a.mode == "link") and fname:match("%.toml$") and (prefix ~= "" or fname ~= "personal_hotstrings.toml")
+						and not PersonalFiles.is_backup(fname) then
 						local stem = fname:match("^(.-)%.toml$")
 						if stem then
 							table.insert(items, { type = "file", name = fname, stem = stem, path = fpath })

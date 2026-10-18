@@ -24,6 +24,36 @@ _ROLE_POPEN = subprocess.Popen
 MAX_FRAME_BYTES = 65536
 MAX_REQUEST_BYTES = 65536
 WORKER_FLAG = "--managed-http-worker"
+
+
+# BEGIN GENERATED NATIVE HTTP FAILURE STAGES
+# Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+FAILURE_STAGES = {
+    "native_policy_load": frozenset(["unavailable"]),
+    "native_selection_bound": frozenset(["unavailable"]),
+    "native_proxy_lookup": frozenset(["unavailable"]),
+    "native_proxy_dictionary": frozenset(["proxy"]),
+    "native_route_empty": frozenset(["unavailable"]),
+    "native_certificate_load": frozenset(["certificate"]),
+    "native_lookup_deadline": frozenset(["deadline"]),
+    "native_dispatch_deadline": frozenset(["deadline"]),
+    "native_session_terminal": frozenset(
+        [
+            "deadline",
+            "cancelled",
+            "offline",
+            "certificate",
+            "proxy",
+            "connect",
+            "unavailable",
+            "protocol",
+            "content_encoding",
+        ]
+    ),
+}
+# END GENERATED NATIVE HTTP FAILURE STAGES
+
+
 REASONS = frozenset(
     (
         "complete",
@@ -441,8 +471,18 @@ class NativeHTTPResponse:
             raise NativeHTTPError("protocol")
 
     def _validate_terminal(self, value):
-        """The generic HTTP role permits exactly its original three C fields."""
-        if set(value) != {"version", "success", "reason"}:
+        """Only failed generic C frames may carry a closed passive stage code."""
+        fields = set(value)
+        if fields == {"version", "success", "reason"}:
+            return
+        if fields != {"version", "success", "reason", "native_refusal_stage"}:
+            raise NativeHTTPError("protocol")
+        stage = value["native_refusal_stage"]
+        if (
+            value.get("success") is not False
+            or type(stage) is not str
+            or value.get("reason") not in FAILURE_STAGES.get(stage, ())
+        ):
             raise NativeHTTPError("protocol")
         self._validate_completion(value)
 
@@ -538,6 +578,10 @@ class NativeHTTPResponse:
         status = getattr(process, "returncode", None) if retired else None
         terminal = getattr(self, "_terminal_value", None) if retired else None
         reason = terminal.get("reason") if type(terminal) is dict else None
+        if type(terminal) is dict and stage == "native_terminal":
+            refusal_stage = terminal.get("native_refusal_stage")
+            if type(refusal_stage) is str and reason in FAILURE_STAGES.get(refusal_stage, ()):
+                stage = refusal_stage
         failure.native_diagnostic = {
             "stage": stage,
             "exception_class": kind,

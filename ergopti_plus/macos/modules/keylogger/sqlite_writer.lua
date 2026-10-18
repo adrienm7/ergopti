@@ -34,6 +34,7 @@ local TextCipher = require("modules.keylogger.text_cipher")
 -- Statement shapes for the at-rest migration (section 8). Shared with Linux so
 -- the two drivers cannot drift on which columns a conversion may rewrite.
 local Migration  = require("keylogger.text_migration")
+local MediaStore = require("keylogger.media_store")
 local LOG    = "keylogger.sqlite_writer"
 
 
@@ -57,6 +58,13 @@ local _device_id = nil
 
 --- Open SQLite handle. nil until M.open_db() succeeds.
 local _db = nil
+
+--- Unadmitted startup handle whose native SQLite close refused cleanup.
+local _media_startup_db_debt = nil
+
+--- A file close can consume its descriptor before reporting failure. Retain its
+--- exact owner as unresolved debt, but never retry that ambiguous close.
+local _media_schema_close_debt = nil
 
 --- Per-device sequential event id counter.
 local _next_event_id = 1
@@ -149,11 +157,27 @@ end
 -- ===================================
 -- ===================================
 
+--- Retire only the unadmitted database acquired for semantic media startup.
+--- Native SQLite refusal leaves the exact handle available to close_db, never get_db.
+local function _retire_media_startup_db(db)
+	local close_ok, close_result = pcall(db.close, db)
+	if not close_ok or (close_result ~= true and close_result ~= sqlite3.OK) then
+		_media_startup_db_debt = db
+		Logger.error(LOG, "Semantic media startup database close failed; exact handle retained: %s.",
+			tostring(close_result))
+	end
+end
+
 --- Open db.sqlite in tmpdir, applying the schema when the file is fresh.
 --- Restores persisted counters (next_event_id, today_log_offset, etc.).
 --- @return boolean True on success, false on unrecoverable error.
 function M.open_db()
 	if not _require_init("open_db") then return false end
+
+	if _media_startup_db_debt ~= nil or _media_schema_close_debt ~= nil then
+		Logger.error(LOG, "Cannot reopen SQLite while semantic media startup cleanup is unresolved.")
+		return false
+	end
 
 	local existed = fs.attributes(_paths.sqlite_path) ~= nil
 	local db, err = sqlite3.open(_paths.sqlite_path)
@@ -181,6 +205,44 @@ function M.open_db()
 			return false
 		end
 		Logger.success(LOG, "Schema applied (version 1).")
+	end
+
+	local media_opened, media_file, media_open_error = pcall(io.open,
+		Paths.shared("data/db/media_schema.sql"), "r")
+	local media_schema = nil
+	if not media_opened or media_file == nil then
+		Logger.error(LOG, "Cannot open semantic media schema: %s.",
+			tostring(media_opened and media_open_error or media_file))
+	else
+		local read_ok, body, read_error = pcall(media_file.read, media_file, "*a")
+		local close_ok, closed, close_error = pcall(media_file.close, media_file)
+		if not read_ok or type(body) ~= "string" then
+			Logger.error(LOG, "Cannot read semantic media schema: %s.",
+				tostring(read_ok and read_error or body))
+		end
+		if not close_ok or closed ~= true then
+			_media_schema_close_debt = media_file
+			Logger.error(LOG, "Semantic media schema close failed; exact owner retained without retry: %s.",
+				tostring(close_ok and close_error or closed))
+		elseif read_ok and type(body) == "string" then
+			media_schema = body
+		end
+	end
+	if media_schema == nil then
+		_retire_media_startup_db(db)
+		return false
+	end
+	local apply_ok, apply_result = pcall(function()
+		return db:exec(MediaStore.schema_transaction(media_schema))
+	end)
+	if not apply_ok or apply_result ~= sqlite3.OK then
+		Logger.error(LOG, "Cannot apply semantic media schema: %s.", tostring(apply_result))
+		local rollback_ok, rollback_result = pcall(db.exec, db, "ROLLBACK;")
+		if not rollback_ok or rollback_result ~= sqlite3.OK then
+			Logger.error(LOG, "Semantic media schema rollback failed: %s.", tostring(rollback_result))
+		end
+		_retire_media_startup_db(db)
+		return false
 	end
 
 	_db = db
@@ -245,10 +307,10 @@ function M.open_db()
 end
 
 --- Close the SQLite handle cleanly without losing retry ownership.
---- @return boolean closed True only when the native handle accepted close.
+--- @return boolean closed True only after SQLite accepted close and no startup file debt remains.
 function M.close_db()
-	local db = _db
-	if db == nil then return true end
+	local db = _media_startup_db_debt or _db
+	if db == nil then return _media_schema_close_debt == nil end
 	local ok, result_or_err = xpcall(function()
 		return db:close()
 	end, debug.traceback)
@@ -258,7 +320,8 @@ function M.close_db()
 		return false
 	end
 	if _db == db then _db = nil end
-	return true
+	if _media_startup_db_debt == db then _media_startup_db_debt = nil end
+	return _db == nil and _media_startup_db_debt == nil and _media_schema_close_debt == nil
 end
 
 --- Return the raw SQLite handle. Log manager uses this for ingest transactions.

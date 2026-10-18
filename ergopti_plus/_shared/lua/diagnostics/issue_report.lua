@@ -58,7 +58,11 @@ end
 local function is_array(value)
 	local count = 0
 	for _ in pairs(value) do count = count + 1 end
-	return count > 0 and count == #value
+	-- Lua's length is undefined for holes; an equal key count can hide map fields.
+	for index = 1, count do
+		if rawget(value, index) == nil then return false end
+	end
+	return count > 0
 end
 
 --- The table's keys, sorted as strings.

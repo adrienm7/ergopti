@@ -50,6 +50,9 @@ global _PrefixContentGeneration := 0
 ; character verifies this token before the engine can consume it.
 global _PrefixFocusedControlToken := 0
 global _PrefixInputContextGeneration := 0
+; A_TickCount of the last physical keystroke the watcher observed, "" before
+; the first: the reference of the idle reset (_PrefixApplyIdleReset).
+global _PrefixLastKeyTick := ""
 
 ; Set when a PRIVATE expansion has written its resolved value into the buffers.
 ; After a star fire the watcher takes the engine's buffer verbatim, so
@@ -255,10 +258,12 @@ _InstallMouseClickResetHooks() {
 
 _OnMouseClickReset(*) {
 	try {
-		; A click places the cursor at an unknown position, but the next
-		; keystroke will start a fresh run — treat it as a word boundary so
-		; is_word triggers (e.g. "c★ → c'est") fire immediately.
-		_PrefixInvalidateInputContext(0, true)
+		; A click places the cursor at an unknown position. With
+		; hotstrings.click_resets_word (the default) the next keystroke starts
+		; a fresh word, so is_word triggers (e.g. "c★ → c'est") fire at once;
+		; without it the run waits for a delimiter. The unknown focus token
+		; makes _PrefixEnsureInputContext keep this verdict.
+		_PrefixInvalidateInputContext(0, HSE_ClickResetsWordCurrent())
 		if IsSet(LLM_Bridge_ResetPredictions)
 			LLM_Bridge_ResetPredictions()
 	} catch as Err {
@@ -542,7 +547,7 @@ PrefixWatcherSuppress(YesNo) {
 	; its OWN SendInput output, and physical input declares itself with
 	; IsPhysical=true instead (F46). Delegating here would drop a physical
 	; character typed inside a nearby output transaction — pinned by
-	; tests/meta/test_hse_physical_input_provenance.ahk, which asserts this call
+	; tests/meta/modules/hotstrings/engine/test_hse_physical_input_provenance.ahk, which asserts this call
 	; is absent. Any comment elsewhere claiming this function holds both counters
 	; is stale; HSE_Suppressed is not part of this contract.
 }
@@ -1112,6 +1117,31 @@ _PrefixInvalidateInputContext(FocusToken := 0, KnownBoundary := true) {
 	return Commit.Generation
 }
 
+; Starts a new word when the user paused longer than hotstrings.idle_reset_seconds
+; since the previous observed keystroke, then stamps this one. Both InputHook
+; callbacks call it: OnKeyDown sees every physical key (characters, Backspace,
+; navigation) first, and OnChar covers a character whose keydown it did not
+; observe; the second call of one keystroke reads a zero gap.
+; @param NowTick {Integer} Tick of the current keystroke.
+; @returns {Boolean} True when the context was reset.
+_PrefixApplyIdleReset(NowTick) {
+	global _PrefixLastKeyTick, _PrefixBuffer, _PrefixFocusedControlToken
+	global HSE_Buffer, HSE_StartIsWordBoundary
+	LastTick := _PrefixLastKeyTick
+	_PrefixLastKeyTick := NowTick
+	IdleSeconds := HSE_IdleResetSecondsCurrent()
+	if !HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds)
+		return false
+	; Nothing to forget: keep the generations and the tooltip owner untouched.
+	if (HSE_Buffer == "" and _PrefixBuffer == "" and HSE_StartIsWordBoundary)
+		return false
+	_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+	if LoggerIsDebugEnabled()
+		LoggerDebug("PrefixWatcher", "Idle reset: {1} ms without typing (limit {2} s) — new word.",
+			NowTick - LastTick, IdleSeconds)
+	return true
+}
+
 ; Verify that the next character still targets the control which owns the two
 ; buffers. An explicit token is a deterministic test seam; production callers
 ; omit it and use the WindowInfo adapter. Failure to resolve focus is fail-closed:
@@ -1150,6 +1180,37 @@ _PrefixEnsureInputContext(FocusToken := unset) {
 ; @return {Boolean}
 _PrefixAltGrMasksCtrl(RAltDown, AltGrKeyDown) {
 	return KS_AltGrAddsFakeLCtrl() and (RAltDown or AltGrKeyDown)
+}
+
+; Whether a modifier key itself went down: Shift, Ctrl, Alt, Win, either side.
+; @param VK {Integer} The virtual key.
+; @returns {Boolean}
+_PrefixIsModifierVK(VK) {
+	return (VK >= 0x10 and VK <= 0x12) or (VK >= 0xA0 and VK <= 0xA5) or VK == 0x5B or VK == 0x5C
+}
+
+; Whether modifier key Name is down, physically or logically: a tap-hold's
+; synthetic hold (CapsLock held as Ctrl) is down for the application without
+; any physical Ctrl. A global holding a function so tests can stand in for the
+; keyboard.
+global _PrefixModifierIsDown := (Name) => (GetKeyState(Name, "P") or GetKeyState(Name)) ? true : false
+
+; Whether the key going down is struck as a shortcut: Ctrl, Alt or Win held,
+; Shift added or not. AltGr is typing: on a standard AltGr layout the right Alt
+; is AltGr and Windows adds a fake LCtrl to it; on a Kana-style layout AltGr
+; is VK_OEM_8, no modifier at all. On a layout without AltGr the right Alt is
+; a plain Alt.
+; @returns {Boolean}
+_PrefixShortcutModifierHeld() {
+	global _PrefixModifierIsDown
+	IsDown := _PrefixModifierIsDown
+	RAltIsAltGr := KS_AltGrAddsFakeLCtrl()
+	if ((IsDown.Call("LControl") or IsDown.Call("RControl"))
+			and !(RAltIsAltGr and IsDown.Call("RAlt")))
+		return true
+	if (IsDown.Call("LAlt") or (!RAltIsAltGr and IsDown.Call("RAlt")))
+		return true
+	return IsDown.Call("LWin") or IsDown.Call("RWin")
 }
 
 ; Handle the two genuine Ctrl chords proven to relocate focus without OnChar.
@@ -1278,6 +1339,9 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		; guard sits before the main dispatch try, so contain it independently: an
 		; unhandled InputHook callback error permanently silences later characters.
 		try {
+			; A character whose keydown the watcher did not observe still gets
+			; the idle rule; after OnKeyDown the gap reads zero.
+			_PrefixApplyIdleReset(A_TickCount)
 			FocusStarted := HotPath_Now()
 			ContextReady := IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext()
 			HotPath_LogIfSlow("Prefix.FocusAdmission", FocusStarted)
@@ -1561,6 +1625,7 @@ _OnPrefixKeyDown(IH, VK, SC) {
 		0x0D, true,  ; VK_RETURN
 		0x1B, true,  ; VK_ESCAPE
 		0x20, true,  ; VK_SPACE
+		; The arrows reset only under hotstrings.arrow_resets_word (below).
 		0x25, true,  ; VK_LEFT
 		0x26, true,  ; VK_UP
 		0x27, true,  ; VK_RIGHT
@@ -1581,35 +1646,39 @@ _OnPrefixKeyDown(IH, VK, SC) {
 	; Same try guard as _OnPrefixChar — an unhandled error here permanently
 	; silences the OnKeyDown callback for all subsequent keystrokes.
 	try {
-		; Detect Ctrl-modified combos that mutate the document context but
-		; do not produce a printable char observable by OnChar. Held Ctrl
-		; is read off the live keyboard state since the InputHook does
-		; not surface modifier flags. Done before the plain-VK branches
-		; so Ctrl+A/X/V/Z/Y do not also fall through to (e.g.) the « no
-		; printable » case.
+		; A long enough pause before this key starts a new word, whatever the
+		; key does next (a Backspace or a navigation key then applies on top).
+		_PrefixApplyIdleReset(A_TickCount)
+		; Shortcuts and arrows first, so they never fall through to the
+		; plain-VK branches below. Held modifiers are read off the live
+		; keyboard state since the InputHook does not surface modifier flags.
+		; Ctrl+F and Ctrl+L move the focus to another control: they always
+		; publish an unknown focus token.
 		CtrlHeld := KS_IsDown("Control")
 		AltGrHeld := _PrefixAltGrMasksCtrl(KS_IsDown("RAlt"), KS_IsDown("SC138"))
 		if _PrefixHandleCtrlContextChord(VK, CtrlHeld, AltGrHeld)
 			return
-		if (CtrlHeld and !AltGrHeld) {
-			if (VK == 0x41) {
-				; Ctrl+A — select-all. The next typed char replaces the
-				; entire selection, landing at a fresh word-start.
-				; IsPhysical=true so a real Ctrl+A landing inside the post-expansion
-				; suppress window is honoured instead of being filtered as engine output.
-				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
-				return
-			}
-			if (VK == 0x58 or VK == 0x56 or VK == 0x5A or VK == 0x59 or VK == 0x08) {
-				; Ctrl+X (cut) / Ctrl+V (paste) / Ctrl+Z (undo) /
-				; Ctrl+Y (redo) / Ctrl+Backspace (delete-word) — document
-				; content rewritten by an unknown amount (a whole word for
-				; Ctrl+Backspace), cursor lands somewhere we cannot observe.
-				; Wipe the buffer and refuse to assume a word boundary on its
+		; An arrow key is an arrow under any modifier: it belongs to
+		; hotstrings.arrow_resets_word, in the ResetVKs branch below.
+		IsArrow := (VK >= 0x25 and VK <= 0x28)
+		if (!IsArrow and !_PrefixIsModifierVK(VK) and _PrefixShortcutModifierHeld()) {
+			if (VK == 0x08) {
+				; Ctrl+Backspace (or Alt+Backspace) deletes a whole word, by an
+				; amount this watcher cannot observe: whatever the settings say,
+				; both buffers are wiped and no word boundary is assumed on the
 				; left. Falling through to the plain VK==0x08 branch below would
 				; chop only ONE char, leaving the buffer ahead of the screen and
 				; later firing an expansion with backspaces into unrelated text.
 				_PrefixInvalidateInputContext(_PrefixFocusedControlToken, false)
+				return
+			}
+			; Insert and Delete keep their own reset below, modifiers or not.
+			if !(VK == 0x2D or VK == 0x2E) {
+				; Any other shortcut (Ctrl+V, Ctrl+Shift+Z, Alt+F4, Win+Shift+S…):
+				; a new word, or the word left open, as
+				; hotstrings.shortcut_resets_word says — or
+				; hotstrings.tap_hold_resets_word when a tap-hold made it.
+				HS_ApplyEventWordReset(HS_ShortcutWordResetKey(), "Shortcut")
 				return
 			}
 		}
@@ -1642,7 +1711,12 @@ _OnPrefixKeyDown(IH, VK, SC) {
 			FocusToken := (VK == 0x09 or VK == 0x0D or VK == 0x1B)
 				? 0
 				: _PrefixFocusedControlToken
-			_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+			; An arrow leaves the word open when hotstrings.arrow_resets_word
+			; is off; the prediction still learns that the caret moved.
+			if (!IsArrow or HSE_WordResetFlagCurrent("arrow_resets_word"))
+				_PrefixInvalidateInputContext(FocusToken, KnownBoundary)
+			else if LoggerIsDebugEnabled()
+				LoggerDebug("PrefixWatcher", "Arrow key: hotstrings.arrow_resets_word is off — the word stays open.")
 			if IsSet(LLM_Bridge_FeedKeyDownIfActive)
 				LLM_Bridge_FeedKeyDownIfActive(VK, true)
 		}

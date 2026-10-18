@@ -33,7 +33,7 @@ for name,text in pairs(cases) do
 end
 K.record_synthetic_output("synthetic-ascii","abc","llm",math.floor(Clock.now_ms()))
 K.record_synthetic_output("synthetic-unicode","Aé中🙂é\n","llm",math.floor(Clock.now_ms()))
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 local manifest,complete=R.read_manifest(root.."/metrics.sqlite")
 assert(complete==true)
 local payload=K.get_dashboard_payload({include_prefetch=false})

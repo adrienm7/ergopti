@@ -396,8 +396,12 @@ _UIA_OnSelectionWorkerTerminal(Status, Context, Result) {
 	}
 
 	; File/log sinks never run inside the keyboard-ownership transaction.
+	; A provider slower than the deadline is the case the deadline and the backoff
+	; exist for, so it is INFO and names the application that was backed off; a
+	; worker that failed outright still warns.
 	if (LogKind = "timeout") {
-		try LoggerWarn("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider is backed off for this process.", UIASW_DEADLINE_MS)
+		try LoggerInfo("Layout", "UIA selection worker exceeded its {1} ms deadline; the provider of '{2}' is backed off for {3} ms.",
+			UIASW_DEADLINE_MS, Context["ProcName"], _UIA_NO_TP_TTL_MS)
 	} else if (LogKind = "failed") {
 		try LoggerWarn("Layout", "UIA selection worker failed: {1}", LogDetail)
 	}
@@ -668,24 +672,6 @@ SC00B Up:: _DigitRowUp("0")
 SC00C:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0C])
 SC00D:: _DigitShiftSend(ErgoptiNumberRowEdgeMapping()[0x0D])
 #HotIf
-
-; Serialised digit-row emit. Critical("On") makes the SendEvent uninterruptible
-; so it cannot interleave with a neighbouring remapped letter's emit in the
-; single OS input queue (remap-emit-critical-uneven). Down and Up are split so
-; the key's auto-repeat / release timing is preserved exactly as before.
-_DigitRowDown(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Down}")
-	; Same rule as _RemapEmit and _DigitShiftSend ten lines below, which this
-	; sibling was left out of: an armed suppressing hook eats this character, so
-	; it must not be recorded as having reached the screen.
-	if _EmitReachedScreen()
-		UpdateLastSentCharacter(Digit)
-}
-_DigitRowUp(Digit, *) {
-	Critical("On")
-	SendEvent("{" Digit " Up}")
-}
 
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),

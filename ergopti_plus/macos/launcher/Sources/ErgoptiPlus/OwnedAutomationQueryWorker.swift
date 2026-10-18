@@ -1,6 +1,7 @@
 // Sources/ErgoptiPlus/OwnedAutomationQueryWorker.swift
 // Signed bounded read-only Shortcuts query with exact native group retirement.
 
+import AppKit
 import CPOSIXCompatibility
 import Carbon
 import CoreFoundation
@@ -611,6 +612,50 @@ enum OwnedAutomationQueryWorker {
 		}
 	}
 
+	/// Shared budget for starting the on-demand target and asking again.
+	static let targetLaunchSeconds: TimeInterval = 4
+
+	/// Shortcuts Events is a background agent that macOS starts on demand, and
+	/// the no-prompt permission query answers procNotFound (-600) for a target
+	/// that is not running. Discovery then refused on every fresh session. Start
+	/// the target once and ask again until it registers or the budget ends; any
+	/// other answer, including a consent refusal, is returned unchanged.
+	static func determinePermission(deadline: TimeInterval, now: () -> TimeInterval,
+		query: () -> OSStatus, launch: () -> Bool, pause: () -> Void) -> OSStatus {
+		var status = query()
+		guard status == OSStatus(procNotFound), launch() else { return status }
+		repeat {
+			status = query()
+			if status != OSStatus(procNotFound) { return status }
+			pause()
+		} while now() < deadline
+		return status
+	}
+
+	/// LaunchServices starts the target without sending it an AppleEvent, so no
+	/// Automation consent is involved and nothing is brought to the foreground.
+	private static func launchShortcutsEvents(until deadline: TimeInterval) -> Bool {
+		guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.shortcuts.events") else {
+			return false
+		}
+		let configuration = NSWorkspace.OpenConfiguration()
+		configuration.activates = false
+		configuration.addsToRecentItems = false
+		configuration.promptsUserIfNeeded = false
+		let finished = DispatchSemaphore(value: 0)
+		let lock = NSLock()
+		var launched = false
+		// The completion handler runs on a concurrent queue, never this thread.
+		NSWorkspace.shared.openApplication(at: url, configuration: configuration) { application, error in
+			lock.lock(); launched = application != nil && error == nil; lock.unlock()
+			finished.signal()
+		}
+		let remaining = max(0, deadline - ProcessInfo.processInfo.systemUptime)
+		guard finished.wait(timeout: .now() + remaining) == .success else { return false }
+		lock.lock(); defer { lock.unlock() }
+		return launched
+	}
+
 	/// Read-only AppleEvents stay isolated from the interactive Hammerspoon runloop.
 	private static func queryRole(arguments: [String]) -> Int32 {
 		let operation = arguments[2], nonce = Int64(arguments[3])!
@@ -652,7 +697,12 @@ enum OwnedAutomationQueryWorker {
 		}
 		guard addressError == noErr else { return publish(refusal("native_refused")) }
 		defer { AEDisposeDesc(&target) }
-		let permission = AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, false)
+		let started = ProcessInfo.processInfo.systemUptime
+		let permission = determinePermission(deadline: started + targetLaunchSeconds,
+			now: { ProcessInfo.processInfo.systemUptime },
+			query: { AEDeterminePermissionToAutomateTarget(&target, typeWildCard, typeWildCard, false) },
+			launch: { launchShortcutsEvents(until: started + targetLaunchSeconds) },
+			pause: { usleep(50_000) })
 		guard permission == noErr else {
 			return publish(refusal(permission == -1743 || permission == -1744
 				? "automation_permission_refused" : "native_refused"))

@@ -14,6 +14,10 @@ local Profiles  = require("modules.llm.profiles")
 local ApiOllama = require("modules.llm.api_ollama")
 local ApiMlx    = require("modules.llm.api_mlx")
 local ApiRemote = require("modules.llm.api_remote")
+local LocalAuth = require("llm.local_server_auth")
+local LocalServers = require("modules.llm.local_servers")
+local RuntimeChoice = require("core.llm.ollama_runtime_choice")
+local EnableAdmission = require("llm.enable_admission")
 local OllamaBinary = require("modules.llm.ollama_binary")
 local Logger    = require("infra.logger")
 local Paths     = require("infra.paths")
@@ -199,7 +203,11 @@ local deferred_profile_warmup_cleanup_pending
 --- @return string|nil reason Why nothing is started, when not admitted.
 local function ollama_start_admitted()
 	if CoreState.runtime_llm_enabled ~= true then return false, "the AI is off" end
-	if OllamaBinary.resolve() == nil then return false, "Ollama is not installed" end
+	local source_path, _, source_kind = OllamaBinary.resolve()
+	if source_path == nil then return false, "Ollama is not installed" end
+	if RuntimeChoice.classify(source_kind) ~= "native" then
+		return false, "The selected Ollama service is managed outside Ergopti"
+	end
 	return true, nil
 end
 
@@ -218,9 +226,11 @@ end
 --- @param callback function|nil Optional callback(backend_name) called when detection completes.
 function M.auto_detect_backend(callback)
 	local now = hs.timer.secondsSinceEpoch()
+	local ollama_origin, mlx_origin = ApiOllama.get_base_url(), ApiMlx.get_base_url()
 
 	-- Return cached result immediately if checked recently (within 10s)
 	if now - CoreState.last_backend_check < CoreState.backend_check_interval
+		and CoreState.last_ollama_origin == ollama_origin and CoreState.last_mlx_origin == mlx_origin
 		and not deferred_profile_warmup_cleanup_pending() then
 		local result = CoreState.backend
 		if type(callback) == "function" then
@@ -228,8 +238,6 @@ function M.auto_detect_backend(callback)
 		end
 		return result
 	end
-
-	CoreState.last_backend_check = now
 
 	-- Capture the generation before launching probes so the closure can detect
 	-- whether set_backend() was called while the probes were in-flight; if it
@@ -252,6 +260,11 @@ function M.auto_detect_backend(callback)
 			Logger.debug(LOG, "auto_detect: user has set a manual backend override — skipping automatic write.")
 			return
 		end
+		if ollama_origin ~= ApiOllama.get_base_url() or mlx_origin ~= ApiMlx.get_base_url() then
+			CoreState.last_backend_check = 0
+			Logger.debug(LOG, "auto_detect: endpoint changed while probing; ignoring stale receipt.")
+			return
+		end
 		-- Prefer Ollama if both are available, otherwise MLX, and only invalidate
 		-- deferred work when the resolved identity actually changes. A same-backend
 		-- health refresh must not cancel an otherwise valid profile warmup.
@@ -272,6 +285,8 @@ function M.auto_detect_backend(callback)
 				return
 			end
 		end
+		CoreState.last_backend_check = now
+		CoreState.last_ollama_origin, CoreState.last_mlx_origin = ollama_origin, mlx_origin
 		CoreState.backend = next_backend
 		if next_backend == "ollama" then
 			-- Ensure the Ollama daemon is running now that we know it is the active
@@ -298,8 +313,8 @@ function M.auto_detect_backend(callback)
 	-- on_both_done() never completes and auto_detect_backend()'s callback is
 	-- silently dropped. Mark the leg done+failed instead, mirroring the
 	-- pattern already used in adapters/http_client.lua's post()/get() (F-MED-5).
-	local ollama_probe_ok = pcall(hs.http.asyncGet, "http://127.0.0.1:11434/api/version", {}, function(status, body)
-		ollama_ok = (status == 200) and type(body) == "string" and body:find('"version"') ~= nil
+	local ollama_probe_ok = pcall(hs.http.asyncGet, ollama_origin .. EnableAdmission.VERSION_PATH, {}, function(status, body)
+		ollama_ok = EnableAdmission.receipt({ ok = status == 200, status = status, body = body }) == true
 		ollama_done = true
 		on_both_done()
 	end)
@@ -313,7 +328,7 @@ function M.auto_detect_backend(callback)
 	-- The MLX probe follows the configured port via api_mlx.get_base_url() — the
 	-- single source of truth. ApiMlx is required at the top of this file, so no
 	-- local re-require and no hardcoded port literal here.
-	local mlx_models_url = ApiMlx.get_base_url() .. "/v1/models"
+	local mlx_models_url = mlx_origin .. "/v1/models"
 	local mlx_probe_ok = pcall(hs.http.asyncGet, mlx_models_url, {}, function(status, body)
 		mlx_ok = (status == 200) and type(body) == "string" and body:find('"object"') ~= nil
 		mlx_done = true
@@ -335,7 +350,7 @@ function M.warm_up_connections()
 		-- Parallel async pings to both backends (fire-and-forget). The MLX URL
 		-- follows the configured port via api_mlx.get_base_url() (required at the
 		-- top of this file) — the single source of truth, no hardcoded port.
-		hs.http.asyncGet("http://127.0.0.1:11434/api/version", {}, function() end)
+		hs.http.asyncGet(ApiOllama.get_base_url() .. EnableAdmission.VERSION_PATH, {}, function() end)
 		hs.http.asyncGet(ApiMlx.get_base_url() .. "/v1/models", {}, function() end)
 	end)
 end
@@ -429,7 +444,7 @@ end
 --- Validates the canonical entry-array shape shared by legacy migration,
 --- combined-state load, and runtime publication. The legacy path alone may
 --- contain cleartext; every durable combined entry must carry an opaque ref,
---- except the empty token of a local server the user gave no key to.
+--- except explicit keyless local endpoints admitted by the shared auth policy.
 --- @param entries any Candidate dense array.
 --- @param allow_plaintext boolean Whether historical cleartext is accepted.
 --- @param active_id string Candidate active identity.
@@ -443,7 +458,8 @@ local function validate_api_entries(entries, allow_plaintext, active_id)
 			or type(entry.provider) ~= "string" or entry.provider == ""
 			or type(entry.model) ~= "string" or entry.model == ""
 			or type(entry.token) ~= "string"
-			or (entry.token == "" and not ApiRemote.is_local_server(entry.provider))
+			or not LocalAuth.entry_token_allowed(entry.provider, entry.token,
+				entry.base_url, LocalServers.SERVERS)
 			or (entry.base_url ~= nil and type(entry.base_url) ~= "string")
 			or (entry.label ~= nil and type(entry.label) ~= "string")
 			or ids[entry.id] == true then
@@ -1255,7 +1271,7 @@ function M.warmup_model(model_name, profile)
 	local resolved_profile = profile or M.get_active_profile()
 	Logger.debug(LOG, "warmup_model: dispatching to backend '%s' for model '%s'.",
 		tostring(CoreState.backend), tostring(model_name))
-	local ok, accepted_or_err = pcall(function()
+	local ok, accepted_or_err, acquired = pcall(function()
 		return get_api().warmup(model_name, resolved_profile)
 	end)
 	if not ok or accepted_or_err ~= true then
@@ -1263,7 +1279,7 @@ function M.warmup_model(model_name, profile)
 			tostring(accepted_or_err))
 		return false
 	end
-	return true
+	return true, acquired
 end
 
 --- Returns true when the active backend has confirmed it can answer inference

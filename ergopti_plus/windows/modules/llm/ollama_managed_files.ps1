@@ -4,7 +4,7 @@
 
 [CmdletBinding()]
 param(
-	[ValidateSet('', 'prepare', 'publish', 'cleanup', 'cleanup_partial')][string]$Action = '',
+	[ValidateSet('', 'prepare', 'publish', 'cleanup', 'cleanup_partial', 'inspect', 'retire_runtime')][string]$Action = '',
 	[string]$ManagedRoot = '',
 	[string]$CataloguePath = '',
 	[string]$CatalogueSha256 = '',
@@ -15,6 +15,10 @@ param(
 	[string]$ManifestSha256 = '',
 	[string]$CreationWalIdentity = '',
 	[string]$CreationWalSha256 = '',
+	[string]$RootIdentity = '',
+	[string]$RuntimeTicket = '',
+	[string]$ReadyFileIdentity = '',
+	[string]$ReadyImageSha256 = '',
 	[long]$MaxExpandedBytes = 0,
 	[int]$MaxEntries = 0
 )
@@ -919,12 +923,83 @@ function Remove-OllamaPreparedStage($Root, [string]$Ticket, [string]$ExpectedIde
 	}
 }
 
+# Reuse is admitted from the current pinned catalogue and complete immutable
+# inventory, never from PATH, a remembered executable string or a selector file.
+function Inspect-OllamaPublishedVersion($Root, $Source) {
+	$target = [IO.Path]::Combine($Root.versions, $Source.version + '-' + $Source.asset + '-' + $Source.pin.sha256)
+	if ([Ergopti.Ollama.ManagedNative]::PathIsAbsent($target)) {
+		return [ordered]@{ ok = $true; phase = 'missing' }
+	}
+	$handle = [Ergopti.Ollama.ManagedNative]::OpenDirectory($target, $true)
+	$checked = $null
+	try {
+		$receiptStream = Open-OllamaReadFile ([IO.Path]::Combine($target, 'prepared.json'))
+		try { $digest = Get-OllamaStreamHash $receiptStream; $receipt = Read-OllamaJsonStream $receiptStream }
+		finally { $receiptStream.Dispose() }
+		if ($receipt.version -cne $Source.version -or $receipt.asset -cne $Source.asset -or
+			$receipt.archive_sha256 -cne $Source.pin.sha256 -or $receipt.catalogue_sha256 -cne $Source.catalogue_sha256) {
+			throw 'An existing published version differs from its admitted release source.'
+		}
+		$checked = Open-OllamaPreparedStage $Root $receipt.ticket $receipt.identity $digest $false $target $handle
+		return [ordered]@{ ok = $true; phase = 'published'; ticket = $receipt.ticket;
+			root_identity = $Root.identity; version_identity = $receipt.identity;
+			manifest_sha256 = $digest; version_path = $target;
+			executable = [IO.Path]::Combine($target, 'ollama.exe'); archive_sha256 = $Source.pin.sha256 }
+	} finally {
+		if ($null -ne $checked) { Close-OllamaPreparedChildren $checked }
+		if (-not [Ergopti.Ollama.ManagedNative]::CloseHandle($handle)) { throw 'Published inspection retains its exact stage lease.' }
+	}
+}
+
+# A killed job cannot execute its finally block. Only the observed readiness
+# identity/image can authorize removal; an unobserved present file stays debt.
+function Remove-OllamaRuntimeReceipt($Root, [string]$ExpectedRoot, [string]$Ticket,
+	[string]$Runtime, [string]$ExpectedIdentity, [string]$ExpectedImage) {
+	if ($Root.identity -cne $ExpectedRoot -or $Ticket -cnotmatch '^[0-9a-f]{32}\z' -or $Runtime -cnotmatch '^[0-9a-f]{32}\z') {
+		throw 'Runtime retirement requires its exact originating root and tickets.'
+	}
+	$path = [IO.Path]::Combine($Root.path, '.runtime-' + $Runtime + '.json')
+	if ([Ergopti.Ollama.ManagedNative]::PathIsAbsent($path)) {
+		return [ordered]@{ ok = $true; phase = 'retired'; ticket = $Ticket }
+	}
+	if ($ExpectedIdentity -cnotmatch '^[0-9a-f]{8}:[0-9a-f]{16}\z' -or $ExpectedImage -cnotmatch '^[0-9a-f]{64}\z') {
+		throw 'An unobserved present runtime receipt retains physical debt.'
+	}
+	$stream = Open-OllamaReadFile $path $true
+	try {
+		if ([Ergopti.Ollama.ManagedNative]::Identity($stream.SafeFileHandle.DangerousGetHandle()) -cne $ExpectedIdentity -or
+			(Get-OllamaStreamHash $stream) -cne $ExpectedImage) { throw 'Runtime retirement refuses a replaced receipt.' }
+		$receipt = Read-OllamaJsonStream $stream
+		if ($receipt.runtime_ticket -cne $Runtime -or $receipt.ticket -cne $Ticket -or $receipt.root_identity -cne $Root.identity) {
+			throw 'Runtime retirement refuses a foreign receipt.'
+		}
+		$created = $receipt.child_created_filetime
+		if (($created -isnot [long] -and $created -isnot [int]) -or $created -le 0) {
+			throw 'An older runtime receipt has no captured child creation identity.'
+		}
+		Remove-OllamaExactFile $stream
+		return [ordered]@{ ok = $true; phase = 'retired'; ticket = $Ticket }
+	} finally { $stream.Dispose() }
+}
+
 if ($MyInvocation.InvocationName -ne '.') {
 	$root = $null; $archive = $null; $stage = $null; $publicationReceipt = $null
 	try {
 		if ($Action -eq '') { throw 'An explicit native file operation is required.' }
+		if ($Action -eq 'inspect') {
+			Initialize-OllamaManagedNative
+			if ([Ergopti.Ollama.ManagedNative]::PathIsAbsent((Assert-OllamaLocalPath $ManagedRoot))) {
+				[ordered]@{ ok = $true; phase = 'missing' } | ConvertTo-Json -Compress
+				exit 0
+			}
+		}
 		$root = Open-OllamaManagedRoot $ManagedRoot ($Action -eq 'prepare')
 		switch ($Action) {
+			'inspect' {
+				$archive = Open-OllamaReleaseSource $CataloguePath $CatalogueSha256 $AssetId
+				$result = Inspect-OllamaPublishedVersion $root $archive
+			}
+			'retire_runtime' { $result = Remove-OllamaRuntimeReceipt $root $RootIdentity $TicketId $RuntimeTicket $ReadyFileIdentity $ReadyImageSha256 }
 			'prepare' {
 				$archive = Read-OllamaPinnedArchive $CataloguePath $CatalogueSha256 $AssetId $ArchivePath $MaxExpandedBytes $MaxEntries
 				$result = Prepare-OllamaManagedStage $root $archive $TicketId $true
@@ -940,7 +1015,10 @@ if ($MyInvocation.InvocationName -ne '.') {
 			'cleanup_partial' { $result = Remove-OllamaPartialStage $root $TicketId $CreationWalIdentity $CreationWalSha256 }
 		}
 		if ($null -ne $stage) { Close-OllamaPreparedStage $stage; $stage = $null }
-		if ($null -ne $archive) { Close-OllamaPinnedArchive $archive; $archive = $null }
+		if ($null -ne $archive) {
+			if ($Action -eq 'inspect') { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
+			$archive = $null
+		}
 		Close-OllamaManagedRoot $root; $root = $null
 		$result | ConvertTo-Json -Depth 12 -Compress
 	} catch {
@@ -954,7 +1032,9 @@ if ($MyInvocation.InvocationName -ne '.') {
 		exit 1
 	} finally {
 		if ($null -ne $stage) { Close-OllamaPreparedStage $stage }
-		if ($null -ne $archive) { Close-OllamaPinnedArchive $archive }
+		if ($null -ne $archive) {
+			if ($Action -eq 'inspect') { $archive.stream.Dispose() } else { Close-OllamaPinnedArchive $archive }
+		}
 		if ($null -ne $root) { Close-OllamaManagedRoot $root }
 	}
 }

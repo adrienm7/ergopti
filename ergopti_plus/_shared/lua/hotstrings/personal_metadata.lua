@@ -9,6 +9,7 @@
 local M = {}
 local Writer = require("toml_codec.writer")
 local Reader = require("toml_codec.reader")
+local Codec = require("toml_codec")
 local KeyPath = require("toml_codec.key_path")
 local Scanner = require("toml_codec.record_scanner")
 
@@ -70,6 +71,25 @@ function M.exact_rows_available(content, rows)
 	return type(content) == "string" and type(rows) == "table" and exact_row_owners(content, rows)
 end
 
+--- Classifies exact stored leaves before the projection can omit an invalid type.
+--- Array and scalar ancestors cannot grant a nested metadata writer authority.
+--- @param document table|nil Canonical decoded source.
+--- @param shapes table|nil Source-owned array identities.
+--- @param row table One exact metadata control path.
+--- @param field string Existing metadata control.
+--- @return boolean available
+local function stored_field_available(document, shapes, row, field)
+	if type(document) ~= "table" or type(shapes) ~= "table" then return false end
+	local path = assert(KeyPath.parse(row.section, true)); path[#path + 1] = row.key
+	local node = document
+	for _, segment in ipairs(path) do
+		if type(node) ~= "table" or shapes.arrays[node] == true then return false end
+		node = node[segment]
+		if node == nil then return true end
+	end
+	return M.valid(field, node)
+end
+
 --- Projects metadata control availability without changing source discovery.
 --- @param content string Exact captured source bytes.
 --- @param section string|nil Exact declared literal section.
@@ -77,19 +97,24 @@ end
 --- @return table unavailable Boolean flags for the four existing controls.
 function M.readonly_fields(content, section, legacy)
 	local parsed, committed = Reader.parse_text(content)
+	local document, shapes = Codec.decode_with_shapes(content)
 	legacy = type(legacy) == "table" and legacy or {}
 	local unavailable = {}
 	for _, field in ipairs({ "delay", "color", "show_tooltip", "priority" }) do
 		local rows = { { section = KeyPath.render(section and { "_meta", "sections", section } or { "_meta" }), key = field } }
 		if section and legacy[field] ~= nil then rows[#rows + 1] = { section = "_meta", key = field } end
-		if section and field == "delay" and committed == true and (parsed.meta.section_delays or {})[section] ~= nil then
+		if section and field == "delay" then
 			rows[#rows + 1] = { section = "_meta.section_delays", key = section }
 		end
 		local meta = committed == true and (section and (parsed.meta.sections or {})[section] or parsed.meta) or nil
 		local value = type(meta) == "table" and meta[field] or nil
 		local stored = section and (legacy.sections or {})[section] or legacy
 		if type(stored) == "table" and stored[field] ~= nil then value = stored[field] end
-		unavailable[field] = committed ~= true or not M.exact_rows_available(content, rows)
+		local source_available = true
+		for _, row in ipairs(rows) do
+			if not stored_field_available(document, shapes, row, field) then source_available = false; break end
+		end
+		unavailable[field] = committed ~= true or not source_available or not M.exact_rows_available(content, rows)
 			or not M.valid(field, value) or (section and legacy[field] ~= nil and not M.valid(field, legacy[field])) or false
 	end
 	return unavailable
@@ -128,6 +153,7 @@ function M.prepare(content, section, field, value, legacy)
 		rows[#rows + 1] = { section = "_meta.section_delays", key = section, delete = true, literal_key = true }
 	end
 	if not exact_row_owners(content, rows) then return nil, "ambiguous-metadata-owner" end
+	if M.readonly_fields(content, section, legacy)[field] then return nil, "unavailable-metadata-owner" end
 	local ok, detail, candidate = Writer.prepare_batch("personal-metadata.toml", rows,
 		{ read_with_status = function() return content, "ok" end }, { status = "ok", content = content })
 	if ok ~= true then return nil, detail end

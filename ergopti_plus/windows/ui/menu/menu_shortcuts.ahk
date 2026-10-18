@@ -23,9 +23,11 @@
 ; Dynamic handlers supply the platform-specific blocks (personal shortcuts,
 ; script control, extensions, edit action) that cannot be described in JSON.
 _BuildShortcutsSubmenu() {
-	DynHandlers := Map(
-		"personal_shortcuts",         (M, C) => _SC_Personal(M, C),
-	)
+	DynHandlers := Map()
+	DeclaredFrames := Map("personal_shortcuts", Map(
+		"manifest_key", "personal_shortcuts_frame",
+		"children_id", "personal_shortcuts_registered",
+		"provider", _PersonalShortcutRows))
 
 	; The keyboard slots are a list, not a group: their rows are the user's own
 	; assignments, so the manifest can name the section but not enumerate it. The
@@ -52,7 +54,7 @@ _BuildShortcutsSubmenu() {
 		"key_combinations", () => _SC_KeyCombinationsSubmenu(),
 		"script_control",   () => _SC_ScriptControlSubmenu())
 
-	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters)
+	return MenuRenderer_Build("shortcuts_menu", "Shortcuts", DynHandlers, GroupBuilders, ListProviders, Commands, Getters, , , DeclaredFrames)
 }
 
 ; The checked_when getters of the Shortcuts submenu: its switch, and the ticks
@@ -83,12 +85,6 @@ _SC_KeyCombinationCommands(Options := unset) {
 		"key_combinations_toggle", MenuRenderer_CategoryGateCommand("KeyCombinations"),
 		"scope_restore", (*) => KeyCombinationsApplyScope("recommended", OwnedOptions),
 		"scope_clear", (*) => KeyCombinationsApplyScope("clear", OwnedOptions))
-}
-
-; Dynamic handler: personal shortcuts submenu (if any registered).
-; Emits its own leading separator when items are present, matching pre-refactor behaviour.
-_SC_Personal(SubMenu, _Cat) {
-	_AppendPersonalShortcutsSubmenuIfAny(SubMenu)
 }
 
 ; « Raccourcis de gestion du script », declared by script_control_group: its
@@ -160,46 +156,14 @@ _SC_ExtensionRows() {
 						ExtName := NM[1]
 				}
 			}
-			MarkerState := Map("shortcut_extension_name", (*) => ExtId)
-			; Admit both possible complete markers before native allocation or builders.
-			ErrorRows := MenuRenderer_TemplateRows("shortcut_extension_error_frame", Map(), MarkerState, Map())
-			EmptyRows := MenuRenderer_TemplateRows("shortcut_extension_empty_frame", Map(), Map(), Map())
-			if !(ErrorRows is Array) || ErrorRows.Length == 0
-					|| !_MR_AppendTemplateRowsAdmitted(ErrorRows, 1, Map())
-					|| !(EmptyRows is Array) || EmptyRows.Length == 0
-					|| !_MR_AppendTemplateRowsAdmitted(EmptyRows, 1, Map())
+			ConstructorOwner := MenuRenderer_ConstructObservedMenu, ObserverOwner := _SC_ObserveExtensionMenu
+			if !(ConstructorOwner is Func) || !(ObserverOwner is Func)
+				|| Object.Prototype.HasOwnProp.Call(ConstructorOwner, "Call")
+				|| Object.Prototype.HasOwnProp.Call(ObserverOwner, "Call")
 				return []
-			ExtMenu := Menu()
-			OwnedMenus.Push(ExtMenu)
-			BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
-			if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
-				BuildFailed := false
-				try {
-					%BuilderFn%(ExtMenu, ExtName)
-				} catch as Err {
-					; A broken bundled extension is user-actionable, so fail LOUD:
-					; ERROR (not a Warn the user never reads) plus a visible disabled
-					; row in the submenu so a crashed builder is not indistinguishable
-					; from an absent one.
-					LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
-					BuildFailed := true
-				}
-				; Even a builder that returns without throwing may have populated
-				; nothing (bad TOML, missing global) — an empty submenu is just as
-				; opaque, so surface the same marker.
-				if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
-					if !BuildFailed
-						LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
-					; A label and nothing else: the renderer draws it inert and greyed,
-					; which is exactly what a marker is.
-					if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_error_frame", Map(), MarkerState, Map()) == 0
-						throw Error("Shortcut extension error marker was withdrawn during its native builder")
-				}
-			} else {
-				LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
-				if MenuRenderer_AppendTemplate(ExtMenu, "shortcut_extension_empty_frame", Map(), Map(), Map()) == 0
-					throw Error("Shortcut extension empty marker was withdrawn before publication")
-			}
+			ExtMenu := ConstructorOwner.Call("shortcut_extension_construction_ahk", ExtId, ExtName, ObserverOwner, OwnedMenus)
+			if !(ExtMenu is Menu)
+				return []
 			Rows.Push(Map("label", ExtName, "submenu", ExtMenu))
 		}
 		Completed := true
@@ -460,4 +424,44 @@ _SC_ApplyScope(Mode, Options) {
 	CandidateOptions["supplement"] := ConfigIOShortcutScopeOperations
 	Providers := Map("personal", PersonalShortcutScopePaths, "parameters", ConfigScopeActionParameterPaths)
 	return ConfigScopeApply("shortcuts", Mode, Providers, CandidateOptions)
+}
+
+
+/**
+ * Observes the original native builder without selecting or placing presentation.
+ * @param {String} ExtId Exact physical extension identity.
+ * @param {String} ExtName Original manifest-derived display name.
+ * @param {Menu} ExtMenu The exact owned native Menu passed to the external builder.
+ * @returns {String} Original failed, empty, missing or populated observation.
+ */
+_SC_ObserveExtensionMenu(ExtId, ExtName, ExtMenu) {
+	MarkerOutcome := "populated"
+	BuilderFn := "BuildExtMenu_" . StrReplace(ExtId, "-", "_")
+	if IsSet(%BuilderFn%) and HasMethod(%BuilderFn%) {
+		BuildFailed := false
+		try {
+			%BuilderFn%(ExtMenu, ExtName)
+		} catch as Err {
+			; A broken bundled extension is user-actionable, so fail LOUD:
+			; ERROR (not a Warn the user never reads) plus a visible disabled
+			; row in the submenu so a crashed builder is not indistinguishable
+			; from an absent one.
+			LoggerError("Extensions", "BuildExtMenu for '{1}' threw: {2}.", ExtId, Err.Message)
+			BuildFailed := true
+		}
+		; Even a builder that returns without throwing may have populated
+		; nothing (bad TOML, missing global) — an empty submenu is just as
+		; opaque, so surface the same marker.
+		if (BuildFailed or _ExtMenuItemCount(ExtMenu) == 0) {
+			if !BuildFailed
+				LoggerError("Extensions", "BuildExtMenu for '{1}' added no items — extension menu is empty.", ExtId)
+			; A label and nothing else: the renderer draws it inert and greyed,
+			; which is exactly what a marker is.
+			MarkerOutcome := BuildFailed ? "failed" : "empty"
+		}
+	} else {
+		LoggerWarn("Extensions", "No BuildExtMenu_{1} function found — menu.ahk not loaded?", StrReplace(ExtId, "-", "_"))
+		MarkerOutcome := "missing"
+	}
+	return MarkerOutcome
 }

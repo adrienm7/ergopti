@@ -12,7 +12,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Pure + dependency-light: takes the resolved gate state and the enabled-only
 ;    section count as plain arguments, touches no Features map, no menu, no OS —
-;    so it is unit-tested in isolation (tests/unit/test_hotstring_count_policy.ahk)
+;    so it is unit-tested in isolation (tests/unit/modules/hotstrings/catalogue/test_hotstring_count_policy.ahk)
 ;    and cannot regress to the old "show the full count while disabled" behaviour.
 ; 2. Single source of truth: every count site (grand total + per-category labels)
 ;    routes through this helper so the displayed numbers can never diverge.

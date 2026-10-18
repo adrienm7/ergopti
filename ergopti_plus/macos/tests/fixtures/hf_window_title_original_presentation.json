@@ -1,0 +1,310 @@
+{
+	"status": "CAPTURED_FROM_ORIGINAL_REAL_LOCALE_SOURCES_BEFORE_ANY_CANDIDATE_NO_RUNTIME",
+	"source_keys": [
+		"mlx.hf_login_title",
+		"token_prompt.window_title",
+		"token_prompt.title",
+		"token_prompt.label"
+	],
+	"locale_order": [
+		"da",
+		"de",
+		"en",
+		"es",
+		"fr",
+		"it",
+		"nl",
+		"no",
+		"pl",
+		"pt",
+		"sv",
+		"tr",
+		"cs",
+		"ru",
+		"uk",
+		"he",
+		"ar",
+		"hi",
+		"zh",
+		"ja",
+		"ko"
+	],
+	"locale_order_sha256": "ced2aa13eadae6005222bc45f9ef3217c09c559bedcc50a15538c8b1ecca0c22",
+	"locales": {
+		"da": {
+			"original_hf_native_label": "HuggingFace-login",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace-login",
+			"original_page_document_title": "HuggingFace-login",
+			"original_page_heading": "🔐 HuggingFace-login",
+			"original_input_label": "HuggingFace-token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"de": {
+			"original_hf_native_label": "HuggingFace-Anmeldung",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace-Anmeldung",
+			"original_page_document_title": "HuggingFace-Anmeldung",
+			"original_page_heading": "🔐 HuggingFace-Anmeldung",
+			"original_input_label": "HuggingFace-Token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"en": {
+			"original_hf_native_label": "HuggingFace Login",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace Login",
+			"original_page_document_title": "HuggingFace Login",
+			"original_page_heading": "🔐 HuggingFace Login",
+			"original_input_label": "HuggingFace Token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"es": {
+			"original_hf_native_label": "Inicio de sesión en HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Inicio de sesión en HuggingFace",
+			"original_page_document_title": "Inicio de sesión HuggingFace",
+			"original_page_heading": "🔐 Inicio de sesión HuggingFace",
+			"original_input_label": "Token HuggingFace:",
+			"default_app_native_label_equal_to_hf": false
+		},
+		"fr": {
+			"original_hf_native_label": "Connexion HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Connexion HuggingFace",
+			"original_page_document_title": "Connexion HuggingFace",
+			"original_page_heading": "🔐 Connexion HuggingFace",
+			"original_input_label": "Token HuggingFace :",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"it": {
+			"original_hf_native_label": "Accesso HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Accesso HuggingFace",
+			"original_page_document_title": "Accesso HuggingFace",
+			"original_page_heading": "🔐 Accesso HuggingFace",
+			"original_input_label": "Token HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"nl": {
+			"original_hf_native_label": "HuggingFace-aanmelding",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace-aanmelding",
+			"original_page_document_title": "HuggingFace-aanmelding",
+			"original_page_heading": "🔐 HuggingFace-aanmelding",
+			"original_input_label": "HuggingFace-token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"no": {
+			"original_hf_native_label": "HuggingFace-pålogging",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace-pålogging",
+			"original_page_document_title": "HuggingFace-pålogging",
+			"original_page_heading": "🔐 HuggingFace-pålogging",
+			"original_input_label": "HuggingFace-token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"pl": {
+			"original_hf_native_label": "Logowanie HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Logowanie HuggingFace",
+			"original_page_document_title": "Logowanie HuggingFace",
+			"original_page_heading": "🔐 Logowanie HuggingFace",
+			"original_input_label": "Token HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"pt": {
+			"original_hf_native_label": "Login HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Login HuggingFace",
+			"original_page_document_title": "Login HuggingFace",
+			"original_page_heading": "🔐 Login HuggingFace",
+			"original_input_label": "Token HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"sv": {
+			"original_hf_native_label": "HuggingFace-inloggning",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace-inloggning",
+			"original_page_document_title": "HuggingFace-inloggning",
+			"original_page_heading": "🔐 HuggingFace-inloggning",
+			"original_input_label": "HuggingFace-token:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"tr": {
+			"original_hf_native_label": "HuggingFace Girişi",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace Girişi",
+			"original_page_document_title": "HuggingFace Girişi",
+			"original_page_heading": "🔐 HuggingFace Girişi",
+			"original_input_label": "HuggingFace Token'ı:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"cs": {
+			"original_hf_native_label": "Přihlášení HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Přihlášení HuggingFace",
+			"original_page_document_title": "Přihlášení HuggingFace",
+			"original_page_heading": "🔐 Přihlášení HuggingFace",
+			"original_input_label": "Token HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"ru": {
+			"original_hf_native_label": "Вход в HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Вход в HuggingFace",
+			"original_page_document_title": "Вход в HuggingFace",
+			"original_page_heading": "🔐 Вход в HuggingFace",
+			"original_input_label": "Токен HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"uk": {
+			"original_hf_native_label": "Вхід у HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — Вхід у HuggingFace",
+			"original_page_document_title": "Вхід у HuggingFace",
+			"original_page_heading": "🔐 Вхід у HuggingFace",
+			"original_input_label": "Токен HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"he": {
+			"original_hf_native_label": "התחברות ל-HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — התחברות ל-HuggingFace",
+			"original_page_document_title": "התחברות ל-HuggingFace",
+			"original_page_heading": "🔐 התחברות ל-HuggingFace",
+			"original_input_label": "אסימון HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"ar": {
+			"original_hf_native_label": "تسجيل الدخول إلى HuggingFace",
+			"original_native_caption_source_projection": "ErgoptiPlus — تسجيل الدخول إلى HuggingFace",
+			"original_page_document_title": "تسجيل الدخول إلى HuggingFace",
+			"original_page_heading": "🔐 تسجيل الدخول إلى HuggingFace",
+			"original_input_label": "رمز HuggingFace:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"hi": {
+			"original_hf_native_label": "HuggingFace लॉगिन",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace लॉगिन",
+			"original_page_document_title": "HuggingFace लॉगिन",
+			"original_page_heading": "🔐 HuggingFace लॉगिन",
+			"original_input_label": "HuggingFace टोकन:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"zh": {
+			"original_hf_native_label": "HuggingFace 登录",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace 登录",
+			"original_page_document_title": "HuggingFace 登录",
+			"original_page_heading": "🔐 HuggingFace 登录",
+			"original_input_label": "HuggingFace 令牌：",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"ja": {
+			"original_hf_native_label": "HuggingFaceログイン",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFaceログイン",
+			"original_page_document_title": "HuggingFaceログイン",
+			"original_page_heading": "🔐 HuggingFaceログイン",
+			"original_input_label": "HuggingFaceトークン:",
+			"default_app_native_label_equal_to_hf": true
+		},
+		"ko": {
+			"original_hf_native_label": "HuggingFace 로그인",
+			"original_native_caption_source_projection": "ErgoptiPlus — HuggingFace 로그인",
+			"original_page_document_title": "HuggingFace 로그인",
+			"original_page_heading": "🔐 HuggingFace 로그인",
+			"original_input_label": "HuggingFace 토큰:",
+			"default_app_native_label_equal_to_hf": true
+		}
+	},
+	"locale_source_pins": [
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/da.json",
+			"sha256": "a92a0c9f1cbc8b1642e1a1da4340578649e670e2ace1341a7fa2d2482d4b00aa",
+			"bytes": 231557
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/de.json",
+			"sha256": "0e095da40684398f518f5def0c5a392947d9a2b55877bb411959f4da1c5a1647",
+			"bytes": 243553
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/en.json",
+			"sha256": "afa1f565cb71ef6be23a99e37e10f1f33eecfaca222458d3beea51f64f491711",
+			"bytes": 225271
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/es.json",
+			"sha256": "cc0e45af2116db3e0201eb4280516e956e782edf3d0e34cd14af9777a584bfa8",
+			"bytes": 241096
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/fr.json",
+			"sha256": "9223151848fa12e88a85a69dc656d7e7167866e1da6738a453bbb612af567754",
+			"bytes": 247287
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/it.json",
+			"sha256": "2ac2fef43128ca3cad6813600583d8fe6eec8e5d98626d4ec1247e06f68c7557",
+			"bytes": 240429
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/nl.json",
+			"sha256": "da604d0034d9476bd21a191c5d98332e25b81f1fd9d0b236cfce5c09ee0d79c2",
+			"bytes": 237618
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/no.json",
+			"sha256": "cbb326f7f8ed43f1f58113ad50934c493aaa3e027f16a7cd4a58eb6fddf4ed6d",
+			"bytes": 231501
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pl.json",
+			"sha256": "00b6ccff5c8469604e825c113994ef1e569e28b387ce234f1e6016339effb90c",
+			"bytes": 240746
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/pt.json",
+			"sha256": "5392d0f54712e2f6538941cc4dd6251d989c67167bcd7640d063e4f88d438c8b",
+			"bytes": 240964
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/sv.json",
+			"sha256": "70ec81f54dda0f0b68be91fb77df204d60ef4312a3012b0e2807c29aa7a0509d",
+			"bytes": 235388
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/tr.json",
+			"sha256": "6314a34237a17e86cd0990b2c98dc548f8fef0dd9f7c144b129d0e0eb5845466",
+			"bytes": 239791
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/cs.json",
+			"sha256": "80488b2d9d0b5aca836488bc7976d6b35613258c8077592968ae11103e8c83fd",
+			"bytes": 239207
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ru.json",
+			"sha256": "a002a9e77d08948ad1274af95a75aac0dd9d74105f5dac57d03f74caf9d41771",
+			"bytes": 314256
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/uk.json",
+			"sha256": "f1ec90b6778f77faf64204080e4cad0fd914650d00163732a18fca3cade7e4b6",
+			"bytes": 311136
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/he.json",
+			"sha256": "3ae615024b65eb80cbe2a336f581fc1d50249b2f249504bc0d85b51eff312337",
+			"bytes": 263437
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ar.json",
+			"sha256": "37c0dafcbd004891f766617ff80f1c0b1ada849cf29aecb6078995f948fa7870",
+			"bytes": 282428
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/hi.json",
+			"sha256": "f10aff6a966b8fb65a70fb31609f3a57b738b84f129743f1bfba708579359fe7",
+			"bytes": 363596
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/zh.json",
+			"sha256": "303e51b21133107619a4838c3a908209d0d37863bbcd49f9ccef51332671053b",
+			"bytes": 220918
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ja.json",
+			"sha256": "16d0e825daaa6df07dce02464da3a3cc58abc8ff3e6de6e91b458bc9962b8b16",
+			"bytes": 269920
+		},
+		{
+			"path": "static/ergopti_plus/_shared/data/locales/ko.json",
+			"sha256": "6873672ca6d3affd207f3e00f749213224b11351ddaea5856e911c99f0624368",
+			"bytes": 246794
+		}
+	]
+}

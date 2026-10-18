@@ -44,10 +44,12 @@ for _, name in ipairs({ "CONFIG", "DATA", "CACHE", "STATE" }) do
 end
 print("OWNED_PROFILE " .. profile)
 local J=require('json'); local K=require('modules.keylogger.keylogger'); local W=require('modules.keylogger.sqlite_writer')
+-- Flushes are asynchronous owned SQLite batches; wait for their physical ACK.
+local Drain=require('tests.support.sqlite_flush_native')
 local root=assert(os.getenv('XDG_CONFIG_HOME')); assert(uv.fs_mkdir(root..'/ergopti',448))
 local config=assert(io.open(root..'/ergopti/config.toml','w')); assert(config:write('[metrics]\nenabled = true\n') and config:close())
 K.init({sqlite_path=root..'/metrics.sqlite',log_dir=root..'/logs'}); assert(K.is_enabled() and W.is_available())
-K.record_synthetic_output('Editor','zz','llm',1000); K.flush()
+K.record_synthetic_output('Editor','zz','llm',1000); Drain.flush(K)
 assert(W.register_device('owned-webkit','owned-webkit','linux','',''))
 assert(W.upsert_app_day('owned-webkit','2000-01-01','Editor',{chars=7,time_ms=700}))
 assert(W.upsert_ngrams('owned-webkit','2000-01-01','Editor',{h={c=7,td=700,cd=7}},'ngram_chars'))

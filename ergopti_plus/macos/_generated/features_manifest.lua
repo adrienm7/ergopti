@@ -84,6 +84,18 @@ M.features = {
 		path = "hotstrings.repeat_key_enabled", id = "repeat_key_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.repeat_key_enabled", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{
+		path = "hotstrings.idle_reset_seconds", id = "idle_reset_seconds", section = "hotstrings", default = 3, type = "number", description_key = "menu.hotstrings.idle_reset", platforms = { "ahk", "hs", "linux" }, recommended = 3, input_altering = false,
+	},
+	{
+		path = "hotstrings.click_resets_word", id = "click_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.click_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "hotstrings.arrow_resets_word", id = "arrow_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.arrow_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "hotstrings.shortcut_resets_word", id = "shortcut_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.shortcut_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
 		path = "hotstrings.expansion_delay", id = "expansion_delay", section = "hotstrings", default = 0.75, type = "number", description_key = "menu.hotstrings.expansion_delay", platforms = { "hs" }, recommended = 0.75, input_altering = false,
 	},
 	{
@@ -904,6 +916,9 @@ M.unavailable = {
 	},
 	{
 		path = "hotstrings.magic_key_source_char", section = "hotstrings", reason_key = "platform_reason.magic_key_detection_is_windows", platforms = { "ahk" },
+	},
+	{
+		path = "hotstrings.tap_hold_resets_word", section = "hotstrings", reason_key = "platform_reason.tap_hold_word_reset_not_on_macos", platforms = { "ahk", "linux" },
 	},
 	{
 		path = "llm.onboarding_seen", section = "llm", reason_key = "", platforms = { "ahk" },

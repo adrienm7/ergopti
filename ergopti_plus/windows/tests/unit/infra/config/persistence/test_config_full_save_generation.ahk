@@ -1,0 +1,602 @@
+﻿; tests/unit/infra/config/persistence/test_config_full_save_generation.ahk
+
+; ==============================================================================
+; MODULE: Full-configuration save generations
+; DESCRIPTION:
+; Behavioural proof that every accepted full-save request remains represented
+; until its exact collected batch reaches the writer and is acknowledged.
+; Deferred wake-ups are coalesced one-shots; malformed writer statuses fail
+; closed; speculative LLM reconciliation never mutates live Features.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+global _CFGFS_TimerCalls := 0
+global _CFGFS_TimerDelay := 0
+global _CFGFS_TimerThrows := false
+global _CFGFS_WriterCalls := 0
+global _CFGFS_WriterResult := true
+global _CFGFS_SeenUpdates := 0
+global _CFGFS_SeenPath := ""
+global _CFGFS_RequestDuringWrite := false
+global _CFGFS_CollectCalls := 0
+global _CFGFS_CollectValue := "old"
+global _CFGFS_NotifyCalls := 0
+global _CFGFS_TimerCritical := -1
+global _CFGFS_WriterCritical := -1
+global _CFGFS_CollectCritical := -1
+global _CFGFS_NotifyCritical := -1
+
+_CFGFS_Reset() {
+	global _CFGFS_TimerCalls, _CFGFS_TimerDelay, _CFGFS_TimerThrows
+	global _CFGFS_WriterCalls, _CFGFS_WriterResult, _CFGFS_SeenUpdates
+	global _CFGFS_SeenPath
+	global _CFGFS_RequestDuringWrite, _CFGFS_CollectCalls
+	global _CFGFS_CollectValue, _CFGFS_NotifyCalls
+	global _CFGFS_TimerCritical, _CFGFS_WriterCritical
+	global _CFGFS_CollectCritical, _CFGFS_NotifyCritical
+	_ConfigFullSaveCoordinator({
+		requested_generation: 0,
+		committed_generation: 0,
+		settled_generation: 0,
+		terminal_required_generation: 0,
+		bound_path: "",
+		bound_path_key: "",
+		reload_required: false,
+		timer_armed: false,
+		reported_failure_generation: 0
+	})
+	_CFGFS_TimerCalls := 0
+	_CFGFS_TimerDelay := 0
+	_CFGFS_TimerThrows := false
+	_CFGFS_WriterCalls := 0
+	_CFGFS_WriterResult := true
+	_CFGFS_SeenUpdates := 0
+	_CFGFS_SeenPath := ""
+	_CFGFS_RequestDuringWrite := false
+	_CFGFS_CollectCalls := 0
+	_CFGFS_CollectValue := "old"
+	_CFGFS_NotifyCalls := 0
+	_CFGFS_TimerCritical := -1
+	_CFGFS_WriterCritical := -1
+	_CFGFS_CollectCritical := -1
+	_CFGFS_NotifyCritical := -1
+}
+
+_CFGFS_CaptureRuntime() {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	return Map(
+		"path_set", IsSet(ConfigurationFile),
+		"path", IsSet(ConfigurationFile) ? ConfigurationFile : "",
+		"ready_set", IsSet(_DriverReady),
+		"ready", IsSet(_DriverReady) ? _DriverReady : false,
+		"boot_failed_set", IsSet(_ConfigBootReadFailed),
+		"boot_failed", IsSet(_ConfigBootReadFailed)
+			? _ConfigBootReadFailed : false)
+}
+
+_CFGFS_RestoreRuntime(Runtime) {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	if Runtime["path_set"]
+		ConfigurationFile := Runtime["path"]
+	else
+		ConfigurationFile := unset
+	if Runtime["ready_set"]
+		_DriverReady := Runtime["ready"]
+	else
+		_DriverReady := unset
+	if Runtime["boot_failed_set"]
+		_ConfigBootReadFailed := Runtime["boot_failed"]
+	else
+		_ConfigBootReadFailed := unset
+}
+
+_CFGFS_Prepare(Path, Ready := true, BootReadFailed := false, CompleteNativeBoot := true) {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	_CFGFS_Reset()
+	ConfigurationFile := Path
+	_DriverReady := Ready
+	_ConfigBootReadFailed := BootReadFailed
+	; Membership alone does not mean the actual native Boot has completed.
+	if !ConfigMigrateBoot(Path, "known")
+		ConfigSchemaPrepareSource(Path)
+	; Unready/read-error and explicit pre-Boot refusal subjects remain readonly.
+	if !Ready || BootReadFailed || !CompleteNativeBoot
+		return
+	if ConfigSchemaCanPrepareWrite(Path)
+		return
+	Present := FSStrictExists(Path)
+	Before := Present ? FSReadUtf8Exact(Path) : ""
+	if Present {
+		; Preserve original unversioned/old/invalid/newer sources. This helper
+		; never stamps or silently migrates an independent legacy expectation.
+		try Document := TOML_ParseDocument(Before)
+		catch
+			return
+		if !Document.Has("_meta") || !(Document["_meta"] is Map)
+				|| !Document["_meta"].Has("schema_version")
+			return
+		Version := Document["_meta"]["schema_version"]
+		if !_ConfigMigrateIsVersion(Version) || Version != ConfigMigrateCurrentVersion()
+			return
+	}
+	; Only genuine ordinary-current or fresh absent subjects reach default Boot.
+	Boot := ConfigMigrateBoot(Path)
+	if (Boot is Map) && Boot.Get("status", "") != (Present ? "current" : "absent")
+		_CFGFS_TraceActualBootRefusal(Boot)
+	AssertTrue(Boot is Map, "the actual native default Boot returns its real result")
+	AssertEqual(Present ? "current" : "absent", Boot["status"],
+		"the current/fresh fixture completes actual native startup without migration")
+	AssertEqual(0, Boot["read_only"])
+	AssertEqual(Present, FSStrictExists(Path), "native startup preserves actual fixture presence")
+	if Present
+		AssertTrue(FSUtf8ExactMatches(Path, Before), "ordinary current startup preserves every independent source byte")
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path), "actual Boot, not public membership, admits later native writes")
+}
+
+_CFGFS_Timer(Callback, DelayMs) {
+	global _CFGFS_TimerCalls, _CFGFS_TimerDelay, _CFGFS_TimerThrows
+	global _CFGFS_TimerCritical
+	_CFGFS_TimerCalls += 1
+	_CFGFS_TimerDelay := DelayMs
+	_CFGFS_TimerCritical := A_IsCritical
+	if _CFGFS_TimerThrows
+		throw Error("injected timer failure")
+	return true
+}
+
+_CFGFS_Collect() {
+	global _CFGFS_CollectCalls, _CFGFS_CollectValue
+	global _CFGFS_CollectCritical
+	_CFGFS_CollectCalls += 1
+	_CFGFS_CollectCritical := A_IsCritical
+	return [{ Section: "full_save_test", Key: "value",
+		Value: _CFGFS_CollectValue }]
+}
+
+_CFGFS_ThrowingCollect() {
+	global _CFGFS_CollectCalls
+	_CFGFS_CollectCalls += 1
+	throw Error("injected collector failure")
+}
+
+_CFGFS_Writer(Path, Updates) {
+	global _CFGFS_WriterCalls, _CFGFS_WriterResult, _CFGFS_SeenUpdates
+	global _CFGFS_SeenPath
+	global _CFGFS_RequestDuringWrite
+	global _CFGFS_WriterCritical
+	_CFGFS_WriterCalls += 1
+	_CFGFS_WriterCritical := A_IsCritical
+	_CFGFS_SeenPath := Path
+	_CFGFS_SeenUpdates := Updates
+	if _CFGFS_RequestDuringWrite {
+		_CFGFS_RequestDuringWrite := false
+		_ConfigFullSaveRequest()
+	}
+	return _CFGFS_WriterResult
+}
+
+_CFGFS_Notify(Message, Options) {
+	global _CFGFS_NotifyCalls, _CFGFS_NotifyCritical
+	_CFGFS_NotifyCalls += 1
+	_CFGFS_NotifyCritical := A_IsCritical
+}
+
+_CFGFS_PendingGenerationCannotRebaseAcrossPaths() {
+	global ConfigurationFile, _CFGFS_WriterCalls, _CFGFS_SeenPath
+	global CONFIG_SAVE_DEFERRED, CONFIG_SAVE_FAILED
+	Runtime := _CFGFS_CaptureRuntime()
+	OldPath := A_Temp . "\ergopti_full_save_bound_old.toml"
+	NewPath := A_Temp . "\ergopti_full_save_bound_new.toml"
+	_CFGFS_Prepare(OldPath)
+	Owner := _ConfigWriteLeaseTryAcquire(OldPath, "block-old-path")
+	Bundle := false
+	try {
+		Generation := 0
+		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(_CFGFS_Writer,
+			_CFGFS_Timer, true, 0, _CFGFS_Collect, &Generation))
+		AssertEqual(1, Generation)
+		AssertEqual(OldPath, _ConfigFullSaveBoundPath())
+		_ConfigWriteLeaseRelease(Owner)
+		Owner := false
+
+		ConfigurationFile := NewPath
+		AssertEqual(CONFIG_SAVE_FAILED, _ConfigDrainFullSave(_CFGFS_Writer,
+			_CFGFS_Timer, 0, _CFGFS_Collect),
+			"a deferred old-path generation must not write the newly published path")
+		AssertEqual(0, _CFGFS_WriterCalls)
+		AssertTrue(_ConfigFullSaveHasPending())
+
+		Bundle := _ConfigWriteTerminalTryAcquire([OldPath, NewPath])
+		AssertTrue(Bundle is Object)
+		AssertFalse(_ConfigFullSaveSettleTerminal(Bundle, _CFGFS_Writer,
+			_CFGFS_Timer, _CFGFS_Collect),
+			"terminal ownership cannot legitimize new-path RAM for an old-path request")
+		AssertEqual(0, _CFGFS_WriterCalls)
+
+		ConfigurationFile := OldPath
+		AssertTrue(_ConfigFullSaveSettleTerminal(Bundle, _CFGFS_Writer,
+			_CFGFS_Timer, _CFGFS_Collect))
+		AssertEqual(1, _CFGFS_WriterCalls)
+		AssertEqual(OldPath, _CFGFS_SeenPath,
+			"the accepted generation must reach its exact original path")
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual("", _ConfigFullSaveBoundPath(),
+			"a fully settled coordinator must release its path binding")
+	} finally {
+		if (Owner is Object)
+			_ConfigWriteLeaseRelease(Owner)
+		if (Bundle is Object)
+			_ConfigWriteTerminalRelease(Bundle)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: pending generations never rebase across paths "
+	. "(config-full-save-path-binding)",
+	_CFGFS_PendingGenerationCannotRebaseAcrossPaths)
+
+_CFGFS_BlockedOwnerQueuesLatestState() {
+	global ConfigurationFile, _DriverReady, _ConfigBootReadFailed
+	global _CFGFS_CollectValue, _CFGFS_WriterCalls, _CFGFS_TimerCalls
+	global _CFGFS_CollectCalls, _CFGFS_SeenUpdates
+	global CONFIG_SAVE_DEFERRED, CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := A_Temp . "\ergopti_full_save_blocked.toml"
+	_CFGFS_Prepare(Path)
+	Owner := _ConfigWriteLeaseTryAcquire(Path, "outer-test")
+	try {
+		AssertTrue(Owner is Object)
+		Result := SaveFullConfig(_CFGFS_Writer, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect)
+		AssertEqual(CONFIG_SAVE_DEFERRED, Result)
+		AssertEqual(0, _CFGFS_CollectCalls,
+			"a losing owner must defer before reading live state")
+		AssertEqual(0, _CFGFS_WriterCalls)
+		AssertEqual(1, _CFGFS_TimerCalls)
+		AssertTrue(_ConfigFullSaveHasPending())
+		_ConfigWriteLeaseRelease(Owner)
+		Owner := 0
+
+		_CFGFS_CollectValue := "new"
+		AssertEqual(CONFIG_SAVE_OK, _SaveFullConfigDeferred(
+			_CFGFS_Writer, _CFGFS_Timer, _CFGFS_Notify, _CFGFS_Collect))
+		AssertEqual(1, _CFGFS_WriterCalls)
+		AssertEqual("new", _CFGFS_SeenUpdates[1].Value,
+			"the deferred drain must collect the post-publication state")
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		if (Owner is Object)
+			_ConfigWriteLeaseRelease(Owner)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: blocked owner queues the latest state (config-full-save-generation)",
+	_CFGFS_BlockedOwnerQueuesLatestState)
+
+_CFGFS_WriterReceivesBatchAndStrictStatus() {
+	global _CFGFS_WriterResult, _CFGFS_SeenUpdates, _CFGFS_TimerCalls
+	global CONFIG_SAVE_OK, CONFIG_SAVE_FAILED
+	Runtime := _CFGFS_CaptureRuntime()
+	try {
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_batch.toml")
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(
+			_CFGFS_Writer, _CFGFS_Timer, true, 0, _CFGFS_Collect))
+		AssertTrue(_CFGFS_SeenUpdates is Array)
+		AssertEqual("full_save_test", _CFGFS_SeenUpdates[1].Section)
+		AssertEqual("value", _CFGFS_SeenUpdates[1].Key)
+		AssertEqual("old", _CFGFS_SeenUpdates[1].Value)
+		AssertFalse(_ConfigFullSaveHasPending())
+
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_string_status.toml")
+		_CFGFS_WriterResult := "1"
+		AssertEqual(CONFIG_SAVE_FAILED, SaveFullConfig(
+			_CFGFS_Writer, _CFGFS_Timer, true, 0, _CFGFS_Collect),
+			"a string that compares equal to 1 must not acknowledge durability")
+		AssertTrue(_ConfigFullSaveHasPending())
+		AssertEqual(1, _CFGFS_TimerCalls,
+			"a malformed writer status must retain and re-arm the obligation")
+	} finally {
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: writer receives batch and status is strict (config-full-save-generation) (config-full-save-writer-contract)",
+	_CFGFS_WriterReceivesBatchAndStrictStatus)
+
+_CFGFS_DefaultWriterPreservesObsoleteDriverNamespace() {
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := A_Temp . "\ergopti_full_save_legacy_namespace_"
+		. A_ScriptHwnd . "_" . A_TickCount . ".toml"
+	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n[ahk.layout]`nergopti_base = false`n`n"
+		. "[layout]`nergopti_base = true`n`n"
+		. "[future_extension]`nkeep = 42`n"
+	Expected := Chr(0xFEFF) . Source . "[full_save_test]`n" . 'value = "old"' . "`n"
+	try {
+		FileAppend(Source, Path, "UTF-8-RAW")
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_CFGFS_Prepare(Path)
+		Before := _ConfigFullSaveCoordinator()
+		AssertEqual(0, Before.requested_generation)
+		AssertEqual(0, Before.committed_generation)
+		AssertEqual(0, Before.settled_generation)
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(1, Generation)
+		After := _ConfigFullSaveCoordinator()
+		AssertEqual(Generation, After.requested_generation)
+		AssertEqual(Generation, After.committed_generation)
+		AssertEqual(Generation, After.settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"the complete obsolete and future source remains exact around the collected update")
+		Data := ParseTomlFile(Path)
+		AssertTrue(Data.Has("ahk.layout"),
+			"ordinary full saves must preserve the obsolete namespace until explicit cleanup")
+		AssertTrue(Data.Has("layout"),
+			"preserving the legacy namespace must preserve canonical sections")
+		AssertTrue(Data.Has("future_extension"),
+			"ordinary saves must preserve unrelated forward-compatible sections")
+		AssertEqual(42, Data["future_extension"]["keep"])
+		AssertEqual("old", TOML_Read(Path, "full_save_test", "value", "missing"),
+			"the fresh native reader must observe the new explicit namespace")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: canonical writer preserves obsolete [ahk.*] sections "
+	. "(config-full-save-obsolete-preservation)",
+	_CFGFS_DefaultWriterPreservesObsoleteDriverNamespace)
+
+_CFGFS_DefaultWriterPreservesCompleteObsoletePrefix() {
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	Folder := A_Temp . "\ergopti_full_save_obsolete_"
+		. A_ScriptHwnd . "_" . A_TickCount
+	AssertTrue(DllCall("CreateDirectoryW", "Str", Folder, "Ptr", 0, "Int"),
+		"the fixture must exclusively own its native directory")
+	Path := Folder . "\config.toml"
+	Retired := "# Retired user entries remain until explicit cleanup.`n"
+		. "[ahk]`n" . 'retired = "opaque"' . " # retain exact spelling`n`n"
+		. "[ahk.layout]`nergopti_base = false`n`n"
+		. "[ahk.layout.deep]`n" . 'future = {enabled = true, label = "retain"}' . "`n`n"
+		. "[ahk_future]`nkeep = 42`n`n"
+	Source := "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Retired . "[full_save_test]`n" . 'value = "before"' . "`n"
+	Expected := Chr(0xFEFF) . "_meta.schema_version = " . ConfigMigrateCurrentVersion() . "`n" . Retired . "[full_save_test]`n" . 'value = "old"' . "`n"
+	try {
+		AssertEqual(1, FSWriteCreateDurable(Path, Source))
+		AssertEqual(Source, FSReadUtf8Exact(Path))
+		_CFGFS_Prepare(Path)
+		AssertEqual(0, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(0, _ConfigFullSaveCoordinator().settled_generation)
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(1, Generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"root, nested and deeper obsolete sections, comments and future values remain byte-exact")
+		Data := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual("opaque", Data["ahk"]["retired"])
+		AssertTrue(Data["ahk"]["layout"]["ergopti_base"] is TOML_Bool)
+		AssertEqual(false, Data["ahk"]["layout"]["ergopti_base"].Value)
+		AssertTrue(Data["ahk"]["layout"]["deep"]["future"]["enabled"] is TOML_Bool)
+		AssertEqual(true, Data["ahk"]["layout"]["deep"]["future"]["enabled"].Value)
+		AssertEqual("retain", Data["ahk"]["layout"]["deep"]["future"]["label"])
+		AssertEqual(42, Data["ahk_future"]["keep"])
+		AssertEqual("old", Data["full_save_test"]["value"])
+
+		; A semantic no-op still acknowledges its own exact new generation.
+		Generation := 0
+		Result := SaveFullConfig(0, _CFGFS_Timer, true, 0,
+			_CFGFS_Collect, &Generation)
+		AssertTrue(Result is Integer)
+		AssertEqual(CONFIG_SAVE_OK, Result)
+		AssertEqual(2, Generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().requested_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().committed_generation)
+		AssertEqual(Generation, _ConfigFullSaveCoordinator().settled_generation)
+		AssertFalse(_ConfigFullSaveHasPending())
+		AssertEqual(Expected, FSReadUtf8Exact(Path),
+			"a repeated ordinary save preserves the entire already durable image")
+	} finally {
+		if FileExist(Path)
+			FileDelete(Path)
+		if DirExist(Folder)
+			DirDelete(Folder)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: preserves root and nested obsolete namespaces plus exact no-op generations "
+	. "(config-full-save-obsolete-preservation)",
+	_CFGFS_DefaultWriterPreservesCompleteObsoletePrefix)
+
+_CFGFS_NewGenerationIsNotOverAcknowledged() {
+	global _CFGFS_RequestDuringWrite, _CFGFS_WriterCalls, _CFGFS_TimerCalls
+	global CONFIG_SAVE_OK
+	Runtime := _CFGFS_CaptureRuntime()
+	try {
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_new_generation.toml")
+		_CFGFS_RequestDuringWrite := true
+		AssertEqual(CONFIG_SAVE_OK, SaveFullConfig(
+			_CFGFS_Writer, _CFGFS_Timer, true, 0, _CFGFS_Collect))
+		AssertEqual(1, _CFGFS_WriterCalls)
+		AssertTrue(_ConfigFullSaveHasPending(),
+			"a request created during I/O must outlive the older acknowledgement")
+		AssertEqual(1, _CFGFS_TimerCalls)
+		AssertEqual(CONFIG_SAVE_OK, _SaveFullConfigDeferred(
+			_CFGFS_Writer, _CFGFS_Timer, _CFGFS_Notify, _CFGFS_Collect))
+		AssertEqual(2, _CFGFS_WriterCalls)
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: in-write requests are never over-acknowledged (config-full-save-generation)",
+	_CFGFS_NewGenerationIsNotOverAcknowledged)
+
+_CFGFS_RetryTimersAreOneShotAndCoalesced() {
+	global _CFGFS_TimerCalls, _CFGFS_TimerDelay
+	Path := A_Temp . "\ergopti_full_save_retry_timer.toml"
+	_CFGFS_Reset()
+	try {
+		_ConfigFullSaveRequest(true, Path)
+		AssertTrue(_ConfigArmFullSaveRetry(250, _CFGFS_Timer))
+		AssertEqual(-250, _CFGFS_TimerDelay)
+		AssertTrue(_ConfigArmFullSaveRetry(-900, _CFGFS_Timer))
+		AssertEqual(1, _CFGFS_TimerCalls,
+			"one pending generation may own only one wake-up")
+
+		_CFGFS_Reset()
+		_ConfigFullSaveRequest(true, Path)
+		AssertFalse(_ConfigArmFullSaveRetry(0, _CFGFS_Timer),
+			"zero would cancel the promised retry and must fail closed")
+		AssertEqual(0, _CFGFS_TimerCalls)
+		AssertFalse(_ConfigFullSaveCoordinator().timer_armed)
+	} finally {
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: retries are one-shot and coalesced (config-full-save-generation)",
+	_CFGFS_RetryTimersAreOneShotAndCoalesced)
+
+_CFGFS_CollectorFailureStaysPendingAndVisible() {
+	global _CFGFS_CollectCalls, _CFGFS_WriterCalls
+	global _CFGFS_TimerCalls, _CFGFS_NotifyCalls
+	global CONFIG_SAVE_FAILED
+	Runtime := _CFGFS_CaptureRuntime()
+	try {
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_collector_failure.toml")
+		_ConfigFullSaveRequest()
+		AssertEqual(CONFIG_SAVE_FAILED, _SaveFullConfigDeferred(
+			_CFGFS_Writer, _CFGFS_Timer, _CFGFS_Notify,
+			_CFGFS_ThrowingCollect))
+		AssertEqual(1, _CFGFS_CollectCalls)
+		AssertEqual(0, _CFGFS_WriterCalls)
+		AssertTrue(_ConfigFullSaveHasPending())
+		AssertEqual(1, _CFGFS_TimerCalls)
+		AssertEqual(1, _CFGFS_NotifyCalls)
+	} finally {
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: collector failure stays pending and visible (config-full-save-generation)",
+	_CFGFS_CollectorFailureStaysPendingAndVisible)
+
+_CFGFS_UnreadySaveIsTypedDeferred() {
+	global _CFGFS_CollectCalls, _CFGFS_WriterCalls, _CFGFS_TimerDelay
+	global CONFIG_SAVE_DEFERRED, _DriverReady, ConfigurationFile
+	Runtime := _CFGFS_CaptureRuntime()
+	try {
+		; Source admission completes before this independent driver-readiness gate.
+		_CFGFS_Prepare(A_Temp . "\ergopti_full_save_unready.toml")
+		_DriverReady := false
+		AssertTrue(ConfigSchemaCanPrepareWrite(ConfigurationFile))
+		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(
+			_CFGFS_Writer, _CFGFS_Timer, true, 0, _CFGFS_Collect))
+		AssertEqual(0, _CFGFS_CollectCalls)
+		AssertEqual(0, _CFGFS_WriterCalls)
+		AssertTrue(_ConfigFullSaveHasPending())
+		AssertTrue(_CFGFS_TimerDelay < 0)
+	} finally {
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+
+Test("config full save: unready requests return typed DEFERRED (config-full-save-generation)",
+	_CFGFS_UnreadySaveIsTypedDeferred)
+
+_CFGFS_AcceptedDeferredDrainsAtTerminal() {
+	global _CFGFS_CollectValue, _CFGFS_WriterCalls, _CFGFS_SeenUpdates
+	global CONFIG_SAVE_DEFERRED
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := A_Temp . "\ergopti_full_save_terminal_drain.toml"
+	_CFGFS_Prepare(Path)
+	Owner := _ConfigWriteLeaseTryAcquire(Path, "blocking-test")
+	Bundle := false
+	try {
+		AssertTrue(Owner is Object)
+		Generation := 0
+		AssertEqual(CONFIG_SAVE_DEFERRED, SaveFullConfig(_CFGFS_Writer,
+			_CFGFS_Timer, true, 0, _CFGFS_Collect, &Generation))
+		AssertEqual(1, Generation)
+		AssertEqual(0, _CFGFS_WriterCalls)
+		_ConfigWriteLeaseRelease(Owner)
+		Owner := 0
+		_CFGFS_CollectValue := "terminal-latest"
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object)
+		AssertTrue(_ConfigFullSaveSettleTerminal(Bundle, _CFGFS_Writer,
+			_CFGFS_Timer, _CFGFS_Collect))
+		AssertEqual(1, _CFGFS_WriterCalls)
+		AssertEqual("terminal-latest", _CFGFS_SeenUpdates[1].Value)
+		AssertFalse(_ConfigFullSaveHasPending())
+	} finally {
+		if (Owner is Object)
+			_ConfigWriteLeaseRelease(Owner)
+		if (Bundle is Object)
+			_ConfigWriteTerminalRelease(Bundle)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+Test("config full save: accepted deferred generation drains at terminal "
+	. "(config-full-save-terminal-drain)",
+	_CFGFS_AcceptedDeferredDrainsAtTerminal)
+
+_CFGFS_TerminalWriteFailureRefusesSettlement() {
+	global _CFGFS_WriterResult, _CFGFS_WriterCalls
+	Runtime := _CFGFS_CaptureRuntime()
+	Path := A_Temp . "\ergopti_full_save_terminal_failure.toml"
+	_CFGFS_Prepare(Path)
+	Bundle := false
+	try {
+		AssertEqual(1, _ConfigFullSaveRequest())
+		_CFGFS_WriterResult := false
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object)
+		AssertFalse(_ConfigFullSaveSettleTerminal(Bundle, _CFGFS_Writer,
+			_CFGFS_Timer, _CFGFS_Collect))
+		AssertEqual(1, _CFGFS_WriterCalls)
+		AssertTrue(_ConfigFullSaveHasPending(),
+			"failed terminal I/O must retain the accepted obligation")
+		AssertEqual(0, _ConfigFullSaveCoordinator().committed_generation)
+	} finally {
+		if (Bundle is Object)
+			_ConfigWriteTerminalRelease(Bundle)
+		_CFGFS_RestoreRuntime(Runtime)
+		_CFGFS_Reset()
+	}
+}
+Test("config full save: terminal write failure refuses exit "
+	. "(config-full-save-terminal-refusal)",
+	_CFGFS_TerminalWriteFailureRefusesSettlement)
+
+
+#Include %A_LineFile%\..\..\..\..\..\fixtures\startup_full_save_observer.ahk

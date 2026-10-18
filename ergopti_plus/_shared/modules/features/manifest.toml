@@ -456,6 +456,76 @@ input_altering = true
 type = "boolean"
 description_key = "menu.hotstrings.repeat_key_enabled"
 
+# Seconds without a keystroke after which the next key starts a new word, as
+# if a delimiter had been typed: a word-start hotstring fires again after a
+# pause instead of reading the text typed before it. 0 disables the reset (the
+# buffer is kept forever, the behaviour before 2026-10). The menu offers the
+# `preset_values` plus a free entry for any other non-negative value.
+# A pure parameter of the matcher: it types nothing by itself.
+[[features.hotstrings]]
+id = "idle_reset_seconds"
+default = 3
+recommended = 3
+input_altering = false
+type = "number"
+preset_values = [0, 1, 2, 3, 5, 10]
+description_key = "menu.hotstrings.idle_reset"
+
+# Whether a mouse click (or a touch with tap-to-click) starts a new word. Off,
+# the click still empties the buffer (the caret moved somewhere unknown) but
+# the next run is treated as the middle of a word, so word-start hotstrings
+# wait for a delimiter.
+[[features.hotstrings]]
+id = "click_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.click_resets_word"
+
+# Whether an arrow key starts a new word, whatever modifier is held with it and
+# wherever it comes from: the keyboard, or a key the driver itself sends (the
+# navigation layer, a remap, a tap-hold, a gesture). Off, the word in progress
+# survives the caret move; the other navigation keys (Home, End, Page Up, Page
+# Down, Insert, Delete) still forget it, since they move by an unknown amount.
+[[features.hotstrings]]
+id = "arrow_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.arrow_resets_word"
+
+# Whether a shortcut starts a new word: a key struck with Ctrl, Alt or Win held
+# (Cmd or Ctrl on macOS, where Option types characters), Shift added or not.
+# AltGr and Shift alone are typing. Off, Ctrl+V or Ctrl+Z leave the word in
+# progress open. Ctrl+Backspace and its siblings delete text by an unknown
+# amount and forget the word either way.
+[[features.hotstrings]]
+id = "shortcut_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.shortcut_resets_word"
+
+# Whether a tap-hold key's own output starts a new word: the action of its tap
+# (copy, paste, a window switch…) and every shortcut struck under its held
+# modifier or layer. A tap that types its key (Space, Enter, Tab, Backspace…)
+# keeps that key's effect, a Shift or AltGr hold is typing, and an arrow from
+# the navigation layer follows arrow_resets_word. Not on macOS: Karabiner-
+# Elements runs the tap-holds there and its output reaches the driver as the
+# keyboard's own keys, so a shortcut it sends follows shortcut_resets_word.
+[[features.hotstrings]]
+id = "tap_hold_resets_word"
+platforms = ["ahk", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.tap_hold_resets_word"
+reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
+
 [[features.hotstrings]]
 id = "expansion_delay"
 platforms = ["hs"]
@@ -4376,11 +4446,29 @@ type = "---"
 type = "dynamic"
 id = "agent_system1"
 i18n = "menu.agent.system1"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system1"
+i18n = "menu.agent.system1"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "dynamic"
 id = "agent_system2"
 i18n = "menu.agent.system2"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "list"
+id = "agent_system2"
+i18n = "menu.agent.system2"
+platforms = ["ahk"]
+unavailable = "hide"
 
 [[menu.agent_menu]]
 type = "---"
@@ -4389,6 +4477,17 @@ type = "---"
 type = "dynamic"
 id = "agent_disabled_apps"
 i18n = "menu.agent.disabled_apps"
+platforms = ["hs", "linux"]
+unavailable = "hide"
+
+[[menu.agent_menu]]
+type = "command"
+id = "agent_disabled_apps"
+i18n = "menu.agent.disabled_apps"
+caption_getter = "agent_disabled_apps_count"
+caption_format = "numbered"
+platforms = ["ahk"]
+unavailable = "hide"
 
 # Both native system providers use this fixed Off row; backend choices remain data.
 [[menu.agent_system_controls]]
@@ -4814,7 +4913,7 @@ i18n = "menu.shortcuts.script_shortcuts"
 checked_when = ["script_control_enabled"]
 
 [[menu.shortcuts_menu]]
-type = "dynamic"
+type = "list"
 id = "personal_shortcuts"
 # AHK-only (mirrors wrap_symbols_menu above): the Windows driver maintains a
 # structured personal_shortcuts.ahk registry it can walk to list each
@@ -5625,16 +5724,10 @@ type = "group"
 id = "hotstrings_params"
 i18n = "menu.hotstrings.params"
 
-# One checkbox for every section of every category, where a « Tout activer » /
-# « Tout désactiver » pair of commands used to be: two rows and two keys for one
-# control, whose state the user could only guess. Ticked when every category and
-# every one of its sections is on; a click switches them all to the other side.
-[[menu.hotstrings_menu]]
-type = "check"
-id = "hotstrings_all_sections"
-i18n = "menu.hotstrings.enable_all_sections"
-checked_when = ["hotstrings_all_sections_enabled"]
-
+# No whole-tree « all sections » row (removed 2026-10-17): it switched on the
+# packs of every language and the programmable hotstrings at once. Each
+# category, language, dynamic, personal and extension submenu owns the bulk
+# rows for its own sections.
 [[menu.hotstrings_menu]]
 type = "---"
 
@@ -5889,6 +5982,55 @@ type = "check"
 id = "repeat_key"
 i18n = "menu.hotstrings.repeat_key_toggle"
 checked_when = ["hotstrings_repeat_enabled"]
+
+# When the hotstring engine forgets the current word: after a pause without
+# typing (the feature's preset_values, plus a free entry each
+# driver answers with its native prompt) and after a mouse click. Each driver
+# supplies the setter, the prompt and the state behind the tick.
+[[menu.hotstrings_params_group]]
+type = "---"
+
+[[menu.hotstrings_params_group]]
+type = "choice"
+id = "idle_reset"
+path = "hotstrings.idle_reset_seconds"
+i18n = "menu.hotstrings.idle_reset"
+choice_registry = "hotstrings.idle_reset"
+show_current_choice = true
+current_choice_suffix = ": {1}"
+custom_command = "idle_reset_custom"
+custom_i18n = "menu.hotstrings.idle_reset_custom"
+custom_unit_i18n = "menu.hotstrings.idle_reset_unit"
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "click_resets_word"
+i18n = "menu.hotstrings.click_resets_word"
+checked_when = ["hotstrings_click_resets_word"]
+
+# After an arrow key, a shortcut, or a tap-hold key's tap or hold: the same
+# word start as a click. All three default to on; off keeps the word in
+# progress open across that event.
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "arrow_resets_word"
+i18n = "menu.hotstrings.arrow_resets_word"
+checked_when = ["hotstrings_arrow_resets_word"]
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "shortcut_resets_word"
+i18n = "menu.hotstrings.shortcut_resets_word"
+checked_when = ["hotstrings_shortcut_resets_word"]
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "tap_hold_resets_word"
+i18n = "menu.hotstrings.tap_hold_resets_word"
+platforms = ["ahk", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
+checked_when = ["hotstrings_tap_hold_resets_word"]
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while
@@ -7726,6 +7868,22 @@ i18n = "menu.extensions.empty"
 platforms = ["ahk"]
 unavailable = "hide"
 
+# Observed native outcomes select presentation through one shared frame.
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_error_frame"
+present_when = "shortcut_extension_builder_failed"
+
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_error_frame"
+present_when = "shortcut_extension_builder_empty"
+
+[[menu.shortcut_extension_result_frame]]
+type = "include"
+section = "shortcut_extension_empty_frame"
+present_when = "shortcut_extension_builder_missing"
+
 # Complete native per-model action, identity, specification, capability and hardware frames.
 
 [[menu.llm_model_action_rows]]
@@ -8532,6 +8690,15 @@ id = "personal_empty"
 i18n = "menu.hotstrings.no_group_loaded"
 platforms = ["linux"]
 unavailable = "hide"
+
+# One Windows file parent consumes completed literal stem/count receipts.
+[menu.hotstring_personal_file_caption]
+format = "%s (%s)"
+
+# Windows folder captions consume the observed positive-count fact and literal receipts.
+[menu.hotstring_personal_folder_caption]
+positive_format = "%s (%s)"
+nonpositive_format = "%s"
 
 [[menu.hotstring_personal_file_frame]]
 type = "include"
@@ -9555,16 +9722,6 @@ caption_joiner = " — "
 platforms = ["linux"]
 unavailable = "hide"
 
-# The Windows Agent picker remains native; its fixed count caption is declared.
-[[menu.agent_windows_disabled_apps_command]]
-type = "command"
-id = "agent_disabled_apps"
-i18n = "menu.agent.disabled_apps"
-caption_getter = "agent_disabled_apps_count"
-caption_format = "numbered"
-platforms = ["ahk"]
-unavailable = "hide"
-
 # Windows model parent: native cached health precedes the translated model label.
 [[menu.llm_model_parent_ahk]]
 type = "group"
@@ -9574,3 +9731,43 @@ caption_getters = ["llm_model_health_prefix", "llm_model_current_caption"]
 disabled_when = ["llm_model_parent_ready"]
 platforms = ["ahk"]
 unavailable = "hide"
+
+# Runtime personal section inventories retain their native labels and callbacks.
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["ahk", "hs"]
+unavailable = "hide"
+
+[[menu.hotstring_personal_default_choice]]
+type = "check"
+id = "personal_default_section"
+caption_source = "native"
+caption_getter = "personal_default_section_label"
+checked_when = ["personal_default_section_selected"]
+platforms = ["linux"]
+unavailable = "hide"
+
+# Native personal section leaves keep their genuine registry callbacks and caption values.
+[[menu.hotstring_personal_section_choice]]
+type = "check"
+id = "personal_section_toggle"
+caption_source = "native"
+caption_getter = "personal_section_label"
+checked_when = ["personal_section_selected"]
+disabled_when = ["personal_section_ready"]
+platforms = ["hs"]
+unavailable = "hide"
+
+
+# Windows native extension production retains its external builder and callback ABI.
+# This finite program owns construction order and observed-result placement.
+[menu.shortcut_extension_construction_ahk]
+kind = "owned_native_menu"
+platform = "ahk"
+program = ["admit_markers", "allocate_owned_menu", "observe_native_builder", "place_observed_result"]
+result_frame = "shortcut_extension_result_frame"
+append_outcomes = ["failed", "empty", "missing"]

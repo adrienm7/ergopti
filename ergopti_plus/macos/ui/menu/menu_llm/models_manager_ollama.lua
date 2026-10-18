@@ -61,6 +61,13 @@ if not ok_dw then download_window = nil end
 -- ==============================
 -- ==============================
 
+--- Reports whether original model requirements and retained tasks are idle.
+--- Migration cannot borrow cancellation or signal authority from this query.
+--- @return boolean idle
+function M.migration_idle()
+	return next(_active_tasks) == nil and RequirementRegistry.backend_idle("Ollama") == true
+end
+
 --- Finds the absolute path to the Ollama binary.
 --- @return string|nil The path or nil if not found.
 local function get_ollama_path()
@@ -341,30 +348,6 @@ function M.new(deps, presets, ram_getter)
 		return clean
 	end
 
-	local function build_ollama_restart_command()
-		local ollama_bin, source_kind = require_ollama_path("restart the daemon")
-		if not ollama_bin then return nil end
-		
-		-- Launch daemon via bash nohup to ensure it survives subprocess termination.
-		-- The shared foreground pipeline uses a `while read` loop because macOS'
-		-- default BWK awk lacks gawk's strftime() / fflush(file) builtins.
-		local launch_cmd, command_err = OllamaServerCommand.build(
-			ollama_bin, Logger.today_log_path(), OllamaEndpoint.get_port(), source_kind)
-		if not launch_cmd then
-			Logger.error(LOG, "Could not build Ollama daemon command: %s", tostring(command_err))
-			return nil
-		end
-		if type(OllamaBinary.SOURCE_NATIVE_MANAGED) == "string"
-			and source_kind == OllamaBinary.SOURCE_NATIVE_MANAGED
-			and ManagedPullReceipt.handles(ollama_bin) then
-			-- Do not execute an inherited shell startup file before the native
-			-- source owner. Relay, trust, model store and cwd remain unchanged.
-			return "nohup /usr/bin/env -u BASH_ENV -u ENV /bin/sh -c " .. text_utils.shell_quote(launch_cmd)
-				.. " </dev/null >/dev/null 2>&1 &"
-		end
-		return "nohup /bin/bash -c " .. text_utils.shell_quote(launch_cmd)
-			.. " </dev/null >/dev/null 2>&1 &"
-	end
 
 	-- One manager instance owns one readiness transaction. Callers join this
 	-- single-flight operation with independent freshness predicates and terminal
@@ -829,25 +812,42 @@ function M.new(deps, presets, ram_getter)
 		end
 
 		start_restart = function()
-			local command = build_ollama_restart_command()
-			if not command then
-				notify_start_failure("ollama.daemon_fail")
-				settle_operation(false, "restart_command_unavailable")
-				return false
-			end
-			-- Do not use a login shell: user profile startup is unrelated to this
-			-- fixed launch command and can otherwise stall the shared readiness owner.
-			return start_owned_command("Ollama daemon restart", BASH_BIN, {"-c", command},
-				function(exit_code)
-					if exit_code ~= 0 then
-						Logger.error(LOG, "Ollama daemon restart worker exited with code %s.",
-							tostring(exit_code))
-						notify_start_failure("ollama.daemon_fail")
-						settle_operation(false, "restart_failed")
-						return false
+			-- Delegate to the same foreground daemon owner as ordinary inference.
+			-- This readiness transaction owns only unpublished startup, not a
+			-- detached shell or permission to stop an external Ollama service.
+			local ApiOllama = require("modules.llm.api_ollama")
+			local accepted = ApiOllama.ensure_running({
+				is_authorized = function()
+					return owns_operation() and retain_current_waiters()
+				end,
+				on_acquired = function(handle)
+					if not owns_operation() or not retain_current_waiters() then return false end
+					operation.command = handle
+					if observe_command_settlement(handle) ~= true then return false end
+					return owns_operation() and operation.command == handle
+				end,
+				on_settled = function(published, reason)
+					if not owns_operation() then return end
+					if published ~= true then
+						notify_start_failure(reason == "external runtime requires manual service management"
+							and "ollama.external_manual_start_body" or "ollama.daemon_fail")
+						-- Native pre-publication exit retains the established unreachable
+						-- readiness class; ownership/manual refusals keep their reason.
+						settle_operation(false, reason == "server task exited before publication"
+							and "restart_failed" or reason or "restart_failed")
+						return
 					end
-					return schedule_retry()
-				end, "restart_task_start_refused")
+					-- Exact READY publication transfers the retained daemon lifetime
+					-- to ApiOllama; the manager now owns its existing HTTP probe only.
+					operation.command = nil
+					operation.command_observed = nil
+					if retain_current_waiters() then schedule_retry() end
+				end,
+			})
+			if accepted ~= true and owns_operation() then
+				settle_operation(false, "restart_refused")
+			end
+			return accepted == true
 		end
 
 		start_probe = function(is_retry)
@@ -1212,6 +1212,7 @@ function M.new(deps, presets, ram_getter)
 	schedule_initial_refresh()
 
 	local function check_model_loadable(target_model, on_success, on_fail, opts)
+		local origin = OllamaEndpoint.get_base_url()
 		local is_current = type(opts) == "table" and opts.is_current or function() return true end
 		local requirement_lifecycle = type(opts) == "table"
 			and opts._requirement_lifecycle or nil
@@ -1232,7 +1233,7 @@ function M.new(deps, presets, ram_getter)
 			return ok == true and current == true
 		end
 		local function current_or_cancel()
-			if still_current() then return true end
+			if still_current() and origin == OllamaEndpoint.get_base_url() then return true end
 			settle_failure("stale", false)
 			return false
 		end
@@ -1292,7 +1293,7 @@ function M.new(deps, presets, ram_getter)
 			end
 			requirement_registered = true
 		end
-		local accepted = client.post("http://127.0.0.1:11434/api/chat",
+		local accepted = client.post(origin .. "/api/chat",
 			{ ["Content-Type"] = "application/json" }, body, function(result)
 				if not current_or_cancel() then return end
 				if type(result) == "table" and result.status == 200 then
@@ -1656,14 +1657,14 @@ function M.new(deps, presets, ram_getter)
 			end
 			if not current_or_cancel() then return finish_result(false) end
 			if code == 0 then
-				pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 				complete_progress_ui(owner, true, target_model)
 				
 				-- Pre-load the model in Ollama immediately after pulling without reloading the OS state
 				check_model_loadable(target_model, function()
+					pcall(notifications.notify, i18n.get("ollama.model_installed_title"), string.format(i18n.get("ollama.model_ready"), target_model), "success")
 					settle_success()
-				end, function()
-					settle_success()
+				end, function(reason)
+					settle_cancel(reason == "stale" and "stale" or "model_load_failed")
 				end, opts)
 			elseif code == 15 then
 				pcall(notifications.notify, i18n.get("ollama.cancelled_title"), i18n.get("ollama.download_cancelled"), "warning")

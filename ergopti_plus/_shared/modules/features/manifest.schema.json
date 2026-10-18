@@ -251,6 +251,15 @@
 					"minItems": 1,
 					"description": "Required when type = \"enum\"."
 				},
+				"preset_values": {
+					"type": "array",
+					"minItems": 1,
+					"items": {
+						"type": "number",
+						"minimum": 0
+					},
+					"description": "Strictly ascending values a number feature's menu offers, including its default and recommended values; the menu adds a free entry for any other value."
+				},
 				"description_key": {
 					"type": "string"
 				},

@@ -550,12 +550,25 @@ def _report_failure(failure, reason):
         "cleanup": "unconfirmed",
     }
     native = getattr(failure, "native_diagnostic", None)
+    # Only the exact already-loaded request engine supplies generated codes.
+    # Reporting never imports a successor engine or acquires another request.
+    engine = sys.modules.get("_ergopti_native_http")
+    vocabulary = getattr(engine, "FAILURE_STAGES", None)
+    narrow_stages = vocabulary if type(vocabulary) is dict else {}
+    stages.update(narrow_stages)
     if type(native) is dict and set(native) == set(fact) - {"version"}:
         if (
             all(type(native[key]) is str for key in ("stage", "exception_class", "cleanup"))
             and native["stage"] in stages
             and native["exception_class"] in kinds
             and native["cleanup"] in {"confirmed", "unconfirmed"}
+            and (
+                native["stage"] not in narrow_stages
+                or (
+                    type(native["native_receipt_reason"]) is str
+                    and native["native_receipt_reason"] in narrow_stages[native["stage"]]
+                )
+            )
         ):
             fact["stage"] = native["stage"]
             fact["exception_class"] = native["exception_class"]

@@ -650,6 +650,7 @@ local function new(options)
 				status = 0,
 				body = "",
 				error = tostring(task_or_err),
+				error_kind = "native_dispatch",
 			})
 			_notify_settlement_observers()
 			return false
@@ -831,6 +832,13 @@ local function new(options)
 		end
 		_settlement_observers[#_settlement_observers + 1] = observer
 		return true
+	end
+
+	--- Reports physical settlement of this exact HTTP owner and its timers.
+	--- An inactive business request may still retain native cleanup debt.
+	--- @return boolean settled
+	function inst.isSettled()
+		return _fully_settled() and _lifecycle_depth == 0
 	end
 
 	--- Returns true when a request is currently in flight.

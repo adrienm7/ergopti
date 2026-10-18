@@ -1,0 +1,559 @@
+--- tests/unit/modules/keymap/registry/test_registry_mutation_transactions_exact_commitment.lua
+
+--- ==============================================================================
+--- MODULE: Registry Mutation Transactions
+--- DESCRIPTION:
+--- Proves that public group/section mutators return an exact boolean commitment
+--- and restore both runtime mappings and persistent section settings when a
+--- loader or post-load hook fails after mutation has begun.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+package.loaded["tests.support.modules.keymap.registry.registry_mutation_transactions_fixture"] = nil
+local Fixture = require("tests.support.modules.keymap.registry.registry_mutation_transactions_fixture")
+local CaptionFixture = Fixture.CaptionFixture
+local add_group_mapping = Fixture.add_group_mapping
+local fresh_registry = Fixture.fresh_registry
+local with_menu_diagnostics = Fixture.with_menu_diagnostics
+
+
+
+
+
+helpers.describe("registry mutations: exact commitment and rollback", function()
+	helpers.it("exposes one caller-owned transaction across a registration batch", function()
+		local state, registry = fresh_registry()
+		local committed = registry.registry_transaction("test_batch", function()
+			registry.register_lua_group("prospective", "Prospective", {})
+			add_group_mapping(registry, "prospective", "partial")
+			return false
+		end)
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_nil(state.groups.prospective,
+			"the public transaction must restore group ownership")
+		helpers.assert_eq(#state.mappings, 0,
+			"the public transaction must restore every mapping in the batch")
+	end)
+
+	helpers.it("withholds private callback failures while preserving rollback visibility", function()
+		local _, registry = fresh_registry()
+		local Logger = require("infra.logger")
+		helpers.admit_logger_privacy(Logger)
+		local lines = {}
+		local previous_level = Logger.current_level
+		Logger.set_level("DEBUG")
+		Logger.set_sink(function(line) lines[#lines + 1] = tostring(line) end)
+		local committed = registry.registry_transaction("private_registration", function()
+			error("PRIVATE_REGISTRY_SENTINEL", 0)
+		end)
+		Logger.set_sink(nil)
+		Logger.set_level(previous_level)
+
+		helpers.assert_eq(committed, false)
+		helpers.assert_true(#lines > 0, "the failed transaction must remain visible")
+		local joined = table.concat(lines, "\n")
+		helpers.assert_true(joined:find("private_registration", 1, true) ~= nil)
+		helpers.assert_true(joined:find("PRIVATE_REGISTRY_SENTINEL", 1, true) == nil,
+			"a callback handling personal mappings may carry PII in its error object")
+	end)
+
+	helpers.it("returns exact booleans for committed and impossible group states", function()
+		local _, registry = fresh_registry()
+		registry.register_lua_group("atomic", "Atomic", {})
+		add_group_mapping(registry, "atomic", "alpha")
+
+		helpers.assert_eq(registry.disable_group("atomic"), true)
+		helpers.assert_eq(registry.disable_group("atomic"), true,
+			"an idempotent request still fully satisfies the requested postcondition")
+		registry.set_post_load_hook("atomic", function()
+			add_group_mapping(registry, "atomic", "alpha")
+		end)
+		helpers.assert_eq(registry.enable_group("atomic"), true)
+		helpers.assert_eq(registry.enable_group("atomic"), true)
+		helpers.assert_eq(registry.disable_group("missing"), false)
+		helpers.assert_eq(registry.enable_group("missing"), false)
+	end)
+
+	helpers.it("rolls back a programmatic enable when its post-load hook throws", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("control", "Control", {})
+		add_group_mapping(registry, "control", "omega")
+		local control_mapping = state.mappings[1]
+		registry.register_lua_group("hooked", "Hooked", {})
+		add_group_mapping(registry, "hooked", "stable")
+		helpers.assert_eq(registry.disable_group("hooked"), true)
+		local seq_before = state.seq_counter
+
+		registry.set_post_load_hook("hooked", function()
+			registry.set_group_context("hooked")
+			registry.add("partial", "PARTIAL", { is_case_sensitive = true })
+			error("injected post-load failure")
+		end)
+
+		local ok, committed = pcall(registry.enable_group, "hooked")
+		helpers.assert_true(ok, "a public mutator must convert a hook throw into false")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(registry.is_group_enabled("hooked"), false)
+		helpers.assert_eq(#state.mappings, 1,
+			"the mapping registered before the hook throw must be removed")
+		helpers.assert_eq(state.mappings[1], control_mapping,
+			"a sibling group's corpus must retain its object identity")
+		helpers.assert_eq(state.seq_counter, seq_before,
+			"rollback must restore monotonic counters as well as visible mappings")
+		helpers.assert_nil(state.current_group,
+			"a throwing hook must not leak its group context into later registrations")
+		helpers.assert_nil(registry.mappings_for_tail("l"),
+			"tail indexes must not retain the hook's partial mapping")
+		local control_bucket = registry.mappings_for_tail("a")
+		helpers.assert_eq(control_bucket and control_bucket[1], control_mapping,
+			"tail indexes must still point at the restored sibling corpus")
+		local lookup_count = 0
+		for _, mapping in pairs(state.mappings_lookup) do
+			lookup_count = lookup_count + 1
+			helpers.assert_eq(mapping, control_mapping,
+				"the exact lookup must not retain the hook's partial mapping")
+		end
+		helpers.assert_eq(lookup_count, 1)
+	end)
+
+	helpers.it("restores settings and the live group when a section reload cannot parse", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("broken", "Broken", { { name = "one" } })
+		state.groups.broken.path = helpers.fixtures_dir() .. "invalid-hotstrings.toml"
+		state.groups.broken.kind = "toml"
+		add_group_mapping(registry, "broken", "stable")
+		local mapping_before = state.mappings[1]
+		local key = "ergopti.hotstrings_section_broken_one"
+		hs.settings.set(key, false)
+
+		local previous_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function() error("injected TOML parse failure") end,
+		}
+		local ok, committed = pcall(registry.enable_section, "broken", "one")
+		package.loaded["infra.toml.reader"] = previous_reader
+
+		helpers.assert_true(ok, "parse failure must be contained by the public mutator")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(hs.settings.get(key), false,
+			"the persisted section choice must roll back when its live reload fails")
+		helpers.assert_eq(registry.is_group_enabled("broken"), true,
+			"the group was enabled before the request and must remain enabled")
+		helpers.assert_eq(#state.mappings, 1)
+		helpers.assert_eq(state.mappings[1], mapping_before,
+			"rollback must restore the exact previously-live mapping object")
+	end)
+
+	helpers.it("rolls an editor-style TOML reload back to the exact live corpus", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("personal", "Personal", {})
+		state.groups.personal.path = "/virtual/personal_hotstrings.toml"
+		state.groups.personal.kind = "toml"
+		add_group_mapping(registry, "personal", "stable")
+		local mapping_before = state.mappings[1]
+		local previous_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function() error("injected editor reload failure", 0) end,
+		}
+
+		local ok, committed = pcall(
+			registry.reload_toml,
+			"personal",
+			"/virtual/personal_hotstrings.toml"
+		)
+		package.loaded["infra.toml.reader"] = previous_reader
+
+		helpers.assert_true(ok, "the public reload must contain parser failures")
+		helpers.assert_eq(committed, false)
+		helpers.assert_eq(registry.is_group_enabled("personal"), true,
+			"a failed editor reload must not leave the group disabled")
+		helpers.assert_eq(#state.mappings, 1)
+		helpers.assert_eq(state.mappings[1], mapping_before,
+			"rollback must restore the exact mapping object visible before Save")
+		helpers.assert_eq(registry.mappings_for_tail("e")[1], mapping_before,
+			"the hot-path tail index must point back to the restored corpus")
+	end)
+
+	helpers.it("does not activate a TOML group that the user disabled before Save", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("personal", "Personal", {})
+		add_group_mapping(registry, "personal", "stable")
+		helpers.assert_eq(registry.disable_group("personal"), true)
+		local previous_reader = package.loaded["infra.toml.reader"]
+		package.loaded["infra.toml.reader"] = {
+			parse = function() error("disabled groups must not be loaded by Save", 0) end,
+		}
+
+		local committed = registry.reload_toml("personal", "/virtual/new-personal.toml")
+		package.loaded["infra.toml.reader"] = previous_reader
+
+		helpers.assert_eq(committed, true)
+		helpers.assert_eq(registry.is_group_enabled("personal"), false)
+		helpers.assert_eq(#state.mappings, 0,
+			"saving an intentionally disabled group must not activate its mappings")
+		helpers.assert_eq(state.groups.personal.path, "/virtual/new-personal.toml")
+		helpers.assert_eq(state.groups.personal.kind, "toml")
+	end)
+
+	helpers.it("rolls back a throwing or ineffective settings write by read-back", function()
+		-- Enabling writes an explicit true (an absent key means the manifest's
+		-- shipped default), so both directions go through `set`.
+		for _, operation in ipairs({ "set_false", "set_true" }) do
+			for _, mode in ipairs({ "throw_after_write", "nil_noop", "false_noop" }) do
+				local state, registry = fresh_registry()
+				registry.register_lua_group("settings", "Settings", { { name = "one" } })
+				add_group_mapping(registry, "settings", "stable")
+				local mapping_before = state.mappings[1]
+				local key = "ergopti.hotstrings_section_settings_one"
+				local real_set, real_clear = hs.settings.set, hs.settings.clear
+				local previous
+				if operation == "set_true" then previous = false end
+				if previous == false then real_set(key, false) else real_clear(key) end
+				local real_operation = real_set
+				hs.settings.set = function(write_key, value)
+					if mode == "throw_after_write" then
+						real_operation(write_key, value)
+						error("injected settings failure after write")
+					end
+					-- Return values are not commitments: set normally returns nil and
+					-- clear may return false for an absent key. The no-op is detected
+					-- only because the exact read-back still has the old value.
+					if mode == "false_noop" then return false end
+					return nil
+				end
+
+				local action = operation == "set_true" and registry.enable_section or registry.disable_section
+				local ok, committed = pcall(action, "settings", "one")
+				hs.settings.set, hs.settings.clear = real_set, real_clear
+				local label = operation .. "/" .. mode
+				helpers.assert_true(ok, label .. " must be contained by the public mutator")
+				helpers.assert_eq(committed, false, label .. " must not report commitment")
+				helpers.assert_eq(hs.settings.get(key), previous,
+					label .. " must restore the previous persistent value")
+				helpers.assert_eq(registry.is_group_enabled("settings"), true)
+				helpers.assert_eq(#state.mappings, 1)
+				helpers.assert_eq(state.mappings[1], mapping_before)
+				helpers.assert_true(registry.mappings_for_tail("e") ~= nil,
+					label .. " must leave live indexes attached to the old corpus")
+			end
+		end
+	end)
+
+	helpers.it("does not register a Lua group whose file throws after a partial add", function()
+		local state, registry = fresh_registry()
+		local seq_before = state.seq_counter
+		local fixture = helpers.fixtures_dir() .. "partial_hotstrings_failure.lua"
+		local committed = registry.load_file("partial", fixture)
+		helpers.assert_eq(committed, false)
+		helpers.assert_nil(state.groups.partial)
+		helpers.assert_eq(#state.mappings, 0)
+		helpers.assert_eq(state.seq_counter, seq_before)
+	end)
+end)
+
+helpers.describe("hotstring category scope: runtime and persistence acknowledgement", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, publication in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("(hotstring-category-owner) " .. tostring(enabled) .. "/" .. publication, function()
+				local state, registry = fresh_registry()
+				local before = not enabled
+				registry.register_lua_group("rolls", "Rolls", { { name = "hc" }, { name = "sx" } })
+				registry.register_lua_group("spare", "Spare", {})
+				add_group_mapping(registry, "spare", "untouched")
+				local spare_mapping = state.mappings[1]
+				for _, name in ipairs({ "hc", "sx" }) do
+					hs.settings.set("ergopti.hotstrings_section_rolls_" .. name, before)
+				end
+				registry.set_post_load_hook("rolls", function()
+					for _, name in ipairs({ "hc", "sx" }) do
+						if registry.is_section_enabled("rolls", name) then add_group_mapping(registry, "rolls", name) end
+					end
+				end)
+				if before then
+					add_group_mapping(registry, "rolls", "hc")
+					add_group_mapping(registry, "rolls", "sx")
+				else
+					helpers.assert_eq(registry.disable_group("rolls"), true)
+				end
+				local previous_mappings = {}
+				for index, mapping in ipairs(state.mappings) do previous_mappings[index] = mapping end
+				local publications, candidate = 0, {}
+				local committed = registry.set_category_scope_enabled({ "rolls" }, enabled, function()
+					publications = publications + 1
+					candidate.group = registry.is_group_enabled("rolls")
+					for _, name in ipairs({ "hc", "sx" }) do
+						candidate[name] = registry.is_section_enabled("rolls", name)
+					end
+					if publication == "throw" then error("injected publication failure") end
+					if publication == "nil" then return nil end
+					return publication == "true"
+				end)
+				local accepted = publication == "true"
+				local wanted = before
+				if accepted then wanted = enabled end
+				helpers.assert_eq(committed, accepted)
+				helpers.assert_eq(publications, 1)
+				helpers.assert_eq(candidate.group, enabled, "the persistence owner sees the complete candidate runtime")
+				for _, name in ipairs({ "hc", "sx" }) do helpers.assert_eq(candidate[name], enabled) end
+				helpers.assert_eq(registry.is_group_enabled("rolls"), wanted)
+				for _, name in ipairs({ "hc", "sx" }) do
+					helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_" .. name), wanted)
+				end
+				helpers.assert_eq(registry.is_group_enabled("spare"), true)
+				helpers.assert_eq(state.mappings[1], spare_mapping, "another group's exact mapping survives")
+				helpers.assert_eq(#state.mappings, wanted and 3 or 1)
+				if not accepted then
+					for index, mapping in ipairs(previous_mappings) do
+						helpers.assert_eq(state.mappings[index], mapping, "refusal restores exact native authority")
+					end
+				end
+			end)
+		end
+	end
+
+	-- hotstrings-submenu-live-2026-10-17: Ergopti binds magic key's « replace »
+	-- and repeat corrections; they are drawn, and switched, in its own submenu,
+	-- so the category's « check all » never reaches them.
+	helpers.it("(hotstring-category-owner) excluded bound sections keep their own choice", function()
+		local _, registry = fresh_registry()
+		registry.register_lua_group("magickey", "Magic key", { { name = "own" }, { name = "replace" } })
+		for _, name in ipairs({ "own", "replace" }) do
+			hs.settings.set("ergopti.hotstrings_section_magickey_" .. name, false)
+		end
+		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, function() return true end,
+			{ magickey = { replace = true } }), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_own"), true)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_magickey_replace"), false,
+			"the extension's bound section is not this submenu's")
+		helpers.assert_eq(registry.set_category_scope_enabled({ "magickey" }, true, nil, "replace"), false,
+			"a malformed exclusion refuses before any write")
+	end)
+
+	helpers.it("(hotstring-category-owner) rejects an unknown sibling before publication", function()
+		local state, registry = fresh_registry()
+		registry.register_lua_group("rolls", "Rolls", { { name = "hc" } })
+		add_group_mapping(registry, "rolls", "hc")
+		local mapping = state.mappings[1]
+		local writes = 0
+		helpers.assert_eq(registry.set_category_scope_enabled({ "rolls", "missing" }, false,
+			function() writes = writes + 1; return true end), false)
+		helpers.assert_eq(writes, 0)
+		helpers.assert_eq(registry.is_group_enabled("rolls"), true)
+		helpers.assert_eq(state.mappings[1], mapping)
+	end)
+end)
+
+helpers.describe("canonical hotstring cache projection", function()
+	local function fixture(source)
+		local state, registry = fresh_registry()
+		local files = { config = source }
+		package.loaded["adapters.file_system"] = {
+			read_with_status = function(path) return files[path], files[path] and "ok" or "absent" end,
+			write_if_unchanged = function(path, content, expected)
+				if expected.status ~= (files[path] and "ok" or "absent")
+					or (expected.status == "ok" and files[path] ~= expected.content) then return false end
+				files[path] = content; return true
+			end,
+		}
+		package.loaded["infra.preferences"] = nil
+		local preferences = require("infra.preferences")
+		registry.register_lua_group("rolls", "Rolls", { { name = "hc" }, { name = "sx" }, { name = "-" } })
+		registry.register_lua_group("ext:demo:test", "Extension", { { name = "fast" }, { name = "info", is_module_placeholder = true } })
+		return state, registry, preferences, files
+	end
+
+	helpers.it("replaces stale section settings with neutral absence before registry use", function()
+		local _, registry, preferences = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		hs.settings.set("ergopti.hotstrings_section_ext:demo:test_fast", true)
+		local saved, status = preferences.load("config")
+		helpers.assert_eq(status, "absent")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+		helpers.assert_eq(registry.is_group_enabled("ext:demo:test"), false)
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+		helpers.assert_eq(registry.is_section_enabled("ext:demo:test", "fast"), false)
+	end)
+
+	helpers.it("loads actual group and section readers without claiming unknown neighbors", function()
+		local _, registry, preferences, files = fixture('[hotstrings]\ngroups = { rolls = true, future = { keep = 9 } }\nmodules = { rolls = { hc = true, future = { keep = 7 } } }\n')
+		local source = files.config
+		local saved = preferences.load("config")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+		helpers.assert_true(registry.is_section_enabled("rolls", "hc"))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "sx"), false)
+		helpers.assert_eq(files.config, source, "projection is not migration or persistence")
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_future"))
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_-"))
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_ext:demo:test_info"))
+	end)
+
+	helpers.it("reads an old-shape owned value as neutral absence, never a refused projection (config-outdated-hotstrings)", function()
+		-- An outdated choice is never an ERROR or a failed boot sync, and never
+		-- guessed on: "yes" is not a switch, so the section keeps its neutral value.
+		local _, registry, preferences = fixture('[hotstrings]\nmodules = { rolls = { hc = "yes" } }\n')
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		local saved = preferences.load("config")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+	end)
+
+	helpers.it("refuses a cache write whose native readback did not commit", function()
+		local _, registry, preferences = fixture(nil)
+		local set = hs.settings.set
+		hs.settings.set = function(key, value)
+			if key == "ergopti.hotstrings_section_rolls_hc" and value == false then return nil end
+			return set(key, value)
+		end
+		local ok, result = pcall(registry.apply_hotstring_preferences, preferences.load("config"))
+		hs.settings.set = set
+		helpers.assert_true(ok)
+		helpers.assert_eq(result, false)
+		helpers.assert_nil(hs.settings.get("ergopti.hotstrings_section_rolls_hc"))
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+	end)
+
+	helpers.it("retains an already committed corpus when the menu applies the same candidate", function()
+		local _, registry, preferences = fixture('[hotstrings]\ngroups = { rolls = true }\nmodules = { rolls = { hc = true } }\n')
+		local rebuilds = 0
+		registry.set_post_load_hook("rolls", function() rebuilds = rebuilds + 1 end)
+		local saved = preferences.load("config")
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(rebuilds, 1)
+		helpers.assert_true(registry.apply_hotstring_preferences(saved))
+		helpers.assert_eq(rebuilds, 1, "boot followed by menu sync must not reload the same group")
+	end)
+
+	helpers.it("rolls settings and groups back when a real post-load hook throws", function()
+		local _, registry, preferences = fixture('[hotstrings]\ngroups = { rolls = true }\nmodules = { rolls = { hc = true } }\n')
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", false)
+		registry.set_post_load_hook("rolls", function() error("injected reload refusal") end)
+		helpers.assert_eq(registry.apply_hotstring_preferences(preferences.load("config")), false)
+		helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_rolls_hc"), false)
+		helpers.assert_true(registry.is_group_enabled("rolls"))
+		helpers.assert_true(registry.is_group_enabled("ext:demo:test"))
+	end)
+
+	helpers.it("saves sparse choices into inline tables while retaining unknown neighbors", function()
+		local _, registry, preferences, files = fixture('[hotstrings]\ngroups = { rolls = true, future = { keep = 9 } }\nmodules = { rolls = { hc = true, future = { keep = 7 } } }\n')
+		helpers.assert_true(registry.apply_hotstring_preferences(preferences.load("config")))
+		helpers.assert_true(registry.disable_section("rolls", "hc"))
+		local state = { hotstrings = { rolls = false, ["ext:demo:test"] = false } }
+		helpers.assert_true(preferences.save("config", state, { "rolls", "ext:demo:test" }, { keymap = registry }))
+		local decoded = require("toml_codec").decode(files.config)
+		helpers.assert_nil(decoded.hotstrings.groups.rolls)
+		helpers.assert_nil(decoded.hotstrings.modules.rolls.hc)
+		helpers.assert_eq(decoded.hotstrings.groups.future.keep, 9)
+		helpers.assert_eq(decoded.hotstrings.modules.rolls.future.keep, 7)
+		helpers.assert_true(registry.apply_hotstring_preferences(preferences.load("config")))
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+	end)
+
+	helpers.it("projects the canonical source before the actual boot call can start input", function()
+		local _, registry = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		local source, read_error = helpers.read_driver_unit("local function has_common_hotstring_groups")
+		helpers.assert_type(source, "string", tostring(read_error))
+		local body = source:match('(if keymap.apply_hotstring_preferences%(boot_saved_prefs%).-if keymap_started ~= true then.-\nend)')
+		helpers.assert_type(body, "string", "the owned boot boundary must exist")
+		local starts = 0
+		local run = assert(load(body, "hotstring boot boundary", "t", setmetatable({
+			boot_saved_prefs = require("infra.preferences").load("config"),
+			keymap = {
+				apply_hotstring_preferences = registry.apply_hotstring_preferences,
+				start = function()
+					helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+					helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+					starts = starts + 1; return true
+				end,
+			},
+		}, { __index = _G })))
+		run()
+		helpers.assert_eq(starts, 1)
+	end)
+
+	helpers.it("the real menu synchronizer replaces absent canonical section choices", function()
+		local _, registry, preferences = fixture(nil)
+		hs.settings.set("ergopti.hotstrings_section_rolls_hc", true)
+		package.loaded["ui.menu.menu_state"] = nil
+		local MenuState = require("ui.menu.menu_state")
+		local state = { hotstrings = {}, keymap = false, delays = {}, repeat_key_enabled = false }
+		local keymap = setmetatable({ set_llm_model = function() return true end }, { __index = registry })
+		local result, report = MenuState.sync_state_to_modules(state, preferences.load("config"), false, {
+			keymap = keymap, core_mods = {}, hotstring_editor = {},
+		})
+		helpers.assert_true(result, helpers.inspect(report))
+		helpers.assert_eq(registry.is_group_enabled("rolls"), false)
+		helpers.assert_eq(registry.is_section_enabled("rolls", "hc"), false)
+	end)
+end)
+
+helpers.describe("personal menu: the real category persistence owner", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, publication in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("personal menu transaction " .. tostring(enabled) .. "/" .. publication, function()
+				return with_menu_diagnostics(function()
+					local Custom = helpers.load_with_stubs("ui.menu.menu_hotstrings_custom")
+					local state, registry = fresh_registry()
+					local names = { "personal", "personal_ext_work", "custom" }
+					for _, group in ipairs(names) do
+						registry.register_lua_group(group, group, { { name = "one" }, { name = "two" } })
+						for _, section in ipairs({ "one", "two" }) do
+							hs.settings.set("ergopti.hotstrings_section_" .. group .. "_" .. section, not enabled)
+						end
+						registry.set_post_load_hook(group, function()
+							for _, section in ipairs({ "one", "two" }) do
+								if registry.is_section_enabled(group, section) then add_group_mapping(registry, group, group .. section) end
+							end
+						end)
+						if enabled then helpers.assert_eq(registry.disable_group(group), true) end
+					end
+					registry.register_lua_group("spare", "Spare", {})
+					add_group_mapping(registry, "spare", "untouched")
+					local spare_mapping = state.mappings[#state.mappings]
+					local menu_state = { hotstrings = {}, keymap = false, trigger_char = "★" }
+					for _, group in ipairs(names) do menu_state.hotstrings[group] = not enabled end
+					local starts, updates, candidate = 0, 0, {}
+					registry.start = function() starts = starts + 1; return true end
+					local ctx = { state = menu_state, paused = true, keymap = registry,
+						hotfiles = { "personal.toml", "personal_ext_work.toml" },
+						get_group_name = function(path) return path:gsub("%.toml$", "") end,
+						applyTriggerChar = function(value) return value end,
+						hotstring_editor = { open = function() end },
+						updateMenu = function() updates = updates + 1 end,
+						save_prefs = function()
+							for _, group in ipairs(names) do
+								candidate[group] = { registry.is_group_enabled(group), menu_state.hotstrings[group],
+									registry.is_section_enabled(group, "one"), registry.is_section_enabled(group, "two") }
+							end
+							if publication == "throw" then error("personal owner publication refused") end
+							if publication == "nil" then return nil end
+							return publication == "true"
+						end,
+					}
+					local rows = CaptionFixture.build_custom(Custom, ctx, { group_counts = {} }).submenu
+					local committed = rows[enabled and 1 or 2].fn()
+					local accepted, wanted = publication == "true", not enabled
+					if accepted then wanted = enabled end
+					helpers.assert_eq(committed, accepted)
+					for _, group in ipairs(names) do
+						helpers.assert_eq(candidate[group], { enabled, enabled, enabled, enabled }, "one complete candidate reaches publication")
+						helpers.assert_eq(registry.is_group_enabled(group), wanted)
+						helpers.assert_eq(menu_state.hotstrings[group], wanted)
+						for _, section in ipairs({ "one", "two" }) do
+							helpers.assert_eq(hs.settings.get("ergopti.hotstrings_section_" .. group .. "_" .. section), wanted)
+						end
+					end
+					helpers.assert_eq(registry.is_group_enabled("spare"), true)
+					local found_spare = false
+					for _, mapping in ipairs(state.mappings) do if mapping == spare_mapping then found_spare = true end end
+					helpers.assert_true(found_spare, "an unrelated group's exact native mapping survives")
+					helpers.assert_eq({ starts, updates }, { 0, accepted and 1 or 0 })
+					helpers.assert_eq(menu_state.keymap, false)
+				end)
+			end)
+		end
+	end
+end)

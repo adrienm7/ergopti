@@ -48,12 +48,12 @@ local FOLDER_IDS = { config_dir = true, logs_dir = true, crash_dir = true, diagn
 -- ===============================
 -- ===============================
 
---- Opens a target with the desktop's handler, in the background.
+--- Receives the launcher exit and both closed streams without blocking GTK.
 --- @param target string A path or a URL.
---- @return boolean started
-local function xdg_open(target)
-	local Shell = require("adapters.shell_runner")
-	return Shell.run("xdg-open " .. Shell.quote(target) .. " >/dev/null 2>&1 &")
+--- @param done function Receives the real native exit receipt.
+--- @return table|nil cancellable native request
+local function xdg_open(target, done)
+	return require("adapters.shell_runner").run_async("xdg-open", { target }, { timeout_ms = require("infra.timings").ms("ui", "desktop_open_timeout_ms") }, done)
 end
 
 --- The production side effects; a test replaces any of them.
@@ -83,7 +83,7 @@ local DEFAULT_EFFECTS = {
 	end,
 	-- No portable "select this file" exists across file managers; the folder
 	-- holding it is the next best thing
-	reveal = function(path) return xdg_open(path:match("^(.*)/[^/]*$") or path) end,
+	reveal = function(path, done) return xdg_open(path:match("^(.*)/[^/]*$") or path, done) end,
 	open = xdg_open,
 	open_url = xdg_open,
 	notify = function(title, body, level)
@@ -132,101 +132,126 @@ end
 -- ===============================
 -- ===============================
 
---- Saves the report under the diagnostics folder and opens that folder.
---- @param effects table
---- @param paths table The snapshot's paths section.
---- @param name string Validated file name.
---- @param text string Redacted report.
---- @return string|nil path
---- @return string|nil error
-local function save_and_reveal(effects, paths, name, text)
-	if type(paths.diagnostics_dir) ~= "string" then return nil, "the diagnostics folder is unknown" end
-	local path, err = effects.save(paths.diagnostics_dir, name, text)
-	if not path then return nil, "the report could not be saved: " .. tostring(err) end
-	if not effects.reveal(path) then Logger.warn(LOG, "The saved report's folder could not be opened.") end
-	return path
-end
-
---- Reports on GitHub: copies and saves the complete approved report, then
---- reveals its local attachment before opening the bug form with stable host
---- version, OS and driver fields. Editable fields stay outside the URL; the
---- browser opens last and no attachment is uploaded automatically.
---- @param effects table
---- @param documents table { templates, repository, redaction }
---- @param action table Host-approved text and technical identity fields.
---- @param redact function
---- @param paths table Host-retained attachment directory.
---- @return table
-local function report(effects, documents, action, redact, paths)
-	local text = redact(action.text)
-	-- Copy the complete reviewed report independently of its short metadata URL
-	if not effects.copy(text) then error("the clipboard refused the report") end
-	-- Complete the local attachment before opening the metadata-only issue form.
-	local path, err = save_and_reveal(effects, paths, action.name, text)
-	if not path then error(err) end
-	local fields = {}
-	-- Only the host-derived technical identity is stable enough to prefill.
-	for _, id in ipairs({ "version", "os", "driver" }) do fields[id] = action.fields[id] end
-	local report_field = documents.templates.templates.bug.report_field
-	if type(report_field) ~= "string" then error("the bug template names no report field") end
-	local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
-	if not effects.open_url(url) then error("the browser could not be opened") end
-	return { path = path }
-end
-
---- Performs one action of the diagnostics page, already validated.
---- @param action table From healthcheck.actions.validate (copy, save, report, open_path).
---- @param paths table The snapshot's paths section.
---- @param documents table { templates, repository, redaction }
---- @param context table The redaction context.
---- @param overrides table|nil Replacement side effects (tests only).
---- @return table { ok = boolean, path = string|nil, missing = true|nil }
-function M.perform(action, paths, documents, context, overrides, snapshot)
-	local effects = effects_with(overrides)
-	local function redact(text) return text end
-	Logger.start(LOG, "Diagnostics action '%s'…", action.action)
-	local ok, result = xpcall(function()
+--- Performs one action through an explicit completion and retained owner.
+--- Async opener admission is never a result. Inline completion is valid for
+--- synchronous actions and native ports that have already received their exit.
+--- @param owner table { current = function(): boolean, complete = function(result) }
+--- @return table operation { cancel = function() }
+function M.perform(action, paths, documents, context, overrides, snapshot, owner)
+	assert(type(owner) == "table" and type(owner.current) == "function" and type(owner.complete) == "function",
+		"Diagnostics action needs its current owner and completion")
+	local effects, request = effects_with(overrides), {}
+	local active, child, pending = true, nil, nil
+	function request.cancel()
+		active, pending = false, nil
+		local retained = child
+		child = nil
+		if retained then retained.cancel() end
+	end
+	local function current()
+		if not active then return false end
+		if owner.current() == true then return true end
+		request.cancel()
+		return false
+	end
+	local function finish(result, detail)
+		if not current() then return end
+		active, pending = false, nil
+		if result.missing then
+			Logger.info(LOG, "Diagnostics action '%s': the file does not exist yet.", action.action)
+		elseif result.ok then
+			Logger.success(LOG, "Diagnostics action '%s' done.", action.action)
+		else
+			Logger.error(LOG, "Diagnostics action '%s' failed: %s", action.action, tostring(detail))
+		end
+		if owner.current() == true then owner.complete(result) end
+	end
+	local function invoke(fn, ...)
+		if not current() then return end
+		local ok, detail = xpcall(fn, debug.traceback, ...)
+		if not ok then finish({ ok = false }, detail) end
+	end
+	local function launch(kind, target, next_step)
+		if not current() then return end
+		local ticket = {}
+		pending = ticket
+		local function completed(receipt)
+			if not current() or pending ~= ticket then return end
+			pending, child = nil, nil
+			invoke(next_step, type(receipt) == "table" and receipt or { ok = false, error = "invalid launcher receipt" })
+		end
+		local called, handle, detail = pcall(effects[kind], target, completed)
+		if pending == ticket and current() then
+			if called and type(handle) == "table" and type(handle.cancel) == "function" then child = handle
+			else completed({ ok = false, error = tostring(called and detail or handle) }) end
+		elseif not called then
+			Logger.error(LOG, "The completed launcher port failed: %s", tostring(handle))
+		elseif type(handle) == "table" and type(handle.cancel) == "function" then
+			-- An inline callback may already have dispatched a successor child.
+			handle.cancel()
+		end
+	end
+	local function opened(receipt, path)
+		finish({ ok = receipt.ok == true, path = path, exit_code = receipt.code }, receipt.error)
+	end
+	local function save_then(next_step)
+		if type(paths.diagnostics_dir) ~= "string" then error("the diagnostics folder is unknown") end
+		local path, detail = effects.save(paths.diagnostics_dir, action.name, action.text)
+		if not current() then return end
+		if not path then error("the report could not be saved: " .. tostring(detail)) end
+		launch("reveal", path, function(receipt)
+			if receipt.ok ~= true then
+				Logger.warn(LOG, "The saved report's folder could not be opened (status=%s, reason=%s).",
+					tostring(receipt.code), tostring(receipt.error))
+			end
+			if current() then next_step(path) end
+		end)
+	end
+	invoke(function()
+		Logger.start(LOG, "Diagnostics action '%s'…", action.action)
+		if not current() then return end
 		if action.action == "copy" or action.action == "save" or action.action == "report" then
 			local document = Share.document(snapshot, documents.schema,
 				require("infra.i18n").get(documents.schema.share_policy.notice_key))
 			assert(action.text == document.text, "Diagnostic sharing preview is stale or invalid")
-			action = { action = action.action, text = document.text, fields = document.fields, name = document.name, summary = document.summary }
+			action = { action = action.action, text = document.text, fields = document.fields, name = document.name }
 		end
-		if action.action == "copy" then
-			if not effects.copy(redact(action.text)) then error("the clipboard refused the report") end
-			return {}
-		elseif action.action == "save" then
-			local path, err = save_and_reveal(effects, paths, action.name, redact(action.text))
-			if not path then error(err) end
-			return { path = path }
+		if not current() then return end
+		if action.action == "copy" or action.action == "report" then
+			local copied = effects.copy(action.text)
+			if not current() then return end
+			if copied ~= true then error("the clipboard refused the report") end
+		end
+		if action.action == "copy" then finish({ ok = true })
+		elseif action.action == "save" then save_then(function(path) finish({ ok = true, path = path }) end)
 		elseif action.action == "report" then
-			return report(effects, documents, action, redact, paths)
+			save_then(function(path)
+				local fields = {}
+				for _, id in ipairs({ "version", "os", "driver" }) do fields[id] = action.fields[id] end
+				assert(type(documents.templates.templates.bug.report_field) == "string", "the bug template names no report field")
+				local url = IssueLink.build_url(documents.templates, documents.repository, "bug", fields)
+				launch("open_url", url, function(receipt) opened(receipt, path) end)
+			end)
 		elseif action.action == "open_path" then
 			local path = paths[action.id]
 			if type(path) ~= "string" or path == "" then error("the path " .. action.id .. " is unknown") end
-			if FOLDER_IDS[action.id] and not effects.make_dir(path) then error("cannot create " .. path) end
-			if not effects.exists(path) then
-				if FOLDER_IDS[action.id] then error(path .. " does not exist") end
-				-- A file not created yet, such as today's errors file before the
-				-- day's first warning: nothing to open, and no failure of ours
-				return { missing = path }
+			if FOLDER_IDS[action.id] then
+				local created = effects.make_dir(path)
+				if not current() then return end
+				if created ~= true then error("cannot create " .. path) end
 			end
-			if not effects.open(path) then error("the file manager could not open " .. path) end
-			return {}
-		end
-		error("no handler for the action " .. tostring(action.action))
-	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Diagnostics action '%s' failed: %s", action.action, tostring(result))
-		return { ok = false }
-	end
-	if result.missing then
-		Logger.info(LOG, "Diagnostics action '%s': %s does not exist yet.", action.action, result.missing)
-		return { ok = false, missing = true }
-	end
-	Logger.success(LOG, "Diagnostics action '%s' done.", action.action)
-	result.ok = true
-	return result
+			local exists = effects.exists(path)
+			if not current() then return end
+			if not exists then
+				if FOLDER_IDS[action.id] then error(path .. " does not exist") end
+				finish({ ok = false, missing = true }); return
+			end
+			launch("open", path, function(receipt) opened(receipt) end)
+		elseif action.action == "suggest_feature" then
+			launch("open_url", action.url, function(receipt) opened(receipt) end)
+		else error("no handler for the action " .. tostring(action.action)) end
+	end)
+	return request
 end
 
 
@@ -248,27 +273,40 @@ end
 
 --- Opens the GitHub feature form with the version and the system prefilled.
 --- @param overrides table|nil Replacement side effects (tests only).
---- @return boolean opened
-function M.suggest_feature(overrides)
-	Logger.start(LOG, "Opening the feature request form…")
+local _feature_request, _feature_owner
+
+--- @return table|nil cancellable request; completion receives the child outcome.
+function M.suggest_feature(overrides, complete)
+	local previous = _feature_request
+	local token = {}
+	_feature_owner, _feature_request = token, nil
+	local function current() return _feature_owner == token and package.loaded["ui.healthcheck.report"] == M end
+	if previous then previous.cancel() end
+	if not current() then return nil end
 	local effects = effects_with(overrides)
-	local ok, err = xpcall(function()
-		local Bridge = require("ui.healthcheck.bridge")
-		local documents = Bridge.config()
-		local context = M.redaction_context(overrides)
-		local document = Share.document(Bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), documents.schema,
+	local function finished(result)
+		if not current() then return end
+		_feature_request = nil
+		if result.ok ~= true then
+			local i18n = require("infra.i18n")
+			effects.notify(i18n.get("menu.debug.suggest_feature"), i18n.get("notify.github_report_failed"), "error")
+		end
+		if current() and type(complete) == "function" then complete(result.ok == true) end
+	end
+	local completed = false
+	local ok, request = xpcall(function()
+		local bridge = require("ui.healthcheck.bridge")
+		local documents = bridge.config()
+		local document = Share.document(bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), documents.schema,
 			require("infra.i18n").get(documents.schema.share_policy.notice_key))
 		local url = IssueLink.build_url(documents.templates, documents.repository, "feature", document.fields)
-		if not effects.open_url(url) then error("the browser could not be opened") end
+		return M.perform({ action = "suggest_feature", url = url }, {}, documents, {}, overrides, nil, {
+			current = current, complete = function(result) completed = true; finished(result) end,
+		})
 	end, debug.traceback)
-	if not ok then
-		Logger.error(LOG, "Feature request failed: %s", tostring(err))
-		local I18n = require("infra.i18n")
-		effects.notify(I18n.get("menu.debug.suggest_feature"), I18n.get("notify.github_report_failed"), "error")
-		return false
-	end
-	Logger.success(LOG, "Feature request form opened.")
-	return true
+	if not ok then Logger.error(LOG, "Feature request failed: %s", tostring(request)); finished({ ok = false }); return nil end
+	if current() and not completed then _feature_request = request else request.cancel() end
+	return request
 end
 
 return M

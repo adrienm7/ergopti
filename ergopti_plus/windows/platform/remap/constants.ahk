@@ -1209,6 +1209,11 @@ TapHoldDispatchTap(KeyId, TapFn) {
 		; keys. DisableCapsWord is a no-op when CapsWord is inactive.
 		if _TapHoldTapEndsCapsWord(KeyId)
 			DisableCapsWord()
+		; A command tap (paste, a window switch…) starts a new word, or leaves
+		; the word open, as hotstrings.tap_hold_resets_word says; its keystroke,
+		; if any, is then attributed to the tap-hold (TapHoldOwnsShortcut).
+		if (TapHoldTapIsCommand(KeyId) and IsSet(HS_ApplyEventWordReset))
+			HS_ApplyEventWordReset("tap_hold_resets_word", "tap of " . KeyId)
 		PreviousTap := TapHoldTapInDispatch()
 		_TapHoldTapInDispatch := KeyId
 		try TapFn.Call()
@@ -1218,6 +1223,69 @@ TapHoldDispatchTap(KeyId, TapFn) {
 	finally {
 		TapHoldForgetTrackedKey(KeyId)
 	}
+}
+
+; Tap actions that type, as the key would: hotstrings.tap_hold_resets_word
+; leaves them to the key they emit (TapHoldTapIsCommand).
+global TAP_HOLD_TYPING_TAP_ACTIONS := Map("one_shot_shift", true, "caps_word", true, "caps_lock", true)
+
+; Whether the configured tap of KeyId is a command rather than typing: an
+; action of the catalogue (copy, paste, a window switch, an AI request…), a
+; keystroke under Ctrl, Alt or Win included. The native tap (the key itself),
+; the keystroke of a key (Tab, Enter, Backspace, an arrow) and the typing
+; actions keep the effect of the key they emit on the hotstring word.
+; @param KeyId {String} Canonical tap-hold key id.
+; @returns {Boolean}
+TapHoldTapIsCommand(KeyId) {
+	global GESTURE_ACTIONS, TapHold, TAP_HOLD_TYPING_TAP_ACTIONS
+	ActionId := TapHoldTapAction(TapHold, KeyId)
+	if (ActionId == "" or ActionId == KeyId or TAP_HOLD_TYPING_TAP_ACTIONS.Has(ActionId))
+		return false
+	if !(IsSet(GESTURE_ACTIONS) and GESTURE_ACTIONS.Has(ActionId))
+		return false
+	Action := GESTURE_ACTIONS[ActionId]
+	if !Action.HasOwnProp("Key")
+		return true
+	for _, ModifierName in Action.Mods {
+		if (ModifierName = "Ctrl" or ModifierName = "Alt" or ModifierName = "Win")
+			return true
+	}
+	return false
+}
+
+; Whether a shortcut made now is a tap-hold key's own output, which
+; hotstrings.tap_hold_resets_word governs instead of
+; hotstrings.shortcut_resets_word: a tap being dispatched, the navigation
+; layer held, or a hold whose owner presses Ctrl, Alt or Win itself (CapsLock
+; held as Ctrl). A key held as its own modifier (LCtrl as Ctrl, passed
+; through) is the native modifier, and Shift or the layout's AltGr only type.
+; @returns {Boolean}
+TapHoldOwnsShortcut() {
+	global _TH_OwnedModifiers, LayerEnabled
+	if (TapHoldTapInDispatch() != "")
+		return true
+	if (IsSet(LayerEnabled) and LayerEnabled)
+		return true
+	for _, ModKey in _TH_OwnedModifiers {
+		if _TH_HoldMakesShortcuts(ModKey)
+			return true
+	}
+	return false
+}
+
+; Whether a held modifier combination makes shortcuts: any member besides
+; Shift and the layout's AltGr (on QWERTY right Alt is a plain Alt).
+; @param ModKey {String|Array} Resolved hold modifier.
+; @returns {Boolean}
+_TH_HoldMakesShortcuts(ModKey) {
+	for _, Name in _TH_SyntheticKeyList(ModKey) {
+		if RegExMatch(Name, "i)^[LR]?Shift$")
+			continue
+		if (KS_LayoutHasAltGr() and Name = KS_AltGrKeyName())
+			continue
+		return true
+	}
+	return false
 }
 
 ; Tap-hold keys whose tap output is a word terminator, and therefore ends
@@ -1299,8 +1367,8 @@ _TapHoldKeyTapModifiers(Mods) {
 	if !TapHoldAnyModifierHeld()
 		return Mods
 	Words := "Blind"
-	for _, Mod in Mods
-		Words .= " " . Mod
+	for _, ModifierName in Mods
+		Words .= " " . ModifierName
 	return Words
 }
 

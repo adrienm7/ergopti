@@ -251,7 +251,7 @@ _MG_LoadSubCategories(ManifestPath := "") {
 		; NOT memoized, deliberately. Caching the parsed manifest was tried and
 		; reverted: it defeats the fail-fast contract that an invalid canonical
 		; manifest must throw on EVERY call, which
-		; tests/unit/test_master_gates.ahk pins. The re-read was only harmful because
+		; tests/unit/infra/config/persistence/test_master_gates.ahk pins. The re-read was only harmful because
 		; ToggleCategoryAllFeatures ran this under Critical; that Critical span was
 		; removed (F-01), so a few ms of FileRead + JsonParse per live category toggle
 		; no longer sits on the keyboard-hook starvation path and is not worth trading

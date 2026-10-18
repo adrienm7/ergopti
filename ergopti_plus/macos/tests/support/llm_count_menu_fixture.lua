@@ -114,7 +114,8 @@ return function(callback, options)
 			end
 		end
 		local menu = require("ui.menu.menu_llm").create({ state = state,
-			keymap = { set_llm_model = accept }, save_prefs = accept, update_menu = accept, active_tasks = {} })
+			keymap = { set_llm_model = accept }, script_control = options.script_control,
+			save_prefs = accept, update_menu = accept, active_tasks = {} })
 		helpers.assert_type(menu.build_item, "function")
 		callback(menu, state, calls, function(value) outcome = value end)
 		helpers.assert_eq(command_deliveries, 0, "count-only scenarios never deliver the newly bound setting commands")

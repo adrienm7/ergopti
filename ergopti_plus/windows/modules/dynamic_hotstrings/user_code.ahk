@@ -22,7 +22,10 @@ global _UserHotstringsLoader := 0
 global _UserHotstringsJobs := Map()
 global _UserHotstringsLoadEpoch := 0
 global _UserHotstringsLastRepair := ""
-global _UserHotstringsRepairPending := false
+; Why an enabled programmable source is not running, as the Hotstrings menu
+; shows it: "missing" (no source file: create the example), "failed" (the
+; source could not be read or loaded: open it), "" when nothing is wrong.
+global _UserHotstringsProblem := ""
 
 UserHotstringsSourcePath() {
 	global _ConfigDir
@@ -43,35 +46,66 @@ _UserHotstringsRefreshMenu() {
 	return true
 }
 
+; The source problems the user repairs from the Hotstrings menu, and the
+; problem each one shows there. Every other refusal is a driver fault.
+global USER_HOTSTRINGS_SOURCE_PROBLEMS := Map("source-missing", "missing",
+	"source-unreadable", "failed", "source-load-failed", "failed")
+
 _UserHotstringsReport(Kind, Id) {
-	global _UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsRepairPending
+	global _UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsProblem
+	global USER_HOTSTRINGS_SOURCE_PROBLEMS
 	; Stable identifiers only: user exceptions may contain private source/text.
 	Receipt := _UserHotstringsLoadEpoch . ":" . Kind . ":" . Id
 	if Receipt == _UserHotstringsLastRepair
 		return true
 	_UserHotstringsLastRepair := Receipt
-	LoggerError("UserHotstrings", "Programmable source refused: {1} ({2}).", Kind, Id)
-	if !_UserHotstringsRepairPending {
-		_UserHotstringsRepairPending := true
-		try SetTimer(_UserHotstringsOfferRepair, -1)
+	; A missing or broken personal source is the user's to repair, not a driver
+	; failure: one WARNING, and the Hotstrings menu row shows the problem with
+	; its repair (create the example, open the script). It used to be a modal
+	; Yes/No offer at every boot with the option on and no file.
+	if (Id == "load" and USER_HOTSTRINGS_SOURCE_PROBLEMS.Has(Kind)) {
+		_UserHotstringsProblem := USER_HOTSTRINGS_SOURCE_PROBLEMS[Kind]
+		if (_UserHotstringsProblem == "missing")
+			LoggerWarn("UserHotstrings", "Programmable hotstrings are on but personal_dynamic_hotstrings.ahk does not exist — the Hotstrings menu offers to create an example.")
+		else
+			LoggerWarn("UserHotstrings", "Programmable source refused: {1} — the Hotstrings menu offers to open it.", Kind)
+		_UserHotstringsRefreshMenu()
+		return true
 	}
+	LoggerError("UserHotstrings", "Programmable source refused: {1} ({2}).", Kind, Id)
 	return true
 }
 
-_UserHotstringsOfferRepair(*) {
-	global _UserHotstringsRepairPending
-	try {
-		Present := FSStrictExists(UserHotstringsSourcePath())
-		ActionLabel := Present ? T("menu.hotstrings.user_code.open_source") : T("menu.hotstrings.user_code.create_example")
-		Choice := Ui_MsgBox(T("menu.hotstrings.user_code.error") . "`n`n"
-			. ActionLabel . "?", T("menu.hotstrings.user_code.title"), "YesNo Iconx")
-		if Choice == "Yes" {
-			if Present
-				UserHotstringsOpenSource()
-			else
-				UserHotstringsCreateExample()
-		}
-	} finally _UserHotstringsRepairPending := false
+/**
+ * Why the enabled programmable source is not running.
+ * @returns {String} "missing", "failed", or "" when nothing is wrong.
+ */
+UserHotstringsProblem() {
+	global _UserHotstringsProblem
+	return _UserHotstringsProblem
+}
+
+/**
+ * Creates the example source from the menu, then loads it at once when the
+ * option is on, so the problem the menu showed is gone.
+ * @returns {Boolean} Whether the example was created, and loaded when on.
+ */
+UserHotstringsRepairWithExample(*) {
+	global Features
+	; The example never overwrites a source: an existing one is only loaded.
+	if FSStrictExists(UserHotstringsSourcePath()) {
+		LoggerInfo("UserHotstrings", "The programmable source already exists — kept unchanged.")
+	} else if !UserHotstringsCreateExample() {
+		LoggerError("UserHotstrings", "The example programmable source could not be created.")
+		return false
+	} else {
+		LoggerInfo("UserHotstrings", "Example programmable source created.")
+	}
+	Requested := Features["hotstrings"]["dynamic"].Has("user_code")
+		&& Features["hotstrings"]["dynamic"]["user_code"]["enabled"] && IsCategoryGated("Hotstrings")
+	if !Requested
+		return true
+	return UserHotstringsSetEnabled(true)
 }
 
 UserHotstringsOpenSource(*) {
@@ -101,9 +135,12 @@ UserHotstringsInit() {
 }
 
 UserHotstringsSetEnabled(Enabled) {
-	global _UserHotstringsOwner
+	global _UserHotstringsOwner, _UserHotstringsProblem
 	if !IsObject(_UserHotstringsOwner) || !(Enabled is Integer) || (Enabled != 0 && Enabled != 1)
 		return false
+	; A disabled source has no problem to show; an enable reloads and reports.
+	if !Enabled
+		_UserHotstringsProblem := ""
 	WasEnabled := _UserHotstringsOwner.enabled
 	NeedsLoad := Enabled && (!WasEnabled || !_UserHotstringsOwner.ready)
 	; Close callback admission before cancelling the independently owned loader.
@@ -176,7 +213,7 @@ UserHotstringsInvalidate(Reason := "lifecycle") {
 		; so it aborts output and releases capture; a late timer cannot do it twice.
 		; Native text output retains its own completion callback and suppression.
 		; Revoked publication is observed by admission/commit; the terminal runner
-		; cannot retire this sender or release a capture it never acquired.
+		; cannot retire this sender, and its completion releases its own capture.
 		if !TerminalOwner.Get("NativeLiteral", false)
 			_HSE_RunOwnedTerminalTransaction(TerminalOwner)
 		Ready := !TerminalOwner["Pending"] && Ready
@@ -236,7 +273,7 @@ UserHotstringsReload(*) {
 		return false
 	}
 	Done(ExitCode, Stdout, Stderr) {
-		global _UserHotstringsOwner, _UserHotstringsLoadEpoch, _UserHotstringsLoader
+		global _UserHotstringsOwner, _UserHotstringsLoadEpoch, _UserHotstringsLoader, _UserHotstringsProblem
 		if Epoch != _UserHotstringsLoadEpoch
 			return false
 		_UserHotstringsLoader := 0
@@ -245,6 +282,8 @@ UserHotstringsReload(*) {
 				throw Error("Source publication refused.")
 			Rules := _UserHotstringsParseMetadata(Stdout)
 			Published := _UserHotstringsOwner.Reload(Rules, Source)
+			if Published
+				_UserHotstringsProblem := ""
 			_UserHotstringsRefreshMenu()
 			return Published
 		} catch {

@@ -46,7 +46,7 @@ Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
 assert(Keylogger.is_enabled() and Writer.is_available())
 Keylogger.on_keydown("a", 1000, "owned-wpm")
 Keylogger.on_keydown("b", 2300, "owned-wpm")
-Keylogger.flush()
+require("tests.support.sqlite_flush_native").flush(Keylogger)
 local original = assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;"))[1]
 
 check("public collector flush preserves fractional event-derived WPM and raw bytes", function()
@@ -61,7 +61,7 @@ check("public collector flush preserves fractional event-derived WPM and raw byt
 end)
 
 check("second collector flush cannot duplicate the accepted raw batch", function()
-	Keylogger.flush()
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
 	assert(row_count() == 1)
 	assert(Writer.query_rows("SELECT wpm,hex(text),hex(events_json) FROM events_typing;")[1] == original)
 end)

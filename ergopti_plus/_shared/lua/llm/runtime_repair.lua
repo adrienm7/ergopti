@@ -45,6 +45,7 @@ function M.new(ports, policy)
 	-- Capture the ports once; arbitrary mutation of the caller table has no authority.
 	local P = {}; for key, value in pairs(ports) do P[key] = value end
 	local active, app, sequence, controller = nil, nil, 0, {}
+	local responses = setmetatable({}, {__mode='k'})
 	local bootstrap_ms, poll_ms=policy.bootstrap_timeout_ms, policy.poll_ms
 
 	local function call(fn, ...)
@@ -99,6 +100,34 @@ function M.new(ports, policy)
 		return 'running'
 	end
 	function controller:has_debt() return active ~= nil or (app ~= nil and app.stopping) end
+
+	--- Captures original app/absence custody without invoking any observer or effect.
+	--- @return table receipt Opaque read-only response identity, never readiness.
+	function controller:capture_response()
+		local receipt={}
+		responses[receipt]={app=app,sequence=sequence}
+		return receipt
+	end
+	--- Checks the captured app, binary/source and exact retained service without retirement.
+	--- @param receipt table Original opaque observer receipt.
+	--- @param origin string Requested original service origin.
+	--- @return boolean current No start, stop, publication or cleanup is authorized.
+	function controller:response_current(receipt,origin)
+		local witness=responses[receipt]
+		if not witness or witness.app~=app or witness.sequence~=sequence then return false end
+		local record=witness.app
+		-- Absence authenticates only this controller view, never an external server.
+		if not record then return active == nil end
+		if record.origin~=origin or record.stopping then return false end
+		local held=record.service
+		if not held or held.acquiring or held.unknown or type(held.is_current)~='function'
+			or type(held.running)~='function' or not app_current(record) then return false end
+		if not yes(held.is_current,held.operation) or app~=record or record.stopping then return false end
+		if not yes(held.running,held.operation) or app~=record or record.stopping then return false end
+		-- Running is the final observer; later source callbacks could invalidate that proof.
+		return app==record and record.service==held
+			and responses[receipt]==witness and witness.sequence==sequence and not record.stopping
+	end
 
 	function controller:start(snapshot, action, explicit_consent, on_done)
 		local request = {started = false}

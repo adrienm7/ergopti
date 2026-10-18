@@ -74,12 +74,25 @@ KLR_LoadSchema(db) {
 		schema_path := KLR_ResolveSchemaPath()
 		if !FileExist(schema_path)
 				return false
-		try schema := FileRead(schema_path, "UTF-8")
+		try schema := FSReadStrict(schema_path)
 		catch as err {
 				try LoggerError("KLReader", "Schema read failed: {1}.", err.Message)
 				return false
 		}
-		return SQLite_Exec(db, schema)
+		if !SQLite_Exec(db, schema)
+				return false
+		return KLR_LoadMediaSchema(db)
+}
+
+; Apply only the additive schema to a private cold or upgrade candidate.
+KLR_LoadMediaSchema(db) {
+		global _SharedDir
+		try media_schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
+		catch as err {
+				try LoggerError("KLReader", "Semantic media schema read failed: {1}.", err.Message)
+				return false
+		}
+		return SQLite_Exec(db, media_schema)
 }
 
 
@@ -195,6 +208,17 @@ KLR_BuildDatabase(metrics_dir) {
 		; into one tail append (klr-reader-durable-cache).
 		if !KLRCache.db
 				KLR_CacheAttach(md, logPath)
+		; Format 14 predates media tables. Upgrade only a private copy before
+		; any unchanged-image fast path can return the published handle.
+		BeforeMediaUpgrade := KLRCache.db
+		if BeforeMediaUpgrade && !KLR_UpgradeMediaCache()
+				return 0
+		if BeforeMediaUpgrade && KLRCache.db != BeforeMediaUpgrade {
+				; Hand the additive upgrade to the next worker without another
+				; whole-image clone. Existing atomic save preserves a locked source.
+				KLRCache.saved_at := ""
+				KLR_CacheSaveIfOwned(md, logPath)
+		}
 		; A warm refresh never mutates the published handle. Collect all new bytes,
 		; clone the last-good database, and apply/re-project on that private handle.
 		; Publication swaps both DB and offsets only after every ledger reaches a
@@ -347,6 +371,56 @@ KLR_BuildDatabase(metrics_dir) {
 		return KLRCache.db
 }
 
+; Preserve the already-validated offsets and numeric projection when an old
+; cache predates the additive media schema. The read-only image stays unchanged
+; until a complete private successor can be published.
+KLR_UpgradeMediaCache(LoadMedia := unset) {
+		static UnretiredCandidate := 0
+		if UnretiredCandidate
+				throw Error("Semantic media cache upgrade has an unretired candidate.")
+		Rows := SQLite_Query(KLRCache.db,
+				"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
+		if Rows[1]["n"] = 2
+				return true
+		Candidate := KLR_CloneCandidate(KLRCache.db)
+		if !Candidate
+				return false
+		Failure := 0
+		try {
+				Loader := IsSet(LoadMedia) ? LoadMedia : KLR_LoadMediaSchema
+				if !Loader.Call(Candidate)
+						throw Error("Semantic media cache schema installation failed.")
+				Rows := SQLite_Query(Candidate,
+						"SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name IN ('ngram_media_keys','agg_app_day_media_hold')")
+				if Rows[1]["n"] != 2
+						throw Error("Semantic media cache schema installation is incomplete.")
+				KLR_PublishCandidate(Candidate, KLR_CopyOffsets(KLRCache.last_sizes),
+						KLR_CopyLedgerSnapshots(KLRCache.ledger_snapshots))
+				Candidate := 0
+		} catch as Caught {
+				Failure := Caught
+		} finally {
+				if Candidate {
+						; SQLite_Close defers native retirement. This newly
+						; acquired candidate requires the actual native retirement result.
+						try {
+								Status := SQLite_CloseChecked(Candidate)
+								if Status != SQLiteConst.OK
+										throw Error("Semantic media cache candidate close refused: " . Status)
+						} catch as CleanupFailure {
+								UnretiredCandidate := Candidate
+								if IsObject(Failure)
+										Failure.Message .= " | " . CleanupFailure.Message
+								else
+										Failure := CleanupFailure
+						}
+				}
+		}
+		if IsObject(Failure)
+				throw Failure
+		return true
+}
+
 ; Retire a candidate that failed to publish, and answer what the build should
 ; return.
 ;
@@ -440,7 +514,7 @@ KLR_PublishCandidate(candidate, sizes, snapshots) {
 		; sqlite3_close_v2 may enter the OS allocator. Keep it outside the critical
 		; publication window. Immediate close relies on KLR_BuildDatabase running in
 		; the disposable, single-flow /force worker guarded by
-		; tests/meta/test_keylogger_prefetch_worker.ahk. A future in-process caller
+		; tests/meta/modules/keylogger/test_keylogger_prefetch_worker.ahk. A future in-process caller
 		; must add borrower ownership/deferred close before reusing this publication.
 		if (old_db && old_db != candidate)
 				try SQLite_Close(old_db)
@@ -562,7 +636,7 @@ KLR_ExecLargeFile(db, path, &loaded_offset, &loaded_snapshot := unset) {
 		; Open in binary mode (no encoding conversion). The raw bytes are UTF-8
 		; exactly as SQLite expects — StrPut inside SQLite_ExecBuf handles the
 		; AHK-side conversion only for the tiny carry string.
-		try fh := FileOpen(path, "r`n", "UTF-8")
+		try fh := FSOpenStrict(path, "r`n", "UTF-8")
 		catch as err {
 				try LoggerError("KLReader", "Metrics ledger open failed: {1}.", err.Message)
 				return false
@@ -761,7 +835,7 @@ KLR_LedgerSnapshotFromHandle(file_handle) {
 }
 
 KLR_LedgerSnapshot(path) {
-		try fh := FileOpen(path, "r")
+		try fh := FSOpenStrict(path, "r")
 		catch as err {
 				try LoggerError("KLReader", "Metrics ledger snapshot open failed: {1}.", err.Message)
 				return Map("ok", false)
@@ -805,7 +879,7 @@ KLR_LedgerWriteTimeIsSame(left, right) {
 KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 	Guard := 0
 	try {
-		Guard := FileOpen(Path, "r-w", "UTF-8")
+		Guard := FSOpenStrict(Path, "r-w", "UTF-8")
 		if !IsObject(Guard)
 			return Map("ok", false)
 		; FileOpen prefetches for BOM detection. Accessing Handle discards that
@@ -832,7 +906,7 @@ KLR_ReadStableLedgerChunk(Reader, Path, Count := -1) {
 }
 
 KLR_ReadLedgerTail(path, start_offset) {
-		try fh := FileOpen(path, "r", "UTF-8")
+		try fh := FSOpenStrict(path, "r", "UTF-8")
 		catch as err {
 				try LoggerError("KLReader", "Incremental ledger open failed: {1}.", err.Message)
 				return Map("ok", false, "sql", "", "end_offset", start_offset)

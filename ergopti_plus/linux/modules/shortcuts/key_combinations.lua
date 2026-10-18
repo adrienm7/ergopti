@@ -45,6 +45,8 @@ local function declared_settings()
 	return settings
 end
 local M, instance = {}, nil
+local original_pair, original_pair_separator = Shared.pair, Shared.PAIR_SEPARATOR
+local identity_receipts = setmetatable({}, { __mode = "k" })
 local buffered_settings = setmetatable({}, {__mode="k"})
 local function clone(map)
 	local result = {}; for key, value in pairs(map) do result[key] = value end; return result
@@ -59,12 +61,16 @@ function M.new(options)
 	local files = options.files or Files
 	local route = options.route or function() return ConfigPaths.config("config.toml") end
 	local key_ids, known, holds = {}, {}, { none = true }
+	local pair = Shared.pair
+	local original_policy = rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		and getmetatable(Shared) == nil and pair == original_pair
+		and rawget(Shared, "PAIR_SEPARATOR") == original_pair_separator
 	for _, key in ipairs(options.keys) do
 		assert(type(key.id) == "string" and type(key.key) == "string", "Linux physical catalogue required")
 		key_ids[#key_ids + 1] = key.id
 	end
 	for _, first in ipairs(key_ids) do for _, second in ipairs(key_ids) do
-		if first ~= second then known[Shared.pair(first, second)] = true end
+		if first ~= second then known[pair(first, second)] = true end
 	end end
 	for _, hold in ipairs(HoldOptions.build(options.hold_picker)) do
 		if hold.kind ~= "none" then holds[hold.id] = true end
@@ -189,7 +195,7 @@ function M.new(options)
 	function owner.configuration_entries()
 		local entries={}
 		for _,first in ipairs(key_ids) do for _,second in ipairs(key_ids) do
-			if first~=second then entries[#entries+1]={id=Shared.pair(first,second),first=first,second=second} end
+			if first~=second then entries[#entries+1]={id=pair(first,second),first=first,second=second} end
 		end end
 		return entries
 	end
@@ -220,6 +226,29 @@ function M.new(options)
 		end
 		if receipt.guard() ~= true then return nil end
 		return receipt
+	end
+	--- Captures every ordered/third-slot claim from this installed source owner.
+	function owner.capture_collision_inventory()
+		if not rawequal(instance, owner) then return nil end
+		local source = owner.capture_edit_source()
+		if not source then return nil end
+		local captured, revision = state, generation
+		local entries = owner.configuration_entries()
+		local claims = {}
+		for _, entry in ipairs(entries) do
+			if state.enabled and (state.taps[entry.id] ~= "none" or state.holds[entry.id] ~= "none"
+				or state.chord_enabled and owner.get_chord(entry.id) ~= "none") then
+				claims[#claims + 1] = { binding = "combination__" .. entry.id, first = entry.first, second = entry.second }
+			end
+		end
+		local function current()
+			return rawequal(instance, owner) and state == captured and generation == revision
+				and source.guard() == true and rawequal(instance, owner) and state == captured and generation == revision
+		end
+		if not current() then return nil end
+		return { claims = claims, path = source.path, content = source.content, status = source.status, current = current,
+			sealed = function() return rawequal(instance, owner) and state == captured and generation == revision
+				and not busy and lease == nil and delivery_fence == nil end }
 	end
 	function owner.engine_options(thresholds)
 		local configured = { keys = clone(key_ids), taps = clone(state.taps), holds = clone(state.holds), thresholds = clone(thresholds),
@@ -399,7 +428,38 @@ function M.new(options)
 		busy = false
 		return ok and installed == true
 	end
+	-- A logical identity receipt observes the actual private constructor result;
+	-- it never enrolls an active assignment or changes native/input admission.
+	identity_receipts[owner] = { keys = clone(key_ids), known = clone(known), original_policy = original_policy }
 	return owner
+end
+--- Pure logical identity of the published owner; no runtime or file port runs.
+--- @param owner table Exact Manager-issued combinations owner.
+--- @param keys table Complete immutable key source saved by its actual issuer.
+--- @return boolean current
+function M.instance_is_current(owner, keys)
+	local receipt = type(owner) == "table" and identity_receipts[owner] or nil
+	if not rawequal(instance, owner) or receipt == nil or type(keys) ~= "table" or getmetatable(keys) ~= nil
+		or receipt.original_policy ~= true
+		or not rawequal(rawget(package.loaded, "tap_hold.key_combinations"), Shared)
+		or getmetatable(Shared) ~= nil or rawget(Shared, "pair") ~= original_pair
+		or rawget(Shared, "PAIR_SEPARATOR") ~= original_pair_separator then return false end
+	local ids, count = {}, 0
+	for index, key in next, keys do
+		if type(index) ~= "number" or index < 1 or index % 1 ~= 0 or type(key) ~= "table"
+			or getmetatable(key) ~= nil or type(rawget(key, "id")) ~= "string"
+			or receipt.keys[index] ~= rawget(key, "id") then return false end
+		ids[index], count = key.id, count + 1
+	end
+	if count ~= #receipt.keys then return false end
+	for index = 1, count do if ids[index] == nil then return false end end
+	local expected = {}
+	for _, first in ipairs(ids) do
+		for _, second in ipairs(ids) do
+			if first ~= second then expected[first .. original_pair_separator .. second] = true end
+		end
+	end
+	return equal(receipt.known, expected)
 end
 function M.set_instance(owner)
 	if type(owner) ~= "table" or type(owner.capture_runtime) ~= "function" then return false end
@@ -411,7 +471,7 @@ function M.install(options)
 	return true
 end
 for _, name in ipairs({"get_action","get_hold","get_chord","chord_pair","chord_settings","configuration_entries","is_enabled","capture_edit_source","has_bindings","configuration_domain","capture_action","engine_options",
-	"capture_runtime","capture_chord","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
+	"capture_runtime","capture_chord","capture_collision_inventory","acquire_delivery_fence","owns_delivery_fence","release_delivery_fence","configuration_pending","owns_configuration","validate_slot","acquire_configuration","release_configuration","configuration_snapshot","configuration_source","configuration_source_matches","configuration_candidate","apply_configuration"}) do
 	M[name] = function(...)
 		if not instance then return name == "get_action" and "none" or nil end
 		return instance[name](...)

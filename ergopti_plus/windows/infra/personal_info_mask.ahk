@@ -11,7 +11,7 @@
 ; at runtime from _shared/modules/personal_info/fields.toml. The two halves are
 ; pinned together by _shared/modules/personal_info/preview_vectors.toml, which
 ; every driver's suite replays byte for byte;
-; tests/unit/test_personal_info_mask_vectors.ahk is this driver's consumer of
+; tests/unit/modules/hotstrings/personal/test_personal_info_mask_vectors.ahk is this driver's consumer of
 ; that corpus.
 ;
 ; The two sinks get DIFFERENT answers on purpose: a bubble is read by the person

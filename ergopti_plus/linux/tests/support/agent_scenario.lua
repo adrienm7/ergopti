@@ -202,10 +202,14 @@ function M.run(opts, body)
 				world.typed[#world.typed + 1] = candidate.to_type
 				return true
 			end,
-			read_selection = function()
-				world.reads = world.reads + 1
-				if world.selection == nil then return false, "", "no_selection" end
-				return true, world.selection, nil
+			read_selection = function(_, authorized, callback)
+				local function complete()
+					world.reads = world.reads + 1
+					if world.selection == nil then callback(false, "", "no_selection"); return true end
+					callback(true, world.selection, nil, world.selection_receipt); return true
+				end
+				if world.defer_selection_read then world.complete_selection_read = complete else complete() end
+				return true
 			end,
 			replace_selection = function() error("the agent never replaces the selection") end,
 			focus_id = function() return world.window.app .. "\1" .. world.window.title end,

@@ -25,6 +25,8 @@
 
 local M = {}
 local WindowTitles = require("window_titles")
+local NativePresentation = require("infra.native_presentation")
+local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 local NumberRowPolicy = require("layout.number_row_policy")
 local ParameterLabel = require("action_parameter_label")
 local RowDialect = require("menu.row_dialect")
@@ -97,6 +99,21 @@ local separator_array = type(ManifestMenu) == "table" and rawget(ManifestMenu, "
 local separator_root = type(ManifestMenu) == "table" and rawget(ManifestMenu, "get_root")
 local header_template = type(ManifestMenu) == "table" and rawget(ManifestMenu, "template_rows")
 local header_command = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_row")
+local uninstall_caption_factory = type(ManifestMenu) == "table" and rawget(ManifestMenu, "command_caption_receiver")
+local uninstall_caption_i18n = rawget(separator_modules, "infra.i18n")
+local uninstall_caption_get = type(uninstall_caption_i18n) == "table" and rawget(uninstall_caption_i18n, "get")
+
+--- Retains only the actual caption facade and translator used by removal options.
+--- @return boolean current
+local function uninstall_caption_facade_current()
+	return type(ManifestMenu) == "table" and getmetatable(ManifestMenu) == nil
+		and rawget(package, "loaded") == separator_modules
+		and rawget(separator_modules, "infra.manifest_menu") == ManifestMenu
+		and type(uninstall_caption_factory) == "function" and rawget(ManifestMenu, "command_caption_receiver") == uninstall_caption_factory
+		and type(uninstall_caption_i18n) == "table" and getmetatable(uninstall_caption_i18n) == nil
+		and rawget(separator_modules, "infra.i18n") == uninstall_caption_i18n
+		and type(uninstall_caption_get) == "function" and rawget(uninstall_caption_i18n, "get") == uninstall_caption_get
+end
 
 --- Refuses facade or function withdrawal without invoking its replacement.
 --- @return boolean
@@ -249,17 +266,8 @@ local function assign_parameterized_action(ctx, gestures, binding, action, assig
 		show_error(zenity_plain(gestures.get_action_parameter_error(action)))
 		return false
 	end
-	if spec == "program" then
-		return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused)
-	end
-	if type(gestures.set_action_parameter) ~= "function"
-		or not gestures.set_action_parameter(binding, action, value)
-	then
-		Logger.error(LOG, "Action parameter for binding '%s' was not persisted.",
-			tostring(binding))
-		return false
-	end
-	return assign() == true
+	-- A rejected assignment cannot leave its parameter durably changed.
+	return require("infra.program_binding_transaction").apply(binding, value, ctx.is_paused, action)
 end
 
 --- Opens the shared searchable action catalogue for one current assignment.
@@ -625,7 +633,11 @@ local function _build_layouts(ctx)
 		local function notify(key, level)
 			local ok_notifier, Notifier = pcall(require, "adapters.application_notifier")
 			if ok_notifier then
-				Notifier.send(i18n_safe(key), { title = i18n_safe("dialog.magic_key_source.title"), level = level })
+				local body = i18n_safe(key)
+				local receipt = PrepareNativePresentation("magic_key_source_notice", "notification")
+				local title = receipt and NativePresentationTitle(receipt) or nil
+				if title == nil then return false end
+				Notifier.send(body, { title = title, level = level })
 			else
 				Logger.error(LOG, "No notifier: %s.", i18n_safe(key))
 			end
@@ -1201,20 +1213,6 @@ local function _manifest_hotstring_rows(ctx, config)
 		return rows
 	end
 
-	--- Every known category id, sorted: the scope of the whole-tree « all
-	--- sections » checkbox, switched in ONE write. The row it replaced looped
-	--- `toggle_group` until 2026-08-05, which never touched the section keys and
-	--- ended each category in a full `load_all()` — magickey.toml alone is 305 KB —
-	--- inside a menu callback.
-	--- @return table Array of category ids.
-	local function all_category_ids()
-		local ids = {}
-		local categories = type(config.get_categories) == "function" and config.get_categories() or nil
-		for id in pairs(categories or {}) do ids[#ids + 1] = id end
-		table.sort(ids)
-		return ids
-	end
-
 	--- Renders a delay for a menu label: "750 ms", or the infinity sign for 0.
 	---
 	--- Zero does not mean "fire instantly" — it means the trigger never expires,
@@ -1442,11 +1440,15 @@ local function _manifest_hotstring_rows(ctx, config)
 					for _, boundary in ipairs(boundaries) do sub[#sub + 1] = boundary end
 				elseif def.key then
 					local key = def.key
+					-- A built-in slot carries a locale key, never display text, so the
+					-- row follows the active language; only a custom slot carries the
+					-- literal label its user typed.
+					local text = def.custom and def.label or i18n_safe(def.label_key)
 					-- The live magic key, not the ★ the catalogue was written with.
 					-- The label is shipped as a literal star; a user who changed the
 					-- key saw the delimiter list still naming a character that is no
 					-- longer their trigger, in every language.
-					local label = (def.label or key):gsub("★", MagicKey.get())
+					local label = text:gsub("★", MagicKey.get())
 					-- A consumed delimiter is swallowed by the expansion; an unconsumed
 					-- one is typed after it. The difference is visible only in the
 					-- output, so the row has to say which it is — a space that vanishes
@@ -1610,6 +1612,7 @@ local function _manifest_hotstring_rows(ctx, config)
 		end,
 	}
 
+	local personal_choices_admitted = true
 	local providers = {
 		["hotstring_categories_standard"] = function()
 			local rows = {}
@@ -1817,14 +1820,21 @@ local function _manifest_hotstring_rows(ctx, config)
 				local choices = {}
 
 				for _, name in ipairs(personal and personal.sections_order or {}) do
-					choices[#choices + 1] = {
-						label   = name,
-						checked = (current == name),
-						action      = function()
+					local selected = (current == name)
+					local choice = ManifestMenu.check_row("hotstring_personal_default_choice", "personal_default_section", {
+						["personal_default_section"] = function()
 							Editor.set_pref("default_section", name)
 							if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
 						end,
-					}
+					}, {
+						personal_default_section_label = function() return name end,
+						personal_default_section_selected = function() return selected end,
+					})
+					if type(choice) ~= "table" then
+						personal_choices_admitted = false
+						return {}
+					end
+					choices[#choices + 1] = choice
 				end
 				local sub = ManifestMenu.template_rows("hotstring_personal_default_frame", {
 					["personal_default_none"] = none_action,
@@ -2164,17 +2174,71 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.state_getters["hotstrings_repeat_enabled"] = function()
 				return RepeatKey.is_enabled()
 			end
+			-- When the engine forgets the current word: the `idle_reset` choice
+			-- (presets plus a free entry) and the click, arrow, shortcut and
+			-- tap-hold checkboxes. The renderer draws the rows; these are their
+			-- owners and states.
+			-- Required here, not with the module imports: the menu manifest gate pins
+			-- this file's top-level bindings.
+			local WordReset = require("modules.hotstrings.word_reset")
+			local function word_reset_changed(committed)
+				if committed and type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+				return committed
+			end
+			params_ctx.commands["idle_reset"] = function(seconds)
+				return word_reset_changed(WordReset.set_idle_seconds(seconds))
+			end
+			params_ctx.commands["idle_reset_custom"] = function()
+				local answer = prompt_text(i18n_safe("menu.hotstrings.idle_reset_title"),
+					i18n_safe("menu.hotstrings.idle_reset_prompt"),
+					string.format("%g", WordReset.idle_seconds()))
+				if answer == nil then return false end
+				local seconds = WordReset.parse_seconds(answer)
+				if seconds == nil then
+					Logger.warn(LOG, "Invalid idle delay '%s' — ignored.", tostring(answer))
+					show_error(i18n_safe("menu.hotstrings.idle_reset_invalid"),
+						i18n_safe("dialog.gestures.param_error_title"))
+					return false
+				end
+				return word_reset_changed(WordReset.set_idle_seconds(seconds))
+			end
+			params_ctx.commands["click_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_click_resets_word())
+			end
+			params_ctx.commands["arrow_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_arrow_resets_word())
+			end
+			params_ctx.commands["shortcut_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_shortcut_resets_word())
+			end
+			params_ctx.commands["tap_hold_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
+			end
+			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
+				return WordReset.idle_seconds()
+			end
+			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
+				return WordReset.click_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_arrow_resets_word"] = function()
+				return WordReset.arrow_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function()
+				return WordReset.shortcut_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_tap_hold_resets_word"] = function()
+				return WordReset.tap_hold_resets_word()
+			end
 			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
 				params_handlers, nil, params_ctx, params_providers)
 		end,
 	}
 
-	-- The « all sections » checkbox is a `check` declaration, built by the shared
-	-- renderer, so this driver supplies only its behaviour and its tick.
+	-- No whole-tree « all sections » row: it switched on the packs of every
+	-- language at once. Each submenu owns the bulk rows of its own content.
 	local hs_ctx = {}
 	for key, value in pairs(ctx) do hs_ctx[key] = value end
 	local function hotstrings_on() return _hotstrings_on(ctx) end
-	local whole_tree = all_sections_row(all_category_ids())
 
 	--- Restores or clears the Hotstrings scope at once.
 	--- @param mode string "recommended" or "clear".
@@ -2186,7 +2250,6 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.commands = {
 		["scope_restore"] = function() return apply_hotstrings_scope("recommended") end,
 		["scope_clear"] = function() return apply_hotstrings_scope("clear") end,
-		["hotstrings_all_sections"] = whole_tree and whole_tree.action or nil,
 		-- The category switch, the submenu's first row. Every driver registers it:
 		-- no tray can switch a category from the row that opens its submenu.
 		["hotstrings_toggle"]      = function()
@@ -2218,9 +2281,10 @@ local function _manifest_hotstring_rows(ctx, config)
 	hs_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do hs_ctx.state_getters[key] = value end
 	hs_ctx.state_getters["hotstrings_enabled"] = hotstrings_on
-	hs_ctx.state_getters["hotstrings_all_sections_enabled"] = function() return whole_tree ~= nil and whole_tree.checked end
 
-	return ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
+	local rows = ManifestMenu.build("hotstrings_menu", "Hotstrings", nil, group_builders, hs_ctx, providers)
+	if not personal_choices_admitted then return nil end
+	return rows
 end
 
 --- Builds the hotstrings submenu: the manifest's rows, then this driver's own.
@@ -4095,7 +4159,8 @@ local function _build_tap_holds(ctx)
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
 		Picker.open({
-			title = i18n_safe("tap_hold.picker.title_prefix") .. _tap_hold_key_label(catalog_entry),
+			presentation_id = "tap_hold_action",
+			presentation_suffix = _tap_hold_key_label(catalog_entry),
 			current = current == "" and "__native__" or current,
 			allow_native = true,
 			native_label = i18n_safe("tap_hold.tap.none"),
@@ -4576,9 +4641,11 @@ local function _build_language(ctx)
 				label   = i18n.display_name(code) .. " (" .. code .. ")",
 				checked = code == active,
 				action  = function()
-					if i18n.set_locale(cap) and type(ctx.on_menu_changed) == "function" then
-						ctx.on_menu_changed()
-					end
+					local committed = i18n.set_locale(cap)
+					-- GTK toggles before dispatch; a refused write still needs the
+					-- authoritative locale image to restore its current check.
+					if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+					return committed
 				end,
 			}
 		end
@@ -4768,11 +4835,21 @@ M._about_update_rows = _about_update_rows
 --- @param ctx table Menu context.
 --- @return function
 local function _uninstall_command(ctx)
+	local receive, current
+	if uninstall_caption_facade_current() then receive, current = uninstall_caption_factory("about_menu", "uninstall") end
 	return function()
-		require("ui.menu.uninstall").run({
-			title = i18n_safe("menu.global.uninstall"),
-			confirmation = i18n_safe("dialog.uninstall.confirm"),
-			failure = i18n_safe("dialog.uninstall.failed"),
+		if not uninstall_caption_facade_current() or type(receive) ~= "function" or type(current) ~= "function" or not current() then return false end
+		local run = require("ui.menu.uninstall").run
+		local title = receive()
+		if title == nil or not uninstall_caption_facade_current() or not current() then return false end
+		local confirmation = i18n_safe("dialog.uninstall.confirm")
+		if not uninstall_caption_facade_current() or not current() then return false end
+		local failure = i18n_safe("dialog.uninstall.failed")
+		if not uninstall_caption_facade_current() or not current() then return false end
+		local options = {
+			title = title,
+			confirmation = confirmation,
+			failure = failure,
 			confirm = function(title, text)
 				return ask_yes_no(title, zenity_plain(text),
 					i18n_safe("button.remove"), i18n_safe("button.cancel"))
@@ -4785,7 +4862,9 @@ local function _uninstall_command(ctx)
 				end
 				ctx.on_quit()
 			end,
-		})
+		}
+		if not uninstall_caption_facade_current() or not current() then return false end
+		run(options)
 	end
 end
 

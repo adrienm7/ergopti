@@ -654,7 +654,8 @@ LLM_Menu_EnsureModelReady() {
 			return true
 		return LLM_Menu_CommitMutation("the default installed LLM model",
 			(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-				"model", model))
+				"model", model),
+			_LLM_Menu_ApplyModelCommitted)
 	}
 	replacement := LLM_PickBestInstalledDisplayName()
 	if (replacement == "")
@@ -663,7 +664,8 @@ LLM_Menu_EnsureModelReady() {
 	new_tag := _LLM_ResolveOllamaTagCore(replacement, false)
 	Committed := LLM_Menu_CommitMutation("the installed LLM model correction",
 		(Candidate) => _LLM_Menu_SetCandidateValue(Candidate,
-			"model", replacement))
+			"model", replacement),
+		_LLM_Menu_ApplyModelCommitted)
 	if Committed {
 		try LoggerWarn("LLM",
 			"Model '{1}' (tag '{2}') is not installed — switched to '{3}' (tag '{4}').",

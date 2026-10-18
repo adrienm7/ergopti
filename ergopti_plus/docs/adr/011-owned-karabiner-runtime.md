@@ -15,7 +15,7 @@ modifications. Up to `v0.0.0-dev.147` onboarding installs the official
 Karabiner-Elements 16.0.0 application (UI, system extension and root grabber)
 and ErgoptiPlus merges token-scoped rules into the user's own
 `~/.config/karabiner/karabiner.json`. Ergopti never owns a Karabiner process:
-that is rule R3, and `tests/meta/test_karabiner_stock_process_isolation.lua`
+that is rule R3, and `tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
 enforces it.
 
 That arrangement cannot count physical keys exactly (HS-274). Karabiner rewrites
@@ -98,9 +98,11 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
   production path until the owned runtime passes native and real-Mac
   acceptance. New flags default to today's behaviour and use key names no older
   build ever wrote, so shared-mode generator output and boot stay identical.
-- VirtualHIDDevice version skew (only one version can be active system-wide) was
-  not part of the answers; the owned mode must surface it as an explicit named
-  state, and its resolution is still to be decided.
+- An incompatible VirtualHIDDevice (only one version can be active system-wide)
+  blocks owned mode in an explicit named unavailable state with an explanation.
+  The decided policy offers a driver-only update requiring explicit confirmation.
+  Detection, product wiring and authenticated signed DriverKit payload suppliers
+  remain unfinished, as do native validation and real-Mac acceptance.
 - Counts are exact only inside an admitted capture. Before approval, during
   stream loss or with the option off while another Karabiner holds the
   keyboards, the gaps are recorded explicitly and never reconstructed.
@@ -128,5 +130,5 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 - The dual-mode description: `static/ergopti_plus/macos/platform/remap/README.md`
   and `static/ergopti_plus/macos/launcher/README.md`.
 - R3 stays enforced for stock processes by
-  `static/ergopti_plus/macos/tests/meta/test_karabiner_stock_process_isolation.lua`
+  `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
   until the owned runtime lands together with the exact code it must allow.

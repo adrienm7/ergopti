@@ -49,6 +49,7 @@
 
 local M = {}
 local original_source_owner_ports = {}
+local original_reconciliation_ports = {}
 
 local Logger = require("logger.shim")
 local InputEvent = require("infra.input_event")
@@ -134,6 +135,7 @@ local EVENT_FIELDS = { "type", "code", "value", "seconds", "microseconds", "time
 local EVENT_FIELD_SET = {}
 for _, field in ipairs(EVENT_FIELDS) do EVENT_FIELD_SET[field] = true end
 local SYN_DROPPED = 3
+local SYN_REPORT = 0
 
 -- Open descriptors, by caller-owned slot. A machine may expose several physical
 -- keyboards and pointers; slots keep their handles and grab state independent.
@@ -369,6 +371,7 @@ function M.open(path, slot)
 	_generation = _generation + 1
 	st.fd, st.path, st.grabbed = fd, path, false
 	st.generation, st.read_epoch, st.synchronized = _generation, 0, true
+	st.recovery_kind, st.recovery_ready = nil, false
 	st.native = rawequal(backend, _native_backend) and type(fd) == "number"
 		and fd >= 0 and fd <= 2147483647 and fd % 1 == 0
 	st.native_grab = false
@@ -404,6 +407,7 @@ function M.grab(slot)
 	end
 	st.grabbed = true
 	st.native_grab = st.native and acknowledged == true
+	if st.recovery_kind == "ungrab" then st.recovery_ready = true end
 	pcall(Logger.success, LOG, "Grabbed %s — the desktop no longer sees this device.", tostring(st.path))
 	_busy = false
 	return true
@@ -416,6 +420,7 @@ function M.ungrab(slot)
 	local st = state(slot)
 	if st.fd == nil or not st.grabbed then return true end
 	st.native_grab = false
+	st.synchronized, st.recovery_kind, st.recovery_ready = false, "ungrab", false
 	_generation = _generation + 1
 	st.generation = _generation
 	_busy = true
@@ -559,13 +564,15 @@ end
 --- Checks private provider/session identity, not an unobserved kernel state lease.
 --- @param record table Private original event record.
 --- @return boolean current
-local function native_session_current(record)
+local function native_session_current(record, staging)
 	local st = record.state
-	if _busy or _native_debt or not rawequal(_slots[record.slot], st)
+	if not staging and (_busy or st.synchronized ~= true
+		or record.reconciliation and record.reconciliation.committed ~= true) then return false end
+	if _native_debt or not rawequal(_slots[record.slot], st)
 		or not rawequal(_backend, record.backend) or not rawequal(_backend, _native_backend)
 		or st.fd ~= record.fd or st.generation ~= record.generation
 		or st.native ~= true or st.native_grab ~= true or st.grabbed ~= true
-		or st.synchronized ~= true or st.close_error ~= nil then return false end
+		or st.close_error ~= nil then return false end
 	for name, port in pairs(_native_ports or {}) do
 		if not rawequal(rawget(record.backend, name), port) then return false end
 	end
@@ -573,6 +580,37 @@ local function native_session_current(record)
 		if not rawequal(rawget(InputEvent, name), port) then return false end
 	end
 	return true
+end
+
+--- Constructs an opaque source owner without publishing input currency.
+--- @param key string|table Original slot.
+--- @param st table Private native state.
+--- @return table|nil lease Opaque original descriptor identity, never its fd.
+--- @return function|nil observer Original private issuer/port/lifetime RAM join.
+local function source_owner(key, st)
+	local owner = st.descriptor_owner
+	local lease = {}
+	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
+		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
+	_source_owners[lease] = record
+	local open_observer = function(original, capture, current, retire)
+		if not rawequal(original, lease) or _source_owners[original] ~= record
+			or getmetatable(original) ~= nil or next(original) ~= nil
+			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
+			or retire ~= original_source_owner_ports.retire
+			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
+			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
+			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
+			or st.fd ~= owner.fd
+			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
+		for name, port in pairs(_native_ports or {}) do
+			if not rawequal(rawget(owner.backend, name), port) then return false end
+		end
+		return true
+	end
+	local observer = function(...) return open_observer(...) and st.generation == record.generation end
+	record.open_observer, record.observer = open_observer, observer
+	return lease, observer
 end
 
 --- Captures only this genuine native descriptor's original open lifetime.
@@ -589,27 +627,7 @@ function M.capture_source_owner(slot)
 		or st.fd ~= owner.fd or st.native ~= true or not rawequal(_backend, owner.backend)
 		or not rawequal(_native_backend, owner.backend) then return nil end
 	for name, port in pairs(_native_ports or {}) do if not rawequal(rawget(owner.backend, name), port) then return nil end end
-	local lease = {}
-	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
-		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
-	_source_owners[lease] = record
-	local observer = function(original, capture, current, retire)
-		if not rawequal(original, lease) or _source_owners[original] ~= record
-			or getmetatable(original) ~= nil or next(original) ~= nil
-			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
-			or retire ~= original_source_owner_ports.retire
-			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
-			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
-			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
-			or st.fd ~= owner.fd or st.generation ~= record.generation
-			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
-		for name, port in pairs(_native_ports or {}) do
-			if not rawequal(rawget(owner.backend, name), port) then return false end
-		end
-		return true
-	end
-	record.observer = observer
-	return lease, observer
+	return source_owner(key, st)
 end
 
 --- Observes the original grabbed input session without querying a native provider.
@@ -620,6 +638,7 @@ end
 --- @param retire function|nil Construction-captured original retirement port.
 --- @return boolean current Native input currency; not physical-device proof.
 --- @return boolean|nil cleanup Optional original cleanup currency, never input rights.
+--- @return boolean|nil same_open Original descriptor lifetime only; ignores retired input generations.
 function M.source_owner_current(lease, observer, capture, current, retire)
 	local record = _source_owners[lease]
 	local input = record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
@@ -631,7 +650,10 @@ function M.source_owner_current(lease, observer, capture, current, retire)
 	local cleanup = record ~= nil and record.observer == observer and type(observer) == "function"
 		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
 		and retire == original_source_owner_ports.retire and observer(lease, capture, current, retire) == true
-	return input and cleanup, cleanup
+	local same_open = record ~= nil and record.observer == observer and type(observer) == "function"
+		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
+		and retire == original_source_owner_ports.retire and record.open_observer(lease, capture, current, retire) == true
+	return input and cleanup, cleanup, same_open
 end
 
 --- Retires only the original descriptor; a reopened slot/FD remains untouched.
@@ -714,6 +736,109 @@ function M.pressed_keys_view(capability)
 		max_code = record.max_code, down = down, origin = "native-evdev" }
 end
 
+--- Stages fresh native state without admitting any source until restoration acknowledges it.
+--- The caller must also keep its logical cohort unpublished throughout the callback.
+--- @param slots table Dense native reader slot list, including a recovered source.
+--- @param restore function Receives detached snapshots with pending source/held leases.
+--- @param originals table|nil Dense original per-open leases, independent of revoked input generations.
+--- @return boolean committed
+function M.reconcile_sources(slots, restore, originals)
+	if _busy or _native_debt or type(slots) ~= "table" or getmetatable(slots) ~= nil
+		or #slots == 0 or type(restore) ~= "function" then return false end
+	for key in pairs(slots) do
+		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
+	end
+	for index = 1, #slots do if rawget(slots, index) == nil then return false end end
+	if originals ~= nil then
+		if type(originals) ~= "table" or getmetatable(originals) ~= nil or #originals ~= #slots then return false end
+		for key in pairs(originals) do
+			if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
+		end
+		for index = 1, #slots do if rawget(originals, index) == nil then return false end end
+	end
+	local transaction, records, snapshots, seen, recovering = {}, {}, {}, {}, false
+	for index, slot in ipairs(slots) do
+		local st = _slots[slot]
+		if seen[slot] or not st then return false end
+		seen[slot] = true
+		local record = { state = st, slot = slot, backend = _backend, fd = st.fd,
+			generation = st.generation, path = st.path, read_epoch = st.read_epoch,
+			max_code = 0x2ff, reconciliation = transaction }
+		if originals then
+			local lease = rawget(originals, index)
+			local origin = _source_owners[lease]
+			if not origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.slot, slot) or not rawequal(origin.state, st)
+				or not rawequal(origin.descriptor, st.descriptor_owner) or origin.fd ~= st.fd
+				or origin.descriptor.state ~= "open" or not rawequal(origin.backend, _backend) then return false end
+			-- A native ungrab/drop revokes generation, not the original per-open
+			-- descriptor. Retain this private join independently of input currency.
+			record.original_lease, record.original_owner = lease, origin
+		end
+		if not native_session_current(record, true) then return false end
+		if st.synchronized ~= true then
+			if st.recovery_ready ~= true then return false end
+			recovering = true
+		end
+		records[index] = record
+	end
+	if not recovering then return false end
+	_busy = true
+	local function current()
+		for name, port in pairs(original_reconciliation_ports) do
+			if rawget(M, name) ~= port then return false end
+		end
+		for _, record in ipairs(records) do
+			local origin, lease = record.original_owner, record.original_lease
+			if origin and (_source_owners[lease] ~= origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.state, _slots[record.slot]) or not rawequal(origin.slot, record.slot)
+				or not rawequal(origin.descriptor, record.state.descriptor_owner)
+				or origin.descriptor.state ~= "open" or origin.fd ~= record.state.fd
+				or not rawequal(origin.backend, _backend)) then return false end
+			if record.read_epoch ~= record.state.read_epoch
+				or record.query_epoch and record.query_epoch ~= record.state.key_query_epoch
+				or not native_session_current(record, true) then return false end
+		end
+		return true
+	end
+	local called, acknowledged = pcall(function()
+		for index, record in ipairs(records) do
+			local st = record.state
+			st.key_query_epoch = (st.key_query_epoch or 0) + 1
+			record.query_epoch = st.key_query_epoch
+			local bytes = _native_ports.read_owned_key_bits(record.fd, ioctl_read_request(EVIOCGKEY_NR, 96), 96)
+			local leds = _native_ports.read_owned_key_bits(record.fd, ioctl_read_request(EVIOCGLED_NR, 2), 2)
+			if type(bytes) ~= "string" or #bytes ~= 96 or type(leds) ~= "string" or #leds ~= 2
+				or not current() then return false end
+			local keys, active, down = {}, {}, {}
+			for code = 0, record.max_code do
+				if math.floor(bytes:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then
+					keys[code], down[#down + 1] = true, code
+				end
+			end
+			for code = 0, 15 do
+				if math.floor(leds:byte(math.floor(code / 8) + 1) / (2 ^ (code % 8))) % 2 == 1 then active[code] = true end
+			end
+			record.down = down
+			local held = {}; _held_receipts[held] = record
+			local lease, observer = source_owner(record.slot, st)
+			_source_owners[lease].reconciliation = transaction
+			snapshots[index] = { slot = record.slot, source = record.path, keys = keys, leds = active,
+				held = held, lease = lease, observer = observer, current = current }
+		end
+		return restore(snapshots) == true and current()
+	end)
+	if called and acknowledged == true then
+		for _, record in ipairs(records) do
+			record.state.synchronized = true
+			record.state.recovery_kind, record.state.recovery_ready = nil, false
+		end
+		transaction.committed = true
+	end
+	_busy = false
+	return transaction.committed == true
+end
+
 --- Rejects replaced, remapped or mutated decoded objects without metatable callbacks.
 --- @param record table Private original event record.
 --- @return boolean original
@@ -782,8 +907,11 @@ function M.read_event(slot)
 	row.timestamp_us = row.seconds * 1000000 + row.microseconds
 	if row.type == _codec.EV_SYN and row.code == SYN_DROPPED then
 		st.synchronized = false
+		st.recovery_kind, st.recovery_ready = "drop", false
 		_generation = _generation + 1
 		st.generation = _generation
+	elseif row.type == _codec.EV_SYN and row.code == SYN_REPORT and st.recovery_kind == "drop" then
+		st.recovery_ready = true
 	end
 	_busy = false
 	if row.type == _codec.EV_KEY and row.code >= 1 and row.code <= 0x2ff
@@ -911,5 +1039,9 @@ M.EVIOCGLED_NR = EVIOCGLED_NR
 original_source_owner_ports.capture = M.capture_source_owner
 original_source_owner_ports.current = M.source_owner_current
 original_source_owner_ports.retire = M.retire_source
+for _, name in ipairs({ "capture_source_owner", "source_owner_current", "retire_source", "reconcile_sources",
+	"capture_pressed_keys", "pressed_keys_view", "pressed_keys_current" }) do
+	original_reconciliation_ports[name] = rawget(M, name)
+end
 
 return M

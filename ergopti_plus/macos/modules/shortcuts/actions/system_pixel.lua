@@ -41,7 +41,7 @@ local SCREENCAPTURE_BIN = "/usr/sbin/screencapture"
 
 -- GC root for live hs.task objects. A task not referenced from a GC root can be
 -- collected mid-run, which kills the subprocess so its completion callback never
--- fires. Canonical spelling recognised by tests/unit/meta/test_gc_retention.lua;
+-- fires. Canonical spelling recognised by tests/meta/lua_safety/test_gc_retention.lua;
 -- entries are released when the callback runs or the launch is refused.
 local _active_tasks = {}
 

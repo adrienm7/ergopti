@@ -42,7 +42,7 @@ end
 
 check("real synthetic output survives flush and the public range payload", function()
 	Keylogger.record_synthetic_output("owned-synthetic-app", "a\0b", "other", 1000)
-	Keylogger.flush()
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
 	local rows = assert(Writer.query_rows("SELECT hex(token),c FROM ngram_chars WHERE app='owned-synthetic-app' ORDER BY hex(token);"))
 	assert(table.concat(rows, ",") == "00|1,61|1,62|1", "real flush did not persist the exact original characters")
 	local payload = Keylogger.get_range_payload(today, today, { "owned-synthetic-app" })

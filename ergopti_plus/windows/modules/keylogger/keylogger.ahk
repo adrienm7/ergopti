@@ -328,7 +328,7 @@ KL_WriteAtomic(path, content) {
     ; Force replaces an instance only at the END of the successor's load, so two
     ; drivers can briefly be alive and writing the same metrics directory. It is
     ; a built-in rather than a GetCurrentProcessId DllCall on purpose — the
-    ; OS-call purity ratchet (tests/meta/test_ahk_os_purity_ratchet.ahk) counts
+    ; OS-call purity ratchet (tests/meta/suite/test_ahk_os_purity_ratchet.ahk) counts
     ; direct OS calls outside adapters/, and this needs none.
     tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
     _KL_ReapStaleTemps(path, STALE_TEMP_MS)
@@ -1136,42 +1136,6 @@ KL_Init(metrics_dir) {
 		return false
 	}
 	return true
-}
-
-; Publish the terminal ownership lease before any other subsystem drains into
-; the keylogger. The global shutdown handler calls this before the deferred
-; hotstring fire queue, and KL_Stop repeats it for direct callers.
-KL_BeginShutdown() {
-	ShutdownCritical := Critical("On")
-	try {
-		if !Keylogger.initialized
-			return false
-		if !Keylogger._shutting_down {
-			Keylogger._shutting_down := true
-			Keylogger.lifecycle_generation += 1
-		}
-		return true
-	} finally {
-		Critical(ShutdownCritical)
-	}
-}
-
-; Rolls back the reversible shutdown lease when an OnExit gate refuses before
-; any producer is stopped. Durable rows already drained remain consumed, while
-; future keylogger callbacks receive a fresh lifecycle generation.
-KL_CancelShutdown() {
-	ShutdownCritical := Critical("On")
-	try {
-		if !Keylogger.initialized
-			return false
-		if Keylogger._shutting_down {
-			Keylogger._shutting_down := false
-			Keylogger.lifecycle_generation += 1
-		}
-		return true
-	} finally {
-		Critical(ShutdownCritical)
-	}
 }
 
 /** Emits shutdown stage resources without including event contents or foreground context. */

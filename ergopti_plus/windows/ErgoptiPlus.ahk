@@ -387,6 +387,9 @@ BootProfile_Stamp("Diagnostics and core state initialised")
 #Include adapters/network_info.ahk
 #Include adapters/keyboard_hook.ahk
 #Include adapters/llm_nav_event_owner.ahk
+#Include adapters/terminal_output_preview.ahk
+#Include adapters/terminal_output_custody.ahk
+#Include adapters/terminal_output_sendinput.ahk
 #Include adapters/llm_automation.ahk
 #Include adapters/mouse_control.ahk
 #Include adapters/window_manager.ahk
@@ -440,6 +443,11 @@ if UIASW_IsWorkerInvocation()
 #Include infra/hotstrings/hotstring_buffer_effects.ahk
 #Include infra/hotstrings/hotstring_live_toggle.ahk
 #Include infra/hotstrings/hotstring_count_policy.ahk
+; The programmable-hotstring owner's state must exist before the first tray
+; render counts its rules and before a startup failure runs the shutdown
+; preflight that invalidates it. Its globals initialise at this include
+; position; modules/hotstrings.ahk's later #Include of it is then a no-op.
+#Include modules/dynamic_hotstrings/user_code.ahk
 ; Generated terminator catalogue (single source of truth — shared with macOS via
 ; _shared/core/domain/Terminators.spec.js). Both the tray and config-window delimiter
 ; menus render this catalogue so the word-terminator list never drifts between
@@ -517,6 +525,7 @@ BootProfile_Stamp("Manifest, updater and locale state initialised")
 #Include modules/keymap/layout/layout_altgr.ahk
 #Include ../_shared/modules/features/number_row_policy.ahk
 #Include modules/keymap/layout/layout_shift_caps.ahk
+#Include modules/keymap/layout/digit_row_bindings.ahk
 ; .keylayout reading (registry layout emulation and the Ergopti tables):
 ; definitions only. The hotkeys are registered by KeylayoutEmulation_Boot below
 ; and the Ergopti tables are read by modules/keymap/layout.ahk.
@@ -1211,7 +1220,6 @@ global _DriverUiCleanupReady := true
 LoggerInfo("ErgoptiPlus", "Shutdown handler registered before configured menu publication.")
 if _DriverStartupSmokeDir == ""
 	WebView_BeginBrowserWarmup()
-global _FmtCountCache := Map()
 global _DriverInputInitPending := true
 global _DriverMenuReady := false
 MenuStartupCommands_Begin(() => _DriverReady && _LLM_Menu_RuntimeActivated)
@@ -1346,6 +1354,9 @@ BootProfile_Mark("Metrics/keylogger started")
 #Include infra/script_altgr_hotkeys.ahk
 BootProfile_StageBegin("layout and remaps")
 _RegisterScriptAltGrHotkeys()
+; Update the original static slots in place: creating runtime variants would
+; move the direct digits behind the static typing tap-hold roll variants.
+DigitRow_RegisterBindings()
 ; Before modules/keymap/layout.ahk: AHK fires the earliest-created hotkey variant
 ; whose criterion holds, so the registry layout emulation must register first to
 ; own its keys over every Ergopti layer. A no-op when no registry layout is chosen.
@@ -1426,6 +1437,7 @@ if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
+HealthCheck_StartWindowControl()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
@@ -1495,7 +1507,8 @@ if (_DriverStartupSmokeDir != "") {
 						. " main_lines=" . _StartupSmokeLoggerRefusal["main_lines"]
 						. " error_lines=" . _StartupSmokeLoggerRefusal["error_lines"]
 						. " topical_queues=" . _StartupSmokeLoggerRefusal["topical_queues"]
-						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"] . "`n",
+						. " topical_lines=" . _StartupSmokeLoggerRefusal["topical_lines"]
+						. " last_append_failure=" . _StartupSmokeLoggerRefusal["last_append_failure"] . "`n",
 						"*", "UTF-8-RAW")
 				throw Error("The startup smoke could not make its diagnostic logs durable.")
 		}

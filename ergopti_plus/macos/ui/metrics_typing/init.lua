@@ -29,6 +29,7 @@ local WebviewResult = require("adapters.webview_result")
 local hs         = hs
 local fs         = require("hs.fs")
 local json       = require("hs.json")
+local Json       = require("json")
 local FileSystem = require("adapters.file_system")
 local ui_builder = require("ui.ui_builder")
 local Logger     = require("infra.logger")
@@ -155,7 +156,11 @@ end
 
 local function encode_delivery(generation, webview, site, value)
 	if not delivery_is_current(generation, webview) then return nil end
-	local ok, encoded = pcall(json.encode, value)
+	-- Native hs.json.encode requires a table; this mailbox owns an exact string.
+	local ok, encoded = pcall(function()
+		if type(value) ~= "string" or not utf8.len(value) then return nil end
+		return Json.quote(value)
+	end)
 	if not delivery_is_current(generation, webview) then return nil end
 	if not ok or type(encoded) ~= "string" or encoded == "" then
 		delivery_failure(generation, webview, site, "encoding")

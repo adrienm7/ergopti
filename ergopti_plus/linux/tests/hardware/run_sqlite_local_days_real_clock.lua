@@ -37,7 +37,7 @@ end
 local begin_ts=os.date('!%Y-%m-%d %H:%M:%S')
 K.record_hotstring('owned-real-day','q','abc',1000,'static',0,false)
 K.record_shortcut('owned-real-day','owned-action',1000)
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 local end_ts=os.date('!%Y-%m-%d %H:%M:%S')
 for _,table_name in ipairs({'events_typing','events_hotstring','events_shortcut'}) do
   check('actual public '..table_name..' uses local day and retains UTC timestamp',function()
@@ -83,7 +83,7 @@ local function packed()
   return table.concat(assert(W.query_rows('SELECT id,date,ts FROM events_typing UNION ALL SELECT id,date,ts FROM events_hotstring UNION ALL SELECT id,date,ts FROM events_shortcut UNION ALL SELECT id,date,ts FROM events_app_switch ORDER BY id;')),'\n')
 end
 local durable=packed()
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 check('second public flush preserves accepted raw bytes and duplicate-free IDs',function()
   assert(packed()==durable)
   assert(W.query_rows('SELECT COUNT(*),COUNT(DISTINCT id) FROM (SELECT id FROM events_typing UNION ALL SELECT id FROM events_hotstring UNION ALL SELECT id FROM events_shortcut UNION ALL SELECT id FROM events_app_switch);')[1]=='11|11')

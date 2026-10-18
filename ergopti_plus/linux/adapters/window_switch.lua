@@ -22,10 +22,12 @@ function M.available()
 	if Display.kind() ~= Display.X11 then return false, "dialog.action_picker.requires_x11" end
 	if not Runner.supported() or not Native then return false, "platform_reason.program_runner_unavailable" end
 	for _, tool in ipairs(TOOLS) do
-		if Shell.has_command(tool) ~= true then return false, "dialog.action_picker.requires_tool", tool end
+		if Shell.has_command(tool, true) ~= true then return false, "dialog.action_picker.requires_tool", tool end
 	end
 	-- BusyBox timeout exists on Alpine but cannot preserve the owned worker group.
-	local checked, admitted = pcall(Shell.exec_checked, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+	-- Capability admission needs only an exit status, never a captured stdout
+	-- receipt and its temporary file, readers and extra shell processes.
+	local checked, admitted = pcall(Shell.run, "timeout --foreground 1 sh -c ':' >/dev/null 2>&1")
 	if not checked or admitted ~= true then return false, "dialog.action_picker.requires_tool", "GNU timeout" end
 	return true
 end

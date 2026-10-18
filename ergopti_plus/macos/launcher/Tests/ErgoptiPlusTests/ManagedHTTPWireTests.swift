@@ -114,20 +114,24 @@ final class ManagedWireFrames: @unchecked Sendable {
 }
 
 final class ManagedHTTPWireTests: XCTestCase {
-	/// Actual system trust, PAC script/URL and proxy recipients are mandatory
-	/// receiving checks. Missing native prerequisites fail rather than skip.
+	/// Actual native default trust refusal, enterprise-anchor trust, PAC script/URL
+	/// and proxy recipients are mandatory receiving checks. Missing native
+	/// prerequisites fail rather than skip. Trust arrives through the product's
+	/// SSL_CERT_FILE channel because changing trust settings needs an
+	/// authorization prompt that no unattended host can answer.
 	func testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure() throws {
 		let fixture = try ManagedWireFixture()
 		defer {
 			do { try fixture.close() }
-			catch { XCTFail("Owned native wire fixture did not restore trust and private keychain") }
+			catch { XCTFail("Owned native wire fixture did not retire its peers and processes") }
 		}
 		let host = try XCTUnwrap(fixture.profile["host"] as? String)
 		let port = try XCTUnwrap(fixture.profile["origin_port"] as? Int)
 		let script = try XCTUnwrap(fixture.profile["pac"] as? String)
 		let pacURL = try XCTUnwrap(fixture.profile["pac_url"] as? String)
+		let anchors = ["SSL_CERT_FILE": try XCTUnwrap(fixture.profile["ca_file"] as? String)]
 
-		func execute(_ path: String, useURL: Bool = false) throws -> (Int32, [(UInt8, Data)]) {
+		func execute(_ path: String, useURL: Bool = false, trusted: Bool = true) throws -> (Int32, [(UInt8, Data)]) {
 			let fields: [String: Any] = ["version": 1, "url": "https://\(host):\(port)\(path)",
 				"method": "GET", "headers": [["Accept-Encoding", "identity"]],
 				"timeout": 20, "idle_timeout": 10, "direct": false]
@@ -137,7 +141,8 @@ final class ManagedHTTPWireTests: XCTestCase {
 			else { settings[kCFNetworkProxiesProxyAutoConfigJavaScript as String] = script }
 			let collector = ManagedWireFrames()
 			let status = ManagedHTTPWorker.execute(request, maximumSelections: 128,
-				settingsProvider: { settings as CFDictionary }, output: collector.append)
+				settingsProvider: { settings as CFDictionary }, environment: trusted ? anchors : [:],
+				output: collector.append)
 			return (status, try collector.frames())
 		}
 
@@ -148,12 +153,10 @@ final class ManagedHTTPWireTests: XCTestCase {
 			return try XCTUnwrap(JSONSerialization.jsonObject(with: last.1) as? [String: Any])
 		}
 
-		let untrusted = try execute("/certificate?case=seven")
+		let untrusted = try execute("/certificate?case=seven", trusted: false)
 		XCTAssertNotEqual(untrusted.0, 0)
 		XCTAssertEqual(try terminal(untrusted)["reason"] as? String, "certificate")
 		XCTAssertFalse(untrusted.1.contains { $0.0 == 72 || $0.0 == 68 }, "Untrusted origin TLS delivers no HTTP headers or body")
-		let trust = try fixture.command(["command": "trust", "enabled": true])
-		XCTAssertEqual(trust["trusted"] as? Bool, true)
 
 		for (path, useURL) in [("/alpha?case=one", false), ("/beta?case=two", true), ("/fallback?case=three", false)] {
 			let result = try execute(path, useURL: useURL)

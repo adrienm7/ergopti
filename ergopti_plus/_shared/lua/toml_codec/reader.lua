@@ -35,6 +35,7 @@ local LOG    = "toml_reader"
 local Bom    = require("toml_codec.bom")
 local BasicString = require("toml_codec.basic_string")
 local KeyPath = require("toml_codec.key_path")
+local RecordScanner = require("toml_codec.record_scanner")
 
 -- Optional disk-cache provider, injected by the host driver via
 -- M.set_cache_provider(). Stays nil in pure/test contexts so parsing is
@@ -469,6 +470,12 @@ local function parse_lines(lines)
 			-- Skip blank lines and TOML comments
 			if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
 
+			-- Header comments are source-owned and are not part of a section name.
+			-- The scanner keeps a # inside a quoted semantic segment intact.
+			if line:sub(1, 1) == "[" then
+				local _, _, comment_offset = RecordScanner.advance(line, 0, nil)
+				if comment_offset then line = line:sub(1, comment_offset - 1):match("^%s*(.-)%s*$") end
+			end
 			-- Detect section headers
 			if line == "[_meta.sections]" then
 				mode = "meta_sections"

@@ -28,6 +28,7 @@ local km_utils   = require("modules.keymap.utils")
 local Logger     = require("infra.logger")
 local Keycodes   = require("infra.keycodes")
 local Manifest   = require("infra.manifest_reader")
+local HotstringCore = require("infra.hotstring_engine")
 
 local Registry   = require("modules.keymap.registry")
 local Expander   = require("modules.keymap.expander")
@@ -91,6 +92,10 @@ M.DEFAULT_STATE = {
 	keymap                      = Manifest.default_for("hotstrings.enabled"),
 	repeat_key_enabled          = Manifest.default_for("hotstrings.repeat_key_enabled"),
 	expansion_delay             = Manifest.default_for("hotstrings.expansion_delay"),
+	idle_reset_seconds          = Manifest.default_for("hotstrings.idle_reset_seconds"),
+	click_resets_word           = Manifest.default_for("hotstrings.click_resets_word"),
+	arrow_resets_word           = Manifest.default_for("hotstrings.arrow_resets_word"),
+	shortcut_resets_word        = Manifest.default_for("hotstrings.shortcut_resets_word"),
 	delays                      = {},     -- Per-group overrides; empty = use DELAYS_DEFAULT
 	trigger_char                = Manifest.default_for("hotstrings.trigger_char"),
 	preview_star_enabled        = Manifest.default_for("hotstrings.preview_star_enabled"),
@@ -204,6 +209,14 @@ local function observe_context_epoch(epoch)
 	if epoch ~= _last_context_epoch then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
+		-- Deliberately not governed by hotstrings.arrow_resets_word or
+		-- shortcut_resets_word. An epoch is an opaque token for "an Ergopti
+		-- action handed output to Quartz": it does not say whether that output was
+		-- an arrow, a shortcut, typed text or a paste of unknown length, so the
+		-- only safe claim is an unknown boundary. Hotstring expansions are
+		-- replacements, not actions, so they keep their own buffer handling; the
+		-- arrows and chords of the Karabiner layers are foreign events and do
+		-- follow the options in the keyDown tap.
 		CoreState.start_is_word_boundary = false
 		_action_preview_refresh_pending = false
 		_last_context_epoch = epoch
@@ -439,6 +452,92 @@ function M.set_base_delay(secs)
 	Logger.debug(LOG, "Base delay: %.3fs.", v)
 	return true
 end
+
+--- Returns the pause after which the next key starts a new word.
+--- @return number Seconds; 0 means the buffer is never reset by a pause.
+function M.get_idle_reset_seconds()
+	return CoreState.IDLE_RESET_SEC
+end
+
+--- Sets the pause after which the next key starts a new word.
+--- @param secs number hotstrings.idle_reset_seconds; 0 disables the reset.
+--- @return boolean committed False for a value that is not a non-negative number.
+function M.set_idle_reset_seconds(secs)
+	if not HotstringCore.valid_idle_reset_seconds(secs) then
+		Logger.error(LOG, "Idle reset refused: '%s' is not a non-negative number of seconds.", tostring(secs))
+		return false
+	end
+	-- Both fields at once: the same projection recompute_word_timeout makes.
+	CoreState.IDLE_RESET_SEC = secs
+	CoreState.WORD_TIMEOUT_SEC = secs
+	Logger.debug(LOG, "Idle reset: %gs.", secs)
+	return true
+end
+
+--- Returns whether a mouse click starts a new word.
+--- @return boolean
+function M.is_click_resets_word_enabled()
+	return CoreState.click_resets_word == true
+end
+
+--- Sets whether a mouse click starts a new word.
+--- @param enabled boolean hotstrings.click_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_click_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Click reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.click_resets_word = enabled
+	Logger.debug(LOG, "Click starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+--- Returns whether an arrow key starts a new word.
+--- @return boolean
+function M.is_arrow_resets_word_enabled()
+	return CoreState.arrow_resets_word == true
+end
+
+--- Sets whether an arrow key (any modifiers held) starts a new word.
+--- @param enabled boolean hotstrings.arrow_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_arrow_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Arrow reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.arrow_resets_word = enabled
+	Logger.debug(LOG, "Arrow starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+--- Returns whether a Cmd/Ctrl shortcut starts a new word.
+--- @return boolean
+function M.is_shortcut_resets_word_enabled()
+	return CoreState.shortcut_resets_word == true
+end
+
+--- Sets whether a Cmd/Ctrl shortcut starts a new word.
+--- @param enabled boolean hotstrings.shortcut_resets_word.
+--- @return boolean committed False for a non-boolean value.
+function M.set_shortcut_resets_word(enabled)
+	if type(enabled) ~= "boolean" then
+		Logger.error(LOG, "Shortcut reset refused: '%s' is not a boolean.", tostring(enabled))
+		return false
+	end
+	CoreState.shortcut_resets_word = enabled
+	Logger.debug(LOG, "Shortcut starts a new word: %s.", tostring(enabled))
+	return true
+end
+
+-- The word-reset policy is neutral in state.lua; this module owns it and seeds
+-- it from the features manifest through its own setters, which refuse an
+-- invalid default with an ERROR and keep the neutral policy.
+M.set_idle_reset_seconds(M.DEFAULT_STATE.idle_reset_seconds)
+M.set_click_resets_word(M.DEFAULT_STATE.click_resets_word)
+M.set_arrow_resets_word(M.DEFAULT_STATE.arrow_resets_word)
+M.set_shortcut_resets_word(M.DEFAULT_STATE.shortcut_resets_word)
 
 --- Returns the side of the last shift key pressed.
 --- @return string|nil "left", "right", or nil if Shift is not held.
@@ -772,6 +871,8 @@ M.request_agent_selection = LLMBridge.request_agent_selection
 M.request_agent_command = LLMBridge.request_agent_command
 M.toggle_agent_auto = LLMBridge.toggle_agent_auto
 M.reset_predictions  = LLMBridge.reset_predictions
+-- Configuration retires prediction identity without reopening quarantined input.
+M.reset_predictions_for_configuration = LLMBridge.reset_quarantined_context
 M.reset_predictions_for_pause = LLMBridge.reset_predictions_for_pause
 
 M.classify_trigger   = Registry.classify_trigger
@@ -1310,6 +1411,29 @@ local FAST_EXIT_KEYCODES = {
 	[135] = true,  -- LAYER_SYN_3
 }
 
+-- The four arrows, governed by hotstrings.arrow_resets_word whatever modifiers
+-- are held with them.
+-- Literal like FAST_EXIT_KEYCODES above: this table is built when the module
+-- loads, and the keycode registry's LEFT_ARROW … UP_ARROW and FORWARD_DELETE
+-- (the same numbers) are not part of every narrowed registry fixture.
+local ARROW_KEYCODES = {
+	[123] = true,  -- Left
+	[124] = true,  -- Right
+	[125] = true,  -- Down
+	[126] = true,  -- Up
+}
+
+-- Forward Delete, Home, End, Page Up and Page Down: they delete text or jump to
+-- a place the buffer never observed, so the next run always starts at an
+-- unknown boundary. No word-reset option governs them.
+local UNOBSERVED_JUMP_KEYCODES = {
+	[117] = true,  -- Forward Delete
+	[115] = true,  -- Home
+	[116] = true,  -- Page Up
+	[119] = true,  -- End
+	[121] = true,  -- Page Down
+}
+
 -- One-shot per interceptor index, so a throwing interceptor is reported once
 -- instead of on every keystroke.
 --
@@ -1443,6 +1567,8 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 
 	local dt  = now - CoreState.last_key_time
 	_user_hotstring_elapsed = dt
+	-- 0 is the "no key yet" seed, not a timestamp: the first key has no pause.
+	local previous_key_ms = CoreState.last_key_time > 0 and CoreState.last_key_time * 1000 or nil
 	CoreState.last_key_time = now
 	local flags = e:getFlags()
 
@@ -1458,11 +1584,12 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 	if not internal_loopback and keyCode ~= Keycodes.F16_LLM_CHAIN_SIGNAL
 		and LLMBridge.handle_llm_keys(keyCode, flags, false) then return true end
 
-	-- Wipe the buffer after the user pauses long enough that the next keystroke
-	-- cannot possibly belong to the same word. The pause itself stands in for
-	-- a word terminator, so the post-wipe context starts on a fresh word
-	-- boundary and word-boundary-required triggers are allowed to fire.
-	if CoreState.WORD_TIMEOUT_SEC > 0 and dt > CoreState.WORD_TIMEOUT_SEC then
+	-- Wipe the buffer after the user pauses for hotstrings.idle_reset_seconds:
+	-- the pause itself stands in for a word terminator, so the post-wipe
+	-- context starts on a fresh word boundary and word-boundary-required
+	-- triggers are allowed to fire. The rule is the shared engine's; the
+	-- seconds clock is exact enough that no resolution is taken off.
+	if HotstringCore.idle_resets_word(previous_key_ms, now * 1000, CoreState.WORD_TIMEOUT_SEC, 0) then
 		CoreState.buffer = ""
 		CoreState.llm_buffer = ""
 		CoreState.start_is_word_boundary = true
@@ -1519,14 +1646,25 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		return LLMBridge.check_escape_reset()
 	end
 
-	-- 5. Modifier shortcuts (Cmd/Ctrl) break the current word context.
-	-- Cmd+A / Ctrl+A is the one exception — select-all replaces the entire
-	-- selection with the next typed char, so the new context starts at a
-	-- fresh word-start. Every other Cmd/Ctrl combo (cut, paste, undo,
-	-- redo, app shortcuts, …) leaves the cursor in unobservable territory.
-	if flags.cmd or flags.ctrl then
-		CoreState.buffer = ""
-		CoreState.start_is_word_boundary = (keyCode == hs.keycodes.map["a"])
+	-- 5. Cmd/Ctrl shortcuts, Shift or Option added or not. Option alone types
+	-- characters on macOS and is no shortcut modifier, and an arrow with
+	-- modifiers is an arrow: step 7 and its own option own it.
+	-- Cmd/Ctrl + Backspace / Forward Delete delete an unknown amount of text and
+	-- Cmd/Ctrl + Home/End/PgUp/PgDn jump somewhere unobserved: they keep the
+	-- unconditional reset to an unknown boundary. Every other chord (cut, paste,
+	-- undo, select-all, app shortcuts, …) follows hotstrings.shortcut_resets_word:
+	-- on, the next run starts a new word; off, the buffer and the word-start
+	-- state are left exactly as they were and the word continues. The prediction
+	-- side is the same either way: a shortcut still withdraws a visible
+	-- prediction.
+	if (flags.cmd or flags.ctrl) and not ARROW_KEYCODES[keyCode] then
+		if keyCode == Keycodes.BACKSPACE or UNOBSERVED_JUMP_KEYCODES[keyCode] then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = false
+		elseif CoreState.shortcut_resets_word == true then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+		end
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
@@ -1560,12 +1698,24 @@ local function onKeyDownRaw(e, provenance, provenance_status)
 		return false
 	end
 
-	-- 7. Arrow / navigation keys move the cursor; the next typed run starts
-	-- fresh, so treat the new position as a word boundary.
-	if keyCode == 117 or keyCode == 115 or keyCode == 116 or keyCode == 119 or keyCode == 121
-		or (keyCode >= 123 and keyCode <= 126) then
+	-- 7. Navigation. Forward Delete, Home, End, Page Up and Page Down always
+	-- empty the buffer at an unknown boundary. An arrow (with any modifier; the
+	-- Karabiner navigation layer's arrows are foreign events and arrive here the
+	-- same way) follows hotstrings.arrow_resets_word: on, the next run starts a
+	-- new word; off, the buffer and the word-start state are left untouched and
+	-- the word continues. Predictions are withdrawn in every case.
+	if UNOBSERVED_JUMP_KEYCODES[keyCode] then
 		CoreState.buffer = ""
 		CoreState.start_is_word_boundary = false
+		cancel_action_preview_recovery()
+		LLMBridge.check_nav_reset()
+		return false
+	end
+	if ARROW_KEYCODES[keyCode] then
+		if CoreState.arrow_resets_word == true then
+			CoreState.buffer = ""
+			CoreState.start_is_word_boundary = true
+		end
 		cancel_action_preview_recovery()
 		LLMBridge.check_nav_reset()
 		return false
@@ -1957,7 +2107,9 @@ mouse_tap = eventtap.new(
 		-- Canvas, AX, task cancellation and logging run only after Quartz receives
 		-- the older fence payload and the original mouse event.
 		CoreState.buffer = ""
-		CoreState.start_is_word_boundary = false
+		-- hotstrings.click_resets_word: the caret moved somewhere unobservable;
+		-- by default the next run is a new word, as on the other drivers.
+		CoreState.start_is_word_boundary = CoreState.click_resets_word == true
 		cancel_action_preview_recovery()
 		LLMBridge.set_runtime_quarantined(true)
 		local scheduled = SyntheticInput.defer_after_callback("keymap mouse reset",

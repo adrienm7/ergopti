@@ -8,7 +8,7 @@
 ; any in-flight typing on a transient flicker (layout-poll-blind-reload).
 ;
 ; _ShouldReloadForHkl isolates the "should we reload now?" logic so it is exercised
-; headlessly by tests/meta/test_layout_quiescence.ahk. It has no OS dependency and
+; headlessly by tests/meta/modules/keymap/test_layout_quiescence.ahk. It has no OS dependency and
 ; never reloads — it only reports the decision and advances the caller's tracking
 ; refs. Reloading is deferred until the new layout is stable across two consecutive
 ; polls AND the user is physically idle AND no expansion is in flight, turning a

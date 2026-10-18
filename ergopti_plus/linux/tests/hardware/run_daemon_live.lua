@@ -265,11 +265,71 @@ sleep(1.5)
 
 -- Re-resolved rather than reused: the daemon may recreate its virtual keyboard
 -- after startup, and the node number moves with it.
+-- Focus priming deliberately leaves the preceding text unknown. A word-only
+-- first trigger needs a real separator, acknowledged on this same output Reader.
+-- This is part of the original output admission window, not a second wait.
+local boundary_rows = { { 1, 57, 1 }, { 0, 0, 0 }, { 1, 57, 0 }, { 0, 0, 0 } }
+local boundary_output, boundary_error = nil, nil
+local boundary_emitted, boundary_count = false, 0
+local function refuse_boundary(reason)
+	boundary_error = reason
+	return "boundary-refused"
+end
+local function admit_output()
+	if not boundary_output then
+		local node = node_for(DAEMON_OUTPUT)
+		if not node or EvdevReader.open(node, out_slot) ~= true then return nil end
+		boundary_output = node
+	end
+	if EvdevReader.device_path(out_slot) ~= boundary_output
+		or node_for(DAEMON_OUTPUT) ~= boundary_output then
+		return refuse_boundary("the original output path changed")
+	end
+	if not boundary_emitted then
+		local before, status = EvdevReader.read_event(out_slot)
+		local held = EvdevReader.pressed_keys(out_slot, 767)
+		if before ~= nil or status ~= "would_block" or type(held) ~= "table" or next(held) ~= nil then
+			return refuse_boundary("the output was not clear before the separator")
+		end
+		boundary_emitted = true
+		local down_called, down = pcall(Keyboard.emit, KEY_SPACE, 1)
+		local up_called, up = pcall(Keyboard.emit, KEY_SPACE, 0)
+		if not down_called or down ~= true or not up_called or up ~= true then
+			return refuse_boundary("the separator writes were not acknowledged")
+		end
+	end
+	-- Four expected rows and one terminal read: extra/repeat/drop rows refuse.
+	for _ = 1, 5 do
+		local event, status = EvdevReader.read_event(out_slot)
+		if event == nil then
+			if status ~= "would_block" then return refuse_boundary("the output read failed") end
+			if boundary_count ~= #boundary_rows then return nil end
+			local held = EvdevReader.pressed_keys(out_slot, 767)
+			if type(held) ~= "table" or next(held) ~= nil then
+				return refuse_boundary("the separator left an unavailable or held key")
+			end
+			return boundary_output
+		end
+		local expected = boundary_rows[boundary_count + 1]
+		if status ~= "event" or type(event) ~= "table" or not expected
+			or event.type ~= expected[1] or event.code ~= expected[2] or event.value ~= expected[3] then
+			return refuse_boundary("the separator event census differed")
+		end
+		boundary_count = boundary_count + 1
+	end
+	return refuse_boundary("the separator drain did not terminate")
+end
 local opened_output = await(function()
-	local node = node_for(DAEMON_OUTPUT)
-	return node and EvdevReader.open(node, out_slot) and node or nil
+	local called, result = pcall(admit_output)
+	if not called then return refuse_boundary("the native admission operation raised") end
+	return result
 end, 10)
-if not opened_output then
+if not opened_output or boundary_error then
+	local close_called, closed = pcall(EvdevReader.close, out_slot)
+	if not close_called or closed ~= true then
+		print("  FAIL the boundary output Reader close was not acknowledged")
+	end
+	print("  FAIL native word-boundary admission: " .. (boundary_error or "original 10-second admission exhausted"))
 	dump_log()
 	stop_daemon()
 	os.execute("ls -l /dev/input; cat /proc/bus/input/devices | grep -A5 -i ergopti")

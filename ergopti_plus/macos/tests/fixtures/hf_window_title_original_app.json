@@ -1,0 +1,8 @@
+{
+	"title_key": "token_prompt.window_title",
+	"width": 720,
+	"height": 155,
+	"min_width": 720,
+	"min_height": 155,
+	"vhost": "ergopti.tokenprompt"
+}

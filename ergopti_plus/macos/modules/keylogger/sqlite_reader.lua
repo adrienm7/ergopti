@@ -82,6 +82,7 @@ local function _safe_query(label, fn, pacer)
 		Logger.error(LOG, "Query failed (%s): %s.", label, tostring(err))
 	end
 	if pacer then pacer.pause() end
+	return ok
 end
 
 --- Rows handled between two pause checks in paced mode.
@@ -152,6 +153,8 @@ local function _new_app_entry()
 		first_typed_min = nil, last_typed_min = nil,
 		layouts_seen = {},
 		kc_hold      = {},
+		media_keys   = {},
+		media_hold   = {},
 		win_titles   = {},
 		hourly       = {},
 		hourly_min5  = {},
@@ -187,6 +190,10 @@ end
 --- @param end_date   string|nil Inclusive upper bound (YYYY-MM-DD), or nil.
 --- @param pacer      table|nil Pacer from `infra.paced_job`.
 local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
+	local complete = true
+	local function query(label, fn, query_pacer)
+		if _safe_query(label, fn, query_pacer) ~= true then complete = false end
+	end
 	local function date_filter()
 		local clauses = {}
 		if start_date and start_date ~= "" then
@@ -199,7 +206,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end
 
 	-- Core agg_app_day: sum across devices.
-	_safe_query("agg_app_day", function()
+	query("agg_app_day", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app,
 			       SUM(chars)            AS chars,
@@ -238,7 +245,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_buckets → time/credited/hs_input/llm_input bucket maps.
-	_safe_query("agg_app_day_buckets", function()
+	query("agg_app_day_buckets", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, bucket_ms,
 			       SUM(time_sum)           AS time_sum,
@@ -266,7 +273,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- histogram buckets in Lua to avoid MIN(length_buckets_json) losing data
 	-- when multiple devices contribute rows for the same (date, app). Retain
 	-- source multiplicity so byte-identical blobs contribute once per device.
-	_safe_query("agg_app_day_burst", function()
+	query("agg_app_day_burst", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app,
 			       SUM(count_total)        AS count_total,
@@ -297,7 +304,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_session.
-	_safe_query("agg_app_day_session", function()
+	query("agg_app_day_session", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, count_total, longest_ms, longest_chars, total_active_ms, durations_json
 			FROM agg_app_day_session %s
@@ -315,7 +322,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_chars_class.
-	_safe_query("agg_app_day_chars_class", function()
+	query("agg_app_day_chars_class", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app,
 			       SUM(letter) AS letter, SUM(digit) AS digit, SUM(punct) AS punct,
@@ -336,7 +343,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_errors.
-	_safe_query("agg_app_day_errors", function()
+	query("agg_app_day_errors", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app,
 			       SUM(bs_total)        AS bs_total,
@@ -357,7 +364,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_ergo.
-	_safe_query("agg_app_day_ergo", function()
+	query("agg_app_day_ergo", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app,
 			       MAX(same_finger_streak_max) AS f_max,
@@ -374,7 +381,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_layouts.
-	_safe_query("agg_app_day_layouts", function()
+	query("agg_app_day_layouts", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, layout, SUM(count) AS count
 			FROM agg_app_day_layouts %s
@@ -386,7 +393,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	end, pacer)
 
 	-- agg_app_day_kc_hold.
-	_safe_query("agg_app_day_kc_hold", function()
+	query("agg_app_day_kc_hold", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, keycode,
 			       SUM(sum_ms) AS s, SUM(count) AS c, MAX(max_ms) AS mx,
@@ -402,8 +409,27 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 	end, pacer)
 
+	-- Semantic keys have labelled rows, never fabricated numeric positions.
+	query("ngram_media_keys", function()
+		for r in _rows(db, string.format([[
+			SELECT date, app, media_id, SUM(c) AS c FROM ngram_media_keys %s
+			GROUP BY date, app, media_id
+		]], date_filter()), pacer) do
+			_get(manifest, r.date, r.app).media_keys[r.media_id] = require("keylogger.media_store").project_press(r)
+		end
+	end, pacer)
+	query("agg_app_day_media_hold", function()
+		for r in _rows(db, string.format([[
+			SELECT date, app, media_id, SUM(sum_ms) AS sum_ms, SUM(count) AS count,
+			MAX(max_ms) AS max_ms, SUM(tap_count) AS tap_count, SUM(hold_count) AS hold_count
+			FROM agg_app_day_media_hold %s GROUP BY date, app, media_id
+		]], date_filter()), pacer) do
+			_get(manifest, r.date, r.app).media_hold[r.media_id] = require("keylogger.media_store").project_hold(r)
+		end
+	end, pacer)
+
 	-- agg_app_day_titles.
-	_safe_query("agg_app_day_titles", function()
+	query("agg_app_day_titles", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, title, SUM(c) AS c, SUM(ms) AS ms
 			FROM agg_app_day_titles %s
@@ -417,7 +443,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 	-- agg_app_day_hourly.
 	-- GROUP BY date, app, hour, e_buckets_json to avoid MIN(e_buckets_json) loss
 	-- on multi-device installs; accumulate scalars and merge buckets in Lua.
-	_safe_query("agg_app_day_hourly", function()
+	query("agg_app_day_hourly", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, hour,
 			       SUM(c) AS c, SUM(e) AS e, SUM(em) AS em, SUM(es) AS es,
@@ -446,7 +472,7 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 
 	-- agg_app_day_hourly_min5.
 	-- Same multi-device fix: GROUP BY slot, e_buckets_json; accumulate in Lua.
-	_safe_query("agg_app_day_hourly_min5", function()
+	query("agg_app_day_hourly_min5", function()
 		for r in _rows(db, string.format([[
 			SELECT date, app, slot,
 			       SUM(c) AS c, SUM(e) AS e, SUM(es) AS es,
@@ -472,6 +498,8 @@ local function _accumulate_manifest(db, manifest, start_date, end_date, pacer)
 		end
 	end, pacer)
 
+	return complete
+
 end
 
 --- Manifest source tables whose MIN/MAX(date) bound a paced manifest read.
@@ -479,6 +507,7 @@ local MANIFEST_TABLES = {
 	"agg_app_day", "agg_app_day_buckets", "agg_app_day_burst", "agg_app_day_session",
 	"agg_app_day_chars_class", "agg_app_day_errors", "agg_app_day_ergo", "agg_app_day_layouts",
 	"agg_app_day_kc_hold", "agg_app_day_titles", "agg_app_day_hourly", "agg_app_day_hourly_min5",
+	"ngram_media_keys", "agg_app_day_media_hold",
 }
 
 --- Days per paced manifest window. The largest per-(date, app) tables return
@@ -493,19 +522,21 @@ local MANIFEST_WINDOW_DAYS = 30
 --- @return table windows Array of { lo, hi } day pairs.
 local function _manifest_windows(db, start_date, end_date)
 	local lo, hi = nil, nil
+	local complete = true
 	for _, tbl in ipairs(MANIFEST_TABLES) do
-		_safe_query(tbl .. "(bounds)", function()
+		local accepted = _safe_query(tbl .. "(bounds)", function()
 			for r in db:nrows(string.format(
 				"SELECT (SELECT MIN(date) FROM %s) AS lo, (SELECT MAX(date) FROM %s) AS hi", tbl, tbl)) do
 				if r.lo and (not lo or r.lo < lo) then lo = r.lo end
 				if r.hi and (not hi or r.hi > hi) then hi = r.hi end
 			end
 		end)
+		if accepted ~= true then complete = false end
 	end
 	if start_date and start_date ~= "" and (not lo or start_date > lo) then lo = start_date end
 	if end_date and end_date ~= "" and (not hi or end_date < hi) then hi = end_date end
 	local windows = {}
-	if not lo or not hi or lo > hi then return windows end
+	if not lo or not hi or lo > hi then return windows, complete end
 	local window_lo = lo
 	while window_lo <= hi do
 		local window_hi = window_lo
@@ -517,7 +548,7 @@ local function _manifest_windows(db, start_date, end_date)
 		windows[#windows + 1] = { window_lo, window_hi }
 		window_lo = M.next_day(window_hi)
 	end
-	return windows
+	return windows, complete
 end
 
 --- Build a manifest dict matching the legacy shape: `manifest[date][app] =
@@ -527,21 +558,25 @@ end
 --- @param end_date    string|nil Inclusive upper bound (YYYY-MM-DD), or nil.
 --- @param pacer       table|nil Pacer from `infra.paced_job`; reads month windows.
 --- @return table The manifest dict.
+--- @return boolean complete True only when all manifest queries and bounds succeeded.
 function M.read_manifest(sqlite_path, start_date, end_date, pacer)
 	local manifest = {}
+	local complete = true
 	local db = _open(sqlite_path)
-	if not db then return manifest end
+	if not db then return manifest, false end
 	if pacer then
 		-- Every manifest cell belongs to exactly one day, so disjoint windows
 		-- partition the rows without changing any cell.
-		for _, window in ipairs(_manifest_windows(db, start_date, end_date)) do
-			_accumulate_manifest(db, manifest, window[1], window[2], pacer)
+		local windows, bounds_accepted = _manifest_windows(db, start_date, end_date)
+		if bounds_accepted ~= true then complete = false end
+		for _, window in ipairs(windows) do
+			if _accumulate_manifest(db, manifest, window[1], window[2], pacer) ~= true then complete = false end
 		end
 	else
-		_accumulate_manifest(db, manifest, start_date, end_date, nil)
+		if _accumulate_manifest(db, manifest, start_date, end_date, nil) ~= true then complete = false end
 	end
 	db:close()
-	return manifest
+	return manifest, complete
 end
 
 

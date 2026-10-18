@@ -21,6 +21,7 @@ local Shell = require("adapters.shell_runner")
 local Logger = require("logger.shim")
 
 local LOG = "infra.dynamic_hotstrings_scope"
+local PROGRAMMABLE_PATH = "hotstrings.dynamic.user_code"
 local _owner, _sequence = nil, 0
 
 --- Builds one recoverable transaction through the actual runtime owners.
@@ -42,7 +43,10 @@ function M.new(options)
 		local families, owned = {}, {}
 		for _, path in ipairs(Preferences.paths()) do owned[path] = true end
 		for _, entry in ipairs(Manifest.features()) do
-			if entry.section == "hotstrings.dynamic" and entry.type == "feature" then
+			-- The programmable hotstrings run the user's own code and keep their
+			-- own switch: a bulk click of the families never enables them.
+			if entry.section == "hotstrings.dynamic" and entry.type == "feature"
+				and entry.path ~= PROGRAMMABLE_PATH then
 				assert(owned[entry.path .. ".enabled"], "dynamic family has no preference owner")
 				families[#families + 1] = entry.id
 			end

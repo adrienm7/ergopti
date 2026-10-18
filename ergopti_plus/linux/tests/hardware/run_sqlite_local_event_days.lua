@@ -67,12 +67,12 @@ for index, fixture in ipairs(fixtures) do
 	Keylogger.record_shortcut("owned-events", "owned-action", 1000)
 	instant = instant + (fixture.advance or 0)
 	assert(os.date("%Y-%m-%d") == local_day, "fixture must not change the flush calendar day")
-	Keylogger.flush()
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
 	local hotstrings, shortcuts, typing = rows("events_hotstring"), rows("events_shortcut"), rows("events_typing")
 	local before, revision = packed(), assert(Writer.get_revision())
 	local manifest = Reader.read_manifest(path)
 	local dashboard = Keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest
-	Keylogger.flush()
+	require("tests.support.sqlite_flush_native").flush(Keylogger)
 	print("native " .. fixture.name .. " local=" .. local_day .. "; typing=" .. typing[1] .. "; hotstring=" .. hotstrings[1] .. "; shortcut=" .. shortcuts[1])
 	check(fixture.name .. ": public raw days agree with local aggregates and retain UTC instants/IDs", function()
 		assert(#hotstrings == 1 and #shortcuts == 1 and #typing == 1)
@@ -82,7 +82,7 @@ for index, fixture in ipairs(fixtures) do
 		assert(manifest[local_day]["owned-events"].hs_chars == 3 and dashboard[local_day]["owned-events"].hs_chars == 3)
 		assert(assert(Writer.query_rows("SELECT trigger||'|'||replacement||'|'||h_type||'|'||net_saved_chars FROM events_hotstring;"))[1] == "q|abc|static|2")
 		assert(assert(Writer.query_rows("SELECT key FROM events_shortcut;"))[1] == "owned-action")
-		assert(packed() == before and Writer.get_revision() == revision + 1)
+		assert(packed() == before and Writer.get_revision() == revision, "empty flush must not publish a false data revision")
 	end)
 	if index == 1 then
 		assert(Writer.register_device("owned-adapter", "owned adapter", "linux", "", ""))
@@ -120,7 +120,7 @@ for index, fixture in ipairs(fixtures) do
 			assert(all[1] == "11|11|1|11" and Writer.get_meta("linux_next_event_id") == "12")
 		end)
 		Keylogger.record_hotstring("owned-events", "private-owned", "xyz", 1000, "static", 0, true)
-		Keylogger.flush()
+		require("tests.support.sqlite_flush_native").flush(Keylogger)
 		check("private public logging retains aggregate counts and withholds raw hotstring content", function()
 			assert(#rows("events_hotstring") == 3, "private output must not append a raw hotstring row")
 			assert(Reader.read_manifest(path)[local_day]["owned-events"].hs_chars == 6)
@@ -130,7 +130,7 @@ for index, fixture in ipairs(fixtures) do
 		Keylogger.record_hotstring("owned-events", "suppressed", "unused", 1000, "static", 0, false)
 		Keylogger.record_shortcut("owned-events", "suppressed-action", 1000)
 		Keylogger.unsuppress()
-		Keylogger.flush()
+		require("tests.support.sqlite_flush_native").flush(Keylogger)
 		check("suppressed public producers cannot append raw rows", function() assert(packed() == accepted) end)
 	end
 	os.date, os.time = native_date, native_time

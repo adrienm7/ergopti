@@ -470,7 +470,7 @@ end
 --- @param data table  The configuration dictionary.
 --- @param expected_source table|nil Optional exact source precondition.
 --- @return boolean, string|nil, string|nil Commit, error, and committed payload.
-function M.write(path, data, file_adapter, create_only, expected_source)
+function M.write(path, data, file_adapter, create_only, expected_source, preserve_source)
 	if type(path) ~= "string" or path == "" then
 		Logger.error(LOG, "Invalid path provided for TOML write.")
 		return false, "Invalid path provided."
@@ -604,6 +604,12 @@ function M.write(path, data, file_adapter, create_only, expected_source)
 	end
 
 	local payload = table.concat(L, "\n")
+	if preserve_source == true then
+		local detail
+		payload, detail = require("hotstrings.personal_model").prepare(expected_source, data,
+			function(value) return BasicString.unescape_body(esc(value)) end)
+		if payload == nil then return false, detail end
+	end
 	local published, publish_err
 	local committed_payload = nil
 	local create_admission

@@ -257,21 +257,21 @@ end
 function M.detect()
 	local kind = DisplayServer.kind()
 	if kind == DisplayServer.X11 then
-		if Shell.has_command("wmctrl") then return BACKENDS.wmctrl, nil end
+		if Shell.has_command("wmctrl", true) then return BACKENDS.wmctrl, nil end
 		return nil, "tool:wmctrl"
 	end
 	if kind ~= DisplayServer.WAYLAND then return nil, "unknown" end
 	if env("HYPRLAND_INSTANCE_SIGNATURE") or DisplayServer.desktop_is("hyprland") then
-		if Shell.has_command("hyprctl") then return BACKENDS.hyprland, nil end
+		if Shell.has_command("hyprctl", true) then return BACKENDS.hyprland, nil end
 		return nil, "tool:hyprctl"
 	end
 	if env("SWAYSOCK") or DisplayServer.desktop_is("sway") then
-		if Shell.has_command("swaymsg") then return BACKENDS.sway, nil end
+		if Shell.has_command("swaymsg", true) then return BACKENDS.sway, nil end
 		return nil, "tool:swaymsg"
 	end
 	if DisplayServer.desktop_is("kde") then
 		for _, binary in ipairs(QDBUS_BINARIES) do
-			if Shell.has_command(binary) then
+			if Shell.has_command(binary, true) then
 				return setmetatable({ binary = binary }, { __index = BACKENDS.kwin }), nil
 			end
 		end

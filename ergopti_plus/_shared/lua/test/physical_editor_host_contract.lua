@@ -5,7 +5,9 @@ return function(helpers, Json, shared_path, load_host, platform)
 	local checks=0
 	local function eq(a,b,label)checks=checks+1;helpers.assert_eq(a,b,label)end
 	local noop=function()end
-	local logger={error=noop,info=noop,debug=noop,warn=noop}
+	-- Every level the real shim has: a module first loaded here (the manifest reader
+	-- logs done) must not depend on another test file having loaded it before.
+	local logger={error=noop,info=noop,debug=noop,warn=noop,trace=noop,done=noop,start=noop,success=noop}
 	package.loaded['infra.paths']={shared=function(path)return shared_path(path) end}
 	package.loaded['infra.i18n']={get=function(key)return key end}
 	package.loaded['logger.shim']=logger;package.loaded['infra.logger']=logger
@@ -30,7 +32,7 @@ return function(helpers, Json, shared_path, load_host, platform)
 		local old=epoch;eq(backend.on_message({action='close'},{},{app_name='physical_shortcuts',epoch=old}),true,'Linux exact epoch closes')
 		eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'Linux successor opens after native close')
 		backend.on_window_closed(old);eq(backend.on_message({action='ready'},{},{app_name='physical_shortcuts',epoch=epoch}),true,'Old native close cannot clear successor')
-		old=epoch;backend.on_window_closed(old);epoch=0;eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
+		old=epoch;epoch=0;backend.on_window_closed(old);eq(backend.open({scope=scope(),is_paused=function()return false end}),true,'GTK close also retires session')
 	else
 		-- Macro host controlled ports. These are tables, not native userdata qualification.
 		local callback,picker,lastjs,backend

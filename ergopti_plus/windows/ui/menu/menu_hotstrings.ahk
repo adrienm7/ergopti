@@ -330,7 +330,9 @@ _HS_WordExpanderRows(Commands := unset) {
 			continue
 		}
 		Chars := D["chars"]
-		Lbl   := D["label"]
+		; The catalogue carries a locale key, never display text: resolving it
+		; here, at render time, follows a language switch without a restart.
+		Lbl   := t(D["label_key"])
 		; A consumed delimiter is swallowed by the expansion, an unconsumed one is
 		; typed after it. The difference shows only in the output, so the row has
 		; to say which it is. On Windows consumption is opt-in via
@@ -777,6 +779,8 @@ _HS_PreScanPersonal() {
 			} else if (A_LoopFileName ~= "i)\.toml$") {
 				if (PathParts.Length == 0 and A_LoopFileName == "personal_hotstrings.toml")
 					continue
+				if PersonalFileIsBackup(A_LoopFileName)
+					continue
 				SplitPath A_LoopFileFullPath, , , , &ExtStem
 				FileSections := _ParseExtTomlSections(A_LoopFileFullPath)
 				FileCount := 0
@@ -900,6 +904,20 @@ _HS_PersonalRows(Options := unset) {
 		; what they were until 2026-08-07: MenuRenderer_AppendRows renders row DATA
 		; into a menu the CALLER owns, so the driver can hold the reference it needs
 		; and still let the renderer draw every row in it.
+		; An empty inventory has no dynamic leaf source to admit on any driver.
+		HasDefaultChoices := false
+		for _, SecName in TomlData["sections_order"] {
+			if SecName != "-" && TomlData["sections"].Has(SecName) {
+				HasDefaultChoices := true
+				break
+			}
+		}
+		if HasDefaultChoices {
+			; Admit the actual record source before allocating callback-owned menus.
+			DefaultChoiceDefinition := _MR_FindItemById("hotstring_personal_default_choice", "personal_default_section")
+			if !(DefaultChoiceDefinition is Map) || _MR_Get(DefaultChoiceDefinition, "type") != "check"
+				return []
+		}
 		PersonalMenu := Menu()
 		OwnedMenus.Push(PersonalMenu)
 		DefaultSectionMenu := Menu()
@@ -914,10 +932,13 @@ _HS_PersonalRows(Options := unset) {
 			if !TomlData["sections"].Has(SecName)
 				continue
 			SecLabel := DisambiguatedLabels[SecName]
-			DefaultRows.Push(Map(
-				"label",   SecLabel,
-				"action",  _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels),
-				"checked", (CurDefaultSec == SecName) ? true : false))
+			DefaultChoice := MenuRenderer_CheckRow("hotstring_personal_default_choice", "personal_default_section",
+				Map("personal_default_section", _MakeSetDefaultSectionFn(SecName, PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels)),
+				Map("personal_default_section_label", ((Label) => (*) => Label)(SecLabel),
+					"personal_default_section_selected", ((Selected) => (*) => Selected)(CurDefaultSec == SecName)))
+			if !(DefaultChoice is Map)
+				return []
+			DefaultRows.Push(DefaultChoice)
 		}
 		DefaultCommands := Map("personal_default_none", (*) => _SetPersonalDefaultSection("", PersonalMenu, TomlData, DefaultSectionMenu, DisambiguatedLabels))
 		DefaultGetters := Map("personal_default_unset", (*) => CurDefaultSec == "", "personal_default_boundary", (*) => true)
@@ -979,7 +1000,7 @@ _HS_PersonalRows(Options := unset) {
 		if !(PersonalRows is Array)
 			return []
 		_HS_CategoryMenu("Personal", "", PersonalRows,
-			(_Targets, Enabled) => HotstringsPersonalScopeApply(Enabled, Options), PersonalMenu)
+			(_Targets, Enabled) => HS_TogglePersonalAllSections(Enabled, Options), PersonalMenu)
 		PersonalActiveCount := 0
 		PersonalAllEnabled  := true
 		PersonalSectionCount := 0
@@ -1063,6 +1084,9 @@ _HS_TomlFileRow(TF) {
 	TFMenu := Menu(), HandedOff := false
 	PrimaryFailure := 0
 	try {
+	CaptionPolicy := MenuRenderer_PersonalFileCaptionPolicy()
+	if !(CaptionPolicy is Map)
+		return false
 	ControlRows := [], SectionRows := []
 	Owner := PersonalFileControls.ForPath(TF.path)
 	if Owner is PersonalFileAdoptedOwner {
@@ -1088,9 +1112,14 @@ _HS_TomlFileRow(TF) {
 		return false
 	if MenuRenderer_AppendTemplate(TFMenu, "hotstring_personal_file_frame", Commands, Getters, Providers, &WholeTreeAdmitted) != 1 + ControlRows.Length + SectionRows.Length || !WholeTreeAdmitted
 		return false
-	Result := Map(
-		"label", TF.stem . " (" . FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . ")",
-		"submenu", TFMenu)
+	; Keep original late reads and native concatenation coercion before projection.
+	Result := (FileStem := TF.stem . "",
+		FileCount := FmtCount(Owner is PersonalFileAdoptedOwner ? Owner.ActiveCount() : TF.count) . "",
+		CaptionOwner := CaptionPolicy["parent"],
+		CaptionOwner != MenuRenderer_PersonalFileParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
+			? false : CaptionOwner.Call(CaptionPolicy, FileStem, FileCount, TFMenu))
+	if !(Result is Map)
+		return false
 	HandedOff := true
 	return Result
 	} catch as ErrorInfo {
@@ -1137,6 +1166,13 @@ _HS_PersonalFileControlRows(Owner, Section, Options := unset) {
 			continue
 		if Values.Has(Id)
 			Row["label"] .= " : " . Values[Id]
+		Field := Id == "personal_file_tooltip" ? "show_tooltip"
+			: (Id == "personal_file_delay" ? "delay" : (Id == "personal_file_priority" ? "priority"
+				: (Id == "personal_file_color" ? "color" : "")))
+		if Field != "" && !Owner.MetadataAvailable(Section, Field) {
+			Row["disabled"] := true
+			Row["label"] .= " — " . t("menu.hotstrings.personal_metadata_unavailable")
+		}
 		Rows.Push(Row)
 	}
 	return Rows
@@ -1207,6 +1243,9 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 		OwnedMenus := []
 	PrimaryFailure := 0
 	try {
+	CaptionPolicy := MenuRenderer_PersonalFolderCaptionPolicy()
+	if !(CaptionPolicy is Map)
+		return false
 	FolderNames := []
 	for FolderName in Tree
 		FolderNames.Push(FolderName)
@@ -1266,8 +1305,16 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 		if MenuRenderer_AppendTemplate(FolderMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != SubfolderRows.Length + FileRows.Length || !WholeTreeAdmitted
 			return false
 		FolderTotal := _HS_NodeTotal(Node)
-		FolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")
-		FolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))
+		; Preserve positive count coercion before the original outer name coercion.
+		FolderRow := (FolderPositive := FolderTotal > 0,
+			FolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : "",
+			FolderNameReceipt := FolderName . "",
+			CaptionOwner := CaptionPolicy["parent"],
+			CaptionOwner != MenuRenderer_PersonalFolderParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")
+				? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu))
+		if !(FolderRow is Map)
+			return false
+		FolderRows.Push(FolderRow)
 	}
 	Providers := Map("personal_folders", (*) => FolderRows, "personal_files", (*) => [])
 	Getters := Map("personal_folder_file_boundary", (*) => false)
@@ -1452,19 +1499,27 @@ _HS_ExtensionScopeCommandRows(ExtensionId, Options) {
 }
 
 ; Read intent on the click, so an older menu never inverts a masked runtime flag.
+; An enabled source that does not run shows why on its own row (missing, or
+; failed to load), and the repair stays one click away: creating the example
+; loads it at once, and opening a source that does not exist is greyed.
 _HS_ProgrammableHotstringRows() {
 	Commands := Map("open_user_hotstring_source", UserHotstringsOpenSource,
 		"reload_user_hotstring_source", UserHotstringsReload,
-		"create_user_hotstring_example", UserHotstringsCreateExample)
+		"create_user_hotstring_example", UserHotstringsRepairWithExample)
+	Problem := UserHotstringsProblem()
 	Rows := []
 	for Declaration in _MR_GetMenuDef("programmable_hotstrings") {
 		if !(Declaration is Map)
 			continue
 		if Declaration.Get("type", "") == "feature" {
 			Label := _ApplyMenuLabelDynamicSubstitutions(t(Declaration["i18n"]), Declaration["path"])
+			if (Problem != "")
+				Label .= " — " . t("menu.hotstrings.user_code.problem_" . Problem)
 			Row := MenuRowWithLabel(Declaration["path"], Label, "DynamicHotstrings")
 		} else if Declaration.Get("type", "") == "command" {
 			Row := MenuRenderer_CommandRow("programmable_hotstrings", Declaration["id"], Commands)
+			if (Row is Map and Problem == "missing" and Declaration["id"] == "open_user_hotstring_source")
+				Row["disabled"] := true
 		} else {
 			continue
 		}

@@ -175,6 +175,7 @@ function M.new(options)
 		keyboard = keyboard, parameters = parameters, recognizes = domain,
 	})
 	local edit_source = options.expected_source
+	local collision_inventory
 	local validators = { action_parameter_domain = parameter_domain }
 	--- Resolves every owner's view of a document. The pre-write source is the
 	--- user's, where outdated values are tolerated; the post-write candidate
@@ -420,9 +421,31 @@ function M.new(options)
 	function owner.edit(rows, receipt)
 		rows = PhysicalAvailability.capture_updates(rows)
 		if rows == nil then return false, "save_failed" end
-		if not owner.physical_delivery_available()
-			and PhysicalAvailability.requires_delivery(rows, "gesture_parameters", parameters.split_action_parameter_key) then
-			return false, "unavailable"
+		if PhysicalAvailability.requires_delivery(rows, "gesture_parameters", parameters.split_action_parameter_key) then
+			-- Preserve the original strict capability refusal before observing owners.
+			if not owner.physical_delivery_available() then return false, "unavailable" end
+			-- Parameters change no input identity; their original publisher still
+			-- owns typed validation, source currency, leases and retirement.
+			local mappings = {}
+			for _, row in ipairs(rows) do
+				if PhysicalAvailability.requires_delivery({ row }) then mappings[#mappings + 1] = row end
+			end
+			if #mappings > 0 then
+				if collision_inventory == nil then
+					local constructed, candidate = pcall(function()
+						return require("modules.shortcuts.physical_collisions").new(keyboard, taps, combinations,
+							require("platform.remap.tap_hold_manager"), require("adapters.xkb_capture"))
+					end)
+					if not constructed or type(candidate) ~= "table" or type(candidate.validate) ~= "function" then return false, "unavailable" end
+					collision_inventory = candidate
+				end
+				local observed, free, reason = pcall(collision_inventory.validate, mappings)
+				if not observed or free ~= true then
+					return false, observed and (reason == "collision" or reason == "source_changed") and reason or "unavailable"
+				end
+			end
+			-- Recheck after observers; this partial preflight grants no output rights.
+			if not owner.physical_delivery_available() then return false, "unavailable" end
 		end
 		if receipt ~= nil then
 			local called, expected = pcall(editor_inventory.expected_source, receipt)

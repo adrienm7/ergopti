@@ -67,6 +67,8 @@ function M.new_batch()
 		kc_ngram     = {},
 		sc_ngram     = { ngram_shortcuts = {}, ngram_shortcut_bigrams = {} },
 		kc_hold      = {},
+		media_ngram  = {},
+		media_hold   = {},
 		titles       = {},
 		hourly       = {},
 		hourly_min5  = {},

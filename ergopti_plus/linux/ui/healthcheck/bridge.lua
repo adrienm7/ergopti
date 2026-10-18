@@ -59,6 +59,7 @@ local _config = nil
 -- The state of the window's current page: its epoch, whether details are
 -- included, its last snapshot and its running probes
 local _session = nil
+local _action_revision = 0
 
 
 
@@ -635,6 +636,17 @@ end
 -- ===============================
 -- ===============================
 
+--- Retires an action before cancellation can call back into this page.
+local function cancel_action(session)
+	_action_revision = _action_revision + 1
+	local revision = _action_revision
+	if not session then return revision end
+	local request = session.action_request
+	session.action_token, session.action_request = nil, nil
+	if request then request.cancel() end
+	return revision
+end
+
 --- Performs one validated action.
 --- @param session table
 --- @param action table From healthcheck.actions.
@@ -654,14 +666,20 @@ local function perform(session, action, state, context)
 				require("infra.i18n").get(documents.schema.share_policy.notice_key)).text }
 	end
 	if action.action == "cancel" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		for id, result in pairs(session.snapshot.probes) do
 			if result.state == "pending" then session.snapshot.probes[id] = { state = "cancelled", cleanup = "pending" } end
 		end
 		return { type = "action", action = "cancel", ok = true, snapshot = session.snapshot }
 	end
 	if action.action == "refresh" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		archive_cleanup_metadata(session)
 		session.detailed = action.detailed
 		local revision = (session.snapshot.export_revision or 1) + 1
@@ -672,14 +690,36 @@ local function perform(session, action, state, context)
 		return { type = "snapshot", snapshot = session.snapshot }
 	end
 	if action.action == "close" then
+		local revision = cancel_action(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		cancel_probes(session)
+		if _session ~= session or revision ~= _action_revision then return nil end
 		if context and type(context.close_owned_window) == "function" then context.close_owned_window() end
 		return nil
 	end
-	local result = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot)
-	result.type = "action"
-	result.action = action.action
-	return result
+	local revision = cancel_action(session)
+	if _session ~= session or revision ~= _action_revision then return nil end
+	local token = { snapshot = session.snapshot, revision = session.snapshot.export_revision }
+	session.action_token = token
+	local inline, answer, completed = true, nil, false
+	local function current()
+		return _session == session and session.action_token == token and session.snapshot == token.snapshot
+			and session.snapshot.export_revision == token.revision
+			and require("ui.webview_manager").current_epoch("healthcheck") == session.epoch
+	end
+	local request = Report.perform(action, session.snapshot.sections.paths, documents, Report.redaction_context(), nil, session.snapshot, {
+		current = current,
+		complete = function(result)
+			if not current() or completed then return end
+			completed = true
+			session.action_request = nil
+			result.type, result.action = "action", action.action
+			if inline then answer = result else push(session, result) end
+		end,
+	})
+	inline = false
+	if current() and not completed then session.action_request = request else request.cancel() end
+	return answer
 end
 
 --- Handles an incoming page message.
@@ -692,7 +732,11 @@ function M.on_message(payload, state, context)
 	local epoch = type(context) == "table" and context.epoch or nil
 	if payload == "ready" then
 		Logger.info(LOG, "Diagnostics page ready.")
-		cancel_probes(_session)
+		local previous = _session
+		local revision = cancel_action(previous)
+		if _session ~= previous or revision ~= _action_revision then return nil end
+		cancel_probes(previous)
+		if _session ~= previous or revision ~= _action_revision then return nil end
 		_session = {
 			epoch    = epoch,
 			detailed = false,
@@ -723,6 +767,15 @@ function M.on_message(payload, state, context)
 		return { type = "action", action = action.action, ok = false }
 	end
 	return answer
+end
+
+--- Invalidates work even when the native close box did not send a page action.
+function M.on_window_closed(epoch)
+	if not _session or (epoch ~= nil and _session.epoch ~= epoch) then return end
+	local previous = _session
+	_session = nil
+	cancel_action(previous)
+	cancel_probes(previous)
 end
 
 --- Opens the diagnostics window, in report mode when asked: the page then

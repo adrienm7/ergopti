@@ -34,6 +34,9 @@
 ; @param Opts {Map|0} { image?: path_string, title?: label_string }
 ;               image  {String} Path to an ICO or PNG file.
 ;               title  {String} Text label shown as the tooltip text (via TrayMenuSetTooltip).
+if !TrayMenuFrameNative("current")
+	throw Error("The native menu adapter could not retain its intrinsic cohort")
+
 TrayMenuSetIcon(Opts) {
 	if !(Opts is Map)
 		return
@@ -154,6 +157,27 @@ TrayMenuIsSeparatorAt(TargetMenu, Position) {
 	return (State & MF_SEPARATOR) != 0
 }
 
+; Points an existing, already declared row of a native menu at a new submenu.
+; AHK's Menu.Add updates a row whose name exists instead of appending one; this
+; adapter owns that native rebinding so callers never place rows themselves.
+; @param TargetMenu {Menu} A rendered AHK menu that already holds the row.
+; @param Label {String} Exact caption of the existing row.
+; @param Submenu {Menu} The submenu the row opens from now on.
+TrayMenuRebindSubmenu(TargetMenu, Label, Submenu) {
+	if !(TargetMenu is Menu) || !(Submenu is Menu) || Type(Label) != "String" || Label == ""
+		throw ValueError("Rebinding a submenu requires a native menu, a caption and a submenu")
+	Count := TrayMenuItemCount(TargetMenu)
+	loop Count {
+		if TrayMenuItemCaption(TargetMenu, A_Index - 1) == Label {
+			TargetMenu.Add(Label, Submenu)
+			if TrayMenuItemCount(TargetMenu) != Count
+				throw Error("Rebinding the submenu of '" . Label . "' appended a row")
+			return
+		}
+	}
+	throw ValueError("No existing row named '" . Label . "' to rebind")
+}
+
 /** Ends native navigation before a failed or reentered popup can be painted. */
 TrayMenuCancelNavigation() {
 	return DllCall("EndMenu", "int") != 0
@@ -170,7 +194,7 @@ TrayMenuDestroy() {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_TRAY_MENU := Map(
     "setIcon",    TrayMenuSetIcon,
@@ -199,4 +223,153 @@ TrayMenuItemCaption(TargetMenu, Position) {
 	if Read != Length
 		throw Error("Native menu caption changed while reading")
 	return StrGet(TextBuffer, "UTF-16")
+}
+
+/**
+ * Owns the finite native menu receipt and retirement operations.
+ * The include bootstrap retains intrinsics before an external DATA provider runs.
+ * Capture requires the current native class; retirement uses the already-held class.
+ * @param {String} Operation One of current, capture, ids, count, or release.
+ * @param {Menu|Boolean} Target Actual native menu for capture or owned retirement.
+ * @param {Integer} Handle Previously captured native HMENU for retirement.
+ * @returns {Boolean|Array|Integer} Native evidence or the completed operation result.
+ */
+TrayMenuFrameNative(Operation, Target := false, Handle := 0) {
+	static NativeClass := Menu, NativeDll := DllCall
+	static HandleGetter := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Handle").Get
+	static DeleteMethod := Object.Prototype.GetOwnPropDesc.Call(Menu.Prototype, "Delete").Call
+	static NameGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "Name").Get
+	static BuiltInGetter := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, "IsBuiltIn").Get
+	HeldLive() {
+		if NativeDll != DllCall
+			return false
+		for Callable in [NativeDll, HandleGetter, DeleteMethod, NameGetter, BuiltInGetter] {
+			if !(Callable is Func) || ObjGetBase(Callable) != Func.Prototype
+				return false
+			for Name in ObjOwnProps(Callable)
+				return false
+		}
+		for Pair in [["Name", NameGetter], ["IsBuiltIn", BuiltInGetter]] {
+			Name := Pair[1], Getter := Pair[2]
+			if !Object.Prototype.HasOwnProp.Call(Func.Prototype, Name)
+				return false
+			Descriptor := Object.Prototype.GetOwnPropDesc.Call(Func.Prototype, Name)
+			if !Object.Prototype.HasOwnProp.Call(Descriptor, "Get") || Descriptor.Get != Getter
+				return false
+			for Field in ObjOwnProps(Descriptor)
+				if Field != "Get"
+					return false
+		}
+		return true
+	}
+	if !HeldLive() {
+		if Operation == "current" || Operation == "capture"
+			return false
+		throw Error("Owned native menu operation lost its retained intrinsics")
+	}
+	if Operation == "current" {
+		if NativeClass != Menu || !Object.Prototype.HasOwnProp.Call(NativeClass.Prototype, "Handle")
+			|| !Object.Prototype.HasOwnProp.Call(NativeClass.Prototype, "Delete")
+			return false
+		HandleDescriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass.Prototype, "Handle")
+		DeleteDescriptor := Object.Prototype.GetOwnPropDesc.Call(NativeClass.Prototype, "Delete")
+		if !Object.Prototype.HasOwnProp.Call(HandleDescriptor, "Get") || HandleDescriptor.Get != HandleGetter
+			|| !Object.Prototype.HasOwnProp.Call(DeleteDescriptor, "Call") || DeleteDescriptor.Call != DeleteMethod
+			return false
+		for Field in ObjOwnProps(HandleDescriptor)
+			if Field != "Get"
+				return false
+		for Field in ObjOwnProps(DeleteDescriptor)
+			if Field != "Call"
+				return false
+		BuiltIn := BuiltInGetter.Call(NativeDll)
+		if !HeldLive() || !BuiltIn
+			return false
+		NativeDllName := NameGetter.Call(NativeDll)
+		return HeldLive() && NativeDllName == "DllCall" && NativeClass == Menu
+	}
+	if Operation == "capture" {
+		if NativeClass != Menu || !(Target is NativeClass) || ObjGetBase(Target) != NativeClass.Prototype
+			|| Object.Prototype.HasOwnProp.Call(Target, "Handle")
+			return false
+		Handle := HandleGetter.Call(Target)
+		if !HeldLive() || !NativeDll.Call("IsMenu", "ptr", Handle, "int")
+			return false
+		Count := NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")
+		if Count < 0
+			return false
+		Rows := []
+		loop Count {
+			if !HeldLive()
+				return false
+			Position := A_Index - 1
+			State := NativeDll.Call("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
+			if State == 0xFFFFFFFF
+				return false
+			Length := NativeDll.Call("GetMenuStringW", "ptr", Handle, "uint", Position,
+				"ptr", 0, "int", 0, "uint", 0x400, "int")
+			TextBuffer := Buffer((Length + 1) * 2, 0)
+			Read := NativeDll.Call("GetMenuStringW", "ptr", Handle, "uint", Position,
+				"ptr", TextBuffer, "int", Length + 1, "uint", 0x400, "int")
+			if Read != Length
+				return false
+			Id := NativeDll.Call("GetMenuItemID", "ptr", Handle, "int", Position, "uint")
+			Child := NativeDll.Call("GetSubMenu", "ptr", Handle, "int", Position, "ptr")
+			Rows.Push([StrGet(TextBuffer, "UTF-16"), Id, State, Child])
+		}
+		if !HeldLive() || Object.Prototype.HasOwnProp.Call(Target, "Handle")
+			|| HandleGetter.Call(Target) != Handle
+			return false
+		return HeldLive() && NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int") == Count ? [Handle, Rows] : false
+	}
+	if Type(Handle) != "Integer" || Handle <= 0
+		throw ValueError("Owned native menu operation requires its captured handle")
+	if Operation == "count"
+		return NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")
+	if !(Target is NativeClass) || ObjGetBase(Target) != NativeClass.Prototype
+		|| HandleGetter.Call(Target) != Handle || !HeldLive()
+		throw Error("Owned native menu retirement lost its captured handle")
+	if Operation == "ids" {
+		Ids := [], Count := NativeDll.Call("GetMenuItemCount", "ptr", Handle, "int")
+		if Count >= 0 {
+			loop Count {
+				if !HeldLive()
+					throw Error("Owned native menu enumeration lost its retained intrinsics")
+				Ids.Push(NativeDll.Call("GetMenuItemID", "ptr", Handle, "int", A_Index - 1, "uint"))
+			}
+		}
+		if !HeldLive()
+			throw Error("Owned native menu enumeration lost its retained intrinsics")
+		return Ids
+	}
+	if Operation == "release" {
+		DeleteMethod.Call(Target)
+		return true
+	}
+	throw ValueError("Unknown owned native menu operation")
+}
+
+_TrayBootstrapNoOp(*) {
+	return 0
+}
+
+/** Publishes the compiled startup row through one native replacement transaction. */
+_InstallSafeBootstrapTray(Label := unset, MenuObj := 0) {
+	Status := _TrayBootstrapProjectedRows("inert", Map())[1]
+	if !IsSet(Label)
+		Label := Status.Label
+	if !(Label is String) or Label == ""
+		throw ValueError("tray bootstrap label must be a non-empty string")
+	if !IsObject(MenuObj)
+		MenuObj := A_TrayMenu
+	PreviousCritical := Critical("On")
+	try {
+		; Own retirement and replacement in one uninterruptible AHK transaction.
+		; A caller-side Delete followed by this helper left a real click/timer seam
+		; in which Windows could display an empty root.
+		MenuObj.Delete()
+		MenuObj.Add(Label, _TrayBootstrapNoOp)
+		MenuObj.Disable(Label)
+		return true
+	} finally Critical(PreviousCritical)
 }
