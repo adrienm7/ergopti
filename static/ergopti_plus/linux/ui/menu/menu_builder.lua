@@ -4149,10 +4149,34 @@ local function _build_tap_holds(ctx)
 	local options = th.hold_options()
 	local feature_on = th.file_enabled() and th.is_enabled()
 
+	local capture_edit = th.capture_configuration_edit
+	local function edit_guard(setter_name)
+		local setter, is_paused = Writer[setter_name], ctx.is_paused
+		if type(capture_edit) ~= "function" or type(setter) ~= "function" then return nil end
+		local ok, scope = pcall(capture_edit)
+		if not ok or type(scope) ~= "function" then return nil end
+		local function ports_current()
+			return ctx.tap_holds == th and th.capture_configuration_edit == capture_edit
+				and package.loaded["platform.remap.tap_hold_writer"] == Writer and Writer[setter_name] == setter
+				and type(is_paused) == "function" and ctx.is_paused == is_paused
+		end
+		local function current()
+			if not ports_current() then return false end
+			local called, paused = pcall(is_paused)
+			if not called or paused ~= false or not ports_current() then return false end
+			local checked, live = pcall(scope)
+			return checked and live == true and ports_current()
+		end
+		if not current() then return nil end
+		return current, setter
+	end
+
 	--- Opens the searchable action picker for a key's tap.
 	--- @param catalog_entry table The key's entry of the manager's key_catalog().
 	--- @param current string The key's tap now.
 	local function pick_tap(catalog_entry, current)
+		local guard, setter = edit_guard("set_tap")
+		if not guard then changed(false); return false end
 		local key_id = catalog_entry.id
 		local ok_picker, Picker = pcall(require, "ui.action_picker.bridge")
 		if not ok_picker or type(Picker.open) ~= "function" then
@@ -4164,6 +4188,7 @@ local function _build_tap_holds(ctx)
 			items[#items + 1] = { type = "action", id = id, label = _tap_hold_action_label(id, ctx.gestures) }
 		end
 		table.sort(items, function(left, right) return left.label < right.label end)
+		if guard() ~= true then changed(false); return false end
 		Picker.open({
 			presentation_id = "tap_hold_action",
 			presentation_suffix = _tap_hold_key_label(catalog_entry),
@@ -4172,14 +4197,18 @@ local function _build_tap_holds(ctx)
 			native_label = i18n_safe("tap_hold.tap.none"),
 			items = items,
 		}, function(option)
-			local ok = Writer.set_tap(key_id, option == "__native__" and "" or option)
-			changed(ok)
-			return ok
+			if guard() ~= true then changed(false); return false end
+			local called, persisted = pcall(setter, key_id, option == "__native__" and "" or option, guard)
+			local accepted = called and persisted == true
+			changed(accepted)
+			return accepted
 		end)
 	end
 
 	--- Asks for a key's own delay, in milliseconds.
 	local function ask_delay(key_id, current_ms)
+		local guard, setter = edit_guard("set_threshold")
+		if not guard then changed(false); return false end
 		local value = prompt_text(i18n_safe("menu.tapholds.key_tap_delay_dialog_title"),
 			string.format(i18n_safe("menu.tapholds.key_tap_delay_dialog_prompt"), current_ms),
 			tostring(current_ms))
@@ -4190,7 +4219,8 @@ local function _build_tap_holds(ctx)
 			show_error(tostring(value), i18n_safe("dialog.gestures.param_error_title"))
 			return false
 		end
-		local call_ok, persisted = pcall(Writer.set_threshold, key_id, math.floor(ms + 0.5) / 1000)
+		if guard() ~= true then changed(false); return false end
+		local call_ok, persisted = pcall(setter, key_id, math.floor(ms + 0.5) / 1000, guard)
 		if not call_ok or persisted ~= true then
 			changed(false)
 			return false
