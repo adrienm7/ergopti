@@ -266,3 +266,113 @@ describe("Diagnostic snapshot: the daemon boot emits it after ready", function()
 		assert_true(opened >= 5, "the boot must be split into stages, found " .. opened)
 	end)
 end)
+
+
+--- Captures only snapshot log output while preserving the real collector.
+--- @param body function Receives the collector and emitted formatted lines.
+local function with_prepared_snapshot(body)
+	local Collector, Logger = require("infra.diagnostic_snapshot"), require("logger.shim")
+	local original, lines = Logger.info, {}
+	Logger.info = function(tag, _, message)
+		if tag == Snapshot.MODULE then lines[#lines + 1] = message end
+	end
+	local ok, why = pcall(body, Collector, lines)
+	Logger.info = original
+	if not ok then error(why, 0) end
+end
+
+describe("snapshot preparation before capture (snapshot-prepared-ready)", function()
+	it("snapshot-prepared-ready emits cached discovery with frozen boot time and whitelisted metadata", function()
+		with_prepared_snapshot(function(Collector, lines)
+			local frozen, reads, clock = false, 0, 100
+			local previous_profiler = package.loaded["infra.boot_profiler"]
+			local Profiler = helpers.load_module_with_dependency("infra.boot_profiler", "infra.monotonic", {
+				now_ms = function() return clock end,
+			})
+			package.loaded["infra.boot_profiler"] = previous_profiler
+			Profiler.begin()
+			local env = { read = function(path)
+				assert_true(not frozen, "ready emission must not perform another discovery read")
+				reads = reads + 1
+				if path == "/etc/os-release" then return 'NAME="Prepared Linux"\nVERSION_ID="42"\n' end
+			end, exists = function()
+				assert_true(not frozen, "ready emission must not probe filesystem metadata")
+				return false
+			end }
+			local prepared = Collector.prepare({ script_dir = "/prepared/source" }, env)
+			assert_true(type(prepared) == "function" and reads > 0)
+			assert_eq(#lines, 0, "preparation must not announce an unready driver")
+			frozen, clock = true, 237.4
+			local completed_boot = Profiler.complete()
+			assert_eq(completed_boot, Profiler.boot_ms(), "the real profiler must freeze the emitted boot total")
+			local message = prepared({ boot_ms = completed_boot, locale = "fr", keyboard_layout = "azerty",
+				log_level = "DEBUG", features_enabled = 3, features_total = 5,
+				driver = "forged driver", os = "forged OS", config_dir = "untrusted path" })
+			assert_eq(#lines, 1); assert_eq(message, lines[1])
+			assert_true(message:find("boot_ms=137", 1, true) ~= nil)
+			assert_true(message:find("features_enabled=3/5", 1, true) ~= nil)
+			assert_true(message:find("os=" .. Snapshot.render_value("Prepared Linux"), 1, true) ~= nil)
+			assert_true(not message:find("forged", 1, true) and not message:find("untrusted path", 1, true))
+			assert_eq(pcall(prepared, {}), false, "one preparation cannot publish twice after logger reentry")
+			assert_eq(#lines, 1)
+		end)
+	end)
+
+	it("snapshot-prepared-ready a refused discovery produces no fabricated snapshot", function()
+		with_prepared_snapshot(function(Collector, lines)
+			assert_true(type(Collector.prepare) == "function", "the real preparation API must be present")
+			local okay = pcall(Collector.prepare, {}, { read = function() error("controlled discovery read failure", 0) end,
+				exists = function() return false end })
+			assert_eq(okay, false); assert_eq(#lines, 0)
+		end)
+	end)
+
+	local function position(state, name)
+		for index, event in ipairs(state.events) do if event == name then return index end end
+	end
+	it("snapshot-prepared-ready actual Main prepares ungrabbed then emits only after genuine ready and frozen total", function()
+		local state = require("tests.support.main_startup_fixture").run({ boot_ms = 137 })
+		assert_true(state.ok, tostring(state.error))
+		assert_eq(state.snapshot_prepared_under_grab, false)
+		local prepare, grab, ready, complete, emit = position(state, "diagnostics.prepare"), position(state, "hook.start"),
+			position(state, "daemon.ready"), position(state, "boot.complete"), position(state, "diagnostics")
+		assert_true(prepare and grab and ready and complete and emit, "every actual startup boundary must execute")
+		assert_true(prepare < grab and grab < ready and ready < complete and complete < emit)
+		assert_eq(state.snapshot_boot_ms, 137, "the pre-capture elapsed time is not the completed boot total")
+	end)
+
+	for _, fault in ipairs({ "hook_refused", "layout_refused" }) do
+		it("snapshot-prepared-ready actual Main " .. fault .. " never announces ready or emits prepared facts", function()
+			local state = require("tests.support.main_startup_fixture").run({ [fault] = true })
+			assert_eq(state.ok, false); assert_eq(position(state, "daemon.ready"), nil)
+			assert_eq(position(state, "diagnostics"), nil)
+			assert_eq(state.grabbed, false); assert_eq(state.closes, 1)
+		end)
+	end
+	it("snapshot-prepared-ready stopping during discovery prevents later capture and emission", function()
+		local state = require("tests.support.main_startup_fixture").run({ on_boundary = function(boundary, _, env)
+			if boundary == "diagnostics.prepare" then env.shutdown.request("TERM during snapshot discovery") end
+		end })
+		assert_eq(state.ok, true); assert_eq(position(state, "hook.start"), nil)
+		assert_eq(position(state, "daemon.ready"), nil); assert_eq(position(state, "diagnostics"), nil)
+		assert_eq(state.grabbed, false); assert_eq(state.closes, 1)
+	end)
+	for _, boundary in ipairs({ "daemon.ready", "boot.complete" }) do
+		it("snapshot-prepared-ready an acknowledged stop during " .. boundary .. " suppresses the cached emission", function()
+			local state = require("tests.support.main_startup_fixture").run({ on_boundary = function(stage, _, env)
+				if stage == boundary then env.shutdown.request("TERM during readiness logging") end
+			end })
+			assert_true(state.ok, tostring(state.error)); assert_true(position(state, "hook.start") ~= nil)
+			assert_eq(position(state, "diagnostics"), nil)
+			assert_eq(state.grabbed, false); assert_eq(state.closes, 1)
+			assert_eq(state.application_loops, 0)
+		end)
+	end
+
+	it("snapshot-prepared-ready optional discovery failure leaves real input ready without a false snapshot", function()
+		local state = require("tests.support.main_startup_fixture").run({ snapshot_prepare_throws = true })
+		assert_true(state.ok, tostring(state.error)); assert_true(position(state, "daemon.ready") ~= nil)
+		assert_eq(position(state, "diagnostics"), nil); assert_eq(state.snapshot_errors, 1)
+		assert_true(state.pumps > 0)
+	end)
+end)
