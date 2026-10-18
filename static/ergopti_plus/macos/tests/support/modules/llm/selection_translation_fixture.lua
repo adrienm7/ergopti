@@ -92,8 +92,17 @@ local function make_synthetic(world)
 		world.selection = world.pasted
 		return true
 	end
-	function synthetic.seal() return true end
-	function synthetic.cancel() return true end
+	function synthetic.on_complete(tx, callback) tx.callback = callback end
+	function synthetic.on_dispatched(tx, callback) tx.dispatched = callback end
+	function synthetic.seal(tx)
+		if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+		if tx.callback then tx.callback(tx, "complete") end
+		return true
+	end
+	function synthetic.cancel(tx)
+		if tx.callback then tx.callback(tx, "cancelled") end
+		return true
+	end
 	return synthetic
 end
 
@@ -119,6 +128,15 @@ local function build_world(selection, ui_locale)
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 
 	local hs_stub = _G.hs
+	world.clock_ns = 0
+	hs_stub.timer.absoluteTime = function() return world.clock_ns end
+	local native_timer_new = hs_stub.timer.new
+	hs_stub.timer.new = function(delay, callback)
+		return native_timer_new(delay, function()
+			world.clock_ns = world.clock_ns + math.ceil(delay * 1e9)
+			callback()
+		end)
+	end
 	local front_app = {
 		title = function() return "TranslateApp" end,
 		name = function() return "TranslateApp" end,
@@ -165,7 +183,7 @@ local function build_world(selection, ui_locale)
 		end,
 		getAll = function() return {} end,
 	}
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	require("tests.support.modules.llm.selection_translation_destination").attach(world)
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keylogger"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -261,7 +279,9 @@ end
 --- @param ui_locale string|nil The interface locale.
 --- @param scenario function Receives the world.
 local function with_world(selection, ui_locale, scenario)
-	scenario(build_world(selection, ui_locale))
+	return require("tests.support.modules.llm.selection_translation_scope").run(function()
+		return scenario(build_world(selection, ui_locale))
+	end)
 end
 
 --- Fires, in order, every pending timer of the text pipeline (never its 2 s

@@ -40,7 +40,8 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			cancels = 0,
 		}
 		local synthetic = {}
-		function synthetic.emit_key_stroke()
+		function synthetic.emit_key_stroke(_, _, _, tx)
+			helpers.assert_not_nil(tx, "copy and paste require explicit completion ownership")
 			calls.implicit = calls.implicit + 1
 			return true
 		end
@@ -62,7 +63,11 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 			calls.dispatches = calls.dispatches + 1
 			return true
 		end
-		function synthetic.seal()
+		function synthetic.on_complete(tx, callback) tx.callback = callback end
+		function synthetic.on_dispatched(tx, callback) tx.dispatched = callback end
+	function synthetic.seal(tx)
+			if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+		if tx.callback then tx.callback(tx, "complete") end
 			calls.seals = calls.seals + 1
 			return true
 		end
@@ -88,10 +93,10 @@ helpers.describe("text transform: reselection is one synthetic transaction", fun
 		timers[4]:fire()
 
 		helpers.assert_eq(calls.implicit, 2,
-			"only Cmd+C and Cmd+V may use standalone synthetic actions")
-		helpers.assert_eq(calls.begins, 1)
+			"Cmd+C and Cmd+V each retain an explicit synthetic action")
+		helpers.assert_eq(calls.begins, 3)
 		helpers.assert_eq(calls.dispatches, 1)
-		helpers.assert_eq(calls.seals, 1)
+		helpers.assert_eq(calls.seals, 3)
 		helpers.assert_eq(calls.cancels, 0)
 		helpers.assert_eq(calls.pairs, #selected * 2,
 			"the original Left then Shift+Right selection must stay inside one batch")
