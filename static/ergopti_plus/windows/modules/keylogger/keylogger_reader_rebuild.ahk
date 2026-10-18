@@ -207,7 +207,10 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			Ledger := _KLR_RebuildNextLedger(State)
 			if !IsObject(Ledger)
 				break
-			_KLR_RebuildStep(State, Ledger)
+			; A carry-only read has not changed the private image. Only an
+			; executed transaction can authorize a round or its checkpoint.
+			if !_KLR_RebuildStep(State, Ledger)
+				continue
 			if !LastRound || TickElapsed64(LastRound, _KLR_RebuildNow()) >= KLRRebuild.round_interval_ms {
 				_KLR_RebuildRound(State, false)
 				LastRound := _KLR_RebuildNow()
@@ -346,11 +349,12 @@ _KLR_RebuildDoneBytes(State) {
 ; Read the bytes just before the ledger cursor and execute every complete batch
 ; they contain. The prefix before the first batch header is carried to the next
 ; (older) read, so only whole transactions ever reach SQLite.
+; @returns {Boolean} Whether this step executed a complete SQL span.
 _KLR_RebuildStep(State, Ledger) {
 	if !Ledger.Has("frames")
 		_KLR_RebuildIndex(State, Ledger)
 	if Ledger["finished"]
-		return
+		return false
 	Cursor := Ledger["cursor"]
 	Frames := Ledger["frames"]
 	while Ledger["frame_cursor"] > 0 && Frames[Ledger["frame_cursor"]][1] >= Cursor
@@ -379,7 +383,7 @@ _KLR_RebuildStep(State, Ledger) {
 				. KLRRebuildConst.MAX_CARRY_CHARS . " characters")
 		Ledger["carry"] := Combined
 		Ledger["cursor"] := NewCursor
-		return
+		return false
 	}
 	_KLR_RebuildExecute(State["db"], Executable)
 	Ledger["cursor"] := NewCursor
@@ -393,6 +397,7 @@ _KLR_RebuildStep(State, Ledger) {
 	for Day in KLR_CacheAffectedDates(Map(Ledger["path"], Map("sql", Executable)))
 		if StrCompare(Day, State["done_boundary"]) > 0
 			State["dirty"][Day] := true
+	return true
 }
 
 _KLR_RebuildReadBytes(Ledger, Start, Count) {

@@ -349,3 +349,5 @@ for _KLRNF64Kind in ["round", "checkpoint"] {
 }
 
 #Include test_klr_trusted_frames.ahk
+
+#Include test_klr_executed_rounds.ahk
