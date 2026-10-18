@@ -5566,12 +5566,27 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 		function rootOwner(source, name) {
 			const tokens = scriptTokens(source, '.ahk');
 			const code = nativeCodeLines(source);
+			// Line starts are indexed once: recounting the newlines before every
+			// token was quadratic in the source and dominated the Menus suite.
+			const lineStarts = [0];
+			for (let at = source.indexOf('\n'); at >= 0; at = source.indexOf('\n', at + 1))
+				lineStarts.push(at + 1);
+			const lineOf = (offset) => {
+				let low = 0,
+					high = lineStarts.length - 1;
+				while (low < high) {
+					const middle = (low + high + 1) >> 1;
+					if (lineStarts[middle] <= offset) low = middle;
+					else high = middle - 1;
+				}
+				return low;
+			};
 			let depth = 0;
 			const matches = [];
 			for (let index = 0; index < tokens.length; index++) {
 				const token = tokens[index];
-				const line = source.slice(0, token.start).split('\n').length - 1;
-				const column = token.start - source.lastIndexOf('\n', token.start - 1) - 1;
+				const line = lineOf(token.start);
+				const column = token.start - lineStarts[line];
 				if (code[line]?.slice(column, column + token.value.length) !== token.value) continue;
 				if (
 					!depth &&
@@ -5592,8 +5607,8 @@ function shortcutConstructionPublication(sources, target, nativeFile) {
 							bodyDepth = 1;
 						while (end < tokens.length && bodyDepth) {
 							const brace = tokens[end];
-							const row = source.slice(0, brace.start).split('\n').length - 1;
-							const col = brace.start - source.lastIndexOf('\n', brace.start - 1) - 1;
+							const row = lineOf(brace.start);
+							const col = brace.start - lineStarts[row];
 							if (brace.kind === 'symbol' && code[row]?.[col] === brace.value) {
 								if (brace.value === '{') bodyDepth++;
 								if (brace.value === '}') bodyDepth--;
