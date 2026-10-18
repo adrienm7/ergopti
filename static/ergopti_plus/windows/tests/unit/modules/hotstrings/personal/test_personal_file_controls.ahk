@@ -241,7 +241,7 @@ _PFC_FreshReceiptRefusesCachedAmbiguityAndUnreadability() {
 		Record := PersonalFileControls.Scan()[1]
 		Assert(FSWriteDurable(Fixture.file, Ambiguous))
 		Refused := false
-		try PersonalFileAdoptedOwner(Record, TOML_ParseFreshFileTyped(Fixture.path))
+		try PersonalFileAdoptedOwner(Record, ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Fixture.path)).Document)
 		catch
 			Refused := true
 		Assert(Refused, "constructor refuses an edit after the exact admitted discovery receipt")
@@ -689,3 +689,63 @@ _PFC_FileRowRendersWithoutReparsing() {
 }
 Test("personal-file-metadata: a file row renders from the admitted parse (perf-personal-metadata-2026-10-17)",
 	_PFC_FileRowRendersWithoutReparsing)
+
+; Boot migration and the semantic cache leave current-schema source untouched.
+; The fresh adopted owner must read the same authored choices when registering.
+_PFC_SemanticActivation(Shape, Mode) {
+	global HSE_RegistryByGroup, _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	Fixture := _PFC_Fixture()
+	try {
+		Id := Fixture.descriptor["id"], Key := TOML_RenderKey(Id)
+		FileEnabled := Mode != "file-off", SectionEnabled := Mode == "all-on"
+		FileLiteral := FileEnabled ? "true" : "false"
+		SectionLiteral := SectionEnabled ? "true" : "false"
+		switch Shape {
+			case "dotted": Source := "hotstrings.groups." . Key . " = " . FileLiteral
+				. "`nhotstrings.modules." . Key . ".quiet = " . SectionLiteral . "`n"
+			case "inline": Source := "hotstrings = { groups = { " . Key . " = " . FileLiteral
+				. " }, modules = { " . Key . " = { quiet = " . SectionLiteral . " } } }`n"
+			case "quoted": Source := '["hotstrings"."groups"]`n' . Key . " = " . FileLiteral
+				. '`n["hotstrings"."modules".' . Key . ']`nquiet = ' . SectionLiteral . "`n"
+			default: throw ValueError("Unknown personal activation source shape")
+		}
+		Source := _CMJFixtureCurrentSource(Source . '[category_enabled]`nhotstrings = true`n'
+			. '[future]`ntext = "001" # exact foreign data`n')
+		AssertTrue(FSWriteDurable(Fixture.path, Source))
+		Boot := ConfigMigrateBoot(Fixture.path)
+		AssertEqual("current", Boot["status"], "the actual boot owner admits this authored source")
+		Cache := ParseConfigTomlFile(Fixture.path)
+		AssertTrue(Cache["future"]["text"] is String)
+		AssertEqual("001", Cache["future"]["text"])
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Source), "boot does not canonicalize aliases before registration")
+
+		HSE_RegistryClear()
+		PersonalFileControls.Register()
+		Owner := PersonalFileControls.owners[Id]
+		AssertTrue(Owner.groups[Id] is TOML_Bool, "the actual adopted gate retains TOML Boolean intent")
+		AssertEqual(FileEnabled, Owner.groups[Id].Value)
+		AssertTrue(Owner.sections["quiet"] is TOML_Bool)
+		AssertEqual(SectionEnabled, Owner.sections["quiet"].Value)
+		Expected := FileEnabled ? (SectionEnabled ? 2 : 1) : 0
+		AssertEqual(Expected, HSE_RegistryByGroup.Count, "actual registration honors file and independent section choices")
+		AssertEqual(Expected, PersonalFileControls.ActiveCount())
+		AssertEqual(FileEnabled, HSE_RegistryByGroup.Has(Id . ".live"))
+		AssertEqual(FileEnabled && SectionEnabled, HSE_RegistryByGroup.Has(Id . ".quiet"))
+		Index := Map(), TriggerSet := Map()
+		PersonalFileControls.BuildPreview(Index, TriggerSet)
+		AssertEqual(Expected, TriggerSet.Count, "preview cannot expose a disabled mapping")
+		AssertEqual(FileEnabled, TriggerSet.Has("abcd"))
+		AssertEqual(FileEnabled && SectionEnabled, TriggerSet.Has("qwer"))
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Source), "adoption and registration never rewrite settings or foreign data")
+	} finally {
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache] {
+			if Store.Has(Fixture.path)
+				Store.Delete(Fixture.path)
+		}
+		_PFC_Cleanup(Fixture)
+	}
+}
+for _PFC_SemanticShape in ["dotted", "inline", "quoted"]
+	for _PFC_SemanticMode in ["file-off", "section-off", "all-on"]
+		Test("personal-file-controls: " . _PFC_SemanticShape . " " . _PFC_SemanticMode . " reaches registration and preview (personal-semantic-activation)",
+			_PFC_SemanticActivation.Bind(_PFC_SemanticShape, _PFC_SemanticMode))
