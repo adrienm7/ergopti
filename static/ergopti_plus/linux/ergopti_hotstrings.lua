@@ -252,6 +252,7 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "programmable hotstrings",
+			wait_for_ack = true,
 			stop = function()
 				return not dyn_hotstrings or dyn_hotstrings.stop_user_code() == true
 			end,
@@ -277,11 +278,14 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "local API discovery",
+			wait_for_ack = true,
 			stop = function()
 				local servers = package.loaded["modules.llm.local_servers"]
 				if servers and servers.shutdown() ~= true then
 					Logger.warn("shutdown", "Local API discovery still owns native cleanup debt.")
+					return false
 				end
+				return true
 			end,
 		},
 		{
@@ -329,8 +333,10 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "file watchers",
+			wait_for_ack = true,
 			stop = function()
-				if file_watchers and type(file_watchers.stop) == "function" then file_watchers.stop() end
+				if file_watchers and type(file_watchers.stop) == "function" then return file_watchers.stop() == true end
+				return true
 			end,
 		},
 		{
