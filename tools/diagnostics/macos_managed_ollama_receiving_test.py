@@ -1175,6 +1175,90 @@ class NativeCommandExitControls(unittest.TestCase):
 
 
 class NativeInferenceAccountingControls(unittest.TestCase):
+    def test_run_publishes_validated_inference_after_cancellation_retirement(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+            subject.root = ROOT
+            subject.work = Path(temporary)
+            subject.home = subject.work / "home"
+            subject.home.mkdir()
+            subject.source_hashes = {}
+            subject.receipt = {}
+            subject.clean = {}
+            subject.api_environment = {}
+            subject.port = 12345
+            subject.binary = subject.work / "native-ollama"
+            subject.settings = subject.work / "proxy-settings.json"
+            subject.options = SimpleNamespace(profile="pac-inline")
+            subject.prepare = Mock()
+            subject.start = Mock()
+            subject.stop = Mock()
+            blob = b"created native model bytes"
+            blob_name = "sha256:" + hashlib.sha256(blob).hexdigest()
+            manifest = json.dumps(
+                {"config": {"digest": blob_name, "size": len(blob)}, "layers": []}
+            ).encode()
+
+            def publish(store):
+                manifest_path = store / "manifests/library/native/latest"
+                manifest_path.parent.mkdir(parents=True)
+                manifest_path.write_bytes(manifest)
+                blob_path = store / "blobs" / blob_name.replace(":", "-")
+                blob_path.parent.mkdir()
+                blob_path.write_bytes(blob)
+
+            subject.own_command = Mock(
+                side_effect=lambda *_: publish(subject.home / "producer-models")
+            )
+            subject.registry = Mock(held_digest="sha256:held-native-body")
+            subject.registry.pac.return_value = "function FindProxyForURL() {}"
+            subject.fixture = SimpleNamespace(
+                host="registry.invalid",
+                origin_port=443,
+                stats=lambda: {
+                    "active": 0,
+                    "records": [
+                        {"event": "origin", "path": "/?native=manifest", "route": route}
+                        for route in ["first", "second"]
+                    ]
+                    + [{"event": "held_closed", "closed": True}],
+                },
+            )
+            pulled = SimpleNamespace(pending=True)
+
+            def pull_model(_name, callback):
+                publish(subject.home / ".ollama/models")
+                callback({"status": "success"})
+                return True
+
+            pulled.pull = pull_model
+            cancelled = SimpleNamespace(pending=True)
+
+            def pull_cancelled(_name, callback, *, timeout):
+                self.assertEqual(timeout, 30)
+                callback({"digest": subject.registry.held_digest, "completed": 1})
+                self.fail("cancellation must interrupt the native body callback")
+
+            cancelled.pull = pull_cancelled
+            subject.owner = Mock(side_effect=[pulled, Mock(), Mock(), cancelled])
+            subject.retirement = Mock(side_effect=lambda owner: setattr(owner, "pending", False))
+            response = io.BytesIO(
+                json.dumps({"done": True, "eval_count": 2, "eval_duration": 1000}).encode()
+            )
+            opener = SimpleNamespace(open=Mock(return_value=response))
+            with patch.object(RECEIVING.urllib.request, "build_opener", return_value=opener):
+                subject.run()
+
+            self.assertTrue(response.closed)
+            self.assertEqual(subject.receipt["inference_eval_count"], 2)
+            self.assertTrue(subject.receipt["native_pull_retired"])
+            self.assertTrue(subject.receipt["native_cancel_retired"])
+            self.assertEqual(subject.receipt["native_sockets"], 0)
+            self.assertEqual(
+                [call.args for call in subject.retirement.call_args_list],
+                [(pulled,), (cancelled,)],
+            )
+
     def observe(self, reply):
         subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
         subject.port = 12345
