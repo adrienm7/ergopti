@@ -65,6 +65,21 @@ helpers.describe("test module groups (macos-test-shards)", function()
 			"this file must land in the meta group")
 	end)
 
+	helpers.it("names only folders that hold tests", function()
+		-- A renamed folder would otherwise leave its prefix matching nothing and
+		-- silently move its tests into a later, larger shard.
+		local modules = discovered_modules()
+		for _, group in ipairs(ModuleGroups.GROUPS) do
+			for _, prefix in ipairs(group.prefixes) do
+				local found = false
+				for _, name in ipairs(modules) do
+					if (name:gsub("%.", "/") .. "/"):sub(1, #prefix) == prefix then found = true; break end
+				end
+				helpers.assert_true(found, group.name .. " prefix matches no test file: " .. prefix)
+			end
+		end
+	end)
+
 	helpers.it("refuses an unknown group instead of running nothing", function()
 		local ok, err = pcall(ModuleGroups.select, { "tests.meta.harness.test_module_groups" }, "metta")
 		helpers.assert_eq(ok, false)
