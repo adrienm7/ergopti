@@ -201,31 +201,40 @@ end
 -- body so the body can be a plain local function referenced by name below.
 local update_widget_body
 
+local function is_current(generation)
+	return _running and generation == _generation
+end
+
 --- Polls the engine and redraws the canvas.
 --- Wrapped end-to-end in a pcall (mirrors tooltip_hotstring.lua / tooltip_llm.lua):
 --- this runs on a bare hs.timer callback with no caller to catch a raised error,
 --- and there is no hs.uncaughtErrorHandler anywhere in the tree, so an unguarded
 --- fault here would silently kill the 0.2 s timer with nothing in the file logger.
-local function update_widget()
-	local ok, err = pcall(update_widget_body)
+local function update_widget(generation)
+	if not is_current(generation) then return false end
+	local ok, err = pcall(update_widget_body, generation)
 	if not ok then Logger.error(LOG, "Crash during widget update: " .. tostring(err) .. ".") end
+	return ok and err ~= false and is_current(generation)
 end
 
 --- Actual widget-update body, wrapped by update_widget() above.
-update_widget_body = function()
+update_widget_body = function(generation)
 	local stats = keylogger.get_live_stats()
+	if not is_current(generation) then return false end
 	local display_wpm = stats.wpm or 0
 	local now = hs.timer.absoluteTime() / 1000000000
 	local active_source = WPMShared.get_active_source(stats, CONFIG.source_color_duration, now)
+	if not is_current(generation) then return false end
 
 	local ok_tooltip, tooltip = pcall(require, "ui.tooltip")
 	local tooltip_visible = false
 	if ok_tooltip and type(tooltip) == "table" and type(tooltip.is_visible) == "function" then
 		tooltip_visible = tooltip.is_visible()
 	end
+	if not is_current(generation) then return false end
 
 	local canon = CONFIG.canon
-	if not canon then return end
+	if not canon then return false end
 	local frame_opts = {
 		now_s = now,
 		hold_s = CONFIG.source_color_duration,
@@ -233,6 +242,7 @@ update_widget_body = function()
 		resolve = WPMShared.resolve_group_hex,
 		unit = WPMShared.unit_label(),
 	}
+	if not is_current(generation) then return false end
 
 	-- One sample per refresh for the graph, and the shared rule for showing:
 	-- while text appears or a preview is up, and briefly after — unless the
@@ -250,16 +260,19 @@ update_widget_body = function()
 		-- unconditionally would raise inside this pcall-wrapped body every 0.2 s
 		-- until a screen reappears. Skip this cycle instead of crashing.
 		local screen = hs.screen.mainScreen()
+		if not is_current(generation) then return false end
 		if not screen then
 			Logger.error(LOG, "update_widget: hs.screen.mainScreen() returned nil — skipping this cycle.")
 			return
 		end
 		local full_frame = screen:fullFrame()
+		if not is_current(generation) then return false end
 		local frame = _show_graph and WPMModel.graph_frame(canon, _wpm_history, stats, frame_opts)
 			or WPMModel.compact_frame(canon, stats, frame_opts)
 		local canvas_width, canvas_height = frame.width, frame.height
 		local compact_w = canon.compact.width
 		local compact_h = canon.compact.height_number + canon.compact.height_gap + canon.compact.height_unit
+		if not is_current(generation) then return false end
 
 		-- Publish this cycle's geometry for the mouseCallback closure (see the
 		-- _canvas_geom declaration in section 2 for why this indirection exists).
@@ -273,17 +286,23 @@ update_widget_body = function()
 		local target_x, target_y = WPMModel.frame_origin(canon, frame, _pos_x, _pos_y)
 
 		if not _canvas then
-			_canvas = GraphicsRenderer.createWindow({
+			local candidate = GraphicsRenderer.createWindow({
 				x = target_x, y = target_y, w = canvas_width, h = canvas_height,
 				clickThrough = false, alwaysOnTop = false,
 			})
-			if _canvas == 0 then
-				_canvas = nil
-				Logger.error(LOG, "update_widget_body(): failed to allocate the widget canvas.")
-				return
+			if not is_current(generation) then
+				if candidate and candidate ~= 0 then candidate:delete() end
+				return false
 			end
+			if not candidate or candidate == 0 then
+				Logger.error(LOG, "update_widget_body(): failed to allocate the widget canvas.")
+				return false
+			end
+			_canvas = candidate
 			_canvas:level(hs.drawing.windowLevels.cursor)
+			if not is_current(generation) or _canvas ~= candidate then return false end
 			_canvas:behavior({ "canJoinAllSpaces", "stationary" })
+			if not is_current(generation) or _canvas ~= candidate then return false end
 			local callback_canvas = _canvas
 			local callback_generation = _generation
 			-- Drag: mouseCallback fires on left-button down inside the canvas.
@@ -329,12 +348,15 @@ update_widget_body = function()
 					})
 				end
 			end)
+			if not is_current(generation) or _canvas ~= candidate then return false end
 		else
 			-- Only reposition when not dragging.
 			if not _drag_start_mouse then
 				_canvas:frame({ x = target_x, y = target_y, w = canvas_width, h = canvas_height })
 			end
 		end
+		if not is_current(generation) then return false end
+		local canvas = _canvas
 
 		-- The frame the shared model computed, as hs.canvas elements.
 		local elements = {}
@@ -374,8 +396,9 @@ update_widget_body = function()
 				frame = { x = 0, y = frame.strip_y, w = frame.width, h = frame.height_unit } })
 		end
 
-		_canvas:replaceElements(elements)
-		_canvas:show()
+		canvas:replaceElements(elements)
+		if not is_current(generation) or _canvas ~= canvas then return false end
+		canvas:show()
 	else
 		if _canvas then _canvas:hide() end
 	end
@@ -451,9 +474,9 @@ function M.start(show_graph)
 	end
 	if _running then
 		_show_graph = want_graph
-		_pause_restore_pending = false
-		update_widget()
-		return true
+		local updated = update_widget(_generation)
+		if updated then _pause_restore_pending = false end
+		return updated
 	end
 	-- A destroyed canvas cannot deliver the mouseUp that closes its drag. Never
 	-- let that lease gate positioning or move a later canvas generation.
@@ -469,7 +492,7 @@ function M.start(show_graph)
 	local timer_ok, timer_candidate, timer_committed = xpcall(function()
 		return TimerScheduler.every(CONFIG.update_s, function()
 			if not _running or generation ~= _generation then return end
-			update_widget()
+			update_widget(generation)
 		end)
 	end, debug.traceback)
 	if type(timer_candidate) == "table" then _timer = timer_candidate end
@@ -522,10 +545,12 @@ function M.start(show_graph)
 		return false
 	end
 	_running = true
+	local updated = update_widget(generation)
+	if not is_current(generation) then return false end
+	if not updated then M.stop(); return false end
 	_pause_restore_pending = false
-	update_widget()
 	Logger.info(LOG, "Floating WPM widget started successfully.")
-	return true
+	return is_current(generation)
 end
 
 --- Halts the widget and clears the screen.

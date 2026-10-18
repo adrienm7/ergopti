@@ -96,8 +96,8 @@ helpers.describe("wpm_widget: update_widget() body is pcall-guarded at source (F
 
 	helpers.it("wraps the update_widget body in pcall with Logger.error on failure", function()
 		local src = read_src()
-		helpers.assert_true(src:find("local ok, err = pcall(update_widget_body)", 1, true) ~= nil,
-			"update_widget() must call its body through pcall")
+		helpers.assert_true(src:find("local ok, err = pcall(update_widget_body, generation)", 1, true) ~= nil,
+			"update_widget() must call its generation-bound body through pcall")
 		helpers.assert_true(src:find('Logger.error(LOG, "Crash during widget update: "', 1, true) ~= nil,
 			"a failed update_widget_body() must be logged at ERROR level")
 	end)
