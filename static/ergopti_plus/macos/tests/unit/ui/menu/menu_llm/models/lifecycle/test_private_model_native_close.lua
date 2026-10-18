@@ -35,6 +35,21 @@ local function with_dialog(kind, scenario)
 		local subject = helpers.load_with_stubs(module_name, {
 			webview = { windowMasks = { titled = 1, closable = 2 }, new = function()
 				local view = construct()
+				-- Pinned userdata_gc removes the metatable before releasing native refs.
+				setmetatable(view, { __name = "hs.webview" })
+				local native_delete, native_close = view.delete, view.user_close
+				function view:user_close()
+					native_close(self)
+					if self.disposed then setmetatable(self, nil) end
+				end
+				function view:delete()
+					if h.delete_refusal == "throw" then error("native delete refused before consumption") end
+					if h.delete_refusal == "false" then return false end
+					if h.delete_refusal == "nil" then return nil end
+					local result = native_delete(self)
+					if self.disposed then setmetatable(self, nil) end
+					return result
+				end
 				function view:allowNewWindows() assert(not self.disposed); return self end
 				function view:evaluateJavaScript() assert(not self.disposed); return self end
 				return view
@@ -75,10 +90,16 @@ local function with_dialog(kind, scenario)
 						return true
 					end,
 				} }
+			function h.admit()
+				local admitted = manager.prompt_hf_login(function(result) h.terminals[#h.terminals + 1] = result end,
+					provenance)
+				h.prompt_timer = h.timers[#h.timers]
+				return admitted
+			end
+			function h.deliver_prompt() h.prompt_timer:deliver() end
 			function h.show()
-				if not manager.prompt_hf_login(function(result) h.terminals[#h.terminals + 1] = result end,
-					provenance) then return false end
-				h.timers[#h.timers]:deliver()
+				if not h.admit() then return false end
+				h.deliver_prompt()
 				return h.flow.webview ~= nil
 			end
 			function h.cancel() h.bridges[#h.bridges].callback({ body = "cancel" }) end
@@ -170,4 +191,92 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 			end)
 		end)
 	end
+
+	for _, refusal in ipairs({ "throw", "false", "nil" }) do
+		helpers.it("settles HF construction after required native setter " .. refusal, function()
+			with_dialog("hf", function(h)
+				h.policy_refuses = refusal
+				helpers.assert_true(h.admit(), "public admission accepts the timer, not a visible window")
+				helpers.assert_eq(#h.windows, 0)
+				helpers.assert_eq(h.terminals, {})
+				h.deliver_prompt()
+				local rejected = h.windows[1]
+				helpers.assert_eq(rejected.visible, false)
+				helpers.assert_eq(rejected.deletes, 1)
+				helpers.assert_nil(getmetatable(rejected), "native GC consumed the userdata")
+				helpers.assert_nil(h.retained[rejected])
+				helpers.assert_nil(h.flow.webview, "consumption without a close callback must retire its exact owner")
+				helpers.assert_eq(h.terminals, { false })
+				helpers.assert_eq(h.settled, 1)
+				h.policy_refuses = nil
+				helpers.assert_true(h.admit())
+				h.deliver_prompt()
+				local successor = h.windows[2]
+				helpers.assert_true(successor.visible)
+				helpers.assert_true(h.retained[successor])
+				h.drain()
+				helpers.assert_eq(h.flow.webview, successor)
+				successor:user_close()
+				helpers.assert_eq(h.terminals, { false, false })
+				helpers.assert_eq(h.settled, 2)
+				helpers.assert_nil(next(h.retained))
+			end)
+		end)
+
+		helpers.it("retains HF construction debt when delete returns " .. refusal .. " without consumption", function()
+			with_dialog("hf", function(h)
+				h.policy_refuses, h.delete_refusal = "false", refusal
+				helpers.assert_true(h.admit())
+				h.deliver_prompt()
+				local rejected = h.windows[1]
+				helpers.assert_true(h.retained[rejected])
+				helpers.assert_not_nil(getmetatable(rejected))
+				helpers.assert_eq(h.flow.webview, rejected)
+				helpers.assert_eq(h.terminals, {})
+				helpers.assert_eq(h.settled, 0)
+				helpers.assert_eq(h.admit(), false, "a real unconsumed native debt blocks its successor")
+				h.delete_refusal = nil
+				h.flow.close_webview(nil, false)
+				helpers.assert_nil(h.flow.webview)
+				helpers.assert_eq(h.terminals, { false })
+				helpers.assert_eq(h.settled, 1)
+				helpers.assert_nil(next(h.retained))
+			end)
+		end)
+	end
+
+
+	helpers.it("waits for the visible HF fade before settling and admitting its successor", function()
+		with_dialog("hf", function(h)
+			helpers.assert_true(h.admit())
+			h.deliver_prompt()
+			local first = h.windows[1]
+			helpers.assert_true(first.visible)
+			h.cancel()
+			helpers.assert_not_nil(getmetatable(first))
+			helpers.assert_true(h.retained[first])
+			helpers.assert_eq(h.flow.webview, first)
+			helpers.assert_eq(h.terminals, {})
+			helpers.assert_eq(h.settled, 0)
+			helpers.assert_eq(h.admit(), false)
+			h.drain()
+			helpers.assert_nil(getmetatable(first))
+			helpers.assert_nil(h.retained[first])
+			helpers.assert_nil(h.flow.webview)
+			helpers.assert_eq(h.terminals, { false })
+			helpers.assert_eq(h.settled, 1)
+			helpers.assert_true(h.admit())
+			h.deliver_prompt()
+			local successor = h.windows[2]
+			helpers.assert_true(successor.visible)
+			helpers.assert_eq(h.flow.webview, successor)
+			h.drain()
+			helpers.assert_true(h.retained[successor])
+			successor:user_close()
+			helpers.assert_eq(h.terminals, { false, false })
+			helpers.assert_eq(h.settled, 2)
+			helpers.assert_nil(next(h.retained))
+		end)
+	end)
+
 end)
