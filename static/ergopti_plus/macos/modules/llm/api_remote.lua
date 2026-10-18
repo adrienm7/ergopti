@@ -1956,7 +1956,7 @@ local _req_counter = 0
 --- structure unchanged.
 local function post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
                                         temperature, max_tokens, num_predictions, is_batch,
-                                        on_success, on_fail, dedup_stats, on_raw)
+                                        on_success, on_fail, dedup_stats, on_raw, current)
 	local provider = M.PROVIDERS[entry.provider]
 	local my_identity = _identity_generation
 	local identity_entry = find_active_entry()
@@ -2147,10 +2147,10 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 		post_backboard_message(_infer_client, base, entry.token or "",
 			{ model = model, system = final_sys or "", text = user_prompt },
 			on_response,
-			function(_, detail)
+			function(reason, detail)
 				if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail) end
-			end)
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail or reason) end
+			end, current)
 		return
 	end
 
@@ -2176,6 +2176,9 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 	Logger.debug(LOG, "[%s] #%d POST -> %s (provider=%s, %d chars prompt)",
 		model, req_id, redact_url(url), provider.format, #(user_prompt or ""))
 
+	if not request_authorized("Raw text", current, function(reason)
+		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason) end
+	end) then return end
 	_infer_client.post(url, headers, encoded, on_response)
 end
 
@@ -2184,7 +2187,7 @@ end
 --- Keychain can delay/fail one request without freezing keyboard processing.
 local function post_and_parse(model_name, system_prompt, full_text, tail_text,
                                temperature, max_tokens, num_predictions, is_batch,
-                               on_success, on_fail, dedup_stats, on_raw)
+                               on_success, on_fail, dedup_stats, on_raw, current)
 	M.resolve_active_entry(function(resolved, entry)
 		if resolved ~= true or not entry then
 			if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
@@ -2192,7 +2195,7 @@ local function post_and_parse(model_name, system_prompt, full_text, tail_text,
 		end
 		post_and_parse_resolved(entry, model_name, system_prompt, full_text, tail_text,
 			temperature, max_tokens, num_predictions, is_batch,
-			on_success, on_fail, dedup_stats, on_raw)
+			on_success, on_fail, dedup_stats, on_raw, current)
 	end)
 end
 
@@ -2207,13 +2210,17 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Called on a credential, transport, HTTP or empty-answer failure.
---- @param _options table|nil { chat = true } as for api_ollama.request_raw: a remote
----        request is always a chat turn, so there is nothing to change.
+--- @param options table|nil { chat = true, current = function|nil }; a remote request
+---        is always a chat turn. current retains action authority through Keychain.
 function M.request_raw(model_name, system_prompt, full_text, tail_text, temperature, max_tokens, on_raw, on_fail,
-                       _options)
+                       options)
 	if type(on_raw) ~= "function" then error("api_remote.request_raw: on_raw must be a function") end
+	assert(options == nil or type(options) == "table", "api_remote.request_raw: options must be a table or nil")
+	local current
+	if options ~= nil then current = options.current end
+	assert(current == nil or type(current) == "function", "api_remote.request_raw: current must be a function or nil")
 	post_and_parse(model_name, system_prompt, full_text, tail_text,
-		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw)
+		temperature, max_tokens, 1, false, nil, on_fail, ApiCommon.new_dedup_stats(), on_raw, current)
 end
 
 --- Finds the API entry a vision request to a provider runs with: the active

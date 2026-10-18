@@ -14,8 +14,8 @@ local M = {}
 
 --- Builds a real FIFO pipeline with separately controlled timers and delivery.
 --- @return table world
-function M.build(configure)
-	local world = Fixture.build_world("Hello", "fr")
+function M.build(configure, options)
+	local world = Fixture.build_world("Hello", "fr", options)
 	local classification_timers = hs.timer.__timers
 	local quartz = Quartz.make({ deliver_trigger = false })
 	for key, value in pairs(quartz.hs_overrides) do
@@ -122,9 +122,9 @@ end
 
 --- Runs a complete native FIFO scenario with exact module and hs restoration.
 --- @param scenario function Receives the native FIFO world.
-function M.with_world(scenario, configure)
+function M.with_world(scenario, configure, options)
 	return require("tests.support.modules.llm.selection_translation_scope").run(function()
-		return scenario(M.build(configure))
+		return scenario(M.build(configure, options))
 	end)
 end
 

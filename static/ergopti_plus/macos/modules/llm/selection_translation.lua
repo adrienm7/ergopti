@@ -246,10 +246,14 @@ local function request_translation(generation, language, selection, parent, focu
 	end
 	local function on_fail(detail)
 		if not is_current(generation, "answer") then return end
+		if detail == "cancelled" then
+			engine.close_answer_surface(session)
+			return
+		end
 		fail("the model gave no answer (" .. tostring(detail) .. ")")
 	end
 	local sent = engine.request_chat_answer(LABEL, Translate.system_prompt(config, language),
-		Translate.user_text(config, selection), config.max_tokens, on_raw, on_fail)
+		Translate.user_text(config, selection), config.max_tokens, on_raw, on_fail, continuation_current.current)
 	if not sent then
 		fail("the request could not be sent")
 		return
