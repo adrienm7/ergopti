@@ -43,10 +43,21 @@ int ergopti_vhd_report_socket_matches(int descriptor, const struct ergopti_vhd_r
   return now.cookie == original->cookie && now.device == original->device && now.inode == original->inode ? 0 : ESTALE;
 }
 
-#if __has_include(<sys/codesign.h>) && __has_include(<kern/cs_blobs.h>)
 // A process can retain its mapped text vnode after unlink; CS_VALID is sampled anew on every negative cleanup cut.
+#if __has_include(<sys/codesign.h>) && __has_include(<kern/cs_blobs.h>)
 #include <sys/codesign.h>
-#include <sys/proc.h>
+#else
+// The public macOS SDK omits these XNU declarations, yet libSystem exports the
+// csops system call. Compiling the supplier out made every shipped build refuse
+// its own image. These are the fixed kernel ABI values from xnu
+// bsd/sys/codesign.h and osfmk/kern/cs_blobs.h; the kernel still answers.
+int csops(pid_t pid, unsigned int ops, void *useraddr, size_t usersize);
+#define CS_OPS_STATUS 0
+#define CS_OPS_CDHASH 5
+#define CS_VALID 0x00000001u
+#define CS_KILLED 0x01000000u
+#define CS_CDHASH_LEN 20
+#endif
 _Static_assert(CS_CDHASH_LEN == 20, "Unsupported kernel CDHash length");
 static int report_self_image(struct ergopti_vhd_report_self_image *output) {
   if (!output) return EINVAL;
@@ -84,17 +95,6 @@ int ergopti_vhd_report_self_image_matches(const struct ergopti_vhd_report_self_i
   return observed.pid == original->pid && observed.seconds == original->seconds && observed.microseconds == original->microseconds
     && !memcmp(observed.cdhash, original->cdhash, CS_CDHASH_LEN) ? 0 : ESTALE;
 }
-#else
-// A missing authentic SDK declaration is an unavailable supplier, never a synthetic image grant.
-int ergopti_vhd_report_self_image_capture(struct ergopti_vhd_report_self_image *output) {
-  if (output) memset(output, 0, sizeof(*output));
-  return ENOTSUP;
-}
-int ergopti_vhd_report_self_image_matches(const struct ergopti_vhd_report_self_image *original) {
-  (void)original;
-  return ENOTSUP;
-}
-#endif
 
 // Same guarded kernel peer observation as the authenticated original supplier; no publication purpose.
 int ergopti_vhd_report_channel_peer(int descriptor, ergopti_vhd_report_peer_identity* out) {
