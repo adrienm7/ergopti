@@ -7,7 +7,7 @@
 --- macOS suite writes into while running.
 ---
 --- ROOT CAUSE ENCODED — A DOCUMENTED ASSUMPTION THAT WAS NEVER TRUE:
---- tests/unit/adapters/test_toml_cache.lua states outright that
+--- tests/unit/adapters/storage/test_toml_cache.lua states outright that
 --- "scratch_test_dir is gitignored and absent in CI", and other tests (such as
 --- test_jsonl_survives_sqlite_open_failure.lua) write into it on that basis.
 --- The repository .gitignore listed

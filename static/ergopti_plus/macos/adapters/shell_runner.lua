@@ -651,7 +651,7 @@ local OSASCRIPT_BIN = "/usr/bin/osascript"
 ---
 --- `pcall` is deliberately not used: it returns the error and discards it, which
 --- is the swallowing pattern `wrapped_on_done` was fixed for and that
---- `tests/unit/adapters/test_shell_runner_on_done_visible.lua` pins against. These
+--- `tests/unit/adapters/processes/test_shell_runner_on_done_visible.lua` pins against. These
 --- callbacks run from an hs.task completion, where a bare throw is invisible.
 --- @param label string Identifies the call site in the log line.
 --- @param fn function|nil The callback. Nothing happens when it is absent.
