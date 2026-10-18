@@ -413,7 +413,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":"","future":{"retained":true}}],"active_id":"","future":{"kept":true}}]]
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
 			local changes, stages, result, active, after, mode = 0, 0
-			local backend_calls = 0
+			local backend_calls, errors = 0, 0
 			local ok, failure = pcall(function()
 				package.loaded["modules.llm.api_remote"] = {
 					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
@@ -433,7 +433,8 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 				end
 				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
 					{ get_backend = function() return "api" end,
-						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end }, {},
+						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end },
+					{ error = function() errors = errors + 1 end },
 					function() changes = changes + 1 end, function() return {} end)
 				result = exact(rows, "cerebras/qwen").action()
 				active = owner.active()
@@ -450,6 +451,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			helpers.assert_eq(stages, 1)
 			helpers.assert_eq(changes, refused and 0 or 1)
 			helpers.assert_eq(result, not refused)
+			helpers.assert_eq(errors, refused and 1 or 0, "only a refused private selection reports an error")
 			helpers.assert_nil(staging, "the real writer retires its staging file")
 			local retained = require("json").decode(after)
 			helpers.assert_eq(retained.future.kept, true)
