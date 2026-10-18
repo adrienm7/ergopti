@@ -1,0 +1,690 @@
+--- tests/unit/modules/hotstrings/menu/test_category_submenu_opening_row.lua
+
+--- ==============================================================================
+--- MODULE: Category Submenus
+--- DESCRIPTION:
+--- What a hotstring category looks like in the tray, and what its rows do.
+---
+--- WHY THIS IS ROUGHLY FOUR FIFTHS OF THE MENU:
+--- On the other two drivers a category is a submenu: a gate, a way to open its
+--- file, and a checkbox per section with the number of entries behind it. On
+--- Linux it was ONE line showing the file's own stem with a tick — so the
+--- sections, the counts, the localised name and the file were all unreachable,
+--- and the menu's category half was the part that did not exist rather than the
+--- part that was untranslated.
+---
+--- WHAT THE COUNTS ARE FOR:
+--- A section with three entries and one with nine hundred are the same row
+--- without them, and the second is the one a user disables when autocorrection
+--- fights them.
+---
+--- WHY DISABLED AND NOT HIDDEN:
+--- Sections under a switched-off category are greyed. A row that disappears
+--- reads as a bug, and the user still needs to see what they get back when they
+--- switch the category on.
+--- ==============================================================================
+
+package.loaded["tests.support.modules.hotstrings.menu.category_submenu_fixture"] = nil
+local Fixture = require("tests.support.modules.hotstrings.menu.category_submenu_fixture")
+local helpers, fake_config, rolls_row, with_file_command =
+	Fixture.helpers, Fixture.fake_config, Fixture.rolls_row, Fixture.with_file_command
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 1/ The category row itself ==============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("category submenu: the row that opens it", function()
+
+	helpers.it("shows the localised name, not the file stem", function()
+		local row = rolls_row((fake_config({})))
+		helpers.assert_true(row ~= nil, "the category must appear in the menu at all")
+		helpers.assert_true(row.title:find("Rolls", 1, true) ~= nil
+			or row.title:find("Roulements", 1, true) ~= nil,
+			"the packs carry a description in 21 locales and the menu printed the "
+				.. "stem — 'distancesreduction' rather than 'Réduction des distances', "
+				.. "in every language; got: " .. tostring(row.title))
+	end)
+
+	helpers.it("shows how many hotstrings it holds", function()
+		local row = rolls_row((fake_config({})))
+		helpers.assert_true(row.title:find("15", 1, true) ~= nil,
+			"a category is chosen by size as much as by name; got: " .. tostring(row.title))
+	end)
+
+	helpers.it("reflects its enabled state as a checkmark", function()
+		helpers.assert_eq(rolls_row((fake_config({ enabled = true }))).checked, true, "on")
+		helpers.assert_eq(rolls_row((fake_config({ enabled = false }))).checked, false, "off")
+	end)
+
+	helpers.it("is a submenu, not a single toggle", function()
+		local row = rolls_row((fake_config({})))
+		helpers.assert_true(#row.menu >= 4,
+			"a gate, a file, the bulk rows and one row per section; a single line "
+				.. "cannot express any of it")
+	end)
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 2/ What the rows inside do ==============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("category submenu: its rows", function()
+
+	for _, enabled in ipairs({ true, false }) do
+		helpers.it("offers the explicit category scope command " .. tostring(enabled), function()
+			local config, log = fake_config({})
+			local row = rolls_row(config)
+			local i18n = require("infra.i18n")
+			helpers.assert_eq(row.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
+			helpers.assert_eq(row.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
+			helpers.assert_nil(row.menu[enabled and 1 or 2].checked)
+			row.menu[enabled and 1 or 2].fn()
+			helpers.assert_eq(log.bulk, { "rolls=" .. tostring(enabled) },
+				"one click selects only the category the user opened")
+			helpers.assert_eq(log.toggled, {}, "the previous gate toggle cannot run as a second mutation")
+		end)
+	end
+
+	for _, enabled in ipairs({ true, false }) do
+		for _, outcome in ipairs({ "true", "false", "nil", "throw" }) do
+			helpers.it("category command reports owner outcome " .. outcome .. " for " .. tostring(enabled), function()
+				local config = fake_config({})
+				local requested = {}
+				config.set_category_scope_enabled = function(ids, on)
+					requested[#requested + 1] = { ids = ids, enabled = on }
+					if outcome == "throw" then error("category owner fixture refused") end
+					if outcome == "nil" then return nil end
+					return outcome == "true"
+				end
+				local execute, modal = os.execute, require("ui.modal")
+				local run, asked, modals = modal.run, {}, 0
+				modal.run = function(callback) modals = modals + 1; return callback() end
+				local called, result = pcall(function()
+					local row = rolls_row(config)
+					os.execute = function(command)
+						if command:find("zenity", 1, true) then asked[#asked + 1] = command; return 0 end
+						return execute(command)
+					end
+					return row.menu[enabled and 1 or 2].fn()
+				end)
+				os.execute, modal.run = execute, run
+				helpers.assert_true(called, "a category click contains a throwing owner: " .. tostring(result))
+				helpers.assert_eq(requested, { { ids = { "rolls" }, enabled = enabled } })
+				helpers.assert_eq(result, outcome == "true", "only exact true acknowledges the owner")
+				local notices = outcome == "true" and 0 or 1
+				helpers.assert_eq(#asked, notices, "each refused transaction surfaces one visible failure")
+				helpers.assert_eq(modals, notices, "the failure dialog uses the keyboard-release boundary")
+				if notices > 0 then
+					helpers.assert_true(asked[1]:find("--error", 1, true) ~= nil)
+					helpers.assert_true(asked[1]:find("--text=" .. require("adapters.shell_runner").quote(
+						require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil, "the refusal is localized")
+				end
+			end)
+		end
+	end
+
+	helpers.it("offers the category's own file, at the path the loader resolved", function()
+		local config = fake_config({})
+		local opened = {}
+		local row = rolls_row(config, { on_open_file = function(p) opened[#opened + 1] = p end })
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" and item.title:lower():find("open") then item.fn() end
+			if type(item.title) == "string" and item.title:lower():find("ouvrir") then item.fn() end
+		end
+		helpers.assert_eq(opened, { "/home/u/.config/ergopti/hotstrings/rolls.toml" },
+			"finding a pack by hand means knowing whether it came from the bundle or "
+				.. "the user's own directory, which is exactly what the loader resolved")
+	end)
+
+	helpers.it("lists every section with its entry count", function()
+		local row = rolls_row((fake_config({})))
+		local titles = {}
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" then titles[#titles + 1] = item.title end
+		end
+		local joined = table.concat(titles, " | ")
+		helpers.assert_true(joined:find("hc (12)", 1, true) ~= nil,
+			"the section and how many entries it holds: " .. joined)
+		helpers.assert_true(joined:find("sx (3)", 1, true) ~= nil,
+			"and the next one: " .. joined)
+	end)
+
+	helpers.it("lists the sections in the order the file declares", function()
+		local row = rolls_row((fake_config({})))
+		local hc_at, sx_at
+		for i, item in ipairs(row.menu) do
+			if type(item.title) == "string" then
+				if item.title:find("hc (", 1, true) then hc_at = i end
+				if item.title:find("sx (", 1, true) then sx_at = i end
+			end
+		end
+		helpers.assert_true(hc_at ~= nil and sx_at ~= nil and hc_at < sx_at,
+			"sections_order groups related rolls together; sorting them alphabetically "
+				.. "would scatter them")
+	end)
+
+	helpers.it("toggles the section the user clicked", function()
+		local config, log = fake_config({})
+		local row = rolls_row(config)
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" and item.title:find("sx (", 1, true) then item.fn() end
+		end
+		helpers.assert_eq(log.sections, { "rolls.sx" },
+			"named, so a menu with two sections cannot toggle the wrong one")
+	end)
+
+	helpers.it("checks a section that is on and unchecks one that is off", function()
+		local row = rolls_row((fake_config({ sections_enabled = { hc = true, sx = false } })))
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" and item.title:find("hc (", 1, true) then
+				helpers.assert_eq(item.checked, true, "hc is on")
+			end
+			if type(item.title) == "string" and item.title:find("sx (", 1, true) then
+				helpers.assert_eq(item.checked, false, "and sx is off")
+			end
+		end
+	end)
+
+
+end)
+
+
+
+
+-- =================================================================
+-- =================================================================
+-- ======= 3/ A switched-off category ==============================
+-- =================================================================
+-- =================================================================
+
+helpers.describe("category submenu: when the category is off", function()
+
+	helpers.it("greys its sections rather than hiding them", function()
+		local row = rolls_row((fake_config({ enabled = false })))
+		local seen = 0
+		for _, item in ipairs(row.menu) do
+			-- A section row is "<name> (<count>)" and nothing else. Matched by shape
+			-- rather than by " (" so the gate row — whose localised label ends in a
+			-- parenthesised hint — is not mistaken for one.
+			if type(item.title) == "string" and item.title:match("^%S+ %(%d+%)$") then
+				seen = seen + 1
+				helpers.assert_eq(item.disabled, true,
+					"a row that disappears reads as a bug, and the user still needs to "
+						.. "see what they get back when they switch the category on")
+			end
+		end
+		helpers.assert_true(seen >= 2, "both sections must still be listed; saw " .. seen)
+	end)
+
+	helpers.it("leaves the gate itself clickable", function()
+		local config, log = fake_config({ enabled = false })
+		local row = rolls_row(config)
+		helpers.assert_true(not row.menu[1].disabled,
+			"greying the gate too would make a disabled category impossible to "
+				.. "re-enable from the menu that disabled it")
+		row.menu[1].fn()
+		helpers.assert_eq(log.bulk, { "rolls=true" }, "and it must still act")
+	end)
+
+end)
+
+
+
+
+helpers.describe("personal category scope parity", function()
+	for _, enabled in ipairs({ true, false }) do
+		for _, posture in ipairs({ true, false }) do
+			helpers.it("personal command " .. tostring(enabled) .. " behind gate " .. tostring(posture), function()
+				local config, log = fake_config({ enabled = posture })
+				local category = config.get_category("rolls")
+				category.id, category.path = "personal", "/user/hotstrings/personal.toml"
+				category.description, category.extension = { en = "Personal fixture", fr = "Personal fixture" }, nil
+				config.get_groups = function() return { "personal" } end
+				config.get_category = function(id) if id == "personal" then return category end end
+				config.is_group_enabled = function(id) return id == "personal" and posture end
+				local mb = helpers.load_module("ui.menu.menu_builder")
+				local captured = nil
+				local function find(rows)
+					for _, row in ipairs(rows or {}) do
+						if type(row.title) == "string" and row.title:find("Personal fixture", 1, true) then
+							captured = row
+						end
+						find(row.menu)
+					end
+				end
+				find(mb.build({ config = config, _version = "9.9.9", paused = false }))
+				helpers.assert_true(captured ~= nil, "the actual personal provider must render its category")
+				local i18n = require("infra.i18n")
+				helpers.assert_eq(captured.menu[1].title, i18n.get("menu.hotstrings.scope_enable_all"))
+				helpers.assert_eq(captured.menu[2].title, i18n.get("menu.hotstrings.scope_disable_all"))
+				helpers.assert_nil(captured.menu[enabled and 1 or 2].checked)
+				helpers.assert_eq(captured.menu[enabled and 1 or 2].fn(), true)
+				helpers.assert_eq(log.bulk, { "personal=" .. tostring(enabled) })
+				helpers.assert_eq(log.toggled, {}, "the independent engine/group toggles do not run")
+			end)
+		end
+	end
+end)
+
+
+
+
+helpers.describe("shared category file command", function()
+	helpers.it("shared category file: consumes the actual declared label", function()
+		with_file_command(function()
+			local row = rolls_row((fake_config({})), { on_open_file = function() return true end })
+			helpers.assert_eq(row.menu[3].title, "fixture.category.file.command")
+		end, true)
+	end)
+	for _, receipt in ipairs({ "true", "false", "nil" }) do
+		helpers.it("shared category file: keeps the captured source and opening receipt " .. receipt .. " while paused", function()
+			with_file_command(function()
+				local config = fake_config({ enabled = false })
+				local category = config.get_category("rolls")
+				config.get_category = function() return category end
+				local opened, saves = {}, 0
+				local row = rolls_row(config, {
+					is_paused = function() return true end,
+					save_prefs = function() saves = saves + 1 end,
+					on_open_file = function(path)
+						opened[#opened + 1] = path
+						if receipt == "nil" then return nil end
+						return receipt == "true"
+					end,
+				})
+				local command = row.menu[3]
+				helpers.assert_eq(command.title, "menu.hotstrings.open_file")
+				helpers.assert_true(command.disabled ~= true, "file configuration stays available under pause")
+				local original = category.path
+				category.path = "/foreign/replaced.toml"
+				local result = command.fn()
+				if receipt == "nil" then helpers.assert_nil(result)
+				else helpers.assert_eq(result, receipt == "true") end
+				helpers.assert_eq(opened, { original }, "the actual opening owner receives the loader's captured source")
+				helpers.assert_eq(saves, 0, "opening never enters a settings writer")
+			end)
+		end)
+	end
+	helpers.it("shared category file: refuses a held callback after its actual opening owner is withdrawn", function()
+		with_file_command(function()
+			local calls = 0
+			local ctx = { on_open_file = function() calls = calls + 1; return true end }
+			local mb = helpers.load_module("ui.menu.menu_builder")
+			ctx.config = fake_config({})
+			local function find(rows)
+				for _, row in ipairs(rows or {}) do
+					if row.title == "menu.hotstrings.open_file" then return row end
+					local child = find(row.menu)
+					if child then return child end
+				end
+			end
+			local command = find(mb.build(ctx))
+			helpers.assert_true(command ~= nil)
+			ctx.on_open_file = nil
+			helpers.assert_eq(command.fn(), false)
+			helpers.assert_eq(calls, 0)
+			local disabled = find(mb.build(ctx))
+			helpers.assert_eq(disabled.disabled, true)
+		end)
+	end)
+	helpers.it("shared category file: keeps absent category paths out of the native provider", function()
+		with_file_command(function()
+			local config = fake_config({})
+			local category = config.get_category("rolls")
+			category.path = nil
+			config.get_category = function() return category end
+			local row = rolls_row(config)
+			for _, item in ipairs(row.menu) do
+				helpers.assert_true(item.title ~= "menu.hotstrings.open_file")
+			end
+			helpers.assert_true(#row.menu > 2, "the remaining category and section commands still render")
+		end)
+	end)
+end)
+
+
+
+
+helpers.describe("category section callbacks: exact publication acknowledgement", function()
+	local function section_action(config)
+		local row = assert(rolls_row(config), "the actual category provider must remain visible")
+		for _, item in ipairs(row.menu) do
+			if type(item.title) == "string" and item.title:find("hc (", 1, true) then return item.fn end
+		end
+		error("the native hc section row was not rendered")
+	end
+	local function observe_click(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, result = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, result, notices, releases
+	end
+	for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("contains the section owner receipt " .. outcome, function()
+			local config, log = fake_config({})
+			local asked = {}
+			if outcome == "missing" then config.toggle_section = nil
+			else config.toggle_section = function(id, name)
+				asked[#asked + 1] = { id, name }
+				if outcome == "throw" then error("inert native section refusal") end
+				if outcome == "nil" then return nil end
+				if outcome == "number" then return 2 end
+				if outcome == "text" then return "true" end
+				return outcome == "true"
+			end end
+			local called, result, notices, releases = observe_click(section_action(config))
+			helpers.assert_true(called, "a section click contains a refused or throwing owner")
+			helpers.assert_eq(#notices, outcome == "true" and 0 or 1, "a refused owner has a visible failure instead of a silent click")
+			helpers.assert_eq(result, outcome == "true", "only the exact boolean true acknowledges publication")
+			helpers.assert_eq(asked, outcome == "missing" and {} or { { "rolls", "hc" } })
+			helpers.assert_eq(releases, #notices, "the visible refusal releases the keyboard before its modal")
+			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
+			if #notices > 0 then
+				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
+				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+			end
+		end)
+	end
+
+	local function with_real_section_owner(body)
+		local directory = os.tmpname()
+		assert(os.remove(directory))
+		directory = directory .. "-ergopti-section-ack"
+		local quote = require("adapters.shell_runner").quote
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local path = directory .. "/config.toml"
+		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
+			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
+		local fh = assert(io.open(path, "wb"));assert(fh:write(original));assert(fh:close())
+		local loaded = {}
+		for name, value in pairs(package.loaded) do loaded[name] = value end
+		local Terminators = require("modules.hotstrings.terminator_settings")
+		local catalogue = Terminators.snapshot()
+		local ok, err = pcall(function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			package.loaded["modules.hotstrings.loader"] = nil
+			local paths = {}
+			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			-- The private fixture has no external installed layout roots.
+			paths.extension_roots = function() return {} end
+			package.loaded["infra.paths"] = paths
+			local loader = require("modules.hotstrings.loader")
+			local native_find = loader.find_toml_files
+			package.loaded["modules.hotstrings.loader"] = {
+				find_toml_files = native_find, list_subdirs = function() return {} end,
+				read_file = function() return nil end,
+				load_catalogue = function()
+					return { committed = true, errors = 0, categories = {
+						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
+							description = { en = "Rolls", fr = "Roulements" },
+							extension = { id = "ergopti", name = "Ergopti" },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
+				end,
+			}
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local changed = 0
+			assert(config._set_config_file_for_test(path))
+			assert(config.init(engine, directory, function() changed = changed + 1 end))
+			local _, loaded = config.load_all();assert(loaded)
+			body({ config = config, engine = engine, path = path, original = original,
+				changed = function() return changed end })
+		end)
+		local restored = Terminators.restore_configuration(catalogue)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		assert(restored, "the exact delimiter catalogue is restored")
+		assert(removed == true, "the owned private fixture is retired")
+		if not ok then error(err, 0) end
+	end
+	local function read(path)
+		local fh = assert(io.open(path, "rb"));local data = fh:read("*a");assert(fh:close());return data
+	end
+	local function section_fires(engine)
+		engine:reset();engine:on_char("h");local result = engine:on_char("q")
+		return result ~= nil and result.replacement == "section-result"
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
+		helpers.it("reports a real canonical section publication refusal " .. outcome .. " without repainting", function()
+			with_real_section_owner(function(c)
+				helpers.assert_true(section_fires(c.engine), "the original actual engine mapping fires")
+				local action = section_action(c.config)
+				local rename, publications = os.rename, 0
+				os.rename = function(from, to)
+					if from == c.path .. ".tmp" and to == c.path then
+						publications = publications + 1
+						if outcome == "throw" then error("inert owned publication refusal") end
+						if outcome == "nil" then return nil, "inert owned publication refusal" end
+						if outcome == "number" then return 2 end
+						return false, "inert owned publication refusal"
+					end
+					return rename(from, to)
+				end
+				local called, result, notices, releases = observe_click(action)
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(publications, 1, "the actual conditional writer attempted its owned staging publication")
+				helpers.assert_eq(#notices, 1, "the actual refused publication is visible to the user")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(c.changed(), 0, "no success notification/repaint is published")
+				helpers.assert_eq(read(c.path), c.original, "every independent source byte survives the refused write")
+				helpers.assert_true(c.config.is_section_checked("rolls", "hc"))
+				helpers.assert_true(section_fires(c.engine), "the actual engine is compensated after failed persistence")
+				helpers.assert_eq(#notices, 1)
+				helpers.assert_eq(releases, 1)
+			end)
+		end)
+	end
+	helpers.it("acknowledges the real section publication and refreshes only after durable success", function()
+		with_real_section_owner(function(c)
+			local called, result, notices, releases = observe_click(section_action(c.config))
+			helpers.assert_true(called)
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(c.changed(), 1)
+			helpers.assert_true(c.config.refresh_choices(), "a real disk reload accepts the committed choice")
+			helpers.assert_eq(c.changed(), 2, "the separate reload owns its own publication notification")
+			helpers.assert_eq(c.config.is_section_checked("rolls", "hc"), false)
+			helpers.assert_eq(section_fires(c.engine), false)
+			local source = read(c.path)
+			helpers.assert_true(source:find('label = "kept"', 1, true) ~= nil)
+			helpers.assert_true(source:find('foreign = true', 1, true) ~= nil)
+			helpers.assert_eq(#notices, 0)
+			helpers.assert_eq(releases, 0)
+		end)
+	end)
+end)
+
+
+
+
+helpers.describe("extension-bound section callbacks: exact publication acknowledgement", function()
+	local function section_action(config)
+		local category = config.get_category("rolls")
+		category.extension = nil
+		category.sections.hc.extension = { id = "ergopti", name = "Ergopti" }
+		local getter = config.get_category
+		config.get_category = function(id) if id == "rolls" then return category end; return getter(id) end
+		local mb = helpers.load_module("ui.menu.menu_builder")
+		local label = string.format(require("infra.i18n").get("menu.extensions.hotstrings_of"), "Ergopti")
+		local found
+		local function find(rows)
+			for _, row in ipairs(rows or {}) do
+				if row.title == label then found = row end
+				if type(row.menu) == "table" then find(row.menu) end
+			end
+		end
+		find(mb.build({ config = config, _version = "9.9.9" }))
+		assert(found, "the actual owning extension submenu must be present")
+		for _, row in ipairs(found.menu or {}) do
+			if type(row.title) == "string" and row.title:find("hc (", 1, true) then return row.fn end
+		end
+		error("the extension provider did not draw the direct bound hc section")
+	end
+	local function observe_click(action)
+		local execute, modal = os.execute, require("ui.modal")
+		local run, notices, releases = modal.run, {}, 0
+		modal.run = function(callback) releases = releases + 1; return callback() end
+		os.execute = function(command)
+			if command:find("zenity", 1, true) then notices[#notices + 1] = command; return 0 end
+			return execute(command)
+		end
+		local called, result = pcall(action)
+		os.execute, modal.run = execute, run
+		return called, result, notices, releases
+	end
+	for _, outcome in ipairs({ "true", "false", "nil", "number", "text", "throw", "missing" }) do
+		helpers.it("contains the bound section owner receipt " .. outcome, function()
+			local config, log = fake_config({})
+			local asked = {}
+			if outcome == "missing" then config.toggle_section = nil
+			else config.toggle_section = function(id, name)
+				asked[#asked + 1] = { id, name }
+				if outcome == "throw" then error("inert native section refusal") end
+				if outcome == "nil" then return nil end
+				if outcome == "number" then return 2 end
+				if outcome == "text" then return "true" end
+				return outcome == "true"
+			end end
+			local called, result, notices, releases = observe_click(section_action(config))
+			helpers.assert_true(called, "a section click contains a refused or throwing owner")
+			helpers.assert_eq(#notices, outcome == "true" and 0 or 1, "a refused owner has a visible failure instead of a silent click")
+			helpers.assert_eq(result, outcome == "true", "only the exact boolean true acknowledges publication")
+			helpers.assert_eq(asked, outcome == "missing" and {} or { { "rolls", "hc" } })
+			helpers.assert_eq(releases, #notices, "the visible refusal releases the keyboard before its modal")
+			helpers.assert_eq(log.toggled, {}, "the category gate remains independently owned")
+			if #notices > 0 then
+				helpers.assert_true(notices[1]:find("--error", 1, true) ~= nil)
+				helpers.assert_true(notices[1]:find(require("adapters.shell_runner").quote(
+					require("infra.i18n").get("dialog.bulk_toggle.save_failed")), 1, true) ~= nil)
+			end
+		end)
+	end
+
+	local function with_real_section_owner(body)
+		local directory = os.tmpname()
+		assert(os.remove(directory))
+		directory = directory .. "-ergopti-section-ack"
+		local quote = require("adapters.shell_runner").quote
+		assert(require("adapters.shell_runner").run("mkdir -p " .. quote(directory)) == true)
+		local path = directory .. "/config.toml"
+		local original = '# independently written future preferences\n[hotstrings]\ngroups = { rolls = true, foreign = true }\n'
+			.. '[hotstrings.modules.rolls]\nhc = true\nsx = false\n[future]\nlabel = "kept"\n'
+		local fh = assert(io.open(path, "wb"));assert(fh:write(original));assert(fh:close())
+		local loaded = {}
+		for name, value in pairs(package.loaded) do loaded[name] = value end
+		local Terminators = require("modules.hotstrings.terminator_settings")
+		local catalogue = Terminators.snapshot()
+		local ok, err = pcall(function()
+			package.loaded["modules.hotstrings.hotstrings_config"] = nil
+			package.loaded["modules.hotstrings.loader"] = nil
+			local paths = {}
+			for key, value in pairs(require("infra.paths")) do paths[key] = value end
+			-- The private fixture has no external installed layout roots.
+			paths.extension_roots = function() return {} end
+			package.loaded["infra.paths"] = paths
+			local loader = require("modules.hotstrings.loader")
+			local native_find = loader.find_toml_files
+			package.loaded["modules.hotstrings.loader"] = {
+				find_toml_files = native_find, list_subdirs = function() return {} end,
+				read_file = function() return nil end,
+				load_catalogue = function()
+					return { committed = true, errors = 0, categories = {
+						rolls = { id = "rolls", path = directory .. "/rolls.toml", count = 1,
+							description = { en = "Rolls", fr = "Roulements" },
+							extension = { id = "ergopti", name = "Ergopti" },
+							sections_order = { "hc", "sx" }, sections = { hc = { count = 1 }, sx = { count = 0 } } },
+					}, mappings = { { trigger = "hq", replacement = "section-result", group = "rolls", section = "hc", auto_expand = true } } }
+				end,
+			}
+			local config, engine = require("modules.hotstrings.hotstrings_config"), require("hotstring_engine").new()
+			local changed = 0
+			assert(config._set_config_file_for_test(path))
+			assert(config.init(engine, directory, function() changed = changed + 1 end))
+			local _, loaded = config.load_all();assert(loaded)
+			body({ config = config, engine = engine, path = path, original = original,
+				changed = function() return changed end })
+		end)
+		local restored = Terminators.restore_configuration(catalogue)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		local removed = require("adapters.shell_runner").run("rm -rf " .. quote(directory))
+		assert(restored, "the exact delimiter catalogue is restored")
+		assert(removed == true, "the owned private fixture is retired")
+		if not ok then error(err, 0) end
+	end
+	local function read(path)
+		local fh = assert(io.open(path, "rb"));local data = fh:read("*a");assert(fh:close());return data
+	end
+	local function section_fires(engine)
+		engine:reset();engine:on_char("h");local result = engine:on_char("q")
+		return result ~= nil and result.replacement == "section-result"
+	end
+	for _, outcome in ipairs({ "false", "nil", "number", "throw" }) do
+		helpers.it("reports a real bound canonical section publication refusal " .. outcome .. " without repainting", function()
+			with_real_section_owner(function(c)
+				helpers.assert_true(section_fires(c.engine), "the original actual engine mapping fires")
+				local action = section_action(c.config)
+				local rename, publications = os.rename, 0
+				os.rename = function(from, to)
+					if from == c.path .. ".tmp" and to == c.path then
+						publications = publications + 1
+						if outcome == "throw" then error("inert owned publication refusal") end
+						if outcome == "nil" then return nil, "inert owned publication refusal" end
+						if outcome == "number" then return 2 end
+						return false, "inert owned publication refusal"
+					end
+					return rename(from, to)
+				end
+				local called, result, notices, releases = observe_click(action)
+				os.rename = rename
+				helpers.assert_true(called)
+				helpers.assert_eq(publications, 1, "the actual conditional writer attempted its owned staging publication")
+				helpers.assert_eq(#notices, 1, "the actual refused publication is visible to the user")
+				helpers.assert_eq(result, false)
+				helpers.assert_eq(c.changed(), 0, "no success notification/repaint is published")
+				helpers.assert_eq(read(c.path), c.original, "every independent source byte survives the refused write")
+				helpers.assert_true(c.config.is_section_checked("rolls", "hc"))
+				helpers.assert_true(section_fires(c.engine), "the actual engine is compensated after failed persistence")
+				helpers.assert_eq(#notices, 1)
+				helpers.assert_eq(releases, 1)
+			end)
+		end)
+	end
+	helpers.it("acknowledges the real bound section publication and refreshes only after durable success", function()
+		with_real_section_owner(function(c)
+			local called, result, notices, releases = observe_click(section_action(c.config))
+			helpers.assert_true(called)
+			helpers.assert_eq(result, true)
+			helpers.assert_eq(c.changed(), 1)
+			helpers.assert_true(c.config.refresh_choices(), "a real disk reload accepts the committed choice")
+			helpers.assert_eq(c.changed(), 2, "the separate reload owns its own publication notification")
+			helpers.assert_eq(c.config.is_section_checked("rolls", "hc"), false)
+			helpers.assert_eq(section_fires(c.engine), false)
+			local source = read(c.path)
+			helpers.assert_true(source:find('label = "kept"', 1, true) ~= nil)
+			helpers.assert_true(source:find('foreign = true', 1, true) ~= nil)
+			helpers.assert_eq(#notices, 0)
+			helpers.assert_eq(releases, 0)
+		end)
+	end)
+end)
+

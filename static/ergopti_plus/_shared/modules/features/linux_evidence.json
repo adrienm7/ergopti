@@ -96,7 +96,7 @@
 				"static/ergopti_plus/linux/infra/shortcuts_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_script_chords.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_shortcuts_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_shortcuts_scope_terminal_shortcut.lua"
 			]
 		},
 		"dynamic_master": {
@@ -363,7 +363,7 @@
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
 		"simultaneous_chord_settings": {
@@ -381,7 +381,7 @@
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		}
 	},
@@ -550,7 +550,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_trigger_now.lua"
 			]
 		},
@@ -840,7 +840,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_magic_editor_policy.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
 			]
 		},

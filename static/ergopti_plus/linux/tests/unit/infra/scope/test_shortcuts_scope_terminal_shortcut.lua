@@ -1,0 +1,570 @@
+--- tests/unit/infra/scope/test_shortcuts_scope_terminal_shortcut.lua
+
+--- Exercises the actual shortcut readers, dispatchers and parameter owner.
+
+package.loaded["tests.support.infra.scope.shortcuts_scope_fixture"] = nil
+local Fixture = require("tests.support.infra.scope.shortcuts_scope_fixture")
+local helpers, declared_parent, Sandbox, Codec, Manifest, SOURCE, with_scope, SLOTS, CHORDS_SOURCE, CHORD_PARAMETER =
+	Fixture.helpers, Fixture.declared_parent, Fixture.Sandbox, Fixture.Codec, Fixture.Manifest, Fixture.SOURCE, Fixture.with_scope, Fixture.SLOTS, Fixture.CHORDS_SOURCE, Fixture.CHORD_PARAMETER
+
+
+
+
+helpers.describe("Linux terminal shortcut scope", function()
+	helpers.it("(magic-editor-scope) distinguishes durable personal None from scope removal and fences unproved sources", function()
+		with_scope(function(scope, owners, _, path)
+			local source = { generation = 1, status = "ready", candidates = {
+				{ code = "KeyJ", native_code = 36, identity = "evdev:36", text = "★", native_text = "j", direct = true, dead = false },
+			} }
+			package.loaded["modules.hotstrings.magic_key_source"] = {
+				editor_source = function() return source end, known_codes = function() return { KeyJ = true } end,
+			}
+			package.loaded["modules.hotstrings.magic_key"] = { get = function() return "★" end }
+			local function decision()
+				return owners.keyboard.magic_editor_decision({ master = owners.manager.is_enabled(), paused = false, inhibited = false })
+			end
+			helpers.assert_true(owners.manager.set_enabled(true))
+			helpers.assert_true(owners.keyboard.set_action("super_j", "none"))
+			owners.keyboard._reset()
+			helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).shortcuts.keyboard.super_j, "none", "explicit None is durable personal ownership")
+			helpers.assert_eq(decision().reason, "explicit_assignment", "restart cannot turn personal native behavior into the conditional default")
+			helpers.assert_true(scope.apply("clear"))
+			local cleared = Codec.decode(Sandbox.read_bytes(path))
+			helpers.assert_eq(cleared.shortcuts.keyboard.super_j, nil, "scope removal restores actual absence")
+			helpers.assert_eq(cleared.shortcuts.keyboard.future_physical, "future_action", "unknown keyboard neighbors stay intact")
+			helpers.assert_eq(cleared.unrelated.keep, 42)
+			helpers.assert_eq(decision().active, false, "Clear keeps the shared logical slot and master disabled")
+			helpers.assert_true(owners.keyboard.set_action("magic_editor", "open_hotstrings_editor"))
+			helpers.assert_true(owners.manager.set_enabled(true))
+			helpers.assert_true(decision().active, "owned reactivation uses an acknowledged current source after physical intent removal")
+			source.status, source.candidates, source.generation = "unavailable", {}, 2
+			helpers.assert_eq(decision().reason, "source_unavailable", "removing a claim never invents native source admission")
+		end, '[shortcuts]\nenabled = true\n[shortcuts.keyboard]\nfuture_physical = "future_action"\n[unrelated]\nkeep = 42\n')
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("applies " .. mode .. " through the real owners and preserves other domains", function()
+			with_scope(function(scope, owners, controls, path, backup)
+				helpers.assert_true(scope.apply(mode))
+				helpers.assert_eq(Sandbox.read_bytes(backup), SOURCE)
+				local config = Codec.decode(Sandbox.read_bytes(path))
+				helpers.assert_eq(owners.manager.is_enabled(), mode == "recommended")
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "none")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), mode == "clear" and "none"
+					or Manifest.recommended_for("shortcuts.tap_keys.number_row_left"))
+				helpers.assert_eq(owners.url.get_url(), Manifest.default_for("shortcuts.chatgpt_url"))
+				helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "")
+				helpers.assert_eq(owners.gestures.get_action_parameter("tap_key__number_row_left", "send_text"), "")
+				helpers.assert_eq(config.gesture_parameters.keyboard__ctrl_j__open_url, nil)
+				helpers.assert_eq(config.linux.action_parameters.keyboard__ctrl_k__open_url, nil)
+				helpers.assert_eq(config.gesture_parameters.tap_3__open_url, "https://gesture.example")
+				helpers.assert_eq(config.gesture_parameters.tap_hold__caps_lock__open_url, "https://hold.example")
+				helpers.assert_eq(config.gesture_parameters.unknown, "keep")
+				helpers.assert_eq(config.linux.action_parameters.unknown, "keep")
+				helpers.assert_eq(config.shortcuts.keyboard.foreign_slot, "keep")
+				helpers.assert_eq(config.shortcuts.tap_keys.unknown, "keep")
+				helpers.assert_eq(config.shortcuts.unknown, "keep")
+				helpers.assert_eq(config.metrics.enabled, true)
+				helpers.assert_eq(config.llm.enabled, true)
+				helpers.assert_eq(config.other.value, 42)
+				helpers.assert_eq(owners.gestures.get_action("tap_3"), "enter")
+				helpers.assert_eq(controls.device_calls, 0, "shortcut parameters must never operate evdev")
+				owners.manager.init({ persist = true, config_path = path })
+				owners.keyboard._reset()
+				owners.taps._reset()
+				helpers.assert_eq(owners.manager.is_enabled(), mode == "recommended")
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "none")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), mode == "clear" and "none" or Manifest.recommended_for("shortcuts.tap_keys.number_row_left"))
+			end)
+		end)
+	end
+
+	helpers.it("cancels queued script work and keeps Ctrl+G native after Clear", function()
+		with_scope(function(scope, owners, controls)
+			local options = { defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end }
+			helpers.assert_true(owners.keyboard.consume({ key = "p", mods = { ctrl = true } }, options))
+			helpers.assert_true(scope.apply("clear"))
+			controls.queued[1]()
+			helpers.assert_eq(#controls.executed, 0)
+			helpers.assert_eq(owners.keyboard.dispatch({ key = "g", mods = { ctrl = true } },
+				{ only_script = not owners.manager.is_enabled() }), false)
+			helpers.assert_eq(#controls.executed, 0)
+		end)
+	end)
+
+	helpers.it("clears an outdated owned value instead of refusing (config-outdated-shortcuts)", function()
+		-- An old-shape or retired slot value is outdated configuration: the
+		-- reset that would remove it must never be refused because of it.
+		with_scope(function(scope, owners, controls, path)
+			local malformed = SOURCE:gsub('ctrl_j = "open_url"', 'ctrl_j = false')
+			Sandbox.write_bytes(path, malformed)
+			helpers.assert_eq(scope.apply("clear"), true)
+			helpers.assert_true(not Sandbox.read_bytes(path):find("ctrl_j = false", 1, true),
+				"the clear removes the outdated value")
+			helpers.assert_eq(#controls.backups, 1)
+			helpers.assert_true(owners.manager.configuration_admitted())
+		end)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("retains obsolete keyboard and tap parents and refuses " .. mode
+			.. " collisions (config-outdated-shortcut-shape)", function()
+			-- Ordinary scope reset cannot replace an obsolete parent. Clear's
+			-- explicit magic-editor None also differs from neutral absence.
+			local stale = '[shortcuts]\nenabled = true\nkeyboard = "x"\ntap_keys = "y"\n'
+			with_scope(function(scope, owners, controls, path)
+				local assignments, parameters = owners.keyboard.get_assignments(), owners.gestures.get_all_action_parameters()
+				local actions = {}
+				for _, slot in ipairs(owners.chords.slots()) do actions[slot.id] = owners.chords.get_action(slot.id) end
+				local enabled, wrap = owners.manager.is_enabled(), owners.manager.is_wrap_on_type_enabled()
+				local chords, url = owners.chords.chords_enabled(), owners.url.get_url()
+				local ok, candidate = pcall(owners.keyboard.configuration_candidate, Codec.decode(stale))
+				helpers.assert_true(ok, tostring(candidate), "obsolete source remains readable")
+				helpers.assert_eq(scope.apply(mode), false)
+				helpers.assert_eq(Sandbox.read_bytes(path), stale, "the entire source stays intact until explicit cleanup")
+				helpers.assert_eq(#controls.backups, 0)
+				helpers.assert_eq(controls.device_calls, 0)
+				helpers.assert_eq(controls.runtime_calls, 0)
+				helpers.assert_eq(owners.keyboard.get_assignments(), assignments)
+				helpers.assert_eq(owners.gestures.get_all_action_parameters(), parameters)
+				helpers.assert_eq(owners.manager.is_enabled(), enabled)
+				helpers.assert_eq(owners.manager.is_wrap_on_type_enabled(), wrap)
+				helpers.assert_eq(owners.chords.chords_enabled(), chords)
+				helpers.assert_eq(owners.url.get_url(), url)
+				for id, action in pairs(actions) do helpers.assert_eq(owners.chords.get_action(id), action) end
+				helpers.assert_eq(owners.keyboard.get_action("magic_editor"), "open_hotstrings_editor")
+				helpers.assert_eq(owners.taps.get_action("number_row_left"), "none")
+				helpers.assert_true(owners.manager.configuration_admitted())
+				helpers.assert_eq(scope.pending(), false)
+			end, stale)
+		end)
+	end
+
+	helpers.it("refuses a reset whose own written action is unassignable (config-outdated-strict-candidate)", function()
+		-- Tolerance is for the user's pre-write values. After the write every
+		-- walked slot is the scope's own output, so an unassignable one there is
+		-- a real failure: the reset must be refused and compensated, never
+		-- committed with the slot silently unbound.
+		with_scope(function(scope, owners, _, path)
+			local refused = Manifest.recommended_for("shortcuts.keyboard.ctrl_g")
+			helpers.assert_true(refused ~= "none", "the fixture needs a recommended keyboard action")
+			local is_assignable = owners.gestures.is_assignable
+			owners.gestures.is_assignable = function(action)
+				if action == refused then return false end
+				return is_assignable(action)
+			end
+			local ok, committed = pcall(scope.apply, "recommended")
+			owners.gestures.is_assignable = is_assignable
+			helpers.assert_true(ok, tostring(committed))
+			helpers.assert_eq(committed, false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE, "the refused reset is compensated")
+		end)
+	end)
+
+	helpers.it("refuses a reserved backup before changing runtime", function()
+		with_scope(function(scope, owners, _, path, backup)
+			Sandbox.write_bytes(backup, "reserved")
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(Sandbox.read_bytes(backup), "reserved")
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_true(owners.manager.configuration_admitted())
+		end)
+	end)
+
+	helpers.it("compensates an owner refusal after that owner has already changed", function()
+		with_scope(function(scope, owners, controls, path)
+			controls.refuse_runtime = true
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+			helpers.assert_eq(owners.taps.get_action("number_row_left"), "send_text")
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(controls.runtime_calls, 2, "candidate and compensation must both reach the real owner")
+			helpers.assert_eq(#controls.backups, 1)
+		end)
+	end)
+
+	helpers.it("compensates conditional publication refusal and preserves exact source", function()
+		with_scope(function(scope, owners, controls, path)
+			controls.refuse = path
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+			helpers.assert_eq(owners.keyboard.get_action("ctrl_k"), "enter")
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_eq(controls.runtime_calls, 2)
+			helpers.assert_eq(#controls.backups, 1)
+		end)
+	end)
+
+	helpers.it("preserves an external edit while restoring the old runtime", function()
+		with_scope(function(scope, owners, controls, path)
+			local external = SOURCE .. "external = 9\n"
+			controls.before_publish = function(target) if target == path then Sandbox.write_bytes(path, external) end end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), external)
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+		end)
+	end)
+
+	helpers.it("retains refused compensation and fences every participating setter until retry", function()
+		with_scope(function(scope, owners, controls, path)
+			controls.refuse = path
+			controls.before_publish = function(target) if target == path then controls.refuse_restore = true end end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_true(scope.pending())
+			helpers.assert_eq(owners.manager.set_enabled(true), false)
+			helpers.assert_eq(owners.manager.set_wrap_on_type_enabled(false), false)
+			helpers.assert_eq(owners.keyboard.set_action("ctrl_j", "enter"), false)
+			helpers.assert_eq(owners.taps.set_action("number_row_left", "enter"), false)
+			helpers.assert_eq(owners.url.set_url("https://new.example"), false)
+			helpers.assert_eq(owners.url.open(), false)
+			helpers.assert_eq(owners.gestures.set_action_parameter("keyboard__ctrl_j", "open_url", "https://new.example"), false)
+			helpers.assert_eq(owners.gestures.apply_scope("clear"), false)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			controls.refuse_restore, controls.before_publish, controls.refuse = false, nil, nil
+			helpers.assert_true(scope.retry_restore())
+			helpers.assert_eq(scope.pending(), false)
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+			helpers.assert_true(owners.keyboard.set_action("ctrl_j", "enter"))
+		end)
+	end)
+
+
+	helpers.it("refuses a pause raised after backup and releases all owners", function()
+		with_scope(function(scope, owners, controls, path)
+			controls.before_publish = function(target) if target ~= path then controls.paused = true end end
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_eq(#controls.backups, 1)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_true(owners.manager.is_enabled())
+			helpers.assert_true(owners.manager.configuration_admitted())
+		end)
+	end)
+
+	helpers.it("fences real dispatch and competing mutations during the publication window", function()
+		with_scope(function(scope, owners, controls, path)
+			local observed = false
+			controls.before_publish = function(target)
+				if target == path then return end
+				observed = true
+				helpers.assert_eq(owners.keyboard.dispatch({ key = "p", mods = { ctrl = true } }), false)
+				helpers.assert_eq(owners.taps.on_key("number_row_left"), false)
+				helpers.assert_eq(owners.manager.select_word(), false)
+				helpers.assert_eq(owners.manager.toggle_caps_word(), false)
+				helpers.assert_eq(owners.manager.set_enabled(false), false)
+				helpers.assert_eq(owners.gestures.set_action("tap_3", "none"), false)
+				helpers.assert_eq(owners.url.open(), false)
+			end
+			helpers.assert_true(scope.apply("clear"))
+			helpers.assert_true(observed)
+			helpers.assert_eq(#controls.executed, 0)
+		end)
+	end)
+
+	helpers.it("releases earlier acquisitions when the parameter owner is already held", function()
+		with_scope(function(scope, owners, controls, path)
+			local other = {}
+			helpers.assert_true(owners.gestures.acquire_parameter_configuration(other))
+			helpers.assert_eq(scope.apply("clear"), false)
+			helpers.assert_true(owners.manager.configuration_admitted())
+			helpers.assert_eq(#controls.backups, 0)
+			helpers.assert_eq(Sandbox.read_bytes(path), SOURCE)
+			helpers.assert_true(owners.gestures.release_parameter_configuration(other))
+		end)
+	end)
+
+	helpers.it("uses live transaction admission in the daemon's actual wrap getter", function()
+		local file = assert(io.open("ergopti_hotstrings.lua", "r"))
+		local source = file:read("*a")
+		file:close()
+		local block = assert(source:match('local wrap_on_type = require%("modules.shortcuts.wrap_on_type"%).new%({(.-)get_pair%s*='))
+		local getter = assert(block:match("is_active%s*=%s*(function%(%).-end),"))
+		local admitted = true
+		local factory = assert((loadstring or load)("return function(shortcuts, script_actions, secure_focus_guard) return " .. getter .. " end"))()
+		local active = factory({ is_enabled = function() return true end, is_wrap_on_type_enabled = function() return true end,
+			configuration_admitted = function() return admitted end }, { is_paused = function() return false end },
+			{ blocks_text = function() return false end })
+		helpers.assert_true(active())
+		admitted = false
+		helpers.assert_eq(active(), false)
+		admitted = true
+		helpers.assert_true(active())
+	end)
+
+	-- The declared rows of the first group, not injected ones: the switch, the
+	-- restore, the clear, a separator. Neither scope row asks (the maintainer
+	-- retired the clear's question on 2026-09-30); a pause refuses the owner.
+	for _, mode in ipairs({ "clear", "recommended", "paused" }) do
+		helpers.it("routes the actual rendered " .. mode .. " request to the public terminal", function()
+			with_scope(function(_, owners, controls, path)
+				local renderer = require("infra.manifest_menu")
+				local root = renderer.get_root()
+				local top, execute = root.top_level, os.execute
+				local selected = mode == "recommended" and "recommended" or "clear"
+				local i18n = require("infra.i18n")
+				local changed, questions = 0, 0
+				local passed, err = pcall(function()
+					root.top_level = declared_parent(top, "shortcuts")
+					os.execute = function(command)
+						if command:find("zenity", 1, true) then
+							questions = questions + 1
+							return 0
+						end
+						return execute(command)
+					end
+					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+						is_paused = function() return controls.paused end,
+						on_menu_changed = function() changed = changed + 1 end })
+					local submenu
+					for _, item in ipairs(menu) do
+						if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
+					end
+					helpers.assert_true(type(submenu) == "table", "the real Shortcuts submenu must exist")
+					helpers.assert_eq(table.concat({ submenu[1].title, submenu[2].title, submenu[3].title,
+						submenu[4].title }, " | "), table.concat({ i18n.get("menu.shortcuts.enable"),
+						i18n.get("common.restore_recommended"), i18n.get("common.clear_to_system"), "-" }, " | "))
+					local action = (selected == "clear" and submenu[3] or submenu[2]).fn
+					helpers.assert_eq(type(action), "function")
+					if mode == "paused" then controls.paused = true end
+					action()
+					local expected = mode ~= "paused"
+					helpers.assert_eq(changed, expected and 1 or 0)
+					helpers.assert_eq(questions, 0, "no scope row asks (restore-recommended-no-confirm)")
+					helpers.assert_eq(owners.manager.is_enabled(), mode ~= "clear")
+					if not expected then helpers.assert_eq(Sandbox.read_bytes(path), SOURCE) end
+				end)
+				root.top_level, os.execute = top, execute
+				if not passed then error(err, 0) end
+			end)
+		end)
+	end
+end)
+
+
+
+
+-- shortcuts-restore-row: the row is the manifest's own declaration now, not
+-- one this suite injects. It runs the recommended scope without a question.
+helpers.describe("Linux Shortcuts restore row", function()
+	helpers.it("the declared Shortcuts restore row restores the recommended scope without a question", function()
+		with_scope(function(_, owners, controls, path)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top, execute = root.top_level, os.execute
+			local changed, questions = 0, 0
+			local passed, err = pcall(function()
+				root.top_level = declared_parent(top, "shortcuts")
+				os.execute = function(command)
+					if command:find("command -v zenity", 1, true) then return 0 end
+					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					return execute(command)
+				end
+				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					is_paused = function() return controls.paused end,
+					on_menu_changed = function() changed = changed + 1 end })
+				local i18n = require("infra.i18n")
+				local action
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.shortcuts.title") then
+						for _, row in ipairs(item.menu or {}) do
+							if row.title == i18n.get("common.restore_recommended") then action = row.fn end
+						end
+					end
+				end
+				helpers.assert_eq(type(action), "function", "the Shortcuts submenu draws the declared restore row")
+				owners.manager.set_enabled(false)
+				action()
+				helpers.assert_eq(questions, 0, "restoring the recommended values asks nothing")
+				helpers.assert_eq(changed, 1)
+				helpers.assert_eq(owners.manager.is_enabled(), Manifest.recommended_for("shortcuts.enabled"))
+				helpers.assert_eq(Codec.decode(Sandbox.read_bytes(path)).other.value, 42)
+			end)
+			root.top_level, os.execute = top, execute
+			if not passed then error(err, 0) end
+		end)
+	end)
+end)
+
+
+
+
+-- The maintainer's request of 2026-09-30: « Taper un symbole encadre la
+-- sélection » (no AltGr: the symbols need not be there) and « Symboles
+-- encadrants » form one group, with no separator between them.
+helpers.describe("Linux Shortcuts wrap group", function()
+	helpers.it("draws the wrap toggle by its behaviour, followed by its symbols", function()
+		with_scope(function(_, owners, controls)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top = root.top_level
+			local passed, err = pcall(function()
+				root.top_level = declared_parent(top, "shortcuts")
+				local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+					is_paused = function() return controls.paused end })
+				local i18n = require("infra.i18n")
+				local submenu
+				for _, item in ipairs(menu) do
+					if item.title == i18n.get("menu.shortcuts.title") then submenu = item.menu end
+				end
+				helpers.assert_true(type(submenu) == "table", "the real Shortcuts submenu must exist")
+				local at
+				for index, row in ipairs(submenu) do
+					if row.title == i18n.get("shortcuts.label_wrap_text") then at = index end
+				end
+				helpers.assert_true(at ~= nil, "the wrap toggle is drawn with its label")
+				helpers.assert_eq(submenu[at + 1].title, i18n.get("menu.shortcuts.wrap_symbols"),
+					"the wrapping symbols follow the toggle with no separator between them")
+				helpers.assert_true(not i18n.get("shortcuts.label_wrap_text"):find("AltGr", 1, true))
+			end)
+			root.top_level = top
+			if not passed then error(err, 0) end
+		end)
+	end)
+end)
+
+
+
+
+helpers.describe("Linux terminal shortcut scope revert", function()
+	helpers.it("reverts a committed clear under the same dispatch ownership", function()
+		with_scope(function(scope, owners, _, path, backup)
+			local before = Sandbox.read_bytes(path)
+			helpers.assert_true(scope.apply("clear"))
+			helpers.assert_eq(owners.manager.is_enabled(), false)
+			local reverted, detail = scope.revert()
+			helpers.assert_eq(reverted, true, detail)
+			helpers.assert_eq(Sandbox.read_bytes(path), before)
+			helpers.assert_eq(owners.manager.is_enabled(), true)
+			helpers.assert_eq(scope.pending(), false)
+			os.remove(backup)
+			helpers.assert_true(scope.apply("clear"), "every dispatch port is released after a revert")
+		end)
+	end)
+end)
+
+
+
+
+helpers.describe("Linux script chords in the Shortcuts scope", function()
+	helpers.it("script-chord: the Shortcuts clear writes the four chords off and leaves them to the application", function()
+		with_scope(function(scope, owners, _, path)
+			helpers.assert_true(scope.apply("clear"))
+			local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control
+			for _, slot in ipairs(SLOTS) do
+				helpers.assert_eq(saved[slot], "none", slot .. " is written off, since absence is the preset")
+				helpers.assert_eq(owners.chords.get_action(slot), "none")
+			end
+			helpers.assert_eq(owners.chords.on_key({ code = 28, mods = { altgr = true } }), false,
+				"AltGr + Enter reaches the application after a clear")
+		end)
+	end)
+
+	helpers.it("script-chord: the Shortcuts restore brings the four presets and the switch back", function()
+		with_scope(function(scope, owners, _, path)
+			helpers.assert_eq(owners.chords.chords_enabled(), false)
+			helpers.assert_true(scope.apply("recommended"))
+			local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control or {}
+			for _, slot in ipairs(SLOTS) do
+				helpers.assert_eq(saved[slot], nil, slot .. " back on its preset is a deletion")
+				helpers.assert_eq(owners.chords.get_action(slot), Manifest.recommended_for("shortcuts.script_control." .. slot))
+			end
+			helpers.assert_eq(saved.chords_enabled, nil)
+			helpers.assert_eq(owners.chords.chords_enabled(), true)
+		end, CHORDS_SOURCE)
+	end)
+
+	for _, mode in ipairs({ "clear", "recommended" }) do
+		helpers.it("script-chord: the submenu's " .. mode .. " touches the chords and nothing else", function()
+			with_scope(function(_, owners, controls, path, backup)
+				Sandbox.write_bytes(path, Sandbox.read_bytes(path):gsub("%[gesture_parameters%]\n",
+					"[gesture_parameters]\n" .. CHORD_PARAMETER .. ' = "https://script.example"\n', 1))
+				-- Model the daemon reload of the newly persisted parameter before
+				-- the scope requires agreement with that exact canonical frame.
+				owners.gestures.init({ persist = true, config_path = path, enabled = false })
+				owners.chords._reset()
+				owners.chords.init({ is_paused = function() return controls.paused end,
+					defer = function(callback) controls.queued[#controls.queued + 1] = callback; return true end })
+				local narrowed = require("infra.shortcuts_scope").new({ path = path, backup_path = backup .. ".chords",
+					files = controls.files, is_paused = function() return controls.paused end, only = "script_chords" })
+				helpers.assert_true(narrowed.apply(mode))
+				local config = Codec.decode(Sandbox.read_bytes(path))
+				local chords = config.shortcuts.script_control or {}
+				for _, slot in ipairs(SLOTS) do
+					helpers.assert_eq(chords[slot], mode == "clear" and "none" or nil, slot)
+				end
+				helpers.assert_eq(owners.chords.chords_enabled(), true)
+				helpers.assert_eq(config.gesture_parameters[CHORD_PARAMETER], nil, "the chords' parameters go with them")
+				helpers.assert_eq(config.shortcuts.keyboard.ctrl_j, "open_url", "the keyboard slots are untouched")
+				helpers.assert_eq(config.shortcuts.tap_keys.number_row_left, "send_text", "the tap keys are untouched")
+				helpers.assert_eq(config.shortcuts.enabled, true)
+				helpers.assert_eq(config.gesture_parameters.keyboard__ctrl_j__open_url, "https://old.example")
+				helpers.assert_eq(owners.gestures.get_action_parameter("keyboard__ctrl_j", "open_url"), "https://old.example")
+				helpers.assert_eq(owners.keyboard.get_action("ctrl_j"), "open_url")
+				os.remove(backup .. ".chords")
+			end, CHORDS_SOURCE)
+		end)
+	end
+
+	helpers.it("script-chord: the tray draws the shared submenu, ticks it from the switch and asks nothing", function()
+		with_scope(function(_, owners, controls, path)
+			local renderer = require("infra.manifest_menu")
+			local root = renderer.get_root()
+			local top, execute = root.top_level, os.execute
+			local questions, changed = 0, 0
+			local passed, err = pcall(function()
+				root.top_level = declared_parent(top, "shortcuts")
+				os.execute = function(command)
+					if command:find("command -v zenity", 1, true) then return 0 end
+					if command:find("zenity --question", 1, true) then questions = questions + 1; return 1 end
+					return execute(command)
+				end
+				local i18n = require("infra.i18n")
+				local function group()
+					local menu = require("ui.menu.menu_builder").build({ shortcuts = owners.manager, paused = false,
+						is_paused = function() return controls.paused end,
+						on_menu_changed = function() changed = changed + 1 end })
+					for _, item in ipairs(menu) do
+						if item.title == i18n.get("menu.shortcuts.title") then
+							for _, row in ipairs(item.menu or {}) do
+								if row.title == i18n.get("menu.shortcuts.script_shortcuts") then return row end
+							end
+						end
+					end
+				end
+				local row = group()
+				helpers.assert_eq(type(row), "table", "the Shortcuts submenu draws « Raccourcis de gestion du script »")
+				helpers.assert_eq(row.checked, false, "the title mirrors the switch, off in this configuration")
+				local titles = {}
+				for _, sub in ipairs(row.menu) do titles[#titles + 1] = sub.title end
+				helpers.assert_eq(titles[1], i18n.get("menu.shortcuts.script_shortcuts_enable"))
+				helpers.assert_eq(titles[2], i18n.get("common.restore_recommended"))
+				helpers.assert_eq(titles[3], i18n.get("common.clear_to_system"))
+				helpers.assert_eq(titles[4], "-")
+				helpers.assert_eq(#titles, 8, "the switch, restore, clear, a separator and the four slots")
+				for index, slot in ipairs(SLOTS) do
+					helpers.assert_true(titles[4 + index]:find(i18n.get("sg_labels." .. slot), 1, true) == 1, titles[4 + index])
+				end
+				row.menu[1].fn()
+				helpers.assert_eq(owners.chords.chords_enabled(), true)
+				helpers.assert_eq(group().checked, true, "the title follows the switch")
+				row.menu[3].fn()
+				helpers.assert_eq(questions, 0, "the submenu's clear asks nothing")
+				local saved = Codec.decode(Sandbox.read_bytes(path)).shortcuts.script_control
+				for _, slot in ipairs(SLOTS) do helpers.assert_eq(saved[slot], "none", slot) end
+				group().menu[2].fn()
+				helpers.assert_eq(questions, 0, "the submenu's restore asks nothing")
+				helpers.assert_eq(owners.chords.get_action("script_altgr_escape"), "script_quit")
+				helpers.assert_eq(changed, 3)
+			end)
+			root.top_level, os.execute = top, execute
+			if not passed then error(err, 0) end
+		end, CHORDS_SOURCE)
+	end)
+end)
+
