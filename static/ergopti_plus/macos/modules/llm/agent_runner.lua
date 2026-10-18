@@ -618,13 +618,20 @@ local function run_agent(generation, source, text, focus, backend, learning)
 			if not request_current() then return end
 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
 			if not request_current() then return end
-			if session then engine.close_answer_surface(session) end
-			if not still_current() then return end
+			local consent_current = still_current
+			if session then
+				local closed_revision = engine.close_answer_surface(session)
+				if type(closed_revision) ~= "number" then return end
+				consent_current = function()
+					return still_current() and engine.current_request_revision() == closed_revision
+				end
+			end
+			if not consent_current() then return end
 			local Offer = require("modules.llm.local_model_offer")
 			if Offer.is_missing(reason, detail) then
 				-- Named, with its Download button, instead of the vague failure
 				Offer.offer(detail.model, { automatic = learning ~= nil,
-					current = learning == nil and still_current or nil })
+					current = learning == nil and consent_current or nil })
 				return
 			end
 			if not learning then show_notice("llm.agent.failed") end
