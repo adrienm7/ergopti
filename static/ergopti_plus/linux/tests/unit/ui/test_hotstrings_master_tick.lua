@@ -120,6 +120,8 @@ local function dyn_double(on)
 	function dyn.set_enabled(value) dyn.on = value; return true end
 	function dyn.active_count() return 0 end
 	function dyn.rule_families() return {} end
+	-- The programmable row reads the source problem when it is drawn.
+	function dyn.user_code_problem() return nil end
 	return dyn
 end
 

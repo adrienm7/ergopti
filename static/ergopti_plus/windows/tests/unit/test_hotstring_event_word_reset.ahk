@@ -329,6 +329,9 @@ _HEWR_TypingHoldsOnAltGrLayout() {
 }
 
 _HEWR_TypingHoldsAreNotTheTapHolds() {
+	AssertFalse(_TH_HoldMakesShortcuts("LShift"), "a Shift hold only types")
+	AssertFalse(_TH_HoldMakesShortcuts(["LShift", "RShift"]), "nor does a two-Shift hold")
+	AssertTrue(_TH_HoldMakesShortcuts(["LCtrl", "LShift"]), "a Ctrl+Shift hold makes shortcuts")
 	_HEWR_WithLayout("altgr", _HEWR_TypingHoldsOnAltGrLayout)
 }
 

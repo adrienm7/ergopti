@@ -104,19 +104,19 @@ function M.build(ports)
 					end },
 			} }
 	end
-	local open = command(ports.open)
+	local commands = {
+		open_user_hotstring_source = command(ports.open),
+		reload_user_hotstring_source = command(ports.reload),
+		create_user_hotstring_example = command(repair_with_example),
+	}
 	local rows = ports.manifest.build("programmable_hotstrings", "Hotstrings", nil, nil, {
 		feature_rows = feature_rows,
-		commands = {
-			open_user_hotstring_source = open,
-			reload_user_hotstring_source = command(ports.reload),
-			create_user_hotstring_example = command(repair_with_example),
-		},
+		commands = commands,
 	})
 	-- A missing source has nothing to open: the example row creates it.
 	if problem == "missing" then
 		for _, row in ipairs(rows) do
-			if row.fn == open then row.disabled = true end
+			if row.fn == commands.open_user_hotstring_source then row.disabled = true end
 		end
 	end
 	return rows

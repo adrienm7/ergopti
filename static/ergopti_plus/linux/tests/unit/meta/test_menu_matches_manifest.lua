@@ -403,6 +403,8 @@ local function full_context()
 			get_rules_count = function() return 0 end,
 			active_count    = function() return 0 end,
 			rule_families   = function() return {} end,
+			-- The programmable row reads the source problem when it is drawn.
+			user_code_problem = function() return nil end,
 			set_rule_enabled = noop,
 		},
 	}

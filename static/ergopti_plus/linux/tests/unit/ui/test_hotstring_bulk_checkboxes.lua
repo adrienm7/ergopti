@@ -80,6 +80,8 @@ local function fake_dyn(on, families_on)
 			}
 		end,
 		set_rule_enabled = function(section, value) log.rules[#log.rules + 1] = { section = section, on = value } end,
+		-- The programmable row reads the source problem when it is drawn.
+		user_code_problem = function() return nil end,
 	}, log
 end
 

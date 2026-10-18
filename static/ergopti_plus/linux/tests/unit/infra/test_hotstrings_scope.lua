@@ -160,6 +160,8 @@ local function with_scope(body, source)
 				return true
 			end,
 			get_rules_count = function() return 3 end,
+			-- The programmable row reads the source problem when it is drawn.
+			user_code_problem = function() return nil end,
 		}
 		context.preview_port = { set_enabled = function(name, value) context.preview[name] = value end }
 		context.Config, context.engine = Config, engine
