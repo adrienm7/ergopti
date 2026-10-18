@@ -1,26 +1,18 @@
-"""Portable owned-image/build admission controls; no native Swift or trust credit.
+"""Portable owned-image/build admission controls; no native Swift credit.
 
-Actual POSIX files, query children and existing main-handler signals are used.
-Native compiler/signing/Security responses are explicitly modeled. Import only
-through the owning receiving-facts suite's fixed helper path and exact selector.
+Actual POSIX files and aliases are used. Native compiler and signing responses
+are explicitly modeled. Import only through the owning receiving-facts suite's
+fixed helper path and exact selector.
 """
 
-import contextlib
 import hashlib
 import importlib.util
-import io
-import json
 import os
 import re
 from pathlib import Path
 import shutil
-import signal
-import ssl
-import subprocess
-import sys
 import tempfile
 import time
-from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -37,14 +29,6 @@ def load(name, path):
 
 
 B = load("portable_enrolled_fixture_builder", SOURCE)
-W = load("portable_enrolled_fixture_wire", SUPPORT / "native_http_wire_fixture.py")
-RECEIPT = {
-    "version": 1,
-    "export_status": 0,
-    "entry_count": 1,
-    "owned_status": 0,
-    "owned_present": 1,
-}
 RECEIVING = []
 
 
@@ -233,7 +217,6 @@ class BuilderControls(unittest.TestCase):
         self.assertTrue(self.build.root.exists())
         self.assertFalse(self.owner.closed)
         self.assertFalse(self.build.receipt_path.exists())
-        self.assertFalse(hasattr(self.owner, "trust_query_owner"))
 
     def test14SigningFailureDoesNotBindImage(self):
         original = self.owner._command
@@ -246,7 +229,6 @@ class BuilderControls(unittest.TestCase):
         self.owner._command = command
         with self.assertRaisesRegex(RuntimeError, "EXACT signing refusal"):
             self.qualified()
-        self.assertFalse(hasattr(self.owner, "trust_query_owner"))
         self.assertTrue(self.build.root.exists())
 
     def test15ExactAbsoluteDeadlineSharedByCompileAndSigning(self):
@@ -303,31 +285,6 @@ class BuilderControls(unittest.TestCase):
         self.assertTrue(old.exists())
         self.assertEqual(self.owner.calls, [])
 
-    def test20MandatoryOwnerRevalidationFailsBeforeOptionalQuery(self):
-        fixture = W.WireFixture.__new__(W.WireFixture)
-        fixture.trust_query_executable = Path("/NOT EXECUTED")
-        primary = B.BuildRefused("EXACT source/image refusal")
-        fixture.trust_query_owner = SimpleNamespace(verify=mock.Mock(side_effect=primary))
-        fixture._command = mock.Mock()
-        with self.assertRaises(B.BuildRefused) as got:
-            fixture._observe_admin_trust(time.monotonic() + 1)
-        self.assertIs(got.exception, primary)
-        fixture._command.assert_not_called()
-
-    def test21OwnedQueryCancellationIsNotOptional(self):
-        fixture = W.WireFixture.__new__(W.WireFixture)
-        fixture.trust_query_executable = Path("/NOT EXECUTED")
-        fixture.trust_query_owner = SimpleNamespace(verify=lambda: fixture.trust_query_executable)
-        fixture.ca = self.private / "fake.pem"
-        fixture.ca.write_text("PORTABLE CERTIFICATE INPUT")
-        fixture.command_fact = None
-        primary = W.FixtureFailure("Native fixture cancelled")
-        fixture._command = mock.Mock(side_effect=primary)
-        with mock.patch.object(W.ssl, "PEM_cert_to_DER_cert", return_value=b"PORTABLE DER"):
-            with self.assertRaises(W.FixtureFailure) as got:
-                fixture._observe_admin_trust(time.monotonic() + 1)
-        self.assertIs(got.exception, primary)
-
     def test23NativeProcessOwnerMissingRefusesBeforeCompilation(self):
         self.owner.groups = None
         with self.assertRaises(B.BuildRefused):
@@ -344,7 +301,6 @@ class BuilderControls(unittest.TestCase):
             with self.assertRaisesRegex(B.BuildRefused, "deadline exhausted"):
                 self.qualified()
         self.assertEqual(len(self.owner.calls), 2)
-        self.assertFalse(hasattr(self.owner, "trust_query_owner"))
 
     def test25StartupNeverExtendsExistingSigningCommandCap(self):
         deadline = time.monotonic() + 44
@@ -357,224 +313,6 @@ class BuilderControls(unittest.TestCase):
             self.assertLessEqual(kwargs["deadline"], after + 15)
             self.assertGreaterEqual(kwargs["deadline"], before + 15)
             self.assertLess(kwargs["deadline"], deadline)
-
-
-class PortableImageOwner:
-    """Actual POSIX image identity; explicitly NOT a signed native Swift image."""
-
-    def __init__(self, root):
-        self.path = root / "explicit-portable-owned-query-image"
-        self.path.write_bytes(b"EXPLICIT PORTABLE IMAGE BINDING")
-        self.identity = self.path.lstat()
-        self.sha = hashlib.sha256(self.path.read_bytes()).digest()
-        self.before = None
-
-    def verify(self):
-        if self.before:
-            self.before()
-        data, current = B.regular_bytes(self.path)
-        if (current.st_dev, current.st_ino) != (
-            self.identity.st_dev,
-            self.identity.st_ino,
-        ) or hashlib.sha256(data).digest() != self.sha:
-            raise B.BuildRefused("Exact portable owner image refusal")
-        return self.path
-
-
-class AdmissionControls(unittest.TestCase):
-    def setUp(self):
-        self.fixture = W.WireFixture(native=False)
-        self.addCleanup(self.fixture.close)
-        self.owner = PortableImageOwner(self.fixture.root)
-        self.fixture.trust_query_owner = self.owner
-        self.fixture.trust_query_executable = self.owner.path
-
-    def installed_handlers(self):
-        """Recover the actual existing main handler, without recreating its body."""
-        saved = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
-        captured = {}
-
-        class CapturedHandler(Exception):
-            pass
-
-        def stop(**kwargs):
-            captured.update({sig: signal.getsignal(sig) for sig in saved})
-            raise CapturedHandler()
-
-        try:
-            with (
-                mock.patch.object(W, "WireFixture", side_effect=stop),
-                mock.patch.object(W.sys, "argv", ["owned-wire-fixture"]),
-                contextlib.redirect_stdout(io.StringIO()),
-            ):
-                with self.assertRaises(CapturedHandler):
-                    W.main()
-        finally:
-            for sig, handler in saved.items():
-                signal.signal(sig, handler)
-        self.assertEqual(set(captured), set(saved))
-        self.assertTrue(all(callable(v) for v in captured.values()))
-        return captured
-
-    @contextlib.contextmanager
-    def physical_handler(self, signum, handler):
-        previous = signal.signal(signum, handler)
-        try:
-            yield
-        finally:
-            signal.signal(signum, previous)
-
-    def test01MandatoryOwnerRefusalNeverBecomesUnknownObservation(self):
-        primary = B.BuildRefused("Exact mandatory source refusal")
-        self.owner.before = mock.Mock(side_effect=primary)
-        self.fixture._command = mock.Mock()
-        for after in (False, True):
-            with self.subTest(after=after), contextlib.redirect_stdout(io.StringIO()) as output:
-                with self.assertRaises(B.BuildRefused) as got:
-                    self.fixture._observe_admin_trust(time.monotonic() + 2, after=after)
-                self.assertIs(got.exception, primary)
-                self.assertEqual(output.getvalue(), "")
-        self.fixture._command.assert_not_called()
-
-    def test02DifferentOwnedImagePathCannotSelectACallee(self):
-        self.owner.verify = lambda: self.owner.path.with_name("foreign-path")
-        self.fixture._command = mock.Mock()
-        with self.assertRaises(W.FixtureFailure):
-            self.fixture._observe_admin_trust(time.monotonic() + 2)
-        self.fixture._command.assert_not_called()
-
-    def test03ExactOwnedImageArgumentAndOwnedCertificateDER(self):
-        commands = []
-
-        def command(arguments, input_bytes=b"", **kwargs):
-            commands.append((arguments, input_bytes, kwargs))
-            return (0, json.dumps(RECEIPT).encode())
-
-        self.fixture._command = command
-        output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            self.fixture._observe_admin_trust(time.monotonic() + 2)
-        self.assertEqual(len(commands), 1)
-        arguments, der, kwargs = commands[0]
-        self.assertEqual(arguments, [str(self.owner.path), "--fixture-admin-trust-query"])
-        self.assertEqual(der, ssl.PEM_cert_to_DER_cert(self.fixture.ca.read_text()))
-        self.assertLessEqual(kwargs["deadline"], time.monotonic() + 2)
-        self.assertEqual(
-            json.loads(output.getvalue().removeprefix("# native_http_admin_trust ")),
-            {"observed": 1, **RECEIPT},
-        )
-
-    def test04OriginalSettledTechnicalFailureRemainsOptionalForEveryRole(self):
-        self.fixture._command = mock.Mock(side_effect=RuntimeError("Exact technical query refusal"))
-        self.fixture.command_fact = {"phase": "complete", "status": 1}
-        for after, after_install, prefix in [
-            (False, False, "# native_http_admin_trust "),
-            (True, False, "# native_http_admin_trust_after "),
-            (False, True, "# native_http_admin_trust_installed "),
-        ]:
-            output = io.StringIO()
-            with (
-                self.subTest(after=after, after_install=after_install),
-                contextlib.redirect_stdout(output),
-                contextlib.redirect_stderr(output),
-            ):
-                self.fixture._observe_admin_trust(
-                    time.monotonic() + 2, after=after, after_install=after_install
-                )
-            self.assertEqual(
-                json.loads(output.getvalue().removeprefix(prefix)), {"version": 1, "observed": 0}
-            )
-
-    def test05PhysicalSIGINTAndSIGTERMBeforeNewlyAdmittedQueriesRemainCancellation(self):
-        handlers = self.installed_handlers()
-        self.fixture._command = mock.Mock()
-        for after in (False, True):
-            for signum in (signal.SIGINT, signal.SIGTERM):
-                self.owner.before = lambda sig=signum: os.kill(os.getpid(), sig)
-                output = io.StringIO()
-                with (
-                    self.subTest(after=after, signum=signum),
-                    self.physical_handler(signum, handlers[signum]),
-                    contextlib.redirect_stdout(output),
-                    contextlib.redirect_stderr(output),
-                ):
-                    with self.assertRaises(W.FixtureFailure) as got:
-                        self.fixture._observe_admin_trust(time.monotonic() + 2, after=after)
-                    self.assertEqual(got.exception.args, ("Native fixture cancelled",))
-                    self.assertEqual(output.getvalue(), "")
-        self.fixture._command.assert_not_called()
-
-    def test06PhysicalSignalsAfterActualPortableQueryRetiresCannotBecomeUnknownSuccess(self):
-        handlers = self.installed_handlers()
-        original = self.fixture._command
-        real_popen = subprocess.Popen
-        children = []
-        received = []
-        body = (
-            "import sys,json,hashlib; data=sys.stdin.buffer.read(); sys.stdout.buffer.write(json.dumps("
-            + repr(RECEIPT)
-            + ").encode())"
-        )
-
-        def acquire(*args, **kwargs):
-            child = real_popen(*args, **kwargs)
-            child.output_capture = kwargs["stdout"]
-            child.error_capture = kwargs["stderr"]
-            children.append(child)
-            return child
-
-        for after in (False, True):
-            for signum in (signal.SIGINT, signal.SIGTERM):
-
-                def query(arguments, input_bytes=b"", **kwargs):
-                    received.append((arguments, input_bytes))
-                    result = original(
-                        [sys.executable, "-I", "-B", "-c", body], input_bytes, **kwargs
-                    )
-                    self.assertEqual(result, (0, json.dumps(RECEIPT).encode()))
-                    child = children[-1]
-                    self.assertEqual(child.returncode, 0)
-                    self.assertTrue(child.stdin.closed)
-                    self.assertTrue(child.output_capture.closed)
-                    self.assertTrue(child.error_capture.closed)
-                    os.kill(os.getpid(), signum)
-                    return result
-
-                output = io.StringIO()
-                with (
-                    self.subTest(after=after, signum=signum),
-                    self.physical_handler(signum, handlers[signum]),
-                    mock.patch.object(self.fixture, "_command", side_effect=query),
-                    mock.patch.object(W.subprocess, "Popen", side_effect=acquire),
-                    contextlib.redirect_stdout(output),
-                    contextlib.redirect_stderr(output),
-                ):
-                    with self.assertRaises(W.FixtureFailure) as got:
-                        self.fixture._observe_admin_trust(time.monotonic() + 2, after=after)
-                    self.assertEqual(got.exception.args, ("Native fixture cancelled",))
-                    self.assertEqual(output.getvalue(), "")
-        self.assertEqual(len(children), 4)
-        for arguments, der in received:
-            self.assertEqual(arguments, [str(self.owner.path), "--fixture-admin-trust-query"])
-            self.assertEqual(der, ssl.PEM_cert_to_DER_cert(self.fixture.ca.read_text()))
-
-    def test07MandatorySameInodeImageEditRefusesBeforeAnyQuery(self):
-        self.owner.path.write_bytes(b"FOREIGN SAME-INODE IMAGE")
-        self.fixture._command = mock.Mock()
-        with self.assertRaises(B.BuildRefused):
-            self.fixture._observe_admin_trust(time.monotonic() + 2)
-        self.fixture._command.assert_not_called()
-
-    def test08FixedPACRoleObservationNeverEntersJSONReplyPipe(self):
-        self.fixture.trust_query_output = sys.stderr
-        self.fixture._command = mock.Mock(return_value=(0, json.dumps(RECEIPT).encode()))
-        stdout, stderr = io.StringIO(), io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            self.fixture.trust_query_output = sys.stderr
-            self.fixture._observe_admin_trust(time.monotonic() + 2)
-            self.fixture._observe_admin_trust(time.monotonic() + 2, after=True)
-        self.assertEqual(stdout.getvalue(), "")
-        self.assertEqual(len(stderr.getvalue().splitlines()), 2)
 
 
 class AliasDuringReadControl(unittest.TestCase):
@@ -653,21 +391,9 @@ EXPECTED_TEST_IDENTITIES = {
         "test17FixedRoleRejectsArbitrarySelectorsNonfiniteAndRenewedBudgets",
         "test18SourceDirectoryAliasRefuses",
         "test19RootReplacementDoesNotRemoveForeignObject",
-        "test20MandatoryOwnerRevalidationFailsBeforeOptionalQuery",
-        "test21OwnedQueryCancellationIsNotOptional",
         "test23NativeProcessOwnerMissingRefusesBeforeCompilation",
         "test24ExpiredStartupIsNotRenewedBySigning",
         "test25StartupNeverExtendsExistingSigningCommandCap",
-    ),
-    "AdmissionControls": (
-        "test01MandatoryOwnerRefusalNeverBecomesUnknownObservation",
-        "test02DifferentOwnedImagePathCannotSelectACallee",
-        "test03ExactOwnedImageArgumentAndOwnedCertificateDER",
-        "test04OriginalSettledTechnicalFailureRemainsOptionalForEveryRole",
-        "test05PhysicalSIGINTAndSIGTERMBeforeNewlyAdmittedQueriesRemainCancellation",
-        "test06PhysicalSignalsAfterActualPortableQueryRetiresCannotBecomeUnknownSuccess",
-        "test07MandatorySameInodeImageEditRefusesBeforeAnyQuery",
-        "test08FixedPACRoleObservationNeverEntersJSONReplyPipe",
     ),
     "AliasDuringReadControl": (
         "test_owned_read_refuses_real_hardlink_added_after_descriptor_acquisition",
@@ -676,13 +402,13 @@ EXPECTED_TEST_IDENTITIES = {
 
 
 def enrolled_cases():
-    """Expose exactly24+8+1 controls; any census/identity drift refuses import."""
-    classes = (BuilderControls, AdmissionControls, AliasDuringReadControl)
+    """Expose exactly 22+1 controls; any census/identity drift refuses import."""
+    classes = (BuilderControls, AliasDuringReadControl)
     for case in classes:
         actual = tuple(unittest.defaultTestLoader.getTestCaseNames(case))
         expected = EXPECTED_TEST_IDENTITIES[case.__name__]
         if case.__module__ != __name__ or actual != expected:
             raise RuntimeError("Portable native fixture control identity refused")
-    if sum(len(EXPECTED_TEST_IDENTITIES[case.__name__]) for case in classes) != 33:
+    if sum(len(EXPECTED_TEST_IDENTITIES[case.__name__]) for case in classes) != 23:
         raise RuntimeError("Portable native fixture control census refused")
     return classes

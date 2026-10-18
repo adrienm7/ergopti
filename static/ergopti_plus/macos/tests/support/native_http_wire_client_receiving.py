@@ -539,8 +539,8 @@ class RealNativeClientReceiving(unittest.TestCase):
 
         if httpx.__version__ != "0.28.1" or huggingface_hub.__version__ != "1.13.0":
             raise RuntimeError("Native receiving requires the committed client dependency lock")
-        # This owner supplies native WNOWAIT/group retirement for compilation,
-        # signing and the fixture security commands too.
+        # This owner supplies native WNOWAIT/group retirement for compilation
+        # and signing too.
         cls.fixture = wire.WireFixture()
         cls.receiving_workers = []
         cls.root = None
@@ -556,7 +556,6 @@ class RealNativeClientReceiving(unittest.TestCase):
             prepare_native_clock_evidence(cls.build)
             cls.build.build()
             cls.clock_proof = receive_native_clock(cls.build, builder)
-            cls.fixture.authorization_observation = True
             cls.app = cls.build.app
             cls.resources = cls.build.resources
             native = cls.build.native
@@ -601,8 +600,6 @@ class RealNativeClientReceiving(unittest.TestCase):
             cls.fixture.closed is not True
             or cls.fixture.command_group_debt
             or cls.fixture.command_file_debt
-            or cls.fixture.trust_attempted
-            or cls.fixture.keychain_created
             or cls.fixture.receiving_facts()["active"]
         ):
             raise RuntimeError("Native fixture build root cleanup remains unsettled")
@@ -632,8 +629,6 @@ class RealNativeClientReceiving(unittest.TestCase):
                         {
                             "version": 1,
                             "closed": int(cls.fixture.closed),
-                            "trust_unsettled": int(cls.fixture.trust_attempted),
-                            "keychain_unsettled": int(cls.fixture.keychain_created),
                             "active": cls.fixture.receiving_facts()["active"],
                         },
                         sort_keys=True,
@@ -672,6 +667,10 @@ class RealNativeClientReceiving(unittest.TestCase):
         for key in self.managed.Policy.ProxyPolicy().system_lookup_environment_exclusions + (
             "no_proxy",
             "NO_PROXY",
+            # The untrusted refusal needs native default trust only; anchors
+            # are granted explicitly by the test that expects success.
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
         ):
             clean.pop(key, None)
         clean.update(self.environment)
@@ -818,7 +817,9 @@ class RealNativeClientReceiving(unittest.TestCase):
                 [{"event": "connect", "route": "first"}],
                 "A certificate refusal never advances to another PAC relay",
             )
-            self.fixture.trust(True)
+            # The signed worker inherits this environment: trust is the
+            # product's SSL_CERT_FILE anchor, never a system trust change.
+            os.environ.update(self.fixture.anchor_environment())
             for path, pac_url in [
                 ("/alpha?case=one", False),
                 ("/beta?case=two", True),
@@ -872,7 +873,7 @@ class RealNativeClientReceiving(unittest.TestCase):
         from huggingface_hub.utils import close_session, get_session
 
         before = len(self.fixture.stats()["records"])
-        self.fixture.trust(True)
+        os.environ.update(self.fixture.anchor_environment())
         self.managed.install_huggingface_transport()
         self.addCleanup(close_session)
         client = get_session()

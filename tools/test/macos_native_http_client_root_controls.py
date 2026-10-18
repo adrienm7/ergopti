@@ -38,8 +38,6 @@ class ModeledNativeOwner:
     native = True
     groups = object()
     closed = False
-    trust_attempted = False
-    keychain_created = False
 
     def __init__(self):
         self.command_group_debt = []
@@ -202,8 +200,6 @@ class CleanupOwner:
         self.closed = False
         self.command_group_debt = []
         self.command_file_debt = []
-        self.trust_attempted = False
-        self.keychain_created = False
         self.active = 0
         self.close_failure = None
         self.close_calls = 0
