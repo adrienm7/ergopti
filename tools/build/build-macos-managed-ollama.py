@@ -105,6 +105,18 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
             if text.count("d.client.Do(req)") != 2:
                 raise ValueError("The reviewed upstream download request seams changed")
             text = text.replace("d.client.Do(req)", "nativehttp.Do(d.client, req)")
+        if relative == "server/download.go":
+            # Upstream fetches each blob part with http.DefaultClient from the
+            # direct URL the registry named. Unwrapped, those requests ignored
+            # PAC, proxies and enterprise anchors and resolved the registry
+            # host directly, so a pull behind a PAC-only proxy failed there.
+            text = replace_once(
+                text,
+                "\t\tresp, err := http.DefaultClient.Do(req)\n",
+                "\t\tchunkClient := *http.DefaultClient\n"
+                "\t\tchunkClient.Transport = nativehttp.Wrap(chunkClient.Transport)\n"
+                "\t\tresp, err := nativehttp.Do(&chunkClient, req)\n",
+            )
         if relative == "server/routes.go":
             text = replace_once(
                 text,
