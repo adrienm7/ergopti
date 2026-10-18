@@ -92,7 +92,6 @@ return {
 	"tests.unit.infra.network.test_managed_http_queued_deadline",
 	"tests.unit.infra.network.test_network_proxy_policy_contract",
 	"tests.meta.architecture.test_curl_engine_scan",
-
 	"tests.unit.modules.gestures.programs.test_native_worker_owner",
 	"tests.unit.adapters.layout.test_physical_chord_source_currency",
 	"tests.unit.adapters.layout.test_number_row_native_levels_shared_typed_facts",
@@ -572,6 +571,7 @@ return {
 	"tests.unit.ui.menu.structure.test_menu_languages_and_global_separator",
 	"tests.unit.ui.menu.structure.test_menu_pause_greys_features",
 	"tests.unit.ui.menu.structure.test_metrics_widget_menu_parity",
+	"tests.unit.ui.menu.metrics.test_privacy_toggle_publication",
 	"tests.unit.ui.menu.hotstrings.test_personal_hotstring_frames",
 	"tests.unit.ui.menu.about.test_menu_uninstall",
 	"tests.unit.ui.onboarding.test_onboarding_startup",
