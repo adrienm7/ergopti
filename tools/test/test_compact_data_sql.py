@@ -257,6 +257,43 @@ class CompactionTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
         self.assertEqual([(1, payload)], read_rows(self.path))
 
+    def test_disposable_projection_policy_follows_durable_schema_defaults(self):
+        schema = SCHEMA.read_text(encoding="utf-8")
+        control_path = self.path.parent / "durable-schema-control.db"
+        with contextlib.closing(sqlite3.connect(str(control_path))) as conn:
+            conn.executescript(schema)
+            self.assertEqual("delete", conn.execute("PRAGMA journal_mode").fetchone()[0])
+            self.assertEqual(2, conn.execute("PRAGMA synchronous").fetchone()[0])
+
+        payload = "retained é漢\r\nCOMMIT;\n"
+        self.write(captured_batch(1, payload))
+        source = self.path.read_bytes()
+        load = OWNER.exec_large_file
+        observed = []
+
+        def observe_policy_then_load(conn, path):
+            observed.append(
+                (
+                    conn.execute("PRAGMA journal_mode").fetchone()[0],
+                    conn.execute("PRAGMA synchronous").fetchone()[0],
+                    conn.execute("SELECT COUNT(*) FROM events_hotstring").fetchone()[0],
+                )
+            )
+            load(conn, path)
+
+        with (
+            patch.object(OWNER, "exec_large_file", observe_policy_then_load),
+            contextlib.redirect_stdout(io.StringIO()),
+        ):
+            self.assertTrue(OWNER.compact_device(self.path, SCHEMA))
+        self.assertEqual(
+            [("off", 0, 0)], observed, "schema defaults cannot override the disposable DB policy"
+        )
+        self.assertEqual([(1, payload)], read_rows(self.path))
+        self.assertEqual(source, self.backup.read_bytes())
+        self.assertFalse((self.path.parent / "_compact_work.db").exists())
+        self.assertFalse(self.path.with_suffix(".compact.tmp").exists())
+
     def test_export_read_refusal_preserves_source_backup_and_owned_stage_cleanup(self):
         self.write(captured_batch(1, "retained"))
         source = self.path.read_bytes()
