@@ -222,6 +222,12 @@ local runtime_shutdown_ack = not prediction_engine
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
 		{
+			name = "tray action authority",
+			stop = function()
+				return not privacy_owners.menu_rebuild or privacy_owners.menu_rebuild.stop() == true
+			end,
+		},
+		{
 			name = "cursor-display window operations",
 			stop = function()
 				return not gestures or gestures.stop_window_switches() == true
@@ -2089,21 +2095,28 @@ local function main()
 			}
 		end
 
-		rebuild_tray_menu = function()
-			if shutdown.is_requested() then return end
-			local ctx = _build_menu_ctx()
-			local ok_build, items = pcall(menu_builder.build, ctx)
-			if not ok_build then
-				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
-				return
-			end
-			if shutdown.is_requested() then return end
-			tray_menu.setMenu(items)
-			if shutdown.is_requested() then return end
-			-- Every pause toggle rebuilds the menu, so the logo follows here.
-			if type(tray_menu.setPaused) == "function" then tray_menu.setPaused(ctx.paused == true) end
-		end
+		-- Refresh callbacks only revoke RAM authority. GTK publication runs once
+		-- after the keyboard pump, using the latest committed menu context.
+		privacy_owners.menu_rebuild = (function(builder, tray, context)
+			local build, publish, set_paused = builder.build, tray.setMenu, tray.setPaused
+			return require("ui.menu.rebuild_owner").new({
+				current = function()
+					return not shutdown.is_requested() and menu_builder == builder and tray_menu == tray
+						and builder.build == build and tray.setMenu == publish and tray.setPaused == set_paused
+				end,
+				build = function()
+					local ctx = context()
+					return build(ctx), ctx.paused == true
+				end,
+				publish = publish,
+				appearance = type(set_paused) == "function" and function(paused) return set_paused(paused) end or nil,
+				on_error = function(reason) Logger.error(LOG, "Tray menu refresh refused: %s.", reason) end,
+			})
+		end)(menu_builder, tray_menu, _build_menu_ctx)
+		rebuild_tray_menu = privacy_owners.menu_rebuild.request
 		rebuild_tray_menu()
+		privacy_owners.menu_rebuild.pump()
+
 		if not privacy_owners.startup_checkpoint() then return end
 		else
 			-- The degraded tray, shown when the menu builder is unavailable.
@@ -2691,6 +2704,10 @@ local function main()
 			if gestures and type(gestures.pump) == "function" then
 				local owner = gestures
 				RuntimeGuard.call("gesture pump", owner.pump, owner.stop_reading)
+			end
+			if privacy_owners.menu_rebuild then
+				local owner = privacy_owners.menu_rebuild
+				RuntimeGuard.call("tray menu rebuild", owner.pump, owner.stop)
 			end
 		end,
 		onPeriodic = on_periodic,
