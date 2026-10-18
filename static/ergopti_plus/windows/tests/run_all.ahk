@@ -225,7 +225,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../platform/remap/tap_hold_loader.ahk
 #Include ../platform/remap/tap_hold_writer.ahk
 ; The layer-file loader reads _shared/keymap and the physical-key registry at run
-; time; meta/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
+; time; meta/corpus/test_corpus_keymap_layers.ahk replays the cross-driver corpus through it.
 #Include ../platform/remap/layers_loader.ahk
 ; The navigation layer's hotkey table, built from layer files; registration is
 ; injectable, so unit/test_nav_layer_table.ahk drives it without a live hook.
@@ -389,7 +389,7 @@ InstallSendNoOps()
 #Include unit/test_adapter_compliance_new.ahk
 #Include unit/test_feature_io_locator.ahk
 #Include meta/test_feature_io_impl_no_global.ahk
-#Include meta/test_isset_no_property_arg.ahk
+#Include meta/suite/test_isset_no_property_arg.ahk
 #Include unit/test_adapter_contract_vectors.ahk
 #Include unit/test_clipboard_paste_transaction_ownership.ahk
 #Include unit/test_suppressive_inputhook_ownership.ahk
@@ -585,7 +585,7 @@ InstallSendNoOps()
 ; include paths are resolved relative to the tests/ directory.
 #Include unit/test_shortcuts.ahk
 #Include unit/test_keepawake_visible_cancellation.ahk
-#Include unit/test_runner_shard.ahk
+#Include unit/suite/test_runner_shard.ahk
 
 ; Metrics boolean preferences retain their existing transaction owner; ordinary
 ; chord syntax tests use the shared parser and registrar without binding hotkeys.
@@ -1141,13 +1141,13 @@ global _AhkSubDir := ""
 _LogBootProgress("keylogger modules + tests included")
 
 ; ── Meta tests (codebase hygiene, no production includes needed) ──
-#Include meta/test_ahk_brace_balance.ahk
-#Include meta/test_run_all_include_integrity.ahk
-#Include meta/test_runner_only_filter.ahk
-#Include meta/test_runner_failure_ergonomics.ahk
-#Include unit/test_qualification_parser_owner.ahk
-#Include meta/test_ahk_os_purity_ratchet.ahk
-#Include meta/test_ahk_os_purity_inputs.ahk
+#Include meta/suite/test_ahk_brace_balance.ahk
+#Include meta/suite/test_run_all_include_integrity.ahk
+#Include meta/suite/test_runner_only_filter.ahk
+#Include meta/suite/test_runner_failure_ergonomics.ahk
+#Include unit/suite/test_qualification_parser_owner.ahk
+#Include meta/suite/test_ahk_os_purity_ratchet.ahk
+#Include meta/suite/test_ahk_os_purity_inputs.ahk
 #Include meta/test_logger_pairing.ahk
 #Include meta/test_remote_generate_curl_dispatch.ahk
 #Include unit/test_network_dispatch_nonblocking.ahk
@@ -1165,7 +1165,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_remote_connect_timeout_bounded.ahk
 #Include meta/test_keylogger_json_64bit_decode.ahk
 #Include meta/test_crash_build_offthread.ahk
-#Include meta/test_assertions_are_case_sensitive.ahk
+#Include meta/suite/test_assertions_are_case_sensitive.ahk
 #Include meta/test_personal_hotstring_node_shape.ahk
 #Include meta/test_personal_hotstring_seed.ahk
 #Include meta/test_personal_hotstring_new_section_seed.ahk
@@ -1173,8 +1173,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_personal_toml_write_failure_logged.ahk
 #Include meta/test_hotstring_override_atomic_publish_20260813.ahk
 #Include meta/test_personal_section_label_disambiguation_wired.ahk
-#Include meta/test_no_duplicate_defaults.ahk
-#Include meta/test_require_state_pattern.ahk
+#Include meta/suite/test_no_duplicate_defaults.ahk
+#Include meta/suite/test_require_state_pattern.ahk
 #Include meta/test_keylogger_pause_guard.ahk
 #Include meta/test_changelog_http_timeout.ahk
 #Include meta/test_dpapi_decrypt_safe.ahk
@@ -1282,14 +1282,14 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_presented_record_single_source.ahk
 #Include meta/test_remote_poll_deadline.ahk
 #Include meta/test_download_integrity_guard.ahk
-#Include meta/test_no_coauthor_in_commits.ahk
+#Include meta/suite/test_no_coauthor_in_commits.ahk
 #Include meta/test_bundle_exclusions.ahk
 #Include meta/test_llm_menu_init_order.ahk
 #Include meta/test_llm_ensure_model_ready_guard.ahk
 #Include meta/test_boot_deferred_tasks.ahk
 #Include meta/test_boot_error_fatal_before_ready.ahk
 #Include meta/test_hotif_globals_boot_safe.ahk
-#Include meta/test_hotif_directive_lexical_boundaries.ahk
+#Include meta/suite/test_hotif_directive_lexical_boundaries.ahk
 #Include meta/test_error_net_prelogger_safe.ahk
 #Include meta/test_boot_paths_fail_soft.ahk
 #Include meta/test_wpm_widget_native_render.ahk
@@ -1376,34 +1376,34 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_metrics_disabled_when.ahk
 #Include unit/test_metrics_widget_menu_parity.ahk
 #Include meta/test_port_adapter_coverage.ahk
-#Include meta/test_no_class_global_conflict.ahk
+#Include meta/suite/test_no_class_global_conflict.ahk
 #Include meta/test_locale_json_valid.ahk
 #Include meta/test_wrap_symbols_gate.ahk
 #Include meta/test_wrap_symbols_catalogue.ahk
 #Include unit/test_wrap_symbols_global_transaction_20260813.ahk
 ; ── Cross-driver corpus consumers ──
-#Include meta/test_corpus_hotstrings.ahk
+#Include meta/corpus/test_corpus_hotstrings.ahk
 #Include meta/test_preview_matches_engine.ahk
 #Include meta/test_prefix_buffer_tracks_engine.ahk
 #Include meta/test_prefix_buffer_atomic_transitions_20260813.ahk
 #Include meta/test_nav_cluster_resets_both_buffers.ahk
 #Include meta/test_preview_never_wiped_alone.ahk
 #Include meta/test_preview_engine_single_owner.ahk
-#Include meta/test_corpus_dynamic_hotstrings_prefix.ahk
-#Include meta/test_corpus_hotstrings_config_resolve.ahk
-#Include meta/test_corpus_tap_hold.ahk
-#Include meta/test_corpus_keymap_layers.ahk
-#Include meta/test_corpus_hotstring_matcher.ahk
+#Include meta/corpus/test_corpus_dynamic_hotstrings_prefix.ahk
+#Include meta/corpus/test_corpus_hotstrings_config_resolve.ahk
+#Include meta/corpus/test_corpus_tap_hold.ahk
+#Include meta/corpus/test_corpus_keymap_layers.ahk
+#Include meta/corpus/test_corpus_hotstring_matcher.ahk
 ; LLM parser corpus -- tests LLM_ParseOllamaResponse and _LLMRemoteParseResponse
 ; against the shared cross-driver vectors (already included above via api_ollama/api_remote).
-#Include meta/test_corpus_llm_parser.ahk
+#Include meta/corpus/test_corpus_llm_parser.ahk
 ; Security / keylogger privacy corpus -- tests ES_PASSWORD detection and
 ; Win32 known-class lookup logic in isolation (OS-level paths are headless-safe stubs).
-#Include meta/test_corpus_security_keylogger.ahk
+#Include meta/corpus/test_corpus_security_keylogger.ahk
 ; PromptBuilder corpus -- tests the generated PromptBuilder class against the
 ; shared cross-driver vectors.
 #Include ../_generated/prompt_builder.ahk
-#Include meta/test_corpus_prompt_builder.ahk
+#Include meta/corpus/test_corpus_prompt_builder.ahk
 ; Chord notation corpus -- runs the shared _shared/lua/chord/vectors.json against
 ; the AutoHotkey twin, plus the native-translation half that is supposed to differ.
 #Include ../infra/chord.ahk
@@ -1431,10 +1431,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_config_transition_integration.ahk
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
 ; same shared file the macOS and Linux suites replay.
-#Include meta/test_corpus_logger_behaviour.ahk
+#Include meta/corpus/test_corpus_logger_behaviour.ahk
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
-#Include meta/test_corpus_toml_fuzz.ahk
+#Include meta/corpus/test_corpus_toml_fuzz.ahk
 #Include meta/test_toml_inline_comment_stripping.ahk
 #Include meta/test_toml_read_failure_is_loud.ahk
 #Include meta/test_config_boot_read_failure_blocks_persist.ahk
@@ -1443,21 +1443,21 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_config_recovery_gateway.ahk
 ; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
-#Include meta/test_corpus_keylogger_aggregation.ahk
+#Include meta/corpus/test_corpus_keylogger_aggregation.ahk
 ; Healthcheck snapshot corpus -- tests _HealthCheck_FormatUptime and validates
 ; the golden vectors for the shared snapshot logic (format_uptime, issues, schema).
-#Include meta/test_corpus_healthcheck_snapshot.ahk
+#Include meta/corpus/test_corpus_healthcheck_snapshot.ahk
 ; Updater release parser corpus -- tests Updater_ParseTagName / Updater_ParseBody /
 ; _Updater_ParsePrerelease / _Updater_SplitReleasesArray against shared cross-driver vectors.
-#Include meta/test_corpus_updater_release_parser.ahk
+#Include meta/corpus/test_corpus_updater_release_parser.ahk
 ; Locale resolution corpus -- tests t() cascade (active→en→fr→raw key) and ★
 ; substitution against shared cross-driver vectors.
-#Include meta/test_corpus_locale_resolution.ahk
+#Include meta/corpus/test_corpus_locale_resolution.ahk
 ; Tooltip layout corpus -- validates _TooltipClampToScreen against shared
 ; cross-driver vectors.
-#Include meta/test_corpus_tooltip_layout.ahk
+#Include meta/corpus/test_corpus_tooltip_layout.ahk
 ; TOML coercion corpus
-#Include meta/test_corpus_toml_coercion.ahk
+#Include meta/corpus/test_corpus_toml_coercion.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/test_activate_hotstrings_sleep_gate.ahk
@@ -1479,12 +1479,12 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_dispatcher_start_guarded.ahk
 #Include meta/test_dispatcher_start_ungated.ahk
 #Include meta/test_dispatcher_stop_wired.ahk
-#Include meta/test_driver_source_helpers_fail_loudly.ahk
-#Include meta/test_driver_source_partial_reads.ahk
-#Include meta/test_driver_body_cache.ahk
-#Include meta/test_driver_block_comment_extraction.ahk
-#Include meta/test_driver_symbol_case.ahk
-#Include meta/test_driver_quoted_definitions.ahk
+#Include meta/suite/test_driver_source_helpers_fail_loudly.ahk
+#Include meta/suite/test_driver_source_partial_reads.ahk
+#Include meta/suite/test_driver_body_cache.ahk
+#Include meta/suite/test_driver_block_comment_extraction.ahk
+#Include meta/suite/test_driver_symbol_case.ahk
+#Include meta/suite/test_driver_quoted_definitions.ahk
 #Include meta/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
 #Include meta/test_format_toml_stale_path_deadcode.ahk
@@ -1563,7 +1563,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_bundle_upgrade_transaction.ahk
 #Include meta/test_tab_accept_cancels_timer.ahk
 #Include meta/test_textsend_clipboard_thread.ahk
-#Include meta/test_tint_test_stale_constants_comment.ahk
+#Include meta/suite/test_tint_test_stale_constants_comment.ahk
 #Include meta/test_tooltip_hide_non_blocking.ahk
 #Include meta/test_tooltip_teardown_on_keyboard_thread.ahk
 #Include meta/test_llm_bridge_deferred_hides.ahk
@@ -1609,7 +1609,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_uridecode_multibyte_utf8_corruption.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
-#Include meta/test_generated_substr_minus_one.ahk
+#Include meta/suite/test_generated_substr_minus_one.ahk
 #Include meta/test_toml_multiline_array_depth.ahk
 #Include meta/test_toml_unescape_ordering.ahk
 #Include meta/test_clipboard_sentinel.ahk
@@ -1817,7 +1817,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_flush_on_error.ahk
 #Include meta/test_atomic_write_unique_scratch.ahk
 #Include unit/test_atomic_temp_owner.ahk
-#Include meta/test_byref_call_sites.ahk
+#Include meta/suite/test_byref_call_sites.ahk
 #Include meta/test_uia_probe_bounded.ahk
 #Include meta/test_healthcheck_collectors_guarded.ahk
 #Include meta/test_personal_editor_section_guard.ahk
@@ -1829,7 +1829,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_shutdown_veto_bounded.ahk
 #Include meta/test_suspend_lifecycle_logged.ahk
 #Include unit/test_lifecycle_transition.ahk
-#Include meta/test_dead_state_and_single_source.ahk
+#Include meta/suite/test_dead_state_and_single_source.ahk
 #Include meta/test_discarded_config_is_reported.ahk
 #Include meta/test_sql_replay_is_idempotent.ahk
 #Include meta/test_keyboard_shortcut_slots_roundtrip.ahk
@@ -1877,7 +1877,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_logger_repeat_collapsing.ahk
 #Include meta/test_shell_runner_boot_crash_and_quoting.ahk
 #Include meta/test_hotpath_priority_starvation.ahk
-#Include meta/test_priority_baseline_single_source.ahk
+#Include meta/suite/test_priority_baseline_single_source.ahk
 
 ; -- Previously-orphaned regression tests (on disk but never wired into the
 ;    runner; re-wired so they actually execute). All were silently skipped; the
@@ -1918,7 +1918,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_healthcheck_os_name_windows11.ahk
 #Include unit/test_healthcheck_issues_from_errors_file.ahk
 #Include unit/test_healthcheck_report_issue.ahk
-#Include meta/test_corpus_diagnostics.ahk
+#Include meta/corpus/test_corpus_diagnostics.ahk
 
 ; Guards the _HsEdWeb_Reset() idempotency fix for the live-log access-violation
 ; crash (double-unsubscribe against an already torn-down WebView2 controller).
@@ -1973,7 +1973,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_takenote_winmaximize_guard.ahk
 #Include meta/test_personal_info_combo_generation.ahk
 #Include meta/test_personal_combo_letters_guard.ahk
-#Include meta/test_driver_pid_single_source.ahk
+#Include meta/suite/test_driver_pid_single_source.ahk
 #Include meta/test_taphold_timings_load_order.ahk
 #Include meta/test_suspend_resets_hse_context.ahk
 #Include meta/test_capsword_parse_time_callback.ahk
@@ -2114,7 +2114,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_tooltip_row_band_elision.ahk
 #Include meta/test_boot_profile_retroactive_stamps.ahk
 #Include meta/test_clipboard_history_paste_wiring.ahk
-#Include meta/test_fast_timer_inventory.ahk
+#Include meta/suite/test_fast_timer_inventory.ahk
 #Include meta/test_gestures_bulk_actions_ahk_reachable.ahk
 #Include meta/test_gesture_constants_available_to_onboarding.ahk
 #Include meta/test_hotpath_segment_coverage.ahk
@@ -2139,8 +2139,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_inline_autotype_staleness.ahk
 #Include meta/test_walker_batch_has_an_inprocess_drain.ahk
 #Include unit/test_walker_title_cap_enforced.ahk
-#Include meta/test_suite_watchdog_manifest.ahk
-#Include meta/test_suite_unique_includes.ahk
+#Include meta/suite/test_suite_watchdog_manifest.ahk
+#Include meta/suite/test_suite_unique_includes.ahk
 
 #Include unit/test_file_read_activity.ahk
 

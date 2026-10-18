@@ -125,7 +125,7 @@ _TRF_ParseStaysNonThrowing() {
 	catch
 		Threw := true
 	Assert(!Threw,
-		"ParseTomlFile must not throw on an unreadable or missing path — tests/meta/test_corpus_toml_fuzz.ahk requires this, so the read failure has to be reported out of band")
+		"ParseTomlFile must not throw on an unreadable or missing path — tests/meta/corpus/test_corpus_toml_fuzz.ahk requires this, so the read failure has to be reported out of band")
 }
 
 

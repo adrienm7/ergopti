@@ -102,9 +102,9 @@ if (!fileExistsSP('macos/tests/unit/meta/test_corpus_locale_resolution.lua')) {
 }
 
 // ── 7. AHK must have a corpus consumer test included in run_all.ahk ────────
-if (!fileExistsSP('windows/tests/meta/test_corpus_locale_resolution.ahk')) {
+if (!fileExistsSP('windows/tests/meta/corpus/test_corpus_locale_resolution.ahk')) {
 	errors.push(
-		'windows/tests/meta/test_corpus_locale_resolution.ahk: missing — must replay locale corpus'
+		'windows/tests/meta/corpus/test_corpus_locale_resolution.ahk: missing — must replay locale corpus'
 	);
 } else {
 	const runAll = fileExistsSP('windows/tests/run_all.ahk')

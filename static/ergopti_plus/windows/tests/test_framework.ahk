@@ -596,16 +596,16 @@ Test(Name, Callback, Interactive := false) {
 ; dominates the CI wall time.
 global TEST_MODULE_GROUPS := [
 	["meta", "^meta/"],
-	["llm-servers-a", "test_local_server_panel|test_managed_|ollama"],
-	["llm-servers-b", "local_server"],
-	["llm-terminal", "llm_nav_event_owner/"],
-	["llm", "llm|model|prediction|vision|agent|tone|translate|prompt|api_test"],
-	["config-transition", "config_transition"],
-	["config-scope-a", "global_config_scope|restore_recommended"],
-	["config-scope-b", "scope|journal"],
-	["config", "config|toml|updater|migrat|backup|sqlite|settings"],
-	["hotstrings", "hotstring|personal|prefix|magic|capsword|tap|wrap|shortcut|text|corpus|dynamic"],
-	["keymap", "layout|altgr|keylay|keymap|digit|kana|gesture|keylogger|klr|metrics|wpm|heatmap|key_comb"],
+	["llm-servers-a", "^unit/modules/llm/servers/test_local_server_(panel|scope_cohort)\.ahk$|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(test_local_server_panel|test_managed_|ollama)"],
+	["llm-servers-b", "^unit/modules/llm/servers/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(local_server)"],
+	["llm-terminal", "^unit/modules/llm/nav_event_owner/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(llm_nav_event_owner/)"],
+	["llm", "^unit/modules/llm/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(llm|model|prediction|vision|agent|tone|translate|prompt|api_test)"],
+	["config-transition", "^unit/infra/config/transition/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(config_transition)"],
+	["config-scope-a", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm)\.ahk$|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(global_config_scope|restore_recommended)"],
+	["config-scope-b", "^unit/infra/config/scope/|^unit/test_config_scope_manifest\.ahk$|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(scope|journal)"],
+	["config", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(config|toml|updater|migrat|backup|sqlite|settings)"],
+	["hotstrings", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(hotstring|personal|prefix|magic|capsword|tap|wrap|shortcut|text|corpus|dynamic)"],
+	["keymap", "^unit/(platform/remap|modules/(keymap|gestures))/|^(?=unit/(llm_nav_event_owner/|llm_profiles/)?[^/]+$).*(layout|altgr|keylay|keymap|digit|kana|gesture|keylogger|klr|metrics|wpm|heatmap|key_comb)"],
 	["core", ""]
 ]
 
