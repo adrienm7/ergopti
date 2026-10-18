@@ -308,9 +308,13 @@ if MAGIC_REPEAT ~= "none" then
 end
 
 -- A focused ordinary text field, conclusively.
+package.preload["adapters.atspi_focus_watch"] = function()
+	return require("tests.support.focus_watch_fixture")
+end
 package.preload["adapters.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
+		publishFocus = function() return true end,
 		refresh = function() return true, "insecure" end,
 		isSecureField = function() return false end,
 		getVerdict = function() return "insecure" end,
@@ -318,6 +322,18 @@ package.preload["adapters.secure_field_detector"] = function()
 		isSecureApp = function() return false end,
 		isUrlBar = function() return false end,
 	}
+end
+
+-- A completed desktop selection includes the shared focus-settle interval.
+-- Advance only this controlled selection clock; production never sleeps here.
+local settle_selection = function() end
+if TAP_WRAP ~= "none" then
+	local Clock = require("infra.monotonic")
+	local original, elapsed_ms = Clock.now_ms, 0
+	Clock.now_ms = function() return original() + elapsed_ms end
+	settle_selection = function()
+		elapsed_ms = elapsed_ms + require("infra.timings").ms("privacy", "focus_settle_ms")
+	end
 end
 
 local CONTROL = { BS = "backspace", CBS = "backspace", ESC = "escape", LEFT = "left" }
@@ -460,6 +476,8 @@ package.preload["adapters.event_loop"] = function()
 				selection.primary = selection.primary == "" and "selected" or "fresh"
 				screen = chars(selection.primary)
 				selection.focused = true
+				settle_selection()
+				loop.onPeriodic()
 			elseif token == "TAPKEY" then
 				i = i + #token + 2
 				local consumed = callbacks.onConsume({ code = 41, char = "(",

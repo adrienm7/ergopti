@@ -155,6 +155,8 @@ local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
+local FocusWatch        = require("adapters.atspi_focus_watch")
+local secure_focus_watch = nil
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
@@ -297,6 +299,13 @@ local shutdown = ShutdownCoordinator.new({
 				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
 					prediction_engine.cancel_model_download()
 				end
+			end,
+		},
+		{
+			name = "accessible focus watch",
+			stop = function()
+				if secure_focus_watch then return secure_focus_watch.stop() == true end
+				return true
 			end,
 		},
 		{
@@ -867,7 +876,9 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
+	secure_focus_watch = FocusWatch.new()
 	local secure_focus_guard = FocusGuard.new({
+		watch      = secure_focus_watch,
 		detector   = secure_field_detector,
 		keylogger  = keylogger,
 		prediction = prediction_engine,
@@ -883,7 +894,11 @@ local function main()
 	})
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
+	if not secure_focus_watch.start() or not secure_focus_watch.wait_ready() then
+		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
+	end
 	secure_focus_guard.prime()
+	local physical_privacy_admission = nil
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
@@ -954,7 +969,11 @@ local function main()
 			secure_focus_guard.invalidate()
 			return
 		end
-		if secure_focus_guard.blocks_text() then return end
+		local admission = physical_privacy_admission
+		physical_privacy_admission = nil
+		if admission and admission.code == scancode then
+			if not admission.allowed then return end
+		elseif secure_focus_guard.blocks_text() then return end
 
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
@@ -1058,6 +1077,7 @@ local function main()
 			end
 		end
 
+		if result and secure_focus_guard.blocks_text() then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1259,6 +1279,9 @@ local function main()
 	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		capture_owned_scancodes[scancode] = nil
+		local allowed = not secure_focus_guard.blocks_text()
+		physical_privacy_admission = { code = scancode, allowed = allowed }
+		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
@@ -1362,6 +1385,7 @@ local function main()
 		-- daemon happens to own would make the dashboard a picture of the driver's
 		-- configuration rather than of the user's habits.
 		if key_name == "shortcut" and type(detail) == "table" then
+			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
 			if chord then
 				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
@@ -1549,8 +1573,10 @@ local function main()
 	})
 
 	local function on_click()
-		secure_focus_guard.invalidate()
+		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
+		-- checks fresh privacy first; actual wrapping remains gated after settle.
 		wrap_on_type.on_pointer_down()
+		secure_focus_guard.invalidate()
 		-- A click may clear or move the selection a tone step would replace.
 		if prediction_engine then prediction_engine.drop_tone("pointer click") end
 		-- The guard above emptied the buffer at an unknown position. With
@@ -1685,6 +1711,7 @@ local function main()
 			capture_owned_scancodes[scancode] = nil
 			return
 		end
+		if secure_focus_guard.blocks_text() then return end
 		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
@@ -2468,6 +2495,7 @@ local function main()
 					tray_menu = nil
 				end)
 			end
+			secure_focus_watch.pump()
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()

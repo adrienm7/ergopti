@@ -63,7 +63,9 @@ local function load_native_backend()
 		void *g_hash_table_lookup(GHashTable *hash_table, const void *key);
 		void g_hash_table_unref(GHashTable *hash_table);
 		void g_free(void *mem);
+		void *g_object_ref(void *object);
 		void g_object_unref(void *object);
+		void atspi_accessible_clear_cache(AtspiAccessible *object);
 		void g_error_free(void *error);
 	]])
 	if not ok_cdef then return nil end
@@ -88,6 +90,9 @@ local function load_native_backend()
 		local root = atspi.atspi_get_desktop(0)
 		return root ~= nil and root or nil
 	end
+	function backend.retain(node) return gobject.g_object_ref(node) end
+	function backend.clear(node) atspi.atspi_accessible_clear_cache(node) end
+	function backend.clear_tree(node) atspi.atspi_accessible_clear_cache(node) end
 	function backend.release(node)
 		if node ~= nil then gobject.g_object_unref(node) end
 	end
@@ -169,7 +174,7 @@ end
 -- ===================================
 -- ===================================
 
-local function traverse(backend)
+local function traverse(backend, retain_focus)
 	if not backend then return nil, false end
 	local root = backend.root()
 	if root == nil then return nil, false end
@@ -179,6 +184,7 @@ local function traverse(backend)
 	local focused_role = nil
 	local focused_identity = nil
 	local focused_count = 0
+	local handles = retain_focus and { backend = backend } or nil
 
 	local function visit(node, depth)
 		if failed or depth > MAX_DEPTH then failed = true; return end
@@ -196,6 +202,10 @@ local function traverse(backend)
 			focused_count = focused_count + 1
 			focused_role = role
 			focused_identity = identity
+			if handles and type(backend.retain) == "function" then
+				if handles.focus then backend.release(handles.focus) end
+				handles.focus = backend.retain(node)
+			end
 		end
 
 		local children = backend.children(node)
@@ -234,6 +244,14 @@ local function traverse(backend)
 		end
 	end
 
+	if handles and #scoped == 1 and type(backend.retain) == "function" then
+		handles.window = backend.retain(scoped[1])
+	end
+	local function discard_handles()
+		if not handles then return end
+		if handles.focus then backend.release(handles.focus) end
+		if handles.window then backend.release(handles.window) end
+	end
 	local ok, traversal_error
 	if #scoped > 0 then
 		ok, traversal_error = pcall(function()
@@ -248,12 +266,13 @@ local function traverse(backend)
 		backend.release(root)
 	end
 	if not ok then
+		discard_handles()
 		Logger.debug(LOG, "AT-SPI traversal failed — %s", tostring(traversal_error))
 		return nil, false
 	end
-	if failed or focused_count ~= 1 then return nil, false, nil end
+	if failed or focused_count ~= 1 then discard_handles(); return nil, false, nil end
 	focused_identity.active_scope = #scoped > 0
-	return focused_role, true, focused_identity
+	return focused_role, true, focused_identity, handles
 end
 
 --- Runs the native traversal in the current process.
@@ -279,6 +298,54 @@ function M._get_native_snapshot()
 		native_bus_name = type(identity) == "table" and identity.native_bus_name or nil,
 		native_object_path = type(identity) == "table" and identity.native_object_path or nil,
 	}, true
+end
+
+--- Retains exact native control/frame references for one resident worker.
+--- Each full scan discards libatspi's old tree cache first; daemon code never
+--- receives native pointers or invokes this in the keyboard process.
+--- @return table|nil snapshot
+--- @return boolean conclusive
+--- @return table|nil handles Worker-owned GObject references.
+function M._get_native_watch_snapshot()
+	local backend = load_native_backend()
+	if not backend then return nil, false end
+	local root = backend.root()
+	if root == nil then return nil, false end
+	backend.clear_tree(root)
+	backend.release(root)
+	local role, conclusive, identity, handles = traverse(backend, true)
+	if not conclusive then return nil, false end
+	local snapshot = { role = role, active_scope = identity.active_scope == true,
+		native_bus_name = identity.native_bus_name, native_object_path = identity.native_object_path }
+	if handles then handles.snapshot = snapshot end
+	return snapshot, true, handles
+end
+
+--- Rechecks exact retained native state through fresh AT-SPI GetState calls.
+--- Old focus or inactive frames withhold instead of walking an application's
+--- complete tree on the input admission deadline.
+--- @param handles table Worker-owned native references.
+--- @return table|nil snapshot
+--- @return boolean conclusive
+function M._check_native_watch_focus(handles)
+	if not handles or not handles.focus or not handles.window then return nil, false end
+	local backend = handles.backend
+	backend.clear(handles.focus)
+	backend.clear(handles.window)
+	if backend.focused(handles.focus) ~= true or backend.active(handles.window) ~= true then return nil, false end
+	local role = backend.role(handles.focus)
+	if type(role) ~= "number" then return nil, false end
+	return { role = role, active_scope = true, native_bus_name = handles.snapshot.native_bus_name,
+		native_object_path = handles.snapshot.native_object_path }, true
+end
+
+--- Releases every GObject owned by the resident worker's exact focus receipt.
+--- @param handles table|nil Worker-owned native references.
+function M._release_native_watch_focus(handles)
+	if not handles then return end
+	for _, key in ipairs({ "focus", "window" }) do
+		if handles[key] then handles.backend.release(handles[key]); handles[key] = nil end
+	end
 end
 
 --- Returns the focused accessible role and whether the query was conclusive.
@@ -363,6 +430,14 @@ end
 --- @return table|nil snapshot Detached cached native focus identity.
 function M.cached_snapshot()
 	return _last_snapshot and copy_snapshot(_last_snapshot) or nil
+end
+
+--- Shares the resident privacy owner's admitted receipt with existing consumers.
+--- Only scalar native identity is retained; text and accessible names are absent.
+--- @param snapshot table|nil Exact active native worker receipt, or unknown.
+function M._publish_resident_snapshot(snapshot)
+	_last_snapshot = snapshot and copy_snapshot({ role = snapshot.role, active_scope = true,
+		native_bus_name = snapshot.bus, native_object_path = snapshot.path, attributes = {} }) or nil
 end
 
 --- Installs an ownership-compatible tree backend for tests.
