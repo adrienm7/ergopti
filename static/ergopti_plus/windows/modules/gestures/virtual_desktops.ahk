@@ -170,6 +170,8 @@ GestureDesktopNavigateWrap(Direction, ReadState := 0, Press := 0) {
 	PressFn := HasMethod(Press, "Call") ? Press : TextPressKey
 	if (Direction != "prev" && Direction != "next")
 		throw ValueError("GestureDesktopNavigateWrap: unknown direction '" . String(Direction) . "'")
+	if A_IsSuspended
+		return 0
 	Rows := GestureEmitActionsData()
 	try {
 		State := ReadFn()
@@ -177,7 +179,12 @@ GestureDesktopNavigateWrap(Direction, ReadState := 0, Press := 0) {
 	} catch as Err {
 		LoggerWarn("gestures", "Cannot wrap the virtual desktops ({1}) — moving one desktop without wrapping.", Err.Message)
 		Step := Rows[Direction == "next" ? "desktop_next" : "desktop_prev"]
-		PressFn(Step.Key, Step.Mods)
+		if A_IsSuspended
+			return 0
+		if !PressFn(Step.Key, Step.Mods) {
+			LoggerError("gestures", "The fallback desktop navigation press was refused.")
+			return 0
+		}
 		return 1
 	}
 	if (Steps = 0) {
@@ -188,7 +195,16 @@ GestureDesktopNavigateWrap(Direction, ReadState := 0, Press := 0) {
 	if (Abs(Steps) > 1)
 		LoggerDebug("gestures", "Wrapping from desktop {1} to desktop {2} of {3}.",
 			State.Index + 1, State.Index + Steps + 1, State.Count)
-	loop Abs(Steps)
-		PressFn(Step.Key, Step.Mods)
-	return Abs(Steps)
+	Sent := 0
+	loop Abs(Steps) {
+		; Registry reads and prior sends may pump the callback that pauses us.
+		if A_IsSuspended
+			break
+		if !PressFn(Step.Key, Step.Mods) {
+			LoggerError("gestures", "Desktop navigation stopped after {1} press(es): the next press was refused.", Sent)
+			break
+		}
+		Sent += 1
+	}
+	return Sent
 }

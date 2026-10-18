@@ -221,3 +221,58 @@ _VDT_ActionsAreRegistered() {
 		"the wrap is not one keystroke a tap-hold could replay")
 }
 Test("virtual desktops: plain and wrapping actions are both registered", _VDT_ActionsAreRegistered)
+
+
+; A pause can arrive while a registry query or an earlier key send pumps AHK
+; messages. Each fixture restores the real suspend flag before returning.
+_VDT_InterruptedOutput(Mode) {
+	PriorPause := A_IsSuspended
+	State := {reads: 0, attempts: 0}
+	try {
+		Suspend(Mode == "entry")
+		Read := _VDT_InterruptRead.Bind(Mode, State)
+		Press := _VDT_InterruptPress.Bind(Mode, State)
+		Sent := GestureDesktopNavigateWrap("next", Read, Press)
+		switch Mode {
+			case "entry":
+				AssertEqual(0, State.reads, "a paused action cannot query or send")
+				AssertEqual(0, State.attempts)
+				AssertEqual(0, Sent)
+			case "read", "failed-read":
+				AssertEqual(1, State.reads, "the actual query must run")
+				AssertEqual(0, State.attempts, "neither wrap nor fallback may send after a query pauses")
+				AssertEqual(0, Sent)
+			case "send":
+				AssertEqual(1, State.attempts, "a pause inside the first send must stop the remaining two")
+				AssertEqual(1, Sent, "only the completed first press may be counted")
+			case "refusal":
+				AssertEqual(2, State.attempts, "a rejected second press must stop the third")
+				AssertEqual(1, Sent, "a rejected press must not be counted")
+			case "fallback-refusal":
+				AssertEqual(1, State.attempts, "the plain fallback must make one actual attempt")
+				AssertEqual(0, Sent, "a rejected fallback must not be counted")
+		}
+	} finally Suspend(PriorPause)
+}
+
+_VDT_InterruptRead(Mode, State) {
+	State.reads += 1
+	if Mode == "read" || Mode == "failed-read"
+		Suspend(true)
+	if Mode == "failed-read" || Mode == "fallback-refusal"
+		throw Error("scripted registry read failure")
+	return {Index: 3, Count: 4}
+}
+
+_VDT_InterruptPress(Mode, State, Key, Mods) {
+	State.attempts += 1
+	AssertEqual("Ctrl+Win", _VDT_JoinMods(Mods), "the real action must keep the navigation chord")
+	AssertEqual(Mode == "fallback-refusal" ? "Right" : "Left", Key)
+	if Mode == "send"
+		Suspend(true)
+	return Mode != "fallback-refusal" && !(Mode == "refusal" && State.attempts == 2)
+}
+
+for Mode in ["entry", "read", "failed-read", "send", "refusal", "fallback-refusal"]
+	Test("virtual desktops: stop interrupted output at " . Mode . " (desktop-wrap-interrupted-output)",
+		_VDT_InterruptedOutput.Bind(Mode))
