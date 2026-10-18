@@ -127,6 +127,7 @@ graph TD
         MACOS_shell_runner["ShellRunner.lua"]
         MACOS_storage["Storage.lua"]
         MACOS_synthetic_input["SyntheticInput.lua"]
+        MACOS_synthetic_input_loopback_owner["SyntheticInputLoopbackOwner.lua"]
         MACOS_system_info["SystemInfo.lua"]
         MACOS_system_switcher_input["SystemSwitcherInput.lua"]
         MACOS_system_switcher_runtime["SystemSwitcherRuntime.lua"]
