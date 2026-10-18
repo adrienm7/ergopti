@@ -36,6 +36,8 @@ local FileDigest    = require("adapters.file_digest")
 local ShellRunner   = require("adapters.shell_runner")
 local ProcessRunner = require("adapters.process_runner")
 local Json          = require("json")
+local ShutdownHelpers, HelpersSettled = ProcessRunner.shutdown, ProcessRunner.is_settled
+local CancelHttp, CancelDigest = HttpClient.cancel, FileDigest.cancel
 local Registry      = require("layouts.registry")
 local Catalogue     = require("layouts.catalogue")
 local Outdated      = require("config_outdated")
@@ -118,6 +120,65 @@ local _active = ""
 -- Decoded index shipped with the package, read once.
 local _bundled_index = nil
 local _bundled_index_read = false
+local _epoch = 0
+local _stopping = false
+local _checking_shutdown = false
+local _transports_cancelled = false
+
+--- Tests the original registry lifetime without borrowing a later request.
+--- @param epoch number Captured lifetime generation.
+--- @return boolean
+local function current(epoch) return not _stopping and epoch == _epoch end
+
+--- Fences async stages and disk mutations even for injected collaborators.
+--- Read-only metadata remains available while native shutdown owns its debt.
+--- @param source table Original collaborators.
+--- @return table
+local function scoped_deps(source)
+	local epoch, scoped = _epoch, {}
+	for key, value in pairs(source) do scoped[key] = value end
+	for _, name in ipairs({ "write", "delete", "ensure_dir" }) do
+		local operation = source[name]
+		if type(operation) == "function" then
+			scoped[name] = function(...)
+				if not current(epoch) then return false, "layout registry stopped" end
+				local ok, detail = operation(...)
+				if not current(epoch) then return false, "layout registry stopped" end
+				return ok, detail
+			end
+		end
+	end
+	if type(source.run) == "function" then
+		scoped.run = function(program, args, options, callback)
+			if not current(epoch) then return false end
+			return source.run(program, args, options, function(...)
+				if current(epoch) then return callback(...) end
+			end)
+		end
+	end
+	if type(source.transport) == "table" then
+		scoped.transport = {}
+		for key, value in pairs(source.transport) do scoped.transport[key] = value end
+		local get, sha256 = source.transport.get, source.transport.sha256
+		if type(get) == "function" then
+			scoped.transport.get = function(url, headers, timeout_ms, callback)
+				if not current(epoch) then return false end
+				return get(url, headers, timeout_ms, function(...)
+					if current(epoch) then return callback(...) end
+				end)
+			end
+		end
+		if type(sha256) == "function" then
+			scoped.transport.sha256 = function(text, callback)
+				if not current(epoch) then return false end
+				return sha256(text, function(...)
+					if current(epoch) then return callback(...) end
+				end)
+			end
+		end
+	end
+	return scoped
+end
 
 
 
@@ -284,10 +345,10 @@ end
 --- @return table|nil deps
 --- @return string|nil error
 local function resolve_deps(deps)
-	if deps ~= nil then return deps, nil end
+	if deps ~= nil then return scoped_deps(deps), nil end
 	local settings, settings_err = M.settings()
 	if not settings then return nil, settings_err end
-	return default_deps(settings), nil
+	return scoped_deps(default_deps(settings)), nil
 end
 
 
@@ -480,11 +541,15 @@ end
 -- ================================
 
 --- Refreshes the catalogue from the registry (a conditional request).
---- on_done(outcome) is called exactly once; see Catalogue.resolve_index.
+--- on_done(outcome) runs once unless terminal shutdown cancels its delivery;
+--- see Catalogue.resolve_index.
 --- @param on_done function|nil
 --- @param deps table|nil
 --- @return boolean dispatched
 function M.refresh(on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then
 		Logger.error(LOG, "The layout registry is unusable: %s.", tostring(deps_err))
@@ -503,6 +568,7 @@ function M.refresh(on_done, deps)
 			return { text = deps.read(index_path), etag = deps.exists(etag_path) and deps.read(etag_path) or nil }
 		end,
 		write_cache = function(text, etag)
+			if not current(epoch) then return false, "layout registry stopped" end
 			local ok, err = write_file(deps, deps.local_dir .. deps.settings.index_file, text)
 			if not ok then return false, err end
 			local etag_path = deps.local_dir .. deps.settings.etag_file
@@ -514,6 +580,7 @@ function M.refresh(on_done, deps)
 		decode_json = deps.decode_json,
 		transport = deps.transport,
 	}, function(outcome)
+		if not current(epoch) then return end
 		_catalogue = { index = outcome.index, source = outcome.source, error = outcome.error }
 		if outcome.cache_warning then Logger.warn(LOG, "%s; refreshed without it.", outcome.cache_warning) end
 		if outcome.error then
@@ -578,6 +645,7 @@ end
 --- @param on_done function
 --- @return boolean acquired
 local function acquire_slot(id, action, on_done)
+	if _stopping then return false end
 	if _busy then
 		Logger.warn(LOG, "Refused to %s '%s': '%s' is still being %sed.", action, id, _busy.id, _busy.action)
 		on_done(false, M.FAILURE_BUSY, "another layout operation is still running")
@@ -598,12 +666,16 @@ end
 
 --- Installs (or updates) one registry layout in the user XKB tree.
 --- on_done(true, { entry, source, verified }) or
---- on_done(false, failure_code, detail, user_message) is called exactly once.
+--- on_done(false, failure_code, detail, user_message) runs once unless terminal
+--- shutdown cancels its delivery.
 --- @param id string Registry id.
 --- @param on_done function
 --- @param deps table|nil
 --- @return boolean dispatched
 function M.install(id, on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then
 		Logger.error(LOG, "The layout registry is unusable: %s.", tostring(deps_err))
@@ -617,6 +689,7 @@ function M.install(id, on_done, deps)
 	end
 	if not acquire_slot(id, "install", on_done) then return false end
 	local function finish(ok, code_or_detail, detail)
+		if not current(epoch) then return end
 		_busy = nil
 		if ok then
 			Logger.success(LOG, "Installed the '%s' layout, version %s, from the %s copy (verified: %s).", id,
@@ -636,6 +709,7 @@ function M.install(id, on_done, deps)
 		return false
 	end
 	M.refresh(function(outcome)
+		if not current(epoch) then return end
 		if not outcome.index then
 			finish(false, M.FAILURE_DOWNLOAD, outcome.error and outcome.error.detail or "no registry index")
 			return
@@ -660,6 +734,7 @@ function M.install(id, on_done, deps)
 			end,
 			transport = deps.transport,
 		}, function(ok, detail)
+			if not current(epoch) then return end
 			if not ok then
 				finish(false, M.FAILURE_DOWNLOAD, detail)
 				return
@@ -682,6 +757,7 @@ function M.install(id, on_done, deps)
 				and deps.bundled_dir .. deps.settings.index_file
 				or deps.local_dir .. deps.settings.index_file
 			convert(deps, entry, layout_path, index_path, function(converted, code, convert_err)
+				if not current(epoch) then return end
 				if not converted then
 					finish(false, code, convert_err)
 					return
@@ -695,6 +771,7 @@ function M.install(id, on_done, deps)
 					args[#args + 1] = language
 				end
 				run_installer(deps, args, function(installed, report, install_err)
+					if not current(epoch) then return end
 					if not installed then
 						finish(false, report, install_err)
 						return
@@ -717,12 +794,15 @@ end
 --- Uninstalls one registry layout: removes it from the user XKB tree and the
 --- desktop's input sources, then deletes the local copy and its record.
 --- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
---- is called exactly once.
+--- is called exactly once unless terminal shutdown cancels its delivery.
 --- @param id string
 --- @param on_done function
 --- @param deps table|nil
 --- @return boolean dispatched
 function M.uninstall(id, on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then
 		on_done(false, M.FAILURE_RECORD, deps_err, nil)
@@ -741,6 +821,7 @@ function M.uninstall(id, on_done, deps)
 	if not acquire_slot(id, "uninstall", on_done) then return false end
 	Logger.start(LOG, "Uninstalling the '%s' layout…", id)
 	run_installer(deps, { "uninstall", "--layout-id", id }, function(removed, report, detail)
+		if not current(epoch) then return end
 		if not removed then
 			_busy = nil
 			Logger.error(LOG, "The '%s' layout was not uninstalled: %s.", id, tostring(detail))
@@ -773,12 +854,15 @@ end
 
 --- Makes one installed registry layout the session's first input source.
 --- on_done(true, { id }) or on_done(false, failure_code, detail, user_message)
---- is called exactly once.
+--- is called exactly once unless terminal shutdown cancels its delivery.
 --- @param id string
 --- @param on_done function
 --- @param deps table|nil
 --- @return boolean dispatched
 function M.select(id, on_done, deps)
+	if _stopping then return false end
+	local epoch, receive = _epoch, on_done
+	on_done = function(...) if current(epoch) and receive then return receive(...) end end
 	local resolved, deps_err = resolve_deps(deps)
 	if not resolved then
 		on_done(false, M.FAILURE_SELECT, deps_err, nil)
@@ -793,6 +877,7 @@ function M.select(id, on_done, deps)
 	if not acquire_slot(id, "select", on_done) then return false end
 	Logger.start(LOG, "Activating the '%s' layout…", id)
 	run_installer(deps, { "activate", "--layout-id", id }, function(ok, report, detail)
+		if not current(epoch) then return end
 		_busy = nil
 		if not ok then
 			Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
@@ -806,8 +891,30 @@ function M.select(id, on_done, deps)
 	return true
 end
 
+--- Revokes every registry workflow before cancelling its external transports.
+--- HTTP and digest cancellation fence delivery only; this ACK covers the native
+--- install/activation helpers owned by ProcessRunner, not network retirement.
+--- Cancelled workflows deliberately never invoke their business callbacks.
+--- @return boolean acknowledged Every install/activation helper physically retired.
+function M.shutdown()
+	if not _stopping then _stopping = true; _epoch = _epoch + 1 end
+	if _checking_shutdown then return false end
+	_checking_shutdown = true
+	if not _transports_cancelled then
+		_transports_cancelled = true
+		pcall(CancelHttp, REQUEST_OWNER)
+		pcall(CancelDigest, REQUEST_OWNER)
+	end
+	local checked, settled = pcall(ShutdownHelpers)
+	_checking_shutdown = false
+	if checked and settled == true then _busy = nil; return true end
+	return false
+end
+
 --- Test seam: forgets the catalogue, the operation slot and the shipped index.
 function M._reset()
+	if _stopping or HelpersSettled() ~= true then error("layout registry still owns terminal native lifetime", 2) end
+	_epoch = _epoch + 1
 	_catalogue = { index = nil, source = Catalogue.SOURCE_NONE, error = nil }
 	_busy = nil
 	_active = ""

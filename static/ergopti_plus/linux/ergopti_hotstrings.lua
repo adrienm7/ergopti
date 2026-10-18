@@ -277,6 +277,22 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "layout install and activation helpers",
+			wait_for_ack = true,
+			stop = (function()
+				-- Public replacements cannot acknowledge an already captured helper.
+				local resolved, registry, stop
+				return function()
+					if not resolved then
+						resolved = true
+						registry = package.loaded["modules.keymap.layout_registry"]
+						stop = registry and registry.shutdown
+					end
+					return not registry or stop() == true
+				end
+			end)(),
+		},
+		{
 			name = "local API discovery",
 			wait_for_ack = true,
 			stop = function()

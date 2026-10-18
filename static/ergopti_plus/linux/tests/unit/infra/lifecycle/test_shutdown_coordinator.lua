@@ -548,8 +548,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
 		local state = { closed = false, context_closed = false, watch_closed = false, metrics_closed = false, stops = 0, loops = 0, cancelled = 0 }
-		local native_closed = { discovery = false, programs = false, watchers = false }
-		local native_calls = { discovery = 0, programs = 0, watchers = 0 }
+		local native_closed = { discovery = false, programs = false, watchers = false, layouts = false }
+		local native_calls = { discovery = 0, programs = 0, watchers = 0, layouts = 0 }
 		local function native_stop(name)
 			return function()
 				native_calls[name] = native_calls[name] + 1
@@ -572,7 +572,7 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 			},
 			package = { loaded = { ["modules.llm.local_servers"] = {
 				shutdown = native_stop("discovery"),
-			} } }, require = function() return { cleanup = function() end, flush = function() end } end,
+			}, ["modules.keymap.layout_registry"] = { shutdown = native_stop("layouts") } } }, require = function() return { cleanup = function() end, flush = function() end } end,
 			TimerScheduler = { cancelAll = function() end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
@@ -610,6 +610,8 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		native_closed.programs = true
 		helpers.assert_eq(coordinator.poll(), false, "program ACK must not release live watchers")
 		native_closed.watchers = true
+		helpers.assert_eq(coordinator.poll(), false, "layout helpers require their own physical retirement ACK")
+		native_closed.layouts = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")
@@ -1280,4 +1282,96 @@ helpers.describe("native signal regression child", function()
 		local result = os.execute(quote(executable) .. " " .. quote(helpers.driver_root() .. "/tests/fixtures/native_signal_shutdown.lua"))
 		helpers.assert_true(result == true or result == 0, "native signal ownership child must pass")
 	end)
+end)
+
+
+helpers.describe("actual Main layout helper retirement", function()
+	local function fixture(loaded, receipt)
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local text = file:read("*a"); file:close()
+		local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"),
+			"actual Main shutdown constructor must exist")
+		local capture = assert(text:match("(local shutdown_runtime = prediction_engine and prediction_engine%.shutdown_runtime.-)\nlocal shutdown = ShutdownCoordinator"))
+		local state = { calls = 0, loops = 0, timers = 0, receipt = receipt }
+		local layout = { shutdown = function()
+			state.calls = state.calls + 1
+			if state.receipt == "throw" then error("controlled layout cleanup failure") end
+			return state.receipt
+		end }
+		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
+			keylogger = { stop = function() return true end }, privacy_owners = {},
+			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
+			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
+			prediction_engine = false,
+			package = { loaded = { ["modules.keymap.layout_registry"] = loaded and layout or nil } },
+			require = function(name)
+				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+					"cold shutdown must not import " .. tostring(name))
+				return { cleanup = function() end, flush = function() end }
+			end,
+			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1 end },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() state.loops = state.loops + 1 end },
+		}, { __index = _G })
+		local body = capture .. "\nreturn ShutdownCoordinator.new({" .. registry .. "\n})"
+		local chunk, why
+		if setfenv then chunk, why = loadstring(body, "actual Main layout shutdown"); if chunk then setfenv(chunk, env) end
+		else chunk, why = load(body, "actual Main layout shutdown", "t", env) end
+		return assert(chunk, why)(), state, layout, env
+	end
+
+	helpers.it("(layout-helper-shutdown) cold quit imports no layout module", function()
+		local coordinator, state = fixture(false)
+		helpers.assert_true(coordinator.request("cold quit"))
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.calls, 0)
+		helpers.assert_eq(state.loops, 1)
+	end)
+
+	for _, refusal in ipairs({ "nil", "false", "zero", "throw" }) do
+		helpers.it("(layout-helper-shutdown) actual Main retains " .. refusal .. " until exact helper ACK", function()
+			local receipt
+			if refusal == "false" then receipt = false elseif refusal == "zero" then receipt = 0
+			elseif refusal == "throw" then receipt = "throw" end
+			local coordinator, state = fixture(true, receipt)
+			helpers.assert_true(coordinator.request("quit while installer runs"))
+			helpers.assert_true(coordinator.is_pending(), "a logical cancellation cannot acknowledge native helper retirement")
+			helpers.assert_eq(state.calls, 1)
+			helpers.assert_eq(state.loops, 0)
+			helpers.assert_eq(state.timers, 1, "cancelAll must not prevent later native helper ACK")
+			helpers.assert_eq(coordinator.request("repeated TERM"), false)
+			helpers.assert_eq(coordinator.poll(), false)
+			helpers.assert_eq(state.calls, 2)
+			helpers.assert_eq(state.loops, 0)
+			state.receipt = true
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(state.loops, 1)
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(state.loops, 1)
+		end)
+	end
+
+	for _, replacement in ipairs({ "module", "method", "unload" }) do
+		helpers.it("(layout-helper-shutdown) retains original helper ACK after " .. replacement .. " replacement", function()
+			local coordinator, state, layout, env = fixture(true, false)
+			helpers.assert_true(coordinator.request("quit"))
+			helpers.assert_true(coordinator.is_pending())
+			local foreign_calls = 0
+			local function foreign_stop() foreign_calls = foreign_calls + 1; return true end
+			if replacement == "module" then env.package.loaded["modules.keymap.layout_registry"] = { shutdown = foreign_stop }
+			elseif replacement == "method" then layout.shutdown = foreign_stop
+			else env.package.loaded["modules.keymap.layout_registry"] = nil end
+			helpers.assert_eq(coordinator.poll(), false, "foreign public exports cannot acknowledge the captured helper")
+			helpers.assert_eq(state.calls, 2)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(state.loops, 0)
+			state.receipt = true
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(state.loops, 1)
+		end)
+	end
 end)
