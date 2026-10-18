@@ -2787,6 +2787,113 @@ helpers.describe("personal editor: canonical reload acknowledgement", function()
 		for name, value in pairs(prior) do assert(package.loaded[name] == value, "every prior module identity is restored") end
 		if not called then error(failure, 0) end
 	end
+	for _, scenario in ipairs({ "positive", "external", "recovery", "root", "page", "publication", "generation", "ready-refused", "retained", "retained-foreign", "forged", "push-reentry", "final-page", "postwrite-external", "state-refresh" }) do
+		helpers.it("personal-source-receipt: preserves the displayed file through " .. scenario, function()
+			with_native_owners(function(c)
+				local handler = helpers.load_module("ui.personal_info_editor.bridge")
+				local epoch, closes, notices = 41, 0, 0
+				local host = {
+					current_epoch = function() return epoch end,
+					page_current = function(_, expected) return expected == epoch end,
+					eval_js = function() return true end,
+				}
+				local context = { app_name = "personal_info_editor", epoch = epoch,
+					close_owned_window = function() closes = closes + 1;return true end }
+				local state = { dyn_hotstrings = c.dynamic, webview_manager = host,
+					config = { reload = function() return 0, true end },
+					i18n = { get = function(key) return key end },
+					notify_error = function(key) helpers.assert_eq(key, "dialog.personal_info.save_failed");notices = notices + 1 end }
+				if scenario == "ready-refused" then host.eval_js = function() return false end end
+				if scenario == "push-reentry" then host.eval_js = function() epoch = epoch + 1;return true end end
+				local ready = handler.on_message({ action = "ready" }, state, context)
+				helpers.assert_eq(ready.pushed, scenario ~= "ready-refused" and scenario ~= "push-reentry")
+				helpers.assert_eq(ready.data.fields[1].value, "Ada")
+				local winner = c.original:gsub('first_name = "Ada"', 'first_name = "Independent"', 1)
+				local target = c.path
+				if scenario == "state-refresh" then
+					local refreshed = {};for key, value in pairs(state) do refreshed[key] = value end
+					refreshed.layout = "independent input source change";state = refreshed
+				end
+				if scenario == "external" or scenario == "recovery" then write(c.path, winner) end
+				if scenario == "root" then
+					target = c.directory .. "/other-personal-info.toml"
+					write(target, winner)
+					helpers.assert_true(c.dynamic.init({ personal_info_path = target, trigger_char = "★" }))
+				end
+				if scenario == "generation" then helpers.assert_true(c.dynamic.init({ personal_info_path = c.path, trigger_char = "★" })) end
+				if scenario == "page" then epoch = epoch + 1;handler.on_window_closed(context.epoch) end
+				if scenario == "retained" or scenario == "retained-foreign" then
+					state.config.reload = function() return 0, false end
+					local first = handler.on_message({ action = "save", values = { first_name = "InitiallyCommitted" } }, state, context)
+					helpers.assert_eq(first, { saved = true, reloaded = false, closed = false })
+					state.config.reload = function() return 0, true end
+					if scenario == "retained-foreign" then write(c.path, winner) end
+				end
+				local writer = require("toml_codec.writer")
+				local native_batch = writer.batch_write
+				if scenario == "publication" then
+					writer.batch_write = function(...)
+						write(c.path, winner)
+						return native_batch(...)
+					end
+				end
+				if scenario == "final-page" then
+					writer.batch_write = function(path, updates, adapter, expected, on_error, admission)
+						return native_batch(path, updates, adapter, expected, on_error, function()
+							epoch = epoch + 1
+							return admission == nil or admission() == true
+						end)
+					end
+				end
+				if scenario == "postwrite-external" then
+					state.config.reload = function() return 0, false end
+					writer.batch_write = function(...)
+						local committed, detail, bytes = native_batch(...)
+						write(c.path, winner)
+						return committed, detail, bytes
+					end
+				end
+				local called, result
+				if scenario == "forged" then
+					called, result = pcall(c.dynamic.save_info, { first_name = "Grace" }, { status = "ok", content = c.original })
+					result = { saved = result }
+				else
+					called, result = pcall(handler.on_message, { action = "save", values = { first_name = "Grace" },
+						source = { status = "ok", content = c.original } }, state, context)
+				end
+				writer.batch_write = native_batch
+				helpers.assert_true(called, tostring(result))
+				if scenario == "postwrite-external" then
+					helpers.assert_eq(result, { saved = true, reloaded = false, closed = false })
+					helpers.assert_eq(read(target), winner)
+					local retry = handler.on_message({ action = "save", values = { first_name = "MustNotBorrowWinner" } }, state, context)
+					helpers.assert_eq(retry.saved, false)
+					helpers.assert_eq(read(target), winner)
+				elseif scenario == "positive" or scenario == "retained" or scenario == "state-refresh" then
+					helpers.assert_true(result.saved and result.reloaded and result.closed)
+					helpers.assert_eq(closes, 1)
+					helpers.assert_eq(read(target), c.original:gsub('first_name = "Ada"', 'first_name = "Grace"', 1))
+				else
+					helpers.assert_eq(result.saved, false)
+					helpers.assert_eq(closes, 0)
+					helpers.assert_eq(read(target), (scenario == "page" or scenario == "generation"
+						or scenario == "ready-refused" or scenario == "forged" or scenario == "push-reentry"
+						or scenario == "final-page") and c.original or winner)
+					if scenario == "root" then helpers.assert_eq(read(c.path), c.original) end
+					if scenario == "external" or scenario == "publication" then helpers.assert_eq(notices, 1) end
+					if scenario == "recovery" then
+						local fresh = handler.on_message({ action = "ready" }, state, context)
+						helpers.assert_true(fresh.pushed)
+						helpers.assert_eq(fresh.data.fields[1].value, "Independent")
+						local retry = handler.on_message({ action = "save", values = { first_name = "Retried" } }, state, context)
+						helpers.assert_true(retry.saved and retry.closed)
+						helpers.assert_eq(read(target), winner:gsub('first_name = "Independent"', 'first_name = "Retried"', 1))
+					end
+				end
+			end)
+		end)
+	end
+
 	for _, outcome in ipairs({ "committed", "uninitialized", "false", "nil", "number", "throw" }) do
 		helpers.it("consumes the actual canonical catalogue receipt after a real personal save " .. outcome, function()
 			with_native_owners(function(c)
