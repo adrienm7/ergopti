@@ -337,6 +337,11 @@ return_delay_ms = 200
 # AHK: keylogger.ahk INGEST_TICK_MS. HS: log_manager.lua INGEST_TICK_SEC.
 ingest_tick_ms = 5000
 
+# Hard deadline for one private SQLite child, including its stdin feed.
+# Linux: reservation, transactional flush and commit-receipt resolution are
+# separate owned phases; no new phase starts before physical cleanup ACK.
+sqlite_operation_timeout_ms = 1000
+
 # Keystroke delay above this value is treated as a "thinking pause".
 # AHK: keylogger.ahk / keylogger_walker.ahk THINK_PAUSE_MS.
 # HS: aggregator.lua THINK_PAUSE_THRESHOLD_MS.

@@ -139,6 +139,11 @@ local _pending_hotstring_events = {}
 -- pairs, everything an extension registers — was absent from the metrics.
 local _pending_shortcut_events = {}
 local _pending_app_switch_events = {}
+local _flush_state, _flush_stopping, _flush_pumping = nil, false, false
+local _flush_generation, _stop_final_dispatched, _stop_fallback_attempted = 0, false, false
+local _flush_listeners = {}
+local _last_flush_committed = false
+local _flush_unavailable_warned = false
 -- The window title currently focused, and when it became so. Held rather than
 -- asked for at flush, because a flush lands between keystrokes and the title by
 -- then may already be the next one.
@@ -286,6 +291,7 @@ local _password_apps = _default_password_apps()
 --- added in one place and cannot be forgotten on one of the five paths.
 --- @return boolean
 local function may_record()
+	if _flush_stopping then return false end
 	if not _enabled then return false end
 	if _suppressed then return false end
 	if _secure_filter_enabled and _secure_field then return false end
@@ -375,7 +381,10 @@ end
 --- Initialises the keylogger.
 --- @param opts table { log_dir?, password_apps? }
 function M.init(opts)
+	if _flush_state or _flush_stopping then return false end
 	if not Preferences.admit() then return false end
+	_flush_generation = _flush_generation + 1
+	_flush_listeners = {}
 	local options = type(opts) == "table" and opts or {}
 	-- Validate canonical consent before initializing collectors or persistent data.
 	local preferences = Preferences.snapshot()
@@ -921,6 +930,7 @@ end
 --- cached manifest it had before — the one visible symptom being that a reset
 --- changed nothing.
 function M.clear_cache()
+	if M.has_flush_debt() or _flush_stopping then return false end
 	_manifest_cache = { revision = nil, manifest = nil }
 	Logger.info(LOG, "Dashboard cache cleared at the user's request.")
 	return true
@@ -936,6 +946,7 @@ end
 --- @param score number|nil Productivity score, as the shared page defines it.
 --- @return boolean Whether it was persisted.
 function M.set_app_category(app_name, category, score)
+	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(app_name) ~= "string" or app_name == "" then
 		Logger.error(LOG, "set_app_category(): an application name is required.")
 		return false
@@ -1010,6 +1021,7 @@ end
 --- layered on top, so refreshing a dashboard never double-counts a session.
 --- @return table Metrics prefetch payload matching the macOS/Windows schema.
 function M.get_dashboard_payload(opts)
+	if M.is_flush_pending() then return nil, "SQLite flush pending" end
 	local options = type(opts) == "table" and opts or {}
 	local manifest = add_live_manifest_delta(persisted_manifest())
 	local prefetch = nil
@@ -1029,6 +1041,7 @@ end
 --- @param end_date string|nil Inclusive range end.
 --- @param apps table|nil Selected application IDs.
 function M.get_range_payload(start_date, end_date, apps)
+	if M.is_flush_pending() then return nil, "SQLite flush pending" end
 	local payload = { historical = empty_ngrams(), today = {} }
 	if SqliteWriter and SqliteWriter.is_available() and SqliteReader then
 		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps)
@@ -1306,6 +1319,7 @@ end
 --- @param enabled boolean
 --- @return boolean The posture actually in force after the call.
 function M.set_encrypt_enabled(enabled)
+	if M.has_flush_debt() or _flush_stopping then return false end
 	if not Preferences.admit() then return false end
 	local want = (enabled == true)
 	if want and not TextCipher.is_available() then
@@ -1334,6 +1348,7 @@ end
 --- posture. Idempotent: a pass over an already-converted table skips every row.
 --- @return boolean True when a pass is in flight.
 function M.migrate_stored_text()
+	if M.has_flush_debt() or _flush_stopping then return false end
 	if not Preferences.admit() then return false end
 	TextMigration.cancel()
 	return TextMigration.start(
@@ -1346,6 +1361,7 @@ end
 --- one openssl spawn per value, and the flush path runs on the keystroke side of
 --- the daemon where that cost would be felt as input lag.
 function M.pump_migration()
+	if M.has_flush_debt() then return end
 	TextMigration.pump()
 end
 
@@ -1368,8 +1384,9 @@ function M.is_encrypt_enabled()
 end
 
 --- Captures configuration without transient focus state or historical data.
---- @return table|nil Detached native and desired posture; nil during conversion.
+--- @return table|nil Detached posture; nil during conversion, owned flush or shutdown.
 function M.configuration_snapshot()
+	if M.has_flush_debt() or _flush_stopping then return nil end
 	if TextMigration.is_running() then
 		Logger.error(LOG, "Collector configuration is owned by an active historical conversion.")
 		return nil
@@ -1389,6 +1406,7 @@ end
 --- @param candidate table Configuration snapshot to apply or restore.
 --- @return boolean acknowledged
 function M.apply_configuration(candidate)
+	if M.has_flush_debt() or _flush_stopping then return false end
 	if type(candidate) ~= "table" or TextMigration.is_running() then return false end
 	for _, key in ipairs({ "enabled", "private_filter_enabled", "secure_filter_enabled",
 		"system_auth_filter_enabled", "encrypt", "cipher_enabled" }) do
@@ -1468,246 +1486,390 @@ function M.export_json()
 	return _to_json(data)
 end
 
---- Writes the current session stats to persistent storage.
----
---- Primary path: SQLite — inserts session summary into the canonical
---- events_typing table and upserts per-app aggregates + n-grams.
----
---- Fallback path: JSON log file (~/.config/ergopti/logs/keystrokes_YYYY-MM-DD.json)
---- when the sqlite3 CLI is absent.
-function M.flush()
-	local date = os.date("%Y-%m-%d")
-	local now_iso = os.date("!%Y-%m-%d %H:%M:%S")
-	local stats = M.get_session_stats()
-	local wpm = M.get_wpm()
+--- Copies only caller-owned RAM data; no I/O or persistence is implied.
+local function copy_flush_value(value)
+	if type(value) ~= "table" then return value end
+	local result = {}
+	for key, item in pairs(value) do result[key] = copy_flush_value(item) end
+	return result
+end
 
-	-- PRIMARY: SQLite persistence.
-	if SqliteWriter and SqliteWriter.is_available() then
-		-- 1. Persist buffered physical key events before any aggregate. This is
-		-- the canonical, replayable source shared with the macOS/AHK drivers.
-		local typing_batch = {}
-		-- The nine n-gram families, walked from the SAME buffered stream the raw
-		-- events are built from. Built here rather than accumulated per keystroke
-		-- because a sequence is only knowable in context — a bigram needs the
-		-- character before it, and a long pause has to be able to un-make one.
-		local ngram_batch = nil
-		-- Keystrokes are stamped on the monotonic clock, which says nothing about
-		-- the time of day; the activity histogram is entirely about the time of
-		-- day. Taking both readings at the same instant gives the offset between
-		-- them, and the offset is what makes an uptime figure into an hour.
-		local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
-		for app_id, pending in pairs(_pending_typing_events) do
-			if #pending.events > 0 then
-				local total_time_ms = 0
-				for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
-				typing_batch[#typing_batch + 1] = {
-					ts = now_iso, date = date, app = dashboard_app_name(app_id),
-					text = table.concat(pending.text),
-					wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
-					events_json = _to_json(pending.events),
-				}
-				local ok_walk, walked = pcall(AggregateWalker.walk,
-					pending.events, date, dashboard_app_name(app_id), ngram_batch,
-					{ times = pending.times, wall_offset_ms = wall_offset_ms })
-				if ok_walk then
-					ngram_batch = walked
-				else
-					-- Loudly, and without taking the raw events down with it: the
-					-- replayable stream is the source of truth and the aggregates are
-					-- derived from it, so losing the derivation must never lose the source.
-					Logger.error(LOG, "N-gram walk failed for '%s' — aggregates skipped: %s.",
-						tostring(app_id), tostring(walked))
-				end
-			end
+--- Composes one immutable snapshot without advancing public watermarks.
+local function capture_flush()
+	local date, now_iso = os.date("%Y-%m-%d"), os.date("!%Y-%m-%d %H:%M:%S")
+	local payload = { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} }, upserts = {} }
+	local add = setmetatable({}, { __index = function(_, kind)
+		return function(_, ...)
+			payload.upserts[#payload.upserts + 1] = { kind = kind, args = copy_flush_value({ ... }) }
 		end
-		if #typing_batch > 0 then
-			if not SqliteWriter.insert_typing_events(_device_id, typing_batch) then return end
-			_pending_typing_events = {}
-		end
-		if #_pending_hotstring_events > 0 then
-			if not SqliteWriter.insert_hotstring_events(_device_id, _pending_hotstring_events) then return end
-			_pending_hotstring_events = {}
-		end
-		if #_pending_shortcut_events > 0 then
-			if not SqliteWriter.insert_shortcut_events(_device_id, _pending_shortcut_events) then return end
-			_pending_shortcut_events = {}
-		end
-		if ngram_batch then
-			for _, group in ipairs(AggregateWalker.batches_for_writer(ngram_batch)) do
-				SqliteWriter.upsert_ngrams(_device_id, group.date, group.app,
-					group.ngrams, group.table_name)
-			end
-			local daily = AggregateWalker.daily_rows(ngram_batch)
-			for _, row in ipairs(daily.chars_class) do SqliteWriter.upsert_chars_class(_device_id, row) end
-			for _, row in ipairs(daily.errors) do SqliteWriter.upsert_errors(_device_id, row) end
-			for _, row in ipairs(daily.hourly) do SqliteWriter.upsert_hourly(_device_id, row) end
-			for _, row in ipairs(daily.hourly_min5) do SqliteWriter.upsert_hourly_min5(_device_id, row) end
-			for _, row in ipairs(daily.app_buckets) do SqliteWriter.upsert_app_bucket(_device_id, row) end
-			for _, row in ipairs(daily.bursts) do SqliteWriter.upsert_burst(_device_id, row) end
-			for _, row in ipairs(daily.sessions) do SqliteWriter.upsert_session(_device_id, row) end
-			for _, row in ipairs(daily.ergo) do SqliteWriter.upsert_ergo(_device_id, row) end
-			for _, row in ipairs(daily.layouts) do SqliteWriter.upsert_layout(_device_id, row) end
-		end
-		-- The machine's own state, which the dashboard puts beside the typing to
-		-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
-		if SystemMetrics then
-			local day = SystemMetrics.current()
-			if day then SqliteWriter.upsert_system_day(_device_id, day) end
-		end
-
-		if #_pending_app_switch_events > 0 then
-			-- Counted BEFORE the raw events are handed over, because that call
-			-- clears the buffer. The aggregate is derived from the same rows and
-			-- deriving it afterwards would count an empty list every time.
-			local transitions = {}
-			for _, event in ipairs(_pending_app_switch_events) do
-				local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
-				local row = transitions[key]
-				if not row then
-					row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
-					transitions[key] = row
-				end
-				row.count = row.count + 1
-			end
-			if not SqliteWriter.insert_app_switch_events(_device_id, _pending_app_switch_events) then return end
-			_pending_app_switch_events = {}
-			for _, row in pairs(transitions) do SqliteWriter.upsert_switch_to(_device_id, row) end
-		end
-
-		-- 2. Upsert only new per-app daily aggregate values.
-		local apps = M.get_app_stats()
-		for app_id, app_stats in pairs(apps) do
-			-- The dashboard and both other drivers retain the complete desktop
-			-- identifier (for example org.mozilla.firefox). Truncating at the first
-			-- dot silently merged unrelated applications in the persisted database.
-			local app_name = dashboard_app_name(app_id)
-			local current = {
-				chars       = app_stats.keystrokes or 0,
-				time_ms     = app_stats.typing_time_ms or 0,
-				app_time_ms = app_stats.focus_time_ms or 0,
-				hs_chars    = app_stats.hs_chars or 0,
-				hs_triggers = app_stats.hs_triggers or 0,
-				hs_input_chars = app_stats.hs_input_chars or 0,
-				-- The three LLM counters, missing from this table until 2026-08-06.
-				-- record_synthetic_output has always incremented them in memory and
-				-- upsert_app_day has always accepted them — they were simply never
-				-- named here, so every accepted completion was counted for the life of
-				-- the process and forgotten at the next start. The dashboard's
-				-- LLM-gain figure read zero on a machine that had been using it all
-				-- day, which looks exactly like a feature nobody uses.
-				llm_chars       = app_stats.llm_chars or 0,
-				llm_triggers    = app_stats.llm_triggers or 0,
-				llm_input_chars = app_stats.llm_input_chars or 0,
-				-- The denominators of the acceptance rate. Recorded in memory since
-				-- record_suggestion existed and never persisted, which is the same
-				-- shape the three LLM counters above had: a number the process knew
-				-- and forgot at every restart.
-				hs_suggested    = app_stats.hs_suggested or 0,
-				llm_suggested   = app_stats.llm_suggested or 0,
+	end })
+	local buffers = {
+		typing = _pending_typing_events, hotstrings = _pending_hotstring_events,
+		shortcuts = _pending_shortcut_events, switches = _pending_app_switch_events,
+	}
+	local _pending_typing_events, _pending_hotstring_events = buffers.typing, buffers.hotstrings
+	local _pending_shortcut_events, _pending_app_switch_events = buffers.shortcuts, buffers.switches
+	local _flushed_app_totals = copy_flush_value(_flushed_app_totals)
+	local _flushed_app_titles = copy_flush_value(_flushed_app_titles)
+	local _flushed_app_holds = copy_flush_value(_flushed_app_holds)
+	local _flushed_app_ngrams = copy_flush_value(_flushed_app_ngrams)
+	local _flushed_app_scancodes = copy_flush_value(_flushed_app_scancodes)
+	local _flushed_app_sources = copy_flush_value(_flushed_app_sources)
+	-- 1. Compose buffered physical key events and their matching aggregates. This is
+	-- the canonical, replayable source shared with the macOS/AHK drivers.
+	local typing_batch = {}
+	-- The nine n-gram families, walked from the SAME buffered stream the raw
+	-- events are built from. Built here rather than accumulated per keystroke
+	-- because a sequence is only knowable in context — a bigram needs the
+	-- character before it, and a long pause has to be able to un-make one.
+	local ngram_batch = nil
+	-- Keystrokes are stamped on the monotonic clock, which says nothing about
+	-- the time of day; the activity histogram is entirely about the time of
+	-- day. Taking both readings at the same instant gives the offset between
+	-- them, and the offset is what makes an uptime figure into an hour.
+	local wall_offset_ms = os.time() * MS_PER_SECOND - math.floor(Monotonic.now_ms())
+	for app_id, pending in pairs(_pending_typing_events) do
+		if #pending.events > 0 then
+			local total_time_ms = 0
+			for _, event in ipairs(pending.events) do total_time_ms = total_time_ms + (event[2] or 0) end
+			typing_batch[#typing_batch + 1] = {
+				ts = now_iso, date = date, app = dashboard_app_name(app_id),
+				text = table.concat(pending.text),
+				wpm = SharedMetrics.compute_wpm_from_events(#pending.events, total_time_ms),
+				events_json = _to_json(pending.events),
 			}
-			local previous = _flushed_app_totals[app_id] or {}
-			local delta = {}
-			local changed = false
-			for field, value in pairs(current) do
-				local increment = math.max(0, value - (previous[field] or 0))
-				delta[field] = increment
-				changed = changed or increment > 0
-			end
-			if changed then SqliteWriter.upsert_app_day(_device_id, date, app_name, delta) end
-			_flushed_app_totals[app_id] = current
-
-			-- Hold durations, as deltas: the row sums on conflict.
-			local flushed_holds = _flushed_app_holds[app_id] or {}
-			for code, row in pairs((_app_stats[app_id] or {}).kc_hold or {}) do
-				local before = flushed_holds[code]
-					or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
-				local delta_count = math.max(0, row.count - before.count)
-				if delta_count > 0 then
-					SqliteWriter.upsert_kc_hold(_device_id, {
-						date = date, app = app_name, keycode = code,
-						sum_ms = math.max(0, row.sum_ms - before.sum_ms),
-						count = delta_count,
-						-- The longest hold is a record, not a delta: sending the running
-						-- maximum is right because the column takes a MAX on conflict.
-						max_ms = row.max_ms,
-						tap_count = math.max(0, row.tap_count - before.tap_count),
-						hold_count = math.max(0, row.hold_count - before.hold_count),
-					})
-				end
-				flushed_holds[code] = {
-					sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
-					tap_count = row.tap_count, hold_count = row.hold_count,
-				}
-			end
-			_flushed_app_holds[app_id] = flushed_holds
-
-			-- Window titles, as deltas like everything else on this table: the rows
-			-- add on conflict, so writing the cumulative counters again would count
-			-- every earlier keystroke once more per flush.
-			local flushed_titles = _flushed_app_titles[app_id] or {}
-			for title, row in pairs((_app_stats[app_id] or {}).titles or {}) do
-				local before = flushed_titles[title] or { c = 0, ms = 0 }
-				local delta_c = math.max(0, (row.c or 0) - before.c)
-				local delta_ms = math.max(0, (row.ms or 0) - before.ms)
-				if delta_c > 0 or delta_ms > 0 then
-					SqliteWriter.upsert_title(_device_id, {
-						date = date, app = app_name, title = title,
-						c = delta_c, ms = delta_ms,
-					})
-				end
-				flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
-			end
-			_flushed_app_titles[app_id] = flushed_titles
-		end
-
-		-- 3. Record which per-app character counts are now persisted, so the
-		-- live view adds only what came after. They were also written here, as a
-		-- delta, on top of the aggregate walker's rows for the same characters:
-		-- both upserts add, so every stored character count was doubled. The
-		-- walker's rows, which carry the sources too, are the only write.
-		for app_id, app_stats in pairs(_app_stats) do
-			_flushed_app_ngrams[app_id] = {}
-			for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
-			_flushed_app_sources[app_id] = {}
-			for token, sources in pairs(app_stats.ngram_sources or {}) do
-				_flushed_app_sources[app_id][token] = {}
-				for source, count in pairs(sources) do _flushed_app_sources[app_id][token][source] = count end
-			end
-
-			local previous_scancodes = _flushed_app_scancodes[app_id] or {}
-			local scancode_delta = {}
-			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
-				local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
-				if increment > 0 then scancode_delta[scancode] = increment end
-			end
-			if next(scancode_delta) ~= nil then
-				if not SqliteWriter.upsert_scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta) then return end
-			end
-			_flushed_app_scancodes[app_id] = {}
-			for scancode, count in pairs(app_stats.physical_scancodes or {}) do
-				_flushed_app_scancodes[app_id][scancode] = count
+			local ok_walk, walked = pcall(AggregateWalker.walk,
+				pending.events, date, dashboard_app_name(app_id), ngram_batch,
+				{ times = pending.times, wall_offset_ms = wall_offset_ms })
+			if ok_walk then
+				ngram_batch = walked
+			else
+				-- Loudly, and without taking the raw events down with it: the
+				-- replayable stream is the source of truth and the aggregates are
+				-- derived from it, so losing the derivation must never lose the source.
+				return nil, "Typing aggregate derivation failed; pending source remains unacknowledged"
 			end
 		end
-
-		-- 4. Bump the revision counter so dashboards know new data exists.
-		SqliteWriter.bump_rev()
-		_manifest_cache = { revision = nil, manifest = nil }
-
-		Logger.info(LOG, "Session flushed to SQLite: %s.", _sqlite_path)
-		return
+	end
+	payload.raw.typing = typing_batch
+	if ngram_batch then
+		for _, group in ipairs(AggregateWalker.batches_for_writer(ngram_batch)) do
+			add.ngrams(_device_id, group.date, group.app, group.ngrams, group.table_name)
+		end
+		local methods = {
+			chars_class = "chars_class", errors = "errors", hourly = "hourly", hourly_min5 = "hourly_min5",
+			app_buckets = "app_bucket", bursts = "burst", sessions = "session", ergo = "ergo", layouts = "layout",
+		}
+		for family, rows in pairs(AggregateWalker.daily_rows(ngram_batch)) do
+			for _, row in ipairs(rows) do add[assert(methods[family])](_device_id, row) end
+		end
+	end
+	if #_pending_hotstring_events > 0 then
+		payload.raw.hotstrings = _pending_hotstring_events
+		_pending_hotstring_events = {}
+	end
+	if #_pending_shortcut_events > 0 then
+		payload.raw.shortcuts = _pending_shortcut_events
+		_pending_shortcut_events = {}
+	end
+	-- The machine's own state, which the dashboard puts beside the typing to
+	-- explain a quiet afternoon. Sampled on the daemon's tick, written here.
+	if SystemMetrics then
+		local day = SystemMetrics.current()
+		if day then add.system_day(_device_id, day) end
 	end
 
+	if #_pending_app_switch_events > 0 then
+		-- Count the transitions from this exact immutable raw snapshot. Its
+		-- source remains retained until the whole transaction is acknowledged.
+		local transitions = {}
+		for _, event in ipairs(_pending_app_switch_events) do
+			local key = event.date .. "\1" .. event.prev_app .. "\1" .. event.next_app
+			local row = transitions[key]
+			if not row then
+				row = { date = event.date, app_from = event.prev_app, app_to = event.next_app, count = 0 }
+				transitions[key] = row
+			end
+			row.count = row.count + 1
+		end
+		payload.raw.switches = _pending_app_switch_events
+		_pending_app_switch_events = {}
+		for _, row in pairs(transitions) do add.switch_to(_device_id, row) end
+	end
+
+	-- 2. Upsert only new per-app daily aggregate values.
+	local apps = M.get_app_stats()
+	for app_id, app_stats in pairs(apps) do
+		-- The dashboard and both other drivers retain the complete desktop
+		-- identifier (for example org.mozilla.firefox). Truncating at the first
+		-- dot silently merged unrelated applications in the persisted database.
+		local app_name = dashboard_app_name(app_id)
+		local current = {
+			chars       = app_stats.keystrokes or 0,
+			time_ms     = app_stats.typing_time_ms or 0,
+			app_time_ms = app_stats.focus_time_ms or 0,
+			hs_chars    = app_stats.hs_chars or 0,
+			hs_triggers = app_stats.hs_triggers or 0,
+			hs_input_chars = app_stats.hs_input_chars or 0,
+			-- The three LLM counters, missing from this table until 2026-08-06.
+			-- record_synthetic_output has always incremented them in memory and
+			-- upsert_app_day has always accepted them — they were simply never
+			-- named here, so every accepted completion was counted for the life of
+			-- the process and forgotten at the next start. The dashboard's
+			-- LLM-gain figure read zero on a machine that had been using it all
+			-- day, which looks exactly like a feature nobody uses.
+			llm_chars       = app_stats.llm_chars or 0,
+			llm_triggers    = app_stats.llm_triggers or 0,
+			llm_input_chars = app_stats.llm_input_chars or 0,
+			-- The denominators of the acceptance rate. Recorded in memory since
+			-- record_suggestion existed and never persisted, which is the same
+			-- shape the three LLM counters above had: a number the process knew
+			-- and forgot at every restart.
+			hs_suggested    = app_stats.hs_suggested or 0,
+			llm_suggested   = app_stats.llm_suggested or 0,
+		}
+		local previous = _flushed_app_totals[app_id] or {}
+		local delta = {}
+		local changed = false
+		for field, value in pairs(current) do
+			local increment = math.max(0, value - (previous[field] or 0))
+			delta[field] = increment
+			changed = changed or increment > 0
+		end
+		if changed then add.app_day(_device_id, date, app_name, delta) end
+		_flushed_app_totals[app_id] = current
+
+		-- Hold durations, as deltas: the row sums on conflict.
+		local flushed_holds = _flushed_app_holds[app_id] or {}
+		for code, row in pairs((_app_stats[app_id] or {}).kc_hold or {}) do
+			local before = flushed_holds[code]
+				or { sum_ms = 0, count = 0, max_ms = 0, tap_count = 0, hold_count = 0 }
+			local delta_count = math.max(0, row.count - before.count)
+			if delta_count > 0 then
+				add.kc_hold(_device_id, {
+					date = date, app = app_name, keycode = code,
+					sum_ms = math.max(0, row.sum_ms - before.sum_ms),
+					count = delta_count,
+					-- The longest hold is a record, not a delta: sending the running
+					-- maximum is right because the column takes a MAX on conflict.
+					max_ms = row.max_ms,
+					tap_count = math.max(0, row.tap_count - before.tap_count),
+					hold_count = math.max(0, row.hold_count - before.hold_count),
+				})
+			end
+			flushed_holds[code] = {
+				sum_ms = row.sum_ms, count = row.count, max_ms = row.max_ms,
+				tap_count = row.tap_count, hold_count = row.hold_count,
+			}
+		end
+		_flushed_app_holds[app_id] = flushed_holds
+
+		-- Window titles, as deltas like everything else on this table: the rows
+		-- add on conflict, so writing the cumulative counters again would count
+		-- every earlier keystroke once more per flush.
+		local flushed_titles = _flushed_app_titles[app_id] or {}
+		for title, row in pairs((_app_stats[app_id] or {}).titles or {}) do
+			local before = flushed_titles[title] or { c = 0, ms = 0 }
+			local delta_c = math.max(0, (row.c or 0) - before.c)
+			local delta_ms = math.max(0, (row.ms or 0) - before.ms)
+			if delta_c > 0 or delta_ms > 0 then
+				add.title(_device_id, {
+					date = date, app = app_name, title = title,
+					c = delta_c, ms = delta_ms,
+				})
+			end
+			flushed_titles[title] = { c = row.c or 0, ms = row.ms or 0 }
+		end
+		_flushed_app_titles[app_id] = flushed_titles
+	end
+
+	-- 3. Record which per-app character counts are now persisted, so the
+	-- live view adds only what came after. They were also written here, as a
+	-- delta, on top of the aggregate walker's rows for the same characters:
+	-- both upserts add, so every stored character count was doubled. The
+	-- walker's rows, which carry the sources too, are the only write.
+	for app_id, app_stats in pairs(_app_stats) do
+		_flushed_app_ngrams[app_id] = {}
+		for token, count in pairs(app_stats.ngrams or {}) do _flushed_app_ngrams[app_id][token] = count end
+		_flushed_app_sources[app_id] = {}
+		for token, sources in pairs(app_stats.ngram_sources or {}) do
+			_flushed_app_sources[app_id][token] = {}
+			for source, count in pairs(sources) do _flushed_app_sources[app_id][token][source] = count end
+		end
+
+		local previous_scancodes = _flushed_app_scancodes[app_id] or {}
+		local scancode_delta = {}
+		for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+			local increment = math.max(0, count - (previous_scancodes[scancode] or 0))
+			if increment > 0 then scancode_delta[scancode] = increment end
+		end
+		if next(scancode_delta) ~= nil then
+			add.scancodes(_device_id, date, dashboard_app_name(app_id), scancode_delta)
+		end
+		_flushed_app_scancodes[app_id] = {}
+		for scancode, count in pairs(app_stats.physical_scancodes or {}) do
+			_flushed_app_scancodes[app_id][scancode] = count
+		end
+	end
+
+	return {
+		payload = payload, buffers = buffers,
+		watermarks = {
+			totals = _flushed_app_totals, titles = _flushed_app_titles, holds = _flushed_app_holds,
+			ngrams = _flushed_app_ngrams, scancodes = _flushed_app_scancodes, sources = _flushed_app_sources,
+		},
+	}
+end
+
+--- Returns a RAM-only description of native ownership and logical flush debt.
+--- Known rollback permits coherent last-COMMIT + complete RAM projections;
+--- unresolved COMMIT and running writes must defer such merged projections.
+--- @return table
+function M.get_flush_status()
+	local state = _flush_state
+	local safe = state == nil or (state.operation ~= nil and state.operation:is_read_safe() == true)
+	return {
+		phase = state and (state.operation and state.operation:phase() or "uncertain") or "idle",
+		pending = not safe, has_debt = state ~= nil, read_safe = safe,
+		committed = state == nil and _last_flush_committed == true,
+		stopping = _flush_stopping, generation = _flush_generation,
+		retryable = state ~= nil and state.operation ~= nil and state.operation:is_retryable() == true,
+		error = state and state.operation and state.operation.result and state.operation.result.error or nil,
+	}
+end
+
+--- Returns whether a merged persisted/live projection must wait for a verdict.
+--- @return boolean
+function M.is_flush_pending() return M.get_flush_status().pending end
+
+--- Returns whether a captured snapshot is still unacknowledged.
+--- @return boolean
+function M.has_flush_debt() return _flush_state ~= nil end
+
+--- Subscribes to the next conclusive commit/rollback observation from pump().
+--- @param callback function Receives the RAM-only status; may run inline if safe.
+--- @return boolean
+function M.when_flush_settled(callback)
+	if type(callback) ~= "function" or _flush_stopping then return false end
+	local status = M.get_flush_status()
+	if status.read_safe then pcall(callback, status) else _flush_listeners[#_flush_listeners + 1] = callback end
+	return true
+end
+
+local function publish_flush_observation()
+	if _flush_stopping or not M.get_flush_status().read_safe then return end
+	local listeners = _flush_listeners
+	_flush_listeners = {}
+	local status = M.get_flush_status()
+	for _, callback in ipairs(listeners) do pcall(callback, status) end
+end
+
+--- Consumes staged native receipts off the input callback, without running luv.
+--- @return boolean Whether no captured snapshot remains.
+function M.pump_flush()
+	if _flush_pumping then return _flush_state == nil end
+	local state = _flush_state
+	if not state then publish_flush_observation(); return true end
+	if not state.operation then return false end
+	_flush_pumping = true
+	local called, settled = pcall(state.operation.pump, state.operation)
+	if not called then
+		Logger.error(LOG, "SQLite flush observation failed; exact ownership remains retained.")
+		_flush_pumping = false
+		return false
+	end
+	if settled == true then
+		local result = state.operation.result
+		if type(result) == "table" and result.committed == true then
+			local marks = state.snapshot.watermarks
+			_flushed_app_totals, _flushed_app_titles, _flushed_app_holds = marks.totals, marks.titles, marks.holds
+			_flushed_app_ngrams, _flushed_app_scancodes, _flushed_app_sources = marks.ngrams, marks.scancodes, marks.sources
+			_manifest_cache = { revision = nil, manifest = nil }
+			_last_flush_committed, _flush_state = true, nil
+			Logger.info(LOG, "Session flush received its SQLite COMMIT and native cleanup acknowledgement.")
+		elseif not state.failure_reported then
+			state.failure_reported = true
+			Logger.error(LOG, "SQLite persistence did not receive a conclusive successful COMMIT; pending source remains retained.")
+		end
+	end
+	_flush_pumping = false
+	publish_flush_observation()
+	return _flush_state == nil
+end
+
+local function restore_flush_buffers(buffers)
+	local function prepend(older, newer)
+		local values = {}
+		for _, value in ipairs(older) do values[#values + 1] = value end
+		for _, value in ipairs(newer) do values[#values + 1] = value end
+		return values
+	end
+	for app, older in pairs(buffers.typing) do
+		local newer = _pending_typing_events[app]
+		if newer then
+			for _, field in ipairs({ "text", "events", "times" }) do older[field] = prepend(older[field], newer[field]) end
+		end
+		_pending_typing_events[app] = older
+	end
+	_pending_hotstring_events = prepend(buffers.hotstrings, _pending_hotstring_events)
+	_pending_shortcut_events = prepend(buffers.shortcuts, _pending_shortcut_events)
+	_pending_app_switch_events = prepend(buffers.switches, _pending_app_switch_events)
+end
+
+local function warn_flush_unavailable()
+	if not _flush_unavailable_warned then
+		_flush_unavailable_warned = true
+		Logger.warn(LOG, "SQLite flush transport unavailable; pending source stays in memory and was not saved.")
+	end
+end
+
+local function dispatch_flush()
+	if SqliteWriter.flush_transport_available() ~= true then
+		_last_flush_committed = false
+		warn_flush_unavailable()
+		return false
+	end
+	local captured, snapshot, reason = pcall(capture_flush)
+	if not captured or not snapshot then
+		Logger.error(LOG, "SQLite flush preparation refused; pending source remains retained.")
+		return false
+	end
+	local payload = snapshot.payload
+	if #payload.raw.typing == 0 and #payload.raw.hotstrings == 0 and #payload.raw.shortcuts == 0
+		and #payload.raw.switches == 0 and #payload.upserts == 0 then
+		_last_flush_committed = true
+		return true
+	end
+	_flush_generation = _flush_generation + 1
+	_last_flush_committed = false
+	local state = { snapshot = snapshot }
+	_flush_state = state -- Reserve before any reentrant external allocation.
+	_pending_typing_events, _pending_hotstring_events = {}, {}
+	_pending_shortcut_events, _pending_app_switch_events = {}, {}
+	local called, operation = pcall(SqliteWriter.start_flush, _device_id, payload)
+	if not called then
+		Logger.error(LOG, "SQLite dispatch raised; uncertain ownership and source remain retained.")
+		return false
+	end
+	if not operation then
+		-- Refusal acquires nothing, but a port may have synchronously admitted
+		-- another input callback. Restore the old prefix without losing arrivals.
+		restore_flush_buffers(snapshot.buffers)
+		_flush_state = nil
+		return false
+	end
+	state.operation = operation
+	return M.pump_flush()
+end
+
+local function flush_json()
+	local date = os.date("%Y-%m-%d")
 	-- FALLBACK: JSON log file. It holds the session summary only, so the
 	-- buffered raw events are dropped here: kept, they grew for the whole
 	-- session, since only the SQLite branch ever emptied them.
-	_pending_typing_events = {}
-	_pending_hotstring_events = {}
-	_pending_shortcut_events = {}
-	_pending_app_switch_events = {}
-
 	if not _log_dir then
 		Logger.warn(LOG, "flush(): no log directory configured.")
-		return
+		return false
 	end
 
 	os.execute(string.format("mkdir -p '%s' 2>/dev/null", _log_dir:gsub("'", "'\\''")))
@@ -1717,12 +1879,72 @@ function M.flush()
 	local fh = io.open(path, "w")
 	if not fh then
 		Logger.error(LOG, "flush(): cannot write to '%s'.", path)
-		return
+		return false
 	end
-	fh:write(M.export_json(), "\n")
-	fh:close()
+	local written = fh:write(M.export_json(), "\n")
+	local closed = fh:close()
+	if not written or not closed then return false end
+	_pending_typing_events, _pending_hotstring_events = {}, {}
+	_pending_shortcut_events, _pending_app_switch_events = {}, {}
 
 	Logger.info(LOG, "Session flushed to JSON: %s.", path)
+	return true
+end
+
+--- Dispatches or retries one immutable flush snapshot; false never means saved.
+--- @return boolean True only after durable COMMIT and native cleanup ACK.
+function M.flush()
+	if _flush_stopping then return false end
+	if _flush_state then
+		local operation = _flush_state.operation
+		if operation and operation:is_retryable() then
+			_flush_generation = _flush_generation + 1
+			operation:retry()
+		end
+		return M.pump_flush()
+	end
+	if SqliteWriter and SqliteWriter.is_available() then return dispatch_flush() end
+	return flush_json()
+end
+
+--- Quiesces producers and waits for exact native retirement, independently of
+--- business success. Failed persistence remains retained and is reported; it
+--- must never be mistaken for a resource still owned after its cleanup ACK.
+--- @return boolean True only when no native flush work remains acquired.
+function M.stop()
+	if not _flush_stopping then
+		_flush_stopping = true
+		_flush_generation = _flush_generation + 1
+		_flush_listeners = {}
+	end
+	M.pump_flush()
+	if _flush_state then
+		local operation = _flush_state.operation
+		if not operation then return false end
+		-- A failed, physically settled attempt is not retried during shutdown.
+		-- A live attempt keeps its original deadline and can finish normally.
+		if operation:is_retryable() then operation:cancel(); M.pump_flush() end
+		if operation:is_settled() then
+			local result = operation.result
+			if type(result) == "table" and result.committed ~= true then return true end
+		end
+		if _flush_state then return false end
+	end
+	if _stop_final_dispatched then return true end
+	_stop_final_dispatched = true
+	if SqliteWriter and SqliteWriter.is_available() then
+		if dispatch_flush() then return true end
+		if _flush_state then return M.stop() end
+		if SqliteWriter.flush_transport_available() then
+			Logger.error(LOG, "Final SQLite persistence was refused before acquisition; source remains retained.")
+		end
+		return true
+	end
+	if not _stop_fallback_attempted then
+		_stop_fallback_attempted = true
+		if flush_json() ~= true then Logger.error(LOG, "Final session persistence failed before shutdown.") end
+	end
+	return true
 end
 
 
@@ -1766,6 +1988,8 @@ end
 
 --- Resets all session data.
 function M.reset_session()
+	if M.has_flush_debt() or _flush_stopping then return false end
+	_flush_generation = _flush_generation + 1
 	_hold_token = {}
 	if Metrics then Metrics.reset_session() end
 	_app_stats = {}
@@ -1787,6 +2011,7 @@ function M.reset_session()
 	_pending_app_switch_events = {}
 	_live = new_live_tracker()
 	_session_started_at = os.time() * 1000
+	return true
 end
 
 
@@ -1847,6 +2072,11 @@ end
 function M._pending_buffer_count_for_test()
 	local count = #_pending_hotstring_events + #_pending_shortcut_events + #_pending_app_switch_events
 	for _, pending in pairs(_pending_typing_events) do count = count + #pending.events end
+	if _flush_state then
+		local held = _flush_state.snapshot.buffers
+		count = count + #held.hotstrings + #held.shortcuts + #held.switches
+		for _, pending in pairs(held.typing) do count = count + #pending.events end
+	end
 	return count
 end
 

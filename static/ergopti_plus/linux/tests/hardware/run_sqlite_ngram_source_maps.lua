@@ -41,7 +41,7 @@ local function source_map(app)
 end
 local function synth(app, text, tag) K.record_synthetic_output(app, text, tag, math.floor(Clock.now_ms()), 0, 0) end
 synth("owned-public", "xx", "extension")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 check("first public synthetic batch admits arbitrary literal source label", function()
 	local map = source_map("owned-public")
 	assert(map.extension == 2)
@@ -50,7 +50,7 @@ end)
 if proof then assert(W.exec_sql("VACUUM INTO '" .. proof .. "/first.sqlite';")) end
 synth("owned-public", "x", "extension")
 synth("owned-public", "x", "paste")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 print("SQL public-second=" .. tostring(rows("SELECT c,td,cd,e,esrc_json FROM ngram_chars WHERE app='owned-public' AND token='x';")[1]))
 check("second same-device token flush retains additive arbitrary source counters", function()
 	local map = source_map("owned-public")
@@ -68,7 +68,7 @@ check("actual raw event metadata retains all four source-tagged synthetic entrie
 end)
 for _ = 1, 2 do
 	for _, tag in ipairs({ "hotstring", "llm", "other" }) do synth("owned-recognized", "x", tag) end
-	K.flush()
+	require("tests.support.sqlite_flush_native").flush(K)
 end
 check("recognized hotstring llm other counters keep their additive public semantics", function()
 	local map = source_map("owned-recognized")
@@ -76,9 +76,9 @@ check("recognized hotstring llm other counters keep their additive public semant
 	assert(rows("SELECT c FROM ngram_chars WHERE app='owned-recognized' AND token='x';")[1] == "6")
 end)
 K.on_keydown("x", math.floor(Clock.now_ms()), "owned-manual")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 K.on_keydown("x", math.floor(Clock.now_ms()), "owned-manual")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 check("manual none events do not invent synthetic attribution", function()
 	local map = source_map("owned-manual")
 	assert(map.none == nil and (map.hotstring or 0) == 0 and (map.llm or 0) == 0 and (map.other or 0) == 0)

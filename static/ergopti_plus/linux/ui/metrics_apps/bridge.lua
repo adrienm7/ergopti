@@ -15,13 +15,23 @@ M.bridge_name = "metrics_apps_bridge"
 
 local Logger = require("logger.shim")
 local LOG = "bridge.metrics_apps"
+local Flush = require("ui.metrics_flush_bridge")
+
+local function default_push(payload, state, context)
+	return Flush.push("metrics_apps", M.bridge_name, payload, state, context)
+end
+M._push = default_push
+local Requests = Flush.new("metrics_apps", function(...) return M._push(...) end)
 
 --- Builds the shared metrics payload expected by the browser dashboard.
 --- @param state table Daemon state.
 --- @return table
 local function _build_initial_payload(state, include_prefetch)
 	local keylogger = state.keylogger
-	if keylogger and type(keylogger.get_dashboard_payload) == "function" then
+	if keylogger then
+		local status = Flush.status(keylogger)
+		if not status or not status.read_safe or status.stopping
+			or type(keylogger.get_dashboard_payload) ~= "function" then return nil end
 		return keylogger.get_dashboard_payload({ include_prefetch = include_prefetch ~= false })
 	end
 	return {
@@ -43,7 +53,7 @@ end
 --- @param payload any  String or table from host_bridge.js.
 --- @param state  table Daemon state { engine, keylogger, config, llm, layout }.
 --- @return any|nil  Response to send back to JS.
-function M.on_message(payload, state)
+local function handle(payload, state, request)
 	if type(payload) == "string" then
 		if payload == "ready" then
 			Logger.info(LOG, "Metrics apps UI ready.")
@@ -61,7 +71,9 @@ function M.on_message(payload, state)
 	-- as a field: the page applies each reply as dashboard data, and a bare
 	-- { saved = … } or { supported = false } emptied it until the next poll.
 	local function with_payload(fields)
+		if not request.valid() then return nil end
 		local reply = _build_initial_payload(state, false)
+		if not reply then return nil end
 		for key, value in pairs(fields) do reply[key] = value end
 		return reply
 	end
@@ -80,10 +92,16 @@ function M.on_message(payload, state)
 	-- silent nil. The guard read as defensive while making the branch
 	-- permanently unreachable and wrong.
 	if action == "reset" then
+		local reset = false
 		if state.keylogger and type(state.keylogger.reset_session) == "function" then
-			pcall(state.keylogger.reset_session)
+			local ok, accepted = pcall(state.keylogger.reset_session)
+			reset = ok and accepted == true
+			if reset and not request.accept_reset() then return nil end
 		end
-		return _build_initial_payload(state, true)
+		if not request.valid() then return nil end
+		local reply = _build_initial_payload(state, true)
+		if reply then reply.reset = reset end
+		return reply
 	end
 
 	if action == "export" then
@@ -118,7 +136,7 @@ function M.on_message(payload, state)
 		local category = tostring(payload.cat or "")
 		if state.keylogger and type(state.keylogger.set_app_category) == "function" then
 			local ok = state.keylogger.set_app_category(app_name, category, tonumber(payload.score) or 0)
-			return with_payload({ saved = ok })
+			return with_payload({ saved = ok == true })
 		end
 		Logger.error(LOG, "Category edit for '%s' arrived but the keylogger cannot store it.", app_name)
 		return with_payload({ saved = false })
@@ -135,6 +153,32 @@ function M.on_message(payload, state)
 
 	Logger.warn(LOG, "Unknown bridge action received: %s.", tostring(action))
 	return nil
+end
+
+--- Routes requests through the flush and native page owner before any action.
+--- @param payload any
+--- @param state table
+--- @param context table|nil
+--- @return table|nil
+function M.on_message(payload, state, context)
+	if type(payload) == "table" then
+		payload = { action = payload.action, app = payload.app, cat = payload.cat, score = payload.score }
+	end
+	local action = type(payload) == "table" and payload.action or payload
+	if action ~= "ready" and action ~= "refresh" and action ~= "reset" and action ~= "export"
+		and action ~= "pause" and action ~= "resume" and action ~= "edit" and action ~= "pick" then return nil end
+	local read = action == "ready" or action == "refresh" or action == "pick" or action == "export"
+	return Requests.run(state, context, function(request) return handle(payload, state, request) end, not read)
+end
+
+--- Revokes deferred actions from the exact page being retired.
+--- @param epoch number
+function M.on_window_closed(epoch) Requests.close(epoch) end
+
+--- Restores test channels and revokes outstanding requests.
+function M._reset()
+	Requests.reset()
+	M._push = default_push
 end
 
 return M

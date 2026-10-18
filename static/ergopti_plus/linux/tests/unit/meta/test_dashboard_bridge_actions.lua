@@ -179,7 +179,7 @@ helpers.describe("dashboard bridges: the typing window answers from its cache", 
 			end,
 			clear_cache = function() return true end,
 		}
-		return keylogger, counts
+		return require("tests.fakes.metrics_keylogger").synchronous(keylogger), counts
 	end
 
 	--- The bridge with recording deferral and push channels.
@@ -267,11 +267,11 @@ helpers.describe("metrics apps bridge: every reply is dashboard data", function(
 
 	helpers.it("answers a category edit, the picker and a pause with the manifest", function()
 		local Bridge = helpers.load_module("ui.metrics_apps.bridge")
-		local state = { keylogger = {
+		local state = { keylogger = require("tests.fakes.metrics_keylogger").synchronous({
 			get_dashboard_payload = function() return { metrics_manifest = { ["2026-09-24"] = {} } } end,
 			set_app_category = function() return true end,
 			suppress = function() end,
-		} }
+		}) }
 		-- The page applies each reply as the dashboard; one without the manifest
 		-- emptied it until the next poll.
 		for _, message in ipairs({

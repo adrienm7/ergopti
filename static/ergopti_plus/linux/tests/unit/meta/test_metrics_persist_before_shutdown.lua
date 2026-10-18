@@ -69,12 +69,17 @@ helpers.describe("metrics persistence: not only at shutdown", function()
 
 	helpers.it("still flushes on the way out", function()
 		local code = daemon_source()
-		local flushes = 0
-		for _ in code:gmatch("keylogger%.flush") do flushes = flushes + 1 end
-		helpers.assert_true(flushes >= 3,
-			"the periodic flush is in ADDITION to the two shutdown paths, not instead "
-				.. "of them: the last few seconds before a clean exit are still worth "
-				.. "keeping — found " .. flushes .. " call site(s)")
+		local owner = code:match('name = "metrics SQLite flush",(.-)\n\t\t},')
+		helpers.assert_true(type(owner) == "string" and owner ~= "", "the final metrics owner must exist")
+		helpers.assert_true(owner:find("wait_for_ack = true", 1, true) ~= nil,
+			"shutdown must wait for physical SQLite cleanup, including a failed business write")
+		helpers.assert_true(owner:find("return keylogger.stop() == true", 1, true) ~= nil,
+			"the last input snapshot belongs to the acknowledged metrics shutdown owner")
+		local signal = code:match("local function on_term%(sig%)(.-)\n\tend")
+		helpers.assert_true(type(signal) == "string" and signal:find("shutdown.request", 1, true) ~= nil,
+			"SIGTERM must route through the same final metrics owner")
+		helpers.assert_true(code:find('shutdown.request("event loop returned")', 1, true) ~= nil,
+			"ordinary event-loop exit must route through the same final metrics owner")
 	end)
 
 end)
