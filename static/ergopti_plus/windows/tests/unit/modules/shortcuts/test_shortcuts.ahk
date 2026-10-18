@@ -250,8 +250,7 @@ TestShortcuts_DOMPathToFilesystem_EmptyInput() {
 Test("Shortcuts/win: DOMPathToFilesystem returns empty string for empty input", TestShortcuts_DOMPathToFilesystem_EmptyInput)
 
 TestShortcuts_GetKnownFolderDownloads_ReturnsStringOrEmpty() {
-	; The function returns a path string or "" when no Downloads folder found.
-	; We only assert on the return type — not the exact path (machine-dependent).
+	; The Shell chooses the current user's known folder, which is machine-dependent.
 	Result := GetKnownFolderDownloads()
 	AssertTrue(Result is String, "GetKnownFolderDownloads must return a string")
 }
@@ -585,3 +584,56 @@ for _SRCT_Scenario in ["pause", "cancel", "pause-resume", "ordinary", "absent",
 	"write-refused", "close-refused", "close-throws", "launch-throws"]
 	Test("Shortcuts/win: registry continuation " . _SRCT_Scenario . " (regjump-continuation-revocation)",
 		_SRCT_Continuation.Bind(_SRCT_Scenario))
+
+; Downloads can be moved away from USERPROFILE while an old Downloads folder
+; still exists there. Only the Shell known-folder identity selects the target.
+TestShortcuts_DownloadsUsesShellPath() {
+	Target := "Z:\Company\Alice\Downloads"
+	Calls := []
+	NativeCall(Name, Args*) {
+		Calls.Push(Name)
+		if Name == "shell32\SHGetKnownFolderPath" {
+			AssertEqual(0x374DE290, NumGet(Args[2], 0, "UInt"), "the Shell receives FOLDERID_Downloads")
+			AssertEqual(0xC4396491, NumGet(Args[2], 8, "UInt"), "the GUID tail keeps its native byte order")
+			AssertEqual(0x4000, Args[4], "a temporarily offline folder still resolves to its configured path")
+			AssertEqual(0, Args[6], "the current user owns the known-folder lookup")
+			NumPut("Ptr", StrPtr(Target), Args[8])
+			return 0
+		}
+		AssertEqual("ole32\CoTaskMemFree", Name, "the only other native call frees the Shell string")
+		AssertEqual(StrPtr(Target), Args[2], "the exact returned allocation is freed")
+	}
+	AssertEqual(Target, GetKnownFolderDownloads(NativeCall), "the redirected path wins over translated profile folders")
+	AssertEqual(2, Calls.Length, "one native lookup and one allocation release")
+}
+Test("Shortcuts/win: resolve redirected Downloads through the Shell (downloads-known-folder)",
+	TestShortcuts_DownloadsUsesShellPath)
+
+TestShortcuts_DownloadsRefusesNativeFailure() {
+	Calls := []
+	NativeCall(Name, Args*) {
+		Calls.Push(Name)
+		return -2147024891
+	}
+	Failure := ""
+	try GetKnownFolderDownloads(NativeCall)
+	catch as Err
+		Failure := Err.Message
+	AssertContains(Failure, "HRESULT 0x80070005", "an access denial must not silently choose a different folder")
+	AssertEqual(1, Calls.Length, "a refused lookup has no allocation to free")
+}
+Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
+	TestShortcuts_DownloadsRefusesNativeFailure)
+
+TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
+	Targets := []
+	AssertTrue(_OpenDownloadsWith(() => "Z:\Company\Alice Downloads", (Command) => Targets.Push(Command)))
+	AssertEqual('explorer.exe "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
+	FailedResolve() {
+		throw Error("Downloads lookup denied")
+	}
+	AssertThrows(() => _OpenDownloadsWith(FailedResolve, (Command) => Targets.Push(Command)))
+	AssertEqual(1, Targets.Length, "a failed lookup cannot launch Explorer at a guessed folder")
+}
+Test("Shortcuts/win: open only the resolved Downloads target (downloads-known-folder)",
+	TestShortcuts_OpenDownloadsKeepsResolvedTarget)
