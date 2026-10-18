@@ -25,6 +25,7 @@ async function observe(source, root, scenario) {
 	const diagnostics = [];
 	let warmCalls = 0;
 	let retiredMetricsCalls = 0;
+	let configTypesCalls = 0;
 	let initialReceipt;
 	let initialNonce;
 	let initialFullSave;
@@ -115,6 +116,46 @@ async function observe(source, root, scenario) {
 									saved += '# retained legacy dashboard bindings\n';
 								if (scenario === 'retired-missing') fs.unlinkSync(file);
 								else fs.writeFileSync(file, '\uFEFF' + saved);
+							}
+							if (fixture === 'literal-config-types') {
+								configTypesCalls++;
+								assert.equal(options.env.ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES, '1');
+								const file = path.join(probe, 'config/autohotkey/config.toml');
+								if (configTypesCalls === 1)
+									assert.equal(
+										fs.readFileSync(file, 'utf8'),
+										"[script]\nlocale = 'en'\nlog_level = 'DEBUG'\n" +
+											'[personal_editor]\ndefault_section = "001"\n'
+									);
+								assert.match(
+									fs.readFileSync(args[1], 'utf8'),
+									/_StartupSmokeConfigTypesReceipt\(\)/
+								);
+								const typedWarm = configTypesCalls === 2;
+								const corrupt = scenario.startsWith('types-warm-') ? typedWarm : !typedWarm;
+								const receipt = {
+									nonce: options.env.ERGOPTI_STARTUP_SMOKE_NONCE,
+									pid: launchPid + 1,
+									locale: 'en',
+									level: 'DEBUG',
+									section: '001'
+								};
+								if (corrupt && scenario.endsWith('-nonce')) receipt.nonce = 'f'.repeat(32);
+								if (corrupt && scenario.endsWith('-numeric')) receipt.section = 1;
+								if (corrupt && scenario.endsWith('-pid')) receipt.pid--;
+								if (corrupt && scenario.endsWith('-level')) receipt.level = 'INFO';
+								if (corrupt && scenario.endsWith('-locale')) receipt.locale = 'fr';
+								if (!(corrupt && scenario.endsWith('-missing')))
+									fs.writeFileSync(path.join(probe, 'config-types.json'), JSON.stringify(receipt), {
+										flag: 'wx'
+									});
+								fs.writeFileSync(
+									file,
+									'[script]\nlocale = "en"\nlog_level = "DEBUG"\n' +
+										'[personal_editor]\ndefault_section = ' +
+										(corrupt && scenario.endsWith('-disk') ? '1' : '"001"') +
+										'\n'
+								);
 							}
 							const warm = fixture === 'fresh-config' && initialReceipt !== undefined;
 							if (warm) warmCalls++;
@@ -250,7 +291,15 @@ async function observe(source, root, scenario) {
 			.readdirSync(owned)
 			.filter((name) => name.startsWith('ergopti-startup-diagnostics-'))
 			.map((name) => JSON.parse(fs.readFileSync(path.join(owned, name, 'receipt.json'), 'utf8')));
-		return { status, warmCalls, retiredMetricsCalls, diagnostics, retained, failure };
+		return {
+			status,
+			warmCalls,
+			retiredMetricsCalls,
+			configTypesCalls,
+			diagnostics,
+			retained,
+			failure
+		};
 	} finally {
 		assert.equal(
 			fs.realpathSync(owned),
@@ -601,6 +650,20 @@ async function check(source, root = ROOT) {
 		'retired-duplicate',
 		'retired-missing',
 		'slow-render',
+		'types-cold-pid',
+		'types-cold-level',
+		'types-cold-numeric',
+		'types-cold-locale',
+		'types-cold-nonce',
+		'types-cold-missing',
+		'types-cold-disk',
+		'types-warm-pid',
+		'types-warm-level',
+		'types-warm-numeric',
+		'types-warm-locale',
+		'types-warm-nonce',
+		'types-warm-missing',
+		'types-warm-disk',
 		'ready'
 	]) {
 		const result = await observe(source, root, scenario);
@@ -650,6 +713,14 @@ async function check(source, root = ROOT) {
 				1,
 				'the actual retired-Metrics boot must execute once'
 			);
+		if (scenario.startsWith('types-') || scenario === 'ready')
+			assert.equal(
+				result.configTypesCalls,
+				scenario.startsWith('types-cold-') ? 1 : 2,
+				'the authored configuration must boot and independently restart'
+			);
+		if (scenario.startsWith('types-'))
+			assert.match(result.diagnostics.join('\n'), /literal-config-types.*configuration/);
 		if (scenario.startsWith('retired-'))
 			assert.match(
 				result.diagnostics.join('\n'),
@@ -684,7 +755,7 @@ if (require.main === module)
 	check(fs.readFileSync(path.join(ROOT, OWNER), 'utf8')).then(
 		() =>
 			console.log(
-				'[OK] Twenty-nine inert actual startup admission cases reject stale readiness, uncommitted saves and retired-Metrics source loss.'
+				'[OK] Actual startup admission cases reject stale readiness, uncommitted saves, changed config types and retired-Metrics source loss.'
 			),
 		(error) => {
 			console.error(error);
