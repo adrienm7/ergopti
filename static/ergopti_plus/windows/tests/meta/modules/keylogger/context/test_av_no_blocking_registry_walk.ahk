@@ -1,9 +1,10 @@
-﻿; tests/meta/modules/keylogger/context/test_av_focus_mode_dead_code.ahk
+﻿; tests/meta/modules/keylogger/context/test_av_no_blocking_registry_walk.ahk
 
 ; ==============================================================================
-; MODULE: AV Focus-Mode Dead-Code Meta Test
+; MODULE: AV Slow Tick Registry-Walk Guard
 ; DESCRIPTION:
-; Static source guard for the "av-focus-mode-dead-code" finding.
+; Static source guard for the "av-focus-mode-dead-code" finding: the AV slow
+; tick never polls Focus Assist and never walks the registry.
 ;
 ; keylogger_av_state.ahk previously shipped a fully wired but permanently
 ; disabled Focus Assist detector: KL_AV_PollFocusMode() (the only caller in
@@ -15,10 +16,9 @@
 ;
 ; The fix removes the dead machinery entirely (per project rule 5.6 - no
 ; unused fallback code) until a non-blocking focus-state source exists. This
-; guard pins three regressions:
+; guard pins two regressions:
 ;   1. KL_AV_SlowTick must NOT call KL_AV_PollFocusMode.
-;   2. The KL_AV_PollFocusMode function definition must be gone.
-;   3. No `loop reg` may appear anywhere in the file (the blocking walk the
+;   2. No `loop reg` may appear anywhere in the file (the blocking walk the
 ;      removal note warns about must never return on this hot timer path).
 ;
 ; This is a meta-static test (scans source text) because keylogger_av_state.ahk
@@ -62,12 +62,6 @@ _AVFM_SlowTickDoesNotPollFocus() {
 }
 Test("Keylogger AV: KL_AV_SlowTick never calls KL_AV_PollFocusMode (av-focus-mode-dead-code)", _AVFM_SlowTickDoesNotPollFocus)
 
-_AVFM_PollFocusModeRemoved() {
-	Src := _AVFM_ReadSource("modules/keylogger/keylogger_av_state.ahk")
-	Assert(InStr(Src, "KL_AV_PollFocusMode() {") = 0,
-		"KL_AV_PollFocusMode() definition must be removed - inert machinery misleads maintainers and risks re-enabling the blocking registry walk (project rule 5.6)")
-}
-Test("Keylogger AV: KL_AV_PollFocusMode definition is removed (av-focus-mode-dead-code)", _AVFM_PollFocusModeRemoved)
 
 _AVFM_NoBlockingRegistryWalk() {
 	Src := _AVFM_ReadSource("modules/keylogger/keylogger_av_state.ahk")

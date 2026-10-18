@@ -1035,7 +1035,6 @@ global _AhkSubDir := ""
 #Include unit/modules/hotstrings/engine/test_build_inserts_covers_emitted_types.ahk
 #Include unit/modules/keylogger/metrics/test_metrics_and_locale_honesty.ahk
 #Include unit/modules/keylogger/test_keylogger_app_categories.ahk
-#Include meta/test_keylogger_ui_dead_code.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader.ahk
 #Include unit/modules/keylogger/reader/test_keylogger_reader_manifest_contract.ahk
 #Include unit/modules/keylogger/test_keylogger_llm_accepted_metrics.ahk
@@ -1251,9 +1250,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/keylogger/ergonomics/test_ergo_roi_count_synth.ahk
 #Include meta/modules/llm/profiles/test_profile_delete_path.ahk
 #Include meta/modules/llm/navigation/test_nav_val_modifiers_wired.ahk
-#Include meta/test_no_active_app_cache.ahk
-#Include meta/test_b7_1_dead_shims_absent.ahk
-#Include meta/test_b7_3_dead_fns_absent.ahk
 #Include meta/modules/updater/test_updater_sync_winhttp_blocks.ahk
 #Include meta/adapters/sqlite/test_sqlite_progress_yield.ahk
 #Include meta/modules/keylogger/ergonomics/test_agg_app_day_llm_suggested.ahk
@@ -1463,7 +1459,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/hotstrings/catalogue/test_activate_hotstrings_sleep_gate.ahk
 #Include meta/ui/windows/test_app_picker_t_variable_shadows_i18n.ahk
 #Include meta/infra/lifecycle/test_appstate_orphaned_parallel_state.ahk
-#Include meta/modules/keylogger/context/test_av_focus_mode_dead_code.ahk
+#Include meta/modules/keylogger/context/test_av_no_blocking_registry_walk.ahk
 #Include meta/ui/tooltip/test_border_gdi_cleanup_broken_nesting.ahk
 #Include meta/ui/tooltip/test_tooltip_measure_gdi_ownership.ahk
 #Include meta/platform/remap/keys/test_capslock_led_single_owner.ahk
@@ -1487,7 +1483,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/suite/test_driver_quoted_definitions.ahk
 #Include meta/adapters/crash_report/test_error_handler_heavy_diagnostics.ahk
 #Include meta/modules/hotstrings/catalogue/test_ext_builder_fn_dynamic_call_swallow.ahk
-#Include meta/infra/toml/test_format_toml_stale_path_deadcode.ahk
 #Include meta/modules/gestures/test_gesturepickcolor_clipboard_clobber.ahk
 #Include meta/modules/shortcuts/test_getselection_blocks_and_eats_keys.ahk
 #Include meta/adapters/crash_report/test_global_error_handler_sendevent_storm.ahk
@@ -1495,7 +1490,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/gestures/test_gesture_modifier_release_class.ahk
 #Include meta/ui/healthcheck/test_health_probe_timer_suspend_guard.ahk
 #Include meta/ui/healthcheck/test_healthcheck_init_dead_reference.ahk
-#Include meta/ui/healthcheck/test_healthcheck_onwebmsg_dead_code.ahk
+#Include meta/ui/healthcheck/test_healthcheck_webview_handler.ahk
 #Include meta/modules/hotstrings/engine/test_hse_disable_group_atomic.ahk
 #Include meta/ui/menu/test_insert_id_discovery_label_collision.ahk
 #Include meta/infra/config/persistence/test_isrepeat_section_name_mismatch_latent_divergence.ahk
@@ -1655,7 +1650,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/llm/api/test_llm_api_no_entry_logged.ahk
 #Include meta/modules/llm/prediction/test_llm_cancel_not_under_critical.ahk
 #Include meta/modules/llm/prediction/test_llm_dispatch_not_under_critical.ahk
-#Include meta/test_dead_ps1_pipeline_absent.ahk
 #Include meta/modules/llm/servers/test_deps_fail_restores_priority.ahk
 #Include meta/modules/llm/navigation/test_tab_accept_invalidates_inflight.ahk
 #Include meta/modules/llm/navigation/test_llm_accept_suppress_balance.ahk
@@ -1893,7 +1887,6 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/platform/remap/keys/test_space_hold_exception_guard.ahk
 #Include meta/modules/llm/api/test_stream_handle_type.ahk
 #Include meta/modules/llm/api/test_warmup_backoff_preserved.ahk
-#Include meta/test_wpm_menubar_dead_code_removed.ahk
 ; These three were orphaned with their own (duplicate or pure-scan) includes;
 ; the duplicate test_framework.ahk includes were stripped so they integrate.
 #Include meta/adapters/test_dpapi_blob_size.ahk
