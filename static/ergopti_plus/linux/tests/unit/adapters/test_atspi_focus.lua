@@ -207,6 +207,57 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_eq(snapshot.attributes.id, "urlbar-input")
 	end)
 
+	helpers.it("(focus-context-join) embedded cross-process fields retain their actual active frame ancestor", function()
+		local tree = { id = "desktop", children = { { id = "app", children = {
+			{ id = "frame", active = true, name = "Owned native frame", bus = ":1.10", path = "/owned/frame",
+				children = { { id = "embedded", bus = ":1.20", children = {
+					{ id = "field", focused = true, role = 61, bus = ":1.20", path = "/embedded/field" },
+				} } } },
+		} } } }
+		local fake = backend(tree)
+		fake.active = function(node) return node.active == true end
+		fake.retain = function(node) return node end
+		fake.process_id = function() return require("luv").os_getpid() end
+		fake.identity = function(node)
+			return { name = node.name or "", attributes = {}, native_bus_name = node.bus, native_object_path = node.path }
+		end
+		AtspiFocus._set_backend_for_test(fake)
+		local snapshot, conclusive = AtspiFocus._get_native_context_snapshot()
+		helpers.assert_true(conclusive)
+		helpers.assert_eq(snapshot.native_bus_name, ":1.20")
+		helpers.assert_eq(snapshot.native_object_path, "/embedded/field")
+		helpers.assert_eq(snapshot.window_bus_name, ":1.10")
+		helpers.assert_eq(snapshot.window_object_path, "/owned/frame")
+		helpers.assert_eq(snapshot.window_title, "Owned native frame")
+		helpers.assert_eq(snapshot.process_id, require("luv").os_getpid())
+		helpers.assert_true(type(snapshot.app_id) == "string" and snapshot.app_id ~= "")
+	end)
+
+	for _, fault in ipairs({ "none", "cross process", "scope", "bus", "frame", "pid", "app", "title" }) do
+		helpers.it("(focus-context-join) isolated context helper validates " .. fault, function()
+			local snapshot = { role = 61, attributes = {}, active_scope = true,
+				native_bus_name = ":1.8", native_object_path = "/owned/field",
+				window_bus_name = ":1.8", window_object_path = "/owned/frame",
+				process_id = 123, app_id = "owned-native", window_title = "Owned frame" }
+			if fault == "scope" then snapshot.active_scope = false end
+			if fault == "bus" then snapshot.native_bus_name = "display-label" end
+			if fault == "frame" then snapshot.window_bus_name = "unscoped-frame-label" end
+			if fault == "cross process" then snapshot.window_bus_name = ":1.9" end
+			if fault == "pid" then snapshot.process_id = 0 end
+			if fault == "app" then snapshot.app_id = "" end
+			if fault == "title" then snapshot.window_title = nil end
+			AtspiFocus._set_backend_for_test(nil)
+			AtspiFocus._set_command_runner_for_test(function(command)
+				helpers.assert_true(command:find("_get_native_context_snapshot", 1, true) ~= nil)
+				return true, "FOCUS:" .. require("json").encode(snapshot)
+			end)
+			local result, conclusive = AtspiFocus.get_context_snapshot()
+			helpers.assert_eq(conclusive, fault == "none" or fault == "cross process")
+			if fault == "none" or fault == "cross process" then helpers.assert_eq(result.app_id, "owned-native")
+			else helpers.assert_eq(result, nil) end
+		end)
+	end
+
 	AtspiFocus._set_backend_for_test(nil)
 	AtspiFocus._set_command_runner_for_test(nil)
 	package.loaded["logger.shim"] = previous_logger

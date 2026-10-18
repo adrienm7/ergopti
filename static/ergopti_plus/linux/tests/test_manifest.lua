@@ -9,6 +9,11 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_atspi_context_async",
+	"tests.unit.adapters.test_atspi_focus_watch",
+	"tests.unit.modules.keylogger.test_focus_guard_async",
+	"tests.unit.modules.keylogger.test_pointer_focus_privacy",
+	"tests.unit.infra.test_session_lock",
 	"tests.unit.modules.updater.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.test_production_manager_owners",
 	"tests.unit.infra.test_ollama_pinned_artifact",
@@ -119,6 +124,7 @@ return {
 	"tests.unit.meta.test_callback_error_description",
 	"tests.unit.meta.test_combination_labels",
 	"tests.unit.adapters.test_atspi_focus",
+	"tests.unit.adapters.test_atspi_focus_chains",
 	"tests.unit.adapters.test_clipboard_failure_atomic",
 	"tests.unit.adapters.test_clipboard_selection_transaction",
 	"tests.unit.adapters.test_evdev_reader",
@@ -376,6 +382,8 @@ return {
 	"tests.unit.modules.hotstrings.test_terminator_settings",
 	"tests.unit.modules.hotstrings.test_terminator_scope_policy",
 	"tests.unit.modules.keylogger.test_focus_guard",
+	"tests.unit.modules.keylogger.test_focus_guard_app_context",
+	"tests.unit.modules.keylogger.test_resident_text_identity",
 	"tests.unit.modules.keylogger.test_aggregate_walker",
 	"tests.unit.modules.keylogger.test_unicode_character_classes",
 	"tests.unit.modules.keylogger.test_app_switch_aggregate",

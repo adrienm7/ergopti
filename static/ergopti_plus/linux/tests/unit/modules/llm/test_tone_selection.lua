@@ -97,7 +97,7 @@ local function scenario(opts, body)
 		local world = { posts = {}, ollama = {}, notices = {}, reads = 0, focus = "editor\1Draft",
 			selection = opts.selection, preferences = preferences, emitted = {} }
 		package.loaded["adapters.secure_field_detector"] = {
-			isSecureField = function() return false end,
+			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
@@ -150,6 +150,7 @@ local function scenario(opts, body)
 			-- The daemon's seams: a copy probe, the injector, the window probe
 			read_selection = function()
 				world.reads = world.reads + 1
+				if world.on_read_selection then world.on_read_selection() end
 				if world.selection == nil then return false, "", "no_selection" end
 				return true, world.selection, nil
 			end,
@@ -161,6 +162,7 @@ local function scenario(opts, body)
 				return true
 			end,
 			focus_id = function() return world.focus end,
+			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -479,5 +481,89 @@ helpers.describe("injector: one Left arrow per user-perceived character", functi
 		for _, case in ipairs(cases) do
 			helpers.assert_eq(Injector.caret_steps(case[1]), case[2], "steps for " .. case[1])
 		end
+	end)
+end)
+
+helpers.describe("selection rewrites require a known stable native focus", function()
+	helpers.it("explains a tone refusal when privacy cannot admit its text field (selection-native-focus)", function()
+		scenario({ selection = "merci pour ton aide", secure = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+		end)
+	end)
+	helpers.it("refuses a paced tone request after its native field changes (selection-native-focus)", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			helpers.assert_eq(#world.posts, 1, "the second request must wait for pacing")
+			world.focus = "atspi::1.42:/different-field"
+			world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1, "a stale selected field cannot be sent after the timer fires")
+		end)
+	end)
+	for _, missing in ipairs({"empty", "unavailable"}) do
+		helpers.it("refuses tone before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
+			scenario({selection = "merci pour ton aide"}, function(world)
+				world.focus = missing == "empty" and "" or nil
+				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+				helpers.assert_eq(world.reads, 0, "an unknown target cannot authorize a copy probe")
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+					"a deliberate action must explain that the active text field is unavailable")
+			end)
+		end)
+	end
+
+	helpers.it("refuses a tone request when focus moves during selection capture (selection-native-focus)", function()
+		scenario({selection = "merci pour ton aide"}, function(world)
+			world.focus = "x11:10:100"
+			world.on_read_selection = function() world.focus = "x11:10:101" end
+			helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+			helpers.assert_eq(world.reads, 1)
+			helpers.assert_eq(#world.posts, 0, "the captured text is never attributed to the replacement target")
+			helpers.assert_eq(#world.emitted, 0)
+		end)
+	end)
+end)
+
+helpers.describe("tone resident global privacy admission", function()
+	for _, verdict in ipairs({ "protected", "unknown", "throw" }) do
+		helpers.it("refuses " .. verdict .. " ownership before reading tone selection (llm-global-privacy)", function()
+			scenario({ selection = "merci pour ton aide", privacy_guard = function()
+				if verdict == "throw" then error("controlled resident barrier failure") end
+				if verdict == "protected" then return true end
+			end }, function(world)
+				helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(#world.emitted, 0)
+			end)
+		end)
+	end
+	helpers.it("refuses nested cancellation before reading tone selection (llm-global-privacy)", function()
+		local current
+		scenario({ selection = "merci pour ton aide", privacy_guard = function() current.engine.cancel(); return false end }, function(world)
+			current = world
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+	helpers.it("rechecks global privacy before paced tone send and physical replacement (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = "merci pour ton aide", privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			blocked = true; world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_eq(#world.emitted, 0, "a completed protected selection is never replaced")
+			blocked = false
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			helpers.assert_eq(#world.posts, 1, "the next request must wait for pacing")
+			blocked = true; world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_true(world.engine.is_enabled())
+		end)
 	end)
 end)

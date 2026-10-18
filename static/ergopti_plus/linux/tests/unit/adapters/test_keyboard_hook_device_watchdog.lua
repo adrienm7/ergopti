@@ -764,7 +764,7 @@ local function aggregate_consumer_session(streams, options)
 	local reader = helpers.load_module("adapters.evdev_reader")
 	reader._set_backend((multi_recorder(queues)))
 	local writer = helpers.load_module("adapters.uinput_writer")
-	local session = { rows = {}, captures = {}, paths = paths, queues = queues, Input = Input }
+	local session = { rows = {}, captures = {}, chars = {}, paths = paths, queues = queues, Input = Input }
 	writer._set_backend({
 		open = function() return 7 end, ioctl = function() return true end,
 		write = function(_, bytes)
@@ -785,6 +785,7 @@ local function aggregate_consumer_session(streams, options)
 		end,
 		process = function(code, value)
 			session.captures[#session.captures + 1] = { code, value }
+			if options.process then return options.process(code, value) end
 			if value == 1 then held[code] = true elseif value == 0 then held[code] = nil end
 			if code == 30 and value ~= 0 then return held[42] and "A" or "a", "a" end
 			return nil, nil, nil
@@ -795,7 +796,8 @@ local function aggregate_consumer_session(streams, options)
 	package.loaded["adapters.xkb_capture"] = saved_xkb
 	session.hook = hook
 	if options.engine then assert(hook.set_remapper(options.engine)) end
-	hook.start({ intercept = true, onEmitRaw = function(code, value)
+	hook.start({ intercept = true, onChar = function(char) session.chars[#session.chars + 1] = char end,
+		onEmitRaw = function(code, value)
 		local acknowledged = writer.emit(code, value)
 		if options.after_emit then options.after_emit(session, code, value) end
 		return acknowledged
@@ -829,6 +831,89 @@ local function aggregate_consumer_session(streams, options)
 end
 
 helpers.describe("Hook aggregate modifier contract: preserved red controls", function()
+
+	helpers.it("(linux-text-wire-custody) omits a shared key press the output owner coalesced", function()
+		local session = aggregate_consumer_session({
+			a = { { 30, 1, 1 }, { 30, 0, 3 } }, b = { { 30, 1, 2 }, { 30, 0, 4 } },
+		})
+		session.pump(); local chars, rows = session.chars, session.rows; session.close()
+		helpers.assert_eq(rows, { { 30, 1 }, { 30, 0 } }, "the desktop received only one physical press")
+		helpers.assert_eq(chars, { "a" }, "the matcher must see exactly the text delivered to the desktop")
+	end)
+
+	helpers.it("(linux-text-wire-custody) preserves real autorepeat while omitting duplicate downs", function()
+		local session = aggregate_consumer_session({
+			a = { { 30, 1, 1 }, { 30, 1, 2 }, { 30, 2, 3 }, { 30, 0, 4 } },
+		})
+		session.pump(); local chars, captures = session.chars, session.captures; session.close()
+		helpers.assert_eq(chars, { "a", "a" }, "a repeat types a character; a duplicate down does not")
+		helpers.assert_eq(captures, { { 30, 1 }, { 30, 2 }, { 30, 0 } })
+	end)
+
+	helpers.it("(linux-text-wire-custody) ignores repeats of a key an injection already released", function()
+		local session = aggregate_consumer_session({ a = { { 30, 1, 1 } } })
+		session.pump()
+		local injected = session.inject_text("x")
+		session.queue("a", 30, 2, 2); session.queue("a", 30, 0, 3); session.pump()
+		local chars, rows = session.chars, session.rows; session.close()
+		helpers.assert_true(injected.ok)
+		helpers.assert_eq(rows, { { 30, 1 }, { 30, 0 }, { 45, 1 }, { 45, 0 } })
+		helpers.assert_eq(chars, { "a" }, "a spent repeat cannot invent text after an expansion")
+	end)
+
+	helpers.it("(linux-spent-capture-retirement) retires a captured lock before its next physical press", function()
+		local locked, down = false, false
+		local session = aggregate_consumer_session({ a = { { 58, 1, 1 }, { 30, 1, 2 } } }, {
+			process = function(code, value)
+				if code == 58 then
+					if value == 1 and not down then locked = not locked end
+					if value == 1 then down = true elseif value == 0 then down = false end
+				end
+			end,
+		})
+		session.pump()
+		local injected = session.inject_text("x")
+		session.queue("a", 30, 0, 3); session.queue("a", 58, 0, 4); session.pump()
+		session.queue("a", 58, 1, 5); session.queue("a", 58, 0, 6); session.pump()
+		local captures = session.captures; session.close()
+		helpers.assert_true(injected.ok)
+		helpers.assert_eq(locked, false, "the next CapsLock press must toggle after injection spent its prior output owner")
+		helpers.assert_eq(captures, { { 58, 1 }, { 30, 1 }, { 30, 0 }, { 58, 0 }, { 58, 1 }, { 58, 0 } },
+			"a spent output release still retires the physical transition already admitted to XKB")
+	end)
+
+	helpers.it("(linux-spent-capture-retirement) waits for the final shared spent owner before capture release", function()
+		local session = aggregate_consumer_session({ a = { { 30, 1, 1 } }, b = { { 30, 1, 2 } } })
+		session.pump()
+		local injected = session.inject_text("x")
+		session.queue("a", 30, 0, 3); session.pump()
+		local after_first = #session.captures
+		session.queue("b", 30, 0, 4); session.pump()
+		local captures, chars = session.captures, session.chars; session.close()
+		helpers.assert_true(injected.ok)
+		helpers.assert_eq(after_first, 1, "one shared source still owns the captured down")
+		helpers.assert_eq(captures, { { 30, 1 }, { 30, 0 } }, "the last physical owner retires capture once")
+		helpers.assert_eq(chars, { "a" }, "capture cleanup cannot create additional text")
+	end)
+
+	helpers.it("(linux-text-wire-custody) feeds Compose only the aggregate dead-key press", function()
+		local pending = false
+		local session = aggregate_consumer_session({
+			a = { { 40, 1, 1 }, { 40, 0, 3 }, { 18, 1, 5 }, { 18, 0, 6 } },
+			b = { { 40, 1, 2 }, { 40, 0, 4 } },
+		}, { process = function(code, value)
+			if value == 0 then return nil end
+			if code == 40 then
+				if pending then pending = false; return "^", "^" end
+				pending = true; return nil, "^"
+			end
+			if code == 18 then local char = pending and "ê" or "e"; pending = false; return char, "e" end
+		end })
+		session.pump(); local chars, captures = session.chars, session.captures; session.close()
+		helpers.assert_eq(chars, { "ê" }, "a suppressed second dead key cannot finish Compose early")
+		helpers.assert_eq(captures, { { 40, 1 }, { 40, 0 }, { 18, 1 }, { 18, 0 } },
+			"the capture state receives one aggregate press and the last owner's release")
+	end)
 
 	helpers.it("coalesces shared modifier capture to one global XKB down and final up", function()
 		local session = aggregate_consumer_session({

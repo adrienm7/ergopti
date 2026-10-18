@@ -74,7 +74,7 @@ local _process_thread = nil
 -- =========================================
 -- =========================================
 
--- Joins the application identity and the window title into one comparable key.
+-- Joins the native window, application identity and title into one comparable key.
 -- A control character rather than a printable one: a window title may legally
 -- contain any punctuation, and a separator that can occur in the data makes two
 -- different focus states compare equal.
@@ -87,24 +87,24 @@ local FOCUS_KEY_SEPARATOR = "\1"
 --- keystroke path's application cache, so the WindowInfo adapter could have been
 --- made to speak every Wayland compositor without changing anything a user sees.
 --- One question, one answer, wherever the answer has to come from.
---- @return string appId, string windowTitle
+--- @return string appId, string windowTitle, string nativeIdentity
 local function _focused_identity()
-	local ok, info = pcall(WindowInfo.getFocused)
-	if not ok or type(info) ~= "table" then return "", "" end
-	return info.appId or "", info.windowTitle or ""
+	local ok, info, native = pcall(WindowInfo.focused_snapshot)
+	if not ok or type(info) ~= "table" then return "", "", "" end
+	if type(native) ~= "string" then native = "" end
+	return info.appId or "", info.windowTitle or "", native
 end
 
 --- A value that changes exactly when the focused window's identity changes.
 ---
---- Includes the TITLE, not just the application. A browser switching to a
---- private window keeps its process and its window, and that transition is the
---- one the password-suppression feature exists to notice — keying on the window
---- id, as this did, made it structurally invisible.
+--- Native identity detects switches between identical titles in one process.
+--- The title also detects a browser changing privacy context within one window.
 --- @param app_id string
 --- @param title string
+--- @param native string
 --- @return string
-local function _focus_key(app_id, title)
-	return app_id .. FOCUS_KEY_SEPARATOR .. title
+local function _focus_key(app_id, title, native)
+	return native .. FOCUS_KEY_SEPARATOR .. app_id .. FOCUS_KEY_SEPARATOR .. title
 end
 
 --- Returns a set (name -> true) of currently running process names via ps,
@@ -227,8 +227,8 @@ function M.tick(tick_count)
 
 	-- Focus-change check (every tick)
 	local ok_f = pcall(function()
-		local app_name, title = _focused_identity()
-		local key = _focus_key(app_name, title)
+		local app_name, title, native = _focused_identity()
+		local key = _focus_key(app_name, title, native)
 		if key ~= _last_focus_key then
 			_last_focus_key = key
 			for _, cb in ipairs(_focus_callbacks) do

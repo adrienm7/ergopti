@@ -109,8 +109,9 @@ done
 
 LIB_DIR="${PREFIX}/lib/ergopti"
 BIN_DIR="${PREFIX}/bin"
-CONFIG_DIR="${HOME}/.config/ergopti/hotstrings"
-SYSTEMD_DIR="${HOME}/.config/systemd/user"
+CONFIG_ROOT="${XDG_CONFIG_HOME:-$HOME/.config}"
+CONFIG_DIR="${CONFIG_ROOT}/ergopti/hotstrings"
+SYSTEMD_DIR="${CONFIG_ROOT}/systemd/user"
 
 # Single source of truth for the shared-tree location, both the repo source and
 # the install destination. A future rename of the _shared/ tree only needs editing these
@@ -960,7 +961,7 @@ _setup_permissions
 if $INSTALL_SERVICE; then
 	echo ""
 	echo "=== Création des services systemd utilisateur ==="
-	AUTOSTART_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/autostart"
+	AUTOSTART_DIR="${CONFIG_ROOT}/autostart"
 	AUTOSTART_FILE="${AUTOSTART_DIR}/ergopti-hotstrings.desktop"
 	STARTUP_OWNER="xdg"
 
@@ -1057,7 +1058,7 @@ for kind in wrapper unit autostart; do
 	case "$kind" in
 		wrapper) owned="${BIN_DIR}/ergopti-hotstrings" ;;
 		unit) owned="${SYSTEMD_DIR}/ergopti-hotstrings.service" ;;
-		autostart) owned="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/ergopti-hotstrings.desktop" ;;
+		autostart) owned="${CONFIG_ROOT}/autostart/ergopti-hotstrings.desktop" ;;
 	esac
 	if [ "$kind" != wrapper ] && ! $INSTALL_SERVICE; then continue; fi
 	if [ -f "$owned" ]; then

@@ -44,6 +44,7 @@ try {
 		fs.writeFileSync(file, 'sentinel');
 	}
 	const stubs = path.join(sandbox, 'stubs');
+	let configHome = null;
 	fs.mkdirSync(stubs);
 	fs.writeFileSync(path.join(stubs, 'systemctl'), '#!/bin/bash\nexit 0\n', { mode: 0o755 });
 	const run = (...args) =>
@@ -51,7 +52,11 @@ try {
 			encoding: 'utf8',
 			input: '',
 			timeout: 15000,
-			env: { HOME: bashPath(home), PATH: `${bashPath(stubs)}:/usr/bin:/bin` }
+			env: {
+				HOME: bashPath(home),
+				PATH: `${bashPath(stubs)}:/usr/bin:/bin`,
+				...(configHome ? { XDG_CONFIG_HOME: bashPath(configHome) } : {})
+			}
 		});
 	assert.notEqual(run('--yes').status, 0, 'an unrelated wrapper must prevent removal');
 	assert.ok(fs.existsSync(library), 'refusal preserves the installation');
@@ -183,6 +188,36 @@ try {
 	assert.ok(!fs.existsSync(unit), 'quoted service entry removed');
 	assert.equal(fs.readFileSync(config, 'utf8'), 'sentinel', 'personal data preserved');
 	assert.equal(fs.readFileSync(neighbour, 'utf8'), 'sentinel', 'neighbour application preserved');
+	// Replay removal under a custom XDG config root. An ignored @unit receipt
+	// otherwise leaves an enabled service pointing to the deleted launcher.
+	configHome = path.join(home, 'config with spaces');
+	const customUnit = path.join(configHome, 'systemd/user/ergopti-hotstrings.service');
+	const customPersonal = path.join(configHome, 'ergopti/personal.toml');
+	const ownedFiles = [
+		['linux/ergopti_hotstrings.lua', path.join(library, 'linux/ergopti_hotstrings.lua'), 'runtime'],
+		[
+			'@wrapper',
+			wrapper,
+			`#!/bin/bash\nDRIVER_ROOT="${bashPath(library)}/linux"\nexec luajit "\${DRIVER_ROOT}/ergopti_hotstrings.lua" "$@"\n`
+		],
+		['@unit', customUnit, `[Service]\nExecStart=/bin/bash "${bashPath(wrapper)}" --tray\n`]
+	];
+	let customManifest = '';
+	for (const [relative, file, contents] of ownedFiles) {
+		fs.mkdirSync(path.dirname(file), { recursive: true });
+		fs.writeFileSync(file, contents);
+		customManifest += `${createHash('sha256').update(contents).digest('hex')}\t${relative}\n`;
+	}
+	fs.mkdirSync(path.dirname(customPersonal), { recursive: true });
+	fs.writeFileSync(customPersonal, 'custom-personal');
+	fs.writeFileSync(ownershipPath, customManifest);
+	const customPreflight = run('--check');
+	assert.equal(customPreflight.status, 0, customPreflight.stderr);
+	assert.ok(fs.existsSync(customUnit), 'XDG preflight preserves the owned service');
+	const customRemoval = run('--yes');
+	assert.equal(customRemoval.status, 0, customRemoval.stderr);
+	assert.ok(!fs.existsSync(customUnit), 'XDG config service must be removed with its launcher');
+	assert.equal(fs.readFileSync(customPersonal, 'utf8'), 'custom-personal');
 	console.log('[OK] Linux uninstaller removes only the validated standalone installation.');
 } finally {
 	fs.rmSync(sandbox, { recursive: true, force: true });

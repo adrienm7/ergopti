@@ -66,6 +66,14 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
                SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
 
+-- Retain the launcher's lock here, while preventing any later external process
+-- from holding it after this daemon stops or crashes.
+local lock_protected, lock_error = require("infra.session_lock").protect()
+if not lock_protected then
+	io.stderr:write("[session_lock] " .. lock_error .. "\n")
+	os.exit(78)
+end
+
 
 -- =========================================
 -- =========================================
@@ -147,6 +155,7 @@ local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
+local privacy_owners = {}
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
@@ -289,6 +298,21 @@ local shutdown = ShutdownCoordinator.new({
 				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
 					prediction_engine.cancel_model_download()
 				end
+			end,
+		},
+		{
+			name = "privacy context capture",
+			wait_for_ack = true,
+			stop = function()
+				return not privacy_owners.context or privacy_owners.context.stop() == true
+			end,
+		},
+		{
+			name = "accessible focus watch",
+			wait_for_ack = true,
+			stop = function()
+				if privacy_owners.watch then return privacy_owners.watch.stop() == true end
+				return true
 			end,
 		},
 		{
@@ -865,12 +889,26 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
+	privacy_owners.watch = require("adapters.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
+		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,
 		keylogger  = keylogger,
 		prediction = prediction_engine,
 		now_ms     = Monotonic.now_ms,
 		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
+		retry_ms   = Timings.ms("privacy", "context_retry_ms"),
+		capture_context_async = function(field, options, callback)
+			if not window_info or type(window_info.start_privacy_context) ~= "function" then return nil end
+			return window_info.start_privacy_context(field, options, callback)
+		end,
+		publish_context = function(context)
+			_cached_app_id = context.app_id
+			keylogger.set_private_window(keylogger.is_private_window(context.title))
+			local password_app = keylogger.is_password_app(context.app_id)
+			if password_app then keylogger.suppress() else keylogger.unsuppress() end
+			return true, keylogger.is_context_protected(context.app_id, context.title)
+		end,
 		reset_text = function()
 			_undoable = nil
 			_last_offered = nil
@@ -879,9 +917,14 @@ local function main()
 			engine:reset(false)
 		end,
 	})
+	privacy_owners.context = secure_focus_guard
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
+	if not privacy_owners.watch.start() or not privacy_owners.watch.wait_ready() then
+		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
+	end
 	secure_focus_guard.prime()
+	local physical_privacy_admission = nil
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
@@ -952,7 +995,11 @@ local function main()
 			secure_focus_guard.invalidate()
 			return
 		end
-		if secure_focus_guard.blocks_text() then return end
+		local admission = physical_privacy_admission
+		physical_privacy_admission = nil
+		if admission and admission.code == scancode then
+			if not admission.allowed then return end
+		elseif secure_focus_guard.blocks_text() then return end
 
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
@@ -1056,6 +1103,7 @@ local function main()
 			end
 		end
 
+		if result and secure_focus_guard.blocks_text() then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1257,6 +1305,9 @@ local function main()
 	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
 		capture_owned_scancodes[scancode] = nil
+		local allowed = not secure_focus_guard.blocks_text()
+		physical_privacy_admission = { code = scancode, allowed = allowed }
+		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
@@ -1278,6 +1329,8 @@ local function main()
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			is_paused     = script_actions.is_paused,
+			privacy_guard = secure_focus_guard.blocks_text,
+			privacy_context = secure_focus_guard.current_context,
 			-- How a manual prediction request says why it was refused: the daemon's
 			-- one transient surface outside the prediction overlay.
 			notify        = function(text)
@@ -1309,12 +1362,9 @@ local function main()
 				engine:reset()
 				return true
 			end,
-			-- Read live, not from the 250 ms focus cache: the answer is dropped when
-			-- another window took the focus while it ran.
-			focus_id = window_info and function()
-				local info = window_info.getFocused()
-				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
-			end or nil,
+			-- Retain the exact active text control: programmatic field changes can
+			-- happen inside one native window without any pointer or keyboard event.
+			focus_id = secure_focus_guard.focused_text_identity,
 			-- The AI agent's context: the application and the window title the
 			-- user is in, read live like focus_id.
 			focused_window = window_info and function()
@@ -1363,6 +1413,7 @@ local function main()
 		-- daemon happens to own would make the dashboard a picture of the driver's
 		-- configuration rather than of the user's habits.
 		if key_name == "shortcut" and type(detail) == "table" then
+			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
 			if chord then
 				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
@@ -1553,8 +1604,10 @@ local function main()
 	})
 
 	local function on_click()
-		secure_focus_guard.invalidate()
+		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
+		-- checks fresh privacy first; actual wrapping remains gated after settle.
 		wrap_on_type.on_pointer_down()
+		secure_focus_guard.invalidate()
 		-- A click may clear or move the selection a tone step would replace.
 		if prediction_engine then prediction_engine.drop_tone("pointer click") end
 		-- The guard above emptied the buffer at an unknown position. With
@@ -1689,6 +1742,7 @@ local function main()
 			capture_owned_scancodes[scancode] = nil
 			return
 		end
+		if secure_focus_guard.blocks_text() then return end
 		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
@@ -2385,9 +2439,9 @@ local function main()
 				process_lifecycle = nil
 			end)
 		end
-		-- A raw Tab/click invalidates synchronously on the input path. Only this
-		-- periodic path may run the blocking accessibility probe, after its shared
-		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
+		-- Raw navigation invalidates synchronously. Dispatch/retry stays periodic
+		-- after the shared focus-settle deadline; idle consumes retained results.
+		-- Unknown and probe failure stay fail-closed.
 		secure_focus_guard.refresh(false)
 		if file_watchers then
 			local owner = file_watchers
@@ -2472,6 +2526,9 @@ local function main()
 					tray_menu = nil
 				end)
 			end
+			privacy_owners.watch.pump()
+			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
+			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()

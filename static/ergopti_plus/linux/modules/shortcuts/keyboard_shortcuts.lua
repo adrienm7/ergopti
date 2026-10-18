@@ -825,13 +825,34 @@ function M.consume(detail, opts)
 	if not hit or hit.held_back or _configuration_owner ~= nil or entry_generation ~= _dispatch_generation then return false, nil end
 	local generation = _dispatch_generation
 	local admission_reader, decision_reader = opts.admission, M.magic_editor_decision
+	-- Ordinary chords have the same live gates as contextual bindings. A pause
+	-- or a modal capture can begin after the key was claimed but before delivery.
+	local function delivery_current()
+		if hit.physical or hit.decision then
+			return _configuration_owner == nil and generation == _dispatch_generation
+		end
+		local function owner_current()
+			return _configuration_owner == nil and generation == _dispatch_generation
+				and opts.admission == admission_reader
+		end
+		if not owner_current() then return false end
+		if admission_reader == nil then return true end
+		if type(admission_reader) ~= "function" then return false end
+		local called, admission = pcall(admission_reader)
+		if not called or type(admission) ~= "table" or not owner_current() then return false end
+		if type(admission.master) ~= "boolean" or type(admission.paused) ~= "boolean"
+			or admission.inhibited ~= false then return false end
+		return ScriptActions.is_script_action(hit.action)
+			or (admission.master == true and admission.paused == false)
+	end
+	if not delivery_current() then return false, nil end
 	-- A scheduled callback has no delivery rights until its original queue ACK.
 	local deferring, accepted, early, dispatched = true, false, false, false
 	local deferred, queued = pcall(opts.defer, function()
 		if deferring then early = true; return end
 		if not accepted or dispatched then return end
 		dispatched = true
-		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
+		if not delivery_current() then return end
 		if hit.physical then
 			if not physical_admitted(opts, hit) then return end
 			local source = physical_source_generation()
@@ -858,15 +879,18 @@ function M.consume(detail, opts)
 		if hit.decision and not contextual_current() then return end
 		if _configuration_owner ~= nil or generation ~= _dispatch_generation then return end
 		-- Logging and lazy executor loading can reenter after the first live check.
-		fire(hit, hit.physical and function() return physical_current(hit) end
-			or hit.decision and contextual_current or nil)
+		fire(hit, function()
+			if hit.physical and not physical_current(hit) then return false end
+			if hit.decision and not contextual_current() then return false end
+			return delivery_current()
+		end)
 	end)
 	deferring = false
 	if not deferred or queued ~= true or early then
 		Logger.error(LOG, "Keyboard shortcut %s could not be queued — the key is typed instead.", hit.slot)
 		return false, nil
 	end
-	if _configuration_owner ~= nil or generation ~= _dispatch_generation then return false, nil end
+	if not delivery_current() then return false, nil end
 	accepted = true
 	return true, hit.slot
 end

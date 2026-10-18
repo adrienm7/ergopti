@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "Noch nichts getippt, das die KI fortsetzen könnte.",
 	"llm.manual_prediction.paused": "Ergopti+ ist pausiert: kein Vorschlag erzeugt.",
 	"llm.prompt_prediction.unknown_prompt": "Der für diese Verknüpfung gewählte Prompt existiert nicht mehr: Wählen Sie einen anderen.",
+	"llm.text_target_unavailable": "KI ist im aktuellen Textfeld nicht verfügbar. Klicke in ein anderes Textfeld und versuche es erneut.",
 	"llm.tone.most_formal": "Der Text ist bereits im förmlichsten Ton.",
 	"llm.tone.most_familiar": "Der Text ist bereits im lockersten Ton.",
 	"llm.live.on": "Live-Modus an: {1}",

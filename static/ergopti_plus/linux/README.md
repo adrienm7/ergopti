@@ -180,6 +180,12 @@ keyboard layout. Reinstalling the application can reuse the retained settings.
 | Secure field detection   | ✅ AT-SPI    | ✅ AT-SPI              | Secure applications, private windows and focused password fields suppress capture and prediction; an inconclusive focus probe fails closed                                                                |
 | Config UI                | ✅ WebKitGTK | ✅ WebKitGTK           | Shared configuration, diagnostics, onboarding, metrics and editor pages are routed through page-scoped bridges                                                                                            |
 
+AI predictions, tone rewrites and translations require a fresh AT-SPI identity
+for the active text field before sending or inserting text. A window ID alone
+cannot distinguish two fields in the same application. Password fields and
+applications that do not expose an active accessible text destination refuse AI
+typing, including when the general privacy filters are disabled.
+
 ## Distribution support
 
 Target distributions: **Ubuntu 22.04+, Fedora 38+, Arch Linux, Debian 12+**.
