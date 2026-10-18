@@ -389,10 +389,23 @@ func managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {
 }
 #endif
 
+/// macOS 15 reports a proxy whose TCP connect is refused as the bare CFNetwork
+/// kCFErrorHTTPSProxyConnectionFailure (310), or kCFErrorHTTPProxyConnectionFailure
+/// (306) for plain HTTP, with no NSURLErrorDomain wrapper and no POSIX cause.
+/// Both fail before any proxy reply: a CONNECT that the proxy answers with an
+/// error is the separate code 311
+/// (kCFStreamErrorHTTPSProxyFailureUnexpectedResponseToCONNECTMethod).
+func managedHTTPProxyConnectionFailed(_ error: NSError) -> Bool {
+	return error.domain == kCFErrorDomainCFNetwork as String
+		&& [CFNetworkErrors.cfErrorHTTPSProxyConnectionFailure, .cfErrorHTTPProxyConnectionFailure]
+			.contains { error.code == Int($0.rawValue) }
+}
+
 func managedHTTPFailure(_ error: NSError) -> String {
 	#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
 	for fact in managedHTTPNativeErrorFacts(error) { _ = fputs(fact + "\n", stderr) }
 	#endif
+	if managedHTTPProxyConnectionFailed(error) { return "connect" }
 	guard error.domain == NSURLErrorDomain else { return "unavailable" }
 	let code = error.code
 	switch code {
@@ -610,6 +623,11 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 			while seen.insert(ObjectIdentifier(native)).inserted {
 				if native.domain == NSPOSIXErrorDomain && native.code == Int(ECONNREFUSED) {
 					refusedTCPConnect = true; break
+				}
+				// The bare proxy connection failure names the proxy route itself, so
+				// it does not depend on metrics for a connection that never opened.
+				if managedHTTPProxyConnectionFailed(native) {
+					refusedTCPConnect = true; proxyObserved = true; break
 				}
 				guard let underlying = native.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
 				native = underlying
