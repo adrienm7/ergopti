@@ -149,6 +149,47 @@ local run_contract = function(helpers,load_manager,load_host)
     end)
    end)
   end
+  for _,mode in ipairs({'close_debt','renderer_debt','closing','cancelled_acquisition','failed_acquisition'})do
+   helpers.it('(bridge-retirement-admission) queued native messages cannot save during '..mode,function()
+    fixture(function(m,c)
+     local writes=0;c.message=function()writes=writes+1;return{saved=true}end
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'save'end}end}
+     local function queued()c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)end
+     if mode=='failed_acquisition'then
+      c.present=function()error('private native presentation failure')end;c.view_destroy='no_ack'
+      helpers.assert_eq(m.show('metrics_typing','en'),false);queued()
+     elseif mode=='cancelled_acquisition'then
+      c.present=function(owner)owner.hide('metrics_typing',owner.current_epoch('metrics_typing'));queued()end
+      helpers.assert_eq(m.show('metrics_typing','en'),false)
+     else
+      helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+      if mode=='closing'then c.on_release=queued;helpers.assert_eq(m.hide('metrics_typing',epoch),true)
+      else
+       c.view_destroy='no_ack'
+       if mode=='renderer_debt'then c.views[1].on_web_process_terminated()
+       else helpers.assert_eq(m.hide('metrics_typing',epoch),false)end
+       helpers.assert_eq(m.current_epoch('metrics_typing'),epoch,'Exact native cleanup debt is retained')
+       helpers.assert_eq(m.page_current('metrics_typing',epoch),false);queued()
+      end
+     end
+     helpers.assert_eq(writes,0,'Retained cleanup authority must never retain the retired page mutation capability')
+     c.view_destroy=nil;c.on_release=nil;helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  helpers.it('(bridge-retirement-admission) live native acquisition still admits its ready callback',function()
+   fixture(function(m,c)
+    local ready=0;c.message=function()ready=ready+1;return{ready=true}end
+    c.present=function(owner)
+     c.provisional=not owner.page_current('metrics_typing',owner.current_epoch('metrics_typing'))
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'ready'end}end}
+     c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)
+    end
+    helpers.assert_eq(m.show('metrics_typing','en'),true);helpers.assert_eq(c.provisional,true)
+    helpers.assert_eq(ready,1);helpers.assert_eq(#c.replies,1)
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
   helpers.it('(webview-single-pump) reopening pages retains one process-wide GTK handler',function()
    fixture(function(m,c)
     for _=1,25 do
