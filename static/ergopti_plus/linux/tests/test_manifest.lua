@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.ui.menu.structure.test_menu_rebuild_owner",
 	"tests.unit.adapters.atspi.test_atspi_context_async",
 	"tests.unit.adapters.atspi.test_atspi_focus_watch",
 	"tests.unit.adapters.atspi.test_atspi_focus_watch_worker",
