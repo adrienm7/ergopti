@@ -254,14 +254,14 @@ helpers.describe("prefix expansions: reaching the engine", function()
 	local function loaded_with(provider)
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given, publications = {}, 0
-		local fake_engine = {
-			load_mappings = function(_, mappings)
-				given = mappings
-				publications = publications + 1
-				return true
-			end,
-		}
-		config.init(fake_engine, nil, nil)
+		local engine = require("hotstring_engine").new()
+		local load = engine.load_mappings
+		engine.load_mappings = function(self, mappings)
+			given = mappings
+			publications = publications + 1
+			return load(self, mappings)
+		end
+		config.init(engine, nil, nil)
 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
 		end
@@ -305,7 +305,10 @@ helpers.describe("prefix expansions: reaching the engine", function()
 		-- its phone, SSN and IBAN completions as well.
 		local config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		local given = nil
-		config.init({ load_mappings = function(_, mappings) given = mappings; return true end }, nil, nil)
+		local engine = require("hotstring_engine").new()
+		local load = engine.load_mappings
+		engine.load_mappings = function(self, mappings) given = mappings; return load(self, mappings) end
+		config.init(engine, nil, nil)
 		if not config.is_section_checked("dynamichotstrings", "phoneprefixes") then
 			helpers.assert_true(config.toggle_section("dynamichotstrings", "phoneprefixes"))
 		end

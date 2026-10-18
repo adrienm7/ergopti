@@ -256,3 +256,198 @@ helpers.describe("hotstring catalogue: runtime publication acknowledgement", fun
 		end)
 	end)
 end)
+
+
+helpers.describe("hotstring choice rollback keeps the published catalogue", function()
+	local function with_choice_runtime(callback, choices)
+		local previous_loader = package.loaded["modules.hotstrings.loader"]
+		local previous_config = package.loaded["modules.hotstrings.hotstrings_config"]
+		local Writer = require("toml_codec.writer")
+		local previous_writer = Writer.batch_write
+		local state = { reads = 0, writes = 0, unavailable = false }
+		package.loaded["modules.hotstrings.loader"] = {
+			find_toml_files = function() return {} end,
+			list_subdirs = function() return {} end,
+			read_file = function() return nil end,
+			load_catalogue = function()
+				state.reads = state.reads + 1
+				if state.unavailable then return { committed = false, errors = 1, mappings = {}, categories = {} } end
+				return { committed = true, errors = 0,
+					categories = { probe = { id = "probe", sections = { main = {} }, sections_order = { "main" } } },
+					mappings = { { trigger = "xyz", replacement = "candidate", group = "probe", section = "main", auto_expand = true } } }
+			end,
+		}
+		package.loaded["modules.hotstrings.hotstrings_config"] = nil
+		local ok, err = pcall(function()
+			local Config = require("modules.hotstrings.hotstrings_config")
+			local Engine = require("hotstring_engine").new()
+			require("tests.support.hotstring_choices").with_file(Config, choices, function(path)
+				helpers.assert_true(Config.init(Engine, "virtual.toml"))
+				local _, committed = Config.load_all()
+				helpers.assert_eq(committed, true)
+				local source = require("tests.support.hotstring_choices").read(path)
+				Writer.batch_write = function(...)
+					if state.allow_writes then
+						state.writes = state.writes + 1
+						return previous_writer(...)
+					end
+					state.writes, state.unavailable = state.writes + 1, true
+					return false, "injected concurrent configuration refusal"
+				end
+				callback(Config, Engine, state, path, source)
+			end)
+		end)
+		Writer.batch_write = previous_writer
+		package.loaded["modules.hotstrings.loader"] = previous_loader
+		package.loaded["modules.hotstrings.hotstrings_config"] = previous_config
+		if not ok then error(err, 0) end
+	end
+
+	for _, selection in ipairs({ "group", "section", "bulk", "category" }) do
+		helpers.it("restores exact " .. selection .. " mappings without rescanning refused sources (choice-rollback-image)", function()
+			local choices = "[hotstrings]\ngroups = { probe = " .. tostring(selection == "section")
+				.. " }\n[hotstrings.modules.probe]\nmain = " .. tostring(selection == "group") .. "\n"
+			with_choice_runtime(function(Config, Engine, state, path, source)
+				local previous = Engine:mapping_state()
+				local select = selection == "group" and function() return Config.enable_group("probe") end
+					or selection == "section" and function() return Config.toggle_section("probe", "main") end
+					or selection == "bulk" and function() return Config.enable_all() end
+					or function() return Config.set_category_scope_enabled({ "probe" }, true) end
+				helpers.assert_eq(select(), false, "the candidate file was refused")
+				Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
+				helpers.assert_nil(Engine:on_char("z"), "a refused selection must never leave its candidate expanding")
+				helpers.assert_eq(Config.is_group_enabled("probe"), selection == "section")
+				helpers.assert_eq(Config.is_section_checked("probe", "main"), selection == "group")
+				helpers.assert_eq(state.reads, 2, "inverse publication must use retained RAM, without another source scan")
+				helpers.assert_eq(state.writes, 1, "rollback must not rewrite the refused choice")
+				helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+				helpers.assert_eq(Engine:mapping_state().generation, previous.generation + 2,
+					"candidate and exact inverse both have acknowledged generations")
+			end, choices)
+		end)
+	end
+
+	helpers.it("retains the lease until the exact inverse acknowledges publication (choice-rollback-image)", function()
+		with_choice_runtime(function(Config, Engine, state, path, source)
+			local original = Engine.load_mappings
+			local inverse_allowed, calls = false, 0
+			Engine.load_mappings = function(self, mappings)
+				calls = calls + 1
+				if calls > 1 and not inverse_allowed then return false end
+				return original(self, mappings)
+			end
+			helpers.assert_eq(Config.enable_group("probe"), false)
+			helpers.assert_eq(Config.acquire({}), false, "an unacknowledged inverse retains exclusive ownership")
+			helpers.assert_eq(Config.retry_personal_gate_cleanup(), false)
+			helpers.assert_eq(Config.disable_all(), false, "another selection cannot interleave the inverse")
+			helpers.assert_eq(state.writes, 1)
+			inverse_allowed = true
+			helpers.assert_eq(Config.retry_personal_gate_cleanup(), true)
+			helpers.assert_eq(Config.is_group_enabled("probe"), false)
+			Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
+			helpers.assert_nil(Engine:on_char("z"))
+			helpers.assert_eq(state.reads, 2, "native retry still uses the original immutable image")
+			helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+			local next_owner = {}
+			helpers.assert_eq(Config.acquire(next_owner), true)
+			helpers.assert_eq(Config.release(next_owner), true)
+		end, "[hotstrings]\ngroups = { probe = false }\n[hotstrings.modules.probe]\nmain = true\n")
+	end)
+
+	helpers.it("never replaces a foreign generation while its inverse is pending (choice-rollback-image)", function()
+		with_choice_runtime(function(Config, Engine, state)
+			local original = Engine.load_mappings
+			local calls = 0
+			Engine.load_mappings = function(self, mappings)
+				calls = calls + 1
+				if calls > 1 then return false end
+				return original(self, mappings)
+			end
+			helpers.assert_eq(Config.enable_group("probe"), false)
+			helpers.assert_eq(original(Engine, { { trigger = "xyz", replacement = "foreign", auto_expand = true } }), true)
+			local foreign = Engine:mapping_state()
+			helpers.assert_eq(Config.retry_personal_gate_cleanup(), false)
+			helpers.assert_eq(Engine:mapping_state(), foreign, "the original candidate no longer owns this generation")
+			Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
+			helpers.assert_eq(Engine:on_char("z").replacement, "foreign")
+			helpers.assert_eq(state.reads, 2)
+			helpers.assert_eq(state.writes, 1)
+			helpers.assert_eq(Config.acquire({}), false, "foreign state cannot acknowledge the old inverse")
+		end, "[hotstrings]\ngroups = { probe = false }\n[hotstrings.modules.probe]\nmain = true\n")
+	end)
+
+	helpers.it("restores publication completed before a reporting exception (choice-rollback-image)", function()
+		with_choice_runtime(function(Config, Engine, state)
+			local Logger = require("logger.shim")
+			local previous, raised = Logger.success, false
+			Logger.success = function(module, message, ...)
+				if module == "modules.hotstrings.hotstrings_config" and message:sub(1, 7) == "Loaded " then
+					raised = true
+					error("injected post-publication reporting failure")
+				end
+				return previous(module, message, ...)
+			end
+			local ok, committed = pcall(Config.enable_group, "probe")
+			Logger.success = previous
+			helpers.assert_eq(ok, true)
+			helpers.assert_eq(raised, true, "the failure follows acknowledged engine publication")
+			helpers.assert_eq(committed, false)
+			Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
+			helpers.assert_nil(Engine:on_char("z"), "the exact inverse also owns exceptional completion")
+			helpers.assert_eq(Config.is_group_enabled("probe"), false)
+			helpers.assert_eq(state.reads, 2)
+			helpers.assert_eq(state.writes, 0)
+		end, "[hotstrings]\ngroups = { probe = false }\n[hotstrings.modules.probe]\nmain = true\n")
+	end)
+
+	for _, mode in ipairs({ "enable", "disable" }) do
+		for _, selection in ipairs({ "group", "all" }) do
+			helpers.it("refuses pending " .. mode .. " " .. selection .. " no-ops (choice-owner-preadmission)", function()
+				local before = mode == "disable"
+				with_choice_runtime(function(Config, Engine, state, path, source)
+					local original, calls = Engine.load_mappings, 0
+					Engine.load_mappings = function(self, mappings)
+						calls = calls + 1
+						if calls > 1 then return false end
+						return original(self, mappings)
+					end
+					local request = selection == "group" and function() return Config[mode .. "_group"]("probe") end
+						or Config[mode .. "_all"]
+					helpers.assert_eq(request(), false, "the initial file publication refuses")
+					helpers.assert_eq(request(), false, "a retained candidate is never an acknowledged no-op")
+					helpers.assert_eq(state.writes, 1)
+					helpers.assert_eq(Config.acquire({}), false)
+					helpers.assert_eq(require("tests.support.hotstring_choices").read(path), source)
+				end, "[hotstrings]\ngroups = { probe = " .. tostring(before)
+					.. " }\n[hotstrings.modules.probe]\nmain = true\n")
+			end)
+		end
+	end
+
+	for _, selection in ipairs({ "section", "all" }) do
+		helpers.it("plans " .. selection .. " intent after settling the inverse (choice-owner-preadmission)", function()
+			with_choice_runtime(function(Config, Engine, state, path)
+				local original, calls = Engine.load_mappings, 0
+				local inverse_allowed = false
+				Engine.load_mappings = function(self, mappings)
+					calls = calls + 1
+					if calls > 1 and not inverse_allowed then return false end
+					return original(self, mappings)
+				end
+				local request = selection == "section" and function() return Config.toggle_section("probe", "main") end
+					or Config.enable_all
+				helpers.assert_eq(request(), false)
+				inverse_allowed, state.unavailable, state.allow_writes = true, false, true
+				helpers.assert_true(request(), "the fresh intent must use the restored committed choices")
+				helpers.assert_eq(state.writes, 2, "an acknowledged intent is persisted after inverse retirement")
+				helpers.assert_eq(Config.is_group_enabled("probe"), true)
+				helpers.assert_eq(Config.is_section_checked("probe", "main"), true)
+				Engine:reset(); Engine:on_char("x"); Engine:on_char("y")
+				helpers.assert_eq(Engine:on_char("z").replacement, "candidate")
+				local document = require("toml_codec").decode(require("tests.support.hotstring_choices").read(path))
+				helpers.assert_eq(document.hotstrings.modules.probe.main, true)
+			end, "[hotstrings]\ngroups = { probe = " .. tostring(selection == "section")
+				.. " }\n[hotstrings.modules.probe]\nmain = false\n")
+		end)
+	end
+end)

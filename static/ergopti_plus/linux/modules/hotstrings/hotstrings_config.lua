@@ -19,7 +19,7 @@
 --- through the manifest's neutral defaults. Fresh independently admitted personal
 --- sources start enabled; known historical owners retain their explicit choices
 --- and historical missing-group false. A choice reaches the engine before it is
---- written. Refused personal choices restore the exact prior runtime image and
+--- written. Refused choices restore the exact prior runtime image and
 --- retain their lease until its native inverse is acknowledged.
 --- ==============================================================================
 
@@ -1472,7 +1472,7 @@ local function engine_generation(engine)
 	return value
 end
 
---- Settles only the exact candidate engine image owned by a refused gate edit.
+--- Settles only the exact candidate engine image owned by a refused choice edit.
 --- Foreign runtime generations keep the lease closed rather than being replaced.
 --- @return boolean restored
 function M.retry_personal_gate_cleanup()
@@ -1492,6 +1492,13 @@ function M.retry_personal_gate_cleanup()
 end
 -- =========================================
 
+--- Settles retained publication before a caller reads choices or plans a no-op.
+--- @return string|nil refusal Pending inverse or a foreign scope, otherwise nil.
+local function choice_refusal()
+	if M.retry_personal_gate_cleanup() ~= true then return "personal-gate-inverse-pending" end
+	if _scope_owner ~= nil then return "scope-pending" end
+end
+
 --- Publishes candidate choices to the engine, then to config.toml.
 ---
 --- The engine goes first so a catalogue it refuses never reaches the file. A
@@ -1503,19 +1510,17 @@ end
 --- @return boolean committed
 --- @return string|nil reason Refusal reason.
 local function commit_choices(changes, label)
-	if M.retry_personal_gate_cleanup() ~= true then return false, "personal-gate-inverse-pending" end
-	if _scope_owner ~= nil then
-		Logger.error(LOG, "%s refused: a hotstring configuration scope is still pending.", label)
-		return false, "scope-pending"
+	local refusal = choice_refusal()
+	if refusal then
+		Logger.error(LOG, "%s refused: %s.", label, refusal)
+		return false, refusal
 	end
 	if not _engine then
 		Logger.error(LOG, "%s refused: engine not initialised.", label)
 		return false, "engine-not-initialized"
 	end
-	local canonical = false
 	for _, change in ipairs(changes) do
 		if PersonalFiles.components(change.group) then
-			canonical = true
 			local binding = M.personal_file_scope_binding(change.group)
 			if not binding or binding.current() ~= true then
 				Logger.error(LOG, "%s refused: the personal source binding is unavailable or stale.", label)
@@ -1524,16 +1529,15 @@ local function commit_choices(changes, label)
 		end
 	end
 	local previous = _choices
-	local owner, snapshot, candidate_generation, candidate_live
-	if canonical then
-		if engine_generation(_engine) == nil then return false, "native-generation-unavailable" end
-		owner = {}
-		if M.acquire(owner) ~= true then return false, "scope-pending" end
-		_personal_transaction_owner = owner
-		snapshot = { paths = _toml_paths, sources = _personal_sources, adoptions = _personal_adoptions,
-			mappings = _mappings, live = _live_mappings, categories = _categories, overrides = _overrides,
-			override_source = _override_source, errors = _parse_errors, published = _published, choices = previous }
-	end
+	if engine_generation(_engine) == nil then return false, "native-generation-unavailable" end
+	local owner, candidate_generation, candidate_live = {}, nil, nil
+	if M.acquire(owner) ~= true then return false, "scope-pending" end
+	_personal_transaction_owner = owner
+	-- Every choice owns an exact inverse. Re-reading sources after a refused
+	-- file publication can itself refuse, leaving the candidate active forever.
+	local snapshot = { paths = _toml_paths, sources = _personal_sources, adoptions = _personal_adoptions,
+		mappings = _mappings, live = _live_mappings, categories = _categories, overrides = _overrides,
+		override_source = _override_source, errors = _parse_errors, published = _published, choices = previous }
 	local called, committed, reason = pcall(function()
 		local current, source = read_choices()
 		local candidate, operations = copy_choices(current), {}
@@ -1592,14 +1596,12 @@ local function commit_choices(changes, label)
 		_choices = candidate
 		local _, published, refusal = M.load_all(owner)
 		if published ~= true then return false, refusal end
-		if canonical then
-			candidate_generation, candidate_live = engine_generation(_engine), _live_mappings
-			if candidate_generation == nil then return false, "native-generation-unavailable" end
-			for _, change in ipairs(changes) do
-				if PersonalFiles.components(change.group) then
-					local binding = M.personal_file_scope_binding(change.group)
-					if not binding or binding.current() ~= true then return false, "stale-personal-source" end
-				end
+		candidate_generation, candidate_live = engine_generation(_engine), _live_mappings
+		if candidate_generation == nil then return false, "native-generation-unavailable" end
+		for _, change in ipairs(changes) do
+			if PersonalFiles.components(change.group) then
+				local binding = M.personal_file_scope_binding(change.group)
+				if not binding or binding.current() ~= true then return false, "stale-personal-source" end
 			end
 		end
 		if not require("hotstrings.personal_metadata").exact_rows_available(source.content or "", personal_rows) then
@@ -1610,33 +1612,26 @@ local function commit_choices(changes, label)
 		return true
 	end)
 	if called and committed == true then
-		if owner then
-			if M.release(owner) ~= true then return false, "scope-release-refused" end
-			_personal_transaction_owner = nil
-		end
+		if M.release(owner) ~= true then return false, "scope-release-refused" end
+		_personal_transaction_owner = nil
 		Logger.info(LOG, "%s committed (%d choice(s)).", label, #changes)
 		return true
 	end
 	reason = called and reason or tostring(committed)
-	if canonical then
-		if candidate_generation then
-			_personal_gate_debt = { owner = owner, engine = _engine, snapshot = snapshot,
-				generation = candidate_generation, live = candidate_live }
-			M.retry_personal_gate_cleanup()
-		else
-			_choices = previous
-			_toml_paths, _personal_sources, _personal_adoptions = snapshot.paths, snapshot.sources, snapshot.adoptions
-			_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
-			_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, {}
-			_parse_errors, _published = snapshot.errors, snapshot.published
-			if M.release(owner) == true then _personal_transaction_owner = nil end
-		end
-	elseif _choices ~= previous then
+	if candidate_live == nil and _live_mappings ~= snapshot.live then
+		candidate_generation, candidate_live = engine_generation(_engine), _live_mappings
+	end
+	if candidate_live then
+		_personal_gate_debt = { owner = owner, engine = _engine, snapshot = snapshot,
+			generation = candidate_generation, live = candidate_live }
+		M.retry_personal_gate_cleanup()
+	else
 		_choices = previous
-		local _, restored = M.load_all()
-		if restored ~= true then
-			Logger.error(LOG, "%s: the previous catalogue could not be republished.", label)
-		end
+		_toml_paths, _personal_sources, _personal_adoptions = snapshot.paths, snapshot.sources, snapshot.adoptions
+		_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
+		_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, {}
+		_parse_errors, _published = snapshot.errors, snapshot.published
+		if M.release(owner) == true then _personal_transaction_owner = nil end
 	end
 	Logger.error(LOG, "%s refused: %s.", label, tostring(reason))
 	return false, reason
@@ -1680,6 +1675,8 @@ end
 --- @param group_name string
 --- @return boolean committed
 function M.disable_group(group_name)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if not addressable(group_name) then return false end
 	if not M.is_group_enabled(group_name) then return true end
 	return commit_choices({ { group = group_name, enabled = false } }, "Category '" .. group_name .. "' disable")
@@ -1689,6 +1686,8 @@ end
 --- @param group_name string
 --- @return boolean committed
 function M.enable_group(group_name)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if not addressable(group_name) then return false end
 	if M.is_group_enabled(group_name) then return true end
 	return commit_choices({ { group = group_name, enabled = true } }, "Category '" .. group_name .. "' enable")
@@ -1698,6 +1697,8 @@ end
 --- @param group_name string
 --- @return boolean committed
 function M.toggle_group(group_name)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if not addressable(group_name) then return false end
 	local committed = commit_choices({ { group = group_name, enabled = not M.is_group_enabled(group_name) } },
 		"Category '" .. group_name .. "' toggle")
@@ -1712,6 +1713,8 @@ end
 --- happened, which is indistinguishable from a click that missed.
 --- @return integer|boolean Number of choices changed, or false when refused.
 function M.enable_all()
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	local changes = {}
 	for _, id in ipairs(known_categories()) do
 		if addressable(id) then
@@ -1734,6 +1737,8 @@ end
 --- Disables every known category, leaving each section choice as it was.
 --- @return integer|boolean Number of categories changed, or false when refused.
 function M.disable_all()
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	local changes = {}
 	for _, id in ipairs(known_categories()) do
 		if addressable(id) and M.is_group_enabled(id) then changes[#changes + 1] = { group = id, enabled = false } end
@@ -2040,6 +2045,8 @@ end
 --- @param section string
 --- @return boolean committed
 function M.toggle_section(category, section)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if not addressable(category) or not (addressable(section)
 		or PersonalFiles.components(category) and type(section) == "string" and _categories[category]
 		and (_categories[category].sections or {})[section]) then return false end
@@ -2078,6 +2085,8 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_all_sections(category, enabled)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if type(enabled) ~= "boolean" then return false end
 	local changes = section_changes({ category }, enabled)
 	if not changes then return false end
@@ -2093,6 +2102,8 @@ end
 --- @param enabled boolean
 --- @return boolean committed
 function M.set_categories_sections(categories, enabled)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	if type(categories) ~= "table" or type(enabled) ~= "boolean" then return false end
 	local changes = section_changes(categories, enabled)
 	if not changes then return false end
@@ -2108,6 +2119,8 @@ end
 --- @return boolean committed
 --- @return string|nil reason Stable planner or persistence refusal.
 function M.set_category_scope_enabled(targets, enabled)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	local inventory = {}
 	for id in pairs(_categories) do inventory[id] = own_sections(id) end
 	local changes, reason = PersonalAdoption.plan_selection(inventory, targets, enabled)
@@ -2127,6 +2140,8 @@ end
 --- @return boolean committed
 --- @return string|nil reason Stable planner or persistence refusal.
 function M.set_category_gates_enabled(targets, enabled)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	local inventory = {}
 	-- This operation offers category gates only. The existing scope planner
 	-- validates their known identities with no section leaves in this domain.
@@ -2150,6 +2165,8 @@ end
 --- @return boolean committed
 --- @return string|nil reason
 function M.set_extension_sections_enabled(targets, bound, enabled)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
 	local inventory = {}
 	for id in pairs(_categories) do inventory[id] = known_sections(id) end
 	-- This driver's existing extension commands preserve each whole pack's

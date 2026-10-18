@@ -152,10 +152,14 @@ local function with_wizard(answer, scenario)
 			--- Starts one session from the file, as a reload does.
 			function world.boot()
 				world.published = {}
-				Config.init({ load_mappings = function(_, published)
-					world.published[#world.published + 1] = published
-					return true
-				end }, "virtual.toml", nil)
+				local engine = require("hotstring_engine").new()
+				local load = engine.load_mappings
+				engine.load_mappings = function(self, published)
+					local committed = load(self, published)
+					if committed then world.published[#world.published + 1] = published end
+					return committed
+				end
+				Config.init(engine, "virtual.toml", nil)
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed, "the fixture catalogue must publish")
 			end
