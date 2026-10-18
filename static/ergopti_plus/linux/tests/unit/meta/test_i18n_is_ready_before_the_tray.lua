@@ -53,7 +53,7 @@ helpers.describe("boot order: the locale is loaded before the tray is drawn", fu
 		-- The fallback shown when the menu builder is unavailable. It listed a
 		-- French label written into the source, which is a translation of exactly
 		-- one of the twenty-one languages this driver speaks.
-		local fallback = src:match("tray_menu%.setMenu%(%{.-%}%)")
+		local fallback = src:match("tray_menu%.setFallbackMenu%b()")
 		helpers.assert_true(fallback ~= nil, "the degraded tray must still be findable")
 		helpers.assert_true(fallback:find("Quitter", 1, true) == nil,
 			"the degraded tray must take its label from i18n like every other row — a French string in "

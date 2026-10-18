@@ -143,6 +143,22 @@ function M.setMenu(items)
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
 end
 
+--- Installs the two-row fallback menu: a name and a way out.
+---
+--- The only rows this driver draws outside the shared renderer, and on
+--- purpose: they serve when the menu subsystem failed to load, and when the
+--- daemon cannot reach the keyboard and holds its icon to say so, so they must
+--- not depend on what they survive without. One builder serves both.
+--- @param title string The first, inert row.
+--- @param quit_label string The translated Quit row.
+--- @param on_quit function Runs when Quit is clicked.
+function M.setFallbackMenu(title, quit_label, on_quit)
+	M.setMenu({
+		{ title = title, disabled = true },
+		{ title = quit_label, fn = on_quit },
+	})
+end
+
 --- Shows the greyed logo while the daemon is paused, as the macOS menu bar and
 --- the Windows tray do; the normal one otherwise.
 --- @param paused boolean
