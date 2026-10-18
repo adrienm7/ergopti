@@ -21,7 +21,7 @@ const { spawnSync } = require('node:child_process');
 const ROOT = fs.realpathSync(path.resolve(__dirname, '../..'));
 const DIRECTORY = 'tools/diagnostics/apple_shortcuts_installed_target';
 const FILES = {
-	'collect_installed_target.py': '258776e0964bc09725452bd5e09a15438ba025974ced5ed87a542c6d6fef1529',
+	'collect_installed_target.py': '9e44dcfae877bb8987b7d96513a3daeaaeae3d1e7380014efd0c0065952447c2',
 	'installed_target_reader.py': '080eec4c55817e972f78e920cbcbbad02d0939618281aca23b845ec512fa976e',
 	'test_collector_source_binding.py':
 		'9290c8666a3cfe120ec25026764785a32892d5324058c463c45c919039cc012b',
@@ -36,7 +36,7 @@ const DEPENDENCIES = {
 	'tools/diagnostics/macos_owned_process.py':
 		'9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98',
 	'tools/diagnostics/apple_shortcuts_probe/run_probe.py':
-		'22eb3101e2719473519ffb3203262a00db1faca6ce924751add99b1cd876d9a2'
+		'b79ad910c43e23003908bb0cc2151fff7532f6df8154ab849b8aa80ef3f1342e'
 };
 // These names/order come from the original independently frozen 19+15 corpus.
 const GROUPS = {

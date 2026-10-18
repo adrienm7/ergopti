@@ -24,6 +24,15 @@ TARGET_BUNDLE = "com.apple.shortcuts.events"
 PROC_NOT_FOUND = -600
 CONSENT_ABSENT = {-1743: "refusal_code_observed", -1744: "consent_required"}
 PREFLIGHT_RETRY_SECONDS = 0.25
+# Every owned native step, and the preflight phase without a service start.
+CAPTURE_SECONDS = 20
+# Absolute bound of the preflight phase once Shortcuts Events had to be started.
+# Hosted run 39115677563 on macos-15-intel: `open -g -j -b` exited 0 in 247 ms,
+# then the next AEDeterminePermissionToAutomateTarget call blocked for ~17 s
+# while the cold-started agent checked in, until the shared 20 s deadline; the
+# arm64 job answered -1744 at once. 45 s covers that Intel cold start and keeps
+# the probe well inside the 2-minute workflow step.
+SERVICE_START_SECONDS = 45
 
 
 def require(condition):
@@ -178,18 +187,23 @@ def capture(
     role,
     *,
     deadline=None,
+    budget=CAPTURE_SECONDS,
     environment=None,
     allow_empty=False,
 ):
     owners = []
     started = time.monotonic()
     shared_deadline = deadline is not None
+    # Only the two named budgets exist; a caller cannot widen one ad hoc.
+    require(type(budget) is int and budget in (CAPTURE_SECONDS, SERVICE_START_SECONDS))
     if shared_deadline:
         require(
-            type(deadline) in (int, float) and math.isfinite(deadline) and deadline <= started + 20
+            type(deadline) in (int, float)
+            and math.isfinite(deadline)
+            and deadline <= started + budget
         )
     else:
-        deadline = started + 20
+        deadline = started + budget
     failure_kind = "none"
     observed_terminal = None
     primary_error = None
@@ -511,15 +525,20 @@ def discover_with_native_preflight(script, build, native, ownership, evidence, r
     that nobody answers on a hosted runner, so the native no-prompt preflight
     decides first. procNotFound means the on-demand Shortcuts Events agent is
     not running: LaunchServices starts it once, without activation, and the
-    preflight repeats. The original post-help 20 seconds cover every step.
+    preflight repeats. The post-help CAPTURE_SECONDS cover every step; a start
+    replaces them with SERVICE_START_SECONDS counted from the same phase start,
+    so no later preflight or the catalogue query ever gains a fresh budget.
     Returns the final status and the catalogue bytes, or None without consent.
     """
-    deadline = time.monotonic() + 20
+    phase_started = time.monotonic()
+    budget = CAPTURE_SECONDS
+    deadline = phase_started + budget
     record.update(
         {
             "source": "native_sdk",
             "statuses": [],
             "service_launch_attempted": False,
+            "budget_seconds": budget,
             "catalogue_retrieval_attempted": False,
         }
     )
@@ -533,6 +552,7 @@ def discover_with_native_preflight(script, build, native, ownership, evidence, r
             evidence,
             "permission_preflight",
             deadline=deadline,
+            budget=budget,
         )
         status = validate_permission_preflight(raw)
         record["statuses"].append(status)
@@ -544,6 +564,10 @@ def discover_with_native_preflight(script, build, native, ownership, evidence, r
             # -g and -j start the agent hidden in the background; LaunchServices
             # opens it without an Automation-gated Apple event from this process.
             record["service_launch_attempted"] = True
+            # Fixed at the phase start: time already spent stays spent.
+            budget = SERVICE_START_SECONDS
+            deadline = phase_started + budget
+            record["budget_seconds"] = budget
             capture(
                 ["/usr/bin/open", "-g", "-j", "-b", TARGET_BUNDLE],
                 native,
@@ -551,6 +575,7 @@ def discover_with_native_preflight(script, build, native, ownership, evidence, r
                 evidence,
                 "service_launch",
                 deadline=deadline,
+                budget=budget,
                 allow_empty=True,
             )
         else:
@@ -578,6 +603,7 @@ def discover_with_native_preflight(script, build, native, ownership, evidence, r
         evidence,
         "discovery",
         deadline=deadline,
+        budget=budget,
     )
     for lease in build["leases"].values():
         require_lease(lease)
