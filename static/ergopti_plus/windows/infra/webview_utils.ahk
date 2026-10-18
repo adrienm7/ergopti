@@ -213,13 +213,15 @@ class WebViewHost {
 		ReadyFired := false   ; guards against double OnReady ("ready" msg + NavCompleted)
 		Queue      := []
 		ResetDone  := false
+		BuildActive := false
+		CloseRequested := false
 		Epoch      := 0      ; invalidates deferred callbacks after close/reset
 		SafetyTimer := 0      ; BoundFunc for the safety flush; cancelled on teardown
 		Opts       := unset
 
 		; --------------------------------------------------------------------------
 		; Factory: opens (or reuses) a WebView2 window for AppId.
-		; Returns a WebViewHost instance on success, or "" (falsy) on fallback.
+		; Returns a host for an opened or user-cancelled request, or "" on fallback.
 		; The caller checks the return value: if falsy, build the native fallback.
 		;
 		; Opts keys (all optional unless noted):
@@ -266,15 +268,17 @@ class WebViewHost {
 
 				; ── Build the window ─────────────────────────────────────────────────
 				if !Host._Build() {
-						return ""
+						return Host.CloseRequested ? Host : ""
 				}
 
-				; ── Register singleton ───────────────────────────────────────────────
-				if !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"]) {
-						WebViewHost._Instances[AppId] := Host
-				}
-
-				return Host
+				; Publication and Close cannot interleave after the yielding build.
+				PreviousCritical := Critical("On")
+				try {
+						if !Host.ResetDone && !Host.CloseRequested
+								&& !(Opts.Has("AllowMultiple") && Opts["AllowMultiple"])
+								WebViewHost._Instances[AppId] := Host
+						return Host
+				} finally Critical(PreviousCritical)
 		}
 
 		; --------------------------------------------------------------------------
@@ -349,6 +353,35 @@ class WebViewHost {
 		; Returns true on success, false on fallback.
 		; --------------------------------------------------------------------------
 		_Build() {
+				if this.BuildActive || this.ResetDone
+						throw Error("WebViewHost cannot build an active or retired host.")
+				this.BuildActive := true
+				Completed := false
+				try {
+						Completed := this._BuildOwned()
+						return Completed && !this.CloseRequested
+				} finally {
+						this.BuildActive := false
+						if !Completed || this.CloseRequested
+								this.Close()
+				}
+		}
+
+		/**
+		 * Shows the native parent before controller creation reads its client rect.
+		 */
+		_ShowWindow(Window, Options) {
+				Window.Show(Options)
+		}
+
+		/**
+		 * Acquires a controller while the native parent remains owned by the build.
+		 */
+		_CreateController(PlaceholderHwnd, Loader) {
+				return WebView2.create(PlaceholderHwnd, , WebView_SharedEnvironment(Loader))
+		}
+
+		_BuildOwned() {
 				global _VendorDir, _SharedDir, _I18nLocale
 				this.Epoch += 1
 
@@ -360,6 +393,7 @@ class WebViewHost {
 
 				; ── Gui ──────────────────────────────────────────────────────────────
 				g := this._NewWindow(MinSize)
+				this.Gui := g
 				g.BackColor := BackColor
 				g.MarginX   := 0
 				g.MarginY   := 0
@@ -368,29 +402,30 @@ class WebViewHost {
 				g.OnEvent("Size",  this._OnResize.Bind(this))
 
 				; Show BEFORE creating the control — a hidden Gui has a zero client rect
-				g.Show((Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
-				this.Gui := g
+				this._ShowWindow(g, (Opts.Get("NoActivate", false) ? "NoActivate " : "") . "w" . Geo.w . " h" . Geo.h . " Center")
+				if this.CloseRequested
+						return false
 
 				; ── WebView2 create ──────────────────────────────────────────────────
 				loader := _VendorDir . "\64bit\WebView2Loader.dll"
 				if !IsSet(WebView2) || !FileExist(loader) {
 						try LoggerWarn("WebViewHost", "WebView2 unavailable for '{1}'.", this.AppId)
-						try g.Destroy()
-						this.Gui := 0
 						return false
 				}
 				try {
-						this.Controller := WebView2.create(Placeholder.Hwnd, , WebView_SharedEnvironment(loader))
+						this.Controller := this._CreateController(Placeholder.Hwnd, loader)
 				} catch as Err {
+						if this.CloseRequested
+								return false
 						try LoggerError("WebViewHost", "WebView2 create failed for '{1}': {2} — falling back.", this.AppId, Err.Message)
-						try g.Destroy()
-						this._Reset(false)
-						this.Gui := 0
 						return false
 				}
 
-				this.WebView   := this.Controller.CoreWebView2
-				this.ResetDone := false
+				if this.CloseRequested
+						return false
+				this.WebView := this.Controller.CoreWebView2
+				if this.CloseRequested
+						return false
 
 				; ── Harden settings ──────────────────────────────────────────────────
 				try {
@@ -402,19 +437,33 @@ class WebViewHost {
 						s.IsSwipeNavigationEnabled         := false
 				}
 
+				if this.CloseRequested
+						return false
+
 				; ── JS ↔ AHK bridge subscriptions ────────────────────────────────────
 				this.MsgSub := this.WebView.WebMessageReceived(this._OnWebMessage.Bind(this))
+				if this.CloseRequested
+						return false
 				this.NavSub := this.WebView.NavigationCompleted(this._OnNavigationCompleted.Bind(this))
+				if this.CloseRequested
+						return false
 
 				; ── Virtual host mapping ─────────────────────────────────────────────
 				try this.WebView.SetVirtualHostNameToFolderMapping(Vhost, _SharedDir, 1)
+				if this.CloseRequested
+						return false
 				; Extra vhosts (e.g. onboarding maps a second host to _StaticDir)
 				if Opts.Has("ExtraVhosts") && Opts["ExtraVhosts"] is Array {
 						for _, Ev in Opts["ExtraVhosts"] {
+								if this.CloseRequested
+										return false
 								if (Ev is Map && Ev.Has("host") && Ev.Has("path"))
 										try this.WebView.SetVirtualHostNameToFolderMapping(Ev["host"], Ev["path"], 1)
 						}
 				}
+
+				if this.CloseRequested
+						return false
 
 				; ── i18n seed ────────────────────────────────────────────────────────
 				if !(Opts.Has("SkipI18nSeed") && Opts["SkipI18nSeed"]) {
@@ -422,12 +471,18 @@ class WebViewHost {
 						Seed := "window.__i18n_base='https://" . Vhost . "/data/locales/';"
 								. "window._i18n_locale='" . Loc . "';"
 						try this.WebView.AddScriptToExecuteOnDocumentCreated(Seed)
+						if this.CloseRequested
+								return false
 				}
 
 				; ── Navigate ─────────────────────────────────────────────────────────
 				HtmlPath := Opts.Has("CustomHtmlPath") ? Opts["CustomHtmlPath"] : ("/ui/" . this.AppId . "/index.html")
 				try this.WebView.Navigate("https://" . Vhost . HtmlPath . "?cb=" . A_TickCount)
+				if this.CloseRequested
+						return false
 				try this.Controller.Fill()
+				if this.CloseRequested
+						return false
 
 				; ── Safety flush: if the page never posts "ready", flush after 2.5 s ─
 				; Keep the BoundFunc itself: SetTimer RETURNS an empty string, so
@@ -443,7 +498,7 @@ class WebViewHost {
 
 		; ── WebMessageReceived callback (COM) ────────────────────────────────────
 		_OnWebMessage(Handler, Args) {
-				if A_IsSuspended
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				try Msg := Args.TryGetWebMessageAsString()
 				if !IsSet(Msg)
@@ -468,7 +523,7 @@ class WebViewHost {
 		}
 
 		_DispatchMessage(CallbackEpoch, Payload) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
+				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
 						return
 				; Timer callbacks report failures through the global error owner.
 				this.Opts["OnMessage"](this, Payload)
@@ -476,7 +531,7 @@ class WebViewHost {
 
 		; ── NavigationCompleted callback ─────────────────────────────────────────
 		_OnNavigationCompleted(Handler, Args) {
-				if A_IsSuspended || this.ResetDone
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				this._FlushQueue()
 				this._FireOnReady()
@@ -486,7 +541,7 @@ class WebViewHost {
 		; "ready" postMessage and NavigationCompleted can trigger this; the
 		; ReadyFired flag guarantees the module's init-data push runs at most once.
 		_FireOnReady() {
-				if this.ReadyFired
+				if this.ReadyFired || this.ResetDone || this.CloseRequested
 						return
 				this.ReadyFired := true
 				if this.Opts.Has("OnReady")
@@ -494,7 +549,7 @@ class WebViewHost {
 		}
 
 		_DispatchReady(CallbackEpoch) {
-				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch)
+				if A_IsSuspended || this.ResetDone || (CallbackEpoch != this.Epoch) || this.CloseRequested
 						return
 				; Preserve initialization failures for the global timer error owner.
 				this.Opts["OnReady"](this)
@@ -503,6 +558,8 @@ class WebViewHost {
 		; ── Queue-based eval ─────────────────────────────────────────────────────
 		; Evaluates JS in the page, queuing until the page signals ready.
 		Eval(Js) {
+				if this.ResetDone || this.CloseRequested
+						return
 				if (this.Ready && this.HasOwnProp("WebView")) {
 						SetTimer(this._RunScript.Bind(this, Js), -1)
 				} else {
@@ -513,12 +570,14 @@ class WebViewHost {
 		}
 
 		_RunScript(Js) {
-				if !this.HasOwnProp("WebView")
+				if !this.HasOwnProp("WebView") || this.ResetDone || this.CloseRequested
 						return
 				WebView_RunScriptAsync(this.WebView, Js, "WebViewHost." . this.AppId)
 		}
 
 		_FlushQueue() {
+				if this.ResetDone || this.CloseRequested
+						return
 				this.Ready := true
 				for _, Js in this.Queue {
 						if this.HasOwnProp("WebView")
@@ -528,7 +587,7 @@ class WebViewHost {
 		}
 
 		_SafetyFlush() {
-				if A_IsSuspended || this.ResetDone
+				if A_IsSuspended || this.ResetDone || this.CloseRequested
 						return
 				if (!this.Ready) {
 						try LoggerWarn("WebViewHost", "{1}: page did not signal ready within timeout — flushing.", this.AppId)
@@ -538,7 +597,7 @@ class WebViewHost {
 
 		; ── Window events ────────────────────────────────────────────────────────
 		_OnResize(GuiObj, MinMax, Width, Height) {
-				if A_IsSuspended || this.ResetDone || (MinMax == -1)
+				if A_IsSuspended || this.ResetDone || (MinMax == -1) || this.CloseRequested
 						return
 				if this.HasOwnProp("Controller")
 						try this.Controller.Fill()
@@ -546,10 +605,22 @@ class WebViewHost {
 
 		_OnClose(*) {
 				this.Close()
+				return true
 		}
 
 		; ── Public: close and destroy the window ─────────────────────────────────
 		Close() {
+				if this.BuildActive {
+						; Native creation pumps GUI events. Keep its HWND alive until the
+						; pending controller returns, while revoking all callback effects.
+						if !this.CloseRequested {
+								this.CloseRequested := true
+								this.Epoch += 1
+						}
+						if this.Gui != 0
+								this.Gui.Hide()
+						return
+				}
 				Saved := (this.Gui != 0) ? this.Gui : 0
 				this._Reset(true)
 				try {
