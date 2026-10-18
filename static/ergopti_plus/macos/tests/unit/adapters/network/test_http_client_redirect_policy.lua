@@ -270,3 +270,44 @@ helpers.describe("HttpClient redirect ownership", function()
 		helpers.assert_true(type(terminal.error) == "string" and terminal.error ~= "")
 	end)
 end)
+
+helpers.describe("redirect reference resolution", function()
+	for _, case in ipairs({
+		{ location = "#section", expected = "https://api.example.test/a/b/c?base=kept#section" },
+		{ base = "https://api.example.test/a/./b?old", location = "?new", expected = "https://api.example.test/a/./b?new" },
+		{ base = "https://api.example.test/a/./b?old", location = "#new", expected = "https://api.example.test/a/./b?old#new" },
+		{ location = ".", expected = "https://api.example.test/a/b/" },
+		{ location = "..", expected = "https://api.example.test/a/" },
+		{ location = "../models//latest", expected = "https://api.example.test/a/models//latest" },
+		{ location = "?next=chosen", expected = "https://api.example.test/a/b/c?next=chosen" },
+		{ location = "../", expected = "https://api.example.test/a/" },
+		{ location = "../../../../models", expected = "https://api.example.test/models" },
+		{ location = "models/.", expected = "https://api.example.test/a/b/models/" },
+		{ location = "models/..", expected = "https://api.example.test/a/b/" },
+		{ location = "./models/../latest", expected = "https://api.example.test/a/b/latest" },
+		{ location = "models?next=/../latest", expected = "https://api.example.test/a/b/models?next=/../latest" },
+		{ location = "models#next/../latest", expected = "https://api.example.test/a/b/models#next/../latest" },
+		{ location = "models%2F..%2Flatest", expected = "https://api.example.test/a/b/models%2F..%2Flatest" },
+		{ location = "/a//b/../models", expected = "https://api.example.test/a//models" },
+		{ location = "//api.example.test/a/./models", expected = "https://api.example.test/a/models" },
+		{ location = "https://api.example.test/a/b/../models", expected = "https://api.example.test/a/models" },
+	}) do
+		helpers.it("resolves " .. case.location .. " (http-redirect-reference)", function()
+			helpers.with_stub_scope({ "adapters.http_client", "adapters.timer_scheduler" }, function()
+				local client, state = load_fixture()
+				local terminal
+				client.get(case.base or "https://api.example.test/a/b/c?base=kept", {
+					Authorization = "Bearer same-origin-token",
+				}, function(result) terminal = result end)
+				state.callbacks[1](307, "", { location = case.location })
+				helpers.assert_eq(#state.requests, 2)
+				helpers.assert_eq(state.requests[2].url, case.expected)
+				helpers.assert_eq(state.requests[2].headers.Authorization, "Bearer same-origin-token")
+				helpers.assert_eq(terminal, nil, "a redirect is not the terminal response")
+				state.callbacks[2](200, "chosen resource", {})
+				helpers.assert_eq(terminal.ok, true)
+				helpers.assert_eq(terminal.body, "chosen resource")
+			end)
+		end)
+	end
+end)

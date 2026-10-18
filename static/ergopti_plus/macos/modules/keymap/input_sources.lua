@@ -6,7 +6,7 @@
 --- Enumerates and switches the macOS keyboard input sources (the live HIToolbox
 --- list), maps the layouts an installed bundle declares to their TIS identifiers,
 --- adds or removes any installed .keylayout in the enabled list, and selects a
---- source via isolated osascript. Extracted from ui/menu/menu_keyboard_layout.lua
+--- source via the isolated native launcher. Extracted from ui/menu/menu_keyboard_layout.lua
 --- (audit F4) — the ~660-line input-source layer that the submenu builder drives.
 ---
 --- FEATURES & RATIONALE:
@@ -14,7 +14,7 @@
 ---    _active_layouts_cache and refreshed asynchronously off the click path.
 --- 2. Legacy-id migration: upgrades pre-namespace Ergopti ids to the current TIS
 ---    namespace so older installs keep working.
---- 3. Isolated osascript: TIS calls run in their own subprocess so a hang cannot
+--- 3. Isolated mutations: TIS calls run in their own subprocess so a hang cannot
 ---    stall the Hammerspoon run loop.
 ---
 --- Owns the active-layout probe cache; depends on layout_install for on-disk
@@ -23,13 +23,13 @@
 
 local hs      = hs
 local Logger  = require("infra.logger")
-local text_utils = require("infra.text_utils")
 local Timings = require("infra.timings")
 local install = require("modules.keymap.layout_install")
 local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local OpenStepPlist = require("infra.openstep_plist")
 local PythonInterpreter = require("adapters.python_interpreter")
+local InputSourceSelector = require("adapters.input_source_selector")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -102,8 +102,9 @@ end
 --- @param executable string Absolute executable path.
 --- @param args table Argument vector.
 --- @param on_done function|nil fn(ok, stdout, reason, stderr).
+--- @param environment table|nil Exact child environment overrides.
 --- @return boolean accepted True only when the subprocess start commits.
-local function run_bounded_process(label, executable, args, on_done)
+local function run_bounded_process(label, executable, args, on_done, environment)
 	if reject_if_mutation_busy(label, on_done) then return false end
 
 	local owner = {
@@ -147,7 +148,7 @@ local function run_bounded_process(label, executable, args, on_done)
 		if deadline_settled == true then owner.deadline_settled = true end
 		publish_pending_terminal()
 		release_mutation_if_settled(owner)
-	end)
+	end, nil, environment)
 	owner.handle = handle
 
 	local observed_task = handle.onSettled(function()
@@ -293,22 +294,8 @@ local function format_ergopti_display(id)
 	return "Ergopti" .. variant .. ansi_part .. version_part
 end
 
---- Runs an AppleScript in an owned, deadline-bounded child process so Carbon/TIS
---- failures stay contained without blocking the Hammerspoon runloop.
---- @param script string The AppleScript source code to execute.
---- @param on_done function|nil fn(ok, output, reason).
---- @return boolean accepted True only when the child start commits.
-local function run_osascript_isolated_async(script, on_done)
-	if type(script) ~= "string" or script == "" then
-		invoke_mutation_done("osascript.reject", on_done, false, nil, "invalid_script")
-		return false
-	end
-	return run_bounded_process("Input-source AppleScript", "/usr/bin/osascript",
-		{ "-e", script }, on_done)
-end
-
---- Enumerates every enabled keyboard-layout input source via Carbon TIS
---- in an isolated osascript subprocess. Returns a list of records:
+--- Enumerates enabled keyboard-layout input sources through the isolated
+--- defaults reader. Returns a list of records:
 ---
 ---     { id = "com.apple.keylayout.ergopti.plus",
 ---       name = "Ergopti+",
@@ -632,7 +619,7 @@ local build_kl_name_to_tis_id
 ---      "Ergopti_v2_2_2_plus") is NOT accepted by setLayout.
 ---   2. hs.keycodes.setLayout(kl_name) — fallback using the internal name in case
 ---      the localised form differs from what hs.keycodes expects.
----   3. TISSelectInputSource via osascript with the stable TIS ID resolved from
+---   3. TISSelectInputSource via the native launcher with the stable TIS ID resolved from
 ---      kl_name through build_kl_name_to_tis_id() — covers Ergopti variants on
 ---      macOS Sequoia where setLayout fails for third-party bundles.
 --- @param localised_name string The display / localised name (r.name), e.g. "French".
@@ -676,23 +663,18 @@ local function set_input_source_async(localised_name, kl_name, on_done)
 		local kl_map = build_kl_name_to_tis_id() or {}
 		tis_id = kl_map[kl_name] or kl_name
 	end
-	local script = text_utils.applescript_format([[
-use framework "Carbon"
-use framework "Foundation"
-on run
-	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
-	set theSources to current application's TISCreateInputSourceList(theProps, true)
-	if theSources is not missing value and (count of (theSources as list)) > 0 then
-		set theSource to item 1 of (theSources as list)
-		current application's TISSelectInputSource(theSource)
-		return "OK"
-	end if
-	return "MISS"
-end run
-]], tis_id)
-	return run_osascript_isolated_async(script, function(process_ok, out, reason)
+	local executable, arguments, environment, resolve_reason = InputSourceSelector.command(tis_id)
+	if executable == nil then
+		Logger.warn(LOG, "Native input-source selection could not resolve its exact helper: %s.",
+			tostring(resolve_reason))
+		invoke_mutation_done("set_input_source.tis", on_done, false, nil, resolve_reason)
+		return false
+	end
+	return run_bounded_process("Native input-source selection", executable, arguments, function(process_ok, out, reason)
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-		local switched = process_ok == true and out_text == "OK"
+		-- Carbon returns an OSStatus independently of the helper's process exit.
+		-- Finding the source does not prove the native selection was accepted.
+		local switched = process_ok == true and out_text == "0"
 		if switched then
 			Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).",
 				localised_name or kl_name, tis_id)
@@ -700,10 +682,10 @@ end run
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s).",
-			tostring(localised_name), tostring(kl_name), tis_id, failure_reason)
+		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s, result=%s).",
+			tostring(localised_name), tostring(kl_name), tis_id, failure_reason, out_text)
 		invoke_mutation_done("set_input_source.tis", on_done, false, out_text, failure_reason)
-	end)
+	end, environment)
 end
 
 --- Builds a mapping from KeyboardLayout Name (internal HIToolbox name) to stable TIS ID
@@ -974,8 +956,8 @@ end
 
 --- Replaces legacy Ergopti entries in the user's active input-source list with
 --- their v2.2.2+ stable-id equivalents, then re-activates the appropriate
---- variant. Uses TISDisableInputSource / TISEnableInputSource via the
---- AppleScript ObjC bridge so no external tooling is required.
+--- variant. The native launcher retains every source before invoking the
+--- typed Carbon mutations, and refuses a missing replacement before any effect.
 --- The latest bundle MUST already be installed locally — TIS only enables
 --- input sources for layouts present on disk.
 --- @param legacy_active table TIS ids from list_active_keyboard_layouts() that look legacy.
@@ -986,58 +968,35 @@ local function upgrade_active_list_async(legacy_active, on_done)
 		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
 		return false
 	end
-	-- Build the AppleScript: a sequence of disable+enable operations
-	local lines = {
-		"use framework \"Carbon\"",
-		"use framework \"Foundation\"",
-		"on findSource(theID)",
-		"\tset theProps to current application's NSDictionary's dictionaryWithObjects:{theID} forKeys:{\"TISPropertyInputSourceID\"}",
-		"\tset theSources to current application's TISCreateInputSourceList(theProps, true)",
-		"\tif theSources is missing value then return missing value",
-		"\tset theList to theSources as list",
-		"\tif (count of theList) = 0 then return missing value",
-		"\treturn item 1 of theList",
-		"end findSource",
-		"on run",
-		"\tset disabled to {}",
-		"\tset enabled to {}",
-	}
-	-- Disable each legacy id, then enable its migrated equivalent. The last
-	-- migrated id is also selected so the active layout follows the upgrade.
-	local last_new
-	for _, old in ipairs(legacy_active) do
-		local new_id = migrate_legacy_id(old)
-		last_new = new_id
-		table.insert(lines, text_utils.applescript_format("\tset oldSrc to my findSource(\"%s\")", old))
-		table.insert(lines, "\tif oldSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISDisableInputSource(oldSrc)")
-		table.insert(lines, "\t\tset end of disabled to oldSrc")
-		table.insert(lines, "\tend if")
-		table.insert(lines, text_utils.applescript_format("\tset newSrc to my findSource(\"%s\")", new_id))
-		table.insert(lines, "\tif newSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISEnableInputSource(newSrc)")
-		table.insert(lines, "\t\tset end of enabled to newSrc")
-		table.insert(lines, "\tend if")
+	local requested_upgrades = #legacy_active
+	local replacements = {}
+	local entry_count = 0
+	for index, old in pairs(legacy_active) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or index > requested_upgrades then
+			invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+			return false
+		end
+		entry_count = entry_count + 1
+		replacements[index] = { old_id = old, new_id = migrate_legacy_id(old) }
 	end
-	if last_new then
-		table.insert(lines, text_utils.applescript_format("\tset selSrc to my findSource(\"%s\")", last_new))
-		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
+	if entry_count ~= requested_upgrades then
+		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
+		return false
 	end
-	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
-	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
-	-- Lua pattern below matched nothing — enabled_n stayed nil, the > 0 test
-	-- failed, and every SUCCESSFUL upgrade was reported to the user as a failure.
-	table.insert(lines, "\treturn ((count of disabled) as text) & \"/\" & ((count of enabled) as text)")
-	table.insert(lines, "end run")
-	local script = table.concat(lines, "\n")
-	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
-	return run_osascript_isolated_async(script, function(process_ok, out, reason)
-		-- osascript exits 0 even when findSource resolved nothing, so the status
-		-- bit is insufficient. Require the script's own enabled count.
+	local executable, arguments, environment, resolve_reason = InputSourceSelector.upgrade(replacements)
+	if executable == nil then
+		Logger.error(LOG, "Native input-source upgrade could not resolve its exact command: %s.",
+			tostring(resolve_reason))
+		invoke_mutation_done("upgrade_active_list.done", on_done, false, nil, resolve_reason)
+		return false
+	end
+	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", requested_upgrades)
+	return run_bounded_process("Native input-source upgrade", executable, arguments, function(process_ok, out, reason)
+		-- Process exit alone cannot acknowledge the complete native operation.
+		-- Every requested replacement must be present in the enabled count.
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
 		local _disabled_n, enabled_n = out_text:match("^(%d+)%s*/%s*(%d+)$")
-		local upgraded = process_ok == true and tonumber(enabled_n or 0) ~= nil
-			and tonumber(enabled_n or 0) > 0
+		local upgraded = process_ok == true and tonumber(enabled_n) == requested_upgrades
 		if upgraded then
 			invalidate_active_layouts_cache()
 			Logger.success(LOG, "List upgrade applied (%s).", out_text)
@@ -1045,9 +1004,10 @@ local function upgrade_active_list_async(legacy_active, on_done)
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.error(LOG, "List upgrade failed (reason=%s).", failure_reason)
+		Logger.error(LOG, "List upgrade failed (expected=%d, reason=%s, result=%s).",
+			requested_upgrades, failure_reason, out_text)
 		invoke_mutation_done("upgrade_active_list.done", on_done, false, out_text, failure_reason)
-	end)
+	end, environment)
 end
 
 --- Strips the Apple keylayout / keyboardlayout / inputmethod prefixes from a

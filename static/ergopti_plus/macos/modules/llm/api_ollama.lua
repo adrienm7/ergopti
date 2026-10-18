@@ -2208,6 +2208,7 @@ function M.fetch_sequential(full_text, tail_text, model_name, temperature,
 			post_fn(model_name, system_prompt, full_text, tail_text,
 				temp, tokens, 1, false,
 				function(preds)
+					if not request_is_current() then return end
 					if type(preds) == "table" and type(preds[1]) == "table" then
 						if #results < requested_predictions then
 							ApiCommon.insert_prediction(results, preds[1], dedup_stats, DEDUPLICATION_ENABLED, Logger, LOG)

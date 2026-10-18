@@ -128,7 +128,10 @@ helpers.describe("keylogger-export-log-privacy", function()
 								if path == folder .. "data.sql" then return chunk end
 								return phase == "invalid" and "invalid-json" or ('{"device_id":"' .. identity .. '"}')
 							end,
-							seek = function(_, mode, offset) helpers.assert_eq(mode, "set"); helpers.assert_eq(offset, 0) end,
+							seek = function(_, mode, offset)
+								helpers.assert_eq(mode, "set"); helpers.assert_eq(offset, 0)
+								return offset
+							end,
 							close = function() return true end,
 						}
 					end

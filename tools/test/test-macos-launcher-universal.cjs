@@ -2,7 +2,7 @@
 
 /**
  * ==============================================================================
- * MODULE: macOS Launcher Architecture Guard
+ * MODULE: macOS Launcher Architecture and Framework Guard
  * DESCRIPTION:
  * Regression guard for the host executable of ErgoptiPlus.app. The published
  * v0.0.0-dev.127 archive shipped Contents/MacOS/ErgoptiPlus as an arm64-only
@@ -16,7 +16,11 @@
  * The launcher must be compiled for every architecture the embedded runtime
  * supports, and the build must fail fast when the produced binary lacks one.
  * This guard fails if the build or bin-path query drops an architecture, or if
- * the post-build lipo verification disappears.
+ * the post-build lipo verification disappears. Framework assembly also replays
+ * strict-shell discovery: a missing preferred SPM layout must reach the next
+ * supported layout instead of aborting silently through grep under pipefail.
+ * A failed Swift invocation must also refuse a previous product while the
+ * function runs inside the production command-substitution boundary.
  * ==============================================================================
  */
 
@@ -79,7 +83,8 @@ if (
 
 // Behavioural replay: run the real declaration and build_launcher() with stubbed
 // toolchain commands, so a flag or verification regression cannot hide behind
-// matching source text.
+// matching source text. Capture stdout exactly as production does: Bash clears
+// errexit there, so failed compilation or path discovery needs an explicit guard.
 const archStart = build.indexOf('LAUNCHER_ARCHS=(');
 const archEnd = build.indexOf('\ndone\n', archStart);
 if (buildFunction && archStart >= 0 && archEnd > archStart) {
@@ -87,29 +92,39 @@ if (buildFunction && archStart >= 0 && archEnd > archStart) {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-archs-'));
 	try {
 		fs.writeFileSync(path.join(tmp, 'ErgoptiPlus'), 'product');
-		const replay = (lipoOutput) =>
+		const replay = (lipoOutput, swiftFailure = '') =>
 			spawnSync(
 				bashExecutable(),
 				[
 					'-c',
 					`
-set -e
+set -euo pipefail
 LAUNCHER_DIR="$1"
 log() { :; }
 fail() { printf 'FAIL:%s\\n' "$*" >&2; exit 1; }
 swift() {
 	printf 'SWIFT:%s\\n' "$*" >&2
-	if [[ "$*" == *--show-bin-path* ]]; then printf '%s\\n' "$LAUNCHER_DIR"; fi
+	if [[ "$*" == *--show-bin-path* ]]; then
+		printf '%s\\n' "$LAUNCHER_DIR"
+		if [[ "$SWIFT_FAILURE" == query ]]; then return 24; fi
+	elif [[ "$SWIFT_FAILURE" == build ]]; then
+		return 23
+	fi
 }
 lipo() { printf '%s\\n' "$LIPO_OUTPUT"; }
 ${archBlock}
 ${buildFunction[0]}
-build_launcher
+launcher_bin="$(build_launcher)"
+printf '%s\\n' "$launcher_bin"
 `,
 					'fixture',
 					tmp.replaceAll('\\', '/')
 				],
-				{ encoding: 'utf8', timeout: 10000, env: { ...process.env, LIPO_OUTPUT: lipoOutput } }
+				{
+					encoding: 'utf8',
+					timeout: 10000,
+					env: { ...process.env, LIPO_OUTPUT: lipoOutput, SWIFT_FAILURE: swiftFailure }
+				}
 			);
 
 		const universal = replay('x86_64 arm64');
@@ -125,6 +140,22 @@ build_launcher
 				`build_launcher() did not pass both architectures to every swift call: ${swiftLines.join(' | ')}`
 			);
 		}
+		for (const [phase, diagnostic] of [
+			['build', 'Swift launcher compilation failed'],
+			['query', 'Swift launcher binary path query failed']
+		]) {
+			const failed = replay('x86_64 arm64', phase);
+			if (
+				failed.error ||
+				failed.status === 0 ||
+				!failed.stderr.includes(diagnostic) ||
+				failed.stdout.trim()
+			) {
+				errors.push(
+					`(swift-stale-product-${phase}) failed Swift ${phase} must refuse the existing previous product.`
+				);
+			}
+		}
 		const thin = replay('arm64');
 		if (thin.error || thin.status === 0 || !thin.stderr.includes('lacks the x86_64 slice')) {
 			errors.push('build_launcher() accepted an arm64-only launcher (the dev.127 defect).');
@@ -134,13 +165,104 @@ build_launcher
 	}
 }
 
+// Replay the complete assembly under the builder's strict shell options. SPM
+// layouts vary: an empty preferred search must reach the documented alternatives.
+const assemblyFunction = build.match(/^assemble_native_runtime\(\) \{[\s\S]*?^\}/m);
+if (!assemblyFunction) {
+	errors.push('assemble_native_runtime() function is missing.');
+} else {
+	const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti sparkle discovery-'));
+	try {
+		const launcher = path.join(fixture, 'launcher');
+		const buildRoot = path.join(launcher, '.build');
+		const product = path.join(fixture, 'ErgoptiPlus');
+		fs.mkdirSync(launcher, { recursive: true });
+		fs.writeFileSync(product, 'launcher');
+		fs.writeFileSync(path.join(launcher, 'com.ergoptiplus.remap-guardian.plist'), 'plist');
+		const replay = (frameworks, failTraversal = false) => {
+			fs.rmSync(buildRoot, { recursive: true, force: true });
+			fs.rmSync(path.join(fixture, 'app'), { recursive: true, force: true });
+			fs.mkdirSync(buildRoot);
+			for (const framework of frameworks) {
+				const folder = path.join(buildRoot, framework);
+				fs.mkdirSync(folder, { recursive: true });
+				fs.writeFileSync(path.join(folder, 'origin'), framework);
+			}
+			return spawnSync(
+				bashExecutable(),
+				[
+					'-c',
+					`
+set -euo pipefail
+REPO_ROOT="$1"
+LAUNCHER_DIR="$1/launcher"
+BUILD_DIR="$1/build"
+APP_PATH="$1/app"
+log() { :; }
+fail() { printf 'FAIL:%s\\n' "$*" >&2; exit 1; }
+xcrun() { :; }
+lipo() { :; }
+plutil() { :; }
+${failTraversal ? 'find() { return 13; }' : ''}
+${assemblyFunction[0]}
+assemble_native_runtime "$1/ErgoptiPlus"
+`,
+					'fixture',
+					fixture.replaceAll('\\', '/')
+				],
+				{ encoding: 'utf8', timeout: 10000 }
+			);
+		};
+		const artifact = 'artifacts/sparkle/Sparkle.framework';
+		const preferred = 'artifacts/sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework';
+		const source = 'checkouts/Sparkle/build/Sparkle.framework';
+		for (const [slug, frameworks, expected] of [
+			['sparkle-artifact-fallback', [artifact], artifact],
+			['sparkle-source-fallback', [source], source],
+			['sparkle-preferred-slice', [artifact, preferred, source], preferred],
+			['sparkle-artifact-before-source', [source, artifact], artifact]
+		]) {
+			const result = replay(frameworks);
+			if (result.error || result.status !== 0) {
+				errors.push(`(${slug}) assembly refused a valid framework: ${result.stderr.trim()}`);
+				continue;
+			}
+			const actual = fs.readFileSync(
+				path.join(fixture, 'app/Contents/Frameworks/Sparkle.framework/origin'),
+				'utf8'
+			);
+			if (actual !== expected) errors.push(`(${slug}) selected ${actual}, expected ${expected}.`);
+		}
+		const missing = replay([]);
+		if (
+			missing.error ||
+			missing.status === 0 ||
+			!missing.stderr.includes('Sparkle.framework not found')
+		) {
+			errors.push(
+				'(sparkle-missing-diagnostic) absent framework must fail with the named build diagnostic.'
+			);
+		}
+		const traversal = replay([preferred], true);
+		if (
+			traversal.error ||
+			traversal.status === 0 ||
+			!traversal.stderr.includes('Cannot inspect Sparkle.framework candidates')
+		) {
+			errors.push(
+				'(sparkle-traversal-diagnostic) failed enumeration must preserve the named build failure.'
+			);
+		}
+	} finally {
+		fs.rmSync(fixture, { recursive: true, force: true });
+	}
+}
+
 if (errors.length > 0) {
-	console.error(
-		'\x1b[31m[ERROR] macOS launcher is not built as a verified universal binary:\x1b[0m'
-	);
+	console.error('\x1b[31m[ERROR] macOS launcher architecture or framework assembly failed:\x1b[0m');
 	for (const e of errors) console.error('  - ' + e);
 	process.exit(1);
 }
 console.log(
-	'\x1b[32m[OK] macOS launcher builds for arm64 and x86_64 and verifies both slices.\x1b[0m'
+	'\x1b[32m[OK] macOS launcher verifies universal slices and assembles every supported Sparkle layout.\x1b[0m'
 );

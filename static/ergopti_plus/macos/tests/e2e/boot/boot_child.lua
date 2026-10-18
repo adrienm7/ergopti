@@ -16,6 +16,7 @@
 --- Actions: boot (boot and idle), restore_recommended (boot, then the menu's
 --- « Restore recommended values » answered Yes), python_helper (boot, then the
 --- display-mirror shortcut, a helper that runs Python).
+--- type_for_wpm boots Metrics, types physical keys and observes its floating canvas.
 --- Output: the driver's log lines, E2E_* observation lines from the world,
 --- E2E_FACT key=value lines (the lease workers started, the final lease phase
 --- and the native reloads among them), and a final E2E_DONE line.
@@ -154,6 +155,33 @@ elseif ACTION == "python_helper" then
 		World.record("SCENARIO_FAILED", "display_mirror_toggle did not run: " .. tostring(result))
 	end
 	idle(5)
+elseif ACTION == "type_for_wpm" then
+	-- A user types after the configured application's real menu started Metrics
+	-- and the floating widget. No keylogger, model or widget method is stubbed.
+	for _, key in ipairs({ { 0, "a" }, { 11, "b" }, { 8, "c" } }) do
+		World.keyboard_event(hs, key[1], key[2], true)
+		World.keyboard_event(hs, key[1], key[2], false)
+		idle(0.1)
+	end
+	idle(0.3)
+	local stats = require("modules.keylogger").get_live_stats()
+	World.record("FACT", "wpm_input_counted=" .. tostring(stats.wpm > 0))
+	local visible, recovered = 0, false
+	local config = require("toml_codec").decode(require("tests.support.source_file").read(
+		SHARED .. "/modules/wpm_widget/constants.toml"))
+	local compact = config.compact
+	local screen = hs.screen.mainScreen():fullFrame()
+	for _, canvas in ipairs(hs.canvas.__instances) do
+		local frame = canvas:frame()
+		if canvas:isShowing() and frame.w == compact.width and frame.h == compact.height
+			and canvas[3] and tonumber(canvas[3].text) then
+			visible = visible + 1
+			recovered = frame.x == screen.x + screen.w - compact.width - compact.edge_margin
+				and frame.y == screen.y + screen.h - compact.height - compact.edge_margin
+		end
+	end
+	World.record("FACT", "wpm_canvas_visible=" .. visible)
+	World.record("FACT", "wpm_position_recovered=" .. tostring(recovered))
 elseif ACTION ~= "boot" then
 	World.record("SCENARIO_FAILED", "unknown action " .. tostring(ACTION))
 end

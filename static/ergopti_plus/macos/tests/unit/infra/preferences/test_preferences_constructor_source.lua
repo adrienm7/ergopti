@@ -9,8 +9,7 @@
 local helpers = require("tests.helpers")
 local text_utils = require("infra.text_utils")
 local lfs = require("lfs")
-local source = debug.getinfo(1, "S").source:sub(2):gsub("\\", "/")
-local driver = assert(source:match("^(.*)/tests/unit/infra/preferences/test_preferences_constructor_source%.lua$"))
+local driver = helpers.driver_root():gsub("/$", "")
 
 -- Each child has genuine isolated module caches and a private configuration root.
 -- Relative requires run from the documented driver cwd; mixed requires retain a

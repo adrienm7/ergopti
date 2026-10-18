@@ -33,38 +33,29 @@ local helpers = require("tests.helpers")
 -- ================================================================
 -- ================================================================
 
-helpers.describe("input-source upgrade: the script returns a parseable count", function()
-	helpers.it("coerces both counts to text before concatenating", function()
+helpers.describe("input-source upgrade: the native helper returns a parseable count", function()
+	helpers.it("uses the typed native transaction instead of the crashing AppleScript bridge", function()
 		local src = helpers.read_driver_source("upgrade_active_list_async")
 		helpers.assert_true(src ~= nil and src ~= "", "input_sources must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")
-		local at = code:find("count of disabled", 1, true)
-		helpers.assert_true(at ~= nil, "the script must still report its counts")
-
-		local line = code:sub(at - 120, at + 160)
-		helpers.assert_true(line:find("as text", 1, true) ~= nil,
-			"AppleScript's & on two non-string operands builds a LIST, so the payload arrived as "
-				.. "\"1, /, 2\" and the parser below saw no match at all — reporting every "
-				.. "successful upgrade as a failure")
+		helpers.assert_true(code:find("InputSourceSelector.upgrade(replacements)", 1, true) ~= nil,
+			"the typed helper owns native mutation and canonical count serialization")
+		helpers.assert_nil(code:find("TISCreateInputSourceList", 1, true),
+			"the former Carbon dictionary bridge must not be reconstructed in Lua")
 	end)
 
-	helpers.it("the parser accepts the corrected payload and rejects a failed run", function()
-		-- The verdict logic, exercised directly: this is the shape the script now
-		-- emits, and the shape a genuinely failed upgrade emits.
-		local function parse(out)
-			local _disabled_n, enabled_n = tostring(out or ""):match("(%d+)%s*/%s*(%d+)")
-			return tonumber(enabled_n or 0) and tonumber(enabled_n or 0) > 0
+	helpers.it("the actual count grammar accepts native counts and rejects the former list form", function()
+		local src = helpers.read_driver_source("upgrade_active_list_async")
+		helpers.assert_true(src ~= nil and src ~= "", "input_sources must be locatable")
+		local pattern = src:match('out_text:match%("(.-)"%)')
+		helpers.assert_not_nil(pattern, "the production result grammar must be present")
+		for _, case in ipairs({ { text = "1/2", enabled = 2 }, { text = "1/0", enabled = 0 },
+			{ text = "1, /, 2" }, { text = "garbage1/2" }, { text = "1/2garbage" } }) do
+			local _, enabled = case.text:match(pattern)
+			helpers.assert_eq(tonumber(enabled), case.enabled,
+				"the real result grammar must preserve the native count payload")
 		end
-
-		helpers.assert_true(parse("1/2"),
-			"a run that enabled two sources must be read as success")
-		helpers.assert_true(not parse("1/0"),
-			"a run that disabled the legacy source without enabling its replacement must NOT be "
-				.. "success — that leaves the user with no Ergopti layout at all")
-		helpers.assert_true(not parse("1, /, 2"),
-			"and the LIST form must not parse: pinning that this shape fails is what makes the "
-				.. "'as text' coercion load-bearing rather than cosmetic")
 	end)
 end)
 
