@@ -1162,6 +1162,12 @@ _LLMRemote_PollRequest(req_id) {
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))
         return
     }
+    ; WaitForResponse and each response property may pump cancellation. Keep
+    ; the exact reservation until the last read and classification have finished.
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
+        return
+    }
     if !ready {
         SetTimer(() => _LLMRemote_PollRequest(req_id), -LLM_REMOTE_POLL_MS)
         return
@@ -1171,19 +1177,32 @@ _LLMRemote_PollRequest(req_id) {
     entryFormat := entry["format"]
     NetworkReport := ManagedNetworkFailureWindows_FromTransport(http,
         () => _LLMRemote_RequestOwns(req_id, entry) && !entry["cancelled"])
-    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"]
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
-    _LLM_Remote_Async.Delete(req_id)
+    }
     try {
         status := http.Status
-        body   := http.ResponseText
+        if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+            _LLMRemote_DeleteOwned(req_id, entry)
+            return
+        }
+        body := http.ResponseText
     } catch {
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport"))
+        return
+    }
+    if !_LLMRemote_RequestOwns(req_id, entry) || entry["cancelled"] {
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     Classified := _LLMRemoteClassifyTerminal(entryFormat,
         Map("exit", 0, "status", status, "body_read", true, "body", body),
         entry.Has("model_id_at_dispatch") ? entry["model_id_at_dispatch"] : "")
+    if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+        return
     if !Classified["terminal_ok"] {
         _LLM_InvokeCallback(on_fail, "on_fail",
             _LLMRemote_FailInfo("transport", status, "", NetworkReport))
