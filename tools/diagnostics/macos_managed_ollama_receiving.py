@@ -94,8 +94,6 @@ PREPARE_STEPS = frozenset(
         "listener_copy",
         "listener_sign",
         "listener_verify",
-        "trust_add",
-        "post_trust",
         "environment",
         "archive_admission",
         "asset_peer",
@@ -444,7 +442,7 @@ class Receiver:
             "profile": options.profile,
             "success": False,
             "private_children_retired": False,
-            "native_trust_restored": False,
+            "native_peers_retired": False,
         }
 
     def own_command(self, arguments, environment, timeout=60):
@@ -745,9 +743,6 @@ class Receiver:
             self.fixture._command(["/usr/bin/codesign", "--force", "--sign", "-", str(binary)])
             self.prepare_phase = "listener_verify"
             self.fixture._command(["/usr/bin/codesign", "--verify", "--strict", str(binary)])
-        self.prepare_phase = "trust_add"
-        self.fixture.trust(True)
-        self.prepare_phase = "post_trust"
         self.home = self.work / "home"
         self.home.mkdir(mode=0o700)
         self.prepare_phase = "environment"
@@ -761,9 +756,14 @@ class Receiver:
             "NO_PROXY",
             "OLLAMA_MODELS",
             "OLLAMA_HOST",
+            "SSL_CERT_FILE",
+            "SSL_CERT_DIR",
         ):
             environment.pop(name, None)
         environment["HOME"] = str(self.home)
+        # The bootstrap snapshot carries this enterprise anchor to the Go
+        # transport and the native worker; system trust is never changed.
+        environment.update(self.fixture.anchor_environment())
         self.clean = environment
         self.http_environment = environment | self.worker_environment(self.http_app)
         self.api_environment = environment | self.worker_environment(self.api_app)
@@ -1188,14 +1188,14 @@ class Receiver:
         self.receipt["private_children_retired"] = True
         if self.fixture is not None:
             self.fixture.close()
-            self.receipt["native_trust_restored"] = True
+            self.receipt["native_peers_retired"] = True
         for name, frozen in self.input_hashes.items():
             require(digest(getattr(self.options, name)) == frozen, "native_receiving_input_changed")
         self.receipt["input_hashes"] = self.input_hashes
         for relative, frozen in self.source_hashes.items():
             require(digest(self.root / relative) == frozen, "native_receiving_source_changed")
         # All private leases, generated account keys, CA keys and model files are
-        # removed only after exact native process/group and trust retirement.
+        # removed only after exact native process/group retirement.
         shutil.rmtree(self.work)
 
 
@@ -1211,8 +1211,6 @@ PREPARE_PHASES = frozenset(
         "listener_copy",
         "listener_sign",
         "listener_verify",
-        "trust_add",
-        "post_trust",
         "environment",
         "archive_admission",
         "asset_peer",

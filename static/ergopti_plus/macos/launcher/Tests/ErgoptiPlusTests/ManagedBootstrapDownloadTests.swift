@@ -220,7 +220,7 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		let fixture = try ManagedWireFixture()
 		defer {
 			do { try fixture.close() }
-			catch { XCTFail("Actual bootstrap fixture did not restore trust, hosts, keychain and native processes") }
+			catch { XCTFail("Actual bootstrap fixture did not retire its peers and native processes") }
 		}
 		let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
 		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false,
@@ -230,11 +230,13 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 		let port = try XCTUnwrap(fixture.profile["origin_port"] as? Int)
 		let script = try XCTUnwrap(fixture.profile["pac"] as? String)
 		let pacURL = try XCTUnwrap(fixture.profile["pac_url"] as? String)
+		// Trust arrives through the product SSL_CERT_FILE channel, never system trust.
+		let anchors = ["SSL_CERT_FILE": try XCTUnwrap(fixture.profile["ca_file"] as? String)]
 		let expected = Data([111, 119, 110, 101, 100, 0, 110, 97, 116, 105, 118, 101, 255, 119, 105, 114, 101])
 		let expectedDigest = "87f8e549e9de9c2685521b6594c1c889492f1ebf7e5aeece5449e797f208391e"
 		let policy = try XCTUnwrap(ManagedBootstrapPolicy.parse(JSONSerialization.data(withJSONObject: policyFields)))
 
-		func download(_ path: String, name: String, useURL: Bool = false) throws -> String {
+		func download(_ path: String, name: String, useURL: Bool = false, trusted: Bool = true) throws -> String {
 			let fields: [String: Any] = ["version": 1, "url": "https://\(host):\(port)\(path)",
 				"sha256": expectedDigest, "output": directory.appendingPathComponent(name).path,
 				"timeout_ms": 20_000, "size": 17]
@@ -242,12 +244,12 @@ final class ManagedBootstrapDownloadTests: XCTestCase {
 			var settings: [String: Any] = [kCFNetworkProxiesProxyAutoConfigEnable as String: 1]
 			if useURL { settings[kCFNetworkProxiesProxyAutoConfigURLString as String] = pacURL }
 			else { settings[kCFNetworkProxiesProxyAutoConfigJavaScript as String] = script }
-			return ManagedBootstrapDownload.execute(request, policy: policy, environment: [:], settingsProvider: { settings as CFDictionary })
+			return ManagedBootstrapDownload.execute(request, policy: policy, environment: trusted ? anchors : [:],
+				settingsProvider: { settings as CFDictionary })
 		}
 
-		XCTAssertEqual(try download("/alpha?case=one", name: "untrusted.bin"), "certificate")
+		XCTAssertEqual(try download("/alpha?case=one", name: "untrusted.bin", trusted: false), "certificate")
 		XCTAssertFalse(FileManager.default.fileExists(atPath: directory.appendingPathComponent("untrusted.bin").path))
-		XCTAssertEqual(try fixture.command(["command": "trust", "enabled": true])["trusted"] as? Bool, true)
 		for (path, name, useURL) in [("/alpha?case=one", "first.bin", false),
 			("/beta?case=two", "second.bin", true), ("/fallback?case=three", "fallback.bin", false)] {
 			XCTAssertEqual(try download(path, name: name, useURL: useURL), "complete")

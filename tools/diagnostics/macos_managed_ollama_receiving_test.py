@@ -762,7 +762,7 @@ class TerminalFailureObservationControls(unittest.TestCase):
                     "profile": "pac-inline",
                     "success": False,
                     "private_children_retired": False,
-                    "native_trust_restored": False,
+                    "native_peers_retired": False,
                 },
                 run=Mock(side_effect=primary),
                 close=Mock(side_effect=cleanup),
@@ -806,7 +806,7 @@ class TerminalFailureObservationControls(unittest.TestCase):
             {"exception_class": "RuntimeError", "code": "actual_archive_name"},
         )
         self.assertEqual(value["cleanup_failure"], {"exception_class": "OSError", "code": None})
-        self.assertFalse(value["native_trust_restored"])
+        self.assertFalse(value["native_peers_retired"])
         self.assertNotIn("private-path", raw)
         self.assertNotIn("token", raw)
 

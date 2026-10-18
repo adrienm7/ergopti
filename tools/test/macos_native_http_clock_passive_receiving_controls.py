@@ -150,15 +150,14 @@ class PassiveCommandControls(unittest.TestCase):
 
     def test_original_primary_remains_authoritative_when_callback_is_cancelled(self):
         # Nonzero exit is real in the modeled owned child, not a synthesized fact.
-        self.ports.add_status = 3
-        self.ports.postinstall = False
+        self.ports.exit_status = 3
 
         def cancelled(_):
             raise KeyboardInterrupt("EXPLICIT after original failure")
 
         with self.assertRaises(WIRE.FixtureFailure) as primary:
             self.fixture._command(
-                ["/usr/bin/sudo", "-n", "/usr/bin/security", "add-trusted-cert"],
+                ["EXPLICIT modeled failing command"],
                 passive_receiving=cancelled,
             )
         self.assertEqual(str(primary.exception), "Native fixture command refused")

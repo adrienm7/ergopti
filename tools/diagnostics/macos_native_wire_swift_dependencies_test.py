@@ -72,8 +72,6 @@ class StandaloneSwiftDependencies(unittest.TestCase):
                 self.closed = False
                 self.command_group_debt = []
                 self.command_file_debt = []
-                self.trust_attempted = False
-                self.keychain_created = False
 
             def _command(self, arguments, *, timeout, deadline=None):
                 control.arguments.append(arguments)

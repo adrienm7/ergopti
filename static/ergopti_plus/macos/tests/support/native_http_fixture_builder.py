@@ -276,8 +276,6 @@ class OwnedFixtureBuild:
         self.verify()
         if self.deadline is not None and time.monotonic() >= self.deadline:
             raise BuildRefused("Native fixture build startup deadline exhausted")
-        self.fixture.trust_query_owner = self
-        self.fixture.trust_query_executable = self.executable
         return self
 
     def verify(self):
