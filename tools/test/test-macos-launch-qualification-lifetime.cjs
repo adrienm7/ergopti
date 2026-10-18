@@ -61,15 +61,18 @@ function exercise(source, assigned, refuseBody) {
 				return {
 					spawnSync: (command) => {
 						assert.equal(command, process.platform === 'win32' ? 'python' : 'python3');
-						return { status: 0, stdout: '{"controls":11,"native_calls":0}', stderr: '' };
+						return { status: 0, stdout: '{"controls":19,"native_calls":0}', stderr: '' };
 					}
 				};
 			if (name === './desktop-ci-evidence.cjs')
 				return {
 					...desktop,
 					recordMac(...args) {
+						// Expected refusals stay intact; the body fails at its first
+						// admitted deferred record, after the original call returned.
+						const recorded = desktop.recordMac(...args);
 						if (refuseBody && args.length === 4) throw Error('injected-model-body-refusal');
-						return desktop.recordMac(...args);
+						return recorded;
 					}
 				};
 			if (name === './test-macos-launch-qualification-lifetime.cjs') return {};

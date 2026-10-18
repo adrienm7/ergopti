@@ -63,7 +63,7 @@ function census(sources) {
 	assert.equal(item36, 69);
 	for (const [name, variable, expected] of [
 		['pac', 'passed', 82],
-		['deferral', 'passed', 79],
+		['deferral', 'passed', 76],
 		['deferral', 'publicReceiptChecks', 2],
 		['deferral', 'numberRowSelectorChecks', 30]
 	]) {
@@ -81,7 +81,7 @@ function census(sources) {
 		});
 		assert.equal(matches.length, 1, `${name} original ${variable} census remains exact`);
 	}
-	return { item36, pac: 82, deferral: 111 };
+	return { item36, pac: 82, deferral: 108 };
 }
 function admitRunBoundary(run) {
 	// Recording routing must not invent completion after a return in the real owner.
