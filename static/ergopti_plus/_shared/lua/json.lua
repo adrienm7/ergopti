@@ -84,17 +84,20 @@ end
 local function decode(raw, lossless, source_members)
 	if type(raw) ~= "string" or raw == "" then return nil end
 	local pos = 1
+	local length = #raw
 
+	-- Whitespace and string bodies are skipped with string.find, which runs in C:
+	-- the byte-at-a-time loops they replace dominated decoding the locale
+	-- catalogues (about 230 KB each) on both drivers.
 	local function skip_ws()
-		while pos <= #raw do
-			local c = raw:sub(pos, pos)
-			if c == " " or c == "\t" or c == "\r" or c == "\n" then
-				pos = pos + 1
-			else
-				return c
-			end
+		if pos > length then return nil end
+		local at = raw:find("[^ \t\r\n]", pos)
+		if not at then
+			pos = length + 1
+			return nil
 		end
-		return nil
+		pos = at
+		return raw:sub(at, at)
 	end
 
 	local NULL = lossless and LOSSLESS_NULL or {}
@@ -105,9 +108,21 @@ local function decode(raw, lossless, source_members)
 		if raw:sub(pos, pos) ~= '"' then return nil end
 		pos = pos + 1
 		local res = {}
-		while pos <= #raw do
-			local ch = raw:sub(pos, pos)
-			pos = pos + 1
+		while pos <= length do
+			-- Copy the plain run up to the next quote or backslash in one piece.
+			local stop = raw:find('["\\]', pos)
+			if not stop then
+				pos = length + 1
+				return nil
+			end
+			if stop > pos then
+				local run = raw:sub(pos, stop - 1)
+				-- Lossless mode refuses raw control characters inside a string.
+				if lossless and (run:find("[\1-\31]") or run:find("\0", 1, true)) then return nil end
+				res[#res + 1] = run
+			end
+			local ch = raw:sub(stop, stop)
+			pos = stop + 1
 			if ch == '"' then return table.concat(res) end
 			if ch == "\\" then
 				local esc = raw:sub(pos, pos)
@@ -146,9 +161,6 @@ local function decode(raw, lossless, source_members)
 					if lossless then return nil end
 					res[#res + 1] = esc
 				end
-			else
-				if lossless and ch:byte() < 32 then return nil end
-				res[#res + 1] = ch
 			end
 		end
 		return nil
