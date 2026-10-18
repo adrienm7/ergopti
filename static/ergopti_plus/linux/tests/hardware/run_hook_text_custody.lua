@@ -118,6 +118,23 @@ local ok, failure = pcall(function()
 	assert(table.concat(rows, ",") == "58:1,30:1,30:0,58:0,58:1,58:0,45:1,45:0,58:1,58:0,58:1,58:0",
 		"lock retirement changed native output: " .. table.concat(rows, ","))
 	print("PASS: a spent physical CapsLock release retires XKB before the next toggle")
+
+	chars, rows = {}, {}
+	emit(1, 42, 1)
+	local second_path = paths[2]
+	paths[2] = nil
+	for _ = 1, Hook.DEVICE_CHECK_TICKS do Hook.check_device() end
+	assert(Hook.isRunning(), "removing the unrelated source stopped native capture")
+	emit(1, 30, 1); emit(1, 30, 0)
+	assert(table.concat(chars) == "A", "source removal forgot a retained native Shift: " .. table.concat(chars))
+	paths[2] = second_path
+	for _ = 1, Hook.DEVICE_CHECK_TICKS do Hook.check_device() end
+	assert(Hook.isRunning(), "adding the unrelated source stopped native capture")
+	emit(1, 30, 1); emit(1, 30, 0); emit(1, 42, 0)
+	assert(table.concat(chars) == "AA", "source addition forgot a retained native Shift: " .. table.concat(chars))
+	assert(table.concat(rows, ",") == "42:1,30:1,30:0,30:1,30:0,42:0",
+		"source reconciliation changed retained native output: " .. table.concat(rows, ","))
+	print("PASS: adding and removing another native source preserves the retained Shift without output replay")
 end)
 
 Finder.find_devices = original_find
