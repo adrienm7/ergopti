@@ -236,7 +236,7 @@ Test("webview: deferred mutations recheck Suspend at effect time (AHK-061)",
 ; So this now follows the guarantee transitively, and asserts strictly MORE than
 ; before: the caller must branch on the writer's result and skip the reload, AND
 ; the writer itself must catch and log. See also
-; tests/meta/test_paths_file_single_writer.ahk, which pins that exactly one
+; tests/meta/infra/config/persistence/test_paths_file_single_writer.ahk, which pins that exactly one
 ; writer exists — re-duplicating the hardened block would satisfy this test but
 ; fail that one.
 _A0720WV_PathsEditorSurfacesWriteFailure() {

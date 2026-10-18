@@ -387,8 +387,8 @@ InstallSendNoOps()
 
 ; ── Per-module test files (each registers Test() cases) ──
 #Include unit/adapters/test_adapter_compliance.ahk
-#Include unit/test_feature_io_locator.ahk
-#Include meta/test_feature_io_impl_no_global.ahk
+#Include unit/infra/config/persistence/test_feature_io_locator.ahk
+#Include meta/infra/config/persistence/test_feature_io_impl_no_global.ahk
 #Include meta/suite/test_isset_no_property_arg.ahk
 #Include unit/adapters/test_adapter_contract_vectors.ahk
 #Include unit/adapters/input/test_clipboard_paste_transaction_ownership.ahk
@@ -477,11 +477,11 @@ InstallSendNoOps()
 ; and reads only globals, so the tests drive the REAL function against fixture
 ; personal-info maps rather than asserting on its source.
 #Include unit/test_personal_info_combo_resolver.ahk
-#Include unit/test_master_gates.ahk
+#Include unit/infra/config/persistence/test_master_gates.ahk
 #Include unit/test_domain_registry.ahk
 #Include unit/test_domain_expander.ahk
-#Include unit/test_toml_loader.ahk
-#Include unit/test_toml_helpers_roundtrip.ahk
+#Include unit/infra/toml/test_toml_loader.ahk
+#Include unit/infra/toml/test_toml_helpers_roundtrip.ahk
 #Include unit/test_hotstrings_cache.ahk
 #Include unit/test_hotstring_language_packs.ahk
 #Include unit/test_menu_languages_and_global_separator.ahk
@@ -504,32 +504,32 @@ InstallSendNoOps()
 #Include unit/adapters/uia/test_uia_worker_exit_reentry.ahk
 #Include unit/adapters/uia/test_secure_field_worker_context.ahk
 
-#Include unit/test_config.ahk
-#Include unit/test_feature_state_boot.ahk
+#Include unit/infra/config/persistence/test_config.ahk
+#Include unit/infra/config/persistence/test_feature_state_boot.ahk
 #Include unit/test_wpm_config_types.ahk
 #Include ../ui/wpm/wpm_gdiplus_ownership.ahk
 #Include ../ui/wpm/wpm_widget.ahk
 #Include unit/test_wpm_gdiplus_ownership.ahk
 #Include unit/test_wpm_drag_admission.ahk
 #Include unit/test_wpm_canon.ahk
-#Include unit/test_features_manifest.ahk
-#Include unit/test_neutral_config_manifest.ahk
+#Include unit/infra/config/persistence/test_features_manifest.ahk
+#Include unit/infra/config/persistence/test_neutral_config_manifest.ahk
 #Include unit/test_config_scope_manifest.ahk
-#Include unit/test_config_scope_menus.ahk
-#Include unit/test_config_scope_shortcuts.ahk
+#Include unit/infra/config/scope/test_config_scope_menus.ahk
+#Include unit/infra/config/scope/test_config_scope_shortcuts.ahk
 #Include unit/test_shortcuts_restore_row.ahk
 #Include unit/test_script_control_submenu.ahk
 #Include unit/test_personal_shortcut_neutral_seed.ahk
-#Include unit/test_hotstrings_scope.ahk
+#Include unit/infra/config/scope/test_hotstrings_scope.ahk
 #Include unit/test_personal_file_controls.ahk
-#Include unit/test_hotstring_delimiter_scope_preservation.ahk
-#Include unit/test_hotstring_category_scope.ahk
-#Include unit/test_global_config_scope.ahk
+#Include unit/infra/config/scope/test_hotstring_delimiter_scope_preservation.ahk
+#Include unit/infra/config/scope/test_hotstring_category_scope.ahk
+#Include unit/infra/config/scope/test_global_config_scope.ahk
 #Include unit/test_gesture_clear_boot_marker.ahk
-#Include unit/test_tap_hold_scope.ahk
-#Include unit/test_restore_recommended_no_confirm.ahk
+#Include unit/infra/config/scope/test_tap_hold_scope.ahk
+#Include unit/infra/config/scope/test_restore_recommended_no_confirm.ahk
 #Include unit/test_tap_hold_hand_sections.ahk
-#Include unit/test_config_io_feature_section_resolution.ahk
+#Include unit/infra/config/persistence/test_config_io_feature_section_resolution.ahk
 #Include unit/test_hotstrings_full.ahk
 #Include unit/test_tap_hold_loader.ahk
 #Include unit/infra/i18n/test_i18n.ahk
@@ -596,7 +596,7 @@ InstallSendNoOps()
 #Include ../ui/menu/menu_metrics.ahk
 #Include ../ui/menu/menu_metrics_actions.ahk
 #Include unit/test_metrics_shortcut_named_key.ahk
-#Include unit/test_config_shortcuts_types.ahk
+#Include unit/infra/config/persistence/test_config_shortcuts_types.ahk
 #Include unit/test_metrics_preferences_global_barrier_20260813.ahk
 
 ; LLM modules — pure-logic subset (profiles, models, api_common, api_ollama,
@@ -835,7 +835,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_onboarding_answers.ahk
 #Include unit/test_onboarding_metrics_path.ahk
 #Include unit/test_gestures.ahk
-#Include unit/test_config_keyboard_binding_identity.ahk
+#Include unit/infra/config/persistence/test_config_keyboard_binding_identity.ahk
 #Include unit/test_virtual_desktops.ahk
 #Include unit/test_text_case_vectors.ahk
 #Include unit/test_wrap_selection_action.ahk
@@ -856,7 +856,7 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_key_combinations.ahk
 #Include unit/test_gesture_cycle_candidates.ahk
 #Include unit/test_gesture_recommended_actions.ahk
-#Include unit/test_config_persistence_transactions.ahk
+#Include unit/infra/config/persistence/test_config_persistence_transactions.ahk
 #Include unit/infra/lifecycle/test_reload_terminal_pending.ahk
 #Include unit/infra/lifecycle/test_reload_successor_quiescence.ahk
 #Include unit/infra/lifecycle/test_reload_worker_identity.ahk
@@ -865,22 +865,22 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_tap_hold_hold_picker_options.ahk
 #Include unit/test_menu_command_deferral.ahk
 #Include unit/test_tap_hold_roll.ahk
-#Include unit/test_config_recovery_transactions.ahk
-#Include unit/test_config_commit_gateway.ahk
-#Include unit/test_config_typed_updates.ahk
-#Include unit/test_config_typed_transactions.ahk
-#Include unit/test_config_unused_keys.ahk
-#Include unit/test_config_migrate.ahk
-#Include unit/test_config_partial_load_persistence.ahk
-#Include unit/test_config_partial_load_llm.ahk
-#Include unit/test_toml_numeric_strings.ahk
-#Include unit/test_toml_array_element_types.ahk
-#Include unit/test_toml_inline_tables.ahk
-#Include unit/test_toml_nested_arrays.ahk
-#Include unit/test_toml_float_roundtrip.ahk
-#Include unit/test_toml_incomplete_write.ahk
-#Include unit/test_toml_stage_cleanup.ahk
-#Include unit/test_config_typed_producers.ahk
+#Include unit/infra/config/persistence/test_config_recovery_transactions.ahk
+#Include unit/infra/config/persistence/test_config_commit_gateway.ahk
+#Include unit/infra/config/persistence/test_config_typed_updates.ahk
+#Include unit/infra/config/persistence/test_config_typed_transactions.ahk
+#Include unit/infra/config/persistence/test_config_unused_keys.ahk
+#Include unit/infra/config/migration/test_config_migrate.ahk
+#Include unit/infra/config/persistence/test_config_partial_load_persistence.ahk
+#Include unit/infra/config/persistence/test_config_partial_load_llm.ahk
+#Include unit/infra/toml/test_toml_numeric_strings.ahk
+#Include unit/infra/toml/test_toml_array_element_types.ahk
+#Include unit/infra/toml/test_toml_inline_tables.ahk
+#Include unit/infra/toml/test_toml_nested_arrays.ahk
+#Include unit/infra/toml/test_toml_float_roundtrip.ahk
+#Include unit/infra/toml/test_toml_incomplete_write.ahk
+#Include unit/infra/toml/test_toml_stage_cleanup.ahk
+#Include unit/infra/config/persistence/test_config_typed_producers.ahk
 #Include unit/test_metrics_delivery_owner.ahk
 #Include unit/test_metrics_cached_ready.ahk
 #Include unit/test_metrics_warm_sidecar.ahk
@@ -896,18 +896,18 @@ _LogBootProgress("loading gestures modules")
 #Include unit/test_webview_range_mount.ahk
 #Include unit/test_webview_profile_ownership.ahk
 #Include unit/test_metrics_file_urls.ahk
-#Include unit/test_uridecode_literal_unicode.ahk
+#Include unit/infra/toml/test_uridecode_literal_unicode.ahk
 #Include meta/test_webview_script_observer.ahk
 #Include unit/test_metrics_retry_outcomes.ahk
-#Include meta/test_config_typed_foreign_producers.ahk
-#Include unit/test_config_transition_core.ahk
-#Include unit/test_config_transition_runtime.ahk
-#Include unit/test_config_transition_windows_port.ahk
-#Include unit/test_toml_build_updated_content.ahk
-#Include unit/test_config_full_save_generation.ahk
-#Include unit/test_config_write_terminal_barrier.ahk
-#Include unit/test_feature_io_global_barrier.ahk
-#Include unit/test_editor_global_barrier_behavior_20260813.ahk
+#Include meta/infra/config/persistence/test_config_typed_foreign_producers.ahk
+#Include unit/infra/config/transition/test_config_transition_core.ahk
+#Include unit/infra/config/transition/test_config_transition_runtime.ahk
+#Include unit/infra/config/transition/test_config_transition_windows_port.ahk
+#Include unit/infra/toml/test_toml_build_updated_content.ahk
+#Include unit/infra/config/persistence/test_config_full_save_generation.ahk
+#Include unit/infra/config/persistence/test_config_write_terminal_barrier.ahk
+#Include unit/infra/config/persistence/test_feature_io_global_barrier.ahk
+#Include unit/infra/config/persistence/test_editor_global_barrier_behavior.ahk
 #Include unit/infra/lifecycle/test_runtime_decision_generation.ahk
 #Include meta/test_wpm_global_barrier_behavior_20260813.ahk
 #Include unit/test_gesture_restart_result_zero_is_success.ahk
@@ -1029,9 +1029,9 @@ global _AhkSubDir := ""
 #Include unit/test_keylogger_sql.ahk
 #Include unit/test_keylogger_text_cipher.ahk
 #Include unit/test_keylogger_text_migration.ahk
-#Include unit/test_migration_native_write.ahk
-#Include unit/test_migration_open_refusal.ahk
-#Include unit/test_keylogger_migration_read_refusal.ahk
+#Include unit/infra/config/migration/test_migration_native_write.ahk
+#Include unit/infra/config/migration/test_migration_open_refusal.ahk
+#Include unit/infra/config/migration/test_keylogger_migration_read_refusal.ahk
 #Include unit/test_build_inserts_covers_emitted_types.ahk
 #Include unit/test_metrics_and_locale_honesty.ahk
 #Include unit/test_keylogger_app_categories.ahk
@@ -1232,8 +1232,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_deferred_registration_live_rebuild_race.ahk
 #Include meta/test_spotlight_non_blocking.ahk
 #Include meta/test_spotlight_gdiplus_leak.ahk
-#Include meta/test_toml_batchwrite_atomic.ahk
-#Include unit/test_toml_batchwrite_exact_subtree.ahk
+#Include meta/infra/toml/test_toml_batchwrite_atomic.ahk
+#Include unit/infra/toml/test_toml_batchwrite_exact_subtree.ahk
 #Include meta/test_webview2_temp_leak.ahk
 #Include meta/test_keylogger_webview_fallback.ahk
 #Include meta/test_graphics_renderer_createwindow_catch.ahk
@@ -1243,7 +1243,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_webview_low_ram_native_fallback.ahk
 #Include meta/infra/dispatch/test_hookdispatcher_swallow.ahk
 #Include meta/test_llm_json_parser_silent_fail.ahk
-#Include meta/test_json_unicode_escape.ahk
+#Include meta/infra/toml/test_json_unicode_escape.ahk
 #Include meta/test_healthcheck_recordwarn_called.ahk
 #Include meta/test_wrap_symbol_disabled_state.ahk
 #Include meta/test_screenshot_region_clipwait_clobber.ahk
@@ -1302,7 +1302,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_tray_root_terminal_forwarding.ahk
 #Include meta/test_prefix_watcher_deferred.ahk
 #Include meta/test_hotstrings_ready_contract.ahk
-#Include meta/test_native_hotstrings_migrated.ahk
+#Include meta/infra/config/migration/test_native_hotstrings_migrated.ahk
 #Include meta/test_hse_send_transaction_guard.ahk
 #Include meta/infra/i18n/test_i18n_fallback_deferred.ahk
 #Include unit/test_hse_conform_double_fire.ahk
@@ -1330,7 +1330,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_cle_emoji_gated.ahk
 #Include meta/test_hse_consumed_endchar_ring.ahk
 #Include meta/test_expansion_burst_atomic.ahk
-#Include meta/test_parsetomlfile_unterminated_array_recovers.ahk
+#Include meta/infra/toml/test_parsetomlfile_unterminated_array_recovers.ahk
 #Include meta/infra/dispatch/test_dispatcher_register_duplicate_label.ahk
 #Include meta/test_updater_cancel_fires_on_json.ahk
 #Include meta/test_updater_download_receive_timeout.ahk
@@ -1353,7 +1353,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include ../infra/manifest_menu.ahk
 #Include unit/test_menu_population.ahk
 #Include unit/test_menu_startup_commands.ahk
-#Include unit/test_config_registry_cache.ahk
+#Include unit/infra/config/persistence/test_config_registry_cache.ahk
 #Include unit/test_llm_runtime_activation.ahk
 ; The tray root builder: its top-level dispatcher and the id → builder table.
 ; Function definitions only, and the table names only its own _MI_ builders,
@@ -1428,19 +1428,19 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_llm_hotkeys_deferred_by_pause.ahk
 #Include unit/test_llm_hotkey_cross_owner_collision.ahk
 #Include meta/test_llm_hotkey_cross_owner_policy.ahk
-#Include meta/test_config_transition_integration.ahk
+#Include meta/infra/config/transition/test_config_transition_integration.ahk
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
 ; same shared file the macOS and Linux suites replay.
 #Include meta/corpus/test_corpus_logger_behaviour.ahk
 ; TOML fuzz corpus -- exercises ParseTomlFile() against 50 adversarial inputs.
 ; Asserts the loader never crashes on any input (valid or invalid TOML).
 #Include meta/corpus/test_corpus_toml_fuzz.ahk
-#Include meta/test_toml_inline_comment_stripping.ahk
-#Include meta/test_toml_read_failure_is_loud.ahk
-#Include meta/test_config_boot_read_failure_blocks_persist.ahk
-#Include meta/test_persist_result_not_discarded.ahk
-#Include meta/test_config_persistence_callers.ahk
-#Include meta/test_config_recovery_gateway.ahk
+#Include meta/infra/toml/test_toml_inline_comment_stripping.ahk
+#Include meta/infra/toml/test_toml_read_failure_is_loud.ahk
+#Include meta/infra/config/persistence/test_config_boot_read_failure_blocks_persist.ahk
+#Include meta/infra/config/persistence/test_persist_result_not_discarded.ahk
+#Include meta/infra/config/persistence/test_config_persistence_callers.ahk
+#Include meta/infra/config/persistence/test_config_recovery_gateway.ahk
 ; Keylogger aggregation corpus -- tests KLW_WalkTypingEntry / KLW_WalkAppSwitch /
 ; KLW_WalkWindowSwitch / KLW_WalkSystemEvent against shared cross-driver vectors.
 #Include meta/corpus/test_corpus_keylogger_aggregation.ahk
@@ -1467,10 +1467,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_border_gdi_cleanup_broken_nesting.ahk
 #Include meta/test_tooltip_measure_gdi_ownership.ahk
 #Include meta/test_capslock_led_single_owner.ahk
-#Include meta/test_config_shortcuts_array_escape.ahk
-#Include meta/test_config_window_delay_write_per_keystroke.ahk
-#Include meta/test_config_window_republishes_baked_fields.ahk
-#Include meta/test_config_window_no_delimiter_ui.ahk
+#Include meta/infra/config/persistence/test_config_shortcuts_array_escape.ahk
+#Include meta/infra/config/persistence/test_config_window_delay_write_per_keystroke.ahk
+#Include meta/infra/config/persistence/test_config_window_republishes_baked_fields.ahk
+#Include meta/infra/config/persistence/test_config_window_no_delimiter_ui.ahk
 #Include meta/test_curl_payload_pii_temp_leak.ahk
 #Include meta/test_deadkey_suspend_guard.ahk
 #Include meta/test_deferred_menu_critical_file_io.ahk
@@ -1487,7 +1487,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/suite/test_driver_quoted_definitions.ahk
 #Include meta/adapters/crash_report/test_error_handler_heavy_diagnostics.ahk
 #Include meta/test_ext_builder_fn_dynamic_call_swallow.ahk
-#Include meta/test_format_toml_stale_path_deadcode.ahk
+#Include meta/infra/toml/test_format_toml_stale_path_deadcode.ahk
 #Include meta/test_gesturepickcolor_clipboard_clobber.ahk
 #Include meta/test_getselection_blocks_and_eats_keys.ahk
 #Include meta/adapters/crash_report/test_global_error_handler_sendevent_storm.ahk
@@ -1498,7 +1498,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_healthcheck_onwebmsg_dead_code.ahk
 #Include meta/test_hse_disable_group_atomic.ahk
 #Include meta/test_insert_id_discovery_label_collision.ahk
-#Include meta/test_isrepeat_section_name_mismatch_latent_divergence.ahk
+#Include meta/infra/config/persistence/test_isrepeat_section_name_mismatch_latent_divergence.ahk
 #Include meta/test_text_expansion_auto_toml_backed.ahk
 #Include meta/test_kh_intercept_dead_flag.ahk
 #Include meta/test_kl_refresh_context_blocks_on_keystroke.ahk
@@ -1514,7 +1514,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_llm_failure_callback_arity.ahk
 #Include meta/test_llm_inline_autotype_suspend_guard.ahk
 #Include meta/test_llm_pointer_watch_not_stopped_on_suspend.ahk
-#Include meta/test_loader_toml_injection_readfile_hotpath.ahk
+#Include meta/infra/toml/test_loader_toml_injection_readfile_hotpath.ahk
 #Include meta/test_lock_workstation_named_helper.ahk
 #Include meta/test_lost_tick_after_filtered_keystroke.ahk
 #Include meta/test_menu_dispatch_callbacks_unbounded_growth.ahk
@@ -1535,10 +1535,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_keylogger_session_watcher_synth.ahk
 #Include meta/test_kl_stop_flush_survives_suspend.ahk
 #Include meta/test_onkeydown_dead_llm_branch.ahk
-#Include meta/test_parser_ord_empty_token_crash.ahk
+#Include meta/infra/toml/test_parser_ord_empty_token_crash.ahk
 #Include meta/test_password_cache_torn_write.ahk
 #Include meta/test_paste_plain_nontext_clip_guard.ahk
-#Include meta/test_pathstoml_read_missing_utf8_encoding.ahk
+#Include meta/infra/toml/test_pathstoml_read_missing_utf8_encoding.ahk
 #Include meta/test_personal_ext_scan_unbounded_recursion.ahk
 #Include meta/infra/dispatch/test_pointer_watch_timer_bypasses_suspend.ahk
 #Include meta/test_prefix_index_rebuild_no_suspend_guard.ahk
@@ -1554,7 +1554,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_space_altgr_double_raalt_down.ahk
 #Include meta/test_ssid_utf8_misdecode_and_signal_offset.ahk
 #Include meta/test_stream_final_flush_sleep_blocks_thread.ahk
-#Include meta/test_strict_canon_does_not_drop_stale_keys.ahk
+#Include meta/infra/toml/test_strict_canon_does_not_drop_stale_keys.ahk
 #Include meta/infra/lifecycle/test_suspend_watchdog_no_prefix_keywait.ahk
 #Include meta/adapters/input/test_owned_inputhooks_suspend.ahk
 #Include meta/adapters/input/test_blocking_inputhook_suspend_ownership.ahk
@@ -1586,42 +1586,42 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_push_unguarded_debug_arg_build.ahk
 #Include meta/test_wpm_config_position_pair_validation.ahk
 #Include meta/test_wpm_persistence_transaction.ahk
-#Include meta/test_config_full_save_generation_guard.ahk
+#Include meta/infra/config/persistence/test_config_full_save_generation_guard.ahk
 #Include meta/test_wpm_ring_buffer_cross_thread_race.ahk
 #Include unit/adapters/shell_runner/test_coalesced_job_callbacks_dropped.ahk
 #Include unit/test_count_regex_vs_entry_pattern_divergence.ahk
-#Include unit/test_counttoml_overcounts_personal_meta_sections.ahk
+#Include unit/infra/toml/test_counttoml_overcounts_personal_meta_sections.ahk
 #Include unit/test_delay_edit_non_integer_personal_truncation.ahk
-#Include unit/test_freshness_same_second_edit_window.ahk
+#Include unit/infra/config/persistence/test_freshness_same_second_edit_window.ahk
 #Include unit/adapters/input/test_inline_autotype_not_synthetic.ahk
-#Include unit/test_loadexttoml_skips_meta_sections.ahk
-#Include unit/test_json_number_misleading_error.ahk
-#Include unit/test_json_string_fast_path.ahk
-#Include unit/test_json_object_key_nul.ahk
+#Include unit/infra/toml/test_loadexttoml_skips_meta_sections.ahk
+#Include unit/infra/toml/test_json_number_misleading_error.ahk
+#Include unit/infra/toml/test_json_string_fast_path.ahk
+#Include unit/infra/toml/test_json_object_key_nul.ahk
 #Include unit/test_ollama_curl_temp_pii_plaintext.ahk
-#Include unit/test_parsetomlgroupconfig_missing_file_cache_key.ahk
-#Include unit/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
+#Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key.ahk
+#Include unit/infra/toml/test_parsetomlgroupconfig_missing_file_cache_key_mismatch.ahk
 #Include unit/test_per_entry_priority_divergence_cache_vs_toml.ahk
 #Include unit/adapters/shell_runner/test_plc_closure_callable.ahk
 #Include unit/test_remote_parse_first_content_match.ahk
 #Include unit/test_stale_cache_survives_reset_and_pause.ahk
 #Include unit/test_time_activation_fails_open_on_missing_prev_char.ahk
-#Include unit/test_uridecode_multibyte_utf8_corruption.ahk
+#Include unit/infra/toml/test_uridecode_multibyte_utf8_corruption.ahk
 
 ; -- Audit finding regression tests (batch-wired) --
 #Include meta/suite/test_generated_substr_minus_one.ahk
-#Include meta/test_toml_multiline_array_depth.ahk
-#Include meta/test_toml_unescape_ordering.ahk
+#Include meta/infra/toml/test_toml_multiline_array_depth.ahk
+#Include meta/infra/toml/test_toml_unescape_ordering.ahk
 #Include meta/adapters/input/test_clipboard_sentinel.ahk
 #Include meta/adapters/input/test_clipboard_saveall_sentinel.ahk
 #Include meta/adapters/input/test_textsend_callback_wired.ahk
-#Include meta/test_is_category_all_enabled_loop.ahk
+#Include meta/infra/config/persistence/test_is_category_all_enabled_loop.ahk
 #Include meta/adapters/test_regread_no_type_arg.ahk
 #Include meta/infra/logger/test_logger_dedup_tick.ahk
 #Include meta/test_hse_endchar_consumed_delimiters.ahk
 #Include meta/test_prefix_watcher_magic_suffix.ahk
 #Include meta/test_deadkey_uses_dynamic_magic_key.ahk
-#Include meta/test_parse_overrides_seen_sections.ahk
+#Include meta/infra/toml/test_parse_overrides_seen_sections.ahk
 #Include meta/test_llm_getactiveprofile_arg.ahk
 #Include meta/infra/dispatch/test_tickcount_wrap_safe.ahk
 #Include meta/infra/dispatch/test_tickcount_lib_wrap.ahk
@@ -1633,7 +1633,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_http_cancel_aborts.ahk
 #Include meta/adapters/input/test_keyboard_hook_vk_format.ahk
 #Include meta/adapters/shell_runner/test_plc_stop_clears_callbacks.ahk
-#Include meta/test_toml_coerce_quoted_commas.ahk
+#Include meta/infra/toml/test_toml_coerce_quoted_commas.ahk
 #Include meta/infra/i18n/test_i18n_setlocale_resets_fallback.ahk
 #Include meta/test_ws_save_atomic.ahk
 #Include meta/test_tapholdwriter_int_before_bool.ahk
@@ -1650,7 +1650,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/adapters/input/test_keyboard_hook_dispatch_error_logged.ahk
 #Include meta/test_tray_menu_cleared_before_onboarding.ahk
 #Include meta/test_tray_bootstrap_publication_transaction.ahk
-#Include meta/test_config_shortcuts_unescape_ordering.ahk
+#Include meta/infra/config/persistence/test_config_shortcuts_unescape_ordering.ahk
 #Include meta/test_gesture_selfactivated_bounded.ahk
 #Include meta/test_llm_api_no_entry_logged.ahk
 #Include meta/test_llm_cancel_not_under_critical.ahk
@@ -1690,7 +1690,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_addshortcut_registration_guard.ahk
 #Include meta/test_gpt_hotkey_run_guard.ahk
 #Include meta/test_menu_manifest_lifecycle_pair.ahk
-#Include meta/test_editor_persist_before_publish.ahk
+#Include meta/infra/config/persistence/test_editor_persist_before_publish.ahk
 #Include meta/test_keylogger_webview_epoch.ahk
 #Include meta/test_keylogger_webview_callback_fail_safe.ahk
 #Include meta/test_keylogger_clipboard_registration_transaction.ahk
@@ -1703,7 +1703,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_native_editor_completion.ahk
 #Include unit/adapters/input/test_text_sender_sendinput_failure.ahk
 #Include meta/test_deadkey_unmapped_base_char.ahk
-#Include meta/test_savefullconfig_no_delete.ahk
+#Include meta/infra/config/persistence/test_savefullconfig_no_delete.ahk
 #Include meta/test_keylogger_scan_max_id_tail.ahk
 #Include meta/test_gesture_screenshot_no_tempfile.ahk
 #Include meta/adapters/test_wmexists_is_not_a_handle.ahk
@@ -1711,7 +1711,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/adapters/test_crypto_sha256_is_real.ahk
 #Include meta/test_capslock_led_does_not_latch.ahk
 #Include meta/test_hotstrings_deadkey_uppercase_cleanup.ahk
-#Include meta/test_parser_splitblocks_cap.ahk
+#Include meta/infra/toml/test_parser_splitblocks_cap.ahk
 #Include meta/test_ollama_trim_registry_min_id.ahk
 #Include meta/adapters/input/test_clipwait_binary.ahk
 #Include meta/infra/dispatch/test_timer_scheduler_oneshot_suspend.ahk
@@ -1728,7 +1728,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/test_hse_send_failure_transaction.ahk
 #Include meta/test_hotstrings_combo_auto_escaping.ahk
 #Include meta/test_ergo_flow_gap_end.ahk
-#Include meta/test_config_window_patch_toml_meta_error.ahk
+#Include meta/infra/config/persistence/test_config_window_patch_toml_meta_error.ahk
 #Include meta/test_capsword_mouse_clobber.ahk
 #Include unit/infra/dispatch/test_timer_scheduler_suspend.ahk
 #Include meta/test_magic_key_probe_deadkey_safe.ahk
@@ -1741,7 +1741,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_paste_without_formatting_restore.ahk
 #Include meta/test_hold_layer_release_bounded.ahk
 #Include meta/test_hold_layer_survives_long_press.ahk
-#Include meta/test_toml_batchwrite_cache_coherence.ahk
+#Include meta/infra/toml/test_toml_batchwrite_cache_coherence.ahk
 #Include meta/test_topology_debounce_settled_geometry.ahk
 #Include meta/test_topology_single_append.ahk
 #Include meta/adapters/crash_report/test_crash_report_unique_filename.ahk
@@ -1764,7 +1764,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_menu_master_category_cache.ahk
 #Include unit/adapters/test_storage_st_delete_contract.ahk
 #Include meta/infra/lifecycle/test_boot_dircreate_guarded.ahk
-#Include meta/test_toml_render_bool_sentinel.ahk
+#Include meta/infra/toml/test_toml_render_bool_sentinel.ahk
 #Include meta/test_llm_menu_loaded_gate.ahk
 #Include meta/test_altgr_dispatch_suspend_guard.ahk
 #Include meta/test_llm_inject_complete_callback.ahk
@@ -1822,7 +1822,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_healthcheck_collectors_guarded.ahk
 #Include meta/test_personal_editor_section_guard.ahk
 #Include meta/test_gestures_init_lifecycle_pair.ahk
-#Include meta/test_paths_file_single_writer.ahk
+#Include meta/infra/config/persistence/test_paths_file_single_writer.ahk
 #Include meta/test_changelog_fetch_status_logged.ahk
 #Include meta/adapters/test_mutex_yield_is_recorded.ahk
 #Include meta/infra/lifecycle/test_suspend_deferral_bounded.ahk
@@ -1830,10 +1830,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/infra/lifecycle/test_suspend_lifecycle_logged.ahk
 #Include unit/infra/lifecycle/test_lifecycle_transition.ahk
 #Include meta/suite/test_dead_state_and_single_source.ahk
-#Include meta/test_discarded_config_is_reported.ahk
+#Include meta/infra/config/persistence/test_discarded_config_is_reported.ahk
 #Include meta/test_sql_replay_is_idempotent.ahk
 #Include meta/test_keyboard_shortcut_slots_roundtrip.ahk
-#Include meta/test_config_failures_are_surfaced.ahk
+#Include meta/infra/config/persistence/test_config_failures_are_surfaced.ahk
 #Include meta/adapters/crash_report/test_crash_report_not_suppressed.ahk
 #Include meta/test_submenu_survives_publish.ahk
 #Include meta/test_keymap_hotpath_guards.ahk
@@ -1939,7 +1939,7 @@ _LogBootProgress("keylogger modules + tests included")
 ; GestureGetCyclableWindows TOCTOU guard (commit 7b701020d).
 #Include meta/adapters/test_window_adapters_catch.ahk
 #Include meta/test_onbweb_singleton_guard.ahk
-#Include meta/test_reset_config_writes_meta_placeholder.ahk
+#Include meta/infra/config/persistence/test_reset_config_writes_meta_placeholder.ahk
 #Include meta/test_webview_shared_env_reentrancy_guard.ahk
 #Include meta/test_webview_host_callback_epoch.ahk
 ; AltTabMonitor bare-try-no-catch fix (F37) — sibling of the
@@ -1948,7 +1948,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_metrics_shortcut_persist_guard.ahk
 #Include meta/test_metrics_shortcut_transaction.ahk
 #Include meta/test_metrics_app_time_accuracy.ahk
-#Include meta/test_toggle_category_all_features_atomic.ahk
+#Include meta/infra/config/persistence/test_toggle_category_all_features_atomic.ahk
 #Include meta/adapters/test_crypto_djb2_fallback_logged.ahk
 #Include meta/adapters/test_adapter_callback_swallow_logged.ahk
 #Include meta/test_llm_callbacks_never_swallowed.ahk
@@ -1959,10 +1959,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/adapters/input/test_text_send_direct_mode_guarded.ahk
 #Include meta/test_http_post_reentrancy_guard.ahk
 #Include meta/test_personal_editor_autoexpand_i18n.ahk
-#Include meta/test_jsstr_cr_escaped.ahk
-#Include meta/test_json_string_literal_single_source.ahk
-#Include meta/test_json_string_decoder_single_source.ahk
-#Include meta/test_toml_string_codec_single_source.ahk
+#Include meta/infra/toml/test_jsstr_cr_escaped.ahk
+#Include meta/infra/toml/test_json_string_literal_single_source.ahk
+#Include meta/infra/toml/test_json_string_decoder_single_source.ahk
+#Include meta/infra/toml/test_toml_string_codec_single_source.ahk
 #Include meta/test_magic_key_editor_reopen_presents.ahk
 #Include meta/test_update_check_window_presented.ahk
 #Include meta/test_gesture_notice_presented.ahk
@@ -1977,10 +1977,10 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_taphold_timings_load_order.ahk
 #Include meta/test_suspend_resets_hse_context.ahk
 #Include meta/test_capsword_parse_time_callback.ahk
-#Include meta/test_config_shortcuts_inline_comment.ahk
-#Include meta/test_savefullconfig_llm_loaded_gate.ahk
+#Include meta/infra/config/persistence/test_config_shortcuts_inline_comment.ahk
+#Include meta/infra/config/persistence/test_savefullconfig_llm_loaded_gate.ahk
 #Include meta/adapters/test_single_instance_mutex_first.ahk
-#Include meta/test_master_gate_drifted_subgate_skip.ahk
+#Include meta/infra/config/persistence/test_master_gate_drifted_subgate_skip.ahk
 #Include meta/test_rctrl_lalt_hotif_gated.ahk
 #Include meta/test_prefix_keydown_ctrl_backspace_reset.ahk
 #Include meta/test_prefix_index_rebuild_suspend_replay.ahk
@@ -2003,7 +2003,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_audit_2026_07_20_batch4.ahk
 #Include meta/test_wrap_symbols_load_flush.ahk
 #Include unit/test_wrap_symbols_unreadable_blocks_save.ahk
-#Include unit/test_unreadable_config_never_persisted.ahk
+#Include unit/infra/config/persistence/test_unreadable_config_never_persisted.ahk
 #Include meta/test_app_picker_sort_safe_selection.ahk
 #Include meta/test_changelog_ready_not_stranded.ahk
 #Include meta/test_hcw_bulk_writers_republish.ahk
@@ -2041,17 +2041,17 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/test_wpm_graph_mode_draggable.ahk
 #Include meta/test_wpm_rebuilt_surface_is_sized.ahk
 #Include unit/test_activate_hotstrings_commits_synchronously.ahk
-#Include unit/test_cache_builder_strips_header_comment.ahk
+#Include unit/infra/toml/test_cache_builder_strips_header_comment.ahk
 #Include unit/infra/lifecycle/test_bundle_skip_validation.ahk
 #Include unit/infra/lifecycle/test_startup_smoke_receipt.ahk
 #Include unit/test_clipboard_history_paste.ahk
 #Include unit/test_changelog_request_epoch.ahk
 #Include unit/test_changelog_network_resilience.ahk
-#Include unit/test_config_toml_single_writer.ahk
-#Include unit/test_derived_toml_caches_not_memoised_on_failed_read.ahk
+#Include unit/infra/config/persistence/test_config_toml_single_writer.ahk
+#Include unit/infra/toml/test_derived_toml_caches_not_memoised_on_failed_read.ahk
 #Include unit/test_fire_log_callable_replacement.ahk
 #Include unit/test_fire_log_suspend_boundary.ahk
-#Include unit/test_group_config_cache_alias_invalidation.ahk
+#Include unit/infra/config/persistence/test_group_config_cache_alias_invalidation.ahk
 #Include unit/infra/dispatch/test_hotpath_profiler_exclusive.ahk
 #Include unit/infra/dispatch/test_hotpath_latency_statistics.ahk
 #Include unit/infra/dispatch/test_hotpath_breakdown_reentry.ahk
@@ -2065,8 +2065,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/infra/logger/test_logger_set_level_transaction.ahk
 #Include unit/infra/logger/test_logger_sub_files_multiline_arrays.ahk
 #Include unit/test_marker_substituted_in_replacement.ahk
-#Include unit/test_master_gates_not_persisted.ahk
-#Include unit/test_parse_toml_file_sticky_unreadable.ahk
+#Include unit/infra/config/persistence/test_master_gates_not_persisted.ahk
+#Include unit/infra/toml/test_parse_toml_file_sticky_unreadable.ahk
 #Include unit/test_personal_info_unreadable_never_persisted.ahk
 #Include unit/test_personal_read_clears_unreadable_latch.ahk
 #Include unit/test_personal_reload_bakes_resolved_delay.ahk

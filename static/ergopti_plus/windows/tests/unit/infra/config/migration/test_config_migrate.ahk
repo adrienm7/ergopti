@@ -1,0 +1,2578 @@
+﻿; tests/unit/infra/config/migration/test_config_migrate.ahk
+
+; ==============================================================================
+; MODULE: Config Migration Tests
+; DESCRIPTION:
+; Replays the shared corpus (_shared/tests/corpus/config_migrations) through
+; the Windows interpreter twice: as a pure plan, which must read as every
+; expected.toml and change nothing when replayed on its own output, and as the
+; boot transaction on a temporary config.toml, which must back the file up
+; byte for byte before migrating it and must never write a newer, invalid or
+; unsupported file, refusing every later TOML write to it for the session.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+#Include test_config_migrate_records.ahk
+#Include test_common_autocorrection_migration.ahk
+
+global _CMG_STAMP := "20990101-000000"
+global _CMG_MIN_CASES := 10
+
+_CMG_CorpusDir() {
+	global _SharedDir
+	return _SharedDir . "\tests\corpus\config_migrations"
+}
+
+_CMG_NewDir() {
+	static Seq := 0
+	Seq += 1
+	Dir := A_Temp . "\ergopti_config_migrate_" . A_TickCount . "_" . Seq
+	DirCreate(Dir)
+	return Dir
+}
+
+; Exact bytes of a file the test needs, failing the test when it is unreadable.
+_CMG_Read(Path) {
+	Content := FSReadUtf8Exact(Path)
+	Assert(Content is String, "unreadable test file: " . Path)
+	return Content
+}
+
+_CMG_Parse(Path) {
+	return _ConfigMigrateParse(_CMG_Read(Path), Path)
+}
+
+_CMG_Has(List, Value) {
+	for Item in List {
+		if (Item == Value)
+			return true
+	}
+	return false
+}
+
+; One line per key, for a failure message that shows both models.
+_CMG_ModelText(Model) {
+	Text := ""
+	for Section, Entries in Model {
+		for Key, Value in Entries
+			Text .= "[" . Section . "] " . Key . " = " . TOML_RenderValue(Value) . "; "
+	}
+	return Text
+}
+
+; Every case the corpus index lists, with its spec and registry.
+_CMG_Cases() {
+	Dir := _CMG_CorpusDir()
+	Cases := []
+	for Name in _CMG_Parse(Dir . "\cases.toml")["corpus"]["cases"] {
+		CaseDir := Dir . "\" . Name
+		Own := CaseDir . "\migrations.toml"
+		Cases.Push(Map("name", Name,
+			"spec", _CMG_Parse(CaseDir . "\case.toml")["case"],
+			"registry", FileExist(Own) ? ConfigMigrateLoadRegistry(Own) : ConfigMigrateShippedRegistry(),
+			"input", CaseDir . "\input.toml", "expected", CaseDir . "\expected.toml"))
+	}
+	return Cases
+}
+
+; Real macOS binding identities from the authoritative action registry and
+; actual modifier matrix, not an expected fixture allowlist.
+_CMG_MigrationContext() {
+	global _SharedDir
+	Catalogue := JsonParse(_CMG_Read(_SharedDir . "\modules\actions\modifier_chords.json"))
+	Registry := _CMG_Parse(_SharedDir . "\modules\actions\actions.toml")
+	Actions := Map()
+	Actions.CaseSense := "On"
+	for Family in ["sg", "ax"] {
+		for Id in Registry[Family . "_order"]["items"] {
+			Section := Family . "_actions." . Id
+			if !Registry.Has(Section)
+				continue
+			Row := Registry[Section]
+			if Row.Has("is_header") && (Row["is_header"] is TOML_Bool) && Row["is_header"].Value
+				continue
+			Claimed := StrSplit(Row["platform"], ",")
+			for Platform in Claimed {
+				if Trim(Platform) == "all" || Trim(Platform) == "hs"
+					Actions[Id] := true
+			}
+		}
+	}
+	Modifiers := Catalogue["platforms"]["macos"]["modifiers"]
+	Loop (2 ** Modifiers.Length) - 1 {
+		Mask := A_Index, Prefix := ""
+		for Index, Modifier in Modifiers {
+			if Mod(Floor(Mask / (2 ** (Index - 1))), 2) == 1
+				Prefix .= (Prefix == "" ? "" : "_") . Modifier["id"]
+		}
+		for Key in Catalogue["keys"]
+			Actions[Prefix . "_" . Key["id"]] := true
+	}
+	return Map("modifier_chords", Catalogue, "assignable_actions", Actions)
+}
+
+_CMG_RingText() {
+	Text := ""
+	for _, Line in LoggerRingBufferSnapshot()
+		Text .= Line . "`n"
+	return Text
+}
+
+
+
+
+
+; ================================
+; ================================
+; ======= 1/ Corpus replay =======
+; ================================
+; ================================
+
+_CMG_CorpusPlansMatchExpected() {
+	global _CMG_MIN_CASES
+	Replayed := 0
+	for CaseInfo in _CMG_Cases() {
+		Spec := CaseInfo["spec"]
+		if !_CMG_Has(Spec["drivers"], "ahk")
+			continue
+		Replayed += 1
+		Name := CaseInfo["name"]
+		Registry := CaseInfo["registry"]
+		Plan := ConfigMigratePlan(_CMG_Read(CaseInfo["input"]), Registry, "ahk", _CMG_MigrationContext())
+		AssertEqual(Spec["outcome"], Plan["outcome"], Name . ": outcome (" . Plan["detail"] . ")")
+		if (Spec["outcome"] != "migrated") {
+			AssertFalse(Plan.Has("candidate"), Name . ": a refused or current file has no candidate")
+			continue
+		}
+		AssertEqual(Spec["from_version"], Plan["version"], Name . ": the version the migration starts from")
+		AssertEqual(Spec["to_version"], Registry["current"], Name . ": the version it reaches")
+		if Spec.Has("preserve_source") && Spec["preserve_source"].Value {
+			Input := _CMG_Read(CaseInfo["input"])
+			WithoutStamp := RegExReplace(Plan["candidate"], "\[_meta\]\nschema_version = 2\n\n", "", &Removed, 1)
+			AssertEqual(1, Removed, Name . ": only the stamp is added")
+			AssertEqual(Input, WithoutStamp, Name . ": every unsupported source and destination byte survives")
+		}
+		Migrated := _ConfigMigrateParse(Plan["candidate"], Name . " candidate")
+		Expected := _CMG_Parse(CaseInfo["expected"])
+		Assert(ConfigMigrateSameModel(Migrated, Expected), Name
+			. ": the migrated file must read as expected.toml - got " . _CMG_ModelText(Migrated)
+			. " expected " . _CMG_ModelText(Expected))
+		Replay := ConfigMigrateApplySteps(_ConfigMigrateClone(Migrated), Registry, "ahk",
+			Spec["from_version"], _CMG_MigrationContext())
+		Assert(ConfigMigrateSameModel(Replay, Migrated),
+			Name . ": replaying the steps on their own output must change nothing")
+	}
+	Assert(Replayed >= _CMG_MIN_CASES, "expected at least " . _CMG_MIN_CASES
+		. " corpus cases for ahk, replayed " . Replayed)
+}
+Test("config migrate: every corpus case plans the expected model and replays idempotently "
+	. "(config-migrate-corpus)", _CMG_CorpusPlansMatchExpected)
+
+_CMG_CopyOwnsNestedValues() {
+	Dir := _CMG_CorpusDir() . "\op_copy_if_absent"
+	Model := _CMG_Parse(Dir . "\input.toml")
+	Expected := _CMG_Parse(Dir . "\expected.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	ConfigMigrateApplySteps(Model, Registry, "ahk", 1)
+	Source := Model["source"]["records"]
+	Copied := Model["destination"]["records"]
+	Sibling := Model["sibling"]["records"]
+	Assert(ConfigMigrateSameValue(Copied, Expected["destination"]["records"]), "copy matches the whole independent expected value")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "sibling matches the independent expected value")
+	Source[1]["palette"][1]["Key"] := "edited source"
+	Source.Push(Map("future", "source only"))
+	Assert(ConfigMigrateSameValue(Copied, Expected["destination"]["records"]), "source edits cannot change the copy")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "source edits cannot change the sibling")
+	Copied[1]["palette"][1]["key"] := "edited copy"
+	Copied[1]["visible"].Value := true
+	AssertEqual("lower", Source[1]["palette"][1]["key"], "copy edits cannot change the source's nested Map")
+	AssertEqual(false, Source[1]["visible"].Value, "copy edits cannot change the source's typed Boolean")
+	Assert(ConfigMigrateSameValue(Sibling, Expected["sibling"]["records"]), "copy edits cannot change another destination")
+	Model["source"]["rows"][1][1] := 99
+	Assert(ConfigMigrateSameValue(Model["destination"]["rows"], Expected["destination"]["rows"]),
+		"nested copied arrays own every child")
+}
+Test("config migrate: conditional copies own nested values independently (config-migrate-copy-ownership)", _CMG_CopyOwnsNestedValues)
+
+_CMG_CopyPreservesOccupiedNamespaceBytes() {
+	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Plan := ConfigMigratePlan(Input, ConfigMigrateLoadRegistry(Dir . "\migrations.toml"), "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	AssertContains(Plan["candidate"], Input, "conditional copies preserve every source byte, including empty table headers")
+}
+Test("config migrate: conditional copies retain every occupied namespace byte (config-migrate-copy-bytes)",
+	_CMG_CopyPreservesOccupiedNamespaceBytes)
+
+_CMG_CopyPreservesInlineAncestor() {
+	Input := _CMG_Read(_CMG_CorpusDir() . "\copy_preserves_occupied_namespaces\inline_ancestor.toml")
+	Registry := ConfigMigrateValidateRegistry(_ConfigMigrateParse('[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk", "hs", "linux"]`n'
+		. 'reason = "Contract: preserve occupied inline namespaces."`n'
+		. 'ops = [{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings.inline.deep", to_key = "child" },'
+		. '{ op = "copy_if_absent", section = "source", key = "choice", to_section = "settings", to_key = "inline" }]`n', "inline contract"))
+	Plan := ConfigMigratePlan(Input, Registry, "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	Expected := _ConfigMigrateParse(Input, "independent inline choices")
+	Expected["_meta"] := Map("schema_version", 2)
+	Assert(ConfigMigrateSameModel(Plan["model"], Expected), "all source choices and the complete inline ancestor survive")
+	for Line in StrSplit(Input, "`n") {
+		if Line != ""
+			AssertContains(Plan["candidate"], Line . "`n", "every original row keeps its exact bytes")
+	}
+}
+Test("config migrate: conditional copies preserve occupied inline namespaces (config-migrate-copy-namespace)", _CMG_CopyPreservesInlineAncestor)
+
+_CMG_ChordPreservesInlineAncestor() {
+	Dir := _CMG_CorpusDir() . "\op_move_chord_scalar_ancestor"
+	Input := _CMG_Read(Dir . "\inline_ancestor.toml")
+	Plan := ConfigMigratePlan(Input, ConfigMigrateLoadRegistry(Dir . "\migrations.toml"), "ahk", _CMG_MigrationContext())
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	WithoutStamp := RegExReplace(Plan["candidate"], "\[_meta\]\nschema_version = 2\n\n", "", &Removed, 1)
+	AssertEqual(1, Removed)
+	AssertEqual(Input, WithoutStamp, "both complete inline records and comments remain byte exact")
+}
+Test("config migrate: chord handoffs preserve inline ancestor ownership (config-migrate-chord-namespace)", _CMG_ChordPreservesInlineAncestor)
+
+_CMG_ChordContextOwnsKnownActions() {
+	Context := _CMG_MigrationContext(), Actions := Context["assignable_actions"]
+	AssertTrue(Actions.Has("none"), "NONE comes from the real action catalogue")
+	AssertTrue(Actions.Has("open_hotstrings_editor"), "the editor comes from the real action catalogue")
+	AssertTrue(Actions.Has("cmd_ctrl_option_shift_comma"), "the actual modifier matrix is complete")
+	AssertFalse(Actions.Has("future_action"), "unknown strings do not become recognized choices")
+	AssertFalse(Actions.Has("alt_d"), "native aliases are not persisted action identities")
+	AssertFalse(Actions.Has("_modifier_chords_placeholder"), "picker metadata is not an action")
+}
+Test("config migrate: chord context uses actual offered actions (config-migrate-chord-context)", _CMG_ChordContextOwnsKnownActions)
+
+_CMG_ChordRequiresContext() {
+	Dir := _CMG_CorpusDir() . "\op_move_chord_false"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	Raised := false
+	try ConfigMigratePlan(Input, Registry, "ahk")
+	catch as Err {
+		Raised := true
+		AssertContains(Err.Message, "missing chord action context")
+	}
+	AssertTrue(Raised, "no legacy cleanup can be authorized without actual catalogue context")
+	AssertEqual(Input, _CMG_Read(Dir . "\input.toml"), "the entire legacy source remains unchanged")
+}
+Test("config migrate: absent chord context refuses legacy cleanup (config-migrate-chord-context)", _CMG_ChordRequiresContext)
+
+_CMG_StampOnlyPreservesExactRecords() {
+	Dir := _CMG_CorpusDir() . "\copy_preserves_occupied_namespaces"
+	Input := _CMG_Read(Dir . "\input.toml")
+	Registry := ConfigMigrateLoadRegistry(Dir . "\migrations.toml")
+	OldMeta := '[_meta] # metadata owner`nschema_version = 1.0 # retain this comment`nunknown = "keep"`n`n'
+	NewMeta := StrReplace(OldMeta, "= 1.0", "= 2")
+	Missing := '[_meta]`nunknown = "keep"`n`n'
+	TightMeta := '[_meta]`nschema_version = 1.0#metadata-owner`nunknown = "keep"`n`n'
+	Cases := [
+		{ Source: TightMeta . Input, Expected: StrReplace(TightMeta, "1.0#", "2#") . Input },
+		{ Source: OldMeta . Input, Expected: NewMeta . Input },
+		{ Source: Missing . Input, Expected: '[_meta]`nschema_version = 2`nunknown = "keep"`n`n' . Input },
+		{ Source: Chr(0xFEFF) . StrReplace(OldMeta . Input, "`n", "`r`n"),
+			Expected: Chr(0xFEFF) . StrReplace(NewMeta . Input, "`n", "`r`n") },
+		{ Source: RTrim(OldMeta . Input, "`n"), Expected: RTrim(NewMeta . Input, "`n") },
+		{ Source: Input . "[_meta]", Expected: Input . "[_meta]`nschema_version = 2`n" }
+	]
+	for CaseInfo in Cases {
+		Plan := ConfigMigratePlan(CaseInfo.Source, Registry, "ahk")
+		AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+		AssertEqual(CaseInfo.Expected, Plan["candidate"], "only the metadata stamp may change")
+	}
+}
+Test("config migrate: stamp-only plans preserve comments, BOM, EOL and final rows (config-migrate-stamp-bytes)",
+	_CMG_StampOnlyPreservesExactRecords)
+
+; The boot transaction on a real file: backup, publication or refusal.
+_CMG_CorpusBootTransactions() {
+	global _CMG_STAMP
+	Ran := 0
+	for CaseInfo in _CMG_Cases() {
+		Spec := CaseInfo["spec"]
+		if !_CMG_Has(Spec["drivers"], "ahk")
+			continue
+		Ran += 1
+		Name := CaseInfo["name"]
+		Registry := CaseInfo["registry"]
+		Dir := _CMG_NewDir()
+		try {
+			Path := Dir . "\config.toml"
+			Input := _CMG_Read(CaseInfo["input"])
+			AssertTrue(FSWriteDurable(Path, Input), Name . ": the fixture config must be written")
+			Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, 0, 0, _CMG_MigrationContext())
+			AssertEqual(Spec["outcome"], Result["status"], Name . ": boot status (" . Result["detail"] . ")")
+			Backup := ConfigMigrateBackupPath(Path, Registry["current"], _CMG_STAMP)
+			if (Spec["outcome"] == "migrated") {
+				AssertEqual(0, Result["read_only"], Name . ": a migrated file stays writable")
+				AssertEqual(Backup, Result["backup"], Name . ": the backup sits next to the file")
+				Assert(FSUtf8ExactMatches(Backup, Input), Name . ": the backup holds the exact old bytes")
+				Assert(ConfigMigrateSameModel(_CMG_Parse(Path), _CMG_Parse(CaseInfo["expected"])),
+					Name . ": the published file reads as expected.toml")
+				Published := _CMG_Read(Path)
+				Again := ConfigMigrateRun(Path, Registry, "20990101-000001", 0, 0, _CMG_MigrationContext())
+				AssertEqual("current", Again["status"], Name . ": a second boot finds the file current")
+				Assert(FSUtf8ExactMatches(Path, Published), Name . ": a current file is not rewritten")
+				AssertFalse(FileExist(ConfigMigrateBackupPath(Path, Registry["current"], "20990101-000001")),
+					Name . ": a current file is not backed up")
+			} else if (Spec["outcome"] == "current") {
+				AssertEqual(0, Result["read_only"])
+				Assert(FSUtf8ExactMatches(Path, Input), Name . ": a current file is not rewritten")
+				AssertFalse(FileExist(Backup), Name . ": a current file is not backed up")
+			} else {
+				AssertEqual(1, Result["read_only"], Name . ": the session becomes read-only")
+				Assert(FSUtf8ExactMatches(Path, Input), Name . ": a refused file keeps its exact bytes")
+				AssertFalse(FileExist(Backup), Name . ": a refused file is not backed up")
+				Assert(TOML_WriteRefusal(Path) != "", Name . ": later writes are refused")
+				AssertFalse(TOML_BatchWrite(Path, [{ Section: "gestures", Key: "enabled", Value: TOML_Bool(false) }]),
+					Name . ": a later batch write must refuse")
+				Assert(FSUtf8ExactMatches(Path, Input), Name . ": the refused write changed nothing")
+			}
+		} finally DirDelete(Dir, true)
+	}
+	Assert(Ran > 0, "the corpus must hold boot cases for ahk")
+}
+Test("config migrate: the boot transaction backs up, publishes or refuses every corpus case "
+	. "(config-migrate-boot-corpus)", _CMG_CorpusBootTransactions)
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 2/ Boot guards =======
+; ==============================
+; ==============================
+
+_CMG_NewerFileIsLoggedAndReadOnly() {
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Newer := "[_meta]`nschema_version = 999`n`n[gestures]`nenabled = true`n"
+		AssertTrue(FSWriteDurable(Path, Newer))
+		Result := ConfigMigrateRun(Path)
+		AssertEqual("newer", Result["status"])
+		Ring := _CMG_RingText()
+		Assert(InStr(Ring, "Config migration of '" . Path . "' refused (newer)", true),
+			"the refusal must reach the log")
+		Built := TOML_BuildUpdatedContent(Path, [{ Section: "gestures", Key: "enabled", Value: TOML_Bool(false) }])
+		AssertEqual("error", Built["status"], "a transactional candidate over the refused file must refuse too")
+		Assert(FSUtf8ExactMatches(Path, Newer), "the refused file keeps its exact bytes")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a newer config logs its refusal and refuses candidate rendering "
+	. "(config-migrate-newer-read-only)", _CMG_NewerFileIsLoggedAndReadOnly)
+
+_CMG_AbsentFileIsLeftAlone() {
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Result := ConfigMigrateRun(Path)
+		AssertEqual("absent", Result["status"])
+		AssertEqual(0, Result["read_only"])
+		AssertFalse(FileExist(Path), "no config is created")
+		AssertEqual("", TOML_WriteRefusal(Path))
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: an absent config.toml is left for onboarding (config-migrate-absent)",
+	_CMG_AbsentFileIsLeftAlone)
+
+; A migration step: v1 renames hotstrings.dynamic.datefr.
+_CMG_OneStepRegistry() {
+	return ConfigMigrateValidateRegistry(_ConfigMigrateParse(
+		"[registry]`ncurrent_version = 2`nunstamped_version = 1`n`n"
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk"]`nreason = "r"`n'
+		. 'ops = [{ op = "rename", section = "hotstrings.dynamic", key = "datefr", to_key = "date_fr" }]`n',
+		"the test registry"))
+}
+
+_CMG_FailedBackupAndConcurrentEditKeepTheFile() {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Source := "[hotstrings.dynamic]`ndatefr = true`n"
+		AssertTrue(FSWriteDurable(Path, Source))
+		Result := ConfigMigrateRun(Path, _CMG_OneStepRegistry(), _CMG_STAMP, (*) => 0)
+		AssertEqual("failed", Result["status"], "a refused backup fails the migration")
+		AssertEqual(1, Result["read_only"])
+		Assert(FSUtf8ExactMatches(Path, Source), "a refused backup leaves the file untouched")
+
+		Other := Dir . "\edited.toml"
+		AssertTrue(FSWriteDurable(Other, Source))
+		Edited := Source . "`n[layout]`nedited = true`n"
+		EditingBackup(BackupPath, Content) {
+			FSWriteCreateDurable(BackupPath, Content)
+			FSWriteDurable(Other, Edited)
+			return 1
+		}
+		Result := ConfigMigrateRun(Other, _CMG_OneStepRegistry(), _CMG_STAMP, EditingBackup)
+		AssertEqual("failed", Result["status"], "an edit made after the read fails the publication")
+		Assert(FSUtf8ExactMatches(Other, Edited), "the edit made after the read survives")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a refused backup or a concurrent edit leaves the file untouched "
+	. "(config-migrate-backup-and-edit)", _CMG_FailedBackupAndConcurrentEditKeepTheFile)
+
+_CMG_UnparsableFileIsRefused() {
+	global _CMG_STAMP
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Broken := '[gestures]`nitems = [`n"a",`n'
+		AssertTrue(FSWriteDurable(Path, Broken))
+		Result := ConfigMigrateRun(Path, _CMG_OneStepRegistry(), _CMG_STAMP)
+		AssertEqual("failed", Result["status"])
+		AssertEqual(1, Result["read_only"])
+		Assert(FSUtf8ExactMatches(Path, Broken), "the broken file keeps its exact bytes")
+	} finally DirDelete(Dir, true)
+}
+Test("config migrate: a file the reader cannot fully parse is refused, never rewritten "
+	. "(config-migrate-unparsable)", _CMG_UnparsableFileIsRefused)
+
+; The shared registry-defect corpus: the loader accepts the control and rejects
+; every defect the Lua engine and the JS reference reject too.
+_CMG_RegistryLoaderRejectsDefects() {
+	global _SharedDir
+	Corpus := _SharedDir . "\tests\corpus\config_migration_registries"
+	Index := _CMG_Parse(Corpus . "\cases.toml")["corpus"]
+	Control := ConfigMigrateLoadRegistry(Corpus . "\" . Index["control"] . ".toml")
+	AssertEqual(2, Control["current"], "the control registry must be accepted")
+	Rejected := 0
+	for Name in Index["rejected"] {
+		Path := Corpus . "\" . Name . ".toml"
+		_CMG_Parse(Path)
+		AssertThrows(() => ConfigMigrateLoadRegistry(Path), Name . " must be rejected")
+		Rejected += 1
+	}
+	Assert(Rejected >= 20, "expected at least 20 rejected registries, found " . Rejected)
+	Shipped := ConfigMigrateShippedRegistry()
+	Assert(Shipped["steps"].Length >= 1
+		&& Shipped["steps"].Length == Shipped["current"] - Shipped["unstamped"],
+		"the shipped registry is a gap-free chain with at least one step")
+	AssertEqual(Shipped["current"], ConfigMigrateCurrentVersion())
+}
+Test("config migrate: the registry loader accepts the control and rejects every shared registry "
+	. "defect (config-migrate-registry)", _CMG_RegistryLoaderRejectsDefects)
+
+
+
+
+
+; ================================
+; ================================
+; ======= 3/ Driver wiring =======
+; ================================
+; ================================
+
+; The full save stamps what the boot migration reads.
+_CMG_FullSaveStampsTheCurrentVersion() {
+	global _LLM_Menu
+	Menu := _HSDeepCloneMap(_LLM_Menu)
+	Menu["onboarding_seen"] := false
+	Menu["app_profile_overrides"] := Map()
+	Menu["user_profiles"] := []
+	Stamps := []
+	for Update in _ConfigCollectFullSaveUpdates(ManifestBuildFeaturesMap(), Menu) {
+		if (Update.Section == "_meta" && Update.Key == "schema_version")
+			Stamps.Push(Update.Value)
+	}
+	AssertEqual(1, Stamps.Length, "a full save stamps the version exactly once")
+	AssertEqual(ConfigMigrateCurrentVersion(), Stamps[1],
+		"a full save must stamp the registry's current version, not a literal")
+}
+Test("config migrate: the full save stamps the registry's current version "
+	. "(config-migrate-full-save-stamp)", _CMG_FullSaveStampsTheCurrentVersion)
+
+; The boot migrates before the first read of config.toml and before every
+; producer that can save it; the entry script cannot run headless, so its
+; order is read from the source.
+_CMG_BootMigratesBeforeAnyReaderOrWriter() {
+	SplitPath(A_ScriptDir, , &WindowsDir)
+	Body := ""
+	try Body := FileRead(WindowsDir . "\ErgoptiPlus.ahk", "UTF-8")
+	Assert(Body != "", "ErgoptiPlus.ahk must be readable")
+	Migrate := InStr(Body, "`nConfigMigrateBoot(ConfigurationFile)")
+	Snapshot := InStr(Body, "`nglobal _IniCache := ParseConfigTomlFile(ConfigurationFile)")
+	Apply := InStr(Body, "ApplyBootConfigToml(Features,")
+	FullSave := InStr(Body, "_ConfigQueueFullSave(CONFIG_FULL_SAVE_BOOT_DELAY_MS")
+	Assert(Migrate > 0 && Snapshot > 0 && Apply > 0 && FullSave > 0,
+		"every boot marker must still exist in ErgoptiPlus.ahk")
+	Assert(Migrate < Snapshot && Snapshot < Apply && Apply < FullSave,
+		"the migration runs before the boot snapshot, ApplyBootConfigToml and the boot full save")
+	StrReplace(Body, "ConfigMigrateBoot(", , , &Calls)
+	AssertEqual(1, Calls, "the boot migrates exactly once")
+}
+Test("config migrate: the boot migrates config.toml before reading or saving it "
+	. "(config-migrate-boot-order)", _CMG_BootMigratesBeforeAnyReaderOrWriter)
+
+; A config.toml the session must not write keeps every full save disarmed.
+_CMG_ReadOnlyConfigBlocksFullSaves() {
+	global ConfigurationFile
+	Dir := _CMG_NewDir()
+	Previous := ConfigurationFile
+	try {
+		Path := Dir . "\config.toml"
+		AssertTrue(FSWriteDurable(Path, "[_meta]`nschema_version = 999`n"))
+		AssertEqual("newer", ConfigMigrateRun(Path)["status"])
+		ConfigurationFile := Path
+		AssertFalse(ConfigFullStateCanPersist(), "full saves stay disarmed for a read-only config")
+	} finally {
+		ConfigurationFile := Previous
+		DirDelete(Dir, true)
+	}
+}
+Test("config migrate: a read-only config.toml keeps every full save disarmed "
+	. "(config-migrate-full-save-read-only)", _CMG_ReadOnlyConfigBlocksFullSaves)
+
+; A file this build creates carries this build's version; an existing file
+; keeps its own, since stamping it would skip the steps it still needs.
+_CMG_OnlyANewFileIsStamped() {
+	Dir := _CMG_NewDir()
+	try {
+		Path := Dir . "\config.toml"
+		Updates := ConfigMigrateStampNewFile([{ Section: "script", Key: "locale", Value: "fr" }], Path)
+		AssertEqual(2, Updates.Length, "a file about to be created gets the stamp")
+		AssertEqual("_meta", Updates[2].Section)
+		AssertEqual("schema_version", Updates[2].Key)
+		AssertEqual(ConfigMigrateCurrentVersion(), Updates[2].Value)
+		AssertTrue(FSWriteDurable(Path, '[script]`nlocale = "en"`n'))
+		AssertEqual(1, ConfigMigrateStampNewFile([{ Section: "script", Key: "locale", Value: "fr" }], Path).Length,
+			"an existing file is never stamped by a writer")
+	} finally DirDelete(Dir, true)
+	Body := _DriverFuncBody("_Onboarding_Commit")
+	Assert(Body != "", "_Onboarding_Commit must be found")
+	Assert(InStr(Body, "ConfigMigrateStampNewFile(updates, CandidateConfig)", true) > 0,
+		"the wizard stamps the config.toml it creates")
+}
+Test("config migrate: only a config.toml this build creates is stamped by a writer "
+	. "(config-migrate-stamp-new-file)", _CMG_OnlyANewFileIsStamped)
+
+
+_CMG_SemanticSourceAndCandidateProofs() {
+	Registry := _CMR_CopyRegistry()
+	Duplicate := '[source]`nchoice="legitimate"`n[future]`na.b=1`na."b"=2`n'
+	Before := _ConfigMigrateParse(Duplicate, "legacy dotted source projection")
+	AssertEqual(1, Before["future"]["a.b"])
+	AssertEqual(2, Before["future"]['a."b"'], "the flat model cannot observe the semantic duplicate")
+	Plan := ConfigMigratePlan(Duplicate, Registry, "ahk")
+	AssertEqual("failed", Plan["outcome"], "an unrelated malformed namespace cannot authorize publication")
+	AssertFalse(Plan.Has("candidate"))
+	AssertContains(Plan["detail"], "Duplicate TOML semantic assignment")
+
+	Source := '[source]`nchoice="legitimate"`n[foo]`nbar.future=1`n'
+	Registry := _CMR_TargetRegistry("copy_if_absent")
+	Before := _ConfigMigrateParse(Source, "dotted parent before")
+	After := ConfigMigrateApplySteps(_ConfigMigrateClone(Before), Registry, "ahk", 1)
+	Updates := _ConfigMigrateWriterBatch(Before, After, &Drops)
+	Built := _ConfigMigrateRenderRecords(Source, Updates, Drops)
+	Assert(ConfigMigrateSameModel(After, _ConfigMigrateParse(Built["content"], "legacy dotted candidate projection")),
+		"the old flat candidate readback cannot detect the redeclared dotted parent")
+	AssertThrows(TOML_ParseDocument.Bind(Built["content"]), "the independent semantic namespace owner rejects the candidate")
+	Plan := ConfigMigratePlan(Source, Registry, "ahk")
+	AssertEqual("failed", Plan["outcome"], "candidate namespace validation precedes publication")
+	AssertFalse(Plan.Has("candidate"))
+	AssertContains(Plan["detail"], "Duplicate or closed TOML table namespace")
+}
+Test("config migrate: exact semantic source and candidate namespaces precede publication (config-migrate-dotted-document)",
+	_CMG_SemanticSourceAndCandidateProofs)
+
+_CMG_SemanticProofPreservesUnownedValues() {
+	Foreign := 'future.a.b = 1`n"future.a.b" = "literal dot"`n'
+		. '[[profiles]]`nshortcut.key="first"`n[[profiles]]`nshortcut.key="second"`n'
+		. '[legacy]`ntext = ' . "O'Brien" . '`nshape = { rows=[{ flag=false, count=0, text="001" }] }`n'
+	Source := Foreign . '[source]`nchoice="legitimate"`n'
+	Plan := ConfigMigratePlan(Source, _CMR_CopyRegistry(), "ahk")
+	AssertEqual("migrated", Plan["outcome"], Plan["detail"])
+	; The metadata owner inserts its new table before the first physical header,
+	; after root values. Pin the entire independent byte image, including that
+	; owned insertion, rather than assuming all foreign records are contiguous.
+	Expected := 'future.a.b = 1`n"future.a.b" = "literal dot"`n'
+		. '[_meta]`nschema_version = 2`n`n'
+		. '[[profiles]]`nshortcut.key="first"`n[[profiles]]`nshortcut.key="second"`n'
+		. '[legacy]`ntext = ' . "O'Brien" . '`nshape = { rows=[{ flag=false, count=0, text="001" }] }`n'
+		. '[source]`nchoice="legitimate"`n`n[destination]`nchoice = "legitimate"`n'
+	Assert(StrCompare(Plan["candidate"], Expected, true) == 0,
+		"all unknown source bytes and the exact owned metadata and destination insertions remain exact")
+	Document := TOML_ParseDocument(Plan["candidate"])
+	AssertEqual(1, Document["future"]["a"]["b"])
+	AssertEqual("literal dot", Document["future.a.b"])
+	AssertEqual(2, Document["profiles"].Length)
+	AssertEqual("first", Document["profiles"][1]["shortcut"]["key"])
+	AssertEqual("second", Document["profiles"][2]["shortcut"]["key"])
+	AssertEqual("O'Brien", Document["legacy"]["text"], "an unowned legacy bare scalar retains its existing contract")
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["flag"] is TOML_Bool)
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["count"] is Integer)
+	AssertTrue(Document["legacy"]["shape"]["rows"][1]["text"] is String)
+	AssertEqual("legitimate", Document["destination"]["choice"])
+}
+Test("config migrate: semantic proof preserves valid unknown and legacy values (config-migrate-dotted-document-preservation)",
+	_CMG_SemanticProofPreservesUnownedValues)
+
+_CMG_CurrentSemanticRefusalOwnsBoot() {
+	global _CMG_STAMP
+	Directory := _CMG_NewDir(), Calls := { Backup: 0, Publish: 0 }
+	Backup(Path, Bytes) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Path, Candidate, Source) {
+		Calls.Publish += 1
+		return ""
+	}
+	Path := Directory . "\config.toml"
+	Source := '[_meta]`nschema_version=2`n[future]`na.b=1`na."b"=2`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Legacy := _ConfigMigrateParse(Source, "current flat source projection")
+		AssertEqual("current", ConfigMigrateClassify(Legacy, _CMR_CopyRegistry(), &Version),
+			"a current stamp alone cannot prove semantic source ownership")
+		Result := ConfigMigrateRun(Path, _CMR_CopyRegistry(), _CMG_STAMP, Backup, Publish)
+		AssertEqual("failed", Result["status"])
+		AssertEqual(1, Result["read_only"])
+		AssertEqual(0, Calls.Backup, "callbacks only observe: no backup before source proof")
+		AssertEqual(0, Calls.Publish, "the exact publication owner receives no unsafe candidate")
+		AssertContains(Result["detail"], "Duplicate TOML semantic assignment")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertFalse(TOML_BatchWrite(Path, [{ Section: "future", Key: "value", Value: 7 }]))
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "later writes retain the actual owner's refusal")
+	} finally {
+		if _TOML_WriteRefusals().Has(Path)
+			_TOML_WriteRefusals().Delete(Path)
+		DirDelete(Directory, true)
+	}
+}
+Test("config migrate: current-version boot still requires the exact semantic source proof (config-migrate-dotted-document-boot)",
+	_CMG_CurrentSemanticRefusalOwnsBoot)
+
+_CMG_SemanticSnapshotKeepsStampAuthority(Literal, ExpectedStatus) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := 'hotstrings.trigger_char = "@"`n[_meta]`nschema_version = ' . Literal . "`n"
+	Calls := { Backup: 0, Publish: 0 }
+	Backup(Destination, Content) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Destination, Candidate, Previous) {
+		Calls.Publish += 1
+		return ""
+	}
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		; Custom migration ports exercise the algorithm, not native read authority.
+		AssertEqual(ExpectedStatus, ConfigMigrateBoot(Path)["status"])
+		Result := ConfigMigrateRun(Path, 0, "semantic-snapshot", Backup, Publish)
+		AssertEqual(ExpectedStatus, Result["status"])
+		AssertEqual(0, Calls.Backup)
+		AssertEqual(0, Calls.Publish)
+		Cache := ParseConfigTomlFile(Path)
+		AssertEqual("@", IniCacheGet(Cache, "hotstrings", "trigger_char"),
+			"the reader consumes the admitted setting without inventing stamp authority")
+		if ExpectedStatus == "current" {
+			AssertEqual("", TOML_WriteRefusal(Path))
+			AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "@" }]))
+		} else {
+			AssertEqual(1, Result["read_only"])
+			Reason := TOML_WriteRefusal(Path)
+			Assert(Reason != "", "the actual migration owns the session write refusal")
+			ParseConfigTomlFile(Path)
+			AssertEqual(Reason, TOML_WriteRefusal(Path), "repeated semantic reads never clear invalid/newer stamp refusal")
+			AssertFalse(TOML_BatchWrite(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }]))
+			Built := TOML_BuildUpdatedContent(Path, [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }])
+			AssertEqual("error", Built["status"])
+		}
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "boot consumption must not rewrite any source bytes")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+_CMG_SemanticCurrentSourceConsumesRootSettings() {
+	_CMG_SemanticSnapshotKeepsStampAuthority(String(ConfigMigrateCurrentVersion()), "current")
+}
+_CMG_SemanticInvalidStampsStayReadOnly() {
+	_CMG_SemanticSnapshotKeepsStampAuthority('"10"', "invalid")
+	_CMG_SemanticSnapshotKeepsStampAuthority("false", "invalid")
+	_CMG_SemanticSnapshotKeepsStampAuthority("999", "newer")
+}
+Test("config migrate: a current semantic snapshot consumes root settings without rewriting (config-semantic-snapshot)",
+	_CMG_SemanticCurrentSourceConsumesRootSettings)
+Test("config migrate: semantic readers cannot clear invalid/newer stamp write refusal (config-semantic-snapshot)",
+	_CMG_SemanticInvalidStampsStayReadOnly)
+
+
+_CMG_VariantOperation() => Map("op", "move_ergopti_variant", "section", "layout", "key", "ergopti_plus",
+	"to_key", "ergopti_variant", "base_key", "ergopti_base", "alt_gr_key", "ergopti_alt_gr",
+	"source_key", "emulated_layout", "false_variant", "ergopti", "true_variant", "ergopti_plus")
+
+_CMG_VariantRegistry() {
+	return ConfigMigrateValidateRegistry(_ConfigMigrateParse('[registry]`ncurrent_version = 2`nunstamped_version = 1`n'
+		. '[steps.v1_to_v2]`nfrom = 1`nto = 2`ndrivers = ["ahk", "hs", "linux"]`n'
+		. 'reason = "Independent joint legacy intent."`nops = [{ op = "move_ergopti_variant", section = "layout", '
+		. 'key = "ergopti_plus", to_key = "ergopti_variant", base_key = "ergopti_base", alt_gr_key = "ergopti_alt_gr", '
+		. 'source_key = "emulated_layout", false_variant = "ergopti", true_variant = "ergopti_plus" }]`n', "joint variant registry"))
+}
+
+_CMG_VariantAtomicCase() {
+	for Legacy in [false, true] {
+		for Base in [false, true] {
+			for General in [false, true] {
+				for Selected in ["", "unrecorded"] {
+					Layer := Map("ergopti_plus", TOML_Bool(Legacy), "ergopti_base", TOML_Bool(Base),
+						"ergopti_alt_gr", TOML_Bool(General), "emulated_layout", Selected, "future", "retained")
+					Model := Map("layout", Layer, "private", Map("opaque", ["future", 9]))
+					Before := _ConfigMigrateClone(Model)
+					_ConfigMigrateApplyOp(Model, _CMG_VariantOperation())
+					AssertFalse(Layer.Has("ergopti_plus"), "recognized legacy ownership is consumed exactly once")
+					AssertEqual(Legacy ? "ergopti_plus" : "ergopti", Layer["ergopti_variant"])
+					for Key in ["ergopti_base", "ergopti_alt_gr", "emulated_layout", "future"]
+						AssertTrue(ConfigMigrateSameValue(Before["layout"][Key], Layer[Key]), "joint migration retains independent intent")
+					AssertTrue(ConfigMigrateSameValue(Before["private"], Model["private"]))
+					After := _ConfigMigrateClone(Model)
+					_ConfigMigrateApplyOp(Model, _CMG_VariantOperation())
+					AssertTrue(ConfigMigrateSameModel(After, Model), "recognized absent-source replay is inert")
+				}
+			}
+		}
+	}
+	for Fault in ["legacy-integer", "legacy-string", "base-integer", "altgr-string", "source-boolean", "unknown", "conflict", "casealias", "unknown-absent", "casealias-absent"] {
+		Layer := Map("ergopti_plus", TOML_Bool(true), "ergopti_base", TOML_Bool(false),
+			"ergopti_alt_gr", TOML_Bool(false), "emulated_layout", "", "future", "retained")
+		if Fault == "legacy-integer"
+			Layer["ergopti_plus"] := 1
+		else if Fault == "legacy-string"
+			Layer["ergopti_plus"] := "true"
+		else if Fault == "base-integer"
+			Layer["ergopti_base"] := 0
+		else if Fault == "altgr-string"
+			Layer["ergopti_alt_gr"] := "false"
+		else if Fault == "source-boolean"
+			Layer["emulated_layout"] := TOML_Bool(false)
+		else
+			Layer["ergopti_variant"] := InStr(Fault, "unknown") ? "future" : InStr(Fault, "casealias") ? "ERGOPTI_PLUS" : "ergopti"
+		if InStr(Fault, "-absent")
+			Layer.Delete("ergopti_plus")
+		Model := Map("layout", Layer)
+		Before := _ConfigMigrateClone(Model)
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateApplyOp(Model, _CMG_VariantOperation()))
+		AssertTrue(Failure is ConfigMigrateVariantRefusal, "joint refusal has the startup-stop type")
+		AssertContains(Failure.Message, "Ergopti variant migration refused:")
+		AssertTrue(ConfigMigrateSameModel(Before, Model), "even direct mutable operation refuses before deleting historical intent")
+	}
+}
+Test("config migrate: joint variant operation preserves every legacy layer combination and refuses before consumption (todo96-helper-variant)",
+	_CMG_VariantAtomicCase)
+
+_CMG_VariantBootRefusalCase() {
+	Directory := _CMG_NewDir()
+	try {
+		for Choice in ["future", "ergopti", "ERGOPTI_PLUS"] {
+			Path := Directory . "\" . Choice . ".toml"
+			Source := '; independent retained bytes`n[_meta]`nschema_version = 11`n[layout]`nergopti_plus = true`n'
+				. 'ergopti_variant = "' . Choice . '"`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n'
+			AssertTrue(FSWriteDurable(Path, Source))
+			Failure := _CMG_VariantThrown(() => ConfigMigrateBoot(Path))
+			AssertTrue(Failure is ConfigMigrateVariantRefusal, "actual boot cannot admit a successor with unknown/conflicting helper intent")
+			AssertContains(Failure.Message, "Ergopti variant migration refused:")
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "actual boot refusal keeps every original byte")
+			AssertFalse(TOML_BatchWrite(Path, [{Section: "layout", Key: "ergopti_variant", Value: "ergopti_plus"}]),
+				"the existing session refusal owner disarms subsequent saves")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+		}
+	} finally DirDelete(Directory, true)
+}
+Test("config migrate: actual boot rejects readiness on unknown or conflicting joint variant intent (todo96-helper-variant)",
+	_CMG_VariantBootRefusalCase)
+
+_CMG_VariantThrown(Fn) {
+	try Fn.Call()
+	catch as Failure
+		return Failure
+	throw Error("The actual variant operation should have refused.")
+}
+
+
+_CMG_VariantBootPhysicalRefusalCase() {
+	Directory := _CMG_NewDir()
+	Sources := [
+		'[_meta]`nschema_version = 11`nlayout = { future = "unrelated" }`n',
+		'layout = { ergopti_plus = true, ergopti_base = false, ergopti_alt_gr = false, emulated_layout = "" }`n[_meta]`nschema_version = 11`n',
+		'[_meta]`nschema_version = 11`n[[layout]]`nergopti_plus = true`nergopti_base = false`nergopti_alt_gr = false`nemulated_layout = ""`n',
+		'[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n[layout]`nergopti_plus = true`n',
+		'[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n[layout]`nergopti_variant = "future"`n'
+	]
+	try {
+		for Index, Source in Sources {
+			Path := Directory . "\physical" . Index . ".toml"
+			AssertTrue(FSWriteDurable(Path, Source))
+			if Index == 1 {
+				Result := ConfigMigrateBoot(Path)
+				AssertTrue(Result is Map, "an unrelated opaque owner retains the existing generic startup policy")
+			} else {
+				Failure := _CMG_VariantThrown(() => ConfigMigrateBoot(Path))
+				AssertTrue(Failure is ConfigMigrateVariantRefusal, "actual boot cannot ignore historical/current variant ownership on generic record refusal")
+				AssertContains(Failure.Message, "Ergopti variant migration refused:")
+				AssertTrue(FSUtf8ExactMatches(Path, Source))
+			}
+		}
+	} finally DirDelete(Directory, true)
+}
+Test("config migrate: physical refusal and current-source ambiguity cannot silently neutralize a variant owner (todo96-helper-variant)",
+	_CMG_VariantBootPhysicalRefusalCase)
+
+_CMG_NeutralVariantCase() {
+	Operation := _CMG_VariantOperation()
+	Operation["neutral_variant"] := "none"
+	_ConfigMigrateValidateOp(Operation, "independent neutral admission")
+	for Bad in [false, 1, "ergopti", "ergopti_plus"] {
+		Malformed := Operation.Clone()
+		Malformed["neutral_variant"] := Bad
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateValidateOp(Malformed, "independent neutral admission"))
+		AssertContains(Failure.Message, "neutral variant")
+	}
+	Model := Map("layout", Map("ergopti_variant", "none", "ergopti_base", TOML_Bool(true),
+		"ergopti_alt_gr", TOML_Bool(false), "emulated_layout", ""))
+	Before := _ConfigMigrateClone(Model)
+	_ConfigMigrateApplyOp(Model, Operation)
+	AssertTrue(ConfigMigrateSameModel(Before, Model))
+	Directory := _CMG_NewDir()
+	try {
+		Path := Directory . "\neutral.toml"
+		Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
+			. '`n[layout]`nergopti_variant = "none"`nergopti_base = true`nergopti_alt_gr = false`nemulated_layout = ""`n'
+		AssertTrue(FSWriteDurable(Path, Source))
+		Result := ConfigMigrateBoot(Path)
+		AssertEqual("current", Result["status"])
+		AssertFalse(Result.Get("read_only", false))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally DirDelete(Directory, true)
+	for Layer in [Map("ergopti_plus", TOML_Bool(false), "ergopti_variant", "none"),
+		Map("ergopti_variant", Map("value", "none")), Map("ergopti_variant", "NONE")] {
+		Model := Map("layout", Layer)
+		Before := _ConfigMigrateClone(Model)
+		Failure := _CMG_VariantThrown(() => _ConfigMigrateApplyOp(Model, Operation))
+		AssertContains(Failure.Message, "Ergopti variant migration refused:")
+		AssertTrue(ConfigMigrateSameModel(Before, Model))
+	}
+}
+Test("config migrate: neutral current choice remains distinct from legacy false and occupied owners (todo96-helper-variant)",
+	_CMG_NeutralVariantCase)
+
+
+; Independent complete source subjects distinguish semantic metadata from the
+; migration operation model. The existing native boot owner receives each one;
+; callbacks only observe that no backup or publication effect was attempted.
+_CMG_CanonicalMetadataBoot(Metadata, ExpectedStatus, ExpectedVersion) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Registry := _CMR_CopyRegistry()
+	Source := Metadata . '`n[future]`nkeep = { flag=false, number=1, text="1" } # preserve`n'
+	Calls := { Backup: 0, Publish: 0 }
+	Backup(Destination, Content) {
+		Calls.Backup += 1
+		return 1
+	}
+	Publish(Destination, Candidate, Previous) {
+		Calls.Publish += 1
+		return ""
+	}
+	try {
+		AssertTrue(FSWriteDurable(Path, Source), "the complete native subject must exist")
+		Plan := ConfigMigratePlan(Source, Registry, "ahk")
+		AssertEqual(ExpectedStatus, Plan["outcome"], "canonical metadata owns the pure plan")
+		AssertFalse(Plan.Has("candidate"), "current or refused metadata has no rewrite candidate")
+		if ExpectedStatus == "failed"
+			AssertContains(Plan["detail"], "legacy metadata is not addressable", "the actual physical owner supplies the refusal")
+		Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, Backup, Publish)
+		AssertEqual(ExpectedStatus, Result["status"], "the native migration runner has the same decision")
+		if ExpectedStatus == "failed"
+			AssertContains(Result["detail"], "legacy metadata is not addressable", "the runner preserves the physical ownership reason")
+		AssertEqual(0, Calls.Backup, "metadata classification precedes every backup effect")
+		AssertEqual(0, Calls.Publish, "metadata classification precedes every publication effect")
+		AssertEqual("", Result["backup"], "no unused backup intention may be published")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "every subject preserves its complete source bytes")
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertTrue(Document["future"]["keep"]["flag"] is TOML_Bool)
+		AssertEqual(false, Document["future"]["keep"]["flag"].Value)
+		AssertTrue(Document["future"]["keep"]["number"] is Integer)
+		AssertTrue(Document["future"]["keep"]["text"] is String)
+		if ExpectedStatus == "current" {
+			AssertEqual(ExpectedVersion, Result["from"], "a canonical current stamp is not an unstamped file")
+			AssertEqual(0, Result["read_only"])
+			AssertEqual("", TOML_WriteRefusal(Path), "a genuine current document needs no migration refusal")
+		} else {
+			AssertEqual(1, Result["read_only"])
+			Assert(TOML_WriteRefusal(Path) != "", "the actual boot owner latches the refusal")
+			AssertFalse(TOML_ConfigBatchWrite(Path, []), "even a configuration no-op retains that refusal")
+			AssertFalse(TOML_ConfigBatchWrite(Path, [{ Section: "future", Key: "changed", Value: 7 }]))
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "subsequent writes retain complete source bytes")
+		}
+	} finally {
+		Refusals := _TOML_WriteRefusals(), RefusalKey := _TOML_WriteRefusalKey(Path)
+		if Refusals.Has(RefusalKey)
+			Refusals.Delete(RefusalKey)
+		DirDelete(Dir, true)
+	}
+}
+
+for Index, Metadata in ['_meta.schema_version = 2', '_meta = { schema_version=2 }',
+		'["_meta"]`n"schema_version" = 2',
+		'"_meta.schema_version" = 999`n_meta.schema_version = 2'] {
+	Test("config migrate: current canonical metadata preserves exact source " . Index,
+		_CMG_CanonicalMetadataBoot.Bind(Metadata, "current", 2))
+}
+
+for Index, Subject in [
+	{ Metadata: '_meta = true', Status: "invalid" },
+	{ Metadata: '[["_meta"]]`nschema_version = 2', Status: "invalid" },
+	{ Metadata: '_meta.schema_version = "2"', Status: "invalid" },
+	{ Metadata: '_meta = { schema_version=false }', Status: "invalid" },
+	{ Metadata: '_meta.schema_version = 3', Status: "newer" },
+	{ Metadata: '_meta = { schema_version=3 }', Status: "newer" },
+	{ Metadata: '_meta.schema_version = 1', Status: "failed" },
+	{ Metadata: '_meta = { schema_version=1 }', Status: "failed" }
+] {
+	Test("config migrate: canonical metadata refuses before backup and publication " . Index,
+		_CMG_CanonicalMetadataBoot.Bind(Subject.Metadata, Subject.Status, 0))
+}
+
+
+; These subjects exercise the genuine default Boot constructor. Custom Run
+; algorithm seams never establish journal authority for production consumers.
+_CMJ_CurrentSource() {
+	return '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion()
+		. '`n[hotstrings]`ntrigger_char = "@"`n[future]`nkeep = { truth=false, number=1, text="1" } # unchanged`n'
+}
+
+_CMJ_BuiltGateway(Path, &Calls) {
+	global ConfigurationFile
+	PreviousPath := ConfigurationFile
+	ConfigurationFile := Path
+	Calls := { build: 0, write: 0 }
+	Build() {
+		Calls.build += 1
+		return { updates: [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }] }
+	}
+	Writer(Destination, Updates) {
+		Calls.write += 1
+		return 1
+	}
+	try return ConfigCommitBuilt(Path, "configuration journal subject", Build, Writer, (*) => 0)
+	finally ConfigurationFile := PreviousPath
+}
+
+_CMJ_Cleanup(Dir, Path) {
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	for Cache in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache] {
+		if Cache.Has(Path)
+			Cache.Delete(Path)
+	}
+	Refusals := _TOML_WriteRefusals(), Key := _TOML_WriteRefusalKey(Path)
+	if Refusals.Has(Key)
+		Refusals.Delete(Key)
+	DirDelete(Dir, true)
+}
+
+_CMJ_GenuineCurrentConstructor() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Result := ConfigMigrateBoot(Path)
+		AssertEqual("current", Result["status"])
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		AssertEqual("@", Snapshot.Cache["hotstrings"]["trigger_char"])
+		AssertTrue(Snapshot.Document["future"]["keep"]["truth"] is TOML_Bool)
+		AssertEqual(false, Snapshot.Document["future"]["keep"]["truth"].Value)
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "genuine current boot changes no source bytes")
+		Result["status"] := "invalid"
+		Result["read_only"] := 1
+		AssertTrue(_CMJ_BuiltGateway(Path, &Calls), "mutating a detached public result cannot revoke the actual private constructor")
+		AssertEqual(1, Calls.build)
+		AssertEqual(1, Calls.write, "this observes early admission, not a native durable writer receipt")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: genuine current constructor owns source admission independently of its public result", _CMJ_GenuineCurrentConstructor)
+
+_CMJ_UnconstructedPublicSnapshotCannotSeed() {
+	global _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Fake := ConfigTomlDecodeSnapshot(Source)
+		Fake.Present := true
+		_ConfigTomlSnapshots[Path] := Fake
+		_ParseTomlCache[Path] := Fake.Cache
+		_TomlFileCache[Path] := Fake.Source
+		AssertThrows(ConfigTomlReadSnapshot.Bind(Path), "public reader cache images cannot initialize the actual constructor")
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls), "an unconstructed selected configuration has no permissive fallback")
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: public snapshots cannot seed a selected configuration constructor", _CMJ_UnconstructedPublicSnapshotCannotSeed)
+
+_CMJ_CustomRunCannotSeed() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Registry := ConfigMigrateLoadRegistry(ConfigMigrateRegistryPath())
+		Result := ConfigMigrateRun(Path, Registry, _CMG_STAMP, (*) => 1, (*) => "")
+		AssertEqual("current", Result["status"], "the algorithm seam still has its existing current-file contract")
+		Result["read_only"] := 0
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls), "an injected algorithm observation is not the actual Boot issuer")
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: custom migration results cannot seed private Boot authority", _CMJ_CustomRunCannotSeed)
+
+_CMJ_ExternalSuccessorRefuses(Metadata) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Successor := Metadata . '`n[hotstrings]`ntrigger_char = "#"`n[future]`nkeep = [false, 1, "1"]`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, _CMJ_CurrentSource()))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(FSWriteDurable(Path, Successor))
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls), "a fresh noncurrent successor refuses before candidate effects")
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Successor), "all external successor bytes remain authoritative")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: native future-schema successor refuses before gateway effects",
+	_CMJ_ExternalSuccessorRefuses.Bind('[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)))
+Test("config journal: native invalid-schema successor refuses before gateway effects",
+	_CMJ_ExternalSuccessorRefuses.Bind('_meta = { schema_version="11" }'))
+Test("config journal: native metadata-array successor refuses before gateway effects",
+	_CMJ_ExternalSuccessorRefuses.Bind('[[_meta]]`nschema_version = ' . ConfigMigrateCurrentVersion()))
+
+_CMJ_VersionRefusalReadsOnlyCapturedImage() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Original := '[_meta]`nschema_version = "invalid"`n[hotstrings]`ntrigger_char = "!"`n'
+	try {
+		AssertTrue(FSWriteDurable(Path, Original))
+		AssertEqual("invalid", ConfigMigrateBoot(Path)["status"])
+		CapturedRead := ConfigMigrateBoot(Path, "capture_read")
+		AssertTrue(HasMethod(CapturedRead, "Call"))
+		AssertTrue(CapturedRead.Call(Original, 1))
+		AssertEqual("!", ConfigTomlReadSnapshot(Path).Cache["hotstrings"]["trigger_char"], "the exact captured initial image stays readable only")
+		Reason := TOML_WriteRefusal(Path)
+		Assert(Reason != "", "invalid boot owns its persistence refusal")
+		Repair := _CMJ_CurrentSource()
+		AssertTrue(FSWriteDurable(Path, Repair))
+		AssertFalse(CapturedRead.Call(Repair, 1), "a readable external repair cannot borrow the initial source permission")
+		Fresh := ConfigTomlReadSnapshot(Path)
+		AssertEqual(Repair, Fresh.Source, "a fresh read observes actual repaired bytes without granting write readiness")
+		AssertEqual("@", Fresh.Cache["hotstrings"]["trigger_char"])
+		AssertEqual(Reason, TOML_WriteRefusal(Path), "read availability never clears the invalid boot persistence refusal")
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls))
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Repair))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: invalid boot reads only its genuine captured image", _CMJ_VersionRefusalReadsOnlyCapturedImage)
+
+_CMJ_DefaultRegistryMutationRefuses() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Registry["current"] := Current + 1
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls), "same default registry object with forged contents loses genuine source authority")
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertThrows(ConfigTomlReadSnapshot.Bind(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: in-place default registry mutation cannot forge a version", _CMJ_DefaultRegistryMutationRefuses)
+
+_CMJ_PreparationRunsNoMigration() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		Prepared := ConfigSchemaPrepareSource(Path)
+		AssertEqual("current", Prepared["status"])
+		AssertEqual(1, Prepared["read_only"])
+		AssertEqual("@", ConfigTomlReadSnapshot(Path).Cache["hotstrings"]["trigger_char"])
+		AssertFalse(_CMJ_BuiltGateway(Path, &Calls), "read-only preparation does not fabricate the missing initial write handoff")
+		AssertEqual(0, Calls.build)
+		AssertEqual(0, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+		AssertThrows(ConfigSchemaPrepareSource.Bind(Path), "duplicate read-only initialization refuses")
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"], "the real default boot retains its later migration timing")
+		AssertTrue(_CMJ_BuiltGateway(Path, &Calls))
+		AssertEqual(1, Calls.build)
+		AssertEqual(1, Calls.write)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: read-only preparation retains actual later default boot completion", _CMJ_PreparationRunsNoMigration)
+
+_CMJ_FreshCandidateProof() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertFalse(FSStrictExists(Path), "an actual absent boot creates no source")
+		Candidate := _CMJ_CurrentSource()
+		Admission := ConfigMigrateBoot(Path, "capture_write", Candidate)
+		AssertTrue(HasMethod(Admission, "Call"), "a complete current candidate receives a private source-bound check")
+		AssertTrue(Admission.Call("", 0, Candidate))
+		AssertFalse(Admission.Call("", 1, Candidate), "presence is native source identity")
+		AssertFalse(Admission.Call("changed", 0, Candidate), "source bytes are independent of candidate validity")
+		AssertFalse(Admission.Call("", 0, Candidate . "# changed`n"), "another candidate cannot borrow the same captured check")
+		AssertFalse(ConfigMigrateBoot(Path, "capture_write", '[hotstrings]`ntrigger_char = "@"`n'), "unstamped candidate never gains current-schema proof")
+		AssertFalse(FSStrictExists(Path), "checking is not a native target publication")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: genuine absent boot captures exact current candidate proof without publishing", _CMJ_FreshCandidateProof)
+
+
+_CMJ_PrebootOwnedFreshTargetRequiresExactBundle() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Bundle := _ConfigWriteTerminalTryAcquire([Path])
+	AssertTrue(Bundle is Object)
+	Candidate := _CMJ_CurrentSource()
+	try {
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		Clone := { kind: Bundle.kind, id: Bundle.id, tokens: Bundle.tokens,
+			authorized: false, shutdown_claimed: false }
+		AssertFalse(ConfigSchemaPrepareOwnedSource(Path, Clone), "a same-value public bundle cannot initialize the private source")
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle), "the actual native target issuer can construct a fresh wizard target")
+		AssertFalse(FileExist(Path), "the chosen-target handoff neither migrates nor publishes")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Admission := ConfigMigrateBoot(Path, "capture_write", Candidate)
+		AssertTrue(HasMethod(Admission, "Call"))
+		AssertTrue(Admission.Call("", 0, Candidate))
+		WrongVersion := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1) . '`n'
+		AssertFalse(HasMethod(ConfigMigrateBoot(Path, "capture_write", WrongVersion), "Call"))
+		AssertTrue(_ConfigWriteTerminalRelease(Bundle))
+		AssertFalse(Admission.Call("", 0, Candidate), "releasing the genuine bundle withdraws preboot candidate permission")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"], "only the later genuine boot completes fresh READY")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		_ConfigWriteTerminalRelease(Bundle)
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: actual preboot chosen-target issuance binds the fresh source and candidate", _CMJ_PrebootOwnedFreshTargetRequiresExactBundle)
+
+_CMJ_PrebootOwnedTargetPreservesCapturedRefusal() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Original := '[_meta]`nschema_version = "invalid"`n[future]`nkeep=false`n'
+	Bundle := false
+	try {
+		AssertTrue(FSWriteDurable(Path, Original))
+		AssertEqual("invalid", ConfigSchemaPrepareSource(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object)
+		AssertFalse(ConfigSchemaPrepareOwnedSource(Path, Bundle), "an actual bundle cannot upgrade an invalid initial source")
+		AssertTrue(FSUtf8ExactMatches(Path, Original))
+		AssertTrue(FSWriteDurable(Path, _CMJ_CurrentSource()))
+		AssertFalse(ConfigSchemaPrepareOwnedSource(Path, Bundle), "a repaired successor cannot inherit the captured refusal")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, _CMJ_CurrentSource()))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: exact chosen-target ownership cannot erase the initial source refusal", _CMJ_PrebootOwnedTargetPreservesCapturedRefusal)
+
+
+_CMJ_FreshNativeWriterStampsOnlyItsActualCandidate() {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := A_Temp . "\ergopti-journal-first-write-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Dir), Path := Dir . "\config.toml"
+	Updates := [{ Section: "layout", Key: "ergopti_base", Value: TOML_Bool(true) }]
+	try {
+		ConfigurationFile := Path
+		AssertFalse(FSStrictExists(Path))
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertFalse(FSStrictExists(Path), "actual Boot absence is readonly")
+		AssertTrue(TOML_ConfigBatchWrite(Path, []), "actual native first-use noop needs no fabricated schema candidate")
+		AssertFalse(FSStrictExists(Path), "an empty native acknowledgement does not materialize a first-use file")
+		AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "layout", Key: "ergopti_base", Delete: 1 }]))
+		AssertFalse(FSStrictExists(Path), "neutral native deletion preserves genuine first-use absence")
+		AssertTrue(TOML_ConfigBatchWrite(Path, Updates), "actual default native writer creates its genuine first-use source")
+		Actual := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(ConfigMigrateCurrentVersion(), Actual["_meta"]["schema_version"])
+		AssertTrue(Actual["layout"]["ergopti_base"].Value)
+		AssertEqual(1, Updates.Length, "fresh schema authoring never mutates the caller batch")
+		AssertEqual("layout", Updates[1].Section)
+		AssertTrue(TOML_ConfigBatchWrite(Path, Updates), "the genuine stamped source admits an actual native noop")
+	} finally {
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		DirDelete(Dir, true)
+	}
+}
+Test("config source journal: actual fresh native writer owns its first schema stamp", _CMJ_FreshNativeWriterStampsOnlyItsActualCandidate)
+
+_CMJ_FreshWriterCannotOverrideExplicitInvalidMetadata() {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := A_Temp . "\ergopti-journal-invalid-first-write-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Dir), Path := Dir . "\config.toml"
+	try {
+		ConfigurationFile := Path
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertFalse(TOML_ConfigBatchWrite(Path, [{ Section: "_meta", Key: "schema_version", Value: "invalid" }]))
+		AssertFalse(FSStrictExists(Path), "explicit invalid metadata cannot be overwritten by automatic first-use authoring")
+	} finally {
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		DirDelete(Dir, true)
+	}
+}
+Test("config source journal: first-use authoring preserves strict explicit metadata refusal", _CMJ_FreshWriterCannotOverrideExplicitInvalidMetadata)
+
+_CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement() {
+	global ConfigurationFile, _ParseTomlCache
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := A_Temp . "\ergopti-journal-reader-generation-" . A_TickCount . "-" . Random(1, 999999)
+	DirCreate(Dir), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n[layout]`nergopti_base = true`n'
+	Changed := StrReplace(Source, "ergopti_base = true", "ergopti_base = false")
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Cache := ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		AssertTrue(FSWriteDurable(Path, Changed))
+		AssertTrue(ParseConfigTomlFile(Path) == Cache, "the actual native published cache retains its admitted source generation")
+		AssertTrue(ConfigTomlReadSnapshot(Path) == Snapshot)
+		AssertTrue(IniCacheGet(Cache, "layout", "ergopti_base"))
+		_ParseTomlCache.Delete(Path)
+		Fresh := ParseConfigTomlFile(Path)
+		AssertFalse(Fresh == Cache, "actual cache retirement issues a genuinely reread native generation")
+		AssertFalse(IniCacheGet(Fresh, "layout", "ergopti_base"))
+		AssertTrue(FSDeleteStrict(Path))
+		AssertTrue(ParseConfigTomlFile(Path) == Fresh, "physical deletion does not split the published boot generation")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "retained cached reads never admit a deleted current native write source")
+		_ParseTomlCache.Delete(Path)
+		Absent := ConfigTomlReadSnapshot(Path)
+		AssertFalse(Absent.Present, "genuine retirement observes actual native absence")
+		AssertEqual(0, Absent.Rows.Length)
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		DirDelete(Dir, true)
+	}
+}
+Test("config source journal: native published source survives mutation/deletion until genuine cache retirement", _CMJ_GenuinePublishedGenerationSurvivesMutationAndRetirement)
+
+
+; Native fixtures author their own metadata instead of forging journal READY.
+; Read-only legacy corpus bytes remain exact; this helper never migrates them.
+_CMJFixtureReadonly(Path) {
+	if !ConfigMigrateBoot(Path, "known")
+		ConfigSchemaPrepareSource(Path)
+}
+
+_CMJFixtureCurrentSource(Source) {
+	HadBom := SubStr(Source, 1, 1) == Chr(0xFEFF)
+	Body := HadBom ? SubStr(Source, 2) : Source
+	; Root dotted metadata does not change the root scope of existing fixtures.
+	return (HadBom ? Chr(0xFEFF) : "") . "_meta.schema_version = "
+		. ConfigMigrateCurrentVersion() . "`n" . Body
+}
+
+; Pure final predicates must reject modifications of the SAME genuine producer
+; object before executing a caller getter/method. No replacement owner is minted.
+_CMJ_PurityNativeGateway(Path, State, ExistingOwner := 0) {
+	Build() {
+		State.build += 1
+		return { updates: [{ Section: "hotstrings", Key: "trigger_char", Value: "!" }],
+			publish: () => (State.publish += 1, State.runtime := "!") }
+	}
+	return ConfigCommitBuilt(Path, "genuine owner purity subject", Build, 0, (*) => 0, ExistingOwner)
+}
+
+_CMJ_RegistryObserver(Name, NestedArray := false) {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Stage := Path . ".stage"
+	Source := _CMJ_CurrentSource(), Candidate := StrReplace(Source, 'trigger_char = "@"', 'trigger_char = "!"')
+	Registry := ConfigMigrateShippedRegistry(), Owner := NestedArray ? Registry["steps"] : Registry
+	Hits := { count: 0 }, Publication := { build: 0, publish: 0, runtime: "@" }
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		NoopGuard := ConfigMigrateBoot(Path, "capture_noop")
+		WriteGuard := ConfigMigrateBoot(Path, "capture_write", Candidate)
+		AssertTrue(HasMethod(NoopGuard, "Call")), AssertTrue(HasMethod(WriteGuard, "Call"))
+		AssertTrue(FSWriteDurable(Stage, Candidate))
+		if Name == "__Enum" {
+			Prototype := NestedArray ? Array.Prototype : Map.Prototype
+			Owner.DefineProp(Name, { Call: (This, Arity) =>
+				(Hits.count += 1, Prototype.__Enum.Call(This, Arity)) })
+		} else {
+			Original := Owner.%Name%
+			Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
+		}
+		Acknowledged := ConfigSchemaAcknowledgeNoop(Path, NoopGuard)
+		AssertFalse(Acknowledged, "the genuine native final noop refuses an altered actual registry descriptor")
+		AssertFalse(FSConfigAtomicMoveReplace(Stage, Path, &NativeError,
+			() => WriteGuard.Call(Source, 1, Candidate)), "the native final replacement refuses before executing registry observers")
+		AssertFalse(_CMJ_PurityNativeGateway(Path, Publication), "the actual builder/runtime publisher also refuses")
+		AssertEqual(0, Hits.count, "no public registry getter or method executes, including inside native Critical")
+		AssertEqual(0, Publication.build), AssertEqual(0, Publication.publish)
+		AssertEqual("@", Publication.runtime, "refusal acknowledges no replacement RAM intent")
+		AssertTrue(FSUtf8ExactMatches(Path, Source)), AssertTrue(FSUtf8ExactMatches(Stage, Candidate))
+		Owner.DeleteProp(Name)
+		AssertTrue(ConfigSchemaAcknowledgeNoop(Path, NoopGuard), "exact genuine descriptor repair restores the captured native noop")
+		AssertTrue(FSConfigAtomicMoveReplace(Stage, Path, &NativeError, () => WriteGuard.Call(Source, 1, Candidate)),
+			"the same captured native write guard admits exact original-owner repair")
+		AssertTrue(FSUtf8ExactMatches(Path, Candidate))
+		AssertTrue(_CMJ_PurityNativeGateway(Path, Publication), "actual default writer/runtime publisher remains usable after repair")
+		AssertEqual(1, Publication.build), AssertEqual(1, Publication.publish), AssertEqual("!", Publication.runtime)
+		AssertEqual(0, Hits.count, "repair uses original native data rather than executing the rejected observer")
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(Owner, Name)
+			Owner.DeleteProp(Name)
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+for Name in ["__Enum", "Count", "CaseSense"]
+	Test("config journal: genuine registry observer refuses without invocation " . Name,
+		_CMJ_RegistryObserver.Bind(Name))
+for Name in ["__Enum", "Length"]
+	Test("config journal: genuine nested registry array observer refuses without invocation " . Name,
+		_CMJ_RegistryObserver.Bind(Name, true))
+
+_CMJ_SnapshotObserver(Kind) {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Hits := { count: 0 }, Owner := 0, Name := ""
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		ParseConfigTomlFile(Path)
+		Snapshot := ConfigTomlReadSnapshot(Path)
+		switch Kind {
+			case "snapshot-cache-getter":
+				Owner := Snapshot, Name := "Cache"
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+				Original := Descriptor.Value
+				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
+			case "snapshot-own-count":
+				Owner := Snapshot, Name := "OwnPropCount"
+				Original := 0
+				for Field in ObjOwnProps(Owner)
+					Original += 1
+				Owner.DefineProp(Name, { Call: (*) => (Hits.count += 1, Original) })
+			case "cache-map-enumerator":
+				Owner := Snapshot.Cache, Name := "__Enum"
+				Owner.DefineProp(Name, { Call: (This, Arity) =>
+					(Hits.count += 1, Map.Prototype.__Enum.Call(This, Arity)) })
+			case "typed-bool-value":
+				Owner := Snapshot.Document["future"]["keep"]["truth"], Name := "Value"
+				AssertTrue(Owner is TOML_Bool, "the subject is the actual decoder's native Boolean sentinel")
+				Descriptor := Object.Prototype.GetOwnPropDesc.Call(Owner, Name)
+				Original := Descriptor.Value
+				Owner.DefineProp(Name, { Get: (*) => (Hits.count += 1, Original) })
+		}
+		; Only the genuine parser publishes the replacement generation.
+		ParseConfigTomlFile(Path)
+		Fresh := ConfigTomlReadSnapshot(Path)
+		AssertEqual(0, Hits.count, "read generation comparison rejects genuine exported observers before any invocation")
+		AssertFalse(Fresh == Snapshot, "only a genuine fresh native reread replaces the altered published generation")
+		AssertEqual("@", Fresh.Cache["hotstrings"]["trigger_char"])
+		AssertFalse(Fresh.Document["future"]["keep"]["truth"].Value)
+		AssertEqual(1, Fresh.Document["future"]["keep"]["number"])
+		AssertEqual("1", Fresh.Document["future"]["keep"]["text"])
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "observer refusal changes no actual source bytes")
+		if Kind == "snapshot-cache-getter" || Kind == "typed-bool-value"
+			Owner.DefineProp(Name, Descriptor)
+		else
+			Owner.DeleteProp(Name)
+		AssertTrue(_ConfigTomlSnapshotEqual(Snapshot, Fresh), "exact data-descriptor repair retains the independent original snapshot image")
+		AssertTrue(ConfigTomlReadSnapshot(Path) == Fresh,
+			"repair does not resurrect a retired old cache; the genuinely reread generation remains published")
+		AssertEqual(0, Hits.count)
+	} finally {
+		if Owner is Object && Name != "" {
+			if Kind == "snapshot-cache-getter" || Kind == "typed-bool-value"
+				Owner.DefineProp(Name, Descriptor)
+			else if Object.Prototype.HasOwnProp.Call(Owner, Name)
+				Owner.DeleteProp(Name)
+		}
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+for Kind in ["snapshot-cache-getter", "snapshot-own-count", "cache-map-enumerator", "typed-bool-value"]
+	Test("config journal: genuine published snapshot observer cannot forge a read generation " . Kind,
+		_CMJ_SnapshotObserver.Bind(Kind))
+
+_CMJ_GenuineDenseArrayMutation(SnapshotSubject := false) {
+	global ConfigurationFile
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	ArrayOwner := 0
+	try {
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source)), AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		if SnapshotSubject {
+			Snapshot := ConfigTomlReadSnapshot(Path)
+			ArrayOwner := Snapshot.Rows
+		} else {
+			ArrayOwner := ConfigMigrateShippedRegistry()["steps"]
+			Guard := ConfigMigrateBoot(Path, "capture_noop")
+		}
+		AssertTrue(ArrayOwner.Length > 0, "the genuine producer array must have an independently observed cell")
+		Original := ArrayOwner[1], Length := ArrayOwner.Length
+		ArrayOwner.Delete(1)
+		AssertEqual(Length, ArrayOwner.Length, "the actual sparse mutation keeps the misleading original Length")
+		AssertFalse(ArrayOwner.Has(1))
+		if SnapshotSubject {
+			Fresh := ConfigTomlReadSnapshot(Path)
+			AssertFalse(Fresh == Snapshot, "native reread must retire an actual sparse published row array")
+			AssertTrue(Fresh.Rows.Has(1)), AssertTrue(FSUtf8ExactMatches(Path, Source))
+			ArrayOwner[1] := Original
+			AssertTrue(_ConfigTomlSnapshotEqual(Snapshot, Fresh), "exact original cell repair retains the independently decoded source")
+		} else {
+			AssertFalse(ConfigSchemaAcknowledgeNoop(Path, Guard), "a skipped genuine registry cell cannot authorize native noop")
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+			ArrayOwner[1] := Original
+			AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard), "exact original cell repair restores genuine dense registry admission")
+		}
+	} finally {
+		if ArrayOwner is Array && IsSet(Original)
+			ArrayOwner[1] := Original
+		ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: genuine registry sparse cell cannot hide behind unchanged Length", _CMJ_GenuineDenseArrayMutation)
+Test("config journal: genuine published sparse row array retires to actual native reread", _CMJ_GenuineDenseArrayMutation.Bind(true))
+
+_CMJ_BootRegistryWithdrawal(When := "prepared") {
+	global ConfigurationFile, _LOGGER_TEST_SINK, LOGGER_MIN_LEVEL
+	OldPath := IsSet(ConfigurationFile) ? ConfigurationFile : unset
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1], Reason := Step["reason"]
+	Source := '[_meta]`nschema_version = ' . Registry["unstamped"] . '`n[hotstrings]`ntrigger_char = "@"`n'
+	NativeWrite := FSWriteDurable, PreviousSink := _LOGGER_TEST_SINK
+	PreviousLevel := LOGGER_MIN_LEVEL
+	Seen := { stage: 0, completed: 0, stage_paths: [], stage_content: "", source_unchanged: false }
+	Observe(Line) {
+		if When == "stage" && InStr(Line, "[INFO] [ConfigMigrate] Verified durable migration stage '")
+				&& InStr(Line, "' for '" . Path . "' before native publication.") {
+			Seen.stage += 1
+			; Inspect the real default writer's verified stage, then withdraw its
+			; original registry before the actual final native move can run.
+			loop Files Path . "." . A_ScriptHwnd . "-migration-*.stage", "F" {
+				Seen.stage_paths.Push(A_LoopFileFullPath)
+				Seen.stage_content := FSReadUtf8Exact(A_LoopFileFullPath)
+			}
+			Seen.source_unchanged := FSUtf8ExactMatches(Path, Source)
+			Step["reason"] := Reason . " withdrawn after actual durable stage"
+		}
+		if InStr(Line, "[SUCCESS] [ConfigMigrate] Migrated '") {
+			Seen.completed += 1
+			Step["reason"] := Reason . " withdrawn after genuine native publication"
+		}
+		if PreviousSink != 0
+			PreviousSink.Call(Line)
+	}
+	try {
+		ConfigurationFile := Path
+		AssertTrue(NativeWrite.Call(Path, Source))
+		AssertEqual("migrate", ConfigSchemaPrepareSource(Path)["status"], "the actual older native source owns this migration subject")
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "genuine readonly prepare performs no migration effects")
+		switch When {
+			case "prepared":
+				Step["reason"] := Reason . " withdrawn after genuine prepare"
+			case "stage", "completed":
+				; Close the preceding observer cohort before enabling this one.
+				_LoggerFlushRepeats(true)
+				LOGGER_MIN_LEVEL := "INFO"
+				_LoggerRefreshFastFlags()
+				LoggerSetTestSink(Observe)
+		}
+		Result := ConfigMigrateBoot(Path)
+		AssertEqual("failed", Result["status"], "lost original registry handoff is an actual failure, never a public success map")
+		AssertEqual(1, Result["read_only"]), AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		if When == "prepared" {
+			AssertEqual("", Result["backup"], "registry withdrawal refuses before creating any backup")
+			Count := 0
+			loop Files Dir . "\*", "F"
+				Count += 1
+			AssertEqual(1, Count, "only the exact original native source exists")
+			AssertTrue(FSUtf8ExactMatches(Path, Source))
+		} else {
+			AssertTrue(Result["backup"] != "", "the genuine admitted backup remains owned evidence")
+			AssertTrue(FSUtf8ExactMatches(Result["backup"], Source), "the real backup preserves the complete original source")
+			if When == "stage" {
+				AssertEqual(1, Seen.stage, "withdrawal occurs after the real default durable staging write")
+				AssertEqual(1, Seen.stage_paths.Length, "the observer must inspect exactly one real owned native stage")
+				AssertTrue(Seen.source_unchanged, "the native source remains original when the verified stage is observed")
+				AssertEqual(ConfigMigrateCurrentVersion(), TOML_ParseDocument(Seen.stage_content)["_meta"]["schema_version"],
+					"the actual durable staged bytes contain the genuinely migrated current schema")
+				AssertTrue(FSUtf8ExactMatches(Path, Source), "the actual native final rename refuses the withdrawn owner")
+			} else {
+				AssertEqual(1, Seen.completed, "the real default native migration completed before final handoff withdrawal")
+				AssertEqual(ConfigMigrateCurrentVersion(), TOML_ParseDocument(FSReadUtf8Exact(Path))["_meta"]["schema_version"])
+				AssertFalse(FSUtf8ExactMatches(Path, Source), "completed native publication is reported honestly, not described as rolled back")
+			}
+		}
+		Step["reason"] := Reason
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "repair does not resurrect this session's refused initial boot")
+	} finally {
+		try {
+			; Close this real observer cohort before restoring the exact previous sink.
+			try _LoggerFlushRepeats(true)
+			finally LoggerSetTestSink(PreviousSink)
+		} finally {
+			LOGGER_MIN_LEVEL := PreviousLevel
+			_LoggerRefreshFastFlags()
+			Step["reason"] := Reason
+			ConfigurationFile := IsSet(OldPath) ? OldPath : unset
+			_CMJ_Cleanup(Dir, Path)
+		}
+	}
+}
+for When in ["prepared", "stage", "completed"]
+	Test("config journal: default native older-source migration retains registry custody " . When,
+		_CMJ_BootRegistryWithdrawal.Bind(When))
+
+; These source inputs are handwritten against the independently published v12
+; registry. The real direct semantic writer must not borrow an earlier boot's
+; current-schema decision after an external successor replaces its source.
+_CMJ_PostBootDirectPublication(Metadata, Refuse) {
+	global ConfigurationFile
+	HadPath := IsSet(ConfigurationFile)
+	PreviousPath := HadPath ? ConfigurationFile : ""
+	Coordinator := _ConfigFullSaveCoordinator()
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Original := '[_meta]`nschema_version = 12`n[llm]`nmodel = "user-model"`n'
+	Successor := Metadata . '`n[llm]`nmodel = "user-model"`n[future]`nkeep = [false, 1, "1"]`n'
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the authored current source owns the actual v12 registry contract")
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Original))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertEqual("", TOML_WriteRefusal(Path), "a genuine successful boot must not pre-seed the refusal being tested")
+		AssertTrue(FSWriteDurable(Path, Successor))
+		BeforeNoOp := FSReadUtf8Exact(Path)
+		AssertEqual(Refuse ? 0 : 1, TOML_ConfigBatchWrite(Path, []),
+			"direct unchanged acknowledgement must freshly admit the actual successor schema")
+		AssertTrue(FSUtf8ExactMatches(Path, BeforeNoOp), "a no-op or refusal never replaces the authoritative successor bytes")
+		AssertEqual(Refuse ? 0 : 1, TOML_ConfigBatchWrite(Path,
+			[{ Section: "llm", Key: "model", Value: "changed-model" }]),
+			"direct native publication must freshly admit the actual successor schema")
+		if Refuse {
+			AssertTrue(FSUtf8ExactMatches(Path, Successor), "future and invalid metadata survive refusal byte for byte")
+			AssertTrue(FSWriteDurable(Path, Original))
+			AssertTrue(TOML_ConfigBatchWrite(Path, []), "exact genuine current source repair restores unchanged admission")
+			AssertTrue(TOML_ConfigBatchWrite(Path, [{ Section: "llm", Key: "model", Value: "changed-model" }]),
+				"exact genuine current source repair restores actual native publication")
+		}
+		Document := TOML_ParseDocument(FSReadUtf8Exact(Path))
+		AssertEqual(12, Document["_meta"]["schema_version"], "publication must retain the independent current stamp")
+		AssertEqual("changed-model", Document["llm"]["model"])
+		Stages := 0
+		Loop Files, Path . ".*.tmp"
+			Stages += 1
+		AssertEqual(0, Stages, "these admitted/refused owners leave no unacknowledged stage")
+	} finally {
+		_ConfigFullSaveCoordinator(Coordinator)
+		ConfigurationFile := HadPath ? PreviousPath : unset
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: post-boot direct current12 no-op and writer keep genuine admission",
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 12', false))
+Test("config journal: post-boot direct future99 no-op and writer refuse without borrowing boot",
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = 99', true))
+Test("config journal: post-boot direct nonversion no-op and writer refuse without borrowing boot",
+	_CMJ_PostBootDirectPublication.Bind('[_meta]`nschema_version = "not-a-version"', true))
+Test("config journal: post-boot direct scalar metadata no-op and writer refuse without borrowing boot",
+	_CMJ_PostBootDirectPublication.Bind('_meta = true', true))
+
+
+
+
+
+; ==============================================
+; ==============================================
+; ======= 4/ Read-Only AI Menu Admission =======
+; ==============================================
+; ==============================================
+
+_CMJ_WithAiPersistenceState(Body) {
+	global ConfigurationFile, _LLM_Menu, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Prior := Map("path", IsSet(ConfigurationFile), "menu", IsSet(_LLM_Menu),
+		"read", IsSet(_ConfigBootReadFailed), "rejected", IsSet(_ConfigBootRejectedOverrides))
+	if Prior["path"]
+		Prior["path_value"] := ConfigurationFile
+	if Prior["menu"]
+		Prior["menu_value"] := _LLM_Menu
+	if Prior["read"]
+		Prior["read_value"] := _ConfigBootReadFailed
+	if Prior["rejected"]
+		Prior["rejected_value"] := _ConfigBootRejectedOverrides
+	PriorSuspend := A_IsSuspended
+	Dir := _CMG_NewDir()
+	try {
+		Suspend(false)
+		ConfigurationFile := Dir . "\config.toml"
+		_LLM_Menu := Map("enabled", false)
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		return Body.Call(ConfigurationFile)
+	} finally {
+		try _CMJ_Cleanup(Dir, Dir . "\config.toml")
+		finally {
+			ConfigurationFile := Prior["path"] ? Prior["path_value"] : unset
+			_LLM_Menu := Prior["menu"] ? Prior["menu_value"] : unset
+			_ConfigBootReadFailed := Prior["read"] ? Prior["read_value"] : unset
+			_ConfigBootRejectedOverrides := Prior["rejected"] ? Prior["rejected_value"] : unset
+			Suspend(PriorSuspend)
+		}
+	}
+}
+
+_CMJ_NewerSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path), "observing an unknown destination does not construct it")
+	AssertFalse(ConfigMigrateBoot(Path, "known"))
+	Prepared := ConfigSchemaPrepareSource(Path)
+	AssertEqual("newer", Prepared["status"])
+	Result := ConfigMigrateBoot(Path)
+	AssertEqual("newer", Result["status"])
+	AssertEqual(1, Result["read_only"])
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertFalse(Getters["llm_enabled"].Call())
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "a paused-independent future-schema toggle is not clickable")
+	AssertEqual("newer", ConfigSchemaReadOnlyStatus(Path), "the actual retained classification remains observable without write permission")
+	AssertTrue(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters),
+		"the actual declaration renders protected AI activation disabled")
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the AI toggle", (Message, Options) => Messages.Push([Message, Options]),
+		"the boot configuration was not completely loaded"))
+	AssertEqual(1, Messages.Length)
+	AssertEqual(t("config.read_only.newer_schema"), Messages[1][1], "stale callers explain the actual retained newer schema")
+	AssertFalse(Messages[1][1] == "config.read_only.newer_schema", "the user sees localized guidance, not a raw key")
+	AssertEqual("error", Messages[1][2]["level"])
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "observation, menu rendering and failure reporting preserve every source byte")
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "diagnostic status and notification never grant permission")
+}
+Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
+
+_CMJ_CurrentSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path))
+	AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
+	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
+	Suspend(true)
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")
+	Suspend(false)
+	AssertTrue(Getters["llm_toggle_ready"].Call())
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the ordinary failure", (Message, Options) => Messages.Push(Message), "controlled write refusal"))
+	AssertEqual(t("dialog.bulk_toggle.save_failed"), Messages[1], "ordinary failure localization is unchanged")
+	AssertTrue(FSUtf8ExactMatches(Path, Source))
+}
+Test("config journal: current schema and pause retain ordinary AI menu and failure semantics (newer-schema-ai-current)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_CurrentSchemaAiAdmission))
+
+
+; Repeated classification may reuse only exact source bytes; source reads and
+; registry/owner admission remain genuine on every request.
+_CMJ_MemoSyntheticSource(VersionText) {
+	Source := '[_meta]`nschema_version = ' . VersionText . '`n[llm]`n'
+	loop 135
+		Source .= Format('memo_field_{1:03} = "value{1:03}"`n', A_Index)
+	Padding := 5000 - StrLen(Source)
+	AssertTrue(Padding >= 2, "the controlled classification workload has bounded padding")
+	Source .= "#"
+	loop Padding - 2
+		Source .= "x"
+	return Source . "`n"
+}
+
+_CMJ_MemoFileTimestamp(Path, Stamp := unset) {
+	if IsSet(Stamp)
+		FileSetTime(Stamp, Path, "M")
+	return FileGetTime(Path, "M")
+}
+
+_CMJ_ClassificationMemoFreshSource() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	try {
+		AssertEqual(5000, StrLen(Source), "the workload contains 136 scalar keys in exactly 5000 ASCII bytes")
+		AssertTrue(FSWriteDurable(Path, Source))
+		Stamp := _CMJ_MemoFileTimestamp(Path)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		loop 3
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(HasMethod(Captured, "Call"))
+		ChangedCase := StrReplace(Source, "schema_version", "SCHEMA_VERSION")
+		AssertEqual(StrLen(Source), StrLen(ChangedCase))
+		AssertTrue(FSWriteDurable(Path, ChangedCase))
+		AssertEqual(Stamp, _CMJ_MemoFileTimestamp(Path, Stamp), "the same-length successor retains the old modification timestamp")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a same-length case change cannot reuse current metadata classification")
+		AssertFalse(Captured.Call(ChangedCase, 1), "a cached classification never becomes stale source authority")
+		Future := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion() + 1))
+		AssertTrue(FSWriteDurable(Path, Future))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "fresh newer metadata remains read-only after a warm hit")
+		Invalid := _CMJ_MemoSyntheticSource('"invalid"')
+		AssertTrue(FSWriteDurable(Path, Invalid))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "typed invalid metadata cannot borrow the prior current decision")
+		Malformed := StrReplace(Source, "schema_version = " . ConfigMigrateCurrentVersion(),
+			"schema_version = " . ConfigMigrateCurrentVersion() . "`nschema_version = " . ConfigMigrateCurrentVersion())
+		AssertTrue(FSWriteDurable(Path, Malformed))
+		loop 2
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a parse refusal never grants cached readiness")
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact current source repair restores original admission")
+		AssertTrue(Captured.Call(Source, 1), "the original source guard remains authoritative after exact repair")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo preserves fresh source and case-sensitive authority (classification-memo-source)",
+	_CMJ_ClassificationMemoFreshSource)
+
+_CMJ_ClassificationMemoRegistry() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		Registry["current"] := Current + 1
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a warm source memo cannot hide in-place registry mutation")
+		AssertFalse(Captured.Call(Source, 1))
+		Registry["current"] := Current
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Step["reason"] := Reason . " altered"
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "nested registry data is still compared against the private shadow on a hit")
+		AssertFalse(Captured.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact nested registry repair restores admission")
+		AssertTrue(Captured.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: classification memo rechecks genuine registry and exact repair (classification-memo-registry)",
+	_CMJ_ClassificationMemoRegistry)
+
+_CMJ_ClassificationMemoPresence() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSWriteDurable(Path, ""))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a present empty file cannot borrow absent-source default permission")
+		AssertTrue(FSDelete(Path))
+		AssertFalse(FSStrictExists(Path))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "the genuine absent-image branch still uses its original readiness rules")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo does not alias missing and present empty source (classification-memo-presence)",
+	_CMJ_ClassificationMemoPresence)
+
+
+_CMJ_RegistryLeafScalarTypes() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Registry["current"] := Current + 0.0
+		AssertTrue(Registry["current"] is Float, "the numeric parity vector must be a real Float")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "native integer and equal Float retain canonical numeric equality")
+		AssertTrue(Guard.Call(Source, 1))
+		Registry["current"] := String(Current)
+		AssertTrue(Registry["current"] is String, "the numeric-looking refusal vector must remain a String")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "numeric-looking strings cannot borrow native numeric registry authority")
+		AssertFalse(Guard.Call(Source, 1))
+		Registry["current"] := Current
+		Step["reason"] := StrUpper(Reason)
+		AssertTrue(StrCompare(Step["reason"], Reason, true) != 0, "the actual reason must have a distinct case mutation")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "registry strings remain exactly case-sensitive")
+		AssertFalse(Guard.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact scalar repair restores observed native registry authority")
+		AssertTrue(Guard.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves preserve typed numeric and exact string semantics (registry-leaf-safety)",
+	_CMJ_RegistryLeafScalarTypes)
+
+_CMJ_RegistryLeafNativeOwner() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(Guard.Call(Source, 1))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "direct scalar comparisons cannot skip the exact canonical native owner fence")
+		AssertFalse(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count, "foreign native scalar callbacks are refused before invocation")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves retain canonical native owner admission (registry-leaf-safety)",
+	_CMJ_RegistryLeafNativeOwner)
+
+
+; Native journal recovery returns only the phase acquired before its terminal span.
+_CMJ_OwnedReadyLifecycle(Mode) {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n[private]`nkeep = "retained"`n')
+	Path := Fixture.path, Locator := Fixture.options["locator"], ApiPath := Fixture.directory . "\api_entries.json"
+	Initial := Fixture.source, ApiInitial := '{"generation":0}', Bundle := 0
+	Assert(FSWriteDurable(ApiPath, ApiInitial))
+	try {
+		Loops := Mode == "success" ? 2 : 1
+		Loop Loops {
+			NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = ' . (A_Index == 1 ? "false" : "true") . '`n[private]`nkeep = "retained"`n')
+			ApiNew := '{"generation":' . A_Index . '}'
+			Bundle := _ConfigWriteTerminalTryAcquire([Path, ApiPath, Locator])
+			Assert(Bundle is Object)
+			Specs := [ConfigTransitionPresentTarget(Path, NewSource), ConfigTransitionPresentTarget(ApiPath, ApiNew)]
+			Committed := ConfigTransitionCommitOwned(Locator, Specs, Bundle)
+			Assert(ConfigTransitionResultIs(Committed, "committed_new"), "the real two-file native publisher must commit before readiness is examined")
+			Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle), "same-bundle repeated preparation remains admitted")
+			Resolved := Mode == "rollback" ? ConfigTransitionRollbackOwned(Locator, Bundle)
+				: ConfigTransitionRecoverOwned(Locator, Bundle)
+			Assert(ConfigTransitionResultIs(Resolved, Mode == "rollback" ? "recovered_old" : "recovered_new"))
+			Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+			Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+			Assert(ConfigSchemaCanPrepareWrite(Path), "a completed native transition cannot retire a genuinely booted source forever")
+			AssertTrue(FSUtf8ExactMatches(Path, Mode == "rollback" ? Initial : NewSource))
+			AssertTrue(FSUtf8ExactMatches(ApiPath, Mode == "rollback" ? ApiInitial : ApiNew))
+		}
+		Assert(TOML_ConfigBatchWrite(Path, [{ Section: "llm", Key: "enabled", Value: TOML_Bool(true) }]), "an independent later native writer must remain admitted")
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: two native publications retain booted readiness", _CMJ_OwnedReadyLifecycle.Bind("success"))
+Test("config journal owned settlement: native rollback retains booted readiness", _CMJ_OwnedReadyLifecycle.Bind("rollback"))
+
+_CMJ_OwnedPreparedLifecycle() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\preboot.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Assert(FSWriteDurable(Path, Initial))
+		AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_new"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "owned wizard publication must not manufacture completed startup")
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Assert(ConfigSchemaCanPrepareWrite(Path), "only the genuine later boot may acquire readiness")
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: preboot remains readonly until genuine boot", _CMJ_OwnedPreparedLifecycle)
+
+_CMJ_OwnedColdLegacyRecovery() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\cold.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Legacy := '[llm]`nenabled = true`n', NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Assert(FSWriteDurable(Path, Legacy))
+		Port := ConfigTransitionProductionPort()
+		Assert(ConfigTransitionResultIs(ConfigTransitionPrepare(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Port), "prepared"))
+		AssertEqual("migrate", ConfigSchemaPrepareSource(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_old"), "real cold all-old recovery keeps its legacy source")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertTrue(FSUtf8ExactMatches(Path, Legacy))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "recovery alone does not complete legacy migration")
+		AssertEqual("migrated", ConfigMigrateBoot(Path)["status"])
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: cold legacy WAL recovery preserves later migration", _CMJ_OwnedColdLegacyRecovery)
+
+_CMJ_OwnedSettlementRefusals() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, {}, "old"), "a foreign bundle cannot settle the source")
+		Assert(FSWriteDurable(Path, Fixture.source . "# foreign current bytes`n"))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "current classification cannot replace exact settled byte identity")
+		Assert(FSWriteDurable(Path, Fixture.source))
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "new"), "discoverable WAL debt must remain owned")
+		Assert(ConfigTransitionResultIs(ConfigTransitionRollbackOwned(Locator, Bundle), "recovered_old"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		TOML_RefuseWrites(Path, "owned fixture refusal")
+		AssertFalse(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "an explicit real refusal cannot be promoted to READY")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Bundle is Object
+			_ConfigWriteTerminalRelease(Bundle)
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: foreign bytes bundle debt and refusal stay fail closed", _CMJ_OwnedSettlementRefusals)
+
+_CMJ_OwnedNativeWithdrawal() {
+	Fixture := _ScopeOwnerFixture(), Path := Fixture.directory . "\withdraw.toml", Locator := Fixture.options["locator"], Bundle := 0
+	Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		Assert(FSWriteDurable(Path, Initial))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigSchemaPrepareOwnedSource(Path, Bundle))
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigMigrateBoot(Path, "known"), "withdrawn native authority must not be mistaken for an unknown destination")
+		Recovered := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", Recovered["status"], "recovery cannot report clean settlement after its native issuer was withdrawn")
+		AssertEqual("source_schema_settlement_refused", Recovered["kind"])
+		AssertEqual(0, Invocations.count, "the foreign native callback must never be invoked")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		AssertTrue(FSUtf8ExactMatches(Path, Initial))
+		Assert(ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, "old"), "exact issuer repair can acknowledge the already observed settled image")
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: withdrawn native issuer cannot look like unknown destination", _CMJ_OwnedNativeWithdrawal)
+
+_CMJ_OwnedRecoveredNewRetry() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	Fault := { calls: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call"))
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		; This named boundary fault refuses only schema settlement. The genuine
+		; native recovery still verifies new bytes and physically retires its WAL.
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: (*) => (Fault.calls += 1, false)})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		AssertEqual("source_schema_settlement_refused", First["kind"])
+		AssertEqual(1, Fault.calls, "the injected refusal must occur at the actual post-recovery settlement boundary")
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+		Retry := ConfigTransitionRecoverOwned(Locator, Bundle)
+		Assert(ConfigTransitionResultIs(Retry, "absent"), "retry must retain the genuinely recovered-new side: " . Retry["status"] . "/" . Retry["kind"])
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: recovered-new cleanup refusal retries its exact side", _CMJ_OwnedRecoveredNewRetry)
+
+_CMJ_OwnedRebindFault(Fault, Owner, Path, Locator, Bundle, Side, Bounds := 0) {
+	Fault.calls += 1
+	ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+	Guard := ConfigMigrateBoot(Path, "capture_transition", Map("present", 1, "content", Fault.source), Bundle)
+	Assert(HasMethod(Guard, "Call"))
+	AssertTrue(Guard.Call(Fault.original, 1, Fault.source, 1), "the successor candidate must genuinely reach the original source owner")
+	Assert(FSWriteDurable(Path, Fault.source))
+	return ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds)
+}
+
+_CMJ_OwnedRecoveredImageBound() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n[private]`nmarker = 1`n')
+	Fault := { calls: 0, original: NewSource, source: _CMJFixtureCurrentSource('[llm]`nenabled = false`n[private]`nmarker = 2`n') }
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: (*) => false})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedRebindFault.Bind(Fault)})
+		Retry := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual(1, Fault.calls, "the candidate replacement must occur after native record snapshot verification")
+		AssertEqual("retry", Retry["status"])
+		AssertEqual("source_schema_settlement_refused", Retry["kind"])
+		AssertTrue(FSUtf8ExactMatches(Path, Fault.source))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "the recovered image cannot promote a later same-bundle candidate to READY")
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: recovered record cannot lend READY to a later candidate", _CMJ_OwnedRecoveredImageBound)
+
+_CMJ_OwnedPartialFault(Fault, Owner, Path, Locator, Bundle, Side, Bounds := 0) {
+	if Path == Fault.second {
+		Fault.refused += 1
+		return false
+	}
+	ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+	try {
+		Result := ConfigSchemaSettleOwnedSource(Path, Locator, Bundle, Side, Bounds)
+		if (Result is Integer) && Result == 1
+			Fault.confirmed += 1
+		return Result
+	} finally ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedPartialFault.Bind(Fault)})
+}
+
+_CMJ_OwnedPartialRetry() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	Second := Fixture.directory . "\second.toml", Initial := _CMJFixtureCurrentSource('[llm]`nenabled = true`n')
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n')
+	Fault := { second: Second, confirmed: 0, refused: 0 }
+	try {
+		Assert(FSWriteDurable(Second, Initial))
+		AssertEqual("current", ConfigMigrateBoot(Second)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Second, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator,
+			[ConfigTransitionPresentTarget(Path, NewSource), ConfigTransitionPresentTarget(Second, NewSource)], Bundle), "committed_new"))
+		ConfigSchemaSettleOwnedSource.DefineProp("Call", {Call: _CMJ_OwnedPartialFault.Bind(Fault)})
+		First := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", First["status"])
+		AssertEqual(1, Fault.confirmed, "the first real native target must already be settled")
+		AssertEqual(1, Fault.refused, "the second target must actually refuse after partial settlement")
+		ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "absent"))
+		Foreign := { kind: Bundle.kind, id: Bundle.id, tokens: Bundle.tokens, authorized: Bundle.authorized, shutdown_claimed: Bundle.shutdown_claimed }
+		AssertEqual("fatal", ConfigTransitionRecoverOwned(Locator, Foreign)["status"], "a lookalike bundle cannot consume the observation")
+		AssertEqual("fatal", ConfigTransitionRecoverOwned(Fixture.directory . "\foreign-paths.toml", Bundle)["status"], "a foreign locator cannot consume the observation")
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "absent"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+		Assert(ConfigSchemaCanPrepareWrite(Second))
+		AssertTrue(FSUtf8ExactMatches(Path, NewSource))
+		AssertTrue(FSUtf8ExactMatches(Second, NewSource))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigSchemaSettleOwnedSource, "Call")
+			ConfigSchemaSettleOwnedSource.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: partial native settlement retries all original targets", _CMJ_OwnedPartialRetry)
+
+_CMJ_OwnedRecoveryProducer() {
+	Fixture := _ScopeOwnerFixture('[llm]`nenabled = true`n'), Path := Fixture.path, Locator := Fixture.options["locator"], Bundle := 0
+	NewSource := _CMJFixtureCurrentSource('[llm]`nenabled = false`n'), Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigTransitionRecover, "Call"))
+	try {
+		Bundle := _ConfigWriteTerminalTryAcquire([Path, Locator])
+		Assert(Bundle is Object)
+		Assert(ConfigTransitionResultIs(ConfigTransitionCommitOwned(Locator, [ConfigTransitionPresentTarget(Path, NewSource)], Bundle), "committed_new"))
+		ConfigTransitionRecover.DefineProp("Call", {Call: (*) => (Invocations.count += 1, Map("status", "ok", "kind", "recovered_new"))})
+		Refused := ConfigTransitionRecoverOwned(Locator, Bundle)
+		AssertEqual("retry", Refused["status"])
+		AssertEqual("recovery_native_owner_refused", Refused["kind"])
+		AssertEqual(0, Invocations.count, "a foreign recovery callback cannot mint an actual-native observation")
+		ConfigTransitionRecover.DeleteProp("Call")
+		Assert(ConfigTransitionResultIs(ConfigTransitionInspect(Locator, ConfigTransitionProductionPort()), "ready"))
+		Assert(ConfigTransitionResultIs(ConfigTransitionRecoverOwned(Locator, Bundle), "recovered_new"))
+		Assert(_ConfigWriteTerminalRelease(Bundle)), Bundle := 0
+		Assert(ConfigSchemaCanPrepareWrite(Path))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigTransitionRecover, "Call")
+			ConfigTransitionRecover.DeleteProp("Call")
+		if Bundle is Object {
+			ConfigTransitionRollbackOwned(Locator, Bundle)
+			_ConfigWriteTerminalRelease(Bundle)
+		}
+		_ScopeOwnerCleanup(Fixture)
+	}
+}
+Test("config journal owned settlement: only the original recovery producer can mint its outcome", _CMJ_OwnedRecoveryProducer)
+; Caller-held predicates must reject additional source units after a literal NUL.
+; The native reader is never asked to decode NUL-bearing bytes in this subject.
+_CMJ_CapturedTransitionRejectsCallerNulSuffix(Side) {
+	global ConfigurationFile
+	HadPath := IsSet(ConfigurationFile)
+	PreviousPath := HadPath ? ConfigurationFile : ""
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = true`n# genuine original image`n'
+	Candidate := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = false`n# genuine candidate image`n'
+	Bundle := false
+	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v12 registry")
+		ConfigurationFile := Path
+		AssertTrue(FSWriteDurable(Path, Source))
+		BeforeBytes := FileRead(Path, "RAW")
+		AssertEqual(StrLen(Source), BeforeBytes.Size, "the genuine original native image has its complete independent ASCII byte count")
+		loop BeforeBytes.Size
+			AssertEqual(Ord(SubStr(Source, A_Index, 1)), NumGet(BeforeBytes, A_Index - 1, "UChar"),
+				"the initial raw byte vector equals the handwritten source")
+		OriginalBytesValid := true
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object, "the captured predicate requires an actual native terminal bundle")
+		OriginalBundleId := Bundle.id
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle), "the real prepare_owned handoff owns this source")
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+		Guard := ConfigMigrateBoot(Path, "capture_transition", Map("present", 1, "content", Candidate), Bundle)
+		AssertTrue(HasMethod(Guard, "Call"), "the genuine capture_transition request must return its actual predicate")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "exact original and candidate images are admitted")
+		AssertTrue(Guard.Call(Candidate, 1, Source, 1), "both genuine images retain the issued transition permission")
+		Nul := Chr(0), Suffix := "fixed-caller-suffix"
+		AssertEqual(1, StrLen(Nul)), AssertEqual(0, Ord(Nul))
+		CallerSource := Source . Nul . Suffix
+		CallerCandidate := Candidate . Nul . Suffix
+		AssertTrue(CallerSource is String), AssertTrue(CallerCandidate is String)
+		AssertEqual(StrLen(Source) + 1 + StrLen(Suffix), StrLen(CallerSource))
+		AssertEqual(StrLen(Candidate) + 1 + StrLen(Suffix), StrLen(CallerCandidate))
+		AssertEqual(0, Ord(SubStr(CallerSource, StrLen(Source) + 1, 1)))
+		AssertEqual(0, Ord(SubStr(CallerCandidate, StrLen(Candidate) + 1, 1)))
+		if Side == "source"
+			AssertFalse(Guard.Call(CallerSource, 1, Candidate, 1),
+				"caller source units after NUL are outside both genuinely captured images")
+		else if Side == "next"
+			AssertFalse(Guard.Call(Source, 1, CallerCandidate, 1),
+				"caller next-content units after NUL cannot borrow genuine candidate permission")
+		else
+			throw Error("Unknown caller-only NUL regression side")
+		AssertFalse(Guard.Call(1, 1, Candidate, 1), "the existing Source String guard rejects a numeric caller")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "exact source repair preserves the same still-live captured predicate")
+		Bundle.id := OriginalBundleId + 1
+		AssertFalse(Guard.Call(Source, 1, Candidate, 1), "actual native bundle identity withdrawal refuses the retained predicate")
+		Bundle.id := OriginalBundleId
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path), "exact bundle repair restores its actual native ownership")
+		AssertTrue(Guard.Call(Source, 1, Candidate, 1), "the same guard accepts the exactly repaired real bundle")
+	} catch as Err {
+		PrimaryError := Err
+	}
+	; Each teardown action remains independent of earlier body/cleanup failures.
+	try ConfigurationFile := HadPath ? PreviousPath : unset
+	catch as Err
+		CleanupErrors.Push({ stage: "global_restore", error: Err })
+	if Bundle is Object && IsSet(OriginalBundleId) {
+		try Bundle.id := OriginalBundleId
+		catch as Err
+			CleanupErrors.Push({ stage: "bundle_id_restore", error: Err })
+	}
+	ReleaseAcknowledged := !(Bundle is Object)
+	if Bundle is Object {
+		try {
+			Released := _ConfigWriteTerminalRelease(Bundle)
+			ReleaseAcknowledged := (Released is Integer) && Released == 1
+			if !ReleaseAcknowledged
+				throw Error("The actual terminal bundle retirement was not acknowledged")
+		} catch as Err
+			CleanupErrors.Push({ stage: "bundle_release", error: Err })
+	}
+	SourceUnchanged := false
+	try {
+		if !IsSet(BeforeBytes)
+			throw Error("No complete original native byte receipt was captured")
+		AfterBytes := FileRead(Path, "RAW")
+		AssertEqual(BeforeBytes.Size, AfterBytes.Size, "caller-only predicate checks never change the native file length")
+		loop BeforeBytes.Size
+			AssertEqual(NumGet(BeforeBytes, A_Index - 1, "UChar"), NumGet(AfterBytes, A_Index - 1, "UChar"),
+				"caller-only predicate checks preserve every actual raw byte")
+		SourceUnchanged := OriginalBytesValid
+	} catch as Err
+		CleanupErrors.Push({ stage: "raw_byte_proof", error: Err })
+	if ReleaseAcknowledged && SourceUnchanged {
+		try _CMJ_Cleanup(Dir, Path)
+		catch as Err
+			CleanupErrors.Push({ stage: "fixture_cleanup", error: Err })
+	} else {
+		CleanupErrors.Push({ stage: "directory_retained", error: Error("Retained fixture directory because native retirement or unchanged original byte proof is unavailable: " . Dir) })
+	}
+	for Secondary in CleanupErrors {
+		; Framework diagnostics are bounded and cannot replace the primary error.
+		Detail := SubStr(StrReplace(StrReplace(Secondary.error.Message, "`r", " "), "`n", " "), 1, 512)
+		try _TestPrint("# ERGOPTI_PRIVATE_CALLER_NUL_CLEANUP side=" . Side . " stage=" . Secondary.stage
+			. " dir=" . Dir . " detail=" . Detail)
+	}
+	if IsObject(PrimaryError)
+		throw PrimaryError
+	if CleanupErrors.Length > 0
+		throw CleanupErrors[1].error
+}
+Test("config journal: captured native transition rejects caller-only Source NUL suffix",
+	_CMJ_CapturedTransitionRejectsCallerNulSuffix.Bind("source"))
+Test("config journal: captured native transition rejects caller-only NextContent NUL suffix",
+	_CMJ_CapturedTransitionRejectsCallerNulSuffix.Bind("next"))
+
+
+; All captured image families retain complete caller String identity. NUL
+; suffixes stay in caller values and are never written to the native source.
+_CMJ_CapturedImageRejectsCallerNulSuffix(Request, Side, WithBom := false) {
+	global ConfigurationFile
+	HadPath := IsSet(ConfigurationFile)
+	PreviousPath := HadPath ? ConfigurationFile : ""
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = true`n# genuine captured image`n'
+	Candidate := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = false`n# genuine captured candidate`n'
+	PhysicalSource := WithBom ? Chr(0xFEFF) . Source : Source
+	Bundle := false, PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the handwritten images require the actual v12 registry")
+		ConfigurationFile := Path
+		AssertTrue(!WithBom || Request == "capture_read", "the BOM subject belongs only to logical captured read")
+		AssertTrue(FSWriteDurable(Path, PhysicalSource))
+		BeforeBytes := FileRead(Path, "RAW")
+		ByteOffset := WithBom ? 3 : 0
+		AssertEqual(StrLen(Source) + ByteOffset, BeforeBytes.Size, "the actual source has its independent ASCII payload and physical BOM byte count")
+		if WithBom {
+			for Index, Byte in [239, 187, 191]
+				AssertEqual(Byte, NumGet(BeforeBytes, Index - 1, "UChar"), "the complete native image begins with the fixed physical UTF-8 BOM")
+		}
+		loop StrLen(Source)
+			AssertEqual(Ord(SubStr(Source, A_Index, 1)), NumGet(BeforeBytes, ByteOffset + A_Index - 1, "UChar"),
+				"the complete raw payload equals the handwritten ASCII native source")
+		OriginalBytesValid := true
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Bundle := _ConfigWriteTerminalTryAcquire([Path])
+		AssertTrue(Bundle is Object, "the fixture must acquire the actual native terminal bundle")
+		OriginalBundleId := Bundle.id
+		AssertTrue(ConfigSchemaPrepareOwnedSource(Path, Bundle), "the genuine prepare_owned request owns this existing image")
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path))
+		Registry := ConfigMigrateShippedRegistry(), RegistryStep := Registry["steps"][1]
+		OriginalReason := RegistryStep["reason"]
+		if Request == "capture_write" {
+			AssertFalse(ConfigMigrateBoot(Path, Request, 1), "ordinary capture refuses an actual non-String candidate at its request boundary")
+			AssertFalse(ConfigMigrateBoot(Path, Request, '[_meta]`nschema_version = 99`n'),
+				"ordinary capture cannot issue a current-image predicate for a genuine newer-schema candidate")
+		}
+		Guard := Request == "capture_write" ? ConfigMigrateBoot(Path, Request, Candidate) : ConfigMigrateBoot(Path, Request)
+		AssertTrue(HasMethod(Guard, "Call"), "the actual captured API must issue the requested predicate")
+		Nul := Chr(0), Suffix := "fixed-caller-image-suffix"
+		AssertEqual(1, StrLen(Nul)), AssertEqual(0, Ord(Nul))
+		CallerSource := Source . Nul . Suffix
+		CallerCandidate := Candidate . Nul . Suffix
+		AssertTrue(CallerSource is String), AssertTrue(CallerCandidate is String)
+		AssertEqual(StrLen(Source) + 1 + StrLen(Suffix), StrLen(CallerSource))
+		AssertEqual(StrLen(Candidate) + 1 + StrLen(Suffix), StrLen(CallerCandidate))
+		AssertEqual(0, Ord(SubStr(CallerSource, StrLen(Source) + 1, 1)))
+		AssertEqual(0, Ord(SubStr(CallerCandidate, StrLen(Candidate) + 1, 1)))
+		if Request == "capture_write" {
+			AssertTrue(Guard.Call(Source, 1, Candidate), "the ordinary write predicate accepts both exact genuinely captured images")
+			AssertFalse(Guard.Call(1, 1, Candidate)), AssertFalse(Guard.Call({}, 1, Candidate))
+			AssertFalse(Guard.Call(Source, "1", Candidate)), AssertFalse(Guard.Call(Source, 0, Candidate))
+			AssertFalse(Guard.Call(Source, 1, 1)), AssertFalse(Guard.Call(Source, 1, {}))
+			if Side == "source"
+				AssertFalse(Guard.Call(CallerSource, 1, Candidate), "ordinary write Source units after NUL cannot borrow captured image identity")
+			else if Side == "candidate"
+				AssertFalse(Guard.Call(Source, 1, CallerCandidate), "ordinary write FinalCandidate units after NUL cannot borrow captured candidate identity")
+			else
+				throw Error("Unknown ordinary write caller position")
+			AssertTrue(Guard.Call(Source, 1, Candidate), "exact caller repair retains the original captured write predicate")
+		} else {
+			AssertTrue(Guard.Call(Source, 1), "the actual read or noop predicate accepts the complete original image")
+			if WithBom
+				AssertFalse(Guard.Call(PhysicalSource, 1), "the genuine captured read expects BOM-stripped logical text while raw native bytes retain BOM")
+			AssertFalse(Guard.Call(1, 1)), AssertFalse(Guard.Call({}, 1))
+			AssertFalse(Guard.Call(Source, "1")), AssertFalse(Guard.Call(Source, 0))
+			AssertFalse(Guard.Call(CallerSource, 1), "caller Source units after NUL are outside the genuinely captured image")
+			AssertTrue(Guard.Call(Source, 1), "exact caller repair retains the same read or noop predicate")
+			if Request == "capture_noop" || Request == "capture_reconcile_noop"
+				AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard), "the retained genuine noop guard is consumed by the actual native acknowledgement")
+		}
+		RegistryStep["reason"] := OriginalReason . " withdrawn after genuine image capture"
+		if Request == "capture_write"
+			AssertFalse(Guard.Call(Source, 1, Candidate), "the real registry owner withdrawal revokes the captured ordinary write")
+		else
+			AssertFalse(Guard.Call(Source, 1), "the real registry owner withdrawal revokes the captured read or noop")
+		RegistryStep["reason"] := OriginalReason
+		if Request == "capture_write"
+			AssertTrue(Guard.Call(Source, 1, Candidate), "exact registry repair restores the original captured ordinary write")
+		else
+			AssertTrue(Guard.Call(Source, 1), "exact registry repair restores the original captured read or noop")
+		Bundle.id := OriginalBundleId + 1
+		AssertFalse(_ConfigWriteTerminalOwnsExact(Bundle, Path), "the original actual bundle identity is genuinely withdrawn")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "read permission cannot extend write-ready under a withdrawn owned bundle")
+		if Request == "capture_read"
+			AssertTrue(Guard.Call(Source, 1), "retained read permission intentionally survives terminal withdrawal without granting write-ready")
+		else if Request == "capture_write"
+			AssertFalse(Guard.Call(Source, 1, Candidate), "actual terminal withdrawal revokes ordinary write admission")
+		else {
+			AssertFalse(Guard.Call(Source, 1), "actual terminal withdrawal revokes noop admission")
+			AssertFalse(ConfigSchemaAcknowledgeNoop(Path, Guard), "the real native acknowledgement cannot consume withdrawn noop admission")
+		}
+		Bundle.id := OriginalBundleId
+		AssertTrue(_ConfigWriteTerminalOwnsExact(Bundle, Path), "exact original bundle repair restores actual native ownership")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		if Request == "capture_write"
+			AssertTrue(Guard.Call(Source, 1, Candidate), "the same ordinary write guard accepts exact bundle repair")
+		else {
+			AssertTrue(Guard.Call(Source, 1), "the same read or noop guard accepts exact bundle repair")
+			if Request == "capture_noop" || Request == "capture_reconcile_noop"
+				AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard), "actual native noop acknowledgement succeeds after exact owner repair")
+		}
+	} catch as Err {
+		PrimaryError := Err
+	}
+	; Cleanup independently restores all shared state and retains uncertain bytes.
+	try ConfigurationFile := HadPath ? PreviousPath : unset
+	catch as Err
+		CleanupErrors.Push({ stage: "global_restore", error: Err })
+	if IsSet(RegistryStep) && IsSet(OriginalReason) {
+		try RegistryStep["reason"] := OriginalReason
+		catch as Err
+			CleanupErrors.Push({ stage: "registry_restore", error: Err })
+	}
+	if Bundle is Object && IsSet(OriginalBundleId) {
+		try Bundle.id := OriginalBundleId
+		catch as Err
+			CleanupErrors.Push({ stage: "bundle_id_restore", error: Err })
+	}
+	ReleaseAcknowledged := !(Bundle is Object)
+	if Bundle is Object {
+		try {
+			Released := _ConfigWriteTerminalRelease(Bundle)
+			ReleaseAcknowledged := (Released is Integer) && Released == 1
+			if !ReleaseAcknowledged
+				throw Error("The actual terminal bundle retirement was not acknowledged")
+		} catch as Err
+			CleanupErrors.Push({ stage: "bundle_release", error: Err })
+	}
+	SourceUnchanged := false
+	try {
+		if !IsSet(BeforeBytes)
+			throw Error("No complete original native byte receipt was captured")
+		AfterBytes := FileRead(Path, "RAW")
+		AssertEqual(BeforeBytes.Size, AfterBytes.Size, "caller-only image checks never change the native source length")
+		loop BeforeBytes.Size
+			AssertEqual(NumGet(BeforeBytes, A_Index - 1, "UChar"), NumGet(AfterBytes, A_Index - 1, "UChar"),
+				"caller-only image checks preserve every complete native source byte")
+		SourceUnchanged := OriginalBytesValid
+	} catch as Err
+		CleanupErrors.Push({ stage: "raw_byte_proof", error: Err })
+	if ReleaseAcknowledged && SourceUnchanged {
+		try _CMJ_Cleanup(Dir, Path)
+		catch as Err
+			CleanupErrors.Push({ stage: "fixture_cleanup", error: Err })
+	} else {
+		CleanupErrors.Push({ stage: "directory_retained", error: Error("Retained fixture directory because native retirement or unchanged original byte proof is unavailable: " . Dir) })
+	}
+	for Secondary in CleanupErrors {
+		Detail := SubStr(StrReplace(StrReplace(Secondary.error.Message, "`r", " "), "`n", " "), 1, 512)
+		try _TestPrint("# ERGOPTI_CAPTURED_IMAGE_CLEANUP request=" . Request . " side=" . Side
+			. " stage=" . Secondary.stage . " dir=" . Dir . " detail=" . Detail)
+	}
+	if IsObject(PrimaryError)
+		throw PrimaryError
+	if CleanupErrors.Length > 0
+		throw CleanupErrors[1].error
+}
+Test("config journal: captured read rejects caller-only Source NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_read", "source"))
+Test("config journal: captured BOM read rejects caller-only Source NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_read", "source", true))
+Test("config journal: captured noop rejects caller-only Source NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_noop", "source"))
+Test("config journal: captured reconcile noop rejects caller-only Source NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_reconcile_noop", "source"))
+Test("config journal: captured ordinary write rejects caller-only Source NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_write", "source"))
+Test("config journal: captured ordinary write rejects caller-only FinalCandidate NUL suffix",
+	_CMJ_CapturedImageRejectsCallerNulSuffix.Bind("capture_write", "candidate"))
+
+
+; Caller-held values never borrow an image by ending at an embedded NUL.
+; Physical source bytes remain ASCII; no transition or native publication occurs.
+_CMJ_UpstreamExactCallerNul(Kind) {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := '[_meta]`nschema_version = 12`n[layout]`nergopti_base = true`n'
+	PrimaryError := false, CleanupErrors := [], OriginalBytesValid := false
+	try {
+		AssertEqual(12, ConfigMigrateCurrentVersion(), "the independent current image requires the actual v12 registry")
+		AssertTrue(FSWriteDurable(Path, Source))
+		BeforeBytes := FileRead(Path, "RAW")
+		AssertEqual(StrLen(Source), BeforeBytes.Size)
+		loop StrLen(Source)
+			AssertEqual(Ord(SubStr(Source, A_Index, 1)), NumGet(BeforeBytes, A_Index - 1, "UChar"),
+				"every native source byte equals the handwritten ASCII image")
+		OriginalBytesValid := true
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "genuine boot grants the original ready phase")
+		Nul := Chr(0)
+		AssertEqual(1, StrLen(Nul)), AssertEqual(0, Ord(Nul))
+		if Kind == "registry" {
+			Registry := ConfigMigrateShippedRegistry(), Step := Registry["steps"][1]
+			OriginalReason := Step["reason"]
+			AssertTrue(OriginalReason is String)
+			Guard := ConfigMigrateBoot(Path, "capture_noop")
+			AssertTrue(HasMethod(Guard, "Call")), AssertTrue(Guard.Call(Source, 1))
+			AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard))
+			Suffix := "caller-registry-suffix", ChangedReason := OriginalReason . Nul . Suffix
+			AssertEqual(StrLen(OriginalReason) + 1 + StrLen(Suffix), StrLen(ChangedReason))
+			AssertEqual(0, Ord(SubStr(ChangedReason, StrLen(OriginalReason) + 1, 1)))
+			Step["reason"] := ChangedReason
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "native registry admission must revoke when its real reason gains units after NUL")
+			AssertFalse(Guard.Call(Source, 1), "the retained original noop must lose the genuinely changed registry owner")
+			AssertFalse(ConfigSchemaAcknowledgeNoop(Path, Guard), "native noop acknowledgement cannot consume the withdrawn registry")
+			Step["reason"] := OriginalReason
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+			AssertTrue(Guard.Call(Source, 1)), AssertTrue(ConfigSchemaAcknowledgeNoop(Path, Guard))
+		} else if Kind == "memo" {
+			Exact := ConfigMigrateBoot(Path, "capture_write", Source)
+			AssertTrue(HasMethod(Exact, "Call")), AssertTrue(Exact.Call(Source, 1, Source))
+			DuplicateTail := '`n[_meta]`nschema_version = 99`n'
+			Malformed := Source . Nul . DuplicateTail
+			AssertEqual(StrLen(Source) + 1 + StrLen(DuplicateTail), StrLen(Malformed))
+			AssertEqual(0, Ord(SubStr(Malformed, StrLen(Source) + 1, 1)))
+			; This is the existing duplicate-table rule, not an invented NUL ban.
+			ParserRefusal := ""
+			try TOML_ParseDocument(Malformed)
+			catch ValueError as Err
+				ParserRefusal := Err.Message
+			AssertEqual("Duplicate or closed TOML table namespace", ParserRefusal,
+				"the actual independent parser refuses the complete duplicate metadata header")
+			Rejected := ConfigMigrateBoot(Path, "capture_write", Malformed)
+			AssertFalse(HasMethod(Rejected, "Call"), "classification memo must not issue write admission for the parse-refused complete caller candidate")
+			AssertFalse(Rejected)
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path), "candidate refusal leaves genuine unchanged source readiness intact")
+			Repaired := ConfigMigrateBoot(Path, "capture_write", Source)
+			AssertTrue(HasMethod(Repaired, "Call")), AssertTrue(Repaired.Call(Source, 1, Source))
+		} else
+			throw ValueError("Unknown upstream complete caller-image regression")
+	} catch as Err {
+		PrimaryError := Err
+	}
+	if IsSet(Step) && IsSet(OriginalReason) {
+		try Step["reason"] := OriginalReason
+		catch as Err
+			CleanupErrors.Push({ stage: "registry_restore", error: Err })
+	}
+	SourceUnchanged := false
+	try {
+		if !IsSet(BeforeBytes)
+			throw Error("No complete original native byte receipt was captured")
+		AfterBytes := FileRead(Path, "RAW")
+		AssertEqual(BeforeBytes.Size, AfterBytes.Size)
+		loop BeforeBytes.Size
+			AssertEqual(NumGet(BeforeBytes, A_Index - 1, "UChar"), NumGet(AfterBytes, A_Index - 1, "UChar"),
+				"caller-only admission checks preserve every physical source byte")
+		SourceUnchanged := OriginalBytesValid
+	} catch as Err
+		CleanupErrors.Push({ stage: "raw_byte_proof", error: Err })
+	if SourceUnchanged {
+		try _CMJ_Cleanup(Dir, Path)
+		catch as Err
+			CleanupErrors.Push({ stage: "fixture_cleanup", error: Err })
+	} else
+		CleanupErrors.Push({ stage: "directory_retained", error: Error("Retained uncertain native source: " . Dir) })
+	for Secondary in CleanupErrors {
+		Detail := SubStr(StrReplace(StrReplace(Secondary.error.Message, "`r", " "), "`n", " "), 1, 512)
+		try _TestPrint("# ERGOPTI_UPSTREAM_CALLER_NUL_CLEANUP kind=" . Kind . " stage=" . Secondary.stage
+			. " dir=" . Dir . " detail=" . Detail)
+	}
+	if IsObject(PrimaryError)
+		throw PrimaryError
+	if CleanupErrors.Length > 0
+		throw CleanupErrors[1].error
+}
+Test("config journal: actual registry reason NUL suffix revokes captured native admission",
+	_CMJ_UpstreamExactCallerNul.Bind("registry"))
+Test("config journal: classification memo cannot admit caller NUL duplicate metadata candidate",
+	_CMJ_UpstreamExactCallerNul.Bind("memo"))

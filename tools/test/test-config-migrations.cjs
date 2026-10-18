@@ -1084,26 +1084,37 @@ if (!ahkEngine.includes(`static Relative := "${REGISTRY_RELATIVE}"`)) {
 		`windows/infra/config_migrate.ahk must name the registry as "${REGISTRY_RELATIVE}"`
 	);
 }
-const ahkSuite = readSource(shared('..', 'windows', 'tests', 'unit', 'test_config_migrate.ahk'));
+const ahkSuite = readSource(
+	shared(
+		'..',
+		'windows',
+		'tests',
+		'unit',
+		'infra',
+		'config',
+		'migration',
+		'test_config_migrate.ahk'
+	)
+);
 if (
 	!ahkSuite.includes('\\tests\\corpus\\config_migrations"') ||
 	!ahkSuite.includes('_CMG_Has(Spec["drivers"], "ahk")')
 ) {
 	fail(
 		'wiring',
-		'windows/tests/unit/test_config_migrate.ahk must replay the corpus for driver "ahk"'
+		'windows/tests/unit/infra/config/migration/test_config_migrate.ahk must replay the corpus for driver "ahk"'
 	);
 }
 if (!ahkSuite.includes('\\tests\\corpus\\config_migration_registries"')) {
 	fail(
 		'wiring',
-		'windows/tests/unit/test_config_migrate.ahk must replay tests/corpus/config_migration_registries'
+		'windows/tests/unit/infra/config/migration/test_config_migrate.ahk must replay tests/corpus/config_migration_registries'
 	);
 }
 const runAll = readSource(shared('..', 'windows', 'tests', 'run_all.ahk'));
 for (const include of [
 	'#Include ../infra/config_migrate.ahk',
-	'#Include unit/test_config_migrate.ahk'
+	'#Include unit/infra/config/migration/test_config_migrate.ahk'
 ]) {
 	if (!runAll.split(/\r?\n/).includes(include)) {
 		fail('wiring', `windows/tests/run_all.ahk must hold "${include}"`);

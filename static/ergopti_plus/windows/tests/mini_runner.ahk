@@ -15,6 +15,6 @@ global _AHK_DRY_RUN := true
 #Include ../infra/logger.ahk
 #Include ../infra/toml/toml_helpers.ahk
 #Include ../infra/toml/toml_loader.ahk
-#Include unit/test_toml_loader.ahk
+#Include unit/infra/toml/test_toml_loader.ahk
 
 RunTests()
