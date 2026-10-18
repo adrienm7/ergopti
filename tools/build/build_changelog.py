@@ -62,10 +62,12 @@ TYPE_RE = re.compile(r"^([a-z]+)(?:\(([^)]+)\))?(!)?:\s+(.+)$")
 # Co-author trailer pattern. Project rule forbids AI / bot credits, so any
 # leftover trailer is stripped from the rendered body.
 # GitHub API hard cap for release body length.
-# The workflow appends ~3 KB of platform-section text after the changelog,
-# so we leave a safety margin below the 125 000-char limit.
+# The workflow wraps the changelog in ~15 000 characters of download,
+# installation and qualification text (v1.0.2: more than 10 000, so a
+# 115 000-character changelog made the API refuse the whole body); keep a
+# margin that also absorbs longer qualification notes.
 GITHUB_RELEASE_BODY_LIMIT = 125_000
-CHANGELOG_MAX_CHARS = GITHUB_RELEASE_BODY_LIMIT - 10_000
+CHANGELOG_MAX_CHARS = GITHUB_RELEASE_BODY_LIMIT - 30_000
 
 COAUTHOR_RE = re.compile(r"^Co-[Aa]uthored-[Bb]y:", re.MULTILINE)
 
