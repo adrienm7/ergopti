@@ -1990,10 +1990,13 @@ end
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back,
 ---        and { model } for MODEL_MISSING.
-local function request_prebuilt(client, label, body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority before private dispatch.
+local function request_prebuilt(client, label, body, on_text, on_fail, continuation_check)
 	if type(body) ~= "table" or type(on_text) ~= "function" or type(on_fail) ~= "function" then
 		error("api_ollama." .. label .. " request: a body, on_text and on_fail are required")
 	end
+	assert(continuation_check == nil or type(continuation_check) == "function",
+		"api_ollama prebuilt continuation check must be a function or nil")
 	local model = body.model
 	if normalize_model_name(model) == nil then
 		error("api_ollama." .. label .. " request: the body names no model")
@@ -2032,6 +2035,18 @@ local function request_prebuilt(client, label, body, on_text, on_fail)
 		-- before handing private bytes to the captured endpoint's HTTP owner.
 		if not current() then
 			return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+		end
+		if continuation_check ~= nil then
+			local ok, admitted = pcall(continuation_check)
+			if not ok then
+				Logger.error(LOG, "%s request continuation check raised: %s.", label, tostring(admitted))
+			end
+			if not ok or admitted ~= true then
+				return ApiCommon.protected_call(on_fail, "on_fail", "cancelled")
+			end
+			if not current() then
+				return ApiCommon.protected_call(on_fail, "on_fail", "model_list_unavailable")
+			end
 		end
 		client.post(origin .. "/api/chat", { ["Content-Type"] = "application/json" }, encoded,
 			function(r)
@@ -2116,8 +2131,9 @@ end
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
-function M.request_vision(body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority after model preflight.
+function M.request_vision(body, on_text, on_fail, continuation_check)
+	return request_prebuilt(_vision_client, "Vision", body, on_text, on_fail, continuation_check)
 end
 
 --- Posts one prebuilt text chat body (no image) to the local server: the AI
