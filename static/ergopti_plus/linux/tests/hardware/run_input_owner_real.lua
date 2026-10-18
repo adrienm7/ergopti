@@ -67,6 +67,7 @@ local original_find, original_classify = Finder.find_devices, Finder.physical_so
 local original_read, original_emit = Reader.read_event, Writer.transaction_emit
 local original_acquire, acquisitions = Writer.acquire_transaction, 0
 local signal_timer, signal_deadline
+local prerequisite_failure
 local original_signal_loaded, original_signal_preload = package.loaded["posix.signal"], package.preload["posix.signal"]
 
 pcall(ffi.cdef, [[
@@ -215,10 +216,13 @@ local function close_output(output)
 end
 
 --- Starts actual Hook/engines with real canonical bytes and explicit fixture admission.
-local function start_session()
+--- @param with_shift_hold boolean|nil Adds only the orphan regression's Shift binding.
+local function start_session(with_shift_hold)
 	local output = open_output()
 	assert(Layout.refresh(), "actual Xvfb keymap initializes native libxkbcommon")
-	local base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+	local keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } }
+	if with_shift_hold then keys.left_shift = { tap_action = "copy", hold_modifier = "shift", time_activation_seconds = .3 } end
+	local base = Engine.new({ keys = keys,
 		tap_min_ms = 0, one_shot_timeout_ms = 1000,
 		key_text = function(code) return Hook.key_text(code) end,
 		plan_text = function(text) return Layout.plan(text) end,
@@ -234,7 +238,7 @@ local function start_session()
 		-- remain untouched and continue rejecting this unqualified production route.
 		actions = { is_assignable = function(action) return action == "one_shot_shift" end } })
 	output.base, output.engine = base, Native.new(base, owner.engine_options({ caps_lock = 300, tab = 300 }))
-	assert(Hook.set_remapper(output.engine, function(action, binding)
+	output.on_tap = function(action, binding)
 		check(action == "one_shot_shift" and binding == "combination__caps_lock_then_tab", "actual canonical pair frame selects OneShotShift")
 		local before = assert(Writer.output_view(output.cap))
 		local broker_before = output.broker.view()
@@ -246,7 +250,8 @@ local function start_session()
 		check(output.armed == true and before.write_epoch == after.write_epoch
 			and reservations_before == acquisitions and broker_before.busy == false and broker_after.busy == false,
 			"logical arm adds no native output write or reservation")
-	end))
+	end
+	assert(Hook.set_remapper(output.engine, output.on_tap))
 	output.broker = assert(Broker.attach(Writer))
 	Hook.start({ intercept = true, requireOutputBroker = true, outputBroker = output.broker, onEmitRaw = Writer.emit,
 		onCaptureReacquired = Layout.publish_current_capture })
@@ -265,10 +270,11 @@ local function start_session()
 	check(Hook.capture_input_owner() == nil and not Hook.arm_one_shot({}), "no input authority outside actual frame or from copied tables")
 end
 
---- Waits across the actual compiled Caps threshold without changing a deadline.
+--- Waits across the actual compiled hold threshold without changing a deadline.
 --- @param label string Original physical press being measured.
-local function wait_for_long_hold(label)
-	local setting = assert(session.base.by_code[58], "actual compiled Caps binding")
+--- @param code integer|nil Defaults to the original Caps binding.
+local function wait_for_long_hold(label, code)
+	local setting = assert(session.base.by_code[code or 58], "actual compiled hold binding")
 	local threshold_ms = setting.threshold_ms
 	assert(type(threshold_ms) == "number" and threshold_ms > 0, "actual configured hold threshold")
 	local held_at = Monotonic.now_ms()
@@ -556,6 +562,132 @@ local function run()
 
 	signal_shutdown("sigterm")
 	signal_shutdown("sigint")
+
+	-- Fixture selection retires A's actual Reader/grab, while A's genuine kernel
+	-- device remains registered. Keeping its minor allocated makes reuse of B's
+	-- freed minor possible without renaming a node or manufacturing authority.
+	start_session(true)
+	local a, b = sources[1], sources[2]
+	local function select_sources(include_a, include_b)
+		Finder.find_devices = function()
+			local paths = {}
+			if include_a then paths[#paths + 1] = sources[1].node end
+			if include_b then paths[#paths + 1] = sources[2].node end
+			return paths, {}
+		end
+		for _ = 1, Hook.DEVICE_CHECK_TICKS do Hook.check_device() end
+		check(Hook.isRunning(), "real source selection preserves the running Hook")
+	end
+	local function expect_retired_holds(label)
+		local ready = await(function() journal_output(); return #output_journal >= 4 end)
+		-- The two independent modifiers commute; each must have exactly one UP
+		-- and its own SYN. Neither iteration order nor an extra report is assumed.
+		check(ready ~= nil and (frames_match(output_journal, "1:29:0 0:0:0 1:42:0 0:0:0")
+			or frames_match(output_journal, "1:42:0 0:0:0 1:29:0 0:0:0")), label)
+		output_journal = {}
+		check(not Reader.wait_readable(100, OUTPUT_SLOT), label .. " has no extra native row")
+		expect_held("", label .. " clears the output bitmap")
+	end
+	local function expect_b_physical_shift(label)
+		local receipt = Reader.capture_pressed_keys("keyboard:" .. b.node)
+		local view = receipt and Reader.pressed_keys_view(receipt)
+		check(view ~= nil and view.origin == "native-evdev" and table.concat(view.down, " ") == "42", label)
+	end
+	local function hold_both()
+		original(a, 58, 1); original(b, 42, 1)
+		expect_frames("1:29:1 0:0:0 1:42:1 0:0:0", 4, "actual Caps A and Shift B own distinct native modifiers")
+		expect_held("29 42", "both consumed sources really hold native Ctrl and Shift")
+		expect_b_physical_shift("B's actual source bitmap holds Shift before cohort retirement")
+	end
+	local function restore_a()
+		assert(a.writer.emit_owned(a.cap, 58, 0), "uncaptured A physically releases its original Caps")
+		select_sources(true, true)
+		a.owner = assert(Reader.capture_source_owner("keyboard:" .. a.node))
+		check(Reader.source_owner_current(a.owner), "the same registered A reacquires a fresh actual Reader lifetime")
+		expect_frames("", 0, "reacquiring A replays no consumed hold or tap")
+	end
+
+	hold_both()
+	local old_a = a.owner
+	select_sources(false, true)
+	expect_retired_holds("A capture departure retires both consumed modifier outputs")
+	check(node_for(a.name) == a.node and not Reader.source_owner_current(old_a)
+		and Reader.source_owner_current(b.owner), "A stays kernel-registered while only its original capture retires")
+	expect_b_physical_shift("retained B is still physically down after its output retirement")
+	-- Without the remapper, a leaked ownerless repeat would stop the broker.
+	-- Keeping Hook live with no output proves suppression belongs to retained B,
+	-- rather than an engine swallowing an arbitrary duplicate input.
+	assert(Hook.set_remapper(nil))
+	original(b, 42, 2)
+	expect_frames("", 0, "retained consumed B repeat emits no replay after remapper removal")
+	check(Hook.isRunning(), "suppressed retained repeat never reaches an ownerless raw output")
+	original(b, 42, 0)
+	expect_frames("", 0, "the genuine retained B UP ends suppression without a duplicate output UP")
+	original(b, 42, 1); original(b, 42, 0)
+	expect_frames("1:42:1 0:0:0 1:42:0 0:0:0", 4, "after its true UP the same B has a fresh raw Shift pair")
+	assert(Hook.set_remapper(session.engine, session.on_tap))
+	restore_a()
+
+	hold_both()
+	select_sources(false, true)
+	expect_retired_holds("second A departure leaves B consumed until its actual lifetime ends")
+	expect_b_physical_shift("B remains physically held immediately before native destruction")
+	restore_a()
+	local old_b_owner, old_b_node, before_destroy = b.owner, b.node, #facts
+	-- No B UP: this destroys the actual held source. All old B evdev references
+	-- must close before allocation; even one retained FD can delay minor reuse.
+	b.close_attempted = true
+	assert(b.writer.close_owned(b.cap), "held B UI_DEV_DESTROY and native writer close acknowledge")
+	b.destroyed = true
+	assert(await(function()
+		Hook.pump()
+		return b.fatal and not Reader.is_open("keyboard:" .. old_b_node) and node_for(b.name) == nil
+	end), "real B disappearance reaches fatal native read and closes its original Reader")
+	check(not Reader.source_owner_current(old_b_owner) and Reader.retire_source(old_b_owner),
+		"old B observer lifetime has an exact close ACK before its minor can be reused")
+	-- Some kernels may deliver an unregister-generated UP before ENODEV. That
+	-- legitimately clears the orphan, so it cannot qualify this lost-UP case.
+	for index = before_destroy + 1, #facts do
+		local fact = facts[index]
+		if fact.source == old_b_node and fact.code == 42 and fact.value == 0 then
+			prerequisite_failure = "kernel delivered B's release before native retirement; lost-UP orphan regression is unqualified"
+			error(prerequisite_failure)
+		end
+	end
+	select_sources(true, false)
+	expect_frames("", 0, "destroying the already-retired consumed B emits no replay or duplicate release")
+	expect_held("", "A stays captured with no held output during B destruction")
+	local replacement = create_source(SOURCE_B)
+	if replacement.node ~= old_b_node then
+		prerequisite_failure = "kernel allocated a different eventN for recreated B; same-path orphan regression is unqualified"
+		error(prerequisite_failure)
+	end
+	check(replacement.node == old_b_node and node_for(a.name) == a.node,
+		"kernel genuinely reuses B's exact eventN while A's original device remains registered")
+	-- create_source owns the fresh device before any assertion; after the exact
+	-- old closes above, replace its retired bookkeeping entry without aliasing it.
+	sources[#sources] = nil
+	sources[2] = replacement
+	native_origins = original_classify({ a.node, replacement.node })
+	assert(#native_origins == 2 and native_origins[1].physical == false and native_origins[2].physical == false,
+		"fresh native discovery still rejects the actual recreated virtual device")
+	select_sources(true, true)
+	replacement.owner = assert(Reader.capture_source_owner("keyboard:" .. replacement.node))
+	check(Reader.source_owner_current(replacement.owner) and not Reader.source_owner_current(old_b_owner),
+		"fresh B owns its original current Reader while the destroyed same-path lease stays revoked")
+	local bitmap = assert(Reader.capture_pressed_keys("keyboard:" .. replacement.node))
+	local bitmap_view = assert(Reader.pressed_keys_view(bitmap))
+	check(bitmap_view.origin == "native-evdev" and #bitmap_view.down == 0, "recreated B starts with a genuinely empty source bitmap")
+	original(replacement, 42, 1)
+	expect_frames("1:42:1 0:0:0", 2, "recreated same-path B's first Shift hold is not eaten by the retired orphan")
+	expect_held("42", "fresh B's first hold really owns native Shift")
+	wait_for_long_hold("the recreated B original hold", 42)
+	original(replacement, 42, 0)
+	expect_frames("1:42:0 0:0:0", 2, "fresh B's first release emits exactly Shift UP without a tap")
+	expect_held("", "same-path reconnection leaves the native output clear after its first release")
+	check(next(Hook.held_modifiers()) == nil, "recreated B leaves no remapped modifier after its first real UP")
+	finish_session(); completed[#completed + 1] = "orphan-source-same-path-first-hold"
+
 	start_session()
 	local departing, retained = sources[1], sources[2]
 	original(departing, 58, 1)
@@ -603,7 +735,10 @@ if not Writer.use_ffi_backend() or not Reader.use_ffi_backend() or not Writer.is
 end
 local ok, failure = xpcall(run, debug.traceback)
 ack_observer = nil
-if not ok then check(false, tostring(failure)) end
+if not ok then
+	if prerequisite_failure then io.stderr:write("ENVIRONMENT: " .. prerequisite_failure .. "\n")
+	else check(false, tostring(failure)) end
+end
 local cleanup_ok = true
 local function cleanup(callback, label)
 	local called, settled = pcall(callback)
@@ -664,8 +799,10 @@ cleanup(function()
 	end) == true
 end, "all exact owned kernel nodes disappear")
 check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "final Reader/Writer transport custody has no debt")
-check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor shared-caps-release-ab shared-caps-release-ba signal-term-held-caps signal-int-held-caps destroy-source-first-surviving-hold",
-	"all nine mandatory native scenarios completed")
+if not prerequisite_failure then
+	check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor shared-caps-release-ab shared-caps-release-ba signal-term-held-caps signal-int-held-caps orphan-source-same-path-first-hold destroy-source-first-surviving-hold",
+		"all ten mandatory native scenarios completed")
+end
 if namespace and cleanup_ok and failures == 0 then
 	cleanup(function() return os.remove(config_path) ~= nil and ffi.C.rmdir(namespace) == 0 end, "exclusive successful fixture namespace removed")
 end
@@ -673,4 +810,4 @@ if namespace and (not cleanup_ok or failures > 0) then
 	io.stderr:write("RETAINED owned failed input fixture namespace: " .. namespace .. "\n")
 end
 print(string.format("INPUT_OWNER_KERNEL %d %d %d", checks - failures, failures, #completed))
-os.exit((failures > 0 or not cleanup_ok) and 1 or 0)
+os.exit((failures > 0 or not cleanup_ok) and 1 or (prerequisite_failure and 2 or 0))
