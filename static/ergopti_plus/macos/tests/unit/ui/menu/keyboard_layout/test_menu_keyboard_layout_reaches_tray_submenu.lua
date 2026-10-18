@@ -1,4 +1,4 @@
---- tests/unit/ui/menu/keyboard_layout/test_menu_keyboard_layout_reaches_tray.lua
+--- tests/unit/ui/menu/keyboard_layout/test_menu_keyboard_layout_reaches_tray_submenu.lua
 
 --- ==============================================================================
 --- MODULE: Regression — the Keyboard layout submenu reaches the tray populated
@@ -16,66 +16,18 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+package.loaded["tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture"] = nil
+local Fixture = require("tests.support.ui.menu.keyboard_layout.menu_keyboard_layout_reaches_tray_fixture")
+local install_legacy_layout_formats = Fixture.install_legacy_layout_formats
+local make_ctx = Fixture.make_ctx
+local switch_row = Fixture.switch_row
+local titles = Fixture.titles
+local tray_row = Fixture.tray_row
+local with_switch_frame = Fixture.with_switch_frame
 
---- The old assertions intentionally retain key-echo captions for unformatted rows.
---- Supply only genuine Layout format strings that the complete caption API now reads.
---- This is fixture input, never an expectation regenerated from the native producer.
-local function install_legacy_layout_formats(translator)
-	translator = translator or require("infra.i18n")
-	local file = assert(io.open(helpers.shared("data/locales/en.json"), "rb"))
-	local catalogue = assert(require("json").decode(file:read("*a")))
-	assert(file:close())
-	local original_get = translator.get
-	translator.get = function(key)
-		local format = catalogue[key]
-		if type(key) == "string" and key:sub(1, #"menu.layout.") == "menu.layout."
-			and type(format) == "string" and format:find("%s", 1, true) then return format end
-		return original_get(key)
-	end
-end
 
---- Builds the layout row and renders it the way the tray root does.
---- @param ctx table Menu context.
---- @return table|nil rendered The materialised tray row.
-local function tray_row(ctx)
-	local layout = helpers.load_with_stubs("ui.menu.menu_keyboard_layout")
-	install_legacy_layout_formats()
-	local ManifestMenu = require("infra.manifest_menu")
-	local item = layout.build(ctx)
-	helpers.assert_true(type(item) == "table", "menu_keyboard_layout.build must return a row")
-	return ManifestMenu.render_rows({ item }, "top_level")[1]
-end
 
---- Collects every title in a rendered submenu.
---- @param rows table
---- @return table<string, boolean>
-local function titles(rows)
-	local set = {}
-	for _, row in ipairs(rows or {}) do
-		if type(row) == "table" and type(row.title) == "string" then set[row.title] = true end
-	end
-	return set
-end
 
---- A context with live state and a magic-key section, as ui.menu.init supplies.
---- @return table
-local function make_ctx()
-	return {
-		base_dir   = helpers.driver_root(),
-		state      = { layout_pause_switch_enabled = true, hotstrings = { magickey = true } },
-		applyTriggerChar = function(text) return text end,
-		save_prefs = function() return true end,
-		updateMenu = function() end,
-		do_reload  = function() end,
-		keymap     = {
-			is_section_enabled = function() return true end,
-			is_group_enabled   = function() return true end,
-			get_sections       = function()
-				return { { name = "replace", description = "Replace J with the magic key" } }
-			end,
-		},
-	}
-end
 
 helpers.describe("Keyboard layout submenu reaches the tray populated", function()
 	helpers.it("the rendered tray row carries a non-empty submenu", function()
@@ -418,54 +370,7 @@ end)
 
 --- Controls native discovery while exercising the genuine layout renderer.
 --- All pre-existing registered subjects above remain unchanged.
-local function with_switch_frame(callback, labels)
-	helpers.with_stub_scope({"ui.menu.menu_keyboard_layout", "infra.manifest_menu", "infra.i18n",
-		"modules.keymap.input_sources", "modules.keymap.layout_install", "modules.keymap.layout_registry"}, function()
-		local sources = helpers.load_with_stubs("modules.keymap.input_sources")
-		local installer = require("modules.keymap.layout_install")
-		local fixture = {records = {{id = "French", name = "French", selected = false}}, saves = 0, updates = 0, effects = 0}
-		sources.list_active_keyboard_layouts = function() return fixture.records end
-		sources.build_kl_name_to_tis_id = function() return fixture.mapping or {} end
-		sources.resolve_installed_ergopti_version = function() return nil end
-		installer.pick_latest_bundle = function() return fixture.latest end
-		installer.highest_installed = function(directory)
-			if directory == installer.SYSTEM_LAYOUTS_DIR then return fixture.system end
-			return fixture.user
-		end
-		installer.bundle_variants = function() return fixture.variants or {} end
-		local function forbidden() fixture.effects = fixture.effects + 1; error("Switching policy must not invoke TIS") end
-		sources.set_input_source_async = forbidden
-		installer.install_system = forbidden
-		installer.install_user = forbidden
-		package.loaded["modules.keymap.layout_registry"] = {picker = function() return fixture.custom or {layouts = {}, active = ""} end, select = forbidden}
-		local translator = require("infra.i18n")
-		local original_get = translator.get
-		translator.get = function(key)
-			if labels then return labels[key] or key end
-			if key == "menu.layout.pause_picker_caption" then return "  ↳ " .. original_get("menu.layout.layout_on_pause") .. " : %s" end
-			if key == "menu.layout.resume_picker_caption" then return "  ↳ " .. original_get("menu.layout.layout_on_resume") .. " : %s" end
-			return original_get(key)
-		end
-		package.loaded["infra.manifest_menu"] = nil
-		local binding = require("infra.manifest_menu")
-		package.loaded["ui.menu.menu_keyboard_layout"] = nil
-		local module = require("ui.menu.menu_keyboard_layout")
-		local ctx = make_ctx()
-		ctx.save_prefs = function() fixture.saves = fixture.saves + 1; return fixture.save_result ~= false end
-		ctx.updateMenu = function() fixture.updates = fixture.updates + 1 end
-		local function build()
-			local item = module.build(ctx)
-			if not item then return nil end
-			return binding.render_rows({item}, "top_level")[1].menu
-		end
-		callback(build, fixture, binding, ctx)
-		helpers.assert_eq(fixture.effects, 0, "Policy construction and selection must not dispatch TIS")
-	end)
-end
 
-local function switch_row(rows, prefix)
-	for _, row in ipairs(rows or {}) do if row.title:sub(1, #prefix) == prefix then return row end end
-end
 
 helpers.describe("layout switching consumes its complete shared presentation frame", function()
 	helpers.it("owns the check and both actual native-choice parents in declared order", function()
@@ -648,155 +553,5 @@ helpers.describe("the complete Layout family retains genuine native record and o
 			root.layout_native_parent[1].i18n = old
 			if not ok then error(detail, 0) end
 		end)
-	end)
-end)
-
-helpers.describe("Layout owns install-state choices, bundle truth and every frozen original caption", function()
-	for _, state in ipairs({"fresh", "older", "current"}) do
-		helpers.it("retains system/user/status order for " .. state .. " actual native installation state", function()
-			local Json, Paths = require("json"), require("infra.paths")
-			local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
-			local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-			with_switch_frame(function(build, fixture)
-				fixture.latest = "Ergopti_v2.2.2.bundle"
-				if state ~= "fresh" then
-					local version = state == "older" and {2, 2, 1} or {2, 2, 2}
-					fixture.system = {name = "Ergopti.bundle", version = version}
-					fixture.user = {name = "Ergopti.bundle", version = version}
-				end
-				if state == "current" then fixture.variants = {{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}} end
-				local rows = assert(build())
-				local expected = {
-					fresh = {"🔐 Install Ergopti (system) v2.2.2", "📥 Install Ergopti (user) v2.2.2", "Install the bundle first"},
-					older = {"Update Ergopti (system) v2.2.1 → v2.2.2", "Update Ergopti (user) v2.2.1 → v2.2.2", "Install the bundle first"},
-					current = {"Ergopti (system) v2.2.2 — up to date ✅", "Ergopti (user) v2.2.2 — up to date ✅", "Add Ergopti v2.2.2 to input sources…"},
-				}
-				local index
-				for i, row in ipairs(rows) do if row.title == expected[state][1] then index = i end end
-				helpers.assert_not_nil(index)
-				for offset, caption in ipairs(expected[state]) do helpers.assert_eq(rows[index + offset - 1].title, caption) end
-				helpers.assert_eq(rows[index].disabled, state == "current" and true or nil)
-				helpers.assert_eq(rows[index + 1].disabled, state == "current" and true or nil)
-				helpers.assert_eq(fixture.effects, 0)
-			end, labels)
-		end)
-	end
-	for _, state in ipairs({"all_active", "legacy_installed", "legacy_missing", "variants", "absent"}) do
-		helpers.it("publishes only the genuine " .. state .. " bundle status family", function()
-			local Json, Paths = require("json"), require("infra.paths")
-			local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
-			local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-			with_switch_frame(function(build, fixture)
-				fixture.latest = "Ergopti_v2.2.2.bundle"
-				fixture.records = {{id = "French", name = "French", selected = false}}
-				if state ~= "legacy_missing" and state ~= "absent" then
-					fixture.system = {name = "Ergopti_v2.2.2.bundle", version = {2, 2, 2}}
-					fixture.variants = {{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}}
-				end
-				if state == "all_active" then
-					fixture.records = {{id = "Ergopti_v2_2_2_plus", name = "Ergopti+", selected = true}}
-					fixture.mapping = {Ergopti_v2_2_2_plus = "stable.plus"}
-				elseif state == "legacy_installed" or state == "legacy_missing" then
-					fixture.records = {{id = "Ergopti_v2_2_1_plus", name = "Ergopti+", selected = false}}
-				end
-				local expected = {all_active = "All Ergopti variants active v2.2.2 ✅", legacy_installed = "Upgrade active list v2.2.1 → v2.2.2",
-					legacy_missing = "Upgrade active list to v2.2.2 (install v2.2.2 first)", variants = "Add Ergopti v2.2.2 to input sources…", absent = "Install the bundle first"}
-				local row = switch_row(assert(build()), expected[state])
-				helpers.assert_not_nil(row)
-				if state == "legacy_installed" then helpers.assert_true(type(row.fn) == "function")
-				elseif state == "variants" then
-					helpers.assert_eq(#row.menu, 1)
-					helpers.assert_eq(row.menu[1].title, "Ergopti+ v2.2.2")
-					helpers.assert_true(type(row.menu[1].fn) == "function")
-				else helpers.assert_eq(row.disabled, true) end
-				helpers.assert_eq(fixture.effects, 0)
-			end, labels)
-		end)
-	end
-	for _, language in ipairs({"da", "de", "en", "es", "fr", "it", "nl", "no", "pl", "pt", "sv", "tr", "cs", "ar", "he", "hi", "uk", "ru", "zh", "ja", "ko"}) do
-		helpers.it("retains the independently frozen complete original caption family in " .. language, function()
-			local Json, Paths = require("json"), require("infra.paths")
-			local function load(relative)
-				local file = assert(io.open(Paths.shared(relative), "rb"))
-				local value = assert(Json.decode(assert(file:read("*a")))); assert(file:close()); return value
-			end
-			local expected = load("tests/corpus/menus/layout_complete_captions.json")[language]
-			with_switch_frame(function(_, _, binding)
-				local getters = {
-					layout_install_scope = function() return "scope" end,
-					layout_install_emoji = function() return "🔐" end,
-					layout_install_latest = function() return "2.2.2" end,
-					layout_install_old = function() return "2.2.1" end,
-					layout_bundle_version = function() return "2.2.2" end,
-					layout_bundle_old_version = function() return "2.2.1" end,
-					layout_variant_label = function() return "Independent Variant" end,
-				}
-				local commands = {layout_install = function() return false end, layout_upgrade_list = function() return false end, layout_enable_variant = function() return false end}
-				for _, case in ipairs({{"layout_bundle_installed", "installed"}, {"layout_bundle_install", "install"}, {"layout_bundle_update", "update"},
-					{"layout_bundle_in_list", "in_list"}, {"layout_bundle_update_install_first", "update_install_first"}, {"layout_bundle_upgrade", "update_list"},
-					{"layout_bundle_upgrade_to", "update_list_to"}, {"layout_bundle_variant_added", "already_added"}, {"layout_bundle_variant_add", "native_variant"},
-					{"layout_bundle_variant_parent", "add_to_list"}, {"layout_bundle_install_first", "install_first"}, {"layout_native_parent", "parent"}}) do
-					local rows = assert(binding.template_rows(case[1], commands, getters, {layout_variant_choices = {}, layout_parent_content = {}}))
-					helpers.assert_eq(#rows, 1)
-					helpers.assert_eq(rows[1].label, expected[case[2]])
-				end
-			end, load("data/locales/" .. language .. ".json"))
-		end)
-	end
-end)
-
-helpers.describe("Layout native choices retain data identity and declared state", function()
-	helpers.it("retains custom registry record spelling, check and native selector without performing selection", function()
-		with_switch_frame(function(build, fixture)
-			fixture.custom = {layouts = {{id = "private.layout", name = "Custom 100%s && 🦀"}}, active = "private.layout"}
-			local row = switch_row(assert(build()), "Custom 100%s && 🦀")
-			helpers.assert_not_nil(row)
-			helpers.assert_eq(row.checked, true)
-			helpers.assert_nil(row.disabled)
-			helpers.assert_true(type(row.fn) == "function")
-			helpers.assert_eq(fixture.effects, 0)
-		end)
-	end)
-	helpers.it("retains added and available variants in actual installed-bundle order", function()
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
-		local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-		with_switch_frame(function(build, fixture)
-			fixture.latest = "Ergopti_v2.2.2.bundle"
-			fixture.system = {name = "Ergopti_v2.2.2.bundle", version = {2, 2, 2}}
-			fixture.variants = {{name = "Ergopti_v2_2_2", tis_id = "stable.base", keylayout = "/actual/base.keylayout"},
-				{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}}
-			fixture.records = {{id = "Ergopti_v2_2_2", name = "Ergopti", selected = true}}
-			fixture.mapping = {Ergopti_v2_2_2 = "stable.base"}
-			local parent = switch_row(assert(build()), "Add Ergopti v2.2.2 to input sources…")
-			helpers.assert_not_nil(parent)
-			helpers.assert_eq(#parent.menu, 2)
-			helpers.assert_eq(parent.menu[1].title, "✅ Ergopti v2.2.2 — already added")
-			helpers.assert_eq(parent.menu[1].disabled, true)
-			helpers.assert_eq(parent.menu[2].title, "Ergopti+ v2.2.2")
-			helpers.assert_true(type(parent.menu[2].fn) == "function")
-			helpers.assert_eq(fixture.effects, 0)
-		end, labels)
-	end)
-end)
-
-helpers.describe("Layout installation state remains native per scope", function()
-	helpers.it("does not borrow the user installation when the system scope is absent", function()
-		local Json, Paths = require("json"), require("infra.paths")
-		local file = assert(io.open(Paths.shared("data/locales/en.json"), "rb"))
-		local labels = assert(Json.decode(assert(file:read("*a")))); assert(file:close())
-		with_switch_frame(function(build, fixture)
-			fixture.latest = "Ergopti_v2.2.2.bundle"
-			fixture.user = {name = "Ergopti_v2.2.2.bundle", version = {2, 2, 2}}
-			fixture.variants = {{name = "Ergopti_v2_2_2_plus", tis_id = "stable.plus", keylayout = "/actual/plus.keylayout"}}
-			local rows = assert(build())
-			local index
-			for i, row in ipairs(rows) do if row.title == "🔐 Install Ergopti (system) v2.2.2" then index = i end end
-			helpers.assert_not_nil(index)
-			helpers.assert_true(type(rows[index].fn) == "function")
-			helpers.assert_eq(rows[index + 1].title, "Ergopti (user) v2.2.2 — up to date ✅")
-			helpers.assert_eq(rows[index + 1].disabled, true)
-			helpers.assert_eq(fixture.effects, 0)
-		end, labels)
 	end)
 end)
