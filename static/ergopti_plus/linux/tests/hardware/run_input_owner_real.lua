@@ -47,6 +47,7 @@ local Writer = require("adapters.uinput_writer")
 local Broker = require("adapters.modifier_broker")
 local Layout = require("adapters.keyboard_layout")
 local Capture = require("adapters.xkb_capture")
+local Monotonic = require("infra.monotonic")
 local Engine = require("platform.remap.tap_hold_engine")
 local Native = require("platform.remap.key_combination_engine")
 local Owner = require("modules.shortcuts.key_combinations")
@@ -243,7 +244,8 @@ local function start_session()
 			"logical arm adds no native output write or reservation")
 	end))
 	output.broker = assert(Broker.attach(Writer))
-	Hook.start({ intercept = true, requireOutputBroker = true, outputBroker = output.broker, onEmitRaw = Writer.emit })
+	Hook.start({ intercept = true, requireOutputBroker = true, outputBroker = output.broker, onEmitRaw = Writer.emit,
+		onCaptureReacquired = Layout.publish_current_capture })
 	assert(Hook.isRunning(), "actual Hook must acquire both native sources")
 	-- This separate, reviewed bootstrap successor republishes the genuine inverse
 	-- after Hook's state reset. It performs no load/reset or fabricated map lookup.
@@ -257,6 +259,17 @@ local function start_session()
 		check(Reader.source_owner_current(source.owner), "actual original Reader lifetime/grab is current")
 	end
 	check(Hook.capture_input_owner() == nil and not Hook.arm_one_shot({}), "no input authority outside actual frame or from copied tables")
+end
+
+--- Waits across the actual compiled Caps threshold without changing a deadline.
+--- @param label string Original physical press being measured.
+local function wait_for_long_hold(label)
+	local setting = assert(session.base.by_code[58], "actual compiled Caps binding")
+	local threshold_ms = setting.threshold_ms
+	assert(type(threshold_ms) == "number" and threshold_ms > 0, "actual configured hold threshold")
+	local held_at = Monotonic.now_ms()
+	assert(os.execute(string.format("sleep %.3f", threshold_ms / 1000)) == 0, "real configured hold-duration wait")
+	check(Monotonic.now_ms() - held_at >= threshold_ms, label .. " crosses the actual compiled hold threshold")
 end
 
 --- Produces one accepted native ordered-pair frame and releases its first key.
@@ -276,18 +289,23 @@ local function finish_session()
 	assert(Hook.set_remapper(nil), "exact remapper retirement")
 	for _, source in ipairs(sources) do
 		check(not Reader.source_owner_current(source.owner), "old native source lifetime revoked")
-		local slot = "input-owner-retirement:" .. source.name
-		assert(Reader.open(source.node, slot))
-		successors[#successors + 1] = assert(Reader.capture_source_owner(slot))
-		assert(Reader.grab(slot))
-		local owner = assert(Reader.capture_source_owner(slot))
-		check(Reader.retire_source(owner), "independent native grab and exact descriptor retirement")
+		if source.destroyed then
+			check(not Reader.is_open("keyboard:" .. source.node) and node_for(source.name) == nil,
+				"destroyed source has no retained Reader or kernel node")
+		else
+			local slot = "input-owner-retirement:" .. source.name
+			assert(Reader.open(source.node, slot))
+			successors[#successors + 1] = assert(Reader.capture_source_owner(slot))
+			assert(Reader.grab(slot))
+			local owner = assert(Reader.capture_source_owner(slot))
+			check(Reader.retire_source(owner), "independent native grab and exact descriptor retirement")
+		end
 	end
 	close_output(session); Broker.detach(Writer)
 	check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "native session has no retained source/output debt")
 end
 
---- Runs four genuine kernel scenarios with separately handwritten wire oracles.
+--- Runs genuine kernel scenarios with separately handwritten wire oracles.
 local function run()
 	assert(rawequal(package.loaded["adapters.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
 	local template = ffi.new("char[?]", #"/tmp/ergopti-input-owner-XXXXXX" + 1, "/tmp/ergopti-input-owner-XXXXXX")
@@ -317,6 +335,13 @@ local function run()
 				if slot == "keyboard:" .. source.node then
 					local receipt = Reader.capture_event(event, slot)
 					if receipt then facts[#facts + 1] = assert(Reader.event_view(receipt)) end
+				end
+			end
+		elseif status == "fatal" then
+			for _, source in ipairs(sources) do
+				if slot == "keyboard:" .. source.node then
+					source.fatal = { status = status, reason = tostring(reason) }
+					print("NATIVE_SOURCE_FATAL " .. source.name .. " " .. tostring(reason))
 				end
 			end
 		end
@@ -394,6 +419,62 @@ local function run()
 	assert(sources[1].writer.emit_owned(sources[1].cap, 30, 0))
 	assert(Hook.set_remapper(nil)); close_output(successor); Broker.detach(Writer)
 	completed[#completed + 1] = "retire-output-protect-successor"
+
+	for _, release_order in ipairs({ { 1, 2 }, { 2, 1 } }) do
+		start_session()
+		original(sources[1], 58, 1); original(sources[2], 58, 1)
+		expect_frames("1:29:1 0:0:0", 2, "two native Caps sources emit exactly one Ctrl DOWN")
+		expect_held("29", "two real Caps holds share one kernel-held Ctrl")
+		wait_for_long_hold("both overlapping original presses")
+		original(sources[release_order[1]], 58, 0)
+		expect_frames("", 0, "the first native Caps UP emits no Ctrl release or tap")
+		expect_held("29", "the retained original Caps keeps native Ctrl held after the first UP")
+		original(sources[release_order[2]], 58, 0)
+		expect_frames("1:29:0 0:0:0", 2, "the last native Caps UP emits exactly one Ctrl UP without a tap")
+		expect_held("", "the final original release clears the native Ctrl bitmap")
+		check(next(Hook.held_modifiers()) == nil, "overlapping holds retain no remapped modifier after both UPs")
+		finish_session()
+		completed[#completed + 1] = release_order[1] == 1 and "shared-caps-release-ab" or "shared-caps-release-ba"
+	end
+
+	start_session()
+	local departing, retained = sources[1], sources[2]
+	original(departing, 58, 1)
+	expect_frames("1:29:1 0:0:0", 2, "departing source genuinely owns a native Ctrl hold")
+	expect_held("29", "Ctrl is kernel-held before source destruction")
+	-- A genuine long hold is the positive control. A kernel disconnect may
+	-- retire pressed keys too; that must not accidentally qualify a short tap.
+	wait_for_long_hold("the departing original press")
+	-- UI_DEV_DESTROY removes the actual native device while its original Caps
+	-- stays down. No fabricated UP or injected Reader failure retires this hold.
+	departing.close_attempted = true
+	assert(departing.writer.close_owned(departing.cap), "source UI_DEV_DESTROY and native close acknowledge")
+	departing.destroyed = true
+	assert(await(function()
+		Hook.pump()
+		return departing.fatal and not Reader.is_open("keyboard:" .. departing.node)
+	end), "actual source disappearance produces a fatal native read and closes its Reader")
+	check(departing.fatal.status == "fatal" and not Reader.source_owner_current(departing.owner),
+		"native fatal read revokes the departed original source owner")
+	check(Hook.isRunning() and Reader.is_grabbed("keyboard:" .. retained.node),
+		"the surviving original source remains captured")
+	expect_frames("1:29:0 0:0:0", 2, "native source destruction releases exactly its remapped Ctrl")
+	expect_held("", "source destruction leaves no kernel-held output")
+	-- Discovery catches up only after the real read failure has been observed;
+	-- it cannot manufacture the tested departure through a selected-path edit.
+	Finder.find_devices = function() return { retained.node }, {} end
+	for _ = 1, Hook.DEVICE_CHECK_TICKS do Hook.check_device() end
+	check(Hook.isRunning() and Reader.is_grabbed("keyboard:" .. retained.node),
+		"source-roster reconciliation preserves the surviving native grab")
+	original(retained, 58, 1)
+	expect_frames("1:29:1 0:0:0", 2, "the surviving keyboard's first Caps hold emits native Ctrl DOWN")
+	expect_held("29", "the first surviving Caps hold really owns kernel Ctrl")
+	wait_for_long_hold("the surviving original press")
+	original(retained, 58, 0)
+	expect_frames("1:29:0 0:0:0", 2, "the first surviving Caps release emits only Ctrl UP, never a tap")
+	expect_held("", "source departure and successor hold leave the native output clear")
+	check(next(Hook.held_modifiers()) == nil, "no remapped modifier remains after successor release")
+	finish_session(); completed[#completed + 1] = "destroy-source-first-surviving-hold"
 end
 
 print("\ninput owner: real kernel virtual keyboards; controlled virtual classification, no physical or product-action claim")
@@ -432,7 +513,12 @@ Finder.find_devices, Finder.physical_sources = original_find, original_classify
 Reader.read_event, Writer.transaction_emit = original_read, original_emit
 Writer.acquire_transaction = original_acquire
 for _, source in ipairs(sources) do
-	if source.cap then cleanup(function() return source.writer.close_owned(source.cap) end, "captured source native destroy/close") end
+	if source.cap and not source.close_attempted then
+		cleanup(function() return source.writer.close_owned(source.cap) end, "captured source native destroy/close")
+	elseif source.close_attempted and not source.destroyed then
+		check(false, "original source close debt retained without retry")
+		cleanup_ok = false
+	end
 end
 cleanup(function() Capture.clear(); return not Capture.is_ready() end, "XKB adapter readiness cleared (no native destroy acknowledgement API)")
 check(not Reader.is_open(OUTPUT_SLOT), "final owned output observer descriptor is closed")
@@ -448,8 +534,8 @@ cleanup(function()
 	end) == true
 end, "all exact owned kernel nodes disappear")
 check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "final Reader/Writer transport custody has no debt")
-check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor",
-	"all four mandatory native scenarios completed")
+check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor shared-caps-release-ab shared-caps-release-ba destroy-source-first-surviving-hold",
+	"all seven mandatory native scenarios completed")
 if namespace and cleanup_ok and failures == 0 then
 	cleanup(function() return os.remove(config_path) ~= nil and ffi.C.rmdir(namespace) == 0 end, "exclusive successful fixture namespace removed")
 end
