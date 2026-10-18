@@ -164,6 +164,62 @@ check('--staged formats staged files once, re-stages them, and refuses partial s
 	}
 });
 
+check('the parallel whole-tree check covers what Prettier covers for "."', () => {
+	const repo = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-format-tree-'));
+	const git = (...args) => {
+		const result = spawnSync('git', args, { cwd: repo, encoding: 'utf8' });
+		assert.strictEqual(result.status, 0, `git ${args.join(' ')}: ${result.stderr}`);
+	};
+	const write = (relative, text) => {
+		fs.mkdirSync(path.dirname(path.join(repo, relative)), { recursive: true });
+		fs.writeFileSync(path.join(repo, relative), text);
+	};
+	try {
+		git('init', '-q');
+		for (const file of ['.prettierrc', '.prettierignore'])
+			fs.copyFileSync(path.join(ROOT, file), path.join(repo, file));
+		fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(repo, 'node_modules'), 'junction');
+		write('tools/lint/format.cjs', read('tools/lint/format.cjs'));
+		write('.gitignore', 'node_modules\n');
+		const clean = 'const x = { a: 1 };\n';
+		// Enough paths for several groups, with one unformatted file at three depths.
+		for (let index = 0; index < 24; index++) write(`pkg${index}/inner/f.js`, clean);
+		write('pkg3/inner/deep/bad.js', 'const  x = {a:1}\n');
+		write('.github/bad.yml', 'a:   1\n');
+		write('top.json', '{"a":1}\n');
+		write('notes.txt', 'not   a Prettier file\n');
+		write('pkg5/_generated/skipped.js', 'const  ignored = {a:1}\n');
+		write('node_modules_shadow/ok.js', clean);
+		git('add', '-A');
+		assert.ok(Format.prettierGroups && Format.prettierTree, 'format.cjs exposes its tree check');
+		const tree = (mode) =>
+			spawnSync(
+				process.execPath,
+				[
+					'-e',
+					`require('./tools/lint/format.cjs').prettierTree('${mode}').then((status) => process.exit(status))`
+				],
+				{ cwd: repo, encoding: 'utf8' }
+			);
+		const checked = tree('--check');
+		assert.strictEqual(checked.status, 1, 'an unformatted file in any group fails the check');
+		const report = checked.stdout + checked.stderr;
+		for (const bad of ['pkg3/inner/deep/bad.js', '.github/bad.yml', 'top.json'])
+			assert.ok(report.includes(bad), `${bad} is reported: ${report}`);
+		for (const quiet of ['notes.txt', 'skipped.js', 'f.js'])
+			assert.ok(!report.includes(quiet), `${quiet} is not reported`);
+		assert.strictEqual(tree('--write').status, 0);
+		assert.strictEqual(tree('--check').status, 0, 'the written tree passes');
+		assert.strictEqual(
+			fs.readFileSync(path.join(repo, 'pkg5/_generated/skipped.js'), 'utf8'),
+			'const  ignored = {a:1}\n',
+			'an ignored file is never rewritten'
+		);
+	} finally {
+		fs.rmSync(repo, { recursive: true, force: true });
+	}
+});
+
 if (failures > 0) {
 	console.error(`\n${failures} formatting gate check(s) failed.`);
 	process.exit(1);
