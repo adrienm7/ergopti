@@ -501,3 +501,157 @@ Test("prefix unicode-time-gate: case-conform live dispatch uses complete typed t
 	_PCA_DeadKeyChunk({ Initial: "A", Chunk: "a" . Chr(0x1F601) . "★", Flags: "*?C", Magic: "★",
 		Trigger: "a" . Chr(0x1F601) . "★", Replacement: "bar", Expected: "Abar", Sends: 1,
 		End: "", Timed: true, TimedKeys: [Chr(0x1F601), "★"], Conform: true }))
+
+/**
+ * A terminal expansion is paced and deferred, so the user keeps typing while it
+ * is pending. A key whose OnChar was already posted when native capture was
+ * admitted, and a key the native capture held, must both land after the
+ * complete replacement, never between its backspaces and its text: the
+ * slow-admission session produced "cc'était" in a terminal TUI.
+ */
+_PCA_TerminalKeysFollowExpansion() {
+	global CategoryEnabled, Features, ScriptInformation, _SendHook
+	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixVisibleFireDecisions
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _KLLastShownSuggestion
+	global HSE_Buffer, _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _HSResolveCache, _HSResolveGen
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerPort, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced
+	Saved := { Categories: CategoryEnabled, Features: Features, Script: ScriptInformation,
+		Send: _SendHook, Active: _LLM_Bridge_Active, Agent: _LLM_Bridge_AgentFeeding,
+		Decisions: _PrefixVisibleFireDecisions, Suggestion: _KLLastShownSuggestion,
+		ResolverCache: _HSResolveCache, NavStarted: _LLM_NavEventOwnerStarted,
+		NavPort: _LLM_NavEventOwnerPort, NavFlags: [_LLM_NavEventOwnerQuarantined,
+			_LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending,
+			_LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending,
+			_LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced] }
+	State := { Screen: "", Sends: 0, Capturing: false, Held: [], Commits: 0, Done: false }
+	NoPrefeed(*) {
+	}
+	Input(Char) {
+		; Native capture owns a physical key typed after admission.
+		if State.Capturing {
+			State.Held.Push(Char)
+			return
+		}
+		State.Screen .= Char
+		_PCA_Call(Char, NoPrefeed)
+	}
+	; The burst re-types the posted suffix itself; its replay only feeds the engine.
+	ReplayVisible(Char) {
+		_PCA_Call(Char, NoPrefeed)
+	}
+	Capture(Name, Args*) {
+		AssertEqual("SendTerminalResult", Name, "the terminal uses the paced owner")
+		Payload := Args[1]
+		Erased := 0
+		while SubStr(Payload, 1, 11) == "{BackSpace}" {
+			Erased += 1
+			Payload := SubStr(Payload, 12)
+		}
+		AssertEqual("{Text}", SubStr(Payload, 1, 6), "the replacement is literal text")
+		State.Screen := SubStr(State.Screen, 1, Max(0, StrLen(State.Screen) - Erased))
+			. SubStr(Payload, 7)
+		State.Sends += 1
+		return true
+	}
+	Begin(Token) {
+		State.Capturing := true
+		return 1
+	}
+	Release(Committed, Token) {
+		State.Capturing := false
+		State.Commits += Committed ? 1 : 0
+		; The native release replays the held edges after the expansion output.
+		for Char in State.Held
+			SetTimer(Input.Bind(Char), -1)
+		State.Held := []
+		SetTimer(() => State.Done := true, -5)
+		return 1
+	}
+	Snapshot(Token) {
+		return Map("token", Token, "phase", State.Capturing ? 1 : 0, "queued", State.Held.Length,
+			"replayed", 0, "last_os_error", 0, "release_kind", 0)
+	}
+	try {
+		HSE_TestReset()
+		KLHook.prev_app := "WindowsTerminal.exe"
+		KLHook.prev_title := "Claude Code"
+		_Stub_SetOutputHost("WindowsTerminal.exe", "Claude Code")
+		CategoryEnabled := Map("Hotstrings", true)
+		Features := Map()
+		ScriptInformation := Map("MagicKey", "★")
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_AgentFeeding := false
+		_PrefixBuffer := ""
+		_PrefixFocusedControlToken := 1
+		_PrefixVisibleFireDecisions := []
+		_KLLastShownSuggestion := ""
+		_HSResolveCache := Map("magickey|replace", {
+			gen: _HSResolveGen, val: { ShowTooltip: false } })
+		_SendHook := Capture
+		_LLM_NavEventOwnerStarted := true
+		_LLM_NavEventOwnerQuarantined := false, _LLM_NavEventOwnerStarting := false
+		_LLM_NavEventOwnerStartRollbackPending := false, _LLM_NavEventOwnerStopping := false
+		_LLM_NavEventOwnerStopPending := false, _LLM_NavEventOwnerPendingStopRecovery := false
+		_LLM_NavEventOwnerLifecycleQuiesced := false
+		_LLM_NavEventOwnerPort := Map("begin_terminal", Begin,
+			"commit_terminal", Release.Bind(true), "abort_terminal", Release.Bind(false),
+			"get_terminal", Snapshot)
+		HSE_Register("*", "ct★", 0, Map("Replacement", "c’était", "OnlyText", true,
+			"Category", "magickey", "Section", "replace"))
+		Input("c")
+		Input("t")
+		Input("★")
+		AssertTrue(_HSE_TerminalOwner is Map, "the terminal expansion is pending")
+		AssertEqual(0, State.Sends, "the paced terminal output is deferred")
+		_HSE_TerminalOwner["ReplayVisibleFn"] := ReplayVisible
+		; This key's OnChar was posted just before capture admission.
+		State.Capturing := false
+		Input("x")
+		State.Capturing := true
+		; This key was typed after admission: native capture holds it.
+		Input("y")
+		Started := A_TickCount
+		while !State.Done && ((A_TickCount - Started) & 0xFFFFFFFF) < 1000
+			Sleep(-1)
+		Started := A_TickCount
+		while ((A_TickCount - Started) & 0xFFFFFFFF) < 30
+			Sleep(-1)
+		AssertTrue(State.Done, "the deferred terminal owner completes")
+		AssertEqual(1, State.Sends, "one paced burst carries the whole expansion")
+		AssertEqual(1, State.Commits, "the capture commits once")
+		AssertEqual("c’étaitxy", State.Screen,
+			"keys typed during the expansion land after its complete output")
+		AssertEqual(State.Screen, HSE_Buffer, "the engine agrees with the recorded screen")
+	} finally {
+		_PrefixInvalidateDeferredEffects()
+		_HSE_TerminalOwner := 0
+		_HSE_TerminalReplayPending := 0
+		HSE_TestReset()
+		CategoryEnabled := Saved.Categories
+		Features := Saved.Features
+		ScriptInformation := Saved.Script
+		_SendHook := Saved.Send
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_AgentFeeding := Saved.Agent
+		_PrefixVisibleFireDecisions := Saved.Decisions
+		_KLLastShownSuggestion := Saved.Suggestion
+		_HSResolveCache := Saved.ResolverCache
+		_LLM_NavEventOwnerStarted := Saved.NavStarted
+		_LLM_NavEventOwnerPort := Saved.NavPort
+		_LLM_NavEventOwnerQuarantined := Saved.NavFlags[1]
+		_LLM_NavEventOwnerStarting := Saved.NavFlags[2]
+		_LLM_NavEventOwnerStartRollbackPending := Saved.NavFlags[3]
+		_LLM_NavEventOwnerStopping := Saved.NavFlags[4]
+		_LLM_NavEventOwnerStopPending := Saved.NavFlags[5]
+		_LLM_NavEventOwnerPendingStopRecovery := Saved.NavFlags[6]
+		_LLM_NavEventOwnerLifecycleQuiesced := Saved.NavFlags[7]
+		SimulateRegularApp()
+		_PrefixSetBuffer("")
+	}
+}
+Test("prefix: keys typed during a terminal expansion follow its output (hsfix-terminal-interleave)",
+	_PCA_TerminalKeysFollowExpansion)

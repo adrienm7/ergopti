@@ -3667,9 +3667,27 @@ _LLM_NavEventOwnerNativeCanStop() {
 	return CanStop == 1 ? 1 : 0
 }
 
+/**
+ * Admits native capture for one terminal hotstring transaction.
+ * Admission runs synchronously inside the completing key's OnChar callback, so it
+ * must stay a constant-time native call. It deliberately does not refresh the
+ * terminal routes: a custody-checked registration rebuild re-validates the whole
+ * canonical layout source and cost 300 ms to 900 ms per expansion, long enough
+ * for keys typed meanwhile to interleave with the paced output. Captured edges
+ * are replayed untransformed, so no hotstring transaction reads those routes;
+ * Start registers them, and a future route reader owns refreshing them off the
+ * keystroke path.
+ * @param {Integer} Token Terminal transaction identity.
+ * @returns {Integer} 1 when admitted, 0 when the owner is busy or registering.
+ */
 _LLM_NavEventOwnerNativeBeginTerminalCapture(Token) {
-	if !LLM_NavEventOwner_RefreshTerminalRoutes()
+	global _LLM_NavEventOwnerTerminalRouteRefreshing, _LLM_NavEventOwnerTerminalRouteUnknown
+	; A registration in progress or of uncertain native custody still refuses the
+	; capture, exactly as the former inline refresh did.
+	if _LLM_NavEventOwnerTerminalRouteRefreshing
 		return 0
+	if IsObject(_LLM_NavEventOwnerTerminalRouteUnknown)
+		throw Error("Uncertain terminal registration retains its original native owner.")
 	Status := DllCall(_LLM_NavEventOwnerNativeExport(
 		"ErgoptiNav_BeginTerminalCapture"), "UInt64", Token, "Int")
 	if Status == 5

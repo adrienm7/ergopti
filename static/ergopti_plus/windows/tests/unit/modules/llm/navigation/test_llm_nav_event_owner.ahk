@@ -28,3 +28,4 @@
 #Include ../nav_event_owner/test_terminal_route_metadata.ahk
 #Include ../nav_event_owner/test_terminal_output_preview.ahk
 #Include ../nav_event_owner/test_terminal_output_custody.ahk
+#Include ../nav_event_owner/test_terminal_capture_admission.ahk

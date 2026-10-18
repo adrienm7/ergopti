@@ -2534,7 +2534,7 @@ _TCH_StartRegistration(Native, Registration, Hwnd, WakeMessage) {
 }
 
 /**
- * The first terminal capture after a driver start refreshes the routes again.
+ * A refresh after a driver start re-registers the routes in the same lifetime.
  * Rows registered by Start belong to the lifetime that Start publishes; they
  * must not read as a withdrawn historical owner (start-epoch-custody).
  */
@@ -2559,7 +2559,7 @@ _TCH_StartRegistrationSurvivesPublication() {
 		try Output := LLM_NavEventOwner_StepTerminalRoute(Snapshot, "none")["Output"]
 		catch as Err
 			Output := Err.Message
-		; Capture admission refreshes the routes first (BeginTerminalCapture).
+		; A later refresh in the same lifetime must keep the Start registration.
 		Refreshed := "not_called"
 		try Refreshed := LLM_NavEventOwner_RefreshTerminalRoutes(Registration.Port)
 		catch as Err

@@ -25,6 +25,15 @@ macOS already owns the completing event and sends tagged deletion pairs to the
 exact application with the shared pacing delay. Keep terminal pacing off normal
 GUI applications.
 
+Terminal capture admission (`LLM_NavEventOwner_BeginTerminalCapture`) runs
+inside the completing key's `OnChar`, so it must stay one native call. A
+terminal-route registration (`LLM_NavEventOwner_RefreshTerminalRoutes`)
+re-checks the whole canonical layout source at every custody guard and measured
+300-900 ms per call in a live session (2026-10-18). Running it there made every
+terminal expansion slow and let typed keys interleave ("cc'était"). Register
+routes at Start or off the keystroke path, never in admission;
+`(hsfix-terminal-admission)` fails if admission registers anything.
+
 ### project-windows-notepad-garbles-typed-text
 
 Windows 11's Notepad (`RichEditD2DPT`) loses the characters of a text typed
