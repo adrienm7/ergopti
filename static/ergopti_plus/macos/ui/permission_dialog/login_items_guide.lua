@@ -196,7 +196,8 @@ local function tick(guide)
 		finish(guide, true)
 		return
 	end
-	guide.elapsed = guide.elapsed + M.POLL_SECONDS
+	-- A busy runloop may coalesce timer firings; callback count is not elapsed time.
+	guide.elapsed = math.floor(TimerScheduler.awake_time() - guide.started_at)
 	local state = read_state(guide.remap)
 	if state == READY then
 		Logger.success(LOG,
@@ -241,7 +242,8 @@ local function start(remap, trigger)
 
 	Logger.start(LOG, "Waiting for the remap guardian's Login Items approval (%s, up to %d s)…",
 		trigger, M.DEADLINE_SECONDS)
-	local guide = { remap = remap, elapsed = 0, shown = false, queued = false }
+	local guide = { remap = remap, started_at = TimerScheduler.awake_time(),
+		elapsed = 0, shown = false, queued = false }
 	local timer, committed = TimerScheduler.every(M.POLL_SECONDS, function() tick(guide) end)
 	if committed ~= true then
 		Logger.error(LOG, "The Login Items approval poll could not start; the steps are not shown.")
