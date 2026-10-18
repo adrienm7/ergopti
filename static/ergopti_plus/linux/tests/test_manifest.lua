@@ -411,6 +411,7 @@ return {
 	"tests.unit.modules.dynamic_hotstrings.test_personal_info_combo_resolver",
 	"tests.unit.modules.hotstrings.engine.test_prefix_expansions",
 	"tests.unit.modules.hotstrings.engine.test_priority_override_collision",
+	"tests.unit.modules.hotstrings.engine.test_priority_publication",
 	"tests.unit.modules.hotstrings.preview.test_parameter_frames",
 	"tests.unit.modules.hotstrings.preview.test_preview_candidates",
 	"tests.unit.modules.hotstrings.preview.test_preview_colored_menu",
