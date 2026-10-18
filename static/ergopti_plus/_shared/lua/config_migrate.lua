@@ -83,6 +83,27 @@ local canonical_decode = assert(rawget(TomlCodec, "decode_with_shapes"))
 -- absence. Generic unregistered adapter seams need no native constructor;
 -- a boot destination captures only an actual initializer owner/issuer tuple.
 -- This assumes the trusted normal loader, not hostile searcher/debug mutation.
+
+--- Whether a native file adapter sits where this module expects its driver.
+---
+--- A checkout keeps the driver beside the shared tree (<root>/linux/adapters,
+--- <root>/_shared); every package (.deb, .rpm, AppImage, Flatpak) ships the
+--- shared tree inside the driver root (<root>/adapters, <root>/_shared).
+--- Accepting only the first refused the native configuration ports in every
+--- package: config.toml could not be read and the daemon died at startup.
+--- @param adapter_source string The adapter function's debug source.
+--- @param own_source string This module's debug source.
+--- @param folder string The driver folder in a checkout ("linux", "macos").
+--- @return boolean
+local function native_adapter_in_layout(adapter_source, own_source, folder)
+	for _, suffix in ipairs({ folder .. "/adapters/file_system.lua", "adapters/file_system.lua" }) do
+		local expected = source_sibling(adapter_source, suffix, "_shared/lua/config_migrate.lua", source_directory)
+		if source_same(own_source, expected, source_directory) then return true end
+	end
+	return false
+end
+M._native_adapter_in_layout = native_adapter_in_layout
+
 local function native_configuration_ports(driver)
 	local owner = rawget(package.loaded, "adapters.file_system")
 	if owner == nil then owner = require("adapters.file_system") end
@@ -91,9 +112,7 @@ local function native_configuration_ports(driver)
 	if type(issuer) ~= "function" then return nil end
 	local source = debug.getinfo(1, "S").source
 	local folder = driver == "hs" and "macos" or driver
-	local expected = source_sibling(debug.getinfo(issuer, "S").source,
-		folder .. "/adapters/file_system.lua", "_shared/lua/config_migrate.lua", source_directory)
-	if not source_same(source, expected, source_directory) then return nil end
+	if not native_adapter_in_layout(debug.getinfo(issuer, "S").source, source, folder) then return nil end
 	local called, issued, reader, writer_method, publisher, remover, admitted_remover, exact_remover, delete = pcall(issuer)
 	if not called or not rawequal(issued, owner) or type(reader) ~= "function"
 		or type(writer_method) ~= "function" or type(publisher) ~= "function" or type(delete) ~= "function"
@@ -1303,9 +1322,7 @@ function M.run(opts)
 		-- The Linux adapter is exactly the shared writer delegate. Use its same
 		-- captured native owner once, rather than recursively consuming a permit.
 		local reader_source = type(record.adapter_reader) == "function" and debug.getinfo(record.adapter_reader, "S").source
-		local expected = source_sibling(reader_source, "linux/adapters/file_system.lua",
-			"_shared/lua/config_migrate.lua", source_directory)
-		if source_same(debug.getinfo(1, "S").source, expected, source_directory) then native_io_adapter = nil
+		if native_adapter_in_layout(reader_source, debug.getinfo(1, "S").source, "linux") then native_io_adapter = nil
 		else native_adapter = false end
 	end
 	local native_default = opts.read == nil and opts.publish == nil and opts.create_backup == nil

@@ -89,6 +89,22 @@ helpers.describe("trusted normal-loader source spelling preserves constructor id
 		if not ok then error(detail, 0) end
 	end)
 
+	helpers.it("admits the native file adapter in the checkout and in every package layout", function()
+		-- Packages ship _shared inside the driver root; matching only the
+		-- checkout layout refused config.toml and killed the packaged daemon.
+		local inside = require("config_migrate")._native_adapter_in_layout
+		local own_checkout = "@/repo/static/ergopti_plus/_shared/lua/config_migrate.lua"
+		local own_package = "@/usr/lib/ergopti/_shared/lua/config_migrate.lua"
+		local own_appimage = "@/tmp/.mount_Ergo12/usr/lib/ergopti/_shared/lua/config_migrate.lua"
+		helpers.assert_eq(inside("@/repo/static/ergopti_plus/linux/adapters/file_system.lua", own_checkout, "linux"), true)
+		helpers.assert_eq(inside("@/usr/lib/ergopti/adapters/file_system.lua", own_package, "linux"), true)
+		helpers.assert_eq(inside("@/tmp/.mount_Ergo12/usr/lib/ergopti/adapters/file_system.lua", own_appimage, "linux"), true)
+		helpers.assert_eq(inside("@/tmp/elsewhere/adapters/file_system.lua", own_package, "linux"), false,
+			"an adapter outside this module's own root is never admitted")
+		helpers.assert_eq(inside("@/repo/static/ergopti_plus/macos/adapters/file_system.lua", own_checkout, "linux"), false)
+		helpers.assert_eq(inside(nil, own_package, "linux"), false)
+	end)
+
 	helpers.it("captures the actual native directory and keeps lexical comparisons query-free", function()
 		local identity, directory = require("module_source_identity"), require("module_source_directory")
 		local lfs = require("lfs")
