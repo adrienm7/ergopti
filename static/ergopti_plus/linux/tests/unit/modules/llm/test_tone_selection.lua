@@ -114,6 +114,11 @@ local function scenario(opts, body)
 		package.loaded["modules.llm.api_entries"] = {
 			active = function() return world.active_entry end,
 			list = function() return { ENTRY, world.alternate_entry } end,
+			remove = function(id)
+				if not world.active_entry or world.active_entry.id ~= id then return false end
+				world.active_entry = nil
+				return true
+			end,
 			set_active = function(id)
 				if id ~= world.alternate_entry.id then return false end
 				world.active_entry = world.alternate_entry
@@ -707,6 +712,23 @@ helpers.describe("AI selection native cleanup acknowledgement", function()
 			helpers.assert_true(not world.engine.shutdown_runtime())
 			world.selection_cleanup_ack = true
 			helpers.assert_true(world.engine.shutdown_runtime())
+		end)
+	end)
+end)
+
+helpers.describe("active API entry deletion", function()
+	helpers.it("ai-pass2-remove retires the active request before deleting its entry", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			local rows = require("ui.menu.llm_backend_rows").rows(world.engine,
+				{ confirm = function() return true end }, nil, function() return {} end)
+			local removed = false
+			for _, row in ipairs(rows) do
+				if row.label and row.label:find("🗑️", 1, true) then helpers.assert_true(row.action()); removed = true end
+			end
+			helpers.assert_true(removed and world.active_entry == nil, "the real deletion action must ACK")
+			world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_eq(#world.emitted, 0, "a deleted provider cannot replace the selected text")
 		end)
 	end)
 end)

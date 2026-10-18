@@ -65,6 +65,7 @@ local function setup(backend)
 			if state.refuse_backend then return false end
 			state.backend = kind
 			state.backend_sets = (state.backend_sets or 0) + 1
+			if state.on_backend then state.on_backend() end
 			return true
 		end,
 	}
@@ -428,7 +429,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			local rename = os.rename
 			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":""}],"active_id":"chosen","future":{"kept":true}}]]
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
-			local changed, result, after, count, active, foreign, stage_calls = 0, nil, nil, nil, nil, nil, 0
+			local changed, result, after, count, active, foreign, stage_calls, backend_calls = 0, nil, nil, nil, nil, nil, 0, 0
 			local ok, failure = pcall(function()
 				local owner = helpers.load_module("modules.llm.api_entries")
 				owner._set_path_for_test(path)
@@ -448,7 +449,10 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 					return rename(from, to)
 				end
 				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
-					{ get_backend = function() return "api" end },
+					{ get_backend = function() return "api" end, set_backend = function(kind)
+						backend_calls = backend_calls + 1
+						return kind == "api"
+					end },
 					{ confirm = function() return true end },
 					function() changed = changed + 1 end, function() return {} end)
 				result = find(rows, "🗑️").action()
@@ -461,6 +465,7 @@ helpers.describe("AI active API commands: acknowledged private removal", functio
 			local removed = os.remove(path)
 			helpers.assert_eq(ok, true, tostring(failure))
 			helpers.assert_eq(removed, true)
+			helpers.assert_eq(backend_calls, 1, "retire the request before entering the real private writer")
 			helpers.assert_eq(stage_calls, 1, "use the actual private stage and native publication owner")
 			helpers.assert_eq(changed, refused and 0 or 1, "writer refusal must not refresh as a committed mutation")
 			helpers.assert_eq(result, not refused, "the menu returns only a durable ACK")
@@ -1144,4 +1149,25 @@ helpers.describe("Real API Add publication (api-add-real-publication)", function
 			helpers.assert_eq(state.requests[1].url, "https://api.openai.com/v1/chat/completions")
 		end)
 	end)
+end)
+
+helpers.describe("active API removal retirement acknowledgement", function()
+	for _, fault in ipairs({ "refused", "reentrant" }) do
+		helpers.it("ai-pass2-remove preserves entries when retirement is " .. fault, function()
+			local build, state, restore = setup("api")
+			local original = { id = "original", provider = "cerebras", model = "qwen", token = "inert" }
+			local replacement = { id = "replacement", provider = "cerebras", model = "replacement", token = "inert" }
+			state.entries, state.active, state.confirm = { original }, original, true
+			if fault == "refused" then state.refuse_backend = true
+			else state.on_backend = function() state.active = replacement end end
+			local result = find(build(), "🗑️").action()
+			restore()
+			helpers.assert_eq(result, false)
+			helpers.assert_eq(state.removal_sets or 0, 0, "no private deletion before exact retirement ACK")
+			helpers.assert_eq(state.changed or 0, 0, "no false deletion announcement")
+			helpers.assert_eq(#state.entries, 1)
+			helpers.assert_eq(#state.tests, 0, "retirement cannot start a provider probe")
+			helpers.assert_eq(state.active, fault == "refused" and original or replacement)
+		end)
+	end
 end)
