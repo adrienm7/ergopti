@@ -821,6 +821,8 @@ Test("_LLMRemoteExtractUsage: estimated cost is included in result map", _Remote
 ; and suppress every public verdict from the retired request.
 _RemotePollRetirement_Interrupt(State, ReqId) {
 	global _LLM_Remote_Async
+	if State["interrupt"] == "none"
+		return
 	if State["interrupt"] == "cancel"
 		LLM_RemoteCancelAsync(ReqId)
 	else if State["interrupt"] == "remove"
@@ -848,17 +850,18 @@ _RemotePollRetirement_PreservesCancellation(Outcome, Boundary, Interrupt) {
 	SavedRegistry := _LLM_Remote_Async
 	_LLM_Remote_Async := Map()
 	ReqId := "remote_poll_retirement"
-	State := Map("cleanups", 0, "successes", 0, "failures", 0,
+	State := Map("cleanups", 0, "successes", 0, "failures", 0, "reason", "",
 		"boundary", Boundary, "interrupt", Interrupt,
 		"successor", Map("transport", "pending", "cancelled", false))
-	State["terminal"] := Map("complete", Outcome != "timeout", "exit", 0,
+	State["terminal"] := Map("complete", Outcome != "timeout", "exit", Outcome == "timeout" ? -1 : 0,
 		"status", Outcome == "failure" ? 500 : 200, "body_read", true,
-		"body", '{"choices":[{"message":{"content":"obsolete answer"}}]}')
+		"body", Outcome == "empty" ? "{}" : (Outcome == "failure"
+			? '{"error":{"message":"provider refused"}}' : '{"choices":[{"message":{"content":"obsolete answer"}}]}'))
 	Entry := Map("transport", "curl", "cancelled", false,
 		"tmp_stdout", "body", "tmp_status", "status", "tmp_exit", "exit",
 		"format", "openai", "start_tick", A_TickCount - 1000, "timeout_ms", 1,
 		"on_success", (*) => State["successes"] += 1,
-		"on_fail", (*) => State["failures"] += 1)
+		"on_fail", (Info) => (State["failures"] += 1, State["reason"] := Info["reason"]))
 	State["entry"] := Entry
 	_LLM_Remote_Async[ReqId] := Entry
 	Port := Map("read_terminal", _RemotePollRetirement_Read.Bind(State, ReqId),
@@ -866,8 +869,15 @@ _RemotePollRetirement_PreservesCancellation(Outcome, Boundary, Interrupt) {
 	try {
 		_LLMRemote_PollCurl(ReqId, Port)
 		AssertEqual(1, State["cleanups"], "the predecessor artifacts must be cleaned once")
-		AssertEqual(0, State["successes"], "retirement during I/O must suppress obsolete success")
-		AssertEqual(0, State["failures"], "retirement during I/O must suppress obsolete failure")
+		AssertEqual(Outcome != "timeout", _LLM_CurlTerminalComplete(State["terminal"]),
+			"the fixture must distinguish a committed response from a live timed-out child")
+		AssertEqual(Interrupt == "none" && Outcome == "success" ? 1 : 0, State["successes"],
+			"only an uninterrupted completion may publish success")
+		AssertEqual(Interrupt == "none" && Outcome != "success" ? 1 : 0, State["failures"],
+			"only an uninterrupted failure may publish its verdict")
+		if Interrupt == "none" && Outcome != "success"
+			AssertEqual(Outcome == "timeout" ? "timeout" : (Outcome == "empty" ? "unsupported_shape" : "provider_error"),
+				State["reason"], "the positive control must reach the intended terminal branch")
 		if Interrupt == "replace" {
 			AssertTrue(_LLM_Remote_Async.Has(ReqId), "the successor must remain registered")
 			AssertEqual(ObjPtr(State["successor"]), ObjPtr(_LLM_Remote_Async[ReqId]),
@@ -879,9 +889,9 @@ _RemotePollRetirement_PreservesCancellation(Outcome, Boundary, Interrupt) {
 	}
 }
 
-for Outcome in ["success", "failure", "timeout"] {
+for Outcome in ["success", "failure", "empty", "timeout"] {
 	for Boundary in ["receipt", "cleanup"] {
-		for Interrupt in ["cancel", "remove", "replace"] {
+		for Interrupt in ["cancel", "remove", "replace", "none"] {
 			Test("remote curl: " . Outcome . " preserves " . Interrupt . " during " . Boundary
 				. " (remote-poll-io-retirement)",
 				_RemotePollRetirement_PreservesCancellation.Bind(Outcome, Boundary, Interrupt))
