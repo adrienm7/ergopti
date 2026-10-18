@@ -6,29 +6,51 @@
 --- Audit finding F-L8. The clipboard path called Clipboard.save() fresh on every
 --- send with no cross-call state. Two clipboard sends within CLIPBOARD_RESTORE_DELAY_S
 --- meant call #2's save() captured call #1's still-injected payload as "the user's
---- clipboard", and both restores then clobbered the real original. Fix: serialise —
---- on an overlapping send cancel the pending restore but KEEP the first-captured
---- original (mirrors keymap/utils.lua).
+--- clipboard", and both restores then clobbered the real original. Native handoff
+--- and host paste grace now refuse overlaps before writing another payload; the
+--- first borrow keeps the exact user's original until restoration commits.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+
+local function immediate_synthetic(emit, defer)
+	local function complete(tx, status)
+		if tx.completed then return false end
+		tx.completed = true
+		if status == "complete" and tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+		if tx.callback then tx.callback(tx, status) end
+		return true
+	end
+	return {
+		begin = function() return {} end,
+		on_dispatched = function(tx, callback) tx.dispatched = callback end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		emit_key_stroke = emit,
+		seal = function(tx) return complete(tx, "complete") end,
+		cancel = function(tx) return complete(tx, "cancelled") end,
+		defer_after_callback = defer,
+	}
+end
 
 helpers.describe("text_sender clipboard path serializes save/restore", function()
 	helpers.it("an overlapping second send does NOT re-save, and the original survives", function()
 		local saves = 0
 		local restores = {}
 		local timers = {}
+		local clock = 0
 		package.loaded["adapters.clipboard"] = {
 			save    = function() saves = saves + 1; return "ORIGINAL", true end,
 			write   = function(_) return true end,
 			restore = function(v) restores[#restores + 1] = v; return true end,
 		}
-		package.loaded["adapters.synthetic_input"] = {
-			emit_key_stroke = function() return true end,
-		}
+		package.loaded["adapters.synthetic_input"] = immediate_synthetic(function() return true end)
 		package.loaded["adapters.timer_scheduler"] = {
-			after = function(_delay, callback)
-				local handle = { timer = {}, callback = callback }
+			awake_time = function() return clock end,
+			after = function(delay, callback)
+				local handle = { timer = {}, callback = function()
+					clock = clock + delay
+					callback()
+				end }
 				timers[#timers + 1] = handle
 				return handle, true
 			end,
@@ -42,8 +64,9 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 			eventtap = { keyStroke = function() end, keyStrokes = function() end },
 		})
 
-		TS.send(("a"):rep(50), { mode = "clipboard" })  -- call #1: saves ORIGINAL, arms restore
-		TS.send(("b"):rep(50), { mode = "clipboard" })  -- call #2: overlaps (restore #1 not fired)
+		helpers.assert_eq(TS.send(("a"):rep(50), { mode = "clipboard" }), true)
+		helpers.assert_eq(TS.send(("b"):rep(50), { mode = "clipboard" }), false,
+			"an overlapping send must not replace a paste payload during host grace")
 
 		-- Root cause: the second save must NOT run while a restore is pending —
 		-- otherwise it would capture call #1's injected "a..." as the user clipboard.
@@ -75,6 +98,7 @@ local function load_failure_fixture(options)
 	local writes = 0
 	local restores = 0
 	local emits = 0
+	local clock = 0
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = { sec = function() return 0.15 end }
 	package.loaded["adapters.clipboard"] = {
@@ -96,27 +120,30 @@ local function load_failure_fixture(options)
 			return true
 		end,
 	}
-	package.loaded["adapters.synthetic_input"] = {
-		emit_key_stroke = function()
+	package.loaded["adapters.synthetic_input"] = immediate_synthetic(
+		function()
 			emits = emits + 1
 			return true
 		end,
-		defer_after_callback = function(_label, callback)
+		function(_label, callback)
 			if options.defer_synchronously then
 				callback()
 				return true
 			end
 			return false
-		end,
-	}
+		end)
 	local timer_calls = 0
 	local cancel_calls = 0
 	package.loaded["adapters.timer_scheduler"] = {
-		after = function(_delay, callback)
+		awake_time = function() return clock end,
+		after = function(delay, callback)
 			timer_calls = timer_calls + 1
 			local outcome = options.timer_outcomes and options.timer_outcomes[timer_calls]
 			if outcome == "throw" then error("injected timer failure") end
-			local handle = { callback = callback, stopped = false, timer = {} }
+			local handle = { callback = function()
+				clock = clock + delay
+				callback()
+			end, stopped = false, timer = {} }
 			timers[#timers + 1] = handle
 			if outcome == "nil" then
 				handle.timer = nil
