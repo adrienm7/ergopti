@@ -851,6 +851,7 @@ KLPF_WorkerMain() {
 						; A cold rebuild of a large store publishes what it rebuilt so far.
 						Publisher := KLPFRebuildPublisher(metrics_dir)
 						KLRRebuild.observer := Publisher
+						KLRRebuild.index_observer := Publisher
 						if A_Args.Length >= flag + 12 {
 								RequestFile := FileOpen(A_Args[flag + 12], "r", "UTF-8")
 								if !IsObject(RequestFile)
