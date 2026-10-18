@@ -258,13 +258,20 @@ function assertNativePolicyFamilyIsolation(source) {
 		'the independent folder case retains actual HWND retirement assertions'
 	);
 }
-const nativePolicySource = fs.readFileSync(
-	path.join(
-		repository,
-		'static/ergopti_plus/windows/tests/unit/ui/windows/test_native_dialog_titles.ahk'
-	),
-	'utf8'
-);
+// The native dialog tests are split by concern; read them as one corpus.
+const nativePolicySource = [
+	'test_native_dialog_titles.ahk',
+	'test_native_file_filter_behavior.ahk',
+	'test_native_folder_orchestration.ahk',
+	'test_native_file_filter_diagnostics.ahk'
+]
+	.map((file) =>
+		fs.readFileSync(
+			path.join(repository, 'static/ergopti_plus/windows/tests/unit/ui/windows', file),
+			'utf8'
+		)
+	)
+	.join('\n');
 assertNativePolicyFamilyIsolation(nativePolicySource);
 for (const original of [
 	'AssertEqual(FileRead(PickerRoot . "\\baseline.filter", "UTF-8"),',
