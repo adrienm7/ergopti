@@ -626,8 +626,12 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 				}
 				// The bare proxy connection failure names the proxy route itself, so
 				// it does not depend on metrics for a connection that never opened.
+				// The same code ends a CONNECT the proxy answered with 407: a proxy
+				// that replied is never a refused route and never fails over.
 				if managedHTTPProxyConnectionFailed(native) {
-					refusedTCPConnect = true; proxyObserved = true; break
+					if proxyAuthenticationObserved { failure = "proxy" }
+					else { refusedTCPConnect = true; proxyObserved = true }
+					break
 				}
 				guard let underlying = native.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
 				native = underlying
