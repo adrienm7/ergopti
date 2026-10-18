@@ -185,8 +185,8 @@ for (const entry of previews) {
 // 3. The AHK regression test runs.
 const runAll = read(path.join(WIN, 'tests', 'run_all.ahk'));
 check(
-	/^#Include unit\/test_hotstring_preview_shows\.ahk$/m.test(runAll),
-	'run_all.ahk must include unit/test_hotstring_preview_shows.ahk'
+	/^#Include unit\/modules\/hotstrings\/preview\/test_hotstring_preview_shows\.ahk$/m.test(runAll),
+	'run_all.ahk must include unit/modules/hotstrings/preview/test_hotstring_preview_shows.ahk'
 );
 
 if (errors.length) {

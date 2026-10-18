@@ -93,7 +93,7 @@ before executing anything. A `Test()` call that happens _during_ a run therefore
 lands in `TEST_REGISTRY` but never in `ActiveTests`: it never executes, and the
 plan count never mentions it. No error, no warning, plan matches, suite green.
 
-There is a live instance. In `unit/test_domain_expander.ahk`, two test functions
+There is a live instance. In `unit/modules/hotstrings/engine/test_domain_expander.ahk`, two test functions
 and their registrations were spliced into the middle of `_DE_Add`'s body — the
 function opens at line 30 and its real body resumes at line 44:
 

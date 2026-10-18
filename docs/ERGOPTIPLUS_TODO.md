@@ -2303,7 +2303,7 @@ configured discovery/cache ownership for nondefault endpoints across three
 OS. Karabiner watchdog/recovery failures require coordination with group 5;
 logger stalls are not treated as a proved cause. These fixes and their
 regressions continue in a second atomic delivery. Root retains CI/test migration
-and `windows/tests/unit/test_hotstrings_config.ahk` fixture isolation.
+and `windows/tests/unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk` fixture isolation.
 
 #### Issue 94 scalar encoding and startup settlement
 

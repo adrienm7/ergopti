@@ -12,7 +12,7 @@
 ; The AHK-only "_global" menu delay tier remains outside this corpus's scope.
 ;
 ; Reuses the _HCfgTestReset / _HCfgTestSeedToml fixture helpers from
-; unit/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
+; unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk (must load before this file — see run_all.ahk).
 ;
 ; The macOS half lives in
 ; macos/tests/unit/meta/test_corpus_hotstrings_config_resolve.lua.
