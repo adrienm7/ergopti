@@ -604,16 +604,20 @@ local function run_agent(generation, source, text, focus, backend, learning)
 				return false
 			end
 			return generation == _generation
-				and (session == nil or engine.current_request_revision() == session)
+		end
+		-- A failed request deliberately closes its own surface before offering
+		-- repair. Keep transport authority separate from that later consent.
+		local function request_current()
+			return still_current() and (session == nil or engine.current_request_revision() == session)
 		end
 		local function on_raw(raw)
-			if not still_current() then return end
+			if not request_current() then return end
 			offer_actions(generation, engine, session, raw, tools, learning)
 		end
 		local function on_fail(reason, detail)
-			if not still_current() then return end
+			if not request_current() then return end
 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
-			if not still_current() then return end
+			if not request_current() then return end
 			if session then engine.close_answer_surface(session) end
 			if not still_current() then return end
 			local Offer = require("modules.llm.local_model_offer")
@@ -629,7 +633,7 @@ local function run_agent(generation, source, text, focus, backend, learning)
 			system = Agent.system2_prompt(config, ctx),
 			text = Agent.system2_user_text(config, text),
 			max_tokens = config.system2.max_tokens,
-		}, on_raw, on_fail, still_current)
+		}, on_raw, on_fail, request_current)
 		Logger.info(LOG, "Agent run %d requested (%s, backend '%s', model %s, %d byte(s), %d tool(s)).",
 			generation, source, backend.backend, backend.model, #text, #tools)
 	end)
