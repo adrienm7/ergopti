@@ -616,6 +616,13 @@ function M.is_processing_paused()
 	return CoreState.processing_paused
 end
 
+--- Returns the opaque input lifecycle shared by callback-owned hotstring work.
+--- Registry changes and stop/pause revoke it even when settings return to their prior values.
+--- @return table token Current immutable generation identity.
+function M.current_hotstring_lifecycle()
+	return _user_hotstring_lifecycle
+end
+
 --- Sets the per-group delay threshold for the given key.
 --- Only keys present in DELAYS_DEFAULT are accepted; unknown keys are silently ignored.
 --- @param key string The group identifier (must be a key of DELAYS_DEFAULT).
