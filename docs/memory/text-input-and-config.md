@@ -60,6 +60,20 @@ the completing character before the editor stores it; a visibility wait may
 accept only that independently predicted scalar with the rest of the document
 and original caret unchanged. It must never accept arbitrary later text.
 
+The worker edits a few 10 ms polls after the completing key, longer when the
+AHK thread is busy (the error window's WebView2 creation took 1.5 s). Until
+2026-10-18 the HSE Notepad owner held no keyboard capture, so a key typed in
+that span reached Notepad and HSE: before the decision it cancelled the
+expansion (« output admission rejected »), during the edit it made the effect
+indeterminate, after the verified edit it revoked the commit (« completed after
+its admission changed »); each was an ERROR and an error window in plain
+typing, and the first one's window caused the next. The owner now admits
+`LLM_NavEventOwner_BeginTerminalCapture` at dispatch and releases it in
+`_HSE_CompleteNotepadOwner`, so held keys replay after the commit or refusal.
+A key that passed the hook before admission is already on screen and fed; the
+worker refuses to edit around it, which is logged as a warning (« yielded »),
+not an error. `(hsfix-notepad-interleave)` and `(hsfix-notepad-capture)` pin it.
+
 ### project-hotstring-engine-internals
 
 Each physical character enters the custom engine exactly once. Windows and macOS

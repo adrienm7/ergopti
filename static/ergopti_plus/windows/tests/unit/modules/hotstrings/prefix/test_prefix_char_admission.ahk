@@ -655,3 +655,205 @@ _PCA_TerminalKeysFollowExpansion() {
 }
 Test("prefix: keys typed during a terminal expansion follow its output (hsfix-terminal-interleave)",
 	_PCA_TerminalKeysFollowExpansion)
+
+/**
+ * A Notepad expansion runs on the native editor worker, so it completes a few
+ * polls after the completing key's OnChar returns. A key typed in that span used
+ * to reach Notepad and the engine: it revoked the expansion's admission, so the
+ * expansion was cancelled (« output admission rejected »), garbled while the
+ * worker edited, or verified and then reported as « completed after its
+ * admission changed », each one an ERROR and an error window in ordinary typing.
+ * The native capture must hold such a key and replay it after the expansion.
+ * @param Moment {String} When the key is typed: "ready" while the worker waits
+ *     for its decision, "emit" while it edits, "after" once its edit is verified.
+ */
+_PCA_NotepadKeysFollowExpansion(Moment) {
+	global CategoryEnabled, Features, ScriptInformation, _SendHook
+	global _PrefixBuffer, _PrefixFocusedControlToken, _PrefixVisibleFireDecisions
+	global _LLM_Bridge_Active, _LLM_Bridge_AgentFeeding, _KLLastShownSuggestion
+	global HSE_Buffer, _HSE_TerminalOwner, _HSE_TerminalReplayPending
+	global _HSResolveCache, _HSResolveGen, _TextSenderNativeTestPort, _TEXT_NATIVE_OWNER
+	global _LLM_NavEventOwnerStarted, _LLM_NavEventOwnerPort, _LLM_NavEventOwnerQuarantined
+	global _LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending
+	global _LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending
+	global _LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced
+	Saved := { Categories: CategoryEnabled, Features: Features, Script: ScriptInformation,
+		Send: _SendHook, Active: _LLM_Bridge_Active, Agent: _LLM_Bridge_AgentFeeding,
+		Decisions: _PrefixVisibleFireDecisions, Suggestion: _KLLastShownSuggestion,
+		ResolverCache: _HSResolveCache, NativePort: _TextSenderNativeTestPort,
+		NativeOwner: _TEXT_NATIVE_OWNER, NavStarted: _LLM_NavEventOwnerStarted,
+		NavPort: _LLM_NavEventOwnerPort, NavFlags: [_LLM_NavEventOwnerQuarantined,
+			_LLM_NavEventOwnerStarting, _LLM_NavEventOwnerStartRollbackPending,
+			_LLM_NavEventOwnerStopping, _LLM_NavEventOwnerStopPending,
+			_LLM_NavEventOwnerPendingStopRecovery, _LLM_NavEventOwnerLifecycleQuiesced] }
+	State := { Screen: "", Prepared: "", Phase: 1, Decision: -1, Poll: 0,
+		Capturing: false, Held: [], Commits: 0, Releases: 0, Done: false, Errors: [] }
+	NoPrefeed(*) {
+	}
+	; The Notepad document: a key that native capture does not hold reaches it.
+	Input(Char) {
+		if State.Capturing {
+			State.Held.Push(Char)
+			return
+		}
+		State.Screen .= Char
+		_PCA_Call(Char, NoPrefeed)
+	}
+	Focus() {
+		return Map("hwnd", 11, "control", 12, "pid", 13)
+	}
+	Begin(Owner) {
+		AssertEqual("ct★", Owner.Opts["deleted_text"], "the worker erases the typed trigger")
+		State.Prepared := State.Screen
+		return 0
+	}
+	Poll(Token) {
+		return Map("phase", State.Phase, "os_error", 0)
+	}
+	Decide(Token, Commit) {
+		State.Decision := Commit
+		return 0
+	}
+	Close(Token) {
+		return 0
+	}
+	Schedule(Fn) {
+		State.Poll := Fn
+	}
+	BeginCapture(Token) {
+		State.Capturing := true
+		return 1
+	}
+	Release(Committed, Token) {
+		State.Capturing := false
+		State.Releases += 1
+		State.Commits += Committed ? 1 : 0
+		; The native release replays the held edges after the expansion output.
+		for Char in State.Held
+			SetTimer(Input.Bind(Char), -1)
+		State.Held := []
+		SetTimer(() => State.Done := true, -5)
+		return 1
+	}
+	Snapshot(Token) {
+		return Map("token", Token, "phase", State.Capturing ? 1 : 0, "queued", State.Held.Length,
+			"replayed", 0, "last_os_error", 0, "release_kind", 0)
+	}
+	Sink(Line) {
+		if InStr(Line, "[ERROR]")
+			State.Errors.Push(Line)
+	}
+	; Mirrors the worker: it edits only the exact image it prepared and verifies it.
+	Work() {
+		if State.Decision != 1 {
+			State.Phase := 5
+			return
+		}
+		if State.Screen != State.Prepared {
+			; A key that reached Notepad between the selection and the replacement
+			; replaced the selected trigger before the expansion was inserted.
+			if Moment == "emit"
+				State.Screen := SubStr(State.Screen, 1, StrLen(State.Prepared) - 3)
+					. "c’était" . SubStr(State.Screen, StrLen(State.Prepared) + 1)
+			State.Phase := Moment == "emit" ? 6 : 5
+			return
+		}
+		State.Screen := SubStr(State.Screen, 1, StrLen(State.Screen) - 3) . "c’était"
+		State.Phase := 4
+	}
+	try {
+		HSE_TestReset()
+		SimulateNotepadActive()
+		CategoryEnabled := Map("Hotstrings", true)
+		Features := Map()
+		ScriptInformation := Map("MagicKey", "★")
+		_LLM_Bridge_Active := false
+		_LLM_Bridge_AgentFeeding := false
+		_PrefixBuffer := ""
+		_PrefixFocusedControlToken := 1
+		_PrefixVisibleFireDecisions := []
+		_KLLastShownSuggestion := ""
+		_HSResolveCache := Map("magickey|replace", {
+			gen: _HSResolveGen, val: { ShowTooltip: false } })
+		_TEXT_NATIVE_OWNER := 0
+		_TextSenderNativeTestPort := Map("focus", Focus, "begin", Begin, "poll", Poll,
+			"decide", Decide, "close", Close, "schedule", Schedule)
+		_LLM_NavEventOwnerStarted := true
+		_LLM_NavEventOwnerQuarantined := false, _LLM_NavEventOwnerStarting := false
+		_LLM_NavEventOwnerStartRollbackPending := false, _LLM_NavEventOwnerStopping := false
+		_LLM_NavEventOwnerStopPending := false, _LLM_NavEventOwnerPendingStopRecovery := false
+		_LLM_NavEventOwnerLifecycleQuiesced := false
+		_LLM_NavEventOwnerPort := Map("begin_terminal", BeginCapture,
+			"commit_terminal", Release.Bind(true), "abort_terminal", Release.Bind(false),
+			"get_terminal", Snapshot)
+		LoggerSetTestSink(Sink)
+		HSE_Register("*", "ct★", 0, Map("Replacement", "c’était", "OnlyText", true,
+			"Category", "magickey", "Section", "replace"))
+		Input("c")
+		Input("t")
+		Input("★")
+		AssertTrue(_HSE_TerminalOwner is Map, "the Notepad expansion is pending")
+		AssertTrue(HasMethod(State.Poll, "Call"), "the native worker owner is queued")
+		State.Poll.Call()
+		AssertEqual("ct★", State.Prepared, "the worker prepares the typed trigger")
+		if Moment == "ready"
+			Input("x")
+		State.Phase := 2
+		State.Poll.Call()
+		if Moment == "emit"
+			Input("x")
+		Work()
+		if Moment == "after"
+			Input("x")
+		State.Poll.Call()
+		Started := A_TickCount
+		while !State.Done && ((A_TickCount - Started) & 0xFFFFFFFF) < 1000
+			Sleep(-1)
+		Started := A_TickCount
+		while ((A_TickCount - Started) & 0xFFFFFFFF) < 30
+			Sleep(-1)
+		AssertEqual(1, State.Decision, "the held key cannot cancel the expansion")
+		AssertEqual(1, State.Commits, "the capture commits once, after the expansion")
+		AssertEqual(1, State.Releases, "the capture is released once")
+		AssertEqual("c’étaitx", State.Screen,
+			"a key typed during a Notepad expansion lands after its complete output")
+		AssertEqual(State.Screen, HSE_Buffer, "the engine agrees with the document")
+		AssertEqual(0, State.Errors.Length,
+			"ordinary typing during an expansion is not an error: "
+			. (State.Errors.Length ? State.Errors[1] : ""))
+	} finally {
+		LoggerClearTestSink()
+		_PrefixInvalidateDeferredEffects()
+		_HSE_TerminalOwner := 0
+		_HSE_TerminalReplayPending := 0
+		HSE_TestReset()
+		CategoryEnabled := Saved.Categories
+		Features := Saved.Features
+		ScriptInformation := Saved.Script
+		_SendHook := Saved.Send
+		_LLM_Bridge_Active := Saved.Active
+		_LLM_Bridge_AgentFeeding := Saved.Agent
+		_PrefixVisibleFireDecisions := Saved.Decisions
+		_KLLastShownSuggestion := Saved.Suggestion
+		_HSResolveCache := Saved.ResolverCache
+		_TextSenderNativeTestPort := Saved.NativePort
+		_TEXT_NATIVE_OWNER := Saved.NativeOwner
+		_LLM_NavEventOwnerStarted := Saved.NavStarted
+		_LLM_NavEventOwnerPort := Saved.NavPort
+		_LLM_NavEventOwnerQuarantined := Saved.NavFlags[1]
+		_LLM_NavEventOwnerStarting := Saved.NavFlags[2]
+		_LLM_NavEventOwnerStartRollbackPending := Saved.NavFlags[3]
+		_LLM_NavEventOwnerStopping := Saved.NavFlags[4]
+		_LLM_NavEventOwnerStopPending := Saved.NavFlags[5]
+		_LLM_NavEventOwnerPendingStopRecovery := Saved.NavFlags[6]
+		_LLM_NavEventOwnerLifecycleQuiesced := Saved.NavFlags[7]
+		SimulateRegularApp()
+		_PrefixSetBuffer("")
+	}
+}
+Test("prefix: a key typed while Notepad awaits the decision follows the expansion (hsfix-notepad-interleave)",
+	_PCA_NotepadKeysFollowExpansion.Bind("ready"))
+Test("prefix: a key typed while Notepad edits follows the expansion (hsfix-notepad-interleave)",
+	_PCA_NotepadKeysFollowExpansion.Bind("emit"))
+Test("prefix: a key typed after the verified Notepad edit follows the expansion (hsfix-notepad-interleave)",
+	_PCA_NotepadKeysFollowExpansion.Bind("after"))

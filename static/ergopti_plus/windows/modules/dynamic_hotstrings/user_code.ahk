@@ -213,7 +213,7 @@ UserHotstringsInvalidate(Reason := "lifecycle") {
 		; so it aborts output and releases capture; a late timer cannot do it twice.
 		; Native text output retains its own completion callback and suppression.
 		; Revoked publication is observed by admission/commit; the terminal runner
-		; cannot retire this sender or release a capture it never acquired.
+		; cannot retire this sender, and its completion releases its own capture.
 		if !TerminalOwner.Get("NativeLiteral", false)
 			_HSE_RunOwnedTerminalTransaction(TerminalOwner)
 		Ready := !TerminalOwner["Pending"] && Ready
