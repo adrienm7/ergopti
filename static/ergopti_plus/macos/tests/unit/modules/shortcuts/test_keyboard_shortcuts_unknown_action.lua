@@ -32,7 +32,7 @@ local MODULES = {
 }
 
 -- The only ids the stubbed catalogue offers. The real catalogue's contents have
--- their own test (tests/unit/modules/gestures/test_action_catalogue_parity.lua).
+-- their own test (tests/unit/modules/gestures/actions/test_action_catalogue_parity.lua).
 local OFFERED = { lookup = true, none = true }
 
 --- Runs `scenario` against the real keyboard-shortcut owner over stubbed

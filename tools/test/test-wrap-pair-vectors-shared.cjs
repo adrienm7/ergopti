@@ -110,7 +110,7 @@ check(
 // Each suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/gestures/test_wrap_pair_parameter_vectors.lua',
+		file: 'macos/tests/unit/modules/gestures/parameters/test_wrap_pair_parameter_vectors.lua',
 		path: 'tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
