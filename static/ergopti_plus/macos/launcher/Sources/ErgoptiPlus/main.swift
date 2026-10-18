@@ -1178,6 +1178,10 @@ if OwnedProgramWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(OwnedProgramWorker.run(arguments: CommandLine.arguments))
 }
 
+if InputSourceSelectionWorker.handles(arguments: CommandLine.arguments) {
+	Darwin.exit(InputSourceSelectionWorker.run(arguments: CommandLine.arguments))
+}
+
 if KeyboardSourceProbeWorker.handles(arguments: CommandLine.arguments) {
 	Darwin.exit(KeyboardSourceProbeWorker.run(arguments: CommandLine.arguments))
 }
