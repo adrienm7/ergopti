@@ -1109,10 +1109,10 @@ const LUA_TIMING_RETENTION = [
 		directory: 'static/ergopti_plus/macos',
 		step: 'Retain macOS Lua timing diagnostics',
 		artifact:
-			'lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+			'lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		path: '${{ runner.temp }}/macos-lua.json',
 		command:
-			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua'
+			'node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua --module="$MACOS_UNIT_GROUP"'
 	}
 ];
 

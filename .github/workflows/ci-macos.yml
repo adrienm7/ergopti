@@ -58,12 +58,20 @@ env:
   ERGOPTI_DEV_RELEASE_VERSION: ${{ inputs.version }}
 
 jobs:
+  # One row per domain group of static/ergopti_plus/macos/tests/support/
+  # module_groups.lua (run.lua --module=<group>); the groups partition the
+  # suite, so the rows together run every test module exactly once. The list
+  # below must equal those groups, in order (test-macos-stage-roles.cjs).
   test-hs:
     name: Unit tests
     runs-on: ubuntu-latest
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        lot: [meta, core, modules, menu_llm, menu_input, ui, other]
     env:
-      MACOS_STAGE_LOT: 'Lua unit and meta (stubbed)'
+      MACOS_STAGE_LOT: ${{ matrix.lot }}
     outputs:
       e2e_matrix: ${{ steps.stage-plan.outputs.e2e_matrix }}
       e2e_metadata: ${{ steps.stage-plan.outputs.e2e_metadata }}
@@ -108,6 +116,7 @@ jobs:
         # cannot change semantics under us.
         env:
           LUA: lua5.4
+          MACOS_UNIT_GROUP: ${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}
         run: |
           set -euo pipefail
           receipt="$RUNNER_TEMP/stable-macos-stubbed-unit.json"
@@ -117,7 +126,7 @@ jobs:
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] macos-stubbed-unit: qualified=false; original command not executed."
           elif [ "$mode" = full ]; then
-              node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua
+              node ../../../tools/test/report.cjs --name macos-lua --json "${{ runner.temp }}/macos-lua.json" -- lua5.4 tests/run.lua --module="$MACOS_UNIT_GROUP"
           else
               echo "Invalid command qualification disposition" >&2
               exit 1
@@ -128,7 +137,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lua-timings-macos-unit-${{ fromJSON(steps.stage-selection.outputs.cell).role }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/macos-lua.json
           if-no-files-found: warn
           retention-days: 7
@@ -137,7 +146,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}
+          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 

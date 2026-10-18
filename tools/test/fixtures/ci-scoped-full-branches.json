@@ -1166,7 +1166,7 @@
 			"job": "test-hs",
 			"name": "Retain source-bound test-hs qualification receipts",
 			"condition": "always()",
-			"body": "      - name: Retain source-bound test-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
+			"body": "      - name: Retain source-bound test-hs qualification receipts\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-test-hs-${{ fromJSON(steps.stage-selection.outputs.cell).architecture || 'stubbed' }}-${{ fromJSON(steps.stage-selection.outputs.cell).scenario }}\n          path: ${{ runner.temp }}/stable-macos-*.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-macos.yml",
