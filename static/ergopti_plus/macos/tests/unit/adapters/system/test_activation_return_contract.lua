@@ -34,15 +34,20 @@ helpers.describe("activation adapters: false native results remain failures", fu
 	end)
 
 	helpers.it("WindowManager.activate propagates window false", function()
+		local focus_calls = 0
 		local adapter = helpers.load_with_stubs("adapters.window_manager", {
 			window = {
 				get = function()
-					return { focus = function() return false end }
+					return {
+						application = function() return {} end,
+						focus = function() focus_calls = focus_calls + 1; return false end,
+					}
 				end,
 			},
 		})
 		helpers.assert_eq(false, adapter.activate(42),
 			"a found window is not focused until win:focus() says true")
+		helpers.assert_eq(focus_calls, 1, "the native refusal must actually be exercised")
 	end)
 
 	helpers.it("WindowManager.activate accepts the documented window-object focus result", function()
@@ -50,6 +55,7 @@ helpers.describe("activation adapters: false native results remain failures", fu
 			window = {
 				get = function()
 					local win = {}
+					win.application = function() return {} end
 					win.focus = function() return win end
 					return win
 				end,
