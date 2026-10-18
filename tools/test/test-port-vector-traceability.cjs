@@ -43,7 +43,7 @@ const ROOT = path.resolve(__dirname, '..', '..');
 const PORTS = path.join(ROOT, 'static/ergopti_plus/_shared/core/ports');
 const MIRROR = path.join(
 	ROOT,
-	'static/ergopti_plus/macos/tests/unit/test_adapter_contract_vectors.lua'
+	'static/ergopti_plus/macos/tests/unit/adapters/contracts/test_adapter_contract_vectors.lua'
 );
 
 // Measured 2026-08-01. Raise as ids are added to the Lua tests; never lower.
