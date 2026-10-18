@@ -3358,6 +3358,7 @@ function M.set_model(model_name)
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local revision, app_epoch = _enable_generation, _runtime_app_epoch
+	M.withdraw()
 	local function current()
 		return not _runtime_closed and _scope_owner == nil
 			and revision == _enable_generation and app_epoch == _runtime_app_epoch
