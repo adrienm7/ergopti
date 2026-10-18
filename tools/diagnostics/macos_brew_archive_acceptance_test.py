@@ -1247,23 +1247,25 @@ class NativeFixtureNameControls(unittest.TestCase):
             self.assertEqual((resources / name).read_bytes(), probe.RESOURCE)
             self.assertEqual(links, [("owned-link", name)])
 
-    def test_distinctive_executable_mode_is_applied_after_codesign_rewrites_it(self):
-        self.assertEqual(probe.FIXTURE_EXECUTABLE_MODE, 0o751)
+    def test_release_executable_mode_is_applied_after_codesign_rewrites_it(self):
+        self.assertEqual(probe.FIXTURE_EXECUTABLE_MODE, 0o755)
         with TemporaryDirectory() as directory:
             _app, events, _links = self.build(Path(directory).resolve(strict=True))
-        # The old order (chmod, sign) left codesign's 0755 in the signed source.
+        # Signing first: codesign's rewrite would otherwise replace the set mode.
         self.assertEqual(
             events,
             [
                 ("--force", "--sign"),
-                ("chmod", "OwnedFixture", 0o751),
+                ("chmod", "OwnedFixture", 0o755),
                 ("--verify", "--deep"),
             ],
         )
         # A mode change that does not take refuses before the source is admitted.
         with TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(probe.AdmissionError, "distinctive fixture mode"):
-                self.build(Path(directory).resolve(strict=True), chmod_applies=False)
+            with self.assertRaisesRegex(probe.AdmissionError, "release executable mode"):
+                self.build(
+                    Path(directory).resolve(strict=True), codesign_mode=0o700, chmod_applies=False
+                )
 
     def test_installed_mode_reports_installed_source_and_expected_bits(self):
         with TemporaryDirectory() as directory:
@@ -1278,10 +1280,10 @@ class NativeFixtureNameControls(unittest.TestCase):
                 (bundle / "Contents/Resources" / probe.RESOURCE_NAME).write_bytes(probe.RESOURCE)
             children = SimpleNamespace(root=root, run=Mock())
             for installed, original in (
-                (0o755, 0o755),
+                (0o751, 0o751),
                 (0o755, 0o751),
                 (0o751, 0o755),
-                (0o700, 0o751),
+                (0o700, 0o755),
             ):
                 modes = {app: installed, source: original}
                 with (
@@ -1296,7 +1298,7 @@ class NativeFixtureNameControls(unittest.TestCase):
                     with self.assertRaisesRegex(
                         probe.AdmissionError,
                         f"^Installed executable mode changed: installed={installed:#o}, "
-                        f"source={original:#o}, expected=0o751$",
+                        f"source={original:#o}, expected=0o755$",
                     ):
                         probe.verify_installed(children, "71.36.1", source)
             children.run.assert_not_called()
