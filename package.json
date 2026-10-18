@@ -454,6 +454,7 @@
 		"test:model-browser-session": "node ./tools/test/test-model-browser-session.cjs",
 		"test:onboarding-wizard-page": "node ./tools/test/test-onboarding-wizard-page.cjs",
 		"test:compact-data-sql": "node ./tools/test/test-compact-data-sql.cjs",
+		"test:compact-data-sql-protocol": "node ./tools/test/test-compact-data-sql-protocol.cjs",
 		"test:metrics-manifest-contract": "node ./tools/test/test-metrics-manifest-contract.cjs",
 		"test:metrics-speed-source-filters": "node ./tools/test/test-metrics-speed-source-filters.cjs",
 		"test:linux-metrics-sqlite-bridge": "node ./tools/test/test-linux-metrics-sqlite-bridge.cjs",
