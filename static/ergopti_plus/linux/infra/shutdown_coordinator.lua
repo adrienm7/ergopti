@@ -51,6 +51,7 @@ function M.new(opts)
 	local pending, native_claims, final_claims = {}, {}, {}
 	local final_started = false
 	local coordinator = {}
+	local preparation, dispatch
 
 	local finish
 
@@ -69,7 +70,7 @@ function M.new(opts)
 	-- Terminal signal watchers must survive the external cleanup barrier: a second
 	-- TERM while native owners retire still belongs to this transaction.
 	finish = function()
-		if complete or registering or polling or not input_stopped or next(pending) ~= nil then return end
+		if preparation or complete or registering or polling or not input_stopped or next(pending) ~= nil then return end
 		if not final_started then
 			final_started, registering = true, true
 			for _, claim in ipairs(final_claims) do
@@ -102,7 +103,7 @@ function M.new(opts)
 		end
 		if #final_claims > 0 then waits_for_native = true end
 		for index, owner in ipairs(pre_wait) do
-			owners[index] = owner
+			owners[index] = { name = owner.name, stop = owner.stop }
 			if owner.wait_for_ack == true or type(owner.when_settled) == "function" then
 				local claim = { name = owner.name, stop = owner.stop, when_settled = owner.when_settled }
 				claims[index] = claim
@@ -110,38 +111,61 @@ function M.new(opts)
 				waits_for_native = true
 			end
 		end
-		if waits_for_native then
-			pcall(Logger.start, LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
-		else
-			Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
-		end
+		dispatch = function()
+			polling, registering = true, true
+			if waits_for_native then
+				pcall(Logger.start, LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+			else
+				Logger.start(LOG, "Shutdown quiescence started (%s).", tostring(reason or "unspecified"))
+			end
 
-		for index, owner in ipairs(owners) do
-			local claim = claims[index]
-			local stop, name = claim and claim.stop or owner.stop, claim and claim.name or owner.name
-			local ok, failure = xpcall(stop, debug.traceback)
-			if claim and (not ok or failure ~= true) then pending[claim] = true end
-			if not ok then
-				if waits_for_native then
-					pcall(Logger.error, LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
-				else
-					Logger.error(LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+			for index, owner in ipairs(owners) do
+				local claim = claims[index]
+				local stop, name = claim and claim.stop or owner.stop, claim and claim.name or owner.name
+				local ok, failure = xpcall(stop, debug.traceback)
+				if claim and (not ok or failure ~= true) then pending[claim] = true end
+				if not ok then
+					if waits_for_native then
+						pcall(Logger.error, LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+					else
+						Logger.error(LOG, "Shutdown owner '%s' failed: %s", name, tostring(failure))
+					end
+				end
+				if claim and pending[claim] and type(claim.when_settled) == "function" then
+					pcall(claim.when_settled, function() acknowledge(claim) end)
 				end
 			end
-			if claim and pending[claim] and type(claim.when_settled) == "function" then
-				pcall(claim.when_settled, function() acknowledge(claim) end)
-			end
-		end
 
-		if keyboard_hook.isRunning() then
-			if type(emergency_reason) == "string" and emergency_reason ~= "" then
-				keyboard_hook.emergency_stop(emergency_reason)
-			else
-				keyboard_hook.stop()
+			if keyboard_hook.isRunning() then
+				if type(emergency_reason) == "string" and emergency_reason ~= "" then
+					keyboard_hook.emergency_stop(emergency_reason)
+				else
+					keyboard_hook.stop()
+				end
 			end
+			input_stopped, registering, polling = true, false, false
+			finish()
 		end
-		input_stopped, registering, polling = true, false, false
-		finish()
+		polling = false
+		if not preparation then dispatch() end
+		return true
+	end
+
+	--- Retains startup acquisitions until their native constructor frames return.
+	--- @return table|nil token Exact opaque ownership, or nil when admission is closed.
+	function coordinator.begin_preparation()
+		if preparation or requested then return nil end
+		preparation = {}
+		return preparation
+	end
+
+	--- Releases only the owned preparation and dispatches an already captured request.
+	--- @param token table Exact value returned by begin_preparation.
+	--- @return boolean released
+	function coordinator.finish_preparation(token)
+		if not preparation or not rawequal(token, preparation) then return false end
+		preparation = nil
+		if dispatch then dispatch() end
 		return true
 	end
 
@@ -149,7 +173,7 @@ function M.new(opts)
 	--- Ordinary owners retain their original one-shot cleanup contract.
 	--- @return boolean complete Every opt-in owner acknowledged physical retirement.
 	function coordinator.poll()
-		if not requested or complete or polling then return complete end
+		if preparation or not requested or complete or polling then return complete end
 		polling = true
 		for _, claim in ipairs(native_claims) do acknowledge(claim) end
 		polling = false

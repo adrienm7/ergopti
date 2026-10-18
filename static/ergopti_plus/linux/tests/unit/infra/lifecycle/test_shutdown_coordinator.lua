@@ -10,6 +10,127 @@
 local helpers = require("tests.helpers")
 local ShutdownCoordinator = helpers.load_module("infra.shutdown_coordinator")
 
+helpers.describe("shutdown coordinator: startup preparation token", function()
+	local function fixture()
+		local state = { stops = 0, ordinary = 0, final = 0, loops = 0, held = true }
+		local owner = { name = "preparing native service", wait_for_ack = true }
+		local ordinary = { name = "prepared ordinary service", stop = function() state.ordinary = state.ordinary + 1 end }
+		owner.stop = function() state.stops = state.stops + 1; return not state.held end
+		local coordinator = ShutdownCoordinator.new({ pre_wait = { owner, ordinary },
+			final_wait = { { name = "terminal watchers", stop = function() state.final = state.final + 1; return true end } },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() state.loops = state.loops + 1 end } })
+		return coordinator, state, owner, ordinary
+	end
+	helpers.it("(startup-late-grab) marks and snapshots requests while all cleanup stays parked", function()
+		local coordinator, state, owner, ordinary = fixture()
+		local token = coordinator.begin_preparation()
+		helpers.assert_true(type(token) == "table" or type(token) == "userdata")
+		helpers.assert_true(coordinator.request("first TERM"))
+		helpers.assert_true(coordinator.is_requested())
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(coordinator.request("second TERM"), false)
+		owner.stop = function() error("A replacement callback cannot own the first request") end
+		ordinary.stop = function() error("Ordinary replacement cannot own the first request") end
+		helpers.assert_eq(coordinator.poll(), false)
+		helpers.assert_eq(state.stops, 0)
+		helpers.assert_eq(state.final, 0)
+		helpers.assert_eq(state.loops, 0)
+		state.held = false
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(state.stops, 1)
+		helpers.assert_eq(state.ordinary, 1)
+		helpers.assert_eq(state.final, 1)
+		helpers.assert_eq(state.loops, 1)
+		helpers.assert_eq(coordinator.is_pending(), false)
+	end)
+	helpers.it("(startup-late-grab) wrong and duplicate tokens cannot release or reacquire preparation", function()
+		local coordinator, state = fixture()
+		local token = coordinator.begin_preparation()
+		helpers.assert_eq(coordinator.begin_preparation(), nil)
+		coordinator.request("quit")
+		helpers.assert_eq(coordinator.finish_preparation({}), false)
+		local spoof = setmetatable({}, { __eq = function() return true end })
+		setmetatable(token, getmetatable(spoof))
+		helpers.assert_eq(coordinator.finish_preparation(spoof), false, "Opaque ownership cannot be forged with __eq")
+		helpers.assert_eq(coordinator.finish_preparation(nil), false)
+		helpers.assert_eq(state.stops, 0)
+		state.held = false
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(coordinator.finish_preparation(token), false)
+		helpers.assert_eq(coordinator.begin_preparation(), nil)
+		helpers.assert_eq(state.stops, 1)
+	end)
+	helpers.it("(startup-late-grab) successful preparation release never requests shutdown", function()
+		local coordinator, state = fixture()
+		local token = coordinator.begin_preparation()
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(coordinator.is_requested(), false)
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.stops, 0)
+		helpers.assert_eq(state.final, 0)
+		helpers.assert_eq(state.loops, 0)
+	end)
+	helpers.it("(startup-late-grab) newly committed native debt survives finish until exact acknowledgment", function()
+		local coordinator, state = fixture()
+		local token = coordinator.begin_preparation()
+		state.held = false
+		coordinator.request("TERM inside constructor")
+		helpers.assert_eq(state.stops, 0, "A resource absent at the request cannot be acknowledged before constructor return")
+		-- The constructor commits a resource only after the callback returns.
+		state.held = true
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(state.stops, 1)
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(state.final, 0)
+		helpers.assert_eq(coordinator.poll(), false)
+		state.held = false
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(state.final, 1)
+		helpers.assert_eq(state.loops, 1)
+	end)
+	helpers.it("(startup-late-grab) snapshots ordinary cleanup and defers observer subscription until constructor return", function()
+		local coordinator, state, owner = fixture()
+		local subscriptions, notify = 0, nil
+		owner.when_settled = function(callback) subscriptions = subscriptions + 1; notify = callback end
+		local token = coordinator.begin_preparation()
+		coordinator.request("TERM")
+		owner.when_settled = function() error("Observer replacement must not acquire the old request") end
+		helpers.assert_eq(subscriptions, 0)
+		coordinator.poll()
+		helpers.assert_eq(subscriptions, 0)
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(subscriptions, 1)
+		helpers.assert_true(type(notify) == "function")
+		helpers.assert_eq(coordinator.finish_preparation(token), false)
+		state.held = false
+		notify()
+		helpers.assert_eq(state.final, 1)
+		helpers.assert_eq(state.loops, 1)
+		notify()
+		helpers.assert_eq(state.loops, 1)
+	end)
+	helpers.it("(startup-late-grab) preserves the first parked diagnostic and emergency reason", function()
+		local reason, emergency
+		local factory = helpers.load_module_with_dependency("infra.shutdown_coordinator", "logger.shim", {
+			start = function(_, _, value) reason = value end, done = function() end,
+		})
+		local coordinator = factory.new({ pre_wait = {}, keyboard_hook = {
+			isRunning = function() return true end, stop = function() error("Emergency cleanup is owned by the first request") end,
+			emergency_stop = function(value) emergency = value end,
+		}, event_loop = { stop = function() end } })
+		local token = coordinator.begin_preparation()
+		coordinator.request("first TERM", "first native failure")
+		helpers.assert_eq(coordinator.request("later TERM", "later failure"), false)
+		helpers.assert_eq(reason, nil)
+		helpers.assert_eq(emergency, nil)
+		helpers.assert_true(coordinator.finish_preparation(token))
+		helpers.assert_eq(reason, "first TERM")
+		helpers.assert_eq(emergency, "first native failure")
+	end)
+end)
+
+
 local function coordinator_fixture(opts)
 	opts = opts or {}
 	local calls = {}
