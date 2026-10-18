@@ -3719,7 +3719,7 @@ jobs:
           rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-linux-noarch.rpm ".rpm"
           rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-x86_64.AppImage "AppImage"
+              build/linux/ErgoptiPlus-x86_64.AppImage "AppImage"
 
       - name: Log the package metadata
         # dpkg-deb --info, rpm -qip and rpm -qlp put the metadata and the file
@@ -3830,7 +3830,7 @@ jobs:
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
             build/linux/ErgoptiPlus-linux-amd64.deb
             build/linux/ErgoptiPlus-linux-noarch.rpm
-            build/linux/ErgoptiPlus-linux-x86_64.AppImage
+            build/linux/ErgoptiPlus-x86_64.AppImage
             build/linux/ErgoptiPlus-linux-x86_64.flatpak
 
       - name: Record mandatory package evidence

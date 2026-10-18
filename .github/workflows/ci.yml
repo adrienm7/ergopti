@@ -608,7 +608,7 @@ jobs:
               Ergopti_xkb.zip \
               ErgoptiPlus-linux-amd64.deb \
               ErgoptiPlus-linux-noarch.rpm \
-              ErgoptiPlus-linux-x86_64.AppImage \
+              ErgoptiPlus-x86_64.AppImage \
               ErgoptiPlus-linux-x86_64.flatpak \
               "$LINUX_BUNDLE_ASSET" \
               "$LINUX_BUNDLE_ASSET.sha256"; do
@@ -1004,7 +1004,7 @@ jobs:
           |---|---|
           | [ErgoptiPlus-linux-amd64.deb](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-amd64.deb) | Driver package for Debian, Ubuntu and Mint |
           | [ErgoptiPlus-linux-noarch.rpm](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-noarch.rpm) | Driver package for Fedora, RHEL and openSUSE |
-          | [ErgoptiPlus-linux-x86_64.AppImage](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.AppImage) | Portable driver — any distribution, no root required |
+          | [ErgoptiPlus-x86_64.AppImage](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-x86_64.AppImage) | Portable driver — any distribution, no root required |
           | [ErgoptiPlus-linux-x86_64.flatpak](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/ErgoptiPlus-linux-x86_64.flatpak) | Sandboxed driver, for a distribution-agnostic install |
           | [$LINUX_BUNDLE_ASSET](https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$LINUX_BUNDLE_ASSET) | Driver bundle with \`install.sh\`, installs under your home directory |
 
@@ -1013,7 +1013,7 @@ jobs:
           - Fedora, RHEL, CentOS, openSUSE, Mageia → \`ErgoptiPlus-linux-noarch.rpm\`
           - Arch, Manjaro, EndeavourOS → build it from \`tools/build/PKGBUILD\` in the repository; no Arch package is attached to this release
           - Flatpak → \`ErgoptiPlus-linux-x86_64.flatpak\`, installed with \`flatpak install --bundle\`. It requests \`--device=all\`, which is the only permission that reaches \`/dev/input\` and \`/dev/uinput\`; the sandbox still cannot grant access your user does not have on the host, so the udev rule in step 2 is required either way
-          - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-linux-x86_64.AppImage\` or \`$LINUX_BUNDLE_ASSET\`
+          - Any other distribution, an immutable one, or no root access → \`ErgoptiPlus-x86_64.AppImage\` or \`$LINUX_BUNDLE_ASSET\`
 
           > **Alpha.** CI exercises virtual input devices, display sessions and package launches. Physical keyboard behavior and desktop-shell integration still need validation on the target distribution.
 

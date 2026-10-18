@@ -5,7 +5,8 @@
  * MODULE: Linux AppImage Portability
  * DESCRIPTION:
  * Pins what the AppImage catalogue test checks: every bundled ELF file loads on
- * the oldest supported Ubuntu LTS and the image is built and launched on it.
+ * the oldest supported Ubuntu LTS, the image is built and launched on it, and
+ * its asset name carries no "linux".
  *
  * FEATURES & RATIONALE:
  * 1. Built on ubuntu-latest, the bundled luajit needed GLIBC_2.38 and died on
@@ -13,6 +14,8 @@
  *    must refuse that exact readelf output and admit 2.35.
  * 2. The build and the launch run in the container the check names, so moving
  *    the build back onto the runner fails here, not in the catalogue.
+ * 3. The catalogue warns on a name containing "linux": one name, everywhere
+ *    the release, its notes and the website refer to it.
  * ==============================================================================
  */
 
@@ -26,6 +29,7 @@ const path = require('node:path');
 const ROOT = path.resolve(__dirname, '..', '..');
 const Ceiling = require('../build/check-elf-glibc-ceiling.cjs');
 
+const APPIMAGE_ASSET = 'ErgoptiPlus-x86_64.AppImage';
 let passed = 0;
 
 function read(relative) {
@@ -208,6 +212,28 @@ if (process.platform === 'linux') {
 		fs.rmSync(sandbox, { recursive: true, force: true });
 	}
 }
+passed++;
+
+// One asset name, with no "linux" in it, wherever the release names it.
+for (const [relative, minimum] of [
+	['.github/workflows/ci-linux.yml', 2],
+	['.github/workflows/ci.yml', 3],
+	['src/routes/ergopti-plus/Hero.svelte', 1],
+	['src/routes/ergopti-plus/Platforms.svelte', 1],
+	['src/routes/ergopti-plus/StickyCta.svelte', 1],
+	['tools/test/browser/site-artifact-smoke.playwright.cjs', 1]
+]) {
+	const text = read(relative);
+	assert.ok(
+		!/ErgoptiPlus-linux-[A-Za-z0-9_]+\.AppImage/.test(text),
+		`${relative} still names the old AppImage`
+	);
+	assert.ok(
+		text.split(APPIMAGE_ASSET).length - 1 >= minimum,
+		`${relative} names ${APPIMAGE_ASSET}`
+	);
+}
+assert.ok(!/linux/i.test(APPIMAGE_ASSET));
 passed++;
 
 console.log(`Linux AppImage portability: ${passed} checks passed.`);

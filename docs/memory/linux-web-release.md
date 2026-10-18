@@ -300,6 +300,24 @@ directory; report `config_paths.get_config_dir()` for the latter. Action: a new
 package format or diagnostic field goes through these owners, and
 `test-package-builds-stamp-commit.cjs` must stay green.
 
+### project-appimage-is-built-on-the-oldest-lts
+
+The AppImage bundles LuaJIT, curl, luv and their ELF closure but uses the
+recipient's glibc, and appimage.github.io tests it on the oldest Ubuntu LTS in
+standard support (22.04, glibc 2.35) under firejail with no network. v1.0.1,
+built on ubuntu-latest, needed GLIBC*2.38 and died before its tray appeared.
+`tools/build/appimage-oldest-lts.sh` now builds it (and the archive backend
+every package carries) in an `ubuntu:22.04` container, and
+`check-elf-glibc-ceiling.cjs` refuses any GLIBC* need above 2.35. GLib, the
+C++ runtime and libgcc are left to the recipient: the tray loads the host GTK
+into the daemon, and an older bundled GLib shadowing it through
+`LD_LIBRARY_PATH` breaks every host library built against GLib >= 2.80. The
+bundled lib directory still reaches child processes through `LD_LIBRARY_PATH`.
+The asset is `ErgoptiPlus-x86_64.AppImage` (the catalogue rejects "linux" in
+the name); installed AppImages never self-update, so a rename breaks no updater.
+Action: keep the build in that container until the catalogue's LTS moves, then
+raise `GLIBC_CEILING` and the image together.
+
 ### project-the-drift-guard-crashes-on-this-windows-box
 
 When a cross-platform drift tool fails on Windows path/process semantics, use

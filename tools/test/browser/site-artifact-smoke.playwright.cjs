@@ -16,7 +16,7 @@ const FIXTURE_ASSETS = Object.freeze([
 	'Ergopti_macOS.zip',
 	'ErgoptiPlus.exe',
 	'ErgoptiPlus.app.zip',
-	'ErgoptiPlus-linux-x86_64.AppImage'
+	'ErgoptiPlus-x86_64.AppImage'
 ]);
 function fixtureDownload(name) {
 	assert.ok(FIXTURE_ASSETS.includes(name), 'Unknown fixture download');
