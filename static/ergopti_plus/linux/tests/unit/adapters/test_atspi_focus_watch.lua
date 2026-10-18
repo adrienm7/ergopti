@@ -231,6 +231,86 @@ helpers.describe("AT-SPI focus watcher: causal input barrier", function()
 		helpers.assert_nil(state.watch.snapshot())
 	end)
 
+	helpers.it("admits an on-time native answer when the parent resumes after its deadline", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.now = 1030
+		end
+		helpers.assert_eq(state.watch.barrier().role, 61)
+		helpers.assert_eq(state.now, 1030, "the final drain must not wait again")
+	end)
+
+	helpers.it("refuses a matching native response emitted after the admission deadline", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1021.527 })
+			state.now = 1030
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_nil(state.watch.snapshot())
+	end)
+
+	helpers.it("does not let a new heartbeat renew an expired on-time barrier answer", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.now = 2500
+			state.message("heartbeat")
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_nil(state.watch.snapshot())
+	end)
+
+	helpers.it("refuses an on-time queued answer after its native owner has exited", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.now, state.running = 1030, false
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_true(state.cancelled)
+	end)
+
+	helpers.it("refuses an on-time queued answer when its native pipe ends before the final drain", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.now, state.eof = 1030, true
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_true(state.cancelled)
+	end)
+
+	helpers.it("keeps a later malformed native frame fatal during the final bounded drain", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.queue[#state.queue + 1] = "invalid-json\n"
+			state.now = 1030
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_true(state.cancelled)
+	end)
+
+	helpers.it("retains a newer unknown verdict after an on-time queued ordinary answer", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.message("snapshot", { at_ms = 1005 })
+			state.now = 1030
+			state.message("unknown")
+		end
+		helpers.assert_nil(state.watch.barrier())
+		helpers.assert_nil(state.watch.snapshot())
+	end)
+
 	helpers.it("resets logical text and closes metrics on a same-window programmatic password", function()
 		local state = fixture()
 		local epoch, secure, resets = 0, true, 0
