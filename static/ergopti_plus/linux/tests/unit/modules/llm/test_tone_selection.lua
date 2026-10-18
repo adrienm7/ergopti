@@ -113,6 +113,10 @@ local function scenario(opts, body)
 			init = function() end,
 			is_enabled = function() return opts.disabled ~= true end,
 			get_current_model = function() return "ollama-model" end,
+			set_model = function(name, source, admission)
+				if admission and admission() ~= true then return false end
+				return preferences.set_many({ ["llm.models.ollama"] = name }, source, admission)
+			end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
 		package.loaded["modules.llm.api_ollama"] = {
@@ -455,6 +459,16 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 			world.wait_for(2)
 			helpers.assert_eq(#world.posts, 1, "the retired provider receives no queued selection")
 			helpers.assert_eq(#world.ollama, 0, "the old tone step is not redirected to the new backend")
+		end)
+	end)
+
+	helpers.it("drops a pending tone answer after changing local model (ai-pass2-model)", function()
+		scenario({ selection = "merci pour ton aide", stored = { ["llm.models.selected"] = "ollama" } }, function(world)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
+			helpers.assert_eq(#world.ollama, 1)
+			helpers.assert_eq(world.engine.set_model("replacement-model"), true)
+			world.ollama[1].on_done("REWRITE: Merci pour votre aide.", nil)
+			helpers.assert_eq(#world.emitted, 0, "the retired model cannot replace the selection")
 		end)
 	end)
 
