@@ -124,6 +124,15 @@ are test infrastructure, not proof of POSIX child exit status, byte-preserving
 files, permissions or kernel behavior. A mandatory Linux observation must execute
 on the native target, without a skip or an assertion relaxed for Windows.
 
+### project-luajit-popen-is-not-an-exit-receipt
+
+LuaJIT's Lua 5.1 `io.popen():close()` can return true after a child exits with
+an error. Use the E2E child-capture helper's actual wait status instead of
+inferring success from printed output. Decode LuaJIT's numeric wait status
+and PUC Lua's exit tuple explicitly. Publish successful scenario results only
+after native cleanup; an intentionally fatal output refusal needs its exact
+nonzero exit and a separate failure receipt, never a healthy cleanup claim.
+
 ### project-plans-are-proportional
 
 Small isolated edits do not need a persistent plan. Use a short checklist for a
