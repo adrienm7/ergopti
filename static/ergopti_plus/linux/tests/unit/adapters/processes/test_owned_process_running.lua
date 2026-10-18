@@ -15,6 +15,7 @@ local function backend()
 	end
 	function native.new_pipe() return handle("pipe") end
 	function native.new_timer() return handle("timer") end
+	function native.update_time() end
 	function native.is_closing(value) return value.closing end
 	function native.read_start(value, callback) value.read = callback return 0 end
 	function native.read_stop(value) value.read_stopped = true return 0 end

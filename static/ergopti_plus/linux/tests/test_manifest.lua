@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.processes.test_owned_process_deadline",
 	"tests.unit.adapters.processes.test_desktop_opener",
 	"tests.unit.ui.healthcheck.test_desktop_report_shutdown",
 	"tests.unit.ui.menu.structure.test_menu_rebuild_owner",

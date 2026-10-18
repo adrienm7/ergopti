@@ -13,6 +13,7 @@ local Logger = require("logger.shim")
 local Shell = require("adapters.shell_runner")
 local Exit = require("infra.libuv_exit")
 local Group = require("infra.libuv_process_group")
+local NativeTimer = require("infra.native_timer")
 local Defaults = require("llm.process_limits").defaults()
 local available, native = pcall(require, "luv")
 if not available then native = nil end
@@ -194,7 +195,7 @@ local function watch_cleanup(request)
 	if not receipt or receipt.state ~= "open" or request.cleanup_watching then return end
 	receipt.active = true
 	request.cleanup_watching = true
-	if not accepted(native.timer_start, handle, GROUP_RECHECK_MS, GROUP_RECHECK_MS, function()
+	if not accepted(NativeTimer.start, native, handle, GROUP_RECHECK_MS, GROUP_RECHECK_MS, function()
 		retry_cleanup(request)
 	end) then
 		request.cleanup_watching = false
@@ -392,7 +393,7 @@ function M.start(executable, args, options, callback)
 	end
 	if not native then return refuse("native asynchronous process support is unavailable") end
 	for _, name in ipairs({ "new_pipe", "new_timer", "spawn", "read_start", "read_stop", "timer_start",
-		"timer_stop", "is_closing", "close", "kill" }) do
+		"timer_stop", "is_closing", "close", "kill", "update_time" }) do
 		if type(native[name]) ~= "function" then return refuse("native process capability is unavailable") end
 	end
 	if owners[request.owner] then return refuse("previous process cleanup pending") end
@@ -468,7 +469,7 @@ function M.start(executable, args, options, callback)
 	end
 	if request.timeout and not request.terminal then
 		request.handles[request.timeout].active = true
-		if not accepted(native.timer_start, request.timeout, options.timeout_ms, 0, function()
+		if not accepted(NativeTimer.start, native, request.timeout, options.timeout_ms, 0, function()
 			finish(request, "process deadline exceeded")
 		end) then return refuse("native process deadline refused") end
 	end
