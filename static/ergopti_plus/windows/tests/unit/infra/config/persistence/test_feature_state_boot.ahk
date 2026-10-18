@@ -205,3 +205,7 @@ _FeatureStateBootNativeInclude(DriverSource, Position) {
 	Line := Trim(SubStr(DriverSource, Position, End ? End - Position : unset), "`r`n `t")
 	return "#Include ..\..\" . StrReplace(SubStr(Line, 10), "/", "\")
 }
+
+for Fixture in ["kana_auto_lower", "kana_auto_upper", "kana_auto_mixed"]
+	Test("feature-state startup: admitted " . Fixture . " stays automatic (kana-auto-case-runtime)",
+		_FeatureStateBootRun.Bind(Fixture))
