@@ -1,0 +1,269 @@
+﻿; tests/unit/infra/config/migration/test_config_journal_ai_admission.ahk
+
+; ==============================================================================
+; MODULE: Config Journal Read-Only AI Menu Admission
+; DESCRIPTION:
+; A newer schema disables AI activation without changing settings, the
+; classification memo keeps fresh source authority, and registry scalar
+; fast leaves keep typed semantics and native owner admission.
+; ==============================================================================
+
+#Requires AutoHotkey v2.0
+
+
+
+
+
+_CMJ_WithAiPersistenceState(Body) {
+	global ConfigurationFile, _LLM_Menu, _ConfigBootReadFailed, _ConfigBootRejectedOverrides
+	Prior := Map("path", IsSet(ConfigurationFile), "menu", IsSet(_LLM_Menu),
+		"read", IsSet(_ConfigBootReadFailed), "rejected", IsSet(_ConfigBootRejectedOverrides))
+	if Prior["path"]
+		Prior["path_value"] := ConfigurationFile
+	if Prior["menu"]
+		Prior["menu_value"] := _LLM_Menu
+	if Prior["read"]
+		Prior["read_value"] := _ConfigBootReadFailed
+	if Prior["rejected"]
+		Prior["rejected_value"] := _ConfigBootRejectedOverrides
+	PriorSuspend := A_IsSuspended
+	Dir := _CMG_NewDir()
+	try {
+		Suspend(false)
+		ConfigurationFile := Dir . "\config.toml"
+		_LLM_Menu := Map("enabled", false)
+		_ConfigBootReadFailed := false
+		_ConfigBootRejectedOverrides := 0
+		return Body.Call(ConfigurationFile)
+	} finally {
+		try _CMJ_Cleanup(Dir, Dir . "\config.toml")
+		finally {
+			ConfigurationFile := Prior["path"] ? Prior["path_value"] : unset
+			_LLM_Menu := Prior["menu"] ? Prior["menu_value"] : unset
+			_ConfigBootReadFailed := Prior["read"] ? Prior["read_value"] : unset
+			_ConfigBootRejectedOverrides := Prior["rejected"] ? Prior["rejected_value"] : unset
+			Suspend(PriorSuspend)
+		}
+	}
+}
+
+_CMJ_NewerSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . (ConfigMigrateCurrentVersion() + 1)
+		. '`n[layout]`nfuture_layout_owner = "retain exactly"`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path), "observing an unknown destination does not construct it")
+	AssertFalse(ConfigMigrateBoot(Path, "known"))
+	Prepared := ConfigSchemaPrepareSource(Path)
+	AssertEqual("newer", Prepared["status"])
+	Result := ConfigMigrateBoot(Path)
+	AssertEqual("newer", Result["status"])
+	AssertEqual(1, Result["read_only"])
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertFalse(Getters["llm_enabled"].Call())
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "a paused-independent future-schema toggle is not clickable")
+	AssertEqual("newer", ConfigSchemaReadOnlyStatus(Path), "the actual retained classification remains observable without write permission")
+	AssertTrue(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters),
+		"the actual declaration renders protected AI activation disabled")
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the AI toggle", (Message, Options) => Messages.Push([Message, Options]),
+		"the boot configuration was not completely loaded"))
+	AssertEqual(1, Messages.Length)
+	AssertEqual(t("config.read_only.newer_schema"), Messages[1][1], "stale callers explain the actual retained newer schema")
+	AssertFalse(Messages[1][1] == "config.read_only.newer_schema", "the user sees localized guidance, not a raw key")
+	AssertEqual("error", Messages[1][2]["level"])
+	AssertTrue(FSUtf8ExactMatches(Path, Source), "observation, menu rendering and failure reporting preserve every source byte")
+	AssertFalse(ConfigSchemaCanPrepareWrite(Path), "diagnostic status and notification never grant permission")
+}
+Test("config journal: newer schema disables AI activation and explains update without changing settings (newer-schema-ai)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_NewerSchemaAiAdmission))
+
+_CMJ_CurrentSchemaAiAdmission(Path) {
+	Source := '[_meta]`nschema_version = ' . ConfigMigrateCurrentVersion() . '`n'
+	AssertTrue(FSWriteDurable(Path, Source))
+	AssertEqual("current", ConfigSchemaPrepareSource(Path)["status"])
+	AssertEqual("", ConfigSchemaReadOnlyStatus(Path))
+	AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+	AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+	Getters := _LLM_Menu_StateGetters()
+	AssertTrue(Getters["llm_toggle_ready"].Call(), "an admitted ordinary current configuration remains available")
+	AssertFalse(MenuRenderer_ResolveDisabledWhen("llm_menu", "llm_toggle", Getters))
+	Suspend(true)
+	AssertFalse(Getters["llm_toggle_ready"].Call(), "configuration readiness does not override suspension")
+	Suspend(false)
+	AssertTrue(Getters["llm_toggle_ready"].Call())
+	Messages := []
+	AssertFalse(ConfigReportPersistenceFailure("the ordinary failure", (Message, Options) => Messages.Push(Message), "controlled write refusal"))
+	AssertEqual(t("dialog.bulk_toggle.save_failed"), Messages[1], "ordinary failure localization is unchanged")
+	AssertTrue(FSUtf8ExactMatches(Path, Source))
+}
+Test("config journal: current schema and pause retain ordinary AI menu and failure semantics (newer-schema-ai-current)",
+	_CMJ_WithAiPersistenceState.Bind(_CMJ_CurrentSchemaAiAdmission))
+
+
+; Repeated classification may reuse only exact source bytes; source reads and
+; registry/owner admission remain genuine on every request.
+_CMJ_MemoSyntheticSource(VersionText) {
+	Source := '[_meta]`nschema_version = ' . VersionText . '`n[llm]`n'
+	loop 135
+		Source .= Format('memo_field_{1:03} = "value{1:03}"`n', A_Index)
+	Padding := 5000 - StrLen(Source)
+	AssertTrue(Padding >= 2, "the controlled classification workload has bounded padding")
+	Source .= "#"
+	loop Padding - 2
+		Source .= "x"
+	return Source . "`n"
+}
+
+_CMJ_MemoFileTimestamp(Path, Stamp := unset) {
+	if IsSet(Stamp)
+		FileSetTime(Stamp, Path, "M")
+	return FileGetTime(Path, "M")
+}
+
+_CMJ_ClassificationMemoFreshSource() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	try {
+		AssertEqual(5000, StrLen(Source), "the workload contains 136 scalar keys in exactly 5000 ASCII bytes")
+		AssertTrue(FSWriteDurable(Path, Source))
+		Stamp := _CMJ_MemoFileTimestamp(Path)
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		loop 3
+			AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(HasMethod(Captured, "Call"))
+		ChangedCase := StrReplace(Source, "schema_version", "SCHEMA_VERSION")
+		AssertEqual(StrLen(Source), StrLen(ChangedCase))
+		AssertTrue(FSWriteDurable(Path, ChangedCase))
+		AssertEqual(Stamp, _CMJ_MemoFileTimestamp(Path, Stamp), "the same-length successor retains the old modification timestamp")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a same-length case change cannot reuse current metadata classification")
+		AssertFalse(Captured.Call(ChangedCase, 1), "a cached classification never becomes stale source authority")
+		Future := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion() + 1))
+		AssertTrue(FSWriteDurable(Path, Future))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "fresh newer metadata remains read-only after a warm hit")
+		Invalid := _CMJ_MemoSyntheticSource('"invalid"')
+		AssertTrue(FSWriteDurable(Path, Invalid))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "typed invalid metadata cannot borrow the prior current decision")
+		Malformed := StrReplace(Source, "schema_version = " . ConfigMigrateCurrentVersion(),
+			"schema_version = " . ConfigMigrateCurrentVersion() . "`nschema_version = " . ConfigMigrateCurrentVersion())
+		AssertTrue(FSWriteDurable(Path, Malformed))
+		loop 2
+			AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a parse refusal never grants cached readiness")
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact current source repair restores original admission")
+		AssertTrue(Captured.Call(Source, 1), "the original source guard remains authoritative after exact repair")
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo preserves fresh source and case-sensitive authority (classification-memo-source)",
+	_CMJ_ClassificationMemoFreshSource)
+
+_CMJ_ClassificationMemoRegistry() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	Source := _CMJ_MemoSyntheticSource(String(ConfigMigrateCurrentVersion()))
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Captured := ConfigMigrateBoot(Path, "capture_noop")
+		Registry["current"] := Current + 1
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a warm source memo cannot hide in-place registry mutation")
+		AssertFalse(Captured.Call(Source, 1))
+		Registry["current"] := Current
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Step["reason"] := Reason . " altered"
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "nested registry data is still compared against the private shadow on a hit")
+		AssertFalse(Captured.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact nested registry repair restores admission")
+		AssertTrue(Captured.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: classification memo rechecks genuine registry and exact repair (classification-memo-registry)",
+	_CMJ_ClassificationMemoRegistry)
+
+_CMJ_ClassificationMemoPresence() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml"
+	try {
+		AssertEqual("absent", ConfigMigrateBoot(Path)["status"])
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(FSWriteDurable(Path, ""))
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "a present empty file cannot borrow absent-source default permission")
+		AssertTrue(FSDelete(Path))
+		AssertFalse(FSStrictExists(Path))
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "the genuine absent-image branch still uses its original readiness rules")
+	} finally _CMJ_Cleanup(Dir, Path)
+}
+Test("config journal: classification memo does not alias missing and present empty source (classification-memo-presence)",
+	_CMJ_ClassificationMemoPresence)
+
+
+_CMJ_RegistryLeafScalarTypes() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Registry := ConfigMigrateShippedRegistry(), Current := Registry["current"]
+	Step := Registry["steps"][1], Reason := Step["reason"]
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		Registry["current"] := Current + 0.0
+		AssertTrue(Registry["current"] is Float, "the numeric parity vector must be a real Float")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "native integer and equal Float retain canonical numeric equality")
+		AssertTrue(Guard.Call(Source, 1))
+		Registry["current"] := String(Current)
+		AssertTrue(Registry["current"] is String, "the numeric-looking refusal vector must remain a String")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "numeric-looking strings cannot borrow native numeric registry authority")
+		AssertFalse(Guard.Call(Source, 1))
+		Registry["current"] := Current
+		Step["reason"] := StrUpper(Reason)
+		AssertTrue(StrCompare(Step["reason"], Reason, true) != 0, "the actual reason must have a distinct case mutation")
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "registry strings remain exactly case-sensitive")
+		AssertFalse(Guard.Call(Source, 1))
+		Step["reason"] := Reason
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path), "exact scalar repair restores observed native registry authority")
+		AssertTrue(Guard.Call(Source, 1))
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		Registry["current"] := Current
+		Step["reason"] := Reason
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves preserve typed numeric and exact string semantics (registry-leaf-safety)",
+	_CMJ_RegistryLeafScalarTypes)
+
+_CMJ_RegistryLeafNativeOwner() {
+	Dir := _CMG_NewDir(), Path := Dir . "\config.toml", Source := _CMJ_CurrentSource()
+	Invocations := { count: 0 }
+	AssertFalse(Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call"))
+	try {
+		AssertTrue(FSWriteDurable(Path, Source))
+		AssertEqual("current", ConfigMigrateBoot(Path)["status"])
+		Guard := ConfigMigrateBoot(Path, "capture_noop")
+		AssertTrue(Guard.Call(Source, 1))
+		ConfigMigrateSameValue.DefineProp("Call", {Call: (*) => (Invocations.count += 1, true)})
+		AssertFalse(ConfigSchemaCanPrepareWrite(Path), "direct scalar comparisons cannot skip the exact canonical native owner fence")
+		AssertFalse(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count, "foreign native scalar callbacks are refused before invocation")
+		ConfigMigrateSameValue.DeleteProp("Call")
+		AssertTrue(ConfigSchemaCanPrepareWrite(Path))
+		AssertTrue(Guard.Call(Source, 1))
+		AssertEqual(0, Invocations.count)
+		AssertTrue(FSUtf8ExactMatches(Path, Source))
+	} finally {
+		if Object.Prototype.HasOwnProp.Call(ConfigMigrateSameValue, "Call")
+			ConfigMigrateSameValue.DeleteProp("Call")
+		_CMJ_Cleanup(Dir, Path)
+	}
+}
+Test("config journal: registry scalar fast leaves retain canonical native owner admission (registry-leaf-safety)",
+	_CMJ_RegistryLeafNativeOwner)
