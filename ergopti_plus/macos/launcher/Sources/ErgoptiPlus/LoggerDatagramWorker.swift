@@ -83,7 +83,7 @@ struct LoggerSinkStatistics: Equatable {
 
 /// Serial file authority used only from LoggerDatagramProcessor's private queue.
 final class LoggerRecordSink {
-	private static let maximumLineBytes = 48 * 1_024
+	static let maximumLineBytes = 48 * 1_024
 	private static let maximumTopicCount = 16
 	private static let maximumTopicNameBytes = 96
 	private static let lockTimeoutSeconds: TimeInterval = 0.25
@@ -91,6 +91,9 @@ final class LoggerRecordSink {
 
 	private var directoryDescriptor: Int32 = -1
 	private var directoryPath: String?
+	private var resolvedDirectoryPath: String?
+	private(set) var ownedCloseError: Int32 = 0
+	private let closeOperation: (Int32) -> Int32
 	private var retentionDays = 14
 	private var topicalWriteDate: String?
 	private var forceTopicalResetForObservedTransition = false
@@ -147,7 +150,8 @@ final class LoggerRecordSink {
 		openOperation: @escaping (Int32, String, Int32, mode_t) -> Int32 = { directory, name, flags, mode in
 			name.withCString { Darwin.openat(directory, $0, flags, mode) }
 		},
-		uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
+		uptime: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
+		closeOperation: @escaping (Int32) -> Int32 = { Darwin.close($0) }
 	) {
 		self.now = now
 		self.beforeLock = beforeLock
@@ -156,6 +160,7 @@ final class LoggerRecordSink {
 		self.synchronizeOperation = synchronizeOperation
 		self.openOperation = openOperation
 		self.uptime = uptime
+		self.closeOperation = closeOperation
 	}
 
 	deinit {
@@ -179,7 +184,7 @@ final class LoggerRecordSink {
 	/// user's own symbolic links are resolved once; OwnedLogDirectoryResolver
 	/// then refuses any link that appears after that resolution.
 	func configure(directoryPath: String, retentionDays: Int) -> Bool {
-		guard (1...3_650).contains(retentionDays),
+		guard ownedCloseError == 0, (1...3_650).contains(retentionDays),
 			let normalizedPath = OwnedLogDirectoryResolver.normalizedAbsoluteDirectoryPath(directoryPath)
 		else {
 			lastDirectoryFailure = LogDirectoryFailure(path: directoryPath, refusal: .invalidPath)
@@ -197,9 +202,11 @@ final class LoggerRecordSink {
 		}
 
 		let descriptor: Int32
+		let resolvedPath: String
 		switch OwnedLogDirectoryResolver.open(normalizedPath) {
 		case let .success(directory):
 			descriptor = directory.descriptor
+			resolvedPath = directory.resolvedPath
 		case let .failure(failure):
 			lastDirectoryFailure = failure
 			return false
@@ -210,7 +217,7 @@ final class LoggerRecordSink {
 				path: normalizedPath,
 				refusal: .unavailable(errorCode: errno)
 			)
-			Darwin.close(descriptor)
+			closeOwnedDescriptor(descriptor)
 			return false
 		}
 		var previousAttributes = stat()
@@ -223,8 +230,13 @@ final class LoggerRecordSink {
 		// Kept descriptors belong to the previous directory descriptor, even at
 		// the same pathname: a replaced folder must never receive them.
 		closeOpenFiles()
-		if directoryDescriptor >= 0 { Darwin.close(directoryDescriptor) }
+		if directoryDescriptor >= 0 {
+			let previous = directoryDescriptor; directoryDescriptor = -1
+			closeOwnedDescriptor(previous)
+		}
+		guard ownedCloseError == 0 else { closeOwnedDescriptor(descriptor); return false }
 		directoryDescriptor = descriptor
+		resolvedDirectoryPath = resolvedPath
 		self.directoryPath = normalizedPath
 		self.retentionDays = retentionDays
 		if !preservesTopicalState {
@@ -271,7 +283,7 @@ final class LoggerRecordSink {
 		calendarDate: String,
 		operationId: String
 	) -> Bool {
-		guard settlePendingWriteRollback(),
+		guard ownedCloseError == 0, settlePendingWriteRollback(),
 			directoryDescriptor >= 0,
 			let persistedLine = Self.persistedLine(line),
 			accepts(line: line, variant: variant, topics: topics, calendarDate: calendarDate),
@@ -315,7 +327,7 @@ final class LoggerRecordSink {
 			// may be truncated, so every kept descriptor is reopened.
 			closeOpenFiles()
 		}
-		guard let bytes = (persistedLine + "\n").data(using: .utf8) else { return false }
+		guard ownedCloseError == 0, let bytes = (persistedLine + "\n").data(using: .utf8) else { return false }
 		let unifiedName = kLogUnifiedPrefix + calendarDate + kLogFileExtension
 		var targets = [(name: unifiedName, topical: false)]
 		if variant == "warn" || variant == "error" {
@@ -344,6 +356,45 @@ final class LoggerRecordSink {
 		pendingRecord = nil
 		statistics.appends += 1
 		return true
+	}
+
+	/// Configures daemon capture with this sink's existing retention default.
+	func configureDaemon(directoryPath: String) -> Bool {
+		configure(directoryPath: directoryPath, retentionDays: retentionDays)
+	}
+
+	/// Appends daemon text using this sink's current local day, never the launch day.
+	func appendDaemon(line: String, operationId: String) -> Bool {
+		guard let path = resolvedDirectoryPath else { return false }
+		var held = stat(); var named = stat()
+		guard fstat(directoryDescriptor, &held) == 0, lstat(path, &named) == 0,
+			(held.st_mode & S_IFMT) == S_IFDIR, (named.st_mode & S_IFMT) == S_IFDIR,
+			held.st_uid == geteuid(), held.st_dev == named.st_dev, held.st_ino == named.st_ino else { return false }
+		let timestamp = now()
+		let parts = Self.gregorianCalendar().dateComponents([.hour, .minute, .second], from: timestamp)
+		let prefix = String(format: "%02d:%02d:%02d [OLLAMA-SERVER] ",
+			parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+		return append(line: prefix + line, variant: "info", topics: [],
+			calendarDate: Self.calendarDate(timestamp), operationId: operationId)
+	}
+
+	/// Closes every original sink descriptor only after partial-write rollback.
+	/// A failed close remains sticky; no reused numeric descriptor is retried.
+	func settleOwnedResources() -> Bool {
+		guard settlePendingWriteRollback() else { return false }
+		pendingRecord = nil
+		closeOpenFiles()
+		if directoryDescriptor >= 0 {
+			let descriptor = directoryDescriptor; directoryDescriptor = -1
+			closeOwnedDescriptor(descriptor)
+		}
+		return ownedCloseError == 0
+	}
+
+	private func closeOwnedDescriptor(_ descriptor: Int32) {
+		if closeOperation(descriptor) != 0 && ownedCloseError == 0 {
+			ownedCloseError = errno == 0 ? EIO : errno
+		}
 	}
 
 	/// Keeps native log files textual without rejecting an otherwise valid Lua
@@ -421,7 +472,7 @@ final class LoggerRecordSink {
 			attributes.st_nlink == 1,
 			Darwin.fchmod(descriptor, S_IRUSR | S_IWUSR) == 0
 		else {
-			Darwin.close(descriptor)
+			closeOwnedDescriptor(descriptor)
 			return nil
 		}
 		let file = OpenFile(descriptor: descriptor, device: attributes.st_dev, inode: attributes.st_ino)
@@ -431,7 +482,7 @@ final class LoggerRecordSink {
 
 	private func closeOpenFile(_ fileName: String) {
 		guard let file = openFiles.removeValue(forKey: fileName) else { return }
-		Darwin.close(file.descriptor)
+		closeOwnedDescriptor(file.descriptor)
 	}
 
 	private func closeOpenFiles() {
@@ -540,9 +591,9 @@ final class LoggerRecordSink {
 		guard rollbackWrite(rollback.descriptor, originalSize: rollback.originalSize)
 		else { return false }
 		guard ergoptiFlock(rollback.descriptor, LOCK_UN) == 0 else { return false }
-		Darwin.close(rollback.descriptor)
 		pendingWriteRollback = nil
-		return true
+		closeOwnedDescriptor(rollback.descriptor)
+		return ownedCloseError == 0
 	}
 
 	/// Prevents an unrelated stalled writer from parking this serial worker forever.

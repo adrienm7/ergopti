@@ -21,44 +21,66 @@ local function without_comments(source)
 		local escaped = false
 		local first_code = line:find("%S") or (#line + 1)
 		local index = 1
-		while index <= #line do
-			local char = line:sub(index, index)
-			local pair = line:sub(index, index + 1)
+		local length = #line
+		while index <= length do
 			if in_c_block then
-				if pair == "*/" then
+				local close = line:find("*/", index, true)
+				if close then
 					in_c_block = false
-					index = index + 2
+					index = close + 2
 				else
-					index = index + 1
+					index = length + 1
 				end
 			elseif quote then
-				out[#out + 1] = char
 				if escaped then
+					out[#out + 1] = line:sub(index, index)
 					escaped = false
-				elseif char == "\\" then
-					escaped = true
-				elseif char == quote then
-					quote = nil
+					index = index + 1
+				else
+					-- Copy the run up to the next escape or closing quote at once.
+					local stop = line:find(quote == '"' and '[\\"]' or "[\\']", index)
+					if not stop then
+						out[#out + 1] = line:sub(index)
+						index = length + 1
+					else
+						out[#out + 1] = line:sub(index, stop)
+						if line:sub(stop, stop) == "\\" then escaped = true else quote = nil end
+						index = stop + 1
+					end
 				end
-				index = index + 1
-			elseif char == '"' or char == "'" then
-				quote = char
-				out[#out + 1] = char
-				index = index + 1
-			elseif pair == "/*" then
-				in_c_block = true
-				index = index + 2
-			elseif pair == "//" then
-				break
-			elseif pair == "--"
-				and (index == first_code or line:sub(index + 2, index + 2):match("[%s%-]") ~= nil) then
-				break
-			elseif char == "#"
-				and (index == first_code or line:sub(index - 1, index - 1):match("%s") ~= nil) then
-				break
 			else
-				out[#out + 1] = char
-				index = index + 1
+				-- Plain code: copy everything before the next byte that can open
+				-- a string or a comment, then decide on that byte exactly as before.
+				local special = line:find("[\"'/%-#]", index)
+				if not special then
+					out[#out + 1] = line:sub(index)
+					index = length + 1
+				elseif special > index then
+					out[#out + 1] = line:sub(index, special - 1)
+					index = special
+				else
+					local char = line:sub(index, index)
+					local pair = line:sub(index, index + 1)
+					if char == '"' or char == "'" then
+						quote = char
+						out[#out + 1] = char
+						index = index + 1
+					elseif pair == "/*" then
+						in_c_block = true
+						index = index + 2
+					elseif pair == "//" then
+						break
+					elseif pair == "--"
+						and (index == first_code or line:sub(index + 2, index + 2):match("[%s%-]") ~= nil) then
+						break
+					elseif char == "#"
+						and (index == first_code or line:sub(index - 1, index - 1):match("%s") ~= nil) then
+						break
+					else
+						out[#out + 1] = char
+						index = index + 1
+					end
+				end
 			end
 		end
 		kept[#kept + 1] = table.concat(out)
@@ -119,28 +141,45 @@ end
 
 local function split_statements(source)
 	local statements = {}
-	local pending = ""
+	local pending = {}
 	local depth = 0
 	for line in (source .. "\n"):gmatch("([^\n]*)\n") do
-		pending = pending == "" and line or (pending .. "\n" .. line)
+		-- An empty pending text restarts with this line (leading blank lines drop).
+		if #pending == 0 or (#pending == 1 and pending[1] == "") then
+			pending = { line }
+		else
+			pending[#pending + 1] = line
+		end
 		local quote = nil
 		local escaped = false
-		for index = 1, #line do
-			local char = line:sub(index, index)
+		local index = 1
+		local length = #line
+		while index <= length do
 			if quote then
 				if escaped then
 					escaped = false
-				elseif char == "\\" then
-					escaped = true
-				elseif char == quote then
-					quote = nil
+					index = index + 1
+				else
+					local stop = line:find(quote == '"' and '[\\"]' or "[\\']", index)
+					if not stop then
+						index = length + 1
+					else
+						if line:sub(stop, stop) == "\\" then escaped = true else quote = nil end
+						index = stop + 1
+					end
 				end
-			elseif char == '"' or char == "'" then
-				quote = char
-			elseif char == "(" or char == "{" or char == "[" then
-				depth = depth + 1
-			elseif char == ")" or char == "}" or char == "]" then
-				depth = math.max(0, depth - 1)
+			else
+				local special = line:find("[\"'%(%){}%[%]]", index)
+				if not special then break end
+				local char = line:sub(special, special)
+				if char == '"' or char == "'" then
+					quote = char
+				elseif char == "(" or char == "{" or char == "[" then
+					depth = depth + 1
+				else
+					depth = math.max(0, depth - 1)
+				end
+				index = special + 1
 			end
 		end
 		local trimmed = line:gsub("%s+$", "")
@@ -148,11 +187,13 @@ local function split_statements(source)
 			or trimmed:match("[=,|\\]$") ~= nil
 			or trimmed:match("%.%.$") ~= nil
 		if not continues then
-			if pending:find("%S") then statements[#statements + 1] = pending end
-			pending = ""
+			local text = table.concat(pending, "\n")
+			if text:find("%S") then statements[#statements + 1] = text end
+			pending = {}
 		end
 	end
-	if pending:find("%S") then statements[#statements + 1] = pending end
+	local text = table.concat(pending, "\n")
+	if text:find("%S") then statements[#statements + 1] = text end
 	return statements
 end
 
@@ -182,10 +223,8 @@ end
 --- @param index number Current byte index.
 --- @return number index First non-whitespace byte index.
 local function skip_expression_space(expression, index)
-	while index <= #expression and expression:sub(index, index):match("%s") do
-		index = index + 1
-	end
-	return index
+	if index > #expression then return index end
+	return expression:find("%S", index) or (#expression + 1)
 end
 
 --- Reads one quoted string or previously resolved constant identifier.
@@ -222,7 +261,7 @@ local function constant_atom_at(expression, index, constants)
 		return nil, #expression + 1
 	end
 
-	local identifier = expression:sub(index):match("^([%a_][%w_]*)")
+	local identifier = expression:match("^([%a_][%w_]*)", index)
 	if not identifier then return nil, index end
 	local value = constants[identifier:lower()]
 	if type(value) ~= "string" then return nil, index end
@@ -299,11 +338,12 @@ local function folded_constant_values(statement, constants, include_identifiers)
 				index = next_index
 			else
 				local identifier = is_identifier_start
-					and statement:sub(index):match("^([%a_][%w_]*)") or nil
+					and statement:match("^([%a_][%w_]*)", index) or nil
 				index = index + (identifier and #identifier or 1)
 			end
 		else
-			index = index + 1
+			-- Only a quote or a letter can start an atom; skip the bytes between.
+			index = statement:find("[\"'%a_]", index + 1) or (#statement + 1)
 		end
 	end
 	return values

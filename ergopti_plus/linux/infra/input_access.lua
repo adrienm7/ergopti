@@ -24,12 +24,14 @@
 ---    RestartPreventExitStatus, because no restart can fix group membership —
 ---    only a new session can — and a restart loop would repeat the notification
 ---    every three seconds.
+--- 3. With --tray the icon stays up, naming the failure, until the user quits:
+---    a desktop launch that vanished looked like an app that never started.
 --- ==============================================================================
 
 local M = {}
 
 --- sysexits.h EX_CONFIG. Pinned by ergopti-hotstrings.service's
---- RestartPreventExitStatus= (tests/unit/infra/test_input_access.lua).
+--- RestartPreventExitStatus= (tests/unit/infra/lifecycle/test_input_access.lua).
 M.EXIT_ACCESS = 78
 
 M.TITLE_KEY = "startup.linux_input_access_title"
@@ -87,7 +89,37 @@ function M.report(deps, detail)
 	if deps.notifier and type(deps.notifier.send) == "function" then
 		pcall(deps.notifier.send, body, { title = notification_label, level = "error" })
 	end
+	if deps.tray then M.hold_tray(deps, notification_label) end
 	return M.EXIT_ACCESS
+end
+
+--- Keeps a tray icon that names the failure until the user quits it.
+---
+--- A desktop launch (the AppImage, the menu entry) has only the tray to show
+--- that the app started at all. Exiting after a notification left nothing on
+--- screen, which a user reads as "it does not launch" and the AppImage
+--- catalogue test fails outright: it starts the app without the input group
+--- and requires a window or a tray icon.
+--- @param deps table tray (tray_menu adapter); i18n, sleep_ms optional.
+--- @param label string The translated failure, shown as the first row.
+function M.hold_tray(deps, label)
+	local tray = deps.tray
+	tray.setIcon({ title = "Ergopti" })
+	if tray.getBackend() == nil then return end
+	local quit_label = "Quit"
+	if deps.i18n then
+		local ok, translated = pcall(deps.i18n.get, "menu.global.quit")
+		-- The menu key carries the row's emoji, which a lone row does not need.
+		if ok and type(translated) == "string" then quit_label = translated:gsub("^%S+%s+", "") end
+	end
+	local quit = false
+	tray.setFallbackMenu(label, quit_label, function() quit = true end)
+	local sleep_ms = deps.sleep_ms or require("adapters.event_loop").sleep_ms
+	while not quit do
+		tray.pump()
+		sleep_ms(100)
+	end
+	tray.destroy()
 end
 
 return M

@@ -66,6 +66,14 @@ package.path = SCRIPT_DIR .. "/?.lua;" ..
                SHARED_LUA_DIR .. "/?/init.lua;" ..
                package.path
 
+-- Retain the launcher's lock here, while preventing any later external process
+-- from holding it after this daemon stops or crashes.
+local lock_protected, lock_error = require("infra.session_lock").protect()
+if not lock_protected then
+	io.stderr:write("[session_lock] " .. lock_error .. "\n")
+	os.exit(78)
+end
+
 
 -- =========================================
 -- =========================================
@@ -147,6 +155,7 @@ local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
+local privacy_owners = {}
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
@@ -289,6 +298,33 @@ local shutdown = ShutdownCoordinator.new({
 				if prediction_engine and type(prediction_engine.cancel_model_download) == "function" then
 					prediction_engine.cancel_model_download()
 				end
+			end,
+		},
+		{
+			name = "AI selection capture",
+			wait_for_ack = true,
+			stop = function()
+				return not privacy_owners.selection or privacy_owners.selection.stop() == true
+			end,
+		},
+		{
+			name = "metrics SQLite flush",
+			wait_for_ack = true,
+			stop = function() return keylogger.stop() == true end,
+		},
+		{
+			name = "privacy context capture",
+			wait_for_ack = true,
+			stop = function()
+				return not privacy_owners.context or privacy_owners.context.stop() == true
+			end,
+		},
+		{
+			name = "accessible focus watch",
+			wait_for_ack = true,
+			stop = function()
+				if privacy_owners.watch then return privacy_owners.watch.stop() == true end
+				return true
 			end,
 		},
 		{
@@ -580,10 +616,8 @@ local function install_signal_handlers()
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
-		-- Keep the signal path self-contained after quiescence. The ordinary clean
-		-- exit repeats both operations idempotently, but an unexpected loop backend
-		-- failure must not leave the last metrics batch or the uinput FD behind.
-		keylogger.flush()
+		-- The coordinator owns the final SQLite flush and its native ACK.
+		-- Signal callbacks never dispatch an independent persistence attempt.
 		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
 		-- before that point can strand held keys because the hook restores them
 		-- through the same uinput device.
@@ -739,19 +773,26 @@ local function main()
 	if not device then
 		device = dev_finder.find_keyboard()
 	end
+	local InputAccess = require("infra.input_access")
 	if not device then
 		Logger.error(LOG, "No keyboard device found. Specify one with --device.")
 		print("Error: no keyboard device detected. Specify one with --device.")
+		-- A sandbox that hides /dev/input looks like this: with --tray the icon
+		-- still names the problem instead of the app vanishing.
+		if opts.tray and tray_menu then
+			InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+				tray = tray_menu }, "no keyboard device detected")
+		end
 		os.exit(1)
 	end
 	-- Found but unreadable is the first launch after install.sh: the input group
 	-- it granted only applies from the next session. Say so on screen — the
 	-- console line below used to be the only trace — and exit with a status
 	-- the unit does not retry, since only a new session can fix it.
-	local InputAccess = require("infra.input_access")
 	if InputAccess.is_denied(device) then
 		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+			tray = opts.tray and tray_menu or nil },
 			device .. " is not readable (the input group applies from the next session)"))
 	end
 	Logger.info(LOG, "Using device: %s.", device)
@@ -781,6 +822,9 @@ local function main()
 	-- LuaJIT's 60-upvalue limit. Declared before the pause controller below,
 	-- whose closure reads it.
 	local TapHold = require("platform.remap.tap_hold_manager")
+	-- When the buffer forgets the current word: after a pause and on a click.
+	-- Required here for the same upvalue budget as TapHold.
+	local WordReset = require("modules.hotstrings.word_reset")
 	-- The action catalogue, bound once. It shares a module with the touchpad
 	-- reader, whose lifecycle is its own: a reader that fails and stops must not
 	-- take the tap actions with it.
@@ -790,6 +834,12 @@ local function main()
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
 			action_catalogue.execute_action(action, binding)
+			-- The command's keys (Ctrl+V for paste) go straight to the virtual
+			-- keyboard and never reach the hook: hotstrings.tap_hold_resets_word
+			-- decides here whether the next key starts a word.
+			local effect = WordReset.apply_tap_action(engine, binding)
+			if effect == "word_start" then _undoable = nil end
+			Logger.debug(LOG, "Tap action '%s' — hotstring word %s.", tostring(action), effect)
 		end,
 		-- Every action the catalogue runs here, not only the gesture picker's
 		-- list: a tap set to one of the others must not read as unsupported.
@@ -821,6 +871,7 @@ local function main()
 
 	local script_actions = ScriptActions.new({
 		reset = function()
+			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset()
@@ -834,6 +885,8 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if paused then keylogger.cancel_hold_intervals() end
+			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
 			if dyn_hotstrings then dyn_hotstrings.invalidate_user_code("script pause transition") end
@@ -853,12 +906,26 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
+	privacy_owners.watch = require("adapters.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
+		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,
 		keylogger  = keylogger,
 		prediction = prediction_engine,
 		now_ms     = Monotonic.now_ms,
 		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
+		retry_ms   = Timings.ms("privacy", "context_retry_ms"),
+		capture_context_async = function(field, options, callback)
+			if not window_info or type(window_info.start_privacy_context) ~= "function" then return nil end
+			return window_info.start_privacy_context(field, options, callback)
+		end,
+		publish_context = function(context)
+			_cached_app_id = context.app_id
+			keylogger.set_private_window(keylogger.is_private_window(context.title))
+			local password_app = keylogger.is_password_app(context.app_id)
+			if password_app then keylogger.suppress() else keylogger.unsuppress() end
+			return true, keylogger.is_context_protected(context.app_id, context.title)
+		end,
 		reset_text = function()
 			_undoable = nil
 			_last_offered = nil
@@ -867,12 +934,18 @@ local function main()
 			engine:reset(false)
 		end,
 	})
+	privacy_owners.context = secure_focus_guard
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
+	if not privacy_owners.watch.start() or not privacy_owners.watch.wait_ready() then
+		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
+	end
 	secure_focus_guard.prime()
+	local physical_privacy_admission = nil
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
+			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
 			engine:reset(false)
@@ -939,7 +1012,11 @@ local function main()
 			secure_focus_guard.invalidate()
 			return
 		end
-		if secure_focus_guard.blocks_text() then return end
+		local admission = physical_privacy_admission
+		physical_privacy_admission = nil
+		if admission and admission.code == scancode then
+			if not admission.allowed then return end
+		elseif secure_focus_guard.blocks_text() then return end
 
 		-- The preview describes the buffer as it was; the character being typed
 		-- now changes it. Dismissed here rather than redrawn, because the redraw
@@ -962,6 +1039,15 @@ local function main()
 		-- from this. The CPU clock barely advances between keystrokes on Linux, so
 		-- it would make every recorded delay meaningless.
 		local now_ms = math.floor(Monotonic.now_ms())
+
+		-- A pause longer than hotstrings.idle_reset_seconds ends the word: the
+		-- buffered text was typed before it and this key starts a new one, so a
+		-- word-start hotstring fires again instead of reading stale context.
+		if WordReset.observe_key(now_ms) then
+			_last_offered = nil
+			engine:reset()
+			Logger.debug(LOG, "Idle pause — the next key starts a new word.")
+		end
 
 		-- Detect current app for per-app keylogger stats. Read from the
 		-- process_lifecycle focus cache (updated off the input path at 250 ms
@@ -1034,6 +1120,7 @@ local function main()
 			end
 		end
 
+		if result and secure_focus_guard.blocks_text() then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1234,6 +1321,10 @@ local function main()
 	local capture_owned_scancodes = {}
 	local function handle_physical(scancode, _key_name, _char, value)
 		if value ~= InputEvent.VALUE_DOWN then return end
+		capture_owned_scancodes[scancode] = nil
+		local allowed = not secure_focus_guard.blocks_text()
+		physical_privacy_admission = { code = scancode, allowed = allowed }
+		if not allowed then return end
 		if user_hotstring_native then user_hotstring_native.observe_input() end
 		local app_id = _cached_app_id or "Unknown"
 		if keylogger.is_password_app(app_id) then
@@ -1251,10 +1342,17 @@ local function main()
 	-- 8.6) Initialise the LLM prediction engine if available. The context
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
+		privacy_owners.selection = require("adapters.selection_transaction").new({
+			focus_id = secure_focus_guard.focused_text_identity,
+			-- Selection reads and writes share the daemon's exact field identity.
+			privacy_guard = secure_focus_guard.blocks_text,
+		})
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			is_paused     = script_actions.is_paused,
+			privacy_guard = secure_focus_guard.blocks_text,
+			privacy_context = secure_focus_guard.current_context,
 			-- How a manual prediction request says why it was refused: the daemon's
 			-- one transient surface outside the prediction overlay.
 			notify        = function(text)
@@ -1269,29 +1367,29 @@ local function main()
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
 				return type(result) == "table" and result.ok == true
 			end,
-			-- The tone actions read the selection the way wrap_selection does (a
-			-- copy probe that puts the clipboard back), then type the rewrite over
-			-- it and select it again, through the one uinput channel.
-			read_selection = function()
-				if opts.dry_run then return false, "", "dry run" end
-				return require("adapters.clipboard").read_selection(
-					require("modules.gestures.combo_emitter").press, event_loop.sleep_ms)
+			-- Selection output is bound to the exact original native range, even
+			-- when an application moves it without any physical input event.
+			read_selection = function(focus, authorized, callback)
+				if opts.dry_run then callback(false, "", "dry run"); return false end
+				return privacy_owners.selection.read(focus, authorized, callback)
 			end,
-			replace_selection = function(text)
-				if opts.dry_run then return false end
-				local result = injector.inject_selected(text, false)
-				if type(result) ~= "table" or result.ok ~= true then return false end
-				-- The caret moved over replaced text: the buffer no longer describes the line.
-				_undoable = nil
-				engine:reset()
-				return true
+			cancel_selection = function() return privacy_owners.selection.cancel() end,
+			replace_selection = function(text, receipt, authorized, callback)
+				if opts.dry_run then callback(false); return false end
+				return privacy_owners.selection.replace(receipt, text, authorized, function(value)
+					return injector.inject_selected(value, false)
+				end, function(committed)
+					if committed then
+						-- The buffer no longer describes the physically replaced line.
+						_undoable = nil
+						engine:reset()
+					end
+					callback(committed)
+				end)
 			end,
-			-- Read live, not from the 250 ms focus cache: the answer is dropped when
-			-- another window took the focus while it ran.
-			focus_id = window_info and function()
-				local info = window_info.getFocused()
-				return (info.appId or "") .. "\1" .. (info.windowTitle or "")
-			end or nil,
+			-- Retain the exact active text control: programmatic field changes can
+			-- happen inside one native window without any pointer or keyboard event.
+			focus_id = secure_focus_guard.focused_text_identity,
 			-- The AI agent's context: the application and the window title the
 			-- user is in, read live like focus_id.
 			focused_window = window_info and function()
@@ -1340,6 +1438,7 @@ local function main()
 		-- daemon happens to own would make the dashboard a picture of the driver's
 		-- configuration rather than of the user's habits.
 		if key_name == "shortcut" and type(detail) == "table" then
+			secure_focus_guard.blocks_text()
 			local chord = keyboard_shortcuts.chord_name(detail)
 			if chord then
 				keylogger.record_shortcut(_cached_app_id or "Unknown", chord,
@@ -1357,6 +1456,9 @@ local function main()
 			})
 		end
 		if script_actions.is_paused() then return end
+		-- A control key is a keystroke too: the idle pause is measured from it.
+		-- Whatever it does to the buffer follows, so its verdict is not needed.
+		WordReset.observe_key(math.floor(Monotonic.now_ms()))
 		-- Modified Tab (Alt+Tab, Ctrl+Tab) reaches the control callback rather
 		-- than on_char. It can cross a privacy boundary just as bare/Shift+Tab can.
 		if key_name == "tab" then
@@ -1402,14 +1504,17 @@ local function main()
 		end
 		_undoable = nil
 
-		-- Backspace edits the buffer as it edited the text; every other control
-		-- key (and a word-deleting Backspace) moves or leaves the caret, so what
-		-- follows is not known to start a word. Escape alone leaves the caret
-		-- where it was.
+		-- Backspace edits the buffer as it edited the text. An arrow and a
+		-- shortcut follow hotstrings.arrow_resets_word, shortcut_resets_word or,
+		-- for a chord a tap-hold produced, tap_hold_resets_word: a new word when
+		-- on, the word kept when off. Every other control key (and a
+		-- word-deleting Backspace) moves the caret by an unknown amount, so what
+		-- follows is not known to start a word; Escape leaves it where it was.
+		local effect = "edited"
 		if one_character then
 			engine:backspace()
 		else
-			engine:reset(key_name == "escape")
+			effect = WordReset.apply_control(engine, key_name, detail)
 		end
 		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
 		-- cancel: the buffer was just edited above, and cancel resets it.
@@ -1418,7 +1523,7 @@ local function main()
 				pcall(function() prediction_engine.withdraw() end)
 			end
 		end
-		Logger.debug(LOG, "Control key '%s' — buffer updated.", key_name)
+		Logger.debug(LOG, "Control key '%s' — buffer %s.", key_name, effect)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
 
@@ -1524,11 +1629,19 @@ local function main()
 	})
 
 	local function on_click()
-		secure_focus_guard.invalidate()
+		-- PRIMARY's baseline belongs to the pre-navigation selection. Its reader
+		-- checks fresh privacy first; actual wrapping remains gated after settle.
 		wrap_on_type.on_pointer_down()
+		secure_focus_guard.invalidate()
 		-- A click may clear or move the selection a tone step would replace.
 		if prediction_engine then prediction_engine.drop_tone("pointer click") end
-		Logger.debug(LOG, "Pointer click — text privacy state invalidated.")
+		-- The guard above emptied the buffer at an unknown position. With
+		-- hotstrings.click_resets_word the clicked caret starts a word instead,
+		-- so a word-start hotstring fires on the first word typed there.
+		local at_word_start = WordReset.click_resets_word()
+		engine:reset(at_word_start)
+		Logger.debug(LOG, "Pointer click — text privacy state invalidated, buffer reset (word start: %s).",
+			tostring(at_word_start))
 	end
 
 	-- 8.7b) Restore the word-delimiter choices.
@@ -1583,7 +1696,8 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)"))
 	end
 
@@ -1642,11 +1756,19 @@ local function main()
 		end
 		return consume_bound_chord(detail)
 	end)
+	-- Bind the same privacy owner for both ends of a physical measurement.
+	local hold_token = keylogger.hold_accounting_token
+	local function hold_admission()
+		if keylogger.hold_accounting_token ~= hold_token
+			or script_actions.is_paused() or input_capture_gate.blocks_text() then return nil end
+		return hold_token()
+	end
 	local function handle_hold(scancode, held_ms)
 		if capture_owned_scancodes[scancode] then
 			capture_owned_scancodes[scancode] = nil
 			return
 		end
+		if secure_focus_guard.blocks_text() then return end
 		keylogger.record_hold(_cached_app_id or "Unknown", scancode, held_ms)
 	end
 	local on_hold = input_capture_gate.guard(handle_hold, function(scancode)
@@ -1689,6 +1811,7 @@ local function main()
 		-- How long each key was held. The release is seen only inside the hook,
 		-- which is why the measurement lives there and the accounting here.
 		onHold = on_hold,
+		onHoldAdmission = hold_admission,
 		onEmitRaw  = injector.emit_key,
 		outputBroker = injector.output_broker(),
 		requireOutputBroker = opts.grab == true,
@@ -1810,14 +1933,19 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
-					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
-					if not keyboard_hook.set_layout(new_layout) then
-						Logger.error(LOG, "Layout '%s' refused — nothing changed.", tostring(new_layout))
-						return
+					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
+					local function selected_map_current()
+						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
+							and keyboard_layout.refresh == refresh and keyboard_hook.set_layout == set_layout
+							and opts.keymap == selected_keymap
 					end
-					if not keyboard_layout.refresh(opts.keymap) then
-						Logger.warn(LOG,
-							"Physical layout label applied; active XKB keymap refresh failed.")
+					if not keyboard_hook.refresh_capture(new_layout, function()
+						Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
+						return selected_map_current() and set_layout(new_layout) == true
+							and selected_map_current() and refresh(selected_keymap) == true
+					end, selected_map_current) then
+						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
+						return
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then
@@ -1994,10 +2122,8 @@ local function main()
 			if ok_i18n and i18n_mod then
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
 			end
-			tray_menu.setMenu({
-				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-				{ title = quit_label, fn = function() shutdown.request("degraded tray quit") end },
-			})
+			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
+				function() shutdown.request("degraded tray quit") end)
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")
@@ -2258,6 +2384,8 @@ local function main()
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			keylogger.observe_hold_focus(appName)
+			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			-- A focus change moves the caret to a different text context. The matcher
 			-- and its aligned timing history must cross that boundary together.
 			_undoable = nil
@@ -2268,7 +2396,6 @@ local function main()
 			-- The private-browsing verdict is computed HERE, off the input path.
 			-- The title was previously received and discarded, which is why the
 			-- driver had no private-browsing filter at all.
-			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			-- The title itself, which was received and discarded. The apps dashboard
 			-- groups a day by window — the difference between "four hours in the
 			-- editor" and "four hours across three files" — and this driver had
@@ -2297,6 +2424,7 @@ local function main()
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
 		_cached_app_id = foreground and foreground.appId or nil
+		keylogger.observe_hold_focus(_cached_app_id)
 		keylogger.set_private_window(
 			keylogger.is_private_window(foreground and foreground.windowTitle))
 		-- Primed here too. Without it the first window of the session — which on a
@@ -2340,9 +2468,9 @@ local function main()
 				process_lifecycle = nil
 			end)
 		end
-		-- A raw Tab/click invalidates synchronously on the input path. Only this
-		-- periodic path may run the blocking accessibility probe, after its shared
-		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
+		-- Raw navigation invalidates synchronously. Dispatch/retry stays periodic
+		-- after the shared focus-settle deadline; idle consumes retained results.
+		-- Unknown and probe failure stay fail-closed.
 		secure_focus_guard.refresh(false)
 		if file_watchers then
 			local owner = file_watchers
@@ -2427,6 +2555,10 @@ local function main()
 					tray_menu = nil
 				end)
 			end
+			privacy_owners.watch.pump()
+			RuntimeGuard.call("metrics SQLite flush acknowledgement", keylogger.pump_flush)
+			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
+			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()
@@ -2462,7 +2594,7 @@ local function main()
 	local stats = keylogger.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-	keylogger.flush()
+	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")

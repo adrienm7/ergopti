@@ -30,9 +30,32 @@
 				"static/ergopti_plus/linux/modules/llm/agent_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ui/menu/agent_rows.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_flow.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_agent_auto.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/agent/test_agent_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/agent/test_agent_flow.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/agent/test_agent_auto.lua"
+			]
+		},
+		"word_reset": {
+			"members": [
+				"hotstrings.idle_reset_seconds",
+				"hotstrings.click_resets_word",
+				"hotstrings.arrow_resets_word",
+				"hotstrings.shortcut_resets_word",
+				"hotstrings.tap_hold_resets_word"
+			],
+			"registered": "yes",
+			"production_caller": "yes",
+			"persisted": "yes",
+			"applied": "yes",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": true,
+			"evidence": [
+				"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
+				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
+				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_word_reset_events.lua"
 			]
 		},
 		"magic_key_source": {
@@ -49,7 +72,7 @@
 				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key_source.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key_source_config_toml_leaf.lua"
 			]
 		},
 		"script_chords": {
@@ -72,8 +95,8 @@
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/infra/shortcuts_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_script_chords.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/test_shortcuts_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_script_chords.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_shortcuts_scope_terminal_shortcut.lua"
 			]
 		},
 		"dynamic_master": {
@@ -87,8 +110,8 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/dynamic_hotstrings/manager.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_empty_config_neutral.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/config/test_empty_config_neutral.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_dynamic_rule_families.lua"
 			]
 		},
 		"tap_hold_master": {
@@ -103,7 +126,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/platform/remap/tap_hold_loader.lua",
 				"static/ergopti_plus/linux/platform/remap/tap_hold_writer.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_tap_hold_integration.lua"
+				"static/ergopti_plus/linux/tests/unit/platform/remap/tap_hold/test_tap_hold_integration.lua"
 			]
 		},
 		"gestures": {
@@ -158,10 +181,10 @@
 			"intentional": true,
 			"evidence": [
 				"static/ergopti_plus/linux/modules/gestures/manager.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_gestures_manager.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/test_gesture_dispatch.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/test_gesture_enable_transaction.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/test_gesture_pump_chain.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gestures_manager_config.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_dispatch.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/config/test_gesture_enable_transaction.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/gestures/engine/test_gesture_pump_chain.lua"
 			]
 		},
 		"hotstrings": {
@@ -256,13 +279,13 @@
 				"static/ergopti_plus/linux/modules/hotstrings/magic_key.lua",
 				"static/ergopti_plus/linux/modules/hotstrings/preview_settings.lua",
 				"static/ergopti_plus/linux/modules/hotstrings/repeat_key.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_hotstrings_config.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_loader_catalogue.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_dynamic_rule_families.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_prefix_expansions.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_magic_key.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_preview_rows.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_repeat_key.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/catalogue/test_hotstrings_config.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/catalogue/test_loader_catalogue.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_dynamic_rule_families.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_prefix_expansions.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/preview/test_preview_rows.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/engine/test_repeat_key.lua"
 			]
 		},
 		"llm": {
@@ -286,8 +309,8 @@
 				"static/ergopti_plus/linux/modules/llm/profiles.lua",
 				"static/ergopti_plus/linux/modules/llm/settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_llm_prediction_engine_integration.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_llm_prediction_engine_integration.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua"
 			]
 		},
 		"metrics": {
@@ -313,9 +336,9 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/keylogger/keylogger.lua",
 				"static/ergopti_plus/linux/modules/keylogger/metrics_collector.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_keylogger_privacy_filters.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/keylogger/test_metrics_toggles_persist.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/test_wpm_readouts.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/privacy/test_keylogger_privacy_filters.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keylogger/core/test_metrics_toggles_persist.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/metrics/test_wpm_readouts.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_wpm_readouts_live.lua"
 			]
 		},
@@ -339,8 +362,8 @@
 				"static/ergopti_plus/linux/modules/shortcuts/key_combinations.lua",
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		},
 		"simultaneous_chord_settings": {
@@ -357,8 +380,8 @@
 				"static/ergopti_plus/linux/platform/remap/tap_hold_manager.lua",
 				"static/ergopti_plus/linux/infra/key_combinations_scope.lua",
 				"static/ergopti_plus/linux/ui/menu/key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/test_key_combinations.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/test_key_combinations_scope.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/key_combinations/test_key_combinations.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/scope/test_key_combinations_scope_acknowledged_ordered_pair.lua"
 			]
 		}
 	},
@@ -379,10 +402,10 @@
 				"static/ergopti_plus/linux/adapters/user_hotstring_destination.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_user_code_contract.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/test_user_hotstring_runtime.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/test_user_hotstring_destination.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/test_user_hotstring_menu.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/dynamic_hotstrings/test_user_code_contract.lua",
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_user_hotstring_runtime.lua",
+				"static/ergopti_plus/linux/tests/unit/adapters/synthetic_input/test_user_hotstring_destination.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/menu/hotstrings/test_user_hotstring_menu.lua"
 			]
 		},
 		"script.locale": {
@@ -396,7 +419,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/infra/i18n.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_i18n_persistence.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/i18n/test_i18n_persistence.lua"
 			]
 		},
 		"script.log_level": {
@@ -410,7 +433,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/infra/script_settings.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/infra/test_script_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/infra/preferences/test_script_settings.lua"
 			]
 		},
 		"script.show_error_dialog": {
@@ -424,7 +447,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/ui/error_dialog/bridge.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/test_error_dialog_bridge.lua"
+				"static/ergopti_plus/linux/tests/unit/ui/webview/test_error_dialog_bridge.lua"
 			]
 		},
 		"shortcuts.chatgpt_url": {
@@ -438,7 +461,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_chatgpt.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt.lua"
 			]
 		},
 		"shortcuts.enabled": {
@@ -452,7 +475,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_master_state.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_master_state.lua"
 			]
 		},
 		"shortcuts.wrap_text_if_selected": {
@@ -467,7 +490,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/wrap_on_type.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/manager.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_wrap_on_type.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_wrap_on_type.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_left": {
@@ -482,7 +505,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_right_1": {
@@ -497,7 +520,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.tap_keys.number_row_right_2": {
@@ -512,7 +535,7 @@
 				"static/ergopti_plus/linux/modules/shortcuts/tap_keys.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_tap_keys.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/text_actions/test_tap_keys.lua"
 			]
 		},
 		"shortcuts.keyboard.super_space": {
@@ -527,8 +550,8 @@
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_shortcuts.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_prediction_trigger_now.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_trigger_now.lua"
 			]
 		},
 		"llm.trigger.debounce_ms": {
@@ -542,7 +565,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_trigger_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_trigger_settings.lua"
 			]
 		},
 		"llm.trigger.instant_on_word_end": {
@@ -556,7 +579,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_prediction_triggers.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_triggers.lua"
 			]
 		},
 		"llm.trigger.after_hotstring": {
@@ -571,7 +594,7 @@
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ui/tooltip/preview.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_prediction_triggers.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_prediction_triggers.lua"
 			]
 		},
 		"llm.trigger.secure_filter_enabled": {
@@ -585,7 +608,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_trigger_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_trigger_settings.lua"
 			]
 		},
 		"llm.trigger.url_bar_filter_enabled": {
@@ -600,7 +623,7 @@
 				"static/ergopti_plus/linux/modules/llm/trigger_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/adapters/secure_field_detector.lua",
-				"static/ergopti_plus/linux/tests/unit/adapters/test_secure_field_detector.lua"
+				"static/ergopti_plus/linux/tests/unit/adapters/atspi/test_secure_field_detector.lua"
 			]
 		},
 		"llm.display.pred_indent": {
@@ -614,7 +637,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
 				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
 		"llm.display.show_info_bar": {
@@ -628,7 +651,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
 				"static/ergopti_plus/linux/ui/tooltip/llm.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
 		"llm.display.streaming": {
@@ -642,7 +665,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
 		"llm.display.streaming_multi": {
@@ -656,7 +679,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/display_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_display_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_display_settings.lua"
 			]
 		},
 		"llm.generation.min_words": {
@@ -670,7 +693,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua"
 			]
 		},
 		"llm.generation.max_words": {
@@ -684,7 +707,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua"
 			]
 		},
 		"llm.generation.auto_raise_temp": {
@@ -698,7 +721,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_llm_settings.lua"
 			]
 		},
 		"llm.user_profiles": {
@@ -714,8 +737,8 @@
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
 				"static/ergopti_plus/linux/ui/prompt_editor/bridge.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/meta/test_ui_bridge_handlers.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_webview_manager.lua"
 			]
 		},
 		"llm.profiles.active": {
@@ -729,7 +752,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua"
 			]
 		},
 		"llm.profiles.auto_profile_for_model": {
@@ -743,7 +766,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/model_profile.lua",
 				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua"
 			]
 		},
 		"llm.profiles.num_predictions": {
@@ -757,7 +780,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/profile_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_profile_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua"
 			]
 		},
 		"llm.navigation.nav_modifiers": {
@@ -771,8 +794,8 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/navigation_settings.lua",
 				"static/ergopti_plus/linux/modules/llm/prediction_engine.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_navigation_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_llm_tooltip_chords_consumed.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_navigation_settings.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/llm/prediction/test_llm_tooltip_chords_consumed.lua"
 			]
 		},
 		"llm.navigation.val_modifiers": {
@@ -786,7 +809,7 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/llm/navigation_settings.lua",
 				"static/ergopti_plus/linux/adapters/keyboard_hook.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/llm/test_navigation_settings.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_navigation_settings.lua"
 			]
 		},
 		"shortcuts.keyboard.ctrl_g": {
@@ -800,8 +823,8 @@
 			"evidence": [
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/chatgpt.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_chatgpt_binding.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_slot_consumes_chord.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_chatgpt_binding.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_slot_consumes_chord.lua"
 			]
 		},
 		"shortcuts.keyboard.magic_editor": {
@@ -816,8 +839,8 @@
 				"static/ergopti_plus/_shared/lua/shortcuts/magic_editor.lua",
 				"static/ergopti_plus/linux/modules/shortcuts/keyboard_shortcuts.lua",
 				"static/ergopti_plus/linux/adapters/xkb_source_probe.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_magic_editor_policy.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/test_keyboard_shortcuts.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_magic_editor_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/shortcuts/keyboard/test_keyboard_shortcuts_which_slots_exist.lua",
 				"static/ergopti_plus/linux/tests/hardware/run_xkb_source_qualification.lua"
 			]
 		},
@@ -830,7 +853,7 @@
 			"proof_tier": "unit",
 			"intentional": true,
 			"evidence": [
-				"static/ergopti_plus/linux/tests/unit/keymap/test_number_row_policy.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/keymap/test_number_row_policy.lua",
 				"static/ergopti_plus/_shared/lua/test/number_row_policy_contract.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua"
 			]

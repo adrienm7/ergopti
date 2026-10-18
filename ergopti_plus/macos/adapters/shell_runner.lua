@@ -144,6 +144,7 @@ local function refused_handle(private)
 	function handle.close_input() return false end
 	function handle.terminate() return true, "settled" end
 	function handle.isSettled() return true end
+	function handle.wasStartAttempted() return false end
 	function handle.onSettled(observer)
 		if type(observer) ~= "function" then return false end
 		local ok, err = xpcall(observer, debug.traceback)
@@ -191,6 +192,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	local _lifecycle = "constructing"
 	local _start_dispatching = false
 	local _start_committed = false
+	local _start_attempted = false
 	local _pending_completion = nil
 	local _pending_chunks = {}
 	local _pending_protocol_bytes = 0
@@ -228,7 +230,8 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		_business_stream_closed = owned_protocol ~= true
 		local task = _task
 		if _lifecycle == "prepared"
-			or (_lifecycle == "start_failed" and _task_proven_not_running(task)) then
+			or (owned_protocol ~= true and _lifecycle == "start_failed"
+				and _task_proven_not_running(task)) then
 			-- No process was launched, so releasing the prepared object is exact
 			-- settlement and requires no signal or completion callback.
 			_task = nil
@@ -290,6 +293,7 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 		local task = _task
 		_lifecycle = "starting"
 		_start_dispatching = true
+		_start_attempted = true
 		local ok, started = pcall(function() return task:start() end)
 		_start_dispatching = false
 		if ok and started and (private ~= true or started == true or started == task) then
@@ -592,6 +596,10 @@ function M.spawn(executable, args, on_done, on_chunk, environment, private, owne
 	--- @return string state `settled`, `pending`, or `refused`.
 	handle.terminate = _safe_terminate
 
+	--- Reports whether this exact handle attempted native start, including refusal.
+	--- @return boolean attempted
+	function handle.wasStartAttempted() return _start_attempted end
+
 	--- Returns literal true only when no exact native task remains retained.
 	function handle.isSettled()
 		return _task == nil and _start_dispatching ~= true
@@ -643,7 +651,7 @@ local OSASCRIPT_BIN = "/usr/bin/osascript"
 ---
 --- `pcall` is deliberately not used: it returns the error and discards it, which
 --- is the swallowing pattern `wrapped_on_done` was fixed for and that
---- `tests/unit/adapters/test_shell_runner_on_done_visible.lua` pins against. These
+--- `tests/unit/adapters/processes/test_shell_runner_on_done_visible.lua` pins against. These
 --- callbacks run from an hs.task completion, where a bare throw is invisible.
 --- @param label string Identifies the call site in the log line.
 --- @param fn function|nil The callback. Nothing happens when it is absent.

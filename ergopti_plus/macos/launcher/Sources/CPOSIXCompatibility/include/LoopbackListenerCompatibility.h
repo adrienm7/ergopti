@@ -60,4 +60,7 @@ int ergopti_listener_validate(int connected_socket, const char *executable,
 int ergopti_suspended_image_validate(const char *executable,
 	const ergopti_listener_identity *expected, uint32_t remaining_ms,
 	ergopti_listener_identity *identity);
+int ergopti_active_image_validate(const char *executable,
+ const ergopti_listener_identity *expected, uint32_t remaining_ms,
+ ergopti_listener_identity *identity);
 #endif

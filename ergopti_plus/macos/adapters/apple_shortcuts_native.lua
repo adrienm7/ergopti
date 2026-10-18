@@ -100,7 +100,9 @@ local function query(request, done, admitted)
 		if not current or current.token ~= captured_helper.token then return false end
 		if type(admitted) ~= "function" then return true end
 		local called, ready = pcall(admitted)
-		return called and ready == true and not cancelled
+		if not called or ready ~= true or cancelled then return false end
+		local after = identity(helper)
+		return after and after.token == captured_helper.token and not cancelled
 	end
 	local function line(value)
 		rows = rows + 1
@@ -153,6 +155,13 @@ local function query(request, done, admitted)
 	raw.onSettled(function() physical = true; notify() end)
 	function handle.start()
 		if started or cancelled or not allowed() then cancel(); return false end
+		-- Construction refusal has no native retirement stream. Only the original
+		-- ShellRunner's settled, never-attempted handle permits this no-start close;
+		-- a completed leader after any launch attempt still owes the protocol ACK.
+		if physical and type(raw.wasStartAttempted) == "function"
+			and raw.wasStartAttempted() == false and raw.isSettled() == true then
+			cancel(); return false
+		end
 		starting, started = true, true
 		local accepted = raw.start() == true
 		starting = false
@@ -214,14 +223,16 @@ function M.revalidate_program(executable, arguments, terminal, admitted)
 	local function allowed()
 		local current = identity()
 		local ok, ready = pcall(admitted)
-		return current and current.token == captured.token and ok and ready == true
+		if not current or current.token ~= captured.token or not ok or ready ~= true then return false end
+		local after = identity()
+		return after and after.token == captured.token
 	end
 	return query({ nonce = 1, operation = "revalidate", id = arguments[2] }, function(code, raw)
 		-- Even observed ID presence cannot authorize remote automation execution.
 		local packet = code == 0 and Owner.validate_reply(raw, {
 			nonce = 1, operation = "revalidate", id = arguments[2],
 		})
-		local verified = packet ~= nil and allowed()
+		local verified = type(packet) == "table" and allowed()
 		terminal(false, nil, verified and "service_retirement_unqualified" or "query_refused")
 	end, allowed)
 end

@@ -606,11 +606,14 @@ local function run_agent(generation, source, text, focus, backend, learning)
 		local function on_fail(reason, detail)
 			if not still_current() then return end
 			Logger.warn(LOG, "Agent failed: System 2 gave no answer (%s).", tostring(reason))
+			if not still_current() then return end
 			if session then engine.close_answer_surface(session) end
+			if not still_current() then return end
 			local Offer = require("modules.llm.local_model_offer")
 			if Offer.is_missing(reason, detail) then
 				-- Named, with its Download button, instead of the vague failure
-				Offer.offer(detail.model, { automatic = learning ~= nil })
+				Offer.offer(detail.model, { automatic = learning ~= nil,
+					current = learning == nil and still_current or nil })
 				return
 			end
 			if not learning then show_notice("llm.agent.failed") end
@@ -686,7 +689,9 @@ function M.set_system2(value)
 		Logger.error(LOG, "System 2 setting refused: '%s' is not a backend.", tostring(value))
 		return false
 	end
-	settings().llm_agent_system2 = value
+	local state = settings()
+	if state.llm_agent_system2 ~= value then _generation = _generation + 1 end
+	state.llm_agent_system2 = value
 	Logger.debug(LOG, "System 2: '%s'.", value)
 	return true
 end
@@ -699,7 +704,9 @@ function M.set_mode(value)
 		Logger.error(LOG, "Agent mode refused: '%s' is not a mode.", tostring(value))
 		return false
 	end
-	settings().llm_agent_mode = value
+	local state = settings()
+	if value == M.MODE_OFF and state.llm_agent_mode ~= value then _generation = _generation + 1 end
+	state.llm_agent_mode = value
 	if value ~= M.MODE_AUTO then M.cancel_typing("mode " .. value) end
 	Logger.debug(LOG, "Agent mode: '%s'.", value)
 	return true

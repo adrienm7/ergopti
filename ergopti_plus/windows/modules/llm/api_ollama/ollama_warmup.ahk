@@ -23,7 +23,7 @@
  * @param {string} model - Ollama model tag.
  */
 _LLM_Ollama_StopWarmupRequest() {
-	global _LLM_Ollama_WarmupHttp
+	global _LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupPendingFn
 	if (_LLM_Ollama_WarmupHttp == 0)
 		return true
 	Request := _LLM_Ollama_WarmupHttp
@@ -45,49 +45,108 @@ _LLM_Ollama_StopWarmupRequest() {
 		return false
 	}
 	_LLM_Ollama_WarmupHttp := 0
+	_LLM_Ollama_WarmupPendingFn := 0
 	return true
 }
 
 LLM_OllamaWarmup(model) {
 	Started := A_TickCount
 	global _LLM_Ollama_IsReady, _LLM_Ollama_WarmupGeneration, LLM_OLLAMA_WARMUP_TIMEOUT
-		, _LLM_Ollama_WarmupHttp
+		, _LLM_Ollama_WarmupHttp, _LLM_Ollama_WarmupPendingFn
+	WarmupTimeoutBudget := LLM_OLLAMA_WARMUP_TIMEOUT
 	if (model == "")
 		return
 	if _LLM_Ollama_IsReady
 		return
-	; Abort any in-flight warmup request before issuing a new one — overlapping
-	; retries would otherwise leak WinHTTP COM objects and hold server connections
-	if (_LLM_Ollama_WarmupHttp != 0) and !_LLM_Ollama_StopWarmupRequest()
-		return false
+	; Replacement intent revokes old callbacks even when native cancellation refuses.
 	_LLM_Ollama_WarmupGeneration += 1
 	gen := _LLM_Ollama_WarmupGeneration
+	if (_LLM_Ollama_WarmupHttp != 0) and !_LLM_Ollama_StopWarmupRequest()
+		return false
+	if gen != _LLM_Ollama_WarmupGeneration
+		return false
 	payload := LLM_BuildOllamaPayload(model, "", " ", 0, false, "", 1, false)
 	payload := RegExReplace(payload, '"num_predict":\d+', '"num_predict":1', , 1)
+	Request := 0
 	try {
-		_LLM_Ollama_WarmupHttp := CurlAsyncRequest()
-		Request := _LLM_Ollama_WarmupHttp
-		Request.SetManagedRouting(0, () => _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request)
-		Request.SetDeadline(Started, LLM_OLLAMA_WARMUP_TIMEOUT)
-		_LLM_Ollama_WarmupHttp.Open("POST", LLM_OLLAMA_BASE_URL "/api/chat", true)
-		_LLM_Ollama_WarmupHttp.SetTimeouts(LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT,
-			LLM_OLLAMA_WARMUP_TIMEOUT, LLM_OLLAMA_WARMUP_TIMEOUT)
-		if !_LLM_Ollama_SendUtf8(_LLM_Ollama_WarmupHttp, payload) {
-			_LLM_Ollama_StopWarmupRequest()
+		Request := CurlAsyncRequest()
+		; Construction can pump a successor. Compare and publish without callbacks;
+		; a withdrawn candidate retires locally and never borrows the new slot.
+		PreviousCritical := Critical("On")
+		try {
+			Published := gen == _LLM_Ollama_WarmupGeneration && _LLM_Ollama_WarmupHttp == 0
+			if Published
+				_LLM_Ollama_WarmupHttp := Request
+		} finally Critical(PreviousCritical)
+		if !Published {
+			RetireRequest()
+			return false
+		}
+		Custody := LLM_OllamaCaptureOriginCustody()
+		Origin := Custody.Call("origin")
+		if !CurrentRequest() {
+			RetireRequest()
+			return false
+		}
+		Request.SetManagedRouting(0, CurrentRequest)
+		Request.SetDeadline(Started, WarmupTimeoutBudget)
+		Request.Open("POST", Origin "/api/chat", true)
+		Request.SetTimeouts(WarmupTimeoutBudget, WarmupTimeoutBudget,
+			WarmupTimeoutBudget, WarmupTimeoutBudget)
+		if !_LLM_Ollama_SendUtf8(Request, payload) {
+			RetireRequest()
 			_LLM_Ollama_OnWarmupPollFailed("send", gen)
 			return false
 		}
-		_LLM_Ollama_PollGeneric(_LLM_Ollama_WarmupHttp,
-			(status, _body) => _LLM_Ollama_OnWarmupDone(status, gen),
+		if !CurrentRequest() {
+			RetireRequest()
+			return false
+		}
+		; Only this committed request can defer an ordinary retry. Its original
+		; model, origin custody, generation and absolute deadline remain retained.
+		_LLM_Ollama_WarmupPendingFn := PendingRequest
+		_LLM_Ollama_PollGeneric(Request,
+			(status, _body) => CurrentRequest() ? _LLM_Ollama_OnWarmupDone(status, gen)
+				: _LLM_Ollama_OnWarmupPollFailed("source_withdrawal", gen),
 			() => _LLM_Ollama_OnWarmupPollFailed("timeout", gen),
-			Started, LLM_OLLAMA_WARMUP_TIMEOUT, _LLM_OLLAMA_WARMUP_POLL_MS)
+			Started, WarmupTimeoutBudget, _LLM_OLLAMA_WARMUP_POLL_MS)
 	} catch as e {
 		try LoggerWarn("LLM.ollama", "Warmup POST failed: {1}.", e.Message)
-		_LLM_Ollama_StopWarmupRequest()
+		RetireRequest()
 		_LLM_Ollama_OnWarmupPollFailed("send", gen)
 		return false
 	}
 	return true
+
+	CurrentRequest() {
+		global _LLM_Ollama_WarmupGeneration, _LLM_Ollama_WarmupHttp
+		return _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request
+			&& LLM_OllamaOriginCustodyCurrent(Custody, Origin)
+			&& _LLM_Ollama_WarmupGeneration == gen && _LLM_Ollama_WarmupHttp == Request
+	}
+
+	PendingRequest(ExpectedModel) {
+		return ExpectedModel == model && CurrentRequest()
+			&& !_LLM_DeadlineExpired(Started, WarmupTimeoutBudget) && !Request.WaitForResponse(0) && CurrentRequest()
+			&& !_LLM_DeadlineExpired(Started, WarmupTimeoutBudget)
+	}
+
+	RetireRequest() {
+		global _LLM_Ollama_WarmupHttp
+		if !IsObject(Request)
+			return true
+		if _LLM_Ollama_WarmupHttp == Request
+			return _LLM_Ollama_StopWarmupRequest()
+		try {
+			Retired := Request.Abort()
+			if Retired is Integer && Retired == true
+				return true
+			LoggerWarn("LLM.ollama", "Superseded warmup retained native cancellation debt.")
+		} catch as RetireError {
+			LoggerWarn("LLM.ollama", "Superseded warmup cancellation failed: {1}.", RetireError.Message)
+		}
+		return false
+	}
 }
 
 _LLM_Ollama_OnWarmupPollFailed(reason, gen := 0) {
@@ -147,7 +206,7 @@ LLM_OllamaScheduleWarmupRetry(model := "") {
 
 LLM_Ollama_WarmupRetryTick() {
 	global _LLM_Ollama_WarmupRetryIntervalMs, _LLM_Ollama_WarmupRetryModel, _LLM_Ollama_Async
-	global _LLM_Ollama_WarmupRetryFn
+	global _LLM_Ollama_WarmupRetryFn, _LLM_Ollama_WarmupPendingFn
 	; TERMINAL condition: warmup succeeded, the chain is done.
 	if LLM_OllamaIsReady()
 		return
@@ -168,6 +227,15 @@ LLM_Ollama_WarmupRetryTick() {
 	if (IsSet(_LLM_Menu) && _LLM_Menu.Has("enabled") && !_LLM_Menu["enabled"]) {
 		LLM_OllamaCancelWarmupRetry()
 		return
+	}
+	; A retry observes the admitted request instead of cancelling a cold model load.
+	if HasMethod(_LLM_Ollama_WarmupPendingFn, "Call") {
+		try {
+			if _LLM_Ollama_WarmupPendingFn.Call(_LLM_Ollama_WarmupRetryModel)
+				return
+		} catch as PendingError {
+			LoggerWarn("LLM.ollama", "Warmup pending observation failed: {1}.", PendingError.Message)
+		}
 	}
 	_LLM_Ollama_WarmupRetryIntervalMs := Min(_LLM_Ollama_WarmupRetryIntervalMs * 2, 60000)
 	try LoggerInfo("LLM.ollama", "Warmup retry in {1} ms for '{2}'.",

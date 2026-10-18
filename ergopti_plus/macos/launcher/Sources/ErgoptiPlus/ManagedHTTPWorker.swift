@@ -12,6 +12,35 @@ import SystemConfiguration
 
 /// One exact, replayable HTTP request. Redirects belong to the caller, so every
 /// redirected URL crosses the same native request boundary again.
+// BEGIN GENERATED NATIVE HTTP FAILURE STAGES
+// Generated from static/ergopti_plus/_shared/modules/network/native_http_failure_stages.json; do not edit this span.
+enum ManagedHTTPFailureStage: String, CaseIterable {
+	case policyLoad = "native_policy_load"
+	case selectionBound = "native_selection_bound"
+	case proxyLookup = "native_proxy_lookup"
+	case proxyDictionary = "native_proxy_dictionary"
+	case routeEmpty = "native_route_empty"
+	case certificateLoad = "native_certificate_load"
+	case lookupDeadline = "native_lookup_deadline"
+	case dispatchDeadline = "native_dispatch_deadline"
+	case sessionTerminal = "native_session_terminal"
+
+	func permits(reason: String) -> Bool {
+		switch self {
+		case .policyLoad: return ["unavailable"].contains(reason)
+		case .selectionBound: return ["unavailable"].contains(reason)
+		case .proxyLookup: return ["unavailable"].contains(reason)
+		case .proxyDictionary: return ["proxy"].contains(reason)
+		case .routeEmpty: return ["unavailable"].contains(reason)
+		case .certificateLoad: return ["certificate"].contains(reason)
+		case .lookupDeadline: return ["deadline"].contains(reason)
+		case .dispatchDeadline: return ["deadline"].contains(reason)
+		case .sessionTerminal: return ["deadline", "cancelled", "offline", "certificate", "proxy", "connect", "unavailable", "protocol", "content_encoding"].contains(reason)
+		}
+	}
+}
+// END GENERATED NATIVE HTTP FAILURE STAGES
+
 struct ManagedHTTPRequest {
 	let url: URL
 	let method: String
@@ -318,7 +347,65 @@ enum ManagedProxyLookup {
 
 /// Native error codes only. URLs, certificate subjects and authentication
 /// challenges are deliberately absent from the receiving protocol.
+#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+/// Observations of an already-delivered error only. No message, URL, certificate
+/// or arbitrary userInfo key is read; the original failure policy is unchanged.
+func managedHTTPNativeErrorFacts(_ error: NSError) -> [String] {
+	func integer(_ value: Any?) -> Int32? {
+		guard let number = value as? NSNumber,
+			CFGetTypeID(number) != CFBooleanGetTypeID(),
+			["c", "C", "s", "S", "i", "I", "l", "L", "q", "Q"].contains(String(cString: number.objCType)),
+			number.doubleValue >= Double(Int32.min), number.doubleValue <= Double(Int32.max)
+		else { return nil }
+		return Int32(exactly: number.int64Value)
+	}
+	var current = error
+	var seen = Set<ObjectIdentifier>()
+	var result: [String] = []
+	let cfNetworkDomain: String = kCFErrorDomainCFNetwork as String
+	while result.count < 4 && seen.insert(ObjectIdentifier(current)).inserted {
+		let domain: String
+		switch current.domain {
+		case NSURLErrorDomain: domain = "url"
+		case NSPOSIXErrorDomain: domain = "posix"
+		case NSOSStatusErrorDomain: domain = "osstatus"
+		case cfNetworkDomain: domain = "cfnetwork"
+		default: domain = "unknown"
+		}
+		let code = domain == "unknown" ? nil : Int32(exactly: current.code)
+		var streamDomain: Int32?
+		var streamCode: Int32?
+		if domain == "cfnetwork" || domain == "url" {
+			if let admittedDomain = integer(current.userInfo["_kCFStreamErrorDomainKey"]),
+				let admittedCode = integer(current.userInfo["_kCFStreamErrorCodeKey"]) {
+				streamDomain = admittedDomain; streamCode = admittedCode
+			}
+		}
+		result.append("# native_http_error_chain node=\(result.count) domain=\(domain) code=\(code.map(String.init) ?? "none") stream_domain=\(streamDomain.map(String.init) ?? "none") stream_code=\(streamCode.map(String.init) ?? "none")")
+		guard let underlying = current.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
+		current = underlying
+	}
+	return result
+}
+#endif
+
+/// macOS 15 reports a proxy whose TCP connect is refused as the bare CFNetwork
+/// kCFErrorHTTPSProxyConnectionFailure (310), or kCFErrorHTTPProxyConnectionFailure
+/// (306) for plain HTTP, with no NSURLErrorDomain wrapper and no POSIX cause.
+/// Both fail before any proxy reply: a CONNECT that the proxy answers with an
+/// error is the separate code 311
+/// (kCFStreamErrorHTTPSProxyFailureUnexpectedResponseToCONNECTMethod).
+func managedHTTPProxyConnectionFailed(_ error: NSError) -> Bool {
+	return error.domain == kCFErrorDomainCFNetwork as String
+		&& [CFNetworkErrors.cfErrorHTTPSProxyConnectionFailure, .cfErrorHTTPProxyConnectionFailure]
+			.contains { error.code == Int($0.rawValue) }
+}
+
 func managedHTTPFailure(_ error: NSError) -> String {
+	#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+	for fact in managedHTTPNativeErrorFacts(error) { _ = fputs(fact + "\n", stderr) }
+	#endif
+	if managedHTTPProxyConnectionFailed(error) { return "connect" }
 	guard error.domain == NSURLErrorDomain else { return "unavailable" }
 	let code = error.code
 	switch code {
@@ -467,7 +554,11 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 
 	func publishTerminal() -> Int32 {
 		let success = failure == nil && exitStatus == 0
-		let sent = json(tag: 67, object: ["version": 1, "success": success, "reason": failure ?? "complete"])
+		var terminal: [String: Any] = ["version": 1, "success": success, "reason": failure ?? "complete"]
+		if !success, let failure, ManagedHTTPFailureStage.sessionTerminal.permits(reason: failure) {
+			terminal["native_refusal_stage"] = ManagedHTTPFailureStage.sessionTerminal.rawValue
+		}
+		let sent = json(tag: 67, object: terminal)
 		return success && sent ? 0 : 74
 	}
 
@@ -533,6 +624,15 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 				if native.domain == NSPOSIXErrorDomain && native.code == Int(ECONNREFUSED) {
 					refusedTCPConnect = true; break
 				}
+				// The bare proxy connection failure names the proxy route itself, so
+				// it does not depend on metrics for a connection that never opened.
+				// The same code ends a CONNECT the proxy answered with 407: a proxy
+				// that replied is never a refused route and never fails over.
+				if managedHTTPProxyConnectionFailed(native) {
+					if proxyAuthenticationObserved { failure = "proxy" }
+					else { refusedTCPConnect = true; proxyObserved = true }
+					break
+				}
 				guard let underlying = native.userInfo[NSUnderlyingErrorKey] as? NSError else { break }
 				native = underlying
 			}
@@ -572,11 +672,22 @@ private final class ManagedHTTPSession: NSObject, URLSessionDataDelegate, @unche
 	private func answer(_ challenge: URLAuthenticationChallenge,
 		completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
 		if challenge.protectionSpace.isProxy() { proxyAuthenticationObserved = true }
+		#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+			_ = fputs("# native_http_trust_challenge mode=\(certificates.isEmpty ? "system" : "extra")\n", stderr)
+		}
+		#endif
 		if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust, !certificates.isEmpty {
 			guard let trust = challenge.protectionSpace.serverTrust,
 				ManagedCertificateAuthorities.evaluate(trust, adding: certificates) else {
+				#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+				_ = fputs("# native_http_extra_trust result=refused\n", stderr)
+				#endif
 				failure = "certificate"; completionHandler(.cancelAuthenticationChallenge, nil); return
 			}
+			#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+			_ = fputs("# native_http_extra_trust result=accepted\n", stderr)
+			#endif
 			completionHandler(.useCredential, URLCredential(trust: trust)); return
 		}
 		completionHandler(.performDefaultHandling, nil)
@@ -589,8 +700,10 @@ enum ManagedHTTPWorker {
 
 	static func handles(arguments: [String]) -> Bool { arguments.dropFirst().first == flag }
 
-	private static func refuse(reason: String, status: Int32, output: (Data) -> Bool) -> Int32 {
-		guard let json = try? JSONSerialization.data(withJSONObject: ["version": 1, "success": false, "reason": reason]),
+	private static func refuse(reason: String, status: Int32, stage: ManagedHTTPFailureStage, output: (Data) -> Bool) -> Int32 {
+		guard stage.permits(reason: reason) else { return 74 }
+		guard let json = try? JSONSerialization.data(withJSONObject: ["version": 1, "success": false, "reason": reason,
+			"native_refusal_stage": stage.rawValue]),
 			let frame = ManagedHTTPFrame.encode(tag: 67, bytes: json) else { return 74 }
 		return output(frame) ? status : 74
 	}
@@ -647,7 +760,7 @@ enum ManagedHTTPWorker {
 			let object = try? JSONSerialization.jsonObject(with: bytes) as? [String: Any],
 			let maximum = object["max_selections"] as? NSNumber,
 			CFGetTypeID(maximum) != CFBooleanGetTypeID(), maximum.doubleValue == Double(maximum.intValue), maximum.intValue > 0
-		else { return refuse(reason: "unavailable", status: 78, output: stdout) }
+		else { return refuse(reason: "unavailable", status: 78, stage: .policyLoad, output: stdout) }
 		return execute(request, maximumSelections: maximum.intValue, started: started, output: stdout)
 	}
 
@@ -662,24 +775,24 @@ enum ManagedHTTPWorker {
 		output: @escaping (Data) -> Bool) -> Int32 {
 		let certificates: [SecCertificate]
 		do { certificates = try ManagedCertificateAuthorities.load(environment: environment) }
-		catch { return refuse(reason: "certificate", status: 74, output: output) }
-		guard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, output: output) }
+		catch { return refuse(reason: "certificate", status: 74, stage: .certificateLoad, output: output) }
+		guard maximumSelections > 0 else { return refuse(reason: "unavailable", status: 78, stage: .selectionBound, output: output) }
 		let routes: [[String: Any]]
 		if request.direct { routes = [[kCFProxyTypeKey as String: kCFProxyTypeNone as String]] }
 		else {
 			let lookupRemaining = request.timeout.map { $0 - (ProcessInfo.processInfo.systemUptime - started) }
-			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
+			if let lookupRemaining, lookupRemaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .lookupDeadline, output: output) }
 			guard let selected = ManagedProxyLookup.routes(url: request.url,
 				budget: min(lookupRemaining ?? request.idleTimeout, request.idleTimeout),
 				maximumSelections: maximumSelections, settingsProvider: settingsProvider, certificates: certificates,
 				discoveryMetadataProvider: discoveryMetadataProvider)
-			else { return refuse(reason: "unavailable", status: 78, output: output) }
+			else { return refuse(reason: "unavailable", status: 78, stage: .proxyLookup, output: output) }
 			routes = selected
 		}
 		for (index, route) in routes.enumerated() {
-			guard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, output: output) }
+			guard let proxy = ManagedProxyLookup.dictionary(route: route) else { return refuse(reason: "proxy", status: 78, stage: .proxyDictionary, output: output) }
 			let remaining = request.timeout.map { $0 - (ProcessInfo.processInfo.systemUptime - started) }
-			if let remaining, remaining <= 0 { return refuse(reason: "deadline", status: 75, output: output) }
+			if let remaining, remaining <= 0 { return refuse(reason: "deadline", status: 75, stage: .dispatchDeadline, output: output) }
 			let scoped = ManagedHTTPRequest(url: request.url, method: request.method,
 				headers: request.headers, timeout: remaining, idleTimeout: request.idleTimeout, direct: request.direct)
 			let owned = ManagedHTTPSession(output: output, certificates: certificates)
@@ -688,6 +801,6 @@ enum ManagedHTTPWorker {
 				return owned.publishTerminal()
 			}
 		}
-		return refuse(reason: "unavailable", status: 78, output: output)
+		return refuse(reason: "unavailable", status: 78, stage: .routeEmpty, output: output)
 	}
 }

@@ -31,7 +31,7 @@
 ---    path resolves to a directory that EXISTS and holds nothing, the write
 ---    succeeds against the wrong place, and nothing is logged. Five separate
 ---    bugs of that shape are recorded in this repo, which is why
----    tests/unit/ui/test_menu_paths_resolution_matrix.lua stats every answer
+---    tests/unit/ui/menu/paths/test_menu_paths_resolution_matrix.lua stats every answer
 ---    rather than comparing strings.
 --- 5. User overrides are validated at this owner boundary, on both load and
 ---    save. Native pickers and typed webview fields therefore cannot disagree:

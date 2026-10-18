@@ -438,7 +438,7 @@ local function save_all(state, data, context)
 	end
 
 	if not (_opening == opening and opening_current(opening, state, context)) then return false end
-	local called, ok, err, committed = pcall(writer.write, path, toml, nil, nil, source)
+	local called, ok, err, committed = pcall(writer.write, path, toml, nil, nil, source, true)
 	if not called then ok = false end
 	if ok ~= true then
 		Logger.error(LOG, "Could not write '%s': %s.", path, tostring(err))

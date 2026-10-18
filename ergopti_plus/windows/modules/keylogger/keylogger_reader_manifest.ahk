@@ -60,6 +60,7 @@ KLR_ReadManifestBase(db, start_date := "", end_date := "", IncludeTitles := true
 		KLR__SumErgo(db, manifest, where)
 		KLR__SumLayouts(db, manifest, where)
 		KLR__SumKcHold(db, manifest, where)
+		KLR__SumMedia(db, manifest, where)
 		if IncludeTitles
 				KLR__SumTitles(db, manifest, where)
 		KLR__SumSystemDay(db, manifest, where)
@@ -155,6 +156,7 @@ KLR_NewAppEntry() {
 				"char_space", 0, "char_other", 0,
 				"first_typed_min", "", "last_typed_min", "",
 				"layouts_seen", Map(), "kc_hold", Map(), "win_titles", Map(),
+				"media_keys", Map(), "media_hold", Map(),
 				"hourly", Map(), "hourly_min5", Map(),
 				"time_buckets", Map(), "credited_buckets", Map(),
 				"hs_input_time_buckets", Map(), "hs_input_credited_buckets", Map(),
@@ -387,6 +389,84 @@ KLR__SumKcHold(db, manifest, where) {
 						"tap", r["t"],
 						"hold", r["h"]
 				)
+		}
+}
+
+; Validate grouped media with the actual shared SQL policy, including the closed
+; semantic namespace and exact counter limits. No second AHK policy is invented.
+; These TEMP objects belong to this call on the caller-owned private reader DB;
+; nothing is returned until every created table acknowledges its own DROP.
+KLR__MediaProjectionRows(db, where, ExecFn := unset) {
+		global _SharedDir
+		Exec := IsSet(ExecFn) ? ExecFn : SQLite_Exec
+		Names := ["_ergopti_media_keys_projection", "_ergopti_media_hold_projection"]
+		Existing := SQLite_Query(db, "SELECT name FROM sqlite_temp_master WHERE name IN ("
+				. SQLite_Q(Names[1]) . "," . SQLite_Q(Names[2]) . ")")
+		if Existing.Length != 0
+				throw Error("Semantic media validation owner already exists; replacement refused.")
+		Checks := SQLite_Query(db, "PRAGMA ignore_check_constraints;")
+		if Checks.Length != 1 || Checks[1]["ignore_check_constraints"] != 0
+				throw Error("Semantic media validation requires native CHECK enforcement.")
+		Schema := FSReadStrict(_SharedDir . "\data\db\media_schema.sql")
+		PressDeclarations := 0
+		HoldDeclarations := 0
+		Schema := StrReplace(Schema, "CREATE TABLE IF NOT EXISTS ngram_media_keys",
+				"CREATE TEMP TABLE " . Names[1], true, &PressDeclarations)
+		Schema := StrReplace(Schema, "CREATE TABLE IF NOT EXISTS agg_app_day_media_hold",
+				"CREATE TEMP TABLE " . Names[2], true, &HoldDeclarations)
+		if PressDeclarations != 1 || HoldDeclarations != 1
+				throw Error("The shared semantic media schema declarations are unsupported.")
+		FailureMessage := ""
+		Rows := Map()
+		try {
+				if Exec.Call(db, Schema) != true
+						throw Error("Semantic media validation schema refused.")
+				PressSql := "INSERT INTO temp." . Names[1]
+						. " (device_id,date,app,media_id,c) SELECT 'projection',date,app,media_id,SUM(c)"
+						. " FROM ngram_media_keys" . where . " GROUP BY date,app,media_id;"
+				HoldSql := "INSERT INTO temp." . Names[2]
+						. " (device_id,date,app,media_id,sum_ms,count,max_ms,tap_count,hold_count)"
+						. " SELECT 'projection',date,app,media_id,SUM(sum_ms),SUM(count),MAX(max_ms),SUM(tap_count),SUM(hold_count)"
+						. " FROM agg_app_day_media_hold" . where . " GROUP BY date,app,media_id;"
+				if Exec.Call(db, PressSql . HoldSql) != true
+						throw Error("Semantic media grouped rows refused by the shared SQL policy.")
+				Rows["keys"] := SQLite_Query(db, "SELECT date,app,media_id,c FROM temp." . Names[1])
+				Rows["holds"] := SQLite_Query(db, "SELECT date,app,media_id,sum_ms,count,max_ms,tap_count,hold_count FROM temp." . Names[2])
+				for Family in Rows {
+						for Row in Rows[Family] {
+								if Type(Row["date"]) != "String" || !RegExMatch(Row["date"], "^\d{4}-\d{2}-\d{2}$")
+										|| Type(Row["app"]) != "String" || Row["app"] = ""
+										throw Error("Semantic media projection requires its captured date and application.")
+						}
+				}
+		} catch as Failure {
+				FailureMessage := Failure.Message
+		}
+		CleanupFailed := false
+		for Name in Names {
+				try {
+						if Exec.Call(db, "DROP TABLE IF EXISTS temp." . Name . ";") != true
+								CleanupFailed := true
+				} catch {
+						CleanupFailed := true
+				}
+		}
+		if FailureMessage != "" || CleanupFailed
+				throw Error((FailureMessage != "" ? FailureMessage : "Semantic media projection refused.")
+						. (CleanupFailed ? " Native temporary-owner cleanup remains unresolved." : ""))
+		return Rows
+}
+
+KLR__SumMedia(db, manifest, where) {
+		Rows := KLR__MediaProjectionRows(db, where)
+		for Row in Rows["keys"] {
+				Cell := KLR_GetCell(manifest, Row["date"], Row["app"])
+				Cell["media_keys"][Row["media_id"]] := Row["c"]
+		}
+		for Row in Rows["holds"] {
+				Cell := KLR_GetCell(manifest, Row["date"], Row["app"])
+				Cell["media_hold"][Row["media_id"]] := Map("s", Row["sum_ms"], "n", Row["count"],
+						"m", Row["max_ms"], "tap", Row["tap_count"], "hold", Row["hold_count"])
 		}
 }
 

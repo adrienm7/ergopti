@@ -1,0 +1,530 @@
+--- tests/unit/ui/menu/shortcuts_and_gestures/test_menu_keyboard_slots_row_data.lua
+
+--- ==============================================================================
+--- MODULE: Menu Keyboard Slots Tests (Hammerspoon)
+--- DESCRIPTION:
+--- Exercises the binding UI the keyboard-slot module never had: the row data it
+--- provides to the manifest renderer, and the two picker flows that create and
+--- edit a binding.
+---
+--- COVERAGE:
+--- 1. Row data, not menu rows — the provider must hand over labels and callbacks
+---    and never the hs.menubar shape, or menu rows are being built outside the
+---    renderer again.
+--- 2. A group lists what is bound plus one "add" row, in catalogue order, so the
+---    rows do not reshuffle between two openings of the same menu.
+--- 3. The slot picker offers only FREE slots — offering a bound one would let a
+---    row that looks like a fresh binding silently overwrite an existing one.
+--- 4. Picking a slot then an action actually persists the assignment and binds it.
+--- 5. Picking "none" removes the binding rather than binding an action literally
+---    named "none".
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+package.loaded["tests.support.ui.menu.shortcuts_and_gestures.menu_keyboard_slots_fixture"] = nil
+local Fixture = require("tests.support.ui.menu.shortcuts_and_gestures.menu_keyboard_slots_fixture")
+local FIRST_KEY = Fixture.FIRST_KEY
+local fresh = Fixture.fresh
+local it = Fixture.it
+local make_ctx = Fixture.make_ctx
+local physical_groups = Fixture.physical_groups
+local physical_rows = Fixture.physical_rows
+
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 2/ Row Data ======================
+-- ==========================================
+-- ==========================================
+
+helpers.describe("menu_keyboard_slots: provided rows", function()
+	it("returns one row per group, each carrying nested rows", function()
+		local ui, shortcuts = fresh()
+		local ctx = make_ctx()
+		local rows = ui.provide_rows(ctx, nil)
+
+		helpers.assert_eq(#rows, #shortcuts.get_keyboard_slot_groups(),
+			"every configurable group must be offered")
+		for _, row in ipairs(rows) do
+			helpers.assert_eq(type(row.label), "string", "a group row must carry a label")
+			helpers.assert_eq(type(row.items), "table", "a group row must carry its own rows")
+		end
+	end)
+
+	it("keeps the fixed contextual row editable after an explicit none choice", function()
+		local ui, shortcuts, picker = fresh()
+		local ctx = make_ctx()
+		helpers.assert_eq(shortcuts.set_keyboard_action("magic_editor", "none"), true)
+		local groups = shortcuts.get_keyboard_slot_groups()
+		local rows = ui.provide_rows(ctx, nil)
+		local contextual
+		for index, group in ipairs(groups) do
+			if group.prefix == "contextual" then contextual = rows[index] end
+		end
+		helpers.assert_not_nil(contextual)
+		helpers.assert_eq(#contextual.items, 1, "one fixed logical slot needs no redundant Add flow")
+		local row = contextual.items[1]
+		helpers.assert_true(row.label:find("Label:none", 1, true) ~= nil)
+		helpers.assert_nil(row.disabled, "source proof does not disable ordinary action editing")
+		row.action()
+		helpers.assert_eq(picker.opened[#picker.opened].opts.current, "none")
+	end)
+
+	it("hands over DATA, never hs.menubar rows", function()
+		-- A provider returning { title = …, fn = … } would be building menu rows
+		-- outside the renderer, which is exactly what the list type exists to stop.
+		local ui = fresh()
+		local ctx = make_ctx()
+		for _, row in ipairs(ui.provide_rows(ctx, nil)) do
+			helpers.assert_nil(row.title, "a provided row must not carry a menubar title")
+			helpers.assert_nil(row.fn, "a provided row must not carry a menubar fn")
+			for _, inner in ipairs(row.items) do
+				helpers.assert_nil(inner.title, "a nested row must not carry a menubar title")
+				helpers.assert_nil(inner.fn, "a nested row must not carry a menubar fn")
+			end
+		end
+	end)
+
+	it("offers creation or fixed-row editing when no physical binding is active", function()
+		local ui = fresh()
+		local ctx = make_ctx()
+		for _, row in ipairs(ui.provide_rows(ctx, nil)) do
+			helpers.assert_true(#row.items >= 1,
+				"each group must retain its ordinary assignment editor")
+			local last = row.items[#row.items]
+			helpers.assert_eq(type(last.action), "function", "the group editor must be actionable")
+		end
+	end)
+
+	it("propagates the disabled flag to every row", function()
+		local ui = fresh()
+		local ctx = make_ctx()
+		for _, row in ipairs(ui.provide_rows(ctx, true)) do
+			helpers.assert_eq(row.disabled, true, "a disabled section must grey its group rows")
+			for _, inner in ipairs(row.items) do
+				helpers.assert_eq(inner.disabled, true, "and the rows inside them")
+			end
+		end
+	end)
+end)
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 3/ Creating A Binding ============
+-- ==========================================
+-- ==========================================
+
+helpers.describe("menu_keyboard_slots: adding a binding", function()
+	it("offers the free slots of the group, and only those", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local taken = group.prefix .. FIRST_KEY
+		helpers.assert_true(shortcuts.set_keyboard_action(taken, "lookup"))
+
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+
+		helpers.assert_eq(#picker.opened, 1, "the add row must open the slot picker")
+		local offered = {}
+		for _, item in ipairs(picker.opened[1].opts.items) do offered[item.id] = true end
+		helpers.assert_true(not offered[taken],
+			"an already-bound slot must not be offered again — picking it would overwrite silently")
+		helpers.assert_true(offered[group.prefix .. "b"],
+			"but every free slot of the group must be")
+
+		helpers.assert_true(shortcuts.set_keyboard_action(taken, "none"))
+	end)
+
+	it("chains the action picker and persists what was chosen", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx, updates = make_ctx()
+		local group = physical_groups(shortcuts)[2]
+		local slot = group.prefix .. "j"
+
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[2].items[#physical_rows(rows, shortcuts)[2].items].action()
+		picker.opened[1].confirm(slot)
+
+		helpers.assert_eq(#picker.opened, 2, "picking a slot must then ask what it should do")
+		picker.opened[2].confirm("select_line")
+
+		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "select_line",
+			"the assignment must be persisted, not merely displayed")
+		helpers.assert_true(updates.count > 0, "and the menu must be rebuilt so the new row shows")
+		helpers.assert_eq(persisted[slot], "select_line", "the real conditional writer must publish the chosen action")
+
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "none"))
+	end)
+
+	it("does nothing when the slot picker is dismissed", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx = make_ctx()
+		local before = 0
+		for _ in pairs(shortcuts.get_keyboard_assignments()) do before = before + 1 end
+
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+		picker.opened[1].confirm(nil)
+
+		helpers.assert_eq(#picker.opened, 1, "a dismissed slot picker must not chain to the action picker")
+		local after = 0
+		for _ in pairs(shortcuts.get_keyboard_assignments()) do after = after + 1 end
+		helpers.assert_eq(after, before, "and must not touch the assignments")
+	end)
+end)
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 4/ Editing A Binding =============
+-- ==========================================
+-- ==========================================
+
+helpers.describe("menu_keyboard_slots: editing a binding", function()
+	it("lists an assigned slot with its action label", function()
+		local ui, shortcuts = fresh()
+		local ctx = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "m"
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
+
+		local rows = ui.provide_rows(ctx, nil)
+		local found = nil
+		for _, inner in ipairs(physical_rows(rows, shortcuts)[1].items) do
+			if inner.label:find("Label:lookup", 1, true) then found = inner end
+		end
+		helpers.assert_true(found ~= nil,
+			"an assigned slot must appear in its group, labelled with what it does")
+
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "none"))
+	end)
+
+	it("opens the action picker on the slot's current action", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "m"
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
+
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[1].action()
+
+		helpers.assert_eq(picker.opened[1].opts.current, "lookup",
+			"the picker must open on what the slot holds, not on 'none'")
+
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "none"))
+	end)
+
+	it("removes the binding when 'none' is chosen", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "m"
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "lookup"))
+
+		local rows = ui.provide_rows(ctx, nil)
+		physical_rows(rows, shortcuts)[1].items[1].action()
+		picker.opened[1].confirm("none")
+
+		helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none",
+			"choosing the disabled row must clear the slot, not bind an action called 'none'")
+		helpers.assert_eq(persisted[slot], "none", "choosing None must preserve explicit personal intent")
+		local still_listed = false
+		for _, inner in ipairs(physical_rows(ui.provide_rows(ctx, nil), shortcuts)[1].items) do
+			if inner.label:find(shortcuts.get_keyboard_slot_label(slot), 1, true) then still_listed = true end
+		end
+		helpers.assert_eq(still_listed, false, "and the row must disappear from the group")
+	end)
+
+	it("does not refresh the menu when the shortcut transaction refuses", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx, updates = make_ctx()
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "m"
+		local original_set = shortcuts.set_keyboard_action
+		shortcuts.set_keyboard_action = function() return false end
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("lookup")
+			helpers.assert_eq(updates.count, 0,
+				"a refused native/persistence transaction must not publish a success refresh")
+		end, debug.traceback)
+		shortcuts.set_keyboard_action = original_set
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+it("menu_keyboard_slots: conditional publication refusal keeps the old choice", function()
+	local ui, shortcuts, picker, persisted = fresh()
+	local ctx, updates = make_ctx()
+	local group = physical_groups(shortcuts)[1]
+	local slot = group.prefix .. "j"
+	local files = package.loaded["adapters.file_system"]
+	local writes = 0
+	files.write_if_unchanged = function()
+		writes = writes + 1
+		return false, "injected conditional refusal"
+	end
+	local rows = ui.provide_rows(ctx, nil)
+	physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+	picker.opened[1].confirm(slot)
+	picker.opened[2].confirm("select_line")
+	helpers.assert_eq(writes, 1, "the real writer must attempt one conditional publication")
+	helpers.assert_nil(persisted[slot])
+	helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none")
+	helpers.assert_eq(updates.count, 0, "a refused publication must not report a successful edit")
+end)
+
+
+
+
+-- ==========================================
+-- ==========================================
+-- ======= 5/ Parameterized Actions =========
+-- ==========================================
+-- ==========================================
+
+--- A context whose gesture registry declares wrap_selection's wrap_pair
+--- parameter and records where a value is stored.
+--- @return table ctx, table stored
+local function parameter_ctx()
+	local ctx = make_ctx()
+	local stored, parameters = {}, {}
+	local function copy(source)
+		local result = {}
+		for key, value in pairs(source) do result[key] = value end
+		return result
+	end
+	ctx.gestures.get_sg_names = function()
+		return { "#header", "lookup", "select_line", "send_key", "wrap_selection", "llm_prompt_prediction",
+			"llm_screen_region", "llm_translate_selection" }
+	end
+	ctx.gestures.get_action_parameter_spec = function(id)
+		return ({
+			wrap_selection = "wrap_pair", send_key = "key", llm_prompt_prediction = "llm_prompt",
+			llm_screen_region = "llm_vision", llm_translate_selection = "llm_language",
+		})[id]
+	end
+	ctx.gestures.get_action_parameter = function(binding, action)
+		if parameters[binding .. "__" .. action] ~= nil then return parameters[binding .. "__" .. action] end
+		return ({
+			wrap_selection = "(", llm_prompt_prediction = "rewrite|2", llm_screen_region = "openai|gpt-4.1-mini",
+			llm_translate_selection = "ja",
+		})[action] or ""
+	end
+	ctx.gestures.llm_prompt_choices = function()
+		return { { value = "basic", label = "Basic" }, { value = "rewrite", label = "Rewrite" } }
+	end
+	ctx.gestures.llm_prompt_default_count = function() return 3 end
+	local vision_choices = {
+		{ value = "local", label = "Local", defaultModel = "qwen2.5vl:3b" },
+		{ value = "cerebras", label = "Cerebras", defaultModel = "" },
+	}
+	ctx.gestures.llm_vision_choices = function() return vision_choices end
+	local language_choices = { { value = "ui", label = "Menu language (English)" }, { value = "ja", label = "日本語" } }
+	ctx.gestures.llm_language_choices = function() return language_choices end
+	ctx.gestures.validate_action_parameter = function(_, value) return value == "(" or value == "enter" end
+	local vocabulary = { keys = {}, modifiers = {}, text_max_code_points = 500 }
+	ctx.gestures.send_vocabulary = function() return vocabulary end
+	ctx.gestures.parameter_prompt = function() return "prompt" end
+	ctx.gestures.parameter_error = function() return "refused" end
+	ctx.gestures.set_action_parameter = function(binding, action, value)
+		parameters[binding .. "__" .. action] = value
+		stored[#stored + 1] = { binding = binding, action = action, value = value }
+		return true
+	end
+	ctx.gestures.get_all_action_parameters = function() return copy(parameters) end
+	ctx.gestures.replace_action_parameters = function(snapshot) parameters = copy(snapshot); return true end
+	ctx.gestures.is_assignable = require("modules.gestures.actions").is_assignable
+
+	-- Keep the retained transaction on the same real keyboard publisher and
+	-- canonical conditional file port installed by fresh().
+	local preferences = require("infra.preferences")
+	local files = package.loaded["adapters.file_system"]
+	local path = require("infra.config_paths").get("ConfigTomlPath")
+	preferences.load(path)
+	local state, noop = {}, function() return true end
+	local core = { gestures = ctx.gestures }
+	local snapshot = function() return preferences.snapshot(state, {}, core) end
+	local save, checkpoint = require("ui.menu.preferences_transaction").bind(preferences, {
+		path = path, state = state, hotfiles = {}, core_modules = core,
+		initial_state = state, initial_preferences = snapshot(), restore_runtime = noop,
+	})
+	local shortcuts = require("modules.shortcuts")
+	local global = assert(require("ui.menu.global_actions_transaction").create({
+		state = state, capture_preferences = snapshot, sync_runtime = noop, restore_state = noop,
+		settings = { get = function() end, set = noop, get_keys = function() return {} end },
+		file_mover = { capture = function() return {} end, move = noop, restore = noop },
+		reset_journal = { prepare = noop, mark_commit = noop, mark_prepared = noop, clear = noop },
+		gestures = { get_action = function() return "none" end, set_action = noop, enable_all = noop, disable_all = noop },
+		shortcuts = { set_shortcut_action = noop, get_keyboard_action = shortcuts.get_keyboard_action,
+			set_keyboard_action = shortcuts.set_keyboard_action, get_keyboard_assignments = shortcuts.get_keyboard_assignments },
+		karabiner = { snapshot_settings = function() return {} end, reset_to_defaults = noop, restore_settings = noop },
+		request_reload = noop, terminal_pending = function() return false end,
+	}))
+	local owner = require("ui.menu.program_parameter_transaction").new({
+		path = path, files = files, gestures = ctx.gestures, preferences = preferences, checkpoint = checkpoint,
+		paused = function() return false end, admission = global.run_exclusive,
+		current_path = function() return require("infra.config_paths").get("ConfigTomlPath") end,
+		save_prefs = save,
+		capture_checkpoint_candidate = function()
+			return { state = require("ui.menu.preferences_transaction").clone(state), preferences = snapshot() }
+		end,
+	})
+	ctx.commit_program_parameter = owner.apply
+	return ctx, stored
+end
+
+helpers.describe("menu_keyboard_slots: parameterized actions", function()
+	-- A keyboard slot bound to wrap_selection (or open_url, search_web) did
+	-- nothing: the picker stored the action and never asked for its parameter,
+	-- which the handler reads under the slot's dispatch binding.
+	it("asks for the parameter under the slot's dispatch binding before binding", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		helpers.assert_eq(type(dialog), "table",
+			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function(_title, _prompt, _prior, confirm) return confirm, "(" end
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("wrap_selection")
+			helpers.assert_eq(#stored, 1, "the pair must be asked for and stored")
+			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot),
+				"under the binding the dispatcher passes, not the bare slot id")
+			helpers.assert_eq(stored[1].value, "(")
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "wrap_selection",
+				"and only then may the slot be bound")
+			helpers.assert_eq(persisted[slot], "wrap_selection", "the canonical TOML candidate must contain the choice")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "none"))
+		if not ok then error(err, 0) end
+	end)
+
+	-- The picker's own editor collects a send_* value before the pick: the
+	-- page must be given what it edits with, and the value it collected must be
+	-- stored without the native prompt asking for it again.
+	it("hands the picker its editor and stores the value it collected without a prompt", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function() error("the value the picker's editor collected must not be asked again") end
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+			picker.opened[1].confirm(slot)
+			local opts = picker.opened[2].opts
+			helpers.assert_eq(opts.send_vocabulary, ctx.gestures.send_vocabulary(),
+				"the page validates with the drivers' own vocabulary")
+			local marked = nil
+			for _, item in ipairs(opts.items) do
+				if item.id == "send_key" then marked = item end
+			end
+			helpers.assert_eq(marked and marked.parameter, "key", "the send_key row names its kind")
+			helpers.assert_eq(opts.parameter_strings.prompts.key, "prompt",
+				"the editor shows the native prompt's text")
+			-- Every parameterized row carries its kind and stored value, so the
+			-- page's "edit the current action" can reopen any of them
+			local by_id = {}
+			for _, item in ipairs(opts.items) do
+				if item.id then by_id[item.id] = item end
+			end
+			helpers.assert_eq(by_id.wrap_selection and by_id.wrap_selection.parameter, "wrap_pair")
+			helpers.assert_eq(by_id.wrap_selection and by_id.wrap_selection.parameterValue, "(")
+			helpers.assert_eq(by_id.llm_prompt_prediction and by_id.llm_prompt_prediction.parameter, "llm_prompt")
+			helpers.assert_eq(by_id.llm_prompt_prediction and by_id.llm_prompt_prediction.parameterValue,
+				"rewrite|2")
+			helpers.assert_eq(opts.prompt_choices, ctx.gestures.llm_prompt_choices(),
+				"the llm_prompt editor offers the AI menu's prompts")
+			helpers.assert_eq(opts.default_count, 3, "and names the AI menu's prediction count")
+			helpers.assert_eq(opts.edit_current_label,
+				package.loaded["infra.i18n"].get("dialog.action_picker.edit_current"))
+			helpers.assert_eq(opts.parameter_strings.prompts.llm_prompt, "prompt")
+			helpers.assert_eq(opts.parameter_strings.errors.llm_prompt, "refused")
+			helpers.assert_type(opts.parameter_strings.countDefault, "string")
+			-- The llm_vision editor: the backends with their default model, and its texts
+			helpers.assert_eq(by_id.llm_screen_region and by_id.llm_screen_region.parameter, "llm_vision")
+			helpers.assert_eq(by_id.llm_screen_region and by_id.llm_screen_region.parameterValue,
+				"openai|gpt-4.1-mini")
+			helpers.assert_eq(opts.vision_choices, ctx.gestures.llm_vision_choices(),
+				"the llm_vision editor offers the vision backends")
+			helpers.assert_eq(opts.parameter_strings.prompts.llm_vision, "prompt")
+			helpers.assert_eq(opts.parameter_strings.errors.llm_vision, "refused")
+			local i18n = package.loaded["infra.i18n"]
+			for field, key in pairs({
+				visionProviderLabel = "dialog.action_picker.vision_provider_label",
+				visionModelLabel = "dialog.action_picker.vision_model_label",
+				visionModelDefault = "dialog.action_picker.vision_model_default",
+				visionModelRequired = "dialog.action_picker.vision_model_required",
+			}) do
+				helpers.assert_eq(opts.parameter_strings[field], i18n.get(key), field)
+			end
+			-- The llm_language editor: the target languages, and its texts
+			helpers.assert_eq(by_id.llm_translate_selection and by_id.llm_translate_selection.parameter,
+				"llm_language")
+			helpers.assert_eq(by_id.llm_translate_selection and by_id.llm_translate_selection.parameterValue, "ja")
+			helpers.assert_eq(opts.language_choices, ctx.gestures.llm_language_choices(),
+				"the llm_language editor offers the target languages")
+			helpers.assert_eq(opts.parameter_strings.prompts.llm_language, "prompt")
+			helpers.assert_eq(opts.parameter_strings.errors.llm_language, "refused")
+			helpers.assert_eq(opts.parameter_strings.languageLabel, i18n.get("dialog.action_picker.language_label"))
+			picker.opened[2].confirm("send_key", "enter")
+			helpers.assert_eq(#stored, 1, "the collected value is stored")
+			helpers.assert_eq(stored[1].binding, shortcuts.keyboard_binding_id(slot))
+			helpers.assert_eq(stored[1].value, "enter")
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "send_key", "and the slot is bound")
+			helpers.assert_eq(persisted[slot], "send_key", "the canonical TOML candidate must contain the choice")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		helpers.assert_true(shortcuts.set_keyboard_action(slot, "none"))
+		if not ok then error(err, 0) end
+	end)
+
+	it("leaves the slot unbound when the parameter prompt is cancelled", function()
+		local ui, shortcuts, picker, persisted = fresh()
+		local ctx, stored = parameter_ctx()
+		local dialog = package.loaded["infra.dialog_util"]
+		helpers.assert_eq(type(dialog), "table",
+			"the slot menu must reach the shared parameter prompt (ui.menu.shortcut_utils)")
+		local saved_prompt = dialog.text_prompt
+		dialog.text_prompt = function() return "cancel", nil end
+		local group = physical_groups(shortcuts)[1]
+		local slot = group.prefix .. "w"
+
+		local ok, err = xpcall(function()
+			local rows = ui.provide_rows(ctx, nil)
+			physical_rows(rows, shortcuts)[1].items[#physical_rows(rows, shortcuts)[1].items].action()
+			picker.opened[1].confirm(slot)
+			picker.opened[2].confirm("wrap_selection")
+			helpers.assert_eq(#stored, 0)
+			helpers.assert_eq(shortcuts.get_keyboard_action(slot), "none",
+				"a binding without its pair would do nothing when pressed")
+		end, debug.traceback)
+		dialog.text_prompt = saved_prompt
+		if not ok then error(err, 0) end
+	end)
+end)

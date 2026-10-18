@@ -421,10 +421,10 @@ time-independent.
 
 Test-runner integration:
 
-- **AHK**: `windows/tests/unit/test_logger.ahk` includes a section that loads
+- **AHK**: `windows/tests/unit/infra/logger/test_logger.ahk` includes a section that loads
   `test_vectors.json` via `JsonParse()` and asserts each expected line (with timestamp
   replaced).
-- **HS**: `macos/tests/unit/lib/test_logger.lua` does the same via `require("lib.json")`.
+- **HS**: `macos/tests/unit/infra/logger/test_logger.lua` does the same via `require("lib.json")`.
 - **Linux**: no vector replay today. The shared core it runs is therefore unpinned by
   this spec.
 

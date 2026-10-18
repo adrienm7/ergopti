@@ -7,21 +7,13 @@
 ; Ensures the Ollama binary is installed and the local inference server is
 ; reachable on the configured local Ollama endpoint.
 ;
-; FEATURES & RATIONALE:
-; 1. Self-bootstrapping: hands install off to winget (native Ollama installer
-;    with its own progress UI) or opens the download page as a fallback — zero
-;    manual setup for the user.
-; 2. Silent fast path: when Ollama is already running, the check exits in
-;    milliseconds with no UI shown.
-; 3. No-block execution: the Ollama reachability check runs from a SetTimer
-;    callback — never from the main AHK thread — so the keyboard and hotkeys
-;    remain fully responsive during install.
-; 4. Epoch-guarded async: every async callback captures the epoch at dispatch
-;    time and discards itself when a newer check or Cancel() has bumped the
-;    counter, preventing stale callbacks from corrupting shared state.
+; Production bootstrap consumes exact app-owned file/runtime components with
+; independent installation, start and model consent. A responding external
+; server remains external. Deferred callbacks retain their captured epoch.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
+#Include ollama_managed_bootstrap.ahk
 
 
 
@@ -158,7 +150,7 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
 	; Defer everything to a timer so the menu can close and the message loop
 	; can process pending paint events before any blocking call (WinHTTP, WebView2).
 	LoggerInfo("LLM", "Scheduling async Ollama reachability check…")
-	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready, on_failed,
+	SetTimer(() => LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?,
 		show_ui, captured_epoch), -50)
 }
 
@@ -169,18 +161,15 @@ LLM_Deps_CheckAndInstall(default_model := "", on_ready := unset, on_failed := un
  * For the silent auto-boot path (show_ui=false) the UI is skipped and the
  * HTTP check runs immediately (no window to paint anyway).
  */
-LLM_Deps_AsyncCheck(default_model, on_ready, on_failed, show_ui,
-		captured_epoch) {
+LLM_Deps_AsyncCheck(default_model, on_ready?, on_failed?, show_ui := true,
+		captured_epoch := 0) {
 	global _LLM_Deps_Epoch
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
 
-	; No more WebView2 + hidden-PowerShell UI. We hand the install off to
-	; winget (or the Ollama download page in the browser); the user gets
-	; the official installer's native UI, which is more familiar AND
-	; doesn't contest CPU/disk with the AHK input pipeline. Run the
-	; reachability check directly — there's nothing left to "paint" first.
-	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready, on_failed, show_ui)
+	; Check the configured endpoint before offering a managed installation.
+	; A responding external server is never acquired, migrated or terminated.
+	LLM_Deps_DoCheck(default_model, captured_epoch, on_ready?, on_failed?, show_ui)
 	return true
 }
 
@@ -228,7 +217,7 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 	}
 
 	LoggerInfo("LLM", "Ollama not running — launching installer…")
-	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunInstaller
+	Installer := HasMethod(InstallerFn, "Call") ? InstallerFn : LLM_Deps_RunManagedInstaller
 	return Installer.Call(default_model, captured_epoch, on_ready?, on_failed?)
 }
 
@@ -243,39 +232,8 @@ _LLM_Deps_DoCheck_Result(running, t_start, captured_epoch, default_model, on_rea
 ; ======================================
 
 /**
- * Hands Ollama installation off to the OS-native installer flow, then
- * polls every 3 s until the daemon answers.
- *
- * Why the simpler approach:
- *   - The previous in-process PS1 installer downloaded a ~1.5 GB exe
- *     via ``Invoke-WebRequest -OutFile`` (no progress streaming), then
- *     ran ``Start-Process -Wait``. The hidden powershell process spent
- *     10+ minutes contesting CPU + disk with the AHK input pipeline,
- *     causing the user's keystrokes to be swallowed mid-typing. Worse,
- *     the WebView never showed download progress (Invoke-WebRequest
- *     doesn't stream stdout), so the user thought it was frozen.
- *   - winget is the supported Microsoft package manager on every
- *     Win 10 / 11 machine. It runs the OFFICIAL Ollama installer with
- *     a normal UAC prompt and progress UI. The download is throttled
- *     to a separate process tree so AHK's keystroke handling stays
- *     responsive.
- *   - Fallback to opening https://ollama.com/download in the default
- *     browser when winget is not available. The user keeps full
- *     control over the install experience and we don't have to babysit
- *     a hidden subprocess.
- *
- * After the installer has been handed off, we keep a 3 s poll timer
- * pinging the configured local Ollama endpoint. Once Ollama answers, the state
- * flips to "ready" and on_ready fires.
- *
- * @param {string} model - Model tag to pull AFTER the daemon is up.
- *                         Currently the responsibility is on the user
- *                         (Ollama's first-run flow handles it via the
- *                         installer's wizard), so this argument is
- *                         only kept for future use.
- * @param {Func} on_ready - Callback on success.
- * @param {Func} on_failed - Callback on failure (rare — only when we
- *                           can't even launch the installer).
+ * Legacy installer task ownership for explicitly injected fixture ports only.
+ * Default production dispatch uses the source-bound managed file/runtime owner.
  */
 _LLM_Deps_RetireInstallerOwner(ExpectedOwner) {
 	global _LLM_Deps_InstallerOwner
@@ -342,6 +300,10 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
 	global _LLM_Deps_InstallerOwner
 	if captured_epoch != _LLM_Deps_Epoch
 		return false
+	; Retained injected transfer regression seam; production always uses the
+	; managed per-user owner, including direct calls to this historical API.
+	if !(Port is Map)
+		return LLM_Deps_RunManagedInstaller(model, captured_epoch, on_ready?, on_failed?)
 	PriorityFn := _LLM_CurlArtifactPortFn(Port, "priority", ProcessSetPriority)
 	; Failed cancellation retains the predecessor; no successor may acquire work.
 	if IsObject(_LLM_Deps_InstallerOwner) {
@@ -414,7 +376,7 @@ LLM_Deps_RunInstaller(model, captured_epoch, on_ready?, on_failed?, Port := 0) {
 		} catch as err {
 			LoggerError("LLM", "Could not open the download page: " err.Message ".")
 			LLM_Deps_Fail(t("menu.llm.deps_download_page_failed"),
-				on_failed, captured_epoch)
+				on_failed?, captured_epoch)
 			return
 		}
 		; Surface a tray tip so the user knows what to do — without it,
@@ -513,6 +475,7 @@ LLM_Deps_Cancel() {
 	global _LLM_Deps_PollTimer, _LLM_Deps_Checking, _LLM_Deps_State, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 
 	InstallerStopped := _LLM_Deps_CancelInstallerOwner()
+	ManagedStopped := LLM_ManagedBootstrapCancel()
 	if !InstallerStopped
 		try LoggerError("LLM", "Cancel could not confirm that the exact installer tree stopped; ownership was retained.")
 	if IsSet(_LLM_Deps_PollTimer) and _LLM_Deps_PollTimer {
@@ -532,7 +495,7 @@ LLM_Deps_Cancel() {
 	; the shared constant, not a hardcoded "Normal" literal
 	; (driver-baseline-priority-reverted-to-normal).
 	try ProcessSetPriority(DRIVER_BASELINE_PRIORITY_CLASS)
-	return InstallerStopped
+	return InstallerStopped && ManagedStopped
 }
 
 ; Stop the exact package-installer tree before lifecycle teardown becomes
@@ -540,7 +503,7 @@ LLM_Deps_Cancel() {
 ; must not be used as successful shutdown while winget may still be mutating
 ; the package store.
 LLM_Deps_PrepareShutdown() {
-	return _LLM_Deps_CancelInstallerOwner()
+	return _LLM_Deps_CancelInstallerOwner() && LLM_ManagedBootstrapCancel()
 }
 
 /**
@@ -548,13 +511,13 @@ LLM_Deps_PrepareShutdown() {
  * @param {string} msg - Human-readable failure reason.
  * @param {Func} on_failed - Optional callback.
  */
-LLM_Deps_Fail(msg, on_failed, captured_epoch := 0) {
+LLM_Deps_Fail(msg, on_failed?, captured_epoch := 0) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, DRIVER_BASELINE_PRIORITY_CLASS
 	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
 		return false
 	if !_LLM_Deps_CancelInstallerOwner()
 		LoggerError("LLM", "Dependency failure could not confirm installer-tree termination; ownership was retained.")
-	return _LLM_Deps_PublishFailure(msg, on_failed, captured_epoch, ProcessSetPriority)
+	return _LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch, ProcessSetPriority)
 }
 
 ; Failure publication must not retry cancellation or discard a retained owner.

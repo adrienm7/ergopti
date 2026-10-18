@@ -790,6 +790,9 @@ function M.capture_owned(owner)
 	if _ordinary_commit_busy or (_ordinary_debt and not settle_ordinary_debt()) then return nil end
 	local gate = _owned_gates[owner]
 	if not rawequal(package.loaded["adapters.storage"], M) or not gate or gate.busy or gate.debt ~= nil or _load_blocked then return nil end
+	-- A JIT-retained guard closure must not keep the native owner alive after
+	-- refusal or finalization. Only the receipt journal owns it after capture.
+	local owner_box = { owner }
 	local captured, cells = owned_guard(gate, function()
 		local identity = { methods = owned_methods() }
 		local source, document, proof = owned_store_source()
@@ -798,12 +801,13 @@ function M.capture_owned(owner)
 		for _, key in ipairs(gate.keys) do generations[key] = _owned_generations[key] or 0 end
 		gate.sequence = gate.sequence + 1
 		local token = {}
-		_owned_receipts[token] = { owner = owner, keys = owned_copy(gate.keys), snapshot = snapshot,
+		_owned_receipts[token] = { owner = owner_box[1], keys = owned_copy(gate.keys), snapshot = snapshot,
 			expected = owned_copy(snapshot), generations = generations, epoch = gate.epoch,
 			sequence = gate.sequence, pending = false, methods = identity.methods, original = source }
 		owned_cache_source(source)
 		return token, owned_copy(snapshot)
 	end)
+	owner_box[1] = nil
 	return type(captured) == "table" and captured or nil, cells
 end
 
@@ -1199,14 +1203,24 @@ end
 
 --- Stores several top-level values in one durable rename transaction.
 --- @param values table Map of storage keys to values.
+--- @param deletions table|nil Dense list of keys removed in the same publication.
 --- @return boolean
-function M.set_many(values)
+function M.set_many(values, deletions)
 	if type(values) ~= "table" or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
-	for key in pairs(values) do if _owned_aliases[tostring(key)] ~= nil then return false end end
-	local committed
-	local held = next(_owned_aliases) ~= nil
+	local removed = {}
+	if deletions ~= nil then
+		if type(deletions) ~= "table" or getmetatable(deletions) ~= nil then return false end
+		if next(deletions) ~= nil then removed = owned_alias_list(deletions); if not removed then return false end end
+	end
 	local updates = {}
 	for key, value in pairs(values) do updates[tostring(key)] = { present = true, value = value } end
+	for _, key in ipairs(removed) do
+		if updates[key] ~= nil then return false end
+		updates[key] = { present = false }
+	end
+	for key in pairs(updates) do if _owned_aliases[key] ~= nil then return false end end
+	local committed
+	local held = next(_owned_aliases) ~= nil
 	if held then committed = owned_foreign_commit(updates)
 	else committed = released_source_commit(updates) end
 	return committed == true

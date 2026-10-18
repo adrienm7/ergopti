@@ -10,7 +10,11 @@ global _AHK_DRY_RUN := false
 #Include ../adapters/file_system.ahk
 #Include ../infra/toml/toml_helpers.ahk
 #Include ../infra/toml/toml_loader.ahk
+#Include ../infra/tick_count.ahk
+#Include ../infra/hotstrings/hotstring_engine_main.ahk
+#Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/hotstrings/hotstrings_config.ahk
-#Include unit/test_hotstrings_config.ahk
+#Include unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk
+#Include unit/modules/hotstrings/catalogue/test_hotstrings_config_delimiters.ahk
 
 RunTests()

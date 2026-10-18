@@ -68,9 +68,17 @@ linux/
   _generated/                 Codegen output
   tests/
     helpers.lua               Assertion + describe/it harness
-    run.lua                   Auto-discovers test_*.lua under tests/unit
-    unit/                     unit + meta tests
+    run.lua                   Runs tests/meta and tests/unit against test_manifest.lua
+    test_manifest.lua         Every test module, checked against discovery
+    meta/<topic>/             Source checks and harness self-tests: architecture,
+                              boot, corpus (shared vector replays), harness
+    unit/<area>/<part>/       Behaviour tests, filed like the driver: adapters/,
+                              infra/, modules/<module>/, platform/remap/, ui/
+    support/                  Fixtures and harness modules tests require;
+                              support/<area>/<name>_fixture.lua for split files
+    fakes/ fixtures/          Port fakes and static inputs
     e2e/run_e2e.lua           corpus-driven end-to-end harness
+    hardware/ distro/         Native probes, never run by the unit suite
   vendor/                     Bundled third-party Lua libs (not in git)
 ```
 
@@ -103,9 +111,32 @@ luajit ergopti_hotstrings.lua --dry-run --verbose
 ```bash
 cd static/ergopti_plus/linux
 luajit tests/run.lua
+luajit tests/run.lua --only "case name substring"
+luajit tests/run.lua --module=infra
 ```
 
+`--module` runs one group of `tests/support/module_groups.lua` (meta, core,
+infra, input, modules, ui); CI runs each group as its own job, and together
+they are exactly the whole suite (`tests/meta/harness/test_module_groups.lua`).
+Put a new test in the folder of the code it exercises and add it to
+`tests/test_manifest.lua`; split a test file along its describes before it
+passes about 800 lines.
+
 Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
+
+Typed-text encryption additionally requires LuaJIT FFI and OpenSSL 3's native
+AES-256-CBC API. Without that capability, activation is refused and a saved ON
+preference keeps persistence closed; encrypted rows cannot be decrypted. There
+is no CLI encryption fallback exposing the key in process arguments. The
+existing key derivation runs synchronously once per session and is cached;
+subsequent encryption and decryption use native byte buffers. Plain Lua 5.4
+tests exercise this capability refusal and the provider contract explicitly.
+
+The installed driver requires `lua-luv` for owned asynchronous SQLite flushes.
+A manually started minimal daemon without it retains collected metrics in RAM;
+`flush()` returns false, merged views remain readable, and shutdown acknowledges
+only that no native write is acquired. It warns once and never claims those
+metrics were saved. Install the required package to restore durable flushes.
 
 ## Installation
 
@@ -179,6 +210,12 @@ keyboard layout. Reinstalling the application can reuse the retained settings.
 | Tooltip overlay          | ✅ GTK       | ✅ GTK                 | Hotstring previews and selectable LLM suggestions share the focus-free tooltip renderer                                                                                                                   |
 | Secure field detection   | ✅ AT-SPI    | ✅ AT-SPI              | Secure applications, private windows and focused password fields suppress capture and prediction; an inconclusive focus probe fails closed                                                                |
 | Config UI                | ✅ WebKitGTK | ✅ WebKitGTK           | Shared configuration, diagnostics, onboarding, metrics and editor pages are routed through page-scoped bridges                                                                                            |
+
+AI predictions, tone rewrites and translations require a fresh AT-SPI identity
+for the active text field before sending or inserting text. A window ID alone
+cannot distinguish two fields in the same application. Password fields and
+applications that do not expose an active accessible text destination refuse AI
+typing, including when the general privacy filters are disabled.
 
 ## Distribution support
 

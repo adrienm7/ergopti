@@ -45,6 +45,43 @@ function M.run(helpers, corpus)
 			helpers.assert_eq(Files.preference_default('hotstrings.modules."personal-file:632e746f6d6c".""'), nil)
 			helpers.assert_eq(Files.preference_default("hotstrings.groups.foreign"), nil)
 		end)
+		-- A scoped reset copied every personal file to <stem>.backup-<stamp>.toml in
+		-- the scanned folder; discovery then loaded each copy as one more source.
+		helpers.it("(personal-file-backups) writer backups are never personal sources", function()
+			for _, name in ipairs({ "words.backup-20261017-190645.toml",
+					"words.backup-20261017-190645-1330382656.toml", "dir/WORDS.BACKUP-20260625-004901.TOML",
+					"words.backup-20260625-004901.backup-20261017-190645-1330382656.toml" }) do
+				helpers.assert_true(Files.is_backup(name), name)
+			end
+			for _, name in ipairs({ "words.toml", "backup-20261017.toml", ".backup-20261017.toml",
+					"words.backup-.toml", "words.backup-notes.toml", "words.backup-2026.toml.bak",
+					"words.backup-20261017.json", "my.backup-plan.toml", 42 }) do
+				helpers.assert_eq(Files.is_backup(name), false, tostring(name))
+			end
+			local Catalogue = require("hotstrings.catalogue_files")
+			helpers.assert_eq(Catalogue.is_category_file("/x/words.backup-20261017-190645.toml"), false)
+			helpers.assert_eq(Catalogue.is_category_file("/x/words.toml"), true)
+		end)
+
+		helpers.it("(native-backslash-components) follows POSIX and Windows separator identity", function()
+			local previous = package.config
+			local ok, err = pcall(function()
+				local Catalogue = require("hotstrings.catalogue_files")
+				for _, separator in ipairs({ "/", "\\" }) do
+					package.config = separator .. previous:sub(2)
+					local posix = separator == "/"
+					helpers.assert_eq(Catalogue.is_category_file("team\\_index.toml"), posix)
+					helpers.assert_eq(Catalogue.is_category_file("team\\defaults.toml"), posix)
+					helpers.assert_eq(Files.is_backup("team\\.backup-20261017.toml"), posix)
+					helpers.assert_eq(Catalogue.is_category_file("team\\words.toml"), true)
+					helpers.assert_eq(Catalogue.is_category_file("team\\words.backup-20261017.toml"), false)
+					helpers.assert_eq(Files.is_backup("team\\words.backup-20261017.toml"), true)
+					helpers.assert_eq(Catalogue.is_category_file("team/_index.toml"), false)
+				end
+			end)
+			package.config = previous
+			if not ok then error(err, 0) end
+		end)
 	end)
 end
 

@@ -22,6 +22,7 @@ local ManifestReader = require("infra.manifest_reader")
 local ManifestMenu   = require("infra.manifest_menu")
 local KeymapLifecycle = require("ui.menu.keymap_lifecycle")
 local Terminators     = require("keymap.terminators")
+local HotstringCore   = require("infra.hotstring_engine")
 local LOG               = "menu_hotstrings"
 
 
@@ -256,10 +257,9 @@ function M.build_management(ctx)
 			elseif def.key then
 				local enabled_t = ctx.keymap and type(ctx.keymap.is_terminator_enabled) == "function" and ctx.keymap.is_terminator_enabled(def.key) or false
 
-				local lbl = def.label or ""
-				lbl = lbl:gsub("Guillemets fermants", "Guillemet fermant")
-				lbl = lbl:gsub("tiret bas", "underscore")
-				lbl = lbl:gsub("Tiret bas", "Underscore")
+				-- The catalogue carries a locale key, never display text: resolving
+				-- it here follows the active language on every menu rebuild.
+				local lbl = i18n.get(def.label_key)
 				if def.consume then lbl = lbl .. " " .. i18n.get("menu.hotstrings.consumed_suffix") end
 
 				exp_sub[#exp_sub + 1] = {
@@ -655,9 +655,72 @@ function M.build_management(ctx)
 		if ctx.save_prefs() ~= true then return false end
 		return ctx.do_reload("menu")
 	end
+	-- The word-reset policy: the idle-reset choice (presets and free entry) and
+	-- the click, arrow and shortcut checkboxes. The renderer draws both rows from the declarations;
+	-- this driver supplies the keymap setters, the native prompt and the state.
+	local function commit_word_reset(state_key, setter, value)
+		if not ctx.keymap or type(ctx.keymap[setter]) ~= "function" then return false end
+		local ok, committed = pcall(ctx.keymap[setter], value)
+		if not ok or committed ~= true then
+			Logger.error(LOG, "Word-reset setting '%s' was refused: %s.", state_key, tostring(committed))
+			return false
+		end
+		ctx.state[state_key] = value
+		if ctx.save_prefs() ~= true then return false end
+		return ctx.do_reload("menu")
+	end
+	local function current_idle_reset()
+		if ctx.keymap and type(ctx.keymap.get_idle_reset_seconds) == "function" then
+			return ctx.keymap.get_idle_reset_seconds()
+		end
+		return ctx.state.idle_reset_seconds
+	end
+	params_ctx.commands["idle_reset"] = function(seconds)
+		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
+	end
+	params_ctx.commands["idle_reset_custom"] = function()
+		local current = current_idle_reset()
+		local ok_label = i18n.get("button.ok")
+		local ok_p, btn, raw = pcall(dialog.text_prompt,
+			i18n.get("menu.hotstrings.idle_reset_title"),
+			i18n.get("menu.hotstrings.idle_reset_prompt"),
+			type(current) == "number" and string.format("%g", current) or "",
+			ok_label, i18n.get("button.cancel"))
+		if not ok_p or btn ~= ok_label or type(raw) ~= "string" then return false end
+		-- A decimal comma is how half the locales write 1,5 s.
+		local seconds = tonumber((raw:gsub("^%s+", ""):gsub("%s+$", ""):gsub(",", ".")))
+		if not HotstringCore.valid_idle_reset_seconds(seconds) then
+			Logger.warn(LOG, "Invalid idle reset '%s' — ignored.", raw)
+			pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+				i18n.get("menu.hotstrings.idle_reset_invalid"), ok_label)
+			return false
+		end
+		return commit_word_reset("idle_reset_seconds", "set_idle_reset_seconds", seconds)
+	end
+	local click_enabled = ctx.keymap and type(ctx.keymap.is_click_resets_word_enabled) == "function"
+		and ctx.keymap.is_click_resets_word_enabled()
+	params_ctx.commands["click_resets_word"] = function()
+		return commit_word_reset("click_resets_word", "set_click_resets_word", not click_enabled)
+	end
+	-- The arrow and shortcut checkboxes (tap_hold_resets_word is greyed by the
+	-- manifest on macOS: Karabiner owns tap-hold, so it has no command here).
+	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
+		and ctx.keymap.is_arrow_resets_word_enabled()
+	params_ctx.commands["arrow_resets_word"] = function()
+		return commit_word_reset("arrow_resets_word", "set_arrow_resets_word", not arrow_enabled)
+	end
+	local shortcut_enabled = ctx.keymap and type(ctx.keymap.is_shortcut_resets_word_enabled) == "function"
+		and ctx.keymap.is_shortcut_resets_word_enabled()
+	params_ctx.commands["shortcut_resets_word"] = function()
+		return commit_word_reset("shortcut_resets_word", "set_shortcut_resets_word", not shortcut_enabled)
+	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
+	params_ctx.state_getters["hotstrings.idle_reset_seconds"] = current_idle_reset
+	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
+	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end
+	params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function() return shortcut_enabled == true end
 
 	-- The manifest's rows for this group, dispatched by id, and then the two rows
 	-- it does not describe.

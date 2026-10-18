@@ -206,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 			request: {
 				code: node('position').value,
 				mods,
-				previous_slot: previous,
+				...(previous === null ? {} : { previous_slot: previous }),
 				request_id: selection
 			}
 		});

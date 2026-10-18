@@ -38,7 +38,7 @@ for name, label in pairs(labels) do
 	K.record_synthetic_output("owned-" .. name, "xx", label, math.floor(Clock.now_ms()))
 end
 K.on_keydown("x", math.floor(Clock.now_ms()), "owned-manual")
-K.flush()
+require("tests.support.sqlite_flush_native").flush(K)
 assert(W.exec_sql("VACUUM INTO '" .. root .. "/accepted.sqlite';"))
 local sqlite_version = assert(W.query_rows("SELECT sqlite_version();"))[1]
 W.close_db()

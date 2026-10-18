@@ -134,7 +134,7 @@ TomlConfigForeignOwnershipRegistry() {
 ; [tap_hold.catalog] in _shared/tap_hold/defaults.toml. Spelled here because
 ; this loader runs before that catalogue is read, and in a function because a
 ; key can be asked about before this file's include position has run;
-; tests/unit/test_key_combinations.ahk holds the two together.
+; tests/unit/platform/remap/key_combinations/test_key_combinations.ahk holds the two together.
 TomlConfigKeyCombinationKeys() {
 	static Keys := "escape|tab|caps_lock|left_shift|left_ctrl|win|left_alt|space|alt_gr|right_ctrl|right_shift|enter|backspace|delete"
 	return Keys

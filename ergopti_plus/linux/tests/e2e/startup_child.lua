@@ -40,6 +40,13 @@ end
 -- soak below, so delayed start-up work (the updater's boot delay, the tray's
 -- periodic refresh) runs within a bounded, deterministic time.
 package.preload["luv"] = function() error("the start-up scenarios run the daemon without luv") end
+-- Removing luv also removes real owned HTTP dispatch. Control that independent
+-- OS edge with typed ordinary listener refusal while retaining production policy.
+-- The real HTTP adapter and errors remain observable for every unrelated owner.
+package.preload["adapters.http_client"] = function()
+	return require("tests.support.owned_http_fixture").local_discovery(dofile("adapters/http_client.lua"))
+end
+
 local system_time = os.time
 local clock_seconds = system_time()
 os.time = function(date)
@@ -137,9 +144,13 @@ package.preload["adapters.uinput_writer"] = function()
 	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
 	return require("tests.fakes").uinput_writer()
 end
+package.preload["adapters.atspi_focus_watch"] = function()
+	return require("tests.support.focus_watch_fixture")
+end
 package.preload["adapters.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
+		publishFocus = function() return true end,
 		refresh = function() return true, "insecure" end,
 		isSecureField = function() return false end,
 		getVerdict = function() return "insecure" end,

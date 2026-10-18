@@ -11,6 +11,7 @@
 --- USAGE:
 ---     luajit tests/run.lua          # Run from the linux driver root
 ---     lua    tests/run.lua          # Works with plain Lua 5.4 as well
+---     luajit tests/run.lua --module=infra   # One CI shard (tests/support/module_groups.lua)
 ---
 --- The runner exits non-zero when at least one assertion fails so it can be
 --- wired into CI without further glue.
@@ -79,15 +80,31 @@ local ok_utf8, compat_utf8 = pcall(require, "compat.utf8")
 if ok_utf8 and compat_utf8 and compat_utf8.install then compat_utf8.install() end
 
 local helpers = require("tests.helpers")
+local shell_quote = require("text_utils").shell_quote
+helpers.initialize_timing()
 local RunnerContract = require("tests.runner_contract")
 local TEST_MANIFEST = require("tests.test_manifest")
+local ModuleGroups = require("tests.support.module_groups")
 
 -- --only <substr> / --only=<substr>: run only test cases whose name contains the
 -- substring, so a single behaviour can be re-run in isolation.
+-- --module <group> / --module=<group>: run one domain group of the manifest, so
+-- CI can shard the suite. The groups partition the manifest exactly.
 local only_filter = nil
+local module_group = nil
 if arg then
 	for i = 1, #arg do
-		if arg[i] == "--only" then
+		if arg[i] == "--module" or (type(arg[i]) == "string" and arg[i]:match("^%-%-module=")) then
+			if arg[i] == "--module" then
+				module_group = arg[i + 1]
+			else
+				module_group = arg[i]:gsub("^%-%-module=", "")
+			end
+			if type(module_group) ~= "string" or module_group == "" then
+				io.stderr:write("tests/run.lua: --module requires a group name\n")
+				os.exit(2)
+			end
+		elseif arg[i] == "--only" then
 			if type(arg[i + 1]) ~= "string" or arg[i + 1] == "" then
 				io.stderr:write("tests/run.lua: --only requires a nonempty substring\n")
 				os.exit(2)
@@ -115,6 +132,7 @@ end
 -- ===================================
 
 local TEST_DIRS = {
+	"tests/meta",
 	"tests/unit",
 }
 
@@ -212,13 +230,31 @@ if not manifest_ok then
 	os.exit(1)
 end
 
-local total_modules, load_errors = RunnerContract.load_modules(TEST_MANIFEST, function(mod_name)
+-- The whole tree is audited against the whole manifest above, so a shard can
+-- never hide an undiscovered or unlisted file; only then is the run narrowed.
+local modules_to_run = TEST_MANIFEST
+if module_group then
+	local ok_group, selected = pcall(ModuleGroups.select, TEST_MANIFEST, module_group)
+	if not ok_group then
+		io.stderr:write("tests/run.lua: " .. tostring(selected) .. "\n")
+		os.exit(2)
+	end
+	modules_to_run = selected
+	print(string.format("Module group %q: %d of %d module(s)", module_group, #modules_to_run, #TEST_MANIFEST))
+end
+
+local total_modules, load_errors = RunnerContract.load_modules(modules_to_run, function(mod_name)
 	print(string.format("\n>>> Loading %s", mod_name))
-	require(mod_name)
+	local ok, load_error = helpers.measure_module(mod_name, function() require(mod_name) end)
+	if not ok then error(load_error, 0) end
 end)
 for _, failure in ipairs(load_errors) do
 	print(string.format("  ! load error in %s: %s", failure.module, failure.error))
 	helpers.get_results().failed = helpers.get_results().failed + 1
+	local failures = helpers.get_results().failures
+	failures[#failures + 1] = {
+		name = failure.module, err = failure.error, kind = "module", module = failure.module,
+	}
 end
 
 local r = helpers.get_results()
@@ -240,8 +276,16 @@ end
 
 if r.failed > 0 then
 	for _, f in ipairs(r.failures) do
-		print(string.format("  - %s : %s\n    replay: luajit tests/run.lua --only %q", f.name, f.err, f.name))
+		local replay = "luajit tests/run.lua"
+		if module_group then replay = replay .. " --module=" .. module_group end
+		if f.kind == "case" then replay = replay .. " --only " .. shell_quote(f.name) end
+		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
+		print(string.format("  - %s : %s\n    replay: %s", f.name, f.err, replay))
 	end
+	os.exit(1)
+end
+if helpers.timing_failed() then
+	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
 end
 os.exit(0)

@@ -179,7 +179,7 @@ local _capsword_watcher_gen = 0
 -- GC root can be collected mid-run, which kills the subprocess and means its
 -- completion callback never fires — here that would leave KE with capsword=1 and
 -- the next spacebar would switch CapsLock back on. Canonical spelling recognised
--- by tests/unit/meta/test_gc_retention.lua. Entries are released in the callbacks.
+-- by tests/meta/lua_safety/test_gc_retention.lua. Entries are released in the callbacks.
 local _active_tasks = {}
 -- Partial starts return nil to their caller, so this module must retain any
 -- eventtap whose rollback failed; no outer layer ever received that capability.
@@ -432,12 +432,10 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 			_capsword_probe_watchdog = nil
 		end
 		if failed_task then
-			local stopped, stop_err = pcall(function() failed_task:terminate() end)
-			if stopped then
-				_active_tasks[failed_task] = nil
-			else
-				Logger.error(LOG, "Abandoned CapsWord task termination failed; retained for retry: %s.",
-					tostring(stop_err))
+			-- Signal acceptance does not release the native task. Only its exact
+			-- completion callback removes the GC root, even after abandonment.
+			if not TaskLifecycle.terminate(failed_task, "Abandoned CapsWord probe") then
+				Logger.error(LOG, "Abandoned CapsWord task termination failed; retained for retry.")
 			end
 		end
 		if reason then Logger.error(LOG, "%s", reason) end
@@ -732,15 +730,14 @@ function M.stop_gesture_watcher(watcher)
 	local tasks = {}
 	for task in pairs(_active_tasks) do tasks[#tasks + 1] = task end
 	for _, task in ipairs(tasks) do
-		local stopped, stop_err = pcall(function() task:terminate() end)
-		if stopped then
-			_active_tasks[task] = nil
-		else
-			Logger.error(LOG, "CapsWord probe task termination failed; retained for retry: %s.",
-				tostring(stop_err))
+		if not TaskLifecycle.terminate(task, "CapsWord probe teardown") then
+			Logger.error(LOG, "CapsWord probe task termination failed; retained for retry.")
 			all_stopped = false
 		end
 	end
+	-- A signal can be accepted while the original process is still running.
+	-- Completions release only their captured task, including during reentry.
+	if next(_active_tasks) ~= nil then all_stopped = false end
 	if _gestures_engine and type(_gestures_engine.set_any_touch_hook) == "function" then
 		local stopped, stop_err = pcall(_gestures_engine.set_any_touch_hook, nil)
 		if stopped then

@@ -104,7 +104,7 @@ helpers.describe("Managed lease generator fixture isolation", function()
 			local native = rawget(_G, "hs")
 			local modules = {
 				"tests.support.generator_managed_lease_fixture",
-				"tests.unit.platform.remap.test_generator_managed_lease",
+				"tests.unit.platform.remap.generator_managed_lease.test_generator_managed_lease",
 				"tests.unit.platform.remap.generator_managed_lease.test_historical_ownership",
 				"tests.unit.platform.remap.generator_managed_lease.test_managed_merge",
 				"tests.unit.platform.remap.generator_managed_lease.test_merge_ambiguity",

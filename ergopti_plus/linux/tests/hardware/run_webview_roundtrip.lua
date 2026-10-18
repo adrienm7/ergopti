@@ -39,11 +39,18 @@ local ok_webkit = pcall(function() return lgi.require("WebKit2", "4.1") end)
 if not ok_webkit then abort("WebKit2GTK is not available to lgi.") end
 local Gtk = lgi.require("Gtk", "3.0")
 
+local EventLoop = require("adapters.event_loop")
+local register_idle = EventLoop.add_idle_handler
+local idle_registrations = 0
+EventLoop.add_idle_handler = function(handler)
+	idle_registrations = idle_registrations + 1
+	return register_idle(handler)
+end
 local Manager = require("ui.webview_manager")
 
 -- The day and app the page must end up holding: only the daemon knows them.
 local DAY, APP, CHARS = "2026-09-24", "Firefox", 4242
-Manager.set_daemon_state({ keylogger = {
+Manager.set_daemon_state({ keylogger = require("tests.fakes.metrics_keylogger").synchronous({
 	get_dashboard_payload = function()
 		return {
 			metrics_manifest = { [DAY] = { [APP] = { chars = CHARS, time = 60000 } } },
@@ -52,7 +59,7 @@ Manager.set_daemon_state({ keylogger = {
 			driver_meta = { os = "linux", heatmap_id = "kc" },
 		}
 	end,
-} })
+}) })
 
 local function pump(seconds)
 	for _ = 1, math.floor(seconds / WAIT_SECONDS) do
@@ -97,6 +104,15 @@ end
 print(string.format("  the page holds %s characters for %s on %s", got, APP, DAY))
 if got == tostring(CHARS) then
 	print("  ok   the page's own request reached the bridge and the reply reached the page")
+	for _ = 1, 5 do
+		assert(Manager.hide("metrics_typing"), "the actual native page must retire before reopening")
+		assert(Manager.show("metrics_typing"), "the actual native page must reopen")
+		EventLoop._run_idle_tick()
+	end
+	assert(idle_registrations == 1,
+		"reopening real WebKit windows must retain exactly one GTK event-loop handler")
+	assert(Manager.shutdown(), "the actual native pages must acknowledge shutdown")
+	print("  ok   repeated native page opens retain one shared GTK event pump")
 	os.exit(0)
 end
 print("  FAIL the page never received the daemon's metrics")

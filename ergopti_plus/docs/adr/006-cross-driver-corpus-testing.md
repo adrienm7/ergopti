@@ -42,8 +42,8 @@ Current corpus directories:
 
 Hammerspoon consumption is implemented in:
 
-- `tests/unit/meta/test_corpus_hotstrings.lua`
-- `tests/unit/meta/test_corpus_tap_hold.lua`
+- `tests/meta/corpus/test_corpus_hotstrings.lua`
+- `tests/meta/corpus/test_corpus_tap_hold.lua`
 
 ## Consequences
 
@@ -82,4 +82,4 @@ Hammerspoon consumption is implemented in:
 
 - Hotstring vectors: `static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json`
 - Tap-hold vectors: `static/ergopti_plus/_shared/tests/corpus/tap_hold/vectors.json`
-- HS corpus runners: `static/ergopti_plus/macos/tests/unit/meta/test_corpus_hotstrings.lua`, `test_corpus_tap_hold.lua`
+- HS corpus runners: `static/ergopti_plus/macos/tests/meta/corpus/test_corpus_hotstrings.lua`, `test_corpus_tap_hold.lua`

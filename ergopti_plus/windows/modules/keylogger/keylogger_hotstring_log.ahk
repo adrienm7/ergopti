@@ -13,7 +13,7 @@
 ; field, once inside the ``tag`` marker. That contract needs a regression test
 ; that inspects the row itself, and the rest of modules/keylogger/keylogger.ahk
 ; installs OS hooks at load, so the headless suite cannot include it. Splitting
-; the record out is what lets tests/unit/test_hotstring_fire_log_privacy.ahk
+; the record out is what lets tests/unit/modules/hotstrings/engine/test_hotstring_fire_log_privacy.ahk
 ; drive the real function against a recording KL_AppendLog instead of asserting
 ; on a copy of it.
 ;

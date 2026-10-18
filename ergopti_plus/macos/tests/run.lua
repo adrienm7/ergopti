@@ -9,7 +9,8 @@
 --- each `test_*.lua` file once.
 ---
 --- USAGE:
----     lua tests/run.lua            # Run from the hammerspoon driver root
+---     lua tests/run.lua                  # Run from the hammerspoon driver root
+---     lua tests/run.lua --module=meta    # One CI shard (tests/support/module_groups.lua)
 ---
 --- The runner exits non-zero when at least one assertion fails so it can be
 --- wired into CI without further glue.
@@ -65,16 +66,25 @@ package.path = table.concat({
 }, ";")
 
 local helpers = require("tests.helpers")
+local shell_quote = require("text_utils").shell_quote
+helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
+local ModuleGroups = require("tests.support.module_groups")
 
 -- --only accepts an exact test module path/name or a historical case-name
 -- substring, so one file or behaviour can be re-run from a red message
 -- arg is the global Lua args table.
+-- --module selects one domain group so CI can shard the suite.
 local only_filter = nil
+local module_group = nil
 if arg then
 	for i = 1, #arg do
-		if arg[i] == "--only" then
+		if arg[i] == "--module" then
+			module_group = arg[i + 1]
+		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-module=") then
+			module_group = arg[i]:gsub("^%-%-module=", "")
+		elseif arg[i] == "--only" then
 			only_filter = arg[i + 1]
 		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
 			only_filter = arg[i]:gsub("^%-%-only=", "")
@@ -198,6 +208,11 @@ for _, dir in ipairs(TEST_DIRS) do
 		discovered_modules[#discovered_modules + 1] = mod_name
 	end
 end
+if module_group then
+	local total = #discovered_modules
+	discovered_modules = ModuleGroups.select(discovered_modules, module_group)
+	print(string.format("Module group %q: %d of %d module(s)", module_group, #discovered_modules, total))
+end
 local modules_to_load, narrowed, case_filter = OnlySelector.select_modules(
 	discovered_modules,
 	only_filter,
@@ -223,10 +238,14 @@ for _, mod_name in ipairs(modules_to_load) do
 	total_modules = total_modules + 1
 	ModuleIsolation.purge(driver_root, shared_lua)
 	print(string.format("\n>>> Loading %s", mod_name))
-	local ok, err = pcall(require, mod_name)
+	local ok, err = helpers.measure_module(mod_name, function() return require(mod_name) end)
 	if not ok then
 		print(string.format("  ! LOAD FAILURE in %s: %s", mod_name, tostring(err)))
 		helpers.get_results().failed = helpers.get_results().failed + 1
+		local failures = helpers.get_results().failures
+		failures[#failures + 1] = {
+			name = mod_name, err = tostring(err), kind = "module", module = mod_name,
+		}
 	end
 end
 
@@ -240,11 +259,16 @@ print(string.format(
 if r.failed > 0 then
 	print("\n--- DETAILED FAILURES ---")
 	for i, f in ipairs(r.failures) do
+		if f.kind ~= "case" then print("  FAIL " .. f.name .. " — " .. f.err) end
 		print(string.format(
-				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %q\n",
-				i, f.name, f.err, f.name
+				"[%d] %s\n    Error: %s\n    replay: lua tests/run.lua --only %s\n",
+				i, f.name, f.err, shell_quote(f.kind == "case" and f.name or f.module or f.name)
 			))
 	end
+	os.exit(1)
+end
+if helpers.timing_failed() then
+	io.stderr:write("tests/run.lua: Lua wall timing diagnostics failed\n")
 	os.exit(1)
 end
 print("\n[OK] All Lua unit tests passed.")

@@ -162,7 +162,24 @@ class ConfigCleanupWindow extends WebViewHost {
 		return Geo
 	}
 
-	Deliver(Message) {
+	; A confirmation can arrive while another configuration write holds its lease:
+	; the page message interrupts that writer's thread, which keeps the lease
+	; until this one returns, so running the cleanup now could only be refused.
+	; It waits for the write through the menu commands' bounded deferral instead.
+	; @param Message {String|Map} Page message.
+	; @param BusyFn {Func} Test seam: whether a configuration write is in progress.
+	; @param ArmFn {Func} Test seam for the one-shot retry timer.
+	Deliver(Message, BusyFn := 0, ArmFn := 0) {
+		if this.ResetDone || this.Cancelled
+			return
+		if (Message is Map) && Message.Get("action", "") == "clean" {
+			MenuCommandRun(ObjBindMethod(this, "_DeliverNow"), [Message], 0, BusyFn, ArmFn)
+			return
+		}
+		this._DeliverNow(Message)
+	}
+
+	_DeliverNow(Message) {
 		if this.ResetDone || this.Cancelled
 			return
 		if this.Session.Handle(Message)

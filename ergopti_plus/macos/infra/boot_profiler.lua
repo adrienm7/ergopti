@@ -51,7 +51,7 @@ local _complete       = false
 local NS_PER_MS = 1e6
 
 -- Label prefix of the mark init.lua records at the end of boot. Pinned against
--- init.lua by tests/unit/lib/test_diagnostic_snapshot.lua.
+-- init.lua by tests/unit/infra/logger/test_diagnostic_snapshot.lua.
 M.BOOT_COMPLETE_LABEL = "Boot complete"
 
 -- Total boot duration captured at the BOOT_COMPLETE_LABEL mark.

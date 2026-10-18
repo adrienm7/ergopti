@@ -49,7 +49,7 @@ end
 --- @param port integer Canonical local port.
 --- @return string|nil command Managed source owner invocation.
 --- @return string|nil reason Fixed internal preparation failure.
-local function managed_service(executable, port)
+local function managed_service(executable, port, log_dir)
 	local Binary = require("modules.llm.ollama_binary")
 	local candidate, budgets = Binary.native_candidate()
 	if executable ~= candidate then return nil, "managed runtime selection is unavailable" end
@@ -64,7 +64,7 @@ local function managed_service(executable, port)
 	local admission, idle, retirement = budgets and budgets.admission, budgets and budgets.idle, budgets and budgets.retirement
 	if not admission or not idle or not retirement then return nil, "managed native budgets are unavailable" end
 	return text_utils.shell_quote(python) .. " -IB " .. text_utils.shell_quote(script)
-		.. " --port " .. string.format("%.0f", port)
+		.. " --log-directory " .. text_utils.shell_quote(log_dir) .. " --port " .. string.format("%.0f", port)
 		.. " --timeout " .. string.format("%.0f", admission)
 		.. " --idle-timeout " .. string.format("%.0f", idle)
 		.. " --retirement-timeout " .. string.format("%.0f", retirement), nil
@@ -75,9 +75,10 @@ end
 --- @param unified_log_file string Logger.today_log_path() at launch.
 --- @param port integer Canonical configured Ollama port.
 --- @param source_kind string|nil Explicit provisional resolver classification.
+--- @param caller_nonce string|nil Opt-in exact-task lifecycle binding; never grants source authority.
 --- @return string|nil command
 --- @return string|nil error_message
-function M.build(ollama_bin, unified_log_file, port, source_kind)
+function M.build(ollama_bin, unified_log_file, port, source_kind, caller_nonce)
 	if type(ollama_bin) ~= "string" or ollama_bin == "" then
 		return nil, "Ollama executable path is absent"
 	end
@@ -89,9 +90,21 @@ function M.build(ollama_bin, unified_log_file, port, source_kind)
 	local log_dir, dir_err = resolve_log_dir(unified_log_file)
 	if not log_dir then return nil, dir_err end
 	local Binary = require("modules.llm.ollama_binary")
+	if caller_nonce ~= nil then
+		if type(caller_nonce) ~= "string" or #caller_nonce ~= 32
+			or not caller_nonce:match("^[0-9a-f]+$") then
+			return nil, "managed daemon caller nonce is invalid"
+		end
+		if type(Binary.SOURCE_NATIVE_MANAGED) ~= "string" or source_kind ~= Binary.SOURCE_NATIVE_MANAGED then
+			return nil, "managed daemon caller requires its native source owner"
+		end
+	end
 	if type(Binary.SOURCE_NATIVE_MANAGED) == "string" and source_kind == Binary.SOURCE_NATIVE_MANAGED then
-		local service, service_err = managed_service(ollama_bin, port)
+		local service, service_err = managed_service(ollama_bin, port, log_dir)
 		if not service then return nil, service_err end
+		if caller_nonce ~= nil then
+			service = service .. " --caller-nonce " .. text_utils.shell_quote(caller_nonce) .. " --acquire-readiness --owned-stdin"
+		end
 		-- The source owner must remain the foreground process. A log pipeline's
 		-- last successful write cannot turn a guarded refusal into exit zero.
 		return "exec " .. service, nil

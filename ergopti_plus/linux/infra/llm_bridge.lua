@@ -185,10 +185,12 @@ end
 --- Parses a streaming NDJSON line from Ollama's /api/chat stream.
 --- @param line string One line of NDJSON.
 --- @return string|nil The token content, or nil if the line is empty/unparseable.
+--- @return string|nil An explicit protocol or provider failure.
 function M.parse_stream_line(line)
 	if type(line) ~= "string" or line:match("^%s*$") then return nil end
 	local data = M.json_decode(line)
-	if type(data) ~= "table" then return nil end
+	if type(data) ~= "table" then return nil, "Invalid Ollama stream envelope" end
+	if data.error ~= nil then return nil, "Ollama reported a stream error" end
 	if type(data.message) == "table" and type(data.message.content) == "string" then
 		if data.message.content ~= "" then
 			return data.message.content

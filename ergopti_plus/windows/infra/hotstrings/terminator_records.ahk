@@ -342,7 +342,10 @@ _HotstringsTerminatorRecordImage(Physical, Records, States, HasStates) {
 	if !Inserted {
 		; A direct parent header keeps this editor's new list representable by
 		; the ordinary writer instead of introducing ignored root dotted leaves.
-		Kept .= (SubStr(Kept, -1) == "`n" ? "" : "`n") . "[hotstrings]`n" . Leaves
+		; A new table follows retained root scalars and dotted metadata; a
+		; prepended header would move those genuine values into hotstrings.
+		Kept .= (Kept == "" || SubStr(Kept, -1) == "`n" ? "" : "`n")
+			. "[hotstrings]`n" . Leaves
 	}
 	return Kept . (SubStr(Kept, -1) == "`n" ? "" : "`n") . Trivia
 }

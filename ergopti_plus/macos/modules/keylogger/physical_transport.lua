@@ -2,6 +2,9 @@
 
 --- Owns a physical stream until its exact task settles, including failed delivery.
 local M = {}
+local Protocol = require("modules.keylogger.physical_protocol")
+local unpack_values = table.unpack or unpack
+local function pack(...) return { n = select("#", ...), ... } end
 
 --- Creates a single-use transport with explicit receiver and adapter ownership.
 ---@param dependencies table spawn, decode, encode, on_error, on_settled; receiver and frame_limit.
@@ -15,35 +18,61 @@ function M.new(dependencies)
 	assert(type(limit) == "number" and limit >= 1 and limit % 1 == 0, "Invalid physical frame limit")
 	local state, handle, identity, failure = "new", nil, nil, nil
 	local pending, dispatching = "", false
-	local acquiring = false
+	local acquiring, settlement_notified, reporting = false, false, false
 	local transport = {}
 
-	local function settled()
-		if state == "settled" then return end
-		receiver.stop()
-		state, handle, pending = "settled", nil, ""
+	local function publish_settlement()
+		if state ~= "settled" or dispatching or reporting or settlement_notified then return end
+		settlement_notified = true
 		dependencies.on_settled()
+	end
+
+	local function settled()
+		if state ~= "settled" then
+			receiver.stop()
+			state, handle, pending = "settled", nil, ""
+		end
+		-- Actual native completion cannot erase an unfinished emission/dispatch.
+		publish_settlement()
 	end
 
 	--- Revokes counting immediately; a retained task remains owned until settlement.
 	---@return boolean accepted Whether termination was accepted.
 	---@return string status Exact task termination status.
 	function transport.stop()
-		if state == "settled" then return true, "settled" end
+		if state == "settled" then
+			if dispatching or reporting then return false, "pending" end
+			return true, "settled"
+		end
 		receiver.stop()
 		state, pending = "stopping", ""
 		if not handle then
 			if acquiring then return false, "pending" end
 			settled(); return true, "settled"
 		end
-		return handle.terminate()
+		local results = pack(handle.terminate())
+		-- A synchronous native close does not retire the actual callback frame.
+		if state == "settled" and (dispatching or reporting) then return false, "pending" end
+		return unpack_values(results, 1, results.n)
 	end
 
 	local function fail(reason)
-		if failure then return end
-		failure = tostring(reason)
-		transport.stop()
-		dependencies.on_error(failure)
+		if failure or reporting then return end
+		reporting = true
+		failure = "Physical callback diagnostic unavailable"
+		-- Revoke delivery before arbitrary diagnostic code can fail or reenter.
+		-- Native refusal remains real debt; it cannot suppress the owner verdict.
+		local stop_ok, stop_error = pcall(transport.stop)
+		local formatted, diagnostic = pcall(tostring, reason)
+		if formatted then failure = diagnostic end
+		-- The raw callback object remains distinct from its safe diagnostic string.
+		local reported, report_error = pcall(dependencies.on_error, failure, reason)
+		reporting = false
+		local published, publish_error = pcall(publish_settlement)
+		if not formatted then error(diagnostic, 0) end
+		if not stop_ok then error(stop_error, 0) end
+		if not reported then error(report_error, 0) end
+		if not published then error(publish_error, 0) end
 	end
 
 	local function consume(line)
@@ -52,9 +81,11 @@ function M.new(dependencies)
 		local sequence, baseline_page
 		if not identity then
 			-- Admission may invoke external code; retain the original wire identity.
-			local candidate = { incarnation = frame.incarnation, lease = frame.lease }
+			local candidate = { incarnation = frame.incarnation, lease = frame.lease, coverage = frame.coverage }
 			receiver.open(frame)
 			identity, sequence = candidate, "0"
+		elseif frame.kind == "lost" then
+			Protocol.loss(frame, identity)
 		elseif frame.kind == "baseline" or frame.kind == "baseline_ready" then
 			sequence, baseline_page = receiver.baseline(frame), true
 		else
@@ -91,8 +122,14 @@ function M.new(dependencies)
 				offset = newline + 1
 			end
 		end)
+		local reported, report_error = true, nil
+		if not ok then reported, report_error = pcall(fail, err) end
 		dispatching = false
-		if not ok then fail(err) end
+		-- Deliver the retained completion once after the actual writer unwinds,
+		-- even when its error observer raises; preserve that original error object.
+		local published, publish_error = pcall(publish_settlement)
+		if not reported then error(report_error, 0) end
+		if not published then error(publish_error, 0) end
 		return true
 	end
 
@@ -126,7 +163,7 @@ function M.new(dependencies)
 
 	--- Reports actual native settlement, not merely a requested stop.
 	---@return boolean
-	function transport.isSettled() return state == "settled" end
+	function transport.isSettled() return state == "settled" and not dispatching and not reporting end
 
 	return transport
 end

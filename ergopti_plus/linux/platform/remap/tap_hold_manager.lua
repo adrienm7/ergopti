@@ -25,6 +25,10 @@ local Config = require("platform.remap.tap_hold_loader")
 local Engine = require("platform.remap.tap_hold_engine")
 local Combinations = require("modules.shortcuts.key_combinations")
 local original_combination_constructor = Combinations.new
+local original_combination_instance_current = Combinations.instance_is_current
+local BindingIdentity = require("config_binding_identity")
+local BindingPublication = require("config_binding_publication")
+local original_combination_catalogue = BindingIdentity.combination_binding_catalogue
 local original_engine_constructor = Engine.new
 local original_config_load, original_config_document = Config.load, Config.load_document
 local NativeCatalogue = require("_generated.action_catalogue")
@@ -50,6 +54,67 @@ local MS_PER_SECOND = 1000
 -- ======= 1/ State ========================
 -- =========================================
 -- =========================================
+
+-- Weak-key values never retain their engine key (including the bare engine).
+-- A source observation is configured-map provenance, not Hook installation.
+local nav_builds = setmetatable({}, { __mode = "k" })
+local original_nav_load, original_nav_capture = NavLayer.load, NavLayer.capture_source_observation
+local original_shared_root = Paths.shared_root
+local original_input_arm_state = Engine.input_arm_state
+local original_codec_decode = Codec.decode
+local nav_engine_ports = {}
+local NAV_ENGINE_PORT_NAMES = { "new", "process", "tick", "handles", "release_all", "input_arm_state" }
+for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
+	nav_engine_ports[name] = Engine[name]
+end
+
+local function nav_ports_current()
+	if not rawequal(package.loaded["platform.remap.nav_layer"], NavLayer) or getmetatable(NavLayer) ~= nil
+		or rawget(NavLayer, "load") ~= original_nav_load
+		or type(original_nav_capture) ~= "function" or rawget(NavLayer, "capture_source_observation") ~= original_nav_capture
+		or not rawequal(package.loaded["infra.paths"], Paths) or rawget(Paths, "shared_root") ~= original_shared_root
+		or not rawequal(package.loaded["toml_codec"], Codec) or rawget(Codec, "decode") ~= original_codec_decode
+		or not rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine) or getmetatable(Engine) ~= nil
+		or not rawequal(package.loaded["platform.remap.key_combination_engine"], PairModule)
+		or rawget(PairModule, "new") ~= original_pair_constructor then return false end
+	for _, name in ipairs(NAV_ENGINE_PORT_NAMES) do
+		local port = nav_engine_ports[name]
+		if type(port) ~= "function" or rawget(Engine, name) ~= port then return false end
+	end
+	return true
+end
+
+local function nav_mapping_current(engine, record)
+	if not record or record.unavailable or not nav_ports_current()
+		or type(record.observation) ~= "table" or getmetatable(record.observation) ~= nil
+		or rawget(record.observation, "current") ~= record.current
+		or rawget(record.observation, "sealed") ~= record.sealed or record.sealed() ~= true then return false end
+	local base, base_metatable = record.base[1], record.base[2]
+	local metatable, index = record.metatable[1], record.metatable[2]
+	if not base or not base_metatable or not rawequal(getmetatable(base), base_metatable)
+		or rawget(base_metatable, "__index") ~= Engine or not rawequal(rawget(base, "nav_layer"), record.map)
+		or not metatable or not index or not rawequal(getmetatable(engine), metatable)
+		or rawget(metatable, "__index") ~= index then return false end
+	if record.wrapped then
+		-- The genuine base was captured before wrapping, retained only weakly.
+		-- No wrapper getter or native installation observation is invoked here.
+		return record.empty and type(index) == "function" and rawget(engine, "nav_layer") == nil
+			and record.sealed() == true
+	end
+	if not rawequal(base, engine) or index ~= Engine then return false end
+	if record.empty then return true end
+	if rawget(engine, "has_combinations")
+		or rawget(engine, "input_arm_state") ~= nil
+		or rawget(engine, "layer_depth") ~= 0 or rawget(engine, "undecided") ~= nil
+		or rawget(engine, "one_shot_until") ~= nil then return false end
+	for _, field in ipairs({ "held", "layer_keys", "key_refs", "physical_down", "native_keys", "instant_down",
+		"one_shot_keys", "one_shot_swallowed", "passed_down", "modifiers_down" }) do
+		local value = rawget(engine, field)
+		if type(value) ~= "table" or getmetatable(value) ~= nil or next(value) ~= nil then return false end
+	end
+	local observed, state = pcall(original_input_arm_state, engine)
+	return observed and state == nil
+end
 
 local _initialized = false
 local _hook = nil            -- The keyboard hook the engine is installed in.
@@ -100,7 +165,25 @@ local function _run_tap(action, binding)
 		_on_text_injected(action.type_text)
 		return
 	end
+	-- A logging sink may synchronously revoke or republish the selected pair.
+	-- Capture its original source and Manager before the callback, then join
+	-- again immediately before the irreversible action executor.
+	local pair_current
+	if type(binding) == "string" and binding:match("^combination__") then
+		local combinations, engine, generation, execute = _combinations, _engine, _generation, _execute_action
+		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return end
+		local captured, guard = pcall(combinations.capture_runtime)
+		if not captured or type(guard) ~= "function" then return end
+		pair_current = function()
+			local checked, current = pcall(guard)
+			return checked and current == true and _initialized and not _paused
+				and rawequal(_combinations, combinations) and rawequal(_engine, engine)
+				and _generation == generation and _execute_action == execute
+		end
+		if not pair_current() then return end
+	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
+	if pair_current and not pair_current() then return end
 	local ok, err = pcall(_execute_action, action, binding or "tap_hold")
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
 end
@@ -164,6 +247,7 @@ local function fields_equal(value,captured)
  for key in pairs(value) do if captured[key]==nil then return false end end
  return true
 end
+local original_engine_key_codes = copy_fields(rawget(Engine, "KEY_CODES"))
 local catalogue_snapshot=copy_fields(rawget(NativeCatalogue,"actions"))
 local function managed_owner_current(loaded,combinations)
  local issuer=managed_owners[combinations]
@@ -172,6 +256,44 @@ local function managed_owner_current(loaded,combinations)
   and fields_equal(loaded.catalog,issuer.catalogue) and fields_equal(loaded.keys,issuer.keys)
   and fields_equal(loaded.hold_picker,issuer.holds)
 end
+--- Observes only the original complete logical key catalogue and its issuer.
+--- Pause, installed hooks, enabled assignments and physical frames grant no rights.
+--- @param owner table Exact original Manager-created combinations owner.
+--- @return boolean current No action callbacks, native operations, registration or IO.
+function M.managed_combination_catalogue_current(owner)
+	local issuer = type(owner) == "table" and managed_owners[owner] or nil
+	return issuer ~= nil and _initialized and type(_loaded) == "table" and getmetatable(_loaded) == nil
+		and rawequal(owner, _combinations) and type(owner) == "table"
+		and getmetatable(M) == nil and rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+		and getmetatable(Combinations) == nil
+		and rawequal(package.loaded["modules.shortcuts.key_combinations"], Combinations)
+		and rawget(Combinations, "new") == original_combination_constructor
+		and rawget(Combinations, "instance_is_current") == original_combination_instance_current
+		and original_combination_instance_current(owner, issuer.catalogue) == true
+		and rawequal(package.loaded["platform.remap.tap_hold_loader"], Config)
+		and rawequal(package.loaded["platform.remap.tap_hold_engine"], Engine)
+		and getmetatable(Engine) == nil and rawget(Engine, "new") == original_engine_constructor
+		and fields_equal(rawget(Engine, "KEY_CODES"), original_engine_key_codes)
+		and getmetatable(Config) == nil and rawget(Config, "load") == original_config_load
+		and rawget(Config, "load_document") == original_config_document
+		and managed_owner_current(_loaded, owner)
+end
+local original_logical_catalogue_current = M.managed_combination_catalogue_current
+
+--- Returns a detached complete logical publication from the original build issuer.
+--- @return table|nil catalogue Withdrawn ownership remains unjudged without IO.
+function M.published_binding_catalogue()
+	if not BindingPublication.owner_is_current("combination", "platform.remap.tap_hold_manager", M)
+		or rawget(M, "managed_combination_catalogue_current") ~= original_logical_catalogue_current
+		or not original_logical_catalogue_current(_combinations)
+		or not rawequal(package.loaded["config_binding_identity"], BindingIdentity)
+		or getmetatable(BindingIdentity) ~= nil
+		or rawget(BindingIdentity, "combination_binding_catalogue") ~= original_combination_catalogue then return nil end
+	local issuer = managed_owners[_combinations]
+	local okay, catalogue = pcall(original_combination_catalogue, issuer.catalogue)
+	return okay and catalogue or nil
+end
+
 local function pair_options(loaded,combinations)
  local issuer=assert(managed_owners[combinations],"original managed pair constructor required")
  assert(issuer.loaded==loaded and getmetatable(combinations)==nil
@@ -197,9 +319,9 @@ function M.managed_pair_options_current(owner,configured)
   if action~="none" and catalogue_snapshot[action]==nil then return false end
  end
  return getmetatable(M)==nil and rawequal(package.loaded["platform.remap.tap_hold_manager"],M)
-  and record~=nil and record.owner==owner and _combinations==owner and record.loaded==_loaded
-  and record.engine==_engine and _installed_engine==_engine and record.generation==_generation
-  and _initialized and not _paused and _hook==_native_hook and type(_native_hook)=="table"
+  and record~=nil and rawequal(record.owner,owner) and rawequal(_combinations,owner) and rawequal(record.loaded,_loaded)
+  and rawequal(record.engine,_engine) and rawequal(_installed_engine,_engine) and record.generation==_generation
+  and _initialized and not _paused and rawequal(_hook,_native_hook) and type(_native_hook)=="table"
   and rawequal(package.loaded["modules.shortcuts.key_combinations"],Combinations)
   and rawget(Combinations,"new")==original_combination_constructor
   and rawget(Engine,"new")==original_engine_constructor
@@ -325,7 +447,16 @@ local function _build(loaded, boot)
 	_check_catalog(loaded.catalog)
 	local one_shot = _read_one_shot()
 	local config_dir = assert(_user_path:match("^(.*)[/\\][^/\\]+$"), "tap-hold path needs a configuration folder")
-	local nav_layer = NavLayer.load({ shared_root = Paths.shared_root(), config_dir = config_dir, boot = boot == true })
+	local nav_eligible = nav_ports_current()
+	local root_port = nav_eligible and original_shared_root or Paths.shared_root
+	local shared_root = root_port()
+	if not nav_ports_current() then nav_eligible = false end
+	local nav_load = nav_eligible and original_nav_load or NavLayer.load
+	local nav_layer, nav_issuance = nav_load({ shared_root = shared_root, config_dir = config_dir, boot = boot == true })
+	local nav_observation
+	if nav_eligible and nav_ports_current() then
+		nav_observation = original_nav_capture(nav_layer, nav_issuance, shared_root, config_dir)
+	end
 	_warn_unsupported_taps(loaded)
 	local count = 0
 	for _, key in pairs(loaded.keys) do
@@ -345,6 +476,7 @@ local function _build(loaded, boot)
 		held_text_modifier_codes = function() return _hook.held_text_modifier_codes() end,
 		held_shortcut_modifier_codes = function() return _hook.held_shortcut_modifier_codes() end,
 	})
+	local nav_base, nav_wrapped = engine, false
 	assert(rawget(Combinations,"new")==original_combination_constructor and rawget(Engine,"new")==original_engine_constructor
   and rawget(PairModule,"new")==original_pair_constructor,
   "original pair/base constructors required")
@@ -360,7 +492,22 @@ local function _build(loaded, boot)
  managed_owners[combinations]=issued
 	if combinations.has_bindings() then
 		engine = CombinationEngine.new(engine, pair_options(loaded,combinations), _buffered_ports())
+		nav_wrapped = true
 	end
+	local nav_record = { unavailable = true }
+	if nav_observation and nav_ports_current() then
+		local empty = next(nav_layer) == nil
+		if empty or not nav_wrapped then
+			nav_record = { map = nav_layer, empty = empty, observation = nav_observation,
+				base = setmetatable({ nav_base, getmetatable(nav_base) }, { __mode = "v" }),
+				current = nav_observation.current, sealed = nav_observation.sealed,
+				metatable = setmetatable({ getmetatable(engine), rawget(getmetatable(engine), "__index") }, { __mode = "v" }),
+				wrapped = nav_wrapped, shared_root = shared_root }
+		end
+	end
+	-- A nonempty wrapped route remains explicitly unsupported. No record value
+	-- retains the engine key, so retirement works on LuaJIT's weak-key collector.
+	nav_builds[engine] = nav_record
 	Logger.info(LOG, "Tap-holds loaded: %d key(s), feature %s.", count, loaded.enabled and "on" or "off")
 	return loaded, one_shot, engine, combinations
 end
@@ -687,6 +834,90 @@ function M._reset_for_test()
 	_combinations, _installed_engine = nil, nil
 	_enabled, _paused = true, false
 	return true
+end
+
+BindingPublication.register("combination", "platform.remap.tap_hold_manager", M, M.published_binding_catalogue)
+
+--- Captures configured native key-prefix reservations from the original Manager.
+--- This observes source/configuration ownership; it grants no physical/output rights.
+function M.capture_collision_inventory()
+	if not _initialized or not _loaded or _paused or not config_exports_current()
+		or original_logical_catalogue_current(_combinations) ~= true then return nil end
+	local Files = require("adapters.file_system")
+	local read, factory = Files.read_with_status, M.capture_collision_inventory
+	local path, defaults, loaded, engine, installed, epoch = _user_path, _defaults_path, _loaded, _engine, _installed_engine, _generation
+	local enabled, paused, combinations = _enabled, _paused, _combinations
+	local nav_record = nav_builds[engine]
+	if not nav_mapping_current(engine, nav_record) then return nil end
+	local bytes, status = read(path)
+	local shipped, shipped_status = read(defaults)
+	if status ~= "ok" or shipped_status ~= "ok" or type(bytes) ~= "string" or type(shipped) ~= "string" then return nil end
+	local decoded = original_config_document(defaults, original_codec_decode(bytes), nil, path)
+	if not nav_mapping_current(engine, nav_record) or not config_exports_current() then return nil end
+	if decoded.enabled ~= loaded.enabled or not fields_equal(decoded.keys, loaded.keys) then return nil end
+	local keys = copy_fields(loaded.keys)
+	local codes = copy_fields(original_engine_key_codes)
+	local native_records = {}
+	if enabled and loaded.enabled and engine and type(engine.by_code) == "table" then
+		for id, fields in pairs(keys) do
+			local code = codes[id]
+			local row = code and engine.by_code[code]
+			if fields.enabled ~= false and row ~= nil then
+				if type(row) ~= "table" or row.id ~= id then return nil end
+				native_records[code] = { row = row, fields = copy_fields(row) }
+			end
+		end
+	end
+	local function runtime()
+		if not rawequal(nav_builds[engine], nav_record) or not nav_mapping_current(engine, nav_record) then return false end
+		if engine and ((engine.layer_depth or 0) ~= 0 or next(engine.held or {}) ~= nil
+			or next(engine.key_refs or {}) ~= nil or next(engine.physical_down or {}) ~= nil) then return false end
+		for code, saved in pairs(native_records) do
+			if not rawequal(engine.by_code[code], saved.row) or not fields_equal(saved.row, saved.fields) then return false end
+		end
+		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M) and _initialized
+			and _user_path == path and _defaults_path == defaults and rawequal(_loaded, loaded)
+			and rawequal(_engine, engine) and rawequal(_installed_engine, installed) and _generation == epoch
+			and _enabled == enabled and _paused == paused and not paused and config_exports_current()
+			and loaded.enabled == decoded.enabled and rawequal(_combinations, combinations)
+			and original_logical_catalogue_current(combinations) == true
+			and fields_equal(loaded.keys, keys) and fields_equal(Engine.KEY_CODES, codes)
+			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+			and M.capture_collision_inventory == factory
+	end
+	local function current()
+		if not runtime() then return false end
+		local content, classification = read(path)
+		local current_defaults, defaults_status = read(defaults)
+		if content ~= bytes or classification ~= status or current_defaults ~= shipped
+			or defaults_status ~= shipped_status or not runtime() then return false end
+		if original_shared_root() ~= nav_record.shared_root or not runtime() or nav_record.current() ~= true then return false end
+		return runtime()
+	end
+	if not current() then return nil end
+	local claims = {}
+	if enabled and loaded.enabled then
+		if not rawequal(installed, engine) or not M.is_active() then return nil end
+		for code, saved in pairs(native_records) do
+			-- Native tap with no hold has no by_code entry in the actual engine.
+			claims[#claims + 1] = { kind = "prefix", binding = "tap_hold__" .. saved.row.id,
+				codes = { code }, unmodified_only = true }
+		end
+		if not nav_record.empty then
+			local reachable = false
+			for _, saved in pairs(native_records) do
+				if type(saved.fields.layer) == "string" and saved.fields.layer ~= "" then reachable = true end
+			end
+			if reachable then
+				for code in pairs(nav_record.map) do
+					claims[#claims + 1] = { kind = "prefix", binding = "nav_layer__" .. tostring(code),
+						codes = { code }, unmodified_only = true }
+				end
+			end
+		end
+	end
+	if not current() then return nil end
+	return { claims = claims, codes = codes, path = path, content = bytes, status = status, current = current, sealed = runtime }
 end
 
 return M

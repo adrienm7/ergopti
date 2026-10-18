@@ -1,5 +1,5 @@
 {
-	"_comment": "Logger test vectors — replayed by all three driver suites: Windows (tests/unit/test_logger_contract.ahk), macOS and Linux (tests/unit/lib/test_logger_contract.lua).",
+	"_comment": "Logger test vectors — replayed by all three driver suites: Windows (tests/unit/infra/logger/test_logger_contract.ahk), macOS (tests/unit/infra/logger/test_logger_contract.lua) and Linux (tests/unit/infra/logger/test_logger_contract.lua).",
 	"_sentinel": "TIMESTAMP replaces the real timestamp so vectors are time-independent.",
 	"_format": "Each vector: variant, module, message (format string), args (array), expected (rendered line with TIMESTAMP sentinel). message_lua/expected_lua and message_ahk/expected_ahk override the pair for a LANGUAGE, not a driver: Lua takes %s, AutoHotkey takes {1}. Linux and macOS both read the _lua pair.",
 

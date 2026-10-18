@@ -13,6 +13,8 @@ local dialog = require("infra.dialog_util")
 local i18n   = require("infra.i18n")
 local Logger = require("infra.logger")
 local SendInput = require("send_input")
+local NativePresentation = require("infra.native_presentation")
+local PrepareNativePresentation, NativePresentationTitle = NativePresentation.prepare, NativePresentation.title
 
 local LOG = "menu.shortcut_utils"
 
@@ -181,6 +183,23 @@ local function apply_prompt_update(callback, ...)
 	return true
 end
 
+--- Returns presentation refusal for the exact runtime-intercepted native route.
+--- Syntax and storage acceptance remain owned by the existing parameter parser.
+--- @param value any Existing or proposed private parameter scalar.
+--- @return string|nil reason Existing translated native-runner availability reason.
+function M.program_assignment_reason(value)
+	local checked, reserved = pcall(function()
+		local parsed = require("program_parameter").parse(value, "hs")
+		if not parsed then return false end
+		local Native = require("adapters.apple_shortcuts_native")
+		return Native.is_chosen_program(parsed.executable, parsed.arguments)
+	end)
+	if not checked or reserved ~= false then
+		return i18n.get("platform_reason.program_runner_unavailable")
+	end
+	return nil
+end
+
 --- Delegates a program edit to the session's existing writer-fenced owner.
 --- @param gestures table Gestures facade.
 --- @param binding string Canonical binding identifier.
@@ -190,6 +209,12 @@ end
 --- @param transaction function Session program transaction entry point.
 --- @return boolean committed
 function M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
+	local reason = action == "run_program" and M.program_assignment_reason(value) or nil
+	if reason then
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			reason, i18n.get("button.ok"), nil, "warning")
+		return false
+	end
 	if type(transaction) ~= "function" then
 		Logger.error(LOG, "Private program edit refused because its transaction owner is unavailable.")
 		return false
@@ -208,13 +233,27 @@ end
 function M.prompt_shortcut(opts)
 	if type(opts) ~= "table" or type(opts.on_apply) ~= "function" then return false end
 
-	local title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	local receipt, title
+	if opts.native_presentation_id ~= nil then
+		if opts.title ~= nil then return false end
+		receipt = PrepareNativePresentation(opts.native_presentation_id, "dialog")
+		title = receipt and NativePresentationTitle(receipt) or nil
+		if title == nil then return false end
+	else
+		title = type(opts.title) == "string" and opts.title or i18n.get("shortcuts.shortcut_label")
+	end
 	local message = type(opts.message) == "string"
 		and opts.message
 		or i18n.get("shortcuts.shortcut_format_hint")
 
 	local current = M.shortcut_to_config_string(opts.current_shortcut)
-	local ok_prompt, button, raw = pcall(dialog.text_prompt, title, message, current, "OK", i18n.get("common.cancel"))
+	local prompt = dialog.text_prompt
+	local cancel_label = i18n.get("common.cancel")
+	if receipt ~= nil then
+		title = NativePresentationTitle(receipt)
+		if title == nil then return false end
+	end
+	local ok_prompt, button, raw = pcall(prompt, title, message, current, "OK", cancel_label)
 	if not ok_prompt or button ~= "OK" or type(raw) ~= "string" then return false end
 
 	local cleaned = raw:match("^%s*(.-)%s*$")
@@ -273,6 +312,13 @@ function M.ask_parameter_value(gestures, action, spec, title, prior)
 		title, prompt, prior, save_btn, i18n.get("button.cancel"))
 	if not prompt_ok or button ~= save_btn then return nil end
 	if spec == "llm_language" and (type(typed) ~= "string" or typed:match("^%s*$")) then return nil end
+	local reason = action == "run_program" and spec == "program"
+		and M.program_assignment_reason(typed) or nil
+	if reason then
+		pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
+			reason, i18n.get("button.ok"), nil, "warning")
+		return nil
+	end
 	return typed
 end
 
@@ -317,7 +363,7 @@ local function prompt_action_parameter(gestures, binding, action, spec, picked, 
 		end
 		if type(gestures.validate_action_parameter) == "function"
 			and gestures.validate_action_parameter(action, value) then
-			if spec == "program" then
+			if spec == "program" or mutation ~= nil or transaction ~= nil then
 				return M.commit_action_parameter(gestures, binding, action, value, mutation, transaction)
 			end
 			return apply_prompt_update(gestures.set_action_parameter,
@@ -397,6 +443,9 @@ function M.picker_parameter_fields(gestures, items, binding)
 			end
 			item.parameter = kind
 			item.parameterValue = binding and gestures.get_action_parameter(binding, item.id) or ""
+			if kind == "program" and item.id == "run_program" then
+				item.hint = M.program_assignment_reason(item.parameterValue) or item.hint
+			end
 			if SendInput.KINDS[kind] or kind == "llm_prompt" or kind == "llm_vision" or kind == "llm_language" or kind == "program" then
 				prompts[kind] = gestures.parameter_prompt(item.id)
 				errors[kind] = gestures.parameter_error(item.id)

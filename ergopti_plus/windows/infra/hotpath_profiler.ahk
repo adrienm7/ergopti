@@ -49,14 +49,24 @@ global _HOTPATH_SLOW_MS := 5.0
 ;
 ; Every entry MUST carry its measured normal cost in a comment: an override
 ; without a measurement behind it is indistinguishable from hiding a regression,
-; and tests/unit/test_hotpath_per_segment_threshold.ahk enforces the comment.
+; and tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk enforces the comment.
 global _HOTPATH_SLOW_MS_BY_SEGMENT := Map(
 	; 2 Hz unattended cross-process UIA/COM round trip on the message thread.
 	; Measured 2026-07-29 21:15-21:46: n=2993, mean 14.3 ms, max 301.0 ms, ~80 %
 	; of all possible ticks over 5 ms. 60 ms keeps every >100 ms event and the one
 	; 301 ms breach of Windows' ~300 ms LowLevelHooksTimeout, while dropping ~99 %
 	; of the volume.
-	"UIA.SelectionPoll", 60.0
+	"UIA.SelectionPoll", 60.0,
+	; The preview tooltip's layered Gui and DWM border, painted from a deferred
+	; timer, never inside a keystroke: a keystroke it delays still reports under
+	; its own segment with the nested time. Measured 2026-10-03..17 from the
+	; one-minute summaries: n=1315, mean 11.5 ms, 95 % over 5 ms, 52 % over 10 ms,
+	; 2 over 50 ms, max 106 ms; it was 81 of the 218 errors-sink lines of
+	; 2026-10-17. 30 ms keeps every stall a typist can see.
+	"Tooltip.Present", 30.0,
+	; The same tooltip's row build. Measured 2026-10-03..17: n=1319, mean 7.1 ms,
+	; 58 % over 5 ms, 15 % over 10 ms, 2 over 50 ms, max 208 ms.
+	"Tooltip.Build", 30.0
 )
 ; A closed segment shorter than this is not remembered as a possible child. It
 ; cannot materially distort a parent that has to exceed _HOTPATH_SLOW_MS to be

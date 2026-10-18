@@ -14,6 +14,9 @@ fi
 source "$SCRIPT_DIR/network-retry.sh"
 source "$SCRIPT_DIR/native_python_bootstrap.sh"
 export PATH="/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+# Only the canonical pinned native bootstrap may supply this interpreter.
+# An inherited executable path is not an admitted private runtime.
+unset ERGOPTI_BOOTSTRAP_PYTHON
 printf '%s\n' 'OLLAMA_INSTALLING'
 if [ ! -x "${ERGOPTI_BOOTSTRAP_PYTHON:-}" ]; then
 	native_bootstrap_python "$HOME/Library/Application Support/Ergopti/native-bootstrap"

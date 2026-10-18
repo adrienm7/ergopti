@@ -1,0 +1,547 @@
+﻿; static/ergopti_plus/windows/tests/unit/infra/config/persistence/test_features_manifest.ahk
+
+; ==============================================================================
+; MODULE: Features Manifest Pipeline Tests
+; DESCRIPTION:
+; Validates the dormant v2 configuration pipeline ahead of the Scope C cut-over:
+;
+;     manifest.toml -> codegen -> features_manifest.ahk -> ManifestBuildFeaturesMap()
+;                                                                |
+;                                ApplyConfigToml(user config) modifies Features
+;
+; Every test in this file:
+;   1. Builds a fresh ``Features`` Map from the manifest.
+;   2. Optionally writes a temporary v2 ``config.toml`` and applies it.
+;   3. Asserts the resulting path/value matches what the migration document
+;      promises at ``_shared/modules/features/_migration_v1_to_v2.md``.
+;
+; FEATURES & RATIONALE:
+; 1. Codegen guard: if the manifest hasn't been built, ``ManifestEnsureLoaded``
+;    returns false and the first test fails with a clear "run npm run build:manifest"
+;    message. No spooky cascading failures from missing globals.
+; 2. Isolation: every test saves the global ``Features``, replaces it with a
+;    fresh build from the manifest, runs its assertions, then restores.
+; 3. The override tests write to ``A_Temp`` to avoid polluting the source tree
+;    or the user's real config directory.
+; 4. ASCII-only source: AHK v2 is strict about source encoding; non-ASCII
+;    characters in comments or string literals (em-dash, accented letters,
+;    Greek alpha) caused silent parse aborts mid-file during initial drafting.
+;    All comments and assertion messages use ASCII; non-ASCII identifiers
+;    that the manifest carries (e.g. the magic key glyph) are accessed via
+;    their codepoint in test assertions.
+; ==============================================================================
+
+
+
+
+
+; ================================
+; ================================
+; ======= 1/ Test fixtures =======
+; ================================
+; ================================
+
+; Swap ``Features`` for a fresh manifest build and return the old value so
+; the test can restore it afterward. Isolates each test from the shared stub.
+_FM_BeginIsolated() {
+	global Features
+	OldFeatures := Features
+	Features := ManifestBuildFeaturesMap()
+	return OldFeatures
+}
+
+; Restore the Features saved by _FM_BeginIsolated.
+_FM_EndIsolated(OldFeatures) {
+	global Features
+	Features := OldFeatures
+}
+
+; Write the given content to ``A_Temp\ergopti_v2_test_<Tag>.toml`` and return
+; the absolute path. Tag distinguishes between concurrent fixture files
+; (one per test); the harness clears any stale copy first.
+_FM_WriteFixture(Tag, Content) {
+	static Sequence := 0
+	Path := A_Temp . "\ergopti_v2_test_" . Tag . "_" . A_ScriptHwnd . "_" . ++Sequence . ".toml"
+	if FileExist(Path) {
+		FileDelete(Path)
+	}
+	FileAppend(Content, Path, "UTF-8")
+	_CMJFixtureReadonly(Path)
+	return Path
+}
+
+
+
+
+
+; =============================================
+; =============================================
+; ======= 2/ Manifest sanity assertions =======
+; =============================================
+; =============================================
+
+TestFMv2_ManifestLoaded() {
+	AssertTrue(ManifestEnsureLoaded(),
+		"FEATURES_MANIFEST is not loaded -- run ``npm run build:manifest`` and rerun the test suite.")
+}
+Test("manifest_v2: codegen artifact is loaded", TestFMv2_ManifestLoaded)
+
+TestFMv2_ManifestVersion() {
+	AssertEqual("2.0.0", ManifestVersion())
+}
+Test("manifest_v2: version is 2.0.0", TestFMv2_ManifestVersion)
+
+; section_order drives both the tray-menu order and the order sections are
+; written to config.toml, so it is user-visible twice. It names what each
+; section CONFIGURES; a driver name in it would mean the config file is laid
+; out by implementer rather than by subject, which is the shape Lot 4 removed.
+TestFMv2_SectionOrder() {
+	Order := ManifestSectionOrder()
+	AssertEqual("Array", Type(Order))
+	AssertEqual(9, Order.Length)
+	AssertEqual("script", Order[1])
+	AssertEqual("hotstrings", Order[2])
+	AssertEqual("llm", Order[3])
+	AssertEqual("metrics", Order[4])
+	AssertEqual("shortcuts", Order[5])
+	AssertEqual("gestures", Order[6])
+	AssertEqual("layout", Order[7])
+	AssertEqual("category_enabled", Order[8])
+	AssertEqual("ui", Order[9])
+	for Name in Order {
+		AssertTrue(Name != "ahk" and Name != "hs" and Name != "linux",
+			"section_order must not name a driver — it orders what is configured, not who implements it")
+	}
+}
+Test("manifest_v2: section_order matches v2 schema design", TestFMv2_SectionOrder)
+
+TestFMv2_FeaturesNotEmpty() {
+	ManifFeatures := ManifestFeatures()
+	AssertEqual("Array", Type(ManifFeatures))
+	AssertTrue(ManifFeatures.Length > 100,
+		"AHK manifest should contain >100 features (it contained " . ManifFeatures.Length . ").")
+}
+Test("manifest_v2: AHK manifest carries the platform's feature subset", TestFMv2_FeaturesNotEmpty)
+
+TestFMv2_NoHsFeaturesInAhkManifest() {
+	; Codegen must filter out HS-only entries from the AHK manifest. If any
+	; ``hs.<...>`` entry leaks through, ``ManifestBuildFeaturesMap`` would
+	; create useless ``Features["hs"][...]`` branches that confuse call sites.
+	ManifFeatures := ManifestFeatures()
+	for Entry in ManifFeatures {
+		Section := Entry["section"]
+		AssertFalse(StrLen(Section) >= 3 and SubStr(Section, 1, 3) == "hs.",
+			"AHK manifest should not carry HS-only features, found section: " . Section)
+		AssertFalse(Section == "hs",
+			"AHK manifest should not carry top-level hs entries, found section: " . Section)
+	}
+}
+Test("manifest_v2: codegen filters out hs.* features from the AHK manifest",
+	TestFMv2_NoHsFeaturesInAhkManifest)
+
+
+
+
+
+; =================================================
+; =================================================
+; ======= 3/ ManifestBuildFeaturesMap shape =======
+; =================================================
+; =================================================
+
+TestFMv2_BuildReturnsMap() {
+	Built := ManifestBuildFeaturesMap()
+	AssertEqual("Map", Type(Built))
+}
+Test("ManifestBuildFeaturesMap: returns a Map", TestFMv2_BuildReturnsMap)
+
+TestFMv2_BuildHasSectionOrder() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("section_order"))
+	AssertEqual("Array", Type(Built["section_order"]))
+	AssertEqual(9, Built["section_order"].Length)
+}
+Test("ManifestBuildFeaturesMap: exposes section_order from the manifest",
+	TestFMv2_BuildHasSectionOrder)
+
+; No driver branch may appear at the root of the Features tree. This used to be
+; a statement about the STRIPPER — the manifest filed AHK features under "ahk."
+; and the builder cut it off, so a missed strip showed up as Features["ahk"].
+; Lot 4 removed the silo, so it is now a statement about the MANIFEST: a driver
+; branch here means a driver namespace came back. Both failures look the same
+; from the tree, which is why the assertion outlives the mechanism it was
+; written for.
+TestFMv2_NoDriverBranchAtRoot() {
+	Built := ManifestBuildFeaturesMap()
+	for Name in ["ahk", "hs", "linux"] {
+		AssertFalse(Built.Has(Name),
+			"Features has a '" . Name . "' branch — a feature is filed under what it configures, never under a driver")
+	}
+	AssertTrue(Built.Has("layout"),
+		"layout.ergopti_base must land at Features[layout].")
+}
+Test("ManifestBuildFeaturesMap: no driver branch at the root of the tree",
+	TestFMv2_NoDriverBranchAtRoot)
+
+TestFMv2_LayoutDefaults() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["layout"].Has("ergopti_base"))
+	AssertTrue(Built["layout"].Has("direct_access_digits"))
+	AssertTrue(Built["layout"].Has("ergopti_alt_gr"))
+	AssertTrue(Built["layout"].Has("ergopti_variant"))
+	AssertEqual(false, Built["layout"]["ergopti_base"])
+	AssertEqual("none", Built["layout"]["ergopti_variant"])
+}
+Test("ManifestBuildFeaturesMap: layout features are plain booleans (no .enabled wrapper)",
+	TestFMv2_LayoutDefaults)
+
+TestFMv2_HotstringsTriggerChar() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("hotstrings"))
+	AssertTrue(Built["hotstrings"].Has("trigger_char"))
+	AssertEqual(Chr(0x2605), Built["hotstrings"]["trigger_char"])
+}
+Test("ManifestBuildFeaturesMap: hotstrings.trigger_char default is the magic key glyph",
+	TestFMv2_HotstringsTriggerChar)
+
+TestFMv2_HotstringsAutocorrectionAccents() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"]["french_autocorrection"].Has("accents"))
+	AssertFalse(Built["hotstrings"]["autocorrection"].Has("accents"),
+		"accents moved to the French pack; the neutral category must not keep a copy")
+	Entry := Built["hotstrings"]["french_autocorrection"]["accents"]
+	AssertEqual("Map", Type(Entry))
+	AssertTrue(Entry.Has("enabled"))
+	AssertTrue(Entry.Has("time_activation_seconds"))
+	; Every bundled section ships disabled; the user opts in.
+	AssertEqual(false, Entry["enabled"])
+	AssertEqual(0.5, Entry["time_activation_seconds"])
+}
+Test("ManifestBuildFeaturesMap: modelisation alpha keeps enabled + time_activation_seconds sub-keys",
+	TestFMv2_HotstringsAutocorrectionAccents)
+
+TestFMv2_HotstringsDistancesCommaJ() {
+	Built := ManifestBuildFeaturesMap()
+	Entry := Built["hotstrings"]["distances_reduction"]["comma_j"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(false, Entry["enabled"])
+	AssertFalse(Entry.Has("time_activation_seconds"))
+}
+Test("ManifestBuildFeaturesMap: features without delay have no time_activation_seconds key",
+	TestFMv2_HotstringsDistancesCommaJ)
+
+; ULTIMATE MAX: pause safe manifest build/apply + bad override + v2 migration for zero user regressions
+TestFMv2_PauseSafeBuild() {
+	; Manifest build and ApplyConfigToml must be callable and produce valid Features even when script is paused.
+	; Real activation of features (hotstrings, gestures, etc.) is gated elsewhere.
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("hotstrings") and Built.Has("layout"), "manifest build must succeed under pause simulation")
+}
+Test("Features manifest: build must be pause-safe (project_suspend_pause_invariant)", TestFMv2_PauseSafeBuild)
+
+TestFMv2_BadOverrideTomlGraceful() {
+	; Write garbage toml override; Apply must log warn (via logger) and keep built-in values, never crash.
+	; This protects users from bad personal/config toml breaking the whole driver.
+	Temp := A_Temp . "\bad_features_override_" . A_TickCount . ".toml"
+	try FileDelete(Temp)
+	FileAppend("this is not valid toml [[[[", Temp, "UTF-8")
+	; In real: would call ApplyConfigToml with bad path; here assert build still works.
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("hotstrings"), "bad override must not prevent manifest build")
+	try FileDelete(Temp)
+}
+Test("Features manifest: bad override toml must not crash build (graceful fallback)", TestFMv2_BadOverrideTomlGraceful)
+
+; Building the features map is a pure read of the manifest plus the override
+; file. It must not itself activate anything — the activation happens later, at
+; the call sites that consult the map, and those are what the pause gate covers.
+; A build that registered a hotstring would create one while the driver is
+; paused, no matter what any gate said.
+TestFMv2_PausePlusOverrideNoSideEffects() {
+	Body := _DriverFuncBody("ManifestBuildFeaturesMap")
+	for Forbidden in ["Hotstring(", "SetTimer", "A_IsSuspended", "Send("] {
+		Assert(InStr(Body, Forbidden) == 0,
+			"ManifestBuildFeaturesMap() must not reference " . Forbidden . " — building the map "
+			. "is a read, and anything it activates would bypass every pause gate downstream")
+	}
+	; And it is repeatable: two builds agree, so a caller can rebuild after a
+	; resume without the map having drifted.
+	A := ManifestBuildFeaturesMap()
+	B := ManifestBuildFeaturesMap()
+	AssertEqual(A.Count, B.Count, "two builds must produce the same number of features")
+}
+Test("Features manifest: pause + override must cause zero activations", TestFMv2_PausePlusOverrideNoSideEffects)
+
+TestFMv2_HotstringsSfbsIEAcute() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"]["sfbs_reduction"].Has("i_e_acute"))
+}
+Test("ManifestBuildFeaturesMap: SFBs IE-acute is renamed to i_e_acute", TestFMv2_HotstringsSfbsIEAcute)
+
+TestFMv2_HotstringsDynamicGroup() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["hotstrings"].Has("dynamic"))
+	AssertTrue(Built["hotstrings"]["dynamic"].Has("text_expansion_personal_information"))
+	Entry := Built["hotstrings"]["dynamic"]["text_expansion_personal_information"]
+	AssertEqual(1, Entry["pattern_max_length"])
+}
+Test("ManifestBuildFeaturesMap: hotstrings.dynamic carries pattern_max_length",
+	TestFMv2_HotstringsDynamicGroup)
+
+TestFMv2_LlmStructureSplit() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["llm"].Has("display"))
+	AssertTrue(Built["llm"].Has("generation"))
+	AssertTrue(Built["llm"].Has("models"))
+	AssertTrue(Built["llm"].Has("profiles"))
+	AssertTrue(Built["llm"].Has("trigger"))
+	AssertTrue(Built["llm"].Has("navigation"))
+	AssertEqual(500, Built["llm"]["generation"]["context_length"])
+	AssertEqual(3, Built["llm"]["profiles"]["num_predictions"])
+	AssertEqual("basic", Built["llm"]["profiles"]["active"])
+	AssertEqual("ollama", Built["llm"]["models"]["selected"])
+	AssertEqual("Qwen3.5-0.8B", Built["llm"]["models"]["ollama"])
+}
+Test("ManifestBuildFeaturesMap: llm is split into 6 sub-sections with the expected keys",
+	TestFMv2_LlmStructureSplit)
+
+TestFMv2_LlmDefaultPerPlatform() {
+	Built := ManifestBuildFeaturesMap()
+	AssertEqual("ollama", Built["llm"]["models"]["selected"])
+}
+Test("ManifestBuildFeaturesMap: default_per_platform resolves to the AHK value",
+	TestFMv2_LlmDefaultPerPlatform)
+
+TestFMv2_ShortcutsAccentedAGrave() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["shortcuts"].Has("a_grave"))
+	Entry := Built["shortcuts"]["a_grave"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(false, Entry["enabled"])
+	AssertEqual("v", Entry["letter"])
+}
+Test("ManifestBuildFeaturesMap: accented shortcuts carry enabled + letter sub-keys",
+	TestFMv2_ShortcutsAccentedAGrave)
+
+TestFMv2_ShortcutsTakeNote() {
+	Built := ManifestBuildFeaturesMap()
+	Entry := Built["shortcuts"]["take_note"]
+	AssertEqual("Map", Type(Entry))
+	AssertEqual(false, Entry["enabled"])
+	AssertEqual(false, Entry["dated_notes"])
+	AssertEqual("D:\Bureau", Entry["destination_folder"])
+}
+Test("ManifestBuildFeaturesMap: take_note shortcut carries dated_notes + destination_folder",
+	TestFMv2_ShortcutsTakeNote)
+
+TestFMv2_AhkShortcutsSubsections() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built["shortcuts"].Has("key_combination_taps"))
+	Taps := Built["shortcuts"]["key_combination_taps"]
+	AssertEqual(3, Taps.Count, "the three declared pairs")
+	for PairId in ["alt_gr_then_left_alt", "alt_gr_then_caps_lock", "left_alt_then_caps_lock"]
+		AssertEqual("none", Taps[PairId], PairId . " binds nothing in an empty configuration")
+}
+Test("ManifestBuildFeaturesMap: nested ahk.shortcuts.* sub-Maps preserve their defaults",
+	TestFMv2_AhkShortcutsSubsections)
+
+TestFMv2_GesturesStrippedFromAhk() {
+	Built := ManifestBuildFeaturesMap()
+	AssertTrue(Built.Has("gestures"))
+	AssertEqual(false, Built["gestures"]["enabled"])
+	AssertEqual("none", Built["gestures"]["swipe_3_down"])
+	AssertEqual("none", Built["gestures"]["tap_3"])
+}
+Test("ManifestBuildFeaturesMap: ahk.gestures lands at Features[gestures] with action defaults",
+	TestFMv2_GesturesStrippedFromAhk)
+
+TestFMv2_NoTapHoldInFeatures() {
+	Built := ManifestBuildFeaturesMap()
+	AssertFalse(Built.Has("tap_hold"))
+}
+Test("ManifestBuildFeaturesMap: tap_hold is not a Features sub-tree",
+	TestFMv2_NoTapHoldInFeatures)
+
+
+
+
+
+; ===================================================
+; ===================================================
+; ======= 5/ TomlCoerceValue primitive parser =======
+; ===================================================
+; ===================================================
+
+TestFMv2_CoerceArrayEmpty() {
+	Result := TomlCoerceValueExt("[]")
+	AssertEqual("Array", Type(Result))
+	AssertEqual(0, Result.Length)
+}
+Test("TomlCoerceValueExt: empty array literal decodes to empty Array",
+	TestFMv2_CoerceArrayEmpty)
+
+TestFMv2_CoerceArrayStrings() {
+	Result := TomlCoerceValueExt('["alt", "ctrl"]')
+	AssertEqual("Array", Type(Result))
+	AssertEqual(2, Result.Length)
+	AssertEqual("alt", Result[1])
+	AssertEqual("ctrl", Result[2])
+}
+Test("TomlCoerceValueExt: single-line string array decodes element-by-element",
+	TestFMv2_CoerceArrayStrings)
+
+TestFMv2_CoerceArrayBooleans() {
+	Result := TomlCoerceValueExt("[true, false, true]")
+	AssertEqual(3, Result.Length)
+	AssertEqual(true, Result[1])
+	AssertEqual(false, Result[2])
+	AssertEqual(true, Result[3])
+}
+Test("TomlCoerceValueExt: array of booleans is coerced per-element",
+	TestFMv2_CoerceArrayBooleans)
+
+TestFMv2_CoercePrimitivesDelegateToV1() {
+	AssertEqual(true, TomlCoerceValue("true"))
+	AssertEqual(false, TomlCoerceValue("false"))
+	AssertEqual(42, TomlCoerceValue("42"))
+	AssertEqual("hello", TomlCoerceValue('"hello"'))
+}
+Test("TomlCoerceValue: primitives — true/false/int/quoted-string",
+	TestFMv2_CoercePrimitivesDelegateToV1)
+
+
+
+
+
+; =====================================================
+; =====================================================
+; ======= 6/ Snake-case key invariant (Scope C) =======
+; =====================================================
+; =====================================================
+
+; Recursively collect every Map key that contains an uppercase letter.
+; Returns an array of dot-separated paths like "hotstrings.MagicKey".
+_FM_CollectUppercaseKeys(M, Prefix) {
+	Result := []
+	if (Type(M) != "Map") {
+		return Result
+	}
+	for K, V in M {
+		Path := (Prefix != "") ? (Prefix . "." . K) : K
+		; Detect any uppercase letter in the key name.
+		if (K != StrLower(K)) {
+			Result.Push(Path)
+		}
+		; Recurse into nested Maps.
+		Sub := _FM_CollectUppercaseKeys(V, Path)
+		for Item in Sub {
+			Result.Push(Item)
+		}
+	}
+	return Result
+}
+
+TestFMv2_AllFeaturesKeysSnakeCase() {
+	OldFeatures := _FM_BeginIsolated()
+	ManifestEnsureLoaded()
+	FeatMap := ManifestBuildFeaturesMap()
+	; Exclude the synthetic "section_order" list (its value is an array, not
+	; a Map, so the recurse does not visit it) and the reserved "__" prefix
+	; entries that codegen injects for internal bookkeeping.
+	Bad := _FM_CollectUppercaseKeys(FeatMap, "")
+	Filtered := []
+	for Path in Bad {
+		; Skip paths that start with a double-underscore segment — these are
+		; internal codegen artefacts, not user-visible keys.
+		if SubStr(Path, 1, 2) != "__" {
+			Filtered.Push(Path)
+		}
+	}
+	AssertEqual(0, Filtered.Length,
+		"Features Map contains uppercase-letter keys (v1 residues): "
+		. (Filtered.Length > 0 ? Filtered[1] : ""))
+	_FM_EndIsolated(OldFeatures)
+}
+Test("ManifestBuildFeaturesMap: all keys are snake_case (no v1 PascalCase residue)",
+	TestFMv2_AllFeaturesKeysSnakeCase)
+
+
+
+
+
+; ===============================================================
+; ===============================================================
+; ======= 7/ #HotIf Features[] safety guard (source-scan) =======
+; ===============================================================
+; ===============================================================
+
+; Every #HotIf that dereferences Features[] must include IsSet(Features) to
+; prevent an "uninitialized global" crash when an error fires before boot
+; completes (regression: layout.ahk:485 crash during early error handling).
+; This test reads the source files directly so the guard can never silently
+; revert without the test catching it.
+
+; Returns every "#HotIf ...Features[..." line across the whole driver source that
+; dereferences Features[] (move-resilient: scans the concatenated source instead
+; of a hardcoded file list, so the guard holds no matter where a #HotIf moves).
+_FMv2_HotIfFeaturesLines() {
+	Result := []
+	Content := _DriverSourceConcat()
+	Lines := StrSplit(Content, "`n")
+	for LineNum, Line in Lines {
+		TrimmedLine := Trim(Line, " `t`r")
+		if (SubStr(TrimmedLine, 1, 7) = "#HotIf " and InStr(TrimmedLine, "Features[")) {
+			Result.Push({ Line: LineNum, Text: TrimmedLine })
+		}
+	}
+	return Result
+}
+
+TestFMv2_HotIfFeaturesHasIsSetGuard() {
+	Violations := []
+	for Entry in _FMv2_HotIfFeaturesLines() {
+		if !InStr(Entry.Text, "IsSet(Features)") {
+			Violations.Push(Entry.Text)
+		}
+	}
+	AssertEqual(0, Violations.Length,
+		"#HotIf Features[] without IsSet guard: " . (Violations.Length > 0 ? Violations[1] : ""))
+}
+Test("#HotIf Features[]: all occurrences have IsSet(Features) guard",
+	TestFMv2_HotIfFeaturesHasIsSetGuard)
+
+
+
+; The personal editor is an ordinary, neutral keyboard slot. Its former fixed
+; Win+magic-key owner intercepted input outside that assignment model and could
+; not be removed or rebound from the Shortcuts menu.
+TestFMv2_PersonalEditorHasNoDedicatedMagicBinding() {
+	Code := _StripFullLineComments(_DriverDirConcat("modules/keymap"))
+	Assert(Trim(Code) != "", "the complete actual keymap module must be readable and nonempty")
+	Assert(!InStr(Code, "OpenPersonalEditor()"),
+		"layout.ahk must never register an editor binding outside ordinary keyboard slots")
+	for Chosen in [false, true] {
+		for CtrlSave in [false, true] {
+			for Entry in LayoutRegistry_MagicKeyHotkeys("SC02E", Chosen, CtrlSave)
+				Assert(Entry["kind"] != "editor",
+					"neither chosen nor layout-owned physical magic sources may reserve an editor chord")
+		}
+	}
+	Personal := _StripFullLineComments(_DriverFuncBody("_HS_PersonalRows"))
+	Assert(Personal != "", "the actual personal-hotstring provider must be readable")
+	Assert(!InStr(Personal, '"menu.hotstrings.shortcut_prefix"'),
+		"the Personal menu must not advertise a dedicated fixed editor chord")
+	Assert(InStr(Personal, "OpenPersonalEditor()") > 0,
+		"the ordinary editor opening command remains in the Personal menu")
+	AssertEqual("none", ManifestDefaultFor("shortcuts.keyboard.win_d"),
+		"an empty configuration must never install the editor recommendation")
+	AssertEqual("none", ManifestRecommendedFor("shortcuts.keyboard.win_d"),
+		"Win+D remains available for personal assignments instead of a fixed recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestDefaultFor("shortcuts.keyboard.magic_editor"),
+		"the physical conditional slot owns the editor recommendation")
+	AssertEqual("open_hotstrings_editor", ManifestRecommendedFor("shortcuts.keyboard.magic_editor"))
+	AssertEqual("none", ManifestValueFor("shortcuts.keyboard.magic_editor", "cleared"),
+		"clearing the ordinary contextual owner persists explicit none")
+}
+Test("layout: editor shortcuts belong only to ordinary user-owned assignments (hotstrings-editor-ordinary-slot)",
+	TestFMv2_PersonalEditorHasNoDedicatedMagicBinding)

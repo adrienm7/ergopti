@@ -605,6 +605,7 @@ class CurlAsyncRequest {
 		}
 		Started := IsObject(Handle) && Handle.start()
 		if !Started {
+			this._MarkNativeDispatchRefused()
 			this.Abort()
 			throw Error("The exact managed request Job did not start.")
 		}
@@ -613,6 +614,12 @@ class CurlAsyncRequest {
 			SetTimer(this.ManagedAdmissionFn, -1)
 		}
 		return true
+	}
+
+	; This metadata records native dispatch infrastructure, never network status.
+	_MarkNativeDispatchRefused() {
+		if this._ManagedIsLive()
+			this.NativeDispatchRefused := true
 	}
 
 	_PollManagedAdmission() {
@@ -653,6 +660,7 @@ class CurlAsyncRequest {
 			} finally Critical(PreviousCritical)
 			this._StopManagedAdmission()
 		} catch {
+			this._MarkNativeDispatchRefused()
 			this.Abort()
 		}
 	}
@@ -683,6 +691,9 @@ class CurlAsyncRequest {
 					&& Receipt.Get("child_quiesced", false) is Integer
 					&& Receipt["child_quiesced"] == true {
 				this.NativeReceipt := Receipt.Get("receipt", Map())
+				if !this.ManagedPayloadPublished && Receipt.Get("ok", 0) is Integer && Receipt.Get("ok", 0) == false
+						&& Receipt.Get("status", -1) is Integer && Receipt.Get("status", -1) == 0
+					this._MarkNativeDispatchRefused()
 				Valid := ExitCode == 0 && Stderr == "" && Receipt.Get("ok", false) == true
 					&& Receipt.Get("status", 0) is Integer && Receipt["status"] >= 100 && Receipt["status"] <= 599
 				if Valid && this.OutputPath == "" {
@@ -786,6 +797,7 @@ class CurlAsyncRequest {
 		if this.ManagedRouting || !(this.DispatchPort is Map) {
 			try return this._SendManaged(Body)
 			catch {
+				this._MarkNativeDispatchRefused()
 				this.Abort()
 				return false
 			}
@@ -1731,7 +1743,7 @@ HTTPIsActive() {
 }
 
 ; Machine-readable contract map - consumed by the generic adapter compliance test
-; (tests/test_adapter_compliance_new.ahk) to verify every required method exists
+; (tests/unit/adapters/test_adapter_compliance.ahk) to verify every required method exists
 ; and is callable without manually listing functions per-adapter.
 global ADAPTER_HTTP_CLIENT := Map(
     "post",     HTTPPost,

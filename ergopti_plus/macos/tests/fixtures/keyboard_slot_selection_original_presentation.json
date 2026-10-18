@@ -1,0 +1,177 @@
+{
+	"provenance": {
+		"head": "db556c2d56e33ddbf85edda277e5aa85df8e95b5",
+		"original_menu_path": "static/ergopti_plus/macos/ui/menu/menu_keyboard_slots.lua",
+		"original_menu_sha256": "8887506bd54de6d5ef5293bdd175077861f6bdb5228f72ca7ab1dee696fc1990",
+		"original_picker_path": "static/ergopti_plus/macos/ui/action_picker/init.lua",
+		"original_picker_sha256": "d0d55d12918e464a00a88e2bab668e9e525701d4679a58cedd0102f9a4126886",
+		"original_factory_path": "static/ergopti_plus/macos/ui/ui_builder.lua",
+		"original_factory_sha256": "bb1c740707e700bee2660b82f4752f7ad50c6d8732451f3dbd06f9043aa7d4eb",
+		"captured_before_candidate_authoring": true,
+		"runtime_executed": false,
+		"policy": "Original fixed slot-selection opts title/label read from original source and original 21 locale blobs. Candidate APIs/generators are not used."
+	},
+	"original_title_key": "dialog.keyboard_shortcut.title_prefix",
+	"original_label_key": "dialog.keyboard_shortcut.prompt",
+	"original_native_window_title_policy": {
+		"prefix": "ErgoptiPlus",
+		"separator": " — "
+	},
+	"original_app_geometry": {
+		"title_key": "dialog.action_picker.label",
+		"width": 460,
+		"height": 560,
+		"min_width": 360,
+		"min_height": 360,
+		"vhost": "ergopti.actionpicker"
+	},
+	"locales": {
+		"da": {
+			"locale_blob_sha256": "19bc1cbd7951bc39f9366e9300d12b30adac2cd11211938625a4fd001e9e8eb7",
+			"original_page_title": "Vælg en tast — ",
+			"original_page_label": "Vælg tastaturkombinationen:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Vælg en tast — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"de": {
+			"locale_blob_sha256": "a439d6e799126705cac999490937126826ee2e8a62130610aa1eeab8ef084d0a",
+			"original_page_title": "Taste wählen — ",
+			"original_page_label": "Tastenkombination auswählen:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Taste wählen — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"en": {
+			"locale_blob_sha256": "d9f0bf148c181cef1db302ac49ed5a3ac8abe06e4b7298c6f7e527671d355d18",
+			"original_page_title": "Choose a key — ",
+			"original_page_label": "Select the key combination:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Choose a key — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"es": {
+			"locale_blob_sha256": "b3fd7b195d8511a7271d85a15d04d1d4f6371e3c9a2692c980abe881d5f6ae9f",
+			"original_page_title": "Elegir una tecla — ",
+			"original_page_label": "Seleccionar la combinación de teclas:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Elegir una tecla — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"fr": {
+			"locale_blob_sha256": "8e93a14633f7fd5a4a7c6148b91aa53ada6f828c86d1769760aa8f218df282f2",
+			"original_page_title": "Choisir une touche — ",
+			"original_page_label": "Sélectionner la combinaison de touches :",
+			"original_native_caption_source_projection": "ErgoptiPlus — Choisir une touche — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"it": {
+			"locale_blob_sha256": "d4a08813a1f0921389c1b5ae7250d6a474f3d9dfd8ed443c7cef99468e30be59",
+			"original_page_title": "Scegli un tasto — ",
+			"original_page_label": "Seleziona la combinazione di tasti:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Scegli un tasto — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"nl": {
+			"locale_blob_sha256": "87a0074bf70f58dd55abedfbf42fb13bff9c49da8de1b502d0da81ca0346e1ef",
+			"original_page_title": "Kies een toets — ",
+			"original_page_label": "Selecteer de toetscombinatie:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Kies een toets — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"no": {
+			"locale_blob_sha256": "8ff12ce51ca2353278233bd2b4029b9374c408f95dd92c65572faeff5c8c8ea8",
+			"original_page_title": "Velg en tast — ",
+			"original_page_label": "Velg tastaturkombinasjon:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Velg en tast — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"pl": {
+			"locale_blob_sha256": "69000da3d6ff0714be19bef3874d85e8dfadf1708c18c9d12d8f42b5227e2634",
+			"original_page_title": "Wybierz klawisz — ",
+			"original_page_label": "Wybierz kombinację klawiszy:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Wybierz klawisz — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"pt": {
+			"locale_blob_sha256": "a388616ae9750d7bac4eb1766ba8d92bbf6e6e9d5893f55db53126c711b1b4bd",
+			"original_page_title": "Escolha uma tecla — ",
+			"original_page_label": "Selecione a combinação de teclas:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Escolha uma tecla — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"sv": {
+			"locale_blob_sha256": "1c5d592a3c46ef15009d548e915163eb359ff4f55124e87f21f69206114bf2b1",
+			"original_page_title": "Välj en tangent — ",
+			"original_page_label": "Välj tangentkombination:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Välj en tangent — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"tr": {
+			"locale_blob_sha256": "87702aead4fcdef29834a793f4df2fc2a798c636cc6c76bd83094732f42c4aaa",
+			"original_page_title": "Tuş seç — ",
+			"original_page_label": "Tuş kombinasyonunu seçin:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Tuş seç — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"cs": {
+			"locale_blob_sha256": "1b791f7e242ca03ed67d367ec07e44dcd010b09c5d650bd71bd8dbd13156d19b",
+			"original_page_title": "Vybrat klávesu — ",
+			"original_page_label": "Vyberte kombinaci kláves:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Vybrat klávesu — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"ru": {
+			"locale_blob_sha256": "195c4099befca76d87e06ccfb3c9c29b36ae4f835cc176b2d53b43c3001b79a7",
+			"original_page_title": "Выберите клавишу — ",
+			"original_page_label": "Выберите сочетание клавиш:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Выберите клавишу — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"uk": {
+			"locale_blob_sha256": "7ee97f84beff0a32cd35033ea96eb8136cc6c91679b17ccf59bed0e671f2c376",
+			"original_page_title": "Оберіть клавішу — ",
+			"original_page_label": "Оберіть комбінацію клавіш:",
+			"original_native_caption_source_projection": "ErgoptiPlus — Оберіть клавішу — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"he": {
+			"locale_blob_sha256": "1b6e6d152033afc8b4308d7f0682d2cc626bf9474e6acb1999e5e3cfd66eb964",
+			"original_page_title": "בחר מקש — ",
+			"original_page_label": "בחר את צירוף המקשים:",
+			"original_native_caption_source_projection": "ErgoptiPlus — בחר מקש — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"ar": {
+			"locale_blob_sha256": "e7170c7ac2fd40d8b606e4c3387b53a84d8d5dbfcd2fadd9817cc1d36c2ba37e",
+			"original_page_title": "اختر مفتاحًا — ",
+			"original_page_label": "حدد تركيبة المفاتيح:",
+			"original_native_caption_source_projection": "ErgoptiPlus — اختر مفتاحًا — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"hi": {
+			"locale_blob_sha256": "9d77370c736f477ccfc58888df6e09743d142d8efebbfdf8fc8de2df4ee6391c",
+			"original_page_title": "कुंजी चुनें — ",
+			"original_page_label": "कुंजी संयोजन चुनें:",
+			"original_native_caption_source_projection": "ErgoptiPlus — कुंजी चुनें — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"zh": {
+			"locale_blob_sha256": "fe02731d78e82b79f08c07809778a44e418b53656c9a7851d221b5bb739a180d",
+			"original_page_title": "选择按键 — ",
+			"original_page_label": "选择按键组合：",
+			"original_native_caption_source_projection": "ErgoptiPlus — 选择按键 — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"ja": {
+			"locale_blob_sha256": "e5419ca1027dda0b3298431c2db6f663e986d46b588eedd48e7fa3263efe3b53",
+			"original_page_title": "キーを選択 — ",
+			"original_page_label": "キーの組み合わせを選択してください:",
+			"original_native_caption_source_projection": "ErgoptiPlus — キーを選択 — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		},
+		"ko": {
+			"locale_blob_sha256": "81c97fa5daee9e161a42075c9fe06075029f588799cc51ad37959e4f62fc49e8",
+			"original_page_title": "키 선택 — ",
+			"original_page_label": "키 조합을 선택하세요:",
+			"original_native_caption_source_projection": "ErgoptiPlus — 키 선택 — ",
+			"projection_policy": "Source-only exact original prefix+separator+title; native runtime UNRUN"
+		}
+	}
+}

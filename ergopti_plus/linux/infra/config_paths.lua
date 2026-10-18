@@ -121,17 +121,27 @@ function M.get_config_dir()
 	if type(configured) ~= "string" or configured:sub(1, 1) ~= "/" then
 		return M.default_config_dir()
 	end
+	if configured:match("^/+$") then return "/" end
 	configured = configured:gsub("/+$", "")
 	return configured ~= "" and configured or M.default_config_dir()
+end
+
+--- Normalizes a bootstrap configuration override without storing it.
+--- @param path any Candidate path.
+--- @return string|nil normalized
+local function normalize_config_override(path)
+	if type(path) ~= "string" then return nil end
+	local normalized = path:match("^/+$") and "/" or path:gsub("/+$", "")
+	if normalized ~= "" and normalized:sub(1, 1) ~= "/" then return nil end
+	return normalized
 end
 
 --- Persists a configuration-directory override.
 --- @param path string Empty/default resets the override; custom paths must be absolute.
 --- @return boolean True only when bootstrap storage confirms the mutation.
 function M.set_config_dir(path)
-	if type(path) ~= "string" then return false end
-	local normalized = path:gsub("/+$", "")
-	if normalized ~= "" and normalized:sub(1, 1) ~= "/" then return false end
+	local normalized = normalize_config_override(path)
+	if normalized == nil then return false end
 
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false end
@@ -158,7 +168,7 @@ end
 function M.config(rel)
 	local base = M.get_config_dir()
 	if type(rel) ~= "string" or rel == "" then return base end
-	return (base .. "/" .. (rel:gsub("^/+", "")))
+	return ((base == "/" and "" or base) .. "/" .. (rel:gsub("^/+", "")))
 end
 
 --- The driver's data directory, optionally with a path appended.
@@ -253,6 +263,29 @@ function M.set_logs_dir(path)
 	end
 	return type(Storage.set) == "function"
 		and Storage.set(LOGS_DIR_STORAGE_KEY, normalized) == true
+end
+
+--- Persists the paths editor's related overrides in one bootstrap publication.
+--- A missing logs value preserves its current override; defaults remove keys.
+--- @param config_dir string Configuration override, empty for the default.
+--- @param logs_dir string|nil Logs override, empty for the default.
+--- @return boolean saved Strict acknowledgement for the entire batch.
+function M.set_paths(config_dir, logs_dir)
+	local config = normalize_config_override(config_dir)
+	if config == nil then return false end
+	local logs = logs_dir ~= nil and M.normalize_logs_dir(logs_dir) or nil
+	if logs_dir ~= nil and logs == nil then return false end
+	local values, deletions = {}, {}
+	local function append(key, value, default)
+		if value == "" or value == default then deletions[#deletions + 1] = key
+		else values[key] = value end
+	end
+	append(CONFIG_DIR_STORAGE_KEY, config, M.default_config_dir())
+	if logs_dir ~= nil then append(LOGS_DIR_STORAGE_KEY, logs, M.default_logs_dir()) end
+	local ok, Storage = pcall(require, "adapters.storage")
+	if not ok or type(Storage) ~= "table" or type(Storage.set_many) ~= "function" then return false end
+	local called, saved = pcall(Storage.set_many, values, deletions)
+	return called and saved == true
 end
 
 return M

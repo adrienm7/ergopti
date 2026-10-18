@@ -2,7 +2,7 @@
 ---
 --- Lua port of _shared/modules/tooltip/dequeue.js — stacked hotstring row expiry logic.
 --- Keep in sync with the JS reference; contract tests live in
---- tests/unit/ui/test_tooltip_dequeue_contract.lua.
+--- tests/unit/ui/tooltip/test_tooltip_dequeue_contract.lua.
 
 local M = {}
 

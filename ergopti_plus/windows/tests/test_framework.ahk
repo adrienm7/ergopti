@@ -66,6 +66,17 @@ if !IsSet(_AHK_ONLY_FILTER)
 if !IsSet(_AHK_QUALIFICATION_PROFILE)
 	global _AHK_QUALIFICATION_PROFILE := ""
 
+; Optional selection flags (run_all sets them): --module=<group>,
+; --list=<file>, --dump-plan=<file> and --reverse. Empty means unused.
+if !IsSet(_AHK_MODULE)
+	global _AHK_MODULE := ""
+if !IsSet(_AHK_LIST_FILE)
+	global _AHK_LIST_FILE := ""
+if !IsSet(_AHK_DUMP_PLAN)
+	global _AHK_DUMP_PLAN := ""
+if !IsSet(_AHK_REVERSE)
+	global _AHK_REVERSE := false
+
 ; Only the principal runner owns parser registration. Including assertion
 ; helpers alone must not create an undeclared function dependency at load time.
 global _TEST_QUALIFICATION_PARSER := 0
@@ -310,8 +321,10 @@ _DriverMaskNonCode(&Src, BlockCommentsOnly := false) {
 	if BlockCommentsOnly && !InStr(Src, "/*")
 		return Src
 	Quote := Chr(34)
-	Pattern := "'(?:``[\s\S]|[^'``])*'|" . Quote
-		. "(?:``[\s\S]|[^" . Quote . "``])*" . Quote
+	; Atomic runs keep large fixture literals from exhausting the PCRE stack.
+	; Escaped delimiters remain separate atoms and cannot close their string.
+	Pattern := "'(?:``[\s\S]|[^'``]++)*+'|" . Quote
+		. "(?:``[\s\S]|[^" . Quote . "``]++)*+" . Quote
 		. "|;[^`r`n]*|(?m:^[ `t]*/\*)"
 	Position := 1
 	CopiedThrough := 1
@@ -568,11 +581,97 @@ global _DriverDirConcatFn := _DriverDirConcat
 ; setup/teardown — tests should be self-contained.
 Test(Name, Callback, Interactive := false) {
 	global TEST_REGISTRY
-	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive })
+	; The registering file decides the module shard (see _TestShardGroup).
+	TEST_REGISTRY.Push({ name: Name, callback: Callback, interactive: Interactive,
+		file: Error("", -1).File })
 }
 
 ; Keep excluded cases outside the execution plan, with explicit diagnostics;
 ; they must never contribute a fabricated successful result to the TAP footer.
+; Module groups for CI: each runner executes one group with --module=<name>.
+; A test belongs to the first group whose pattern matches its registering file
+; (relative to tests/, lower case); "core" takes everything else, so the groups
+; partition the suite and a module's tests keep their relative order. Groups
+; name the domain folders of unit/ (which mirror the driver tree); the
+; heaviest folders are split by file so no group dominates the CI wall time.
+; unit/test_updater.ahk, unit/updater/ and unit/test_config_scope_manifest.ahk
+; keep their flat paths because the sealed updater source roster names them.
+global TEST_MODULE_GROUPS := [
+	["meta", "^meta/"],
+	["llm-servers-a", "^unit/modules/llm/servers/test_local_server_(panel|scope_cohort)"],
+	["llm-servers-b", "^unit/modules/llm/servers/"],
+	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	["llm", "^unit/modules/llm/"],
+	["config-transition", "^unit/infra/config/transition/"],
+	["config-scope-a", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm)\.ahk$"],
+	["config-scope-b", "^unit/infra/config/scope/|^unit/test_config_scope_manifest\.ahk$"],
+	["config", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	["hotstrings", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
+	["keymap", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	["core", ""]
+]
+
+; The module group of a registering test file.
+_TestModuleOf(File) {
+	global TEST_MODULE_GROUPS
+	Relative := StrLower(StrReplace(File, "\", "/"))
+	if Position := InStr(Relative, "/windows/tests/")
+		Relative := SubStr(Relative, Position + StrLen("/windows/tests/"))
+	for Group in TEST_MODULE_GROUPS {
+		if Group[2] == "" || RegExMatch(Relative, Group[2])
+			return Group[1]
+	}
+	throw Error("The module groups must end with a catch-all.")
+}
+
+; Runs the selection backwards when Reverse is set. A test that silently
+; relies on state an earlier test left behind then runs before that test and
+; fails, which is how --reverse finds order-dependent tests.
+_SelectReversed(Tests, Reverse) {
+	if !Reverse
+		return Tests
+	Reversed := []
+	loop Tests.Length
+		Reversed.Push(Tests[Tests.Length - A_Index + 1])
+	return Reversed
+}
+
+; Keeps the tests of one module group; an empty name keeps every test.
+_SelectModule(Tests, Module) {
+	global TEST_MODULE_GROUPS
+	if Module == ""
+		return Tests
+	Known := false
+	for Group in TEST_MODULE_GROUPS
+		Known := Known || Group[1] == Module
+	if !Known
+		throw ValueError("Unknown test module group: " . Module)
+	Selected := []
+	for Entry in Tests {
+		if _TestModuleOf(Entry.file) == Module
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
+; Keeps the tests named in a UTF-8 file (one name per line), in registry order,
+; to replay an exact sequence such as the tests that ran before a failure.
+_SelectListed(Tests, ListFile) {
+	if ListFile == ""
+		return Tests
+	Wanted := Map()
+	loop parse, FileRead(ListFile, "UTF-8"), "`n", "`r" {
+		if A_LoopField != ""
+			Wanted[A_LoopField] := true
+	}
+	Selected := []
+	for Entry in Tests {
+		if Wanted.Has(Entry.name)
+			Selected.Push(Entry)
+	}
+	return Selected
+}
+
 _SelectTests(Registry, Filter, AllowInteractive, &Excluded) {
 	Selected := []
 	Excluded := []
@@ -793,7 +892,7 @@ _TestPrint(Line) {
 RunTests() {
 	global TEST_REGISTRY, TEST_PASS_COUNT, TEST_FAIL_COUNT, _AHK_DRY_RUN, _AHK_ONLY_FILTER
 	global TEST_RESULTS_FILE, TEST_RESULTS_CANONICAL
-	global _AHK_INTERACTIVE
+	global _AHK_INTERACTIVE, _AHK_MODULE, _AHK_LIST_FILE, _AHK_DUMP_PLAN, _AHK_REVERSE
     if (A_IsCritical != 0) {
         throw Error("RunTests started with A_IsCritical=" . A_IsCritical)
     }
@@ -806,6 +905,15 @@ RunTests() {
 	; loop both operate on the selected subset so a filtered run is a valid, fast
 	; replay of a single failing test.
 	ActiveTests := _SelectTests(TEST_REGISTRY, _AHK_ONLY_FILTER, _AHK_INTERACTIVE, &Excluded)
+	UnmodularCount := ActiveTests.Length
+	ActiveTests := _SelectReversed(_SelectListed(_SelectModule(ActiveTests, _AHK_MODULE), _AHK_LIST_FILE),
+		_AHK_REVERSE)
+	if _AHK_DUMP_PLAN != "" {
+		Plan := ""
+		for Entry in ActiveTests
+			Plan .= _TestModuleOf(Entry.file) . "`t" . Entry.file . "`t" . Entry.name . "`n"
+		FileAppend(Plan, _AHK_DUMP_PLAN, "UTF-8")
+	}
 	DeferredName := _TestDevQualificationName()
 	if DeferredName != "" {
 		for Index, Entry in ActiveTests
@@ -820,6 +928,11 @@ RunTests() {
 	if (_AHK_ONLY_FILTER != "")
 		_TestPrint("# --only " . _AHK_ONLY_FILTER . " - " . ActiveTests.Length
 			. " of " . TEST_REGISTRY.Length . " test(s) selected.")
+	if (_AHK_MODULE != "")
+		_TestPrint("# --module " . _AHK_MODULE . " - "
+			. ActiveTests.Length . " of " . UnmodularCount . " test(s) selected.")
+	if _AHK_REVERSE
+		_TestPrint("# --reverse - the selected tests run in reverse registry order.")
 	if (_AHK_DRY_RUN) {
 		_TestPrint("# dry-run - skipping execution.")
 		_CopyTestResultsForCi()

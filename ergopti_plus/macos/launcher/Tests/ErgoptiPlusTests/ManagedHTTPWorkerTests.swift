@@ -19,6 +19,33 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			"idle_timeout": 10, "direct": false]
 	}
 
+	private func assertNativeFailureStagesBeforeNetworkDispatch() throws {
+		let parsed = try XCTUnwrap(ManagedHTTPRequest.parse(JSONSerialization.data(withJSONObject: request)))
+		let cases: [(Int, TimeInterval, String, String, Int32)] = [
+			(0, ProcessInfo.processInfo.systemUptime, "native_selection_bound", "unavailable", 78),
+			(1, ProcessInfo.processInfo.systemUptime - 31, "native_lookup_deadline", "deadline", 75),
+			(1, ProcessInfo.processInfo.systemUptime, "native_proxy_lookup", "unavailable", 78)
+		]
+		for (selections, started, stage, reason, expectedStatus) in cases {
+			var wire = Data()
+			let status = ManagedHTTPWorker.execute(parsed, maximumSelections: selections,
+				started: started, settingsProvider: { nil }, environment: [:],
+				output: { wire.append($0); return true })
+			XCTAssertEqual(status, expectedStatus)
+			XCTAssertGreaterThan(wire.count, 5)
+			let count = wire.prefix(4).reduce(UInt32(0)) { ($0 << 8) | UInt32($1) }
+			XCTAssertEqual(Int(count), wire.count - 4)
+			XCTAssertEqual(wire[4], 67)
+			let fields = try XCTUnwrap(JSONSerialization.jsonObject(with: wire.dropFirst(5)) as? [String: Any])
+			XCTAssertEqual(Set(fields.keys), Set(["version", "success", "reason", "native_refusal_stage"]))
+			XCTAssertEqual(fields["version"] as? Int, 1)
+			XCTAssertEqual(fields["success"] as? Bool, false)
+			XCTAssertEqual(fields["reason"] as? String, reason)
+			XCTAssertEqual(fields["native_refusal_stage"] as? String, stage)
+			XCTAssertFalse(String(decoding: wire, as: UTF8.self).contains("origin.example"))
+		}
+	}
+
 	func testExactURLAndOptionalAbsoluteBudgetRemainSeparateFromReadIdleTimeout() throws {
 		let parsed = try XCTUnwrap(ManagedHTTPRequest.parse(JSONSerialization.data(withJSONObject: request)))
 		XCTAssertEqual(parsed.url.absoluteString, "https://origin.example/path?case=one")
@@ -62,6 +89,44 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: NSURLErrorDomain,
 			code: NSURLErrorTimedOut, userInfo: privateData)), "deadline")
 		XCTAssertEqual(managedHTTPFailure(NSError(domain: "foreign", code: 1, userInfo: privateData)), "unavailable")
+		#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+		// Synthetic errors test privacy/admission; they are never real TLS evidence.
+		let underlying = NSError(domain: kCFErrorDomainCFNetwork as String, code: -1202,
+			userInfo: ["_kCFStreamErrorDomainKey": 3, "_kCFStreamErrorCodeKey": -9807,
+				NSLocalizedDescriptionKey: "reserved-private-underlying"])
+		let original = NSError(domain: NSURLErrorDomain, code: -1202,
+			userInfo: privateData.merging([NSUnderlyingErrorKey: underlying]) { _, new in new })
+		XCTAssertEqual(managedHTTPNativeErrorFacts(original), [
+			"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none",
+			"# native_http_error_chain node=1 domain=cfnetwork code=-1202 stream_domain=3 stream_code=-9807"
+		])
+		XCTAssertFalse(managedHTTPNativeErrorFacts(original).joined().contains("reserved"))
+		XCTAssertFalse(managedHTTPNativeErrorFacts(original).joined().contains("https"))
+		let rejectedFields: [[String: Any]] = [
+			["_kCFStreamErrorDomainKey": true, "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": 3.0, "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": "3", "_kCFStreamErrorCodeKey": -9807],
+			["_kCFStreamErrorDomainKey": 3],
+			["_kCFStreamErrorDomainKey": 3, "_kCFStreamErrorCodeKey": Int64(Int32.max) + 1]
+		]
+		for fields in rejectedFields {
+			XCTAssertEqual(managedHTTPNativeErrorFacts(NSError(domain: NSURLErrorDomain,
+				code: -1202, userInfo: fields)), [
+				"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none"
+			])
+		}
+		XCTAssertEqual(managedHTTPNativeErrorFacts(NSError(domain: "reserved-private-domain",
+			code: 17, userInfo: privateData)), [
+			"# native_http_error_chain node=0 domain=unknown code=none stream_domain=none stream_code=none"
+		])
+		var nativeFactDeep = NSError(domain: NSPOSIXErrorDomain, code: 1)
+		for _ in 0..<6 { nativeFactDeep = NSError(domain: NSURLErrorDomain, code: -1202,
+			userInfo: [NSUnderlyingErrorKey: nativeFactDeep]) }
+		XCTAssertEqual(managedHTTPNativeErrorFacts(nativeFactDeep).count, 4)
+		XCTAssertEqual(managedHTTPNativeErrorFacts(ManagedHTTPDiagnosticCycleError()), [
+			"# native_http_error_chain node=0 domain=url code=-1202 stream_domain=none stream_code=none"
+		])
+		#endif
 
 		// The generic -1202 cannot distinguish an already reported nested TLS cause.
 		for (status, expected) in [(errSSLHostNameMismatch, "hostname_mismatch"),
@@ -146,6 +211,7 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 			XCTAssertLessThan(bytes.count, 4096)
 			XCTAssertFalse(String(decoding: bytes, as: UTF8.self).contains("reserved"))
 		}
+		try assertNativeFailureStagesBeforeNetworkDispatch()
 	}
 
 	func testActualCFNetworkPACReceivesDistinctHTTPSPathsAndQueries() throws {
@@ -344,3 +410,12 @@ final class ManagedHTTPWorkerTests: XCTestCase {
 		print("PAC_ARGUMENT_SHAPE purpose=\(scheme) type=\(proxyType) port=\(code)")
 	}
 }
+
+#if DEBUG || ERGOPTI_MANAGED_HTTP_FIXTURE_DIAGNOSTICS
+/// Test-owned cyclic synthetic error; never a native trust or network claim.
+private final class ManagedHTTPDiagnosticCycleError: NSError, @unchecked Sendable {
+	init() { super.init(domain: NSURLErrorDomain, code: -1202, userInfo: nil) }
+	required init?(coder: NSCoder) { super.init(coder: coder) }
+	override var userInfo: [String: Any] { [NSUnderlyingErrorKey: self] }
+}
+#endif

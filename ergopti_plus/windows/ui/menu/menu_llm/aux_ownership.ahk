@@ -14,7 +14,7 @@ _LLM_Menu_BeginOllamaAux(Kind, Identity := "") {
 	global LLM_OLLAMA_BASE_URL
 	return LLM_AuxBegin(Kind, Map(
 		"backend", "ollama",
-		"endpoint", LLM_OLLAMA_BASE_URL,
+		"endpoint", LLM_OllamaRequestOrigin(),
 		"identity", Identity))
 }
 
@@ -198,8 +198,8 @@ _LLM_Menu_OnInstalledTagsProbeDone(tags, Owner := 0, BuildFn := 0) {
 	if MustResumeBridge {
 		if IsSet(LLM_Menu_EnsureModelReady)
 			LLM_Menu_EnsureModelReady()
-		if IsSet(LLM_Menu_TryStartBridge)
-			LLM_Menu_TryStartBridge()
+		if IsSet(LLM_Menu_ResumeBackendLifecycleAfterTags)
+			LLM_Menu_ResumeBackendLifecycleAfterTags()
 	}
 	if Changed
 		_LLM_Menu_AuxBuild(BuildFn)

@@ -148,6 +148,7 @@ function M.new(ctx)
 		end
 	end
 	local pause_owner_registered = script_control == nil
+	local _startup_settlement_observer = nil
 	local _timer_slots = {
 		reattach = nil,
 		primary = nil,
@@ -185,7 +186,7 @@ function M.new(ctx)
 	--- @return boolean settled
 	local function cancel_startup_timers()
 		local settled = true
-		for _, slot in ipairs({ "reattach", "primary", "backup" }) do
+		for _, slot in ipairs({ "reattach", "primary", "backup", "settlement" }) do
 			if cancel_startup_timer(slot) ~= true then settled = false end
 		end
 		return settled
@@ -358,20 +359,88 @@ function M.new(ctx)
 		return ok == true and result == true
 	end
 
+	--- Unregisters an exact passive listener without consuming native custody.
+	--- @return boolean settled
+	local function cancel_settlement_observer()
+		local owner = _startup_settlement_observer
+		if owner == nil then return true end
+		owner.authorized = false
+		if owner.installing == true then return false end
+		local ok, result = Logger.callback(LOG, "Startup settlement unregistration", owner.lease.cancel)
+		if ok ~= true or result ~= true then
+			Logger.error(LOG, "Startup settlement unregistration remains unsettled.")
+			return false
+		end
+		if _startup_settlement_observer == owner then _startup_settlement_observer = nil end
+		return true
+	end
+
+	local settle_startup_abort
+
+	--- Waits for the original snapshot to retire; this never polls native tasks.
+	--- The owned one-shot leaves the native terminal stack before durable writes.
+	local function observe_requirement_settlement()
+		if _startup_settlement_observer ~= nil or _startup_paused == true then return end
+		if type(models_mgr.when_requirements_settled) ~= "function" then
+			Logger.error(LOG, "Startup requirement settlement observation is unavailable.")
+			return
+		end
+		local generation = _startup_check_generation
+		local owner = { installing = true, authorized = true, lease = nil, ready = false }
+		_startup_settlement_observer = owner
+		local function retired()
+			if owner.installing == true then owner.ready = true; return end
+			if _startup_settlement_observer ~= owner then return end
+			if cancel_settlement_observer() ~= true then return end
+			if generation ~= _startup_check_generation or _startup_paused == true
+				or _startup_abort_pending ~= true then return end
+			if arm_startup_timer("settlement", 0, function()
+				if generation == _startup_check_generation and _startup_abort_pending == true then
+					settle_startup_abort()
+				end
+			end) ~= true then
+				Logger.error(LOG, "Startup original settlement handoff was refused.")
+			end
+		end
+		local ok, lease, committed = Logger.callback(LOG, "Startup requirement settlement observation",
+			models_mgr.when_requirements_settled, requirement_owner, retired)
+		owner.installing = false
+		if type(lease) == "table" and type(lease.cancel) == "function" then owner.lease = lease end
+		if ok ~= true or committed ~= true or owner.lease == nil then
+			owner.authorized = false
+			if owner.lease ~= nil then cancel_settlement_observer()
+			elseif _startup_settlement_observer == owner then _startup_settlement_observer = nil end
+			Logger.error(LOG, "Startup requirement settlement observation was refused.")
+			return
+		end
+		if owner.ready == true or owner.authorized ~= true then
+			-- An already-idle snapshot cannot pay a different refused cleanup gate.
+			-- Retain that gate for its existing retry rather than loop zero timers.
+			cancel_settlement_observer()
+		end
+	end
+
 	--- Retries every exact capability retained by an aborted startup cycle. The
 	--- prediction lock is intentionally released last: a still-live requirement
 	--- task must never run below an unlocked engine after its dispatch refused.
 	--- @return boolean settled
-	local function settle_startup_abort()
+	settle_startup_abort = function()
 		if _startup_abort_pending ~= true then return true end
 		local timers_settled = cancel_startup_timers()
 		local requirements_settled = pause_requirement_tasks()
+		local observation_settled = true
+		if requirements_settled == true then
+			observation_settled = cancel_settlement_observer()
+		else
+			observe_requirement_settlement()
+		end
 		local prediction_settled = false
 		if requirements_settled == true then
 			prediction_settled = restore_startup_prediction_lock() == true
 		end
 		local native_settled = timers_settled == true
 			and requirements_settled == true and prediction_settled == true
+			and observation_settled == true
 		local finalize_settled = _startup_settlement_finalize == nil
 		if native_settled and type(_startup_settlement_finalize) == "function" then
 			_startup_callback_depth = _startup_callback_depth + 1
@@ -1060,6 +1129,7 @@ function M.new(ctx)
 			_startup_timer_generation = _startup_timer_generation + 1
 			_startup_check_generation = _startup_check_generation + 1
 			local timers_settled = cancel_startup_timers()
+			local observation_settled = cancel_settlement_observer()
 			local requirements_settled = pause_requirement_tasks()
 			local callbacks_settled = _startup_callback_depth == 0
 			local reattach_settled = _reattach_dispatch_in_progress ~= true
@@ -1081,6 +1151,7 @@ function M.new(ctx)
 				prediction_settled = reassert_startup_prediction_lock()
 			end
 			return timers_settled == true and requirements_settled == true
+				and observation_settled == true
 				and reattach_settled == true
 				and callbacks_settled == true
 				and prediction_settled == true
@@ -1195,6 +1266,7 @@ function M.new(ctx)
 			and not _startup_sync_in_progress and not _reattach_active
 			and not _reattach_dispatch_in_progress and not _reattach_callback_in_progress
 			and _startup_prediction_lock == nil and next(_timer_slots) == nil
+			and _startup_settlement_observer == nil
 	end
 	return check_startup, scope_idle
 end

@@ -268,7 +268,7 @@ function M.build(ctx)
 				return conflict
 			end
 			local spec = type(gestures.get_action_parameter_spec) == "function" and gestures.get_action_parameter_spec(a) or nil
-			if spec == "program" then
+			if spec then
 				DeferredWork.after(0.05, function()
 					local committed = shortcut_utils.prompt_action_parameter(gestures, slot, a, spec, picked, {
 						section = "gestures", key = slot,
@@ -280,38 +280,6 @@ function M.build(ctx)
 						local conflict = type(gestures.on_action_changed) == "function" and gestures.on_action_changed(slot, a) or nil
 						ctx.updateMenu()
 						show_conflict(conflict)
-					end
-				end, "menu_gestures.action_parameter")
-				return
-			end
-			if spec then
-				DeferredWork.after(0.05, function()
-					local prior = type(gestures.get_action_parameter) == "function" and gestures.get_action_parameter(slot, a) or ""
-					local title    = shortcut_utils.action_parameter_title(gestures.get_action_label(a) or a)
-					-- A value the picker's editor collected is stored without asking.
-					local value = type(picked) == "string" and picked or nil
-					while true do
-						if value == nil then
-							-- The prompt (or the application chooser) and its refusal
-							-- text belong to the parameter kind.
-							value = shortcut_utils.ask_parameter_value(gestures, a, spec, title, prior)
-							if value == nil then return end
-						end
-						if type(gestures.validate_action_parameter) == "function" and gestures.validate_action_parameter(a, value) then
-
-							local stored_ok, stored = xpcall(gestures.set_action_parameter, debug.traceback, slot, a, value)
-							if not stored_ok or stored ~= true then
-								Logger.error(LOG, "Gesture parameter edit did not commit for '%s': %s.", tostring(slot), tostring(stored))
-								return
-							end
-							local conflict = apply_action()
-							show_conflict(conflict)
-							return
-						end
-						pcall(dialog.block_alert, i18n.get("dialog.gestures.param_error_title"),
-							gestures.parameter_error(a), "OK", nil, "warning")
-						prior = value or prior
-						value = nil
 					end
 				end, "menu_gestures.action_parameter")
 				return

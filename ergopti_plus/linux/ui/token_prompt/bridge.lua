@@ -19,7 +19,7 @@
 --- three of the four setters did not exist at all, and every call was skipped
 --- by a `type(…) == "function"` guard — so if a page HAD sent a save, one field
 --- in four would have applied and the window would have reported success.
---- `tests/unit/modules/llm/test_token_prompt_setters.lua` pins the contract now.
+--- `tests/unit/modules/llm/settings/test_token_prompt_setters.lua` pins the contract now.
 --- ==============================================================================
 
 local M = {}

@@ -166,6 +166,43 @@ function M.open(opts, on_confirm, on_cancel)
 		return false
 	end
 
+	local source_opts = type(opts) == "table" and opts or {}
+	local presentation_id, suffix = rawget(source_opts, "presentation_id"), rawget(source_opts, "presentation_suffix")
+	local contextual_receipt, presentation_live, pending_opts, presentation_title
+	local previous, serial = _active_session, _session_serial
+	if presentation_id ~= nil or suffix ~= nil then
+		if getmetatable(source_opts) ~= nil or presentation_id == nil or suffix == nil
+			or rawget(source_opts, "title") ~= nil or rawget(source_opts, "label") ~= nil then return false end
+		local prepare, fields, current = rawget(Manager, "prepare_app_contextual_title"),
+			rawget(Manager, "contextual_title_fields"), rawget(Manager, "contextual_title_current")
+		local show, eval_js = rawget(Manager, "show"), rawget(Manager, "eval_js")
+		local function owners_live()
+			return getmetatable(source_opts) == nil and getmetatable(Manager) == nil
+				and rawget(package.loaded, "ui.webview_manager") == Manager
+				and rawget(source_opts, "presentation_id") == presentation_id
+				and rawget(source_opts, "presentation_suffix") == suffix
+				and rawget(source_opts, "title") == nil and rawget(source_opts, "label") == nil
+				and type(prepare) == "function" and rawget(Manager, "prepare_app_contextual_title") == prepare
+				and type(fields) == "function" and rawget(Manager, "contextual_title_fields") == fields
+				and type(current) == "function" and rawget(Manager, "contextual_title_current") == current
+				and rawget(Manager, "show") == show and type(eval_js) == "function"
+				and rawget(Manager, "eval_js") == eval_js
+		end
+		if not owners_live() then return false end
+		contextual_receipt = prepare(presentation_id, suffix, source_opts)
+		if contextual_receipt == nil or not owners_live() or _active_session ~= previous
+			or _session_serial ~= serial then return false end
+		presentation_live = function() return owners_live() and current(contextual_receipt) == true end
+		if not presentation_live() then return false end
+		local title = fields(contextual_receipt)
+		if type(title) ~= "string" or not presentation_live() or _active_session ~= previous
+			or _session_serial ~= serial then return false end
+		pending_opts = {}
+		for key, value in next, source_opts do pending_opts[key] = value end
+		pending_opts.title = title
+		presentation_title = title
+	end
+
 	if _active_session then
 		local visible = type(Manager.is_visible) == "function"
 			and Manager.is_visible("action_picker") == true
@@ -178,6 +215,9 @@ function M.open(opts, on_confirm, on_cancel)
 		M.pending_opts = nil
 	end
 
+	if presentation_live and (not presentation_live() or _active_session ~= nil
+		or _session_serial ~= serial) then return false end
+
 	_session_serial = _session_serial + 1
 	local session = {
 		epoch = _session_serial,
@@ -185,6 +225,10 @@ function M.open(opts, on_confirm, on_cancel)
 		on_cancel = on_cancel,
 		settling = false,
 		providers = { packet = { unavailable = true } },
+		presentation_current = presentation_live and function()
+			return presentation_live() and M.pending_opts == pending_opts
+				and getmetatable(pending_opts) == nil and rawget(pending_opts, "title") == presentation_title
+		end or nil,
 	}
 	_active_session = session
 	local adapter_ok, adapter = pcall(require, "adapters.program_providers")
@@ -193,12 +237,22 @@ function M.open(opts, on_confirm, on_cancel)
 		ProgramProviderPicker.close(session.providers)
 		return false
 	end
-	M.pending_opts = type(opts) == "table" and opts or {}
-	if Manager.show("action_picker") ~= true then
+	M.pending_opts = pending_opts or (type(opts) == "table" and opts or {})
+	local opened
+	if presentation_live then
+		opened = presentation_live() and Manager.show("action_picker", nil, contextual_receipt)
+	else
+		opened = Manager.show("action_picker")
+	end
+	if opened ~= true then
 		ProgramProviderPicker.close(session.providers)
 		_active_session = nil
 		M.pending_opts = nil
 		Logger.error(LOG, "Action picker native window could not be opened.")
+		return false
+	end
+	if presentation_live and (not session.presentation_current() or _active_session ~= session) then
+		if _active_session == session then close_session(session) end
 		return false
 	end
 	Logger.info(LOG, "Action picker session %d opened.", session.epoch)
@@ -216,6 +270,12 @@ end
 --- whole handler was written to stop having.
 --- @return boolean True when the push was handed to WebKit.
 local function _push_init()
+	local session = _active_session
+	local function title_current()
+		return session == nil or session.presentation_current == nil
+			or (session == _active_session and session.presentation_current() == true)
+	end
+	if not title_current() then return false end
 	-- The same JSON module _handle_json decodes with. dkjson is the webview
 	-- manager's optional dependency and is absent on a plain Lua host, so
 	-- encoding through it made the push fail everywhere the decode half worked.
@@ -227,6 +287,7 @@ local function _push_init()
 	local ok_payload, encoded = pcall(function()
 		return json_mod.encode(M.build_init_payload(M.pending_opts))
 	end)
+	if not title_current() then return false end
 	if not ok_payload or type(encoded) ~= "string" then
 		Logger.error(LOG, "Cannot push init(): payload encoding failed (%s).", tostring(encoded))
 		return false
@@ -238,6 +299,7 @@ local function _push_init()
 		return false
 	end
 
+	if not title_current() then return false end
 	local pushed = Manager.eval_js("action_picker", "init(" .. encoded .. ")")
 	if pushed then
 		Logger.success(LOG, "Action picker initialised (%d byte(s) of payload).", #encoded)

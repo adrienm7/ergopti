@@ -256,6 +256,21 @@ global HSE_LastEndChar := ""
 ; disabled — typed <x>★ sequences fall through unchanged.
 global HSE_RepeatEnabled := true
 
+; hotstrings.idle_reset_seconds and hotstrings.click_resets_word as the loader
+; (ReadScriptConfig) and the menu publish them. "" means not loaded yet: the
+; readers below then answer the manifest default, the single source of both
+; defaults, which this file cannot read at include time.
+global HSE_IdleResetSeconds := ""
+global HSE_ClickResetsWord := ""
+
+; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
+; hotstrings.tap_hold_resets_word, published the same way: whether an arrow
+; key, a shortcut, or a tap-hold key's own output starts a new word. "" reads
+; the manifest default (HSE_WordResetFlagCurrent).
+global HSE_ArrowResetsWord := ""
+global HSE_ShortcutResetsWord := ""
+global HSE_TapHoldResetsWord := ""
+
 ; When false the engine-level @-combo resolver (HSE_TryPersonalInfoCombo) is
 ; disabled — typed @<letters>★ sequences fall through unchanged. Mirrors
 ; HSE_RepeatEnabled: the resolver runs on the keystroke path, so the feature
@@ -923,6 +938,76 @@ HSE_HardReset() {
 		global HSE_Buffer, HSE_StartIsWordBoundary
 		HSE_Buffer := ""
 		HSE_StartIsWordBoundary := false
+}
+
+; Whether a value is a valid hotstrings.idle_reset_seconds: a finite
+; non-negative number of seconds, 0 meaning the reset is disabled. Same rule as
+; the shared Lua engine's valid_idle_reset_seconds.
+; @param Value {Any} Candidate read from config.toml or a menu prompt.
+; @returns {Boolean}
+HSE_ValidIdleResetSeconds(Value) {
+		if !((Value is Integer) or (Value is Float))
+				return false
+		; NaN compares unequal to itself; an infinity survives no subtraction.
+		return Value == Value and Value >= 0 and (Value - Value) == 0
+}
+
+; Whether the pause before the current keystroke starts a new word.
+;
+; Without it the buffer kept the last word for as long as the user stayed
+; away, so the first key typed after a pause was read as the middle of that
+; word and every word-start hotstring stayed silent until a delimiter. Mirrors
+; the shared Lua engine's idle_resets_word; A_TickCount is millisecond-exact
+; for this purpose, so no clock resolution is subtracted.
+; @param LastTick {Integer|String} Tick of the previous keystroke, "" before any.
+; @param NowTick {Integer} Tick of the current keystroke.
+; @param IdleSeconds {Number} hotstrings.idle_reset_seconds; 0 disables the reset.
+; @returns {Boolean}
+HSE_IdleResetsWord(LastTick, NowTick, IdleSeconds) {
+		if !HSE_ValidIdleResetSeconds(IdleSeconds)
+				throw ValueError("HSE_IdleResetsWord: the idle delay must be a non-negative number of seconds.")
+		if (IdleSeconds == 0 or LastTick == "")
+				return false
+		return NowTick - LastTick >= IdleSeconds * 1000
+}
+
+; The idle delay in force: the published value, or the manifest default before
+; the loader ran (unit harness, early boot).
+; @returns {Number}
+HSE_IdleResetSecondsCurrent() {
+		global HSE_IdleResetSeconds
+		return HSE_IdleResetSeconds == ""
+				? ManifestDefaultFor("hotstrings.idle_reset_seconds")
+				: HSE_IdleResetSeconds
+}
+
+; Whether a mouse click starts a new word: the published value, or the
+; manifest default before the loader ran.
+; @returns {Boolean}
+HSE_ClickResetsWordCurrent() {
+		global HSE_ClickResetsWord
+		Value := HSE_ClickResetsWord == ""
+				? ManifestDefaultFor("hotstrings.click_resets_word")
+				: HSE_ClickResetsWord
+		return Value ? true : false
+}
+
+; Whether one of the event word-reset settings is on: the published value, or
+; the manifest default before the loader ran.
+; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
+;        "tap_hold_resets_word".
+; @returns {Boolean}
+HSE_WordResetFlagCurrent(Key) {
+		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+		switch Key {
+				case "arrow_resets_word": Value := HSE_ArrowResetsWord
+				case "shortcut_resets_word": Value := HSE_ShortcutResetsWord
+				case "tap_hold_resets_word": Value := HSE_TapHoldResetsWord
+				default: throw ValueError("Unknown word-reset setting: " . Key)
+		}
+		if (Value == "")
+				Value := ManifestDefaultFor("hotstrings." . Key)
+		return Value ? true : false
 }
 
 ; Apply an expansion to the buffer to mirror the screen change a hotstring

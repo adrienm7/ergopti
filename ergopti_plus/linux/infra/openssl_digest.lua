@@ -8,18 +8,16 @@
 
 local M = { available = false }
 local DIGEST_BYTES = 32 -- SHA-256's native ABI output size.
-local ffi_ok, ffi = pcall(require, "ffi")
+local Native = require("infra.openssl_library")
+local ffi = Native.ffi
 local library, null_pointer
-if ffi_ok then
+if ffi then
 	local declared = pcall(ffi.cdef, [[
 		unsigned char *SHA256(const unsigned char *data, size_t length, unsigned char *digest);
 	]])
 	if declared then
-		local loaded, candidate, candidate_null = pcall(function()
-			return ffi.load("libcrypto.so.3"), ffi.cast("void *", 0)
-		end)
-		if loaded and pcall(function() return candidate.SHA256 end) then
-			library, null_pointer = candidate, candidate_null
+		if pcall(function() return Native.library.SHA256 end) then
+			library, null_pointer = Native.library, ffi.cast("void *", 0)
 			M.available = true
 		end
 	end

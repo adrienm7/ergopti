@@ -78,4 +78,35 @@ function M.attach(port, controls)
 	return port
 end
 
+--- Controls only default local discovery in a daemon fixture that removes luv
+--- for its virtual clock. Other HTTP owners keep their actual adapter. A scripted
+--- absent listener is ordinary connection refusal, not unavailable dispatch.
+--- @param port table Actual HTTP adapter whose unrelated owners remain intact.
+--- @return table port
+--- @return table probes Captured software observations, never native receipts.
+function M.local_discovery(port)
+	local order, servers, published = require("modules.llm.local_server_catalogue").load({})
+	assert(published and #order > 0, "fixture local discovery catalogue is unavailable")
+	local probes = {}
+	local controlled = M.attach({ get = function(url, headers, options, done)
+		local id = options.owner:match("^llm_local_server:(.+)$")
+		local server = id and servers[id]
+		assert(server and url == server.base_url .. "/models", "fixture probe must retain its declared default URL")
+		assert(headers.Authorization == nil and options.follow_redirects == false,
+			"fixture default probe must preserve keyless no-redirect admission")
+		probes[#probes + 1] = { id = id, url = url, owner = options.owner }
+		done({ ok = false, status = 0, body = "", error = "scripted loopback listener is absent" })
+		return true
+	end })
+	local actual = assert(port.get_owned, "actual owned HTTP capability is required")
+	port.get_owned = function(url, headers, options, done)
+		local owner = type(options) == "table" and options.owner or nil
+		if type(owner) == "string" and owner:match("^llm_local_server:") then
+			return controlled.get_owned(url, headers, options, done)
+		end
+		return actual(url, headers, options, done)
+	end
+	return port, probes
+end
+
 return M
