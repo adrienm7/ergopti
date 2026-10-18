@@ -147,10 +147,30 @@ Test("logger: the pre-init queue filter keeps exactly the lines at or above the 
 _LPIL_SemanticThreshold(Fixture) {
 	Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
 	AssertTrue(FileExist(Harness), "the actual native configuration/logger harness exists")
-	Command := Chr(34) . A_AhkPath . Chr(34) . " /ErrorStdOut "
-		. Chr(34) . Harness . Chr(34) . " " . Fixture
-	AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"),
-		"the real logger must accept the admitted " . Fixture . " threshold")
+	Receipt := {Calls: 0, Code: -1, Output: "", Errors: ""}
+	OnDone(Code, Output, Errors) {
+		Receipt.Calls += 1
+		Receipt.Code := Code
+		Receipt.Output := Output
+		Receipt.Errors := Errors
+	}
+	; Use the real bounded process-tree owner so missing child dependencies
+	; expose their native failure text without hanging or orphaning a process.
+	Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Harness, Fixture], OnDone)
+	try {
+		AssertTrue(Handle.start(), "the exact native logger child must start")
+		Started := A_TickCount
+		while !Receipt.Calls && TickElapsed64(Started, A_TickCount) < 15000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, Receipt.Calls, "the native logger child must complete exactly once within its bounded wait")
+		AssertEqual(0, Receipt.Code,
+			"the real logger must accept the admitted " . Fixture . " threshold: " . Receipt.Output . Receipt.Errors)
+		AssertEqual("", Receipt.Errors, "native logger startup must not hide an error on stderr")
+	} finally {
+		AssertTrue(Handle.terminate(), "the exact native logger process tree must retire")
+	}
 }
 for Fixture in ["logger_dotted", "logger_inline", "logger_quoted"]
 	Test("logger startup: " . Fixture . " applies its threshold (logger-semantic-level)",
