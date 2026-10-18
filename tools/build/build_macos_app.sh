@@ -212,11 +212,15 @@ build_launcher() {
 	fi
 	log "Building Swift launcher (release, ${LAUNCHER_ARCHS[*]})"
 	(
-		cd "$LAUNCHER_DIR"
-		swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --product ErgoptiPlus >&2
-	)
+		cd "$LAUNCHER_DIR" &&
+			swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --product ErgoptiPlus >&2
+	) || fail "Swift launcher compilation failed."
+	# Callers capture this function's stdout in a command substitution, where
+	# Bash disables errexit. Explicit refusals prevent shipping a stale product.
 	local built_bin
-	built_bin="$(swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --show-bin-path --package-path "$LAUNCHER_DIR")/ErgoptiPlus"
+	built_bin="$(swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --show-bin-path --package-path "$LAUNCHER_DIR")" \
+		|| fail "Swift launcher binary path query failed."
+	built_bin="$built_bin/ErgoptiPlus"
 	[ -f "$built_bin" ] || fail "Swift build did not produce ErgoptiPlus binary."
 	local built_archs
 	built_archs=" $(lipo -archs "$built_bin") " || fail "lipo could not read launcher architectures."
