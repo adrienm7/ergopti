@@ -216,6 +216,18 @@ _PathsEdWeb_Browse(Target := "config", PickFn := Ui_DirSelect, EvalFn := _PathsE
 		. _PathsEdWeb_JsStr(Fwd) . "," . _PathsEdWeb_JsStr(Target) . ")")
 }
 
+; The default Gui Close action only hides the window and keeps its controls
+; alive. Explicit cancellation retires that HWND while a folder modal pumps.
+_PathsEdNative_BindCancellation(Window) {
+	for EventName in ["Close", "Escape"]
+		Window.OnEvent(EventName, _PathsEdNative_Cancel)
+}
+
+_PathsEdNative_Cancel(Window, *) {
+	Window.Destroy()
+	return true
+}
+
 ; The native fallback owns a concrete control rather than a WebView epoch.
 ; Closing its window while the picker pumps must not write the dead control.
 _PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
