@@ -23,6 +23,7 @@ local Storage        = require("adapters.storage")
 local TimerScheduler = require("adapters.timer_scheduler")
 local ShellRunner    = require("adapters.shell_runner")
 local Timings        = require("infra.timings")
+local StreamRetirement = require("modules.llm.mlx_stream_retirement")
 local Paths          = require("infra.paths")
 local LOG            = "llm.api_mlx"
 
@@ -1127,16 +1128,17 @@ function M.cancel_streaming()
 		-- Always terminate to free the MLX server connection; leaving prefill-phase
 		-- curls running blocks the server from answering the next request
 		local task = _stream.task
-		local terminated, terminate_result = xpcall(function() return task.terminate() end, debug.traceback)
-		if terminated and terminate_result == true then
-			local phase = _stream.has_chunks and "mid-flight" or "prefill"
+		local phase = _stream.has_chunks and "mid-flight" or "prefill"
+		local settled, state = StreamRetirement.cancel(_stream, task)
+		if settled then
 			Logger.debug(LOG, "Active MLX stream terminated (%s).", phase)
-			_stream.task       = nil
-			_stream.has_chunks = false
 		else
 			cancelled = false
-			Logger.error(LOG, "Active MLX stream termination failed; retained for retry: %s",
-				tostring(terminate_result))
+			if state == "pending" then
+				Logger.debug(LOG, "Active MLX stream is awaiting native exit; exact task retained.")
+			else
+				Logger.error(LOG, "Active MLX stream termination failed; retained for retry: %s", state)
+			end
 		end
 	end
 	return cancelled
