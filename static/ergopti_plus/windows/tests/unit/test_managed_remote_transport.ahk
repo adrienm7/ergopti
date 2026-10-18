@@ -1502,7 +1502,10 @@ _ManagedRemoteTrustPublisherIndependent() {
 			(Code, Out, Err) => Results.Push(Map("exit", Code, "stdout", Out, "stderr", Err)), , , 8192)
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while Results.Length == 0 && !TickExpired64(Started, 5000) {
+		; A cold powershell.exe settles in about one second but has taken over
+		; five on a loaded runner; the budget matches this file's other cold
+		; PowerShell probes. Exit code, exact output and stderr stay asserted.
+		while Results.Length == 0 && !TickExpired64(Started, 18000) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
@@ -1706,7 +1709,10 @@ _ManagedRemoteScopeProducerControl() {
 	try {
 		AssertTrue(Handle.start())
 		Started := A_TickCount
-		while Results.Length == 0 && !TickExpired64(Started, 5000) {
+		; A cold powershell.exe settles in about one second but has taken over
+		; five on a loaded runner; the budget matches this file's other cold
+		; PowerShell probes. Exit code, exact output and stderr stay asserted.
+		while Results.Length == 0 && !TickExpired64(Started, 18000) {
 			_SR_TreePoll()
 			Sleep(10)
 		}
