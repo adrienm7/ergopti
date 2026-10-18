@@ -16,7 +16,7 @@ from installed_target_reader import MetadataRefused, read_bundle, resolution_pat
 
 DEPENDENCIES = {
     "tools/diagnostics/macos_owned_process.py": "9b985af7e8bf549cb843b289885a2bea38a67ea3ce44defaf389dab1001fef98",
-    "tools/diagnostics/apple_shortcuts_probe/run_probe.py": "085d5787e3ace19d45abfed37a5adf92415e70595f2e8d2de80c54b9b136079f",
+    "tools/diagnostics/apple_shortcuts_probe/run_probe.py": "22eb3101e2719473519ffb3203262a00db1faca6ce924751add99b1cd876d9a2",
 }
 
 

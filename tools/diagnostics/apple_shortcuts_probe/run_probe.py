@@ -19,6 +19,11 @@ import time
 
 LIMIT = 65536
 CONTRACT = "macos-shortcuts-discovery-probe"
+TARGET_BUNDLE = "com.apple.shortcuts.events"
+# AEDeterminePermissionToAutomateTarget statuses that are complete observations.
+PROC_NOT_FOUND = -600
+CONSENT_ABSENT = {-1743: "refusal_code_observed", -1744: "consent_required"}
+PREFLIGHT_RETRY_SECONDS = 0.25
 
 
 def require(condition):
@@ -328,7 +333,10 @@ def validate(raw):
     if value.get("status") in ("refused", "stale"):
         require(set(value) == {"version", "status", "stage", "reason"})
         require(type(value["stage"]) is int and 1 <= value["stage"] <= 5)
-        require(value["reason"] in ("native_refused", "automation_permission_refused"))
+        require(
+            value["reason"]
+            in ("native_refused", "automation_permission_refused", "consent_not_established")
+        )
         return {
             "observed": False,
             "status": value["status"],
@@ -381,19 +389,17 @@ def require_lease(lease):
     require(lease_file(lease[0], lease[3]) == lease)
 
 
-def validate_sdk_constants(raw):
-    """Accept only the constant-only helper's closed, independently typed record."""
+def validate_permission_preflight(raw):
+    """Accept only the native preflight's closed record with one signed 32-bit OSStatus."""
     require(type(raw) is bytes and 0 < len(raw) <= 1024)
     value = json.loads(raw.decode("utf-8"), object_pairs_hook=unique_object)
-    require(
-        type(value) is dict and set(value) == {"version", "event_class", "event_id", "target_type"}
-    )
+    require(type(value) is dict and set(value) == {"mode", "status", "version"})
+    require(type(value["mode"]) is str and value["mode"] == "permission_preflight")
     require(type(value["version"]) is int and value["version"] == 1)
-    for key in ("event_class", "event_id", "target_type"):
-        require(type(value[key]) is int and 0 <= value[key] <= 4294967295)
+    require(type(value["status"]) is int and -2147483648 <= value["status"] <= 2147483647)
     canonical = json.dumps(value, sort_keys=True, separators=(",", ":"))
     require(raw == (canonical + "\n").encode("utf-8"))
-    return canonical
+    return value["status"]
 
 
 def sdk_tool_path(raw):
@@ -498,28 +504,74 @@ def build_sdk_constants(root, output, native, ownership, evidence, source_bytes)
     return {"image": image, "leases": leases, "compiler": compiler, "sdk": sdk}
 
 
-def discover_with_sdk_constants(script, build, native, ownership, evidence):
-    """Share the original post-help 20 seconds across constants and osascript."""
+def discover_with_native_preflight(script, build, native, ownership, evidence, record):
+    """Send the catalogue Apple event only when existing consent was observed.
+
+    Without consent the first ``app.shortcuts()`` raises an Automation prompt
+    that nobody answers on a hosted runner, so the native no-prompt preflight
+    decides first. procNotFound means the on-demand Shortcuts Events agent is
+    not running: LaunchServices starts it once, without activation, and the
+    preflight repeats. The original post-help 20 seconds cover every step.
+    Returns the final status and the catalogue bytes, or None without consent.
+    """
     deadline = time.monotonic() + 20
-    for lease in build["leases"].values():
-        require_lease(lease)
-    raw = capture(
-        [str(build["image"])], native, ownership, evidence, "sdk_constants", deadline=deadline
+    record.update(
+        {
+            "source": "native_sdk",
+            "statuses": [],
+            "service_launch_attempted": False,
+            "catalogue_retrieval_attempted": False,
+        }
     )
-    projection = validate_sdk_constants(raw)
-    for lease in build["leases"].values():
-        require_lease(lease)
+    while True:
+        for lease in build["leases"].values():
+            require_lease(lease)
+        raw = capture(
+            [str(build["image"]), "--permission-preflight"],
+            native,
+            ownership,
+            evidence,
+            "permission_preflight",
+            deadline=deadline,
+        )
+        status = validate_permission_preflight(raw)
+        record["statuses"].append(status)
+        for lease in build["leases"].values():
+            require_lease(lease)
+        if status != PROC_NOT_FOUND:
+            break
+        if not record["service_launch_attempted"]:
+            # -g and -j start the agent hidden in the background; LaunchServices
+            # opens it without an Automation-gated Apple event from this process.
+            record["service_launch_attempted"] = True
+            capture(
+                ["/usr/bin/open", "-g", "-j", "-b", TARGET_BUNDLE],
+                native,
+                ownership,
+                evidence,
+                "service_launch",
+                deadline=deadline,
+                allow_empty=True,
+            )
+        else:
+            time.sleep(max(0.0, min(PREFLIGHT_RETRY_SECONDS, deadline - time.monotonic())))
+        if time.monotonic() >= deadline:
+            raise ProbeObservationRefused("target_not_running")
+    if status in CONSENT_ABSENT:
+        return status, None
+    if status != 0:
+        raise ProbeObservationRefused("permission_status")
     if time.monotonic() >= deadline:
         raise ProbeObservationRefused("deadline")
+    record["catalogue_retrieval_attempted"] = True
     discovered = capture(
         [
             "/usr/bin/osascript",
             "-l",
             "JavaScript",
             str(script),
-            "--permission-preflight",
-            "--sdk-constants",
-            projection,
+            "--native-permission-status",
+            "0",
         ],
         native,
         ownership,
@@ -529,7 +581,35 @@ def discover_with_sdk_constants(script, build, native, ownership, evidence):
     )
     for lease in build["leases"].values():
         require_lease(lease)
-    return discovered
+    return status, discovered
+
+
+def preflight_outcome(status, raw):
+    """Map one gated observation to closed result fields and its failure verdict.
+
+    Absent consent is a complete hosted observation: the catalogue was
+    deliberately not requested, so neither discovery nor permission is inferred.
+    """
+    if raw is None:
+        require(type(status) is int and status in CONSENT_ABSENT)
+        return {
+            "permission": CONSENT_ABSENT[status],
+            "reason": "automation_consent_absent",
+            "discovery_observed": False,
+            "catalogue_retrieval_attempted": False,
+        }, False
+    require(type(status) is int and status == 0)
+    observed = validate(raw)
+    fields = {
+        "permission": "preflight_permitted",
+        "inventory": observed,
+        "discovery_observed": observed["observed"],
+        "catalogue_retrieval_attempted": True,
+        "reason": "none" if observed["observed"] else observed["reason"],
+    }
+    if observed.get("reason") == "automation_permission_refused":
+        fields["permission"] = "refusal_code_observed"
+    return fields, not observed["observed"]
 
 
 def main():
@@ -583,6 +663,8 @@ def main():
         "cli_identifier_help_observed": False,
         "physical_operations": evidence,
         "permission": "not_determined",
+        "permission_preflight": {},
+        "catalogue_retrieval_attempted": False,
         "reason": "probe_refused",
     }
     failure = True
@@ -611,26 +693,26 @@ def main():
         for lease in source_leases.values():
             require_lease(lease)
         build["leases"]["discovery"] = source_leases[script]
-        raw = discover_with_sdk_constants(script, build, native, ownership, evidence)
-        observed = validate(raw)
-        result["inventory"] = observed
-        result["discovery_observed"] = observed["observed"]
-        if observed["observed"]:
-            result["reason"] = "none"
-            failure = False
-        else:
-            result["reason"] = observed["reason"]
-            if observed["reason"] == "automation_permission_refused":
-                result["permission"] = "refusal_code_observed"
+        status, raw = discover_with_native_preflight(
+            script, build, native, ownership, evidence, result["permission_preflight"]
+        )
+        fields, failure = preflight_outcome(status, raw)
+        result.update(fields)
         for path in source_files:
             require(
                 hashlib.sha256(path.read_bytes()).hexdigest() == hashes[str(path.relative_to(root))]
             )
-    except Exception:
+    except Exception as error:
         failure = True
         result["discovery_observed"] = False
         result["reason"] = "probe_refused"
+        if isinstance(error, ProbeObservationRefused):
+            result["failure"] = error.kind
     finally:
+        # The preflight record owns this fact even when a later step refused.
+        result["catalogue_retrieval_attempted"] = result["permission_preflight"].get(
+            "catalogue_retrieval_attempted", False
+        )
         # Includes exact physical receipts on declined native API/start/timeout,
         # without including stdout, stderr, identifiers or discovered names.
         (args.output / "observation.json").write_text(json.dumps(result, sort_keys=True) + "\n")

@@ -1017,8 +1017,8 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts structured API controls complete'
 	);
 	check(
-		/Controlled JXA cases: 13 passed, 0 failed; native execution untested/.test(controls.stdout),
-		'all thirteen independent Shortcuts API controls execute'
+		/Controlled JXA cases: 14 passed, 0 failed; native execution untested/.test(controls.stdout),
+		'all fourteen independent Shortcuts API controls execute'
 	);
 	check(
 		/SDK constant transport JXA controls: 7 passed, 0 failed; native execution UNRUN/.test(
@@ -1049,36 +1049,34 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	const windowsSDKScope = process.platform === 'win32';
-	const parserCount = windowsSDKScope ? 35 : 51;
+	const parserCount = windowsSDKScope ? 44 : 58;
 	check(
 		new RegExp(`Ran ${parserCount} tests in `).test(parser.stderr) &&
 			/\nOK\s*$/.test(parser.stderr),
 		windowsSDKScope
-			? 'all thirty-five original portable Shortcuts controls execute without skip'
-			: 'all thirty-five original and sixteen POSIX SDK controls execute without skip'
+			? 'all forty-four portable Shortcuts controls execute without skip'
+			: 'all forty-four portable and fourteen POSIX SDK controls execute without skip'
 	);
 	if (windowsSDKScope) {
 		const sdkFilesystemCases = [
-			'SDKCanonicalEnvelopeControls.test_noncanonical_valid_values_cannot_enter_the_jxa_channel',
 			'SDKCanonicalEnvelopeControls.test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path',
 			'SDKCanonicalEnvelopeControls.test_symlink_compiler_output_cannot_chmod_a_foreign_target',
-			'SDKConstantTransportControls.test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv',
-			'SDKConstantTransportControls.test_constant_retirement_consumes_shared_budget_before_osascript_acquisition',
-			'SDKConstantTransportControls.test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed',
 			'SDKConstantTransportControls.test_controlled_build_records_real_capture_retirement_and_source_image_leases',
-			'SDKConstantTransportControls.test_expired_constant_capture_retires_without_acquiring_osascript',
 			'SDKConstantTransportControls.test_expired_or_invalid_absolute_deadline_never_acquires_a_group',
+			'SDKConstantTransportControls.test_expired_preflight_capture_retires_without_acquiring_osascript',
 			'SDKConstantTransportControls.test_in_capture_same_byte_inode_replacement_refuses_before_osascript',
 			'SDKConstantTransportControls.test_late_discovery_cannot_gain_a_second_twenty_second_budget',
 			'SDKConstantTransportControls.test_lease_replacement_same_bytes_and_mutation_refuse_without_new_acquisition',
-			'SDKConstantTransportControls.test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript',
-			'SDKConstantTransportControls.test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript',
+			'SDKConstantTransportControls.test_malformed_preflight_records_refuse_before_osascript',
+			'SDKConstantTransportControls.test_nonzero_unclean_and_unretired_preflight_group_cannot_reach_osascript',
 			'SDKConstantTransportControls.test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations',
+			'SDKConstantTransportControls.test_preflight_and_discovery_use_one_budget_and_exact_admitted_argv',
+			'SDKConstantTransportControls.test_preflight_retirement_consumes_shared_budget_before_osascript_acquisition',
 			'SDKConstantTransportControls.test_source_changed_before_build_refuses_without_any_acquisition'
 		];
 		const expectedScope = {
 			case_names: sdkFilesystemCases,
-			collected: 16,
+			collected: 14,
 			executed: 0,
 			native: 'UNRUN',
 			status: 'UNRUN_UNSUPPORTED'
@@ -1093,7 +1091,7 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 			[scopeRecord + '\r\n\r\n', false],
 			[scopeRecord + '\n' + scopeRecord + '\n', false],
 			['extra record\n' + scopeRecord + '\n', false],
-			[scopeRecord.replace('"collected":16', '"collected": 16') + '\n', false],
+			[scopeRecord.replace('"collected":14', '"collected": 14') + '\n', false],
 			[scopeRecord.replace('"executed":0', '"executed":0,"executed":0') + '\n', false],
 			[scopeRecord.replace('"native":"UNRUN",', '') + '\n', false],
 			[
@@ -1103,7 +1101,7 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 				) + '\n',
 				false
 			],
-			[scopeRecord.replace('"collected":16', '"collected":17') + '\n', false],
+			[scopeRecord.replace('"collected":14', '"collected":15') + '\n', false],
 			[scopeRecord.replace(sdkFilesystemCases[0], 'ForeignControl.test_wrong') + '\n', false],
 			['\uFEFF' + scopeRecord + '\n', false]
 		])
@@ -1113,10 +1111,10 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 			);
 		check(
 			sdkScopeRecordMatches(parser.stdout, expectedScope),
-			'Windows collects all sixteen exact SDK filesystem cases as explicitly UNRUN_UNSUPPORTED'
+			'Windows collects all fourteen exact SDK filesystem cases as explicitly UNRUN_UNSUPPORTED'
 		);
 		console.log(
-			'Shortcuts SDK filesystem controls: 16 collected, 0 executed; UNRUN_UNSUPPORTED; native=UNRUN'
+			'Shortcuts SDK filesystem controls: 14 collected, 0 executed; UNRUN_UNSUPPORTED; native=UNRUN'
 		);
 	} else {
 		check(
