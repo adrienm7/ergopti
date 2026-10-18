@@ -1031,6 +1031,12 @@ retire user-closed windows outside their Cocoa notification. Check native
 consumption separately from business close callbacks. These failures can appear
 only in process `stderr` while `hs.console.getConsole()` is empty; qualify both
 native output streams as well as the console and exact process retirement.
+Disarming the parent does not disarm WebKit children: `allowNewWindows`
+defaults to true, while `createWebViewWithConfiguration` allocates a child
+with `deleteOnClose` true and copies the parent's `windowCallback`. An unowned
+child can therefore notify its parent's owner and enter recursive GC. Factory
+windows must commit `allowNewWindows(false)` before owner hooks or HTML;
+rejecting a child in `policyCallback` happens after its native allocation.
 
 ### project-hs-development-runtime-registers-stock-peers
 

@@ -58,7 +58,12 @@ local run_contract = function(helpers, load_host, load_builder)
    end},new=function()
     c.created=c.created+1
     local view=setmetatable({},{__native_live=true})
-    for _,name in ipairs({'windowTitle','windowStyle','shadow','level','allowTextEntry','allowGestures','allowNewWindows','show'})do view[name]=function(self)return self end end
+    for _,name in ipairs({'windowTitle','windowStyle','shadow','level','allowTextEntry','allowGestures','show'})do view[name]=function(self)return self end end
+    function view:allowNewWindows(value)
+     if value==nil then return self.allow_new_windows~=false end
+     assert(type(value)=="boolean","allowNewWindows expects a boolean")
+     self.allow_new_windows=value;return self
+    end
     function view:windowCallback(fn)self.closing=fn;return self end
     function view:navigationCallback(fn)self.navigation=fn;return self end
     function view:evaluateJavaScript()return self end

@@ -36,7 +36,6 @@ local function with_native_editor(name, scenario)
 		local construct = require("tests.support.native_webview_close_fixture")(h)
 		local function new_window()
 			local view = construct()
-			function view:allowNewWindows() assert(not self.disposed); return self end
 			function view:evaluateJavaScript() assert(not self.disposed); return self end
 			return view
 		end

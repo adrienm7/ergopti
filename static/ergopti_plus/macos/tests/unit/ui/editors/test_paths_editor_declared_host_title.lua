@@ -31,8 +31,14 @@ local function with_fixture(callback)
 				return self
 			end
 			for _, name in ipairs({"windowStyle", "level", "allowTextEntry", "allowGestures",
-				"shadow", "allowNewWindows", "windowCallback", "navigationCallback", "html", "show"}) do
+				"shadow", "windowCallback", "navigationCallback", "html", "show"}) do
 				view[name] = function() return view end
+			end
+			function view:allowNewWindows(value)
+				if value == nil then return self.allow_new_windows ~= false end
+				assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+				self.allow_new_windows = value
+				return self
 			end
 			function view:deleteOnClose(value)
 				if value == nil then return self.delete_on_close == true end

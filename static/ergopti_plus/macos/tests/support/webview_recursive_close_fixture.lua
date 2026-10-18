@@ -46,8 +46,14 @@ local function make_windows(h)
 		h.retained[state] = nil
 	end
 	for _, name in ipairs({ "windowTitle", "windowStyle", "shadow", "allowTextEntry",
-		"allowGestures", "allowNewWindows", "level", "html" }) do
+		"allowGestures", "level", "html" }) do
 		methods[name] = function(self) return self end
+	end
+	function methods:allowNewWindows(value)
+		if value == nil then return self.native.allow_new_windows ~= false end
+		assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+		self.native.allow_new_windows = value
+		return self
 	end
 	function methods:deleteOnClose(value)
 		if value == nil then return self.native.delete_on_close end

@@ -43,7 +43,6 @@ local function with_window(module_name, scenario)
 			local construct = require("tests.support.native_webview_close_fixture")(h)
 			local function new_window()
 				local view = construct()
-				function view:allowNewWindows() assert(not self.disposed); return self end
 				function view:frame() assert(not self.disposed); return { x = 0, y = 0, w = 460, h = 380 } end
 				function view:evaluateJavaScript()
 					assert(not self.disposed, "retired windows cannot receive JavaScript")
