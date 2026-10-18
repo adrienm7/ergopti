@@ -53,6 +53,28 @@ helpers.describe("updater restart: starting the installed version", function()
 				"this deferral runs only on a host whose separator is Windows'")
 		end)
 	else
+		helpers.it("(restart-relay-dispatch-ack) refuses shutdown when native relay dispatch exits unsuccessfully", function()
+			local Shell = require("adapters.shell_runner")
+			local folder = os.tmpname()
+			os.remove(folder)
+			helpers.assert_true(Shell.run("mkdir " .. Shell.quote(folder)))
+			local fake = assert(io.open(folder .. "/setsid", "w"))
+			fake:write("#!/bin/sh\nexit 73\n")
+			fake:close()
+			helpers.assert_true(Shell.run("chmod 700 " .. Shell.quote(folder .. "/setsid")))
+			local called, failure = xpcall(function()
+				local how = Restarter.restart({ wrapper = "/unreached/launcher", args = {},
+					cgroup = TERMINAL_CGROUP, pid = Restarter.own_pid(),
+					run = function(command)
+						return Shell.run("PATH=" .. Shell.quote(folder) .. ":\"$PATH\" " .. command)
+					end })
+				helpers.assert_nil(how, "a failed native setsid must not authorize the daemon to exit")
+			end, debug.traceback)
+			os.remove(folder .. "/setsid")
+			os.remove(folder)
+			if not called then error(failure, 0) end
+		end)
+
 		helpers.it("really waits for the process and then runs the launcher", function()
 			local dir = os.tmpname()
 			os.remove(dir)
