@@ -610,17 +610,29 @@ Test("Shortcuts/win: resolve redirected Downloads through the Shell (downloads-k
 	TestShortcuts_DownloadsUsesShellPath)
 
 TestShortcuts_DownloadsRefusesNativeFailure() {
+	_TestShortcuts_DownloadsNativeFailure(false)
+	_TestShortcuts_DownloadsNativeFailure(true)
+}
+
+_TestShortcuts_DownloadsNativeFailure(OwnsPath) {
 	Calls := []
+	Target := "Z:\Company\Downloads"
 	NativeCall(Name, Args*) {
 		Calls.Push(Name)
-		return -2147024891
+		if Name == "shell32\SHGetKnownFolderPath" {
+			if OwnsPath
+				NumPut("Ptr", StrPtr(Target), Args[8])
+			return -2147024891
+		}
+		AssertEqual("ole32\CoTaskMemFree", Name, "a failed lookup must release any returned allocation")
+		AssertEqual(StrPtr(Target), Args[2], "failure releases only its own allocation")
 	}
 	Failure := ""
 	try GetKnownFolderDownloads(NativeCall)
 	catch as Err
 		Failure := Err.Message
 	AssertContains(Failure, "HRESULT 0x80070005", "an access denial must not silently choose a different folder")
-	AssertEqual(1, Calls.Length, "a refused lookup has no allocation to free")
+	AssertEqual(OwnsPath ? 2 : 1, Calls.Length, "only an owned allocation requires a release")
 }
 Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
 	TestShortcuts_DownloadsRefusesNativeFailure)
