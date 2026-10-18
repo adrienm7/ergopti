@@ -763,19 +763,26 @@ local function main()
 	if not device then
 		device = dev_finder.find_keyboard()
 	end
+	local InputAccess = require("infra.input_access")
 	if not device then
 		Logger.error(LOG, "No keyboard device found. Specify one with --device.")
 		print("Error: no keyboard device detected. Specify one with --device.")
+		-- A sandbox that hides /dev/input looks like this: with --tray the icon
+		-- still names the problem instead of the app vanishing.
+		if opts.tray and tray_menu then
+			InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+				tray = tray_menu }, "no keyboard device detected")
+		end
 		os.exit(1)
 	end
 	-- Found but unreadable is the first launch after install.sh: the input group
 	-- it granted only applies from the next session. Say so on screen — the
 	-- console line below used to be the only trace — and exit with a status
 	-- the unit does not retry, since only a new session can fix it.
-	local InputAccess = require("infra.input_access")
 	if InputAccess.is_denied(device) then
 		Logger.error(LOG, "Keyboard device %s exists but this session may not read it.", device)
-		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+		os.exit(InputAccess.report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier,
+			tray = opts.tray and tray_menu or nil },
 			device .. " is not readable (the input group applies from the next session)"))
 	end
 	Logger.info(LOG, "Using device: %s.", device)
@@ -1671,7 +1678,8 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"), notifier = notifier },
+		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+			notifier = notifier, tray = opts.tray and tray_menu or nil },
 			"/dev/uinput cannot be opened for writing (uinput group or module missing)"))
 	end
 
