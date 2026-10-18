@@ -506,7 +506,7 @@ is the reference: `not LayerEnabled` on every tap-hold variant plus the
 nav_layer.ahk LAlt swallower. macOS follows it with a `variable_unless
 layer_active` condition on the key's Karabiner rule (layer_keys.json runs
 first) and a `SWALLOWED_ON_LAYER` manipulator; Linux in its tap-hold engine.
-Pins: `test_layer_key_under_another_holder.ahk`, `test_generator.lua`,
+Pins: `test_layer_key_under_another_holder.ahk`, `test_generator_layers.lua`,
 `test_tap_hold_engine.lua`. Action: a new layer hold path on any driver must
 stand down while the layer is on, or a second holder's release turns the layer
 off under the first; change the swallow list on every driver at once.

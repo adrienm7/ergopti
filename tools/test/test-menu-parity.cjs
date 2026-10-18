@@ -6363,7 +6363,7 @@ if (unreasoned.length < UNREASONED_BASELINE) {
 // for the same menu.
 // hs 8 → 9 on 2026-08-07: the hotstrings submenu. It was the last macOS menu
 // that read the manifest for nothing at all — the drift gate in
-// tests/meta/test_menu_hotstrings_layout_drift_gate.lua exists solely because
+// tests/meta/menu/test_menu_hotstrings_layout_drift_gate.lua exists solely because
 // this menu and its declaration could disagree with nothing comparing them.
 // hs 9 → 10, linux 10 → 11 on 2026-08-07: the language selector. Three drivers
 // listed the same twenty-one locales from the same shared catalogue into a menu
