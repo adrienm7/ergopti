@@ -137,9 +137,14 @@ end)
 describe("Runtime log: previously swallowed failures now log", function()
 	local src = daemon_source()
 
+	-- Signals are owned by infra/signal_handlers.lua since fix(linux): own
+	-- native signals through graceful shutdown; a refused installation is
+	-- logged and refuses input capture instead of continuing without them.
 	it("reports a signal handler that could not be installed", function()
-		assert_true(src:find("Signal handler for %s could not be installed", 1, true) ~= nil,
+		assert_true(src:find("Signal handler admission refused: %s.", 1, true) ~= nil,
 			"install failures must be logged, not discarded by a bare pcall")
+		assert_true(src:find("refusing input capture", 1, true) ~= nil,
+			"a refused signal installation must stop startup before input capture")
 		assert_eq(nil, src:find("pcall(signal.signal, signal.SIGINT", 1, true),
 			"the bare pcall that discarded the result is gone")
 	end)
