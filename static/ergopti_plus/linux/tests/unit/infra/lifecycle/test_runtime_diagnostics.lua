@@ -19,7 +19,7 @@ local it          = helpers.it
 local assert_eq   = helpers.assert_eq
 local assert_true = helpers.assert_true
 
-local Logger     = require("logger")
+local Logger     = require("logger.shim")
 local RuntimeLog = require("diagnostics.runtime_log")
 
 --- Runs body with the real shared logger at DEBUG and a capturing sink.
