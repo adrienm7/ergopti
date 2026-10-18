@@ -293,7 +293,7 @@ helpers.describe("Hammerspoon --only selects modules before require", function()
 
 	helpers.it("accepts an exact source-only module with zero registered cases", function()
 		local success, output = run_focused_runner(
-			"tests/unit/lib/test_config_overrides_comment_strip.lua"
+			"tests/unit/infra/config/test_config_overrides_comment_strip.lua"
 		)
 		helpers.assert_true(success, output)
 		helpers.assert_true(output:find("Focused discovery: 1 of", 1, true) ~= nil,
