@@ -287,6 +287,7 @@ function M.open(existing, on_save)
 		return false
 	end
 	local show_ok, webview = xpcall(ui_builder.show_webview, debug.traceback, {
+		delete_on_close = true,
 		frame         = frame,
 		title         = context.payload.title,
 		style_masks   = {"titled", "closable", "utility"},

@@ -910,6 +910,7 @@ function M.open()
 	local closed = false
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame        = ui_builder.get_centered_frame(geo.width, geo.height),
 			title        = i18n.get("hs_config.window_title"),
 			style_masks  = { "titled", "closable", "resizable", "utility" },
