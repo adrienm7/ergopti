@@ -42,7 +42,7 @@ helpers.describe("text_sender: a throw mid-send does not keep the clipboard", fu
 		helpers.assert_true(src ~= nil and src ~= "", "text_sender must be locatable")
 
 		local code = src:gsub("%-%-[^\n]*", "")
-		local write_at = code:find("Clipboard.write(text)", 1, true)
+		local write_at = code:find("Clipboard.write(text, receipt)", 1, true)
 		helpers.assert_true(write_at ~= nil, "the clipboard send must still write the payload")
 
 		local arm_at = code:find("schedule_restore()", write_at, true)
@@ -51,7 +51,9 @@ helpers.describe("text_sender: a throw mid-send does not keep the clipboard", fu
 			"exact restoration must be armed BEFORE Cmd+V is published; otherwise a timer "
 				.. "refusal leaves no callback capable of returning the user's clipboard")
 		local helper_at = code:find("local function restore_clipboard", 1, true)
-		local helper_body = helper_at and code:sub(helper_at, helper_at + 600) or ""
+		local helper_end = helper_at and code:find("\nlocal queue_restore_retry", helper_at, true)
+		helpers.assert_true(helper_at ~= nil and helper_end ~= nil, "the exact restore helper must remain bounded")
+		local helper_body = code:sub(helper_at, helper_end - 1)
 		helpers.assert_true(helper_body:find("Clipboard.restore", 1, true) ~= nil,
 			"both rollback and timer completion must use the retained exact-restore helper")
 		helpers.assert_true(helper_body:find("restored ~= true", 1, true) ~= nil,

@@ -16,6 +16,8 @@ local function with_sender(callback)
 		"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
 		"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
 		"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
+		"infra.toml.reader", "json", "toml_codec.basic_string", "toml_codec.bom",
+		"toml_codec.key_path", "toml_codec.reader", "toml_codec.record_scanner",
 	}, function()
 		local f = Fixture.make({ deliver_trigger = false, absolute_time = 0 })
 		local initial = {
@@ -24,18 +26,31 @@ local function with_sender(callback)
 		}
 		local clipboard = initial
 		f.restore_calls = 0
+		f.change_count = 0
 		f.hs_overrides.pasteboard = {
+			changeCount = function()
+				f.count_reads = (f.count_reads or 0) + 1
+				if f.count_failure_on_read == f.count_reads then return nil end
+				if f.count_failure == "throw" then error("pasteboard count unavailable") end
+				if f.count_failure == "nil" then return nil end
+				return f.change_count
+			end,
 			readAllData = function() return clipboard end,
 			setContents = function(value)
+				f.change_count = f.change_count + 1
 				clipboard = { ["public.utf8-plain-text"] = value }
+				if f.write_refusal == "throw" then error("payload write raised after mutation") end
+				if f.write_refusal == "false" then return false end
 				return true
 			end,
 			writeAllData = function(value)
 				f.restore_calls = f.restore_calls + 1
+				f.change_count = f.change_count + 1
 				clipboard = value
+				if f.restore_refusal == "false" then return false end
 				return true
 			end,
-			clearContents = function() clipboard = {} end,
+			clearContents = function() f.change_count = f.change_count + 1; clipboard = {} end,
 		}
 		local synthetic = f.load()
 		f.synthetic = synthetic
@@ -48,9 +63,10 @@ local function with_sender(callback)
 			return tx
 		end
 		synthetic.on_complete = function(tx, observer)
-			return actual_complete(tx, function(...)
+			return actual_complete(tx, function(finished, status, ...)
 				f.complete_calls = f.complete_calls + 1
-				return observer(...)
+				f.last_terminal_status = status
+				return observer(finished, status, ...)
 			end)
 		end
 		f.sender = require("adapters.text_sender")
@@ -220,6 +236,231 @@ helpers.describe("text sender retains paste payload through native handoff", fun
 			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "PAYLOAD")
 			f.expire_restore()
 			helpers.assert_true(helpers.deep_equal(f.clipboard(), f.initial))
+		end)
+	end)
+end)
+
+helpers.describe("text sender restores only its exact native pasteboard owner", function()
+	for _, value in ipairs({ "NEW USER COPY", "PAYLOAD" }) do
+		helpers.it("preserves a user copy during paste grace: " .. value, function()
+			with_sender(function(f)
+				helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+				f.finish_broker()
+				helpers.assert_true(f.hs_overrides.pasteboard.setContents(value))
+				f.expire_restore()
+				helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], value)
+				helpers.assert_eq(f.restore_calls, 0, "a new native owner must preserve even identical text")
+				helpers.assert_true(f.sender.send("SECOND", { mode = "clipboard" }))
+				f.finish_broker(); f.expire_restore()
+				helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], value)
+			end)
+		end)
+	end
+	helpers.it("captures the external copy before a second send inherits an expired grace", function()
+		with_sender(function(f)
+			helpers.assert_true(f.sender.send("FIRST", { mode = "clipboard" }))
+			f.finish_broker()
+			f.options.absolute_time = f.options.absolute_time + math.ceil(f.restore_delay * 1e9)
+			f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+			helpers.assert_true(f.sender.send("SECOND", { mode = "clipboard" }))
+			f.finish_broker(); f.expire_restore()
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.restore_calls, 1, "only the second request may restore its new snapshot")
+		end)
+	end)
+	for _, refusal in ipairs({ "throw", "nil" }) do
+		helpers.it("retains clipboard recovery while native count returns " .. refusal, function()
+			with_sender(function(f)
+				helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+				f.finish_broker()
+				f.count_failure = refusal
+				f.expire_restore()
+				helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "PAYLOAD")
+				helpers.assert_eq(f.restore_calls, 0)
+				helpers.assert_eq(f.sender.send("BLOCKED", { mode = "clipboard" }), false)
+				helpers.assert_eq(#f.producers, 1)
+				f.count_failure = nil
+				f.expire_restore()
+				helpers.assert_true(helpers.deep_equal(f.clipboard(), f.initial))
+				helpers.assert_eq(f.restore_calls, 1)
+			end)
+		end)
+	end
+	helpers.it("does not adopt the clipboard written by a reentrant payload diagnostic", function()
+		with_sender(function(f)
+			local debug = f.logger.debug
+			f.logger.debug = function(log, format, ...)
+				if format:find("write():", 1, true) then
+					f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+				end
+				return debug(log, format, ...)
+			end
+			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
+			f.finish_broker(); f.expire_restore()
+			helpers.assert_eq(#f.pump_deliveries, 0)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.restore_calls, 0)
+		end)
+	end)
+	helpers.it("keeps the native write receipt captured before a reentrant refusal diagnostic", function()
+		with_sender(function(f)
+			local error_log = f.logger.error
+			f.logger.error = function(log, format, ...)
+				if format:find("write():", 1, true) then
+					f.write_refusal = nil
+					f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+				end
+				return error_log(log, format, ...)
+			end
+			f.write_refusal = "throw"
+			local receipt = {}
+			local written, returned = require("adapters.clipboard").write("PAYLOAD", receipt)
+			helpers.assert_eq(written, false)
+			helpers.assert_true(returned == receipt)
+			helpers.assert_eq(receipt.count, 1, "capture before Logger can change the board")
+			helpers.assert_eq(receipt.count_ok, true)
+			helpers.assert_eq(f.change_count, 2)
+		end)
+	end)
+	helpers.it("preserves a user copy made after a refused native restore", function()
+		with_sender(function(f)
+			helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+			f.finish_broker()
+			f.restore_refusal = "false"
+			local error_log = f.logger.error
+			f.logger.error = function(log, format, ...)
+				if format:find("restore():", 1, true) then f.hs_overrides.pasteboard.setContents("NEW USER COPY") end
+				return error_log(log, format, ...)
+			end
+			f.expire_restore()
+			f.restore_refusal = nil
+			f.expire_restore()
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.restore_calls, 1, "an old retry must not overwrite the diagnostic's new owner")
+		end)
+	end)
+	helpers.it("preserves a user copy when an undispatched paste is cancelled", function()
+		with_sender(function(f)
+			helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+			f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+			helpers.assert_true(f.synthetic.cancel(f.producers[1]))
+			f.finish_broker(); f.expire_restore()
+			helpers.assert_eq(#f.pump_deliveries, 0)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.restore_calls, 0)
+		end)
+	end)
+end)
+
+helpers.describe("native clipboard ownership metadata", function()
+	helpers.it("retains an unproven post-write owner until another observed clipboard change", function()
+		with_sender(function(f)
+			f.count_failure_on_read = 4
+			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
+			helpers.assert_eq(#f.producers, 0)
+			helpers.assert_eq(f.restore_calls, 0)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "PAYLOAD")
+			helpers.assert_eq(f.sender.send("BLOCKED", { mode = "clipboard" }), false)
+			f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+			f.expire_restore()
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_true(f.sender.send("SECOND", { mode = "clipboard" }))
+			f.finish_broker(); f.expire_restore()
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+		end)
+	end)
+	helpers.it("keeps a thrown payload's exact receipt through reentrant diagnostics", function()
+		with_sender(function(f)
+			f.write_refusal = "throw"
+			local error_log = f.logger.error
+			f.logger.error = function(log, format, ...)
+				if format:find("write():", 1, true) then
+					f.write_refusal = nil
+					f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+				end
+				return error_log(log, format, ...)
+			end
+			helpers.assert_eq(f.sender.send("PAYLOAD", { mode = "clipboard" }), false)
+			f.expire_restore()
+			helpers.assert_eq(#f.producers, 0)
+			helpers.assert_eq(f.restore_calls, 0)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+		end)
+	end)
+	helpers.it("fences reentrant sends while a native restore diagnostic is running", function()
+		with_sender(function(f)
+			helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+			f.finish_broker()
+			local debug = f.logger.debug
+			local nested
+			f.logger.debug = function(log, format, ...)
+				if format:find("restore():", 1, true) then nested = f.sender.send("REENTRANT", { mode = "clipboard" }) end
+				return debug(log, format, ...)
+			end
+			f.expire_restore()
+			helpers.assert_eq(nested, false)
+			helpers.assert_eq(#f.producers, 1)
+			helpers.assert_eq(f.restore_calls, 1)
+			helpers.assert_true(helpers.deep_equal(f.clipboard(), f.initial))
+		end)
+	end)
+end)
+
+helpers.describe("clipboard release keeps its reentrant diagnostics fenced", function()
+	for _, entry in ipairs({ "timer", "send" }) do
+		helpers.it("fences a Logger.info successor during clipboard reconciliation from " .. entry, function()
+			with_sender(function(f)
+				helpers.assert_true(f.sender.send("FIRST", { mode = "clipboard" }))
+				f.finish_broker()
+				f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+				local info, nested, attempted = f.logger.info, nil, false
+				f.logger.info = function(log, format, ...)
+					if not attempted and format:find("Clipboard changed owner", 1, true) then
+						attempted = true
+						nested = f.sender.send("NESTED", { mode = "clipboard" })
+					end
+					return info(log, format, ...)
+				end
+				if entry == "timer" then f.expire_restore()
+				else
+					f.options.absolute_time = f.options.absolute_time + math.ceil(f.restore_delay * 1e9)
+					helpers.assert_true(f.sender.send("OUTER", { mode = "clipboard" }))
+				end
+				helpers.assert_eq(nested, false, "diagnostics cannot admit a successor before reconciliation returns")
+				helpers.assert_eq(#f.producers, entry == "timer" and 1 or 2)
+				if entry == "send" then f.finish_broker(); f.expire_restore() end
+				helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			end)
+		end)
+	end
+	helpers.it("keeps an external copy when native trigger timeouts retire the queued paste", function()
+		with_sender(function(f)
+			helpers.assert_true(f.sender.send("PAYLOAD", { mode = "clipboard" }))
+			f.hs_overrides.pasteboard.setContents("NEW USER COPY")
+			for _ = 1, 12 do
+				local selected
+				for _, deadline in ipairs({ f.synthetic.PUMP_DELIVERY_TIMEOUT_SEC, f.synthetic.PERIODIC_OWNER_TICK_SEC }) do
+					for index, timer in ipairs(f.timers) do
+						if not timer.stopped and timer.delay <= deadline then
+							if deadline ~= f.synthetic.PUMP_DELIVERY_TIMEOUT_SEC or timer.delay == deadline then
+								selected = table.remove(f.timers, index)
+								break
+							end
+						end
+					end
+					if selected then break end
+				end
+				if not selected then break end
+				f.options.absolute_time = f.options.absolute_time + math.ceil(selected.delay * 1e9)
+				selected.callback()
+				if selected.recurring and not selected.stopped then f.timers[#f.timers + 1] = selected end
+				if f.complete_calls > 0 then break end
+			end
+			helpers.assert_eq(f.complete_calls, 1)
+			helpers.assert_eq(f.last_terminal_status, "failed")
+			helpers.assert_eq(#f.pump_deliveries, 0)
+			helpers.assert_eq(f.clipboard()["public.utf8-plain-text"], "NEW USER COPY")
+			helpers.assert_eq(f.restore_calls, 0)
 		end)
 	end)
 end)

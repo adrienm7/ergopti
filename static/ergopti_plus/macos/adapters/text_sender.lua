@@ -103,6 +103,9 @@ local _paste_generation = 0
 local _paste_transaction = nil
 local _paste_native_pending = false
 local _paste_restore_after = nil
+local _paste_owned_count = nil
+local _paste_unproven_count = nil
+local _paste_mutations = 0
 
 --- Reports whether one application identity is a terminal input host.
 --- @param bundle_id string|nil macOS bundle identifier.
@@ -171,6 +174,8 @@ end
 local function release_clipboard()
 	stop_restore_timer()
 	_paste_saved_original = nil
+	_paste_owned_count = nil
+	_paste_unproven_count = nil
 	_paste_owns_clipboard = false
 	_paste_recovery_only = false
 	_paste_transaction = nil
@@ -180,16 +185,55 @@ local function release_clipboard()
 end
 
 local function paste_settling()
-	return _paste_native_pending or (_paste_restore_after ~= nil
+	return _paste_mutations > 0 or _paste_native_pending or (_paste_restore_after ~= nil
 		and TimerScheduler.awake_time() < _paste_restore_after)
+end
+
+--- Verifies retained native identity; a new owner keeps its current clipboard.
+local function reconcile_clipboard_owner()
+	if not _paste_owns_clipboard then return true end
+	local ok, count, detail = pcall(Clipboard._change_count)
+	if not ok or count == nil then return false, detail or "native clipboard ownership cannot be read" end
+	if _paste_owned_count == nil then
+		-- A later read cannot retroactively prove an unobserved native mutation.
+		-- Wait for another observed owner change instead of adopting this count.
+		if _paste_unproven_count == nil or count == _paste_unproven_count then
+			_paste_unproven_count = count
+			return false, "native clipboard ownership was not captured"
+		end
+	end
+	if count ~= _paste_owned_count then
+		_paste_mutations = _paste_mutations + 1
+		local released, release_error = pcall(function()
+			release_clipboard()
+			Logger.info(LOG, "Clipboard changed owner; preserving the newer clipboard without restoration.")
+		end)
+		_paste_mutations = _paste_mutations - 1
+		if not released then return false, release_error end
+	end
+	return true
 end
 
 local function restore_clipboard()
 	if not _paste_owns_clipboard then return true end
 	if paste_settling() then return false, "native paste is still settling", true end
-	local ok_restore, restored = pcall(Clipboard.restore, _paste_saved_original)
+	local current, ownership_error = reconcile_clipboard_owner()
+	if not current then return false, ownership_error end
+	if not _paste_owns_clipboard then return true end
+	local generation = _paste_generation
+	local receipt = { expected_count = _paste_owned_count }
+	_paste_mutations = _paste_mutations + 1
+	local ok_restore, restored = pcall(Clipboard.restore, _paste_saved_original, receipt)
+	_paste_mutations = _paste_mutations - 1
+	if generation ~= _paste_generation or not _paste_owns_clipboard then return true end
 	if not ok_restore or restored ~= true then
-		return false, ok_restore and "Clipboard.restore returned " .. tostring(restored) or restored
+		if receipt.attempted ~= false then
+			_paste_owned_count = receipt.count_ok == true and receipt.count or nil
+			_paste_unproven_count = nil
+		end
+		local reconciled, count_error = reconcile_clipboard_owner()
+		if reconciled and not _paste_owns_clipboard then return true end
+		return false, count_error or (ok_restore and "Clipboard.restore returned " .. tostring(restored) or restored)
 	end
 	release_clipboard()
 	return true
@@ -311,6 +355,8 @@ function M.send(text, opts, callback)
 					error("previous clipboard recovery remains pending: " .. tostring(restore_error), 0)
 				end
 			end
+			local current, ownership_error = reconcile_clipboard_owner()
+			assert(current, ownership_error)
 			-- If a restore is still pending after the previous paste's grace, cancel it
 			-- but KEEP the first-captured original; only capture the user's clipboard
 			-- when no send is in flight (otherwise we'd save our own injected payload).
@@ -322,16 +368,44 @@ function M.send(text, opts, callback)
 						.. tostring(restore_error), 0)
 				end
 			else
-				local snapshot, snapshot_ok = Clipboard.save()
-				assert(snapshot_ok == true, "clipboard snapshot failed")
-				_paste_saved_original = snapshot
+				assert(retry_restore_timer_cleanup() == true, "prior clipboard timer cleanup remains pending")
+				_paste_mutations = _paste_mutations + 1
+				local captured, snapshot, count = pcall(function()
+					local before, count_error = Clipboard._change_count()
+					assert(before ~= nil, count_error)
+					local saved, snapshot_ok = Clipboard.save()
+					assert(snapshot_ok == true, "clipboard snapshot failed")
+					local after = Clipboard._change_count()
+					assert(after == before, "clipboard changed during snapshot capture")
+					return saved, after
+				end)
+				_paste_mutations = _paste_mutations - 1
+				assert(captured, snapshot)
+				_paste_saved_original, _paste_owned_count = snapshot, count
 			end
 
 			_paste_generation = _paste_generation + 1
 			_paste_owns_clipboard = true
 			_paste_recovery_only = true
-			local ok_write, written = pcall(function() return Clipboard.write(text) end)
-			if not ok_write or written ~= true then
+			local receipt = { expected_count = _paste_owned_count }
+			local write_generation = _paste_generation
+			_paste_mutations = _paste_mutations + 1
+			local ok_write, written = pcall(function()
+				local accepted = Clipboard.write(text, receipt)
+				if receipt.attempted ~= false then
+					_paste_owned_count = receipt.count_ok == true and receipt.count or nil
+				end
+				assert(accepted == true and receipt.attempted == true and receipt.count_ok == true,
+					"clipboard payload ownership was not acknowledged")
+				local current, count_error = reconcile_clipboard_owner()
+				assert(current and _paste_owns_clipboard, count_error or "clipboard ownership changed after writing")
+			end)
+			_paste_mutations = _paste_mutations - 1
+			if not ok_write then
+				if write_generation == _paste_generation and _paste_owns_clipboard
+					and receipt.attempted ~= false then
+					_paste_owned_count = receipt.count_ok == true and receipt.count or nil
+				end
 				error("clipboard payload refused: " .. tostring(written), 0)
 			end
 
