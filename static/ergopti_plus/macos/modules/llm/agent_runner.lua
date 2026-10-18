@@ -293,7 +293,7 @@ local function chat(backend, payload, on_text, on_fail, use, current)
 	if backend.kind == "local" then
 		local Ollama = dependency("modules.llm.api_ollama", "request_chat")
 		if not Ollama then return on_fail("the local backend is unavailable") end
-		Ollama.request_chat(body, on_text, on_fail)
+		Ollama.request_chat(body, on_text, on_fail, current)
 		return
 	end
 	local Remote = dependency("modules.llm.api_remote", "request_chat")
