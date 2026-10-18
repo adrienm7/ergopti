@@ -1,4 +1,4 @@
---- tests/unit/modules/test_classify_trigger_no_silent_fallback.lua
+--- tests/unit/modules/hotstrings/test_classify_trigger_no_silent_fallback.lua
 
 --- ==============================================================================
 --- MODULE: Regression — the @-collector must not silently fall back to three scans

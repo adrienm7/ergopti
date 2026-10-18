@@ -1,4 +1,4 @@
---- tests/unit/modules/test_three_silent_defects.lua
+--- tests/meta/regressions/test_three_silent_defects.lua
 
 --- ==============================================================================
 --- MODULE: Regression — three defects that reported the wrong answer

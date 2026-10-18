@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstrings_config_show_tooltip.lua
+--- tests/unit/modules/hotstrings/test_hotstrings_config_show_tooltip.lua
 
 --- ==============================================================================
 --- MODULE: hotstrings_config show_tooltip Round-Trip Tests

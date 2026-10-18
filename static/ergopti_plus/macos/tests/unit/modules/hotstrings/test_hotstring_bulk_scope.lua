@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstring_bulk_scope.lua
+--- tests/unit/modules/hotstrings/test_hotstring_bulk_scope.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Category Selection Parity (macOS)

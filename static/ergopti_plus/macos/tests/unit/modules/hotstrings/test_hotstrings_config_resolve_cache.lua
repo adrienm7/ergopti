@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstrings_config_resolve_cache.lua
+--- tests/unit/modules/hotstrings/test_hotstrings_config_resolve_cache.lua
 
 --- ==============================================================================
 --- MODULE: Hotstrings Config — resolve() Memo

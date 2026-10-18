@@ -1,4 +1,4 @@
---- tests/unit/modules/test_brightness_actions.lua
+--- tests/unit/modules/shortcuts/system_actions/test_brightness_actions.lua
 
 --- ==============================================================================
 --- MODULE: Shared Screen Brightness Contract

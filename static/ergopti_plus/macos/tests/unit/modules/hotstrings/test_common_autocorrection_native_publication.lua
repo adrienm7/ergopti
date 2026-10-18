@@ -1,4 +1,4 @@
---- tests/unit/modules/test_common_autocorrection_native_publication.lua
+--- tests/unit/modules/hotstrings/test_common_autocorrection_native_publication.lua
 --- Actual adapter, Writer and override controller with real temporary I/O.
 --- Native locking and close refusals are doubled; physical macOS remains separate.
 local helpers = require("tests.helpers")

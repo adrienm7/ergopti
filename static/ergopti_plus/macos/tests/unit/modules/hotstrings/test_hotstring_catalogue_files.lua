@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstring_catalogue_files.lua
+--- tests/unit/modules/hotstrings/test_hotstring_catalogue_files.lua
 
 --- ==============================================================================
 --- MODULE: Hotstring Catalogue Discovery Skips Metadata (macOS)

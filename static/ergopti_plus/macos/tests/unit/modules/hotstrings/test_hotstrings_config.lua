@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstrings_config.lua
+--- tests/unit/modules/hotstrings/test_hotstrings_config.lua
 
 --- ==============================================================================
 --- MODULE: hotstrings_config Priority Unit Tests
