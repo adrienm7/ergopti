@@ -289,3 +289,5 @@ _TapHoldPickerCallsLayerOwner() {
 }
 Test("tap-hold-scope: the hold picker writes through the layer owner (hold-picker-brings-the-layer-2026-10-01)",
 	_TapHoldPickerCallsLayerOwner)
+
+#Include test_tap_hold_semantic_consumers.ahk
