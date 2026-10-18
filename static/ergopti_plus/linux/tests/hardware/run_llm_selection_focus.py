@@ -53,11 +53,12 @@ def gtk(root):
     def control():
         request = json.loads((root / "control.json").read_text())
         if request.get("reset"):
-            for entry, text in zip(fields, ("ORIGIN", "SECOND", "SECRET", "OTHER")):
+            for entry, text in zip(fields, ("ORIGIN SECOND ORIGIN", "SECOND", "SECRET", "OTHER")):
                 entry.set_text(text)
         current[0] = request["target"]
         windows[0 if current[0] < 3 else 1].present()
         fields[current[0]].grab_focus()
+        fields[current[0]].select_region(request.get("start", 0), request.get("end", -1))
         state()
         return True
 
@@ -134,9 +135,9 @@ def session(root):
                     )
                     return json.loads(line.removeprefix("RECEIPT:"))
 
-                def focus(target, reset=False):
+                def focus(target, reset=False, start=0, end=-1):
                     (root / "control.json").write_text(
-                        json.dumps({"target": target, "reset": reset})
+                        json.dumps({"target": target, "reset": reset, "start": start, "end": end})
                     )
                     app.send_signal(signal.SIGUSR1)
                     time.sleep(0.2)
@@ -249,6 +250,47 @@ def session(root):
                         )
                         unchanged(before)
                         cases += 1
+                for mode in ("tone", "translation"):
+                    for name, start, end in (
+                        ("unchanged", 0, 6),
+                        ("different-text", 7, 13),
+                        ("same-text-new-range", 14, 20),
+                    ):
+                        before = focus(0, True, 0, 6)
+                        initial = command("reset")
+                        original_range = command("selection-range")
+                        assert (
+                            original_range["selection_first"],
+                            original_range["selection_last"],
+                        ) == (0, 6)
+                        assert command("start-" + mode)["requests"] == 1
+                        if mode == "translation":
+                            assert command("offer")["offered"]
+                        focus(0, False, start, end)
+                        moved = command("selection-range")
+                        assert (moved["selection_first"], moved["selection_last"]) == (start, end)
+                        assert initial["target"] == moved["target"], (
+                            "range moves must stay inside the same native field"
+                        )
+                        result = command("finish" if mode == "tone" else "accept")
+                        assert result["applied"] == (1 if name == "unchanged" else 0), (
+                            mode,
+                            name,
+                            result,
+                        )
+                        if name != "unchanged":
+                            unchanged(before)
+                            if mode == "translation":
+                                assert not result["accepted"]
+                        else:
+                            time.sleep(0.1)
+                            after = json.loads((root / "state.json").read_text())["texts"]
+                            assert (
+                                after[0] != before[0]
+                                and after[0].endswith(" SECOND ORIGIN")
+                                and after[1:] == before[1:]
+                            ), (mode, name, after)
+                        cases += 1
                 for stage in ("completion", "acceptance"):
                     before = focus(0, True)
                     command("reset")
@@ -293,6 +335,19 @@ def session(root):
                 finally:
                     app.send_signal(signal.SIGCONT)
                 print(f"Native wedged AT-SPI refusal: {timeout['deadline_ms']:.1f}ms")
+                focus(0, True, 0, 6)
+                command("reset")
+                app.send_signal(signal.SIGSTOP)
+                try:
+                    cold_timeout = command("selection-range")
+                    assert "selection_first" not in cold_timeout
+                    assert cold_timeout["selection_ms"] < 1100, cold_timeout
+                finally:
+                    app.send_signal(signal.SIGCONT)
+                cases += 1
+                print(
+                    f"Native selected-range helper timeout and settlement: {cold_timeout['selection_ms']:.1f}ms"
+                )
                 print(
                     f"PASS native GTK AI text focus: {cases} cases; correct controls type; changed fields/windows and passwords refuse request/output"
                 )

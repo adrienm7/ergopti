@@ -301,6 +301,13 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "AI selection capture",
+			wait_for_ack = true,
+			stop = function()
+				return not privacy_owners.selection or privacy_owners.selection.stop() == true
+			end,
+		},
+		{
 			name = "privacy context capture",
 			wait_for_ack = true,
 			stop = function()
@@ -1325,6 +1332,11 @@ local function main()
 	-- 8.6) Initialise the LLM prediction engine if available. The context
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
+		privacy_owners.selection = require("adapters.selection_transaction").new({
+			focus_id = secure_focus_guard.focused_text_identity,
+			-- Selection reads and writes share the daemon's exact field identity.
+			privacy_guard = secure_focus_guard.blocks_text,
+		})
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
@@ -1345,22 +1357,25 @@ local function main()
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
 				return type(result) == "table" and result.ok == true
 			end,
-			-- The tone actions read the selection the way wrap_selection does (a
-			-- copy probe that puts the clipboard back), then type the rewrite over
-			-- it and select it again, through the one uinput channel.
-			read_selection = function()
-				if opts.dry_run then return false, "", "dry run" end
-				return require("adapters.clipboard").read_selection(
-					require("modules.gestures.combo_emitter").press, event_loop.sleep_ms)
+			-- Selection output is bound to the exact original native range, even
+			-- when an application moves it without any physical input event.
+			read_selection = function(focus, authorized, callback)
+				if opts.dry_run then callback(false, "", "dry run"); return false end
+				return privacy_owners.selection.read(focus, authorized, callback)
 			end,
-			replace_selection = function(text)
-				if opts.dry_run then return false end
-				local result = injector.inject_selected(text, false)
-				if type(result) ~= "table" or result.ok ~= true then return false end
-				-- The caret moved over replaced text: the buffer no longer describes the line.
-				_undoable = nil
-				engine:reset()
-				return true
+			cancel_selection = function() return privacy_owners.selection.cancel() end,
+			replace_selection = function(text, receipt, authorized, callback)
+				if opts.dry_run then callback(false); return false end
+				return privacy_owners.selection.replace(receipt, text, authorized, function(value)
+					return injector.inject_selected(value, false)
+				end, function(committed)
+					if committed then
+						-- The buffer no longer describes the physically replaced line.
+						_undoable = nil
+						engine:reset()
+					end
+					callback(committed)
+				end)
 			end,
 			-- Retain the exact active text control: programmatic field changes can
 			-- happen inside one native window without any pointer or keyboard event.

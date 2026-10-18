@@ -207,6 +207,24 @@ helpers.describe("AT-SPI focus query", function()
 		helpers.assert_eq(snapshot.attributes.id, "urlbar-input")
 	end)
 
+	for _, foreign in ipairs({ false, true }) do
+		helpers.it("ai-pass2-span reads only the original native field foreign=" .. tostring(foreign), function()
+			local field = { id = "field", focused = true, role = 61, bus = ":1.8", path = "/field/A" }
+			local frame = { id = "frame", active = true, children = { field } }
+			local fake = backend({ id = "desktop", children = { { id = "app", children = { frame } } } })
+			local reads = 0
+			fake.active = function(node) return node.active == true end
+			fake.retain = function(node) return node end
+			fake.clear = function() end
+			fake.identity = function(node) return { attributes = {}, native_bus_name = node.bus, native_object_path = node.path } end
+			fake.selection = function() reads = reads + 1; return { first = 0, last = 6, text = "ORIGIN" } end
+			AtspiFocus._set_backend_for_test(fake)
+			local selected = AtspiFocus._get_native_selection_snapshot({ bus = ":1.8", path = foreign and "/field/B" or "/field/A", role = 61 })
+			helpers.assert_eq(reads, foreign and 0 or 1, "foreign text must not be acquired even inside the child")
+			helpers.assert_eq(selected ~= nil, not foreign)
+		end)
+	end
+
 	helpers.it("(focus-context-join) embedded cross-process fields retain their actual active frame ancestor", function()
 		local tree = { id = "desktop", children = { { id = "app", children = {
 			{ id = "frame", active = true, name = "Owned native frame", bus = ":1.10", path = "/owned/frame",
