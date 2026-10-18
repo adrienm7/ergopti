@@ -96,7 +96,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 					helpers.assert_true(h.show())
 					local first, controller = h.windows[1], h.controllers[1]
 					helpers.assert_not_nil(h.script_refs[controller])
-					if mode == "user" then first:user_close() else helpers.assert_true(h.close()) end
+					if mode == "user" then first:user_close() else helpers.assert_true(h.close()) end; h.drain()
 					helpers.assert_nil(h.script_refs[controller], "window GC alone does not release a script callback")
 					helpers.assert_eq(h.releases, 1, "the exact callback must be released once")
 					helpers.assert_true(h.show())
@@ -105,6 +105,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 					helpers.assert_nil(h.retained[first])
 					helpers.assert_not_nil(h.script_refs[successor], "old native fade completion cannot unref a new bridge")
 					h.windows[2]:user_close()
+					h.drain()
 					helpers.assert_nil(next(h.script_refs))
 				end)
 			end)
@@ -118,6 +119,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 					local receiver = h.script_refs[controller]
 					h.unref_mode = refusal
 					h.windows[1]:user_close()
+					h.drain()
 					helpers.assert_nil(next(h.retained))
 					helpers.assert_true(h.script_refs[controller] == receiver)
 					local timers = #h.timers
@@ -131,6 +133,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 					old_action(module_name, receiver)
 					helpers.assert_not_nil(h.script_refs[h.controllers[2]])
 					h.windows[2]:user_close()
+					h.drain()
 					helpers.assert_nil(next(h.script_refs))
 				end)
 			end)
@@ -156,6 +159,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 					helpers.assert_eq(#h.controllers, 1)
 				end
 				h.windows[1]:user_close()
+				h.drain()
 				helpers.assert_true(entered)
 				helpers.assert_nil(next(h.script_refs))
 			end)
@@ -177,6 +181,7 @@ helpers.describe("script callback cleanup keeps exact native custody", function(
 				h.unref_mode = nil
 				helpers.assert_true(h.show())
 				h.windows[1]:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.script_refs))
 			end)
 		end)
@@ -204,6 +209,7 @@ helpers.describe("close logging preserves exact callback ownership", function()
 				helpers.assert_not_nil(h.script_refs[h.controllers[2]], "old cleanup cannot unref a successor")
 				h.drain()
 				h.windows[2]:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.script_refs))
 			end, debug.traceback)
 			logger.info = original
@@ -232,6 +238,7 @@ helpers.describe("callback custody covers native option evaluation", function()
 				hs.screen.mainScreen = screen
 				helpers.assert_true(h.show())
 				h.windows[1]:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.script_refs))
 			end, debug.traceback)
 			logger.error = original

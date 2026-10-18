@@ -16,7 +16,7 @@ local function with_editor(scenario)
 	rawset(_G, "lfs", nil)
 	local result = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.prompt_editor", "ui.ui_builder", "adapters.timer_scheduler", "adapters.webview_result",
+			"ui.prompt_editor", "ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "adapters.webview_result",
 			"infra.deferred_work", "infra.paths", "infra.logger", "infra.locale", "infra.log_folders",
 			"locale.core", "json", "adapters.json_codec", "diagnostics.redact", "window_titles",
 			"webview.presentation", "infra.launcher_environment", "adapters.log_transport", "app_dirs",
@@ -75,7 +75,7 @@ local function with_editor(scenario)
 				end },
 			})
 			function h.open(id) return editor.open({ id = id or "A" }, function() h.saves = h.saves + 1; return true end) end
-			function h.drain() while #h.deferred > 0 do table.remove(h.deferred, 1)() end end
+			function h.drain() h.drain_native_close() end
 			function h.message(view)
 				view.navigation_callback("didFinishNavigation")
 				local payload = hs.json.decode(view.scripts[#view.scripts]:match("^init%((.*)%)$"))
@@ -106,6 +106,7 @@ helpers.describe("prompt bridge retirement is independent of native window GC", 
 				if route == "factory refusal" then h.policy_refuses = "throw" end
 				helpers.assert_eq(h.open(), route ~= "factory refusal")
 				if route == "user" then h.windows[1]:user_close()
+				h.drain()
 				elseif route == "explicit" then helpers.assert_true(editor.close()); h.drain() end
 				helpers.assert_nil(next(h.retained), "the window reference has actually retired")
 				helpers.assert_nil(next(h.callbacks), "window GC must not stand in for native setCallback(nil)")
@@ -127,6 +128,7 @@ helpers.describe("prompt bridge retirement is independent of native window GC", 
 					local old, message = h.callbacks[h.bridges[1]], h.message(h.windows[1])
 					h.refusal = refusal
 					if route == "user" then h.windows[1]:user_close()
+					h.drain()
 					else helpers.assert_eq(editor.close(), false); h.drain() end
 					helpers.assert_nil(next(h.retained))
 					helpers.assert_eq(editor.scope_idle(), false, "ambiguous native acknowledgement retains cleanup custody")
@@ -141,7 +143,7 @@ helpers.describe("prompt bridge retirement is independent of native window GC", 
 					helpers.assert_true(h.open("B"))
 					helpers.assert_nil(h.callbacks[h.bridges[1]])
 					helpers.assert_not_nil(h.callbacks[h.bridges[2]])
-					helpers.assert_eq(h.windows[1].deletes, route == "explicit" and 1 or 0)
+					helpers.assert_eq(h.windows[1].deletes, 1)
 					helpers.assert_true(editor.close()); h.drain()
 					helpers.assert_nil(next(h.callbacks))
 				end)
@@ -204,6 +206,7 @@ helpers.describe("prompt bridge retirement is independent of native window GC", 
 	helpers.it("detaches the bridge when factory rollback consumes the window before raising", function()
 		with_editor(function(editor, h)
 			h.policy_refuses, h.throw_after_gc = "throw", true
+			h.policy_refuses_after_call = 2
 			helpers.assert_eq(h.open(), false)
 			helpers.assert_nil(next(h.retained))
 			helpers.assert_nil(getmetatable(h.windows[1]))

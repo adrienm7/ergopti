@@ -1020,6 +1020,18 @@ the native sentinel in callback fixtures. The pinned implementation is in
 [libwebview.m](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/webview/libwebview.m),
 `webview_evaluateJavaScript` and `NSError_toLua`.
 
+### project-hs-webview-close-rewraps-native-userdata
+
+In packaged Hammerspoon 1.1.1, `deleteOnClose(true)` can recurse from
+`windowWillClose` into `userdata_gc`: GC clears `udRef` before closing, and
+`HSWebViewWindow_toLua` wraps the same native window again. A guard against GC
+on the same consumed userdata does not prevent `C stack overflow`. Keep native
+automatic GC disabled and use the factory's `ui/webview_close_owner.lua` to
+retire user-closed windows outside their Cocoa notification. Check native
+consumption separately from business close callbacks. These failures can appear
+only in process `stderr` while `hs.console.getConsole()` is empty; qualify both
+native output streams as well as the console and exact process retirement.
+
 ### project-hs-development-runtime-registers-stock-peers
 
 Launching custom Karabiner core/console paths does not isolate their IPC peers:

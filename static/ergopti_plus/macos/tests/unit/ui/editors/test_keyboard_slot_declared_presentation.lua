@@ -17,7 +17,7 @@ local function fixture(callback, cleanup_failures)
 	local previous_base = rawget(_G, "_base_dir")
 	local ok, failure = xpcall(function()
 		helpers.with_stub_scope({
-			"ui.ui_builder", "ui.action_picker", "infra.i18n", "infra.locale", "locale.core",
+			"ui.ui_builder", "ui.webview_close_owner", "ui.action_picker", "infra.i18n", "infra.locale", "locale.core",
 			"infra.logger", "infra.paths", "infra.config_paths", "infra.deferred_work",
 			"adapters.json_codec", "adapters.timer_scheduler", "adapters.storage", "webview.i18n_seed",
 			"window_titles", "webview.presentation", "program_provider_picker",
@@ -39,9 +39,13 @@ local function fixture(callback, cleanup_failures)
 					end },
 					new = function()
 						state.creates = state.creates + 1
-						local view = { captions = {}, scripts = {}, deletes = 0 }
+						local view = setmetatable({ captions = {}, scripts = {}, deletes = 0 }, {})
 						function view:windowTitle(caption) self.captions[#self.captions + 1] = caption; return self end
-						function view:deleteOnClose(value) self.delete_on_close = value; return self end
+						function view:deleteOnClose(value)
+							if value == nil then return self.delete_on_close == true end
+							self.delete_on_close = value
+							return self
+						end
 						for _, name in ipairs({ "windowStyle", "level", "allowTextEntry", "allowGestures",
 							"shadow", "allowNewWindows", "html", "show" }) do view[name] = function() return view end end
 						function view:windowCallback(fn) self.on_window = fn; return self end
@@ -56,6 +60,7 @@ local function fixture(callback, cleanup_failures)
 							self.deletes = self.deletes + 1
 							if self.on_window then self.on_window("closed") end
 							if state.delete_refused then error("controlled native close refusal") end
+							setmetatable(self, nil)
 							return self
 						end
 						state.views[#state.views + 1] = view

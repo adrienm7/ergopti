@@ -30,7 +30,7 @@ local function run_window(module_name, scenario)
 		"adapters.task_environment", "modules.updater.config_backup", "updater.release_sources", "updater.channels",
 		"updater.version", "updater.release_install", "updater.release_assets", "network.failure", "updater.config_backup",
 		"ui.model_browser", "ui.changelog",
-		"ui.ui_builder", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
+		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "infra.deferred_work", "infra.paced_job", "infra.paced_json",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
@@ -62,8 +62,8 @@ local function run_window(module_name, scenario)
 					return controller
 				end } },
 			timer = { absoluteTime = function() return 1000000000 end, secondsSinceEpoch = function() return 1 end,
-				new = function(_, receive)
-					local timer = { active = false, receive = receive }
+				new = function(delay, receive)
+					local timer = { active = false, receive = receive, delay = delay }
 					function timer:start() self.active = true; return self end
 					function timer:stop() self.active = false; return self end
 					function timer:running() return self.active end
@@ -116,7 +116,7 @@ local function run_window(module_name, scenario)
 			return true
 		end
 		function h.drain()
-			while #h.deferred > 0 do table.remove(h.deferred, 1)() end
+			h.drain_native_close()
 		end
 		scenario(window, h)
 	end)

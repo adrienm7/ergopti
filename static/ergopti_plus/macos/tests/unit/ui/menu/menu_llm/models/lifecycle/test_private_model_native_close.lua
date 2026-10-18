@@ -21,7 +21,7 @@ local function with_dialog(kind, scenario)
 		"ui.menu.menu_llm.models_manager_mlx_repo", "ui.menu.menu_llm.backend_labels",
 		"adapters.task_environment", "adapters.shell_runner", "compat.utf8", "diagnostics.runtime_log",
 		"infra.manifest_menu", "logger.shim", "menu.renderer", "text_utils",
-		"ui.ui_builder", "adapters.timer_scheduler", "adapters.task_lifecycle", "infra.deferred_work",
+		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "adapters.task_lifecycle", "infra.deferred_work",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
@@ -72,8 +72,8 @@ local function with_dialog(kind, scenario)
 				return bridge
 			end } },
 			timer = { absoluteTime = function() return 1000000000 end, secondsSinceEpoch = function() return 1 end,
-				new = function(_, receive)
-					local timer = { active = false }
+				new = function(delay, receive)
+					local timer = { active = false, delay = delay }
 					function timer:start() self.active = true; return self end
 					function timer:stop() self.active = false; return self end
 					function timer:running() return self.active end
@@ -142,7 +142,7 @@ local function with_dialog(kind, scenario)
 			function h.cancel() return h.bridges[#h.bridges].callback({ body = { action = "cancel" } }) end
 		end
 		function h.drain()
-			while #h.deferred > 0 do table.remove(h.deferred, 1)() end
+			h.drain_native_close()
 		end
 		scenario(h)
 	end)
@@ -155,8 +155,9 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 				helpers.assert_true(h.show())
 				local first = h.windows[1]
 				first:user_close()
+				h.drain()
 				helpers.assert_nil(h.retained[first], "native udRef outlives a discarded Lua window owner")
-				helpers.assert_eq(first.deletes, 0)
+				helpers.assert_eq(first.deletes, 1)
 				if kind == "hf" then
 					helpers.assert_eq(h.terminals, { false })
 					helpers.assert_eq(h.settled, 1)
@@ -166,6 +167,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 				helpers.assert_true(h.retained[successor])
 				helpers.assert_eq(successor.disposed, false)
 				successor:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.retained))
 				if kind == "hf" then
 					helpers.assert_eq(h.terminals, { false, false })
@@ -212,6 +214,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 		helpers.it("settles HF construction after required native setter " .. refusal, function()
 			with_dialog("hf", function(h)
 				h.policy_refuses = refusal
+				h.policy_refuses_after_call = 2
 				helpers.assert_true(h.admit(), "public admission accepts the timer, not a visible window")
 				helpers.assert_eq(#h.windows, 0)
 				helpers.assert_eq(h.terminals, {})
@@ -233,6 +236,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 				h.drain()
 				helpers.assert_eq(h.flow.webview, successor)
 				successor:user_close()
+				h.drain()
 				helpers.assert_eq(h.terminals, { false, false })
 				helpers.assert_eq(h.settled, 2)
 				helpers.assert_nil(next(h.retained))
@@ -242,6 +246,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 		helpers.it("retains HF construction debt when delete returns " .. refusal .. " without consumption", function()
 			with_dialog("hf", function(h)
 				h.policy_refuses, h.delete_refusal = "false", refusal
+				h.policy_refuses_after_call = 2
 				helpers.assert_true(h.admit())
 				h.deliver_prompt()
 				local rejected = h.windows[1]
@@ -289,6 +294,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 			h.drain()
 			helpers.assert_true(h.retained[successor])
 			successor:user_close()
+			h.drain()
 			helpers.assert_eq(h.terminals, { false, false })
 			helpers.assert_eq(h.settled, 2)
 			helpers.assert_nil(next(h.retained))
@@ -303,12 +309,13 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 					helpers.assert_true(h.show())
 					local bridge = h.bridges[1]
 					helpers.assert_type(h.script_refs[bridge], "function")
-					if close == "native" then h.windows[1]:user_close() else h.cancel(); h.drain() end
+					if close == "native" then h.windows[1]:user_close() else h.cancel(); h.drain() end; h.drain()
 					helpers.assert_nil(next(h.retained))
 					helpers.assert_nil(h.script_refs[bridge], "native window GC never unregisters the script callback")
 					helpers.assert_true(h.show())
 					helpers.assert_type(h.script_refs[h.bridges[2]], "function")
 					h.windows[2]:user_close()
+					h.drain()
 					helpers.assert_nil(next(h.script_refs))
 				end)
 			end)
@@ -322,6 +329,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 					local queued = h.script_refs[bridge]
 					h.release_refusal = refusal
 					first:user_close()
+					h.drain()
 					helpers.assert_nil(h.retained[first])
 					helpers.assert_eq(h.script_refs[bridge], queued)
 					if kind == "hf" then
@@ -336,9 +344,10 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 					h.release_refusal = nil
 					helpers.assert_true(h.show())
 					helpers.assert_nil(h.script_refs[bridge])
-					helpers.assert_eq(first.deletes, 0, "controller retry cannot delete its retired window")
+					helpers.assert_eq(first.deletes, 1, "controller retry cannot repeat the deferred native delete")
 					helpers.assert_true(h.retained[h.windows[2]])
 					h.windows[2]:user_close()
+					h.drain()
 					helpers.assert_nil(next(h.script_refs))
 					helpers.assert_nil(next(h.retained))
 				end)
@@ -356,6 +365,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 					helpers.assert_eq(h.show(), false, "native unref is still on stack")
 				end
 				h.windows[1]:user_close()
+				h.drain()
 				helpers.assert_eq(attempts, 1)
 				helpers.assert_nil(next(h.script_refs))
 				helpers.assert_eq(h.saved, 0)
@@ -366,6 +376,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 				old({ body = kind == "hf" and "cancel" or { action = "cancel" } })
 				helpers.assert_true(h.retained[h.windows[2]])
 				h.windows[2]:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.script_refs))
 			end)
 		end)
@@ -391,6 +402,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 				local successor = h.windows[#h.windows]
 				helpers.assert_true(h.retained[successor])
 				successor:user_close()
+				h.drain()
 				helpers.assert_nil(next(h.retained))
 				helpers.assert_nil(next(h.script_refs))
 			end)
@@ -427,6 +439,7 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 			h.deliver_prompt()
 			helpers.assert_true(h.retained[h.windows[2]])
 			h.windows[2]:user_close()
+			h.drain()
 			helpers.assert_nil(next(h.script_refs))
 		end)
 	end)

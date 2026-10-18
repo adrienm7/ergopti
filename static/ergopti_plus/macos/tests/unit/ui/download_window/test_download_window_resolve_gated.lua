@@ -39,21 +39,26 @@ local function make_webview_overrides()
 	local overrides = {
 		webview = {
 			new = function()
-				local webview = {}
+				local webview = setmetatable({}, {})
 				for _, method in ipairs({
 					"windowTitle", "windowStyle", "level", "allowTextEntry",
 					"allowGestures", "allowNewWindows", "windowCallback", "shadow",
-					"navigationCallback", "html", "show", "deleteOnClose",
+					"navigationCallback", "html", "show",
 				}) do webview[method] = function(self) return self end end
+				function webview:deleteOnClose(value)
+					if value == nil then return self.delete_on_close == true end
+					self.delete_on_close = value
+					return self
+				end
 				webview.frame = function() return { x = 0, y = 0, w = 460, h = 380 } end
 				webview.evaluateJavaScript = function() end
-				webview.delete = function() end
+				webview.delete = function(self) setmetatable(self, nil) end
 				webview.hswindow = function() return nil end
 				return webview
 			end,
 			usercontent = {
 				new = function(_name)
-					return { setCallback = function(_self, fn) captured_cb = fn end }
+					return { setCallback = function(self, fn) captured_cb = fn; return self end }
 				end,
 			},
 		},
