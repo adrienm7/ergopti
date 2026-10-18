@@ -230,6 +230,17 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
+					"name": "Qualify actual input-source AppleScript XCTest controls",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"timeout-minutes": 10,
+					"shell": "bash"
+				},
+				{
+					"name": "Retain input-source AppleScript XCTest diagnostics",
+					"uses": "actions/upload-artifact@v4",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+				},
+				{
 					"name": "Qualify actual native PAC source ownership XCTest controls",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
 					"timeout-minutes": 10,

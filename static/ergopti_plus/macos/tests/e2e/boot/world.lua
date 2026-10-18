@@ -576,6 +576,10 @@ local function machine_answer(path, args, helper)
 		return { code = 0, stdout = "" }
 	end
 	if path == "/usr/bin/shortcuts" then return { code = 0, stdout = "" } end
+	if path == "/usr/bin/top" and #args == 4
+		and args[1] == "-l" and args[2] == "1" and args[3] == "-n" and args[4] == "0" then
+		return { code = 0, stdout = "CPU usage: 1.0% user, 1.0% sys, 98.0% idle\nPhysMem: 8G used (1G wired)\n" }
+	end
 	if path == "/bin/sh" or path == "/bin/zsh" or path == "/bin/bash" then return { code = 0, stdout = "" } end
 	return { code = 127, stderr = tostring(path) .. ": this command is not modelled by the E2E Mac" }
 end
@@ -985,6 +989,38 @@ function M.pointer_event(hs, type_name)
 			local ok, err = xpcall(tap.fn, debug.traceback, event)
 			if not ok then record("TAP_RAISED", err) end
 			delivered = delivered + 1
+		end
+	end
+	return delivered
+end
+
+--- Delivers one physical keyboard phase to the started native event taps.
+--- Character data comes from the window server, with no owned synthetic tag.
+--- @param hs table Native API double.
+--- @param keycode integer macOS virtual keycode.
+--- @param characters string Composed characters of the physical key.
+--- @param down boolean True for keyDown, false for keyUp.
+--- @return integer delivered Taps that received the event before consumption.
+function M.keyboard_event(hs, keycode, characters, down)
+	local event_type = down and hs.eventtap.event.types.keyDown or hs.eventtap.event.types.keyUp
+	local event = {
+		getType = function() return event_type end,
+		getKeyCode = function() return keycode end,
+		getCharacters = function() return characters end,
+		getFlags = function() return {} end,
+		getProperty = function() return 0 end,
+	}
+	local delivered = 0
+	for _, tap in ipairs(hs.eventtap.__taps) do
+		local watched = false
+		for _, watched_type in ipairs(tap.enabled and tap.types or {}) do
+			if watched_type == event_type then watched = true end
+		end
+		if watched then
+			local ok, consumed = xpcall(tap.fn, debug.traceback, event)
+			if not ok then record("TAP_RAISED", consumed) end
+			delivered = delivered + 1
+			if ok and consumed == true then break end
 		end
 	end
 	return delivered

@@ -171,6 +171,18 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
+		'Qualify actual input-source AppleScript XCTest controls',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
+		'Retain input-source AppleScript XCTest diagnostics',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
 		'Retain selected-release native ownership receiving',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (always()) }}"
 	],

@@ -107,7 +107,7 @@ function admitNativeSdkSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 32) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -202,7 +202,7 @@ function admitNativePacSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 32) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -241,7 +241,7 @@ function admitNativeSourceSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 32) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -426,9 +426,10 @@ function admitPermissionObservationSelector(mac) {
 	const retention = job.indexOf('      - name: Retain scoped item 36 native diagnostics\n');
 	if (archive < 0 || archive >= observation || retention <= observation) return null;
 	const position = jobs[0].index + observation + PERMISSION_STEP_SOURCE.indexOf(PERMISSION_FILTER);
-	return admitNativeNumberRowSelector(
+	const numberRowAdmitted = admitNativeNumberRowSelector(
 		mac.slice(0, position) + mac.slice(position + PERMISSION_FILTER.length)
 	);
+	return numberRowAdmitted === null ? null : admitNativeInputSourceSelector(numberRowAdmitted);
 }
 
 // Only this complete read-only cohort may add the NumberRow selector.
@@ -449,7 +450,7 @@ function admitNativeNumberRowSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 32) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
 	} catch {
 		return null;
 	}
@@ -478,6 +479,36 @@ function admitNativeNumberRowSelector(mac) {
 		return null;
 	const position = jobs[0].index + selected + NUMBER_ROW_STEP_SOURCE.indexOf(NUMBER_ROW_FILTER);
 	return mac.slice(0, position) + mac.slice(position + NUMBER_ROW_FILTER.length);
+}
+
+// This independent selector qualifies the actual Lua script, retaining the
+// blanket refusal for every full-package or foreign exclusion.
+const INPUT_SOURCE_FILTER = "--filter '(^|[.])InputSourceAppleScriptTests([/.]|$)'";
+const INPUT_SOURCE_STEP_SOURCE = guardedStep(
+	'managed-ollama-native',
+	fs.readFileSync(path.join(__dirname, 'fixtures/input-source-applescript-step.txt'), 'utf8')
+);
+function admitNativeInputSourceSelector(mac) {
+	if (mac.split(INPUT_SOURCE_FILTER).length !== 2) return null;
+	const jobs = [...mac.matchAll(/^  e2e-hs:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
+	if (jobs.length !== 1) return null;
+	const steps = [
+		...jobs[0][0].matchAll(
+			/^      - name: Qualify actual input-source AppleScript XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+		)
+	];
+	if (steps.length !== 1) return null;
+	const step = steps[0][0];
+	if (step !== INPUT_SOURCE_STEP_SOURCE) return null;
+	const carbon = jobs[0][0].indexOf(
+		'      - name: Retain selected number-row Carbon XCTest diagnostics\n'
+	);
+	const pac = jobs[0][0].indexOf(
+		'      - name: Qualify actual native PAC source ownership XCTest controls\n'
+	);
+	if (carbon < 0 || steps[0].index <= carbon || pac <= steps[0].index) return null;
+	const position = jobs[0].index + steps[0].index + step.indexOf(INPUT_SOURCE_FILTER);
+	return mac.slice(0, position) + mac.slice(position + INPUT_SOURCE_FILTER.length);
 }
 
 function sourceProblems(pkg, mac, rootCaller) {
@@ -1203,6 +1234,64 @@ function run({ includeLeafControls = true } = {}) {
 		});
 
 	assert.equal(passed, 76);
+	// Independent script selection keeps every historical control above unchanged.
+	assert.equal(admitNativeInputSourceSelector(workflow), workflow.replace(INPUT_SOURCE_FILTER, ''));
+	const inputSourceStep =
+		/^      - name: Qualify actual input-source AppleScript XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/m.exec(
+			workflow
+		)?.[0];
+	assert.ok(inputSourceStep);
+	let inputSourceSelectorControls = 0;
+	for (const [from, to] of [
+		[INPUT_SOURCE_FILTER, "--filter 'InputSourceAppleScriptTests'"],
+		[INPUT_SOURCE_FILTER, INPUT_SOURCE_FILTER + ' ' + INPUT_SOURCE_FILTER],
+		['receipt.expected_count !== 2', 'receipt.expected_count !== 1'],
+		['receipt.received_count !== 2', 'receipt.received_count !== 1'],
+		['${input_source_statuses[0]}', '0'],
+		['${input_source_statuses[1]}', '0'],
+		['InputSourceAppleScriptTests.swift', 'ForeignTests.swift'],
+		['modules/keymap/input_sources.lua', 'modules/keymap/foreign.lua'],
+		['test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', ': "$GITHUB_SHA"'],
+		['test "$architecture" = "$MACOS_STAGE_ARCHITECTURE"', ': "$MACOS_STAGE_ARCHITECTURE"'],
+		['keyboard_geometry_xctest_receipt.py', 'missing_receipt.py'],
+		['        shell: bash', '        continue-on-error: true\n        shell: bash']
+	]) {
+		assert.ok(inputSourceStep.includes(from));
+		const changed = workflow.replace(inputSourceStep, inputSourceStep.replace(from, to));
+		assert.equal(admitNativeInputSourceSelector(changed), null);
+		assert.equal(admitNativeSdkSelector(changed), null);
+		inputSourceSelectorControls++;
+	}
+	assert.equal(inputSourceSelectorControls, 12);
+	console.log('PASS: input-source AppleScript exact-selector controls=12; native execution UNRUN.');
+	const inputSourceComparisons =
+		'          cmp "$source" "$evidence/InputSourceAppleScriptTests.swift"\n' +
+		'          cmp "$producer" "$evidence/input_sources.lua"\n';
+	assert.equal(inputSourceStep.split(inputSourceComparisons).length, 2);
+	for (const [name, step] of [
+		[
+			'early success',
+			inputSourceStep.replace('          set +e\n', '          exit 0\n          set +e\n')
+		],
+		[
+			'nonexecuting validator',
+			inputSourceStep.replace('node - "$evidence/input-source-verdict.json"', 'cat')
+		],
+		[
+			'comparisons before native execution',
+			inputSourceStep
+				.replace(inputSourceComparisons, '')
+				.replace('          set +e\n', inputSourceComparisons + '          set +e\n')
+		]
+	]) {
+		assert.notEqual(step, inputSourceStep, name);
+		const changed = workflow.replace(inputSourceStep, () => step);
+		assert.equal(admitNativeInputSourceSelector(changed), null, name);
+		assert.equal(admitNativeSdkSelector(changed), null, name);
+	}
+	console.log(
+		'PASS: input-source AppleScript execution-bypass controls=3; native execution UNRUN.'
+	);
 	let publicationControls = 0;
 	for (const lane of ['core', 'macos', 'windows', 'linux']) {
 		const entry = `      - ${lane}\n`;

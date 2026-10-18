@@ -8,6 +8,11 @@
 --- only runloop indefinitely. These tests exercise the real subprocess and timer
 --- adapters over faithful native doubles, proving that every mutation starts
 --- only after a deadline commits and retains its exact owner through timeout.
+--- Carbon mutation refusal is an OSStatus, independent of child process exit.
+--- Preserve that status across selection and migration before publishing success
+--- (tis-osstatus); native worker tests verify the individual Carbon mutations.
+--- Discover every replacement before disabling a working legacy source: a
+--- predictable missing target must not partially mutate the enabled list.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -15,6 +20,7 @@ local helpers = require("tests.helpers")
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME = "Ergopti_v2_2_2_plus"
 local KEYLAYOUT_PATH = "/tmp/Ergopti.bundle/Contents/Resources/Ergopti_v2_2_2_plus.keylayout"
+local NATIVE_HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 
 
 --- Clears every stateful module owned by this test fixture.
@@ -23,6 +29,8 @@ local function reset_fixture_modules()
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["adapters.input_source_selector"] = nil
+	package.loaded["platform.remap.lease_helper"] = nil
 end
 
 
@@ -32,6 +40,16 @@ end
 local function load_fixture(options)
 	options = options or {}
 	reset_fixture_modules()
+	package.loaded["platform.remap.lease_helper"] = {
+		resolve = function()
+			if options.helper_unavailable == true then return nil, "helper_unavailable" end
+			return NATIVE_HELPER, nil, {
+				ERGOPTI_LAUNCHER_EXECUTABLE = NATIVE_HELPER,
+				ERGOPTI_LAUNCHER_DEVICE = "1",
+				ERGOPTI_LAUNCHER_INODE = "2",
+			}
+		end,
+	}
 
 	local fixture = {
 		order = {},
@@ -48,7 +66,10 @@ local function load_fixture(options)
 			on_done = on_done,
 			running = false,
 			terminate_calls = 0,
+			env = {},
 		}
+		function task:environment() return self.env end
+		function task:setEnvironment(environment) self.env = environment; return self end
 		function task:start()
 			fixture.order[#fixture.order + 1] = "start"
 			if options.task_start_mutates == true then self.running = true end
@@ -61,7 +82,7 @@ local function load_fixture(options)
 			self.terminate_calls = self.terminate_calls + 1
 			if options.task_terminate_result == false then return false end
 			if options.task_terminate_completes == true then
-				self:complete(0, "OK\n", "")
+				self:complete(0, "0\n", "")
 			end
 			return self
 		end
@@ -114,7 +135,160 @@ local function load_fixture(options)
 end
 
 
+--- Keeps native-status probes independent of earlier fixtures in this module.
+--- @param name string Regression description.
+--- @param body function Fixture construction and assertions.
+local function status_test(name, body)
+	helpers.it(name, function()
+		helpers.with_stub_scope({
+			"modules.keymap.input_sources", "modules.keymap.layout_install",
+			"adapters.shell_runner", "adapters.timer_scheduler", "adapters.task_lifecycle",
+			"adapters.python_interpreter", "infra.openstep_plist",
+			"adapters.input_source_selector", "platform.remap.lease_helper",
+		}, body)
+	end)
+end
+
+
 helpers.describe("input-source mutations: deadline owns the subprocess", function()
+	status_test("(tis-osstatus) publishes selection only for the native success status", function()
+		local cases = {
+			{ stdout = "0\n", exit_code = 0, ok = true },
+			{ stdout = "-50\n", exit_code = 0, ok = false },
+			{ stdout = "1\n", exit_code = 0, ok = false },
+			{ stdout = "OK\n", exit_code = 0, ok = false },
+			{ stdout = "MISS\n", exit_code = 0, ok = false },
+			{ stdout = "0\n", exit_code = 1, ok = false },
+		}
+		for _, case in ipairs(cases) do
+			local f = load_fixture()
+			local terminals = {}
+			helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME,
+				function(ok, out, reason)
+					terminals[#terminals + 1] = { ok = ok, out = out, reason = reason }
+				end), true)
+			f.tasks[1]:complete(case.exit_code, case.stdout, "")
+			helpers.assert_eq(#terminals, 1, "each native result must settle exactly once")
+			helpers.assert_eq(terminals[1].ok, case.ok,
+				"selection must honor the native OSStatus: " .. case.stdout)
+			helpers.assert_eq(terminals[1].out, case.stdout:gsub("[\r\n]+$", ""))
+			reset_fixture_modules()
+		end
+	end)
+
+	status_test("(tis-native-selector) invokes the bundle helper with the exact source argv and identity", function()
+		local f = load_fixture()
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function() end), true)
+		helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+		helpers.assert_eq(#f.tasks[1].args, 2)
+		helpers.assert_eq(f.tasks[1].args[1], "--select-input-source")
+		helpers.assert_eq(f.tasks[1].args[2], KL_NAME)
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_EXECUTABLE, NATIVE_HELPER)
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_DEVICE, "1")
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_INODE, "2")
+		f.tasks[1]:complete(0, "0\n", "")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-selector) refuses an unavailable exact helper without spawning", function()
+		local f = load_fixture({ helper_unavailable = true })
+		local terminal
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(ok, _, reason)
+			terminal = { ok = ok, reason = reason }
+		end), false)
+		helpers.assert_eq(#f.tasks, 0)
+		helpers.assert_eq(#f.timers, 0)
+		helpers.assert_eq(terminal.ok, false)
+		helpers.assert_eq(terminal.reason, "helper_unavailable")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-osstatus) refuses every native migration status without counting success", function()
+		for _, operation in ipairs({ "TISDisableInputSource", "TISEnableInputSource", "TISSelectInputSource" }) do
+			local f = load_fixture()
+			local terminal
+			helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" }, function(ok)
+				terminal = ok
+			end), true)
+			helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+			f.tasks[1]:complete(0, operation .. ":-50\n", "")
+			helpers.assert_eq(terminal, false, operation .. " refusal must not become upgrade success")
+			reset_fixture_modules()
+		end
+	end)
+
+	status_test("(tis-partial-upgrade) requires every requested replacement before reporting success", function()
+		local cases = {
+			{ requested = 2, stdout = "1/1\n", ok = false },
+			{ requested = 2, stdout = "1/2\n", ok = true },
+			{ requested = 1, stdout = "1/2\n", ok = false },
+			{ requested = 2, stdout = "2/2\n", ok = true },
+			{ requested = 2, stdout = "0/0\n", ok = false },
+			{ requested = 2, stdout = "1, /, 2\n", ok = false },
+		}
+		for _, case in ipairs(cases) do
+			local f = load_fixture()
+			local entries = { "com.apple.keylayout.ergopti.plus" }
+			if case.requested == 2 then entries[2] = "com.apple.keylayout.ergopti.ansi" end
+			local terminal = nil
+			helpers.assert_eq(f.IS.upgrade_active_list_async(entries, function(ok)
+				terminal = ok
+			end), true)
+			f.tasks[1]:complete(0, case.stdout, "")
+			helpers.assert_eq(terminal, case.ok,
+				"the native enabled count must equal the requested replacement count")
+			reset_fixture_modules()
+		end
+	end)
+
+	status_test("(tis-target-preflight) transfers every replacement in one immutable native transaction", function()
+		local f = load_fixture()
+		local entries = { "com.apple.keylayout.ergopti.plus", "com.apple.keylayout.ergopti.ansi" }
+		helpers.assert_eq(f.IS.upgrade_active_list_async(entries, function() end), true)
+		entries[1], entries[2] = "changed", nil
+		local args = f.tasks[1].args
+		helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+		helpers.assert_eq(#f.tasks, 1, "all replacements belong to one native preflight")
+		helpers.assert_eq(#args, 5)
+		helpers.assert_eq(args[1], "--upgrade-input-sources")
+		helpers.assert_eq(args[2], "com.apple.keylayout.ergopti.plus")
+		helpers.assert_eq(args[3], "com.apple.keyboardlayout.ergopti.plus")
+		helpers.assert_eq(args[4], "com.apple.keylayout.ergopti.ansi")
+		helpers.assert_eq(args[5], "com.apple.keyboardlayout.ergopti.ansi")
+		f.tasks[1]:complete(0, "2/2\n", "")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-upgrade) refuses an unavailable helper before any native transaction", function()
+		local f = load_fixture({ helper_unavailable = true })
+		local terminal
+		helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" },
+			function(ok, _, reason) terminal = { ok = ok, reason = reason } end), false)
+		helpers.assert_eq(#f.tasks, 0)
+		helpers.assert_eq(#f.timers, 0)
+		helpers.assert_eq(terminal.ok, false)
+		helpers.assert_eq(terminal.reason, "helper_unavailable")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-upgrade) rejects incomplete request tables before any child starts", function()
+		for _, entries in ipairs({
+			{ [1] = "com.apple.keylayout.ergopti.plus", [3] = "com.apple.keylayout.ergopti.ansi" },
+			{ "com.apple.keylayout.ergopti.plus", foreign = "com.apple.keylayout.ergopti.ansi" },
+			{ "com.apple.keylayout.ergopti.plus", true },
+		}) do
+			local f = load_fixture()
+			local terminal
+			helpers.assert_eq(f.IS.upgrade_active_list_async(entries,
+				function(ok, _, reason) terminal = { ok = ok, reason = reason } end), false)
+			helpers.assert_eq(#f.tasks, 0)
+			helpers.assert_eq(#f.timers, 0)
+			helpers.assert_eq(terminal.ok, false)
+			helpers.assert_eq(terminal.reason, "invalid_entries")
+			reset_fixture_modules()
+		end
+	end)
+
 	helpers.it("times out a hung selection without blocking or accepting a sibling", function()
 		local f = load_fixture()
 		local terminals = {}
@@ -156,7 +330,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(set_layout_calls, 0,
 			"the busy owner must reject before an in-process setLayout attempt")
 
-		f.tasks[1]:complete(0, "OK\n", "")
+		f.tasks[1]:complete(0, "0\n", "")
 		helpers.assert_eq(#terminals, 1,
 			"a late successful completion must not replace the timeout terminal")
 
@@ -218,12 +392,12 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		local cases = {
 			{
 				label = "selection",
-				executable = "/usr/bin/osascript",
+				executable = NATIVE_HELPER,
 				invoke = function(IS, done)
 					return IS.set_input_source_async(LOCALISED_NAME, KL_NAME, done)
 				end,
 				assert_args = function(args)
-					helpers.assert_eq(args[1], "-e")
+					helpers.assert_eq(args[1], "--select-input-source")
 				end,
 			},
 			{
@@ -254,12 +428,12 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "upgrade",
-				executable = "/usr/bin/osascript",
+				executable = NATIVE_HELPER,
 				invoke = function(IS, done)
 					return IS.upgrade_active_list_async({ "Ergopti_v2_2_1_plus" }, done)
 				end,
 				assert_args = function(args)
-					helpers.assert_eq(args[1], "-e")
+					helpers.assert_eq(args[1], "--upgrade-input-sources")
 				end,
 			},
 		}
@@ -291,7 +465,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		local cases = {
 			{
 				label = "selection",
-				stdout = "OK\n",
+				stdout = "0\n",
 				invoke = function(IS, done)
 					return IS.set_input_source_async(LOCALISED_NAME, KL_NAME, done)
 				end,
@@ -312,7 +486,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "upgrade",
-				stdout = "1/2\n",
+				stdout = "1/1\n",
 				invoke = function(IS, done)
 					return IS.upgrade_active_list_async({ "Ergopti_v2_2_1_plus" }, done)
 				end,
@@ -378,7 +552,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 				terminals[#terminals + 1] = { ok = ok, reason = reason }
 			end), true)
 
-		f.tasks[1]:complete(0, "OK\n", "")
+		f.tasks[1]:complete(0, "0\n", "")
 		helpers.assert_eq(#terminals, 0,
 			"a success must wait while the exact deadline timer refuses cleanup")
 		f.timers[1]:fire()

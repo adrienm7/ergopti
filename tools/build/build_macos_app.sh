@@ -212,11 +212,15 @@ build_launcher() {
 	fi
 	log "Building Swift launcher (release, ${LAUNCHER_ARCHS[*]})"
 	(
-		cd "$LAUNCHER_DIR"
-		swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --product ErgoptiPlus >&2
-	)
+		cd "$LAUNCHER_DIR" &&
+			swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --product ErgoptiPlus >&2
+	) || fail "Swift launcher compilation failed."
+	# Callers capture this function's stdout in a command substitution, where
+	# Bash disables errexit. Explicit refusals prevent shipping a stale product.
 	local built_bin
-	built_bin="$(swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --show-bin-path --package-path "$LAUNCHER_DIR")/ErgoptiPlus"
+	built_bin="$(swift build -c release "${LAUNCHER_ARCH_FLAGS[@]}" --show-bin-path --package-path "$LAUNCHER_DIR")" \
+		|| fail "Swift launcher binary path query failed."
+	built_bin="$built_bin/ErgoptiPlus"
 	[ -f "$built_bin" ] || fail "Swift build did not produce ErgoptiPlus binary."
 	local built_archs
 	built_archs=" $(lipo -archs "$built_bin") " || fail "lipo could not read launcher architectures."
@@ -286,14 +290,27 @@ assemble_native_runtime() {
 	if [ "${ERGOPTI_AUTOMATION_QUERY_CI_PUBLISH:-0}" = "1" ]; then
 		launcher_build_root="$BUILD_DIR/automation-query-ci/package/.build"
 	fi
-	local sparkle_fw
-	sparkle_fw="$(find "$launcher_build_root/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | grep -i "macos" | head -1)"
-	if [ -z "$sparkle_fw" ]; then
-		sparkle_fw="$(find "$launcher_build_root/artifacts" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
-	fi
-	if [ -z "$sparkle_fw" ]; then
-		sparkle_fw="$(find "$launcher_build_root" -name "Sparkle.framework" -type d 2>/dev/null | head -1)"
-	fi
+	# Inspect the existing build root once: an absent preferred artifact is
+	# normal, whereas a failed traversal must remain a build error. Pipelines
+	# ending in grep/head abort under pipefail before alternatives can run.
+	local sparkle_candidates
+	sparkle_candidates="$(find "$launcher_build_root" -name "Sparkle.framework" -type d)" \
+		|| fail "Cannot inspect Sparkle.framework candidates under $launcher_build_root."
+	local sparkle_fw="" sparkle_artifact="" candidate relative
+	while IFS= read -r candidate; do
+		[ -n "$candidate" ] || continue
+		[ -n "$sparkle_fw" ] || sparkle_fw="$candidate"
+		case "$candidate" in
+			"$launcher_build_root"/artifacts/*)
+				[ -n "$sparkle_artifact" ] || sparkle_artifact="$candidate"
+				relative="${candidate#"$launcher_build_root"/artifacts/}"
+				case "$relative" in
+					*[Mm][Aa][Cc][Oo][Ss]*) sparkle_artifact="$candidate"; break ;;
+				esac
+				;;
+		esac
+	done <<< "$sparkle_candidates"
+	if [ -n "$sparkle_artifact" ]; then sparkle_fw="$sparkle_artifact"; fi
 	[ -n "$sparkle_fw" ] || fail "Sparkle.framework not found under $LAUNCHER_DIR/.build — run 'swift build' in $LAUNCHER_DIR first."
 	log "Bundling Sparkle.framework (source: $sparkle_fw)"
 	cp -R "$sparkle_fw" "$APP_PATH/Contents/Frameworks/Sparkle.framework"

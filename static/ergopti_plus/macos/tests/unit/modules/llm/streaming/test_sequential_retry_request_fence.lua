@@ -4,9 +4,9 @@
 --- MODULE: Sequential LLM Retry Request Fence Regression
 --- DESCRIPTION:
 --- Proves that every backend revalidates the request identity immediately before
---- dispatching a failed variant's retry. A superseded chain must not consume local
---- GPU time or a paid remote request merely because its first transport callback
---- arrived after the engine advanced to a newer request.
+--- dispatching a failed variant's retry or publishing its completed predictions.
+--- A superseded chain must neither consume another inference nor publish a late
+--- result after the engine advanced to a newer request.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -27,7 +27,10 @@ local api_common = {
 	DEFAULT_TEMPERATURE = 0.5,
 	new_dedup_stats = function() return {} end,
 	get_diversity_temperature = function(base) return base end,
-	insert_prediction = function() return true end,
+	insert_prediction = function(results, prediction)
+		results[#results + 1] = prediction
+		return true
+	end,
 	log_prediction_summary = function() end,
 	protected_call = function(callback, _label, ...)
 		if type(callback) == "function" then return callback(...) end
@@ -49,6 +52,7 @@ local CASES = {
 		configure = function(module, post)
 			local fetch = module.fetch_sequential
 			helpers.assert_true(set_upvalue(fetch, "post_and_parse", post))
+			helpers.assert_true(set_upvalue(fetch, "post_and_parse_streaming", post))
 			helpers.assert_true(set_upvalue(fetch, "RETRY_FAILED_PREDICTION_ENABLED", true))
 			helpers.assert_true(set_upvalue(fetch, "RETRY_FAILED_PREDICTION_MAX_MULTIPLIER", 2))
 			helpers.assert_true(set_upvalue(fetch, "_RETRY_EXTRA_TOKENS", 5))
@@ -85,10 +89,14 @@ local CASES = {
 	},
 }
 
-helpers.describe("sequential retry dispatch revalidates request ownership", function()
+helpers.describe("sequential callbacks revalidate request ownership", function()
 	for _, case in ipairs(CASES) do
 		helpers.it(case.name .. " drops a retry after the request is superseded", function()
-			helpers.with_fresh_modules({ case.module_name }, function()
+			helpers.with_stub_scope({
+				case.module_name, "modules.llm.api_common", "modules.llm.profiles",
+				"modules.llm.progressive_reveal", "adapters.http_client",
+				"adapters.timer_scheduler", "adapters.shell_runner",
+			}, function()
 				local module = helpers.load_with_stubs(case.module_name)
 				local fetch = module.fetch_sequential
 				helpers.assert_true(set_upvalue(fetch, "ApiCommon", api_common))
@@ -137,5 +145,49 @@ helpers.describe("sequential retry dispatch revalidates request ownership", func
 					"a still-current request must retain its bounded retry")
 			end)
 		end)
+
+		for _, streaming in ipairs({ false, true }) do
+			helpers.it(case.name .. " drops a completed variant after supersession with streaming=" .. tostring(streaming)
+				.. " (sequential-result-fence)", function()
+				helpers.with_stub_scope({
+					case.module_name, "modules.llm.api_common", "modules.llm.profiles",
+					"modules.llm.progressive_reveal", "adapters.http_client",
+					"adapters.timer_scheduler", "adapters.shell_runner",
+				}, function()
+					local module = helpers.load_with_stubs(case.module_name)
+					local fetch = module.fetch_sequential
+					helpers.assert_true(set_upvalue(fetch, "ApiCommon", api_common))
+					helpers.assert_true(set_upvalue(fetch, "Profiles", profiles))
+					helpers.assert_true(set_upvalue(fetch, "TimerScheduler", scheduler))
+
+					local dispatches, publications = 0, 0
+					local success_callbacks = {}
+					case.configure(module, function(...)
+						local args = { ... }
+						dispatches = dispatches + 1
+						success_callbacks[#success_callbacks + 1] = args[9]
+					end)
+					local request_id = 41
+					local function request_id_provider() return request_id end
+					local function on_success() publications = publications + 1 end
+					module.fetch_sequential("full", "tail", "fixture-model", 0.5, 8, 1, {},
+						on_success, function() end, request_id_provider, streaming, nil)
+					helpers.assert_eq(dispatches, 1)
+					helpers.assert_type(success_callbacks[1], "function")
+
+					request_id = 42
+					success_callbacks[1]({ { text = "abandoned prediction" } })
+					helpers.assert_eq(publications, 0,
+						"a completed stale variant must not publish before the next-dispatch fence")
+					helpers.assert_eq(dispatches, 1, "a stale result must not continue its chain")
+
+					module.fetch_sequential("full", "tail", "fixture-model", 0.5, 8, 1, {},
+						on_success, function() end, request_id_provider, streaming, nil)
+					success_callbacks[2]({ { text = "current prediction" } })
+					helpers.assert_eq(publications, 2, "a current variant publishes progress and its final result")
+					helpers.assert_eq(dispatches, 2, "a successful current variant needs no retry")
+				end)
+			end)
+		end
 	end
 end)

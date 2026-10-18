@@ -1,0 +1,42 @@
+      - name: Qualify actual input-source AppleScript XCTest controls
+        if: ${{ !cancelled() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/input-source-applescript-evidence"
+          mkdir "$evidence"
+          transcript="$evidence/input-source-xctest.log"
+          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/InputSourceAppleScriptTests.swift"
+          producer="static/ergopti_plus/macos/modules/keymap/input_sources.lua"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git show "$GITHUB_SHA:$source" | cmp - "$source"
+          git show "$GITHUB_SHA:$producer" | cmp - "$producer"
+          case "$(uname -m)" in
+            arm64) architecture=arm64 ;;
+            x86_64) architecture=amd64 ;;
+            *) exit 1 ;;
+          esac
+          test "$architecture" = "$MACOS_STAGE_ARCHITECTURE"
+          cp "$source" "$evidence/InputSourceAppleScriptTests.swift"
+          cp "$producer" "$evidence/input_sources.lua"
+          printf '%s\n' "$GITHUB_SHA" > "$evidence/tested-sha.txt"
+          printf '%s\n' "$architecture" > "$evidence/architecture.txt"
+          set +e
+          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
+            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \
+            --filter '(^|[.])InputSourceAppleScriptTests([/.]|$)' 2>&1 | tee "$transcript"
+          input_source_statuses=("${PIPESTATUS[@]}")
+          set -e
+          test "${#input_source_statuses[@]}" -eq 2
+          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \
+            --class InputSourceAppleScriptTests --source "$evidence/InputSourceAppleScriptTests.swift" \
+            --log "$transcript" --receipt "$evidence/input-source-verdict.json" \
+            --test-exit "${input_source_statuses[0]}" --capture-exit "${input_source_statuses[1]}"
+          node - "$evidence/input-source-verdict.json" <<'NODE'
+          const fs = require('node:fs');
+          const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (!receipt.passed || receipt.scope !== 'InputSourceAppleScriptTests' || receipt.expected_count !== 2 || receipt.received_count !== 2 || receipt.failures.length !== 0 || receipt.test_exit !== 0 || receipt.capture_exit !== 0) throw new Error('exact two-case native input-source AppleScript receiving refused');
+          NODE
+          cmp "$source" "$evidence/InputSourceAppleScriptTests.swift"
+          cmp "$producer" "$evidence/input_sources.lua"
+        timeout-minutes: 10

@@ -1349,7 +1349,9 @@ local function ensure_app_switch_watcher()
 		local bundle_id = app:bundleID()
 		local app_name = app:name()
 		if type(app_name) ~= "string" or app_name == "" then return end
-		if app_name == _current_app_name then return end
+		-- A display name can belong to several installed applications or clones.
+		-- Ignore duplicate activation only while both recorded identities match.
+		if app_name == _current_app_name and bundle_id == _current_bundle_id then return end
 
 		_previous_bundle_id = _current_bundle_id
 		_previous_app_name = _current_app_name
