@@ -293,6 +293,36 @@ function M._last_complete_batch_offset(chunk)
 	return last_commit
 end
 
+--- Read a ledger suffix only after the committed offset and file close agree.
+--- A refused seek leaves the cursor unchanged, so reading anyway would replay
+--- the prefix and advance the watermark beyond the actual imported suffix.
+--- @param path string Foreign ledger path.
+--- @param watermark integer Committed byte offset.
+--- @return string|nil chunk Validated unread bytes, or nil on a native refusal.
+local function _read_foreign_sql_tail(path, watermark)
+	local opened, handle = pcall(io.open, path, "r")
+	if not opened or handle == nil then
+		Logger.warn(LOG, "Foreign sync: ledger open failed; watermark preserved.")
+		return nil
+	end
+	local stage = "seek"
+	local read_ok, chunk = pcall(function()
+		if handle:seek("set", watermark) ~= watermark then return nil end
+		stage = "read"
+		return handle:read("*a")
+	end)
+	local close_ok, closed = pcall(handle.close, handle)
+	if not read_ok or type(chunk) ~= "string" then
+		Logger.warn(LOG, "Foreign sync: ledger %s failed; watermark preserved.", stage)
+	end
+	if not close_ok or closed ~= true then
+		Logger.warn(LOG, "Foreign sync: ledger close failed; watermark preserved.")
+		return nil
+	end
+	if not read_ok or type(chunk) ~= "string" then return nil end
+	return chunk
+end
+
 --- Runs from the ingest tick. Cheap when no foreign growth has occurred since
 --- the last call (just one fs.attributes() check per device folder).
 ---@param on_applied fun(device_id:string):boolean|nil|nil Optional callback that
@@ -360,59 +390,54 @@ function M.sync_foreign_data_sql(on_applied)
 				if not has_device_row then
 					Logger.warn(LOG, "Foreign sync: skipping invalid device.json.")
 				elseif sz > watermark then
-					local rfh = io.open(data_sql, "r")
-					if rfh then
-						rfh:seek("set", watermark)
-						local chunk = rfh:read("*a")
-						rfh:close()
-						if chunk and #chunk > 0 then
-							-- Apply ONLY through the last complete batch boundary. A
-							-- cross-device sync can copy the file mid-append, so the chunk
-							-- may end with an orphan "BEGIN TRANSACTION;" + inserts and NO
-							-- "COMMIT;". Exec'ing that raw leaves the connection in an open
-							-- transaction (which then poisons the next local ingest BEGIN
-							-- with "cannot start a transaction within a transaction") and
-							-- the watermark would skip the missing COMMIT forever. Find the
-							-- last "COMMIT;" and defer any trailing partial batch to the next
-							-- tick; advance the watermark only to that boundary (F-M3).
-							local last_commit = M._last_complete_batch_offset(chunk)
-							if last_commit == 0 then
-								Logger.debug(LOG, "Foreign sync: no complete batch yet — deferring.")
-							else
-								local applicable = chunk:sub(1, last_commit)
-								local applied_to = watermark + last_commit
-								local ok2, err = pcall(function()
-									local rc = db:exec(applicable)
-									if rc ~= sqlite3.OK then
-										error("foreign exec failed: " .. (db:errmsg() or "?"))
-									end
-								end)
-							if ok2 then
-								local derived_ok = true
-								if type(on_applied) == "function" then
-									local callback_ok, callback_result = pcall(on_applied, entry)
-									derived_ok = callback_ok and callback_result ~= false
-									if not derived_ok then
-										Logger.warn(LOG, "Foreign sync: derived rebuild failed; watermark deferred.")
-									end
+					local chunk = _read_foreign_sql_tail(data_sql, watermark)
+					if chunk and #chunk > 0 then
+						-- Apply ONLY through the last complete batch boundary. A
+						-- cross-device sync can copy the file mid-append, so the chunk
+						-- may end with an orphan "BEGIN TRANSACTION;" + inserts and NO
+						-- "COMMIT;". Exec'ing that raw leaves the connection in an open
+						-- transaction (which then poisons the next local ingest BEGIN
+						-- with "cannot start a transaction within a transaction") and
+						-- the watermark would skip the missing COMMIT forever. Find the
+						-- last "COMMIT;" and defer any trailing partial batch to the next
+						-- tick; advance the watermark only to that boundary (F-M3).
+						local last_commit = M._last_complete_batch_offset(chunk)
+						if last_commit == 0 then
+							Logger.debug(LOG, "Foreign sync: no complete batch yet — deferring.")
+						else
+							local applicable = chunk:sub(1, last_commit)
+							local applied_to = watermark + last_commit
+							local ok2, err = pcall(function()
+								local rc = db:exec(applicable)
+								if rc ~= sqlite3.OK then
+									error("foreign exec failed: " .. (db:errmsg() or "?"))
 								end
-								if derived_ok then
-									local watermark_rc = db:exec(string.format(
-										"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
-										applied_to, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
-									if watermark_rc == sqlite3.OK then
-										table.insert(synced_devices, entry)
-										Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)
-									else
-										Logger.warn(LOG, "Foreign sync: cannot advance watermark: %s.", db:errmsg() or "?")
-									end
+							end)
+						if ok2 then
+							local derived_ok = true
+							if type(on_applied) == "function" then
+								local callback_ok, callback_result = pcall(on_applied, entry)
+								derived_ok = callback_ok and callback_result ~= false
+								if not derived_ok then
+									Logger.warn(LOG, "Foreign sync: derived rebuild failed; watermark deferred.")
 								end
-							else
-									-- Defensively roll back any partial transaction the failed
-									-- exec opened so it cannot poison the local ingest BEGIN.
-									pcall(function() db:exec("ROLLBACK;") end)
-									Logger.warn(LOG, "Foreign sync rolled back: %s.", tostring(err))
+							end
+							if derived_ok then
+								local watermark_rc = db:exec(string.format(
+									"UPDATE devices SET imported_data_sql_size=%d, updated_at='%s' WHERE device_id='%s'",
+									applied_to, _now_ts():gsub("'", "''"), entry:gsub("'", "''")))
+								if watermark_rc == sqlite3.OK then
+									table.insert(synced_devices, entry)
+									Logger.debug(LOG, "Foreign sync: applied %d byte(s).", applied_to - watermark)
+								else
+									Logger.warn(LOG, "Foreign sync: cannot advance watermark: %s.", db:errmsg() or "?")
 								end
+							end
+						else
+								-- Defensively roll back any partial transaction the failed
+								-- exec opened so it cannot poison the local ingest BEGIN.
+								pcall(function() db:exec("ROLLBACK;") end)
+								Logger.warn(LOG, "Foreign sync rolled back: %s.", tostring(err))
 							end
 						end
 					end
