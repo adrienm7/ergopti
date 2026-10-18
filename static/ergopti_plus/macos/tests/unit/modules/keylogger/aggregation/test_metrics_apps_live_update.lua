@@ -170,9 +170,9 @@ local function load_dashboard(options)
 	end
 	hs_stub.webview.usercontent.new = function()
 		return {
-			setCallback = function(_, callback)
+			setCallback = function(self, callback)
 				context.bridge_callback = callback
-				return true
+				return self
 			end,
 		}
 	end
