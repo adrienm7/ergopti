@@ -8,9 +8,7 @@ import re
 
 from hs_delayed_timer_probe import (
     INSTALLED_EXECUTABLE,
-    NativeDelayedTimerProbe,
     CONTRACT as TIMER_CONTRACT,
-    unique_object,
 )
 
 CONTRACT = json.loads(Path(__file__).with_name("hs_karabiner_config_contract.json").read_text())
@@ -456,33 +454,3 @@ def validate_summary(summary):
         raise ValueError("Missing measured native Karabiner manipulators")
     if summary["executable"] != INSTALLED_EXECUTABLE:
         raise ValueError("Foreign packaged Karabiner qualification executable")
-
-
-class NativeKarabinerConfigProbe(NativeDelayedTimerProbe):
-    """Reuse the existing owned scripting transport; never acquire a runtime lease."""
-
-    def observe(self, pid, processes):
-        receipt = self.output / "native-karabiner-config.json"
-        private_home = self.output / "karabiner-private-home"
-        private_home.mkdir(mode=0o700)
-        destination = private_home / ".config/karabiner/karabiner.json"
-        destination.parent.mkdir(parents=True, mode=0o700)
-        original = (json.dumps(INITIAL_CONFIG, indent=2) + "\n").encode()
-        with destination.open("xb") as handle:
-            handle.write(original)
-        if receipt.exists() or processes(self.executable) != [pid]:
-            raise RuntimeError("Native Karabiner probe lacks its fresh exact runtime or receipt")
-        self.bind_runtime(pid, processes)
-        fixture = Path(__file__).with_name("hs_karabiner_config_native.lua")
-        source = "return dofile({}).run({}, {}, {})".format(
-            *(json.dumps(str(value)) for value in (fixture, receipt, destination, self.nonce))
-        )
-        self.execute(source)
-        if processes(self.executable) != [pid]:
-            raise RuntimeError("Native Karabiner runtime changed before receipt admission")
-        result = json.loads(receipt.read_text(), object_pairs_hook=unique_object)
-        if destination.read_bytes() != original:
-            raise RuntimeError(
-                "Native Karabiner probe did not restore its exact private source bytes"
-            )
-        return validate_receipt(result, self.nonce, pid, self.executable, self.domain)

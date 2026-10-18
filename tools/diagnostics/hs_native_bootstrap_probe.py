@@ -22,7 +22,8 @@ import time
 from hs_delayed_timer_probe import (
     AppleScriptPreference,
     CONTRACT as TIMER_CONTRACT,
-    NativeDelayedTimerProbe,
+    bounded_diagnostic_text,
+    executable_path,
     SCRIPTING_TIMEOUT_SECONDS,
     SCRIPT_CLEANUP_TIMEOUT_SECONDS,
     unique_object,
@@ -66,7 +67,7 @@ def bounded_refusal(error):
         if isinstance(error, subprocess.TimeoutExpired)
         else f"{type(error).__name__}: {error}"
     )
-    return NativeDelayedTimerProbe.bounded_diagnostic_text(detail)
+    return bounded_diagnostic_text(detail)
 
 
 def read_receipt(path, limit=RECEIPT_BYTE_LIMIT):
@@ -145,7 +146,7 @@ def installed_product(app, domain, runner=subprocess.run):
     if verified.returncode:
         raise RuntimeError("The installed native runtime signature was not verified")
     product = {
-        "executable": str(NativeDelayedTimerProbe.executable_path(app)),
+        "executable": str(executable_path(app)),
         "bundle_id": domain,
         "version": TIMER_CONTRACT["runtime_version"],
         "codesign_verified": True,
@@ -248,7 +249,7 @@ class NativeStartupBootstrap:
         self.domain = domain
         self.processes = processes
         self.runner = runner
-        self.executable = NativeDelayedTimerProbe.executable_path(app)
+        self.executable = executable_path(app)
         self.launcher = app / "Contents/MacOS/ErgoptiPlus"
         self.embedded = app / "Contents/Frameworks/Hammerspoon.app"
         self.nonce = secrets.token_hex(16)
