@@ -1212,7 +1212,10 @@ class Receiver:
                 pulled = owner.pull(model_name, rows.append)
             except BaseException as refusal:
                 # The pull owner's refusals carry one fixed lexical reason.
-                reason = refusal.args[0] if len(refusal.args) == 1 else None
+                # Native HTTP errors keep their closed reason on .reason.
+                reason = getattr(refusal, "reason", None)
+                if reason is None and len(refusal.args) == 1:
+                    reason = refusal.args[0]
                 self.receipt["pull_refusal"] = {
                     "exception_class": type(refusal).__name__,
                     "reason": reason if type(reason) is str and len(reason) <= 32 else None,
@@ -1261,6 +1264,15 @@ class Receiver:
         )
         with opener.open(request, timeout=60) as response:
             inference = json.load(response)
+        # Fixed generation counters only, never the generated text.
+        self.receipt["inference_facts"] = {
+            key: inference.get(key)
+            for key in ("done", "done_reason", "eval_count", "prompt_eval_count")
+            if type(inference.get(key)) in (bool, int, str) and len(str(inference.get(key))) <= 32
+        }
+        self.receipt["inference_facts"]["eval_duration_type"] = type(
+            inference.get("eval_duration")
+        ).__name__
         require(
             inference.get("done") is True
             and inference.get("eval_count") == 1
