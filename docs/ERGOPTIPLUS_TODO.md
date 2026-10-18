@@ -2999,6 +2999,81 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **AppImage catalog retest of v1.0.3 is still red (October 18).** The bot
+      (AppImage/appimage.github.io#10422, run 39164737606) now reports glibc
+      2.34 (fine) but the app exits at start with "Error: no keyboard device
+      detected. Specify one with --device." The catalog has no input device:
+      the daemon must start without any keyboard (show the tray icon and the
+      "keyboard access unavailable" state, retry or wait for a device) instead
+      of exiting; the offline ubuntu:22.04 smoke had a device or input group
+      difference — reproduce with no /dev/input device at all. Then release
+      and comment `/retest`.
+- [ ] **Site deployment on main fails (October 18).** Workflow "Deploy site"
+      on main fails in job "Receive tested site without write permission",
+      step "Admit exact completed producer" (exit 1) after v1.0.3; read
+      `gh run view <id> --log-failed` for the latest main run and fix the
+      producer admission (likely the new release run shape or the renamed
+      AppImage asset).
+- [ ] **Next release with nothing deferred (state on October 18, after
+      v1.0.3).** v1.0.3 still deferred the seven v1.0.2 macOS native scopes
+      (`.github/ci/stable_v103_macos_native_qualification_exception.json`,
+      `STABLE_V103_SCOPE_IDS` in `tools/ci/dev-release-qualification.cjs`; the
+      maintainer wants the next release with no deferral at all). Open causes: - PAC: `ManagedBootstrapDownloadTests.testActualNativeBootstrapTLSFullURLPACAndArtifactPublication`
+      intermittently ends at "deadline": with the PAC route
+      `PROXY <refused>; PROXY <first>` the native worker never gets a
+      completion for the refused-proxy session, so it never fails over
+      (runs 39129185772, 39133078749, 39149596503). Add worker stage
+      diagnostics on CI, find the root cause in the product and fix it. - HTTP wire: `native_http_wire_client_receiving.py`
+      `RealNativeClientReceiving.test01RealHTTPXFullURLPACURLFallbackAndVerifiedPhysicalChildEOF`
+      hit "Managed network request failed: deadline" in the package step
+      (run 39144577314), probably the same fallback. - Brew archive: the receipt now passes; the upgrade fails where
+      Homebrew clones `homebrew/core` on the hosted runner. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
+      hit a deadline, likely the same proxy fallback. - Shortcuts discovery, launch AppleEvents and the 27 owned-runtime XCTest
+      methods: fixes are committed but never reached a fully green Build
+      and Install-and-launch run, because a plain dispatch keeps the
+      deferred E2E scopes red and skips Build. Validate them through a
+      release-like run.
+      When a scope is green, remove it from the v1.0.3 profile constants and
+      JSON; with none left, the next tag publishes with no profile (tested).
+- [ ] **CI duration: from ~24 to ~20 minutes.** Measured on dev run
+      39136434948: Windows lane 20.1 min, Linux 23.7 min, common 19.5 min,
+      macOS unit rows 2-4 min each (7-row matrix), macOS lane ~23 min once the
+      Managed Ollama receiving cell passes or is deferred. The critical path is
+      now Linux: Build (~7 min, one packaging step builds every format) then the installed-archive install cells (~5 min).
+      Next steps: build the Linux packages per format in parallel (keeping
+      every install cell bound to the exact bytes it installs), speed up the
+      installed-archive cells, and keep the graph symmetric (one row per OS,
+      the same columns). All unit suites are already sharded by module group:
+      Windows `TEST_MODULE_GROUPS` (12 rows), macOS
+      `tests/support/module_groups.lua` (7), Linux
+      `tests/support/module_groups.lua` (6); the matrix gates check that each
+      CI matrix equals its groups.
+- [ ] **Integrate the maintainer's fix branches regularly.** The maintainer
+      runs one agent per OS on `fix/windows`, `fix/macos` and `fix/linux`.
+      Regularly: `git fetch`, merge each into `dev` (`--no-ff`, resolve
+      conflicts by carrying the branch's intent into the reorganized test
+      tree), validate (Linux-only or macOS-only dispatch on a `tmp/*` branch
+      when the full lane is not needed), push `dev`, then fast-forward each
+      `fix/*` branch to `dev` (`git push origin dev:refs/heads/fix/<os>` only
+      when it is an ancestor of `dev`, never a rewrite). After a merge that
+      touches `run_all.ahk`, `test_framework.ahk` or a sealed source, reseal
+      `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json`.
+- [ ] **Configuration transactions re-check every guard per native
+      operation.** `AllLive` in `config_transition_runtime.ahk` deep-compares
+      the shipped migration registry once per open file before and after each
+      operation (O(files x operations), ~10 ms per compare; 12 217 checks in
+      the 32-file `hotstrings-capacity` test). Decide whether one registry
+      liveness proof per `AllLive` call keeps the custody guarantee (tests
+      deliberately mutate the shipped registry mid-transaction and expect a
+      refusal, so a plain cache is not enough). See also the older entry
+      "Slow Windows tests: repeated deep registry liveness checks".
+- [ ] **Check the AppImage catalog retest (October 18).** v1.0.3 ships
+      `ErgoptiPlus-x86_64.AppImage`, built on Ubuntu 22.04 (glibc 2.35, no
+      "linux" in the name, offline start with its tray icon). `/retest` was
+      commented on AppImage/appimage.github.io#10422; read the bot's verdict.
+      The catalog runs the app in firejail, which CI could only approximate
+      (an offline ubuntu:22.04 container, since firejail cannot sandbox inside
+      Docker); fix whatever the bot still reports and retest.
 - [ ] **Test parity across the three drivers (audit of October 18).**
       [The parity audit](audits/2026-10-18-test-parity-audit.md) ranks 15
       parity work items. First come the three stale Linux conformance skips
