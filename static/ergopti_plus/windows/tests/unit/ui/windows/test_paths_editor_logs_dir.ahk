@@ -101,3 +101,86 @@ _PELD_UncreatableLogsFolderIsRefused() {
 }
 Test("paths editor: a logs folder that cannot be created is refused (paths-editor-logs-dir)",
 	_PELD_UncreatableLogsFolderIsRefused)
+
+; A native modal's completion belongs to the session that opened it, even when
+; the process remains alive and now holds another WebView in the same globals.
+class _FPB_NativeWindow {
+	Id := 3001
+	Live := true
+	Hwnd {
+		get {
+			if !this.Live
+				throw Error("Controlled native editor destruction")
+			return this.Id
+		}
+	}
+}
+
+_FPB_Pick(World, RootDir, Options, Prompt, Title, OwnerHwnd) {
+	global _PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch
+	World.Picks += 1
+	AssertEqual(World.Host == "onboarding" ? 3 : 1, Options, "the native creation policy stays unchanged")
+	AssertEqual(0, OwnerHwnd)
+	if World.Mode == "closed" || World.Mode == "reopened" {
+		Advance := World.Mode == "closed" ? 1 : 2
+		if World.Host == "paths"
+			_PathsEdWeb_SessionEpoch += Advance
+		else if World.Host == "onboarding"
+			_OnbWeb_SessionEpoch += Advance
+		else if World.Mode == "closed"
+			World.Window.Live := false
+		else
+			World.Window.Id += 1
+	} else if World.Mode == "pause"
+		Suspend(true)
+	return World.Mode == "cancel" ? "" : "D:\Picked folder"
+}
+
+_FPB_ResultOwnsSession(Host, Target, Mode) {
+	global _PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch, _ConfigDir
+	Saved := [_PathsEdWeb_SessionEpoch, _OnbWeb_SessionEpoch, _ConfigDir, A_IsSuspended]
+	World := { Host: Host, Mode: Mode, Picks: 0, Scripts: [], Window: _FPB_NativeWindow(), Edit: {Value: "C:/Private configuration"} }
+	try {
+		_PathsEdWeb_SessionEpoch := 1001
+		_OnbWeb_SessionEpoch := 2001
+		_ConfigDir := "C:\Private configuration\"
+		Suspend(Mode == "already-paused")
+		Pick := _FPB_Pick.Bind(World)
+		Eval := (Js) => World.Scripts.Push(Js)
+		if Host == "paths"
+			_PathsEdWeb_Browse(Target, Pick, Eval)
+		else if Host == "onboarding"
+			_OnbWeb_PickConfigDir("C:\Private configuration", Pick, Eval)
+		else
+			_PathsEdNative_Browse(World.Window, World.Edit, Pick,
+				(Hwnd) => World.Window.Live && World.Window.Hwnd == Hwnd)
+		AssertEqual(Mode == "already-paused" ? 0 : 1, World.Picks)
+		AssertEqual(Mode == "live" && Host != "native" ? 1 : 0, World.Scripts.Length,
+			"only a still-current unpaused session may receive the picked folder")
+		if Host == "native"
+			AssertEqual(Mode == "live" ? "D:/Picked folder" : "C:/Private configuration", World.Edit.Value,
+				"the original native field changes only while its window is current")
+		else if Mode == "live" {
+			if Host == "paths" {
+				AssertContains(World.Scripts[1], '"D:/Picked folder/"')
+				AssertContains(World.Scripts[1], '"' . Target . '"')
+			} else
+				AssertContains(World.Scripts[1], JsonStringLiteral("D:\Picked folder"))
+		}
+	} finally {
+		_PathsEdWeb_SessionEpoch := Saved[1]
+		_OnbWeb_SessionEpoch := Saved[2]
+		_ConfigDir := Saved[3]
+		Suspend(Saved[4])
+	}
+}
+for Mode in ["live", "closed", "reopened", "pause", "cancel", "already-paused"] {
+	Test("folder picker: config field completion respects " . Mode . " (webview-folder-picker-session)",
+		_FPB_ResultOwnsSession.Bind("paths", "config", Mode))
+	Test("folder picker: logs field completion respects " . Mode . " (webview-folder-picker-session)",
+		_FPB_ResultOwnsSession.Bind("paths", "logs", Mode))
+	Test("folder picker: onboarding completion respects " . Mode . " (webview-folder-picker-session)",
+		_FPB_ResultOwnsSession.Bind("onboarding", "config", Mode))
+	Test("folder picker: native field completion respects " . Mode . " (webview-folder-picker-session)",
+		_FPB_ResultOwnsSession.Bind("native", "config", Mode))
+}

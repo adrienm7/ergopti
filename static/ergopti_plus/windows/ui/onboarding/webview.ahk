@@ -454,15 +454,21 @@ _OnbWeb_PreviewLocale(Code) {
 
 ; Opens the native folder picker and feeds the chosen path back to the page.
 ; A cancelled dialog leaves the input untouched.
-_OnbWeb_PickConfigDir(Current) {
+_OnbWeb_PickConfigDir(Current, PickFn := Ui_DirSelect, EvalFn := _OnbWeb_Eval) {
+	global _OnbWeb_SessionEpoch
+	if A_IsSuspended
+		return false
+	SessionEpoch := _OnbWeb_SessionEpoch
 	chosen := ""
-	try chosen := Ui_DirSelect("*" . Current, 3, t("dialog.config_folder.title"), t("dialog.config_folder.window_title"), 0)
+	try chosen := PickFn.Call("*" . Current, 3, t("dialog.config_folder.title"), t("dialog.config_folder.window_title"), 0)
 	catch as PickerError {
 		LoggerError("Onboarding", "Native configuration-folder selection failed: {1}", PickerError.Message)
 		return
 	}
-	if (chosen != "")
-		_OnbWeb_Eval("window.setConfigDir(" . _OnbWeb_JsStr(chosen) . ")")
+	; The wizard may have closed or reopened while the native picker pumped.
+	if (chosen == "" || A_IsSuspended || !_OnbWeb_SessionCurrent(SessionEpoch))
+		return false
+	EvalFn.Call("window.setConfigDir(" . _OnbWeb_JsStr(chosen) . ")")
 }
 
 ; Answers the page with the metrics store of the folder confirmed on the config
