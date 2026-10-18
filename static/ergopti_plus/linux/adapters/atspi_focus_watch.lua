@@ -91,9 +91,10 @@ local function native_transport()
 	end
 	function transport.command()
 		local executable = assert(uv.exepath(), "native interpreter identity unavailable")
+		local shared_lua = assert(Paths.shared("lua"), "shared Lua library unavailable")
 		return executable, { Paths.driver_root() .. "/adapters/atspi_focus_watch_worker.lua",
 			transport.events_path, tostring(uv.os_getpid()),
-			tostring(Timings.ms("privacy", "focus_settle_ms")), transport.control_path }
+			tostring(Timings.ms("privacy", "focus_settle_ms")), transport.control_path, shared_lua }
 	end
 	return transport
 end
