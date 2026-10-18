@@ -138,40 +138,7 @@ local function with_runtime(body)
 	if not ok then error(problem, 0) end
 end
 
---- Uses the real multiphase injector with independently authored native wire replies.
---- @param f table Actual runtime and programmable owner fixture.
---- @param body function Scenario observing native output phases.
-local function with_native_injector(f, body)
-	local Layout = require("adapters.keyboard_layout")
-	local Capture = require("adapters.xkb_capture")
-	local ready, plan, caps = Layout.is_ready, Layout.plan, Capture.caps_locked
-	local emitted = {}
-	Layout.is_ready = function() return true end
-	Layout.plan = function(text)
-		if f.clipboard then return nil, "fixture clipboard-only character" end
-		helpers.assert_eq(text, "0")
-		return { { keycode = 11, mods = {} } }
-	end
-	Capture.caps_locked = function() return false end
-	Injector._set_uinput({ is_open = function() return true end,
-		emit = function(code, value)
-			emitted[#emitted + 1] = { code = code, value = value }
-			if f.native_emit_hook then f.native_emit_hook(code, value) end
-			return true
-		end })
-	Injector._set_nanosleep_for_test(function()
-		if f.phase_mutate then f.phase_mutate() end
-	end)
-	f.injector_port.inject = function(...)
-		local result = Injector.inject(...)
-		f.delivery = result
-		return result
-	end
-	local ok, problem = xpcall(function() body(emitted) end, debug.traceback)
-	Injector._set_uinput(nil); Injector._set_nanosleep_for_test(nil)
-	Layout.is_ready, Layout.plan, Capture.caps_locked = ready, plan, caps
-	if not ok then error(problem, 0) end
-end
+local with_native_injector = require("tests.support.infra.preferences.user_hotstring_native_fixture").with
 
 --- Runs actual global and dynamic scope owners around the native callback fixture.
 local function with_configuration_scope(f, body)
