@@ -500,10 +500,16 @@ helpers.describe("magic replacement: the Ergopti extension control", function()
 		local ok, err = pcall(function()
 			local Config = helpers.load_module(names[2])
 			Choices.with_file(Config, source, function(path)
-				Config.init({ load_mappings = function(_, mappings)
-					state.published[#state.published + 1] = mappings
-					return not (state.reject and #state.published == 2)
-				end }, "virtual.toml", function() state.notified = state.notified + 1 end)
+				local engine, attempts = require("hotstring_engine").new(), 0
+				local load = engine.load_mappings
+				engine.load_mappings = function(self, mappings)
+					attempts = attempts + 1
+					if state.reject and attempts == 2 then return false end
+					local committed = load(self, mappings)
+					if committed then state.published[#state.published + 1] = mappings end
+					return committed
+				end
+				Config.init(engine, "virtual.toml", function() state.notified = state.notified + 1 end)
 				local _, committed = Config.load_all()
 				helpers.assert_eq(committed, true, "the fixture catalogue must initialize")
 				local Builder = helpers.load_module(names[3])

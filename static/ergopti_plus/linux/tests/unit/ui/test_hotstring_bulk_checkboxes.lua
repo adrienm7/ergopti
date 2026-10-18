@@ -329,7 +329,14 @@ helpers.describe("aggregate menu preserves actual private choices and native pub
 						.. '[private]\nfuture = "retained foreign source"\n'
 					Choices.with_file(Config, source, function(path)
 						local published = {}
-						Config.init({ load_mappings = function(_, mappings) published[#published+1] = mappings; return true end }, "virtual.toml", nil)
+						local engine = require("hotstring_engine").new()
+						local load = engine.load_mappings
+						engine.load_mappings = function(self, mappings)
+							local committed = load(self, mappings)
+							if committed then published[#published + 1] = mappings end
+							return committed
+						end
+						Config.init(engine, "virtual.toml", nil)
 						local _, initial = Config.load_all()
 						helpers.assert_eq(initial, true)
 						view.set_categories_sections = Config.set_categories_sections
