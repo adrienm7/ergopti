@@ -76,8 +76,51 @@ RECEIVER_FAILURE_CODES = frozenset(
         "actual_retained_source_bytes",
         "native_receiving_input_changed",
         "native_receiving_source_changed",
+        # Stage outcomes: without them every failed pull, inference or cancel
+        # was published as the same opaque "unknown" receiver code.
+        "actual_pull_success",
+        "http_exit_is_not_daemon_ack",
+        "actual_pull_retired",
+        "exact_manifest_publication",
+        "exact_blob_publication",
+        "actual_native_inference",
+        "actual_cancelled_body",
+        "actual_cancelled_operation_retired",
+        "actual_cancelled_tls_peer_closed",
+        "cancel_does_not_publish_partial_model",
+        "actual_full_query_reached_origin",
+        "actual_full_url_route_selection",
+        "actual_origin_and_proxy_sockets_retired",
     }
 )
+# Closed, text-free classes for daemon pull error rows; the raw text can name
+# private hosts and paths and is never published.
+PULL_ERROR_CLASSES = (
+    ("certificate", ("certificate", "x509", "tls")),
+    ("proxy", ("proxy",)),
+    ("deadline", ("timeout", "deadline")),
+    ("connect", ("connect", "refused")),
+    ("not_found", ("not found", "404")),
+)
+
+
+def pull_error_classes(rows):
+    """Project daemon progress errors onto fixed classes, never their text."""
+    classes = set()
+    for row in rows:
+        error = row.get("error") if isinstance(row, dict) else None
+        if not isinstance(error, str):
+            continue
+        lowered = error.lower()
+        classes.add(
+            next(
+                (name for name, words in PULL_ERROR_CLASSES if any(w in lowered for w in words)),
+                "other",
+            )
+        )
+    return sorted(classes)
+
+
 PREPARE_STEPS = frozenset(
     {
         "receiver_admission",
@@ -1112,7 +1155,9 @@ class Receiver:
         rows = []
         with patch.dict(os.environ, self.api_environment, clear=True):
             owner = self.owner()
-            require(owner.pull(model_name, rows.append), "actual_pull_success")
+            pulled = owner.pull(model_name, rows.append)
+            self.receipt["pull_error_classes"] = pull_error_classes(rows)
+            require(pulled, "actual_pull_success")
             require(owner.pending, "http_exit_is_not_daemon_ack")
             self.retirement(owner)
         require(not owner.pending, "actual_pull_retired")
