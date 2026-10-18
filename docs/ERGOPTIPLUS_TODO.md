@@ -2999,6 +2999,13 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **Check the AppImage catalog retest (October 18).** v1.0.3 ships
+      `ErgoptiPlus-x86_64.AppImage`, built on Ubuntu 22.04 (glibc 2.35, no
+      "linux" in the name, offline start with its tray icon). `/retest` was
+      commented on AppImage/appimage.github.io#10422; read the bot's verdict.
+      The catalog runs the app in firejail, which CI could only approximate
+      (an offline ubuntu:22.04 container, since firejail cannot sandbox inside
+      Docker); fix whatever the bot still reports and retest.
 - [ ] **Test parity across the three drivers (audit of October 18).**
       [The parity audit](audits/2026-10-18-test-parity-audit.md) ranks 15
       parity work items. First come the three stale Linux conformance skips
