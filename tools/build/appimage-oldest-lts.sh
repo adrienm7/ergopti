@@ -32,6 +32,7 @@ set -euo pipefail
 OLDEST_LTS_IMAGE="ubuntu:22.04"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
+BUILD_ROOT="$PROJECT_ROOT/build/linux"
 SELF="tools/build/appimage-oldest-lts.sh"
 SMOKE_USER="catalogue"
 
@@ -53,7 +54,10 @@ container_build() {
 	export PATH="/opt/node/bin:$PATH"
 	node --version
 
-	rm -f build/linux/linux/bin/libergopti_archive_publication.so
+	# The bundle's backend was compiled on the runner: replace it with one built
+	# here, which every package made from the bundle then carries.
+	local backend="libergopti_archive_publication.so"
+	rm -f "$BUILD_ROOT/linux/bin/$backend"
 	bash tools/build/build-linux-native-output.sh
 
 	# appimagetool ships as an AppImage and a container has no FUSE: unpack it.
@@ -66,7 +70,7 @@ container_build() {
 	ln -sf "$tools/squashfs-root/AppRun" /usr/local/bin/appimagetool
 
 	bash tools/build/build-linux-appimage.sh
-	chown -R "$HOST_UID:$HOST_GID" build/linux
+	chown -R "$HOST_UID:$HOST_GID" "$BUILD_ROOT"
 }
 
 # ----------------------------------------------------------------------
@@ -137,7 +141,7 @@ user_smoke() {
 # ----------------------------------------------------------------------
 case "${1:-}" in
 	build)
-		[ -f "$PROJECT_ROOT/build/linux/linux/ergopti_hotstrings.lua" ] || {
+		[ -f "$BUILD_ROOT/linux/ergopti_hotstrings.lua" ] || {
 			echo "[ERR] No driver bundle: run tools/build/build-linux-driver.sh first." >&2
 			exit 1
 		}

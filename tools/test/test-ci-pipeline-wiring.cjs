@@ -792,6 +792,18 @@ const STEP_CONDITIONS = [
 	[
 		LINUX_BOX,
 		'install-linux',
+		'Every bundled ELF file loads on the oldest supported LTS',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
+		'It shows its tray icon on Ubuntu 22.04, offline',
+		"env.INSTALL_KIND == 'appimage'"
+	],
+	[
+		LINUX_BOX,
+		'install-linux',
 		'The bundled shared data tree resolves and opens',
 		"env.INSTALL_KIND == 'appimage'"
 	],
