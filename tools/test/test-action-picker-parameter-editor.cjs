@@ -1049,13 +1049,13 @@ for (const platform of ['hs', 'linux', 'ahk']) {
 		'Shortcuts parser and owned registration controls complete'
 	);
 	const windowsSDKScope = process.platform === 'win32';
-	const parserCount = windowsSDKScope ? 44 : 58;
+	const parserCount = windowsSDKScope ? 47 : 61;
 	check(
 		new RegExp(`Ran ${parserCount} tests in `).test(parser.stderr) &&
 			/\nOK\s*$/.test(parser.stderr),
 		windowsSDKScope
-			? 'all forty-four portable Shortcuts controls execute without skip'
-			: 'all forty-four portable and fourteen POSIX SDK controls execute without skip'
+			? 'all forty-seven portable Shortcuts controls execute without skip'
+			: 'all forty-seven portable and fourteen POSIX SDK controls execute without skip'
 	);
 	if (windowsSDKScope) {
 		const sdkFilesystemCases = [

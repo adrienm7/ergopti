@@ -755,10 +755,20 @@ class NativePreflightGateControls(unittest.TestCase):
         }
     ).encode()
 
-    def run_gate(self, statuses, *, preflight_elapsed=0.0, launch=(0, b"", b""), catalogue=None):
+    def run_gate(
+        self,
+        statuses,
+        *,
+        preflight_elapsed=0.0,
+        post_launch_elapsed=None,
+        discovery_elapsed=0.0,
+        launch=(0, b"", b""),
+        catalogue=None,
+    ):
         now = [0.0]
         calls, groups = [], []
         pending = list(statuses)
+        launched = [False]
 
         def acquire(arguments, native, register, **options):
             arguments = list(arguments)
@@ -766,13 +776,16 @@ class NativePreflightGateControls(unittest.TestCase):
             if arguments == [self.image, "--permission-preflight"]:
                 status = pending.pop(0) if len(pending) > 1 else pending[0]
                 code, raw, errors = 0, preflight_record(status), b""
-                now[0] += preflight_elapsed
+                cold = launched[0] and post_launch_elapsed is not None
+                now[0] += post_launch_elapsed if cold else preflight_elapsed
             elif arguments == self.launch:
+                launched[0] = True
                 code, raw, errors = launch
             elif arguments[0] == "/usr/bin/osascript":
                 code = 0
                 raw = self.inventory if catalogue is None else catalogue
                 errors = b"ASCP:1\nASCP:2\nASCP:3\nASCP:4\n"
+                now[0] += discovery_elapsed
             else:
                 raise AssertionError("unexpected controlled acquisition argv")
             group = SimpleNamespace(process=SimpleNamespace(pid=321, returncode=None))
@@ -834,6 +847,7 @@ class NativePreflightGateControls(unittest.TestCase):
                         "source": "native_sdk",
                         "statuses": [status],
                         "service_launch_attempted": False,
+                        "budget_seconds": 20,
                         "catalogue_retrieval_attempted": False,
                     },
                 )
@@ -877,7 +891,62 @@ class NativePreflightGateControls(unittest.TestCase):
         self.assertEqual(self.catalogue_calls(gate), [])
         self.assertFalse(gate.record["catalogue_retrieval_attempted"])
         self.assertTrue(set(gate.record["statuses"]) == {-600})
-        self.assertLessEqual(len(gate.record["statuses"]), 20)
+        self.assertLessEqual(len(gate.record["statuses"]), subject.SERVICE_START_SECONDS)
+        self.assertEqual(gate.record["budget_seconds"], subject.SERVICE_START_SECONDS)
+
+    def test_intel_cold_start_preflight_gets_the_named_service_start_budget(self):
+        # Hosted run 39115677563 (macos-15-intel): the post-start preflight
+        # blocked ~17 s and hit the old shared 20 s deadline after the -600.
+        gate = self.run_gate([-600, -1744], preflight_elapsed=3.0, post_launch_elapsed=30.0)
+        self.assertIsNone(gate.failure)
+        self.assertEqual(gate.outcome, (-1744, None))
+        self.assertEqual(gate.record["statuses"], [-600, -1744])
+        self.assertEqual(gate.record["budget_seconds"], subject.SERVICE_START_SECONDS)
+        self.assertEqual(subject.SERVICE_START_SECONDS, 45)
+        self.assertEqual(subject.CAPTURE_SECONDS, 20)
+
+    def test_service_start_budget_is_one_absolute_bound_for_every_later_step(self):
+        # The extension counts from the phase start, not from the start or a step.
+        gate = self.run_gate([-600, -1744], preflight_elapsed=10.0, post_launch_elapsed=35.0)
+        self.assertEqual(gate.failure, "deadline")
+        self.assertEqual(gate.record["statuses"], [-600])
+        gate = self.run_gate(
+            [-600, 0], preflight_elapsed=2.0, post_launch_elapsed=40.0, discovery_elapsed=3.5
+        )
+        self.assertEqual(gate.failure, "deadline", "the catalogue query gains no fresh budget")
+        self.assertEqual(gate.evidence[-1]["role"], "discovery")
+        self.assertTrue(gate.record["catalogue_retrieval_attempted"])
+        gate = self.run_gate([0], preflight_elapsed=2.0, discovery_elapsed=18.5)
+        self.assertEqual(gate.failure, "deadline", "without a start the phase keeps 20 s")
+        self.assertEqual(gate.record["budget_seconds"], 20)
+
+    def test_capture_admits_only_the_two_named_budgets(self):
+        def refuse(*_arguments, **_options):
+            raise AssertionError("a refused budget must not acquire a group")
+
+        ownership = SimpleNamespace(acquire_owned=refuse)
+        with patch.object(subject.time, "monotonic", return_value=100.0):
+            for budget, deadline in (
+                (30, 110.0),
+                (True, 100.5),
+                (20.0, 110.0),
+                (None, 110.0),
+                (subject.CAPTURE_SECONDS, 120.001),
+                (subject.SERVICE_START_SECONDS, 145.001),
+            ):
+                with self.subTest(budget=budget, deadline=deadline):
+                    evidence = []
+                    with self.assertRaises(ValueError):
+                        subject.capture(
+                            ["fixture"],
+                            object(),
+                            ownership,
+                            evidence,
+                            "permission_preflight",
+                            deadline=deadline,
+                            budget=budget,
+                        )
+                    self.assertEqual(evidence, [])
 
     def test_unknown_status_and_failed_start_refuse_before_the_catalogue(self):
         for status in (1, -1708, -2147483648, 2147483647):
@@ -1444,7 +1513,7 @@ def load_tests(loader, tests, pattern):
         (PermissionPreflightControls, 12),
         (UnavailableRefinementControls, 3),
         (CaptureBudgetControls, 2),
-        (NativePreflightGateControls, 9),
+        (NativePreflightGateControls, 12),
     )
     portable = unittest.TestSuite()
     for group, expected in portable_groups:
@@ -1455,7 +1524,7 @@ def load_tests(loader, tests, pattern):
     sdk = []
     for group in (SDKCanonicalEnvelopeControls, SDKConstantTransportControls):
         sdk.extend(group.__name__ + "." + name for name in loader.getTestCaseNames(group))
-    if tuple(sorted(sdk)) != SDK_FILESYSTEM_CASES or tests.countTestCases() != 58:
+    if tuple(sorted(sdk)) != SDK_FILESYSTEM_CASES or tests.countTestCases() != 61:
         raise AssertionError("complete Shortcuts SDK case census changed")
     if subject.sys.platform == "win32":
         print(
