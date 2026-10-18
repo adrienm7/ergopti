@@ -2172,3 +2172,65 @@ helpers.describe("script storage retired journal roots", function()
 		end)
 	end)
 end)
+
+helpers.describe("storage-mixed-batch: atomic values and removals", function()
+	for _, held in ipairs({ false, true }) do
+		helpers.it("storage-mixed-batch: persists removal and value together with held=" .. tostring(held), function()
+			storage_cohort_fixture('{"a":false,"future":0.1,"huge":9007199254740993}', function(storage, _, path, _, _, read)
+				local owner = { pending = function() return false end }
+				if held then helpers.assert_true(storage.acquire_owned(owner, { "unrelated" })) end
+				helpers.assert_true(storage.set_many({ appended = "new" }, { "a" }))
+				helpers.assert_nil(storage.get("a")); helpers.assert_eq(storage.get("appended"), "new")
+				helpers.assert_eq(read(path), '{"future":0.1,"huge":9007199254740993,"appended":"new"}')
+				if held then helpers.assert_true(storage.release_owned(owner)) end
+				local reloaded = helpers.load_module("adapters.storage")
+				helpers.assert_nil(reloaded.get("a")); helpers.assert_eq(reloaded.get("appended"), "new")
+			end)
+		end)
+	end
+	for _, held in ipairs({ false, true }) do
+		helpers.it("storage-mixed-batch: refused native publication keeps every original cell with held=" .. tostring(held), function()
+			storage_cohort_fixture('{"a":false,"peer":1}', function(storage, files, path, _, _, read)
+				local owner = { pending = function() return false end }
+				if held then helpers.assert_true(storage.acquire_owned(owner, { "unrelated" })) end
+				local rename, publish = os.rename, files.write_if_unchanged
+				local publications = 0
+				os.rename = function(from, to)
+					if to == path then publications = publications + 1; return nil, "native rename refused" end
+					return rename(from, to)
+				end
+				files.write_if_unchanged = function(name, ...)
+					if name == path then publications = publications + 1; return false, "native publisher refused" end
+					return publish(name, ...)
+				end
+				local ok, detail = xpcall(function()
+					helpers.assert_eq(storage.set_many({ peer = 2 }, { "a" }), false)
+					helpers.assert_eq(publications, 1)
+					helpers.assert_eq(read(path), '{"a":false,"peer":1}')
+					helpers.assert_eq(storage.get("a"), false); helpers.assert_eq(storage.get("peer"), 1)
+				end, debug.traceback)
+				os.rename, files.write_if_unchanged = rename, publish
+				if not ok then error(detail, 0) end
+				if held then helpers.assert_true(storage.release_owned(owner)) end
+			end)
+		end)
+	end
+	for _, deletions in ipairs({ false, { "a", "a" }, { "" }, { [2] = "a" }, { "a" }, { "a\0b" } }) do
+		helpers.it("storage-mixed-batch: refuses malformed or overlapping removals " .. helpers.inspect(deletions), function()
+			storage_cohort_fixture('{"a":false,"peer":1}', function(storage, _, path, _, _, read)
+				helpers.assert_eq(storage.set_many({ a = true }, deletions), false)
+				helpers.assert_eq(read(path), '{"a":false,"peer":1}')
+				helpers.assert_eq(storage.get("a"), false)
+			end)
+		end)
+	end
+	helpers.it("storage-mixed-batch: a held removed alias rejects the entire batch", function()
+		storage_cohort_fixture('{"a":false,"peer":1}', function(storage, _, path, _, _, read)
+			local owner = { pending = function() return false end }
+			helpers.assert_true(storage.acquire_owned(owner, { "a" }))
+			helpers.assert_eq(storage.set_many({ peer = 2 }, { "a" }), false)
+			helpers.assert_eq(read(path), '{"a":false,"peer":1}')
+			helpers.assert_true(storage.release_owned(owner))
+		end)
+	end)
+end)

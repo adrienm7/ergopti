@@ -79,6 +79,119 @@ helpers.describe("keyboard_hook.while_released: a dialog runs with the keyboard 
 
 end)
 
+helpers.describe("keyboard_hook.while_released: native refusal never blocks a grabbed keyboard", function()
+	local function run_refusal(port, replacement, dialog_error)
+		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local Reader = require("adapters.evdev_reader")
+		local original = port and Reader[port]
+		local observed = { dialog = false, stages = {} }
+		Hook._test_drive({ { type = EV_KEY, code = KEY_A, value = 1 } }, {
+			onChar = function()
+				local slot = "keyboard:/dev/input/test"
+				assert(Reader.grab(slot))
+				if port then Reader[port] = function(...) return replacement(original, ...) end end
+				observed.called, observed.result, observed.error = pcall(Hook.while_released, function()
+					observed.dialog = true
+					if dialog_error then error("modal failure", 0) end
+					return "modal result"
+				end, { observer = function(stage) observed.stages[#observed.stages + 1] = stage end })
+				observed.open = Reader.is_open(slot)
+				observed.grabbed = Reader.is_grabbed(slot)
+				observed.running = Hook.isRunning()
+				if port then Reader[port] = original end
+			end,
+			onEmitRaw = function(_, value) return not (port == nil and value == 0) end,
+		}, true)
+		if port then Reader[port] = original end
+		return observed
+	end
+
+	for _, mode in ipairs({ "refuses", "throws" }) do
+		helpers.it("does not enter a modal when native ungrab " .. mode, function()
+			local result = run_refusal("ungrab", function()
+				if mode == "throws" then error("controlled ungrab failure", 0) end
+				return false
+			end)
+			helpers.assert_eq(result.dialog, false)
+			helpers.assert_eq(result.open, false, "emergency close settles the remaining grab")
+			helpers.assert_eq(result.running, false)
+			helpers.assert_eq(table.concat(result.stages), "refused")
+		end)
+	end
+
+	helpers.it("does not enter a modal when retiring the forwarded key fails", function()
+		local result = run_refusal()
+		helpers.assert_eq(result.dialog, false)
+		helpers.assert_eq(result.open, false)
+		helpers.assert_eq(result.running, false)
+	end)
+
+	for _, port in ipairs({ "grab", "pressed_keys" }) do
+		helpers.it("closes every modal grab when restoration " .. port .. " raises", function()
+			local result = run_refusal(port, function(original, ...)
+				if port == "grab" then assert(original(...)) end
+				error("controlled restoration failure", 0)
+			end)
+			helpers.assert_true(result.dialog)
+			helpers.assert_eq(result.open, false, "an acquired grab cannot escape the restoration failure")
+			helpers.assert_eq(result.running, false)
+			helpers.assert_eq(table.concat(result.stages), "refused")
+		end)
+	end
+
+	helpers.it("preserves a dialog exception after a refused regrab", function()
+		local result = run_refusal("grab", function() return false end, true)
+		helpers.assert_eq(result.called, false)
+		helpers.assert_eq(result.result, "modal failure")
+		helpers.assert_eq(result.open, false)
+	end)
+
+	helpers.it("closes the entire cohort when its second keyboard raises after regrab", function()
+		local Reader = helpers.load_module("adapters.evdev_reader")
+		local paths = { os.tmpname(), os.tmpname() }
+		for _, path in ipairs(paths) do local file = assert(io.open(path, "w")); file:close() end
+		local saved_finder = package.loaded["modules.hotstrings.device_finder"]
+		local saved_xkb = package.loaded["adapters.xkb_capture"]
+		package.loaded["modules.hotstrings.device_finder"] = {
+			find_devices = function() return paths, {} end,
+			is_key_device = function() return true end,
+		}
+		package.loaded["adapters.xkb_capture"] = {
+			is_ready = function() return true end, reset_state = function() return true end,
+			process = function() end, modifier_role = function() end,
+		}
+		Reader._set_backend({
+			open = function(path) return path end, close = function() return true end,
+			ioctl = function() return true end, read = function() end, poll = function() return false end,
+			read_bits = function(_, _, count) return string.rep("\0", count) end,
+		})
+		local Hook = helpers.load_module("adapters.keyboard_hook")
+		local original_grab = Reader.grab
+		local ok, failure = pcall(function()
+			Hook.start({ intercept = true, onEmitRaw = function() return true end })
+			assert(Hook.isRunning())
+			Reader.grab = function(slot)
+				local acknowledged = original_grab(slot)
+				if slot == "keyboard:" .. paths[2] then error("controlled second-source failure", 0) end
+				return acknowledged
+			end
+			local result = Hook.while_released(function() return "completed" end)
+			helpers.assert_eq(result, "completed")
+			for _, path in ipairs(paths) do
+				helpers.assert_eq(Reader.is_open("keyboard:" .. path), false,
+					"restoring an earlier source cannot leave its keyboard grabbed")
+			end
+			helpers.assert_eq(Hook.isRunning(), false)
+		end)
+		Reader.grab = original_grab
+		pcall(Hook.stop); Reader._reset_backend()
+		package.loaded["modules.hotstrings.device_finder"] = saved_finder
+		package.loaded["adapters.xkb_capture"] = saved_xkb
+		for _, path in ipairs(paths) do os.remove(path) end
+		if not ok then error(failure, 0) end
+	end)
+end)
+
 
 helpers.describe("keyboard_hook.while_released: acknowledged modal observer", function()
 	helpers.it("brackets only the real callback after native restoration and preserves results", function()

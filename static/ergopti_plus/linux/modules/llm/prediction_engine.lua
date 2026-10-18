@@ -95,6 +95,7 @@ local _privacy_context = nil
 -- replaced (typed over, then selected back), and which window has the focus.
 local _read_selection = nil
 local _replace_selection = nil
+local _cancel_selection = nil
 local _focus_id = nil
 local _buffer_focus = nil
 local current_focus
@@ -536,6 +537,7 @@ function M.init(opts)
 	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
+	_cancel_selection = type(options.cancel_selection) == "function" and options.cancel_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
 	_buffer_focus = nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
@@ -1165,12 +1167,13 @@ end
 --- step was actually waiting for its pacing timer.
 --- @param reason string What the log names the cause.
 function M.drop_tone(reason)
+	_tone_generation = _tone_generation + 1
+	if _cancel_selection then pcall(_cancel_selection) end
 	if _tone_timer then
 		_scheduler.cancel(_tone_timer)
 		_tone_timer = nil
 		Logger.debug(LOG, "Paced tone step dropped (%s).", tostring(reason))
 	end
-	_tone_generation = _tone_generation + 1
 end
 
 --- The focused window's identity, "" when unknown.
@@ -1181,13 +1184,23 @@ current_focus = function()
 	return (ok and type(id) == "string") and id or ""
 end
 
+--- Retains an action's authority across asynchronous native observations.
+--- @param epoch integer Original AI request epoch.
+--- @param generation integer Original tone generation.
+--- @return boolean current
+local function selection_current(epoch, generation)
+	return not _runtime_closed and not _scope_owner and _enabled and not _is_paused()
+		and epoch == _request_epoch and generation == _tone_generation
+end
+
 --- Replaces the selection with a tone step's rewrite, when that is still safe.
 --- @param generation integer The step's generation.
 --- @param plan table The tone.plan() result.
 --- @param focus string The focused window's identity when the step was sent.
+--- @param receipt table|nil Opaque original selected-range receipt.
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
-local function finish_tone(generation, plan, focus, full_text, err)
+local function finish_tone(generation, plan, focus, receipt, full_text, err)
 	if _runtime_closed or _scope_owner then return end
 	if generation ~= _tone_generation then
 		Logger.debug(LOG, "Tone answer ignored: a newer step or an edit superseded it.")
@@ -1195,6 +1208,7 @@ local function finish_tone(generation, plan, focus, full_text, err)
 	end
 	-- The step is settled: a late second callback finds no current generation.
 	_tone_generation = _tone_generation + 1
+	local epoch, committed_generation = _request_epoch, _tone_generation
 	if _is_paused() or not _enabled then
 		Logger.info(LOG, "Tone answer dropped: the AI was paused or switched off while it ran.")
 		return
@@ -1214,19 +1228,19 @@ local function finish_tone(generation, plan, focus, full_text, err)
 		Logger.info(LOG, "Tone rewrite dropped: another window took the focus while it ran.")
 		return
 	end
-	local ok, replaced = pcall(_replace_selection, text)
-	if not ok or replaced ~= true then
-		Logger.error(LOG, "Tone rewrite could not replace the selection: %s",
-			ok and "injection refused" or tostring(replaced))
-		return
+	local function authorized() return selection_current(epoch, committed_generation) end
+	local function replaced(committed)
+		if committed ~= true or not authorized() then return end
+		_tone_memory = Tone.remember(plan, text)
+		Logger.info(LOG, "Selection rewritten to %s (%d byte(s)).", plan.profile_id, #text)
+		if _on_output then
+			-- No context: the daemon attributes the output to the focused application.
+			local observed, observe_err = pcall(_on_output, text, nil)
+			if not observed then Logger.warn(LOG, "Tone output observer failed: %s", tostring(observe_err)) end
+		end
 	end
-	_tone_memory = Tone.remember(plan, text)
-	Logger.info(LOG, "Selection rewritten to %s (%d byte(s)).", plan.profile_id, #text)
-	if _on_output then
-		-- No context: the daemon attributes the output to the focused application.
-		local observed, observe_err = pcall(_on_output, text, nil)
-		if not observed then Logger.warn(LOG, "Tone output observer failed: %s", tostring(observe_err)) end
-	end
+	local ok, accepted = pcall(_replace_selection, text, receipt, authorized, replaced)
+	if not ok or accepted ~= true then Logger.error(LOG, "Tone rewrite selection verification was refused.") end
 end
 
 --- Rewrites the selection one register along the tone ladder and replaces it,
@@ -1235,7 +1249,7 @@ end
 --- step while one is waiting supersedes it.
 --- @param direction number Tone.MORE_FORMAL or Tone.MORE_FAMILIAR.
 --- @param cycle boolean Wrap around at the ends of the ladder.
---- @return boolean requested True when the rewrite request was started.
+--- @return boolean accepted True when capture/rewrite workflow was accepted.
 function M.shift_tone(direction, cycle)
 	if _runtime_closed or _scope_owner then return false end
 	local step = nil
@@ -1269,96 +1283,103 @@ function M.shift_tone(direction, cycle)
 		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
-	local read_ok, selection, read_err = _read_selection()
-	if current_focus() ~= focus then
-		Logger.info(LOG, "Tone step refused: focus changed while the selection was read.")
-		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
-		return false
-	end
-	if not read_ok then
-		if read_err == "no_selection" then
-			Logger.info(LOG, "Tone step ignored: nothing is selected.")
-		else
-			Logger.warn(LOG, "Tone step ignored: the selection could not be read (%s).", tostring(read_err))
+	local origin_epoch, origin_generation = _request_epoch, _tone_generation
+	local function authorized() return selection_current(origin_epoch, origin_generation) end
+	local completed
+	local function captured(read_ok, selection, read_err, receipt)
+		if not authorized() then return false end
+		if current_focus() ~= focus or not authorized() then
+			Logger.info(LOG, "Tone step refused: focus changed while the selection was read.")
+			show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+			return false
 		end
-		return false
-	end
-	local plan, why = Tone.plan(selection, _tone_memory, direction, cycle == true)
-	if not plan then
-		if why == "end_of_ladder" then
-			Logger.info(LOG, "Tone step refused: already at the end of the ladder.")
-			show_notice(step.end_key, why)
-		else
-			Logger.info(LOG, "Tone step ignored: the selection is blank.")
-		end
-		return false
-	end
-	-- By exact id, like a prompt action: a missing ladder profile is a broken
-	-- catalogue, never replaced by another prompt.
-	local profile = ProfileSettings.resolve_id(plan.profile_id)
-	if not profile then
-		Logger.error(LOG, "Tone step refused: the built-in prompt '%s' is missing.", plan.profile_id)
-		return false
-	end
-	local backend, target, model, runtime_response = M.resolve_backend()
-	if not backend then return false end
-	local system_prompt = resolve_system_prompt(profile, {
-		min_words = Settings.get("min_words"),
-		max_words = Settings.get("max_words"),
-		language = prompt_language(),
-	}, 1)
-	if type(system_prompt) ~= "string" or system_prompt == "" then
-		Logger.error(LOG, "Tone prompt '%s' has no usable system prompt.", plan.profile_id)
-		return false
-	end
-	-- The backends serve one request at a time: a prediction in flight or on
-	-- offer is withdrawn, or its callback would never come and block the next.
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
-	if _predicting or #_suggestions > 0 then M.dismiss() end
-
-	local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
-	local generation = _tone_generation
-	local request_opts = {
-		runtime_response = runtime_response,
-		stream = false,
-		verify_local_model = verify_local_model == true,
-		temperature = Settings.get("temperature"),
-		max_tokens = Rewrite.max_tokens(plan.source),
-		line_mode = true,
-	}
-	Logger.info(LOG, "Sending tone rewrite (backend=%s, model=%s, profile=%s, %d byte(s)).",
-		M.get_backend(), model, plan.profile_id, #plan.source)
-
-	local send
-	send = function()
-		if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
-		local kind = M.get_backend()
-		local now = _clock_ms()
-		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
-		if wait_ms > 0 then
-			_tone_timer = _scheduler.after(wait_ms / 1000, function()
-				_tone_timer = nil
-				send()
-			end)
-			if type(_tone_timer) ~= "table" or _tone_timer.armed ~= true then
-				_tone_timer = nil
-				Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
+		if not read_ok then
+			if read_err == "no_selection" then
+				Logger.info(LOG, "Tone step ignored: nothing is selected.")
+			else
+				Logger.warn(LOG, "Tone step ignored: the selection could not be read (%s).", tostring(read_err))
 			end
-			return
+			return false
 		end
-		if global_privacy_blocks() or current_focus() ~= focus then
-			Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
-			return
+		local plan, why = Tone.plan(selection, _tone_memory, direction, cycle == true)
+		if not plan then
+			if why == "end_of_ladder" then
+				Logger.info(LOG, "Tone step refused: already at the end of the ladder.")
+				show_notice(step.end_key, why)
+			else
+				Logger.info(LOG, "Tone step ignored: the selection is blank.")
+			end
+			return false
 		end
-		_last_request_ms[kind] = now
-		-- Not the prediction's _inflight_backend: a dropped step is left to finish
-		-- and ignored, and the next request on that backend cancels it anyway.
-		backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
-			finish_tone(generation, plan, focus, full_text, err)
-		end)
+		-- By exact id, like a prompt action: a missing ladder profile is a broken
+		-- catalogue, never replaced by another prompt.
+		local profile = ProfileSettings.resolve_id(plan.profile_id)
+		if not profile then
+			Logger.error(LOG, "Tone step refused: the built-in prompt '%s' is missing.", plan.profile_id)
+			return false
+		end
+		local backend, target, model, runtime_response = M.resolve_backend()
+		if not backend then return false end
+		local system_prompt = resolve_system_prompt(profile, {
+			min_words = Settings.get("min_words"),
+			max_words = Settings.get("max_words"),
+			language = prompt_language(),
+		}, 1)
+		if type(system_prompt) ~= "string" or system_prompt == "" then
+			Logger.error(LOG, "Tone prompt '%s' has no usable system prompt.", plan.profile_id)
+			return false
+		end
+		-- The backends serve one request at a time: a prediction in flight or on
+		-- offer is withdrawn, or its callback would never come and block the next.
+		if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+		if _predicting or #_suggestions > 0 then M.dismiss() end
+
+		local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
+		local generation = origin_generation
+		local request_opts = {
+			runtime_response = runtime_response,
+			stream = false,
+			verify_local_model = verify_local_model == true,
+			temperature = Settings.get("temperature"),
+			max_tokens = Rewrite.max_tokens(plan.source),
+			line_mode = true,
+		}
+		Logger.info(LOG, "Sending tone rewrite (backend=%s, model=%s, profile=%s, %d byte(s)).",
+			M.get_backend(), model, plan.profile_id, #plan.source)
+
+		local send
+		send = function()
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			local kind = M.get_backend()
+			local now = _clock_ms()
+			local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
+			if wait_ms > 0 then
+				_tone_timer = _scheduler.after(wait_ms / 1000, function()
+					_tone_timer = nil
+					send()
+				end)
+				if type(_tone_timer) ~= "table" or _tone_timer.armed ~= true then
+					_tone_timer = nil
+					Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
+				end
+				return
+			end
+			if global_privacy_blocks() or current_focus() ~= focus then
+				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
+				return
+			end
+			_last_request_ms[kind] = now
+			-- Not the prediction's _inflight_backend: a dropped step is left to finish
+			-- and ignored, and the next request on that backend cancels it anyway.
+			backend.chat(target, model, messages, request_opts, nil, function(full_text, err)
+				finish_tone(generation, plan, focus, receipt, full_text, err)
+			end)
+		end
+		send()
+		return true
 	end
-	send()
-	return true
+	local accepted = _read_selection(focus, authorized, function(...) completed = captured(...) end)
+	return accepted == true and completed ~= false
 end
 
 --- Deletes a capture's image and its private directory. A file that is still
@@ -1850,7 +1871,7 @@ end
 --- selected as a tone step leaves it. Escape, a dismiss or typing leave the
 --- text untouched; a newer trigger supersedes the one in flight.
 --- @param value string The binding's parameter, "ui" or a locale code.
---- @return boolean requested True when the translation request was started.
+--- @return boolean accepted True when capture/translation workflow was accepted.
 function M.translate_selection(value)
 	if _runtime_closed or _scope_owner then return false end
 	if not _read_selection or not _replace_selection then
@@ -1891,54 +1912,62 @@ function M.translate_selection(value)
 		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
-	local read_ok, selection, read_err = _read_selection()
-	if current_focus() ~= focus then
-		Logger.info(LOG, "Translation refused: focus changed while the selection was read.")
-		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
-		return false
-	end
-	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
-		if read_ok or read_err == "no_selection" then
-			Logger.info(LOG, "Translation refused: nothing is selected.")
-			show_notice(TRANSLATE_NO_SELECTION_KEY, "no_selection")
-		else
-			Logger.warn(LOG, "Translation ignored: the selection could not be read (%s).", tostring(read_err))
+	local origin_epoch, origin_generation = _request_epoch, _tone_generation
+	local function authorized() return selection_current(origin_epoch, origin_generation) end
+	local completed
+	local function captured(read_ok, selection, read_err, receipt)
+		if not authorized() then return false end
+		if current_focus() ~= focus or not authorized() then
+			Logger.info(LOG, "Translation refused: focus changed while the selection was read.")
+			show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+			return false
 		end
-		return false
-	end
-	local backend, backend_target, model, runtime_response = M.resolve_backend()
-	if not backend then
-		Logger.info(LOG, "Translation refused (backend_not_ready).")
-		show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
-		return false
-	end
-	-- One offer at a time: a screen reading in flight would replace this one,
-	-- and a tone step would rewrite the text being translated.
-	M.drop_vision("superseded")
-	M.drop_tone("superseded")
-	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus)
-	local messages = {
-		{ role = "system", content = Translate.system_prompt(config, language) },
-		{ role = "user", content = Translate.user_text(config, selection) },
-	}
-	Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
-		M.get_backend(), model, code, #selection)
-	send_paced(epoch, "Translation", function()
-		if current_focus() ~= focus then
-			Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
+		if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
+			if read_ok or read_err == "no_selection" then
+				Logger.info(LOG, "Translation refused: nothing is selected.")
+				show_notice(TRANSLATE_NO_SELECTION_KEY, "no_selection")
+			else
+				Logger.warn(LOG, "Translation ignored: the selection could not be read (%s).", tostring(read_err))
+			end
+			return false
+		end
+		local backend, backend_target, model, runtime_response = M.resolve_backend()
+		if not backend then
+			Logger.info(LOG, "Translation refused (backend_not_ready).")
+			show_notice(MANUAL_REFUSAL_KEYS.backend_not_ready, "backend_not_ready")
+			return false
+		end
+		-- One offer at a time: a screen reading in flight would replace this one,
+		-- and a tone step would rewrite the text being translated.
+		M.drop_vision("superseded")
+		M.drop_tone("superseded")
+		local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus)
+		_suggestion_context.selection_receipt = receipt
+		local messages = {
+			{ role = "system", content = Translate.system_prompt(config, language) },
+			{ role = "user", content = Translate.user_text(config, selection) },
+		}
+		Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
+			M.get_backend(), model, code, #selection)
+		send_paced(epoch, "Translation", function()
+			if current_focus() ~= focus then
+				Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
+				_predicting = false
+				clear_offer()
+				return
+			end
+			_inflight_backend = backend
+			backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
+				function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
+		end, function()
 			_predicting = false
 			clear_offer()
-			return
-		end
-		_inflight_backend = backend
-		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
-			function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
-	end, function()
-		_predicting = false
-		clear_offer()
-		show_notice(TRANSLATE_FAILED_KEY, "failed")
-	end)
-	return true
+			show_notice(TRANSLATE_FAILED_KEY, "failed")
+		end)
+		return true
+	end
+	local accepted = _read_selection(focus, authorized, function(...) completed = captured(...) end)
+	return accepted == true and completed ~= false
 end
 
 --- Fills the {1}, {2}… of a translated template with plain values: a value is
@@ -2262,17 +2291,24 @@ function M.agent_selection()
 		return false
 	end
 	local window = focused_window()
-	local read_ok, selection, read_err = _read_selection()
-	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
-		if read_ok or read_err == "no_selection" then
-			Logger.info(LOG, "Agent selection refused: nothing is selected.")
-			show_notice(AGENT_KEYS.no_selection, "no_selection")
-		else
-			Logger.warn(LOG, "Agent selection ignored: the selection could not be read (%s).", tostring(read_err))
+	local focus, origin_epoch, origin_generation = current_focus(), _request_epoch, _tone_generation
+	local function authorized() return selection_current(origin_epoch, origin_generation) end
+	local completed
+	local function captured(read_ok, selection, read_err)
+		if not authorized() then return false end
+		if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
+			if read_ok or read_err == "no_selection" then
+				Logger.info(LOG, "Agent selection refused: nothing is selected.")
+				show_notice(AGENT_KEYS.no_selection, "no_selection")
+			else
+				Logger.warn(LOG, "Agent selection ignored: the selection could not be read (%s).", tostring(read_err))
+			end
+			return false
 		end
-		return false
+		return run_agent("selection", selection, { chat = chat, config = config, window = window })
 	end
-	return run_agent("selection", selection, { chat = chat, config = config, window = window })
+	local accepted = _read_selection(focus, authorized, function(...) completed = captured(...) end)
+	return accepted == true and completed ~= false
 end
 
 --- The llm_agent_command action: System 2 reads a command the user types in a
@@ -2655,10 +2691,12 @@ local function close_accepted_offer()
 	end
 end
 
---- Accepts one displayed prediction after the daemon commits its physical edit.
+--- Accepts one displayed prediction, or starts selection verification.
+--- Selection offers close only after the asynchronous physical commit ACK.
 --- @param index integer
---- @return boolean
-function M.accept(index)
+--- @param complete function Actual physical/connector commit callback.
+--- @return boolean accepted Workflow accepted; selection commit may be pending.
+local function accept_candidate(index, complete)
 	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
@@ -2675,6 +2713,7 @@ function M.accept(index)
 			local agent = _suggestion_context and _suggestion_context.agent or nil
 			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
 			close_accepted_offer()
+			complete(true)
 			return true
 		end
 	elseif candidate.replaces_selection then
@@ -2687,7 +2726,32 @@ function M.accept(index)
 			Logger.info(LOG, "Translation not inserted: another window has the focus.")
 			return false
 		end
-		ok, committed = pcall(_replace_selection, candidate.to_type)
+		local context, epoch, generation = _suggestion_context, _request_epoch, _tone_generation
+		if context.selection_accepting then return false end
+		local pending = {}
+		context.selection_accepting = pending
+		local function authorized()
+			return selection_current(epoch, generation) and _suggestion_context == context
+				and context.selection_accepting == pending and _suggestions[tonumber(index)] == candidate
+		end
+		local completed
+		ok, committed = pcall(_replace_selection, candidate.to_type, context.selection_receipt, authorized, function(ack)
+			if not authorized() then complete(false); return end
+			context.selection_accepting = nil
+			completed = ack == true
+			if not completed then complete(false); return end
+			if _on_output then pcall(_on_output, candidate.to_type, context) end
+			if _suggestion_context ~= context or epoch ~= _request_epoch then complete(true); return end
+			close_accepted_offer()
+			if _engine and type(_engine.reset) == "function" then _engine:reset() end
+			_buffer_focus = nil
+			complete(true)
+		end)
+		if not ok or committed ~= true then
+			if context.selection_accepting == pending then context.selection_accepting = nil end
+			return false
+		end
+		return completed ~= false
 	else
 		if type(_apply_prediction) ~= "function" then return false end
 		local focus = _suggestion_context and _suggestion_context.focus or ""
@@ -2710,7 +2774,24 @@ function M.accept(index)
 	-- The accepted text is not asked about again until the user types.
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
 	_buffer_focus = nil
+	complete(true)
 	return true
+end
+
+--- Accepts an offer or starts its native selection verification.
+--- @param index integer Candidate index.
+--- @param on_complete function|nil Receives actual physical/connector commit ACK.
+--- @return boolean accepted Workflow admission, not an asynchronous commit receipt.
+function M.accept(index, on_complete)
+	local completed = false
+	local function complete(committed)
+		if completed then return end
+		completed = true
+		if type(on_complete) == "function" then pcall(on_complete, committed == true) end
+	end
+	local accepted = accept_candidate(index, complete)
+	if accepted ~= true then complete(false) end
+	return accepted
 end
 
 function M.select(index)
@@ -2873,7 +2954,12 @@ function M.shutdown_runtime()
 	local probe_closed = not _enable_admission or _enable_admission.cancel() == true
 	local download_closed = M.cancel_model_download() == true
 	local runtime_closed = stop_runtime_app()
-	return probe_closed and download_closed and runtime_closed
+	local selection_closed = true
+	if _cancel_selection then
+		local checked, acknowledged = pcall(_cancel_selection)
+		selection_closed = checked and acknowledged == true
+	end
+	return probe_closed and download_closed and runtime_closed and selection_closed
 end
 
 --- Captures existing managed lifetime before origin/settings/native readers run.
@@ -3281,7 +3367,7 @@ function M.set_backend(kind, admit)
 	_enable_generation = _enable_generation + 1
 	local revision, app_epoch = _enable_generation, _runtime_app_epoch
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
-	M.dismiss()
+	M.withdraw()
 	if _runtime_closed or _scope_owner or not admitted("after") then return false end
 	local function current()
 		return not _runtime_closed and _scope_owner == nil
@@ -3358,6 +3444,7 @@ function M.set_model(model_name)
 	_enable_generation = _enable_generation + 1
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	local revision, app_epoch = _enable_generation, _runtime_app_epoch
+	M.withdraw()
 	local function current()
 		return not _runtime_closed and _scope_owner == nil
 			and revision == _enable_generation and app_epoch == _runtime_app_epoch
@@ -3465,6 +3552,10 @@ end
 --- @return boolean quiescent
 function M.quiesce_configuration(owner)
 	if _scope_owner ~= owner then return false end
+	if _cancel_selection then
+		local checked, acknowledged = pcall(_cancel_selection)
+		if not checked or acknowledged ~= true or _scope_owner ~= owner then return false end
+	end
 	if not stop_runtime_app() then return false end
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	if _pending_trigger then

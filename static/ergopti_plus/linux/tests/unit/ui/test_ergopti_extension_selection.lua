@@ -74,7 +74,7 @@ helpers.describe("Shipped Ergopti native menu (Linux)", function()
 					key_text = function(code) return code == 36 and "j" or nil end,
 					defer = function(callback) queued[#queued + 1] = callback; return true end,
 				})
-				Config.init({ load_mappings = function() return true end }, nil)
+				Config.init(require("hotstring_engine").new(), nil)
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed, "the real bundled and shipped extension catalogue initializes")
 				local category = Config.get_category("magickey")

@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local run_contract = function(helpers,load_manager,load_host)
  local function fixture(body)
   local loaded={};for name,value in pairs(package.loaded)do loaded[name]=value end
-  local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0}
+  local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0,ucms={},replies={}}
   local manager
   local noop=function()end
   package.loaded['logger.shim']={success=noop,info=noop,debug=noop,warn=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
@@ -48,9 +48,11 @@ local run_contract = function(helpers,load_manager,load_host)
      if controls.unregister=='throw'then error('private unregister detail')end
      if controls.unregister=='false'then return false end
     end
+    controls.ucms[#controls.ucms+1]=ucm
     return ucm
    end,WebView=function()
     local view={alive=true}
+    function view:run_javascript(code)controls.replies[#controls.replies+1]={view=self,code=code}end
     function view:load_html()if controls.load then error('private load detail')end;if controls.child_during_load then self:destroy()end end
     function view:destroy()
      controls.view_destroy_calls=controls.view_destroy_calls+1
@@ -83,7 +85,7 @@ local run_contract = function(helpers,load_manager,load_host)
    controls.idle_handlers[#controls.idle_handlers+1]=fn
   end}
   package.loaded['infra.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
-  package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function()return true end,
+  package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
   local called,detail=pcall(function()
    local titles=require('window_titles');package.loaded['window_titles']={compose=titles.compose,key_for_app=function(app)if app=='physical_shortcuts'then return 'physical_shortcuts.window_title'end;return titles.key_for_app(app)end}
@@ -102,6 +104,92 @@ local run_contract = function(helpers,load_manager,load_host)
   if not called then error(detail,0)end
  end
  helpers.describe('Actual native WebView acquisition and retirement debt',function()
+  helpers.it('(native-window-owner) renderer termination retires an ordinary page before retry',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
+    c.views[1].on_web_process_terminated()
+    helpers.assert_eq(m.current_epoch('metrics_typing'),nil,'A terminated renderer cannot remain an acknowledged visible page')
+    helpers.assert_eq(c.views[1].alive,false);helpers.assert_eq(c.windows[1].alive,false)
+    helpers.assert_eq(c.closed,{old});helpers.assert_eq(c.release_calls,1)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local current=m.current_epoch('metrics_typing')
+    helpers.assert_true(current>old);helpers.assert_eq(#c.views,2)
+    local released=c.release_calls;c.views[1].on_web_process_terminated()
+    helpers.assert_eq(m.current_epoch('metrics_typing'),current);helpers.assert_eq(c.views[2].alive,true)
+    helpers.assert_eq(c.release_calls,released,'A retired renderer callback cannot release a successor')
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
+  helpers.it('(native-window-owner) renderer retirement refusal retains debt and blocks stale writes',function()
+   fixture(function(m,c)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
+    c.view_destroy='no_ack';c.views[1].on_web_process_terminated()
+    helpers.assert_eq(m.current_epoch('metrics_typing'),old)
+    helpers.assert_eq(m.page_current('metrics_typing',old),false,'Renderer death revokes admission even while cleanup is pending')
+    helpers.assert_eq(m.show('metrics_typing','en'),false);helpers.assert_eq(#c.views,1)
+    c.view_destroy=nil;helpers.assert_eq(m.hide('metrics_typing',old),true)
+    helpers.assert_eq(m.show('metrics_typing','en'),true);helpers.assert_eq(#c.views,2)
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
+  for _,mode in ipairs({'close','replace','same'})do
+   helpers.it('(native-window-owner) bridge response retains source owner through handler callback: '..mode,function()
+    fixture(function(m,c)
+     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
+     c.message=function()
+      if mode~='same'then helpers.assert_eq(m.hide('metrics_typing',old),true)end
+      if mode=='replace'then helpers.assert_eq(m.show('metrics_typing','en'),true)end
+      return {source='retired reply'}
+     end
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'request'end}end}
+     c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)
+     helpers.assert_eq(#c.replies,mode=='same'and 1 or 0,'Only the page that issued the request may receive its response')
+     if mode=='same'then helpers.assert_eq(c.replies[1].view,c.views[1])end
+     if mode=='replace'then helpers.assert_true(m.current_epoch('metrics_typing')>old);helpers.assert_eq(c.views[2].alive,true)end
+     helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  for _,mode in ipairs({'close_debt','renderer_debt','closing','cancelled_acquisition','failed_acquisition'})do
+   helpers.it('(bridge-retirement-admission) queued native messages cannot save during '..mode,function()
+    fixture(function(m,c)
+     local writes=0;c.message=function()writes=writes+1;return{saved=true}end
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'save'end}end}
+     local function queued()c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)end
+     if mode=='failed_acquisition'then
+      c.present=function()error('private native presentation failure')end;c.view_destroy='no_ack'
+      helpers.assert_eq(m.show('metrics_typing','en'),false);queued()
+     elseif mode=='cancelled_acquisition'then
+      c.present=function(owner)owner.hide('metrics_typing',owner.current_epoch('metrics_typing'));queued()end
+      helpers.assert_eq(m.show('metrics_typing','en'),false)
+     else
+      helpers.assert_eq(m.show('metrics_typing','en'),true);local epoch=m.current_epoch('metrics_typing')
+      if mode=='closing'then c.on_release=queued;helpers.assert_eq(m.hide('metrics_typing',epoch),true)
+      else
+       c.view_destroy='no_ack'
+       if mode=='renderer_debt'then c.views[1].on_web_process_terminated()
+       else helpers.assert_eq(m.hide('metrics_typing',epoch),false)end
+       helpers.assert_eq(m.current_epoch('metrics_typing'),epoch,'Exact native cleanup debt is retained')
+       helpers.assert_eq(m.page_current('metrics_typing',epoch),false);queued()
+      end
+     end
+     helpers.assert_eq(writes,0,'Retained cleanup authority must never retain the retired page mutation capability')
+     c.view_destroy=nil;c.on_release=nil;helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
+  helpers.it('(bridge-retirement-admission) live native acquisition still admits its ready callback',function()
+   fixture(function(m,c)
+    local ready=0;c.message=function()ready=ready+1;return{ready=true}end
+    c.present=function(owner)
+     c.provisional=not owner.page_current('metrics_typing',owner.current_epoch('metrics_typing'))
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'ready'end}end}
+     c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)
+    end
+    helpers.assert_eq(m.show('metrics_typing','en'),true);helpers.assert_eq(c.provisional,true)
+    helpers.assert_eq(ready,1);helpers.assert_eq(#c.replies,1)
+    helpers.assert_eq(m.shutdown(),true)
+   end)
+  end)
   helpers.it('(webview-single-pump) reopening pages retains one process-wide GTK handler',function()
    fixture(function(m,c)
     for _=1,25 do

@@ -48,6 +48,16 @@ helpers.describe("linux-callback-error-description", function()
 	end)
 	local native_ok = pcall(require, "luv")
 	if native_ok and package.config:sub(1, 1) == "/" then
+		for _, kind in ipairs({ "object", "string" }) do
+			helpers.it("linux-callback-error-description: completed " .. kind .. " callback retires an overdue watchdog", function()
+				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+				local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+				local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " after " .. quote(kind) .. " blocked_callback")
+				helpers.assert_true(result == true or result == 0,
+					"the actual successful sibling must acknowledge watchdog retirement before stopping the loop")
+			end)
+		end
 		for _, scenario in ipairs({ "after", "every", "idle", "periodic", "registered idle", "deferred" }) do
 			for _, kind in ipairs({ "object", "string" }) do
 				helpers.it("linux-callback-error-description: actual " .. scenario .. " isolates " .. kind .. " failure", function()

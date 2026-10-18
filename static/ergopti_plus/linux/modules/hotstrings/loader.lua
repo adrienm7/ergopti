@@ -99,7 +99,7 @@ end
 --- @param path string Absolute path to a .toml file.
 --- @return string
 local function category_of(path)
-	local stem = path:match("([^/\\]+)%.toml$")
+	local stem = path:match("([^/]+)%.toml$")
 	return stem or "unknown"
 end
 
@@ -384,6 +384,17 @@ function M.is_pack_file(path)
 	return CatalogueFiles.is_category_file(path)
 end
 
+--- Decodes native find records without treating valid filename bytes as syntax.
+--- POSIX filenames can contain newlines, carriage returns and trailing spaces.
+--- @param output string NUL-terminated native path records.
+--- @return table paths Exact native paths.
+local function discovered_paths(output)
+	assert(output == "" or output:sub(-1) == "\0", "native discovery returned incomplete path framing")
+	local paths = {}
+	for path in output:gmatch("([^%z]+)%z") do paths[#paths + 1] = path end
+	return paths
+end
+
 --- Scans a directory tree and returns every hotstring pack in it.
 --- Useful for pointing the loader at ~/.config/ergopti/hotstrings/.
 --- @param dir string Absolute path to the root directory to scan.
@@ -398,9 +409,8 @@ function M.find_toml_files(dir, max_directory_depth)
 	local result = {}
 	local limit = max_directory_depth and (" -maxdepth " .. tostring(max_directory_depth)) or ""
 	local out = Shell.exec(string.format(
-		"find %s%s -type f -name '*.toml' 2>/dev/null", Shell.quote(dir), limit))
-	for line in out:gmatch("[^\r\n]+") do
-		local path = line:match("^%s*(.-)%s*$")
+		"find %s%s -type f -name '*.toml' -print0 2>/dev/null", Shell.quote(dir), limit))
+	for _, path in ipairs(discovered_paths(out)) do
 		if M.is_pack_file(path) then result[#result + 1] = path end
 	end
 
@@ -429,9 +439,9 @@ function M.unavailable_directories(dir, max_directory_depth)
 	end
 	local prefix = dir:gsub("/+$", "") .. "/"
 	local rows = {}
-	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print 2>/dev/null",
+	local out = Shell.exec(string.format("find %s -maxdepth %d \\( -type l -o -type d \\) -print0 2>/dev/null",
 		Shell.quote(dir), max_directory_depth))
-	for path in out:gmatch("[^\r\n]+") do
+	for _, path in ipairs(discovered_paths(out)) do
 		if path:sub(1, #prefix) == prefix then
 			local relative = path:sub(#prefix + 1)
 			local depth = 0; for _ in relative:gmatch("[^/]+") do depth = depth + 1 end
@@ -459,9 +469,8 @@ function M.list_subdirs(dir)
 	if type(dir) ~= "string" or dir == "" then return {} end
 	local result = {}
 	local out = Shell.exec(string.format(
-		"find %s -mindepth 1 -maxdepth 1 -type d 2>/dev/null", Shell.quote(dir)))
-	for line in out:gmatch("[^\r\n]+") do
-		local path = line:match("^%s*(.-)%s*$")
+		"find %s -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null", Shell.quote(dir)))
+	for _, path in ipairs(discovered_paths(out)) do
 		if path ~= "" then result[#result + 1] = path end
 	end
 	return result

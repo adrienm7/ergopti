@@ -46,6 +46,39 @@ local function subject()
 end
 
 helpers.describe("api_ollama: asynchronous streaming", function()
+	for _, specimen in ipairs({
+		{ name = "provider-LF", record = '{"error":"fixture inference failed"}', ending = "\n" },
+		{ name = "provider-EOF", record = '{"error":"fixture inference failed"}', ending = "" },
+		{ name = "malformed-LF", record = "{not JSON}", ending = "\n" },
+		{ name = "malformed-EOF", record = "{not JSON}", ending = "" },
+	}) do
+		helpers.it("rejects failed stream records after partial text " .. specimen.name .. " (ollama-stream-provider-error)", function()
+			local api, transport, restore = subject()
+			local ok, failure = pcall(function()
+				local chunks, terminals = {}, {}
+				api.chat("http://127.0.0.1:11434", "test-model", {}, { stream = true },
+					function(text) chunks[#chunks + 1] = text end,
+					function(text, err) terminals[#terminals + 1] = { text = text, error = err } end)
+				local request = assert(transport.requests[1])
+				request.on_chunk('{"message":{"content":"partial"},"done":false}\n')
+				request.on_chunk(specimen.record .. specimen.ending)
+				if specimen.ending ~= "" then request.on_chunk('{"message":{"content":"must not publish"}}\n') end
+				helpers.assert_eq(#terminals, 0, "the original transport still owns completion")
+				helpers.assert_true(api.is_active(), "the active native owner is retained until settlement")
+				request.on_done({ ok = true, status = 200 })
+				helpers.assert_eq(#terminals, 1)
+				helpers.assert_true(type(terminals[1].error) == "string" and terminals[1].error ~= "",
+					"an explicit provider failure cannot be a successful partial answer")
+				helpers.assert_eq(table.concat(chunks), "partial", "failure suppresses subsequent tokens")
+				helpers.assert_eq(api.is_active(), false)
+				request.on_done({ ok = true, status = 200 })
+				helpers.assert_eq(#terminals, 1, "late transport completion cannot publish twice")
+			end)
+			restore()
+			if not ok then error(failure, 0) end
+		end)
+	end
+
 	helpers.it("returns before a slow response and frames split NDJSON chunks", function()
 		local api, transport, restore = subject()
 		local chunks = {}

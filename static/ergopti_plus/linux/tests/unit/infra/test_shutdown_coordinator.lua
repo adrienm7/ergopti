@@ -175,8 +175,9 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close()
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
-		local state = { closed = false, context_closed = false, watch_closed = false, stops = 0, loops = 0, cancelled = 0 }
+		local state = { closed = false, context_closed = false, watch_closed = false, metrics_closed = false, stops = 0, loops = 0, cancelled = 0 }
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
+			keylogger = { stop = function() return state.metrics_closed end },
 			privacy_owners = {
 				context = { stop = function() return state.context_closed end },
 				watch = { stop = function() return state.watch_closed end },
@@ -213,6 +214,9 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		helpers.assert_eq(coordinator.poll(), false, "one privacy ACK cannot retire both owners")
 		helpers.assert_eq(state.loops, 0)
 		state.watch_closed = true
+		helpers.assert_eq(coordinator.poll(), false, "SQLite cleanup is independent from both privacy ACKs")
+		helpers.assert_eq(state.loops, 0)
+		state.metrics_closed = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")

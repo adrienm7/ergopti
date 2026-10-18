@@ -192,3 +192,173 @@ helpers.describe("clipboard file-selection probe (text/uri-list)", function()
 		end)
 	end)
 end)
+
+--- Exercises the production asynchronous range owner with native ACK boundaries.
+--- @param body function
+local function with_native_selection(body)
+	local names = { "adapters.selection_transaction", "adapters.atspi_focus", "infra.monotonic" }
+	local previous = {}
+	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
+	local world = { now = 0, focus = "atspi::1.2:/field", allowed = true, starts = 0,
+		emitted = 0, first = 0, last = 6, text = "ORIGIN" }
+	local adapter = { cached_snapshot = function()
+		return { native_bus_name = ":1.2", native_object_path = "/field", role = 61 }
+	end }
+	function adapter.start_selection_capture(_, _, callback)
+		world.starts = world.starts + 1
+		local operation, listeners, done = {}, {}, false
+		function operation:is_settled() return done end
+		function operation:on_settled(fn)
+			listeners[#listeners + 1] = fn
+			if done then fn() end
+			if world.fault == "register-throw" then error("accepted registration then threw") end
+			return world.fault ~= "register-refuse"
+		end
+		function operation:cancel() world.cancelled = true; return done end
+		world.deliver = function()
+			done = true
+			callback({ bus = ":1.2", path = "/field", role = 61,
+				first = world.first, last = world.last, text = world.text })
+			for _, fn in ipairs(listeners) do fn() end
+		end
+		if world.inline then world.deliver() end
+		if world.fault == "start-throw" then error("accepted native operation then threw") end
+		if world.fault == "missing-cancel" then operation.cancel = nil end
+		if world.fault == "missing-settled" then operation.is_settled = nil end
+		if world.fault == "missing-registration" then operation.on_settled = nil end
+		return operation
+	end
+	package.loaded["infra.monotonic"] = { now_ms = function() return world.now end }
+	package.loaded["adapters.atspi_focus"], package.loaded["adapters.selection_transaction"] = adapter, nil
+	local owner = require("adapters.selection_transaction").new({
+		focus_id = function()
+			if world.during_focus then local fn = world.during_focus; world.during_focus = nil; fn() end
+			return world.focus
+		end,
+		privacy_guard = function() return world.blocked == true end,
+	})
+	local function authorized() return world.allowed end
+	local function emit()
+		world.emitted = world.emitted + 1
+		return world.ack or { ok = true }
+	end
+	function world.read()
+		local delivered, success, text, receipt = false
+		helpers.assert_true(owner.read(world.focus, authorized, function(ok, value, _, token)
+			delivered, success, text, receipt = true, ok, value, token
+		end))
+		helpers.assert_true(not delivered, "dispatch cannot invent native completion")
+		helpers.assert_true(not owner.is_settled())
+		world.deliver()
+		helpers.assert_true(delivered and success)
+		helpers.assert_eq(text, "ORIGIN")
+		helpers.assert_true(owner.is_settled())
+		return receipt
+	end
+	function world.replace(receipt)
+		local delivered, committed = false
+		owner.replace(receipt, "rewritten", authorized, emit, function(ok) delivered, committed = true, ok end)
+		if not delivered then world.deliver() end
+		helpers.assert_true(delivered)
+		return committed
+	end
+	local ok, err = pcall(body, owner, world, authorized, emit)
+	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
+	helpers.assert_true(ok, tostring(err))
+end
+
+helpers.describe("asynchronous native selected-range transactions", function()
+	helpers.it("ai-pass2-span commits the original range only once after the physical ACK", function()
+		with_native_selection(function(_, world)
+			local receipt = world.read()
+			helpers.assert_true(world.replace(receipt))
+			helpers.assert_true(not world.replace(receipt))
+			helpers.assert_eq(world.emitted, 1)
+			helpers.assert_eq(world.starts, 2)
+		end)
+	end)
+	for _, changed in ipairs({ "offset", "text", "focus", "privacy", "authorization" }) do
+		helpers.it("ai-pass2-span refuses changed " .. changed .. " before any physical edit", function()
+			with_native_selection(function(_, world)
+				local receipt = world.read()
+				if changed == "offset" then world.first, world.last = 14, 20
+				elseif changed == "text" then world.text = "SECOND"
+				elseif changed == "focus" then world.focus = "atspi::1.2:/other"
+				elseif changed == "privacy" then world.blocked = true
+				else world.allowed = false end
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_eq(world.emitted, 0)
+			end)
+		end)
+	end
+	for index, ack in ipairs({ { ok = false }, {}, true }) do
+		helpers.it("ai-pass2-span rejects an absent or refused physical success receipt " .. index, function()
+			with_native_selection(function(_, world)
+				local receipt = world.read()
+				world.ack = ack
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_true(not world.replace(receipt))
+				helpers.assert_eq(world.emitted, 1)
+			end)
+		end)
+	end
+	for _, action in ipairs({ "cancel", "stop", "timeout", "authorization", "privacy", "focus" }) do
+		helpers.it("ai-pass2-span retains " .. action .. " cleanup until actual native ACK", function()
+			with_native_selection(function(owner, world, authorized)
+				local delivered, success = false
+				helpers.assert_true(owner.read(world.focus, authorized, function(ok) delivered, success = true, ok end))
+				if action == "cancel" then helpers.assert_true(not owner.cancel())
+				elseif action == "stop" then helpers.assert_true(not owner.stop())
+				elseif action == "timeout" then world.now = 1001
+				elseif action == "privacy" then world.blocked = true
+				elseif action == "focus" then world.focus = "atspi::1.2:/other"
+				else world.allowed = false end
+				helpers.assert_true(not delivered)
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				helpers.assert_eq(world.starts, 1)
+				world.deliver()
+				helpers.assert_true(delivered and not success)
+				helpers.assert_true(owner.is_settled())
+				if action == "stop" then
+					helpers.assert_true(owner.stop())
+					helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				end
+			end)
+		end)
+	end
+	for _, fault in ipairs({ "start-throw", "missing-cancel", "missing-settled", "missing-registration", "register-throw", "register-refuse" }) do
+		helpers.it("ai-pass2-span retains inconclusive acquired ownership after " .. fault, function()
+			with_native_selection(function(owner, world, authorized)
+				world.fault = fault
+				local callbacks = 0
+				helpers.assert_true(not owner.read(world.focus, authorized, function() callbacks = callbacks + 1 end))
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+				helpers.assert_true(not owner.stop())
+				world.deliver()
+				helpers.assert_eq(callbacks, 0, "late completion cannot invent missing native lifetime authority")
+				helpers.assert_true(not owner.is_settled())
+				helpers.assert_true(not owner.stop())
+				helpers.assert_eq(world.starts, 1)
+			end)
+		end)
+	end
+	helpers.it("ai-pass2-span handles inline native settlement after subscription ACK", function()
+		with_native_selection(function(owner, world, authorized)
+			world.inline = true
+			local completed = false
+			helpers.assert_true(owner.read(world.focus, authorized, function(ok) completed = ok end))
+			helpers.assert_true(completed and owner.is_settled())
+		end)
+	end)
+	helpers.it("ai-pass2-span fences reentry before native dispatch and cannot pump libuv", function()
+		with_native_selection(function(owner, world, authorized)
+			world.during_focus = function()
+				helpers.assert_true(not owner.read(world.focus, authorized, function() end))
+			end
+			world.read()
+			helpers.assert_eq(world.starts, 1)
+		end)
+	end)
+end)

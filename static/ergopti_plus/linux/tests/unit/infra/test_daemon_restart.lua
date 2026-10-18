@@ -52,6 +52,31 @@ helpers.describe("daemon restart", function()
 		helpers.assert_contains(record.commands[1], "setsid sh -c")
 	end)
 
+	helpers.it("(linux-cgroup-unit-owner) relays a daemon in a different unit sharing the service prefix", function()
+		for _, suffix in ipairs({ "-backup.service", ".scope", "2", "-helper.slice" }) do
+			local cgroup = "0::/user.slice/app.slice/" .. Restarter.UNIT .. suffix .. "\n"
+			local opts, record = fixture(cgroup, { kind = "standalone", wrapper = LAUNCHER })
+			helpers.assert_eq(DaemonRestart.restart(opts), "relay",
+				"a similarly named cgroup cannot restart this process through Ergopti's service")
+			helpers.assert_eq(record.resolved, 1, "the actual standalone installation must be resolved")
+			helpers.assert_contains(record.commands[1], "setsid sh -c")
+		end
+	end)
+
+	helpers.it("(linux-cgroup-unit-owner) recognizes exact service ancestors in v1 and v2 records", function()
+		for _, cgroup in ipairs({
+			"0::/" .. Restarter.UNIT .. "\n",
+			"0::/user.slice/" .. Restarter.UNIT .. "/workers\n",
+			"12:name=systemd:/user.slice/" .. Restarter.UNIT .. "\n9:cpu:/other\n",
+			"9:cpu:/other\n12:name=systemd:/user.slice/" .. Restarter.UNIT .. "/workers\n",
+		}) do
+			local opts, record = fixture(cgroup, nil)
+			helpers.assert_eq(DaemonRestart.restart(opts), "systemd")
+			helpers.assert_eq(record.resolved, 0)
+			helpers.assert_eq(record.commands, { "systemctl --user --no-block restart " .. Restarter.UNIT })
+		end
+	end)
+
 	helpers.it("refuses to exit a daemon no launcher can bring back", function()
 		for _, context in ipairs({
 			{ kind = "package", reason = "owned by the system package manager" },

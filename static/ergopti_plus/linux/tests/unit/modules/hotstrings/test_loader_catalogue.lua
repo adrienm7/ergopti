@@ -509,3 +509,138 @@ helpers.describe("common autocorrection interleaved source order", function()
 		actual_catalogue("autocorrection", { "caps" })
 	end)
 end)
+
+
+helpers.describe("native hotstring discovery preserves filename bytes", function()
+	helpers.it("loads literal newline and carriage-return filenames (native-discovery-framing)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows forbids CR/LF filename bytes")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		local relatives = { "line\nbreak.toml", "return\rname.toml", "nested\nfolder/words.toml" }
+		assert(Shell.run("mkdir -p " .. Shell.quote(root .. "/nested\nfolder")))
+		local ok, err = pcall(function()
+			local expected = {}
+			for index, relative in ipairs(relatives) do
+				local path = root .. "/" .. relative
+				local handle = assert(io.open(path, "w"))
+				assert(handle:write('[probe]\n"probe' .. index .. '" = { output = "kept", auto_expand = true }\n'))
+				assert(handle:close())
+				expected[#expected + 1] = path
+			end
+			local Loader = helpers.load_module("modules.hotstrings.loader")
+			local discovered = Loader.find_toml_files(root)
+			table.sort(expected); table.sort(discovered)
+			helpers.assert_eq(discovered, expected, "native filenames must not become separate or truncated sources")
+			local catalogue = Loader.load_catalogue(discovered)
+			helpers.assert_eq(catalogue.committed, true)
+			helpers.assert_eq(#catalogue.mappings, #relatives, "each discovered source must remain readable")
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("keeps literal whitespace in extension-directory routes (native-discovery-framing)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows forbids CR/LF filename bytes")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		local expected = { root .. "/line\nbreak", root .. "/return\rname", root .. "/trailing " }
+		for _, path in ipairs(expected) do assert(Shell.run("mkdir -p " .. Shell.quote(path))) end
+		local ok, err = pcall(function()
+			local discovered = helpers.load_module("modules.hotstrings.loader").list_subdirs(root)
+			table.sort(expected); table.sort(discovered)
+			helpers.assert_eq(discovered, expected, "native extension names must preserve every filename byte")
+			local diagnostics = helpers.load_module("modules.hotstrings.loader").unavailable_directories(root, 1)
+			local unavailable = {}
+			for _, row in ipairs(diagnostics) do
+				helpers.assert_eq(row.label, row.path:sub(#root + 2), "diagnostic labels preserve native components")
+				unavailable[#unavailable + 1] = row.path
+			end
+			table.sort(unavailable)
+			helpers.assert_eq(unavailable, expected, "scan-boundary diagnostics retain exact source routes")
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("refuses truncated native discovery records (native-discovery-framing)", function()
+		local Shell = require("adapters.shell_runner")
+		local previous = Shell.exec
+		Shell.exec = function() return "/uncommitted/source.toml" end
+		local ok, err = pcall(function()
+			local Loader = helpers.load_module("modules.hotstrings.loader")
+			for _, discover in ipairs({ Loader.find_toml_files, Loader.list_subdirs }) do
+				local admitted, reason = pcall(discover, "/isolated")
+				helpers.assert_eq(admitted, false, "an incomplete native record must not become a source")
+				helpers.assert_true(tostring(reason):find("incomplete path framing", 1, true) ~= nil)
+			end
+		end)
+		Shell.exec = previous
+		if not ok then error(err, 0) end
+	end)
+end)
+
+
+helpers.describe("literal POSIX backslash filenames", function()
+	helpers.it("keeps personal bundled-stem filenames independent (native-backslash-components)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows uses backslash as a separator")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
+		local path = root .. "/team\\autocorrection.toml"
+		local file = assert(io.open(path, "w"))
+		assert(file:write('[probe]\n"nativeq" = { output = "Owned", auto_expand = true }\n'))
+		assert(file:close())
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config, {}, function()
+				local engine = require("hotstring_engine").new()
+				helpers.assert_true(Config.init(engine, root))
+				local _, published = Config.load_all()
+				helpers.assert_eq(published, true)
+				helpers.assert_true(Config.get_category("autocorrection").path ~= path,
+					"a literal backslash filename cannot replace the common source")
+				local source = require("hotstrings.personal_files").describe({ "team\\autocorrection.toml" })
+				helpers.assert_eq(Config.get_category(source.id).path, path)
+				for _, char in ipairs({ "n", "a", "t", "i", "v", "e" }) do
+					helpers.assert_eq(engine:on_char(char), nil, "a partial trigger must not expand")
+				end
+				local match = engine:on_char("q")
+				helpers.assert_eq(match.replacement, "Owned")
+				helpers.assert_eq(match.personal_source_id, source.id)
+			end)
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("classifies metadata and writer backups by the native filename (native-backslash-components)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows uses backslash as a separator")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
+		local ok, err = pcall(function()
+			for _, name in ipairs({ "team\\_index.toml", "team\\defaults.toml", "team\\.backup-20261017.toml", "_index.toml" }) do
+				local file = assert(io.open(root .. "/" .. name, "w")); assert(file:close())
+			end
+			local found = helpers.load_module("modules.hotstrings.loader").find_toml_files(root)
+			table.sort(found)
+			helpers.assert_eq(found, { root .. "/team\\_index.toml", root .. "/team\\defaults.toml" },
+				"metadata prefixes and backup suffixes belong to exact native filename components")
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+end)

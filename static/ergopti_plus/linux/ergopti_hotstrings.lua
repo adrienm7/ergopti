@@ -301,6 +301,18 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "AI selection capture",
+			wait_for_ack = true,
+			stop = function()
+				return not privacy_owners.selection or privacy_owners.selection.stop() == true
+			end,
+		},
+		{
+			name = "metrics SQLite flush",
+			wait_for_ack = true,
+			stop = function() return keylogger.stop() == true end,
+		},
+		{
 			name = "privacy context capture",
 			wait_for_ack = true,
 			stop = function()
@@ -604,10 +616,8 @@ local function install_signal_handlers()
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
-		-- Keep the signal path self-contained after quiescence. The ordinary clean
-		-- exit repeats both operations idempotently, but an unexpected loop backend
-		-- failure must not leave the last metrics batch or the uinput FD behind.
-		keylogger.flush()
+		-- The coordinator owns the final SQLite flush and its native ACK.
+		-- Signal callbacks never dispatch an independent persistence attempt.
 		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
 		-- before that point can strand held keys because the hook restores them
 		-- through the same uinput device.
@@ -1332,6 +1342,11 @@ local function main()
 	-- 8.6) Initialise the LLM prediction engine if available. The context
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
+		privacy_owners.selection = require("adapters.selection_transaction").new({
+			focus_id = secure_focus_guard.focused_text_identity,
+			-- Selection reads and writes share the daemon's exact field identity.
+			privacy_guard = secure_focus_guard.blocks_text,
+		})
 		prediction_engine.init({
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
@@ -1352,22 +1367,25 @@ local function main()
 				local result = injector.inject(candidate.deletes, candidate.to_type, false)
 				return type(result) == "table" and result.ok == true
 			end,
-			-- The tone actions read the selection the way wrap_selection does (a
-			-- copy probe that puts the clipboard back), then type the rewrite over
-			-- it and select it again, through the one uinput channel.
-			read_selection = function()
-				if opts.dry_run then return false, "", "dry run" end
-				return require("adapters.clipboard").read_selection(
-					require("modules.gestures.combo_emitter").press, event_loop.sleep_ms)
+			-- Selection output is bound to the exact original native range, even
+			-- when an application moves it without any physical input event.
+			read_selection = function(focus, authorized, callback)
+				if opts.dry_run then callback(false, "", "dry run"); return false end
+				return privacy_owners.selection.read(focus, authorized, callback)
 			end,
-			replace_selection = function(text)
-				if opts.dry_run then return false end
-				local result = injector.inject_selected(text, false)
-				if type(result) ~= "table" or result.ok ~= true then return false end
-				-- The caret moved over replaced text: the buffer no longer describes the line.
-				_undoable = nil
-				engine:reset()
-				return true
+			cancel_selection = function() return privacy_owners.selection.cancel() end,
+			replace_selection = function(text, receipt, authorized, callback)
+				if opts.dry_run then callback(false); return false end
+				return privacy_owners.selection.replace(receipt, text, authorized, function(value)
+					return injector.inject_selected(value, false)
+				end, function(committed)
+					if committed then
+						-- The buffer no longer describes the physically replaced line.
+						_undoable = nil
+						engine:reset()
+					end
+					callback(committed)
+				end)
 			end,
 			-- Retain the exact active text control: programmatic field changes can
 			-- happen inside one native window without any pointer or keyboard event.
@@ -1915,14 +1933,19 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
-					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
-					if not keyboard_hook.set_layout(new_layout) then
-						Logger.error(LOG, "Layout '%s' refused — nothing changed.", tostring(new_layout))
-						return
+					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
+					local function selected_map_current()
+						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
+							and keyboard_layout.refresh == refresh and keyboard_hook.set_layout == set_layout
+							and opts.keymap == selected_keymap
 					end
-					if not keyboard_layout.refresh(opts.keymap) then
-						Logger.warn(LOG,
-							"Physical layout label applied; active XKB keymap refresh failed.")
+					if not keyboard_hook.refresh_capture(new_layout, function()
+						Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
+						return selected_map_current() and set_layout(new_layout) == true
+							and selected_map_current() and refresh(selected_keymap) == true
+					end, selected_map_current) then
+						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
+						return
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then
@@ -2535,6 +2558,7 @@ local function main()
 				end)
 			end
 			privacy_owners.watch.pump()
+			RuntimeGuard.call("metrics SQLite flush acknowledgement", keylogger.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
 			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
@@ -2572,7 +2596,7 @@ local function main()
 	local stats = keylogger.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-	keylogger.flush()
+	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")
