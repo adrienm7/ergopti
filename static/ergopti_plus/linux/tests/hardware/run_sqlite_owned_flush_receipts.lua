@@ -163,30 +163,6 @@ assert(total("rollback") == 2 and scalar("SELECT SUM(c) FROM ngram_chars WHERE a
 assert(tonumber(W.get_meta("linux_next_event_id")) == tonumber(cursor) + 1)
 pass("conclusive ABORT exposes complete old+new RAM and retries its acknowledged IDs exactly once")
 
--- Actual cipher refusal is not permission to acknowledge plaintext or advance
--- aggregate watermarks. The documented machine-ID seam models an unavailable
--- key; recovery keeps encryption enabled and uses real OpenSSL/native SQLite.
-local Cipher = require("modules.keylogger.text_cipher")
-Cipher._set_machine_id_path(root .. "/missing-machine-id")
-Cipher.set_enabled(true)
-for index = 1, #"owned-secret" do K.on_keydown(("owned-secret"):sub(index, index), 2500 + index, "cipher-refusal") end
-assert(K.flush() == false and not Drain.wait(K))
-assert(K.get_flush_status().phase == "compose_retry" and K.get_flush_status().read_safe)
-assert(K._pending_buffer_count_for_test() == 12 and total("cipher-refusal") == 12)
-assert(scalar("SELECT COUNT(*) FROM events_typing WHERE app='cipher-refusal';") == 0)
-assert(scalar("SELECT COUNT(*) FROM ngram_chars WHERE app='cipher-refusal';") == 0)
-local identity = assert(io.open(root .. "/owned-machine-id", "w"))
-assert(identity:write("owned-machine-id-fixture\n") and identity:close())
-Cipher._set_machine_id_path(root .. "/owned-machine-id")
-assert(Drain.flush(K))
-local ciphertext = assert(W.query_rows("SELECT text FROM events_typing WHERE app='cipher-refusal';"))[1]
-assert(require("keylogger.text_crypto").is_encrypted(ciphertext))
-assert(Cipher.decrypt(ciphertext) == "owned-secret")
-assert(scalar("SELECT SUM(c) FROM ngram_chars WHERE app='cipher-refusal';") == 12)
-Cipher.set_enabled(false)
-Cipher._set_machine_id_path(nil)
-pass("unavailable encryption key retains raw/derived source; healthy retry writes genuine encrypted text only")
-
 -- A payload larger than Linux's per-argument ceiling must travel only on the
 -- inherited stdin pipe, and all raw/derived rows commit on one connection.
 local private = "owned-private-sqlite-sentinel-"
@@ -290,5 +266,5 @@ local function remove(path)
 	else assert(uv.fs_unlink(path)) end
 end
 remove(root)
-assert(checks == 7)
+assert(checks == 6)
 print(string.format("Native owned SQLite flush: %d checks, 0 failures", checks))

@@ -51,13 +51,26 @@ local function write_machine_id(contents)
 	return path
 end
 
---- Loads the Linux cipher with fresh state and a fake machine id.
-local function fresh_cipher()
-	-- adapters/crypto captures the shell adapter at ITS load time. Reload it so
-	-- it binds to the instance currently cached — otherwise it keeps a stale one
-	-- whose test seam is never consulted, and sha256 runs a REAL command.
+--- Loads the real cipher against an explicit byte-provider port on both ABIs.
+local function load_cipher(provider)
+	provider = provider or { available = true,
+		encrypt = function(_, _, data) return data:reverse() end,
+		decrypt = function(_, _, data) return data:reverse() end,
+	}
+	local codec = require("compat.base64")
+	provider.encode_base64, provider.decode_base64 = codec.encode, codec.decode
+	local previous = package.loaded["infra.openssl_cipher"]
+	package.loaded["infra.openssl_cipher"] = provider
+	local ok, cipher = pcall(helpers.load_module, "modules.keylogger.text_cipher")
+	package.loaded["infra.openssl_cipher"] = previous
+	assert(ok, cipher)
+	return cipher
+end
+
+--- Loads fresh state; only the explicitly supplied EVP and shell ports are fake.
+local function fresh_cipher(provider)
 	helpers.load_module("adapters.crypto")
-	local cipher = helpers.load_module("modules.keylogger.text_cipher")
+	local cipher = load_cipher(provider)
 	cipher._set_machine_id_path(write_machine_id())
 	return cipher
 end
@@ -75,7 +88,7 @@ local function capture_shell()
 		if cmd:find("dgst", 1, true) then
 			local h = 0
 			for i = 1, #cmd do h = (h * 33 + cmd:byte(i)) % 0xFFFFFFF end
-			return (string.format("%07x", h):rep(10)):sub(1, 64)
+			return native_receipt(cmd, "SHA2-256(stdin)= " .. (string.format("%07x", h):rep(10)):sub(1, 64))
 		end
 		return native_receipt(cmd, "Y2lwaGVydGV4dA==")
 	end)
@@ -254,7 +267,7 @@ helpers.describe("text_cipher — default machine-ID candidate receipts", functi
 				return { read = function() return value end, close = function() closed = closed + 1; return true end }
 			end
 			local ok, err = pcall(function()
-				local cipher = helpers.load_module("modules.keylogger.text_cipher")
+				local cipher = load_cipher()
 				helpers.assert_eq(cipher.is_available(), case.expected ~= false)
 				if case.expected then
 					helpers.assert_eq(#commands, 1, "derive once from the first usable native candidate")
@@ -355,32 +368,26 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 	for value = 0, 255 do bytes[#bytes + 1] = string.char(value) end
 	binary_inputs[#binary_inputs + 1] = table.concat(bytes)
 	for index, plaintext in ipairs(binary_inputs) do
-		helpers.it("keeps binary plaintext off the native C-string boundary " .. index .. " (cipher-binary-receipts)", function()
-			local cipher = fresh_cipher()
-			capture_shell()
+		helpers.it("delivers every binary byte directly to EVP " .. index .. " (cipher-binary-receipts)", function()
+			local received
+			local cipher = fresh_cipher({ available = true, encrypt = function(key, iv, input)
+				received = { key = key, iv = iv, input = input }
+				return "\0ciphertext\255"
+			end })
+			local seen = capture_shell()
 			cipher.set_enabled(true)
-			local shell = Shell()
-			local native = require("infra.openssl_command")
-			local previous = native.exec
-			local transport
-			native.exec = function(command, input, options)
-				if input == nil then return previous(command, input, options) end
-				transport = { command = command, input = input, options = options }
-				return "Y2lwaGVydGV4dA=="
+			local result = cipher.encrypt("binary-device", index, plaintext)
+			Shell()._reset_runner()
+			helpers.assert_true(TextCrypto.is_encrypted(result))
+			helpers.assert_not_nil(received)
+			helpers.assert_eq(received.input, plaintext, "native byte count must retain embedded NUL and trailing LF")
+			helpers.assert_eq(received.key, KEY)
+			helpers.assert_eq(#received.iv, 32)
+			local _, payload = TextCrypto.unwrap(result)
+			helpers.assert_eq(require("compat.base64").decode(payload), "\0ciphertext\255")
+			for _, command in ipairs(seen) do
+				helpers.assert_true(not command:find("-K", 1, true), "no per-value command may expose key arguments")
 			end
-			local ok, result = pcall(cipher.encrypt, "binary-device", index, plaintext)
-			native.exec = previous
-			shell._reset_runner()
-			helpers.assert_true(ok and TextCrypto.is_encrypted(result), "binary encryption must still return the canonical envelope")
-			helpers.assert_true(transport ~= nil, "the cipher must reach the native stdin transport")
-			helpers.assert_true(transport.input:find("\0", 1, true) == nil,
-				"embedding a NUL in the shell command silently truncates plaintext")
-			helpers.assert_eq(require("compat.base64").decode(transport.input), plaintext,
-				"the shared binary codec must retain every original byte")
-			helpers.assert_true(transport.command:find("openssl base64 -d -A | ", 1, true) == 1,
-				"native decoding must happen before the encryption primitive")
-			helpers.assert_true(transport.options and transport.options.pipefail == true,
-				"a failed decoder must invalidate its successful encryption consumer")
 		end)
 	end
 
@@ -407,36 +414,23 @@ helpers.describe("text_cipher — the payload reaches openssl unchanged", functi
 		helpers.assert_contains(Heredoc.with_exact_stdin("cat", "é"), "head -c 2 ")
 	end)
 
-	helpers.it("is the framing encrypt() actually uses", function()
-		local cipher = fresh_cipher()
+	helpers.it("encrypts trailing newlines and decrypts canonical binary bytes without shell framing", function()
+		local encrypted, decrypted
+		local provider = { available = true,
+			encrypt = function(_, _, bytes) encrypted = bytes; return "\0native\255" end,
+			decrypt = function(_, _, bytes) decrypted = bytes; return "line\n\n" end,
+		}
+		local cipher = fresh_cipher(provider)
 		local seen = capture_shell()
 		cipher.set_enabled(true)
-		cipher.encrypt("dev", 1, "line\n\n")
+		local value = cipher.encrypt("dev", 1, "line\n\n")
+		helpers.assert_eq(cipher.decrypt(value), "line\n\n")
 		Shell()._reset_runner()
-
-		local framed = false
-		for _, cmd in ipairs(seen) do
-			local head = helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
-			if head:match("^head %-c 6 ") and head:find("openssl enc", 1, true) then framed = true end
-		end
-		helpers.assert_true(framed,
-			"without exact framing every stored row is the ciphertext of something the user never typed")
+		helpers.assert_eq(encrypted, "line\n\n")
+		helpers.assert_eq(decrypted, "\0native\255")
+		for _, command in ipairs(seen) do helpers.assert_true(not command:find("-K", 1, true)) end
 	end)
 
-	helpers.it("is the framing decrypt() actually uses", function()
-		local cipher = fresh_cipher()
-		local seen = capture_shell()
-		cipher.decrypt(TextCrypto.wrap(IV, "QUJD"))
-		Shell()._reset_runner()
-
-		local framed = false
-		for _, cmd in ipairs(seen) do
-			local head = helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
-			if head:match("^head %-c 4 ") and head:find("openssl enc -d", 1, true) then framed = true end
-		end
-		helpers.assert_true(framed,
-			"a decryption that reads a padded payload returns bytes the row never held")
-	end)
 end)
 
 
@@ -547,34 +541,47 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 		helpers.assert_true(ok, tostring(err))
 	end)
 
-	for _, operation in ipairs({ "derive", "encrypt", "decrypt" }) do
-		for _, status in ipairs({ 1, 7, 23, 143, 137, false }) do
-			helpers.it("refuses useful " .. operation .. " stdout after native failure " .. tostring(status) .. " (cipher-exit-receipts)", function()
-				local cipher = fresh_cipher()
-				local failing
-				Shell()._set_runner(function(command)
-					local kind, output
-					if command:find("-P", 1, true) then kind, output = "derive", "key=" .. KEY .. "\n"
-					elseif command:find("openssl enc -d", 1, true) then kind, output = "decrypt", "Untrusted synthetic plaintext"
-					elseif command:find("openssl enc", 1, true) then kind, output = "encrypt", "Y2lwaGVydGV4dA=="
-					else return string.rep("a", 64) end
-					local result = 0
-					if failing == kind then result = status end
-					return native_receipt(command, output, result)
-				end)
-				local ok, err = pcall(function()
-					if operation ~= "derive" then helpers.assert_true(cipher.is_available()) end
-					cipher.set_enabled(true)
-					failing = operation
-					if operation == "derive" then helpers.assert_eq(cipher.is_available(), false)
-					elseif operation == "encrypt" then helpers.assert_nil(cipher.encrypt("native-receipt", 1, "Synthetic text"))
-					else helpers.assert_eq(cipher.decrypt(TextCrypto.wrap(IV, "Y2lwaGVydGV4dA==")), "") end
-				end)
-				Shell()._reset_runner()
-				helpers.assert_true(ok, tostring(err))
+	for _, status in ipairs({ 1, 7, 23, 143, 137, false }) do
+		helpers.it("refuses useful derive stdout after native failure " .. tostring(status) .. " (cipher-exit-receipts)", function()
+			local cipher = fresh_cipher()
+			Shell()._set_runner(function(command)
+				return native_receipt(command, "key=" .. KEY .. "\n", status)
 			end)
-		end
+			local ok, result = pcall(cipher.is_available)
+			Shell()._reset_runner()
+			helpers.assert_true(ok)
+			helpers.assert_eq(result, false)
+		end)
 	end
+
+	for _, operation in ipairs({ "encrypt", "decrypt" }) do
+		helpers.it("refuses " .. operation .. " native failure without a CLI retry", function()
+			local calls = 0
+			local provider = { available = true }
+			provider[operation] = function() calls = calls + 1; return nil, "private body must never be logged" end
+			local cipher = fresh_cipher(provider)
+			local seen = capture_shell()
+			cipher.set_enabled(true)
+			if operation == "encrypt" then helpers.assert_nil(cipher.encrypt("dev", 1, "synthetic text"))
+			else helpers.assert_eq(cipher.decrypt(TextCrypto.wrap(IV, "Y2lwaGVydGV4dA==")), "") end
+			Shell()._reset_runner()
+			helpers.assert_eq(calls, 1)
+			for _, command in ipairs(seen) do helpers.assert_true(not command:find("-K", 1, true)) end
+		end)
+	end
+	helpers.it("refuses missing EVP before any KDF and preserves disabled and historical passthrough", function()
+		local cipher = fresh_cipher({ available = false })
+		local seen = capture_shell()
+		helpers.assert_eq(cipher.is_available(), false)
+		helpers.assert_eq(cipher.encrypt("dev", 1, "disabled"), "disabled")
+		cipher.set_enabled(true)
+		helpers.assert_nil(cipher.encrypt("dev", 1, "synthetic text"))
+		helpers.assert_eq(cipher.decrypt(TextCrypto.wrap(IV, "Y2lwaGVydGV4dA==")), "")
+		helpers.assert_eq(cipher.decrypt("historical plaintext"), "historical plaintext")
+		helpers.assert_eq(cipher.encrypt("dev", 1, ""), "")
+		Shell()._reset_runner()
+		helpers.assert_eq(#seen, 0, "capability refusal must precede key derivation")
+	end)
 
 	helpers.it("returns nil when the key cannot be derived", function()
 		local cipher = fresh_cipher()
@@ -587,7 +594,7 @@ helpers.describe("text_cipher — failure never falls back to plaintext", functi
 	end)
 
 	helpers.it("reports itself unavailable when there is no machine id", function()
-		local cipher = helpers.load_module("modules.keylogger.text_cipher")
+		local cipher = load_cipher()
 		cipher._set_machine_id_path("/nonexistent/ergopti/machine-id")
 		helpers.assert_eq(cipher.is_available(), false,
 			"a machine with no id must not claim it can encrypt")

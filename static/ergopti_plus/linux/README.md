@@ -107,6 +107,14 @@ luajit tests/run.lua
 
 Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 
+Typed-text encryption additionally requires LuaJIT FFI and OpenSSL 3's native
+AES-256-CBC API. Without that capability, activation is refused and a saved ON
+preference keeps persistence closed; encrypted rows cannot be decrypted. There
+is no CLI encryption fallback exposing the key in process arguments. The
+existing key derivation runs synchronously once per session and is cached;
+subsequent encryption and decryption use native byte buffers. Plain Lua 5.4
+tests exercise this capability refusal and the provider contract explicitly.
+
 The installed driver requires `lua-luv` for owned asynchronous SQLite flushes.
 A manually started minimal daemon without it retains collected metrics in RAM;
 `flush()` returns false, merged views remain readable, and shutdown acknowledges
