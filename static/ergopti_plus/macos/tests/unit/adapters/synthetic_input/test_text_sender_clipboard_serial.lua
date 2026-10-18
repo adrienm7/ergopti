@@ -37,11 +37,21 @@ helpers.describe("text_sender clipboard path serializes save/restore", function(
 		local saves = 0
 		local restores = {}
 		local timers = {}
-		local clock = 0
+		local clock, count = 0, 0
 		package.loaded["adapters.clipboard"] = {
+			_change_count = function() return count end,
 			save    = function() saves = saves + 1; return "ORIGINAL", true end,
-			write   = function(_) return true end,
-			restore = function(v) restores[#restores + 1] = v; return true end,
+			write = function(_, receipt)
+				count = count + 1
+				receipt.count, receipt.count_ok, receipt.attempted = count, true, true
+				return true, receipt
+			end,
+			restore = function(v, receipt)
+				restores[#restores + 1] = v
+				count = count + 1
+				receipt.count, receipt.count_ok, receipt.attempted = count, true, true
+				return true, receipt
+			end,
 		}
 		package.loaded["adapters.synthetic_input"] = immediate_synthetic(function() return true end)
 		package.loaded["adapters.timer_scheduler"] = {
@@ -98,26 +108,32 @@ local function load_failure_fixture(options)
 	local writes = 0
 	local restores = 0
 	local emits = 0
-	local clock = 0
+	local clock, count = 0, 0
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
 	package.loaded["infra.timings"] = { sec = function() return 0.15 end }
 	package.loaded["adapters.clipboard"] = {
+		_change_count = function() return count end,
 		save = function() return original, true end,
-		write = function(text)
+		write = function(text, receipt)
 			writes = writes + 1
 			current = text
+			count = count + 1
+			receipt.count, receipt.count_ok, receipt.attempted = count, true, true
 			local outcome = options.write_outcomes and options.write_outcomes[writes]
 			if outcome == "throw" then error("injected write failure") end
 			if outcome == "false" then return false end
 			return true
 		end,
-		restore = function(saved)
+		restore = function(saved, receipt)
 			restores = restores + 1
+			receipt.count, receipt.count_ok, receipt.attempted = count, true, true
 			local outcome = options.restore_outcomes and options.restore_outcomes[restores]
 			if outcome == "throw" then error("injected restore failure") end
 			if outcome == "false" then return false end
 			current = saved
-			return true
+			count = count + 1
+			receipt.count = count
+			return true, receipt
 		end,
 	}
 	package.loaded["adapters.synthetic_input"] = immediate_synthetic(

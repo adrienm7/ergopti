@@ -53,20 +53,23 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 		}, function()
 			local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })
 			local original = { ["public.utf8-plain-text"] = "USER CLIPBOARD", ["public.html"] = "<b>original</b>" }
-			local clipboard, writes, restores, notifications = original, 0, 0, 0
+			local clipboard, writes, restores, notifications, count = original, 0, 0, 0, 0
 			f.hs_overrides.pasteboard = {
+				changeCount = function() return count end,
 				readAllData = function() return clipboard end,
 				setContents = function(text)
 					writes = writes + 1
+					count = count + 1
 					clipboard = { ["public.utf8-plain-text"] = text }
 					error("native write raised after changing the pasteboard")
 				end,
 				writeAllData = function(value)
 					restores = restores + 1
+					count = count + 1
 					clipboard = value
 					return true
 				end,
-				clearContents = function() clipboard = {} end,
+				clearContents = function() count = count + 1; clipboard = {} end,
 			}
 			local synthetic = f.load()
 			local sender = require("adapters.text_sender")
