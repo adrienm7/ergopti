@@ -2866,7 +2866,6 @@ local function accept_candidate(index, complete)
 			return false
 		end
 		ok, committed = pcall(continuation_apply, candidate, continuation_context, continuation_current)
-		if not continuation_current() then complete(ok and committed == true); return ok and committed == true end
 	end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
@@ -2876,6 +2875,7 @@ local function accept_candidate(index, complete)
 		local observed, observe_err = pcall(output, candidate.to_type, context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
+	if continuation_current and not continuation_current() then complete(true); return true end
 	if not current() then complete(true); return true end
 	local retired_epoch = close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
