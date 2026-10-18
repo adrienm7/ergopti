@@ -592,9 +592,15 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 ; ===================================
 ; ===================================
 
-KL_Mouse_ParkTick(FilterFn := unset) {
-	CoordMode("Mouse", "Screen")
-	MouseGetPos(&mx, &my)
+KL_Mouse_ParkTick(FilterFn := unset, PositionFn := unset, DistanceFn := unset) {
+	if IsSet(PositionFn) {
+		Position := PositionFn.Call()
+		mx := Position.x
+		my := Position.y
+	} else {
+		CoordMode("Mouse", "Screen")
+		MouseGetPos(&mx, &my)
+	}
 
 	filtered := true
 	if (!A_IsSuspended and Keylogger.initialized)
@@ -608,7 +614,7 @@ KL_Mouse_ParkTick(FilterFn := unset) {
 		filtered,
 		Keylogger.initialized,
 		KL_AppendLog.Bind(),
-		KL_BumpMouseDistance.Bind(),
+		IsSet(DistanceFn) ? DistanceFn : KL_BumpMouseDistance.Bind(),
 		Keylogger.session_app
 	)
 }

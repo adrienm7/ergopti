@@ -438,6 +438,10 @@ Test("mouse-privacy-query-failure: vertical admission fails closed", _KLMS_Priva
 Test("mouse-privacy-query-failure: horizontal admission fails closed", _KLMS_PrivacyFailure.Bind("horizontal"))
 Test("mouse-privacy-query-failure: claimed scroll fails closed", _KLMS_PrivacyFailure.Bind("flush"))
 
+_KLMS_RecordDistance(Recorder, Distance) {
+	Recorder.Distances.Push(Distance)
+}
+
 _KLMS_ParkPrivacyFailure() {
 	Fields := ["prev_x", "prev_y", "prev_initialized", "park_initialized"]
 	Saved := Map()
@@ -445,15 +449,20 @@ _KLMS_ParkPrivacyFailure() {
 		Saved[Field] := KLMouse.%Field%
 	SavedInitialized := Keylogger.initialized
 	SavedMouseMode := A_CoordModeMouse
-	Recorder := {Calls: []}
+	Recorder := {Calls: [], Distances: []}
 	try {
 		Keylogger.initialized := true
 		; An admitted sample resets this flag only on a rejected privacy decision.
 		KLMouse.park_initialized := true
-		KL_Mouse_ParkTick(_KLMS_ThrowPrivacy.Bind(Recorder))
+		KL_Mouse_ParkTick(_KLMS_ThrowPrivacy.Bind(Recorder),
+			_KLMS_Position.Bind(Recorder), _KLMS_RecordDistance.Bind(Recorder))
 		AssertFalse(KLMouse.park_initialized,
 			"classification failure must retire park admission before distance or idle collection")
-		AssertEqual("privacy-error", _JoinParts(Recorder.Calls))
+		AssertEqual("position privacy-error", _JoinParts(Recorder.Calls))
+		AssertEqual(0, Recorder.Distances.Length, "uncertain samples cannot accumulate distance")
+		AssertEqual(-400, KLMouse.prev_x, "the rejected sample must retain the injected position")
+		AssertEqual(125, KLMouse.prev_y)
+		AssertEqual(SavedMouseMode, A_CoordModeMouse, "injected sampling must preserve coordinate mode")
 	} finally {
 		for Field, Value in Saved
 			KLMouse.%Field% := Value
