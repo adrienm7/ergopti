@@ -140,13 +140,22 @@ local function revoke_event(code, source)
 		if value == 1 then
 			if presses[code] and presses[code] ~= source then
 				blocked[source .. "\0" .. code] = true
+				base_ports.activity(base)
 				if policy then policy.activity() end
+				if base.held[code] and not base.held[code].undecided then
+					return base_ports.process(base, code, value, at_ms, receipt)
+				end
 				return {}
 			end
 			presses[code] = source
 		elseif blocked[source .. "\0" .. code] then
-			if value == 0 then blocked[source .. "\0" .. code] = nil end
+			if value == 0 then
+				blocked[source .. "\0" .. code] = nil
+				if base.held[code] then return base_ports.process(base, code, value, at_ms, receipt) end
+			end
 			if policy then policy.activity() end
+			return {}
+		elseif value == 0 and presses[code] and presses[code] ~= source then
 			return {}
 		end
 		local guard = policy and runtime_guard or capture(options.capture)
