@@ -1,14 +1,13 @@
-﻿; tests/meta/ui/healthcheck/test_healthcheck_onwebmsg_dead_code.ahk
+﻿; tests/meta/ui/healthcheck/test_healthcheck_webview_handler.ahk
 
 ; ==============================================================================
-; MODULE: HealthCheck Dead WebMessage Handler Meta Test (Pattern 4)
+; MODULE: HealthCheck WebMessage Handler Meta Test
 ; DESCRIPTION:
-; Static source guard confirming _HealthCheck_OnWebMsg (a fully-written
-; "copy_and_close" WebMessageReceived handler) stays removed. It was defined
-; but never wired up to any WebMessageReceived subscription anywhere in
-; ui/healthcheck/core.ahk -- genuinely dead code. The page's buttons now post
-; their actions to _HC_OnWebMessage, which the window does subscribe, bound to
-; its epoch; the native Copy-and-Close button is gone.
+; Static source guard for the diagnostics window's page messages. A former
+; "copy_and_close" handler was written but never subscribed, so the page's
+; buttons did nothing. The page's buttons now post their actions to
+; _HC_OnWebMessage, which the window subscribes, bound to its epoch; the
+; native Copy-and-Close button is gone.
 ;
 ; SCOPE: source introspection of ui/healthcheck/core.ahk.
 ; ==============================================================================
@@ -24,13 +23,6 @@
 ; ===================================================
 ; ===================================================
 
-_HCOWM_NoDeadHandler() {
-	Src := _DriverDirConcat("ui/healthcheck")
-	Assert(Src != "", "the ui/healthcheck module must exist")
-	Assert(InStr(Src, "_HealthCheck_OnWebMsg") = 0,
-		"_HealthCheck_OnWebMsg was dead code (defined but never subscribed to any WebMessageReceived event) and was removed -- do not reintroduce it without also wiring it up")
-}
-Test("HealthCheck: dead _HealthCheck_OnWebMsg handler stays removed (webview-dead-handler)", _HCOWM_NoDeadHandler)
 
 _HCOWM_LiveHandlerIsSubscribed() {
 	Src := _DriverDirConcat("ui/healthcheck")
