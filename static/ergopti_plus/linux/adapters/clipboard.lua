@@ -409,7 +409,10 @@ function M.paste_text(text, uinput, sleep_ms, admission)
 
 	if not admitted(admission) then return false end
 	if not write_backend_checked(b, text) then
+		-- A failed launcher may already have transferred clipboard ownership.
+		local restored = write_backend_checked(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
+		if not restored then return false, "clipboard restoration failed" end
 		return false
 	end
 
@@ -517,6 +520,7 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
 	if not write_backend_checked(b, "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__") then
+		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
