@@ -39,10 +39,13 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		cancel = function() return true end,
 	}
 	package.loaded["modules.llm.api_remote"] = {
-		provider = function() return { default_model = "qwen-default" } end,
+		provider = function()
+			if calls.on_backend then calls.on_backend() end
+			return { default_model = "qwen-default" }
+		end,
 		serves = function(_, use) return use == "chat" end,
-		chat = function(target, model, _, opts, on_chunk, on_done)
-			calls.remote[#calls.remote + 1] = { target = target, model = model, opts = opts, chunk = on_chunk, done = on_done }
+		chat = function(target, model, messages, opts, on_chunk, on_done)
+			calls.remote[#calls.remote + 1] = { target = target, model = model, messages = messages, opts = opts, chunk = on_chunk, done = on_done }
 			if not asynchronous then on_done(" que tout le monde aille bien " .. #calls.remote, nil) end
 		end,
 		cancel = function()
@@ -63,7 +66,10 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	}
 	package.loaded["modules.llm.profile_settings"] = {
 		get = function(key) if key == "num_predictions" then return 3 end end,
-		resolve = function() return { id = "raw", system_single = "{context}" } end,
+		resolve = function()
+			if calls.on_profile then calls.on_profile() end
+			return { id = "raw", system_single = "{context}" }
+		end,
 	}
 	local stored = { ["llm.models.selected"] = backend }
 	for key, value in pairs(stored_settings or {}) do stored[key] = value end
@@ -480,6 +486,78 @@ helpers.describe("prediction dismissal retains request ownership", function()
 			restore()
 			if not ok then error(err, 0) end
 		end)
+	end
+end)
+
+helpers.describe("prediction start rechecks native admission", function()
+	helpers.it("admits unchanged native ownership through unrelated callbacks (start-owner)", function()
+		local engine, calls, _, restore = load("api", ENTRY, nil, nil, true)
+		local ok, err = pcall(function()
+			local observations = 0
+			local function unrelated() observations = observations + 1 end
+			calls.on_focus, calls.on_backend, calls.on_profile = unrelated, unrelated, unrelated
+			engine.predict("Original context", nil, { num_predictions = 1 })
+			helpers.assert_true(observations >= 4, "Native and backend admission readers must run")
+			helpers.assert_eq(#calls.remote, 1)
+			local messages = calls.remote[1].messages
+			helpers.assert_eq(messages[#messages].content, "Original context")
+			calls.remote[1].done(" accepted completion remains available now", nil)
+			helpers.assert_eq(engine.is_predicting(), false)
+			helpers.assert_eq(#engine.get_suggestions(), 1)
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+
+	for _, boundary in ipairs({ "focus_first", "focus_second", "backend", "profile" }) do
+		for _, transition in ipairs({ "cancel", "scope", "shutdown", "successor" }) do
+			helpers.it("preserves " .. transition .. " during " .. boundary .. " (start-owner)", function()
+				local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
+				local download = package.loaded["modules.llm.model_download"]
+				package.loaded["modules.llm.model_download"] = { shutdown = function() return true end }
+				local ok, err = pcall(function()
+					local reads, transferred = 0, false
+					local function transfer()
+						calls.on_focus, calls.on_backend, calls.on_profile = nil, nil, nil
+						if transition == "cancel" then engine.cancel(); transferred = true
+						elseif transition == "scope" then transferred = engine.acquire_configuration({ pending = function() return false end })
+						elseif transition == "shutdown" then transferred = engine.shutdown_runtime()
+						else
+							engine.predict("Successor context", nil, { num_predictions = 1 })
+							transferred = #calls.remote == 1
+							if transferred then calls.remote[1].chunk(" successor completion remains visible now") end
+						end
+					end
+					if boundary == "backend" then calls.on_backend = transfer
+					elseif boundary == "profile" then calls.on_profile = transfer
+					else
+						calls.on_focus = function()
+							reads = reads + 1
+							if reads == (boundary == "focus_first" and 1 or 2) then transfer() end
+						end
+					end
+					engine.predict("Original context", nil, { num_predictions = 1 })
+					scheduler.settle()
+					helpers.assert_eq(transferred, true, "The admission reader must transfer the original admission")
+					if transition == "successor" then
+						helpers.assert_eq(#calls.remote, 1, "The outer request cannot replace its successor")
+						local messages = calls.remote[1].messages
+						helpers.assert_eq(messages[#messages].content, "Successor context")
+						helpers.assert_eq(engine.is_predicting(), true)
+						helpers.assert_eq(#engine.get_suggestions(), 1)
+						helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+					else
+						helpers.assert_eq(#calls.remote, 0, "Revoked admission cannot send an old prompt")
+						helpers.assert_eq(engine.is_predicting(), false, "Revocation cannot leave a loading request")
+						helpers.assert_eq(#engine.get_suggestions(), 0)
+					end
+					helpers.assert_eq(calls.applied, 0)
+				end)
+				package.loaded["modules.llm.model_download"] = download
+				restore()
+				if not ok then error(err, 0) end
+			end)
+		end
 	end
 end)
 

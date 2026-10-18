@@ -721,17 +721,30 @@ end
 function M.predict(context, output_context, override)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
+	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
+	local function admission_current()
+		return not _runtime_closed and _scope_owner == nil and not _predicting
+			and request == _request_epoch and app_epoch == _runtime_app_epoch
+			and engine == _engine and owner == _runtime_owner
+	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
 
+	if not admission_current() then return false end
 	local focus = _buffer_focus or current_focus()
-	if focus == "" or current_focus() ~= focus then
+	if not admission_current() then return false end
+	local observed_focus = focus ~= "" and current_focus() or ""
+	-- A native admission barrier may dispatch cancellation or a newer request
+	-- even when it returns the same field. The older admission owns no cleanup.
+	if not admission_current() then return false end
+	if focus == "" or observed_focus ~= focus then
 		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
 		return false
 	end
 	local backend, target, model, runtime_response = M.resolve_backend()
+	if not admission_current() then return false end
 	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
@@ -779,6 +792,7 @@ function M.predict(context, output_context, override)
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
+	if not admission_current() then return false end
 	_suggestion_context = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = trigger_chars,
