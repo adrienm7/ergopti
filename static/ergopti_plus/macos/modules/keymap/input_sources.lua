@@ -987,6 +987,7 @@ local function upgrade_active_list_async(legacy_active, on_done)
 		invoke_mutation_done("upgrade_active_list.reject", on_done, false, nil, "invalid_entries")
 		return false
 	end
+	local requested_upgrades = #legacy_active
 	-- Build the AppleScript: a sequence of disable+enable operations
 	local lines = {
 		"use framework \"Carbon\"",
@@ -1037,12 +1038,11 @@ local function upgrade_active_list_async(legacy_active, on_done)
 	local script = table.concat(lines, "\n")
 	Logger.start(LOG, "Upgrading %d legacy Ergopti entry(ies) in the active input-source list…", #legacy_active)
 	return run_osascript_isolated_async(script, function(process_ok, out, reason)
-		-- osascript exits 0 even when findSource resolved nothing, so the status
-		-- bit is insufficient. Require the script's own enabled count.
+		-- A missing intermediate replacement is skipped by the native script.
+		-- One enabled source cannot acknowledge a request to upgrade several.
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
 		local _disabled_n, enabled_n = out_text:match("^(%d+)%s*/%s*(%d+)$")
-		local upgraded = process_ok == true and tonumber(enabled_n or 0) ~= nil
-			and tonumber(enabled_n or 0) > 0
+		local upgraded = process_ok == true and tonumber(enabled_n) == requested_upgrades
 		if upgraded then
 			invalidate_active_layouts_cache()
 			Logger.success(LOG, "List upgrade applied (%s).", out_text)
@@ -1050,7 +1050,8 @@ local function upgrade_active_list_async(legacy_active, on_done)
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.error(LOG, "List upgrade failed (reason=%s, result=%s).", failure_reason, out_text)
+		Logger.error(LOG, "List upgrade failed (expected=%d, reason=%s, result=%s).",
+			requested_upgrades, failure_reason, out_text)
 		invoke_mutation_done("upgrade_active_list.done", on_done, false, out_text, failure_reason)
 	end)
 end

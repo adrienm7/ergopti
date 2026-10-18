@@ -183,6 +183,29 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		reset_fixture_modules()
 	end)
 
+	status_test("(tis-partial-upgrade) requires every requested replacement before reporting success", function()
+		local cases = {
+			{ requested = 2, stdout = "1/1\n", ok = false },
+			{ requested = 2, stdout = "1/2\n", ok = true },
+			{ requested = 1, stdout = "1/2\n", ok = false },
+			{ requested = 2, stdout = "2/2\n", ok = true },
+			{ requested = 2, stdout = "0/0\n", ok = false },
+		}
+		for _, case in ipairs(cases) do
+			local f = load_fixture()
+			local entries = { "com.apple.keylayout.ergopti.plus" }
+			if case.requested == 2 then entries[2] = "com.apple.keylayout.ergopti.ansi" end
+			local terminal = nil
+			helpers.assert_eq(f.IS.upgrade_active_list_async(entries, function(ok)
+				terminal = ok
+			end), true)
+			f.tasks[1]:complete(0, case.stdout, "")
+			helpers.assert_eq(terminal, case.ok,
+				"the native enabled count must equal the requested replacement count")
+			reset_fixture_modules()
+		end
+	end)
+
 	helpers.it("times out a hung selection without blocking or accepting a sibling", function()
 		local f = load_fixture()
 		local terminals = {}
@@ -380,7 +403,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "upgrade",
-				stdout = "1/2\n",
+				stdout = "1/1\n",
 				invoke = function(IS, done)
 					return IS.upgrade_active_list_async({ "Ergopti_v2_2_1_plus" }, done)
 				end,
