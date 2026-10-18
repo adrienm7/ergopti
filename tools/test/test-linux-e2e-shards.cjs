@@ -342,9 +342,12 @@ function aggregate() {
 				session: 'fixture',
 				interpreter: 'fixture',
 				subjects: Object.fromEntries(
-					(shard === null ? Object.keys(contract.subjects) : FIXTURE.subjects[shard]).map(
-						(subject) => [subject, contract.subjects[subject]]
-					)
+					(shard === null
+						? Object.keys(contract.subjects)
+						: job === JOB
+							? FIXTURE.subjects[shard]
+							: ['unit-' + shard]
+					).map((subject) => [subject, contract.subjects[subject]])
 				)
 			});
 	}

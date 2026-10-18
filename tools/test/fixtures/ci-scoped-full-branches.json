@@ -91,7 +91,7 @@
 		},
 		{
 			"scope": "linux-unit-suite",
-			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-linux-unit-suite.json\"\nnode tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] linux-unit-suite: qualified=false; no suite assertion count is claimed.\"\n    node tools/test/linux-ci-evidence.cjs record-deferred-suite --job test-linux --output \"$RUNNER_TEMP/linux-ci-evidence/test-linux.json\" --sha \"$GITHUB_SHA\" --architecture \"$RUNNER_ARCH\" --receipt \"$receipt\"\nelif [ \"$mode\" = full ]; then\n",
+			"prefix": "set -euo pipefail\nreceipt=\"$RUNNER_TEMP/stable-linux-unit-suite.json\"\nnode tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --receipt \"$receipt\"\nmode=\"$(node tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --validate-scope-receipt \"$receipt\")\"\nif [ \"$mode\" = deferred ]; then\n    echo \"[DEFERRED] linux-unit-suite: qualified=false; no suite assertion count is claimed.\"\n    node tools/test/linux-ci-evidence.cjs record-deferred-suite --job test-linux --shard \"$LINUX_UNIT_GROUP\" --output \"$RUNNER_TEMP/linux-ci-evidence/test-linux-$LINUX_UNIT_GROUP.json\" --sha \"$GITHUB_SHA\" --architecture \"$RUNNER_ARCH\" --receipt \"$receipt\"\nelif [ \"$mode\" = full ]; then\n",
 			"suffix": "\nelse\n    exit 1\nfi",
 			"strip": 0,
 			"format": "bash"
@@ -1186,8 +1186,8 @@
 			"file": ".github/workflows/ci-linux.yml",
 			"job": "test-linux",
 			"name": "Retain the source-bound linux-unit-suite qualification",
-			"condition": "always()",
-			"body": "      - name: Retain the source-bound linux-unit-suite qualification\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-linux-unit-suite\n          path: ${{ runner.temp }}/stable-linux-unit-suite.json\n          if-no-files-found: warn"
+			"condition": "${{ always() && matrix.group == 'meta' }}",
+			"body": "      - name: Retain the source-bound linux-unit-suite qualification\n        if: ${{ always() && matrix.group == 'meta' }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: assets-qualification-linux-unit-suite\n          path: ${{ runner.temp }}/stable-linux-unit-suite.json\n          if-no-files-found: warn"
 		},
 		{
 			"file": ".github/workflows/ci-linux.yml",

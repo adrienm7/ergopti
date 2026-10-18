@@ -8,7 +8,7 @@
 ---
 --- FEATURES & RATIONALE:
 --- 1. One table owns the groups; the CI matrix of ci-linux.yml lists the same
----    names in the same order (tools/test/test-linux-unit-shards.cjs).
+---    names in the same order (tools/test/test-linux-ci-evidence.cjs).
 --- 2. Each test module belongs to the FIRST group whose folder prefix it
 ---    starts with. The last group has no prefix and takes everything else, so
 ---    the groups partition the suite: no module runs twice, and a new folder
