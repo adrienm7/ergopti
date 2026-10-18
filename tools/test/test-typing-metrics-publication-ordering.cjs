@@ -35,6 +35,7 @@ function fixture() {
 		selected_apps: new Set(),
 		app_selection_mode: 'all',
 		available_apps: [],
+		manifest_dates_sorted: [],
 		loading_data: false,
 		range_request_sequence: 0,
 		active_range_request_id: 0,
@@ -240,7 +241,7 @@ test('actual Lua cold-empty payload accepts native empty-map arrays', () => {
 		fs.readFileSync(path.join(root, '_shared/ui/metrics_typing/filters.js'), 'utf8'),
 		f.context
 	);
-	f.context.apply_default_date_range = () => {};
+	f.context.get_local_date_string = () => '2026-09-01';
 	f.context.ensure_live_refresh = () => {};
 	f.context.update_app_btn_text = () => {};
 	assert.equal(vm.runInContext(scripts[0], f.context), true);

@@ -11,7 +11,7 @@
 
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
-const { frontend, actualPurge } = require('./support/typing-reset-fixture.cjs');
+const { frontend, bootstrapFrontend, actualPurge } = require('./support/typing-reset-fixture.cjs');
 let passed = 0;
 let failed = 0;
 
@@ -27,6 +27,163 @@ function test(name, callback) {
 }
 
 const payload = { historical: { c: { old: { c: 9 } } }, today: {} };
+
+for (const host of ['linux', 'windows']) {
+	const manifest = {
+		'2026-09-01': { Editor: { chars: 9 } },
+		'2026-09-03': { Editor: { chars: 3 } }
+	};
+	const blob = (history = 'initial') => ({
+		metrics_manifest: manifest,
+		_prefetch_data: { historical: { c: { [history]: { c: 3 } } }, today: {} }
+	});
+	test(`${host}: idle first paint retains defaults and consumes prefetch without another round trip`, () => {
+		const f = bootstrapFrontend(host);
+		f.push(blob());
+		assert.equal(f.context.get_source_mode_flags().show_hs, true);
+		assert.equal(f.context.get_source_mode_flags().show_llm, true);
+		assert.equal(f.elements.btn_case_sensitive.classList.contains('active'), true);
+		assert.equal(f.elements.pause_threshold.value, '5000');
+		assert.equal(f.elements.date_start.value, '2026-09-01');
+		assert.equal(f.elements.date_end.value, '2026-09-07');
+		assert.equal(f.state.app_selection_mode, 'all');
+		assert.equal(f.state.active_range_request_id, 0);
+		assert.equal(f.state.historical_cache.c.initial.c, 3);
+		f.dispatch();
+		assert.equal(f.requests.filter((request) => request.action === 'range').length, 0);
+	});
+	test(`${host}: first tagged reply retains the user's original date and request owner`, () => {
+		const f = bootstrapFrontend(host);
+		f.select('2026-09-03');
+		f.dispatch();
+		const original = f.requests.find((request) => request.action === 'range');
+		f.push(blob()); // The untagged initial ready cannot displace the user's query.
+		assert.equal(f.state.active_range_request_id, original.request_id);
+		f.push({ ...blob('selected'), range_request_id: original.request_id });
+		assert.equal(f.elements.date_start.value, '2026-09-03');
+		assert.equal(f.elements.date_end.value, '2026-09-03');
+		assert.equal(f.state.range_request_sequence, original.request_id);
+		assert.equal(f.state.active_range_request_id, 0);
+		assert.equal(f.state.historical_cache.c.selected.c, 3);
+		f.dispatch();
+		assert.equal(f.requests.filter((request) => request.action === 'range').length, 1);
+	});
+	for (const edited of ['start', 'end', 'both']) {
+		test(`${host}: pre-blur ${edited} date edits retain each bound and require their own projection`, () => {
+			const f = bootstrapFrontend(host);
+			// Native date inputs need not dispatch change until blur. Verify the actual
+			// HTML seam, then leave its handler undispatched while editing the DOM.
+			assert.equal(
+				f.dateChangeHandler('date_start'),
+				'app_state.hour_cutoff = null; apply_date_app_filters()'
+			);
+			assert.equal(
+				f.dateChangeHandler('date_end'),
+				'app_state.hour_cutoff = null; apply_date_app_filters()'
+			);
+			if (edited !== 'end') f.elements.date_start.value = '2026-09-02';
+			if (edited !== 'start') f.elements.date_end.value = '2026-09-04';
+			assert.equal(f.state.range_request_sequence, 0);
+			f.push(blob());
+			assert.equal(f.elements.date_start.value, edited === 'end' ? '2026-09-01' : '2026-09-02');
+			assert.equal(f.elements.date_end.value, edited === 'start' ? '2026-09-07' : '2026-09-04');
+			assert.ok(
+				f.state.active_range_request_id > 0,
+				'default history must not ACK the edited range'
+			);
+			assert.equal(f.state.historical_cache, null);
+			f.dispatch();
+			const ranges = f.requests.filter((request) => request.action === 'range');
+			assert.equal(ranges.length, 1);
+			assert.equal(ranges[0].start_date, f.elements.date_start.value);
+			assert.equal(ranges[0].end_date, f.elements.date_end.value);
+			f.push({ ...blob('edited'), range_request_id: ranges[0].request_id });
+			assert.equal(f.state.active_range_request_id, 0);
+			assert.equal(f.state.historical_cache.c.edited.c, 3);
+		});
+	}
+	for (const [id, action] of [
+		['btn_toggle_hs', 'toggle_hs_source'],
+		['btn_toggle_llm', 'toggle_llm_source'],
+		['btn_case_sensitive', 'toggle_filter'],
+		['pause_threshold', 'pause']
+	])
+		test(`${host}: ${id} intent before ready survives initialization`, () => {
+			const f = bootstrapFrontend(host);
+			if (action === 'pause') f.changePause('1000');
+			else {
+				// Exercise the real handler even if the old document starts inactive.
+				f.context[action](id);
+				if (f.elements[id].classList.contains('active')) f.context[action](id);
+			}
+			f.push(blob());
+			if (action === 'pause') assert.equal(f.elements.pause_threshold.value, '1000');
+			else assert.equal(f.elements[id].classList.contains('active'), false);
+			assert.equal(
+				f.state.active_range_request_id,
+				0,
+				'local-only filter keeps default prefetch fast path'
+			);
+			assert.equal(f.state.historical_cache.c.initial.c, 3);
+			f.dispatch();
+			assert.equal(f.requests.filter((value) => value.action === 'range').length, 0);
+		});
+	for (const selection of ['none', 'subset', 'all']) {
+		test(`${host}: app modal ${selection} intent before ready is preserved before close`, () => {
+			const f = bootstrapFrontend(host);
+			f.state.available_apps.push('Browser');
+			f.state.selected_apps = new Set(['Browser', 'Editor']);
+			f.state.app_selection_mode = 'all';
+			if (selection === 'all') f.context.select_all_apps();
+			if (selection === 'none') f.context.deselect_all_apps();
+			if (selection === 'subset')
+				f.context.toggle_app_selection({ value: 'Browser', checked: false });
+			const expected = [...f.state.selected_apps];
+			f.push({ ...blob(), metrics_manifest: { '2026-09-01': { Editor: {}, Browser: {} } } });
+			assert.deepEqual([...f.state.selected_apps].sort(), expected.sort());
+			if (selection === 'all') assert.equal(f.state.active_range_request_id, 0);
+			else {
+				assert.ok(
+					f.state.active_range_request_id > 0,
+					'modal subset is not ACKed by default prefetch'
+				);
+				assert.equal(f.state.historical_cache, null);
+			}
+			f.context.close_app_modal();
+			f.dispatch();
+			const ranges = f.requests.filter((request) => request.action === 'range');
+			assert.equal(ranges.length, 1);
+			assert.deepEqual([...ranges[0].apps].sort(), expected.sort());
+			f.push({ ...blob('own'), range_request_id: ranges[0].request_id });
+			assert.equal(f.state.active_range_request_id, 0);
+			assert.equal(f.state.historical_cache.c.own.c, 3);
+		});
+	}
+	test(`${host}: first manifest expanding ALL cannot retag history or seed a rejected cache`, () => {
+		const f = bootstrapFrontend(host);
+		f.state.app_selection_mode = 'all';
+		f.select('2026-09-03');
+		f.dispatch();
+		const original = f.requests.find((request) => request.action === 'range');
+		const expanded = { '2026-09-03': { Editor: {}, Browser: {} } };
+		f.push({
+			...blob('wrongScope'),
+			metrics_manifest: expanded,
+			range_request_id: original.request_id
+		});
+		const latest = f.state.active_range_request_id;
+		assert.ok(latest > original.request_id, 'discovered app needs a fresh scope');
+		assert.equal(f.state.historical_cache, null);
+		f.dispatch();
+		const requests = f.requests.filter((request) => request.action === 'range');
+		assert.equal(requests.length, 2);
+		assert.deepEqual([...requests[1].apps].sort(), ['Browser', 'Editor']);
+		// A real terminal permits later live deltas; rejected history must stay absent.
+		assert.equal(f.context.complete_range_request(latest, 'failed'), true);
+		f.push({ metrics_manifest: expanded, _prefetch_data: { today: {} } });
+		assert.deepEqual(Object.keys(f.state.historical_cache), []);
+	});
+}
 
 for (const host of ['macos', 'windows', 'linux']) {
 	for (const prefetch of [false, true]) {
