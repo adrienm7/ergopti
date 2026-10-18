@@ -118,7 +118,7 @@ const CONSUMERS = [
 		path: '_shared/tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/test_wrap_selection_action.ahk',
+		file: 'windows/tests/unit/modules/shortcuts/test_wrap_selection_action.ahk',
 		path: '\\tests\\corpus\\action_parameters\\wrap_pair_vectors.json'
 	}
 ];
@@ -134,8 +134,8 @@ check(
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
 check(
-	/^#Include unit\/test_wrap_selection_action\.ahk$/m.test(ahkRunner),
-	'windows/tests/run_all.ahk must #Include unit/test_wrap_selection_action.ahk'
+	/^#Include unit\/modules\/shortcuts\/test_wrap_selection_action\.ahk$/m.test(ahkRunner),
+	'windows/tests/run_all.ahk must #Include unit/modules/shortcuts/test_wrap_selection_action.ahk'
 );
 
 if (errors.length > 0) {
