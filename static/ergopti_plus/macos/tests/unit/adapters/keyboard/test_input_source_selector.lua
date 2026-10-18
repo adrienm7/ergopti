@@ -82,6 +82,34 @@ helpers.describe("native input-source selection: exact command", function()
 		end)
 	end)
 
+	helpers.it("keeps localized names and exact candidates separate in native lookup argv", function()
+		with_fixture({}, function(selector, resolutions)
+			local executable, args, environment, reason = selector.command_named("French", "French")
+			helpers.assert_eq(executable, EXECUTABLE)
+			helpers.assert_eq(resolutions(), 1)
+			helpers.assert_eq(#args, 3)
+			helpers.assert_eq(args[1], "--select-input-source-by-name")
+			helpers.assert_eq(args[2], "French")
+			helpers.assert_eq(args[3], "French")
+			helpers.assert_eq(environment.ERGOPTI_LAUNCHER_EXECUTABLE, EXECUTABLE)
+			helpers.assert_nil(reason)
+		end)
+	end)
+
+	helpers.it("rejects malformed named lookups before helper resolution", function()
+		with_fixture({}, function(selector, resolutions)
+			for _, case in ipairs({ { "", "id" }, { "French", "" }, { "bad\0name", "id" },
+				{ "French", "bad\0id" }, { string.rep("é", 513), "id" }, { "French", {} } }) do
+				local executable, args, environment, reason = selector.command_named(case[1], case[2])
+				helpers.assert_nil(executable)
+				helpers.assert_nil(args)
+				helpers.assert_nil(environment)
+				helpers.assert_eq(reason, "invalid_source")
+			end
+			helpers.assert_eq(resolutions(), 0)
+		end)
+	end)
+
 	helpers.it("refuses malformed identifiers before native helper resolution", function()
 		with_fixture({}, function(selector, resolutions)
 			for _, case in ipairs({ {}, { value = "" }, { value = 7 }, { value = {} },

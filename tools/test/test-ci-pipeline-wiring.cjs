@@ -346,13 +346,13 @@ const MACOS_NATIVE_STEP_CONDITIONS = [
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
-		'Qualify actual input-source AppleScript XCTest controls',
+		'Qualify native input-source and launcher XCTest controls',
 		NOT_CANCELLED
 	],
 	[
 		MACOS_BOX,
 		'managed-ollama-native',
-		'Retain input-source AppleScript XCTest diagnostics',
+		'Retain native input-source and launcher XCTest diagnostics',
 		'always()'
 	],
 	[

@@ -13,6 +13,7 @@ const FILES = {
 	item36: 'tools/test/test-item36-native-qualification.cjs',
 	pac: 'tools/test/test-macos-native-pac-qualification.cjs',
 	deferral: 'tools/test/test-macos-dev-qualification-deferral.cjs',
+	inputSource: 'tools/test/fixtures/native-input-source-qualification.cjs',
 	pipeline: 'tools/test/test-ci-pipeline-wiring.cjs',
 	runner: 'tools/test/run-js-suite.cjs'
 };
@@ -103,8 +104,32 @@ function admitRunBoundary(run) {
 	}
 	visit(run.body);
 }
+/** Each control delegation stays unconditional in its owner's common body. */
+function isolationStatement(text, run, callee = 'execFileSync') {
+	const calls = [];
+	walk(parse(text), (node) => {
+		if (node.type === 'CallExpression' && node.callee.name === callee) calls.push(node);
+	});
+	assert.equal(calls.length, 1, 'one exact isolation-control invocation');
+	const statement = run.body.body.find(
+		(node) => node.type === 'ExpressionStatement' && node.expression.start === calls[0].start
+	);
+	assert.ok(statement, 'isolation controls must be unconditional in the common run body');
+	return statement;
+}
+/** Records the actual Python call in the extracted owner without launching a child. */
+function isolationPythonStatement(text) {
+	const owners = [];
+	walk(parse(text), (node) => {
+		if (node.type === 'FunctionDeclaration' && node.id.name === 'runInputSourceControls')
+			owners.push(node);
+	});
+	assert.equal(owners.length, 1, 'one extracted input-source control body');
+	admitRunBoundary(owners[0]);
+	return isolationStatement(text, owners[0]);
+}
 function trace(sources, entry) {
-	const counts = { item36: 0, pac: 0, deferral: 0, pacHelper: 0 };
+	const counts = { item36: 0, pac: 0, deferral: 0, pacHelper: 0, inputSourceIsolation: 0 };
 	const cache = new Map();
 	const modules = Object.fromEntries(Object.keys(FILES).map((name) => [name, { exports: {} }]));
 	const main = modules[entry];
@@ -112,6 +137,7 @@ function trace(sources, entry) {
 		workflow: 'PROJECTED_WORKFLOW',
 		rawWorkflow: 'RAW_WORKFLOW',
 		admitItem36Selector: () => {},
+		admitNativeSdkSelector: () => {},
 		admitRawNativePacSelector: () => {},
 		ITEM36_FILTER: 'ITEM36_FILTER',
 		PAC_FILTER: 'PAC_FILTER',
@@ -161,6 +187,8 @@ function trace(sources, entry) {
 			);
 			if (run) {
 				admitRunBoundary(run);
+				const isolation = isolationStatement(sources.deferral, run, 'runInputSourceControls');
+				const python = isolationPythonStatement(sources.inputSource);
 				const leafBlocks = run.body.body.filter(
 					(node) => node.type === 'IfStatement' && node.test.name === 'includeLeafControls'
 				);
@@ -168,6 +196,29 @@ function trace(sources, entry) {
 				const recordedRun = ({ includeLeafControls = true } = {}) => {
 					assert.equal(typeof includeLeafControls, 'boolean');
 					counts.deferral++;
+					evaluate(source(sources.deferral, isolation), module, {
+						runInputSourceControls(context) {
+							assert.deepEqual(Object.keys(context), ['workflow', 'admitNativeSdkSelector']);
+							assert.equal(context.workflow, values.workflow);
+							assert.equal(context.admitNativeSdkSelector, values.admitNativeSdkSelector);
+							evaluate(source(sources.inputSource, python), module, {
+								path,
+								__dirname: path.join(__dirname, 'fixtures'),
+								ROOT: path.resolve(__dirname, '../..'),
+								execFileSync(command, args, options) {
+									assert.equal(command, 'python3');
+									assert.deepEqual(Array.from(args), [
+										path.join(__dirname, 'test_input_source_xctest_isolation.py')
+									]);
+									assert.deepEqual(JSON.parse(JSON.stringify(options)), {
+										cwd: path.resolve(__dirname, '../..'),
+										stdio: 'pipe'
+									});
+									counts.inputSourceIsolation++;
+								}
+							});
+						}
+					});
 					evaluate(source(sources.deferral, leafBlocks[0]), module, {
 						includeLeafControls
 					});
@@ -267,6 +318,35 @@ function checkOwnership(sources) {
 			/deferral owner must not return before its census/,
 			'an early return must not be recorded as completed controls'
 		);
+		const isolation = source(
+			sources.deferral,
+			isolationStatement(sources.deferral, run, 'runInputSourceControls')
+		);
+		const without = sources.deferral.replace(isolation, '');
+		const conditional = sources.deferral.replace(
+			isolation,
+			`if (includeLeafControls) { ${isolation} }`
+		);
+		const duplicate = sources.deferral.replace(isolation, isolation + '\n' + isolation);
+		const foreign = sources.inputSource.replace(
+			'test_input_source_xctest_isolation.py',
+			'foreign.py'
+		);
+		const forgiven = sources.deferral.replace(isolation, `try { ${isolation} } catch {}`);
+		const earlyHelper = sources.inputSource.replace(
+			'function runInputSourceControls({ workflow, admitNativeSdkSelector }) {',
+			'function runInputSourceControls({ workflow, admitNativeSdkSelector }) { return;'
+		);
+		for (const changed of [
+			...[without, conditional, duplicate, forgiven].map((deferral) => ({ ...sources, deferral })),
+			{ ...sources, inputSource: foreign },
+			{ ...sources, inputSource: earlyHelper }
+		])
+			assert.throws(
+				() => trace(changed, 'pipeline'),
+				undefined,
+				'isolation controls must retain exactly one unconditional, unforgiven Python owner'
+			);
 	}
 
 	const pacAssignments = [];
@@ -302,14 +382,14 @@ function checkOwnership(sources) {
 
 	const summaries = [];
 	for (const full of [false, true]) {
-		const total = { item36: 0, pac: 0, deferral: 0, pacHelper: 0 };
+		const total = { item36: 0, pac: 0, deferral: 0, pacHelper: 0, inputSourceIsolation: 0 };
 		for (const entry of enrolled(sources, full)) {
 			const row = trace(sources, entry);
 			Object.keys(total).forEach((key) => (total[key] += row[key]));
 		}
 		assert.deepEqual(
 			total,
-			{ item36: 1, pac: 1, deferral: 1, pacHelper: 1 },
+			{ item36: 1, pac: 1, deferral: 1, pacHelper: 1, inputSourceIsolation: 1 },
 			'full/default control ownership is an exact union'
 		);
 		summaries.push({
@@ -322,25 +402,29 @@ function checkOwnership(sources) {
 		item36: 1,
 		pac: 0,
 		deferral: 0,
-		pacHelper: 0
+		pacHelper: 0,
+		inputSourceIsolation: 0
 	});
 	assert.deepEqual(trace(sources, 'pac'), {
 		item36: 0,
 		pac: 1,
 		deferral: 0,
-		pacHelper: 1
+		pacHelper: 1,
+		inputSourceIsolation: 0
 	});
 	assert.deepEqual(trace(sources, 'deferral'), {
 		item36: 1,
 		pac: 1,
 		deferral: 1,
-		pacHelper: 1
+		pacHelper: 1,
+		inputSourceIsolation: 1
 	});
 	assert.deepEqual(trace(sources, 'pipeline'), {
 		item36: 0,
 		pac: 0,
 		deferral: 1,
-		pacHelper: 0
+		pacHelper: 0,
+		inputSourceIsolation: 1
 	});
 	return summaries;
 }
