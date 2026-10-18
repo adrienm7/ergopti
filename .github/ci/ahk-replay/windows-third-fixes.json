@@ -1,0 +1,101 @@
+{
+	"expected_count": 210,
+	"filters": [
+		{
+			"contains": "toml-section-order-codec",
+			"expected_count": 5
+		},
+		{
+			"contains": "toml-exact-prefix-case",
+			"expected_count": 2
+		},
+		{
+			"contains": "remote-http-abort-retirement",
+			"expected_count": 12
+		},
+		{
+			"contains": "ollama-stream-utf8-admission",
+			"expected_count": 26
+		},
+		{
+			"contains": "metrics-seed-projection-format",
+			"expected_count": 3
+		},
+		{
+			"contains": "wrap-visible-suffix",
+			"expected_count": 1
+		},
+		{
+			"contains": "cleanup-refresh-close",
+			"expected_count": 6
+		},
+		{
+			"contains": "webview-folder-picker-session",
+			"expected_count": 24
+		},
+		{
+			"contains": "sqlite-text-byte-length",
+			"expected_count": 2
+		},
+		{
+			"contains": "sqlite-read-dispatch",
+			"expected_count": 4
+		},
+		{
+			"contains": "selection-startup-revocation",
+			"expected_count": 17
+		},
+		{
+			"contains": "selection-timer-release",
+			"expected_count": 3
+		},
+		{
+			"contains": "selection-startup-owner-settlement",
+			"expected_count": 2
+		},
+		{
+			"contains": "selection-restore-revalidation",
+			"expected_count": 16
+		},
+		{
+			"contains": "native-paths-close-cancellation",
+			"expected_count": 4
+		},
+		{
+			"contains": "metrics-semantic-source",
+			"expected_count": 6
+		},
+		{
+			"contains": "editor-semantic-preference",
+			"expected_count": 3
+		},
+		{
+			"contains": "logger-semantic-level",
+			"expected_count": 3
+		},
+		{
+			"contains": "toml-exact-prefix-source-admission",
+			"expected_count": 2
+		},
+		{
+			"contains": "remote-http-completion-reads",
+			"expected_count": 28
+		},
+		{
+			"contains": "prefix-empty-render-owner",
+			"expected_count": 12
+		},
+		{
+			"contains": "webview-build-close-ownership",
+			"expected_count": 7
+		},
+		{
+			"contains": "plain-paste-owner-refusal",
+			"expected_count": 16
+		},
+		{
+			"contains": "text-sender-restore-unavailable",
+			"expected_count": 6
+		}
+	]
+}
