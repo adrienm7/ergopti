@@ -401,3 +401,62 @@ Test("scroll-native64: vertical omitted native sample", _KLMS_Default.Bind("vert
 Test("scroll-native64: horizontal omitted native sample", _KLMS_Default.Bind("horizontal"))
 Test("scroll-native64: flush omitted native sample", _KLMS_DefaultFlush)
 Test("scroll-native64: empty burst unchanged", _KLMS_Empty)
+
+
+; A throwing privacy classifier exercises the real accumulator/flush boundary.
+_KLMS_ThrowPrivacy(Recorder) {
+	Recorder.Calls.Push("privacy-error")
+	throw Error("owned privacy classification failure")
+}
+
+_KLMS_PrivacyFailureAction(Mode, Recorder) {
+	if Mode = "flush" {
+		KL_Mouse_FlushScroll(1500, _KLMS_ThrowPrivacy.Bind(Recorder),
+			_KLMS_Refresh.Bind(Recorder), _KLMS_Position.Bind(Recorder), _KLMS_Append.Bind(Recorder))
+		for Field in ["scroll_ticks", "scroll_h_ticks", "scroll_start", "scroll_last"]
+			AssertEqual(0, KLMouse.%Field%, "uncertain claimed activity must stay retired")
+	} else {
+		Fn := Mode = "vertical" ? KL_Mouse_AccumScroll : KL_Mouse_AccumScrollH
+		Fn.Call(1, 1500, _KLMS_ThrowPrivacy.Bind(Recorder),
+			_KLMS_Previous.Bind(1500, Recorder), _KLMS_Bump.Bind(Recorder), _KLMS_Arm.Bind(Recorder))
+		AssertEqual(2, KLMouse.scroll_ticks, "classification failure cannot admit a new wheel tick")
+		AssertEqual(0, KLMouse.scroll_h_ticks)
+		AssertEqual(1000, KLMouse.scroll_start)
+		AssertEqual(1000, KLMouse.scroll_last)
+	}
+	AssertEqual("privacy-error", _JoinParts(Recorder.Calls),
+		"failure must precede counters, timers, cursor sampling, refresh and append")
+	AssertEqual(0, Recorder.Events.Length)
+	AssertEqual(0, Recorder.Bumps)
+	AssertEqual(0, Recorder.Arms.Length)
+}
+
+_KLMS_PrivacyFailure(Mode) {
+	_KLMS_WithState(2, 0, 1000, 1000, _KLMS_PrivacyFailureAction.Bind(Mode), 17)
+}
+Test("mouse-privacy-query-failure: vertical admission fails closed", _KLMS_PrivacyFailure.Bind("vertical"))
+Test("mouse-privacy-query-failure: horizontal admission fails closed", _KLMS_PrivacyFailure.Bind("horizontal"))
+Test("mouse-privacy-query-failure: claimed scroll fails closed", _KLMS_PrivacyFailure.Bind("flush"))
+
+_KLMS_ParkPrivacyFailure() {
+	Fields := ["prev_x", "prev_y", "prev_initialized", "park_initialized"]
+	Saved := Map()
+	for Field in Fields
+		Saved[Field] := KLMouse.%Field%
+	SavedInitialized := Keylogger.initialized
+	Recorder := {Calls: []}
+	try {
+		Keylogger.initialized := true
+		; An admitted sample resets this flag only on a rejected privacy decision.
+		KLMouse.park_initialized := true
+		KL_Mouse_ParkTick(_KLMS_ThrowPrivacy.Bind(Recorder))
+		AssertFalse(KLMouse.park_initialized,
+			"classification failure must retire park admission before distance or idle collection")
+		AssertEqual("privacy-error", _JoinParts(Recorder.Calls))
+	} finally {
+		for Field, Value in Saved
+			KLMouse.%Field% := Value
+		Keylogger.initialized := SavedInitialized
+	}
+}
+Test("mouse-privacy-query-failure: park polling fails closed", _KLMS_ParkPrivacyFailure)

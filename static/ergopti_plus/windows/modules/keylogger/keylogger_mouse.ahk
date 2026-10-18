@@ -163,6 +163,16 @@ class KLMouse {
 ; =================================
 ; =================================
 
+; All mouse producers share the same fail-closed privacy boundary. A failed
+; focus query must never turn uncertainty into permission to collect activity.
+_KL_Mouse_ShouldFilter(FilterFn := unset) {
+	try return IsSet(FilterFn) ? FilterFn.Call() : MF_ShouldFilter()
+	catch as Failure {
+		LoggerWarn("Keylogger", "Mouse privacy classification failed; activity withheld.")
+		return true
+	}
+}
+
 _KL_Mouse_GestureAuthorized(DownAuthorized, DownHwnd, DownFocusGeneration,
 	UpHwnd, UpFocusGeneration, UpFiltered, UpSuspended) {
 	return (DownAuthorized is Integer) && DownAuthorized == true
@@ -244,8 +254,7 @@ KL_Mouse_OnLDown(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				Filtered := true
-				try Filtered := MF_ShouldFilter()
+				Filtered := _KL_Mouse_ShouldFilter()
 				PreviousCritical := Critical("On")
 				try {
 						KLMouse.lbtn_down_x    := mx
@@ -277,8 +286,7 @@ KL_Mouse_OnLUp(*) {
 				Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)
 				dist := Measurement.distance
 				duration := Measurement.duration
-				filtered := true
-				try filtered := MF_ShouldFilter()
+				filtered := _KL_Mouse_ShouldFilter()
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
@@ -309,8 +317,7 @@ KL_Mouse_OnRDown(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				Filtered := true
-				try Filtered := MF_ShouldFilter()
+				Filtered := _KL_Mouse_ShouldFilter()
 				PreviousCritical := Critical("On")
 				try {
 						KLMouse.rbtn_down_x    := mx
@@ -342,8 +349,7 @@ KL_Mouse_OnRUp(*) {
 				Measurement := _KL_Mouse_MeasureGesture(Gesture, mx, my)
 				dist := Measurement.distance
 				duration := Measurement.duration
-				filtered := true
-				try filtered := MF_ShouldFilter()
+				filtered := _KL_Mouse_ShouldFilter()
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
@@ -374,8 +380,7 @@ KL_Mouse_OnMDown(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				Filtered := true
-				try Filtered := MF_ShouldFilter()
+				Filtered := _KL_Mouse_ShouldFilter()
 				PreviousCritical := Critical("On")
 				try {
 						KLMouse.mbtn_down_x    := mx
@@ -404,8 +409,7 @@ KL_Mouse_OnMUp(*) {
 		try {
 				CoordMode("Mouse", "Screen")
 				MouseGetPos(&mx, &my, &TargetHwnd)
-				filtered := true
-				try filtered := MF_ShouldFilter()
+				filtered := _KL_Mouse_ShouldFilter()
 				if !_KL_Mouse_GestureAuthorized(Gesture.authorized,
 						Gesture.hwnd, Gesture.focus_generation,
 						TargetHwnd, MetricsFocusCache.generation,
@@ -455,12 +459,7 @@ KL_Mouse_AccumScroll(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 		if A_IsSuspended
 				return
 		; Filter before session counts or timer admission.
-		filtered := false
-		if IsSet(FilterFn) {
-				try filtered := FilterFn.Call()
-		} else {
-				try filtered := MF_ShouldFilter()
-		}
+		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 		if filtered
 				return
 		last := KLMouse.scroll_last
@@ -491,12 +490,7 @@ KL_Mouse_AccumScrollH(delta, NowTick?, FilterFn?, FlushFn?, BumpFn?, ArmFn?) {
 		if A_IsSuspended
 				return
 		; Horizontal admission uses the same privacy and timing policy.
-		filtered := false
-		if IsSet(FilterFn) {
-				try filtered := FilterFn.Call()
-		} else {
-				try filtered := MF_ShouldFilter()
-		}
+		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 		if filtered
 				return
 		last := KLMouse.scroll_last
@@ -549,12 +543,7 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 				Critical(previous_critical)
 		}
 
-		filtered := false
-		if IsSet(FilterFn) {
-				try filtered := FilterFn.Call()
-		} else {
-				try filtered := MF_ShouldFilter()
-		}
+		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 		if filtered
 				return
 		if !Keylogger.initialized
@@ -603,14 +592,13 @@ KL_Mouse_FlushScroll(NowTick?, FilterFn?, RefreshFn?, PositionFn?, AppendFn?) {
 ; ===================================
 ; ===================================
 
-KL_Mouse_ParkTick() {
+KL_Mouse_ParkTick(FilterFn := unset) {
 	CoordMode("Mouse", "Screen")
 	MouseGetPos(&mx, &my)
 
-	filtered := false
-	if (!A_IsSuspended and Keylogger.initialized) {
-		try filtered := MF_ShouldFilter()
-	}
+	filtered := true
+	if (!A_IsSuspended and Keylogger.initialized)
+		filtered := _KL_Mouse_ShouldFilter(FilterFn?)
 	return _KL_Mouse_ProcessParkSample(
 		KLMouse,
 		mx,
