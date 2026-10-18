@@ -258,13 +258,25 @@ helpers.describe("actual shared-output handoff dependencies: green controls", fu
 
 	helpers.it("records legitimate ComboEmitter writes on the same exact output capability", function()
 		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } } })
-		session.pump(); local before = session.view()
+		session.pump(); local before, capability = session.view(), session.cap
 		local combo = helpers.load_module("modules.gestures.combo_emitter")
 		local accepted = combo.press_codes({ 56 }, { 30 }, "controlled shared writer")
-		local after = session.view(); session.close()
+		local after = session.view()
+		local same_capability = rawequal(session.writer.capture_output(), capability)
+		session.queue("a", 42, 0, 2); session.pump()
+		local final, running = session.view(), session.hook.isRunning()
+		session.close()
 		helpers.assert_eq(accepted, true); helpers.assert_eq(after.down, { 42 })
-		helpers.assert_eq(after.write_epoch, before.write_epoch + 4,
+		helpers.assert_eq(session.rows, { { 42, 1 }, { 42, 0 }, { 56, 1 }, { 30, 1 },
+			{ 30, 0 }, { 56, 0 }, { 42, 1 }, { 42, 0 } },
+			"foreign Shift is suspended around Alt+A, then only its original physical UP retires it")
+		helpers.assert_true(same_capability, "the gesture cannot appoint another output capability")
+		helpers.assert_eq(after.generation, before.generation)
+		helpers.assert_eq(after.write_epoch, before.write_epoch + 6,
 			"a private Hook-only epoch would mistake a legitimate same-channel gesture for foreign ownership")
+		helpers.assert_true(running, "the next physical event remains admitted on the original shared writer")
+		helpers.assert_eq(final.generation, before.generation)
+		helpers.assert_eq(final.down, {}, "the exact retained source can release the restored modifier")
 	end)
 
 	helpers.it("retains temporary Writer exact-baseline release instead of silently committing persistent Shift", function()
