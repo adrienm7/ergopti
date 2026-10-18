@@ -393,7 +393,8 @@ TOML_ArrayRecoveryHeader(Line) {
 			|| StrLen(Match[1]) != StrLen(Match[3])
 		return false
 	Inner := Trim(Match[2])
-	Quoted := '"(?:[^"\\]|\\.)*"'
+	BasicQuoted := '"(?:[^"\\]|\\.)*"'
+	Quoted := "(?:" . BasicQuoted . "|'[^']*')"
 	Kind := TOML_LiteralKind(Inner)
 	if RegExMatch(Inner, "^" . Quoted . "$") || (Kind != "unknown" && Kind != "string")
 		return false
