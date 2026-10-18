@@ -222,3 +222,43 @@ _ACS_CountLayoutToken(Tokens, Token) {
 			Count += 1
 	return Count
 }
+
+; A cached HKL is insufficient: digit access and the Layout master change
+; in-process. Registration must retain the hidden native keys for that return.
+_ACS_NumberRowPolicyCache() {
+	global Features, CategoryEnabled, _AccentedShortcutLayoutCache, _AccentedShortcutRegistered
+	SavedCache := _AccentedShortcutLayoutCache
+	SavedRegistered := _AccentedShortcutRegistered
+	SavedCategory := CategoryEnabled["Layout"]
+	_AccentedShortcutLayoutCache := Map()
+	_AccentedShortcutRegistered := false
+	CategoryEnabled["Layout"] := true
+	try {
+		Native := _AccentedShortcutKeysCached(1, _ACS_AzertyScanCode)
+		AssertEqual("c", AccentedShortcutResolve("^SC003", Native))
+		Features["layout"]["direct_access_digits"] := "digits"
+		Digits := _AccentedShortcutKeysCached(1, _ACS_AzertyScanCode)
+		AssertEqual(0, Digits.Count, "live digits mode must not reuse the native accented-key cache")
+		AssertEqual("", AccentedShortcutResolve("^SC003", Digits), "Ctrl+2 must keep its native chord")
+
+		Names := []
+		Count := AccentedShortcuts_Register([1], (Name, *) => Names.Push(Name), (Args*) => 0,
+			(Hkl) => _AccentedShortcutRegistrationKeys(Hkl, _ACS_AzertyScanCode))
+		AssertEqual(18, Count, "digits mode must still register the three hidden native accent positions")
+		AssertEqual(18, Names.Length)
+
+		Features["layout"]["direct_access_digits"] := "native"
+		AssertEqual(Native, _AccentedShortcutKeysCached(1, _ACS_AzertyScanCode),
+			"returning to native mode must recover its own cached profile")
+		Features["layout"]["direct_access_digits"] := "digits"
+		CategoryEnabled["Layout"] := false
+		AssertEqual(Native, _AccentedShortcutKeysCached(1, _ACS_AzertyScanCode),
+			"disabling the Layout master returns accented chords to the native profile")
+	} finally {
+		_AccentedShortcutLayoutCache := SavedCache
+		_AccentedShortcutRegistered := SavedRegistered
+		CategoryEnabled["Layout"] := SavedCategory
+	}
+}
+Test("accented shortcuts: live number-row changes select their own cache (accented-shortcuts-live-digits)", () =>
+	_ACS_WithShortcuts(_ACS_DefaultConfig(), _ACS_NumberRowPolicyCache))
