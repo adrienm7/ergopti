@@ -326,6 +326,21 @@ local shutdown = ShutdownCoordinator.new({
 			end)(),
 		},
 		{
+			name = "desktop launch confirmations",
+			wait_for_ack = true,
+			stop = (function()
+				local resolved, opener, stop
+				return function()
+					if not resolved then
+						resolved = true
+						opener = package.loaded["adapters.desktop_opener"]
+						stop = opener and opener.shutdown
+					end
+					return not opener or (type(stop) == "function" and stop() == true)
+				end
+			end)(),
+		},
+		{
 			name = "AI agent learning",
 			stop = function() require("modules.llm.agent_learning").flush() end,
 		},
