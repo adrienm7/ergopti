@@ -152,13 +152,16 @@ sources.push(...delegatedMenuSources(sources, path.join(DRIVERS, '_shared', 'lua
 
 // This owner captured every source before querying fields and sections. Keep
 // that exact ordered snapshot, splitting and excluding full-line comments once.
-const readerSources = sources.map(({ rel, src }) => ({
-	rel,
-	lines: src.split('\n').filter((line) => {
+const readerSources = sources.map(({ rel, src }) => {
+	const lines = src.split('\n').filter((line) => {
 		const t = line.trimStart();
 		return !t.startsWith('--') && !t.startsWith(';') && !t.startsWith('//');
-	})
-}));
+	});
+	// Every reader pattern contains the token literally, so a file whose kept
+	// lines never contain it cannot match: one substring search replaces five
+	// regular expressions per line for the hundreds of tokens queried below.
+	return { rel, lines, text: lines.join('\n') };
+});
 
 /** Files that reference a token outside a comment. */
 function readersOf(token) {
@@ -171,7 +174,8 @@ function readersOf(token) {
 		new RegExp(`'${escaped}'`)
 	];
 	const hits = [];
-	for (const { rel, lines } of readerSources) {
+	for (const { rel, lines, text } of readerSources) {
+		if (!text.includes(token)) continue;
 		for (const line of lines) {
 			if (patterns.some((p) => p.test(line))) {
 				hits.push(rel);
