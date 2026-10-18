@@ -1156,7 +1156,10 @@ local function main()
 			end
 		end
 
-		if result and secure_focus_guard.blocks_text() then result = nil end
+		-- Ordinary expansions retain their original field through clipboard I/O.
+		-- Tabs between explicitly configured fields keep their separate protocol.
+		local destination = result and secure_focus_guard.capture_text_owner()
+		if result and not destination then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1183,7 +1186,8 @@ local function main()
 					result.backspace_count,
 					result.replacement,
 					result.is_private,
-					replay_terminator
+					replay_terminator,
+					destination
 				)
 				local queued_input = injector._end_injection()
 				expansion_committed = ok_delivery and type(delivery) == "table"
@@ -1218,7 +1222,9 @@ local function main()
 				else
 					_undoable = nil
 					engine:reset()
-					Logger.error(LOG, "Expansion output did not commit — logical state invalidated: %s.",
+					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
+						and delivery_error == "programmable publication is no longer current" and Logger.warn or Logger.error
+					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
 			end
