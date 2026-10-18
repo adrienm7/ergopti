@@ -165,3 +165,142 @@ for Vector in [
 	Test("hotstrings: selection finish " . Vector[1] . " (selection-restore-revalidation)",
 		_SCFC_AfterRestore.Bind(Vector*))
 }
+
+; Startup ports record only OS boundaries. Admission, cancellation, rollback
+; debt and timer ownership all execute through the production selection owner.
+_SCSC_Revoke(State, Boundary) {
+	global _SelectionCaptureJob
+	if State["boundary"] != Boundary or State["revoked"]
+		return
+	State["revoked"] := true
+	State["job"] := _SelectionCaptureJob
+	AssertTrue(_SelectionCaptureJob["starting"], "startup is published before native work")
+	AssertEqual(1, CBClipboardOwner.active.Count, "the interrupted stack owns its snapshot")
+	switch State["action"] {
+		case "pause": Suspend(true)
+		case "cancel": GetSelectionCancel()
+		case "pause-resume":
+			Suspend(true)
+			GetSelectionCancel()
+			Suspend(false)
+		case "new":
+			State["nested"] := GetSelectionAsync((*) => 0, State["ports"])
+			AssertFalse(State["nested"], "the newer request cannot snapshot an in-flight clear")
+	}
+	AssertTrue(_SelectionCaptureJob == State["job"], "revocation retains the exact in-flight job")
+	AssertEqual(1, CBClipboardOwner.active.Count, "revocation defers release until the native call returns")
+}
+
+_SCSC_Save(State) {
+	State["saves"] += 1
+	_SCSC_Revoke(State, "snapshot")
+	return "owned startup snapshot"
+}
+
+_SCSC_Clear(State) {
+	State["clears"] += 1
+	_SCSC_Revoke(State, "clear")
+	return true
+}
+
+_SCSC_Sequence(State) {
+	State["sequences"] += 1
+	_SCSC_Revoke(State, "sequence")
+	return 42
+}
+
+_SCSC_Send(State) {
+	State["sends"] += 1
+	_SCSC_Revoke(State, "send")
+}
+
+_SCSC_Restore(State, Saved) {
+	State["restores"] += 1
+	AssertEqual("owned startup snapshot", Saved)
+	AssertTrue(CBClipboardOwner.restore_debt is Map,
+		"rollback must use the real central clipboard owner")
+	AssertEqual(1, CBClipboardOwner.active.Count)
+	return true
+}
+
+_SCSC_Startup(Boundary, Action) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live capture")
+	AssertEqual(0, CBClipboardOwner.active.Count)
+	AssertFalse(CBClipboardOwner.restore_debt)
+	PreviousId := _SelectionCaptureNextId
+	PreviousGeneration := CBClipboardOwner.generation
+	PreviousSuspended := A_IsSuspended
+	PreviousSettle := CBClipboardOwner.settle_hook
+	State := Map("boundary", Boundary, "action", Action, "revoked", false,
+		"saves", 0, "clears", 0, "sequences", 0, "sends", 0,
+		"restores", 0, "job", 0, "deliveries", 0, "nested", true)
+	Ports := Map("save", _SCSC_Save.Bind(State), "clear", _SCSC_Clear.Bind(State),
+		"sequence", _SCSC_Sequence.Bind(State), "send", _SCSC_Send.Bind(State),
+		"restore", _SCSC_Restore.Bind(State), "foreground", (*) => 101)
+	State["ports"] := Ports
+	try {
+		CBClipboardOwner.settle_hook := 0
+		Suspend(false)
+		Accepted := GetSelectionAsync((Text) => State["deliveries"] += 1, Ports)
+		if Action == "none" {
+			AssertTrue(Accepted, "the ordinary capture must remain admitted")
+			State["job"] := _SelectionCaptureJob
+			AssertFalse(_SelectionCaptureJob["starting"])
+			AssertTrue(IsObject(_SelectionCaptureJob["timer"]))
+			AssertEqual(1, CBClipboardOwner.active.Count)
+			_SelectionCaptureFinish(_SelectionCaptureJob, "captured selection", true, "ready",
+				Ports["restore"], Ports["sequence"],
+				(*) => Map("foreground", 101, "elapsed", 0, "idle", 0))
+		} else {
+			AssertFalse(Accepted, "a revoked startup cannot report accepted")
+			AssertTrue(State["revoked"], "the requested boundary must be reached")
+		}
+		AssertEqual(1, State["saves"])
+		AssertEqual(Boundary == "snapshot" ? 0 : 1, State["clears"])
+		AssertEqual(Boundary == "send" or Action == "none" ? 1 : 0, State["sends"],
+			"revocation must prevent any later Ctrl+C")
+		AssertEqual(Boundary == "snapshot" ? 0 : 1, State["restores"],
+			"only a completed temporary clear needs rollback")
+		AssertEqual(Action == "none" ? 1 : 0, State["deliveries"])
+		AssertFalse(IsObject(_SelectionCaptureJob), "the exact retired job must leave no timer owner")
+		AssertEqual("", State["job"]["clipboard"], "snapshot references must retire")
+		AssertEqual(0, CBClipboardOwner.active.Count)
+		AssertFalse(CBClipboardOwner.restore_debt)
+	} finally {
+		if IsObject(_SelectionCaptureJob) {
+			if IsObject(_SelectionCaptureJob["timer"])
+				SetTimer(_SelectionCaptureJob["timer"], 0)
+			Token := _SelectionCaptureJob["owner_token"]
+			if Token
+				CB_EndOwnedTransaction(Token)
+		}
+		SetTimer(CB_RetryRestoreDebt, 0)
+		if CBClipboardOwner.restore_debt is Map {
+			Token := CBClipboardOwner.restore_debt["owner_token"]
+			CB_EndOwnedTransaction(Token)
+			CBClipboardOwner.restore_debt := 0
+		}
+		; The injected ports close over State; explicitly release that fixture cycle.
+		if IsObject(State["job"]) {
+			CB_EndOwnedTransaction(State["job"]["owner_token"])
+			State["job"]["callback"] := 0
+			State["job"]["timer"] := 0
+		}
+		State.Delete("ports")
+		CBClipboardOwner.settle_hook := PreviousSettle
+		CBClipboardOwner.generation := PreviousGeneration
+		_SelectionCaptureJob := false
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+
+for Boundary in ["snapshot", "clear", "sequence", "send"] {
+	for Action in ["pause", "cancel", "pause-resume", "new"] {
+		Test("hotstrings: selection startup " . Action . " during " . Boundary
+			. " (selection-startup-revocation)", _SCSC_Startup.Bind(Boundary, Action))
+	}
+}
+Test("hotstrings: ordinary selection startup retains its native timer (selection-startup-revocation)",
+	_SCSC_Startup.Bind("none", "none"))
