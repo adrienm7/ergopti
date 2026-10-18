@@ -11,7 +11,10 @@ const { spawnSync } = require('node:child_process');
 const { scriptTokens } = require('../../lib/script-source.cjs');
 const root = path.resolve(__dirname, '../../..');
 const source = fs.readFileSync(
-	path.join(root, 'static/ergopti_plus/windows/tests/unit/test_key_combinations.ahk'),
+	path.join(
+		root,
+		'static/ergopti_plus/windows/tests/unit/platform/remap/key_combinations/test_key_combinations.ahk'
+	),
 	'utf8'
 );
 const owners = [
