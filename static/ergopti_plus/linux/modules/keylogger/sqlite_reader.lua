@@ -146,6 +146,45 @@ local function merge_error_buckets(target, row)
 	end
 end
 
+--- Projects local saved category/score overrides for the shared Apps dashboard.
+--- One read-only query joins every score to this device's category history;
+--- foreign synced categories must not replace the user's own assignment.
+--- @param sqlite_path string Database path.
+--- @param device_id string Local device owning the category edit.
+--- @return table|nil categories Shared { app = { type, score } } map; nil on refusal.
+function M.read_user_categories(sqlite_path, device_id)
+	if type(device_id) ~= "string" or device_id == "" then return nil end
+	local prefix = sql_quote("app_score.")
+	-- TEXT substr stops at NUL. The namespace is ASCII, so slice its bytes first.
+	local app = "CAST(substr(CAST(scores.key AS BLOB), length(" .. prefix .. ") + 1) AS TEXT)"
+	local rows, accepted = read_rows(sqlite_path,
+		"SELECT json_quote(" .. app .. ") AS app_json, json_quote(scores.value) AS score_json, "
+		.. "json_quote(MAX(owned.category)) AS category_json FROM meta AS scores "
+		.. "LEFT JOIN agg_app_day AS owned ON owned.app = " .. app
+		.. " AND owned.device_id = " .. sql_quote(device_id)
+		.. " WHERE substr(scores.key, 1, length(" .. prefix .. ")) = " .. prefix
+		.. " GROUP BY scores.key, scores.value;")
+	if not accepted then return nil end
+	local categories = {}
+	for _, row in ipairs(rows) do
+		-- Quote text before the CLI JSON boundary so NUL cannot shorten a key,
+		-- category or malformed score into a different, apparently valid value.
+		local ok_app, name = pcall(Json.decode, row.app_json)
+		local ok_score, raw_score = pcall(Json.decode, row.score_json)
+		local ok_category, category = pcall(Json.decode_lossless, row.category_json)
+		if ok_category and Json.is_null(category) then category = nil end
+		local score = ok_score and type(raw_score) == "string" and tonumber(raw_score) or nil
+		if not ok_app or type(name) ~= "string" or name == "" or not score
+			or score ~= score or score == math.huge or score == -math.huge
+			or not ok_category or (category ~= nil and type(category) ~= "string") then
+			Logger.warn(LOG, "SQLite category metadata is invalid; dashboard projection refused.")
+			return nil
+		end
+		categories[name] = { type = category or new_entry().category, score = score }
+	end
+	return categories
+end
+
 --- Builds the shared date/app manifest from persisted aggregates.
 --- @return table manifest Partial or complete dashboard projection.
 --- @return boolean complete Whether every native query was accepted.
