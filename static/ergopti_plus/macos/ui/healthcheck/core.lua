@@ -480,6 +480,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.input_source_selector",
+		contract = { "command", "upgrade" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.process_lifecycle",
 		contract = { "start", "stop" },
 		wired    = true,
