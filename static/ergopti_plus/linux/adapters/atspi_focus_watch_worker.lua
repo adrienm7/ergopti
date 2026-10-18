@@ -210,7 +210,9 @@ end
 
 if type(arg) == "table" and type(arg[0]) == "string"
 	and arg[0]:match("/atspi_focus_watch_worker%.lua$") then
-	package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
+	local shared_lua = arg[5]
+	assert(type(shared_lua) == "string" and shared_lua ~= "", "canonical shared Lua directory unavailable")
+	package.path = "./?.lua;./?/init.lua;" .. shared_lua .. "/?.lua;" .. shared_lua .. "/?/init.lua;" .. package.path
 	local ok, completed = pcall(M.run, arg[1], tonumber(arg[2]), tonumber(arg[3]), arg[4])
 	if not ok or completed ~= true then
 		io.stderr:write("Native accessibility focus worker stopped without authority.\n")
