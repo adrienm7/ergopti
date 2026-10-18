@@ -146,7 +146,7 @@ function restoreArchive(
 		throw new Error('A release archive has an unexpected top-level entry.');
 	const restored = path.join(extracted, basename);
 	if (snapshot(restored) !== before)
-		throw new Error('A release archive changed bundle bytes, modes or symlinks.');
+		throw new Error(`A ${format} release archive changed bundle bytes, modes or symlinks.`);
 	run(
 		'/usr/bin/codesign',
 		['--verify', '--deep', '--strict', '-R', '=' + requirement, restored],
