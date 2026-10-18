@@ -343,6 +343,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.input_source_selector",
+		contract = { "command", "command_named", "upgrade" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.webview_result",
 		contract = { "is_error" },
 		wired    = true,
