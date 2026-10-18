@@ -22,7 +22,7 @@ local function with_editor(scenario)
 			"webview.presentation", "infra.launcher_environment", "adapters.log_transport", "app_dirs",
 			"_generated.logger_sub_files", "webview.i18n_seed", "tests.support.native_webview_close_fixture",
 		}, function()
-			local h = { windows = {}, retained = {}, deferred = {}, callbacks = {}, bridges = {}, saves = 0, unbinds = 0, errors = {} }
+			local h = { windows = {}, retained = {}, deferred = {}, callbacks = {}, bridges = {}, saves = 0, unbinds = 0, errors = {}, native_delete_calls = 0 }
 			local logger = helpers.make_logger_stub()
 			logger.error = function(_, text, ...) h.errors[#h.errors + 1] = string.format(text, ...) end
 			package.loaded["infra.logger"] = logger
@@ -36,6 +36,8 @@ local function with_editor(scenario)
 					if self.disposed then setmetatable(self, nil) end
 				end
 				function view:delete()
+					h.native_delete_calls = h.native_delete_calls + 1
+					if h.delete_refuses then error("native window delete refused before mutation") end
 					native_delete(self)
 					if self.disposed then setmetatable(self, nil) end
 					if self.disposed and h.throw_after_gc then error("native wrapper failed after window GC") end
@@ -145,6 +147,37 @@ helpers.describe("prompt bridge retirement is independent of native window GC", 
 				end)
 			end)
 		end
+	end
+
+
+	for _, action in ipairs({ "save", "cancel" }) do
+		helpers.it("retries only native cleanup after an accepted prompt receives " .. action, function()
+			with_editor(function(editor, h)
+				helpers.assert_true(h.open("A"))
+				local view, bridge = h.windows[1], h.bridges[1]
+				local queued, message = h.callbacks[bridge], h.message(view)
+				h.delete_refuses = true
+				queued(message)
+				helpers.assert_eq(h.saves, 1)
+				helpers.assert_eq(h.native_delete_calls, 1)
+				helpers.assert_true(view.visible, "refused native close leaves the same page visible")
+				helpers.assert_true(h.retained[view])
+				helpers.assert_eq(editor.scope_idle(), false)
+				message.body.action = action
+				h.delete_refuses = false
+				queued(message)
+				helpers.assert_eq(h.native_delete_calls, 2, "the current visible page may retry its exact native close")
+				helpers.assert_eq(h.saves, 1, "cleanup retry never repeats accepted persistence")
+				h.drain()
+				helpers.assert_nil(next(h.retained))
+				helpers.assert_nil(next(h.callbacks))
+				helpers.assert_true(h.open("B"))
+				queued(message)
+				helpers.assert_eq(h.native_delete_calls, 2, "an old queued retry cannot close the new owner")
+				helpers.assert_not_nil(h.callbacks[h.bridges[2]])
+				helpers.assert_true(editor.close()); h.drain()
+			end)
+		end)
 	end
 
 	helpers.it("retains both binding and detachment errors and retries the exact UCC", function()
