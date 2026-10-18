@@ -27,7 +27,7 @@ local function with_dialog(kind, scenario)
 		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
 		"infra.notifications", "infra.dialog_util", "tests.support.native_webview_close_fixture",
 	}, function()
-		local h = { windows = {}, retained = {}, deferred = {}, bridges = {}, timers = {}, terminals = {},
+		local h = { windows = {}, retained = {}, deferred = {}, bridges = {}, script_refs = {}, timers = {}, terminals = {},
 			saved = 0, switched = 0, settled = 0 }
 		local construct = require("tests.support.native_webview_close_fixture")(h)
 		local module_name = kind == "hf" and "ui.menu.menu_llm.models_manager_mlx_hf"
@@ -55,7 +55,19 @@ local function with_dialog(kind, scenario)
 				return view
 			end, usercontent = { new = function()
 				local bridge = {}
-				function bridge:setCallback(callback) self.callback = callback; return self end
+				function bridge:setCallback(callback)
+					if callback == nil then
+						if h.on_release then h.on_release(self) end
+						if h.release_refusal == "throw" then error("native script unref refused") end
+						if h.release_refusal == "false" then return false end
+						if h.release_refusal == "nil" then return nil end
+						if h.release_refusal == "true" then return true end
+						if h.release_refusal == "foreign" then return {} end
+					end
+					self.callback = callback
+					h.script_refs[self] = callback
+					return self
+				end
 				h.bridges[#h.bridges + 1] = bridge
 				return bridge
 			end } },
@@ -80,8 +92,12 @@ local function with_dialog(kind, scenario)
 		})
 		if kind == "hf" then
 			local manager = {}
+			h.manager = manager
 			subject.install({ obj = manager, deps = { active_tasks = {} }, presets = {} })
-			local provenance = { owner = {}, is_authorized = function() return true end,
+			local provenance = { owner = {}, is_authorized = function()
+				if h.on_authorization then h.on_authorization() end
+				return true
+			end,
 				lifecycle = {
 					adopt = function(flow) h.flow = flow; return true end,
 					settle = function(flow)
@@ -276,6 +292,142 @@ helpers.describe("private model dialogs release abandoned native windows", funct
 			helpers.assert_eq(h.terminals, { false, false })
 			helpers.assert_eq(h.settled, 2)
 			helpers.assert_nil(next(h.retained))
+		end)
+	end)
+
+
+	for _, kind in ipairs({ "hf", "custom" }) do
+		for _, close in ipairs({ "native", "explicit" }) do
+			helpers.it("releases the " .. kind .. " script reference after " .. close .. " close", function()
+				with_dialog(kind, function(h)
+					helpers.assert_true(h.show())
+					local bridge = h.bridges[1]
+					helpers.assert_type(h.script_refs[bridge], "function")
+					if close == "native" then h.windows[1]:user_close() else h.cancel(); h.drain() end
+					helpers.assert_nil(next(h.retained))
+					helpers.assert_nil(h.script_refs[bridge], "native window GC never unregisters the script callback")
+					helpers.assert_true(h.show())
+					helpers.assert_type(h.script_refs[h.bridges[2]], "function")
+					h.windows[2]:user_close()
+					helpers.assert_nil(next(h.script_refs))
+				end)
+			end)
+		end
+
+		for _, refusal in ipairs({ "throw", "false", "nil", "true", "foreign" }) do
+			helpers.it("retains the " .. kind .. " script owner after unref " .. refusal, function()
+				with_dialog(kind, function(h)
+					helpers.assert_true(h.show())
+					local first, bridge = h.windows[1], h.bridges[1]
+					local queued = h.script_refs[bridge]
+					h.release_refusal = refusal
+					first:user_close()
+					helpers.assert_nil(h.retained[first])
+					helpers.assert_eq(h.script_refs[bridge], queued)
+					if kind == "hf" then
+						helpers.assert_eq(h.terminals, {})
+						helpers.assert_eq(h.settled, 0)
+					end
+					queued({ body = kind == "hf" and "cancel" or { action = "add", value = "unowned/model" } })
+					helpers.assert_eq(h.saved, 0, "retired bridges have no business authority")
+					helpers.assert_eq(h.switched, 0)
+					helpers.assert_eq(h.show(), false, "unacknowledged unref blocks a successor")
+					helpers.assert_eq(#h.windows, 1)
+					h.release_refusal = nil
+					helpers.assert_true(h.show())
+					helpers.assert_nil(h.script_refs[bridge])
+					helpers.assert_eq(first.deletes, 0, "controller retry cannot delete its retired window")
+					helpers.assert_true(h.retained[h.windows[2]])
+					h.windows[2]:user_close()
+					helpers.assert_nil(next(h.script_refs))
+					helpers.assert_nil(next(h.retained))
+				end)
+			end)
+		end
+
+		helpers.it("fences reentrant cleanup and queued callbacks for the " .. kind .. " script owner", function()
+			with_dialog(kind, function(h)
+				helpers.assert_true(h.show())
+				local old = h.script_refs[h.bridges[1]]
+				local attempts = 0
+				h.on_release = function()
+					attempts = attempts + 1
+					old({ body = kind == "hf" and "cancel" or { action = "add", value = "unowned/model" } })
+					helpers.assert_eq(h.show(), false, "native unref is still on stack")
+				end
+				h.windows[1]:user_close()
+				helpers.assert_eq(attempts, 1)
+				helpers.assert_nil(next(h.script_refs))
+				helpers.assert_eq(h.saved, 0)
+				helpers.assert_eq(h.switched, 0)
+				h.on_release = nil
+				helpers.assert_true(h.show())
+				helpers.assert_type(h.script_refs[h.bridges[2]], "function")
+				old({ body = kind == "hf" and "cancel" or { action = "cancel" } })
+				helpers.assert_true(h.retained[h.windows[2]])
+				h.windows[2]:user_close()
+				helpers.assert_nil(next(h.script_refs))
+			end)
+		end)
+	end
+
+
+
+	for _, failure in ipairs({ "geometry", "factory" }) do
+		helpers.it("releases the custom script owner after " .. failure .. " admission refusal", function()
+			with_dialog("custom", function(h)
+				local builder = require("ui.ui_builder")
+				local geometry = builder.get_app_geometry
+				if failure == "geometry" then builder.get_app_geometry = function() return nil end
+				else h.policy_refuses = "false" end
+				helpers.assert_eq(h.show(), false)
+				helpers.assert_nil(next(h.retained))
+				helpers.assert_nil(next(h.script_refs), "a rejected window must not orphan its registered script callback")
+				helpers.assert_eq(h.saved, 0)
+				helpers.assert_eq(h.switched, 0)
+				builder.get_app_geometry = geometry
+				h.policy_refuses = nil
+				helpers.assert_true(h.show())
+				local successor = h.windows[#h.windows]
+				helpers.assert_true(h.retained[successor])
+				successor:user_close()
+				helpers.assert_nil(next(h.retained))
+				helpers.assert_nil(next(h.script_refs))
+			end)
+		end)
+	end
+
+
+	helpers.it("keeps HF cleanup retry owned across reentrant token authorization", function()
+		with_dialog("hf", function(h)
+			helpers.assert_true(h.show())
+			local dispatched = 0
+			h.manager._process_hf_token = function(token)
+				helpers.assert_eq(token, "hf_fixture")
+				dispatched = dispatched + 1
+				return false
+			end
+			h.release_refusal = "false"
+			h.bridges[1].callback({ body = { type = "validate", token = "hf_fixture" } })
+			h.drain()
+			helpers.assert_eq(dispatched, 0, "token dispatch waits for exact script unref")
+			helpers.assert_nil(next(h.retained))
+			helpers.assert_type(h.script_refs[h.bridges[1]], "function")
+			local nested
+			h.on_authorization = function()
+				h.on_authorization = nil
+				nested = h.admit()
+			end
+			h.release_refusal = nil
+			helpers.assert_true(h.admit())
+			helpers.assert_eq(nested, false, "the retry continuation still owns its callback stack")
+			helpers.assert_eq(dispatched, 1)
+			helpers.assert_eq(h.terminals, { false })
+			helpers.assert_eq(h.settled, 1)
+			h.deliver_prompt()
+			helpers.assert_true(h.retained[h.windows[2]])
+			h.windows[2]:user_close()
+			helpers.assert_nil(next(h.script_refs))
 		end)
 	end)
 
