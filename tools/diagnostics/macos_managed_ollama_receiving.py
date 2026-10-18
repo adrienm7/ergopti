@@ -32,6 +32,9 @@ from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[2]
 GGUF_SHA256 = "a85aba87b0e9e724d0b499d12d4dcb9fd2ede378c96ffad75a70a919f2c00c0a"
+# The pinned runner counts its first decode as prompt processing. A second
+# decode is required to observe positive native autoregressive evaluation time.
+INFERENCE_TOKENS = 2
 
 
 def require(condition, reason):
@@ -1154,6 +1157,51 @@ class Receiver:
             time.sleep(0.05)
         raise RuntimeError("actual_operation_retirement")
 
+    def receive_inference(self, model_name):
+        """Require a completed native decode after prompt processing, not just prefill."""
+        self.stage = "inference"
+        with patch.dict(os.environ, self.api_environment, clear=True):
+            self.owner()
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        request = urllib.request.Request(
+            f"http://127.0.0.1:{self.port}/api/generate",
+            method="POST",
+            data=json.dumps(
+                {
+                    "model": model_name,
+                    "prompt": "x",
+                    "stream": False,
+                    "options": {
+                        "num_predict": INFERENCE_TOKENS,
+                        "num_ctx": 64,
+                        "num_gpu": 0,
+                        "temperature": 0,
+                    },
+                }
+            ).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with opener.open(request, timeout=60) as response:
+            inference = json.load(response)
+        # Retain only closed scalar metrics, never the model, prompt or response.
+        self.receipt["inference"] = {
+            "done": inference.get("done") is True,
+            "eval_count": inference.get("eval_count")
+            if type(inference.get("eval_count")) is int
+            else None,
+            "eval_duration_ns": inference.get("eval_duration")
+            if type(inference.get("eval_duration")) is int
+            else None,
+        }
+        require(
+            inference.get("done") is True
+            and type(inference.get("eval_count")) is int
+            and inference["eval_count"] == INFERENCE_TOKENS
+            and type(inference.get("eval_duration")) is int
+            and inference["eval_duration"] > 0,
+            "actual_native_inference",
+        )
+
     def run(self):
         self.prepare()
         self.stage = "create"
@@ -1167,7 +1215,7 @@ class Receiver:
         )
         modelfile = self.work / "Modelfile"
         modelfile.write_text(
-            f"FROM {gguf}\nPARAMETER num_predict 1\nPARAMETER num_ctx 64\nPARAMETER num_gpu 0\nPARAMETER temperature 0\n"
+            f"FROM {gguf}\nPARAMETER num_predict {INFERENCE_TOKENS}\nPARAMETER num_ctx 64\nPARAMETER num_gpu 0\nPARAMETER temperature 0\n"
         )
         self.start(producer=True)
         environment = self.clean | {"OLLAMA_HOST": "127.0.0.1:" + str(self.port)}
@@ -1242,32 +1290,7 @@ class Receiver:
                 (receiving / "blobs" / name.replace(":", "-")).read_bytes() == data,
                 "exact_blob_publication",
             )
-        self.stage = "inference"
-        with patch.dict(os.environ, self.api_environment, clear=True):
-            self.owner()
-        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
-        request = urllib.request.Request(
-            f"http://127.0.0.1:{self.port}/api/generate",
-            method="POST",
-            data=json.dumps(
-                {
-                    "model": model_name,
-                    "prompt": "x",
-                    "stream": False,
-                    "options": {"num_predict": 1, "num_ctx": 64, "num_gpu": 0, "temperature": 0},
-                }
-            ).encode(),
-            headers={"Content-Type": "application/json"},
-        )
-        with opener.open(request, timeout=60) as response:
-            inference = json.load(response)
-        require(
-            inference.get("done") is True
-            and inference.get("eval_count") == 1
-            and type(inference.get("eval_duration")) is int
-            and inference["eval_duration"] > 0,
-            "actual_native_inference",
-        )
+        self.receive_inference(model_name)
         self.stage = "cancel"
         with patch.dict(os.environ, self.api_environment, clear=True):
             self.owner()

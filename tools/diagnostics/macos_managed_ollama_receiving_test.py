@@ -4,6 +4,7 @@
 import hashlib
 import http.client
 import importlib.util
+import io
 import json
 import os
 import re
@@ -1171,6 +1172,85 @@ class NativeCommandExitControls(unittest.TestCase):
                     self.assertEqual(process.wait_calls, 1)
                     self.assertLess(events.index("reserved_observation"), events.index("reap"))
                 self.assertEqual(operation.signals, [])
+
+
+class NativeInferenceAccountingControls(unittest.TestCase):
+    def observe(self, reply):
+        subject = RECEIVING.Receiver.__new__(RECEIVING.Receiver)
+        subject.port = 12345
+        subject.receipt = {}
+        subject.api_environment = {}
+        subject.owner = Mock()
+        opened = []
+
+        def open_request(request, *, timeout):
+            subject.owner.assert_called_once_with()
+            self.assertEqual(timeout, 60)
+            self.assertEqual(request.full_url, "http://127.0.0.1:12345/api/generate")
+            self.assertEqual(request.get_method(), "POST")
+            parameters = json.loads(request.data)
+            self.assertEqual(parameters["model"], "private-fixture-model")
+            self.assertEqual(parameters["options"]["num_gpu"], 0)
+            self.assertEqual(parameters["options"]["num_predict"], 2)
+            # The unchanged upstream runner accounts the first decode as prefill;
+            # positive generation time starts only with the second native decode.
+            value = reply(parameters) if callable(reply) else reply
+            response = io.BytesIO(json.dumps(value).encode())
+            opened.append(response)
+            return response
+
+        opener = SimpleNamespace(open=open_request)
+        with patch.object(RECEIVING.urllib.request, "build_opener", return_value=opener):
+            try:
+                subject.receive_inference("private-fixture-model")
+            finally:
+                for response in opened:
+                    self.assertTrue(
+                        response.closed, "the HTTP owner closes before metric admission"
+                    )
+        return subject.receipt
+
+    def test_two_decodes_observe_native_generation_after_prefill(self):
+        def native_metrics(parameters):
+            tokens = parameters["options"]["num_predict"]
+            return {"done": True, "eval_count": tokens, "eval_duration": (tokens - 1) * 1000}
+
+        self.assertEqual(
+            self.observe(native_metrics),
+            {"inference": {"done": True, "eval_count": 2, "eval_duration_ns": 1000}},
+        )
+
+    def test_incomplete_or_foreign_native_metrics_remain_refused(self):
+        baseline = {"done": True, "eval_count": 2, "eval_duration": 1000}
+        for field, values in {
+            "done": [False, 1, "true", None],
+            "eval_count": [0, 1, 3, True, 2.0, "2", None],
+            "eval_duration": [0, -1, True, 1000.0, "1000", None],
+        }.items():
+            for value in values:
+                with self.subTest(field=field, value=value):
+                    with self.assertRaisesRegex(RuntimeError, "actual_native_inference"):
+                        self.observe(baseline | {field: value})
+
+    def test_inference_receipt_excludes_private_payload(self):
+        self.assertEqual(
+            self.observe(
+                {
+                    "done": True,
+                    "eval_count": 2,
+                    "eval_duration": 1000,
+                    "model": "PRIVATE_MODEL",
+                    "prompt": "PRIVATE_PROMPT",
+                    "response": "PRIVATE_GENERATION",
+                    "context": [101, 102],
+                }
+            ),
+            {"inference": {"done": True, "eval_count": 2, "eval_duration_ns": 1000}},
+        )
+
+    def test_one_prefill_decode_cannot_satisfy_native_generation(self):
+        with self.assertRaisesRegex(RuntimeError, "actual_native_inference"):
+            self.observe({"done": True, "eval_count": 1, "eval_duration": 0})
 
 
 if __name__ == "__main__":
