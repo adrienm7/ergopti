@@ -73,7 +73,8 @@ class SessionLockTests(unittest.TestCase):
                     bootstrap.write_text(
                         "package.preload['compat.utf8'] = function()\n"
                         "  assert(os.getenv('ERGOPTI_SESSION_LOCK_FD') == nil)\n"
-                        "  assert(os.execute(os.getenv('TEST_CHILD_COMMAND')) == 0)\n"
+                        "  local status = os.execute(os.getenv('TEST_CHILD_COMMAND'))\n"
+                        "  assert(status == 0 or status == true)\n"
                         "  local ready = assert(io.open(os.getenv('TEST_READY'), 'w'))\n"
                         "  ready:write('ready'); ready:close()\n"
                         "  require('ffi').cdef('int pause(void);')\n"
