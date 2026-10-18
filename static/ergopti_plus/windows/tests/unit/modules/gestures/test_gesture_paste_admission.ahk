@@ -36,10 +36,13 @@ _GPA_WithFixture(Fn, Held := false) {
 	global GestureLeftClickHeld, GestureRightClickHeld, GestureKeyboardHook
 	AssertEqual(0, CBClipboardOwner.active.Count, "fixture requires an idle clipboard owner")
 	AssertFalse(CBClipboardOwner.restore_debt, "fixture requires no pending restoration")
+	; The unit runner omits feature_state, which owns this production global.
+	; Own the fixture map only during dispatch and preserve true prior absence.
+	SavedKeyboard := IsSet(KeyboardShortcutAssignments) ? KeyboardShortcutAssignments : unset
 	Saved := { Send: _AHK_SendInput, Held: _TapHoldModifierIsHeld, Tap: TapHold,
 		Track: _TH_TapHoldTrackState, Combinations: _TH_PressesTakenByCombination,
 		Reason: _TH_LastTapHoldCancelReason, Dispatch: _TapHoldTapInDispatch,
-		Gestures: GestureAssignments, Keyboard: KeyboardShortcutAssignments,
+		Gestures: GestureAssignments,
 		Enabled: Features["gestures"]["enabled"], Left: GestureLeftClickHeld,
 		Right: GestureRightClickHeld, Hook: GestureKeyboardHook,
 		Suspended: A_IsSuspended, Critical: A_IsCritical }
@@ -73,7 +76,7 @@ _GPA_WithFixture(Fn, Held := false) {
 		_TH_LastTapHoldCancelReason := Saved.Reason
 		_TapHoldTapInDispatch := Saved.Dispatch
 		GestureAssignments := Saved.Gestures
-		KeyboardShortcutAssignments := Saved.Keyboard
+		KeyboardShortcutAssignments := IsSet(SavedKeyboard) ? SavedKeyboard : unset
 		Features["gestures"]["enabled"] := Saved.Enabled
 		GestureLeftClickHeld := Saved.Left
 		GestureRightClickHeld := Saved.Right
@@ -81,6 +84,11 @@ _GPA_WithFixture(Fn, Held := false) {
 		Suspend(Saved.Suspended)
 		Critical(Saved.Critical)
 	}
+	AssertEqual(IsSet(SavedKeyboard), IsSet(KeyboardShortcutAssignments),
+		"fixture teardown must preserve the assignment global's true absence")
+	if IsSet(SavedKeyboard)
+		AssertTrue(KeyboardShortcutAssignments == SavedKeyboard,
+			"fixture teardown must restore the exact prior assignment map")
 }
 
 _GPA_Busy(Route, State) {
