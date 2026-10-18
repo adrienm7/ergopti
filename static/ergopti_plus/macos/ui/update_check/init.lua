@@ -44,6 +44,8 @@ local BRIDGE_NAME = "update_check_bridge"
 local _webview = nil
 local _session = nil
 local _open_revision = 0
+local _retiring_window = nil
+local _settling_retired_window = false
 
 
 
@@ -78,6 +80,27 @@ local function retire_session(expected)
 	local owned = expected or _session
 	if _session == owned then _session = nil end
 	if owned ~= nil then owned.retire() end
+end
+
+--- Settles the exact unpublished candidate before another window may open.
+--- @return boolean settled Native retirement committed or already consumed it.
+local function settle_retired_window()
+	if _settling_retired_window then return false end
+	local view = _retiring_window
+	if not view then return true end
+	_settling_retired_window = true
+	local ok, err = pcall(function()
+		-- Native userdata_gc removes its metatable before releasing the window.
+		-- A wrapper may then raise; never send another method to that userdata.
+		if getmetatable(view) ~= nil then return view:delete() end
+	end)
+	local settled = (ok and err ~= false) or getmetatable(view) == nil
+	if not ok or err == false then
+		Logger.error(LOG, "The update-check candidate cleanup raised: %s.", tostring(err))
+	end
+	_settling_retired_window = false
+	if settled and _retiring_window == view then _retiring_window = nil end
+	return settled
 end
 
 --- Closes the window this module created.
@@ -167,6 +190,7 @@ end
 ---   automatic-check owner and channel owner, and the menu refresh.
 --- @return boolean opened
 function M.open(ctx)
+	if not settle_retired_window() then return false end
 	_open_revision = _open_revision + 1
 	local revision = _open_revision
 	if type(ctx) ~= "table" or type(ctx.channel_owner) ~= "table" then
@@ -207,6 +231,7 @@ function M.open(ctx)
 	end)
 	local masks = hs.webview.windowMasks
 	local view = ui_builder.show_webview({
+		delete_on_close = true,
 		frame = ui_builder.get_centered_frame(geo.width, geo.height),
 		title = i18n.get("update_check.window_title"),
 		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
@@ -236,8 +261,12 @@ function M.open(ctx)
 	if revision ~= _open_revision then return false end
 	if view == nil or view ~= candidate or _session ~= candidate_session then
 		if _webview == candidate then
+			_retiring_window = candidate
 			_webview = nil
+			_settling_retired_window = true
 			retire_session(candidate_session)
+			_settling_retired_window = false
+			settle_retired_window()
 		end
 		Logger.error(LOG, "The update-check window could not be created.")
 		return false
