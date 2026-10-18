@@ -1182,26 +1182,21 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			return M._handle_delete_event(app_name, window_epoch)
 		end
 
-		-- A renderer crash can bypass blur/delete-event while leaving the native
-		-- window object alive. Release only the epoch owned by this WebView.
+		-- A renderer crash retires the complete exact page, including ordinary
+		-- windows. Keeping its registry entry would refocus a dead view on retry.
 		pcall(function()
 			webview.on_web_process_terminated = function()
-				if document_entry then
-					-- A process crash does not acknowledge view/signal/window cleanup.
-					retire_document_entry(document_entry, true)
-					attempt.cancelled = true
-					local owned = _windows[app_name]
-					if owned and owned.epoch == window_epoch then
-						owned.cancelled = true
-						if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
-					elseif not attempt.acquiring and not attempt.retiring then
-						M._destroy_gtk_window(app_name, window_epoch)
-					end
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-				else
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-					_release_app_ownership(app_name, window_epoch)
+				-- Process death does not acknowledge view/signal/window cleanup.
+				retire_document_entry(document_entry, true)
+				attempt.cancelled = true
+				local owned = _windows[app_name]
+				if owned and owned.epoch == window_epoch then
+					owned.cancelled = true
+					if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
+				elseif not attempt.acquiring and not attempt.retiring then
+					M._destroy_gtk_window(app_name, window_epoch)
 				end
+				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
 			end
 		end)
 
