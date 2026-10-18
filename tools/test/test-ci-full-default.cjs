@@ -1129,7 +1129,11 @@ check('v101 managed PAC admission retains Worker filter and exact collector auth
 	const admission = code
 		.slice(0, code.indexOf(marker))
 		.replaceAll('${{ env.MACOS_STAGE_ARCHITECTURE }}', 'arm64');
-	for (const mode of ['full', 'deferred']) {
+	for (const [mode, deferredProfile] of [
+		['full', ''],
+		['deferred', 'stable-v1-0-2-20261017-six-macos-native-scopes'],
+		['deferred', 'stable-v1-0-3-20261018-macos-native-scopes']
+	]) {
 		const shell =
 			`set -euo pipefail
 RUNNER_TEMP="/owned path"
@@ -1150,7 +1154,7 @@ node() {
 			env: {
 				...process.env,
 				MODE: mode,
-				PROFILE: mode === 'full' ? '' : 'stable-v1-0-2-20261017-six-macos-native-scopes'
+				PROFILE: deferredProfile
 			}
 		});
 		assert.equal(result.status, 0, result.stderr);
@@ -1358,6 +1362,10 @@ check('v103 package defers Brew and owned-runtime only while PAC stays mandatory
 		// Owned-runtime alone: the Brew receipt is full, the policy still defers.
 		['full', '', 'full', '', '^exact$', 0, selected],
 		['full', '', 'deferred', v103, '', 1, ''],
+		// A deferred v1.0.3 PAC receipt joins whatever Brew receipt it has.
+		['deferred', v103, 'deferred', v103, '^exact$', 0, selected],
+		['deferred', v103, 'full', '', '^exact$', 0, selected],
+		['deferred', 'stable-v1-0-4-foreign', 'full', '', '^exact$', 1, ''],
 		['full', v103, 'deferred', v103, '^exact$', 1, ''],
 		['foreign', '', 'full', '', '', 1, '']
 	]) {

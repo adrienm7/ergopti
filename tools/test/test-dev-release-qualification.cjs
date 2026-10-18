@@ -1423,7 +1423,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	}
 }
 
-// The v1.0.3 profile defers any subset of six scopes; PAC stays mandatory.
+// The v1.0.3 profile defers any subset of the seven v1.0.2 scopes.
 {
 	const V103 = require('./fixtures/stable-v103-profile.cjs');
 	const approved = q.parseClosedJson(fs.readFileSync(q.STABLE_V103_POLICY_PATH, 'utf8'));
@@ -1440,6 +1440,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	};
 	const clock = '2026-10-19T10:00:00Z';
 	const deferrable = [
+		'macos-native-pac',
 		'macos-native-http',
 		'macos-brew-archive',
 		'macos-native-model-receiving',
@@ -1485,13 +1486,13 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	delete missingField.authorization_note;
 	assert.throws(() => q.validateStableV103Policy(missingField));
 
-	// Any subset of the six scopes is accepted, in the declared order only.
+	// Any subset of the seven scopes is accepted, in the declared order only.
 	for (const subset of V103.subsets(deferrable)) {
 		const policy = V103.policyFor(q, subset);
 		q.validateStableV103Policy(policy, subset);
 		if (subset.length > 1)
 			assert.throws(() => q.validateStableV103Policy(policy, [...subset].reverse()), /order/);
-		for (const foreign of ['macos-native-pac', 'core-js-suite', 'foreign']) {
+		for (const foreign of ['core-js-suite', 'macos-stubbed-unit', 'foreign']) {
 			const extra = structuredClone(policy);
 			extra.scopes[foreign] = policy.scopes[subset[0]];
 			assert.throws(() => q.validateStableV103Policy(extra, subset), Error, foreign);
@@ -1509,6 +1510,8 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	// Exact methods, matrices and commands cannot widen or narrow.
 	const full = V103.policyFor(q, deferrable);
 	for (const [scope, patch] of [
+		['macos-native-pac', { args: ['e2e-hs', 'Foreign step'] }],
+		['macos-native-http', { command: 'foreign' }],
 		['macos-brew-archive', { name: 'testOrdinaryArchiveInstall' }],
 		['macos-brew-archive', { path: 'Tests/ErgoptiPlusTests/Foreign.swift' }],
 		['macos-native-model-receiving', { architectures: ['arm64'] }],
@@ -1522,6 +1525,16 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		const altered = structuredClone(full);
 		Object.assign(altered.scopes[scope], patch);
 		assert.throws(() => q.validateStableV103Policy(altered, deferrable), Error, scope);
+	}
+	// PAC defers exactly the two wire methods and the bootstrap duplicate.
+	for (const mutate of [
+		(methods) => (methods.ManagedHTTPWorkerTests = ['testWorkerMustRemainMandatory']),
+		(methods) => methods.ManagedHTTPWireTests.push('testForeign'),
+		(methods) => delete methods.ManagedBootstrapDownloadTests
+	]) {
+		const altered = structuredClone(full);
+		mutate(altered.scopes['macos-native-pac'].methods);
+		assert.throws(() => q.validateStableV103Policy(altered, deferrable));
 	}
 	for (const mutate of [
 		(methods) => methods.OwnedRuntimeNamespaceCloseOrderTests.pop(),
@@ -1538,7 +1551,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	const selected = q.authorizeQualificationProfile(approved.id, context, clock);
 	assert.equal(q.stablePublicationProfile(context, clock), selected);
 	assert.deepEqual(q.deferredScopes(selected), [...q.STABLE_V103_SCOPE_IDS]);
-	for (const scope of [...deferrable, 'macos-native-pac', 'core-js-suite'])
+	for (const scope of [...deferrable, 'core-js-suite'])
 		assert.equal(
 			q.resolveQualificationProfile(context, clock, scope),
 			q.STABLE_V103_SCOPE_IDS.includes(scope) ? selected : null,
@@ -1578,24 +1591,29 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 			q.scopeDisposition({ ...receipt, version: '1.0.2' }, scope, sha, context, clock)
 		);
 	}
-	assert.throws(() => q.qualificationReceipt(selected, 'macos-native-pac', { source_sha: sha }));
+	assert.throws(() => q.qualificationReceipt(selected, 'core-js-suite', { source_sha: sha }));
 	const notice = q.stablePublicationNotice(approved.id, context, sha, clock);
 	assert(notice.includes(sha));
 	assert(notice.includes('Only stable v1.0.3 main push before 2026-10-25T22:00:00Z is authorized'));
-	assert(notice.includes('the native PAC/WPAD XCTest qualification'));
-	assert(notice.includes('owned-process/client-only HTTP controls'));
-	assert(!notice.includes('macos-native-pac:'));
+	assert(notice.includes('Worker12, owned-process/client-only HTTP controls'));
+	assert.equal(
+		notice.includes(
+			'PAC and WPAD wire methods and their exact bootstrap duplicate remain unqualified'
+		),
+		q.STABLE_V103_SCOPE_IDS.includes('macos-native-pac')
+	);
 	assert.equal(
 		notice.includes('Independent native HTTP wire client receiving remains unqualified'),
 		q.STABLE_V103_SCOPE_IDS.includes('macos-native-http')
 	);
-	console.log('[OK] v1.0.3 profile: exact boundary, any subset of six scopes, PAC mandatory.');
+	console.log('[OK] v1.0.3 profile: exact boundary, any subset of seven scopes.');
 
 	// Publication needs exactly the deferred receipts of the listed scopes.
 	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v103-qualification-'));
 	try {
 		const files = [];
 		const suffixes = {
+			'macos-native-pac': ['arm64', 'amd64'],
 			'macos-native-http': ['arm64', 'amd64'],
 			'macos-brew-archive': [''],
 			'macos-native-model-receiving': ['arm64', 'amd64'],
@@ -1637,7 +1655,7 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		const profile = shrunk.stablePublicationProfile(context, clock);
 		assert.equal(profile.id, approved.id);
 		assert.deepEqual([...shrunk.deferredScopes(profile)], subset);
-		for (const scope of [...deferrable, 'macos-native-pac'])
+		for (const scope of deferrable)
 			assert.equal(
 				shrunk.resolveQualificationProfile(context, clock, scope),
 				subset.includes(scope) ? profile : null
@@ -1651,14 +1669,14 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 	assert.throws(() => none.authorizeQualificationProfile(approved.id, context, clock));
 	assert.throws(() => none.stablePublicationNotice(approved.id, context, sha, clock));
 	assert.equal(none.stablePublicationNotice('', context, sha, clock), '');
-	for (const scope of [...deferrable, 'macos-native-pac'])
+	for (const scope of deferrable)
 		assert.equal(none.resolveQualificationProfile(context, clock, scope), null);
 	assert.equal(
 		none.stablePublicationProfile({ ...context, tag: 'v1.0.2', version: '1.0.2' }, clock).id,
 		q.STABLE_V102_PROFILE_ID
 	);
 	assert.throws(() => V103.loadWithV103Scopes([], true), /Delete the stable profile file/);
-	assert.throws(() => V103.loadWithV103Scopes(['macos-native-pac']));
+	assert.throws(() => V103.loadWithV103Scopes(['macos-stubbed-unit']));
 	assert.throws(() => V103.loadWithV103Scopes(['foreign']));
 	console.log(
 		'[OK] v1.0.3 shrinks one scope at a time; an empty list needs no file and selects no profile.'

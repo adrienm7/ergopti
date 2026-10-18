@@ -401,6 +401,12 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER, PA
 		fs.rmSync(temporary, { recursive: true, force: true });
 	}
 	stableV101PacCollectorControls(repository);
+	if (
+		require('../ci/dev-release-qualification.cjs').STABLE_V103_SCOPE_IDS.includes(
+			'macos-native-pac'
+		)
+	)
+		stableV101PacCollectorControls(repository, '1.0.3', '2026-10-19T10:00:00Z');
 	assert.equal(passed, 82);
 	console.log(
 		'PASS: native PAC/WPAD selected-cohort portable controls=82; actual Darwin/native14 execution UNRUN.'
@@ -410,15 +416,19 @@ module.exports = function run({ workflow, admitNativePacSelector, PAC_FILTER, PA
 if (require.main === module)
 	module.exports(require('./test-macos-dev-qualification-deferral.cjs').pacContext());
 
-/** Independently discovered Worker12 remains mandatory under the exact v1.0.2 scope. */
-function stableV101PacCollectorControls(repository) {
+/** Independently discovered Worker12 remains mandatory under the exact v1.0.2 or v1.0.3 scope. */
+function stableV101PacCollectorControls(
+	repository,
+	version = '1.0.2',
+	clock = '2026-10-10T20:00:00Z'
+) {
 	const assert = require('node:assert/strict');
 	const fs = require('node:fs');
 	const path = require('node:path');
 	const reader = require('../diagnostics/managed_http_pac_xctest_evidence.cjs');
 	const full = require('../diagnostics/swift_xctest_evidence.cjs');
 	const q = require('../ci/dev-release-qualification.cjs');
-	const now = new Date('2026-10-10T20:00:00Z');
+	const now = new Date(clock);
 	const sha = '0123456789abcdef0123456789abcdef01234567';
 	const env = {
 		GITHUB_ACTIONS: 'true',
@@ -429,11 +439,11 @@ function stableV101PacCollectorControls(repository) {
 		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
 		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
 		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
-		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.2',
-		ERGOPTI_DEV_RELEASE_VERSION: '1.0.2'
+		ERGOPTI_DEV_RELEASE_TAG: 'v' + version,
+		ERGOPTI_DEV_RELEASE_VERSION: version
 	};
 	const profile = q.authorizeQualificationProfile(
-		q.STABLE_V102_PROFILE_ID,
+		version === '1.0.2' ? q.STABLE_V102_PROFILE_ID : q.STABLE_V103_PROFILE_ID,
 		q.environmentContext(env),
 		now
 	);
@@ -535,6 +545,8 @@ function stableV101PacCollectorControls(repository) {
 	assert.throws(() => reader.evaluate(valid, 0, 0, { mode: 'deferred' }));
 	assert.throws(() => full.pacQualification(receipt, env, new Date(profile.expires_at)));
 	console.log(
-		'[OK] v1.0.2 PAC receiving requires every Worker12 method and both exact argument observations.'
+		'[OK] v' +
+			version +
+			' PAC receiving requires every Worker12 method and both exact argument observations.'
 	);
 }

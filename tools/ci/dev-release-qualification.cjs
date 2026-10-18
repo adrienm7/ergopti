@@ -30,9 +30,9 @@ const STABLE_V103_POLICY_PATH = path.resolve(
 	'../../.github/ci/stable_v103_macos_native_qualification_exception.json'
 );
 const STABLE_V103_PROFILE_ID = 'stable-v1-0-3-20261018-macos-native-scopes';
-// The only scopes the 2026-10-18 decision lets v1.0.3 defer; PAC is mandatory
-// again since it passed on hosted runners on both architectures.
+// The 2026-10-18 decision lets v1.0.3 defer the same seven scopes as v1.0.2.
 const STABLE_V103_DEFERRABLE_SCOPE_IDS = Object.freeze([
+	'macos-native-pac',
 	'macos-native-http',
 	'macos-brew-archive',
 	'macos-native-model-receiving',
@@ -44,6 +44,7 @@ const STABLE_V103_DEFERRABLE_SCOPE_IDS = Object.freeze([
 // Remove a scope here and from the JSON file once it is green; when none is
 // left, also delete the JSON file and v1.0.3 publishes with no profile.
 const STABLE_V103_SCOPE_IDS = Object.freeze([
+	'macos-native-pac',
 	'macos-native-http',
 	'macos-brew-archive',
 	'macos-native-model-receiving',
@@ -108,6 +109,8 @@ const STABLE_V102_OWNED_RUNTIME_METHODS = freeze({
 });
 // Fixed public sentence per deferred scope, in publication-notice order.
 const STABLE_NATIVE_NOTICE_SENTENCES = Object.freeze({
+	'macos-native-pac':
+		'The native TLS/full-URL PAC and WPAD wire methods and their exact bootstrap duplicate remain unqualified; all twelve HTTP Worker cases remain mandatory.',
 	'macos-native-http':
 		'Independent native HTTP wire client receiving remains unqualified; owned-process and client-only HTTP controls remain mandatory.',
 	'macos-launch-appleevents':
@@ -130,8 +133,8 @@ const STABLE_NATIVE_SPECS = Object.freeze([
 		version: '1.0.2',
 		deferrable: STABLE_V102_SCOPE_IDS,
 		scopes: STABLE_V102_SCOPE_IDS,
-		// The v1.0.2 notice predates the HTTP sentence; its text stays as published.
-		notice_omits: Object.freeze(['macos-native-http']),
+		// The v1.0.2 notice predates the PAC and HTTP sentences; its text stays as published.
+		notice_omits: Object.freeze(['macos-native-pac', 'macos-native-http']),
 		mandatory:
 			'All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
 	}),
@@ -146,7 +149,7 @@ const STABLE_NATIVE_SPECS = Object.freeze([
 		scopes: STABLE_V103_SCOPE_IDS,
 		notice_omits: Object.freeze([]),
 		mandatory:
-			'All unlisted tests, the native PAC/WPAD XCTest qualification, owned-process/client-only HTTP controls, portable model controls, Worker12, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
+			'All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
 	})
 ]);
 const STABLE_NATIVE_SCOPE_IDS = Object.freeze([
