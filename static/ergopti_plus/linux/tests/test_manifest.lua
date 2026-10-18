@@ -11,6 +11,7 @@
 return {
 	"tests.unit.adapters.atspi.test_atspi_context_async",
 	"tests.unit.adapters.atspi.test_atspi_focus_watch",
+	"tests.unit.adapters.atspi.test_atspi_focus_watch_worker",
 	"tests.unit.modules.keylogger.privacy.test_focus_guard_async",
 	"tests.unit.modules.keylogger.privacy.test_pointer_focus_privacy",
 	"tests.unit.infra.lifecycle.test_session_lock",
