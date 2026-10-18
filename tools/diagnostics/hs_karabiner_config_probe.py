@@ -30,6 +30,11 @@ INITIAL_CONFIG = {
         for name, selected in (("Work", False), ("Default", True))
     ],
 }
+# The product owns exactly one selected-profile field beyond the user's rules:
+# the virtual keyboard's ANSI or ISO form follows the registered layout
+# (fix 72a34a2ca9). Every other virtual-HID or profile setting stays the user's.
+VIRTUAL_KEYBOARD_FIELD = "virtual_hid_keyboard"
+VIRTUAL_KEYBOARD_FORMS = ("ansi", "iso")
 VARIANTS = list(itertools.product(CONTRACT["presets"], CONTRACT["switches"], CONTRACT["switches"]))
 IDENTITY_FIELDS = {
     "schema_version",
@@ -311,6 +316,7 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
         )
     seen = []
     manipulator_count = 0
+    virtual_forms = set()
     for variant in result["variants"]:
         if not isinstance(variant, dict) or set(variant) != {
             "preset",
@@ -343,8 +349,20 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
         ):
             raise ValueError("Unselected profile or global preferences changed")
         selected = profiles[1]
-        if not isinstance(selected, dict) or set(selected) != set(INITIAL_CONFIG["profiles"][1]):
+        if not isinstance(selected, dict) or set(selected) != set(INITIAL_CONFIG["profiles"][1]) | {
+            VIRTUAL_KEYBOARD_FIELD
+        }:
             raise ValueError("Selected profile metadata changed")
+        virtual = selected[VIRTUAL_KEYBOARD_FIELD]
+        if (
+            not isinstance(virtual, dict)
+            or set(virtual) != {"keyboard_type_v2"}
+            or virtual["keyboard_type_v2"] not in VIRTUAL_KEYBOARD_FORMS
+        ):
+            raise ValueError(
+                "Selected profile virtual keyboard form is not the owned ANSI or ISO field"
+            )
+        virtual_forms.add(virtual["keyboard_type_v2"])
         if selected["name"] != "Default" or selected["selected"] is not True:
             raise ValueError("Selected profile identity changed")
         complex_modifications = selected["complex_modifications"]
@@ -416,6 +434,8 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
         manipulator_count += count
     if sorted(seen) != sorted(VARIANTS):
         raise ValueError("Native preset and switch coverage is incomplete or duplicated")
+    if len(virtual_forms) != 1:
+        raise ValueError("Native variants disagree on the registered virtual keyboard form")
     return {
         **CONTRACT["summary_fixed"],
         "version": TIMER_CONTRACT["runtime_version"],
