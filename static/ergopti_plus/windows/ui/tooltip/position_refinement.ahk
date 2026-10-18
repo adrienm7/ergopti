@@ -67,7 +67,11 @@ class TooltipPositionRefinement {
 			return false
 		this.Stopped := true
 		this.Pending := 0
-		this.ScheduleFn.Call(this.TimerFn, 0)
+		TimerFn := this.TimerFn
+		; Both callbacks may bind this owner; stopped work must release the cycles.
+		this.TimerFn := 0
+		this.CacheFn := 0
+		this.ScheduleFn.Call(TimerFn, 0)
 	}
 
 	Pump() {
@@ -206,7 +210,7 @@ class TooltipPreviewPositionRequest extends TooltipPositionRefinement {
 				: () => _TooltipPendingPositionState(Request, Surface),
 			ScheduleFn, RequestFn, StartFn,
 			(Surface, Pos) => true,
-			(Hwnd, Anchor) => this.StoreAnchor(Hwnd, Anchor),
+			this.StoreAnchor.Bind(this),
 			() => A_TickCount,
 			HasMethod(IdleFn, "Call") ? IdleFn : () => A_TimeIdlePhysical,
 			DecisionFn)
