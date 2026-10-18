@@ -142,6 +142,7 @@ return {
 	"tests.unit.adapters.atspi.test_atspi_focus",
 	"tests.unit.adapters.atspi.test_atspi_focus_chains",
 	"tests.unit.adapters.synthetic_input.test_clipboard_failure_atomic",
+	"tests.unit.adapters.synthetic_input.test_clipboard_partial_write",
 	"tests.unit.adapters.synthetic_input.test_clipboard_selection_transaction",
 	"tests.unit.adapters.synthetic_input.test_selection_write_owner",
 	"tests.unit.adapters.keyboard_hook.test_evdev_reader_open",
