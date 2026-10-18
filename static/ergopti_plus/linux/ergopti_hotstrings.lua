@@ -155,7 +155,6 @@ local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
-local FocusWatch        = require("adapters.atspi_focus_watch")
 local secure_focus_watch = nil
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
@@ -876,7 +875,7 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
-	secure_focus_watch = FocusWatch.new()
+	secure_focus_watch = require("adapters.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
 		watch      = secure_focus_watch,
 		detector   = secure_field_detector,
