@@ -486,6 +486,11 @@ focus_settle_ms = 250
 # fail-closed while this helper runs, so expiry affects availability, not privacy.
 atspi_probe_timeout_ms = 1000
 
+# Maximum wait for one already-running accessibility worker to answer an input
+# admission barrier. A busy application withholds automation and metrics; input
+# callbacks wait no longer than this budget before physical pass-through resumes.
+focus_barrier_timeout_ms = 20
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Tap-hold / key repeat (AHK)

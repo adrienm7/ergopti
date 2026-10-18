@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_atspi_focus_watch",
+	"tests.unit.modules.keylogger.test_pointer_focus_privacy",
 	"tests.unit.infra.test_session_lock",
 	"tests.unit.modules.updater.test_production_dispatch_refusal",
 	"tests.unit.modules.updater.test_production_manager_owners",
