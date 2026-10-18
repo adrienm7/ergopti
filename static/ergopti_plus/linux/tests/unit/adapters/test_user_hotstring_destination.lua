@@ -20,7 +20,9 @@ local function with_snapshot(body)
 	local state = { bus = ":1.42", path = "/org/a11y/atspi/accessible/7", active = true, role = 61 }
 	Atspi._set_backend_for_test(nil)
 	Atspi._set_command_runner_for_test(function(command)
+		state.probes = (state.probes or 0) + 1
 		helpers.assert_contains(command, "timeout -s KILL", "real helper isolation remains in use")
+		if state.raise then error("controlled native helper failure") end
 		if state.timeout then return false, "FOCUS:{}" end
 		return true, response(state.bus, state.path, state.active, state.role)
 	end)
@@ -48,6 +50,33 @@ local function unsupported_wayland()
 end
 
 helpers.describe("programmable native Linux destination", function()
+	helpers.it("(linux-ai-text-identity) queries the exact active field freshly without compositor identity", function()
+		with_snapshot(function(s)
+			local window = unsupported_wayland()
+			local first = window.focused_text_identity()
+			helpers.assert_eq(first, "atspi::1.42:/org/a11y/atspi/accessible/7")
+			helpers.assert_eq(s.probes, 1, "one target read must issue exactly one bounded helper probe")
+			s.path = "/org/a11y/atspi/accessible/8"
+			helpers.assert_eq(window.focused_text_identity(), "atspi::1.42:/org/a11y/atspi/accessible/8",
+				"two controls in one native window must have different AI destinations")
+			helpers.assert_eq(s.probes, 2, "a new target read must not reuse an earlier native result")
+			s.timeout = true
+			helpers.assert_nil(window.focused_text_identity(), "cached evidence cannot replace a fresh field observation")
+			s.timeout, s.raise = false, true
+			helpers.assert_nil(window.focused_text_identity(), "a native helper exception cannot authorize text output")
+		end)
+	end)
+	helpers.it("(linux-ai-text-identity) refuses private, inactive and non-native fields", function()
+		with_snapshot(function(s)
+			local window = unsupported_wayland()
+			for _, field in ipairs({ "active", "bus", "path", "role" }) do
+				local saved = s[field]
+				s[field] = ({ active = false, bus = "org.editor", path = "7", role = 40 })[field]
+				helpers.assert_nil(window.focused_text_identity(), field .. " cannot own AI text output")
+				s[field] = saved
+			end
+		end)
+	end)
 	helpers.it("(linux-atspi-focus-identity) preserves native targeting without compositor window IPC", function()
 		with_snapshot(function(s)
 			local window = unsupported_wayland()

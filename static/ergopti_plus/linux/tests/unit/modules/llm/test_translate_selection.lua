@@ -78,7 +78,7 @@ local function scenario(opts, body)
 		local world = { posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
 			focus = "editor\1Draft", selection = opts.selection }
 		package.loaded["adapters.secure_field_detector"] = {
-			isSecureField = function() return false end,
+			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
@@ -372,6 +372,35 @@ helpers.it("translates a free language name without changing selection authority
 end)
 
 helpers.describe("selected translations require a known stable native focus", function()
+	helpers.it("explains a translation refusal when privacy cannot admit its text field (selection-native-focus)", function()
+		scenario({ selection = SELECTION, secure = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+		end)
+	end)
+	helpers.it("refuses a paced translation after its native field changes (selection-native-focus)", function()
+		scenario({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_eq(#world.posts, 1, "the second request must wait for pacing")
+			world.focus = "atspi::1.42:/different-field"
+			world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1, "a stale selected field cannot be sent after the timer fires")
+		end)
+	end)
+	helpers.it("withdraws a completed translation after its native field changes (selection-native-focus)", function()
+		scenario({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.focus = "atspi::1.42:/different-field"
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_eq(#world.engine.get_suggestions(), 0, "a stale answer must not become a visible offer")
+			helpers.assert_eq(world.engine.accept(1), false)
+			helpers.assert_eq(#world.replaced, 0)
+		end)
+	end)
 	for _, missing in ipairs({"empty", "unavailable"}) do
 		helpers.it("refuses translation before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
 			scenario({selection = SELECTION}, function(world)
@@ -379,6 +408,8 @@ helpers.describe("selected translations require a known stable native focus", fu
 				helpers.assert_eq(world.engine.translate_selection("en"), false)
 				helpers.assert_eq(world.reads, 0)
 				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+					"a deliberate action must explain that the active text field is unavailable")
 			end)
 		end)
 	end

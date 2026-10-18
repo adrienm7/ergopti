@@ -168,6 +168,7 @@ local MANUAL_REFUSAL_KEYS = {
 -- exists (a deleted custom prompt). Kept apart from MANUAL_REFUSAL_KEYS, which
 -- the three drivers declare identically.
 local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
+local TEXT_TARGET_UNAVAILABLE_KEY = "llm.text_target_unavailable"
 
 -- The screen actions, each with the capture mode it runs and the vision.json
 -- list of answers it offers, in that order; and their notices
@@ -679,7 +680,7 @@ function M.predict(context, output_context, override)
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
-		return
+		return false
 	end
 
 	local focus = _buffer_focus or current_focus()
@@ -925,7 +926,10 @@ local function run_manual(output_context, prompt)
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
 		override and override.profile.id or "from the menu")
 	local refusal = M.predict(context, output_context, override)
-	if refusal == false then return false end
+	if refusal == false then
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
 	if type(refusal) == "string" then
 		Logger.info(LOG, "Manual prediction refused (%s).", refusal)
 		show_notice(MANUAL_REFUSAL_KEYS[refusal], refusal)
@@ -1216,17 +1220,20 @@ function M.shift_tone(direction, cycle)
 	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Tone step suppressed: secure field or excluded context.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	M.drop_tone("superseded")
 	local focus = current_focus()
 	if focus == "" then
 		Logger.warn(LOG, "Tone step refused: the focused window cannot be identified.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	local read_ok, selection, read_err = _read_selection()
 	if current_focus() ~= focus then
 		Logger.info(LOG, "Tone step refused: focus changed while the selection was read.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	if not read_ok then
@@ -1298,6 +1305,10 @@ function M.shift_tone(direction, cycle)
 				_tone_timer = nil
 				Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
 			end
+			return
+		end
+		if current_focus() ~= focus then
+			Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 			return
 		end
 		_last_request_ms[kind] = now
@@ -1751,7 +1762,8 @@ end
 --- @param config table Decoded translate.json.
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
-local function finish_translation(epoch, meta, config, full_text, err)
+--- @param focus string Exact native text destination captured before selection.
+local function finish_translation(epoch, meta, config, full_text, err, focus)
 	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
@@ -1762,6 +1774,11 @@ local function finish_translation(epoch, meta, config, full_text, err)
 	meta.loading = false
 	if _is_paused() or not _enabled then
 		Logger.info(LOG, "Translation dropped: the AI was paused or switched off while it ran.")
+		clear_offer()
+		return
+	end
+	if focus == "" or current_focus() ~= focus then
+		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
 		clear_offer()
 		return
 	end
@@ -1821,16 +1838,19 @@ function M.translate_selection(value)
 	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Translation suppressed: secure field or excluded context.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	local focus = current_focus()
 	if focus == "" then
 		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	local read_ok, selection, read_err = _read_selection()
 	if current_focus() ~= focus then
 		Logger.info(LOG, "Translation refused: focus changed while the selection was read.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
@@ -1860,9 +1880,15 @@ function M.translate_selection(value)
 	Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 		M.get_backend(), model, code, #selection)
 	send_paced(epoch, "Translation", function()
+		if current_focus() ~= focus then
+			Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
+			_predicting = false
+			clear_offer()
+			return
+		end
 		_inflight_backend = backend
 		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
-			function(full_text, err) finish_translation(epoch, meta, config, full_text, err) end)
+			function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
 	end, function()
 		_predicting = false
 		clear_offer()
