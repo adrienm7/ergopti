@@ -410,3 +410,91 @@ helpers.describe("shutdown coordinator: combined native barriers", function()
 		helpers.assert_eq(original_calls, 3, "initial, early observer and final physical readback only")
 	end)
 end)
+
+helpers.describe("shutdown coordinator: signal output ownership", function()
+	local function fixture(ready)
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = file:read("*a"); file:close()
+		local install = assert(source:match("(local function install_signal_handlers%(%).-)%s*%-%- ========================================="),
+			"actual signal installer must exist")
+		local finish = assert(source:match('(shutdown.request%("event loop returned"%).-)%s*if file_watchers then'),
+			"actual final output teardown must exist")
+		local state = { ready = ready, handlers = {}, closes = 0, loops = 0, releases = 0, running = true }
+		local coordinator = ShutdownCoordinator.new({
+			pre_wait = { { name = "native owner", wait_for_ack = true, stop = function()
+				if not state.ready then return false end
+				if state.releases == 0 then
+					helpers.assert_eq(state.closes, 0, "native retirement must retain its output channel")
+					state.releases = state.releases + 1
+				end
+				return true
+			end } },
+			keyboard_hook = {
+				isRunning = function() return state.running end,
+				stop = function() state.running = false end,
+				emergency_stop = function() error("TERM must use ordinary retirement") end,
+			},
+			event_loop = { stop = function() state.loops = state.loops + 1 end },
+		})
+		local signal = { SIGINT = 2, SIGTERM = 15, SIGHUP = 1,
+			signal = function(number, callback) state.handlers[number] = callback; return true end }
+		local env = setmetatable({ shutdown = coordinator, require = function(name)
+			helpers.assert_eq(name, "posix.signal"); return signal
+		end, Logger = { info = function() end, debug = function() end, error = function() end },
+			injector = { close_fast_channel = function() state.closes = state.closes + 1; return true end },
+			tooltip_preview = false, llm_overlay = false, perform_reload = function() end,
+		}, { __index = _G })
+		local function compile(body)
+			local chunk, why
+			if setfenv then chunk, why = loadstring(body, "actual signal teardown"); if chunk then setfenv(chunk, env) end
+			else chunk, why = load(body, "actual signal teardown", "t", env) end
+			return assert(chunk, why)
+		end
+		compile(install .. "\nreturn install_signal_handlers()")()
+		return state, coordinator, compile(finish)
+	end
+
+	helpers.it("(signal-output-ack) retains output across TERM until native retirement and final teardown", function()
+		local state, coordinator, finish = fixture(false)
+		state.handlers[15](15)
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(state.closes, 0, "TERM must not close output while native owners remain")
+		helpers.assert_eq(state.loops, 0)
+		helpers.assert_eq(coordinator.poll(), false)
+		state.ready = true
+		helpers.assert_true(coordinator.poll())
+		helpers.assert_eq(state.releases, 1)
+		helpers.assert_eq(state.loops, 1)
+		finish()
+		helpers.assert_eq(state.closes, 1)
+	end)
+
+	helpers.it("(signal-output-ack) repeated TERM and INT cannot close or replay pending output retirement", function()
+		local state, coordinator, finish = fixture(false)
+		state.handlers[15](15); state.handlers[15](15); state.handlers[2](2)
+		helpers.assert_true(coordinator.is_pending())
+		helpers.assert_eq(state.closes, 0)
+		local ok = pcall(finish)
+		helpers.assert_eq(ok, false, "an early loop return must retain the barrier")
+		helpers.assert_eq(state.closes, 0)
+		state.ready = true
+		helpers.assert_true(coordinator.poll())
+		finish()
+		state.handlers[15](15)
+		helpers.assert_eq(state.releases, 1)
+		helpers.assert_eq(state.closes, 1, "a late signal must not repeat final output teardown")
+		helpers.assert_eq(state.loops, 1)
+	end)
+
+	helpers.it("(signal-output-ack) an already retired transaction uses the same final output teardown", function()
+		local state, coordinator, finish = fixture(true)
+		state.handlers[15](15); state.handlers[15](15)
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.releases, 1)
+		helpers.assert_eq(state.loops, 1)
+		helpers.assert_eq(state.closes, 0)
+		finish()
+		state.handlers[2](2)
+		helpers.assert_eq(state.closes, 1)
+	end)
+end)
