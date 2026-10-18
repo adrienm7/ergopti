@@ -407,6 +407,7 @@ return {
 	"tests.unit.modules.keylogger.privacy.test_window_titles",
 	"tests.unit.modules.keymap.test_layout_catalogue",
 	"tests.unit.modules.keymap.test_layout_registry",
+	"tests.unit.modules.keymap.test_layout_selection_owner",
 	"tests.unit.modules.keymap.test_layout_registry_channel",
 	"tests.unit.modules.llm.settings.test_llm_settings",
 	"tests.unit.modules.llm.prediction.test_prediction_messages",
