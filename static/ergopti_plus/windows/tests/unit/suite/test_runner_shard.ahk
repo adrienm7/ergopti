@@ -47,6 +47,11 @@ _RSH_GroupRules() {
 	AssertEqual("config-transition", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\transition\test_config_transition_windows_port.ahk"))
 	AssertEqual("config-scope-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_global_config_scope.ahk"))
 	AssertEqual("hotstrings", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\hotstrings\personal\test_user_hotstrings.ahk"))
+	AssertEqual("keymap", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\platform\remap\tap_hold\test_tap_hold_loader.ahk"))
+	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_updater.ahk"))
+	AssertEqual("config", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\updater\test_updater_curl_capture.ahk"))
+	AssertEqual("config-scope-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_config_scope_manifest.ahk"))
+	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\adapters\shell_runner\test_shell_runner_tree_owned.ahk"))
 	AssertEqual("core", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\run_all.ahk"))
 	AssertThrows(() => _SelectModule([], "no-such-group"))
 }
