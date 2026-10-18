@@ -613,22 +613,23 @@ local function restart_daemon(reason)
 end
 
 
---- Logs the cross-driver diagnostic snapshot after service preparation.
+--- Emits facts prepared before capture only after actual driver readiness.
 ---
 --- A probe failure is reported and does not stop the daemon: the snapshot
 --- describes the configured driver, it is not a precondition of one.
---- @param boot_ms number Boot time elapsed before input admission.
+--- @param boot_ms number Frozen completed boot duration.
 --- @param opts table Parsed CLI options.
 --- @param i18n_mod table|nil Loaded i18n module, for the UI locale.
-local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod)
+--- @param prepared function|nil One-shot cached environment emitter.
+local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod, prepared)
+	if type(prepared) ~= "function" then return end
 	local ok, err = pcall(function()
 		local enabled, total = 0, 0
 		for id in pairs(hotstrings_config.get_categories() or {}) do
 			total = total + 1
 			if hotstrings_config.is_group_enabled(id) then enabled = enabled + 1 end
 		end
-		DiagnosticSnapshot.emit({
-			script_dir       = SCRIPT_DIR,
+		prepared({
 			boot_ms          = boot_ms,
 			locale           = i18n_mod and i18n_mod.get_locale() or nil,
 			keyboard_layout  = opts.layout,
@@ -2338,9 +2339,13 @@ local function main()
 	BootProfiler.stage_done("services")
 	if not privacy_owners.startup_checkpoint() then return end
 
-	-- Snapshot discovery can block on external probes, so it precedes capture.
-	-- Its duration describes preparation; complete() below includes input admission.
-	emit_diagnostic_snapshot(BootProfiler.elapsed_ms(), opts, ok_i18n and i18n_mod or nil)
+	-- Discover environment facts while the desktop still owns the keyboard.
+	-- Only cached metadata formatting/logging may follow the ready announcement.
+	do
+		local prepared, emitter = pcall(DiagnosticSnapshot.prepare, { script_dir = SCRIPT_DIR })
+		if prepared then privacy_owners.startup.snapshot = emitter
+		else Logger.error(LOG, "Diagnostic snapshot could not be prepared: %s.", tostring(emitter)) end
+	end
 
 	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.11) Start file watchers (inotify-based TOML/.lua hot reload).
@@ -2628,7 +2633,12 @@ local function main()
 
 	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
 		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
-	BootProfiler.complete()
+	if not privacy_owners.startup_checkpoint() then return end
+	local boot_ms = BootProfiler.complete()
+	if not privacy_owners.startup_checkpoint() then return end
+	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil, privacy_owners.startup.snapshot)
+	privacy_owners.startup.snapshot = nil
+	if not privacy_owners.startup_checkpoint() then return end
 	privacy_owners.finish_startup()
 	if not privacy_owners.startup_checkpoint() then return end
 	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end

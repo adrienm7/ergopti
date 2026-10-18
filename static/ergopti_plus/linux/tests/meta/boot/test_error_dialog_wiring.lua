@@ -48,7 +48,10 @@ helpers.describe("daemon wiring: the error window observes logged errors (error-
 		local src = daemon_code()
 		local notice_pos = src:find("ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir())", 1, true)
 		local defer_pos = src:find("event_loop.defer(function() ErrorDialog.notify_last_crash", 1, true)
-		local run_pos = src:find("event_loop.run({", 1, true)
+		local ready_pos = src:find('Logger.success(LOG, "Daemon ready', 1, true)
+		helpers.assert_true(ready_pos ~= nil, "the application loop must follow the daemon readiness announcement")
+		-- Startup retirement may run the same adapter earlier to collect native ACKs.
+		local run_pos = src:find("event_loop.run({", ready_pos, true)
 		helpers.assert_true(notice_pos ~= nil, "the daemon must announce a crash found in the crash reporter's folder")
 		helpers.assert_true(defer_pos ~= nil, "the notice must be deferred onto the loop, where a window can open")
 		helpers.assert_true(run_pos ~= nil, "the event loop must still be findable, or this test compares nothing")

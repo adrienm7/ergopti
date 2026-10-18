@@ -457,8 +457,7 @@ helpers.describe("logger sink — production wiring", function()
 	helpers.it("the exit paths close every open streak before the last line", function()
 		-- Exit and crash are the last chance to emit a withheld count.
 		local exiting_at = entry:find('Logger.info(LOG, "Daemon exiting.")', 1, true)
-		-- The crash line may be written through the guarded pcall form.
-		local crash_at = entry:find('LOG, "Daemon terminated by an unhandled error', 1, true)
+		local crash_at = entry:find('pcall(Logger.error, LOG, "Daemon terminated by an unhandled error', 1, true)
 		helpers.assert_not_nil(exiting_at, "the clean-exit line was not found")
 		helpers.assert_not_nil(crash_at, "the crash line was not found")
 		-- A direct call, or the guarded pcall form the crash path uses.

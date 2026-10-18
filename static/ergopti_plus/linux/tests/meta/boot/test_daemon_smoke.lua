@@ -380,7 +380,7 @@ helpers.describe("daemon startup-capture-publication", function()
 			local calls, retired, closed, pending = {}, false, false, mode == "pending" or mode == "debt" or mode == "runner-rebound"
 			local layout = require("tests.support.layout_cohort_fixture").layout(function() return 30 end)
 			local publication = layout.publish_current_capture
-			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end }
+			local loop = { run = function(opts) calls[#calls + 1] = "loop"; opts.onIdle() end, stop = function() end }
 			if mode ~= "success" and mode ~= "late-rebound" and mode ~= "late-stop" then
 				layout.publish_current_capture = function()
 					if mode == "throw" then error("controlled publication failure") end
@@ -389,7 +389,14 @@ helpers.describe("daemon startup-capture-publication", function()
 					return false
 				end
 			end
-			local hook = { isRunning = function() return not retired end }
+			local hook = {
+				isRunning = function() return not retired end,
+				stop = function() calls[#calls + 1] = "retire"; retired = true end,
+				emergency_stop = function(reason)
+					helpers.assert_eq(reason, "startup runtime failure")
+					calls[#calls + 1] = "retire"; retired = true
+				end,
+			}
 			if mode == "late-rebound" or mode == "late-stop" then
 				local ready = layout.is_ready
 				layout.is_ready = function()
@@ -399,23 +406,44 @@ helpers.describe("daemon startup-capture-publication", function()
 					return admitted
 				end
 			end
-			local shutdown = {
-				request = function(reason, emergency)
-					helpers.assert_eq(reason, "startup layout publication refused")
-					helpers.assert_eq(emergency, reason)
-					calls[#calls + 1] = "retire"; retired = true
-				end,
-				is_pending = function() return pending end,
-				poll = function() calls[#calls + 1] = "ack"; if mode ~= "debt" then pending = false end end,
-			}
+			local polls = 0
+			local shutdown = require("infra.shutdown_coordinator").new({
+				keyboard_hook = hook, event_loop = loop,
+				pre_wait = { { name = "controlled startup native owner", wait_for_ack = true, stop = function()
+					polls = polls + 1
+					if polls > 1 then
+						calls[#calls + 1] = "ack"
+						if mode ~= "debt" then pending = false end
+					end
+					return not pending
+				end } },
+			})
 			local env = { opts = {}, keyboard_layout = layout, keyboard_hook = hook, shutdown = shutdown,
 				injector = { close_fast_channel = function() calls[#calls + 1] = "close"; closed = true; return true end },
-				event_loop = loop,
-				pcall = pcall, type = type, error = error }
-			local chunk
-			if setfenv then chunk = assert(loadstring(block, "actual startup capture admission")); setfenv(chunk, env)
-			else chunk = assert(load(block, "actual startup capture admission", "t", env)) end
-			local ok, failure = pcall(chunk)
+				event_loop = loop, privacy_owners = {},
+				pcall = pcall, type = type, error = error, assert = assert }
+			local function compile(text)
+				if setfenv then
+					local chunk = assert(loadstring(text, "actual startup capture admission")); setfenv(chunk, env); return chunk
+				end
+				return assert(load(text, "actual startup capture admission", "t", env))
+			end
+			-- Capture failure now unwinds through Main's central preparation owner;
+			-- the inverse publisher no longer owns a second private shutdown path.
+			local setup = assert(source:find("\tprivacy_owners.startup = { token =", 1, true))
+			local setup_end = assert(source:find("\n\tif not privacy_owners.startup_checkpoint()", setup, true))
+			compile(source:sub(setup, setup_end - 1))()
+			local ok, failure = pcall(compile(block))
+			if not ok then
+				helpers.assert_true(tostring(failure):find("Current capture inverse publication refused at startup", 1, true) ~= nil,
+					"the actual inverse admission must refuse before central cleanup")
+				local unwind = 'if privacy_owners.startup then privacy_owners.finish_startup("startup runtime failure") end'
+				helpers.assert_true(source:find(unwind, 1, true) ~= nil, "actual terminal unwind must retain preparation cleanup")
+				local cleaned, cleanup_error = pcall(compile(unwind))
+				if not cleaned then failure = cleanup_error end
+			else
+				env.privacy_owners.finish_startup()
+			end
 			if mode == "success" then
 				helpers.assert_true(ok and not retired and not closed)
 				helpers.assert_eq(#calls, 0)
@@ -423,6 +451,7 @@ helpers.describe("daemon startup-capture-publication", function()
 			else
 				helpers.assert_eq(ok, false, "no failed publication may reach readiness")
 				helpers.assert_true(retired, "the owned input hook must retire first")
+				helpers.assert_eq(shutdown.is_pending(), mode == "debt", "only actual native close debt may retain shutdown")
 				if mode == "debt" then
 					helpers.assert_true(tostring(failure):find("unacknowledged", 1, true) ~= nil)
 					helpers.assert_eq(closed, false, "unacknowledged native debt never receives a close success")
@@ -445,7 +474,7 @@ helpers.describe("daemon managed reacquisition publisher", function()
 			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
 			local source = file:read("*a"); file:close()
 			local first = assert(source:find("\t-- Retain the selected inverse publisher", 1, true))
-			local last = assert(source:find("\n\tkeyboard_hook.start({", first, true))
+			local last = assert(source:find('\n\tBootProfiler.stage("input hooks")', first, true))
 			helpers.assert_true(last > first, "the actual original binding must be nonempty")
 			helpers.assert_true(source:sub(last):find("onCaptureReacquired = publish_reacquired_capture", 1, true) ~= nil)
 			local block = source:sub(first, last - 1) .. "\nreturn publish_reacquired_capture"
