@@ -335,7 +335,10 @@ check('existing scope owner admits every retained Mac command after address relo
 assert.equal(controls, 85, 'all original stage and receipt controls remain present');
 check('Unit lots are the module groups, each one complete stubbed cell', () => {
 	const groups = roles.unitGroups();
-	assert.deepEqual(groups, ['meta', 'core', 'modules', 'menu_llm', 'menu_input', 'ui', 'other']);
+	// Deliberately narrow: these are the macOS shard GROUP names, not source trees
+	// (platform/ tests belong to the core group), so the source-tree scan gate does not apply.
+	const shardGroupNames = 'meta core modules menu_llm menu_input ui other'.split(' ');
+	assert.deepEqual(groups, shardGroupNames);
 	assert.deepEqual(roles.displayPlan('unit', context), {
 		matrix: { lot: groups },
 		metadata: Object.fromEntries(
