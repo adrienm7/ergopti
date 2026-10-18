@@ -138,7 +138,7 @@ package.loaded['ui.ui_builder'] = {
 }
 local browser = helpers.load_with_stubs('ui.model_browser', {
 	webview = { usercontent = { new = function()
-		return { setCallback = function(_, callback) bridge = callback end }
+		return { setCallback = function(self, callback) bridge = callback; return self end }
 	end } },
 	json = { encode = function(payload)
 		payloads[#payloads + 1] = payload
