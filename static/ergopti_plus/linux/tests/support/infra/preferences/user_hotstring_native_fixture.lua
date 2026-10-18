@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- @param f table Runtime fixture with optional phase/output transition callbacks.
 --- @param body function Receives the independently recorded output transitions.
 function M.with(f, body)
-	local names = { "adapters.keyboard_layout", "modules.hotstrings.injector" }
+	local names = { "adapters.keyboard_layout", "modules.hotstrings.injector", "adapters.clipboard" }
 	local previous = {}; for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local Capture = require("adapters.xkb_capture")
 	local caps, inject = Capture.caps_locked, f.injector_port.inject
@@ -30,6 +30,10 @@ function M.with(f, body)
 		helpers.assert_true(layout.plan_current(receipt, false) and layout.plan_current(receipt, true))
 		helpers.assert_eq(layout.plan_view(receipt), plan)
 		helpers.assert_true(not rawequal(layout.plan_view(receipt), plan))
+		-- Another test may have reloaded ShellRunner after Clipboard captured it.
+		-- Bind this scoped clipboard to the exact I/O ports the body controls.
+		package.loaded[names[3]] = nil
+		require(names[3])
 		package.loaded[names[2]] = nil
 		injector = require(names[2])
 		Capture.caps_locked = function() return false end
