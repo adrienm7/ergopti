@@ -519,6 +519,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.synthetic_input_loopback_owner",
+		contract = { "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_pull",
 		contract = {
 			"handles", "prepare", "prepare_owned", "mark_start_attempted",

@@ -2021,8 +2021,14 @@ function M.cancel(tx)
 	for token in pairs(tx.retains) do token.active = false end
 	tx.retains = {}
 	tx.retain_count = 0
+	local loopback_pending = false
 	for _, batch in ipairs(tx.batches) do
-		if batch.status == "building" or batch.status == "queued" then
+		if batch.loopback_owner and (batch.status == "building" or batch.status == "queued") then
+			-- Atomically cancel untouched siblings, while the exact loopback
+			-- retains a possible Down's release, provenance and timer debt.
+			batch.loopback_owner.cancel()
+			loopback_pending = true
+		elseif batch.status == "building" or batch.status == "queued" then
 			if batch.paced_owner and invalidate_paced_owner then
 				invalidate_paced_owner(batch.paced_owner, "cancelled")
 			end
@@ -2032,10 +2038,6 @@ function M.cancel(tx)
 			if batch.reserved_owner then
 				invalidate_periodic_owner(batch.reserved_owner, "cancelled")
 			end
-			if batch.loopback_timer and type(batch.loopback_timer.stop) == "function" then
-				pcall(batch.loopback_timer.stop, batch.loopback_timer)
-			end
-			batch.loopback_timer = nil
 			clear_pump_watchdog(batch)
 			if _inflight_batch == batch then _inflight_batch = nil end
 			discard_active_trigger(batch)
@@ -2050,7 +2052,7 @@ function M.cancel(tx)
 		end
 	end
 	try_complete(tx)
-	return true
+	return not loopback_pending
 end
 
 
@@ -2708,50 +2710,42 @@ function M.emit_loopback_key_stroke(modifiers, key, delay, explicit_tx)
 		for candidate in pairs(tx.retains) do token = candidate break end
 	end
 	local batch
-	local built_ok, build_err = xpcall(function()
+	local ok, accepted = xpcall(function()
 		batch = create_batch(tx, "loopback", token)
 		M.loopbackKeyStroke(batch, modifiers, key)
+		assert(not tx.cancelled and not tx.completed and batch.status == "building",
+			"loopback construction lost its exact transaction")
+		local LoopbackOwner = require("adapters.synthetic_input_loopback_owner")
+		local owner = LoopbackOwner.new(TimerScheduler, batch.events, {
+			admit = function() return batch.status == "queued" and not tx.failed and not tx.completed end,
+			withdraw = function() untrack_pending_loopback(batch) end,
+			discard = function() discard_batch_records(batch) end,
+			diagnostic = function(format, detail) defer_diagnostic("error", format, detail) end,
+			terminal = function(status, detail)
+				if detail then tx.failure = detail end
+				if status == "cancelled" then tx.cancelled, tx.sealed = true, true end
+				finish_batch(batch, status)
+			end,
+		})
+		batch.loopback_owner = owner
 		batch.status = "queued"
 		track_pending_loopback(batch)
+		-- Acquire retries before native Down: the first global pair now waits
+		-- the canonical owner tick instead of a one-shot zero-delay turn.
+		return owner.start(M.PERIODIC_OWNER_TICK_SEC)
 	end, debug.traceback)
-	if not built_ok then
-		cancel_failed_emission(tx, "loopback key-stroke")
-		error(build_err, 0)
-	end
-	local timer_handle
-	timer_handle = schedule_zero("synthetic loopback dispatch", function()
-		batch.loopback_timer = nil
-		if batch.status ~= "queued" then return end
-		local posted_count = 0
-		local ok, err = xpcall(function()
-			for index, event in ipairs(batch.events) do
-				assert(type(event.post) == "function",
-					"loopback event.post is unavailable")
-				event:post()
-				posted_count = index
-			end
-		end, debug.traceback)
-		if not ok then
-			-- Keep enrichment only for phases whose post returned successfully;
-			-- never-emitted ghosts must not evict delayed live provenance later.
-			for index = posted_count + 1, #batch.tags do discard_record(batch.tags[index]) end
-			for index = #batch.tags, posted_count + 1, -1 do batch.tags[index] = nil end
-			batch.tx.failure = tostring(err)
-			Logger.error(LOG, "Cannot post synthetic loopback pair - %s.", tostring(err))
-			finish_batch(batch, "failed")
-			return
+	if not ok then
+		tx.failure = tostring(accepted)
+		if batch and batch.loopback_owner == nil then
+			-- A native constructor may return after reentrant cancellation.
+			discard_batch_records(batch)
 		end
-		finish_batch(batch, "dispatched")
-	end)
-	batch.loopback_timer = timer_handle
-	if not timer_handle then
-		batch.tx.failure = "loopback dispatch timer could not be scheduled"
-		discard_batch_records(batch)
-		finish_batch(batch, "failed")
 		cancel_failed_emission(tx, "loopback key-stroke")
+		error(accepted, 0)
 	end
+	if accepted ~= true then cancel_failed_emission(tx, "loopback key-stroke") end
 	if implicit and not tx.cancelled then M.seal(tx) end
-	return timer_handle ~= nil
+	return accepted == true
 end
 
 
