@@ -190,7 +190,9 @@ local function build_world(selection)
 		end,
 		getAll = function() return {} end,
 	}
-	package.loaded["modules.keymap.utils"] = { is_ignored_window = function() return false end }
+	require("tests.support.modules.llm.selection_translation_destination").attach(world, {
+		name = "ToneApp", bundleID = "test.tone", path = "/Applications/Tone.app",
+	})
 	package.loaded["modules.shortcuts.script_control"] = nil
 	package.loaded["modules.keylogger"] = {
 		get_live_stats = function() return { wpm_physical = 0 } end,
@@ -360,6 +362,7 @@ local function case(name, scenario)
 	helpers.it(name, function()
 		return helpers.with_fresh_modules({
 			"modules.llm.tone_rewrite", "adapters.event_provenance", "llm.translate",
+			"tests.support.modules.llm.selection_translation_destination",
 		}, function()
 			return Scope.run(scenario)
 		end)

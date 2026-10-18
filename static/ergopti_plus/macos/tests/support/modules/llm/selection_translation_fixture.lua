@@ -255,7 +255,7 @@ local function build_world(selection, ui_locale)
 
 	local engine = require("modules.llm.prediction_engine")
 	world.engine = engine
-	engine.init({
+	local engine_state = {
 		buffer = "",
 		llm_buffer = "",
 		mappings = {},
@@ -263,7 +263,9 @@ local function build_world(selection, ui_locale)
 		ignored_window_titles = {},
 		ignored_window_patterns = {},
 		suppress_rescan_keep_buffer = function() end,
-	})
+	}
+	engine.init(engine_state)
+	world.engine_state = engine_state
 	engine.set_llm_enabled(true)
 	world.flow = require("modules.llm.selection_translation")
 	-- Only the timers of the actions run: the backend's own stay untouched

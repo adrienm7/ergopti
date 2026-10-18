@@ -2184,12 +2184,15 @@ end
 --- @param source string The text to rewrite, sent as PREFIX and TAIL.
 --- @param on_raw function Receives the model's answer.
 --- @param on_fail function Called when no answer came back.
+--- @param continuation_check function|nil Exact selection admission rechecked before dispatch.
 --- @return boolean requested True when the request was sent.
-function M.request_selection_rewrite(profile_id, source, on_raw, on_fail)
+function M.request_selection_rewrite(profile_id, source, on_raw, on_fail, continuation_check)
 	if not require_state("request_selection_rewrite") then return false end
 	if type(source) ~= "string" or source == "" or type(on_raw) ~= "function" then
 		error("request_selection_rewrite: a source text and an answer callback are required")
 	end
+	assert(continuation_check == nil or type(continuation_check) == "function",
+		"request_selection_rewrite: continuation check must be a function or nil")
 	local reason = manual_refusal()
 	if reason and reason ~= "empty_context" then
 		Logger.info(LOG, "Tone rewrite refused (%s).", reason)
@@ -2212,8 +2215,21 @@ function M.request_selection_rewrite(profile_id, source, on_raw, on_fail)
 		return false
 	end
 	local max_tokens = Rewrite.max_tokens(source)
-	Logger.info(LOG, "Tone rewrite requested with '%s' (%d byte(s), max tokens: %d).",
+	Logger.info(LOG, "Tone rewrite prepared with '%s' (%d byte(s), max tokens: %d).",
 		profile.id, #source, max_tokens)
+	-- Native exclusion/model lookups and diagnostics may re-enter the caller.
+	-- Revalidate its exact selection owner at the final off-hook dispatch edge.
+	if continuation_check ~= nil then
+		local current_ok, current = pcall(continuation_check)
+		if not current_ok then
+			Logger.error(LOG, "Tone rewrite selection guard failed: %s.", tostring(current))
+			return false
+		end
+		if current ~= true then
+			Logger.info(LOG, "Tone rewrite dropped: its selection owner was revoked before dispatch.")
+			return false
+		end
+	end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_completion, debug.traceback,
 		profile, source, source, model, temperature, max_tokens, on_raw, on_fail)
 	if not dispatch_ok then
@@ -2907,6 +2923,12 @@ function M.handle_chain_signal(keyCode)
 	Logger.debug(LOG, "F16 received — chained LLM dispatch committed.")
 	return true
 end
+
+--- Captures the existing request/reset revision without native work.
+--- A producer compares this opaque value again before deferred publication;
+--- resets and newer prediction/answer dispatches revoke the retained revision.
+--- @return number revision RAM-only request owner revision.
+function M.current_request_revision() return fetch_request_counter end
 
 --- @return boolean True while predictions are displayed and awaiting user interaction.
 function M.is_visible() return runtime_available() and predictions_visible end
