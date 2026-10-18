@@ -204,8 +204,12 @@ if not MENU_ROWS_FILE then
 		return {
 			getFocused = info,
 			focused_snapshot = function() return info(), "owned-e2e-window" end,
-			focused_privacy_context = function()
-				return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-e2e-window" }
+			start_privacy_context = function(_, options, callback)
+				local operation = { is_settled = function() return true end, cancel = function() return true end }
+				if options.authorized() then
+					callback({ app_id = "owned-editor", title = "owned-field", native_identity = "owned-e2e-window" })
+				end
+				return operation
 			end,
 			focused_identity = function() return "owned-e2e-window" end,
 			focused_text_identity = function() return "owned-e2e-text-field" end,
@@ -352,6 +356,8 @@ package.preload["adapters.event_loop"] = function()
 	-- loop begins, and dropping that boundary would conceal startup failures.
 	local adapter = dofile("adapters/event_loop.lua")
 	adapter.run = function(loop)
+		-- A settled async observation is published by the next actual daemon tick.
+		loop.onPeriodic()
 		if MAGIC_REPEAT ~= "none" then
 			local Source = require("modules.hotstrings.magic_key_source")
 			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
@@ -484,6 +490,7 @@ package.preload["adapters.event_loop"] = function()
 				screen = chars(selection.primary)
 				selection.focused = true
 				settle_selection()
+				loop.onPeriodic()
 				loop.onPeriodic()
 			elseif token == "TAPKEY" then
 				i = i + #token + 2

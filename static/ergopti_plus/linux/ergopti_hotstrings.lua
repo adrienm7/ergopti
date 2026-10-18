@@ -155,7 +155,7 @@ local Timings           = require("infra.timings")
 local ScriptActions     = require("modules.shortcuts.script_actions")
 local CrashReporter     = require("modules.diagnostics.crash_reporter")
 local FocusGuard        = require("modules.keylogger.focus_guard")
-local secure_focus_watch = nil
+local privacy_owners = {}
 local InputCaptureGate  = require("infra.input_capture_gate")
 local BootProfiler      = require("infra.boot_profiler")
 local DiagnosticSnapshot = require("infra.diagnostic_snapshot")
@@ -301,9 +301,17 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
-			name = "accessible focus watch",
+			name = "privacy context capture",
+			wait_for_ack = true,
 			stop = function()
-				if secure_focus_watch then return secure_focus_watch.stop() == true end
+				return not privacy_owners.context or privacy_owners.context.stop() == true
+			end,
+		},
+		{
+			name = "accessible focus watch",
+			wait_for_ack = true,
+			stop = function()
+				if privacy_owners.watch then return privacy_owners.watch.stop() == true end
 				return true
 			end,
 		},
@@ -875,17 +883,18 @@ local function main()
 	-- A control can change while app ID and window title stay identical. Raw Tab
 	-- and pointer events therefore invalidate the AT-SPI verdict synchronously;
 	-- the periodic loop probes only after the desktop has consumed the event.
-	secure_focus_watch = require("adapters.atspi_focus_watch").new()
+	privacy_owners.watch = require("adapters.atspi_focus_watch").new()
 	local secure_focus_guard = FocusGuard.new({
-		watch      = secure_focus_watch,
+		watch      = privacy_owners.watch,
 		detector   = secure_field_detector,
 		keylogger  = keylogger,
 		prediction = prediction_engine,
 		now_ms     = Monotonic.now_ms,
 		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
-		capture_context = function(field)
-			if not window_info or type(window_info.focused_privacy_context) ~= "function" then return nil end
-			return window_info.focused_privacy_context(field)
+		retry_ms   = Timings.ms("privacy", "context_retry_ms"),
+		capture_context_async = function(field, options, callback)
+			if not window_info or type(window_info.start_privacy_context) ~= "function" then return nil end
+			return window_info.start_privacy_context(field, options, callback)
 		end,
 		publish_context = function(context)
 			_cached_app_id = context.app_id
@@ -902,9 +911,10 @@ local function main()
 			engine:reset(false)
 		end,
 	})
+	privacy_owners.context = secure_focus_guard
 	-- Close the input path before the hook starts, then publish a conclusive
 	-- initial answer if the accessibility service is already usable.
-	if not secure_focus_watch.start() or not secure_focus_watch.wait_ready() then
+	if not privacy_owners.watch.start() or not privacy_owners.watch.wait_ready() then
 		Logger.warn(LOG, "Native accessibility focus watcher unavailable; text automation and metrics stay closed.")
 	end
 	secure_focus_guard.prime()
@@ -2507,7 +2517,7 @@ local function main()
 					tray_menu = nil
 				end)
 			end
-			secure_focus_watch.pump()
+			privacy_owners.watch.pump()
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()

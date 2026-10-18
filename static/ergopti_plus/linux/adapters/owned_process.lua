@@ -289,7 +289,7 @@ end
 --- remain pending for unreaped descendant zombies; those remain honest debt.
 --- @param executable string
 --- @param args table Pure string argument vector.
---- @param options table { owner, timeout_ms?, max_output_bytes?, capture_tail?, authorized?, on_output?, env?, cwd? }.
+--- @param options table { owner, timeout_ms?, max_output_bytes?, capture_tail?, capture_output?, authorized?, on_output?, env?, cwd? }.
 --- @param callback function Called after physical settlement unless cancelled/stale.
 --- @return table operation { started, error, cleanup_error, result, cancel, is_running, is_settled, on_settled }.
 function M.start(executable, args, options, callback)
@@ -298,6 +298,7 @@ function M.start(executable, args, options, callback)
 		owner = options.owner, options = options, callback = callback,
 		handles = {}, listeners = {}, stdout_text = "", stderr_text = "",
 		stdout_eof = false, stderr_eof = false, spawned = false, exited = false,
+		stdout_bytes = 0, stderr_bytes = 0,
 		group_absent = false, settled = false, terminal = false, cancelled = false,
 		dispatching = true,
 	}
@@ -379,6 +380,8 @@ function M.start(executable, args, options, callback)
 	if options.authorized ~= nil and type(options.authorized) ~= "function" then return refuse("invalid source admission") end
 	if options.on_output ~= nil and type(options.on_output) ~= "function" then return refuse("invalid output callback") end
 	if options.capture_tail ~= nil and type(options.capture_tail) ~= "boolean" then return refuse("invalid output capture policy") end
+	if options.capture_output ~= nil and type(options.capture_output) ~= "boolean" then return refuse("invalid output retention policy") end
+	if options.capture_output == false and options.capture_tail == true then return refuse("private output cannot retain tails") end
 	if options.cwd ~= nil and (type(options.cwd) ~= "string" or options.cwd:sub(1, 1) ~= "/"
 		or options.cwd:find("\0", 1, true)) then return refuse("invalid process working directory") end
 	if options.env ~= nil then
@@ -441,7 +444,11 @@ function M.start(executable, args, options, callback)
 			end
 			if type(chunk) ~= "string" then finish(request, "native output receipt malformed") return end
 			local key = kind .. "_text"
-			if options.capture_tail == true then
+			local count_key = kind .. "_bytes"
+			request[count_key] = request[count_key] + #chunk
+			if options.capture_output == false then
+				if request[count_key] > max_output then finish(request, "process output exceeds its bound") return end
+			elseif options.capture_tail == true then
 				-- Long-lived daemon logs keep bounded diagnostics without eventually
 				-- terminating a healthy service because of its total historical output.
 				request[key] = (request[key] .. chunk):sub(-max_output)

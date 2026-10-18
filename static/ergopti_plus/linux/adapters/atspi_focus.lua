@@ -16,6 +16,9 @@ local ShellRunner = require("adapters.shell_runner")
 local Timings = require("infra.timings")
 local Interpreter = require("process.interpreter")
 local NativeIdentity = require("adapters.atspi_native_identity")
+local OwnedProcess = require("adapters.owned_process")
+local Paths = require("infra.paths")
+local ProcessLimits = require("llm.process_limits")
 
 local LOG = "adapters.atspi_focus"
 local STATE_ACTIVE = 1
@@ -328,8 +331,8 @@ function M._get_native_context_snapshot()
 	local called, snapshot = pcall(function()
 		local frame = backend.identity(handles.window)
 		local pid = backend.process_id(handles.window)
-		if not frame or not pid then return nil end
-		local file = io.open("/proc/" .. tostring(pid) .. "/comm", "r")
+		if not frame or type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then return nil end
+		local file = io.open("/proc/" .. string.format("%d", pid) .. "/comm", "r")
 		if not file then return nil end
 		local app = file:read("*l")
 		local closed = file:close()
@@ -484,6 +487,53 @@ function M.get_context_snapshot()
 		or type(snapshot.app_id) ~= "string" or snapshot.app_id == ""
 		or type(snapshot.window_title) ~= "string" then return nil, false end
 	return snapshot, true
+end
+
+--- Starts one direct context helper with private bounded output and one deadline.
+--- The completion callback receives no raw helper output or native diagnostic.
+--- @param field table Exact native bus/path/role receipt.
+--- @param options table { owner, authorized } Generation ownership.
+--- @param callback function Receives context or nil after physical settlement.
+--- @return table|nil operation Owned native process operation.
+function M.start_context_capture(field, options, callback)
+	if type(field) ~= "table" or type(field.bus) ~= "string" or not field.bus:match("^:%d+%.%d+$")
+		or type(field.path) ~= "string" or field.path:sub(1, 1) ~= "/" or field.path:find("\0", 1, true)
+		or type(field.role) ~= "number" or field.role <= 0 or field.role % 1 ~= 0
+		or type(options) ~= "table" or type(options.owner) ~= "string" or type(options.authorized) ~= "function"
+		or type(callback) ~= "function" then return nil end
+	local loaded, native = pcall(require, "luv")
+	if not loaded or type(native.exepath) ~= "function" then return nil end
+	local executable = native.exepath()
+	if type(executable) ~= "string" or executable == "" then return nil end
+	local expected = { bus = field.bus, path = field.path, role = field.role }
+	local chunks, invalid_output = {}, false
+	local operation = OwnedProcess.start(executable, { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
+		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()) }, {
+		owner = options.owner, authorized = options.authorized,
+		timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms"),
+		max_output_bytes = ProcessLimits.defaults().max_output_bytes,
+		capture_tail = false, capture_output = false,
+		on_output = function(chunk, kind)
+			if kind ~= "stdout" then invalid_output = true; return end
+			chunks[#chunks + 1] = chunk
+		end,
+	}, function(result)
+		local body = table.concat(chunks)
+		chunks = {}
+		local encoded = not invalid_output and result.ok == true and body:match("^CONTEXT:(.*)$") or nil
+		local decoded, frame = pcall(function() return encoded and require("json").decode(encoded) end)
+		body = nil
+		local receipt = decoded and type(frame) == "table" and frame.field or nil
+		local context = decoded and type(frame) == "table" and frame.context or nil
+		if type(receipt) ~= "table" or receipt.bus ~= expected.bus or receipt.path ~= expected.path or receipt.role ~= expected.role
+			or type(context) ~= "table" or type(context.app_id) ~= "string" or context.app_id == ""
+			or type(context.title) ~= "string" or type(context.native_identity) ~= "string" or context.native_identity == "" then
+			callback(nil); return
+		end
+		callback({ app_id = context.app_id, title = context.title, native_identity = context.native_identity })
+	end)
+	operation:on_settled(function() chunks = {} end)
+	return operation
 end
 
 --- Reads only the receipt already obtained by the daemon's privacy probe.

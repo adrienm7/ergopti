@@ -175,8 +175,12 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close()
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
-		local state = { closed = false, stops = 0, loops = 0, cancelled = 0 }
+		local state = { closed = false, context_closed = false, watch_closed = false, stops = 0, loops = 0, cancelled = 0 }
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
+			privacy_owners = {
+				context = { stop = function() return state.context_closed end },
+				watch = { stop = function() return state.watch_closed end },
+			},
 			dyn_hotstrings = false, updater = false, file_watchers = false,
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
@@ -204,6 +208,11 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		env.prediction_engine.shutdown_runtime = function() return true end
 		helpers.assert_eq(coordinator.poll(), false, "foreign public replacement cannot acknowledge retained cleanup")
 		state.closed = true
+		helpers.assert_eq(coordinator.poll(), false, "context and watcher cleanup remain independent debts")
+		state.context_closed = true
+		helpers.assert_eq(coordinator.poll(), false, "one privacy ACK cannot retire both owners")
+		helpers.assert_eq(state.loops, 0)
+		state.watch_closed = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")

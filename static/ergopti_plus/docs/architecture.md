@@ -37,6 +37,7 @@ graph TD
 
     subgraph LINUX_Adapters["Linux (Lua) Adapters — linux/adapters/"]
         LINUX_application_notifier["ApplicationNotifier.lua"]
+        LINUX_atspi_context_worker["AtspiContextWorker.lua"]
         LINUX_atspi_focus["AtspiFocus.lua"]
         LINUX_atspi_focus_watch["AtspiFocusWatch.lua"]
         LINUX_atspi_focus_watch_worker["AtspiFocusWatchWorker.lua"]
