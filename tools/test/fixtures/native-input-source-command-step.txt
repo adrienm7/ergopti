@@ -19,6 +19,8 @@
             "$driver/launcher/Sources/ErgoptiPlus/main.swift"
             "$driver/adapters/input_source_selector.lua"
             "$driver/modules/keymap/input_sources.lua"
+            "tools/diagnostics/input_source_xctest_isolation.py"
+            "tools/diagnostics/keyboard_geometry_xctest_receipt.py"
           )
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           for source in "${sources[@]}"; do
@@ -62,8 +64,15 @@
             set -e
             if [ "$receipt_status" -ne 0 ] || [ "$census_status" -ne 0 ]; then overall_status=1; fi
           done
+          for phase in forward reverse; do
+            if ! python3 tools/diagnostics/input_source_xctest_isolation.py \
+              --evidence "$evidence" --package-path "$driver/launcher" \
+              --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" --phase "$phase"; then
+              overall_status=1
+            fi
+          done
           for source in "${sources[@]}"; do
             cmp "$source" "$evidence/$(basename "$source")"
           done
           test "$overall_status" -eq 0
-        timeout-minutes: 10
+        timeout-minutes: 20

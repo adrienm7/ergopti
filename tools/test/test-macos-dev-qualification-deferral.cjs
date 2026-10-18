@@ -3,6 +3,7 @@
 
 /** Source and typed-receipt controls; these do not execute Swift or native Mac APIs. */
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -1278,6 +1279,20 @@ function run({ includeLeafControls = true } = {}) {
 	}
 	assert.equal(inputSourceCohortControls, 3);
 	console.log('PASS: native input-source closed-cohort controls=3; native execution UNRUN.');
+	for (const [from, to] of [
+		['for phase in forward reverse; do', 'for phase in forward; do'],
+		['tools/diagnostics/input_source_xctest_isolation.py', 'tools/diagnostics/foreign.py'],
+		[
+			'--phase "$phase"; then\n              overall_status=1',
+			'--phase "$phase"; then\n              overall_status=0'
+		]
+	]) {
+		assert.ok(inputSourceStep.includes(from));
+		const changed = workflow.replace(inputSourceStep, inputSourceStep.replaceAll(from, to));
+		assert.equal(admitNativeInputSourceSelector(changed), null);
+		assert.equal(admitNativeSdkSelector(changed), null);
+	}
+	console.log('PASS: native input-source isolation execution controls=3; native execution UNRUN.');
 	const inputSourceComparisons =
 		'          for source in "${sources[@]}"; do\n' +
 		'            cmp "$source" "$evidence/$(basename "$source")"\n' +
@@ -1404,6 +1419,13 @@ function run({ includeLeafControls = true } = {}) {
 	);
 
 	if (includeLeafControls) {
+		execFileSync('python3', [path.join(__dirname, 'test_input_source_xctest_isolation.py')], {
+			cwd: ROOT,
+			stdio: 'pipe'
+		});
+		console.log(
+			'PASS: isolated native input-source receipt controls=17; Swift/native execution UNRUN.'
+		);
 		require('./test-item36-native-qualification.cjs')({
 			workflow,
 			admitItem36Selector,

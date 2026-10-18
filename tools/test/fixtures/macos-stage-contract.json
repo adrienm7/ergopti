@@ -232,7 +232,7 @@
 				{
 					"name": "Qualify native input-source and launcher XCTest controls",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
-					"timeout-minutes": 10,
+					"timeout-minutes": 20,
 					"shell": "bash"
 				},
 				{
