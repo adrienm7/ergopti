@@ -9,12 +9,14 @@
 #Requires AutoHotkey v2.0
 
 ; Legacy bare values may contain apostrophes (O'Brien). A literal string opens
-; only at a token boundary, never in the middle of such a value.
+; only at a token boundary, never in the middle of such a value. A physical
+; newline is itself a boundary: scanning beyond it would inspect a skipped
+; comment from the previous line as though that text owned the next token.
 _TOML_IsLiteralStart(Text, Position) {
 	Index := Position - 1
-	while Index > 0 && InStr(" `t`r`n", SubStr(Text, Index, 1))
+	while Index > 0 && InStr(" `t", SubStr(Text, Index, 1))
 		Index -= 1
-	return Index == 0 || InStr("[{,=.", SubStr(Text, Index, 1)) > 0
+	return Index == 0 || InStr("`r`n[{,=.", SubStr(Text, Index, 1)) > 0
 }
 
 /**
