@@ -73,6 +73,7 @@ helpers.describe("linux-picker-native-capabilities", function()
 		local directory = assert(native.fs_mkdtemp("/tmp/ergopti-capability-shell-XXXXXX"))
 		local name = "literal '$(touch SHOULD_NOT_EXIST)'"
 		local binary = directory .. "/" .. name
+		local external_command = directory .. "/command"
 		local descriptor = assert(native.fs_open(binary, "w", 448))
 		assert(native.fs_write(descriptor, "#!/bin/sh\nexit 0\n"))
 		assert(native.fs_close(descriptor))
@@ -92,18 +93,27 @@ helpers.describe("linux-picker-native-capabilities", function()
 			helpers.assert_eq(shell.has_command(name, true), false)
 			assert(native.fs_chmod(binary, 73))
 			helpers.assert_true(shell.has_command(name, true), "execute-only tools require no read permission")
+			-- Some distributions ship an external wrapper for a shell builtin.
+			-- Availability depends on the executable, not a blacklist of names.
+			local command_fd = assert(native.fs_open(external_command, "w", 448))
+			assert(native.fs_write(command_fd, "#!/bin/sh\nexit 0\n"))
+			assert(native.fs_close(command_fd))
+			assert(native.os_setenv("PATH", directory))
+			for _, owner in ipairs({ sh, shell }) do
+				helpers.assert_true(owner.has_command("command", true), "an actual external builtin wrapper is executable")
+			end
 			assert(native.os_unsetenv("PATH"))
 			-- Both native and missing-luv modules must defer to the actual shell's
-			-- initialized default, while still excluding its builtin vocabulary.
+			-- initialized default, while excluding builtins without executable files.
 			for _, owner in ipairs({ sh, shell }) do
 				helpers.assert_true(owner.has_command("sh", true))
-				helpers.assert_eq(owner.has_command("command", true), false)
 				helpers.assert_eq(owner.has_command(".", true), false)
 			end
 		end, debug.traceback)
 		assert(native.chdir(original_cwd))
 		if original_path then assert(native.os_setenv("PATH", original_path)) else assert(native.os_unsetenv("PATH")) end
 		assert(native.fs_unlink(binary))
+		native.fs_unlink(external_command)
 		assert(native.fs_rmdir(directory))
 		if not ok then error(err, 0) end
 	end)
