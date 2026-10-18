@@ -2430,9 +2430,9 @@ local function main()
 				process_lifecycle = nil
 			end)
 		end
-		-- A raw Tab/click invalidates synchronously on the input path. Only this
-		-- periodic path may run the blocking accessibility probe, after its shared
-		-- focus-settle deadline. Unknown and probe failure stay fail-closed.
+		-- Raw navigation invalidates synchronously. Dispatch/retry stays periodic
+		-- after the shared focus-settle deadline; idle consumes retained results.
+		-- Unknown and probe failure stay fail-closed.
 		secure_focus_guard.refresh(false)
 		if file_watchers then
 			local owner = file_watchers
@@ -2518,6 +2518,8 @@ local function main()
 				end)
 			end
 			privacy_owners.watch.pump()
+			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
+			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
 			-- The touchpad, on the same tick as the keyboard. Cheap when nothing is
 			-- reading: gestures.pump() returns 0 immediately unless start_reading()

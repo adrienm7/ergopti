@@ -173,6 +173,73 @@ helpers.describe("asynchronous native privacy context", function()
 		end)
 	end)
 
+	helpers.it("(context-idle) phase remains retained until successful completion is consumed", function()
+		fixture(function(guard, state)
+			assert(not guard.has_context_operation())
+			guard.prime(); assert(guard.has_context_operation())
+			local barriers = state.barriers
+			for _ = 1, 100 do if guard.has_context_operation() then guard.refresh(false) end end
+			assert(state.barriers == barriers and state.starts == 1, "pending idle polls cannot restart a native deadline")
+			state.complete(1, true, false); assert(guard.has_context_operation())
+			guard.refresh(true); assert(guard.has_context_operation())
+			state.operations[1].settled = true
+			assert(guard.refresh(true)); assert(not guard.has_context_operation())
+		end)
+	end)
+
+	helpers.it("(context-idle) canceled cleanup debt stays visible through physical acknowledgment", function()
+		fixture(function(guard, state)
+			guard.prime(); guard.invalidate(); assert(guard.has_context_operation())
+			assert(not guard.stop()); assert(guard.has_context_operation())
+			state.complete(1, true, false); assert(guard.has_context_operation())
+			state.operations[1].settled = true
+			assert(guard.stop()); assert(not guard.has_context_operation())
+		end)
+	end)
+
+	helpers.it("(context-idle) consumed failures and password fields cannot trigger idle probe storms", function()
+		fixture(function(guard, state)
+			guard.prime(); state.complete(1, false, true); assert(guard.has_context_operation())
+			guard.refresh(true); assert(not guard.has_context_operation())
+			local barriers = state.barriers
+			for _ = 1, 100 do if guard.has_context_operation() then guard.refresh(false) end end
+			assert(state.barriers == barriers and state.starts == 1)
+		end)
+		fixture(function(guard, state)
+			state.unknown = true; guard.prime(); assert(not guard.has_context_operation())
+			local barriers = state.barriers
+			for _ = 1, 100 do if guard.has_context_operation() then guard.refresh(false) end end
+			assert(state.barriers == barriers and state.starts == 0)
+		end)
+		fixture(function(guard, state)
+			state.role = 40; guard.prime(); assert(not guard.has_context_operation())
+			local barriers = state.barriers
+			for _ = 1, 100 do if guard.has_context_operation() then guard.refresh(false) end end
+			assert(state.barriers == barriers and state.starts == 0)
+		end)
+	end)
+
+	helpers.it("(context-idle) actual daemon idle bridge consumes retained work without unowned probes", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local source = file:read("*a"); file:close()
+		local bridge = source:match('(privacy_owners%.watch%.pump%(%)%s*.-)if not RuntimeGuard%.call%("keyboard pump"')
+		assert(type(bridge) == "string" and #bridge > 0, "the actual idle bridge must exist")
+		local retained, calls, pumps = false, 0, 0
+		local env = { privacy_owners = { watch = { pump = function() pumps = pumps + 1 end } },
+			secure_focus_guard = { has_context_operation = function() return retained end,
+				refresh = function(immediate) assert(immediate == false); calls = calls + 1; retained = false end } }
+		local compiled, why
+		if setfenv then compiled, why = loadstring(bridge, "actual context idle bridge"); if compiled then setfenv(compiled, env) end
+		else compiled, why = load(bridge, "actual context idle bridge", "t", env) end
+		assert(compiled, why)
+		for _ = 1, 100 do compiled() end
+		assert(pumps == 100 and calls == 0)
+		retained = true; compiled()
+		assert(calls == 1, "a completed observation must not wait for the next 250ms periodic callback")
+		for _ = 1, 100 do compiled() end
+		assert(calls == 1, "unknown/password/no-owner idle iterations cannot dispatch native queries")
+	end)
+
 	helpers.it("(context-async) live policy and publication reentry remain closed", function()
 		fixture(function(guard, state)
 			guard.prime(); state.complete(1, true, true); state.protected = true
