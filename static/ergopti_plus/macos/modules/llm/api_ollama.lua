@@ -2141,8 +2141,9 @@ end
 --- @param body table The request body.
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
-function M.request_chat(body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail)
+--- @param continuation_check function|nil Exact producer authority after model preflight.
+function M.request_chat(body, on_text, on_fail, continuation_check)
+	return request_prebuilt(_vision_client, "Agent", body, on_text, on_fail, continuation_check)
 end
 
 --- Dispatches multiple sequential API requests.
