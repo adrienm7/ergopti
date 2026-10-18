@@ -431,9 +431,10 @@ const RULES = [
 	},
 	{
 		gate: 'macos-tooltip-canvas',
-		why: 'native canvas diagnostic ownership and independent observer controls require their complete pure Python suite',
+		why: 'native canvas and WebView diagnostic ownership and observer controls require their complete pure Python suites',
 		match: (f) =>
 			f.startsWith('tools/diagnostics/macos_tooltip_canvas') ||
+			f.startsWith('tools/diagnostics/macos_webview_binding') ||
 			f === 'tools/diagnostics/macos_owned_process.py' ||
 			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'
 	},

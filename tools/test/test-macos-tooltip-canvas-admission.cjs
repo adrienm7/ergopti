@@ -161,19 +161,21 @@ assert.ok(retain.includes('${{ runner.temp }}/tooltip-provisioning'));
 const root = path.resolve(__dirname, '..', '..');
 const calls = [];
 const silent = { log: () => {}, error: () => {} };
-const completed = { status: 0, stdout: '', stderr: 'Ran 48 tests in 0.01s\n\nOK\n' };
+const completed = { status: 0, stdout: '', stderr: 'Ran 54 tests in 0.01s\n\nOK\n' };
+const bindingCompleted = { ...completed, stderr: 'Ran 18 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
 		env: { PYTHON: 'selected-python' },
 		spawn: (...args) => {
 			calls.push(args);
-			return completed;
+			return args[1][6] === 'macos_webview_binding_test.py' ? bindingCompleted : completed;
 		}
 	}),
 	0
 );
 assert.equal(calls[0][0], 'selected-python');
+assert.equal(calls.length, 2);
 assert.equal(calls[0][2].cwd, root);
 assert.deepEqual(calls[0][1], [
 	'-m',
@@ -183,6 +185,18 @@ assert.deepEqual(calls[0][1], [
 	'tools/diagnostics',
 	'-p',
 	'macos_tooltip_canvas_test.py',
+	'-v'
+]);
+assert.equal(calls[1][0], 'selected-python');
+assert.equal(calls[1][2].cwd, root);
+assert.deepEqual(calls[1][1], [
+	'-m',
+	'unittest',
+	'discover',
+	'-s',
+	'tools/diagnostics',
+	'-p',
+	'macos_webview_binding_test.py',
 	'-v'
 ]);
 for (const receipt of [
@@ -197,9 +211,28 @@ for (const receipt of [
 	{ ...completed, stderr: 'Ran 45 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 47 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 48 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...completed, stderr: 'Ran 48 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 53 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 38 tests in 0.01s\n\nOK (skipped=1)\n' }
 ])
 	assert.equal(run({ ...silent, spawn: () => receipt }), 1);
+
+for (const receipt of [
+	{ ...bindingCompleted, status: 1 },
+	{ ...bindingCompleted, status: null },
+	{ ...bindingCompleted, error: new Error('Binding interpreter unavailable') },
+	{ ...bindingCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 17 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK (skipped=1)\n' }
+]) {
+	assert.equal(
+		run({
+			...silent,
+			spawn: (_python, args) => (args[6] === 'macos_webview_binding_test.py' ? receipt : completed)
+		}),
+		1
+	);
+}
 
 assert.equal(GATE_COMMANDS['macos-tooltip-canvas'].npm, 'test:macos-tooltip-canvas');
 for (const file of [
@@ -207,6 +240,9 @@ for (const file of [
 	'tools/diagnostics/macos_tooltip_canvas.lua',
 	'tools/diagnostics/macos_tooltip_canvas_observer.py',
 	'tools/diagnostics/macos_tooltip_canvas_test.py',
+	'tools/diagnostics/macos_webview_binding.lua',
+	'tools/diagnostics/macos_webview_binding.py',
+	'tools/diagnostics/macos_webview_binding_test.py',
 	'tools/diagnostics/macos_owned_process.py',
 	'tools/test/run-macos-tooltip-canvas-tests.cjs'
 ]) {
