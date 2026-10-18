@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Preserves independent managed-network controls and actual production imports.
 --- Source registration alone does not qualify native or installed behavior.
---- One fixture serves both the plain retry path and the aggregate-cancel
---- path, which calls cancel() before the predecessor settles.
+--- One fixture serves the plain retry path, the aggregate-cancel path, which
+--- calls cancel() before the predecessor settles, and a refused deadline arm.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -273,6 +273,38 @@ helpers.describe("queued deadline ownership: refusal and exact retry", function(
   state.ack_closes()
   helpers.assert_true(successor:is_settled())
   helpers.assert_eq(#results, 1)
+ end)
+end)
+
+helpers.describe("queued deadline allocation: failed arming ownership", function()
+ helpers.it("retains a refused queued deadline allocation until exact native close ACK", function()
+  local client, state = fresh_client({ defer_close = true, defer_deadline_index = 2, refuse_deadline_arm_index = 2 })
+  helpers.assert_true(client.get("http://127.0.0.1:9000/models", {}, { owner = "arm-debt", timeout_ms = 5000 }, function() end))
+  state.refuse_deadline_index = 2
+  local results = {}
+  helpers.assert_eq(client.get("http://127.0.0.1:9000/models", {}, { owner = "arm-debt", timeout_ms = 1000 }, function(result) results[#results + 1] = result end), false)
+  helpers.assert_eq(#state.requests, 1)
+  helpers.assert_eq(#state.deadlines, 2)
+  helpers.assert_true(not state.deadlines[2].token:is_settled())
+  state.complete_request(1, "late\nERGOPTI_HTTP_STATUS:200\n")
+  state.ack_closes()
+  helpers.assert_eq(client.cancel("arm-debt"), false, "failed arming allocation must retain a public retry owner")
+  local refused = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "arm-debt" }, function() end)
+  helpers.assert_true(not refused.started and refused:is_settled())
+  helpers.assert_eq(#state.requests, 1)
+  helpers.assert_eq(#state.deadlines, 2)
+  state.refuse_deadline_index = nil
+  helpers.assert_true(client.cancel("arm-debt"))
+  helpers.assert_true(not state.deadlines[2].token:is_settled())
+  state.deadlines[2].ack()
+  local successor = client.get_owned("http://127.0.0.1:9000/models", {}, { owner = "arm-debt" }, function() end)
+  helpers.assert_true(successor.started)
+  state.complete_request(2, "fresh\nERGOPTI_HTTP_STATUS:200\n")
+  state.ack_closes()
+  helpers.assert_true(successor:is_settled())
+  helpers.assert_eq(#results, 1)
+  helpers.assert_eq(results[1].error, "managed-http-deadline-unavailable")
+  for _, item in ipairs(state.deadlines) do helpers.assert_true(item.token:is_settled()) end
  end)
 end)
 return helpers

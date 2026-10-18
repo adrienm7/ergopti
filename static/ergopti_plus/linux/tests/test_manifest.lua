@@ -87,7 +87,6 @@ return {
 	"tests.unit.infra.network.test_managed_http_cancelled_admission",
 	"tests.unit.infra.network.test_managed_fractional_budget",
 	"tests.unit.infra.network.test_managed_http_deadline",
-	"tests.unit.infra.network.test_managed_http_deadline_arm",
 	"tests.unit.infra.network.test_managed_http_deadline_native",
 	"tests.unit.infra.network.test_managed_http_queued_deadline",
 	"tests.unit.infra.network.test_network_proxy_policy_contract",
