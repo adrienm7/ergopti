@@ -9,6 +9,12 @@ import Foundation
 
 let kInputSourceSelectionFlag = "--select-input-source"
 
+/// Shared argv boundary for native input-source mutation roles.
+func isValidKeyboardSourceIdentifier(_ identifier: String) -> Bool {
+	!identifier.isEmpty && identifier.utf8.count <= kMaximumKeyboardSourceIDBytes
+		&& !identifier.utf8.contains(0)
+}
+
 enum InputSourceSelectionError: Error {
 	case unavailableInventory, ambiguousIdentifier, wrongThread
 }
@@ -64,8 +70,7 @@ enum InputSourceSelectionWorker {
 	) -> Int32 {
 		guard arguments.count == 3, handles(arguments: arguments) else { return 64 }
 		let identifier = arguments[2]
-		guard !identifier.isEmpty, identifier.utf8.count <= kMaximumKeyboardSourceIDBytes,
-			!identifier.utf8.contains(0) else { return 64 }
+		guard isValidKeyboardSourceIdentifier(identifier) else { return 64 }
 		do {
 			let result = try select(identifier)
 			return writeOutput(Data(result.output.utf8)) ? 0 : 74
