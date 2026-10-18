@@ -1123,6 +1123,30 @@ helpers.describe("native source state restoration", function()
 		end)
 	end
 
+	for _, grabbed in ipairs({ false, true }) do
+		helpers.it("(linux-modal-original-open) refuses a replacement without taking over its grab " .. tostring(grabbed), function()
+			Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end }, function(s)
+				local a, b = "keyboard:" .. s.paths.a, "keyboard:" .. s.paths.b
+				local old_a, old_b = assert(s.reader.capture_source_owner(a)), assert(s.reader.capture_source_owner(b))
+				local successor
+				helpers.assert_eq(s.hook.while_released(function()
+					assert(s.reader.close(a)); assert(s.reader.open(s.paths.a, a)); if grabbed then assert(s.reader.grab(a)) end
+					successor = assert(s.reader.capture_source_owner(a))
+					return "completed"
+				end), "completed")
+				helpers.assert_eq(s.hook.isRunning(), false, "the original cohort cannot adopt a foreign open lifetime")
+				helpers.assert_eq(s.reader.source_owner_current(old_a), false)
+				helpers.assert_eq(s.reader.source_owner_current(old_b), false)
+				helpers.assert_eq(s.reader.is_open(b), false, "the original peer is retired")
+				helpers.assert_true(s.reader.is_open(a), "cleanup must leave the successor open")
+				helpers.assert_eq(s.reader.is_grabbed(a), grabbed, "the hook must never take over or ungrab its successor")
+				helpers.assert_eq(s.reader.source_owner_current(successor), grabbed, "the successor retains its own native currency")
+				helpers.assert_eq(s.hook.capture_input_owner(), nil)
+				assert(s.reader.close(a))
+			end)
+		end)
+	end
+
 	for _, boundary in ipairs({ "SYN_DROPPED", "modal" }) do
 		helpers.it("(linux-native-reconciliation) restores logical input admission after " .. boundary, function()
 			local session, published
