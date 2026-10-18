@@ -1548,10 +1548,10 @@ function stableV103PackageCollectorControls(repository) {
 			.matchAll(/\bfunc (test\w+)\(/g)
 	].map((match) => match[1]);
 	assert.equal(workers.length, 12);
-	// PAC/WPAD wire and bootstrap methods are mandatory again under v1.0.3.
+	// Worker12 and Sparkle stay mandatory whatever v1.0.3 still defers.
+	const pacMethods = JSON.parse(JSON.stringify(q.STABLE_V102_PAC_METHODS));
 	const mandatory = {
 		ManagedHTTPWorkerTests: workers,
-		...JSON.parse(JSON.stringify(q.STABLE_V102_PAC_METHODS)),
 		SparkleArchiveUpdateAcceptanceTests: [
 			'testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch'
 		]
@@ -1580,9 +1580,14 @@ function stableV103PackageCollectorControls(repository) {
 		qualified: false,
 		source_sha: source
 	});
-	const brewScope = 'macos-brew-archive',
+	const pacScope = 'macos-native-pac',
+		brewScope = 'macos-brew-archive',
 		ownedScope = 'macos-owned-runtime';
 	for (const scopes of [
+		[pacScope, brewScope, ownedScope],
+		[pacScope, brewScope],
+		[pacScope, ownedScope],
+		[pacScope],
 		[brewScope, ownedScope],
 		[brewScope],
 		[ownedScope],
@@ -1594,10 +1599,16 @@ function stableV103PackageCollectorControls(repository) {
 			const context = shrunk.environmentContext(env);
 			const profile = shrunk.stablePublicationProfile(context, now);
 			assert.equal(profile === null, scopes.length === 0);
-			assert.equal(shrunk.resolveQualificationProfile(context, now, 'macos-native-pac'), null);
-			const brewDeferred = scopes.includes(brewScope),
+			const pacDeferred = scopes.includes(pacScope),
+				brewDeferred = scopes.includes(brewScope),
 				ownedDeferred = scopes.includes(ownedScope);
-			const pac = evidence.pacQualification(fullReceipt('macos-native-pac'), env, now);
+			const pacReceipt = (sha) =>
+				pacDeferred
+					? JSON.parse(
+							JSON.stringify(shrunk.qualificationReceipt(profile, pacScope, { source_sha: sha }))
+						)
+					: { ...fullReceipt(pacScope), source_sha: sha };
+			const pac = evidence.pacQualification(pacReceipt(source), env, now);
 			const brewReceipt = brewDeferred
 				? JSON.parse(
 						JSON.stringify(shrunk.qualificationReceipt(profile, brewScope, { source_sha: source }))
@@ -1605,6 +1616,7 @@ function stableV103PackageCollectorControls(repository) {
 				: fullReceipt(brewScope);
 			const brew = evidence.brewQualification(brewReceipt, env, now);
 			const omitted = [
+				...(pacDeferred ? [pacMethods] : []),
 				...(brewDeferred ? [brewMethods] : []),
 				...(ownedDeferred ? [ownedMethods] : [])
 			];
@@ -1612,7 +1624,7 @@ function stableV103PackageCollectorControls(repository) {
 			if (!omitted.length) {
 				assert.equal(pattern, '');
 				assert.throws(() => evidence.pacSkipPattern(pac, brew));
-				const all = transcript([mandatory, brewMethods, ownedMethods], 'All tests');
+				const all = transcript([mandatory, pacMethods, brewMethods, ownedMethods], 'All tests');
 				const result = evidence.evaluate(all, 0, 0, undefined, pac, brew);
 				assert.equal(result.exit_status, 0);
 				assert.equal(result.brew_qualification, undefined);
@@ -1624,6 +1636,7 @@ function stableV103PackageCollectorControls(repository) {
 			for (const [suite, names] of Object.entries(mandatory))
 				for (const method of names) assert.equal(matches(suite, method), false, method);
 			for (const [methods, deferred] of [
+				[pacMethods, pacDeferred],
 				[brewMethods, brewDeferred],
 				[ownedMethods, ownedDeferred]
 			])
@@ -1634,13 +1647,30 @@ function stableV103PackageCollectorControls(repository) {
 					}
 			const kept = [
 				mandatory,
+				...(pacDeferred ? [] : [pacMethods]),
 				...(brewDeferred ? [] : [brewMethods]),
 				...(ownedDeferred ? [] : [ownedMethods])
 			];
 			const selected = transcript(kept, 'Selected tests');
 			const result = evidence.evaluate(selected, 0, 0, undefined, pac, brew);
 			assert.equal(result.exit_status, 0, JSON.stringify(result.failures));
-			assert.equal(result.qualification, undefined, 'PAC stays mandatory');
+			assert.equal(result.qualification !== undefined, pacDeferred);
+			if (pacDeferred) {
+				assert.equal(result.qualification.profile_id, q.STABLE_V103_PROFILE_ID);
+				assert.deepEqual(result.qualification.classes, []);
+				assert.deepEqual(JSON.parse(JSON.stringify(result.qualification.methods)), pacMethods);
+				// Every Worker case stays mandatory under the PAC deferral.
+				const fewer = {
+					...mandatory,
+					ManagedHTTPWorkerTests: workers.slice(1)
+				};
+				const missing = [fewer, ...kept.slice(1)];
+				assert.equal(
+					evidence.evaluate(transcript(missing, 'Selected tests'), 0, 0, undefined, pac, brew)
+						.exit_status,
+					1
+				);
+			}
 			assert.equal(result.brew_qualification !== undefined, brewDeferred);
 			assert.equal(result.owned_runtime_qualification !== undefined, ownedDeferred);
 			if (ownedDeferred) {
@@ -1677,17 +1707,13 @@ function stableV103PackageCollectorControls(repository) {
 			assert.equal(notice.judge(result, selected, pac, brew).root_qualified, false);
 			// Another source cannot join this package publication.
 			const foreignEnv = { ...env, GITHUB_SHA: 'f'.repeat(40) };
-			const foreignPac = evidence.pacQualification(
-				{ ...fullReceipt('macos-native-pac'), source_sha: 'f'.repeat(40) },
-				foreignEnv,
-				now
-			);
+			const foreignPac = evidence.pacQualification(pacReceipt('f'.repeat(40)), foreignEnv, now);
 			assert.throws(() => evidence.packageSkipPattern(foreignPac, brew));
 			assert.throws(() => evidence.packageSkipPattern(null, brew));
 		});
 	}
 	console.log(
-		'[OK] v1.0.3 package keeps PAC mandatory and defers Brew and owned-runtime independently.'
+		'[OK] v1.0.3 package defers PAC, Brew and owned-runtime independently; Worker12 stays mandatory.'
 	);
 }
 stableV103PackageCollectorControls(repository);

@@ -154,8 +154,8 @@ function evaluate(text, swiftStatus, captureStatus, admission = null) {
 	const qualification = require('./swift_xctest_evidence.cjs').pacQualificationDetails(admission);
 	const narrow =
 		qualification !== null &&
-		qualification.profile_id ===
-			require('../ci/dev-release-qualification.cjs').STABLE_V102_PROFILE_ID;
+		require('../ci/dev-release-qualification.cjs').stableNativeProfile(qualification.profile_id) !==
+			null;
 	const methods = narrow ? { ManagedHTTPWorkerTests: METHODS.ManagedHTTPWorkerTests } : METHODS;
 	const expectedNames = Object.entries(methods).flatMap(([suite, values]) =>
 		values.map((method) => `-[ErgoptiPlusTests.${suite} ${method}]`)

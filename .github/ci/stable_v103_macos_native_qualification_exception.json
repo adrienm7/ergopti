@@ -12,8 +12,23 @@
 	"channel": "main",
 	"tag": "v1.0.3",
 	"version": "1.0.3",
-	"authorization_note": "Explicit human authorization on 2026-10-18 (\"v1.0.3 depuis dev complet\": publish v1.0.3 from current dev with the same macOS native scopes deferred one last time, exception limited to v1.0.3) because v1.0.2 expands hotstrings in terminals after 750-960 ms and dev fixes it. The native PAC/WPAD qualification passed on hosted runners on both architectures and is mandatory again; the independent HTTP wire clients, green on tmp/macos-deferred, timed out in the v1.0.3 release run 39144577314 and are deferred like on v1.0.2. Only the scopes listed here, still red or never run on hosted runners, remain DEFERRED/qualified:false; drop each one as soon as it is green. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"authorization_note": "Explicit human authorization on 2026-10-18 (\"v1.0.3 depuis dev complet\": publish v1.0.3 from current dev with the same macOS native scopes deferred one last time, exception limited to v1.0.3) because v1.0.2 expands hotstrings in terminals after 750-960 ms and dev fixes it. The native PAC/WPAD wire methods and independent HTTP wire clients, green on tmp/macos-deferred, failed on their deadlines in the v1.0.3 release runs 39149596503 (bootstrap PAC duplicate) and 39144577314 (HTTP wire client), so all seven v1.0.2 scopes are deferred again. Only the scopes listed here, still red or never run on hosted runners, remain DEFERRED/qualified:false; drop each one as soon as it is green. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
 	"scopes": {
+		"macos-native-pac": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["e2e-hs", "Qualify actual native PAC and WPAD XCTest controls"],
+			"methods": {
+				"ManagedHTTPWireTests": ["testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure"],
+				"ManagedHTTPWPADWireTests": [
+					"testDHCPMetadataOwnsRealPACURLRoutesAndRefusesInvalidDiscoveryBeforeNetwork"
+				],
+				"ManagedBootstrapDownloadTests": [
+					"testActualNativeBootstrapTLSFullURLPACAndArtifactPublication"
+				]
+			},
+			"reason": "The two native TLS/full-URL PAC and WPAD wire methods and the exact bootstrap duplicate remain DEFERRED and qualified:false: in the v1.0.3 release run 39149596503 the package Swift step failed ManagedBootstrapDownloadTests.testActualNativeBootstrapTLSFullURLPACAndArtifactPublication (\"deadline\" instead of \"complete\"); all twelve ManagedHTTPWorkerTests cases remain mandatory."
+		},
 		"macos-native-http": {
 			"kind": "command",
 			"path": ".github/workflows/ci-macos.yml",
