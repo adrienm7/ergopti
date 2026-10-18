@@ -547,7 +547,7 @@ PrefixWatcherSuppress(YesNo) {
 	; its OWN SendInput output, and physical input declares itself with
 	; IsPhysical=true instead (F46). Delegating here would drop a physical
 	; character typed inside a nearby output transaction — pinned by
-	; tests/meta/test_hse_physical_input_provenance.ahk, which asserts this call
+	; tests/meta/modules/hotstrings/engine/test_hse_physical_input_provenance.ahk, which asserts this call
 	; is absent. Any comment elsewhere claiming this function holds both counters
 	; is stale; HSE_Suppressed is not part of this contract.
 }

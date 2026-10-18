@@ -51,7 +51,7 @@ function New-OwnedRunner {
     if ($Includes.IndexOf($Framework) -ne 0 -or $Includes.IndexOf($Stubs) -le 0) { throw 'The canonical framework/stub initialization order changed.' }
     $Profiler = Join-Path $WindowsRoot 'infra/hotpath_profiler.ahk'
     if (!$Includes.Contains($Profiler)) { $Includes.Add($Profiler) }
-    $Fixtures = @('test_llm_accept_injects_exact_text.ahk','test_hse_send_failure_transaction.ahk') | ForEach-Object { Join-Path $TestsRoot ('unit/' + $_) }
+    $Fixtures = @('unit/modules/llm/navigation/test_llm_accept_injects_exact_text.ahk','unit/modules/hotstrings/engine/test_hse_send_failure_transaction.ahk') | ForEach-Object { Join-Path $TestsRoot $_ }
     $Lines = [Collections.Generic.List[string]]::new()
     foreach ($Line in @('#Requires AutoHotkey v2.0','#SingleInstance Off','#Warn All, StdOut','#Warn VarUnset, Off','OnError(CallerFatal)','global _OWNED_NOTEPAD_DIAGNOSTIC_RUNNER := true')) { $Lines.Add($Line) }
     $Lines.Add('SetWorkingDir(' + (ConvertTo-AhkLiteral $TestsRoot) + ')')

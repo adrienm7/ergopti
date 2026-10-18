@@ -14,6 +14,6 @@ global _AHK_DRY_RUN := false
 #Include ../infra/hotstrings/hotstring_engine_main.ahk
 #Include ../infra/hotstrings/hotstrings_cache.ahk
 #Include ../infra/hotstrings/hotstrings_config.ahk
-#Include unit/test_hotstrings_config.ahk
+#Include unit/modules/hotstrings/catalogue/test_hotstrings_config.ahk
 
 RunTests()
