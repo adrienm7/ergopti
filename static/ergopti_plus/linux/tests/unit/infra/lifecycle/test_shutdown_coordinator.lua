@@ -170,26 +170,37 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		helpers.assert_eq(state.loops, 1)
 	end)
 
-	helpers.it("actual daemon registry admits no loop stop before owned runtime cleanup", function()
+	helpers.it("(shutdown-native-registry-ack) actual daemon registry admits no loop stop before owned runtime cleanup", function()
 		local path = helpers.driver_root() .. "/ergopti_hotstrings.lua"
 		local file = assert(io.open(path, "r")); local text = file:read("*a"); file:close()
 		local registry = text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]")
 		helpers.assert_true(type(registry) == "string" and registry ~= "", "actual daemon registry must exist")
 		local state = { closed = false, context_closed = false, watch_closed = false, metrics_closed = false, stops = 0, loops = 0, cancelled = 0 }
+		local native_closed = { discovery = false, programs = false, watchers = false }
+		local native_calls = { discovery = 0, programs = 0, watchers = 0 }
+		local function native_stop(name)
+			return function()
+				native_calls[name] = native_calls[name] + 1
+				return native_closed[name]
+			end
+		end
 		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
 			keylogger = { stop = function() return state.metrics_closed end },
 			privacy_owners = {
 				context = { stop = function() return state.context_closed end },
 				watch = { stop = function() return state.watch_closed end },
 			},
-			dyn_hotstrings = false, updater = false, file_watchers = false,
+			dyn_hotstrings = { stop_user_code = native_stop("programs") },
+			updater = false, file_watchers = { stop = native_stop("watchers") },
 			process_lifecycle = false, secure_field_detector = false, metrics = false,
 			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
 			prediction_engine = {
 				shutdown_runtime = function() state.stops = state.stops + 1; return state.closed end,
 				cancel = function() state.cancelled = state.cancelled + 1 end,
 			},
-			package = { loaded = {} }, require = function() return { cleanup = function() end, flush = function() end } end,
+			package = { loaded = { ["modules.llm.local_servers"] = {
+				shutdown = native_stop("discovery"),
+			} } }, require = function() return { cleanup = function() end, flush = function() end } end,
 			TimerScheduler = { cancelAll = function() end }, Logger = { warn = function() end },
 			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
 			event_loop = { stop = function() state.loops = state.loops + 1 end },
@@ -217,6 +228,16 @@ helpers.describe("shutdown coordinator: explicit native acknowledgment", functio
 		helpers.assert_eq(coordinator.poll(), false, "SQLite cleanup is independent from both privacy ACKs")
 		helpers.assert_eq(state.loops, 0)
 		state.metrics_closed = true
+		helpers.assert_eq(coordinator.poll(), false, "other native cleanup cannot acknowledge live discovery, programs or watchers")
+		helpers.assert_eq(state.loops, 0)
+		for name, calls in pairs(native_calls) do
+			helpers.assert_true(calls > 1, name .. " must retain its own retryable native cleanup claim")
+		end
+		native_closed.discovery = true
+		helpers.assert_eq(coordinator.poll(), false, "discovery ACK must not release live programs or watchers")
+		native_closed.programs = true
+		helpers.assert_eq(coordinator.poll(), false, "program ACK must not release live watchers")
+		native_closed.watchers = true
 		helpers.assert_true(coordinator.poll())
 		helpers.assert_eq(state.loops, 1)
 		helpers.assert_eq(state.cancelled, 1, "existing prediction cleanup remains one-shot")
