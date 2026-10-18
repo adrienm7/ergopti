@@ -1,4 +1,4 @@
---- tests/unit/modules/test_clipboard_restore_on_throw.lua
+--- tests/unit/modules/hotstrings/test_clipboard_restore_on_throw.lua
 
 --- ==============================================================================
 --- MODULE: Regression — every clipboard writer restores when it throws

@@ -1,4 +1,4 @@
---- tests/unit/modules/test_hotstrings_config_preserves_global.lua
+--- tests/unit/modules/hotstrings/test_hotstrings_config_preserves_global.lua
 
 --- ==============================================================================
 --- MODULE: Regression — saving overrides must not erase the [__global__] block

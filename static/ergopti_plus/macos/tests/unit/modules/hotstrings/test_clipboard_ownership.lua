@@ -1,4 +1,4 @@
---- tests/unit/modules/test_clipboard_ownership.lua
+--- tests/unit/modules/hotstrings/test_clipboard_ownership.lua
 
 --- ==============================================================================
 --- MODULE: Regression — nothing may leave the user's clipboard holding our data

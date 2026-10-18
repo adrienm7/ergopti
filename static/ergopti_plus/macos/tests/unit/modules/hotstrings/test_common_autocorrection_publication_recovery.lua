@@ -1,4 +1,4 @@
---- tests/unit/modules/test_common_autocorrection_publication_recovery.lua
+--- tests/unit/modules/hotstrings/test_common_autocorrection_publication_recovery.lua
 --- Actual controller with an independent capability/transport double. These
 --- cases do not qualify physical locks or the native adapter/Writer producer.
 local helpers = require("tests.helpers")

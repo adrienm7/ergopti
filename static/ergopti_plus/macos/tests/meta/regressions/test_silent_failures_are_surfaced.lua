@@ -1,4 +1,4 @@
---- tests/unit/modules/test_silent_failures_are_surfaced.lua
+--- tests/meta/regressions/test_silent_failures_are_surfaced.lua
 
 --- ==============================================================================
 --- MODULE: Regression — three writers must stop reporting success they did not get

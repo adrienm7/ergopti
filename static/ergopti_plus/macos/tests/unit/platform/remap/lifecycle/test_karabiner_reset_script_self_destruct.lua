@@ -1,4 +1,4 @@
---- tests/unit/modules/test_karabiner_reset_script_self_destruct.lua
+--- tests/unit/platform/remap/lifecycle/test_karabiner_reset_script_self_destruct.lua
 
 --- ==============================================================================
 --- MODULE: Destructive Karabiner Reset Scripts Stay Retired
