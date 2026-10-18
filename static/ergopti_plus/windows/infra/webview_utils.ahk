@@ -555,8 +555,9 @@ class WebViewHost {
 								Saved.Destroy()
 				}
 				this.Gui := 0
-				; Remove from singleton registry
+				; Multiple hosts and late close events cannot unregister another owner.
 				if WebViewHost._Instances.Has(this.AppId)
+						&& WebViewHost._Instances[this.AppId] == this
 						WebViewHost._Instances.Delete(this.AppId)
 		}
 

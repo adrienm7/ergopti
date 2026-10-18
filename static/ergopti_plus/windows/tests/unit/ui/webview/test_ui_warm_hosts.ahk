@@ -222,3 +222,31 @@ _UIWH_BrowserCaption() {
 	}
 }
 Test("UI: hidden browser host retains its caption and shared title (ui-warm-browser-title)", _UIWH_BrowserCaption)
+
+_UIWH_SingletonCloseOwnership() {
+	Saved := WebViewHost._Instances
+	Live := WebViewHost()
+	Other := WebViewHost()
+	Live.AppId := "private-singleton"
+	Other.AppId := Live.AppId
+	WebViewHost._Instances := Map(Live.AppId, Live)
+	try {
+		Other.Close()
+		AssertTrue(WebViewHost._Instances.Has(Live.AppId),
+			"closing an AllowMultiple host must retain the registered singleton")
+		AssertTrue(WebViewHost._Instances[Live.AppId] == Live)
+		Live.Close()
+		AssertFalse(WebViewHost._Instances.Has(Live.AppId), "the registered owner removes itself")
+		Replacement := WebViewHost()
+		Replacement.AppId := Live.AppId
+		WebViewHost._Instances[Live.AppId] := Replacement
+		Live.Close()
+		AssertTrue(WebViewHost._Instances.Has(Live.AppId),
+			"a repeated close cannot unregister the replacement singleton")
+		AssertTrue(WebViewHost._Instances[Live.AppId] == Replacement)
+		Replacement.Close()
+		AssertEqual(0, WebViewHost._Instances.Count)
+	} finally WebViewHost._Instances := Saved
+}
+Test("WebView host: close removes only its registered singleton (webview-singleton-close-owner)",
+	_UIWH_SingletonCloseOwnership)
