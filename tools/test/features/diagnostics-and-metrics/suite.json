@@ -353,6 +353,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"],
 			"repro": "node tools/test/test-hardening-g-fixable-errors-offer-an-action.cjs"
+		},
+		{
+			"id": "compact-data-sql",
+			"ordinal": 444,
+			"name": "SQL compaction retains captured markers and refuses partial projections",
+			"cmd": "node",
+			"args": ["tools/test/test-compact-data-sql.cjs"],
+			"repro": "npm run test:compact-data-sql"
 		}
 	]
 }
