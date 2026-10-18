@@ -21,15 +21,21 @@ const source = fs.readFileSync(path.join(ROOT, 'src/lib/js/getGitHubRelease.js')
 const importLine = "import { branchForInstall } from '$lib/js/isDev.js';";
 assert.equal(source.split(importLine).length - 1, 1, 'the canonical branch port must be explicit');
 assert.equal((source.match(/^import /gm) || []).length, 1, 'unknown dependencies must refuse');
-assert.equal((source.match(/^export /gm) || []).length, 2, 'both actual resolver APIs must load');
+assert.equal(
+	(source.match(/^export /gm) || []).length,
+	5,
+	'the resolver APIs, the asset fallback and its two constants must load'
+);
 
 /** Loads unchanged production bodies with inert external ports and a fresh cache. */
 function load(fetch, branch = () => 'main') {
 	const body = source.replace(importLine, '').replace(/^export /gm, '');
-	return new Function('branchForInstall', 'fetch', body + '\nreturn { getRelease, getRawUrl };')(
-		branch,
-		fetch
-	);
+	return new Function(
+		'branchForInstall',
+		'fetch',
+		body +
+			'\nreturn { getRelease, getRawUrl, assetUrlOrPage, LINUX_APPIMAGE_ASSET, RELEASES_PAGE };'
+	)(branch, fetch);
 }
 
 const API = 'https://api.github.com/repos/adrienm7/ergopti';
@@ -177,6 +183,22 @@ async function main() {
 		for (const asset of stable.assets)
 			assert.equal(release.url(asset.name), asset.browser_download_url);
 		assert.equal(release.url('missing-installer.exe'), null);
+	});
+	await check('a release without the Linux AppImage links its page, never "#"', async () => {
+		const client = load(async (url) => ({
+			ok: true,
+			json: async () => (url.endsWith('/latest') ? stable : newerDev)
+		}));
+		const release = await client.getRelease();
+		const page = 'https://github.com/adrienm7/ergopti/releases';
+		assert.equal(client.RELEASES_PAGE, page);
+		assert.equal(client.LINUX_APPIMAGE_ASSET, 'ErgoptiPlus-x86_64.AppImage');
+		assert.equal(client.assetUrlOrPage(release, client.LINUX_APPIMAGE_ASSET), page + '/tag/v1.0.0');
+		assert.equal(
+			client.assetUrlOrPage(release, 'ErgoptiPlus.exe'),
+			stable.assets[0].browser_download_url
+		);
+		assert.equal(client.assetUrlOrPage(null, client.LINUX_APPIMAGE_ASSET), page);
 	});
 	await check(
 		'dev selects the newest published prerelease without borrowing the stable endpoint',
