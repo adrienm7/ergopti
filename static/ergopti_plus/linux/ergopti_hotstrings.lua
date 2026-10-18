@@ -385,6 +385,22 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "managed HTTP transports",
+			wait_for_ack = true,
+			stop = (function()
+				-- Public exports cannot replace an already retained native debt.
+				local resolved, client, stop
+				return function()
+					if not resolved then
+						resolved = true
+						client = package.loaded["adapters.http_client"]
+						stop = client and client.shutdown
+					end
+					return not client or stop() == true
+				end
+			end)(),
+		},
+		{
 			name = "input capture gate",
 			stop = function()
 				if input_capture_gate and type(input_capture_gate.release_all) == "function" then

@@ -21,6 +21,7 @@ local Deadline = require("infra.managed_http_deadline")
 local Logger = require("logger.shim")
 local LOG = "adapters.http_client"
 local initialized, coordinator, initialization_error = false, nil, nil
+local stopping = false
 
 M.HAS_ASYNC = Curl.HAS_ASYNC
 
@@ -35,9 +36,11 @@ M.HAS_ASYNC = Curl.HAS_ASYNC
 --- @return table|nil
 --- @return string|nil
 local function initialize()
+	if stopping then return nil, "HTTP client stopped" end
 	if initialized then return coordinator, initialization_error end
 	initialized = true
 	local policy, err = PolicyBinding.load()
+	if stopping then return nil, "HTTP client stopped" end
 	if not policy then initialization_error = err; return nil, err end
 	coordinator, initialization_error = Managed.new({
 		policy = policy, proxy = Proxy, curl = Curl.dispatch_owned, redirect = RedirectBinding.load, output = OutputTarget,
@@ -45,6 +48,10 @@ local function initialize()
 		prepare_headers = Curl.rebind_prepared_headers,
 		report = function(message) Logger.error(LOG, "%s", message) end,
 	})
+	if stopping then
+		if coordinator then coordinator.shutdown() end
+		return nil, "HTTP client stopped"
+	end
 	return coordinator, initialization_error
 end
 
@@ -117,8 +124,10 @@ end
 --- @param callback function
 --- @return table
 local function dispatch(url, headers, body, options, method, buffered, owned_api, on_chunk, callback)
+	if stopping then return rejected("HTTP client stopped", nil) end
 	local request = {}
 	for key, value in pairs(type(options) == "table" and options or {}) do request[key] = value end
+	if stopping then return rejected("HTTP client stopped", nil) end
 	request.single_hop_redirect, request.single_hop_receipt_bytes, request.single_hop_url_bytes = nil, nil, nil
 	request.prepared_headers = nil
 	request.owner = owner_name(request.owner)
@@ -128,12 +137,14 @@ local function dispatch(url, headers, body, options, method, buffered, owned_api
 	local redirect_refusal = redirect_option_error(request, owned_api)
 	if redirect_refusal then return rejected(redirect_refusal, callback) end
 	local allowed, err, token, prepared, native_follow = Curl.preflight(url, headers, body, request)
+	if stopping then return rejected("HTTP client stopped", nil) end
 	if not allowed then return rejected(err, callback) end
 	if type(token) ~= "table" or type(prepared) ~= "table" then return rejected("HTTP prepared headers unavailable", callback) end
 	local permission_refusal = retain_redirect_permission(request, native_follow)
 	if permission_refusal then return rejected(permission_refusal, callback) end
 	request.prepared_headers, headers = token, prepared
 	local active, initialization_refusal = initialize()
+	if stopping then return rejected("HTTP client stopped", nil) end
 	if not active then return rejected(initialization_refusal, callback) end
 	return active.start(url, headers, body, request, on_chunk, callback)
 end
@@ -142,6 +153,7 @@ end
 --- Reserves the captured public owner before caller metadata or source callbacks.
 --- The lazy preparation port runs only under the coordinator's exact reservation.
 local function dispatch_owned(url, headers, body, options, method, buffered, on_chunk, callback, native_override)
+	if stopping then return rejected("HTTP client stopped", nil) end
 	local authorized
 	if type(options) == "table" then authorized = rawget(options, "authorized") end
 	if authorized ~= nil and type(authorized) ~= "function" then
@@ -156,6 +168,7 @@ local function dispatch_owned(url, headers, body, options, method, buffered, on_
 	if method == "POST" and authorized == nil then authorized = function() return true end end
 	local active, initialization_refusal = initialize()
 	-- Without a coordinator reservation no caller source can authorize delivery.
+	if stopping then return rejected("HTTP client stopped", nil) end
 	if not active then return rejected(initialization_refusal, nil) end
 	local request = { owner = owner, timeout_ms = timeout_valid and timeout or 0, method = method, buffered = buffered, owned_api = true,
 		absolute_deadline_ms = deadline_valid and absolute_deadline or nil }
@@ -252,6 +265,7 @@ end
 --- This port cannot authorize path/body/ETag/native-follow or manual per-hop use.
 --- @return table Retained physical operation; no writable descriptor is exposed.
 function M.download_output_owned(url, headers, target, options, callback)
+	if stopping then return rejected("HTTP client stopped", nil) end
 	local authorized = type(options) == "table" and rawget(options, "authorized") or nil
 	if type(authorized) ~= "function" then
 		return rejected("owned archive authorization unavailable", nil)
@@ -275,11 +289,13 @@ end
 --- @param callback function
 --- @return boolean
 function M.download(url, headers, destination, options, callback)
+	if stopping then return false end
 	if type(destination) ~= "string" or destination:sub(1, 1) ~= "/" then
 		return rejected("invalid download path", callback).started
 	end
 	local request = {}
 	for key, value in pairs(type(options) == "table" and options or {}) do request[key] = value end
+	if stopping then return false end
 	request.output_path, request.follow_redirects = destination, true
 	return dispatch(url, type(headers) == "table" and headers or {}, nil,
 		request, "GET", true, false, nil, callback).started
@@ -303,6 +319,13 @@ end
 --- @return boolean
 function M.cancel(owner)
 	return not coordinator or coordinator.cancel(owner_name(owner))
+end
+
+--- Closes admission without initializing a cold client; waits for native debt.
+--- @return boolean All managed children and deadline handles physically retired.
+function M.shutdown()
+	stopping = true
+	return coordinator == nil or coordinator.shutdown()
 end
 
 --- Reports logical activity across lookup, active curl and a queued successor.
