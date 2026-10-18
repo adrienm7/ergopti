@@ -374,18 +374,27 @@ require_publication = function(publication, cached)
 	if not ok or current ~= true then error("programmable publication is no longer current", 0) end
 end
 
+--- Captures one original output and API set before any planning callback.
+--- @return table owner Private original channel, broker and observation ports.
+local function capture_replacement_owner()
+	local channel = _uinput
+	local broker, binding = broker_for_channel(channel)
+	return { channel = channel, open = channel and channel.is_open, emit = channel and channel.emit,
+		ready = KeyboardLayout.is_ready, available = Clipboard.is_available, paste = Clipboard.paste_text,
+		broker = broker, binding = binding, output_current = broker and broker.output_current }
+end
+
 --- Prepares the complete replacement without reserving output or erasing text.
 --- Clipboard availability proves a tool exists; snapshot or paste can still fail.
 --- @param text string Whole replacement payload.
 --- @param publication table|nil Retained programmable publication owner.
+--- @param owner table|nil Shared original owner for a complete field set.
 --- @return table prepared Exact route and original channel ownership.
-local function prepare_replacement(text, publication)
-	local channel = _uinput
-	local open, emit = channel and channel.is_open, channel and channel.emit
-	local ready = KeyboardLayout.is_ready
-	local available, paste = Clipboard.is_available, Clipboard.paste_text
-	local broker, binding = broker_for_channel(channel)
-	local output_current = broker and broker.output_current
+local function prepare_replacement(text, publication, owner)
+	owner = owner or capture_replacement_owner()
+	local channel, open, emit, ready = owner.channel, owner.open, owner.emit, owner.ready
+	local available, paste = owner.available, owner.paste
+	local broker, binding, output_current = owner.broker, owner.binding, owner.output_current
 	local prepared = { channel = channel }
 	local function seal()
 		local current_broker, current_binding = broker_for_channel(channel)
@@ -431,7 +440,7 @@ local function prepare_replacement(text, publication)
 			if not checked or current ~= true then error("layout plan is no longer current", 0) end
 		end
 	end
-	function prepared.current()
+	function prepared.source_current()
 		require_publication(publication, false)
 		seal()
 		if prepared.native then
@@ -441,6 +450,9 @@ local function prepare_replacement(text, publication)
 		end
 		require_publication(publication, true)
 		prepared.cached()
+	end
+	function prepared.current()
+		prepared.source_current()
 		-- An idle broker's original output epoch must be current before reservation.
 		-- While reserved, its native transaction owns that epoch and the RAM seal
 		-- checks only the binding, since output_current deliberately refuses busy.
@@ -451,6 +463,50 @@ local function prepare_replacement(text, publication)
 		end
 	end
 	return prepared
+end
+
+--- Copies a dense plain string array without invoking caller-owned metamethods.
+--- @param values table Caller-provided field values.
+--- @return table|nil snapshot Private immutable-by-ownership string sequence.
+local function snapshot_fields(values)
+	if getmetatable(values) ~= nil then return nil end
+	local count, snapshot = 0, {}
+	for index, value in pairs(values) do
+		if type(index) ~= "number" or index % 1 ~= 0 or index < 1 or type(value) ~= "string" then return nil end
+		count = count + 1
+	end
+	for index = 1, count do
+		local value = rawget(values, index)
+		if type(value) ~= "string" then return nil end
+		snapshot[index] = value
+	end
+	return snapshot
+end
+
+--- Prepares all field routes once; per-key checks only inspect the active field.
+--- @param values table Private string snapshot.
+--- @param owner table Common original output captured before diagnostic callbacks.
+--- @return table batch Common output guard and active-field admission.
+--- @return table fields Exact retained route for each original value.
+local function prepare_fields(values, owner)
+	local fields = {}
+	for index, value in ipairs(values) do fields[index] = prepare_replacement(value, nil, owner) end
+	local active = 1
+	local batch = { channel = owner.channel }
+	function batch.current()
+		for _, field in ipairs(fields) do field.current() end
+		-- Later observations may retire an earlier plan. One final RAM pass joins
+		-- every receipt before output is reserved, rather than accepting each alone.
+		for _, field in ipairs(fields) do field.cached() end
+	end
+	function batch.cached() fields[active].cached() end
+	function batch.activate(index)
+		-- The genuine transaction now owns the busy output epoch. Source checking
+		-- must not query the broker's idle-only output_current observer here.
+		fields[index].source_current()
+		active = index
+	end
+	return batch, fields
 end
 
 --- Runs one complete output transaction with unconditional cleanup.
@@ -782,6 +838,12 @@ function M.inject_fields(backspace_count, values, is_private)
 			type(backspace_count), type(values))
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
 	end
+	local snapshot = snapshot_fields(values)
+	if not snapshot then
+		Logger.error(LOG, "inject_fields(): expected a dense plain array of strings.")
+		return { ok = false, error = "invalid field values", cleanup_ok = true }
+	end
+	values = snapshot
 	if #values == 0 then
 		Logger.error(LOG, "inject_fields(): no values — the trigger would be erased for nothing.")
 		return { ok = false, error = "no values", cleanup_ok = true }
@@ -794,11 +856,17 @@ function M.inject_fields(backspace_count, values, is_private)
 		return M.inject(backspace_count, values[1], is_private)
 	end
 
+	local owner = capture_replacement_owner()
 	if is_private then
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d private field(s) (content withheld)…",
 			backspace_count, #values)
 	else
 		Logger.trace(LOG, "inject_fields(): bc=%d, %d field(s)…", backspace_count, #values)
+	end
+	local checked, prepared, fields = pcall(prepare_fields, values, owner)
+	if not checked then
+		Logger.error(LOG, "Cannot prepare %d replacement field(s) before erasure (content withheld).", #values)
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
 
 	local result = run_transaction("inject_fields()", function(tx)
@@ -808,8 +876,10 @@ function M.inject_fields(backspace_count, values, is_private)
 		end
 
 		for index, value in ipairs(values) do
-			if not send_text(tx, value, is_private) then error(tx.error(), 0) end
+			if not send_text(tx, value, is_private, fields[index]) then error(tx.error(), 0) end
+			fields[index].delivered = true
 			if index < #values then
+				prepared.activate(index + 1)
 				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_DOWN, "field Tab down")
 				must_emit(tx, EvdevCodes.KEY_TAB, EVDEV_VALUE_UP, "field Tab up")
 				-- The focus change a Tab causes is asynchronous in most toolkits;
@@ -819,7 +889,7 @@ function M.inject_fields(backspace_count, values, is_private)
 				sleep_ms(INTER_PHASE_DELAY_MS)
 			end
 		end
-	end)
+	end, nil, prepared)
 
 	if result.ok then
 		Logger.done(LOG, "inject_fields(): done (bc=%d, %d field(s)).", backspace_count, #values)
