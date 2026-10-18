@@ -1,6 +1,8 @@
 // tools/diagnostics/apple_shortcuts_probe/discover.js
 // Read-only native API probe. No user name is interpolated; no shortcut is run.
 // Shortcuts Events retrieves the full native catalogue. Only output is bounded.
+// The catalogue Apple event is sent only after a preflight returned noErr (0):
+// without existing consent it would raise an Automation prompt nobody answers.
 ObjC.import('Foundation');
 function checkpoint(number) {
 	var data = $.NSString.stringWithString('ASCP:' + number + '\n').dataUsingEncoding(
@@ -108,25 +110,35 @@ function permissionPreflight(projected) {
 			return;
 		}
 		checkpoint('P:RETURN:' + code);
+		return code;
 	} catch (error) {
 		// No exception detail, permission inference or fallback leaves this boundary.
 		checkpoint('P:REFUSED');
 	}
+	return null;
+}
+// run_probe passes this exact argv only after its native preflight returned 0.
+function consentEstablished(args) {
+	if (!Array.isArray(args)) return false;
+	if (args.length === 2 && args[0] === '--native-permission-status' && args[1] === '0') return true;
+	// A JXA bridge failure returns null and can never reach the catalogue call.
+	if (args.length === 1 && args[0] === '--permission-preflight') return permissionPreflight() === 0;
+	if (args.length === 3 && args[0] === '--permission-preflight' && args[1] === '--sdk-constants')
+		return permissionPreflight(sdkProjection(args[2])) === 0;
+	return false;
 }
 function run(args) {
 	var stage = 1;
 	try {
-		var app = Application('com.apple.shortcuts.events');
 		checkpoint(1);
-		if (Array.isArray(args) && args.length === 1 && args[0] === '--permission-preflight')
-			permissionPreflight();
-		else if (
-			Array.isArray(args) &&
-			args.length === 3 &&
-			args[0] === '--permission-preflight' &&
-			args[1] === '--sdk-constants'
-		)
-			permissionPreflight(sdkProjection(args[2]));
+		if (!consentEstablished(args))
+			return JSON.stringify({
+				version: 1,
+				status: 'refused',
+				stage: stage,
+				reason: 'consent_not_established'
+			});
+		var app = Application('com.apple.shortcuts.events');
 		var catalogue = app.shortcuts();
 		checkpoint(2);
 		if (!Array.isArray(catalogue))

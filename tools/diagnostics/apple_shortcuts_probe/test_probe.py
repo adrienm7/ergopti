@@ -727,13 +727,285 @@ class CaptureBudgetControls(unittest.TestCase):
                 self.assertEqual(observation["elapsed_us"], 20125000)
 
 
+def preflight_record(status):
+    """Encode the native helper's closed record exactly as sdk_constants.c prints it."""
+    return ('{"mode":"permission_preflight","status":%d,"version":1}\n' % status).encode()
+
+
+class NativePreflightGateControls(unittest.TestCase):
+    """Drive the real preflight gate and capture with scripted owned groups.
+
+    The build has no leases, so these cases need no POSIX file modes and run on
+    every host. They would fail against the old probe, which started osascript
+    and its catalogue Apple event whatever the preflight answered.
+    """
+
+    image = "/controlled/sdk-build/sdk_constants"
+    script = "/controlled/discover.js"
+    launch = ["/usr/bin/open", "-g", "-j", "-b", "com.apple.shortcuts.events"]
+    inventory = json.dumps(
+        {
+            "version": 1,
+            "status": "observed",
+            "choices": [
+                {"id": "first", "name": "日本 é\n%PATH%", "accepts_input": False},
+                {"id": "second", "name": "日本 é\n%PATH%", "accepts_input": True},
+            ],
+            "truncated": False,
+        }
+    ).encode()
+
+    def run_gate(self, statuses, *, preflight_elapsed=0.0, launch=(0, b"", b""), catalogue=None):
+        now = [0.0]
+        calls, groups = [], []
+        pending = list(statuses)
+
+        def acquire(arguments, native, register, **options):
+            arguments = list(arguments)
+            calls.append(arguments)
+            if arguments == [self.image, "--permission-preflight"]:
+                status = pending.pop(0) if len(pending) > 1 else pending[0]
+                code, raw, errors = 0, preflight_record(status), b""
+                now[0] += preflight_elapsed
+            elif arguments == self.launch:
+                code, raw, errors = launch
+            elif arguments[0] == "/usr/bin/osascript":
+                code = 0
+                raw = self.inventory if catalogue is None else catalogue
+                errors = b"ASCP:1\nASCP:2\nASCP:3\nASCP:4\n"
+            else:
+                raise AssertionError("unexpected controlled acquisition argv")
+            group = SimpleNamespace(process=SimpleNamespace(pid=321, returncode=None))
+            group.settle_calls = 0
+            group.observe_exit = lambda: SimpleNamespace(si_pid=321, si_code=1, si_status=code)
+
+            def settle():
+                group.settle_calls += 1
+                group.process.returncode = code
+                return True
+
+            group.settle = settle
+            group.receipt = lambda: {"closed": group.process.returncode is not None}
+            groups.append(group)
+            register(group)
+            options["stdout"].write(raw)
+            options["stderr"].write(errors)
+            options["stdout"].flush()
+            options["stderr"].flush()
+            return group
+
+        def sleep(seconds):
+            now[0] += seconds
+
+        evidence, record = [], {}
+        build = {"image": self.image, "leases": {}}
+        ownership = SimpleNamespace(acquire_owned=acquire)
+        outcome, failure = None, None
+        with (
+            patch.object(subject.time, "monotonic", side_effect=lambda: now[0]),
+            patch.object(subject.time, "sleep", side_effect=sleep),
+        ):
+            try:
+                outcome = subject.discover_with_native_preflight(
+                    self.script, build, object(), ownership, evidence, record
+                )
+            except subject.ProbeObservationRefused as error:
+                failure = error.kind
+        self.assertTrue(all(group.settle_calls == 1 for group in groups))
+        self.assertTrue(all(row["retirement_ack"] for row in evidence))
+        self.assertEqual(len(evidence), len(calls))
+        return SimpleNamespace(
+            outcome=outcome, failure=failure, calls=calls, evidence=evidence, record=record
+        )
+
+    def catalogue_calls(self, gate):
+        return [call for call in gate.calls if call[0] == "/usr/bin/osascript"]
+
+    def test_absent_consent_never_starts_the_catalogue_query(self):
+        for status, permission in ((-1743, "refusal_code_observed"), (-1744, "consent_required")):
+            with self.subTest(status=status):
+                gate = self.run_gate([status])
+                self.assertEqual(gate.outcome, (status, None))
+                self.assertEqual(gate.calls, [[self.image, "--permission-preflight"]])
+                self.assertEqual(self.catalogue_calls(gate), [])
+                self.assertEqual(
+                    gate.record,
+                    {
+                        "source": "native_sdk",
+                        "statuses": [status],
+                        "service_launch_attempted": False,
+                        "catalogue_retrieval_attempted": False,
+                    },
+                )
+                fields, failed = subject.preflight_outcome(*gate.outcome)
+                self.assertFalse(failed, "absent consent is a complete hosted observation")
+                self.assertEqual(
+                    fields,
+                    {
+                        "permission": permission,
+                        "reason": "automation_consent_absent",
+                        "discovery_observed": False,
+                        "catalogue_retrieval_attempted": False,
+                    },
+                )
+
+    def test_absent_target_is_started_once_then_consent_required_is_observed(self):
+        gate = self.run_gate([-600, -1744])
+        self.assertIsNone(gate.failure)
+        self.assertEqual(gate.outcome, (-1744, None))
+        self.assertEqual(
+            gate.calls,
+            [
+                [self.image, "--permission-preflight"],
+                self.launch,
+                [self.image, "--permission-preflight"],
+            ],
+        )
+        self.assertEqual(
+            [row["role"] for row in gate.evidence],
+            ["permission_preflight", "service_launch", "permission_preflight"],
+        )
+        self.assertEqual(gate.record["statuses"], [-600, -1744])
+        self.assertTrue(gate.record["service_launch_attempted"])
+        self.assertFalse(gate.record["catalogue_retrieval_attempted"])
+
+    def test_persistent_absent_target_fails_inside_the_shared_budget(self):
+        gate = self.run_gate([-600], preflight_elapsed=1.0)
+        self.assertIn(gate.failure, ("target_not_running", "deadline"))
+        self.assertIsNone(gate.outcome)
+        self.assertEqual(gate.calls.count(self.launch), 1, "the agent is started only once")
+        self.assertEqual(self.catalogue_calls(gate), [])
+        self.assertFalse(gate.record["catalogue_retrieval_attempted"])
+        self.assertTrue(set(gate.record["statuses"]) == {-600})
+        self.assertLessEqual(len(gate.record["statuses"]), 20)
+
+    def test_unknown_status_and_failed_start_refuse_before_the_catalogue(self):
+        for status in (1, -1708, -2147483648, 2147483647):
+            with self.subTest(status=status):
+                gate = self.run_gate([status])
+                self.assertEqual(gate.failure, "permission_status")
+                self.assertEqual(gate.calls, [[self.image, "--permission-preflight"]])
+        for launch, kind in (
+            ((1, b"", b""), "native_exit"),
+            ((0, b"", b"PRIVATE"), "diagnostic_shape"),
+        ):
+            with self.subTest(kind=kind):
+                gate = self.run_gate([-600, 0], launch=launch)
+                self.assertEqual(gate.failure, kind)
+                self.assertEqual(gate.calls[-1], self.launch)
+                self.assertEqual(self.catalogue_calls(gate), [])
+                self.assertNotIn("PRIVATE", json.dumps(gate.evidence))
+
+    def test_existing_consent_runs_admitted_discovery_and_validates_rows(self):
+        gate = self.run_gate([0])
+        self.assertIsNone(gate.failure)
+        self.assertEqual(
+            self.catalogue_calls(gate),
+            [
+                [
+                    "/usr/bin/osascript",
+                    "-l",
+                    "JavaScript",
+                    self.script,
+                    "--native-permission-status",
+                    "0",
+                ]
+            ],
+        )
+        self.assertTrue(gate.record["catalogue_retrieval_attempted"])
+        fields, failed = subject.preflight_outcome(*gate.outcome)
+        self.assertFalse(failed)
+        self.assertEqual(
+            fields,
+            {
+                "permission": "preflight_permitted",
+                "inventory": {"observed": True, "observed_choices": 2, "truncated": False},
+                "discovery_observed": True,
+                "catalogue_retrieval_attempted": True,
+                "reason": "none",
+            },
+        )
+        self.assertNotIn("first", json.dumps(fields))
+
+    def test_existing_consent_with_refused_or_malformed_catalogue_stays_failed(self):
+        for packet, reason in (
+            (
+                b'{"version":1,"status":"refused","stage":1,"reason":"native_refused"}',
+                "native_refused",
+            ),
+            (
+                b'{"version":1,"status":"refused","stage":1,"reason":"automation_permission_refused"}',
+                "automation_permission_refused",
+            ),
+            (
+                b'{"version":1,"status":"refused","stage":1,"reason":"consent_not_established"}',
+                "consent_not_established",
+            ),
+        ):
+            with self.subTest(reason=reason):
+                gate = self.run_gate([0], catalogue=packet)
+                fields, failed = subject.preflight_outcome(*gate.outcome)
+                self.assertTrue(failed)
+                self.assertFalse(fields["discovery_observed"])
+                self.assertEqual(fields["reason"], reason)
+        gate = self.run_gate([0], catalogue=b'{"version":1,"status":"PRIVATE"}')
+        with self.assertRaises(ValueError):
+            subject.preflight_outcome(*gate.outcome)
+
+    def test_late_preflight_cannot_give_the_catalogue_a_fresh_budget(self):
+        gate = self.run_gate([0], preflight_elapsed=20.0)
+        self.assertEqual(gate.failure, "deadline")
+        self.assertEqual(self.catalogue_calls(gate), [])
+        self.assertFalse(gate.record["catalogue_retrieval_attempted"])
+
+    def test_outcome_refuses_every_inconsistent_status_and_payload_pair(self):
+        for status, raw in (
+            (0, None),
+            (-600, None),
+            (True, None),
+            (-1744, self.inventory),
+            (-600, self.inventory),
+            (False, self.inventory),
+        ):
+            with self.subTest(status=status, raw=raw is not None):
+                with self.assertRaises(ValueError):
+                    subject.preflight_outcome(status, raw)
+
+    def test_native_preflight_record_is_closed_canonical_signed32(self):
+        for status in (0, -600, -1743, -1744, -2147483648, 2147483647):
+            self.assertEqual(
+                subject.validate_permission_preflight(preflight_record(status)), status
+            )
+        original = preflight_record(0)
+        for raw in (
+            original[:-1],
+            b" " + original,
+            original + b"\n",
+            original.replace(b'"status":0', b'"status": 0'),
+            original.replace(b'"status":0', b'"status":0.0'),
+            original.replace(b'"status":0', b'"status":true'),
+            original.replace(b'"status":0', b'"status":"0"'),
+            original.replace(b'"version":1', b'"version":true'),
+            original.replace(b'"version":1', b'"version":2'),
+            original.replace(b'"version":1', b'"version":1,"version":1'),
+            original.replace(b'"version":1', b'"version":1,"extra":0'),
+            original.replace(b"permission_preflight", b"constants"),
+            b'{"status":0,"mode":"permission_preflight","version":1}\n',
+            preflight_record(2147483648),
+            preflight_record(-2147483649),
+            b'{"event_class":0,"event_id":0,"target_type":0,"version":1}\n',
+            b"",
+            b" " * 1025,
+        ):
+            with self.subTest(raw=raw[:80]):
+                with self.assertRaises(ValueError):
+                    subject.validate_permission_preflight(raw)
+
+
 # Additive controlled SDK transport cases; all image and SDK bytes below are fake.
 class SDKConstantTransportControls(unittest.TestCase):
     """Drive production capture/build/lease code with registered controlled groups."""
 
-    constants = (
-        b'{"event_class":1668248165,"event_id":1734702180,"target_type":1651863140,"version":1}\n'
-    )
     inventory = b'{"version":1,"status":"observed","choices":[],"truncated":false}'
 
     def fixture(self):
@@ -769,12 +1041,12 @@ class SDKConstantTransportControls(unittest.TestCase):
             calls=[],
             groups=[],
             now=[0.0],
-            constant_raw=self.constants,
-            constant_error=b"",
-            constant_status=0,
-            constant_elapsed=0.0,
+            preflight_raw=preflight_record(0),
+            preflight_error=b"",
+            preflight_status=0,
+            preflight_elapsed=0.0,
             discovery_elapsed=0.0,
-            constant_retired=True,
+            preflight_retired=True,
         )
 
     def ownership(self, fixture):
@@ -783,16 +1055,16 @@ class SDKConstantTransportControls(unittest.TestCase):
             fixture.calls.append({"argv": arguments, "options": options})
             group = SimpleNamespace(process=SimpleNamespace(pid=321, returncode=None))
             group.settle_calls = 0
-            group.is_constant = arguments[0].endswith("/sdk_constants")
-            status = fixture.constant_status if group.is_constant else 0
+            group.is_preflight = arguments[0].endswith("/sdk_constants")
+            status = fixture.preflight_status if group.is_preflight else 0
             group.observe_exit = lambda: SimpleNamespace(si_pid=321, si_code=1, si_status=status)
 
             def settle():
                 group.settle_calls += 1
                 group.process.returncode = status
-                if group.is_constant:
-                    fixture.now[0] += getattr(fixture, "constant_retirement_elapsed", 0.0)
-                return fixture.constant_retired if group.is_constant else True
+                if group.is_preflight:
+                    fixture.now[0] += getattr(fixture, "preflight_retirement_elapsed", 0.0)
+                return fixture.preflight_retired if group.is_preflight else True
 
             group.settle = settle
             group.receipt = lambda: {
@@ -812,9 +1084,10 @@ class SDKConstantTransportControls(unittest.TestCase):
                 image.write_bytes(b"CONTROLLED FAKE COMPILED IMAGE; NOT NATIVE PROOF\n")
                 image.chmod(0o700)
                 raw = b""
-            elif group.is_constant:
-                raw, errors = fixture.constant_raw, fixture.constant_error
-                fixture.now[0] += fixture.constant_elapsed
+            elif group.is_preflight:
+                self.assertEqual(arguments[1:], ["--permission-preflight"])
+                raw, errors = fixture.preflight_raw, fixture.preflight_error
+                fixture.now[0] += fixture.preflight_elapsed
             elif arguments[0] == "/usr/bin/osascript":
                 raw = self.inventory
                 errors = b"ASCP:1\nASCP:2\nASCP:3\nASCP:4\n"
@@ -826,8 +1099,8 @@ class SDKConstantTransportControls(unittest.TestCase):
             options["stdout"].flush()
             options["stderr"].flush()
             stage = (
-                "constant"
-                if group.is_constant
+                "preflight"
+                if group.is_preflight
                 else "discovery"
                 if arguments[0] == "/usr/bin/osascript"
                 else "build"
@@ -856,9 +1129,12 @@ class SDKConstantTransportControls(unittest.TestCase):
 
     def discover(self, fixture, build, ownership, evidence):
         with patch.object(subject.time, "monotonic", side_effect=lambda: fixture.now[0]):
-            return subject.discover_with_sdk_constants(
-                fixture.script, build, object(), ownership, evidence
+            return subject.discover_with_native_preflight(
+                fixture.script, build, object(), ownership, evidence, {}
             )
+
+    def catalogue_started(self, fixture):
+        return any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
 
     def test_controlled_build_records_real_capture_retirement_and_source_image_leases(self):
         fixture = self.fixture()
@@ -905,12 +1181,13 @@ class SDKConstantTransportControls(unittest.TestCase):
                         self.discover(fixture, build, ownership, evidence)
                     self.assertEqual(len(fixture.calls), before)
 
-    def test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv(self):
+    def test_preflight_and_discovery_use_one_budget_and_exact_admitted_argv(self):
         fixture = self.fixture()
         build, ownership, evidence = self.build(fixture)
-        fixture.constant_elapsed, fixture.discovery_elapsed = 19.0, 0.5
-        raw = self.discover(fixture, build, ownership, evidence)
-        self.assertEqual(raw, self.inventory)
+        fixture.preflight_elapsed, fixture.discovery_elapsed = 19.0, 0.5
+        status, raw = self.discover(fixture, build, ownership, evidence)
+        self.assertEqual((status, raw), (0, self.inventory))
+        self.assertEqual(fixture.calls[-2]["argv"], [str(build["image"]), "--permission-preflight"])
         self.assertEqual(
             fixture.calls[-1]["argv"],
             [
@@ -918,13 +1195,12 @@ class SDKConstantTransportControls(unittest.TestCase):
                 "-l",
                 "JavaScript",
                 str(fixture.script),
-                "--permission-preflight",
-                "--sdk-constants",
-                self.constants.decode().rstrip("\n"),
+                "--native-permission-status",
+                "0",
             ],
         )
         self.assertEqual(
-            [record["role"] for record in evidence[-2:]], ["sdk_constants", "discovery"]
+            [record["role"] for record in evidence[-2:]], ["permission_preflight", "discovery"]
         )
         self.assertTrue(all(record["retirement_ack"] for record in evidence))
         self.assertTrue(all(group.settle_calls == 1 for group in fixture.groups))
@@ -933,7 +1209,7 @@ class SDKConstantTransportControls(unittest.TestCase):
     def test_late_discovery_cannot_gain_a_second_twenty_second_budget(self):
         fixture = self.fixture()
         build, ownership, evidence = self.build(fixture)
-        fixture.constant_elapsed, fixture.discovery_elapsed = 19.0, 1.125
+        fixture.preflight_elapsed, fixture.discovery_elapsed = 19.0, 1.125
         with self.assertRaises(subject.ProbeObservationRefused) as caught:
             self.discover(fixture, build, ownership, evidence)
         self.assertEqual(caught.exception.kind, "deadline")
@@ -945,51 +1221,42 @@ class SDKConstantTransportControls(unittest.TestCase):
         )
         self.assertEqual(fixture.groups[-1].settle_calls, 1)
 
-    def test_expired_constant_capture_retires_without_acquiring_osascript(self):
+    def test_expired_preflight_capture_retires_without_acquiring_osascript(self):
         fixture = self.fixture()
         build, ownership, evidence = self.build(fixture)
-        fixture.constant_elapsed = 20.0
+        fixture.preflight_elapsed = 20.0
         with self.assertRaises(subject.ProbeObservationRefused) as caught:
             self.discover(fixture, build, ownership, evidence)
         self.assertEqual(caught.exception.kind, "deadline")
-        self.assertEqual(evidence[-1]["role"], "sdk_constants")
+        self.assertEqual(evidence[-1]["role"], "permission_preflight")
         self.assertTrue(evidence[-1]["retirement_ack"])
-        self.assertFalse(any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls))
+        self.assertFalse(self.catalogue_started(fixture))
         self.assertEqual(fixture.groups[-1].settle_calls, 1)
 
-    def test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript(self):
-        values = [
+    def test_malformed_preflight_records_refuse_before_osascript(self):
+        for encoded in (
             b"{}",
             b"null",
-            b"[]",
             b" " * 1025,
-            self.constants.replace(b'"version":1', b'"version":1,"version":1'),
-            self.constants.replace(b'"version":1', b'"version":1,"extra":0'),
-        ]
-        for field in ("event_class", "event_id", "target_type"):
-            for value in (True, False, "1", None, -1, 0.5, 4294967296):
-                packet = json.loads(self.constants)
-                packet[field] = value
-                values.append(json.dumps(packet, sort_keys=True, separators=(",", ":")).encode())
-        for encoded in values:
+            preflight_record(0).replace(b'"version":1', b'"version":1,"extra":0'),
+            preflight_record(2147483648),
+        ):
             with self.subTest(encoded=encoded[:100]):
                 fixture = self.fixture()
                 build, ownership, evidence = self.build(fixture)
-                fixture.constant_raw = encoded
+                fixture.preflight_raw = encoded
                 with self.assertRaises(ValueError):
                     self.discover(fixture, build, ownership, evidence)
-                self.assertEqual(evidence[-1]["role"], "sdk_constants")
+                self.assertEqual(evidence[-1]["role"], "permission_preflight")
                 self.assertTrue(evidence[-1]["retirement_ack"])
                 self.assertEqual(fixture.groups[-1].settle_calls, 1)
-                self.assertFalse(
-                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
-                )
+                self.assertFalse(self.catalogue_started(fixture))
 
-    def test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript(self):
+    def test_nonzero_unclean_and_unretired_preflight_group_cannot_reach_osascript(self):
         for field, value in (
-            ("constant_status", 3),
-            ("constant_error", b"PRIVATE"),
-            ("constant_retired", False),
+            ("preflight_status", 3),
+            ("preflight_error", b"PRIVATE"),
+            ("preflight_retired", False),
         ):
             with self.subTest(field=field):
                 fixture = self.fixture()
@@ -997,27 +1264,14 @@ class SDKConstantTransportControls(unittest.TestCase):
                 setattr(fixture, field, value)
                 with self.assertRaises(ValueError):
                     self.discover(fixture, build, ownership, evidence)
-                self.assertEqual(evidence[-1]["role"], "sdk_constants")
-                self.assertEqual(evidence[-1]["retirement_ack"], field != "constant_retired")
+                self.assertEqual(evidence[-1]["role"], "permission_preflight")
+                self.assertEqual(evidence[-1]["retirement_ack"], field != "preflight_retired")
                 self.assertEqual(fixture.groups[-1].settle_calls, 1)
-                self.assertFalse(
-                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
-                )
+                self.assertFalse(self.catalogue_started(fixture))
                 self.assertNotIn("PRIVATE", json.dumps(evidence))
 
-    def test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed(self):
-        for value in (0, 4294967295):
-            packet = {"event_class": value, "event_id": value, "target_type": value, "version": 1}
-            expected = json.dumps(packet, sort_keys=True, separators=(",", ":"))
-            self.assertEqual(subject.validate_sdk_constants((expected + "\n").encode()), expected)
-        for version in (True, "1", 0, 2):
-            packet = json.loads(self.constants)
-            packet["version"] = version
-            with self.assertRaises(ValueError):
-                subject.validate_sdk_constants(json.dumps(packet).encode())
-
     def test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations(self):
-        for stage in ("constant", "discovery"):
+        for stage in ("preflight", "discovery"):
             for target in ("source", "snapshot", "compiler", "sdk_settings", "sdk_header", "image"):
                 with self.subTest(stage=stage, target=target):
                     fixture = self.fixture()
@@ -1028,14 +1282,11 @@ class SDKConstantTransportControls(unittest.TestCase):
                         self.discover(fixture, build, ownership, evidence)
                     self.assertEqual(
                         evidence[-1]["role"],
-                        "sdk_constants" if stage == "constant" else "discovery",
+                        "permission_preflight" if stage == "preflight" else "discovery",
                     )
                     self.assertTrue(evidence[-1]["retirement_ack"])
                     self.assertEqual(fixture.groups[-1].settle_calls, 1)
-                    self.assertEqual(
-                        any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls),
-                        stage == "discovery",
-                    )
+                    self.assertEqual(self.catalogue_started(fixture), stage == "discovery")
 
     def test_expired_or_invalid_absolute_deadline_never_acquires_a_group(self):
         fixture = self.fixture()
@@ -1044,7 +1295,7 @@ class SDKConstantTransportControls(unittest.TestCase):
         with patch.object(subject.time, "monotonic", return_value=0.0):
             with self.assertRaises(subject.ProbeObservationRefused) as caught:
                 subject.capture(
-                    ["fixture"], object(), ownership, evidence, "sdk_constants", deadline=0.0
+                    ["fixture"], object(), ownership, evidence, "permission_preflight", deadline=0.0
                 )
             self.assertEqual(caught.exception.kind, "deadline")
             self.assertEqual(evidence[-1]["registered"], 0)
@@ -1059,7 +1310,7 @@ class SDKConstantTransportControls(unittest.TestCase):
                             object(),
                             ownership,
                             evidence,
-                            "sdk_constants",
+                            "permission_preflight",
                             deadline=deadline,
                         )
                     self.assertEqual(len(evidence), before)
@@ -1070,29 +1321,27 @@ class SDKConstantTransportControls(unittest.TestCase):
             with self.subTest(target=target):
                 fixture = self.fixture()
                 build, ownership, evidence = self.build(fixture)
-                fixture.mutation_stage = "constant"
+                fixture.mutation_stage = "preflight"
                 fixture.mutation_path = build["leases"][target][0]
                 fixture.mutation_replacement = True
                 with self.assertRaises(ValueError):
                     self.discover(fixture, build, ownership, evidence)
-                self.assertEqual(evidence[-1]["role"], "sdk_constants")
+                self.assertEqual(evidence[-1]["role"], "permission_preflight")
                 self.assertTrue(evidence[-1]["retirement_ack"])
                 self.assertEqual(fixture.groups[-1].settle_calls, 1)
-                self.assertFalse(
-                    any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls)
-                )
+                self.assertFalse(self.catalogue_started(fixture))
 
-    def test_constant_retirement_consumes_shared_budget_before_osascript_acquisition(self):
+    def test_preflight_retirement_consumes_shared_budget_before_osascript_acquisition(self):
         fixture = self.fixture()
         build, ownership, evidence = self.build(fixture)
-        fixture.constant_retirement_elapsed = 20.0
+        fixture.preflight_retirement_elapsed = 20.0
         with self.assertRaises(subject.ProbeObservationRefused) as caught:
             self.discover(fixture, build, ownership, evidence)
         self.assertEqual(caught.exception.kind, "deadline")
-        self.assertEqual(evidence[-1]["role"], "sdk_constants")
+        self.assertEqual(evidence[-1]["role"], "permission_preflight")
         self.assertTrue(evidence[-1]["retirement_ack"])
         self.assertEqual(fixture.groups[-1].settle_calls, 1)
-        self.assertFalse(any(call["argv"][0] == "/usr/bin/osascript" for call in fixture.calls))
+        self.assertFalse(self.catalogue_started(fixture))
 
     def test_source_changed_before_build_refuses_without_any_acquisition(self):
         fixture = self.fixture()
@@ -1112,21 +1361,6 @@ class SDKConstantTransportControls(unittest.TestCase):
 
 
 class SDKCanonicalEnvelopeControls(unittest.TestCase):
-    def test_noncanonical_valid_values_cannot_enter_the_jxa_channel(self):
-        original = b'{"event_class":0,"event_id":0,"target_type":0,"version":1}\n'
-        self.assertEqual(subject.validate_sdk_constants(original), original[:-1].decode())
-        for raw in (
-            original[:-1],
-            b" " + original,
-            original + b"\n",
-            original.replace(b'"event_class":0', b'"event_class": 0'),
-            b'{"version":1,"event_class":0,"event_id":0,"target_type":0}\n',
-            original.replace(b'"event_id":0', b'"event_id":0.0'),
-        ):
-            with self.subTest(raw=raw):
-                with self.assertRaises(ValueError):
-                    subject.validate_sdk_constants(raw)
-
     def test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path(self):
         with subject.tempfile.TemporaryDirectory(prefix="controlled-sdk-path-") as raw_directory:
             # Canonical like sdk_tool_path's answers (macOS /var -> /private/var).
@@ -1182,23 +1416,21 @@ class SDKCanonicalEnvelopeControls(unittest.TestCase):
 
 
 # The SDK filesystem model depends on POSIX no-follow and executable modes.
-# Windows still collects every case, but executes the original portable cohort.
+# Windows still collects every case, but executes the portable cohort only.
 SDK_FILESYSTEM_CASES = (
-    "SDKCanonicalEnvelopeControls.test_noncanonical_valid_values_cannot_enter_the_jxa_channel",
     "SDKCanonicalEnvelopeControls.test_owned_sdk_lookup_resolves_real_alias_and_refuses_malformed_path",
     "SDKCanonicalEnvelopeControls.test_symlink_compiler_output_cannot_chmod_a_foreign_target",
-    "SDKConstantTransportControls.test_constant_and_discovery_use_one_budget_and_exact_literal_projection_argv",
-    "SDKConstantTransportControls.test_constant_retirement_consumes_shared_budget_before_osascript_acquisition",
-    "SDKConstantTransportControls.test_constant_schema_uint32_endpoints_are_typed_canonical_and_closed",
     "SDKConstantTransportControls.test_controlled_build_records_real_capture_retirement_and_source_image_leases",
-    "SDKConstantTransportControls.test_expired_constant_capture_retires_without_acquiring_osascript",
     "SDKConstantTransportControls.test_expired_or_invalid_absolute_deadline_never_acquires_a_group",
+    "SDKConstantTransportControls.test_expired_preflight_capture_retires_without_acquiring_osascript",
     "SDKConstantTransportControls.test_in_capture_same_byte_inode_replacement_refuses_before_osascript",
     "SDKConstantTransportControls.test_late_discovery_cannot_gain_a_second_twenty_second_budget",
     "SDKConstantTransportControls.test_lease_replacement_same_bytes_and_mutation_refuse_without_new_acquisition",
-    "SDKConstantTransportControls.test_malformed_open_oversized_and_non_uint32_constants_refuse_before_osascript",
-    "SDKConstantTransportControls.test_nonzero_unclean_and_unretired_constant_group_cannot_reach_osascript",
+    "SDKConstantTransportControls.test_malformed_preflight_records_refuse_before_osascript",
+    "SDKConstantTransportControls.test_nonzero_unclean_and_unretired_preflight_group_cannot_reach_osascript",
     "SDKConstantTransportControls.test_post_capture_lease_mutation_refuses_and_retains_exact_retired_operations",
+    "SDKConstantTransportControls.test_preflight_and_discovery_use_one_budget_and_exact_admitted_argv",
+    "SDKConstantTransportControls.test_preflight_retirement_consumes_shared_budget_before_osascript_acquisition",
     "SDKConstantTransportControls.test_source_changed_before_build_refuses_without_any_acquisition",
 )
 
@@ -1212,17 +1444,18 @@ def load_tests(loader, tests, pattern):
         (PermissionPreflightControls, 12),
         (UnavailableRefinementControls, 3),
         (CaptureBudgetControls, 2),
+        (NativePreflightGateControls, 9),
     )
     portable = unittest.TestSuite()
     for group, expected in portable_groups:
         collected = loader.loadTestsFromTestCase(group)
         if collected.countTestCases() != expected:
-            raise AssertionError("original portable Shortcuts cohort changed")
+            raise AssertionError("portable Shortcuts cohort changed")
         portable.addTests(collected)
     sdk = []
     for group in (SDKCanonicalEnvelopeControls, SDKConstantTransportControls):
         sdk.extend(group.__name__ + "." + name for name in loader.getTestCaseNames(group))
-    if tuple(sorted(sdk)) != SDK_FILESYSTEM_CASES or tests.countTestCases() != 51:
+    if tuple(sorted(sdk)) != SDK_FILESYSTEM_CASES or tests.countTestCases() != 58:
         raise AssertionError("complete Shortcuts SDK case census changed")
     if subject.sys.platform == "win32":
         print(
@@ -1230,7 +1463,7 @@ def load_tests(loader, tests, pattern):
             + json.dumps(
                 {
                     "case_names": list(SDK_FILESYSTEM_CASES),
-                    "collected": 16,
+                    "collected": 14,
                     "executed": 0,
                     "native": "UNRUN",
                     "status": "UNRUN_UNSUPPORTED",

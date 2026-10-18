@@ -9,7 +9,11 @@ let passed = 0;
 function entry(id, name, accepts = false) {
 	return { id: () => id, name: () => name, acceptsInput: () => accepts };
 }
-function evaluate(collections, throws) {
+// run_probe's exact argv after its native SDK preflight returned noErr (0).
+const ADMITTED = ['--native-permission-status', '0'];
+function evaluate(collections, throws, ...explicit) {
+	// An explicit undefined argv must reach run() unchanged, not the default.
+	const args = explicit.length ? explicit[0] : ADMITTED;
 	let calls = 0;
 	const checkpoints = [];
 	const collection = function () {
@@ -43,7 +47,7 @@ function evaluate(collections, throws) {
 	};
 	vm.createContext(context);
 	vm.runInContext(source, context);
-	const raw = context.run();
+	const raw = context.run(args);
 	return { value: JSON.parse(raw), raw, calls, checkpoints };
 }
 function test(name, fn) {
@@ -136,8 +140,29 @@ test('fixed stage markers bracket both actual catalogue calls without payload co
 	]);
 	assert.deepEqual(evaluate([], new Error('private')).checkpoints, ['ASCP:1\n']);
 });
-assert.equal(passed, 13);
-process.stdout.write('Controlled JXA cases: 13 passed, 0 failed; native execution untested\n');
+test('without an admitted argv the catalogue Apple event is never sent', () => {
+	for (const args of [
+		undefined,
+		[],
+		['--native-permission-status'],
+		['--native-permission-status', '-1744'],
+		['--native-permission-status', 0],
+		['--native-permission-status', '0', 'extra'],
+		'--native-permission-status 0'
+	]) {
+		const result = evaluate([[entry('id-1', 'name')]], undefined, args);
+		assert.equal(result.calls, 0, JSON.stringify(args));
+		assert.deepEqual(result.value, {
+			version: 1,
+			status: 'refused',
+			stage: 1,
+			reason: 'consent_not_established'
+		});
+		assert.deepEqual(result.checkpoints, ['ASCP:1\n']);
+	}
+});
+assert.equal(passed, 14);
+process.stdout.write('Controlled JXA cases: 14 passed, 0 failed; native execution untested\n');
 
 // The following are explicit native-bridge models, never native permission proof.
 function permissionCase(options = {}, args) {
@@ -235,6 +260,22 @@ function permissionCase(options = {}, args) {
 function onlyPreflight(result) {
 	return result.markers.filter((value) => value.startsWith('ASCP:P:'));
 }
+// The defense-in-depth refusal: no Application object, no catalogue event.
+function noCatalogue(result) {
+	assert.equal(result.calls.filter((value) => value[0] === 'catalogue').length, 0);
+	assert.equal(result.calls.filter((value) => value[0] === 'Application').length, 0);
+	assert.deepEqual(
+		result.markers.filter((value) => /^ASCP:[1-4]\n$/.test(value)),
+		['ASCP:1\n']
+	);
+	assert.deepEqual(result.value, {
+		version: 1,
+		status: 'refused',
+		stage: 1,
+		reason: 'consent_not_established'
+	});
+	assert.equal(result.raw.includes('PRIVATE'), false);
+}
 function originalCatalogue(result) {
 	assert.equal(result.calls.filter((value) => value[0] === 'catalogue').length, 2);
 	assert.deepEqual(
@@ -262,10 +303,10 @@ test('same-process bridge keeps exact native descriptor pointer and SDK read eve
 	assert.ok(events.indexOf('native') < events.indexOf('catalogue'));
 	assert.equal(result.calls.filter((row) => row[0] === 'Application').length, 1);
 });
-test('procNotFound permission refusal and other signed32 codes remain observations only', () => {
+test('procNotFound permission refusal and other signed32 codes never send the catalogue event', () => {
 	for (const code of [-600, -1743, -1744, -2147483648, 2147483647, 71]) {
 		const result = permissionCase({ code });
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:RETURN:' + code + '\n');
 		assert.equal(result.raw.includes('permission'), false);
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 1);
@@ -290,7 +331,7 @@ test('native zero cannot fabricate catalogue success or invocation authorization
 test('invalid native types and out-of-range values remain closed diagnostic refusals', () => {
 	for (const code of [true, false, '0', 0.25, NaN, Infinity, -2147483649, 2147483648]) {
 		const result = permissionCase({ code });
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:INVALID\n');
 		assert.equal(result.raw.includes('PRIVATE'), false);
 	}
@@ -298,7 +339,7 @@ test('invalid native types and out-of-range values remain closed diagnostic refu
 test('missing native function and SDK constants refuse before descriptor acquisition or C call', () => {
 	for (const options of [{ noFunction: true }, { badConstant: true }]) {
 		const result = permissionCase(options);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.deepEqual(onlyPreflight(result), ['ASCP:P:BEGIN\n', 'ASCP:P:UNAVAILABLE\n']);
 		assert.equal(
 			result.calls.filter((row) => row[0] === 'native' || row[0] === 'descriptor').length,
@@ -309,23 +350,23 @@ test('missing native function and SDK constants refuse before descriptor acquisi
 test('descriptor refusal or null pointer never calls native API', () => {
 	for (const options of [{ noDescriptor: true }, { badDescriptor: true }, { noPointer: true }]) {
 		const result = permissionCase(options);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:UNAVAILABLE\n');
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
 	}
 });
-test('import and pointer getter errors expose no private detail and preserve catalogue calls', () => {
+test('import and pointer getter bridge refusals never fall through to app.shortcuts()', () => {
 	for (const options of [{ importThrow: true }, { pointerThrow: true }]) {
 		const result = permissionCase(options);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:REFUSED\n');
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
 		assert.equal(result.raw.includes('PRIVATE'), false);
 	}
 });
-test('native bridge throw is an attempted refusal rather than returned permission status', () => {
+test('native bridge throw is an attempted refusal that never reaches app.shortcuts()', () => {
 	const result = permissionCase({ nativeThrow: true });
-	originalCatalogue(result);
+	noCatalogue(result);
 	assert.deepEqual(onlyPreflight(result), [
 		'ASCP:P:BEGIN\n',
 		'ASCP:P:CALL_ATTEMPT\n',
@@ -334,10 +375,10 @@ test('native bridge throw is an attempted refusal rather than returned permissio
 });
 test('post-call native descriptor lifetime witness refuses changed descriptor', () => {
 	const result = permissionCase({ replaceDescriptor: true });
-	originalCatalogue(result);
+	noCatalogue(result);
 	assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:INVALID\n');
 });
-test('only the fixed sole argv opts into permission preflight', () => {
+test('only the fixed sole argv opts into permission preflight; other argv sends nothing', () => {
 	for (const args of [
 		undefined,
 		[],
@@ -346,10 +387,14 @@ test('only the fixed sole argv opts into permission preflight', () => {
 		'--permission-preflight'
 	]) {
 		const result = permissionCase({}, args);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.deepEqual(onlyPreflight(result), []);
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
 	}
+	const admitted = permissionCase({ code: -1744 }, ADMITTED);
+	originalCatalogue(admitted);
+	assert.deepEqual(onlyPreflight(admitted), []);
+	assert.equal(admitted.calls.filter((row) => row[0] === 'native').length, 0);
 });
 test('permission diagnostics remain fixed content-free markers between checkpoint1 and catalogue', () => {
 	const result = permissionCase();
@@ -391,7 +436,7 @@ test('each unavailable boundary emits only its fixed pre-call label and original
 		[{ noPointer: true }, 'POINTER']
 	]) {
 		const result = permissionCase(options);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.deepEqual(
 			result.markers.filter((value) => value.startsWith('ASCP:B:')),
 			['ASCP:B:' + label + '\n']
@@ -413,7 +458,7 @@ test('failure refinement never labels returned native results or exceptions', ()
 		{ pointerThrow: true }
 	]) {
 		const result = permissionCase(options);
-		originalCatalogue(result);
+		(options.code === 0 ? originalCatalogue : noCatalogue)(result);
 		assert.deepEqual(
 			result.markers.filter((value) => value.startsWith('ASCP:B:')),
 			[]
@@ -424,17 +469,17 @@ test('failure refinement never labels returned native results or exceptions', ()
 		);
 	}
 });
-test('unavailable labels preserve original catalogue refusal and never grant authority', () => {
+test('unavailable labels refuse before the catalogue and never grant authority', () => {
 	const result = permissionCase({ noFunction: true, catalogueThrow: true });
 	assert.equal(result.value.status, 'refused');
-	assert.equal(result.value.reason, 'native_refused');
+	assert.equal(result.value.reason, 'consent_not_established');
 	assert.deepEqual(result.markers, [
 		'ASCP:1\n',
 		'ASCP:P:BEGIN\n',
 		'ASCP:B:API\n',
 		'ASCP:P:UNAVAILABLE\n'
 	]);
-	assert.equal(result.calls.filter((value) => value[0] === 'catalogue').length, 1);
+	assert.equal(result.calls.filter((value) => value[0] === 'catalogue').length, 0);
 	assert.equal(Object.hasOwn(result.value, 'permission'), false);
 });
 assert.equal(passed - beforeUnavailableRefinement, 3);
@@ -546,7 +591,7 @@ test('removing the SDK projection restores the exact unavailable-constants guard
 		bridgeUnavailable: true,
 		args: ['--permission-preflight']
 	});
-	originalCatalogue(legacy);
+	noCatalogue(legacy);
 	assert.equal(legacy.bridgeReads, 3);
 	assert.equal(legacy.pointerReads, 0);
 	assert.equal(legacy.calls.filter((row) => row[0] === 'native').length, 0);
@@ -568,7 +613,7 @@ test('SDK projection preserves API metadata descriptor pointer and lifetime refu
 		[{ noPointer: true }, 'POINTER']
 	]) {
 		const result = sdkConstantCase(sdkConstants, options);
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.equal(result.bridgeReads, 0);
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
 		assert.deepEqual(
@@ -577,7 +622,7 @@ test('SDK projection preserves API metadata descriptor pointer and lifetime refu
 		);
 	}
 	const changed = sdkConstantCase(sdkConstants, { replaceDescriptor: true });
-	originalCatalogue(changed);
+	noCatalogue(changed);
 	assert.equal(onlyPreflight(changed).at(-1), 'ASCP:P:INVALID\n');
 });
 test('SDK projection admits exact uint32 endpoints without guessing or coercion', () => {
@@ -616,6 +661,7 @@ test('SDK projection refuses duplicate noncanonical open and non-uint32 payloads
 	}
 	for (const encoded of values) {
 		const result = sdkConstantCase(encoded);
+		noCatalogue(result);
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0, encoded);
 		assert.equal(result.pointerReads, 0, encoded);
 		assert.equal(result.bridgeReads, 0, encoded);
@@ -630,16 +676,16 @@ test('SDK projection requires the explicit three argument channel without wideni
 		['--permission-preflight', '--sdk-constants', sdkConstants, 'extra']
 	]) {
 		const result = sdkConstantCase(sdkConstants, { args });
-		originalCatalogue(result);
+		noCatalogue(result);
 		assert.deepEqual(onlyPreflight(result), []);
 		assert.equal(result.calls.filter((row) => row[0] === 'native').length, 0);
 		assert.equal(result.bridgeReads, 0);
 	}
 });
-test('SDK-projected returned status remains observation and cannot fabricate catalogue or invocation authority', () => {
+test('SDK-projected status admits the catalogue only for 0 and never fabricates authority', () => {
 	for (const code of [0, -600, -1743, -1744, -2147483648, 2147483647]) {
 		const result = sdkConstantCase(sdkConstants, { code });
-		originalCatalogue(result);
+		(code === 0 ? originalCatalogue : noCatalogue)(result);
 		assert.equal(onlyPreflight(result).at(-1), 'ASCP:P:RETURN:' + code + '\n');
 		assert.equal(Object.hasOwn(result.value, 'permission'), false);
 		assert.equal(Object.hasOwn(result.value, 'invocation_qualified'), false);
