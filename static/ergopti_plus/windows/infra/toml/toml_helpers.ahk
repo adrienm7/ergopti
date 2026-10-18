@@ -501,6 +501,10 @@ TOML_LiteralKind(RawValue) {
 				return "boolean"
 		if TOML_TryParseNumber(Literal, &NumberValue)
 				return "number"
+		; Literal strings carry the same string intent as basic strings. The
+		; coercers already decode them without interpreting Windows backslashes.
+		if RegExMatch(Literal, "^'[^']*'$")
+				return "string"
 		if (StrLen(Literal) >= 2
 		and SubStr(Literal, 1, 1) == '"'
 		and SubStr(Literal, -1) == '"')
