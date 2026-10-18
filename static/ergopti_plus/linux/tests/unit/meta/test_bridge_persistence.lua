@@ -97,15 +97,21 @@ helpers.describe("bridge handler TOML persistence", function()
 	helpers.it("paths_editor_bridge makes the selected config directory authoritative", function()
 		local saved_storage = package.loaded["adapters.storage"]
 		local saved_paths = package.loaded["infra.config_paths"]
-		local values = {}
+		local values, publications = {}, 0
 		package.loaded["adapters.storage"] = {
 			get = function(key, fallback)
 				local value = values[key]
 				if value == nil then return fallback end
 				return value
 			end,
-			set = function(key, value) values[key] = value; return true end,
-			delete = function(key) values[key] = nil; return true end,
+			set = function() error("the paths editor must use one batch publication") end,
+			delete = function() error("the paths editor must remove overrides in the same batch") end,
+			set_many = function(updates, deletions)
+				publications = publications + 1
+				for key, value in pairs(updates) do values[key] = value end
+				for _, key in ipairs(deletions or {}) do values[key] = nil end
+				return true
+			end,
 		}
 		package.loaded["infra.config_paths"] = nil
 		local ok, err = pcall(function()
@@ -132,6 +138,7 @@ helpers.describe("bridge handler TOML persistence", function()
 				action = "save", configDir = "/tmp/ergopti-custom/",
 			}, state)
 			helpers.assert_true(result.saved, "the bridge must report the storage acknowledgement")
+			helpers.assert_eq(publications, 1, "the custom paths use one acknowledged batch")
 			helpers.assert_eq(values["paths.config_dir"], "/tmp/ergopti-custom")
 			helpers.assert_eq(ConfigPaths.config("config.toml"),
 				"/tmp/ergopti-custom/config.toml",
@@ -139,6 +146,7 @@ helpers.describe("bridge handler TOML persistence", function()
 
 			local reset = handler.on_message({ action = "save", configDir = "" }, state)
 			helpers.assert_true(reset.saved, "an empty choice must restore the XDG default")
+			helpers.assert_eq(publications, 2, "reset removes the override in one further batch")
 			helpers.assert_eq(values["paths.config_dir"], nil)
 			helpers.assert_eq(ConfigPaths.get_config_dir(), ConfigPaths.default_config_dir())
 		end)
