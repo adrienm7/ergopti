@@ -449,6 +449,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-ahk-module-matrix.cjs"],
 			"repro": "npm run test:ahk-module-matrix"
+		},
+		{
+			"id": "js-0442",
+			"ordinal": 442,
+			"name": "the cached script tokenizer returns fresh, mode-specific scans after eviction",
+			"cmd": "node",
+			"args": ["tools/test/test-script-source.cjs"],
+			"repro": "node tools/test/test-script-source.cjs"
 		}
 	]
 }
