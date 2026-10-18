@@ -844,6 +844,7 @@ function M.show()
 			_generation = _generation + 1
 			M._wv = nil
 			_painted_snapshot_at = nil
+			M._pending_full_refresh = false
 			local job_stopped = cancel_job()
 			local poller_stopped = cancel_poller()
 			local continuations_stopped = cancel_continuations()
