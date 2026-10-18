@@ -53,8 +53,9 @@ local function install_hs_stubs()
 	_G.hs.webview.usercontent = {
 		new = function(_name)
 			return {
-				setCallback = function(_self, fn)
+				setCallback = function(self, fn)
 					state.bridge_callbacks[#state.bridge_callbacks + 1] = fn
+					return self
 				end,
 			}
 		end,

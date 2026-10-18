@@ -61,6 +61,26 @@ local _chooser_owners = {}
 local _next_chooser_id = 0
 local _closing_webview = nil
 local _focus_owner = nil
+local _usercontent = nil
+local _releasing_controller = false
+
+--- Releases the exact native script callback before its controller is forgotten.
+--- @param controller userdata|table|nil Exact callback owner to release.
+--- @return boolean released Refusals retain cleanup-only custody for retry.
+local function release_controller(controller)
+	if _releasing_controller then return false end
+	if controller == nil or _usercontent ~= controller then return true end
+	_releasing_controller = true
+	local ok, result = pcall(controller.setCallback, controller, nil)
+	local released = ok and result == controller
+	if released then
+		if _usercontent == controller then _usercontent = nil end
+	else
+		Logger.error(LOG, "Apps dashboard callback release did not commit; exact controller retained: %s.", tostring(result))
+	end
+	_releasing_controller = false
+	return released
+end
 
 --- Presents one chooser behind a strong owner until its completion callback.
 --- @param label string Stable diagnostic label.
@@ -281,6 +301,7 @@ end
 --- @return boolean settled True only when timers and requested delete settled.
 local function close_window_generation(generation, webview, delete_window, reason)
 	if not is_owned_window(generation, webview) then return true end
+	local controller = _usercontent
 	_focus_owner = nil
 	local window_settled = true
 	if delete_window then
@@ -303,7 +324,8 @@ local function close_window_generation(generation, webview, delete_window, reaso
 	if not timers_settled then
 		Logger.error(LOG, "Apps dashboard %s retained timer cleanup debt.", reason)
 	end
-	return timers_settled and choosers_settled and window_settled
+	local controller_settled = release_controller(controller)
+	return timers_settled and choosers_settled and window_settled and controller_settled
 end
 
 --- Retries deletion of an unpublished WebView retained by startup rollback.
@@ -333,6 +355,7 @@ end
 --- @param reason string Diagnostic reason.
 --- @return boolean Always false because startup did not commit.
 local function rollback_window_candidate(generation, webview, reason)
+	local controller = _usercontent
 	if generation == _generation then _generation = _generation + 1 end
 	local timers_settled = cancel_continuations()
 	local choosers_settled = delete_owned_choosers()
@@ -351,6 +374,7 @@ local function rollback_window_candidate(generation, webview, reason)
 	if not choosers_settled then
 		Logger.error(LOG, "Apps dashboard startup rollback retained chooser cleanup debt.")
 	end
+	release_controller(controller)
 	Logger.error(LOG, "Apps metrics dashboard startup failed during %s.", reason)
 	return false
 end
@@ -982,18 +1006,25 @@ end
 --- Closes the published apps dashboard generation.
 --- @return boolean committed
 function M.close()
+	if _releasing_controller then return false end
 	if not settle_startup_webview() then return false end
 	if not M._wv then
-		return cancel_continuations() and delete_owned_choosers()
+		local controller = _usercontent
+		local timers_settled = cancel_continuations()
+		local choosers_settled = delete_owned_choosers()
+		local controller_settled = release_controller(controller)
+		return timers_settled and choosers_settled and controller_settled
 	end
 	return close_window_generation(_generation, M._wv, true, "explicit close")
 end
 
 function M.show()
+	if _releasing_controller then return false end
 	if not settle_startup_webview() then
 		Logger.error(LOG, "Apps metrics dashboard startup refused: prior WebView cleanup remains pending.")
 		return false
 	end
+	if not M._wv and not release_controller(_usercontent) then return false end
 	if M._wv then
 		Logger.debug(LOG, "Dashboard already open, bringing to front…")
 		local webview = M._wv
@@ -1047,11 +1078,12 @@ function M.show()
 		if not candidate or type(candidate.setCallback) ~= "function" then
 			error("usercontent candidate unavailable")
 		end
+		_usercontent = candidate
 		local callback_result = candidate:setCallback(function(msg)
 			if not is_current_window(generation, webview) then return end
 			handle_bridge_message(msg, generation, webview)
 		end)
-		if not callback_result then error("usercontent callback registration refused") end
+		if callback_result ~= candidate then error("usercontent callback registration refused") end
 		return candidate
 	end, debug.traceback)
 	if not ucc_ok or not ucc_or_err then
