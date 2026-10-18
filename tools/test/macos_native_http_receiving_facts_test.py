@@ -119,8 +119,12 @@ PROXY_CONNECTION_FAILURE_INVERSE = (
     (
         "\t\t\t\t// The bare proxy connection failure names the proxy route itself, so\n"
         "\t\t\t\t// it does not depend on metrics for a connection that never opened.\n"
+        "\t\t\t\t// The same code ends a CONNECT the proxy answered with 407: a proxy\n"
+        "\t\t\t\t// that replied is never a refused route and never fails over.\n"
         "\t\t\t\tif managedHTTPProxyConnectionFailed(native) {\n"
-        "\t\t\t\t\trefusedTCPConnect = true; proxyObserved = true; break\n"
+        '\t\t\t\t\tif proxyAuthenticationObserved { failure = "proxy" }\n'
+        "\t\t\t\t\telse { refusedTCPConnect = true; proxyObserved = true }\n"
+        "\t\t\t\t\tbreak\n"
         "\t\t\t\t}\n",
         "",
     ),
