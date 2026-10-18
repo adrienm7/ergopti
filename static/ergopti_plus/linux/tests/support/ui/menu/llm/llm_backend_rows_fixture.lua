@@ -10,6 +10,36 @@
 
 local helpers = require("tests.helpers")
 
+--- Supplies the mandatory private runtime admission port for scripted menu tests.
+--- Real gate/source/rollback ownership is exercised by test_api_add_admission.
+--- @param llm table Scripted backend selection owner.
+--- @param state table Observable fixture state.
+local function add_admission_port(llm, state)
+	local receipts, active, generation = setmetatable({}, { __mode = "k" }), nil, 0
+	llm.begin_api_selection = function()
+		if active or state.refuse_backend or llm.get_backend() ~= "api" then return nil end
+		generation = generation + 1
+		state.admissions = (state.admissions or 0) + 1
+		local receipt = {}
+		receipts[receipt] = { generation = generation }
+		active = receipt
+		return receipt
+	end
+	llm.api_selection_is_current = function(receipt, source_current)
+		local held = receipts[receipt]
+		if source_current ~= nil and source_current() ~= true then return false end
+		return held ~= nil and held.generation == generation and llm.get_backend() == "api"
+			and (active == receipt or held.published == true)
+	end
+	llm.finish_api_selection = function(receipt, committed, settled)
+		local held = receipts[receipt]
+		if not held or active ~= receipt or settled ~= true then return false end
+		active = nil
+		if committed then held.published = true else receipts[receipt] = nil end
+		return true
+	end
+end
+
 --- Loads the rows module over scripted collaborators.
 --- @param backend string
 --- @return table Rows, table state, function restore
@@ -18,6 +48,7 @@ local function setup(backend)
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
 	local state = { backend = backend, entries = {}, active = nil, prompts = {}, infos = {}, errors = {}, tests = {} }
+	local sources, source_generation = setmetatable({}, { __mode = "k" }), 0
 	local cerebras = { id = "cerebras", label = "Cerebras", base_url = "https://api.cerebras.ai/v1", default_model = "qwen" }
 	-- A provider that is no chat model: the agent's System 1 only
 	local jev = { id = "typesafe", label = "TypeSafe (Jev)", base_url = "https://api.typesafe.ai/v1/systemone",
@@ -41,20 +72,26 @@ local function setup(backend)
 			state.selection_sets = (state.selection_sets or 0) + 1
 			if state.refuse_selection then return false end
 			for _, e in ipairs(state.entries) do if e.id == id then state.active = e end end
+			source_generation = source_generation + 1
 			return true
 		end,
-		add = function(fields, select)
+		add = function(fields, select, admit)
+			if admit and admit() ~= true then return nil, "scripted admission refused", true end
 			local entry = { id = "e" .. (#state.entries + 1), provider = fields.provider, label = fields.label,
 				token = fields.token, model = fields.model, base_url = fields.base_url }
 			state.entries[#state.entries + 1] = entry
 			if select ~= false then state.active = entry end
-			return entry
+			source_generation = source_generation + 1
+			local receipt = {}; sources[receipt] = source_generation
+			return entry, nil, true, receipt
 		end,
+		source_is_current = function(receipt) return sources[receipt] == source_generation end,
 		remove = function(id)
 			state.removal_sets = (state.removal_sets or 0) + 1
 			if state.refuse_removal then return false end
 			for index, e in ipairs(state.entries) do if e.id == id then table.remove(state.entries, index) end end
 			state.active = nil
+			source_generation = source_generation + 1
 			return true
 		end,
 	}
@@ -69,6 +106,7 @@ local function setup(backend)
 			return true
 		end,
 	}
+	add_admission_port(llm, state)
 	state.answers = {}
 	local dialogs = {
 		prompt = function(title, text, initial, hidden)
@@ -273,6 +311,7 @@ local function with_real_api_add(provider_id, scenario, body)
 		}
 		local llm = { get_backend = function() return "api" end,
 			set_backend = function(kind) state.backends = state.backends + 1; return kind == "api" end }
+		add_admission_port(llm, state)
 		local Rows = helpers.load_module("ui.menu.llm_backend_rows")
 		local function changed() state.changes = state.changes + 1 end
 		local rows = Rows.rows(llm, dialogs, changed, function() return {} end)

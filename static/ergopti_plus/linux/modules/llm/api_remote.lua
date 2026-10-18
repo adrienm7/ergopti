@@ -508,24 +508,46 @@ local _assistants = {}
 --- Opens one exchange, cancelling the one in flight. Its terminal callback runs
 --- at most once, and only while the exchange is still the current one.
 --- @param on_done function|nil
+--- @param admission function|nil Exact caller authorization, when supplied.
 --- @return integer|nil epoch Nil when the exchange in flight could not be cancelled.
 --- @return function|nil done
-local function open_exchange(on_done)
+--- @return function|nil authorized Pinned authorization for each acquisition.
+local function open_exchange(on_done, admission)
+	local function permitted()
+		if admission == nil then return true end
+		if type(admission) ~= "function" then return false end
+		local epoch = _epoch
+		local called, allowed = pcall(admission)
+		return called and allowed == true and _epoch == epoch
+	end
+	if not permitted() then return nil end
 	if _active and M.cancel() ~= true then return nil end
+	if not permitted() then return nil end
 	_epoch = _epoch + 1
 	local epoch = _epoch
 	local finished = false
-	_active = { epoch = epoch }
+	local owner = { epoch = epoch }
+	_active = owner
+	local function authorized()
+		if _active ~= owner or _epoch ~= epoch then return false end
+		local allowed = permitted() and _active == owner and _epoch == epoch
+		if not allowed and _active == owner and _epoch == epoch then
+			finished, _active = true, nil
+		end
+		return allowed
+	end
 	local function done(...)
 		if finished or epoch ~= _epoch then return end
 		finished = true
+		local deliver = admission == nil or authorized()
+		if _active ~= owner or epoch ~= _epoch then return end
 		_active = nil
-		if type(on_done) == "function" then
+		if deliver and type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
 			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
 		end
 	end
-	return epoch, done
+	return epoch, done, admission ~= nil and authorized or nil
 end
 
 --- Why a request failed, with the provider's own explanation when it gives one.
@@ -567,7 +589,9 @@ end
 --- @param payload table The body, encoded here.
 --- @param fail function
 --- @param on_answer function
-local function post_json(epoch, url, headers, payload, fail, on_answer)
+--- @param authorized function|nil Exact exchange authorization.
+local function post_json(epoch, url, headers, payload, fail, on_answer, authorized)
+	if authorized and not authorized() then return end
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then
 		fail("request could not be encoded")
@@ -575,6 +599,7 @@ local function post_json(epoch, url, headers, payload, fail, on_answer)
 	end
 	local dispatched = HttpClient.post(url, headers, body, function(result)
 		if epoch ~= _epoch then return end
+		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
 			fail(failure_detail(result), failure_receipt(result))
 			return
@@ -584,8 +609,9 @@ local function post_json(epoch, url, headers, payload, fail, on_answer)
 			fail("the answer is not a JSON object")
 			return
 		end
+		if authorized and not authorized() then return end
 		on_answer(root)
-	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000 })
+	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then fail("HTTP transport unavailable") end
 end
 
@@ -612,7 +638,9 @@ end
 --- @param spec table { system, text, questions? }
 --- @param fail function fail(detail, failure_receipt?)
 --- @param on_answer function on_answer(root)
-local function backboard_send(epoch, prepared, spec, fail, on_answer)
+--- @param authorized function|nil Exact exchange authorization.
+local function backboard_send(epoch, prepared, spec, fail, on_answer, authorized)
+	if authorized and not authorized() then return end
 	local endpoint = prepared.endpoint
 	local cache_key = endpoint.url .. "\n" .. endpoint.headers[Formats.BACKBOARD_KEY_HEADER]
 	local function send_message(assistant_id)
@@ -620,7 +648,7 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer)
 			assistant_id = assistant_id, model = prepared.model, system = spec.system, text = spec.text,
 			questions = spec.questions,
 		})
-		post_json(epoch, request.url, endpoint.headers, request.body, fail, on_answer)
+		post_json(epoch, request.url, endpoint.headers, request.body, fail, on_answer, authorized)
 	end
 	if _assistants[cache_key] then
 		send_message(_assistants[cache_key])
@@ -632,6 +660,7 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer)
 	post_json(epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
 		fail("the Backboard assistant could not be created: " .. detail, receipt)
 	end, function(root)
+		if authorized and not authorized() then return end
 		local assistant_id = Formats.backboard_assistant_id(root)
 		if not assistant_id then
 			Logger.warn(LOG, "The Backboard assistant could not be created: no assistant_id (keys: %s).",
@@ -639,10 +668,11 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer)
 			fail("the Backboard assistant could not be created: no assistant_id in the answer")
 			return
 		end
+		if authorized and not authorized() then return end
 		_assistants[cache_key] = assistant_id
 		Logger.info(LOG, "Backboard assistant created; reused for this key until the daemon stops.")
 		send_message(assistant_id)
-	end)
+	end, authorized)
 end
 
 --- Sends one completion. Same shape as api_ollama.chat, with the entry in
@@ -652,13 +682,15 @@ end
 --- @param entry table
 --- @param model string|nil Ignored: the entry names its model.
 --- @param messages table
---- @param opts table|nil { temperature?, max_tokens? } Backboard's message has
+--- @param opts table|nil { temperature?, max_tokens?, authorized? } Backboard's message has
 ---   no such fields: they are not sent to it.
 --- @param on_chunk function|nil Called once with the whole text (no streaming).
 --- @param on_done function
 function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local _ = model
-	local epoch, done = open_exchange(on_done)
+	local admission
+	if type(opts) == "table" then admission = rawget(opts, "authorized") end
+	local epoch, done, authorized = open_exchange(on_done, admission)
 	if not epoch then return false end
 	local function refuse(reason)
 		Logger.error(LOG, "Remote request refused before dispatch: %s.", tostring(reason))
@@ -671,12 +703,14 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	end
 	local started = Monotonic.now_ms()
 	local function deliver(text)
+		if authorized and not authorized() then return end
 		if not text or text == "" then
 			Logger.warn(LOG, "Remote response held no completion text.")
 			done("", "empty reply")
 			return
 		end
 		Logger.debug(LOG, "Remote completion received (%d chars in %d ms).", #text, Monotonic.now_ms() - started)
+		if authorized and not authorized() then return end
 		if type(on_chunk) == "function" then pcall(on_chunk, text) end
 		done(text, nil)
 	end
@@ -689,7 +723,7 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		Logger.debug(LOG, "chat() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
 		backboard_send(epoch, prepared, { system = system, text = user }, fail, function(root)
 			deliver(Formats.backboard_text(root))
-		end)
+		end, authorized)
 		return _active ~= nil and _active.epoch == epoch
 	end
 
@@ -698,12 +732,13 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
 	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
 		if epoch ~= _epoch then return end
+		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		deliver(M.extract_text(request.format, result.body))
-	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000 })
+	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
 		return false
@@ -719,9 +754,10 @@ end
 --- @param state string|table What the questions are about.
 --- @param questions table { [id] = { type, instructions, criteria? } }
 --- @param on_done function
+--- @param admission function|nil Exact caller authorization, when supplied.
 --- @return boolean dispatched
-function M.decide(entry, state, questions, on_done)
-	local epoch, done = open_exchange(on_done)
+function M.decide(entry, state, questions, on_done, admission)
+	local epoch, done, authorized = open_exchange(on_done, admission)
 	if not epoch then return false end
 	local function refuse(reason)
 		Logger.error(LOG, "Decision request refused before dispatch: %s.", tostring(reason))
@@ -748,7 +784,7 @@ function M.decide(entry, state, questions, on_done)
 					return
 				end
 				done(answers, nil)
-			end)
+			end, authorized)
 		return _active ~= nil and _active.epoch == epoch
 	end
 
@@ -766,7 +802,7 @@ function M.decide(entry, state, questions, on_done)
 			end
 			Logger.info(LOG, "Jev answers read from Backboard's '%s'.", where)
 			done(answers, nil)
-		end)
+		end, authorized)
 		return _active ~= nil and _active.epoch == epoch
 	end
 	return refuse(provider.label .. " does not answer typed questions")
@@ -823,32 +859,45 @@ end
 --- @param entry table
 --- @param on_done function Called with (ok, detail, elapsed_ms, failure_receipt?): detail is the reply or the error.
 --- The optional receipt is private transport data, not a page-safe report.
+--- @param admission function|nil Exact caller authorization, when supplied.
 --- @return boolean Whether the probe was dispatched.
-function M.test(entry, on_done)
+function M.test(entry, on_done, admission)
+	local origin_epoch = _epoch
+	local function admitted()
+		if admission == nil then return true end
+		if type(admission) ~= "function" or _epoch ~= origin_epoch then return false end
+		local called, allowed = pcall(admission)
+		return called and allowed == true and _epoch == origin_epoch
+	end
+	if not admitted() then return false end
 	local started = Monotonic.now_ms()
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
 	if provider and provider.format == "decisions" then
 		local probe = catalogue().decisions_test
 		if not probe then
+			if not admitted() then return false end
 			on_done(false, "the API provider list is invalid", 0)
 			return false
 		end
+		if not admitted() then return false end
 		return M.decide(entry, probe.state, probe.questions, function(answers, err, receipt)
 			local detail = err or Json.encode(answers) or ""
 			local elapsed = Monotonic.now_ms() - started
 			if receipt == nil then on_done(err == nil, detail, elapsed)
 			else on_done(err == nil, detail, elapsed, receipt) end
-		end)
+		end, admission)
 	end
 	local spec = M.test_request_spec()
 	if not spec then
+		if not admitted() then return false end
 		on_done(false, "the API provider list is invalid", 0)
 		return false
 	end
+	if not admitted() then return false end
 	return M.chat(entry, nil, {
 		{ role = "system", content = spec.system_prompt },
 		{ role = "user", content = spec.user_text },
-	}, { temperature = spec.temperature, max_tokens = spec.max_tokens }, nil, function(text, err, receipt)
+	}, { temperature = spec.temperature, max_tokens = spec.max_tokens, authorized = admission }, nil, function(text, err, receipt)
 		local elapsed = Monotonic.now_ms() - started
 		if receipt == nil then on_done(err == nil, err or text, elapsed)
 		else on_done(err == nil, err or text, elapsed, receipt) end
