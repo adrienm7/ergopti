@@ -619,9 +619,9 @@ local build_kl_name_to_tis_id
 ---      "Ergopti_v2_2_2_plus") is NOT accepted by setLayout.
 ---   2. hs.keycodes.setLayout(kl_name) — fallback using the internal name in case
 ---      the localised form differs from what hs.keycodes expects.
----   3. TISSelectInputSource via the native launcher with the stable TIS ID resolved from
----      kl_name through build_kl_name_to_tis_id() — covers Ergopti variants on
----      macOS Sequoia where setLayout fails for third-party bundles.
+---   3. TISSelectInputSource via the native launcher: installed Ergopti layouts
+---      use their declared stable ID; other menu names resolve uniquely within
+---      one native inventory, preserving the exact ID candidate when present.
 --- @param localised_name string The display / localised name (r.name), e.g. "French".
 --- @param kl_name string The raw KeyboardLayout Name (r.id), e.g. "Ergopti_v2_2_2_plus".
 --- @param on_done function|nil fn(ok, output, reason).
@@ -656,14 +656,22 @@ local function set_input_source_async(localised_name, kl_name, on_done)
 			Logger.debug(LOG, "hs.keycodes declined the kl_name '%s' — falling back to TIS…", kl_name)
 		end
 	end
-	-- Resolve the stable TIS ID for Ergopti variants via the installed bundle map,
-	-- then fall back to using kl_name directly as the TIS ID for standard layouts.
+	-- A menu's raw name ("French") is not a TIS ID. Resolve names and native
+	-- identities from the same Carbon inventory rather than pairing two separate
+	-- hs.keycodes.layouts() snapshots, whose ordering can change between calls.
 	local tis_id = kl_name or localised_name or ""
+	local mapped_id = nil
 	if type(kl_name) == "string" and kl_name ~= "" then
 		local kl_map = build_kl_name_to_tis_id() or {}
-		tis_id = kl_map[kl_name] or kl_name
+		mapped_id = kl_map[kl_name]
+		tis_id = mapped_id or kl_name
 	end
-	local executable, arguments, environment, resolve_reason = InputSourceSelector.command(tis_id)
+	local executable, arguments, environment, resolve_reason
+	if mapped_id == nil and type(localised_name) == "string" and localised_name ~= "" then
+		executable, arguments, environment, resolve_reason = InputSourceSelector.command_named(localised_name, tis_id)
+	else
+		executable, arguments, environment, resolve_reason = InputSourceSelector.command(tis_id)
+	end
 	if executable == nil then
 		Logger.warn(LOG, "Native input-source selection could not resolve its exact helper: %s.",
 			tostring(resolve_reason))

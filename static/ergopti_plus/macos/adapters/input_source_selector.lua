@@ -12,6 +12,7 @@
 local M = {}
 local LauncherHelper = require("platform.remap.lease_helper")
 local SELECT_FLAG = "--select-input-source"
+local SELECT_BY_NAME_FLAG = "--select-input-source-by-name"
 local UPGRADE_FLAG = "--upgrade-input-sources"
 local MAX_SOURCE_BYTES = 1024
 
@@ -50,6 +51,21 @@ end
 function M.command(identifier)
 	if not valid_identifier(identifier) then return nil, nil, nil, "invalid_source" end
 	return resolve({ SELECT_FLAG, identifier })
+end
+
+
+--- Resolves a unique localized name and an exact candidate in one native inventory.
+--- @param localised_name string Native localized source name.
+--- @param identifier string Exact ID candidate, never a guessed prefix.
+--- @return string|nil executable
+--- @return table|nil arguments
+--- @return table|nil environment
+--- @return string|nil reason
+function M.command_named(localised_name, identifier)
+	if not valid_identifier(localised_name) or not valid_identifier(identifier) then
+		return nil, nil, nil, "invalid_source"
+	end
+	return resolve({ SELECT_BY_NAME_FLAG, localised_name, identifier })
 end
 
 
