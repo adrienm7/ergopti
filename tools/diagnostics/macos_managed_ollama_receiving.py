@@ -100,8 +100,31 @@ PULL_ERROR_CLASSES = (
     ("proxy", ("proxy",)),
     ("deadline", ("timeout", "deadline")),
     ("connect", ("connect", "refused")),
-    ("not_found", ("not found", "404")),
+    ("not_found", ("not found", "404", "does not exist")),
+    ("digest", ("digest", "sha256", "checksum")),
+    ("redirect", ("redirect", "location")),
+    ("status", ("status code", "unexpected status", "http status")),
+    ("eof", ("eof", "unexpected end")),
+    ("manifest", ("manifest",)),
+    ("protocol", ("protocol", "malformed", "invalid")),
+    ("unavailable", ("unavailable", "native")),
 )
+# Ollama's progress statuses are fixed vocabulary; only digests vary and they
+# belong to the generated fixture model, so they are masked, never published.
+PULL_STATUS_LIMIT = 16
+
+
+def pull_statuses(rows):
+    """Return the ordered distinct progress statuses with digests masked."""
+    seen = []
+    for row in rows:
+        status = row.get("status") if isinstance(row, dict) else None
+        if not isinstance(status, str):
+            continue
+        masked = re.sub(r"sha256[:-][0-9a-f]{12,64}", "<digest>", status)[:64]
+        if masked not in seen and len(seen) < PULL_STATUS_LIMIT:
+            seen.append(masked)
+    return seen
 
 
 def pull_error_classes(rows):
@@ -1157,6 +1180,7 @@ class Receiver:
             owner = self.owner()
             pulled = owner.pull(model_name, rows.append)
             self.receipt["pull_error_classes"] = pull_error_classes(rows)
+            self.receipt["pull_statuses"] = pull_statuses(rows)
             require(pulled, "actual_pull_success")
             require(owner.pending, "http_exit_is_not_daemon_ack")
             self.retirement(owner)
