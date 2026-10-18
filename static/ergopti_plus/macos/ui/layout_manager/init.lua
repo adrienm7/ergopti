@@ -40,6 +40,27 @@ local STRINGS_FILE = "ui/layout_manager/strings.json"
 local _webview = nil
 local _usercontent = nil
 local _controller = nil
+local _retiring_window = nil
+local _settling_retired_window = false
+
+--- Settles the exact candidate published before a required factory mutation failed.
+--- @return boolean settled Native cleanup committed or already consumed the userdata.
+local function settle_retired_window()
+	if _settling_retired_window then return false end
+	local view = _retiring_window
+	if view == nil then return true end
+	_settling_retired_window = true
+	local ok, result = pcall(function()
+		if getmetatable(view) ~= nil then return view:delete() end
+	end)
+	local settled = (ok and result ~= false) or getmetatable(view) == nil
+	if settled and _retiring_window == view then _retiring_window = nil end
+	if not settled then
+		pcall(Logger.error, LOG, "The layout manager candidate cleanup remains pending: %s.", tostring(result))
+	end
+	_settling_retired_window = false
+	return settled
+end
 
 
 
@@ -144,6 +165,7 @@ end
 --- Opens the layout manager, or focuses it when it is already open.
 --- @return boolean opened
 function M.open()
+	if settle_retired_window() ~= true then return false end
 	local ok_ui, ui_builder = pcall(require, "ui.ui_builder")
 	if not ok_ui then
 		Logger.error(LOG, "The layout manager cannot open: ui_builder is unavailable.")
@@ -197,7 +219,11 @@ function M.open()
 		is_current = function() return candidate ~= nil and candidate == _webview end,
 	})
 	if view == nil or view ~= candidate then
-		_webview, _usercontent, _controller = nil, nil, nil
+		-- on_webview_created transferred cleanup to this caller before the factory
+		-- could reject a required mutation. Retain that exact candidate for retry.
+		if candidate ~= nil then _retiring_window = candidate end
+		if _webview == candidate then _webview, _usercontent, _controller = nil, nil, nil end
+		settle_retired_window()
 		Logger.error(LOG, "The layout manager window could not be created.")
 		return false
 	end

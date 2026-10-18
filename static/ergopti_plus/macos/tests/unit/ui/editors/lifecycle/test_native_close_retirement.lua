@@ -150,3 +150,94 @@ helpers.describe("editor close retires native references", function()
 		end)
 	end
 end)
+
+--- Decorates only this native layout-manager world with observable GC metatables.
+local function with_refused_layout(scenario)
+	with_window("ui.layout_manager", function(editor, h)
+		local create = hs.webview.new
+		hs.webview.new = function(...)
+			local view = create(...)
+			setmetatable(view, {})
+			local user_close, delete = view.user_close, view.delete
+			function view:user_close()
+				user_close(self)
+				if self.disposed then setmetatable(self, nil) end
+			end
+			function view:delete()
+				h.delete_attempts = (h.delete_attempts or 0) + 1
+				if h.on_delete then h.on_delete() end
+				if h.delete_refusal == "throw" then error("native delete refused before GC") end
+				if h.delete_refusal == "false" then return false end
+				delete(self)
+				if self.disposed then setmetatable(self, nil) end
+				if h.throw_after_gc then error("native delete raised after consuming userdata") end
+			end
+			return view
+		end
+		scenario(editor, h)
+	end)
+end
+
+--- Reopens and explicitly closes a healthy successor after rollback settlement.
+local function healthy_layout_successor(h)
+	h.policy_refuses, h.delete_refusal, h.throw_after_gc, h.on_delete = nil, nil, nil, nil
+	helpers.assert_true(h.show(), table.concat(h.errors, "\n"))
+	helpers.assert_eq(#h.windows, 2)
+	helpers.assert_true(h.windows[1].disposed)
+	helpers.assert_true(h.retained[h.windows[2]])
+	helpers.assert_true(h.close())
+	h.drain()
+	helpers.assert_nil(next(h.retained))
+end
+
+helpers.describe("layout manager settles refused factory candidates", function()
+	for _, refusal in ipairs({ "throw", "false", "nil" }) do
+		helpers.it("retires the published layout candidate after policy " .. refusal, function()
+			with_refused_layout(function(_, h)
+				h.policy_refuses = refusal
+				helpers.assert_eq(h.show(), false)
+				helpers.assert_eq(#h.windows, 1, "the required native mutation must actually be reached")
+				helpers.assert_true(h.windows[1].disposed)
+				helpers.assert_nil(h.retained[h.windows[1]])
+				helpers.assert_eq(h.delete_attempts, 1)
+				healthy_layout_successor(h)
+			end)
+		end)
+	end
+	for _, refusal in ipairs({ "throw", "false" }) do
+		helpers.it("retains exact layout rollback debt after delete " .. refusal, function()
+			with_refused_layout(function(_, h)
+				h.policy_refuses, h.delete_refusal = "false", refusal
+				helpers.assert_eq(h.show(), false)
+				helpers.assert_eq(h.delete_attempts, 1)
+				helpers.assert_true(h.retained[h.windows[1]])
+				helpers.assert_eq(h.show(), false, "unsettled debt must block a successor allocation")
+				helpers.assert_eq(#h.windows, 1)
+				helpers.assert_eq(h.delete_attempts, 2, "retry the same native candidate")
+				healthy_layout_successor(h)
+			end)
+		end)
+	end
+	helpers.it("does not retry a layout userdata consumed before native delete throws", function()
+		with_refused_layout(function(_, h)
+			h.policy_refuses, h.throw_after_gc = "false", true
+			helpers.assert_eq(h.show(), false)
+			helpers.assert_eq(h.delete_attempts, 1)
+			helpers.assert_nil(getmetatable(h.windows[1]))
+			helpers.assert_nil(h.retained[h.windows[1]])
+			healthy_layout_successor(h)
+			helpers.assert_eq(h.windows[1].deletes, 1, "the consumed old userdata must never be deleted again")
+		end)
+	end)
+	helpers.it("fences layout reopen during exact native rollback", function()
+		with_refused_layout(function(_, h)
+			local reentered
+			h.policy_refuses = "false"
+			h.on_delete = function() reentered = h.show() end
+			helpers.assert_eq(h.show(), false)
+			helpers.assert_eq(reentered, false, "rollback cannot admit or revoke its own successor")
+			helpers.assert_eq(#h.windows, 1)
+			healthy_layout_successor(h)
+		end)
+	end)
+end)
