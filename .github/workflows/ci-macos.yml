@@ -1819,8 +1819,18 @@ jobs:
           elif [ "$mode" = full ]; then
               :
               test -z "$profile"
-              test "$brew_mode" = full
-              test -z "$brew_profile"
+              # A profile that keeps PAC mandatory may still defer the Brew and
+              # owned-runtime methods, each independently; empty means none.
+              package_skip="$(node tools/diagnostics/swift_xctest_evidence.cjs --package-skip-pattern "$pac_receipt" "$brew_receipt")"
+              if [ -n "$package_skip" ]; then
+                  pac_skip_args=(--skip "$package_skip")
+                  brew_evidence_args=(--brew-qualification-receipt "$brew_receipt")
+                  swift_root_suite="Selected tests"
+                  echo "[DEFERRED] native Brew/owned-runtime scope: exact admitted methods not executed; still compiled; qualified=false."
+              else
+                  test "$brew_mode" = full
+                  test -z "$brew_profile"
+              fi
           else
               echo "Invalid package PAC qualification disposition" >&2
               exit 1

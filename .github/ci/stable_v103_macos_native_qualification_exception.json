@@ -1,0 +1,91 @@
+{
+	"schema": 1,
+	"id": "stable-v1-0-3-20261018-macos-native-scopes",
+	"authorized": true,
+	"authorization_quote": "v1.0.3 depuis dev complet",
+	"expires_at": "2026-10-25T22:00:00Z",
+	"repository": "adrienm7/ergopti",
+	"event_name": "push",
+	"ref": "refs/heads/main",
+	"release": true,
+	"prerelease": "false",
+	"channel": "main",
+	"tag": "v1.0.3",
+	"version": "1.0.3",
+	"authorization_note": "Explicit human authorization on 2026-10-18 (\"v1.0.3 depuis dev complet\": publish v1.0.3 from current dev with the same macOS native scopes deferred one last time, exception limited to v1.0.3) because v1.0.2 expands hotstrings in terminals after 750-960 ms and dev fixes it. The native PAC/WPAD and independent HTTP client qualifications passed on hosted runners on both architectures and are mandatory again. Only the scopes listed here, still red or never run on hosted runners, remain DEFERRED/qualified:false; drop each one as soon as it is green. Every unlisted test, portable model control, Worker12, owned-process/client-only, producer/catalogue/source/asset integrity, compile/package/signing and ordinary verified install/launch remains mandatory. No permission, trust, TCC, sender, integrity or runtime bypass is authorized.",
+	"scopes": {
+		"macos-brew-archive": {
+			"kind": "swift_test_file",
+			"path": "Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift",
+			"name": "testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState",
+			"reason": "The single native Homebrew ZIP installation/XZ upgrade/refusal-preservation acceptance method is DEFERRED and qualified:false: it still failed on hosted macOS runners on 2026-10-18 and its fix has not yet run there; ordinary verified archive install/launch remains mandatory."
+		},
+		"macos-native-model-receiving": {
+			"kind": "command",
+			"path": ".github/workflows/ci-macos.yml",
+			"args": ["e2e-hs", "Receive actual native model create, pull, inference and retirement"],
+			"architectures": ["arm64", "amd64"],
+			"profiles": ["pac-inline", "pac-url", "explicit-proxy"],
+			"reason": "Native model create, pull, inference, cancellation and retirement remain DEFERRED and qualified:false for arm64/amd64 across pac-inline, pac-url and explicit-proxy: the receiving step still failed on both hosted architectures on 2026-10-18 (CI 39127197224); producer/catalogue/assets and portable model controls remain mandatory."
+		},
+		"macos-shortcuts-discovery": {
+			"kind": "command",
+			"path": "tools/diagnostics/apple_shortcuts_probe/run_probe.py",
+			"args": [],
+			"reason": "Native Apple Shortcuts catalogue discovery is DEFERRED and qualified:false until its app-side discovery fix runs on hosted runners; portable Python/JXA controls and ordinary verified install/launch remain mandatory. No permission or catalogue success is inferred."
+		},
+		"macos-launch-appleevents": {
+			"kind": "macos_launch",
+			"path": "tools/diagnostics/macos_launch_gate.py",
+			"scenarios": ["clean", "karabiner_config"],
+			"runners": ["macos-15", "macos-15-intel"],
+			"reason": "Only the external AppleEvent -1744 boundary and its dependent native delayed-timer, Karabiner and ScriptScope feature qualifications are DEFERRED and qualified:false for clean/karabiner_config on macos-15/macos-15-intel until the owned startup-file bootstrap fix runs in the hosted launch job. Actual installation, quarantine, logger, startup, alive, Quit, user-state and the complete launch matrix remain mandatory; no permission or runtime workaround is authorized."
+		},
+		"macos-owned-runtime": {
+			"kind": "swift_test_methods",
+			"path": "Tests/ErgoptiPlusTests",
+			"methods": {
+				"OwnedRuntimeCoreProvisionOwnerTests": [
+					"testCustodyEarlyAdmissionRefusalDoesNotRunInitializedSelfRetirement",
+					"testCustodyExistingMalformedLedgerRefusalRetiresInitializedSelfAndPreservesDebt",
+					"testCustodyFirstWriteRefusalRetiresInitializedSelfAndReleasesOriginalFlock",
+					"testExistingOwnedSystemConfigurationRefusesFirstStart",
+					"testModifiedRecordedPlistIsNotRemovedAfterRestart",
+					"testOwnedDirectoryPreparationCreatesOnlyClosedDataScope",
+					"testReplacedCreatedPlistSurvivesRefusedRollback",
+					"testRestartRetirementRequiresOriginalRecordedVnodeAndBytes",
+					"testServiceDebtBlocksImageLeasesWhileRecoveryNamespaceRemainsObservable",
+					"testServicePlistLateProtectionRefusalRetiresInitializedSelfExactlyOnce",
+					"testUnpublishedCreatedPlistAndLedgerRetireExactly"
+				],
+				"OwnedRuntimeInstalledPeerOwnerTests": [
+					"testActualExclusiveNamespaceLockRefusesSecondOwner",
+					"testActualSharedNamespaceLocksRefuseExclusiveMutation",
+					"testDuplicatedNativeTreeDescriptorDoesNotSurviveExec",
+					"testLifecycleLockRefusesPathReplacementAndPreservesIt",
+					"testLifecycleLockRejectsWritableOrNonemptyLedger",
+					"testNativeTreeCloseRevokesAllFurtherDescriptorAccess",
+					"testPersistentInstallLedgerBlocksImageAdmissionAfterOwnerDeath",
+					"testSurvivingNativeChildRetainsNamespaceAfterParentClose"
+				],
+				"OwnedRuntimeLifecycleInitializerCustodyTests": [
+					"testBootstrapStageLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt",
+					"testEarlyRefusalDoesNotInvokeInitializedSelfRetirement",
+					"testLateRefusalReleasesActualNamespaceBeforeSuccessor",
+					"testLateRefusalRetiresInitializedSelfWithoutDuplicateCloseDebt"
+				],
+				"OwnedRuntimeMaintenanceJournalAdmissionTests": [
+					"testActualFixedMaintenanceLedgerBlocksOriginalImageAdmission"
+				],
+				"OwnedRuntimeNamespaceCloseOrderTests": [
+					"testCallerReferenceLossCannotRetireOriginalNativeNamespace",
+					"testNativeEarlierCloseRefusalKeepsActualNamespaceLocked"
+				],
+				"OwnedVirtualHIDDaemonReportMainOperationTests": [
+					"testRealKernelSelfImageObservationHasCurrentOriginalBirth"
+				]
+			},
+			"reason": "The 27 named owned-runtime custody XCTest methods (native flock, ACL, ownership, launchctl and kernel image observations) have fixes on dev that hosted macOS runners have not yet run; they are DEFERRED and qualified:false. Every other Swift launcher test, the build, signing and the installation matrix remain mandatory."
+		}
+	}
+}

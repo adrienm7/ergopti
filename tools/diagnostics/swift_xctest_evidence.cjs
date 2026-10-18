@@ -47,7 +47,7 @@ function pacQualification(receipt, env = process.env, now = new Date()) {
 		mode,
 		source_sha: env.GITHUB_SHA,
 		profile_id: receipt.profile_id,
-		...(receipt.profile_id === q.STABLE_V102_PROFILE_ID
+		...(q.stableNativeProfile(receipt.profile_id)
 			? { expires_at: receipt.expires_at, methods: capturedMethods(receipt.artifact.methods) }
 			: {})
 	});
@@ -60,18 +60,21 @@ function readPacQualification(file) {
 	return pacQualification(q.parseClosedJson(fs.readFileSync(file, 'utf8')));
 }
 
-/** The Brew omission needs its own exact current scope receipt. */
+/**
+ * The Brew omission needs its own exact current scope receipt. The package
+ * Swift step also owns the owned-runtime methods: the current policy decides
+ * them for this context, bound to the same source, so either scope can be
+ * deferred without the other.
+ */
 function brewQualification(receipt, env = process.env, now = new Date()) {
 	const q = require('../ci/dev-release-qualification.cjs');
-	const mode = q.scopeDisposition(
-		receipt,
-		'macos-brew-archive',
-		env.GITHUB_SHA,
-		q.environmentContext(env),
-		now
-	);
-	if (mode === 'deferred' && receipt.profile_id !== q.STABLE_V102_PROFILE_ID)
-		throw new TypeError('Only the current three-scope profile admits this Brew routing.');
+	const context = q.environmentContext(env);
+	const mode = q.scopeDisposition(receipt, 'macos-brew-archive', env.GITHUB_SHA, context, now);
+	if (mode === 'deferred' && !q.stableNativeProfile(receipt.profile_id))
+		throw new TypeError('Only a stable native profile admits this Brew routing.');
+	const owned = q.resolveQualificationProfile(context, now, 'macos-owned-runtime');
+	if (owned !== null && mode === 'deferred' && owned.id !== receipt.profile_id)
+		throw new TypeError('The Brew and owned-runtime deferrals must share one profile.');
 	const admission = Object.freeze({
 		mode,
 		source_sha: env.GITHUB_SHA,
@@ -81,10 +84,14 @@ function brewQualification(receipt, env = process.env, now = new Date()) {
 			? {
 					methods: capturedMethods({
 						[path.basename(receipt.artifact.path, '.swift')]: [receipt.artifact.name]
-					}),
-					// The same approved v1.0.2 profile defers the named owned-runtime
-					// methods of this Swift step; its source, expiry and profile bind both.
-					owned_runtime_methods: capturedMethods(q.STABLE_V102_OWNED_RUNTIME_METHODS)
+					})
+				}
+			: {}),
+		...(owned !== null
+			? {
+					owned_runtime_methods: capturedMethods(owned.scopes['macos-owned-runtime'].methods),
+					owned_runtime_profile_id: owned.id,
+					owned_runtime_expires_at: owned.expires_at
 				}
 			: {})
 	});
@@ -100,8 +107,25 @@ function readBrewQualification(file) {
 function narrowPac(admission) {
 	return (
 		admission !== null &&
-		admission.profile_id === require('../ci/dev-release-qualification.cjs').STABLE_V102_PROFILE_ID
+		require('../ci/dev-release-qualification.cjs').stableNativeProfile(admission.profile_id) !==
+			null
 	);
+}
+
+/** Lists the [profile, expiry, narrow] owner of every deferral of the package Swift step. */
+function packageDeferrals(admission, brewAdmission) {
+	const rows = [];
+	if (admission !== null && admission.mode === 'deferred')
+		rows.push([admission.profile_id, admission.expires_at, narrowPac(admission)]);
+	if (brewAdmission !== null && brewAdmission.mode === 'deferred')
+		rows.push([brewAdmission.profile_id, brewAdmission.expires_at, true]);
+	if (brewAdmission !== null && brewAdmission.owned_runtime_methods)
+		rows.push([
+			brewAdmission.owned_runtime_profile_id,
+			brewAdmission.owned_runtime_expires_at,
+			true
+		]);
+	return rows;
 }
 
 function rootPattern(admission, brewAdmission = null) {
@@ -109,17 +133,20 @@ function rootPattern(admission, brewAdmission = null) {
 		throw new TypeError('Unadmitted PAC qualification.');
 	if (brewAdmission !== null && !brewAdmissions.has(brewAdmission))
 		throw new TypeError('Unadmitted Brew qualification.');
+	const rows = packageDeferrals(admission, brewAdmission);
+	// Brew and owned-runtime deferrals share one source and one publication
+	// profile with the PAC receipt, whether PAC itself is deferred or full.
 	if (
 		brewAdmission !== null &&
-		brewAdmission.mode === 'deferred' &&
-		(!narrowPac(admission) ||
-			admission.mode !== 'deferred' ||
+		(brewAdmission.mode === 'deferred' || brewAdmission.owned_runtime_methods) &&
+		(admission === null ||
 			admission.source_sha !== brewAdmission.source_sha ||
-			admission.profile_id !== brewAdmission.profile_id ||
-			admission.expires_at !== brewAdmission.expires_at)
+			rows.some(
+				([profile, expiry, narrow]) => !narrow || profile !== rows[0][0] || expiry !== rows[0][1]
+			))
 	)
 		throw new TypeError('The package scope receipts do not own the same publication.');
-	return admission !== null && admission.mode === 'deferred' ? 'Selected tests' : 'All tests';
+	return rows.length ? 'Selected tests' : 'All tests';
 }
 
 /** Closed provenance is available only from an authenticated collector admission. */
@@ -153,43 +180,48 @@ function brewQualificationDetails(admission, brewAdmission) {
 	};
 }
 
-/** The owned-runtime methods deferred by the admitted v1.0.2 Brew receipt. */
+/** The owned-runtime methods the current profile defers in the package Swift step. */
 function ownedRuntimeQualificationDetails(admission, brewAdmission) {
 	rootPattern(admission, brewAdmission);
-	if (
-		brewAdmission === null ||
-		brewAdmission.mode !== 'deferred' ||
-		!brewAdmission.owned_runtime_methods
-	)
-		return null;
+	if (brewAdmission === null || !brewAdmission.owned_runtime_methods) return null;
 	return {
 		scope: 'macos-owned-runtime',
 		status: 'deferred',
 		qualified: false,
 		methods: brewAdmission.owned_runtime_methods,
 		source_sha: brewAdmission.source_sha,
-		profile_id: brewAdmission.profile_id,
-		expires_at: brewAdmission.expires_at
+		profile_id: brewAdmission.owned_runtime_profile_id,
+		expires_at: brewAdmission.owned_runtime_expires_at
 	};
 }
 
+/** Skips exactly the admitted deferred methods; refuses when nothing is deferred. */
 function pacSkipPattern(admission, brewAdmission = null) {
-	rootPattern(admission, brewAdmission);
-	if (admission === null || admission.mode !== 'deferred')
-		throw new Error('PAC execution may only be omitted under its active scope.');
+	if (rootPattern(admission, brewAdmission) !== 'Selected tests')
+		throw new Error('Package tests may only be omitted under an active scope.');
 	const info = pacQualificationDetails(admission);
 	const brew = brewQualificationDetails(admission, brewAdmission);
 	const owned = ownedRuntimeQualificationDetails(admission, brewAdmission);
 	const selectedMethods = {
-		...info.methods,
+		...(info ? info.methods : {}),
 		...(brew ? brew.methods : {}),
 		...(owned ? owned.methods : {})
 	};
 	const methods = Object.entries(selectedMethods).flatMap(([suite, names]) =>
 		names.map((name) => suite + '/' + name + '$')
 	);
-	if (narrowPac(admission)) return '^ErgoptiPlusTests[.](?:' + methods.join('|') + ')';
+	if (info === null || narrowPac(admission))
+		return '^ErgoptiPlusTests[.](?:' + methods.join('|') + ')';
 	return '^ErgoptiPlusTests[.](?:(?:' + pacClasses().join('|') + ')/|' + methods.join('|') + ')';
+}
+
+/** The package skip pattern, or '' when the admitted receipts defer nothing. */
+function packageSkipPattern(admission, brewAdmission) {
+	if (admission === null || brewAdmission === null)
+		throw new TypeError('The package step needs both scope receipts.');
+	return rootPattern(admission, brewAdmission) === 'Selected tests'
+		? pacSkipPattern(admission, brewAdmission)
+		: '';
 }
 
 function methodMatches(name, methods) {
@@ -532,10 +564,9 @@ function archiveAnnotation(receipt) {
 	if (receipt.outcome === 'DEFERRED') {
 		const q = require('../ci/dev-release-qualification.cjs');
 		const fact = receipt.qualification;
-		const policy = q.validatePolicy(
-			q.parseClosedJson(fs.readFileSync(q.STABLE_V102_POLICY_PATH, 'utf8'))
-		);
-		const row = policy.scopes['macos-brew-archive'];
+		const policy = fact ? q.stableNativeProfile(fact.profile_id) : null;
+		const row = policy && policy.scopes['macos-brew-archive'];
+		if (!row) throw new TypeError('Unbound deferred native archive receipt.');
 		const approvedMethods = { [path.basename(row.path, '.swift')]: [row.name] };
 		if (
 			!fact ||
@@ -545,7 +576,6 @@ function archiveAnnotation(receipt) {
 			fact.scope !== 'macos-brew-archive' ||
 			fact.status !== 'deferred' ||
 			fact.qualified !== false ||
-			fact.profile_id !== q.STABLE_V102_PROFILE_ID ||
 			!/^[0-9a-f]{40}$/.test(fact.source_sha) ||
 			fact.expires_at !== policy.expires_at ||
 			JSON.stringify(fact.methods) !== JSON.stringify(approvedMethods)
@@ -608,6 +638,7 @@ module.exports = {
 	readBrewQualification,
 	readPacQualification,
 	pacSkipPattern,
+	packageSkipPattern,
 	annotation,
 	archiveAnnotation,
 	archiveOutcomes,
@@ -617,7 +648,11 @@ module.exports = {
 };
 if (require.main === module) {
 	const args = process.argv.slice(2);
-	if (
+	if (args.length === 3 && args[0] === '--package-skip-pattern') {
+		process.stdout.write(
+			packageSkipPattern(readPacQualification(args[1]), readBrewQualification(args[2]))
+		);
+	} else if (
 		(args.length === 2 || (args.length === 4 && args[2] === '--brew-qualification-receipt')) &&
 		args[0] === '--pac-skip-pattern'
 	) {

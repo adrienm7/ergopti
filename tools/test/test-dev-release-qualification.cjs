@@ -1422,3 +1422,242 @@ async function simulate(context, status = 0, entries = fixtures, afterFamilySign
 		fs.rmSync(owner, { recursive: true, force: true });
 	}
 }
+
+// The v1.0.3 profile defers any subset of five scopes; PAC and HTTP stay mandatory.
+{
+	const V103 = require('./fixtures/stable-v103-profile.cjs');
+	const approved = q.parseClosedJson(fs.readFileSync(q.STABLE_V103_POLICY_PATH, 'utf8'));
+	const context = {
+		github_actions: 'true',
+		repository: 'adrienm7/ergopti',
+		event_name: 'push',
+		ref: 'refs/heads/main',
+		release: true,
+		prerelease: 'false',
+		channel: 'main',
+		tag: 'v1.0.3',
+		version: '1.0.3'
+	};
+	const clock = '2026-10-19T10:00:00Z';
+	const deferrable = [
+		'macos-brew-archive',
+		'macos-native-model-receiving',
+		'macos-shortcuts-discovery',
+		'macos-launch-appleevents',
+		'macos-owned-runtime'
+	];
+	assert.deepEqual([...q.STABLE_V103_DEFERRABLE_SCOPE_IDS], deferrable);
+	assert.equal(approved.id, q.STABLE_V103_PROFILE_ID);
+	assert.equal(approved.id, 'stable-v1-0-3-20261018-macos-native-scopes');
+	assert.equal(approved.authorization_quote, 'v1.0.3 depuis dev complet');
+	assert.deepEqual(Object.keys(approved.scopes), [...q.STABLE_V103_SCOPE_IDS]);
+	if (approved.scopes['macos-owned-runtime'])
+		assert.deepEqual(
+			approved.scopes['macos-owned-runtime'].methods,
+			JSON.parse(JSON.stringify(q.STABLE_V102_OWNED_RUNTIME_METHODS))
+		);
+	q.validateStableV103Policy(approved);
+
+	// Each boundary field refuses a foreign value.
+	for (const patch of [
+		{ id: q.STABLE_V102_PROFILE_ID },
+		{ id: 'stable-v1-0-3-20261018-seven-macos-native-scopes' },
+		{ authorization_quote: 'Différer pour 1.0.2 (Recommandé)' },
+		{ authorized: 'true' },
+		{ tag: 'v1.0.2' },
+		{ tag: 'v1.0.4' },
+		{ version: '1.0.2' },
+		{ version: '1.0.3-dev.1' },
+		{ expires_at: '2026-10-20T22:00:00Z' },
+		{ expires_at: '2026-10-26T22:00:00Z' },
+		{ ref: 'refs/heads/dev' },
+		{ channel: 'dev' },
+		{ prerelease: 'true' },
+		{ event_name: 'workflow_dispatch' },
+		{ release: false },
+		{ repository: 'foreign/ergopti' },
+		{ authorization_note: 'two\nlines' },
+		{ extra: true }
+	])
+		assert.throws(() => q.validateStableV103Policy({ ...approved, ...patch }), Error, patch);
+	const missingField = structuredClone(approved);
+	delete missingField.authorization_note;
+	assert.throws(() => q.validateStableV103Policy(missingField));
+
+	// Any subset of the five scopes is accepted, in the declared order only.
+	for (const subset of V103.subsets(deferrable)) {
+		const policy = V103.policyFor(q, subset);
+		q.validateStableV103Policy(policy, subset);
+		if (subset.length > 1)
+			assert.throws(() => q.validateStableV103Policy(policy, [...subset].reverse()), /order/);
+		for (const foreign of ['macos-native-pac', 'macos-native-http', 'core-js-suite', 'foreign']) {
+			const extra = structuredClone(policy);
+			extra.scopes[foreign] = policy.scopes[subset[0]];
+			assert.throws(() => q.validateStableV103Policy(extra, subset), Error, foreign);
+			assert.throws(() => q.validateStableV103Policy(extra, [...subset, foreign]), Error, foreign);
+		}
+		const missing = structuredClone(policy);
+		delete missing.scopes[subset[0]];
+		assert.throws(() => q.validateStableV103Policy(missing, subset));
+	}
+	assert.throws(() => q.validateStableV103Policy({ ...approved, scopes: {} }, []));
+	assert.throws(() =>
+		q.validateStableV103Policy(approved, [...q.STABLE_V103_SCOPE_IDS, q.STABLE_V103_SCOPE_IDS[0]])
+	);
+
+	// Exact methods, matrices and commands cannot widen or narrow.
+	const full = V103.policyFor(q, deferrable);
+	for (const [scope, patch] of [
+		['macos-brew-archive', { name: 'testOrdinaryArchiveInstall' }],
+		['macos-brew-archive', { path: 'Tests/ErgoptiPlusTests/Foreign.swift' }],
+		['macos-native-model-receiving', { architectures: ['arm64'] }],
+		['macos-native-model-receiving', { profiles: ['pac-inline', 'pac-url'] }],
+		['macos-shortcuts-discovery', { args: ['--foreign'] }],
+		['macos-launch-appleevents', { scenarios: ['clean'] }],
+		['macos-launch-appleevents', { runners: ['macos-15'] }],
+		['macos-owned-runtime', { path: 'Tests' }],
+		['macos-owned-runtime', { reason: '' }]
+	]) {
+		const altered = structuredClone(full);
+		Object.assign(altered.scopes[scope], patch);
+		assert.throws(() => q.validateStableV103Policy(altered, deferrable), Error, scope);
+	}
+	for (const mutate of [
+		(methods) => methods.OwnedRuntimeNamespaceCloseOrderTests.pop(),
+		(methods) => methods.OwnedRuntimeNamespaceCloseOrderTests.push('testForeign'),
+		(methods) => (methods.ManagedHTTPWorkerTests = ['testWorkerMustRemainMandatory']),
+		(methods) => delete methods.OwnedRuntimeMaintenanceJournalAdmissionTests
+	]) {
+		const altered = structuredClone(full);
+		mutate(altered.scopes['macos-owned-runtime'].methods);
+		assert.throws(() => q.validateStableV103Policy(altered, deferrable));
+	}
+
+	// The shipped profile owns exactly its listed scopes for the v1.0.3 main push only.
+	const selected = q.authorizeQualificationProfile(approved.id, context, clock);
+	assert.equal(q.stablePublicationProfile(context, clock), selected);
+	assert.deepEqual(q.deferredScopes(selected), [...q.STABLE_V103_SCOPE_IDS]);
+	for (const scope of [...deferrable, 'macos-native-pac', 'macos-native-http', 'core-js-suite'])
+		assert.equal(
+			q.resolveQualificationProfile(context, clock, scope),
+			q.STABLE_V103_SCOPE_IDS.includes(scope) ? selected : null,
+			scope
+		);
+	for (const [key, value] of [
+		['github_actions', 'false'],
+		['repository', 'foreign/repo'],
+		['event_name', 'workflow_dispatch'],
+		['ref', 'refs/heads/dev'],
+		['release', false],
+		['prerelease', 'true'],
+		['channel', 'dev'],
+		['tag', 'v1.0.2'],
+		['tag', 'v1.0.4'],
+		['version', '1.0.2'],
+		['version', '1.0.4']
+	]) {
+		const foreign = { ...context, [key]: value };
+		assert.equal(q.stablePublicationProfile(foreign, clock), null, key);
+		for (const scope of deferrable)
+			assert.notEqual(q.resolveQualificationProfile(foreign, clock, scope), selected);
+		assert.throws(() => q.authorizeQualificationProfile(approved.id, foreign, clock));
+	}
+	assert.equal(q.stablePublicationProfile(context, approved.expires_at), null);
+	assert.throws(() => q.authorizeQualificationProfile(approved.id, context, approved.expires_at));
+	// The v1.0.2 profile never covers v1.0.3, nor v1.0.3 the v1.0.2 publication.
+	assert.throws(() => q.authorizeQualificationProfile(q.STABLE_V102_PROFILE_ID, context, clock));
+	assert.equal(
+		q.stablePublicationProfile({ ...context, tag: 'v1.0.2', version: '1.0.2' }, clock).id,
+		q.STABLE_V102_PROFILE_ID
+	);
+	for (const scope of q.STABLE_V103_SCOPE_IDS) {
+		const receipt = q.qualificationReceipt(selected, scope, { source_sha: sha });
+		assert.equal(q.scopeDisposition(receipt, scope, sha, context, clock), 'deferred');
+		assert.throws(() =>
+			q.scopeDisposition({ ...receipt, version: '1.0.2' }, scope, sha, context, clock)
+		);
+	}
+	for (const scope of ['macos-native-pac', 'macos-native-http'])
+		assert.throws(() => q.qualificationReceipt(selected, scope, { source_sha: sha }));
+	const notice = q.stablePublicationNotice(approved.id, context, sha, clock);
+	assert(notice.includes(sha));
+	assert(notice.includes('Only stable v1.0.3 main push before 2026-10-25T22:00:00Z is authorized'));
+	assert(notice.includes('native PAC/WPAD XCTest and independent managed HTTP client'));
+	assert(!notice.includes('macos-native-pac:'));
+	assert(!notice.includes('macos-native-http:'));
+	console.log(
+		'[OK] v1.0.3 profile: exact boundary, any subset of five scopes, PAC/HTTP mandatory.'
+	);
+
+	// Publication needs exactly the deferred receipts of the listed scopes.
+	const owner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-v103-qualification-'));
+	try {
+		const files = [];
+		const suffixes = {
+			'macos-brew-archive': [''],
+			'macos-native-model-receiving': ['arm64', 'amd64'],
+			'macos-shortcuts-discovery': ['']
+		};
+		for (const scope of q.STABLE_V103_SCOPE_IDS)
+			for (const suffix of suffixes[scope] || []) {
+				const file = path.join(owner, 'stable-' + scope + (suffix ? '-' + suffix : '') + '.json');
+				const raw = JSON.stringify(q.qualificationReceipt(selected, scope, { source_sha: sha }));
+				fs.writeFileSync(file, raw);
+				files.push({ file, raw });
+			}
+		if (q.STABLE_V103_SCOPE_IDS.includes('macos-launch-appleevents'))
+			for (const scenario of ['clean', 'karabiner_config'])
+				for (const runner of ['macos-15', 'macos-15-intel']) {
+					const file = path.join(
+						owner,
+						'stable-macos-launch-appleevents-' + scenario + '-' + runner + '.json'
+					);
+					const raw = JSON.stringify(
+						q.launchQualificationReceipt(selected, scenario, runner, { source_sha: sha })
+					);
+					fs.writeFileSync(file, raw);
+					files.push({ file, raw });
+				}
+		q.admitCommandReceipts(owner, context, sha, clock);
+		for (const entry of files) {
+			fs.unlinkSync(entry.file);
+			assert.throws(() => q.admitCommandReceipts(owner, context, sha, clock));
+			fs.writeFileSync(entry.file, entry.raw);
+		}
+	} finally {
+		fs.rmSync(owner, { recursive: true, force: true });
+	}
+
+	// Dropping scopes is the constant plus the JSON; none left means no profile at all.
+	for (const subset of V103.subsets(deferrable)) {
+		const shrunk = V103.loadWithV103Scopes(subset);
+		const profile = shrunk.stablePublicationProfile(context, clock);
+		assert.equal(profile.id, approved.id);
+		assert.deepEqual([...shrunk.deferredScopes(profile)], subset);
+		for (const scope of [...deferrable, 'macos-native-pac', 'macos-native-http'])
+			assert.equal(
+				shrunk.resolveQualificationProfile(context, clock, scope),
+				subset.includes(scope) ? profile : null
+			);
+		const text = shrunk.stablePublicationNotice(approved.id, context, sha, clock);
+		for (const scope of deferrable)
+			assert.equal(text.includes(scope + ':'), subset.includes(scope));
+	}
+	const none = V103.loadWithV103Scopes([]);
+	assert.equal(none.stablePublicationProfile(context, clock), null);
+	assert.throws(() => none.authorizeQualificationProfile(approved.id, context, clock));
+	assert.throws(() => none.stablePublicationNotice(approved.id, context, sha, clock));
+	assert.equal(none.stablePublicationNotice('', context, sha, clock), '');
+	for (const scope of [...deferrable, 'macos-native-pac', 'macos-native-http'])
+		assert.equal(none.resolveQualificationProfile(context, clock, scope), null);
+	assert.equal(
+		none.stablePublicationProfile({ ...context, tag: 'v1.0.2', version: '1.0.2' }, clock).id,
+		q.STABLE_V102_PROFILE_ID
+	);
+	assert.throws(() => V103.loadWithV103Scopes([], true), /Delete the stable profile file/);
+	assert.throws(() => V103.loadWithV103Scopes(['macos-native-pac']));
+	assert.throws(() => V103.loadWithV103Scopes(['foreign']));
+	console.log(
+		'[OK] v1.0.3 shrinks one scope at a time; an empty list needs no file and selects no profile.'
+	);
+}

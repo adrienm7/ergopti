@@ -127,6 +127,8 @@ function judge(verdict, transcript, admission = null, brewAdmission = null) {
 		!sameSummary ||
 		JSON.stringify(verdict.qualification) !== JSON.stringify(parsed.qualification) ||
 		JSON.stringify(verdict.brew_qualification) !== JSON.stringify(parsed.brew_qualification) ||
+		JSON.stringify(verdict.owned_runtime_qualification) !==
+			JSON.stringify(parsed.owned_runtime_qualification) ||
 		verdict.complete !== parsed.complete ||
 		verdict.exit_status !== parsed.exit_status ||
 		verdict.failures.length !== parsed.failures.length ||
@@ -180,6 +182,7 @@ function judge(verdict, transcript, admission = null, brewAdmission = null) {
 	result.root_qualified =
 		parsed.qualification === undefined &&
 		parsed.brew_qualification === undefined &&
+		parsed.owned_runtime_qualification === undefined &&
 		parsed.complete &&
 		parsed.script_status === 0 &&
 		parsed.tee_status === 0 &&
