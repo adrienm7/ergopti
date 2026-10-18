@@ -9,7 +9,8 @@
 
 _MSH_Seed() {
 	return Map("version", 2, "store", ConfigTransitionNormalizeConfigDir(A_Temp),
-		"day", "2026-01-02", "ledgers", Map(), "walker_timings", KL_JsonEncode(KLW_TimingValues()))
+		"day", "2026-01-02", "ledgers", Map(), "walker_timings", KL_JsonEncode(KLW_TimingValues()),
+			"projection_format", KLR_CACHE_FORMAT_VERSION)
 }
 
 _MSH_HeaderAtLimit(Extra := 0) {

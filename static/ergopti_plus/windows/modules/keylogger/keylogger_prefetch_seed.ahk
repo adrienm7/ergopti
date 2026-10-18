@@ -27,6 +27,11 @@ _KLPF_HistorySeedValid(Seed) {
 	if !(Version is Integer) || Version != 2 || !(Store is String)
 			|| !(Ledgers is Map) || !_KLPF_HistorySeedDayValid(Seed.Get("day", 0))
 		return false
+	; A reusable JSON snapshot can outlive the reader image whose calculations
+	; produced it. Rebuilding that image must also replace the page's old history.
+	ProjectionFormat := Seed.Get("projection_format", 0)
+	if !(ProjectionFormat is String) || !(ProjectionFormat == KLR_CACHE_FORMAT_VERSION)
+		return false
 	; Identical source bytes can produce different historical aggregates after
 	; changing walker thresholds. Older receipts cannot certify these calculations.
 	if !(Seed.Get("walker_timings", 0) == KL_JsonEncode(KLW_TimingValues()))
@@ -78,7 +83,8 @@ KLPF_CaptureHistorySeed(metrics_dir, SnapshotDay) {
 		Ledgers[LedgerPath] := Map("offset", Offset, "snapshot", Snapshot.Clone())
 	}
 	Seed := Map("version", 2, "store", Store, "day", SnapshotDay, "ledgers", Ledgers,
-		"walker_timings", KL_JsonEncode(KLW_TimingValues()))
+		"walker_timings", KL_JsonEncode(KLW_TimingValues()),
+		"projection_format", KLR_CACHE_FORMAT_VERSION)
 	if !_KLPF_HistorySeedValid(Seed)
 		throw Error("History seed contains invalid consumed ledger metadata.")
 	return Seed
