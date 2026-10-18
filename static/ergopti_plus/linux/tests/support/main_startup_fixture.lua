@@ -132,10 +132,14 @@ function M.run(options)
 	env.device, env.mapping_count, env.config_path, env.SCRIPT_DIR = "/controlled/event0", 1, "/controlled/config.toml", "/controlled/driver"
 	env.BootProfiler = { stage = function(name)
 		if name == "input hooks" then native_callback("input.stage") end
-	end, stage_done = noop, complete = function() record("boot.complete"); return 0 end, elapsed_ms = function() return 0 end }
+	end, stage_done = noop, complete = function() record("boot.complete"); native_callback("boot.complete"); return options.boot_ms or 0 end, elapsed_ms = function() return 0 end }
 	env.Logger = { info = function(_, message)
 		if message == "Keyboard hook started in %s mode." then native_callback("hook.log") end
-	end, error = noop, warn = noop, debug = noop, success = noop, flush_repeats = noop }
+	end, error = function(_, message)
+		if tostring(message):find("Diagnostic snapshot", 1, true) then observed.snapshot_errors = (observed.snapshot_errors or 0) + 1 end
+	end, warn = noop, debug = noop, success = function(_, message)
+		if tostring(message):find("Daemon ready (", 1, true) then record("daemon.ready"); native_callback("daemon.ready") end
+	end, flush_repeats = noop }
 	if options.terminal_logger_throws then env.Logger.error = function() error("controlled terminal logger failure", 0) end end
 	env.tray_menu = { setIcon = function() ui("tray") end,
 		setFallbackMenu = function(_, _, quit) observed.tray_quit = quit end, pump = noop, destroy = noop }
@@ -147,7 +151,17 @@ function M.run(options)
 	env.script_actions = { is_paused = function() return false end }
 	env.secure_focus_guard = { has_context_operation = function() return false end, blocks_text = function() return false end }
 	env.engine = { reset = function() observed.automation = observed.automation + 1 end }
-	env.emit_diagnostic_snapshot = function() record("diagnostics") end
+	env.DiagnosticSnapshot = { prepare = function()
+		record("diagnostics.prepare"); native_callback("diagnostics.prepare")
+		observed.snapshot_prepared_under_grab = observed.grabbed
+		if options.snapshot_prepare_throws then error("controlled diagnostic discovery refusal", 0) end
+		return function(ctx)
+			record("diagnostics"); observed.snapshot_boot_ms = ctx.boot_ms
+		end
+	end }
+	env.emit_diagnostic_snapshot = function(boot_ms, _, _, prepared)
+		if prepared then prepared({ boot_ms = boot_ms }) end
+	end
 	env.RuntimeGuard = { call = function(_, callback) callback(); return true end, optional_require = function() return nil end }
 	env.webview_manager = { set_daemon_state = function(state) observed.daemon_state = state end,
 		show = function()
