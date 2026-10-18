@@ -3281,7 +3281,7 @@ function M.set_backend(kind, admit)
 	_enable_generation = _enable_generation + 1
 	local revision, app_epoch = _enable_generation, _runtime_app_epoch
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
-	M.dismiss()
+	M.withdraw()
 	if _runtime_closed or _scope_owner or not admitted("after") then return false end
 	local function current()
 		return not _runtime_closed and _scope_owner == nil
