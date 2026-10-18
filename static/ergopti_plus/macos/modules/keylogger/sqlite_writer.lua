@@ -217,6 +217,24 @@ local function _exec_startup_sql(db, sql, phase)
 	end
 end
 
+--- Check the canonical completion seed rather than mere file existence.
+--- Opening SQLite creates a file before bootstrap can read or apply the schema.
+--- The schema-version seed is written after every canonical table and index.
+--- @param db userdata Candidate SQLite handle.
+--- @return boolean complete True when the canonical bootstrap reached its seeds.
+local function _schema_bootstrap_completed(db)
+	local has_meta = false
+	for _ in db:nrows("SELECT name FROM sqlite_master WHERE type='table' AND name='meta'") do
+		has_meta = true
+	end
+	if not has_meta then return false end
+	local complete = false
+	for _ in db:nrows("SELECT value FROM meta WHERE key='schema_version'") do
+		complete = true
+	end
+	return complete
+end
+
 --- Initialize an acquired database without publishing it to ingest consumers.
 --- @param db userdata Candidate SQLite handle.
 --- @param existed boolean Whether the cache already existed.
@@ -227,7 +245,7 @@ local function _initialize_db(db, existed)
 	_exec_startup_sql(db, "PRAGMA synchronous = FULL;", "synchronous mode")
 	_exec_startup_sql(db, "PRAGMA encoding = \"UTF-8\";", "encoding")
 
-	if not existed then
+	if not existed or not _schema_bootstrap_completed(db) then
 		Logger.start(LOG, "Bootstrapping fresh db.sqlite at %s…", _paths.sqlite_path)
 		local schema = _read_schema_sql()
 		if not schema then
@@ -287,6 +305,7 @@ local function _initialize_db(db, existed)
 		{ "local_data_sql_outbox", "" },
 		{ "aggregate_cache_revision", "0" },
 		{ "rev",              "0"  },
+		{ "last_applied_data_sql_off", "0" },
 	}) do
 		_exec_startup_sql(db, string.format(
 			"INSERT OR IGNORE INTO meta (key, value) VALUES ('%s', '%s');",
