@@ -407,7 +407,7 @@ enum ManagedBootstrapDownload {
 			let native = ManagedHTTPRequest(url: url, method: "GET", headers: [("Accept-Encoding", "identity")],
 				timeout: budget, idleTimeout: budget, direct: policy.direct(url, environment: environment))
 			let status = ManagedHTTPWorker.execute(native, maximumSelections: policy.maximumSelections,
-				started: started, settingsProvider: settingsProvider, output: collector.consume)
+				started: started, settingsProvider: settingsProvider, environment: environment, output: collector.consume)
 			guard remaining() > 0 else { result = "deadline"; break }
 			if let failure = collector.failure { result = failure; break }
 			if collector.redirectCancelled {
