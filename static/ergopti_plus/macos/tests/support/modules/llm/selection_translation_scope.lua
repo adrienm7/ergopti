@@ -19,6 +19,7 @@ local OWNED = {
 	"brightness_actions",
 	"brightness_actions_data",
 	"config_binding_identity",
+	"compat.utf8",
 	"config_binding_publication",
 	"config_defaults",
 	"config_keyboard_publication",
@@ -29,6 +30,7 @@ local OWNED = {
 	"diagnostics.redact",
 	"diagnostics.runtime_log",
 	"hotstrings.personal_files",
+	"json",
 	"keycodes",
 	"keymap.utils",
 	"lfs",
@@ -44,6 +46,7 @@ local OWNED = {
 	"llm.remote_formats",
 	"llm.rewrite",
 	"llm.tone",
+	"llm.translate",
 	"llm.vision",
 	"logger.shim",
 	"platform.remap.lease_helper",
@@ -60,6 +63,7 @@ local OWNED = {
 	"wrap_pair",
 
 	"adapters.accessibility_permission",
+	"adapters.event_provenance",
 	"adapters.file_system",
 	"adapters.http_client",
 	"adapters.json_codec",
@@ -111,6 +115,7 @@ local OWNED = {
 	"modules.llm.api_mlx_discovery",
 	"modules.llm.api_mlx_fetch",
 	"modules.llm.api_mlx_inference",
+	"modules.llm.mlx_stream_retirement",
 	"modules.llm.api_ollama",
 	"modules.llm.api_remote",
 	"modules.llm.api_token_crypto",
@@ -138,6 +143,7 @@ local OWNED = {
 	"modules.shortcuts.actions.text_continuation",
 	"modules.shortcuts.actions.text_dispatch",
 	"modules.shortcuts.actions.text_transform_grace",
+	"tests.support.modules.llm.selection_translation_destination",
 	"ui.tooltip",
 }
 local M = {}
