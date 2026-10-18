@@ -27,14 +27,18 @@ _ODC_CheckHotkeyAvoidsExplorerCom() {
 	Body := _DriverFuncBody("OpenDownloads")
 	Assert(Body != "", "OpenDownloads must exist in modules/shortcuts/win.ahk")
 
-	Assert(InStr(Body, "GetKnownFolderDownloads()") > 0,
-		"OpenDownloads must resolve the locale-independent Downloads known folder")
-	Assert(InStr(Body, 'ComObject("Shell.Application")') = 0,
+	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
+	Assert(LaunchBody != "", "the resolved-folder launcher must exist")
+	Assert(InStr(Body, "_OpenDownloadsWith(GetKnownFolderDownloads, Run)") > 0
+		&& InStr(LaunchBody, "DownloadsPath := ResolveFn.Call()") > 0,
+		"the hotkey must delegate to the real known-folder resolver and native launcher")
+	Combined := Body . LaunchBody
+	Assert(InStr(Combined, 'ComObject("Shell.Application")') = 0,
 		"OpenDownloads must not enumerate Shell.Application on the keyboard hotkey thread")
-	Assert(InStr(Body, "WinWait") = 0,
+	Assert(InStr(Combined, "WinWait") = 0,
 		"OpenDownloads must not wait for Explorer on the keyboard hotkey thread")
 }
-Test("shortcuts: OpenDownloads avoids synchronous Explorer COM and waits on the keyboard hotkey",
+Test("shortcuts: OpenDownloads avoids synchronous Explorer COM and waits on the keyboard hotkey (open-downloads-delegation-guard)",
 	_ODC_CheckHotkeyAvoidsExplorerCom)
 
 
@@ -49,11 +53,17 @@ Test("shortcuts: OpenDownloads avoids synchronous Explorer COM and waits on the 
 
 _ODC_CheckExplorerLaunchContained() {
 	Body := _DriverFuncBody("OpenDownloads")
-
-	Assert(InStr(Body, "Run('explorer.exe ") > 0,
-		"OpenDownloads must launch Explorer with the resolved Downloads path")
-	Assert(InStr(Body, "catch as Err") > 0 && InStr(Body, "LoggerError") > 0,
-		"OpenDownloads must contain and log Explorer launch failures instead of escaping the hotkey")
+	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
+	Assert(Body != "" && LaunchBody != "", "the hotkey and resolved-folder launcher must exist")
+	Assert(InStr(LaunchBody, "LaunchFn.Call('explorer.exe ") > 0
+		&& RegExMatch(LaunchBody, "LaunchFn\.Call\([^\r\n]*DownloadsPath"),
+		"the native launcher must pass the resolved Downloads path to Explorer")
+	TryPos := InStr(Body, "try {")
+	DelegatePos := InStr(Body, "_OpenDownloadsWith(GetKnownFolderDownloads, Run)")
+	CatchPos := InStr(Body, "catch as Err")
+	LogPos := InStr(Body, "LoggerError", false, Max(1, CatchPos))
+	Assert(TryPos > 0 && DelegatePos > TryPos && CatchPos > DelegatePos && LogPos > CatchPos,
+		"the actual resolver and launcher must remain inside the logged hotkey failure boundary")
 }
-Test("shortcuts: OpenDownloads contains and logs Explorer launch failures",
+Test("shortcuts: OpenDownloads contains and logs Explorer launch failures (open-downloads-delegation-guard)",
 	_ODC_CheckExplorerLaunchContained)
