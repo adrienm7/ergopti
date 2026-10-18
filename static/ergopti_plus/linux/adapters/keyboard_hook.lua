@@ -3205,8 +3205,13 @@ function _source_recovery.run(paths, consume_held, existing)
 	tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers = {}, {}, {}, {}
 	local called, accepted = pcall(function()
 		if not _source_transaction_current(tx) then return false end
-		local slots = {}
-		for _, path in ipairs(_devices) do slots[#slots + 1] = keyboard_slot(path) end
+		local slots, originals = {}, {}
+		for _, path in ipairs(_devices) do
+			local slot = keyboard_slot(path)
+			slots[#slots + 1] = slot
+			if not tx.close_owners[slot] then return false end
+			originals[#originals + 1] = tx.close_owners[slot]
+		end
 		for _, path in ipairs(_pointer_devices) do
 			if not _capture_source_member(tx, path, pointer_slot, false) then return false end
 		end
@@ -3240,7 +3245,7 @@ function _source_recovery.run(paths, consume_held, existing)
 				if not published or acknowledged ~= true or not _source_transaction_current(tx) then return false end
 			end
 			return _source_transaction_current(tx)
-		end) == true and _publish_source_transaction(tx)
+		end, originals) == true and _publish_source_transaction(tx)
 	end)
 	if not called or accepted ~= true then _retire_source_transaction(tx, "native state reconciliation refused") end
 	if _source_reconciliation == tx then _source_reconciliation = nil end
@@ -3969,6 +3974,17 @@ function M.while_released(fn, opts)
 	-- Restoration can acquire one source before a later native operation raises.
 	-- Keep the entire cohort under one cleanup boundary so no grab escapes it.
 	local restored_call, restored, restore_reason = pcall(function()
+		-- Refuse every foreign opening before draining or grabbing ANY successor.
+		-- Native ungrab revokes input generations, but not this per-open RAM join.
+		if modal_tx then
+			for _, path in ipairs(paths) do
+				local slot = keyboard_slot(path)
+				local _, _, same_open = _input_reader_ports.source_owner_current(modal_tx.close_owners[slot],
+					modal_tx.close_observers[slot], _input_reader_ports.capture_source_owner,
+					_input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+				if same_open ~= true then return false, "original_open_replaced" end
+			end
+		end
 		for _, path in ipairs(paths) do
 			local slot = keyboard_slot(path)
 			repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0

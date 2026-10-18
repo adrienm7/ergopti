@@ -593,7 +593,7 @@ local function source_owner(key, st)
 	local record = { state = st, slot = key, descriptor = owner, backend = owner.backend,
 		fd = owner.fd, generation = st.generation, input = st.grabbed == true and st.native_grab == true }
 	_source_owners[lease] = record
-	local observer = function(original, capture, current, retire)
+	local open_observer = function(original, capture, current, retire)
 		if not rawequal(original, lease) or _source_owners[original] ~= record
 			or getmetatable(original) ~= nil or next(original) ~= nil
 			or capture ~= original_source_owner_ports.capture or current ~= original_source_owner_ports.current
@@ -601,14 +601,15 @@ local function source_owner(key, st)
 			or rawget(M, "capture_source_owner") ~= capture or rawget(M, "source_owner_current") ~= current
 			or rawget(M, "retire_source") ~= retire or _busy or _native_debt
 			or owner.state ~= "open" or not rawequal(_slots[key], st) or not rawequal(st.descriptor_owner, owner)
-			or st.fd ~= owner.fd or st.generation ~= record.generation
+			or st.fd ~= owner.fd
 			or not rawequal(_backend, owner.backend) or not rawequal(_native_backend, owner.backend) then return false end
 		for name, port in pairs(_native_ports or {}) do
 			if not rawequal(rawget(owner.backend, name), port) then return false end
 		end
 		return true
 	end
-	record.observer = observer
+	local observer = function(...) return open_observer(...) and st.generation == record.generation end
+	record.open_observer, record.observer = open_observer, observer
 	return lease, observer
 end
 
@@ -637,6 +638,7 @@ end
 --- @param retire function|nil Construction-captured original retirement port.
 --- @return boolean current Native input currency; not physical-device proof.
 --- @return boolean|nil cleanup Optional original cleanup currency, never input rights.
+--- @return boolean|nil same_open Original descriptor lifetime only; ignores retired input generations.
 function M.source_owner_current(lease, observer, capture, current, retire)
 	local record = _source_owners[lease]
 	local input = record ~= nil and getmetatable(lease) == nil and next(lease) == nil and record.input
@@ -648,7 +650,10 @@ function M.source_owner_current(lease, observer, capture, current, retire)
 	local cleanup = record ~= nil and record.observer == observer and type(observer) == "function"
 		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
 		and retire == original_source_owner_ports.retire and observer(lease, capture, current, retire) == true
-	return input and cleanup, cleanup
+	local same_open = record ~= nil and record.observer == observer and type(observer) == "function"
+		and capture == original_source_owner_ports.capture and current == original_source_owner_ports.current
+		and retire == original_source_owner_ports.retire and record.open_observer(lease, capture, current, retire) == true
+	return input and cleanup, cleanup, same_open
 end
 
 --- Retires only the original descriptor; a reopened slot/FD remains untouched.
@@ -735,14 +740,22 @@ end
 --- The caller must also keep its logical cohort unpublished throughout the callback.
 --- @param slots table Dense native reader slot list, including a recovered source.
 --- @param restore function Receives detached snapshots with pending source/held leases.
+--- @param originals table|nil Dense original per-open leases, independent of revoked input generations.
 --- @return boolean committed
-function M.reconcile_sources(slots, restore)
+function M.reconcile_sources(slots, restore, originals)
 	if _busy or _native_debt or type(slots) ~= "table" or getmetatable(slots) ~= nil
 		or #slots == 0 or type(restore) ~= "function" then return false end
 	for key in pairs(slots) do
 		if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
 	end
 	for index = 1, #slots do if rawget(slots, index) == nil then return false end end
+	if originals ~= nil then
+		if type(originals) ~= "table" or getmetatable(originals) ~= nil or #originals ~= #slots then return false end
+		for key in pairs(originals) do
+			if type(key) ~= "number" or key % 1 ~= 0 or key < 1 or key > #slots then return false end
+		end
+		for index = 1, #slots do if rawget(originals, index) == nil then return false end end
+	end
 	local transaction, records, snapshots, seen, recovering = {}, {}, {}, {}, false
 	for index, slot in ipairs(slots) do
 		local st = _slots[slot]
@@ -751,6 +764,17 @@ function M.reconcile_sources(slots, restore)
 		local record = { state = st, slot = slot, backend = _backend, fd = st.fd,
 			generation = st.generation, path = st.path, read_epoch = st.read_epoch,
 			max_code = 0x2ff, reconciliation = transaction }
+		if originals then
+			local lease = rawget(originals, index)
+			local origin = _source_owners[lease]
+			if not origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.slot, slot) or not rawequal(origin.state, st)
+				or not rawequal(origin.descriptor, st.descriptor_owner) or origin.fd ~= st.fd
+				or origin.descriptor.state ~= "open" or not rawequal(origin.backend, _backend) then return false end
+			-- A native ungrab/drop revokes generation, not the original per-open
+			-- descriptor. Retain this private join independently of input currency.
+			record.original_lease, record.original_owner = lease, origin
+		end
 		if not native_session_current(record, true) then return false end
 		if st.synchronized ~= true then
 			if st.recovery_ready ~= true then return false end
@@ -765,6 +789,12 @@ function M.reconcile_sources(slots, restore)
 			if rawget(M, name) ~= port then return false end
 		end
 		for _, record in ipairs(records) do
+			local origin, lease = record.original_owner, record.original_lease
+			if origin and (_source_owners[lease] ~= origin or getmetatable(lease) ~= nil or next(lease) ~= nil
+				or not rawequal(origin.state, _slots[record.slot]) or not rawequal(origin.slot, record.slot)
+				or not rawequal(origin.descriptor, record.state.descriptor_owner)
+				or origin.descriptor.state ~= "open" or origin.fd ~= record.state.fd
+				or not rawequal(origin.backend, _backend)) then return false end
 			if record.read_epoch ~= record.state.read_epoch
 				or record.query_epoch and record.query_epoch ~= record.state.key_query_epoch
 				or not native_session_current(record, true) then return false end

@@ -1083,6 +1083,61 @@ end
 
 helpers.describe("evdev_reader: controlled fresh native held-state receipts", function()
 
+	helpers.it("(linux-modal-original-open) preserves exact original opens across a legitimate two-source regrab", function()
+		controlled_held_reader(nil, function(reader)
+			local originals
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.open("/controlled/" .. slot, slot)); assert(reader.grab(slot)) end
+			originals = { (assert(reader.capture_source_owner("a"))), (assert(reader.capture_source_owner("b"))) }
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.ungrab(slot)); assert(reader.grab(slot)) end
+			local staged
+			helpers.assert_true(reader.reconcile_sources({ "a", "b" }, function(snapshots)
+				staged = snapshots
+				for _, row in ipairs(snapshots) do helpers.assert_eq(reader.source_owner_current(row.lease), false) end
+				return true
+			end, originals))
+			for _, row in ipairs(staged) do helpers.assert_true(reader.source_owner_current(row.lease)) end
+			for _, lease in ipairs(originals) do helpers.assert_eq(reader.source_owner_current(lease), false) end
+			assert(reader.close("a")); assert(reader.close("b"))
+		end)
+	end)
+
+	helpers.it("(linux-modal-original-open) rejects a reopened peer before querying native state", function()
+		controlled_held_reader(nil, function(reader, _, log)
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.open("/controlled/" .. slot, slot)); assert(reader.grab(slot)) end
+			local originals = { (assert(reader.capture_source_owner("a"))), (assert(reader.capture_source_owner("b"))) }
+			for _, slot in ipairs({ "a", "b" }) do assert(reader.ungrab(slot)) end
+			assert(reader.close("a")); assert(reader.open("/controlled/a", "a")); assert(reader.grab("a")); assert(reader.grab("b"))
+			local successor, queries, closes = assert(reader.capture_source_owner("a")), log.queries, log.closes
+			helpers.assert_eq(reader.reconcile_sources({ "a", "b" }, function() error("foreign open admitted") end, originals), false)
+			helpers.assert_eq(log.queries, queries); helpers.assert_eq(log.closes, closes)
+			helpers.assert_true(reader.is_grabbed("a") and reader.source_owner_current(successor))
+			for _, lease in ipairs(originals) do helpers.assert_eq(reader.source_owner_current(lease), false) end
+			assert(reader.close("a")); assert(reader.close("b"))
+		end)
+	end)
+
+	helpers.it("(linux-modal-original-open) rechecks the original opaque owner after restoration callbacks", function()
+		controlled_held_reader(nil, function(reader)
+			assert(reader.open("/controlled/a", "a")); assert(reader.grab("a"))
+			local original, observer = reader.capture_source_owner("a"); assert(original)
+			local staged
+			assert(reader.ungrab("a")); assert(reader.grab("a"))
+			local input, cleanup, same_open = reader.source_owner_current(original, observer,
+				reader.capture_source_owner, reader.source_owner_current, reader.retire_source)
+			helpers.assert_eq(input, false); helpers.assert_eq(cleanup, false)
+			helpers.assert_true(same_open, "per-open identity never grants old input or cleanup currency")
+			helpers.assert_eq(reader.reconcile_sources({ "a" }, function(rows)
+				staged = rows[1].lease; original.changed = true; return true
+			end, { original }), false)
+			helpers.assert_eq(reader.source_owner_current(staged), false)
+			original.changed = nil
+			helpers.assert_true(reader.reconcile_sources({ "a" }, function() return true end, { original }))
+			helpers.assert_eq(reader.source_owner_current(original), false)
+			helpers.assert_eq(reader.source_owner_current(staged), false, "a rejected transaction never borrows a later commit")
+			assert(reader.close("a"))
+		end)
+	end)
+
 	helpers.it("(linux-native-reconciliation) refuses partial or ambiguous cohort lists before native queries", function()
 		controlled_held_reader(nil, function(reader, _, log)
 			assert(reader.open("/controlled/native-a", "a")); assert(reader.grab("a"))
