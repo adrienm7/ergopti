@@ -37,7 +37,10 @@ function sqlite.open(path)
 	end
 	function database:prepare(sql)
 		local values
-		return { bind_values = function(_, ...) values = { ... } end,
+		return { bind_values = function(_, ...)
+			values = { ... }
+			return sqlite.OK
+		end,
 			step = function() assert(call("bound", sql, values), detail); return sqlite.DONE end,
 			finalize = function() return sqlite.OK end }
 	end
@@ -370,7 +373,10 @@ function sqlite.open(path)
 	end
 	function database:prepare(sql)
 		local values
-		return { bind_values = function(_, ...) values = { ... } end,
+		return { bind_values = function(_, ...)
+			values = { ... }
+			return sqlite.OK
+		end,
 			step = function() assert(call("bound", sql, values), detail); return sqlite.DONE end,
 			finalize = function() return sqlite.OK end }
 	end
