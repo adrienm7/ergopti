@@ -543,4 +543,8 @@ return {
 	"tests.unit.adapters.synthetic_input.test_caps_word_constructor_custody",
 	"tests.unit.adapters.synthetic_input.test_caps_word_independent_custody",
 	"tests.unit.adapters.synthetic_input.test_caps_word_native_owner",
+	"tests.meta.corpus.test_corpus_llm_parser",
+	"tests.meta.corpus.test_corpus_prompt_builder",
+	"tests.meta.corpus.test_corpus_tone",
+	"tests.meta.corpus.test_corpus_process_prediction",
 }

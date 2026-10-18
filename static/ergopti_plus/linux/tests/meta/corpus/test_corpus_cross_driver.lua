@@ -11,11 +11,11 @@
 --- CORPORA CONSUMED:
 --- 1. hotstrings/vectors.json         — shared hotstring engine (tested)
 --- 2. tap_hold/vectors.json           — replayed through platform/remap/tap_hold_loader
---- 3. llm/parser_test_vectors.json    — SKIP (LLM engine not implemented on Linux)
---- 4. prompt_builder/vectors.json     — SKIP (PromptBuilder not wired on Linux)
+--- 3. llm/parser_test_vectors.json    — replayed by test_corpus_llm_parser.lua
+--- 4. prompt_builder/vectors.json     — replayed by test_corpus_prompt_builder.lua
 --- 5. security/keylogger vectors      — partially tested (pure-logic paths)
 --- 6. toml/fuzz_corpus.json           — tested (shared TOML codec)
---- 7. locale/resolution_vectors.json  — SKIP (Linux resolves via infra/locale.lua)
+--- 7. locale/resolution_vectors.json  — replayed by test_corpus_locale_resolution.lua
 --- 8. tooltip/{layout,dequeue}         — SKIP (canonical layout math is JS)
 --- 9. updater/release_parser_vectors.json — tested (full replay in
 ---    test_corpus_updater_release_parser.lua; parser used by manager.lua)
@@ -207,7 +207,7 @@ end)
 
 -- =====================================================================
 -- =====================================================================
--- ======= 4/ Corpus 3 — LLM Parser (SKIP — not implemented) ===========
+-- ======= 4/ Corpus 3 — LLM Parser (replayed) ===========
 -- =====================================================================
 -- =====================================================================
 
@@ -224,24 +224,6 @@ describe("Corpus: llm/parser_test_vectors.json", function()
 	it("corpus loaded: " .. tostring(n) .. " vector(s) present", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in llm/parser corpus")
 	end)
-
-	-- STALE RATIONALE, corrected 2026-07-31. This skip said "the LLM engine
-	-- (api_ollama, api_remote, prediction_engine) has not been ported" — all
-	-- three modules exist and load. What is actually missing is a Lua PARSER for
-	-- the advanced-block reply format these vectors describe; the Linux engine
-	-- consumes predictions without going through one. Asserting the real reason
-	-- is what stops the rationale rotting again.
-	it("SKIP [CONF-LINUX-LLM-PARSER] is still justified — Linux has no Lua reply parser to replay these vectors through", function()
-		-- Required directly: if the engine this skip talks about has genuinely
-		-- gone, the throw says so with the real error, and the rationale is wrong
-		-- in the other direction.
-		local engine = require("modules.llm.prediction_engine")
-		assert_true(type(engine) == "table",
-			"modules.llm.prediction_engine must return a module table — this skip's rationale is written around it existing")
-		local ok, mod = pcall(require, "modules.llm.parser")
-		assert_true(not ok or type(mod) ~= "table" or type(mod.process_prediction) ~= "function",
-			"a Lua reply parser now exists on Linux — replay the llm/parser corpus against it instead of skipping it")
-	end)
 end)
 
 
@@ -249,7 +231,7 @@ end)
 
 -- ========================================================================
 -- ========================================================================
--- ======= 5/ Corpus 4 — Prompt Builder (SKIP — not implemented) ===========
+-- ======= 5/ Corpus 4 — Prompt Builder (replayed) ===========
 -- ========================================================================
 -- ========================================================================
 
@@ -265,19 +247,6 @@ describe("Corpus: prompt_builder/vectors.json", function()
 
 	it("corpus loaded: " .. tostring(n) .. " vector(s) present", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in prompt_builder corpus")
-	end)
-
-	-- The skip's reason is that the Linux daemon does not LOAD the shared
-	-- PromptBuilder, not that the module is missing — so that is what is
-	-- checked. The day the daemon requires it, this turns red and the corpus
-	-- gets replayed instead of skipped.
-	it("SKIP [CONF-LINUX-PROMPT-BUILDER] is still justified — the Linux daemon does not load the shared PromptBuilder", function()
-		local root = helpers.driver_root()
-		local fh = io.open(root .. "/ergopti_hotstrings.lua", "r")
-		assert_true(fh ~= nil, "the Linux entry point must be readable")
-		local src = fh:read("*a"); fh:close()
-		assert_true(src:find("llm.prompt_builder", 1, true) == nil,
-			"the daemon now references llm.prompt_builder — replay the prompt_builder corpus against it instead of skipping it")
 	end)
 end)
 
@@ -412,11 +381,11 @@ end)
 
 
 
--- ===========================================
--- ===========================================
--- ======= 8/ Corpus 7 — Locale (SKIP) =======
--- ===========================================
--- ===========================================
+-- ===============================================
+-- ===============================================
+-- ======= 8/ Corpus 7 — Locale (replayed) =======
+-- ===============================================
+-- ===============================================
 
 describe("Corpus: locale/resolution_vectors.json", function()
 	local path = corpus_root .. "/locale/resolution_vectors.json"
@@ -430,27 +399,6 @@ describe("Corpus: locale/resolution_vectors.json", function()
 
 	it("corpus loaded: " .. tostring(n) .. " vector(s) present", function()
 		assert_true(n ~= nil and n >= 1, "expected >=1 vectors in locale corpus")
-	end)
-
-	it("SKIP [CONF-LINUX-LOCALE-CASCADE] — Linux resolves locales via infra/locale.lua (shared cascade replay is a roadmap item)", function()
-		-- The shared locale.core cascade (active->en->fr with star substitution)
-		-- is pinned by the macOS consumer (test_corpus_locale_resolution.lua). The
-		-- Linux driver reads locale files through infra/locale.lua and does not yet
-		-- replay the shared cascade; ADR-006 compliance here means the corpus is
-		-- consumed (file loaded, vectors counted) with the gap tracked, not hidden.
-		--
-		-- The skip used to be assert_true(true), which made the gap indistinguishable
-		-- from a passing replay. What IS checkable while the replay is missing: the
-		-- driver has a locale resolver at all, and the corpus this case will one day
-		-- consume is real. A skip that asserts nothing survives the arrival of the
-		-- feature it is waiting for and goes on reporting a gap that closed.
-		local resolver = io.open(driver_root .. "/infra/locale.lua", "r")
-		assert_true(resolver ~= nil,
-			"the resolver this skip defers to must exist — if infra/locale.lua is gone, the gap "
-				.. "described here is not the gap that is real")
-		if resolver then resolver:close() end
-		assert_true(n >= 1,
-			"and the corpus must carry vectors, or the replay this defers has nothing to replay")
 	end)
 end)
 
