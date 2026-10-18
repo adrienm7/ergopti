@@ -310,8 +310,9 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
     tmp_db = sql_path.parent / "_compact_work.db"
     try:
         tmp_db.unlink(missing_ok=True)
-    except Exception:
-        pass
+    except OSError as error:
+        print(f"  ERROR: cannot remove disposable work database '{tmp_db}': {error}", flush=True)
+        return False
 
     conn = sqlite3.connect(str(tmp_db))
     conn.execute("PRAGMA temp_store = FILE")

@@ -3,6 +3,7 @@
 """Native SQLite and public CLI regressions for lossless ledger compaction."""
 
 import contextlib
+import errno
 import importlib.util
 import io
 import os
@@ -293,6 +294,100 @@ class CompactionTests(unittest.TestCase):
         self.assertEqual(source, self.backup.read_bytes())
         self.assertFalse((self.path.parent / "_compact_work.db").exists())
         self.assertFalse(self.path.with_suffix(".compact.tmp").exists())
+
+    def test_initial_work_db_unlink_refusal_preserves_all_authorities(self):
+        payload = "AUTHORITATIVE é😀 capture"
+        self.write(captured_batch(1, payload))
+        source = self.path.read_bytes()
+        prior_backup = b"independent earlier backup must remain exact"
+        self.backup.write_bytes(prior_backup)
+        work = self.path.parent / "_compact_work.db"
+        stale_rows = [(1, "STALE wrong capture"), (2, "GHOST absent from ledger")]
+        with contextlib.closing(sqlite3.connect(str(work))) as stale:
+            stale.executescript(SCHEMA.read_text(encoding="utf-8"))
+            stale.executescript(
+                "".join(captured_batch(event_id, text) for event_id, text in stale_rows)
+            )
+            self.assertFalse(stale.in_transaction)
+            stale_image = work.read_bytes()
+            real_unlink = Path.unlink
+            refused = []
+
+            def deny_first_work_unlink(path, *args, **kwargs):
+                if path == work and not refused:
+                    refused.append(path)
+                    raise PermissionError(
+                        errno.EACCES, "simulated Windows delete-sharing refusal", str(path)
+                    )
+                return real_unlink(path, *args, **kwargs)
+
+            output = io.StringIO()
+            # Only the OS removal fails. The connect spy delegates to native
+            # SQLite if incorrectly invoked; no fake DB or SQL result is used.
+            with (
+                patch.object(Path, "unlink", deny_first_work_unlink),
+                patch.object(OWNER.sqlite3, "connect", wraps=sqlite3.connect) as connects,
+                contextlib.redirect_stdout(output),
+            ):
+                self.assertFalse(OWNER.compact_device(self.path, SCHEMA))
+                connects.assert_not_called()
+            self.assertEqual([work], refused)
+            self.assertIn("cannot remove disposable work database", output.getvalue())
+            self.assertEqual(source, self.path.read_bytes())
+            self.assertEqual(prior_backup, self.backup.read_bytes())
+            self.assertEqual(
+                stale_image, work.read_bytes(), "refusal cannot alter the held stale DB"
+            )
+            self.assertEqual(
+                stale_rows,
+                stale.execute("SELECT id,replacement FROM events_hotstring ORDER BY id").fetchall(),
+            )
+            self.assertFalse(self.path.with_suffix(".compact.tmp").exists())
+
+    def test_public_cli_held_work_db_respects_native_delete_semantics(self):
+        payload = "AUTHORITATIVE é漢😀 capture"
+        self.write(captured_batch(1, payload))
+        source = self.path.read_bytes()
+        prior_backup = b"independent prior backup must remain exact on refusal"
+        self.backup.write_bytes(prior_backup)
+        work = self.path.parent / "_compact_work.db"
+        stale_rows = [(1, "STALE wrong capture"), (2, "GHOST absent from ledger")]
+        with contextlib.closing(sqlite3.connect(str(work))) as stale:
+            stale.executescript(SCHEMA.read_text(encoding="utf-8"))
+            stale.executescript(
+                "".join(captured_batch(event_id, text) for event_id, text in stale_rows)
+            )
+            self.assertFalse(stale.in_transaction)
+            stale_image = work.read_bytes()
+            result = self.cli()
+            if os.name == "nt":
+                self.assertNotEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertIn("FAILED", result.stdout)
+                self.assertIn("cannot remove disposable work database", result.stdout)
+                self.assertNotIn("Done. Backup kept", result.stdout)
+                self.assertEqual(source, self.path.read_bytes())
+                self.assertEqual(prior_backup, self.backup.read_bytes())
+                self.assertEqual(stale_image, work.read_bytes())
+            else:
+                self.assertEqual(
+                    "posix", os.name, "the supported alternate platforms use POSIX deletion"
+                )
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                self.assertEqual(
+                    [(1, payload)],
+                    read_rows(self.path),
+                    "only authoritative source rows may survive",
+                )
+                self.assertEqual(source, self.backup.read_bytes())
+                self.assertFalse(
+                    work.exists(), "the new private projection is cleaned after publication"
+                )
+            self.assertEqual(
+                stale_rows,
+                stale.execute("SELECT id,replacement FROM events_hotstring ORDER BY id").fetchall(),
+                "the independently held old SQLite image remains unchanged on either platform",
+            )
+            self.assertFalse(self.path.with_suffix(".compact.tmp").exists())
 
     def test_export_read_refusal_preserves_source_backup_and_owned_stage_cleanup(self):
         self.write(captured_batch(1, "retained"))
