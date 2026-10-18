@@ -69,6 +69,8 @@ function M.new(opts)
 	local joining_context = false
 	local joining_identity = nil
 	local joined_context = nil
+	local joined_field = nil
+	local reading_text_identity = false
 	local context_request, attempted_generation = nil, nil
 	local stopped = false
 	local refreshing_context, retiring_context, notifying_context = false, false, false
@@ -109,7 +111,7 @@ function M.new(opts)
 		context_generation = context_generation + 1
 		retry_not_before_ms = nil
 		if asynchronous then retire_context(); joining_context, joining_identity = false, nil end
-		context_pending, observed, joined_context = true, nil, nil
+		context_pending, observed, joined_context, joined_field = true, nil, nil, nil
 		if detector and type(detector.invalidateFocus) == "function" then detector.invalidateFocus() end
 		keylogger.set_secure_field(true)
 		if prediction and type(prediction.cancel) == "function" then pcall(prediction.cancel) end
@@ -121,7 +123,7 @@ function M.new(opts)
 	function guard.invalidate()
 		if stopped then return nil end
 		if asynchronous then retire_context(); joining_context, joining_identity = false, nil end
-		if contextual then context_generation = context_generation + 1; context_pending, joined_context = true, nil end
+		if contextual then context_generation = context_generation + 1; context_pending, joined_context, joined_field = true, nil, nil end
 		if detector and type(detector.invalidateFocus) == "function" then
 			pending_epoch = detector.invalidateFocus()
 		else
@@ -177,6 +179,8 @@ function M.new(opts)
 			retry_not_before_ms = nil
 			observed, context_pending, pending_epoch = request.expected, false, nil
 			joined_context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
+			joined_field = { bus = request.before.bus, path = request.before.path, role = request.before.role,
+				generation = request.generation, epoch = request.epoch }
 			keylogger.set_secure_field(request.before.role == 40 or protected)
 			return true
 		end
@@ -280,6 +284,7 @@ function M.new(opts)
 		if not admitted or committed ~= true or context_generation ~= generation then return false end
 		observed, context_pending, pending_epoch = expected, false, nil
 		joined_context = { app_id = context.app_id, title = context.title, native_identity = context.native_identity }
+		joined_field = { bus = before.bus, path = before.path, role = before.role, generation = generation, epoch = epoch }
 		-- The publisher has already installed the incoming app/title policy.
 		keylogger.set_secure_field(before.role == 40 or protected)
 		return true
@@ -343,15 +348,17 @@ function M.new(opts)
 		return guard.refresh(true)
 	end
 
-	--- Returns whether text automation must be withheld right now.
-	--- @return boolean
-	function guard.blocks_text()
+	--- Checks live privacy and retains the exact receipt from its single barrier.
+	--- @return boolean blocked
+	--- @return table|nil snapshot Fresh resident native receipt.
+	local function text_admission()
 		if stopped then return true end
 		if joining_context then return true end
+		local snapshot
 		if watch then
 			watch.pump()
 			if pending_epoch ~= nil and options.now_ms() < probe_not_before_ms then return true end
-			local snapshot = watch.barrier()
+			snapshot = watch.barrier()
 			if contextual then
 				if not snapshot or identity(snapshot) ~= observed then
 					if not context_pending then revoke_context() end
@@ -370,7 +377,36 @@ function M.new(opts)
 		end
 		if not detector or type(detector.isSecureField) ~= "function" then return true end
 		local ok, secure = pcall(detector.isSecureField)
-		return not ok or secure ~= false
+		return not ok or secure ~= false, snapshot
+	end
+
+	--- Returns whether text automation must be withheld right now.
+	--- @return boolean
+	function guard.blocks_text()
+		local blocked = text_admission()
+		return blocked
+	end
+
+	--- Captures a fresh exact AI text target without launching a native helper.
+	--- A receipt cannot outlive its joined context, generation or detector epoch.
+	--- @return string|nil identity Exact active non-password bus/object identity.
+	function guard.focused_text_identity()
+		if reading_text_identity or stopped or not contextual or not watch or context_pending or joining_context
+			or not joined_field or not joined_context then return nil end
+		local field, context = joined_field, joined_context
+		reading_text_identity = true
+		local called, result = pcall(function()
+			if field.generation ~= context_generation or field.epoch == nil
+				or detector.currentEpoch() ~= field.epoch then return nil end
+			local blocked, snapshot = text_admission()
+			if blocked or not snapshot or snapshot.role == 40
+				or snapshot.bus ~= field.bus or snapshot.path ~= field.path or snapshot.role ~= field.role
+				or detector.currentEpoch() ~= field.epoch or joined_field ~= field or joined_context ~= context
+				or field.generation ~= context_generation or context_pending or joining_context or stopped then return nil end
+			return "atspi:" .. field.bus .. ":" .. field.path
+		end)
+		reading_text_identity = false
+		return called and result or nil
 	end
 
 	--- Fences all publication and retains helper resources until native retirement.

@@ -18,12 +18,14 @@ local source = file:read("*a")
 file:close()
 local seam = assert(source:match("focus_id = (.-),\n%s*%-%-"), "the daemon focus callback must be present")
 local compile = loadstring or load
-local focus_factory = assert(compile("return function(window_info) return " .. seam .. " end"))()
+local focus_factory = assert(compile("return function(window_info, secure_focus_guard) return " .. seam .. " end"))()
 local Window = require("adapters.window_info")
-local focus_id = focus_factory(Window)
-assert(type(focus_id) == "function", "the real daemon must inject a text destination reader")
 local Detector = require("adapters.secure_field_detector")
 local Atspi = require("adapters.atspi_focus")
+local uv = require("luv")
+local Clock = require("infra.monotonic")
+local Timings = require("infra.timings")
+local Watch = require("adapters.atspi_focus_watch").new()
 package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
 	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
@@ -41,6 +43,29 @@ package.loaded["modules.llm.api_remote"] = {
 }
 local Engine = require("modules.llm.prediction_engine")
 local Tone = require("llm.tone")
+local Keylogger = require("modules.keylogger.keylogger")
+local Guard = require("modules.keylogger.focus_guard").new({
+	watch = Watch, detector = Detector, keylogger = Keylogger, prediction = Engine,
+	now_ms = Clock.now_ms, retry_ms = Timings.ms("privacy", "context_retry_ms"),
+	capture_context_async = Window.start_privacy_context,
+	publish_context = function(context) return true, Keylogger.is_context_protected(context.app_id, context.title) end,
+})
+local focus_id = focus_factory(Window, Guard)
+assert(type(focus_id) == "function", "the real daemon must inject a text destination reader")
+assert(Watch.start() and Watch.wait_ready(), "the actual native focus watcher must become ready")
+
+--- Pumps native context ownership off the input path until ordinary text is ready.
+local function await_join()
+	local deadline = Clock.now_ms() + 5000
+	repeat
+		uv.run("nowait")
+		Guard.refresh(true)
+		if not Guard.blocks_text() then return end
+		uv.sleep(1)
+	until Clock.now_ms() > deadline
+	error("native AI privacy context did not join within five seconds")
+end
+
 local function initialize()
 	callback, applied, request, reads = nil, 0, 0, 0
 	scheduler = require("tests.fakes").timer_scheduler()
@@ -52,11 +77,13 @@ local function initialize()
 	Engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 		focus_id = focus_id,
+		privacy_guard = Guard.blocks_text, privacy_context = Guard.current_context,
 		read_selection = function() reads = reads + 1; return true, "Merci pour ton aide", nil end,
 		replace_selection = type_text,
 		apply_prediction = function(candidate) return type_text(candidate.to_type) end,
 	})
-	assert(Detector.refresh(Detector.invalidateFocus()), "the positive initial field must be checked natively")
+	Guard.prime()
+	await_join()
 end
 local function snapshot(fields)
 	local native, conclusive = Atspi.get_snapshot()
@@ -65,17 +92,19 @@ local function snapshot(fields)
 	fields.bus = native and native.native_bus_name
 	fields.active_scope = native and native.active_scope
 	fields.conclusive = conclusive
+	fields.target = focus_id()
 	fields.cached_verdict = Detector.getVerdict()
 	fields.url_filter = require("modules.llm.trigger_settings").get("url_bar_filter_enabled")
 	fields.foreground_type = type(require("adapters.process_lifecycle").getForegroundApp())
 	fields.window = Window.focused_identity()
-	fields.target = focus_id()
 	fields.applied, fields.requests, fields.reads = applied, request, reads
 	fields.offered = Engine.has_suggestions()
 	io.write("RECEIPT:" .. Json.encode(fields) .. "\n")
 end
 for command in io.lines() do
-	local result = {}
+	local result = { barrier_budget_ms = Timings.ms("privacy", "focus_barrier_timeout_ms") }
+	uv.run("nowait")
+	Guard.refresh(true)
 	if command == "reset" then
 		initialize()
 	elseif command:match("^start%-") then
@@ -95,7 +124,31 @@ for command in io.lines() do
 		if command == "finish" and mode ~= "tone" then result.accepted = Engine.accept(1) end
 	elseif command == "accept" then
 		result.accepted = Engine.accept(1)
+	elseif command == "first-character" then
+		result.helper_calls = 0
+		local originals = {}
+		for _, entry in ipairs({ { Atspi, "get_snapshot" }, { Shell, "exec" }, { Shell, "exec_line" }, { Shell, "exec_checked" } }) do
+			local object, name = entry[1], entry[2]
+			local original = object[name]
+			originals[#originals + 1] = { object, name, original }
+			object[name] = function(...)
+				result.helper_calls = result.helper_calls + 1
+				return original(...)
+			end
+		end
+		local started = uv.hrtime()
+		local heartbeat = uv.new_timer()
+		heartbeat:start(0, 0, function()
+			result.heartbeat_delay_ms = (uv.hrtime() - started) / 1000000
+			heartbeat:close()
+		end)
+		local called, detail = pcall(Engine.on_char, "x", "x", {})
+		result.first_char_ms = (uv.hrtime() - started) / 1000000
+		for _, entry in ipairs(originals) do entry[1][entry[2]] = entry[3] end
+		uv.run("nowait")
+		assert(called, detail)
 	elseif command == "benchmark" or command == "deadline" then
+		if command == "benchmark" then await_join() end
 		local clock = require("infra.monotonic")
 		result.probe_ms = {}
 		for _ = 1, command == "benchmark" and 20 or 1 do
@@ -114,3 +167,10 @@ for command in io.lines() do
 	snapshot(result)
 	io.flush()
 end
+Guard.stop()
+Watch.stop()
+local deadline = Clock.now_ms() + 5000
+while (not Guard.stop() or not Watch.is_settled()) and Clock.now_ms() <= deadline do
+	uv.run("nowait"); uv.sleep(1)
+end
+assert(Guard.stop() and Watch.is_settled(), "native AI focus resources must physically retire")
