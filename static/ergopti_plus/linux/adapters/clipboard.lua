@@ -263,6 +263,17 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Requires a caller's live destination without making native focus atomic.
+--- Cleanup never uses this admission: the saved clipboard must still be restored.
+--- @param admission function|nil Full-phase destination check.
+--- @return boolean accepted
+local function admitted(admission)
+	if admission == nil then return true end
+	if type(admission) ~= "function" then return false end
+	local checked, current = pcall(admission)
+	return checked and current == true
+end
+
 --- Emits Ctrl+V through the caller's uinput channel.
 ---
 --- Ctrl+V and not Shift+Insert: it is what every graphical toolkit binds, and
@@ -270,9 +281,11 @@ end
 --- anyway. There is no keystroke that works in every application, which is a
 --- property of the desktop rather than a choice available here.
 --- @param uinput table Channel exposing emit(code, value) -> boolean.
+--- @param admission function|nil Full-phase destination check.
 --- @return boolean True only when the complete chord reached the wire.
-local function press_paste(uinput)
+local function press_paste(uinput, admission)
 	local key_v = require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+	if not admitted(admission) then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_UP) ~= true then return false end
@@ -288,8 +301,10 @@ end
 --- @param text string Text to deliver.
 --- @param uinput table Channel exposing emit(code, value).
 --- @param sleep_ms function Blocking sleep, injected so this module owns no timer.
+--- @param admission function|nil Rechecks the retained destination after blocking phases.
 --- @return boolean True when the paste was issued.
-function M.paste_text(text, uinput, sleep_ms)
+--- @return string|nil Fixed failure reason when clipboard restoration was refused.
+function M.paste_text(text, uinput, sleep_ms, admission)
 	if type(text) ~= "string" or text == "" then return false end
 	if type(uinput) ~= "table" or type(uinput.emit) ~= "function" then
 		Logger.error(LOG, "paste_text(): no uinput channel to press the paste chord with.")
@@ -303,6 +318,7 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
+	if not admitted(admission) then return false end
 	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
 	if not snapshot_ok then
 		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
@@ -310,16 +326,20 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
+	if not admitted(admission) then return false end
 	if not write_backend_checked(b, text) then
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
 		return false
 	end
 
 	local paste_ok, issued = pcall(function()
+		if not admitted(admission) then return false end
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
-		if not press_paste(uinput) then return false end
+		-- The shortcut lookup may query the layout, so validate after it and
+		-- immediately before Ctrl DOWN, not merely before the settle delay.
+		if not press_paste(uinput, admission) then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
-		return true
+		return admitted(admission)
 	end)
 
 	-- Restored even when it was empty: writing "" back is what leaves the
@@ -327,10 +347,12 @@ function M.paste_text(text, uinput, sleep_ms)
 	-- would leave our replacement sitting there.
 	if not write_backend_checked(b, saved) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
-		return false
+		return false, "clipboard restoration failed"
 	end
 	if not paste_ok or not issued then
-		Logger.error(LOG, "paste_text(): checked paste chord emission failed.")
+		-- An admitted transaction distinguishes expected destination retirement
+		-- from real wire failures after cleanup; only it should notify errors.
+		if admission == nil then Logger.error(LOG, "paste_text(): checked paste chord emission failed.") end
 		return false
 	end
 

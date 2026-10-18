@@ -300,17 +300,39 @@ local function send_text(tx, text, is_private, prepared)
 		if prepared then error("prepared native replacement is no longer available", 0) end
 	end
 
+	-- Clipboard restores its saved bytes even when admission fails. Retain the
+	-- original refusal across its protected cleanup so healthy input is not
+	-- emergency-stopped merely because a destination changed during an I/O.
+	local admission_error
+	local function admission()
+		local checked, reason = pcall(require_publication, tx.publication, false)
+		if not checked then admission_error = reason; return false end
+		return true
+	end
 	local pause = sleep_ms
 	if tx.publication then
 		pause = function(ms)
-			require_publication(tx.publication, false)
+			if not admission() then error(admission_error, 0) end
 			sleep_ms(ms)
-			require_publication(tx.publication, false)
+			if not admission() then error(admission_error, 0) end
 		end
 	end
 	require_publication(tx.publication, false)
 	if prepared then prepared.cached() end
-	if Clipboard.paste_text(text, tx.channel(), pause) then
+	local channel = tx.channel()
+	local emit = channel.emit
+	channel.emit = function(...)
+		local checked, result = pcall(emit, ...)
+		if not checked then admission_error = result; error(result, 0) end
+		return result
+	end
+	local pasted, restore_failure = Clipboard.paste_text(text, channel, pause, admission)
+	if restore_failure then
+		tx.fail(restore_failure, "clipboard restoration")
+		error(tx.error(), 0)
+	end
+	if admission_error ~= nil then error(admission_error, 0) end
+	if pasted then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
 		return true
 	end
