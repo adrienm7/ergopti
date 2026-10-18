@@ -370,3 +370,5 @@ for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
 		_RemoteProxy_ReadyInvalidBudget.Bind(Budget))
 
 #Include %A_LineFile%/../test_llm_api_remote_abort_retirement.ahk
+
+#Include %A_LineFile%/../test_llm_api_remote_completion_reads.ahk
