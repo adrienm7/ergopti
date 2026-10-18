@@ -41,6 +41,8 @@ local layout_plan, layout_plan_current, layout_plan_view = KeyboardLayout.plan, 
 local XkbCapture = require("adapters.xkb_capture")
 local Clipboard = require("adapters.clipboard")
 local OutputTransaction = require("modules.hotstrings.output_transaction")
+local ModifierBroker = require("adapters.modifier_broker")
+local broker_for_channel = ModifierBroker.for_channel
 
 local LOG = "modules.hotstrings.injector"
 
@@ -206,16 +208,19 @@ end
 --- which is worse than not typing it: the user loses text they had.
 --- @param tx table Output transaction.
 --- @param text string
+--- @param prepared table|nil Exact ordinary replacement plan retained before erasure.
 --- @return boolean True when the whole string was typed.
-local function send_text_native(tx, text)
+local function send_text_native(tx, text, prepared)
 	if not (_uinput and _uinput.is_open()) then return false end
 	if not KeyboardLayout.is_ready() then return false end
 
 	if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= layout_plan_current
 		or KeyboardLayout.plan_view ~= layout_plan_view then return false end
-	local offered, blocker, receipt = layout_plan(text)
+	local offered, blocker, receipt
+	if prepared then offered, receipt = prepared.plan, prepared.receipt
+	else offered, blocker, receipt = layout_plan(text) end
 	local check, view = layout_plan_current, layout_plan_view
-	local plan = offered and type(view) == "function" and view(receipt) or nil
+	local plan = prepared and prepared.plan or offered and type(view) == "function" and view(receipt) or nil
 	if not plan then
 		Logger.debug(LOG, "Layout cannot type %s — falling back.", tostring(blocker))
 		return false
@@ -225,6 +230,7 @@ local function send_text_native(tx, text)
 		if KeyboardLayout.plan ~= layout_plan or KeyboardLayout.plan_current ~= check or KeyboardLayout.plan_view ~= view or not ok or current ~= true then
 			error("layout plan is no longer current", 0)
 		end
+		if prepared then prepared.seal() end
 	end
 	local function admission()
 		current_plan(false)
@@ -286,9 +292,13 @@ end
 --- @param tx table Output transaction.
 --- @param text string
 --- @param is_private boolean|nil True when `text` is PII and must not be logged.
+--- @param prepared table|nil Admitted ordinary replacement route; nil for other text phases.
 --- @return boolean True when the whole payload was delivered.
-local function send_text(tx, text, is_private)
-	if send_text_native(tx, text) then return true end
+local function send_text(tx, text, is_private, prepared)
+	if not prepared or prepared.native then
+		if send_text_native(tx, text, prepared) then return true end
+		if prepared then error("prepared native replacement is no longer available", 0) end
+	end
 
 	local pause = sleep_ms
 	if tx.publication then
@@ -299,6 +309,7 @@ local function send_text(tx, text, is_private)
 		end
 	end
 	require_publication(tx.publication, false)
+	if prepared then prepared.cached() end
 	if Clipboard.paste_text(text, tx.channel(), pause) then
 		Logger.debug(LOG, "Replacement delivered by clipboard (untypable on this layout).")
 		return true
@@ -363,12 +374,97 @@ require_publication = function(publication, cached)
 	if not ok or current ~= true then error("programmable publication is no longer current", 0) end
 end
 
+--- Prepares the complete replacement without reserving output or erasing text.
+--- Clipboard availability proves a tool exists; snapshot or paste can still fail.
+--- @param text string Whole replacement payload.
+--- @param publication table|nil Retained programmable publication owner.
+--- @return table prepared Exact route and original channel ownership.
+local function prepare_replacement(text, publication)
+	local channel = _uinput
+	local open, emit = channel and channel.is_open, channel and channel.emit
+	local ready = KeyboardLayout.is_ready
+	local available, paste = Clipboard.is_available, Clipboard.paste_text
+	local broker, binding = broker_for_channel(channel)
+	local output_current = broker and broker.output_current
+	local prepared = { channel = channel }
+	local function seal()
+		local current_broker, current_binding = broker_for_channel(channel)
+		if _uinput ~= channel or not channel or channel.is_open ~= open or channel.emit ~= emit
+			or KeyboardLayout.is_ready ~= ready or KeyboardLayout.plan ~= layout_plan
+			or KeyboardLayout.plan_current ~= layout_plan_current or KeyboardLayout.plan_view ~= layout_plan_view
+			or ModifierBroker.for_channel ~= broker_for_channel or current_broker ~= broker or current_binding ~= binding then
+			error("replacement preparation is no longer current", 0)
+		end
+		if broker and (broker.output_current ~= output_current or type(binding) ~= "function" or binding(broker) ~= true) then
+			error("replacement output owner is no longer current", 0)
+		end
+		if prepared.native == false and (Clipboard.is_available ~= available or Clipboard.paste_text ~= paste) then
+			error("clipboard preparation is no longer current", 0)
+		end
+	end
+	prepared.seal = seal
+	seal()
+	if type(open) ~= "function" or open() ~= true then error("uinput channel is not open", 0) end
+	seal()
+	local offered, blocker
+	if ready() then
+		seal()
+		offered, blocker, prepared.receipt = layout_plan(text)
+		seal()
+		prepared.plan = offered and layout_plan_view(prepared.receipt) or nil
+		seal()
+		if offered and not prepared.plan then error("layout plan is no longer current", 0) end
+	end
+	seal()
+	prepared.native = prepared.plan ~= nil
+	if not prepared.native then
+		if type(available) ~= "function" or available() ~= true then error("replacement could not be delivered", 0) end
+		seal()
+	end
+	function prepared.cached()
+		seal()
+		require_publication(publication, true)
+		seal()
+		if prepared.native and not prepared.delivered then
+			local checked, current = pcall(layout_plan_current, prepared.receipt, true)
+			seal()
+			if not checked or current ~= true then error("layout plan is no longer current", 0) end
+		end
+	end
+	function prepared.current()
+		require_publication(publication, false)
+		seal()
+		if prepared.native then
+			local checked, current = pcall(layout_plan_current, prepared.receipt, false)
+			seal()
+			if not checked or current ~= true then error("layout plan is no longer current", 0) end
+		end
+		require_publication(publication, true)
+		prepared.cached()
+		-- An idle broker's original output epoch must be current before reservation.
+		-- While reserved, its native transaction owns that epoch and the RAM seal
+		-- checks only the binding, since output_current deliberately refuses busy.
+		if broker then
+			local checked, current = pcall(output_current)
+			seal()
+			if not checked or current ~= true then error("replacement output owner is no longer current", 0) end
+		end
+	end
+	return prepared
+end
+
 --- Runs one complete output transaction with unconditional cleanup.
 --- @param label string Diagnostic operation name.
 --- @param body function Called as body(transaction).
+--- @param publication table|nil Retained programmable publication owner.
+--- @param prepared table|nil Ordinary replacement guards checked before any output reservation.
 --- @return table Commit result.
-local function run_transaction(label, body, publication)
-	local native_tx = OutputTransaction.new(_uinput)
+local function run_transaction(label, body, publication, prepared)
+	if prepared then
+		local checked, reason = pcall(prepared.current)
+		if not checked then return { ok = false, error = tostring(reason), failed_phase = "replacement preflight", cleanup_ok = true } end
+	end
+	local native_tx = OutputTransaction.new(prepared and prepared.channel or _uinput)
 	local tx
 	-- Cleanup remains on the original transaction wire, so a refused late
 	-- publication never prevents owned key-ups or physical modifier restore.
@@ -376,6 +472,7 @@ local function run_transaction(label, body, publication)
 		emit = function(code, value, phase, admission)
 			if value == EVDEV_VALUE_DOWN and phase ~= "capslock restore down" then
 				require_publication(publication, true)
+				if prepared then prepared.cached() end
 			end
 			if value == EVDEV_VALUE_DOWN and admission then admission() end
 			return native_tx.emit(code, value, phase)
@@ -387,8 +484,10 @@ local function run_transaction(label, body, publication)
 			emit = function(code, value) return tx.emit(code, value, "clipboard paste chord") end }
 	end
 	local ok, err = pcall(function()
-		require_publication(publication, false)
-		if not tx.neutralize(held_text_modifier_codes()) then error(tx.error(), 0) end
+		if prepared then prepared.cached() else require_publication(publication, false) end
+		local text_modifiers = held_text_modifier_codes()
+		if prepared then prepared.cached() end
+		if not tx.neutralize(text_modifiers) then error(tx.error(), 0) end
 		-- Ctrl, Alt and Super are released for good: the chord that asked for
 		-- this text (Alt+1 on a prediction) is spent, and text typed under them
 		-- would be shortcuts. A masking tap comes first, so the release is not a
@@ -598,6 +697,12 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	else
 		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
 	end
+	local checked, prepared = pcall(prepare_replacement, replacement_text, publication)
+	if not checked then
+		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
+		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
+		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
+	end
 
 	local result = run_transaction("inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
@@ -609,12 +714,15 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 
 		require_publication(publication, false)
 		-- Phase 2: type the replacement.
-		if not send_text(tx, replacement_text, is_private) then error(tx.error(), 0) end
+		if not send_text(tx, replacement_text, is_private, prepared) then error(tx.error(), 0) end
+		-- The terminator owns its own plan. The replacement's completed receipt
+		-- no longer fences that later phase; channel/publication seals still do.
+		prepared.delivered = true
 		if replay_terminator and replay_terminator ~= "" then
 			require_publication(publication, false)
 			send_terminator(tx, replay_terminator)
 		end
-	end, publication)
+	end, publication, prepared)
 
 	if result.ok then Logger.done(LOG, "inject(): done (bc=%d).", backspace_count) end
 	return result
