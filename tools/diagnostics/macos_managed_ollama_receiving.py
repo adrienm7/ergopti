@@ -114,6 +114,32 @@ PULL_ERROR_CLASSES = (
 PULL_STATUS_LIMIT = 16
 
 
+def fixture_pull_errors(rows, private):
+    """Return at most four daemon error texts with fixture-private values redacted."""
+    errors = []
+    for row in rows:
+        error = row.get("error") if isinstance(row, dict) else None
+        if not isinstance(error, str):
+            continue
+        for value in private:
+            error = error.replace(value, "<private>")
+        errors.append(error[:240])
+        if len(errors) == 4:
+            break
+    return errors
+
+
+def fixture_origin_requests(fixture):
+    """Project the owned origin's request log onto path, method, route and range."""
+    with fixture.lock:
+        records = list(fixture.records)
+    return [
+        {key: row.get(key) for key in ("event", "method", "route", "path")}
+        for row in records[-24:]
+        if isinstance(row, dict)
+    ]
+
+
 def pull_statuses(rows):
     """Return the ordered distinct progress statuses with digests masked."""
     seen = []
@@ -1181,6 +1207,13 @@ class Receiver:
             pulled = owner.pull(model_name, rows.append)
             self.receipt["pull_error_classes"] = pull_error_classes(rows)
             self.receipt["pull_statuses"] = pull_statuses(rows)
+            if not pulled:
+                # Fixture-only facts: the random fixture host and private home
+                # are redacted; digests name the generated test model.
+                self.receipt["pull_errors"] = fixture_pull_errors(
+                    rows, (self.fixture.host, str(self.home), str(self.work))
+                )
+                self.receipt["origin_requests"] = fixture_origin_requests(self.fixture)
             require(pulled, "actual_pull_success")
             require(owner.pending, "http_exit_is_not_daemon_ack")
             self.retirement(owner)
