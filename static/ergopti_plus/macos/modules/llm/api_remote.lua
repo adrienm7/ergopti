@@ -2149,7 +2149,7 @@ local function post_and_parse_resolved(entry, model_name, system_prompt, full_te
 			on_response,
 			function(reason, detail)
 				if my_identity ~= _identity_generation or find_active_entry() ~= identity_entry then return end
-				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", detail or reason) end
+				if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail", reason == "cancelled" and reason or detail or reason) end
 			end, current)
 		return
 	end

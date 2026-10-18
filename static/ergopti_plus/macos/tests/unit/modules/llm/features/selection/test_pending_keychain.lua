@@ -22,7 +22,7 @@ local FLOWS = {
 
 --- Uses real credential identity/cache logic over a deferred native secret read.
 --- @param scenario function Complete native request scenario.
-local function with_keychain(scenario)
+local function with_keychain(scenario, backboard)
 	return helpers.with_fresh_modules({
 		"modules.llm.tone_rewrite", "modules.llm.mlx_stream_retirement", "adapters.event_provenance",
 		"tests.support.modules.llm.selection_translation_scope",
@@ -38,7 +38,8 @@ local function with_keychain(scenario)
 				return { cancel = function() read.cancelled = true; return true end }
 			end
 			return scenario(world)
-		end, nil, { token = "keychain:selection-key" })
+		end, nil, { token = "keychain:selection-key", provider = backboard and "backboard" or nil,
+			model = backboard and "openai/gpt-4o-mini" or nil })
 	end)
 end
 
@@ -105,6 +106,54 @@ helpers.describe("selection authority survives pending native Keychain", functio
 			end)
 		end)
 	end
+
+
+	for _, phase in ipairs({ "assistant", "message" }) do
+		helpers.it("keeps Backboard " .. phase .. " cancellation distinct from provider failure", function()
+			with_keychain(function(world)
+				awaiting_key(world, FLOWS[2])
+				if phase == "message" then
+					world.pending_keys[1].completed(true, "cleartext-key")
+					helpers.assert_eq(#world.posts, 1, "only assistant creation precedes revocation")
+					helpers.assert_true(world.posts[1].url:match("/assistants$") ~= nil)
+				end
+				world.native_destination.change_focus("8:202")
+				if phase == "assistant" then world.pending_keys[1].completed(true, "cleartext-key")
+				else world.posts[1].callback({ ok = true, status = 200, body = hs.json.encode({ assistant_id = "asst-1" }) }) end
+				helpers.assert_eq(#world.posts, phase == "assistant" and 0 or 1, "revoked selection must never be sent")
+				for _, notice in ipairs(world.notices) do
+					helpers.assert_true(notice ~= "llm.translate.failed", "cancellation is not a Backboard provider failure")
+				end
+				helpers.assert_eq(#world.document, 0)
+			end, true)
+		end)
+	end
+
+	helpers.it("sends current Backboard translation after assistant creation", function()
+		with_keychain(function(world)
+			awaiting_key(world, FLOWS[2])
+			world.pending_keys[1].completed(true, "cleartext-key")
+			helpers.assert_eq(#world.posts, 1)
+			world.posts[1].callback({ ok = true, status = 200, body = hs.json.encode({ assistant_id = "asst-1" }) })
+			helpers.assert_eq(#world.posts, 2)
+			helpers.assert_true(world.posts[2].url:match("/threads/messages$") ~= nil)
+			helpers.assert_eq(world.posts[2].body.assistant_id, "asst-1")
+			helpers.assert_true(world.posts[2].body.content:find("Hello", 1, true) ~= nil)
+		end, true)
+	end)
+
+	helpers.it("preserves Backboard assistant HTTP failure detail for raw callers", function()
+		with_keychain(function(world)
+			local failure
+			world.core.api_remote.request_raw(nil, "system", "selection", "", 0.1, 32,
+				function() error("failed assistant must not answer") end, function(detail) failure = detail end)
+			world.pending_keys[1].completed(true, "cleartext-key")
+			world.posts[1].callback({ ok = false, status = 503, body = "unavailable" })
+			helpers.assert_eq(type(failure), "table")
+			helpers.assert_eq(failure.reason, "assistant_http_503")
+			helpers.assert_eq(failure.status, 503)
+		end, true)
+	end)
 
 	helpers.it("preserves an unguarded legacy remote raw request", function()
 		with_keychain(function(world)
