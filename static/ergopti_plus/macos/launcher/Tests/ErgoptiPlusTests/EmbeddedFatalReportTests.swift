@@ -115,6 +115,43 @@ final class EmbeddedFatalReportTests: XCTestCase {
 		}
 	}
 
+	/// Replacement arguments are data: braces in a path or cause must never
+	/// become a later template substitution (launcher-literal-placeholders).
+	func testCatalogInterpolationPreservesLiteralPlaceholdersInArguments() throws {
+		let directory = FileManager.default.temporaryDirectory
+			.appendingPathComponent("ergopti-localization-\(UUID().uuidString)", isDirectory: true)
+		try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: false)
+		defer { try? FileManager.default.removeItem(at: directory) }
+		let template = "{2}; {1}; {1}; {10}; {11}; {01}; {{1}}; {missing}"
+		let catalog = try JSONSerialization.data(withJSONObject: ["fixture": template])
+		try catalog.write(to: directory.appendingPathComponent("en.json"))
+		let localization = try XCTUnwrap(LauncherLocalization.load(
+			localesDirectory: directory.path, storedLocale: "en", preferredLanguages: []))
+		let arguments = ["é/{2}/🔑", "second {1}"] + Array(repeating: "unused", count: 7) + ["tenth"]
+		XCTAssertEqual(localization.text("fixture", arguments),
+			"second {1}; é/{2}/🔑; é/{2}/🔑; tenth; {11}; {01}; {é/{2}/🔑}; {missing}")
+		XCTAssertEqual(localization.text("fixture"), template,
+			"unprovided template arguments must remain visible")
+		XCTAssertNil(localization.text("absent"))
+	}
+
+	/// The real fatal-alert catalog must preserve a user path containing braces
+	/// while still filling every template-owned component, cause and log slot.
+	func testLocalizedRuntimeAlertPreservesPlaceholderTextInItsComponent() throws {
+		let component = "é/{2}/🔑"
+		let cause = "refused {3}"
+		let logPath = "/Logs/{1}/launcher.log"
+		let report = EmbeddedFatalReport(kind: .runtime, stage: component, message: "", detail: cause)
+		for locale in ["en", "fr"] {
+			let localization = try XCTUnwrap(LauncherLocalization.load(
+				localesDirectory: Self.localesDirectory, storedLocale: locale, preferredLanguages: []))
+			let text = embeddedFatalAlertText(report, logPath: logPath, localization: localization)
+			XCTAssertTrue(text.contains(component), "\(locale): \(text)")
+			XCTAssertTrue(text.contains(cause), "\(locale): \(text)")
+			XCTAssertTrue(text.contains(logPath), "\(locale): \(text)")
+		}
+	}
+
 	func testUnrecognisedKindIsStillShownAndNamedInTheDiagnostic() {
 		let report = EmbeddedFatalReport.parse("kind=later\nstage=x\ndetail=y\n")
 		XCTAssertEqual(report?.kind, .boot)
