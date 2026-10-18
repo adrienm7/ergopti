@@ -135,6 +135,23 @@ local ok, failure = pcall(function()
 	assert(table.concat(rows, ",") == "42:1,30:1,30:0,30:1,30:0,42:0",
 		"source reconciliation changed retained native output: " .. table.concat(rows, ","))
 	print("PASS: adding and removing another native source preserves the retained Shift without output replay")
+
+	chars, rows = {}, {}
+	emit(1, 42, 1); emit(1, 30, 1); emit(1, 30, 0)
+	local original_refresh, original_family = Layout.refresh, Hook.get_layout()
+	local function selected_map_current()
+		return package.loaded["adapters.keyboard_layout"] == Layout and Layout.refresh == original_refresh
+	end
+	assert(Hook.refresh_capture(original_family, function()
+		assert(Hook.set_layout(original_family))
+		return original_refresh()
+	end, selected_map_current), "live native keymap refresh refused the original cohort")
+	emit(1, 30, 1); emit(1, 30, 0); emit(1, 42, 0)
+	assert(table.concat(chars) == "AA", "live keymap refresh forgot the held native Shift: " .. table.concat(chars))
+	assert(table.concat(rows, ",") == "42:1,30:1,30:0,30:1,30:0,42:0",
+		"live keymap refresh emitted a synthetic modifier transition: " .. table.concat(rows, ","))
+	assert(#Hook.held_text_modifier_codes() == 0, "the refreshed Shift never retired")
+	print("PASS: live native keymap refresh preserves held Shift without output replay")
 end)
 
 Finder.find_devices = original_find
