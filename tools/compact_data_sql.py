@@ -314,8 +314,6 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
         pass
 
     conn = sqlite3.connect(str(tmp_db))
-    conn.execute("PRAGMA journal_mode = OFF")
-    conn.execute("PRAGMA synchronous = OFF")
     conn.execute("PRAGMA temp_store = FILE")
     # 64 MB page cache — safe on 8 GB RAM machines.
     conn.execute("PRAGMA cache_size = -65536")
@@ -324,6 +322,11 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
     try:
         schema = schema_path.read_text(encoding="utf-8")
         conn.executescript(schema)
+        # The canonical schema sets durable DELETE/FULL defaults. This database
+        # is a disposable projection, so apply its load policy after the schema
+        # rather than syncing every transaction before publishing any output.
+        conn.execute("PRAGMA journal_mode = OFF")
+        conn.execute("PRAGMA synchronous = OFF")
 
         print(f"  Phase 1/3: loading into SQLite...", flush=True)
         exec_large_file(conn, sql_path)
