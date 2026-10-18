@@ -1529,6 +1529,7 @@ local function main()
 	-- consumption callback below, so the symbol never reaches the application
 	-- when it wraps; see modules/shortcuts/wrap_on_type.lua for the probe.
 	local wrap_on_type = require("modules.shortcuts.wrap_on_type").new({
+		context_epoch = shortcuts and shortcuts.wrap_selection_epoch,
 		is_active = function()
 			return shortcuts ~= nil and shortcuts.is_enabled()
 				and shortcuts.configuration_admitted()
