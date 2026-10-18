@@ -199,19 +199,45 @@ _PathsEdWeb_PushInitData() {
 
 ; Opens the native folder picker and hands the chosen path back to the page.
 ; @param Target {String} "logs" for the logs folder, else the configuration folder.
-_PathsEdWeb_Browse(Target := "config") {
-	global _ConfigDir
+_PathsEdWeb_Browse(Target := "config", PickFn := Ui_DirSelect, EvalFn := _PathsEdWeb_Eval) {
+	global _ConfigDir, _PathsEdWeb_SessionEpoch
 	if A_IsSuspended
 		return false
+	SessionEpoch := _PathsEdWeb_SessionEpoch
 	StartDir := StrReplace(Trim(Target == "logs" ? LoggerLogsDir() : _ConfigDir), "/", "\")
-	Picked := Ui_DirSelect("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
-	if (Picked == "")
-		return
+	Picked := PickFn.Call("*" . StartDir, 1, t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
+	; Native modals pump close/reopen and pause callbacks before returning.
+	if (Picked == "" || A_IsSuspended || !_PathsEdWeb_SessionCurrent(SessionEpoch))
+		return false
 	Fwd := StrReplace(Picked, "\", "/")
 	if !RegExMatch(Fwd, "/$")
 		Fwd .= "/"
-	_PathsEdWeb_Eval("if(window.applyBrowseResult)window.applyBrowseResult("
+	EvalFn.Call("if(window.applyBrowseResult)window.applyBrowseResult("
 		. _PathsEdWeb_JsStr(Fwd) . "," . _PathsEdWeb_JsStr(Target) . ")")
+}
+
+; The native fallback owns a concrete control rather than a WebView epoch.
+; Closing its window while the picker pumps must not write the dead control.
+_PathsEdNative_Browse(Window, Edit, PickFn := Ui_DirSelect, ExistsFn := WMHandleExists) {
+	if A_IsSuspended
+		return false
+	try Hwnd := Window.Hwnd
+	catch
+		return false
+	if !Hwnd || !ExistsFn.Call(Hwnd)
+		return false
+	Picked := PickFn.Call("*" . StrReplace(Trim(Edit.Value), "/", "\"), 1,
+		t("dialog.config_folder.select_title"), t("dialog.config_folder.select_title"), 0)
+	if Picked == "" || A_IsSuspended
+		return false
+	try {
+		if Window.Hwnd != Hwnd || !ExistsFn.Call(Hwnd)
+			return false
+	} catch {
+		return false
+	}
+	Edit.Value := StrReplace(Picked, "\", "/")
+	return true
 }
 
 ; The LogsDirPath a save must store: "" for the default, the resolved folder
