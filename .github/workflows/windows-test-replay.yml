@@ -34,6 +34,20 @@ jobs:
       - name: Verify replay receipt validation
         run: node tools/ci/windows-test-replay.cjs --self-test
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Verify SQL compaction with native Windows SQLite
+        shell: pwsh
+        env:
+          PYTHONUTF8: '1'
+          PYTHONIOENCODING: utf-8
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          python tools/test/test_compact_data_sql.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Install the authenticated AutoHotkey runtime
         shell: pwsh
         run: |
