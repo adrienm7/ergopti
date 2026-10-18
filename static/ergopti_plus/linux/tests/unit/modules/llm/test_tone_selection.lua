@@ -162,18 +162,30 @@ local function scenario(opts, body)
 			engine = { current_buffer = function() return "" end, reset = function() end },
 			is_paused = function() return opts.paused == true end,
 			notify = function(text) world.notices[#world.notices + 1] = text; return true end,
-			-- The daemon's seams: a copy probe, the injector, the window probe
-			read_selection = function()
-				world.reads = world.reads + 1
-				if world.on_read_selection then world.on_read_selection() end
-				if world.selection == nil then return false, "", "no_selection" end
-				return true, world.selection, nil
+			cancel_selection = function()
+				world.selection_cancels = (world.selection_cancels or 0) + 1
+				return world.selection_cleanup_ack ~= false
 			end,
-			replace_selection = function(text)
-				local result = injector.inject_selected(text, false)
-				if type(result) ~= "table" or result.ok ~= true then return false end
-				-- The application now shows the rewrite, selected
-				world.selection = text
+			-- The daemon's asynchronous selection transport and physical injector.
+			read_selection = function(_, authorized, callback)
+				local function complete()
+					world.reads = world.reads + 1
+					if world.on_read_selection then world.on_read_selection() end
+					if world.selection == nil then callback(false, "", "no_selection"); return true end
+					callback(true, world.selection, nil, world.selection_receipt); return true
+				end
+				if world.defer_selection_read then world.complete_selection_read = complete else complete() end
+				return true
+			end,
+			replace_selection = function(text, _, authorized, callback)
+				local function complete()
+					if not authorized() then callback(false); return end
+					local result = injector.inject_selected(text, false)
+					local committed = type(result) == "table" and result.ok == true
+					if committed then world.selection = text end
+					callback(committed)
+				end
+				if world.defer_selection_replace then world.complete_selection_replace = complete else complete() end
 				return true
 			end,
 			focus_id = function() return world.focus end,
@@ -587,7 +599,7 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 	helpers.it("refuses a tone request when focus moves during selection capture (selection-native-focus)", function()
 		scenario({selection = "merci pour ton aide"}, function(world)
 			world.focus = "x11:10:100"
-			world.on_read_selection = function() world.focus = "x11:10:101" end
+			world.on_read_selection = function(_, authorized, callback) world.focus = "x11:10:101" end
 			helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
 			helpers.assert_eq(world.reads, 1)
 			helpers.assert_eq(#world.posts, 0, "the captured text is never attributed to the replacement target")
@@ -631,6 +643,70 @@ helpers.describe("tone resident global privacy admission", function()
 			blocked = true; world.wait_for(2)
 			helpers.assert_eq(#world.posts, 1)
 			helpers.assert_true(world.engine.is_enabled())
+		end)
+	end)
+end)
+
+helpers.describe("selection capture originating action authority", function()
+	for _, action in ipairs({ "cancel", "backend" }) do
+		helpers.it("ai-pass2-span does not revive shift_tone after " .. action .. " during capture", function()
+			scenario({ selection = "merci pour ton aide" }, function(world)
+				world.on_read_selection = function(_, authorized, callback)
+					if action == "cancel" then world.engine.cancel() else world.engine.set_backend("ollama") end
+				end
+				helpers.assert_eq(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false), false)
+				helpers.assert_eq(world.reads, 1)
+				helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.emitted, 0)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("asynchronous tone native ownership", function()
+	helpers.it("ai-pass2-span waits for capture ACK before provider dispatch and fences cancellation", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			world.defer_selection_read = true
+			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			helpers.assert_eq(#world.posts, 0, "workflow admission is not a provider dispatch")
+			world.engine.cancel()
+			world.complete_selection_read()
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+	for _, cancel in ipairs({ false, true }) do
+		helpers.it("ai-pass2-span waits for rewrite verification ACK cancel=" .. tostring(cancel), function()
+			scenario({ selection = "merci pour ton aide" }, function(world)
+			world.defer_selection_replace = true
+			helpers.assert_true(world.engine.shift_tone(require("llm.tone").MORE_FORMAL, false))
+			world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_eq(#world.emitted, 0, "provider completion is not physical selection authority")
+			if cancel then world.engine.cancel() end
+			world.complete_selection_replace()
+			helpers.assert_true(cancel and #world.emitted == 0 or not cancel and #world.emitted > 0)
+		end)
+		end)
+	end
+end)
+
+helpers.describe("AI selection native cleanup acknowledgement", function()
+	helpers.it("ai-pass2-span configuration quiescence awaits selected-range native cleanup", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			world.selection_cleanup_ack = false
+			local owner = { pending = function() return false end }
+			helpers.assert_true(world.engine.acquire_configuration(owner))
+			helpers.assert_true(not world.engine.quiesce_configuration(owner))
+			world.selection_cleanup_ack = true
+			helpers.assert_true(world.engine.quiesce_configuration(owner))
+			helpers.assert_true(world.engine.release_configuration(owner))
+		end)
+	end)
+	helpers.it("ai-pass2-span runtime shutdown awaits selected-range native cleanup", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			world.selection_cleanup_ack = false
+			helpers.assert_true(not world.engine.shutdown_runtime())
+			world.selection_cleanup_ack = true
+			helpers.assert_true(world.engine.shutdown_runtime())
 		end)
 	end)
 end)

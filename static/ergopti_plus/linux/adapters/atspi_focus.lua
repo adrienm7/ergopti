@@ -70,6 +70,11 @@ local function load_native_backend()
 		void *g_object_ref(void *object);
 		void g_object_unref(void *object);
 		void atspi_accessible_clear_cache(AtspiAccessible *object);
+		typedef struct { int start_offset; int end_offset; } ErgoptiAtspiSelectionRange;
+		void *atspi_accessible_get_text_iface(AtspiAccessible *object);
+		int atspi_text_get_n_selections(void *object, void **error);
+		ErgoptiAtspiSelectionRange *atspi_text_get_selection(void *object, int index, void **error);
+		char *atspi_text_get_text(void *object, int start_offset, int end_offset, void **error);
 		void g_error_free(void *error);
 	]])
 	if not ok_cdef then return nil end
@@ -152,6 +157,40 @@ local function load_native_backend()
 			glib.g_hash_table_unref(attrs)
 		end
 		return identity
+	end
+	function backend.selection(node)
+		local text_object = atspi.atspi_accessible_get_text_iface(node)
+		if text_object == nil then return nil, "selection_unavailable" end
+		local function range()
+			local slot = ffi.new("void *[1]")
+			local count = tonumber(atspi.atspi_text_get_n_selections(text_object, slot))
+			if release_error(slot) then return nil end
+			if count ~= 1 then return nil, count == 0 and "no_selection" or "selection_unavailable" end
+			local native = atspi.atspi_text_get_selection(text_object, 0, slot)
+			local failed = release_error(slot)
+			if native == nil then return nil end
+			local first, last = tonumber(native.start_offset), tonumber(native.end_offset)
+			glib.g_free(native)
+			if failed or first < 0 or last <= first or last - first > ProcessLimits.defaults().max_output_bytes then return nil end
+			return { first = first, last = last }
+		end
+		local called, selected, reason = pcall(function()
+			local before, why = range()
+			if not before then return nil, why end
+			local slot = ffi.new("void *[1]")
+			local pointer = atspi.atspi_text_get_text(text_object, before.first, before.last, slot)
+			local failed = release_error(slot)
+			if pointer == nil then return nil end
+			local text = ffi.string(pointer)
+			glib.g_free(pointer)
+			if failed or text == "" then return nil end
+			local after = range()
+			if not after or before.first ~= after.first or before.last ~= after.last then return nil end
+			return { first = before.first, last = before.last, text = text }
+		end)
+		gobject.g_object_unref(text_object)
+		if called and selected then return selected end
+		return nil, called and reason or "selection_unavailable"
 	end
 	function backend.children(node)
 		local error_slot = ffi.new("void *[1]")
@@ -346,6 +385,34 @@ function M._get_native_context_snapshot()
 	return called and snapshot or nil, called and snapshot ~= nil
 end
 
+--- Captures one selected range only in the bounded explicit-action helper.
+--- Native text is never read by the resident privacy worker.
+--- @param expected table Original exact native field receipt.
+--- @return table|nil snapshot Exact field, offsets and selected text.
+--- @return boolean conclusive
+--- @return string|nil reason
+function M._get_native_selection_snapshot(expected)
+	if type(expected) ~= "table" then return nil, false end
+	local backend = _backend_for_test or load_native_backend()
+	local role, conclusive, identity, handles = traverse(backend, true)
+	if not conclusive or not handles or not handles.focus or not handles.window or not identity.active_scope or role == 40
+		or identity.native_bus_name ~= expected.bus or identity.native_object_path ~= expected.path or role ~= expected.role then
+		M._release_native_watch_focus(handles)
+		return nil, false
+	end
+	local called, selection, reason = pcall(function()
+		local selected, why = backend.selection(handles.focus)
+		backend.clear(handles.focus)
+		backend.clear(handles.window)
+		if backend.focused(handles.focus) ~= true or backend.active(handles.window) ~= true or backend.role(handles.focus) ~= role then return nil end
+		if not selected then return nil, why end
+		return { role = role, bus = identity.native_bus_name, path = identity.native_object_path,
+			first = selected.first, last = selected.last, text = selected.text }
+	end)
+	M._release_native_watch_focus(handles)
+	return called and selection or nil, called, called and reason or "selection_unavailable"
+end
+
 --- Retains exact native control/frame references for one resident worker.
 --- Each full scan discards libatspi's old tree cache first; daemon code never
 --- receives native pointers or invokes this in the keyboard process.
@@ -531,6 +598,52 @@ function M.start_context_capture(field, options, callback)
 			callback(nil); return
 		end
 		callback({ app_id = context.app_id, title = context.title, native_identity = context.native_identity })
+	end)
+	operation:on_settled(function() chunks = {} end)
+	return operation
+end
+
+--- Starts an explicit selection observation with the existing cold RPC deadline.
+--- @param field table Original native field identity.
+--- @param options table Exact owned lifetime and admission callback.
+--- @param callback function Receives a snapshot only after native settlement.
+--- @return table|nil operation
+function M.start_selection_capture(field, options, callback)
+	if type(field) ~= "table" or type(field.bus) ~= "string" or not field.bus:match("^:%d+%.%d+$")
+		or type(field.path) ~= "string" or field.path:sub(1, 1) ~= "/" or field.path:find("\0", 1, true)
+		or type(field.role) ~= "number" or field.role <= 0 or field.role % 1 ~= 0
+		or type(options) ~= "table" or type(options.owner) ~= "string" or type(options.authorized) ~= "function"
+		or type(callback) ~= "function" then return nil end
+	local loaded, native = pcall(require, "luv")
+	if not loaded or type(native.exepath) ~= "function" then return nil end
+	local executable = native.exepath()
+	if type(executable) ~= "string" or executable == "" then return nil end
+	local expected = { bus = field.bus, path = field.path, role = field.role }
+	local chunks, invalid = {}, false
+	local operation = OwnedProcess.start(executable, { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
+		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()), "selection" }, {
+		owner = options.owner, authorized = options.authorized,
+		timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms"),
+		max_output_bytes = ProcessLimits.defaults().max_output_bytes,
+		capture_tail = false, capture_output = false,
+		on_output = function(chunk, kind)
+			if kind ~= "stdout" then invalid = true; return end
+			chunks[#chunks + 1] = chunk
+		end,
+	}, function(result)
+		local body = table.concat(chunks)
+		chunks = {}
+		local encoded = not invalid and result.ok == true and body:match("^SELECTION:(.*)$") or nil
+		local decoded, frame = pcall(function() return encoded and require("json").decode(encoded) end)
+		local held = decoded and type(frame) == "table" and frame.field or nil
+		local selection = decoded and type(frame) == "table" and frame.selection or nil
+		if type(held) ~= "table" or held.bus ~= expected.bus or held.path ~= expected.path or held.role ~= expected.role
+			or type(selection) ~= "table" or selection.bus ~= expected.bus or selection.path ~= expected.path or selection.role ~= expected.role
+			or type(selection.first) ~= "number" or selection.first < 0 or selection.first % 1 ~= 0
+			or type(selection.last) ~= "number" or selection.last <= selection.first or selection.last % 1 ~= 0
+			or type(selection.text) ~= "string" or selection.text == "" then callback(nil); return end
+		callback({ bus = selection.bus, path = selection.path, role = selection.role,
+			first = selection.first, last = selection.last, text = selection.text })
 	end)
 	operation:on_settled(function() chunks = {} end)
 	return operation
