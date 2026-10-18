@@ -512,7 +512,7 @@ helpers.describe("wpm readouts: the floating widget", function()
 				helpers.assert_eq(surface.draws[1].y, 180)
 				if refusal == "missing" then store.set_many = nil
 				else store.set_many = function() if refusal == "throw" then error("controlled position refusal") end; return false end end
-				helpers.assert_true(pcall(surface.moved, 640, 360))
+				surface.moved(640, 360)
 				helpers.assert_eq(Widget.reset_position(), false)
 				package.loaded["ui.wpm.widget"] = nil
 				local Restarted = require("ui.wpm.widget")

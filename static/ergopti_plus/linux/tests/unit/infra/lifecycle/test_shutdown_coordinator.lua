@@ -947,7 +947,7 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 
 	helpers.it("completes final teardown only after destroy and close both acknowledge", function()
 		with_output("acknowledged", function(finish, injector, writer, broker, _, calls)
-			helpers.assert_true(pcall(finish))
+			finish()
 			helpers.assert_eq(calls.success, 2)
 			helpers.assert_eq(calls.destroy, 1)
 			helpers.assert_eq(calls.close, 1)
@@ -962,7 +962,7 @@ helpers.describe("shutdown coordinator: final native output acknowledgement", fu
 	helpers.it("acknowledges no-grab teardown when no output channel was acquired", function()
 		with_output("absent", function(finish, injector, writer, _, _, calls)
 			helpers.assert_eq(injector.close_fast_channel(), true)
-			helpers.assert_true(pcall(finish))
+			finish()
 			helpers.assert_eq(calls.success, 2)
 			helpers.assert_eq(calls.destroy, 0)
 			helpers.assert_eq(calls.close, 0)

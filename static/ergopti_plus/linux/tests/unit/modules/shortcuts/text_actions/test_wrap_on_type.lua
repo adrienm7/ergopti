@@ -946,7 +946,8 @@ helpers.describe("wrap on type: committed shortcut context epochs", function()
 	end
 
 	helpers.it("rejects a malformed optional context getter", function()
-		helpers.assert_eq(pcall(controller_with, { context_epoch = true }), false)
+		local built = pcall(controller_with, { context_epoch = true })
+		helpers.assert_eq(built, false)
 	end)
 
 	helpers.it("preserves a successor opened reentrantly by the context getter", function()
