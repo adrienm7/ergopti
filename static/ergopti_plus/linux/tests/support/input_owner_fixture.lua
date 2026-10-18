@@ -214,6 +214,7 @@ function M.with_session(options, body)
 			end
 		end))
 		s.start_options = { intercept = true, requireOutputBroker = true, onEmitRaw = s.writer.emit,
+			onChar = options.on_char,
 			onCaptureReacquired = options.on_capture_reacquired }
 		s.hook.start(s.start_options)
 		assert(s.hook.isRunning())

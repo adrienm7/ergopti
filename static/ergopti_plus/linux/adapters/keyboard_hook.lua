@@ -82,7 +82,7 @@ local original_caps_constructor = assert(caps_constructor_source
 local NativeCapsWord = assert(original_caps_constructor())
 local caps_ports = { capture = NativeCapsWord.capture, current = NativeCapsWord.current, plan = NativeCapsWord.plan }
 local original_input_hook_ports = {}
-local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input" }
+local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input", "refresh_capture" }
 local INPUT_PORT_NAMES = { "capture_input_owner", "input_owner_current", "capture_input_guard", "arm_one_shot", "arm_caps_word", "ack_caps_word", "input_owner_state", "clear_input_arm", "buffered_request_current" }
 local _input_ports = {}
 for _, name in ipairs(INPUT_PORT_NAMES) do _input_ports[name] = rawget(InputIssuer, name) end
@@ -121,7 +121,7 @@ local _running  = false
 -- One captured publisher and one in-flight source transaction belong to a start.
 local _capture_session, _capture_options, _capture_republisher = nil, nil, nil
 local _source_reconciliation = nil
-local _source_recovery = {}
+local _source_recovery = { inverse = rawget(XkbCapture, "inverse_table"), inverse_current = rawget(XkbCapture, "inverse_current") }
 local _number_row = { retired = {}, suppressed = {}, mode = "native" }
 
 -- Every owned keyboard and observed pointer path. The first keyboard remains in
@@ -3246,6 +3246,94 @@ function _source_recovery.run(paths, consume_held, existing)
 	if _source_reconciliation == tx then _source_reconciliation = nil end
 	if called and accepted == true then return true end
 	return false, "native state reconciliation refused"
+end
+
+--- Brackets a selected-map refresh while preserving only acknowledged output modifiers.
+--- Ordinary holds, consumed-key debt and the remapper keep their existing owners.
+--- @param layout string Physical family requested by the menu.
+--- @param refresh function Original selected-map operation, including its label update.
+--- @param selected function Checks the original map selection before and after publication.
+--- @return boolean applied
+function M.refresh_capture(layout, refresh, selected)
+	if _source_reconciliation or not _running or type(refresh) ~= "function" or type(selected) ~= "function"
+		or type(layout) ~= "string" or type(_source_recovery.inverse) ~= "function"
+		or type(_source_recovery.inverse_current) ~= "function" then return false end
+	local tx, previous_layout, rows, ordered = _begin_source_transaction(), _layout, {}, {}
+	local inverse, inverse_current = _source_recovery.inverse, _source_recovery.inverse_current
+	local old_capture
+	local function current()
+		return _source_cohort_current(tx) and package.loaded["adapters.xkb_capture"] == XkbCapture
+			and rawget(XkbCapture, "inverse_table") == inverse and rawget(XkbCapture, "inverse_current") == inverse_current
+			and (not tx.engine or _input_ports.input_owner_current(tx.issuer) == true)
+	end
+	local called, accepted = pcall(function()
+		-- Freeze the output roster before an inverse provider or menu callback runs.
+		for key, row in pairs(_forwarded_down) do
+			rows[key] = { original = row, source = row.owner_source or row.source, code = row.code, owner = _output_owners[key] }
+		end
+		local seen = {}
+		for _, row in ipairs(_modifier_order) do if rows[row.key] then ordered[#ordered + 1] = row.key; seen[row.key] = true end end
+		local remaining = {}; for key in pairs(rows) do if not seen[key] then remaining[#remaining + 1] = key end end
+		table.sort(remaining); for _, key in ipairs(remaining) do ordered[#ordered + 1] = key end
+		local original_view = tx.broker and tx.broker.view()
+		if not original_view or original_view.busy or original_view.debt or not current() then return false end
+		local _, _, captured = inverse(false); old_capture = captured
+		if not old_capture or not current() or inverse_current(old_capture) ~= true or selected() ~= true or not current() then return false end
+		if _armed_input then
+			local arm = _armed_input
+			if arm.consumed or _input_ports.input_owner_state(arm.issuer) == "consumed" then
+				if _withdraw_input_arm(arm) ~= true then return false end
+			else
+				if _input_ports.clear_input_arm(arm.issuer) ~= true then return false end
+				if _armed_input == arm then _armed_input = nil end
+			end
+		end
+		if not current() or refresh() ~= true or not current() or _layout ~= layout
+			or selected() ~= true or not current() or inverse_current(old_capture) == true then return false end
+		local _, _, fresh = inverse(false)
+		if not fresh or not current() or inverse_current(fresh) ~= true then return false end
+		local view = tx.broker and tx.broker.view()
+		if not view or view.busy or view.debt or type(view.owners) ~= "table" or not current() then return false end
+		for owner, output in pairs(original_view.owners) do
+			local after = view.owners[owner]
+			if not after or after.code ~= output.code or after.state ~= output.state then return false end
+		end
+		for owner in pairs(view.owners) do if not original_view.owners[owner] then return false end end
+		for key, row in pairs(rows) do
+			if _forwarded_down[key] ~= row.original or row.original.code ~= row.code
+				or (row.original.owner_source or row.original.source) ~= row.source or _output_owners[key] ~= row.owner then return false end
+		end
+		local consumed, pressed_at, hold_owners = _consumed_down, _pressed_at, _hold_owners
+		_reset_modifier_state()
+		_consumed_down, _pressed_at, _hold_owners = consumed, pressed_at, hold_owners
+		local captured_codes = {}
+		for _, key in ipairs(ordered) do
+			local row, output = rows[key], view.owners[rows[key].owner]
+			if output and output.state == "held" and not consumed[key] then
+				local role, failed = _modifier_role(row.code)
+				if failed then return false end
+				if role then
+					if not captured_codes[row.code] then
+						local _, _, err = _capture(row.code, InputEvent.VALUE_DOWN)
+						if err then return false end
+						captured_codes[row.code] = true
+					end
+					_track_modifier(row.source, row.code, InputEvent.VALUE_DOWN, role)
+				end
+			end
+		end
+		if not _locks.seed(_devices[1]) or not current() or inverse_current(fresh) ~= true then return false end
+		if tx.publisher and (tx.publisher() ~= true or not current()) then return false end
+		if selected() ~= true or not current() or inverse_current(fresh) ~= true then return false end
+		tx.changed = true
+		return _publish_source_transaction(tx)
+	end)
+	if not called or accepted ~= true then
+		if old_capture and current() and inverse_current(old_capture) == true then _layout = previous_layout
+		else _retire_source_transaction(tx, "selected-map refresh refused") end
+	end
+	if _source_reconciliation == tx then _source_reconciliation = nil end
+	return called and accepted == true
 end
 
 --- Re-checks which device should be read, and switches when it has changed.

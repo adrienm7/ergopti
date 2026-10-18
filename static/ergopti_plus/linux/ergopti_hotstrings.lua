@@ -1907,14 +1907,19 @@ local function main()
 				-- capture and to the inverse injection table, so hot system changes
 				-- cannot update only one direction.
 				on_layout_change = function(new_layout)
-					Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
-					if not keyboard_hook.set_layout(new_layout) then
-						Logger.error(LOG, "Layout '%s' refused — nothing changed.", tostring(new_layout))
-						return
+					local refresh, set_layout, selected_keymap = keyboard_layout.refresh, keyboard_hook.set_layout, opts.keymap
+					local function selected_map_current()
+						return package.loaded["adapters.keyboard_layout"] == keyboard_layout
+							and keyboard_layout.refresh == refresh and keyboard_hook.set_layout == set_layout
+							and opts.keymap == selected_keymap
 					end
-					if not keyboard_layout.refresh(opts.keymap) then
-						Logger.warn(LOG,
-							"Physical layout label applied; active XKB keymap refresh failed.")
+					if not keyboard_hook.refresh_capture(new_layout, function()
+						Logger.start(LOG, "Applying layout '%s'…", tostring(new_layout))
+						return selected_map_current() and set_layout(new_layout) == true
+							and selected_map_current() and refresh(selected_keymap) == true
+					end, selected_map_current) then
+						Logger.error(LOG, "Layout '%s' refused — capture was not published.", tostring(new_layout))
+						return
 					end
 					opts.layout = new_layout
 					if webview_manager and webview_manager.set_daemon_state then
