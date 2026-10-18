@@ -830,6 +830,7 @@ function M.install(ctx)
 				title             = i18n.get("mlx.hf_login_title"),
 				style_masks       = { "titled", "closable", "nonactivating" },
 				allow_new_windows = false,
+				delete_on_close   = true,
 				usercontent       = ucc,
 				assets_dir        = TOKEN_ASSETS_DIR,
 				on_close          = on_webview_close,
