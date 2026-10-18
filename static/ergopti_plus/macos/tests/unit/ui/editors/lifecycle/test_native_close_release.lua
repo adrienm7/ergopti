@@ -15,7 +15,7 @@ local EDITORS = {
 	"ui.hotstring_editor", "ui.hotstrings_config_window", "ui.personal_info_editor", "ui.prompt_editor",
 }
 
-local function with_editor(name, scenario)
+local function with_native_editor(name, scenario)
 	return helpers.with_stub_scope({
 		"ui.hotstring_editor", "ui.hotstring_editor.save_validation", "ui.hotstrings_config_window",
 		"ui.personal_info_editor", "ui.prompt_editor", "ui.ui_builder", "adapters.timer_scheduler",
@@ -58,6 +58,19 @@ local function with_editor(name, scenario)
 		function h.drain() while #h.deferred > 0 do table.remove(h.deferred, 1)() end end
 		scenario(editor, h)
 	end)
+end
+
+
+--- LuaFileSystem's native loader also publishes a process global on cold load.
+local function with_editor(name, scenario)
+	local previous_lfs = rawget(_G, "lfs")
+	rawset(_G, "lfs", nil)
+	local outcome = table.pack(xpcall(function()
+		return with_native_editor(name, scenario)
+	end, debug.traceback))
+	rawset(_G, "lfs", previous_lfs)
+	if not outcome[1] then error(outcome[2], 0) end
+	return table.unpack(outcome, 2, outcome.n)
 end
 
 helpers.describe("editors release their closed native windows", function()
