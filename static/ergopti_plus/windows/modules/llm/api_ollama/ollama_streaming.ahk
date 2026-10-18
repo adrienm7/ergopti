@@ -924,6 +924,13 @@ _LLM_Ollama_ReadStreamText(Path, State, Final := false, MaxReadBytes := 0) {
 				throw Error("Ollama stream record exceeds " . ReadLimit . " bytes.")
 			return ""
 		}
+		; StrGet repairs invalid UTF-8 into U+FFFD. Validate the admitted record
+		; bytes first so repaired text cannot become a successful prediction.
+		static CP_UTF8 := 65001, MB_ERR_INVALID_CHARS := 0x8
+		if !DllCall("Kernel32\MultiByteToWideChar", "UInt", CP_UTF8,
+				"UInt", MB_ERR_INVALID_CHARS, "Ptr", Raw.Ptr, "Int", ConsumeBytes,
+				"Ptr", 0, "Int", 0, "Int")
+			throw Error("Ollama stream output contains invalid UTF-8.")
 		Text := StrGet(Raw.Ptr, ConsumeBytes, "UTF-8")
 		State["last_pos"] := Offset + ConsumeBytes
 		State["stream_bytes_pending"] := Available > ConsumeBytes
