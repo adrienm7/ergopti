@@ -620,6 +620,19 @@ jobs:
           test "${#logger_statuses[@]}" -eq 2
           node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"
         timeout-minutes: 10
+      - name: Qualify numeric logger boundary XCTest controls
+        env:
+          GOTOOLCHAIN: 'local'
+          ERGOPTI_RELEASE: "${{ inputs.release && 'true' || 'false' }}"
+          ERGOPTI_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
+          ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        shell: bash
+        run: |
+          bash tools/diagnostics/run_logger_numeric_native.sh "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"
+        timeout-minutes: 5
       - name: Retain independent native SDK XCTest diagnostics
         env:
           GOTOOLCHAIN: 'local'
@@ -643,6 +656,9 @@ jobs:
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-xctest.log
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-source.json
             ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-original-42-verdict.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-numeric-3-xctest.log
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-numeric-3-source.json
+            ${{ env.ERGOPTI_OLLAMA_BUILD_ROOT }}/logger-numeric-3-verdict.json
       - name: Qualify actual selected number-row Carbon XCTest controls
         env:
           GOTOOLCHAIN: 'local'
