@@ -626,6 +626,13 @@ function M.is_wrap_on_type_enabled()
 	return _wrap_on_type
 end
 
+--- Returns the runtime revision owned by an in-progress selection window.
+--- This getter performs no file, clipboard or native input queries.
+--- @return integer epoch Committed state and configuration ownership revision.
+function M.wrap_selection_epoch()
+	return collision_generation
+end
+
 --- Persists and applies the wrap-on-type switch.
 --- @param enabled boolean
 --- @return boolean True when the state was committed.
