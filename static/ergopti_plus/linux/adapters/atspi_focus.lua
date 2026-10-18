@@ -187,18 +187,31 @@ local function traverse(backend, retain_focus)
 	local handles = retain_focus and { backend = backend } or nil
 
 	local function visit(node, depth)
-		if failed or depth > MAX_DEPTH then failed = true; return end
+		if failed or depth > MAX_DEPTH then failed = true; return false end
 		visited = visited + 1
-		if visited > MAX_NODES then failed = true; return end
+		if visited > MAX_NODES then failed = true; return false end
 
 		local focused = backend.focused(node)
-		if focused == nil then failed = true; return end
-		if focused then
-			local role = backend.role(node)
-			if type(role) ~= "number" then failed = true; return end
+		if focused == nil then failed = true; return false end
+		local role = focused and backend.role(node) or nil
+		if focused and type(role) ~= "number" then failed = true; return false end
+
+		local children = backend.children(node)
+		if type(children) ~= "table" then failed = true; return false end
+		local focused_descendant = false
+		for _, child in ipairs(children) do
+			if visit(child, depth + 1) then focused_descendant = true end
+			if backend.release then backend.release(child) end
+		end
+
+		-- WebKit marks its root pane, document and actual HTML input FOCUSED.
+		-- Only a unique leaf identifies one destination; siblings still count
+		-- separately. A password ancestor never authorizes an ordinary child.
+		if focused and focused_descendant and role == 40 then failed = true end
+		if focused and not focused_descendant then
 			local identity = type(backend.identity) == "function"
 				and backend.identity(node) or { name = "", attributes = {} }
-			if type(identity) ~= "table" then failed = true; return end
+			if type(identity) ~= "table" then failed = true; return false end
 			focused_count = focused_count + 1
 			focused_role = role
 			focused_identity = identity
@@ -207,13 +220,7 @@ local function traverse(backend, retain_focus)
 				handles.focus = backend.retain(node)
 			end
 		end
-
-		local children = backend.children(node)
-		if type(children) ~= "table" then failed = true; return end
-		for _, child in ipairs(children) do
-			visit(child, depth + 1)
-			if backend.release then backend.release(child) end
-		end
+		return focused or focused_descendant
 	end
 
 	-- Only the ACTIVE top-level window, when the window manager says which one
