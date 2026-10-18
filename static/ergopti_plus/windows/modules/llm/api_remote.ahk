@@ -1115,6 +1115,8 @@ _LLMRemote_PollRequest(req_id) {
     if !_LLM_Remote_Async.Has(req_id)
         return
     entry := _LLM_Remote_Async[req_id]
+    ; Abort is a yielding COM boundary: a queued cancellation or eviction may
+    ; retire this owner before it returns. Revalidate exact custody afterward.
     if entry["cancelled"] {
         ; Abort the in-flight WinHTTP request before dropping our reference.
         ; Without this the COM object + its socket stay resident until WinHTTP's
@@ -1122,7 +1124,7 @@ _LLMRemote_PollRequest(req_id) {
         ; never responds keeps the request alive far longer than intended.
         if entry.Has("http")
             try entry["http"].Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     ; Wrap-safe deadline guard: if the response never arrives (CDN silent drop,
@@ -1135,7 +1137,8 @@ _LLMRemote_PollRequest(req_id) {
         ; rather than lingering until WinHTTP's internal receive timeout fires.
         if entry.Has("http")
             try entry["http"].Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "Poll deadline exceeded for req_id={1} — aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
@@ -1152,7 +1155,8 @@ _LLMRemote_PollRequest(req_id) {
     } catch as com_err {
         on_fail := entry["on_fail"]
         try http.Abort()
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "WaitForResponse COM error for req_id={1}: {2} — aborting.", req_id, com_err.Message)
         ComMsg := SubStr(com_err.Message, 1, 120)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("transport", 0, ComMsg))

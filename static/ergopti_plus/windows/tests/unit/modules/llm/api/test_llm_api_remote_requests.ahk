@@ -368,3 +368,5 @@ _RemoteProxy_ReadyInvalidBudget(Budget) {
 for Index, Budget in [0, -1, "30000", 0x80000000, "unset"]
 	Test("remote proxy: invalid canonical readiness budget refuses before transport " . Index . " (ready-canonical-budget)",
 		_RemoteProxy_ReadyInvalidBudget.Bind(Budget))
+
+#Include %A_LineFile%/../test_llm_api_remote_abort_retirement.ahk
