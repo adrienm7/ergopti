@@ -24,8 +24,8 @@
 ---
 --- These tests pin the three outcomes in order: typable → keystrokes and no
 --- clipboard; untypable → clipboard, whole and unsplit; untypable with no
---- clipboard tool → an ERROR, because the trigger is already gone and the user
---- deserves to know why rather than to wonder.
+--- clipboard tool → an ERROR before the trigger is erased. Clipboard capability
+--- alone cannot guarantee a later snapshot or paste will succeed.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -74,10 +74,12 @@ end
 
 --- Loads the injector with a layout table and a channel already wired in.
 --- @param channel table The fake uinput channel.
+--- @param prepare_layout function|nil Installs a controlled planning boundary before capture.
 --- @return table injector
-local function load_injector(channel)
+local function load_injector(channel, prepare_layout)
 	local layout = helpers.load_module("adapters.keyboard_layout")
 	layout._set_table_for_test(LAYOUT_WITHOUT_SPANISH)
+	if prepare_layout then prepare_layout(layout) end
 	local injector = helpers.load_module("modules.hotstrings.injector")
 	injector._set_uinput(channel)
 	-- Real sleeps would make this suite wait on every backspace for nothing:
@@ -114,6 +116,154 @@ helpers.describe("injector: a replacement the layout can type is typed", functio
 		restore()
 	end)
 
+end)
+
+helpers.describe("injector: the complete field set is prepared before erasure", function()
+	helpers.it("(injection-fields-preflight) refuses the next Tab when its retained source retires after field one", function()
+		local clip, restore = stub_clipboard(false)
+		local ch, layout_owner, fired = fake_channel(true), nil, false
+		local injector = load_injector(ch, function(layout) layout_owner = layout end)
+		local emit = ch.emit
+		ch.emit = function(code, value)
+			local result = emit(code, value)
+			if code == 19 and value == 0 and not fired then
+				fired = true; layout_owner._set_table_for_test(LAYOUT_WITHOUT_SPANISH)
+			end
+			return result
+		end
+		-- The replacement port is captured before planning, as in every stable channel.
+		local ok, why = pcall(function()
+			local result = injector.inject_fields(3, { "seor", "or" })
+			helpers.assert_true(fired, "the actual first-field final UP must dispatch source retirement")
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_eq(result.cleanup_ok, true)
+			local rows = {}
+			for _, event in ipairs(ch.emitted) do rows[#rows + 1] = event.code .. ":" .. event.value end
+			helpers.assert_eq(table.concat(rows, " "), "14:1 14:0 14:1 14:0 14:1 14:0 31:1 31:0 18:1 18:0 24:1 24:0 19:1 19:0",
+				"owned UP completes, but no Tab or future-field DOWN follows a retired source")
+			helpers.assert_eq(#clip.calls, 0, "late source loss is not permission to paste through a new route")
+		end)
+		restore()
+		if not ok then error(why, 0) end
+	end)
+	helpers.it("(injection-fields-preflight) keeps later clipboard failure distinct from backend availability", function()
+		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+		local clip, restore = stub_clipboard(false)
+		clip.is_available = function() return true end
+		local ok, why = pcall(function()
+			local result = load_injector(fake_channel(true)).inject_fields(3, { "seor", "señor" }, true)
+			helpers.assert_eq(#clip.calls, 1)
+			helpers.assert_eq(result.ok, false, "a later failed paste never becomes a committed field set")
+			helpers.assert_eq(result.cleanup_ok, true)
+			-- No rollback of earlier fields or Tab is promised once a route fails at delivery.
+		end)
+		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		if not ok then error(why, 0) end
+	end)
+	for _, invalid in ipairs({ "second-type", "hole", "metatable" }) do
+		helpers.it("(injection-fields-preflight) refuses " .. invalid .. " before any planning callback", function()
+			local clip, restore = stub_clipboard(false)
+			local ch, plans = fake_channel(true), 0
+			local injector = load_injector(ch, function(layout)
+				local plan = layout.plan
+				layout.plan = function(text) plans = plans + 1; return plan(text) end
+			end)
+			local values = invalid == "second-type" and { "seor", 17 } or invalid == "hole" and { [1] = "seor", [3] = "or" }
+				or setmetatable({ "seor", "or" }, { __len = function() error("caller length metamethod must not run") end })
+			local ok, why = pcall(function()
+				local result = injector.inject_fields(3, values)
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.cleanup_ok, true)
+				helpers.assert_eq(plans, 0)
+				helpers.assert_eq(#ch.emitted, 0)
+				helpers.assert_eq(#clip.calls, 0)
+			end)
+			restore()
+			if not ok then error(why, 0) end
+		end)
+	end
+	for _, revoked in ipairs({ "source", "current-api", "channel" }) do
+		helpers.it("(injection-fields-preflight) refuses late " .. revoked .. " replacement before whole-set output", function()
+			local clip, restore = stub_clipboard(true)
+			local ch, successor, observed = fake_channel(true), fake_channel(true), false
+			local injector, layout_owner, original_current
+			injector = load_injector(ch, function(layout)
+				layout_owner, original_current = layout, layout.plan_current
+				local plan = layout.plan
+				layout.plan = function(text)
+					local offered, blocker, receipt = plan(text)
+					if text == "or" then
+						observed = true
+						if revoked == "source" then layout._set_table_for_test(LAYOUT_WITHOUT_SPANISH)
+						elseif revoked == "current-api" then layout.plan_current = function() return true end
+						else injector._set_uinput(successor) end
+					end
+					return offered, blocker, receipt
+				end
+			end)
+			local ok, why = pcall(function()
+				local result = injector.inject_fields(3, { "seor", "or" })
+				helpers.assert_true(observed, "the second original plan must actually dispatch revocation")
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.cleanup_ok, true)
+				helpers.assert_eq(#ch.emitted, 0, "no first-field mutation before all retained plans join")
+				helpers.assert_eq(#successor.emitted, 0)
+				helpers.assert_eq(#clip.calls, 0, "a stale plan is not an untypable-character fallback")
+			end)
+			layout_owner.plan_current = original_current
+			restore()
+			if not ok then error(why, 0) end
+		end)
+	end
+	for _, mode in ipairs({ "unavailable", "native", "mutated-values" }) do
+		helpers.it("(injection-fields-preflight) " .. mode .. " retains the whole multi-field intent", function()
+			local previous_hook = package.loaded["adapters.keyboard_hook"]
+			local stopped = 0
+			package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
+			local clip, restore = stub_clipboard(false)
+			local ch, documents, active, planned = fake_channel(true), { "btw", "" }, 1, {}
+			local values = { "seor", mode == "unavailable" and "señor" or "or" }
+			local char_of = { [31] = "s", [18] = "e", [24] = "o", [19] = "r" }
+			local emit = ch.emit
+			ch.emit = function(code, value)
+				if value == 1 then
+					if code == 14 then documents[active] = documents[active]:sub(1, -2)
+					elseif code == 15 then active = active + 1
+					elseif char_of[code] then documents[active] = documents[active] .. char_of[code] end
+				end
+				return emit(code, value)
+			end
+			local injector = load_injector(ch, function(layout)
+				local plan = layout.plan
+				layout.plan = function(text)
+					planned[#planned + 1] = text
+					if mode == "mutated-values" and text == "seor" then values[2] = "s" end
+					return plan(text)
+				end
+			end)
+			local ok, why = pcall(function()
+				local result = injector.inject_fields(3, values)
+				local rows = {}
+				for _, event in ipairs(ch.emitted) do rows[#rows + 1] = event.code .. ":" .. event.value end
+				if mode == "unavailable" then
+					helpers.assert_eq(result.ok, false)
+					helpers.assert_eq({ documents = documents, rows = rows, active = active, clip_calls = #clip.calls, stops = stopped },
+						{ documents = { "btw", "" }, rows = {}, active = 1, clip_calls = 0, stops = 0 },
+						"a known impossible later field permits no erasure, first value, Tab, clipboard or grab stop")
+				else
+					helpers.assert_true(result.ok)
+					helpers.assert_eq(documents, { "seor", "or" }, "original field strings survive mutation of their caller array")
+					helpers.assert_eq(table.concat(planned, "|"), "seor|or", "each original field is planned exactly once")
+					helpers.assert_eq(table.concat(rows, " "), "14:1 14:0 14:1 14:0 14:1 14:0 31:1 31:0 18:1 18:0 24:1 24:0 19:1 19:0 15:1 15:0 24:1 24:0 19:1 19:0")
+					helpers.assert_eq(active, 2, "one actual Tab goes between two fields, never after the last")
+				end
+				helpers.assert_eq(result.cleanup_ok, true)
+			end)
+			restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+			if not ok then error(why, 0) end
+		end)
+	end
 end)
 
 
@@ -225,6 +375,190 @@ end)
 
 helpers.describe("injector: an undeliverable replacement is reported, not swallowed", function()
 
+	helpers.it("(injection-route-preflight) does not commit a failed paste just because its backend exists", function()
+		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+		local clip, restore = stub_clipboard(false)
+		clip.is_available = function() return true end
+		local ok, why = pcall(function()
+			local result = load_injector(fake_channel(true)).inject(3, "señor")
+			helpers.assert_eq(#clip.calls, 1, "the available backend reaches the actual paste boundary")
+			helpers.assert_eq(result.ok, false, "backend availability is not an output commit")
+			helpers.assert_eq(result.cleanup_ok, true)
+			-- This later failure may follow erasure. Clipboard snapshot preparation
+			-- is a separate transaction; this preflight cannot promise its rollback.
+		end)
+		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		if not ok then error(why, 0) end
+	end)
+
+	for _, boundary in ipairs({ "plan", "publication", "stable", "fields-plan", "fields-stable" }) do
+		local fields = boundary:match("^fields") ~= nil
+		local slug = fields and "(injection-fields-preflight)" or "(injection-route-preflight)"
+		helpers.it(slug .. " retains the original Writer epoch across " .. boundary, function()
+			local Input = require("infra.input_event")
+			local Broker = require("adapters.modifier_broker")
+			local previous_writer = package.loaded["adapters.uinput_writer"]
+			local previous_hook = package.loaded["adapters.keyboard_hook"]
+			package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() end }
+			local path = os.tmpname(); local file = assert(io.open(path, "w")); assert(file:close())
+			local writer, rows = helpers.load_module("adapters.uinput_writer"), {}
+			writer._set_path_for_test(path)
+			writer._set_backend({ open = function() return 7 end, ioctl = function() return true end,
+				close = function() return true end, write = function(_, bytes)
+					local event = Input.decode(bytes)
+					if event.type == Input.EV_KEY then rows[#rows + 1] = { event.code, event.value } end
+					return true
+				end })
+			local injector, armed, observed, successor
+			local function intervene()
+				if not armed then return end
+				armed, observed = false, true
+				assert(injector.close_fast_channel()); assert(injector.open_fast_channel())
+				successor = assert(writer.capture_output())
+			end
+			injector = load_injector(writer, function(layout)
+				local plan = layout.plan
+				layout.plan = function(text)
+					local offered, blocker, receipt = plan(text)
+					if boundary == "plan" or boundary == "fields-plan" and text == "or" then intervene() end
+					return offered, blocker, receipt
+				end
+			end)
+			local ok, why = pcall(function()
+				assert(injector.open_fast_channel())
+				local original, original_broker = assert(writer.capture_output()), assert(Broker.for_channel(writer))
+				local emit, open = writer.emit, writer.is_open
+				armed = true
+				local publication = boundary == "publication" and {
+					current = function() intervene(); return true end, cached = function() return true end,
+				} or nil
+				local result
+				if fields then result = injector.inject_fields(3, { "seor", "or" })
+				else result = injector.inject(3, "seor", false, nil, publication) end
+				if boundary == "stable" or boundary == "fields-stable" then
+					helpers.assert_eq(observed, nil, "the positive control performs no output replacement")
+					helpers.assert_true(result.ok and result.cleanup_ok, "the original busy reservation remains admissible")
+					helpers.assert_true(writer.output_current(original) and Broker.for_channel(writer) == original_broker)
+					local expected = { { 14, 1 }, { 14, 0 }, { 14, 1 }, { 14, 0 }, { 14, 1 }, { 14, 0 },
+						{ 31, 1 }, { 31, 0 }, { 18, 1 }, { 18, 0 }, { 24, 1 }, { 24, 0 }, { 19, 1 }, { 19, 0 } }
+					if fields then
+						expected[15], expected[16], expected[17], expected[18], expected[19], expected[20]
+							= { 15, 1 }, { 15, 0 }, { 24, 1 }, { 24, 0 }, { 19, 1 }, { 19, 0 }
+					end
+					helpers.assert_eq(rows, expected)
+					return
+				end
+				helpers.assert_true(observed, "actual channel close/reopen must occur at the original observation")
+				helpers.assert_true(writer.emit == emit and writer.is_open == open, "module and API identities survive the real epoch change")
+				helpers.assert_true(not writer.output_current(original) and writer.output_current(successor))
+				helpers.assert_true(Broker.for_channel(writer) ~= original_broker, "the actual successor has a new custody owner")
+				helpers.assert_eq(result.ok, false, "no adoption of a successor output under the old preparation")
+				helpers.assert_eq(result.cleanup_ok, true)
+				helpers.assert_eq(rows, {}, "neither erasure nor replacement reaches the successor Writer")
+			end)
+			assert(injector.close_fast_channel()); writer._reset_backend(); assert(os.remove(path))
+			package.loaded["adapters.uinput_writer"], package.loaded["adapters.keyboard_hook"] = previous_writer, previous_hook
+			if not ok then error(why, 0) end
+		end)
+	end
+
+	for _, route in ipairs({ "native", "clipboard" }) do
+		helpers.it("(injection-route-preflight) retains a complete " .. route .. " route across trigger erasure", function()
+			local clip, restore = stub_clipboard(true)
+			local ch, plans = fake_channel(true), 0
+			local injector = load_injector(ch, function(layout)
+				local plan = layout.plan
+				layout.plan = function(text) plans = plans + 1; return plan(text) end
+			end)
+			local text = route == "native" and "seor" or "señor"
+			local result = injector.inject(3, text)
+			local deleted, typed = 0, {}
+			for _, event in ipairs(ch.emitted) do
+				if event.code == 14 and event.value == 1 then deleted = deleted + 1 end
+				if event.value == 1 and event.code ~= 14 then typed[#typed + 1] = event.code end
+			end
+			helpers.assert_true(result.ok, "the complete route must still commit")
+			helpers.assert_eq(deleted, 3)
+			helpers.assert_eq(plans, 1, "retain the original plan result instead of replanning after erasure")
+			helpers.assert_eq(#clip.calls, route == "native" and 0 or 1)
+			if route == "native" then helpers.assert_eq(table.concat(typed, " "), "31 18 24 19")
+			else helpers.assert_eq(clip.calls[1], text); helpers.assert_eq(#typed, 0) end
+			restore()
+		end)
+	end
+
+	for _, revoked in ipairs({ "channel", "layout", "plan-api", "current-api", "channel-api", "publication", "held-codes" }) do
+		helpers.it("(injection-route-preflight) refuses " .. revoked .. " replacement during route observation", function()
+			local clip, restore = stub_clipboard(true)
+			local ch, successor, observed = fake_channel(true), fake_channel(true), false
+			local previous_hook = package.loaded["adapters.keyboard_hook"]
+			local injector, original_plan, original_current, original_emit, layout_owner
+			local function intervene(layout)
+				observed = true
+				if revoked == "channel" or revoked == "publication" or revoked == "held-codes" then injector._set_uinput(successor)
+				elseif revoked == "layout" then layout._set_table_for_test(LAYOUT_WITHOUT_SPANISH)
+				elseif revoked == "plan-api" then layout.plan = function() error("successor plan must not be adopted") end
+				elseif revoked == "current-api" then layout.plan_current = function() return true end
+				else ch.emit = function() error("successor channel port must not be adopted") end end
+			end
+			injector = load_injector(ch, function(layout)
+				layout_owner, original_plan, original_current, original_emit = layout, layout.plan, layout.plan_current, ch.emit
+				layout.plan = function(text)
+					local plan, blocker, receipt = original_plan(text)
+					if revoked ~= "publication" and revoked ~= "held-codes" then intervene(layout) end
+					return plan, blocker, receipt
+				end
+			end)
+			local publication
+			if revoked == "publication" then publication = {
+				current = function() intervene(layout_owner); return true end,
+				cached = function() return true end,
+			} end
+			if revoked == "held-codes" then package.loaded["adapters.keyboard_hook"] = {
+				held_text_modifier_codes = function() intervene(layout_owner); return { 42 } end,
+				emergency_stop = function() end,
+			} end
+			local ok, why = pcall(function()
+				local result = injector.inject(3, "seor", false, nil, publication)
+				helpers.assert_true(observed, "the original route boundary must actually reenter")
+				helpers.assert_eq(result.ok, false)
+				helpers.assert_eq(result.cleanup_ok, true)
+				helpers.assert_eq(#ch.emitted, 0, "the original route cannot erase under a revoked observation")
+				helpers.assert_eq(#successor.emitted, 0, "a successor channel cannot inherit the old expansion")
+				helpers.assert_eq(#clip.calls, 0, "authority loss is not an untypable-character clipboard fallback")
+			end)
+			layout_owner.plan, layout_owner.plan_current, ch.emit = original_plan, original_current, original_emit
+			package.loaded["adapters.keyboard_hook"] = previous_hook
+			restore()
+			if not ok then error(why, 0) end
+		end)
+	end
+
+	helpers.it("(injection-route-preflight) preserves the trigger and grab when no complete replacement route exists", function()
+		local previous_hook = package.loaded["adapters.keyboard_hook"]
+		local stopped = 0
+		package.loaded["adapters.keyboard_hook"] = { emergency_stop = function() stopped = stopped + 1 end }
+		local clip, restore = stub_clipboard(false)
+		local ch, document = fake_channel(true), "btw"
+		local emit = ch.emit
+		ch.emit = function(code, value)
+			if code == 14 and value == 1 then document = document:sub(1, -2) end
+			return emit(code, value)
+		end
+		local ok, why = pcall(function()
+			local result = load_injector(ch).inject(3, "señor")
+			helpers.assert_eq(result.ok, false, "an impossible expansion is refused")
+			helpers.assert_eq(result.cleanup_ok, true, "no output debt was acquired")
+			helpers.assert_eq(document, "btw", "the original trigger survives refusal")
+			helpers.assert_eq(#ch.emitted, 0, "no erase or modifier neutralisation precedes route admission")
+			helpers.assert_eq(#clip.calls, 0, "an unavailable clipboard is not attempted after erasing")
+			helpers.assert_eq(stopped, 0, "a missing text route cannot disable a healthy grabbed keyboard")
+		end)
+		restore(); package.loaded["adapters.keyboard_hook"] = previous_hook
+		if not ok then error(why, 0) end
+	end)
+
 	helpers.it("logs an ERROR when neither the layout nor the clipboard can deliver", function()
 		-- The stub's error() is a no-op, so it is replaced with a recorder here
 		-- rather than asserted through: what matters is that the ERROR variant was
@@ -248,7 +582,7 @@ helpers.describe("injector: an undeliverable replacement is reported, not swallo
 			if line:find("señor", 1, true) then mentioned = true end
 		end
 		helpers.assert_true(mentioned,
-			"the trigger has already been erased, so silence here is text lost with no explanation")
+			"a replacement refused before erasure must still explain its unavailable route")
 
 		restore()
 		package.loaded["logger.shim"] = previous_logger

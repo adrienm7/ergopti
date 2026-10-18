@@ -10,6 +10,8 @@
 --- A real ENOENT spawn also proves refusal does not publish a second outcome.
 --- SIGTERM-resistant descendants must settle on deadlines and cancellation.
 --- A child actually killed by a signal must never report successful completion.
+--- Canonical ownership may retire an orphaned group before its deadline, but
+--- only after the native terminal error, group absence and physical close ACK.
 --- ==============================================================================
 
 local uv = require("luv")
@@ -38,6 +40,10 @@ if child == 0:
     os._exit(0)
 with open(sys.argv[1], "w", encoding="ascii") as receipt:
     receipt.write(str(leader) + " " + str(child))
+# Do not race group retirement against the descendant installing its signal
+# handler and writing READY: both must precede the leader exit under test.
+while not os.path.exists(sys.argv[1] + ".ready"):
+    time.sleep(0.001)
 os._exit(0)
 ]]
 
@@ -66,6 +72,14 @@ local function running(pid)
 	return state ~= "Z" and state ~= "X"
 end
 
+--- Requires the exact native process group to have disappeared, including zombies.
+--- @param leader number
+--- @return boolean
+local function group_absent(leader)
+	local accepted, _, code = uv.kill(-leader, 0)
+	return accepted == nil and code == "ESRCH"
+end
+
 --- Pumps actual libuv events for a bounded readiness or teardown check.
 --- @param predicate function
 --- @return boolean
@@ -86,27 +100,42 @@ end
 local function check(name, dispatch, cancel)
 	local path = directory .. "/" .. name
 	local leader, descendant, handle
-	local answers, result = 0, nil
+	local answers, result, retired_before_callback = 0, nil, false
 	local ok, err = xpcall(function()
 		handle = assert(dispatch(path, function(answer)
 			answers, result = answers + 1, answer
+			if answer.error and answer.error:find("native process group outlived leader", 1, true) then
+				local group = read_receipt(path)
+				retired_before_callback = group and group_absent(group) and ProcessRunner.is_settled() == true
+			end
 		end), "the production runner did not dispatch")
 		assert(await(function()
 			leader, descendant = read_receipt(path)
 			return leader and not running(leader) and uv.fs_stat(path .. ".ready") ~= nil
 		end), "the leader did not exit before the deadline")
-		assert(running(descendant), "the fixture did not retain a live descendant")
+		local retained_descendant = running(descendant)
 		if cancel then
+			assert(retained_descendant, "the fixture did not retain a live descendant")
 			handle.cancel()
 		else
 			assert(await(function() return answers > 0 end), "missing deadline callback")
-			assert(result.error and (result.error == "timeout" or result.error:find("did not finish", 1, true)),
-				"the result must identify the deadline")
+			local orphaned = result.error and result.error:find("native process group outlived leader", 1, true)
+			assert(retained_descendant or orphaned, "early retirement requires the native orphaned-group error")
+			if orphaned then
+				assert(retired_before_callback, "orphaned-group callback preceded native group absence or close ACK")
+			else
+				assert(result.error and (result.error == "timeout" or result.error:find("did not finish", 1, true)),
+					"the result must identify the deadline")
+			end
 		end
 		assert(await(function() return not running(descendant) end),
 			"descendant survived after its leader exited")
 		assert(answers == (cancel and 0 or 1), "terminal callback count changed")
 		assert(await(function() return not uv.loop_alive() end), "libuv handles survived teardown")
+		assert(await(function() return group_absent(leader) end), "the exact native group survived teardown")
+		local handles = 0
+		uv.walk(function() handles = handles + 1 end)
+		assert(handles == 0, "native handles remain after close ACK")
 	end, debug.traceback)
 	-- Re-read even when a failed readiness assertion preceded identity capture.
 	leader, descendant = read_receipt(path)
@@ -117,7 +146,8 @@ local function check(name, dispatch, cancel)
 	uv.fs_unlink(path)
 	uv.fs_unlink(path .. ".ready")
 	if ok then
-		print("PASS " .. name .. " (native fork, pipes, process group and libuv)")
+		print("PASS " .. name .. " (native fork, exact group ESRCH, close ACK and uv.walk=0; terminal="
+			.. tostring(result and result.error or "cancelled") .. ")")
 	else
 		failures = failures + 1
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
@@ -150,6 +180,23 @@ check("process-stubborn-deadline", function(path, callback)
 	return ProcessRunner.run("python3", { "-c", PROGRAM, path, "ignore-term" },
 		{ timeout_ms = TIMEOUT_MS }, callback)
 end, false)
+
+--- A still-running leader must not be mistaken for an orphaned process group.
+for _, delay in ipairs({ 0.02, 0.2 }) do
+	local answers, result = 0, nil
+	local dispatched = ProcessRunner.run("python3", {
+		"-c", "import sys,time; time.sleep(float(sys.argv[1])); print('leader-finished')", tostring(delay),
+	}, { timeout_ms = TIMEOUT_MS }, function(answer) answers, result = answers + 1, answer end)
+	local settled_leader = await(function() return result ~= nil and not uv.loop_alive() end)
+	if dispatched and settled_leader and answers == 1
+		and result.exit_code == 0 and result.stdout == "leader-finished\n" and result.error == nil then
+		print("PASS process-live-leader-" .. tostring(delay) .. " (real leader completes before unchanged deadline)")
+	else
+		failures = failures + 1
+		io.stderr:write(string.format("FAIL process-live-leader-%s: callbacks=%d settled=%s error=%s\n",
+			tostring(delay), answers, tostring(settled_leader), tostring(result and result.error)))
+	end
+end
 
 local callbacks = 0
 local handle, reason = ShellRunner.run_async(directory .. "/missing-program", {},
@@ -188,5 +235,5 @@ for _, runner in ipairs({ "shell", "process" }) do
 end
 
 assert(uv.fs_rmdir(directory))
-print(string.format("Native process groups: %d passed, %d failed", 9 - failures, failures))
+print(string.format("Native process groups: %d passed, %d failed", 11 - failures, failures))
 os.exit(failures == 0 and 0 or 1)

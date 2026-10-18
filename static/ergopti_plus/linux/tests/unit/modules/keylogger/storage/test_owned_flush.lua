@@ -166,6 +166,120 @@ helpers.describe("owned SQLite collector flush", function()
 		end, function() error("controlled uncertain acquisition") end)
 	end)
 
+
+	it("(live-range-app-filter) RAM characters, sources and physical keys honor selected apps", function()
+		with_collector(function(k)
+			for _, app in ipairs({ "org.example.selected", "org.example.excluded" }) do
+				k.on_keydown("a", 1000, app)
+				k.record_physical_key(app, 30, 1000)
+				k.record_synthetic_output(app, "s", "hotstring", 1100)
+			end
+			for _, apps in ipairs({ { "org.example.selected" }, { false, "", "org.example.selected" } }) do
+				local today = assert(k.get_range_payload(nil, nil, apps)).today
+				helpers.assert_nil(today["org.example.excluded"], "An excluded app must not be reintroduced from RAM")
+				helpers.assert_eq(today["org.example.selected"].c.a.c, 1)
+				helpers.assert_eq(today["org.example.selected"].c.s.hs, 1)
+				helpers.assert_eq(today["org.example.selected"].sc_kb["30"].c, 1)
+			end
+			helpers.assert_eq(next(assert(k.get_range_payload(nil, nil, { "other" })).today), nil)
+		end)
+	end)
+
+	it("(live-range-app-filter) absent or wholly invalid selection keeps the SQL all-apps contract", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "org.example.selected")
+			k.on_keydown("b", 1100, "org.example.excluded")
+			for _, apps in ipairs({ false, {}, { false, "" } }) do
+				local today = assert(k.get_range_payload(nil, nil, apps)).today
+				helpers.assert_eq(today["org.example.selected"].c.a.c, 1)
+				helpers.assert_eq(today["org.example.excluded"].c.b.c, 1)
+			end
+		end)
+	end)
+
+	it("(live-range-app-filter) rollback retains complete RAM while selection survives the COMMIT watermark", function()
+		with_collector(function(k, ops)
+			k.on_keydown("a", 1000, "selected")
+			k.on_keydown("x", 1100, "excluded")
+			k.flush()
+			k.on_keydown("b", 1200, "selected")
+			k.on_keydown("y", 1300, "excluded")
+			helpers.assert_nil(k.get_range_payload(nil, nil, { "selected" }))
+			ops[1].outcome, ops[1].physical = "abort", true
+			k.pump_flush()
+			local today = assert(k.get_range_payload(nil, nil, { "selected" })).today
+			helpers.assert_nil(today.excluded)
+			helpers.assert_eq(today.selected.c.a.c, 1)
+			helpers.assert_eq(today.selected.c.b.c, 1)
+			k.flush()
+			ops[1].outcome, ops[1].physical = "commit", true
+			k.pump_flush()
+			today = assert(k.get_range_payload(nil, nil, { "selected" })).today
+			helpers.assert_nil(today.excluded)
+			helpers.assert_nil(today.selected.c.a, "Committed characters leave the live delta")
+			helpers.assert_eq(today.selected.c.b.c, 1)
+			local all = assert(k.get_range_payload()).today
+			helpers.assert_eq(all.excluded.c.y.c, 1, "Selection cannot discard retained input")
+		end)
+	end)
+
+
+	it("(sqlite-range-date-boundary) excluded days never regain live characters or physical keys", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "selected")
+			k.record_physical_key("selected", 30, 1000)
+			for _, bounds in ipairs({ { "2020-01-01", "2020-01-01" }, { "2100-01-01", "2100-01-01" } }) do
+				local payload = assert(k.get_range_payload(bounds[1], bounds[2], { "selected" }))
+				helpers.assert_nil(next(payload.today), "Excluded live input must stay outside the requested dates")
+			end
+			local today = os.date("%Y-%m-%d")
+			local payload = assert(k.get_range_payload(today, today, { "selected" }))
+			helpers.assert_eq(payload.today.selected.c.a.c, 1)
+			helpers.assert_eq(payload.today.selected.sc_kb["30"].c, 1)
+		end)
+	end)
+
+
+	it("(sqlite-range-date-boundary) a missing projection owner refuses instead of merging unrestricted RAM", function()
+		local name = "modules.keylogger.sqlite_reader"
+		local previous, preload = package.loaded[name], package.preload[name]
+		package.loaded[name] = nil
+		package.preload[name] = function() error("deliberately absent projection owner") end
+		local ok, err = xpcall(function()
+			with_collector(function(k)
+				k.on_keydown("a", 1000, "selected")
+				local payload, reason = k.get_range_payload("2020-01-01", "2020-01-01")
+				helpers.assert_nil(payload)
+				helpers.assert_eq(reason, "SQLite projection unavailable")
+				helpers.assert_eq(k._pending_buffer_count_for_test(), 1)
+			end)
+		end, debug.traceback)
+		package.loaded[name], package.preload[name] = previous, preload
+		if not ok then error(err, 0) end
+	end)
+
+
+	it("(sqlite-range-date-boundary) one captured day owns both SQL and RAM across midnight", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "selected")
+			local native_date, captures = os.date, 0
+			os.date = function(format, timestamp)
+				if format == "%Y-%m-%d" and timestamp == nil then
+					captures = captures + 1
+					return captures == 1 and "2026-10-18" or "2026-10-19"
+				end
+				return native_date(format, timestamp)
+			end
+			local ok, err = xpcall(function()
+				local payload = assert(k.get_range_payload("2026-10-18", "2026-10-18", { "selected" }))
+				helpers.assert_eq(payload.today.selected.c.a.c, 1)
+				helpers.assert_eq(captures, 1, "SQL and RAM must share the original local date")
+			end, debug.traceback)
+			os.date = native_date
+			if not ok then error(err, 0) end
+		end)
+	end)
+
 	it("healthy reset returns a real ACK and retires its UI generation", function()
 		with_collector(function(k)
 			local generation = k.get_flush_status().generation

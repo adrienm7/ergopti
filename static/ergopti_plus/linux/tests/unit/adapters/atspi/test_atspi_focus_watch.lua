@@ -180,6 +180,61 @@ helpers.describe("AT-SPI focus watcher: current native authority", function()
 		helpers.assert_true(state.cancelled)
 	end)
 
+	helpers.it("(focus-backlog) defers honest queued heartbeats across the pump frame budget", function()
+		local state = fixture()
+		state.ready()
+		-- A blocking tray dialog leaves the resident alive. Native pipe reads
+		-- coalesce its ordinary heartbeat frames while the daemon is occupied.
+		for _ = 1, 129 do state.now = state.now + 250; state.message("heartbeat") end
+		local bytes = table.concat(state.queue)
+		state.queue = {}
+		for offset = 1, #bytes, 4096 do
+			state.queue[#state.queue + 1] = bytes:sub(offset, offset + 4095)
+		end
+		state.watch.pump()
+		helpers.assert_nil(state.cancelled, "the work budget cannot turn an honest backlog into fatal protocol corruption")
+		helpers.assert_nil(state.watch.snapshot(), "old fields remain revoked while queued heartbeats drain")
+		state.answer = true
+		helpers.assert_eq(state.watch.barrier().role, 61, "only a fresh matching response can restore collection")
+		helpers.assert_eq(state.started, 1, "backlog recovery must retain the original native helper")
+	end)
+
+	helpers.it("(focus-backlog) withholds an answer when a newer unknown frame exceeds this drain", function()
+		local state = fixture()
+		state.ready()
+		state.on_pause = function()
+			state.on_pause = nil
+			state.message("snapshot")
+			for _ = 1, 127 do state.message("heartbeat") end
+			state.message("unknown")
+			local bytes = table.concat(state.queue)
+			state.queue = {}
+			for offset = 1, #bytes, 4096 do state.queue[#state.queue + 1] = bytes:sub(offset, offset + 4095) end
+		end
+		helpers.assert_nil(state.watch.barrier(), "the early answer cannot outrun an unread native revocation")
+		helpers.assert_nil(state.watch.snapshot())
+		helpers.assert_nil(state.cancelled)
+		state.watch.pump()
+		helpers.assert_nil(state.watch.snapshot(), "the next pump must drain retained frames without new pipe data")
+		state.answer, state.role = true, 40
+		helpers.assert_eq(state.watch.barrier().role, 40, "fresh password authority must not borrow the older ordinary field")
+	end)
+
+	helpers.it("(focus-backlog) keeps a malformed deferred native frame fatal on the next drain", function()
+		local state = fixture()
+		state.ready()
+		for _ = 1, 128 do state.message("heartbeat") end
+		state.queue[#state.queue + 1] = "invalid-json\n"
+		local bytes = table.concat(state.queue)
+		state.queue = {}
+		for offset = 1, #bytes, 4096 do state.queue[#state.queue + 1] = bytes:sub(offset, offset + 4095) end
+		state.watch.pump()
+		helpers.assert_nil(state.cancelled, "an honest bounded prefix is deferred without cancelling its helper")
+		helpers.assert_nil(state.watch.snapshot())
+		assert_false(state.watch.pump())
+		helpers.assert_true(state.cancelled, "malformed data remains fatal after crossing the work boundary")
+	end)
+
 	for name, malformed in pairs({ rollback = { sequence = 1 }, future = { at_ms = 2000 },
 		request = { request = 9 }, fractional = { role = 40.5 }, role_type = { role = "61" } }) do
 		helpers.it("withholds invalid native " .. name .. " receipts", function()

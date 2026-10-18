@@ -394,7 +394,8 @@ helpers.describe("injector: joined programmable and layout admission", function(
 			output_fixture(capture, layout, state, function(injector, rows)
 				local checks, ready, fired = 0, false, false
 				state.on_caps = function()
-					state.on_group = function() if checks == 1 then ready = true end end
+					local armed_at = checks
+					state.on_group = function() if checks > armed_at then ready = true end end
 				end
 				local publication = { current = function() return true end, cached = function()
 					checks = checks + 1

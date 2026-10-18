@@ -248,6 +248,53 @@ assert(total("suspended") == ticks + 1)
 assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='suspended';") == ticks + 1)
 pass("stopped native SQLite leaves timers/input seam live, times out, retires physically, and recovers without loss")
 
+
+-- The persisted reader and uncommitted collector must apply the same selection.
+-- Otherwise selecting an app changes counts merely when an unrelated flush lands.
+for _, app in ipairs({ "org.example.selected", "org.example.excluded" }) do
+	K.on_keydown("a", 4500, app)
+	K.record_physical_key(app, 30, 4500)
+end
+local function selected_projection()
+	local today = assert(K.get_range_payload(nil, nil, { "org.example.selected" })).today
+	assert(today["org.example.excluded"] == nil, "unselected application reintroduced from live RAM")
+	assert(today["org.example.selected"].c.a.c == 1)
+	assert(today["org.example.selected"].sc_kb["30"].c == 1)
+end
+selected_projection()
+assert(Drain.flush(K))
+selected_projection()
+local all_apps = assert(K.get_range_payload()).today
+assert(all_apps["org.example.excluded"].c.a.c == 1)
+assert(all_apps["org.example.excluded"].sc_kb["30"].c == 1)
+pass("selected-app character and physical-key totals are identical before and after actual COMMIT")
+
+
+-- Inclusive historical/future intervals must exclude both today's persisted
+-- data and the newer RAM delta; committing the latter cannot widen the range.
+local Reader = require("modules.keylogger.sqlite_reader")
+local selected_app = "org.example.selected"
+local today = os.date("%Y-%m-%d")
+assert(W.upsert_ngrams("owned-range-history", "2020-01-01", selected_app, { h = { c = 3 } }, "ngram_chars"))
+K.on_keydown("r", 4600, selected_app)
+K.record_physical_key(selected_app, 31, 4600)
+for _, phase in ipairs({ "live", "committed" }) do
+	for _, bounds in ipairs({ { "2020-01-01", "2020-01-01" }, { "2100-01-01", "2100-01-01" } }) do
+		local persisted = Reader.read_range_split_today(W.get_db_path(), bounds[1], bounds[2], { selected_app })
+		local public = assert(K.get_range_payload(bounds[1], bounds[2], { selected_app }))
+		assert(next(persisted.today) == nil and next(public.today) == nil, "excluded today slice leaked during " .. phase)
+		if bounds[1] == "2020-01-01" then
+			assert(persisted.historical.c.h.c == 3 and public.historical.c.h.c == 3)
+		end
+	end
+	local included = assert(K.get_range_payload(today, today, { selected_app })).today[selected_app]
+	assert(included.c.a.c == 1 and included.c.r.c == 1)
+	assert(included.sc_kb["30"].c == 1 and included.sc_kb["31"].c == 1)
+	if phase == "live" then assert(Drain.flush(K)) end
+end
+assert(scalar("SELECT SUM(json_array_length(events_json)) FROM events_typing WHERE app='org.example.selected';") == 2)
+pass("inclusive date ranges keep persisted and live slices stable across an actual COMMIT")
+
 K.on_keydown("z", 5000, "stop")
 assert(K.flush() == false)
 K.on_keydown("q", 5100, "stop")
@@ -266,5 +313,5 @@ local function remove(path)
 	else assert(uv.fs_unlink(path)) end
 end
 remove(root)
-assert(checks == 6)
+assert(checks == 8)
 print(string.format("Native owned SQLite flush: %d checks, 0 failures", checks))

@@ -325,6 +325,14 @@ _required_dependency_package() {
 		pacman:libatspi.so.0) echo "at-spi2-core" ;;
 		xbps:libatspi.so.0) echo "at-spi2-core" ;;
 		apk:libatspi.so.0) echo "at-spi2-core" ;;
+		# The library does not provide the executable used for one-time key
+		# derivation. Minimal installations must admit both capabilities.
+		apt:openssl) echo "openssl" ;;
+		dnf:openssl) echo "openssl" ;;
+		zypper:openssl) echo "openssl" ;;
+		pacman:openssl) echo "openssl" ;;
+		xbps:openssl) echo "openssl" ;;
+		apk:openssl) echo "openssl" ;;
 		# Typing metrics: the keylogger writes and the metrics windows read
 		# through the sqlite3 CLI; without it both fall back to nothing useful.
 		apt:sqlite3) echo "sqlite3" ;;
@@ -552,6 +560,7 @@ _check_or_install luajit
 _check_or_install notify-send
 _check_or_install zenity
 _check_or_install sqlite3
+_check_or_install openssl
 _check_or_install sha256sum
 # The live keymap shared by capture and injection. The daemon now fails closed
 # without libxkbcommon state, while the injector falls back to the clipboard if

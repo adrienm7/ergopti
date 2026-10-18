@@ -312,7 +312,7 @@ function renderRow(row, busy) {
 	}
 
 	const buttons = element('div', 'layout-actions');
-	if (busy && busy.id === row.id) {
+	if (busy && busy.id === row.id && busy.action !== 'select') {
 		const key =
 			busy.action === 'uninstall' ? 'layout_manager.busy_uninstall' : 'layout_manager.busy_install';
 		buttons.appendChild(element('span', 'busy', _t(key)));

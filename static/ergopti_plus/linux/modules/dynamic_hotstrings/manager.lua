@@ -81,6 +81,8 @@ local _rules_count  = 0            -- how many rules were registered
 local _info         = {}           -- parsed [info] table
 local _letters      = {}           -- parsed [letters] map
 local _info_path    = nil          -- active personal_info.toml owner
+local _info_generation = 0
+local _info_edits = setmetatable({}, { __mode = "k" })
 
 local native_utf8 = rawget(_G, "utf8")
 local utf8_lib = (type(native_utf8) == "table" and native_utf8.len
@@ -153,6 +155,7 @@ end
 --- dynamic_hotstrings engine.
 --- @param opts table|nil { trigger_char?, personal_info_path? }
 function M.init(opts)
+	_info_generation = _info_generation + 1
 	UserCode.invalidate("dynamic initialization")
 	local options = type(opts) == "table" and opts or {}
 
@@ -713,14 +716,40 @@ function M.get_letters()
 	return copy
 end
 
+--- Captures fresh personal fields with an opaque source and initialization receipt.
+--- @return table|nil receipt Private edit capability, never a page payload.
+--- @return table|nil info Detached fields from the exact captured file.
+--- @return table|nil letters Detached aliases from the same file.
+--- @return string|nil trigger Active trigger character.
+function M.capture_info_edit()
+	local path, generation, trigger = _info_path, _info_generation, _trigger_char
+	if type(path) ~= "string" or path == "" then return nil end
+	local read, content, status = pcall(TomlWriter.read_classified, path)
+	if not read or status ~= "ok" or type(content) ~= "string" then return nil end
+	local decoded, document = pcall(TomlCodec.decode, content)
+	if not decoded or type(document) ~= "table" or type(document.info) ~= "table"
+		or path ~= _info_path or generation ~= _info_generation or trigger ~= _trigger_char then return nil end
+	local info, letters, keys = {}, {}, {}
+	for key, value in pairs(document.info) do info[key], keys[key] = value, true end
+	for key, value in pairs(type(document.letters) == "table" and document.letters or {}) do letters[key] = value end
+	local receipt = {}
+	_info_edits[receipt] = { path = path, generation = generation, trigger = trigger,
+		keys = keys, source = { status = "ok", content = content } }
+	return receipt, info, letters, trigger
+end
+
+
 --- Persists edited personal-information fields and refreshes their live rules.
 ---
 --- Only fields present in the active source may be changed. This keeps a stale
 --- or foreign page from growing an arbitrary TOML namespace, while preserving
 --- user-defined fields that were valid when the editor opened.
 --- @param values table Map of field names to string values.
+--- @param receipt table|nil Opaque display source; omitted for an immediate API edit.
+--- @param admission function|nil Final page admission, rechecked by the native writer.
 --- @return boolean committed
-function M.save_info(values)
+--- @return table|nil next_receipt Receipt for only the acknowledged committed bytes.
+function M.save_info(values, receipt, admission)
 	if type(values) ~= "table" or next(values) == nil then
 		Logger.error(LOG, "Personal-info save requires at least one edited field.")
 		return false
@@ -730,9 +759,22 @@ function M.save_info(values)
 		return false
 	end
 
+	if admission ~= nil and type(admission) ~= "function" then return false end
+	if receipt == nil then receipt = M.capture_info_edit() end
+	local edit = type(receipt) == "table" and _info_edits[receipt] or nil
+	local function current()
+		if not edit or edit.path ~= _info_path or edit.generation ~= _info_generation
+			or edit.trigger ~= _trigger_char then return false end
+		if admission == nil then return true end
+		local called, admitted = pcall(admission)
+		return called and admitted == true and edit.path == _info_path
+			and edit.generation == _info_generation and edit.trigger == _trigger_char
+	end
+	if not current() then return false end
+
 	local keys = {}
 	for key, value in pairs(values) do
-		if type(key) ~= "string" or _info[key] == nil then
+		if type(key) ~= "string" or not edit.keys[key] then
 			Logger.error(LOG, "Personal-info save refused an unknown field '%s'.", tostring(key))
 			return false
 		end
@@ -748,7 +790,7 @@ function M.save_info(values)
 	for _, key in ipairs(keys) do
 		updates[#updates + 1] = { section = "info", key = key, value = values[key] }
 	end
-	local written, write_err = TomlWriter.batch_write(_info_path, updates)
+	local written, write_err, committed_content = TomlWriter.batch_write(edit.path, updates, nil, edit.source, nil, current)
 	if written ~= true then
 		Logger.error(LOG, "Personal-info publication failed: %s.", tostring(write_err))
 		return false
@@ -761,8 +803,18 @@ function M.save_info(values)
 		return false
 	end
 	if not was_enabled then M.set_enabled(false) end
+	local next_receipt
+	local allowed = admission == nil
+	if admission ~= nil then local called, accepted = pcall(admission);allowed = called and accepted == true end
+	if allowed and type(committed_content) == "string" then
+		local captured = M.capture_info_edit()
+		local following = captured and _info_edits[captured]
+		if following and following.path == edit.path and following.source.content == committed_content then
+			next_receipt = captured
+		end
+	end
 	Logger.info(LOG, "Personal information saved and live rules refreshed.")
-	return true
+	return true, next_receipt
 end
 
 

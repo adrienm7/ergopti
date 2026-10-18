@@ -62,6 +62,7 @@ function frontend(host = 'macos') {
 		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), context);
 	}
 	const state = vm.runInContext('app_state', context);
+	const sourceFlags = context.get_source_mode_flags;
 	context.compute_manifest_metrics = () => {};
 	context.update_app_btn_text = () => {};
 	context.get_local_date_string = () => '2026-09-07';
@@ -84,7 +85,78 @@ function frontend(host = 'macos') {
 		elements.date_start.value = elements.date_end.value = date;
 		context.apply_date_app_filters();
 	}
-	return { context, state, requests, timers, elements, renders, dispatch, select };
+	return { context, state, requests, timers, elements, renders, dispatch, select, sourceFlags };
+}
+
+// Real first-paint pipeline; only the DOM, timer and native transport are ports.
+function bootstrapFrontend(host) {
+	const f = frontend(host);
+	const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+	for (const id of [
+		'btn_toggle_hs',
+		'btn_toggle_llm',
+		'app_modal',
+		'app_list',
+		'app_search',
+		'app_filter_btn'
+	]) {
+		f.elements[id] = { value: '', innerHTML: '', style: {}, focus() {} };
+	}
+	for (const [id, node] of Object.entries(f.elements)) {
+		const tag = html.match(new RegExp('<[a-z]+\\b[^>]*\\bid="' + id + '"[^>]*>'))?.[0] || '';
+		const classes = new Set((tag.match(/\bclass="([^"]*)"/)?.[1] || '').split(/\s+/));
+		node.classList = {
+			add(name) {
+				classes.add(name);
+			},
+			remove(name) {
+				classes.delete(name);
+			},
+			contains(name) {
+				return classes.has(name);
+			},
+			toggle(name) {
+				if (classes.has(name)) classes.delete(name);
+				else classes.add(name);
+			}
+		};
+	}
+	f.elements.pause_threshold.value = '5000';
+	f.context.get_source_mode_flags = f.sourceFlags;
+	for (const file of ['../dom_utils.js', 'format.js', 'modal.js']) {
+		vm.runInContext(fs.readFileSync(path.join(root, file), 'utf8'), f.context, { filename: file });
+	}
+	f.context.get_local_date_string = () => '2026-09-07';
+	let onMessage;
+	if (host === 'windows')
+		f.context.chrome.webview.addEventListener = (_, callback) => {
+			onMessage = callback;
+		};
+	Object.assign(f.context, {
+		URLSearchParams,
+		location: { search: '', hash: '' },
+		createVisibilityPoller() {},
+		decodeHostBridgeResponse(_, raw) {
+			return JSON.parse(raw);
+		}
+	});
+	const bootstrap = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
+		.map((match) => match[1])
+		.find((source) => source.includes('let cached_historical'));
+	assert.ok(bootstrap);
+	vm.runInContext(bootstrap, f.context, { filename: 'typing-bootstrap.js' });
+	f.push = (blob) => {
+		if (host === 'windows') onMessage({ data: { type: 'prefetch', blob } });
+		else f.context.__hostBridgeResponse('metrics_typing_bridge', false, JSON.stringify(blob));
+	};
+	f.changePause = (value) => {
+		f.elements.pause_threshold.value = value;
+		const handler = html.match(/id="pause_threshold"[\s\S]*?onchange="([^"]+)"/)[1];
+		vm.runInContext(handler, f.context);
+	};
+	f.dateChangeHandler = (id) =>
+		html.match(new RegExp('id="' + id + '"[\\s\\S]*?onchange="([^"]+)"'))[1];
+	return f;
 }
 
 function actualPurge(request, success) {
@@ -120,4 +192,4 @@ end)
 	return JSON.parse(line.slice(6));
 }
 
-module.exports = { frontend, actualPurge };
+module.exports = { frontend, bootstrapFrontend, actualPurge };

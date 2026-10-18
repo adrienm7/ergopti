@@ -94,9 +94,17 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 	end
 	local handles = nil
 	local needs_scan = true
-	local function publish()
+	local focus_generation, publishing = 0, false
+	local function sample(generation, captured_request)
 		if handles then
 			local snapshot, conclusive = Focus._check_native_watch_focus(handles)
+			-- GetState/GetRole may synchronously deliver focus or request
+			-- callbacks. Their new authority cannot label this older query.
+			if generation ~= focus_generation or captured_request ~= request then
+				Focus._release_native_watch_focus(handles)
+				handles, needs_scan, dirty = nil, true, true
+				return
+			end
 			if conclusive == true then emit("snapshot", snapshot); return end
 			Focus._release_native_watch_focus(handles)
 			handles = nil
@@ -105,9 +113,21 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 			return
 		end
 		local snapshot, conclusive, retained = Focus._get_native_watch_snapshot()
+		if generation ~= focus_generation or captured_request ~= request then
+			Focus._release_native_watch_focus(retained)
+			needs_scan, dirty = true, true
+			return
+		end
 		handles = retained
 		needs_scan = false
 		if conclusive == true then emit("snapshot", snapshot) else emit("unknown") end
+	end
+	local function publish()
+		if publishing then dirty = true; return end
+		publishing = true
+		local accepted, reason = pcall(sample, focus_generation, request)
+		publishing = false
+		if not accepted then error(reason, 0) end
 	end
 	local function abort()
 		failed = true
@@ -143,6 +163,7 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 				-- active frame policy. Compare native objects, never label text.
 				if kind == "object:property-change:accessible-name"
 					and (not handles or handles.window ~= native.source) then return end
+				focus_generation = focus_generation + 1
 				emit("unknown"); schedule()
 			end)
 			gobject.g_boxed_free(atspi.atspi_event_get_type(), event)
@@ -188,6 +209,7 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 				assert(tonumber(ffi.C.getppid()) == parent_pid and bus ~= nil
 					and dbus.dbus_connection_get_is_connected(bus) ~= 0, "focus listener authority ended")
 				if dirty then dirty = false; publish() else emit("heartbeat") end
+				if needs_scan then schedule() end
 			end)
 			if not accepted then abort(); timer = nil; return 0 end
 			return 1

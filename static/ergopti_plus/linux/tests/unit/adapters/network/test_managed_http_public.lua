@@ -180,15 +180,23 @@ local function fresh_client(config)
  local file = assert(io.open(assert(Paths.shared("modules/network/proxy_policy.json")), "rb"))
  local data = Json.decode(file:read("*a")); file:close()
  local policy = assert(policy_module.new(data))
- package.loaded["infra.proxy_policy"] = { load = function() return policy end, environment = function() return {} end }
+ package.loaded["infra.proxy_policy"] = { load = function()
+  state.policy_loads = (state.policy_loads or 0) + 1
+  if config.on_policy_load then config.on_policy_load(state) end
+  return policy
+ end, environment = function() return {} end }
  package.loaded["infra.paths"] = { driver_root = function() return driver_root end,
   shared_root = function() return assert(Paths.shared_root()) end,
   shared = function(path) return assert(Paths.shared(path)) end }
  package.loaded["infra.managed_http_deadline"] = { start = deadline_port(state, config) }
- return dofile(driver_root .. "/adapters/http_client.lua")
+ local client = dofile(driver_root .. "/adapters/http_client.lua")
+ state.curl = package.loaded["adapters.curl_http_client"]
+ state.managed = package.loaded["infra.managed_http"]
+ return client
  end)
  for _, name in ipairs(names) do package.loaded[name] = saved[name] end
  if not ok then error(client, 0) end
+ state.client = client
  function state.fire_deadlines()
   for _, item in ipairs(state.deadlines) do
    if not item.settled and state.time >= item.deadline then item.fire() end
@@ -392,4 +400,150 @@ helpers.describe("managed public API: independent exact group absence receipts",
 		end)
 	end
 end)
+
+helpers.describe("managed public API: terminal global physical shutdown", function()
+ helpers.it("cold shutdown never initializes, reads caller metadata or invokes business callbacks", function()
+  local client, state = fresh_client()
+  local callbacks, metadata, preflight = 0, 0, 0
+  state.curl.preflight = function() preflight = preflight + 1; error("cold preflight after shutdown") end
+  local options = setmetatable({}, { __pairs = function() metadata = metadata + 1; return next, {}, nil end,
+   __index = function() metadata = metadata + 1 end })
+  helpers.assert_true(client.shutdown())
+  helpers.assert_eq(client.get("http://127.0.0.1:9000", {}, options, function() callbacks = callbacks + 1 end), false)
+  local operation = client.get_owned("http://127.0.0.1:9000", {}, options, function() callbacks = callbacks + 1 end)
+  helpers.assert_true(operation:is_settled())
+  helpers.assert_eq(operation.started, false)
+  local settlements = 0
+  operation:on_settled(function() settlements = settlements + 1 end)
+  helpers.assert_eq(client.download("http://127.0.0.1:9000", {}, "/private/destination", options,
+   function() callbacks = callbacks + 1 end), false)
+  helpers.assert_true(client.shutdown())
+  helpers.assert_eq({ callbacks, metadata, preflight, state.policy_loads or 0, #state.requests, #state.handles }, { 0, 0, 0, 0, 0, 0 })
+  helpers.assert_eq(settlements, 1, "settlement remains observable for a resource-free refusal")
+ end)
+
+ helpers.it("keeps the download boolean ABI when caller metadata reenters shutdown", function()
+  local client, state = fresh_client()
+  local callbacks, preflight, metadata = 0, 0, 0
+  state.curl.preflight = function() preflight = preflight + 1; error("preflight after metadata shutdown") end
+  local options, native_pairs = {}, pairs
+  -- This exact metadata port exercises the same reentry on both Lua ABIs.
+  _G.pairs = function(value)
+   if value == options then
+    metadata = metadata + 1
+    helpers.assert_true(client.shutdown())
+    return next, {}, nil
+   end
+   return native_pairs(value)
+  end
+  local called, accepted = pcall(client.download, "http://127.0.0.1:9000", {}, "/private/destination", options,
+   function() callbacks = callbacks + 1 end)
+  _G.pairs = native_pairs
+  if not called then error(accepted, 0) end
+  helpers.assert_eq(accepted, false, "download must return the original boolean ABI")
+  helpers.assert_eq({ callbacks, preflight, metadata, state.policy_loads or 0, #state.requests }, { 0, 0, 1, 0, 0 })
+ end)
+
+ helpers.it("rechecks initialization when policy loading shuts the client down", function()
+  local stopped, callbacks = nil, 0
+  local client, state = fresh_client({ on_policy_load = function(current) stopped = current.client.shutdown() end })
+  local accepted, operation = client.get("http://127.0.0.1:9000", {}, {}, function() callbacks = callbacks + 1 end)
+  helpers.assert_true(stopped, "policy loading has acquired no native operation")
+  helpers.assert_eq(accepted, false)
+  helpers.assert_true(operation:is_settled())
+  helpers.assert_true(client.shutdown())
+  helpers.assert_eq({ callbacks, state.policy_loads, #state.requests, #state.handles }, { 0, 1, 0, 0 })
+ end)
+
+ helpers.it("rechecks the coordinator constructor before admitting any request", function()
+  local client, state = fresh_client()
+  local construct, calls = state.managed.new, 0
+  state.managed.new = function(dependencies)
+   calls = calls + 1
+   helpers.assert_true(client.shutdown(), "the coordinator constructor itself owns no native resources")
+   return construct(dependencies)
+  end
+  local operation = client.get_owned("http://127.0.0.1:9000", {}, {}, function() error("no terminal delivery after stop") end)
+  helpers.assert_true(operation:is_settled())
+  helpers.assert_eq(operation.started, false)
+  helpers.assert_true(client.shutdown())
+  helpers.assert_eq({ calls, #state.requests, #state.handles }, { 1, 0, 0 })
+ end)
+
+ for _, api in ipairs({ "boolean", "owned" }) do
+  local admission = api
+  helpers.it("closes " .. api .. " admission when preflight reenters shutdown", function()
+   local client, state = fresh_client()
+   local native_preflight, stopped, callbacks = state.curl.preflight, nil, 0
+   state.curl.preflight = function(...)
+    stopped = client.shutdown()
+    return native_preflight(...)
+   end
+   local operation
+   if admission == "owned" then
+    operation = client.get_owned("http://127.0.0.1:9000", {}, {}, function() callbacks = callbacks + 1 end)
+    helpers.assert_eq(stopped, false, "owned preparation is an enrolled admission frame")
+   else
+    local accepted
+    accepted, operation = client.get("http://127.0.0.1:9000", {}, {}, function() callbacks = callbacks + 1 end)
+    helpers.assert_eq(accepted, false)
+    helpers.assert_true(stopped, "boolean preflight has acquired no native operation")
+   end
+   helpers.assert_true(operation:is_settled())
+   helpers.assert_true(client.shutdown())
+   helpers.assert_eq({ callbacks, #state.requests, #state.handles }, { 0, 0, 0 })
+  end)
+ end
+
+ helpers.it("retains curl group, pipe and deadline close debt after logical cancellation", function()
+  local client, state = fresh_client({ defer_close = true, defer_deadline_close = true })
+  local callbacks, settlements = 0, 0
+  local accepted, operation = client.get("http://127.0.0.1:9000", {}, { owner = "first" }, function() callbacks = callbacks + 1 end)
+  local other = client.get_owned("http://127.0.0.1:9001", {}, { owner = "second" }, function() callbacks = callbacks + 1 end)
+  helpers.assert_true(accepted)
+  operation:on_settled(function() settlements = settlements + 1 end)
+  other:on_settled(function() settlements = settlements + 1 end)
+  helpers.assert_true(client.cancel("first"), "logical signal acceptance is preserved")
+  helpers.assert_eq(client.isActive("first"), false)
+  helpers.assert_eq(client.shutdown(), false)
+  helpers.assert_eq(client.shutdown(), false)
+  state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+  state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
+  helpers.assert_eq(client.shutdown(), false, "leader exits do not acknowledge pipe closes")
+  state.ack_closes()
+  helpers.assert_eq(client.shutdown(), false, "native process retirement does not acknowledge deadline closes")
+  helpers.assert_eq(settlements, 0)
+  state.deadlines[1].ack()
+  helpers.assert_eq(client.shutdown(), false)
+  helpers.assert_eq(settlements, 1)
+  state.deadlines[2].ack()
+  helpers.assert_true(client.shutdown())
+  helpers.assert_eq(settlements, 2)
+  helpers.assert_eq(callbacks, 0)
+  helpers.assert_eq(client.get("http://127.0.0.1:9002", {}, {}, function() callbacks = callbacks + 1 end), false)
+  helpers.assert_eq(#state.requests, 2)
+ end)
+
+ for _, failure in ipairs({ "close_failure", "kill_failure", "kill_throw" }) do
+  local refusal = failure
+  helpers.it("retains native " .. failure .. " debt without restoring business delivery", function()
+   local config = { defer_close = true }
+   config[refusal] = true
+   local client, state = fresh_client(config)
+   local callbacks = 0
+   local operation = client.get_owned("http://127.0.0.1:9000", {}, {}, function() callbacks = callbacks + 1 end)
+   helpers.assert_eq(client.shutdown(), false)
+   helpers.assert_eq(client.shutdown(), false)
+   state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
+   helpers.assert_eq(client.shutdown(), false)
+   state.allow_kills, state.allow_closes = true, true
+   client.shutdown()
+   state.ack_closes()
+   helpers.assert_true(client.shutdown())
+   helpers.assert_true(operation:is_settled())
+   helpers.assert_eq(callbacks, 0)
+  end)
+ end
+end)
+
 return helpers

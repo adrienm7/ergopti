@@ -21,6 +21,9 @@
 ---    folder it was installed with: after a save in the paths editor, which
 ---    does not restart the daemon, "open today's log" named a file nobody
 ---    wrote. It names the sink's folder until repoint() moves the sink.
+--- 5. Relative XDG bases made configuration and metrics depend on the daemon's
+---    working directory, hiding existing preferences. Every environment base
+---    must be absolute while preserving valid spaces and filesystem roots.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -199,6 +202,84 @@ helpers.describe("logs folder resolution (logs-dir-resolver)", function()
 			local CrashReporter = require("modules.diagnostics.crash_reporter")
 			helpers.assert_eq(CrashReporter.get_crash_dir(), "/state/ergopti_plus/logs/crash_reports")
 			package.loaded["modules.diagnostics.crash_reporter"] = nil
+		end)
+	end)
+end)
+
+helpers.describe("absolute Linux user directories (xdg-absolute-bases)", function()
+	for _, invalid in ipairs({ "relative folder", "~/folder", ".", "../folder" }) do
+		helpers.it("ignores relative XDG roots: " .. invalid, function()
+			with_paths({ HOME = "/account with spaces", XDG_CONFIG_HOME = invalid,
+				XDG_DATA_HOME = invalid, XDG_STATE_HOME = invalid }, {}, function(Paths)
+				helpers.assert_eq(Paths.config_home(), "/account with spaces/.config")
+				helpers.assert_eq(Paths.data_home(), "/account with spaces/.local/share")
+				helpers.assert_eq(Paths.state_home(), "/account with spaces/.local/state")
+				helpers.assert_eq(Paths.default_config_dir(), "/account with spaces/.config/ergopti")
+				helpers.assert_eq(Paths.metrics_path(), "/account with spaces/.local/share/ergopti/metrics.sqlite")
+				helpers.assert_eq(Paths.default_logs_dir(), "/account with spaces/.local/state/ergopti_plus/logs")
+			end)
+		end)
+	end
+
+	helpers.it("uses absolute temporary placement without treating a relative HOME as account identity", function()
+		with_paths({ HOME = "relative account", TMPDIR = "/temporary with spaces/",
+			XDG_CONFIG_HOME = false, XDG_DATA_HOME = false, XDG_STATE_HOME = false }, {}, function(Paths)
+			helpers.assert_nil(Paths.account_home())
+			helpers.assert_eq(Paths.home(), "/temporary with spaces")
+			helpers.assert_eq(Paths.config_home(), "/temporary with spaces/.config")
+			helpers.assert_eq(Paths.data_home(), "/temporary with spaces/.local/share")
+			helpers.assert_eq(Paths.state_home(), "/temporary with spaces/.local/state")
+		end)
+	end)
+
+	helpers.it("cannot replace a missing HOME with a relative TMPDIR", function()
+		with_paths({ HOME = false, TMPDIR = "relative temporary", XDG_CONFIG_HOME = false,
+			XDG_DATA_HOME = false, XDG_STATE_HOME = false }, {}, function(Paths)
+			helpers.assert_nil(Paths.account_home())
+			helpers.assert_eq(Paths.home(), "/tmp")
+			helpers.assert_eq(Paths.config_home(), "/tmp/.config")
+		end)
+	end)
+
+	helpers.it("preserves absolute folder bytes while dropping only trailing separators", function()
+		with_paths({ HOME = "/account with spaces///", XDG_CONFIG_HOME = "/config \n/",
+			XDG_DATA_HOME = "/data with spaces///", XDG_STATE_HOME = "/state with spaces///" }, {}, function(Paths)
+			helpers.assert_eq(Paths.account_home(), "/account with spaces")
+			helpers.assert_eq(Paths.config_home(), "/config \n")
+			helpers.assert_eq(Paths.data_home(), "/data with spaces")
+			helpers.assert_eq(Paths.state_home(), "/state with spaces")
+		end)
+	end)
+
+	helpers.it("retains the root account directory and joins its fallback children exactly", function()
+		with_paths({ HOME = "/", XDG_CONFIG_HOME = false, XDG_DATA_HOME = false,
+			XDG_STATE_HOME = false }, {}, function(Paths)
+			helpers.assert_eq(Paths.account_home(), "/")
+			helpers.assert_eq(Paths.home(), "/")
+			helpers.assert_eq(Paths.config_home(), "/.config")
+			helpers.assert_eq(Paths.data_home(), "/.local/share")
+			helpers.assert_eq(Paths.state_home(), "/.local/state")
+		end)
+	end)
+
+	helpers.it("retains absolute XDG filesystem roots without introducing a double separator", function()
+		with_paths({ HOME = "/account", XDG_CONFIG_HOME = "/", XDG_DATA_HOME = "/",
+			XDG_STATE_HOME = "/" }, {}, function(Paths)
+			helpers.assert_eq(Paths.config_home(), "/")
+			helpers.assert_eq(Paths.data_home(), "/")
+			helpers.assert_eq(Paths.state_home(), "/")
+			helpers.assert_eq(Paths.default_config_dir(), "/ergopti")
+			helpers.assert_eq(Paths.metrics_path(), "/ergopti/metrics.sqlite")
+			helpers.assert_eq(Paths.default_logs_dir(), "/ergopti_plus/logs")
+		end)
+	end)
+
+	helpers.it("keeps the existing temporary fallback when no absolute base is available", function()
+		with_paths({ HOME = false, TMPDIR = false, XDG_CONFIG_HOME = false,
+			XDG_DATA_HOME = false, XDG_STATE_HOME = false }, {}, function(Paths)
+			helpers.assert_nil(Paths.account_home())
+			helpers.assert_eq(Paths.home(), "/tmp")
+			helpers.assert_eq(Paths.default_config_dir(), "/tmp/.config/ergopti")
 		end)
 	end)
 end)

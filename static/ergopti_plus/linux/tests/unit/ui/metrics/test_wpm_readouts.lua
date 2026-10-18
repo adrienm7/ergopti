@@ -330,6 +330,12 @@ local function with_storage(initial, body)
 	package.loaded["ui.tooltip.preview"] = { is_visible = function() return false end }
 	package.loaded["ui.tooltip.llm"] = { is_showing = function() return false end }
 	local store = Fakes.storage({ initial = initial or {} })
+	-- This fixture models the mandatory all-or-none position batch, including deletions.
+	function store.set_many(updates, deletions)
+		for key, value in pairs(updates) do store.values[key] = value end
+		for _, key in ipairs(deletions or {}) do store.values[key] = nil end
+		return true
+	end
 	package.loaded["adapters.storage"] = store
 	package.loaded["ui.wpm.widget"] = nil
 	package.loaded["ui.wpm.tray_readout"] = nil
@@ -448,6 +454,79 @@ helpers.describe("wpm readouts: the floating widget", function()
 			helpers.assert_nil(store.values["wpm_widget.pos_x"])
 		end)
 	end)
+
+	for _, operation in ipairs({ "drag", "reset" }) do
+		helpers.it("keeps the complete WPM position when the second scalar " .. operation .. " publication refuses", function()
+			with_storage({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }, function(store)
+				local Widget = require("ui.wpm.widget")
+				local surface = fake_surface()
+				Widget._set_surface(surface)
+				helpers.assert_true(Widget.start())
+				helpers.assert_true(Widget.restore())
+				Widget.tick(stats(42), 10)
+				local scalar, batch = 0, 0
+				local original = store.set_many
+				local function refuse_second(key, value)
+					scalar = scalar + 1
+					if scalar == 2 then return false end
+					store.values[key] = value
+					return true
+				end
+				store.set, store.delete = refuse_second, function(key) return refuse_second(key, nil) end
+				store.set_many = function(...)
+					batch = batch + 1
+					return original(...)
+				end
+				if operation == "drag" then surface.moved(640, 360)
+				else helpers.assert_true(Widget.reset_position()) end
+				helpers.assert_eq(scalar, 0, "one position cannot cross two independent publications")
+				helpers.assert_eq(batch, 1)
+				package.loaded["ui.wpm.widget"] = nil
+				local Restarted = require("ui.wpm.widget")
+				local again = fake_surface()
+				Restarted._set_surface(again)
+				helpers.assert_true(Restarted.restore())
+				Restarted.tick(stats(42), 20)
+				if operation == "drag" then
+					helpers.assert_eq(again.draws[1].x, 640)
+					helpers.assert_eq(again.draws[1].y, 360)
+				else
+					local x, y = Model.default_anchor(canon(), again.screen_frame())
+					helpers.assert_eq(again.draws[1].x, x)
+					helpers.assert_eq(again.draws[1].y, y)
+				end
+			end)
+		end)
+	end
+
+	for _, refusal in ipairs({ "false", "throw", "missing" }) do
+		helpers.it("keeps both saved WPM coordinates after a " .. refusal .. " batch refusal", function()
+			with_storage({ ["wpm_widget.pos_x"] = "120", ["wpm_widget.pos_y"] = "180" }, function(store)
+				local Widget = require("ui.wpm.widget")
+				local surface = fake_surface()
+				Widget._set_surface(surface)
+				helpers.assert_true(Widget.start())
+				helpers.assert_true(Widget.restore())
+				Widget.tick(stats(42), 10)
+				helpers.assert_eq(surface.draws[1].x, 120, "persisted numeric strings remain supported")
+				helpers.assert_eq(surface.draws[1].y, 180)
+				if refusal == "missing" then store.set_many = nil
+				else store.set_many = function() if refusal == "throw" then error("controlled position refusal") end; return false end end
+				helpers.assert_true(pcall(surface.moved, 640, 360))
+				helpers.assert_eq(Widget.reset_position(), false)
+				package.loaded["ui.wpm.widget"] = nil
+				local Restarted = require("ui.wpm.widget")
+				local again = fake_surface()
+				Restarted._set_surface(again)
+				helpers.assert_true(Restarted.restore())
+				Restarted.tick(stats(42), 20)
+				helpers.assert_eq(again.draws[1].x, 120)
+				helpers.assert_eq(again.draws[1].y, 180)
+				helpers.assert_eq(store.get("wpm_widget.pos_x"), "120")
+				helpers.assert_eq(store.get("wpm_widget.pos_y"), "180")
+			end)
+		end)
+	end
 
 	helpers.it("draws the graph in graph mode, and keeps that choice", function()
 		with_storage({}, function(_, preferences)

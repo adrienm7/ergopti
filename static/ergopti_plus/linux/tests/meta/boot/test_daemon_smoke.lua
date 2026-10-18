@@ -160,7 +160,9 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
       local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
       helpers.assert_true(fh ~= nil, "daemon file is readable")
       local src = fh:read("*a"); fh:close()
-      local loop_start = assert(src:find("event_loop.run({", 1, true))
+      -- Startup refusal has its own cleanup loop; inspect the recurring runtime loop.
+      local periodic_start = assert(src:find("local on_periodic = function()", 1, true))
+      local loop_start = assert(src:find("event_loop.run({", periodic_start, true))
       local loop_end = assert(src:find("\n\t})", loop_start, true))
       local loop_body = src:sub(loop_start, loop_end)
 
