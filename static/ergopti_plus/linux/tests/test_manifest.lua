@@ -231,6 +231,7 @@ return {
 	"tests.unit.modules.keylogger.aggregation.test_aggregator_helpers",
 	"tests.unit.modules.llm.ollama.test_api_ollama_payload",
 	"tests.unit.modules.llm.ollama.test_api_ollama_stream_parse",
+	"tests.unit.modules.llm.ollama.test_api_ollama_terminal_receipt",
 	"tests.unit.infra.config.test_bridge_persistence",
 	"tests.unit.modules.updater.check.test_changelog_release_sources",
 	"tests.unit.infra.config.test_config_window_overrides",

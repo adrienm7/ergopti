@@ -161,6 +161,24 @@ local function finish_request(request, err)
 	end
 end
 
+--- Validates one inference record before exposing its content to the caller.
+--- HTTP EOF alone does not prove Ollama completed generation. Only the exact
+--- terminal marker closes this stream; whitespace may follow, another record may not.
+--- @param request table Retained original response owner.
+--- @param line string Complete NDJSON record or trailing EOF fragment.
+local function consume_line(request, line)
+	local content, parse_error, record = bridge_mod.parse_stream_line(line)
+	if parse_error then request.stream_error = parse_error; return end
+	if not record then return end
+	if request.done_seen then request.stream_error = "Ollama returned a record after its terminal marker"; return end
+	if type(record.done) ~= "boolean" then request.stream_error = "Invalid Ollama terminal marker"; return end
+	request.done_seen = record.done
+	if content and request_current(request) then
+		request.full_text = request.full_text .. content
+		if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
+	end
+end
+
 --- Parses every complete NDJSON line in one arbitrarily split transport chunk.
 --- @param request table
 --- @param chunk string
@@ -173,24 +191,15 @@ local function consume_chunk(request, chunk, flush)
 		if not newline then break end
 		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
 		request.pending = request.pending:sub(newline + 1)
-		local content, parse_error = bridge_mod.parse_stream_line(line)
-		if parse_error then request.stream_error, request.pending = parse_error, ""; return end
-		if content and request_current(request) then
-			request.full_text = request.full_text .. content
-			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
-		end
+		consume_line(request, line)
+		if request.stream_error then request.pending = ""; return end
 	end
 	if flush and request.pending ~= "" then
-		local content, parse_error = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
+		local line = request.pending:gsub("\r$", "")
 		request.pending = ""
-		if parse_error then request.stream_error = parse_error; return end
-		if content and request_current(request) then
-			request.full_text = request.full_text .. content
-			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
-		end
+		consume_line(request, line)
 	end
 end
-
 
 -- =========================================
 -- =========================================
@@ -259,6 +268,7 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 		on_done = on_done,
 		pending = "",
 		full_text = "",
+		done_seen = false,
 		terminal = false,
 	}
 	_active_request = request
@@ -281,6 +291,8 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 					or (type(result) == "table" and result.error or "HTTP transport failed"))
 			elseif request.stream_error then
 				finish_request(request, request.stream_error)
+			elseif not request.done_seen then
+				finish_request(request, "Ollama stream ended before its terminal marker")
 			elseif request.full_text == "" then
 				finish_request(request, "no response from Ollama")
 			else
