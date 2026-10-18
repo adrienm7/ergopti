@@ -162,10 +162,17 @@ Test("virtual desktops: reads the Windows 10 and Windows 11 registry layouts", _
 _VDT_Presses(Direction, State) {
 	Pressed := []
 	ReadState := (*) => (IsObject(State) ? State : _VDT_Throw())
-	Press := (Key, Mods) => Pressed.Push(Key . ":" . _VDT_JoinMods(Mods))
+	Press := _VDT_RecordPress.Bind(Pressed)
 	Count := GestureDesktopNavigateWrap(Direction, ReadState, Press)
 	AssertEqual(Pressed.Length, Count, "the action must report the presses it sent")
 	return Pressed
+}
+
+; Recording alone has no return value in AHK. Model the sender's explicit
+; success receipt so the production loop can distinguish it from refusal.
+_VDT_RecordPress(Pressed, Key, Mods) {
+	Pressed.Push(Key . ":" . _VDT_JoinMods(Mods))
+	return true
 }
 
 _VDT_Throw() {
@@ -199,14 +206,14 @@ _VDT_WrapActionPresses() {
 	AssertEqual("", _VDT_Join(_VDT_Presses("next", { Index: 0, Count: 1 })),
 		"a single desktop has nowhere to wrap to")
 }
-Test("virtual desktops: desktop_*_wrap walk across the row at the edge", _VDT_WrapActionPresses)
+Test("virtual desktops: desktop_*_wrap walk across the row at the edge (desktop-wrap-press-receipts)", _VDT_WrapActionPresses)
 
 _VDT_UnreadableStateMovesOneDesktop() {
 	AssertEqual("Right:Ctrl+Win", _VDT_Join(_VDT_Presses("next", "fail")),
 		"without a readable position the step is the plain one")
 	AssertEqual("Left:Ctrl+Win", _VDT_Join(_VDT_Presses("prev", "fail")))
 }
-Test("virtual desktops: an unreadable state moves one desktop without wrapping", _VDT_UnreadableStateMovesOneDesktop)
+Test("virtual desktops: an unreadable state moves one desktop without wrapping (desktop-wrap-press-receipts)", _VDT_UnreadableStateMovesOneDesktop)
 
 _VDT_ActionsAreRegistered() {
 	global GESTURE_ACTIONS
