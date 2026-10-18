@@ -621,7 +621,7 @@ local function install_signal_handlers()
 	local signals = require("infra.signal_handlers")
 	privacy_owners.signals_stop = signals.stop
 	local function on_term(sig)
-		Logger.info(LOG, "Signal %d received — shutting down…", sig)
+		pcall(Logger.info, LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
 		-- Native retirement may still be pending after request() returns.
 		-- Output closes only in the normal clean-exit path after all ACKs.
