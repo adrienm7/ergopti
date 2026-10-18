@@ -368,9 +368,9 @@ end
 --- from key presses. Started (or re-acquired after a hotplug) while CapsLock was
 --- already on, the daemon therefore believed it off: typed triggers were read in
 --- the wrong case, and the injector — which releases a locked CapsLock around a
---- replacement — typed it inverted. The LED is read at acquisition, before the
---- grab can make it stale (the kernel drops the compositor's LED writes to a
---- grabbed device), and matches what the desktop last set.
+--- replacement — typed it inverted. The LED is read at acquisition to match
+--- the lock state last published by the desktop. EVIOCGRAB prevents competing
+--- input consumers, but does not prevent the desktop from updating these LEDs.
 --- @param path string|nil The keyboard source just acquired.
 --- @return boolean True when the state now matches the LED.
 local function _seed_caps_lock(path)
@@ -3253,15 +3253,25 @@ function M.check_device()
 	
 		Logger.start(LOG, "Keyboard source set changed (%d → %d) — re-acquiring…",
 			#_devices, #keyboards)
-		local reset_ok, reset_err = XkbCapture.reset_state()
-		if not reset_ok then
-			Logger.error(LOG, "Cannot reset XKB state for the new source set — keeping the previous set: %s.",
-				tostring(reset_err))
-			return not tx.managed
-		end
 		tx.sources, tx.source_observers, tx.pointers, tx.pointer_observers, tx.native_complete = {}, {}, {}, {}, true
 		local acquired, acquire_err = _acquire(keyboards, force_path, tx)
 		if acquired then
+			-- A failed new open must leave the retained XKB state intact. Once
+			-- acquisition succeeds, preserve only modifiers whose exact forwarded
+			-- owner survived; a removed keyboard has already retired its owners.
+			local modifiers = {}
+			for _, entry in ipairs(_modifier_order) do
+				local forwarded = _forwarded_down[entry.key]
+				if forwarded then
+					modifiers[#modifiers + 1] = { source = forwarded.owner_source or forwarded.source,
+						code = entry.code, role = _modifier_down[entry.key] }
+				end
+			end
+			local reset_ok, reset_err = XkbCapture.reset_state()
+			if not reset_ok then
+				Logger.error(LOG, "Cannot reset XKB state after keyboard acquisition: %s.", tostring(reset_err))
+				return false
+			end
 			_seed_caps_lock(_devices[1])
 			-- A source/capture change retires every old repeat callback, but the
 			-- application still never saw its consumed down. Keep that debt only
@@ -3288,6 +3298,15 @@ function M.check_device()
 				end
 			end
 			_reset_modifier_state()
+			local captured = {}
+			for _, modifier in ipairs(modifiers) do
+				if not captured[modifier.code] then
+					local _, _, capture_err = _capture(modifier.code, InputEvent.VALUE_DOWN)
+					if capture_err then return false end
+					captured[modifier.code] = true
+				end
+				_track_modifier(modifier.source, modifier.code, InputEvent.VALUE_DOWN, modifier.role)
+			end
 			_consumed_down, _physical_down = suppressed, physical
 			_sync_dropped = {}
 			if _acquire_pointers(pointers, tx) == false then return false end
