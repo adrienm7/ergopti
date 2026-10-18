@@ -759,3 +759,5 @@ _GSWO_AllEntryPointsShareOwnership() {
 
 Test("screenshot-worker-ownership: every entry point and lifecycle boundary shares one owner",
 	_GSWO_AllEntryPointsShareOwnership)
+
+#Include test_screenshot_region_startup.ahk

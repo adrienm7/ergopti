@@ -26,10 +26,12 @@ _TSC_Check() {
     Assert(Src != "", "GestureScreenshotRegion must exist in modules/gestures.ahk")
     Assert(PollSrc != "" && SaveStartSrc != "" && SaveDoneSrc != "" && FinishSrc != "",
         "region saving must use explicit selection, worker, publication, and cleanup lifecycle")
-    Assert(InStr(Src, "OldClip := CB_SaveAll()") > 0,
+    Assert(InStr(Src, 'SaveFn := Ports.Get("save", CB_SaveAll)') > 0
+        && InStr(Src, "OldClip := SaveFn.Call()") > 0,
         "region transaction must snapshot all clipboard formats through the owned adapter")
     Assert(InStr(Src, "if A_IsSuspended") > 0, "region capture must refuse to start while the driver is suspended")
-    Assert(InStr(Src, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0, "region selection must be deferred to an epoch-bound timer")
+    Assert(InStr(Src, 'State["poll_timer"] := GestureRegionCapturePoll.Bind(Epoch)') > 0
+        && InStr(Src, 'SetTimer(State["poll_timer"], -GESTURE_REGION_CAPTURE_POLL_MS)') > 0, "region selection must be deferred to an epoch-bound timer")
     Assert(InStr(PollSrc, "if A_IsSuspended") > 0, "the deferred region poll must cancel rather than save while suspended")
     Assert(InStr(PollSrc, "ClipWait(GESTURE_REGION_CLIPWAIT_PROBE_SEC") > 0
         && InStr(PollSrc, "GESTURE_REGION_CLIPWAIT_IMAGE_MODE") > 0,

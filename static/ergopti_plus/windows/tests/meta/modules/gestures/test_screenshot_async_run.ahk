@@ -160,7 +160,8 @@ _SAR_RegionCaptureNoBlockingWait() {
         Assert(Body != "", "GestureScreenshotRegion(Mode) must exist")
         Assert(InStr(Body, "RunWait") = 0, "region screenshot hotkey must not wait for PowerShell")
         Assert(InStr(Body, "ClipWait(30") = 0, "region screenshot hotkey must not wait up to 30 seconds for user selection")
-        Assert(InStr(Body, "SetTimer(GestureRegionCapturePoll.Bind(Epoch)") > 0,
+        Assert(InStr(Body, 'State["poll_timer"] := GestureRegionCapturePoll.Bind(Epoch)') > 0
+                && InStr(Body, 'SetTimer(State["poll_timer"], -GESTURE_REGION_CAPTURE_POLL_MS)') > 0,
                 "region screenshot must hand selection tracking to an epoch-bound timer")
 }
 Test("Gesture screenshot: region save defers selection and PowerShell (gesture-region-async)", _SAR_RegionCaptureNoBlockingWait)
