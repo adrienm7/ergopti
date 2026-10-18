@@ -19,10 +19,13 @@
 #      command is printed. Actual native staging requires Linux x86_64.
 #
 # LuaJIT, luv, curl, native GIO modules, schemas and their linked ELF closure
-# are bundled from trusted build-host packages. The recipient supplies glibc
-# and certificate trust; this remains a similar-vintage Linux package rather
-# than universal binary compatibility. Missing components refuse packaging.
-# Native admission does not prove physical input, PAC or desktop settings.
+# are bundled from trusted build-host packages. The recipient supplies glibc,
+# GLib, the C++ runtime and certificate trust, so the build host must be the
+# oldest supported Ubuntu LTS (ubuntu-22.04, glibc 2.35): built on a newer one,
+# the bundled luajit needed GLIBC_2.38 and the image died on Ubuntu 22.04 before
+# showing its tray. check-elf-glibc-ceiling.cjs refuses such a build below.
+# Missing components refuse packaging. Native admission does not prove
+# physical input, PAC or desktop settings.
 #
 # The shared tree is staged as a CHILD of the driver root
 # (usr/lib/ergopti/_shared), matching build-linux-deb.sh and build-linux-rpm.sh.
@@ -139,12 +142,17 @@ echo "  Payload check: all ${#REQUIRED_PAYLOAD[@]} required file(s) present"
 # ----------------------------------------------------------------------
 # 4. Stage and admit the actual native network runtime
 # ----------------------------------------------------------------------
-# Missing build-host prerequisites are a packaging failure. The same-vintage
-# glibc restriction remains; copying an executable alone is not ELF closure.
+# Missing build-host prerequisites are a packaging failure; copying an
+# executable alone is not ELF closure.
 python3 "$SCRIPT_DIR/stage-linux-network-runtime.py" \
   --appdir "$APPDIR" \
   --catalogue "$PROJECT_ROOT/static/ergopti_plus/_shared/data/linux_native_runtime.json" \
   --template "$SCRIPT_DIR/templates/linux-portable-runtime-env.sh"
+
+# Every ELF file the image carries, the driver's own native backend included,
+# must load on the oldest supported LTS. A newer build host fails here rather
+# than on the user's machine.
+node "$SCRIPT_DIR/check-elf-glibc-ceiling.cjs" "$APPDIR"
 
 # ----------------------------------------------------------------------
 # 5. AppRun — the single entry point

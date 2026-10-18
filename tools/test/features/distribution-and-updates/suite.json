@@ -489,6 +489,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-hs274-baseline-contract.cjs"],
 			"repro": "npm run test:hs274-baseline-contract"
+		},
+		{
+			"id": "js-0443",
+			"ordinal": 443,
+			"name": "Linux AppImage loads on the oldest supported LTS glibc and its asset name carries no linux",
+			"cmd": "node",
+			"args": ["tools/test/test-linux-appimage-portability.cjs"],
+			"repro": "node tools/test/test-linux-appimage-portability.cjs"
 		}
 	]
 }

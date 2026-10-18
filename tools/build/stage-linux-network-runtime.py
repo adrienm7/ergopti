@@ -3,9 +3,11 @@
 
 """Stage the build host's actual AppImage network runtime, then admit its ABI.
 
-This preserves the existing AppImage same-vintage glibc requirement. It does
-not bundle a CA store, alter desktop settings, or claim PAC/session delivery.
-Only trusted build-host package files are inspected with ldd.
+The recipient supplies glibc, GLib and the C++ runtime, so the build host must
+be the oldest supported Ubuntu LTS: tools/build/check-elf-glibc-ceiling.cjs
+proves that ceiling on the packaged image. It does not bundle a CA store,
+alter desktop settings, or claim PAC/session delivery. Only trusted build-host
+package files are inspected with ldd.
 """
 
 import argparse
@@ -676,6 +678,24 @@ def external_glibc(name):
     } or name.startswith("ld-linux-")
 
 
+def recipient_base(name):
+    # The tray and the windows load the recipient's GTK stack into the daemon,
+    # and that stack links the recipient's GLib and C++ runtime. A bundled copy
+    # older than the recipient's shadows it through LD_LIBRARY_PATH: a host
+    # library built against GLib 2.80 then misses g_once_init_enter_pointer and
+    # the tray never loads. The build host is the oldest supported LTS, so the
+    # recipient's copies are never older than the ones the modules were built
+    # against; neither they nor their own dependencies are staged.
+    return name in {
+        "libglib-2.0.so.0",
+        "libgobject-2.0.so.0",
+        "libgio-2.0.so.0",
+        "libgmodule-2.0.so.0",
+        "libstdc++.so.6",
+        "libgcc_s.so.1",
+    }
+
+
 def copy_elf_closure(seeds, library_directory, owners):
     pending = list(seeds)
     visited = set()
@@ -687,7 +707,7 @@ def copy_elf_closure(seeds, library_directory, owners):
         if len(visited) > 256:
             raise RuntimeRefused("Native packaging dependency bound exceeded.")
         for name, dependency in dependency_paths(run(["ldd", str(source)])):
-            if external_glibc(name):
+            if external_glibc(name) or recipient_base(name):
                 continue
             copy_unique(dependency, library_directory / name, owners)
             pending.append(dependency)
@@ -774,10 +794,14 @@ def stage(appdir, catalogue, template):
                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
             )
         copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
-        # 0.5's backend is linked and therefore relocatable through package lib.
-        # 0.4's separate runtime plugin search needs another qualification owner.
-        if not any(destination.name == "libpxbackend-1.0.so" for destination in owners):
-            raise RuntimeRefused("Unqualified native libproxy plugin layout.")
+        # The oldest supported LTS ships libproxy 0.4, whose optional plugins
+        # (GNOME settings, PAC runners) load from an absolute build-host path
+        # and so are absent from the image. Its built-in environment, sysconfig
+        # and KDE readers remain, and libgiognomeproxy reads the GNOME proxy
+        # settings itself; PAC stays unqualified. 0.5 links its backend, which
+        # the closure stages. The linked core is required either way.
+        if not any(destination.name == "libproxy.so.1" for destination in owners):
+            raise RuntimeRefused("Native libproxy core absent from the staged closure.")
         copy_unique(template, driver / "network-runtime-env.sh", owners)
         # The shared environment template has a generated catalogue region.
         # It is copied unchanged, rather than generating policy in this stager.
