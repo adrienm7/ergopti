@@ -184,3 +184,96 @@ for Mode in ["live", "closed", "reopened", "pause", "cancel", "already-paused"] 
 	Test("folder picker: native field completion respects " . Mode . " (webview-folder-picker-session)",
 		_FPB_ResultOwnsSession.Bind("native", "config", Mode))
 }
+
+; Default Close hides a Gui without retiring its HWND. These private hidden
+; windows receive targeted messages only; no desktop input is injected.
+_PNC_RecordDefaultClose(Receipt, *) {
+	Receipt.Closed := true
+	return false
+}
+
+_PNC_PostClose(Hwnd) {
+	AssertTrue(DllCall("PostMessageW", "Ptr", Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0, "Int"),
+		"the private native window must receive its close request")
+}
+
+_PNC_DefaultCloseRetainsHiddenHandle() {
+	Window := Gui()
+	Edit := Window.Add("Edit", , "retained value")
+	Receipt := {Closed: false}
+	Window.OnEvent("Close", _PNC_RecordDefaultClose.Bind(Receipt))
+	Window.Show("Hide w220 h100")
+	Hwnd := Window.Hwnd
+	try {
+		_PNC_PostClose(Hwnd)
+		Started := A_TickCount
+		while !Receipt.Closed && A_TickCount - Started < 2000
+			Sleep(1)
+		AssertTrue(Receipt.Closed, "the native Close event must actually run")
+		AssertTrue(WMHandleExists(Hwnd), "default Close preserves the native handle")
+		AssertFalse(DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"))
+		AssertEqual("retained value", Edit.Value, "a hidden closed editor still owns writable controls")
+	} finally Window.Destroy()
+}
+
+_PNC_CloseDuringPicker(Window, *) {
+	Hwnd := Window.Hwnd
+	_PNC_PostClose(Hwnd)
+	Started := A_TickCount
+	while WMHandleExists(Hwnd) && A_TickCount - Started < 2000
+		Sleep(1)
+	AssertFalse(WMHandleExists(Hwnd), "owned Close must destroy rather than hide the editor")
+	return "D:\obsolete selection"
+}
+
+_PNC_OwnedCloseRejectsPickerResult() {
+	Window := Gui()
+	Edit := Window.Add("Edit", , "C:\original")
+	_PathsEdNative_BindCancellation(Window)
+	Window.Show("Hide w220 h100")
+	Hwnd := Window.Hwnd
+	try {
+		AssertTrue(WMHandleExists(Hwnd))
+		AssertFalse(DllCall("IsWindowVisible", "Ptr", Hwnd, "Int"))
+		AssertFalse(_PathsEdNative_Browse(Window, Edit, _PNC_CloseDuringPicker.Bind(Window)),
+			"a cancelled native editor cannot accept a late selection or access its dead edit control")
+	} finally {
+		if WMHandleExists(Hwnd)
+			Window.Destroy()
+	}
+}
+
+class _PNC_EventRegistrar {
+	__New(Window) {
+		this.Window := Window
+		this.Handlers := Map()
+	}
+	OnEvent(Name, Callback) {
+		this.Handlers[Name] := Callback
+		this.Window.OnEvent(Name, Callback)
+	}
+}
+
+_PNC_EscapeRetiresSameWindow() {
+	Window := Gui()
+	Window.Add("Edit", , "C:\original")
+	Window.Show("Hide w220 h100")
+	Hwnd := Window.Hwnd
+	try {
+		Registrar := _PNC_EventRegistrar(Window)
+		_PathsEdNative_BindCancellation(Registrar)
+		AssertTrue(Registrar.Handlers["Close"] == Registrar.Handlers["Escape"],
+			"Close and Escape must share the same definitive cancellation")
+		AssertTrue(Registrar.Handlers["Escape"].Call(Window))
+		AssertFalse(WMHandleExists(Hwnd), "the registered Escape action retires the hidden HWND too")
+	} finally {
+		if WMHandleExists(Hwnd)
+			Window.Destroy()
+	}
+}
+Test("native paths editor: default Close retains the hidden HWND (native-paths-close-cancellation)",
+	_PNC_DefaultCloseRetainsHiddenHandle)
+Test("native paths editor: owned Close retires a picker callback's HWND (native-paths-close-cancellation)",
+	_PNC_OwnedCloseRejectsPickerResult)
+Test("native paths editor: registered Escape destroys the same hidden window (native-paths-close-cancellation)",
+	_PNC_EscapeRetiresSameWindow)

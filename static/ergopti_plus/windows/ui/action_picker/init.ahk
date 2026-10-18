@@ -169,6 +169,7 @@ FilePathsEditor(*) {
 		if _PathsEdWeb_TryOpen()
 				return
 		W := Gui_Create(, t("dialog.config_folder.window_title"))
+		_PathsEdNative_BindCancellation(W)
 		W.SetFont("s10", "Segoe UI")
 		W.MarginX := 12
 		W.MarginY := 12
