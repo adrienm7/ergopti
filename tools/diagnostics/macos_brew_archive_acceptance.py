@@ -545,7 +545,8 @@ def _validate_sender_failure(packet):
     require(
         type(packet["schema"]) is int
         and packet["schema"] == 1
-        and packet["role"] in ("unconfined-positive", "deny-removal-positive", "denied"),
+        and packet["role"]
+        in ("unconfined-consent-required", "deny-removal-consent-required", "denied"),
         "Invalid sender failure role",
     )
     require(
@@ -714,202 +715,12 @@ def _run_appleevent_sender(children, receiver, group, role, arguments, *, confin
         raise
 
 
-def _permission_worker_trace(data):
-    """Closed optional prefix; absent bytes never prove the call boundary was not reached."""
-    require(type(data) is bytes and len(data) <= 256, "Permission trace capture bound refused")
-    entry = b"OWNED_PERMISSION_WORKER/1 phase=api-call-starting\n"
-    joined = b"OWNED_PERMISSION_WORKER/1 phase=worker-joined\n"
-    if data == b"":
-        return {"schema": 1, "stage": "no-milestone", "api_osstatus": None}
-    if data == entry:
-        return {"schema": 1, "stage": "api-call-starting", "api_osstatus": None}
-    require(data.startswith(entry), "Permission trace call boundary refused")
-    tail = data[len(entry) :]
-    match = re.fullmatch(
-        rb"OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=(-?[0-9]{1,11})\n"
-        rb"(OWNED_PERMISSION_WORKER/1 phase=worker-joined\n)?",
-        tail,
-    )
-    require(match is not None, "Permission trace order or frame refused")
-    status = int(match[1])
-    require(
-        -(2**31) <= status < 2**31 and str(status).encode("ascii") == match[1],
-        "Permission trace status refused",
-    )
-    return {
-        "schema": 1,
-        "stage": "worker-joined" if match[2] == joined else "api-returned",
-        "api_osstatus": status,
-    }
-
-
-def _validate_permission_worker_fact(packet):
-    """Information only; API completion never substitutes consent or process closure."""
-    require(
-        type(packet) is dict
-        and set(packet) == {"schema", "stage", "api_osstatus"}
-        and type(packet["schema"]) is int
-        and packet["schema"] == 1,
-        "Permission worker fact shape refused",
-    )
-    require(
-        type(packet["stage"]) is str
-        and packet["stage"]
-        in ("unavailable", "no-milestone", "api-call-starting", "api-returned", "worker-joined"),
-        "Permission worker stage refused",
-    )
-    status = packet["api_osstatus"]
-    require(
-        (
-            packet["stage"] in ("api-returned", "worker-joined")
-            and type(status) is int
-            and -(2**31) <= status < 2**31
-        )
-        or (
-            packet["stage"] in ("unavailable", "no-milestone", "api-call-starting")
-            and status is None
-        ),
-        "Permission worker status unavailable or unbounded",
-    )
-    return dict(packet)
-
-
-def _permission_result_stderr(output, errors):
-    """Extract only a full joined trace agreeing with the unchanged native result."""
-    try:
-        fact = _permission_worker_trace(errors)
-        matched = re.fullmatch(
-            rb"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=(-?[0-9]{1,11})\n", output
-        )
-        if (
-            fact["stage"] == "worker-joined"
-            and matched is not None
-            and str(fact["api_osstatus"]).encode("ascii") == matched[1]
-        ):
-            return b""
-    except AdmissionError:
-        pass
-    return errors  # Partial, dirty, mismatched and native error diagnostics remain refused.
-
-
-def _permission_worker_capture(children, process, stream=1):
-    """Read the same acquired stderr inode once; uncertain close retains exact input debt."""
-    require(
-        process in children.captures and process in children.capture_identities,
-        "Permission worker capture acquisition absent",
-    )
-    require(type(stream) is int and stream in (0, 1), "Permission capture stream refused")
-    path = children.captures[process][stream]
-    identity = children.capture_identities[process][stream]
-    require(
-        path.parent == children.root and owned_path(children.root, path) == path,
-        "Permission worker capture escaped owned root",
-    )
-    descriptor = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
-    data = None
-    info = None
-    primary = None
-    try:
-        info = os.fstat(descriptor)
-        require(
-            stat.S_ISREG(info.st_mode)
-            and info.st_uid == os.getuid()
-            and (info.st_dev, info.st_ino) == identity
-            and 0 <= info.st_size <= 256,
-            "Permission worker capture identity or bound differs",
-        )
-        data = os.read(descriptor, 257)
-        after = os.fstat(descriptor)
-        require(
-            (after.st_dev, after.st_ino, after.st_size) == (info.st_dev, info.st_ino, info.st_size)
-            and len(data) == info.st_size,
-            "Permission worker capture changed or was partial",
-        )
-    except BaseException as error:
-        primary = error
-        raise
-    finally:
-        try:
-            os.close(descriptor)
-        except BaseException:
-            # A close error cannot authorize retry of a possibly reused integer.
-            # Retain this exact acquisition as uncertainty; never claim full fixture closure.
-            children.record_debt(
-                {
-                    "kind": "permission-capture",
-                    "descriptor": descriptor,
-                    "identity": list(identity),
-                    "close": "unacknowledged",
-                }
-            )
-            if primary is None:
-                raise
-    return data
-
-
-def _observe_permission_worker(children, process, primary):
-    """Sample exact retained captures only after the original settlement; preserve primary."""
-    evidence = getattr(children, "evidence", None)
-    output, errors = None, None
-    fact = {"schema": 1, "stage": "unavailable", "api_osstatus": None}
-    try:
-        group = children.groups.get(process)
-        require(
-            group is not None
-            and group.process is process
-            and group.reaped
-            and not any(entry.get("pid") == process.pid for entry in children.debt),
-            "Permission worker capture lacks exact physical settlement",
-        )
-        errors = _permission_worker_capture(children, process)
-        fact = _permission_worker_trace(errors)
-        if fact["stage"] == "worker-joined":
-            output = _permission_worker_capture(children, process, 0)
-    except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
-        if primary is None:
-            raise
-    except Exception:
-        pass  # Optional unknown/capture refusal never replaces the original command outcome.
-    if evidence is not None and getattr(evidence, "descriptor", None) is not None:
-        try:
-            evidence.record(
-                "automation.permission-worker",
-                status="refused" if primary is not None else "pending",
-                permission_worker=fact,
-            )
-        except (OwnedProcessInterrupted, KeyboardInterrupt, SystemExit):
-            if primary is None:
-                raise
-        except Exception:
-            pass
-    return output, errors
-
-
 def _validate_command_timeout(packet):
     """Closed observations only; these timings cannot authorize or extend a wait."""
-    keys = {
-        "schema",
-        "command",
-        "stage",
-        "budget_seconds",
-        "request_deadline_ns",
-        "started_ns",
-        "expired_ns",
-        "spent_ns",
-    }
+    keys = {"schema", "budget_seconds", "started_ns", "expired_ns", "spent_ns"}
     require(type(packet) is dict and set(packet) == keys, "Unadmitted command timeout fields")
     require(
         type(packet["schema"]) is int and packet["schema"] == 1, "Unadmitted command timeout schema"
-    )
-    require(
-        type(packet["command"]) is str
-        and packet["command"] in ("permission-request", "consent-observer", "other"),
-        "Unadmitted command timeout identity",
-    )
-    require(
-        type(packet["stage"]) is str
-        and packet["stage"] in ("readiness", "ui-observer", "exit-wait"),
-        "Unadmitted command timeout stage",
     )
     budget = packet["budget_seconds"]
     require(
@@ -922,15 +733,6 @@ def _validate_command_timeout(packet):
             type(packet[key]) is int and 0 <= packet[key] <= limit,
             "Unadmitted command timeout clock",
         )
-    deadline = packet["request_deadline_ns"]
-    require(
-        deadline is None or (type(deadline) is int and 0 < deadline <= limit),
-        "Unadmitted command timeout request deadline",
-    )
-    require(
-        packet["command"] != "permission-request" or deadline is not None,
-        "Command timeout lost its original request deadline",
-    )
     require(
         packet["expired_ns"] >= packet["started_ns"]
         and packet["spent_ns"] == packet["expired_ns"] - packet["started_ns"],
@@ -959,9 +761,6 @@ class PhaseEvidence:
         self.ownership_closed = False
         self.previous = None
         self.first_timeout = None
-        self.first_permission_worker = None
-        self.last_native_ui = None
-        self.last_native_ui_elapsed_seconds = None
         if directory is not None:
             require(
                 hasattr(os, "O_NOFOLLOW"),
@@ -1009,9 +808,7 @@ class PhaseEvidence:
         command=None,
         debt_kinds=(),
         native_terminal=None,
-        native_ui=None,
         sender_failure=None,
-        permission_worker=None,
     ):
         if self.descriptor is None:
             return True
@@ -1060,8 +857,6 @@ class PhaseEvidence:
                 "server-thread",
                 "server-retirement-error",
                 "external-canary",
-                "automation-readiness",
-                "permission-capture",
             }
             kinds = sorted(set(debt_kinds))
             require(
@@ -1081,23 +876,6 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Native terminal evidence lost its exact unreaped group",
                 )
-            if native_ui is not None:
-                require(
-                    phase == "automation.ui-observation"
-                    and status in ("pending", "refused")
-                    and not closed,
-                    "Automation UI observation cannot claim acceptance or closure",
-                )
-                packet["native_ui"] = _validate_owned_automation_ui_fact(native_ui)
-                # Retain only the most recent already admitted scalar census
-                # after the fixed history limit. It grants no native outcome.
-                self.last_native_ui = {
-                    key: value
-                    for key, value in packet["native_ui"].items()
-                    if key not in ("first_button", "identity")
-                }
-                if "discovery" in self.last_native_ui:
-                    self.last_native_ui["discovery"] = dict(self.last_native_ui["discovery"])
             if sender_failure is not None:
                 require(
                     phase == "appleevent.sender-refusal" and status == "refused" and not closed,
@@ -1110,44 +888,13 @@ class PhaseEvidence:
                     and not packet["groups"][0]["closed"],
                     "Sender observation lost its exact unreaped receiver",
                 )
-            if permission_worker is not None:
-                require(
-                    phase == "automation.permission-worker"
-                    and status in ("pending", "refused")
-                    and not closed,
-                    "Permission worker observation cannot grant consent or closure",
-                )
-                packet["permission_worker"] = _validate_permission_worker_fact(permission_worker)
-                if getattr(self, "first_permission_worker", None) is None:
-                    self.first_permission_worker = dict(packet["permission_worker"])
-            last_native_ui = getattr(self, "last_native_ui", None)
-            if last_native_ui is not None:
-                packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
-            first_permission_worker = getattr(self, "first_permission_worker", None)
-            if first_permission_worker is not None:
-                packet["first_permission_worker"] = _validate_permission_worker_fact(
-                    first_permission_worker
-                )
             first_timeout = getattr(self, "first_timeout", None)
             if first_timeout is not None:
                 packet["first_timeout"] = _validate_command_timeout(first_timeout)
-            # The bounded phase history keeps its first256 events. Carry the last
-            # closed UI observation independently through the terminal checkpoint.
-            last_native_ui = getattr(self, "last_native_ui", None)
-            if native_ui is not None:
-                last_native_ui = json.loads(json.dumps(last_native_ui))
-            if last_native_ui is not None:
-                packet["last_native_ui"] = _validate_owned_automation_ui_fact(last_native_ui)
             semantic = json.dumps(packet, sort_keys=True)
-            if semantic == self.previous and native_ui is None:
+            if semantic == self.previous:
                 return not self.failed
             packet["elapsed_seconds"] = round(time.monotonic() - self.started, 6)
-            if last_native_ui is not None:
-                packet["last_native_ui_elapsed_seconds"] = (
-                    packet["elapsed_seconds"]
-                    if native_ui is not None
-                    else self.last_native_ui_elapsed_seconds
-                )
             packet["history_omitted"] = max(0, self.sequence + 1 - 256)
             data = (json.dumps(packet, sort_keys=True) + "\n").encode()
             require(len(data) <= 4096, "Native phase packet exceeds its safe bound")
@@ -1182,9 +929,6 @@ class PhaseEvidence:
                     os.unlink(temporary, dir_fd=self.descriptor)
                 except FileNotFoundError:
                     pass
-            self.last_native_ui = last_native_ui
-            if last_native_ui is not None:
-                self.last_native_ui_elapsed_seconds = packet["last_native_ui_elapsed_seconds"]
             self.previous = semantic
             self.sequence += 1
             self.ownership_closed = bool(closed)
@@ -1201,191 +945,11 @@ class PhaseEvidence:
             os.close(descriptor)
 
 
-class OwnedAutomationRequest(list):
-    """The existing request argv and its one original public monotonic deadline."""
-
-    def __init__(self, arguments, timeout):
-        super().__init__(arguments)
-        require(type(timeout) is int and timeout > 0, "Owned Automation budget refused")
-        now = time.monotonic_ns()
-        require(type(now) is int and now >= 0, "Owned Automation clock unavailable")
-        self.original_arguments = tuple(arguments)
-        self._timeout = timeout
-        self._deadline_ns = now + timeout * 1_000_000_000
-        self.last_ns = now
-        self.readiness_nonce = None
-        self.readiness = None
-        require(self.deadline_ns <= 2**64 - 1, "Owned Automation deadline unavailable")
-
-    @property
-    def timeout(self):
-        return self._timeout
-
-    @property
-    def deadline_ns(self):
-        return self._deadline_ns
-
-    def remaining(self):
-        require(tuple(self) == self.original_arguments, "Owned Automation request argv changed")
-        now = time.monotonic_ns()
-        require(type(now) is int and now >= self.last_ns, "Owned Automation clock unavailable")
-        self.last_ns = now
-        return max(0, self.deadline_ns - now) / 1_000_000_000
-
-
-class OwnedAutomationReadiness:
-    """Reserve a private startup acknowledgement; it never grants signed identity or consent."""
-
-    def __init__(self, children, request):
-        self.children = children
-        self.request = request
-        self.nonce = request.readiness_nonce
-        require(
-            type(self.nonce) is str
-            and re.fullmatch(r"[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}", self.nonce),
-            "Owned Automation readiness nonce refused",
-        )
-        self.path = children.root / ("automation-ready-" + str(uuid.uuid4()))
-        self.descriptor = os.open(
-            self.path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600
-        )
-        self.closed = False
-        self.close_attempted = False
-        self.close_uncertain = False
-        self.accepted = False
-        try:
-            self.identity = os.fstat(self.descriptor)
-        except BaseException:
-            self.close_attempted = True
-            try:
-                os.close(self.descriptor)
-            except OSError:
-                self.close_uncertain = True
-            else:
-                self.closed = True
-            debt = {"kind": "automation-readiness", "path": str(self.path)}
-            if self.close_uncertain:
-                debt.update(descriptor=self.descriptor, descriptor_close="unacknowledged")
-            children.record_debt(debt)
-            raise
-
-    def environment(self):
-        """Bind only the exact request child to its reserved inode in the owned cwd."""
-        return {
-            "ERGOPTI_OWNED_AUTOMATION_READY_NAME": self.path.name,
-            "ERGOPTI_OWNED_AUTOMATION_READY_DEV": str(self.identity.st_dev),
-            "ERGOPTI_OWNED_AUTOMATION_READY_INO": str(self.identity.st_ino),
-        }
-
-    def wait(self, process):
-        """Wait for foreground readiness inside the original request budget and reservation."""
-        expected = f"OWNED_APPLEEVENT_READY/1 pid={process.pid} nonce={self.nonce}\n".encode()
-        while True:
-            require(self.request.remaining() > 0, "Owned Automation readiness exceeded deadline")
-            require(
-                process in self.children.groups
-                and self.children.groups[process].process is process
-                and not self.children.groups[process].reaped,
-                "Owned Automation readiness requester reservation changed",
-            )
-            group = self.children.groups[process]
-            after = os.fstat(self.descriptor)
-            named = os.stat(self.path, follow_symlinks=False)
-            require(
-                stat.S_ISREG(after.st_mode)
-                and after.st_uid == os.getuid()
-                and stat.S_IMODE(after.st_mode) == 0o600
-                and after.st_nlink == 1
-                and (after.st_dev, after.st_ino) == (self.identity.st_dev, self.identity.st_ino)
-                and (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino)
-                and 0 <= after.st_size <= len(expected),
-                "Owned Automation readiness identity or bound differs",
-            )
-            os.lseek(self.descriptor, 0, os.SEEK_SET)
-            data = os.read(self.descriptor, len(expected) + 1)
-            require(
-                len(data) <= len(expected) and expected.startswith(data),
-                "Owned Automation readiness bytes differ",
-            )
-            if data == expected:
-                require(
-                    self.request.remaining() > 0,
-                    "Owned Automation readiness exceeded deadline",
-                )
-                named = os.stat(self.path, follow_symlinks=False)
-                complete = os.fstat(self.descriptor)
-                require(
-                    (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino),
-                    "Owned Automation readiness identity or bound differs",
-                )
-                require(
-                    (complete.st_dev, complete.st_ino)
-                    == (self.identity.st_dev, self.identity.st_ino)
-                    and stat.S_ISREG(complete.st_mode)
-                    and complete.st_uid == os.getuid()
-                    and stat.S_IMODE(complete.st_mode) == 0o600
-                    and complete.st_nlink == 1
-                    and complete.st_size == len(expected),
-                    "Owned Automation readiness changed during capture",
-                )
-                self.accepted = True
-                return group.observe_exit() is None
-            if group.observe_exit() is not None:
-                # Preserve a native pre-ready refusal and its original captures.
-                # A successful exit without acknowledgement is refused by run().
-                return False
-            time.sleep(min(0.02, self.request.remaining()))
-
-    def close(self, *, retire=True):
-        """Retire only the reserved inode after its request child physically settles."""
-        if self.close_attempted:
-            return
-        self.close_attempted = True
-        failed = False
-        try:
-            os.close(self.descriptor)
-        except OSError:
-            # close() may have released the FD even when reporting an error.
-            # Its number is quarantined, never retried or used to unlink input.
-            self.close_uncertain = True
-            self.children.record_debt(
-                {
-                    "kind": "automation-readiness",
-                    "path": str(self.path),
-                    "descriptor": self.descriptor,
-                    "descriptor_close": "unacknowledged",
-                }
-            )
-            return
-        self.closed = True
-        if retire:
-            try:
-                named = os.stat(self.path, follow_symlinks=False)
-                if (
-                    (named.st_dev, named.st_ino) == (self.identity.st_dev, self.identity.st_ino)
-                    and stat.S_ISREG(named.st_mode)
-                    and named.st_uid == os.getuid()
-                    and stat.S_IMODE(named.st_mode) == 0o600
-                    and named.st_nlink == 1
-                ):
-                    os.unlink(self.path)
-                else:
-                    failed = True
-            except OSError:
-                failed = True
-        else:
-            failed = True
-        if failed:
-            self.children.record_debt({"kind": "automation-readiness", "path": str(self.path)})
-
-
 class Children:
     """Own process groups and settle descendants before removing their inputs."""
 
     def __init__(self, root, evidence=None):
         self.evidence = evidence
-        self.allow_automation_consent = False
-        self.allow_owned_consent_ui = False
         self.root = root
         self.environment = private_environment(root)
         self.active = []
@@ -1397,7 +961,6 @@ class Children:
         self.groups = {}
         self.captures = {}
         self.capture_identities = {}
-        self._timeout_request_deadline_ns = None
 
     def record_debt(self, entry):
         """Repeated retirement attempts keep one diagnostic per exact owned resource."""
@@ -1426,20 +989,6 @@ class Children:
 
     def start(self, arguments, *, confined=False):
         """Acquire an asynchronous native child and every input/capture needed to retire it."""
-        environment = self.environment
-        if type(arguments) is OwnedAutomationRequest:
-            require(arguments.remaining() > 0, "Owned Automation request exceeded deadline")
-            environment = {
-                **self.environment,
-                "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS": str(arguments.deadline_ns),
-            }
-            if arguments.readiness is not None:
-                require(
-                    type(arguments.readiness) is OwnedAutomationReadiness
-                    and arguments.readiness.request is arguments,
-                    "Owned Automation readiness request differs",
-                )
-                environment.update(arguments.readiness.environment())
         self.sequence += 1
         output = self.root / f"child-{self.sequence}.stdout"
         errors = self.root / f"child-{self.sequence}.stderr"
@@ -1462,93 +1011,31 @@ class Children:
                 self.native_groups,
                 register,
                 cwd=self.root,
-                env=environment,
+                env=self.environment,
                 stdout=out,
                 stderr=err,
             )
         return group.process
 
-    def run(self, arguments, *, check=True, confined=False, timeout=180, after_start=None):
+    def run(self, arguments, *, check=True, confined=False, timeout=180):
         """Capture into owned files, cap diagnostics, preserve exact exit status."""
         if self.evidence is not None:
             self.evidence.record("command.begin", command=Path(arguments[0]).name)
-        request = arguments if type(arguments) is OwnedAutomationRequest else None
-        if request is not None:
-            require(timeout == request.timeout, "Owned Automation request budget changed")
-            require(request.remaining() > 0, "Owned Automation request exceeded deadline")
         # Diagnostic samples never schedule native work. The opaque group-wait
         # deadline is deliberately not reconstructed from a new timer.
         timeout_started_ns = None
-        timeout_stage = "exit-wait"
-        timeout_deadline_ns = (
-            request.deadline_ns
-            if request is not None
-            else getattr(self, "_timeout_request_deadline_ns", None)
-        )
-        timeout_command = (
-            "permission-request"
-            if request is not None and request[-1] == "permission-request"
-            else "consent-observer"
-            if Path(arguments[0]) == self.root / "native-appleevent-consent"
-            else "other"
-        )
         if self.evidence is not None and getattr(self.evidence, "descriptor", None) is not None:
             try:
                 timeout_started_ns = time.monotonic_ns()
             except OwnedProcessInterrupted:
-                raise  # No child/readiness input has yet been acquired.
+                raise  # No child input has yet been acquired.
             except Exception:
                 pass  # Optional telemetry must not alter acquisition or its primary.
-        readiness = None
-        if request is not None and request.readiness_nonce is not None:
-            require(after_start is not None, "Owned Automation readiness observer unavailable")
-            readiness = OwnedAutomationReadiness(self, request)
-            request.readiness = readiness
-        before_active = tuple(self.active)
-        try:
-            process = self.start(arguments, confined=confined)
-        except BaseException:
-            if readiness is not None:
-                readiness.close(retire=all(child in before_active for child in self.active))
-                request.readiness = None
-            raise
+        process = self.start(arguments, confined=confined)
         output, errors = self.captures[process]
         failure = None
         try:
-            if request is not None:
-                require(request.remaining() > 0, "Owned Automation request exceeded deadline")
-                if after_start is not None:
-                    timeout_stage = "readiness" if readiness is not None else "ui-observer"
-                    if readiness is None or readiness.wait(process):
-                        timeout_stage = "ui-observer"
-                        previous_timeout_deadline = getattr(
-                            self, "_timeout_request_deadline_ns", None
-                        )
-                        self._timeout_request_deadline_ns = request.deadline_ns
-                        try:
-                            after_start(process, request.deadline_ns / 1_000_000_000)
-                        finally:
-                            self._timeout_request_deadline_ns = previous_timeout_deadline
-                timeout_stage = "exit-wait"
-                remaining = request.remaining()
-                require(remaining > 0, "Owned Automation request exceeded deadline")
-                self.groups[process].wait_for_exit(remaining)
-                require(request.remaining() > 0, "Owned Automation request exceeded deadline")
-            elif after_start is None:
-                self.groups[process].wait_for_exit(timeout)
-            else:
-                original_after_start = after_start
-
-                def after_start(callback_process, callback_deadline):
-                    nonlocal timeout_stage
-                    timeout_stage = "ui-observer"
-                    result = original_after_start(callback_process, callback_deadline)
-                    timeout_stage = "exit-wait"
-                    return result
-
-                deadline = time.monotonic() + timeout
-                after_start(process, deadline)
-                self.groups[process].wait_for_exit(max(0, deadline - time.monotonic()))
+            self.groups[process].wait_for_exit(timeout)
         except subprocess.TimeoutExpired:
             failure = AdmissionError("Owned native command exceeded deadline")
             if timeout_started_ns is not None:
@@ -1557,10 +1044,7 @@ class Children:
                     self.evidence.retain_timeout(
                         {
                             "schema": 1,
-                            "command": timeout_command,
-                            "stage": timeout_stage,
                             "budget_seconds": timeout,
-                            "request_deadline_ns": timeout_deadline_ns,
                             "started_ns": timeout_started_ns,
                             "expired_ns": expired_ns,
                             "spent_ns": expired_ns - timeout_started_ns,
@@ -1571,36 +1055,6 @@ class Children:
                     pass  # Preserve this exact primary; native retirement still runs below.
         except BaseException as error:
             failure = error
-            # The real consent observer raises this exact admission refusal,
-            # rather than TimeoutExpired. Observe it without replacing its
-            # identity or granting an API result, consent or process closure.
-            if (
-                timeout_started_ns is not None
-                and request is not None
-                and timeout_stage == "ui-observer"
-                and type(error) is AdmissionError
-                and type(error.args) is tuple
-                and len(error.args) == 1
-                and type(error.args[0]) is str
-                and error.args[0] == "Owned Automation prompt exceeded its deadline"
-            ):
-                try:
-                    expired_ns = time.monotonic_ns()
-                    self.evidence.retain_timeout(
-                        {
-                            "schema": 1,
-                            "command": timeout_command,
-                            "stage": timeout_stage,
-                            "budget_seconds": timeout,
-                            "request_deadline_ns": timeout_deadline_ns,
-                            "started_ns": timeout_started_ns,
-                            "expired_ns": expired_ns,
-                            "spent_ns": expired_ns - timeout_started_ns,
-                        },
-                        groups=[self.groups[child] for child in self.active],
-                    )
-                except BaseException:
-                    pass  # Preserve this exact primary; native retirement still runs below.
         finally:
             try:
                 self.settle(process)
@@ -1608,12 +1062,6 @@ class Children:
                 self.record_debt({"kind": "process-retirement-error", "pid": process.pid})
             if not any(entry.get("pid") == process.pid for entry in self.debt):
                 self.active.remove(process)
-            if readiness is not None:
-                readiness.close(
-                    retire=self.groups[process].reaped
-                    and not any(entry.get("pid") == process.pid for entry in self.debt)
-                )
-                request.readiness = None
         if self.evidence is not None:
             self.evidence.record(
                 "command.end",
@@ -1622,47 +1070,17 @@ class Children:
                 if failure is not None
                 or process.returncode != 0
                 or any(entry.get("pid") == process.pid for entry in self.debt)
-                or (
-                    readiness is not None
-                    and (
-                        not readiness.accepted
-                        or any(
-                            entry.get("kind") == "automation-readiness"
-                            and entry.get("path") == str(readiness.path)
-                            for entry in self.debt
-                        )
-                    )
-                )
                 else "accepted",
                 groups=[self.groups[child] for child in self.active],
             )
-        permission_capture = (None, None)
-        if request is not None and request[-1] == "permission-request":
-            permission_capture = _observe_permission_worker(self, process, failure)
         if failure is not None:
             raise failure
-        require(
-            readiness is None or readiness.accepted or process.returncode != 0,
-            "Owned Automation requester exited without readiness acknowledgement",
-        )
-        require(
-            readiness is None
-            or not any(
-                entry.get("kind") == "automation-readiness"
-                and entry.get("path") == str(readiness.path)
-                for entry in self.debt
-            ),
-            "Owned Automation readiness retained cleanup debt",
-        )
         require(
             not any(entry.get("pid") == process.pid for entry in self.debt),
             "Owned native command left process-group retirement debt",
         )
         stdout = output.read_bytes()
         stderr = errors.read_bytes()
-        if request is not None and request[-1] == "permission-request":
-            if permission_capture == (stdout, stderr):
-                stderr = _permission_result_stderr(stdout, stderr)
         require(
             len(stdout) <= 1024 * 1024 and len(stderr) <= 1024 * 1024,
             "Owned native output exceeded evidence bound",
@@ -2012,7 +1430,11 @@ def run_appleevent_sender_observed(
             require(
                 type(control) is str
                 and control
-                in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"),
+                in (
+                    "unconfined-consent-required",
+                    "deny-removal-consent-required",
+                    "full-policy-denial",
+                ),
                 "Unadmitted post-failure control",
             )
             fact["control"] = control
@@ -2106,518 +1528,6 @@ def native_compiler(children):
         str(compiler.parent),
         "-fmodules-cache-path=" + str(cache),
     ]
-
-
-def _validate_owned_automation_ui_fact(packet):
-    """Admit only fixed AX enums and bounded scalar facts, never UI text."""
-    keys = {
-        "schema",
-        "ax_trusted",
-        "requester_qualified",
-        "scanned_agents",
-        "windows",
-        "nodes",
-        "candidates",
-        "matches",
-        "first_agent",
-        "first_attribute",
-        "first_type",
-        "first_error",
-    }
-    require(
-        type(packet) is dict
-        and set(packet) - {"discovery"}
-        in (keys, keys | {"first_button"}, keys | {"first_button", "identity"}),
-        "Unadmitted Automation UI fact fields",
-    )
-    require(
-        type(packet["schema"]) is int and packet["schema"] == 1,
-        "Unadmitted Automation UI fact schema",
-    )
-    require(
-        all(type(packet[key]) is bool for key in ("ax_trusted", "requester_qualified")),
-        "Unadmitted Automation UI boolean kind",
-    )
-    limits = {
-        "scanned_agents": 512,
-        "windows": 4096,
-        "nodes": 1048576,
-        "candidates": 4096,
-        "matches": 4096,
-    }
-    require(
-        all(
-            type(packet[key]) is int and 0 <= packet[key] <= limit for key, limit in limits.items()
-        ),
-        "Unadmitted Automation UI observation count",
-    )
-    require(
-        type(packet["first_agent"]) is int and -1 <= packet["first_agent"] <= 3,
-        "Unadmitted Automation UI agent enum",
-    )
-    require(
-        type(packet["first_error"]) is int and -(2**31) <= packet["first_error"] < 2**31,
-        "Unadmitted Automation UI AXError",
-    )
-    require(
-        type(packet["first_attribute"]) is str
-        and packet["first_attribute"]
-        in {
-            "none",
-            "application",
-            "windows",
-            "window-type",
-            "node-type",
-            "node-limit",
-            "role",
-            "value",
-            "button-title",
-            "button-enabled",
-            "children",
-        },
-        "Unadmitted Automation UI attribute enum",
-    )
-    require(
-        type(packet["first_type"]) is str
-        and packet["first_type"]
-        in {
-            "none",
-            "absent",
-            "ax-element",
-            "string",
-            "array",
-            "number",
-            "other",
-        },
-        "Unadmitted Automation UI type enum",
-    )
-    if packet["first_attribute"] == "none":
-        require(
-            packet["first_agent"] == -1
-            and packet["first_type"] == "none"
-            and packet["first_error"] == 0,
-            "Absent Automation UI refusal differs",
-        )
-    else:
-        require(
-            packet["first_agent"] >= 0 and packet["first_type"] != "none",
-            "Automation UI refusal lacks an agent/type",
-        )
-    if "discovery" in packet:
-        discovery = packet["discovery"]
-        require(
-            type(discovery) is dict
-            and set(discovery) == {"schema", "scope", "sender", "receiver", "complete", "nodes"}
-            and type(discovery["schema"]) is int
-            and discovery["schema"] == 1
-            and type(discovery["scope"]) is str
-            and discovery["scope"] in {"unrelated", "candidate", "refused"}
-            and all(type(discovery[key]) is bool for key in ("sender", "receiver", "complete"))
-            and type(discovery["nodes"]) is int
-            and 0 <= discovery["nodes"] <= 257,
-            "Unadmitted first discovery scalar facts",
-        )
-        require(
-            not (discovery["sender"] or discovery["receiver"]) or discovery["nodes"] >= 2,
-            "Discovery text identity precedes its descendant observation",
-        )
-        if discovery["complete"]:
-            require(
-                0 < discovery["nodes"] <= 256
-                and discovery["scope"]
-                == (
-                    "candidate"
-                    if discovery["sender"] and discovery["receiver"]
-                    else "refused"
-                    if discovery["sender"] or discovery["receiver"]
-                    else "unrelated"
-                ),
-                "Complete discovery scope and identity observations disagree",
-            )
-        else:
-            require(discovery["scope"] == "refused", "Incomplete discovery gained a scope")
-        require(packet["windows"] > 0, "Discovery lacks its observed window")
-    if "first_button" in packet:
-        button = packet["first_button"]
-        require(
-            packet["first_attribute"] == "button-title"
-            and packet["first_type"] != "string"
-            and type(button) is dict
-            and set(button)
-            in (
-                {"schema", "subrole", "type", "error"},
-                {"schema", "subrole", "type", "error", "window"},
-                {"schema", "subrole", "type", "error", "labels"},
-                {"schema", "subrole", "type", "error", "window", "labels"},
-            ),
-            "Unadmitted refused button fact fields",
-        )
-        require(
-            type(button["schema"]) is int
-            and button["schema"] == 1
-            and type(button["error"]) is int
-            and -(2**31) <= button["error"] < 2**31,
-            "Unadmitted refused button schema or AXError",
-        )
-        require(
-            type(button["type"]) is str
-            and button["type"] in {"absent", "ax-element", "string", "array", "number", "other"}
-            and type(button["subrole"]) is str
-            and button["subrole"]
-            in {"absent", "wrong-type", "unknown", "close", "minimize", "zoom"},
-            "Unadmitted refused button enum",
-        )
-        require(
-            (button["type"] == "absent" and button["subrole"] == "absent")
-            or (
-                button["type"] == "string"
-                and button["error"] == 0
-                and button["subrole"] in {"unknown", "close", "minimize", "zoom"}
-            )
-            or (
-                button["type"] not in {"absent", "string"}
-                and button["error"] == 0
-                and button["subrole"] == "wrong-type"
-            ),
-            "Refused button type and enum disagree",
-        )
-        if "window" in button:
-            window = button["window"]
-            require(
-                type(window) is dict
-                and set(window) == {"schema", "role", "type", "error", "controls"}
-                and type(window["schema"]) is int
-                and window["schema"] == 1
-                and type(window["error"]) is int
-                and -(2**31) <= window["error"] < 2**31,
-                "Unadmitted refused button window fact fields",
-            )
-            kinds = {"absent", "ax-element", "string", "array", "number", "other"}
-            require(
-                type(window["type"]) is str
-                and window["type"] in kinds
-                and type(window["role"]) is str
-                and window["role"] in {"absent", "wrong-type", "window", "sheet", "other"},
-                "Unadmitted refused button window enum",
-            )
-            require(
-                (window["type"] == "absent" and window["role"] == "absent")
-                or (
-                    window["type"] == "string"
-                    and window["error"] == 0
-                    and window["role"] in {"window", "sheet", "other"}
-                )
-                or (
-                    window["type"] not in {"absent", "string"}
-                    and window["error"] == 0
-                    and window["role"] == "wrong-type"
-                ),
-                "Refused button window type and role disagree",
-            )
-            controls = window["controls"]
-            require(
-                type(controls) is dict and set(controls) == {"close", "minimize", "zoom"},
-                "Unadmitted fixed window control fields",
-            )
-            for control in controls.values():
-                require(
-                    type(control) is dict
-                    and set(control) == {"type", "error", "relation"}
-                    and type(control["error"]) is int
-                    and -(2**31) <= control["error"] < 2**31
-                    and type(control["type"]) is str
-                    and control["type"] in kinds
-                    and type(control["relation"]) is str
-                    and control["relation"] in {"same", "different", "unobserved"},
-                    "Unadmitted fixed window control observation",
-                )
-                require(
-                    (
-                        control["error"] == 0
-                        and control["type"] == "ax-element"
-                        and control["relation"] in {"same", "different"}
-                    )
-                    or (
-                        control["type"] != "ax-element"
-                        and control["relation"] == "unobserved"
-                        and (control["error"] == 0 or control["type"] == "absent")
-                    ),
-                    "Window control identity lacks a successful exact AX element observation",
-                )
-        if "labels" in button:
-            labels = button["labels"]
-            require(
-                type(labels) is dict and set(labels) == {"description", "value"},
-                "Unadmitted exact refused button label fields",
-            )
-            for label in labels.values():
-                require(
-                    type(label) is dict
-                    and set(label) == {"type", "error", "family"}
-                    and type(label["error"]) is int
-                    and -(2**31) <= label["error"] < 2**31
-                    and type(label["type"]) is str
-                    and label["type"]
-                    in {"absent", "ax-element", "string", "array", "number", "other"}
-                    and type(label["family"]) is str
-                    and label["family"]
-                    in {
-                        "allow",
-                        "deny",
-                        "close",
-                        "minimize",
-                        "zoom",
-                        "other",
-                        "absent",
-                        "wrong-type",
-                    },
-                    "Unadmitted exact refused button label observation",
-                )
-                require(
-                    (label["type"] == "absent" and label["family"] == "absent")
-                    or (
-                        label["error"] == 0
-                        and label["type"] == "string"
-                        and label["family"]
-                        in {"allow", "deny", "close", "minimize", "zoom", "other"}
-                    )
-                    or (
-                        label["error"] == 0
-                        and label["type"] not in {"absent", "string"}
-                        and label["family"] == "wrong-type"
-                    ),
-                    "Refused button label type and family disagree",
-                )
-    if "identity" in packet:
-        identity = packet["identity"]
-        require(
-            packet["first_attribute"] == "button-title"
-            and packet["first_type"] == "absent"
-            and packet["first_error"] == -25205
-            and type(identity) is dict
-            and set(identity)
-            == {"schema", "sender", "receiver", "complete", "nodes", "refusal", "error"},
-            "Unadmitted passive window identity fields or original refusal",
-        )
-        require(
-            type(identity["schema"]) is int
-            and identity["schema"] == 1
-            and all(type(identity[key]) is bool for key in ("sender", "receiver", "complete"))
-            and type(identity["nodes"]) is int
-            and 0 <= identity["nodes"] <= 256
-            and type(identity["error"]) is int
-            and -(2**31) <= identity["error"] < 2**31
-            and type(identity["refusal"]) is str
-            and identity["refusal"]
-            in {
-                "none",
-                "deadline",
-                "timeout",
-                "node-limit",
-                "node-type",
-                "role",
-                "value",
-                "children",
-            },
-            "Unadmitted passive window identity scalar facts",
-        )
-        require(
-            (
-                identity["complete"]
-                and identity["refusal"] == "none"
-                and identity["error"] == 0
-                and identity["nodes"] > 0
-            )
-            or (not identity["complete"] and identity["refusal"] != "none"),
-            "Passive window completion and refusal disagree",
-        )
-    return dict(packet)
-
-
-def _owned_automation_ui_run(children, arguments, timeout):
-    """Keep the unchanged primary state and separately capture private enum facts."""
-    if not isinstance(children, Children):
-        return children.run(arguments, check=False, timeout=timeout)
-    path = children.root / ("automation-ui-fact-" + str(uuid.uuid4()))
-    descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
-    before = os.fstat(descriptor)
-    primary_failure = None
-    try:
-        result = children.run([*arguments, str(path)], check=False, timeout=timeout)
-        after = os.fstat(descriptor)
-        named = os.stat(path, follow_symlinks=False)
-        require(
-            stat.S_ISREG(after.st_mode)
-            and after.st_uid == os.getuid()
-            and stat.S_IMODE(after.st_mode) == 0o600
-            and after.st_nlink == 1
-            and (after.st_dev, after.st_ino) == (before.st_dev, before.st_ino)
-            and (named.st_dev, named.st_ino) == (before.st_dev, before.st_ino)
-            and 0 < after.st_size <= 1024,
-            "Owned Automation UI fact identity or bound differs",
-        )
-        os.lseek(descriptor, 0, os.SEEK_SET)
-        data = os.read(descriptor, 1025)
-        require(len(data) == after.st_size, "Owned Automation UI fact changed during capture")
-
-        def unique(pairs):
-            fields = {}
-            for key, value in pairs:
-                require(key not in fields, "Ambiguous Automation UI fact key")
-                fields[key] = value
-            return fields
-
-        packet = _validate_owned_automation_ui_fact(json.loads(data, object_pairs_hook=unique))
-        if children.evidence is not None:
-            require(
-                children.evidence.record(
-                    "automation.ui-observation",
-                    status="refused" if result.returncode else "pending",
-                    native_ui=packet,
-                ),
-                "Owned Automation UI facts could not publish safely",
-            )
-        return result
-    except BaseException as failure:
-        primary_failure = failure
-        raise
-    finally:
-        try:
-            os.close(descriptor)
-        except OSError:
-            if primary_failure is None:
-                raise
-        # The private fixture root owns any failure debt. A pathname replacement
-        # is never removed by this secondary diagnostic channel.
-        try:
-            named = os.stat(path, follow_symlinks=False)
-            if (named.st_dev, named.st_ino) == (before.st_dev, before.st_ino):
-                os.unlink(path)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            if primary_failure is None:
-                raise
-
-
-def approve_owned_automation_prompt(children, process, deadline, sender_name, receiver_name):
-    """Press only a qualified native consent prompt while its exact requester is reserved."""
-    helper = children.root / "native-appleevent-consent"
-    while True:
-        require(
-            process in children.groups
-            and children.groups[process].process is process
-            and not children.groups[process].reaped,
-            "Automation requester reservation changed",
-        )
-        if children.groups[process].observe_exit() is not None:
-            return "request-ended"
-        remaining = deadline - time.monotonic()
-        require(remaining > 0, "Owned Automation prompt exceeded its deadline")
-        result = _owned_automation_ui_run(
-            children,
-            [str(helper), sender_name, receiver_name, str(process.pid)],
-            timeout=min(3, remaining),
-        )
-        require(not result.stderr, "Owned Automation prompt emitted unadmitted diagnostics")
-        if result.returncode == 0 and result.stdout == "OWNED_AUTOMATION_UI/1 state=pressed\n":
-            return "pressed"
-        frame = re.fullmatch(
-            r"OWNED_AUTOMATION_UI/1 state=(accessibility-unavailable|identity-unqualified|observation-refused|approval-refused|requester-unavailable)\n",
-            result.stdout,
-        )
-        require(
-            result.returncode == 0
-            and result.stdout
-            in (
-                "OWNED_AUTOMATION_UI/1 state=absent\n",
-                "OWNED_AUTOMATION_UI/1 state=observation-pending\n",
-            ),
-            "Normal owned Automation UI was not qualified: "
-            + (frame[1] if frame is not None else "unadmitted-receipt"),
-        )
-        time.sleep(min(0.05, max(0, deadline - time.monotonic())))
-
-
-def admit_appleevent_permission_prerequisite(children, sender, policy, checkpoint):
-    """Request normal OS consent only for the same explicitly opted-in owned sender."""
-    require(
-        getattr(children, "allow_automation_consent", False) is True,
-        "Automation consent request was not explicitly authorized",
-    )
-    executable = Path(sender[0])
-    original_digest = digest(executable)
-    original_policy = digest(policy)
-    statuses = []
-
-    def query(mode):
-        arguments = ["/usr/bin/sandbox-exec", "-f", str(policy), *sender, "permission-" + mode]
-        if mode == "request":
-            arguments = OwnedAutomationRequest(arguments, 30)
-        checkpoint("before-automation-" + mode)
-        options = {}
-        ui_observation = {}
-        if mode == "request" and getattr(children, "allow_owned_consent_ui", False) is True:
-            arguments.readiness_nonce = sender[-1]
-            sender_name = children.automation_sender_name
-            receiver_name = children.automation_receiver_name
-
-            def observe_ui(process, deadline):
-                ui_observation["state"] = approve_owned_automation_prompt(
-                    children, process, deadline, sender_name, receiver_name
-                )
-
-            options["after_start"] = observe_ui
-        result = children.run(
-            arguments,
-            check=False,
-            timeout=30,
-            **options,
-        )
-        require(
-            digest(executable) == original_digest and digest(policy) == original_policy,
-            "Owned Automation sender or sandbox identity changed",
-        )
-        checkpoint("after-automation-" + mode)
-        foreground = re.fullmatch(
-            r"OWNED_APPLEEVENT_FOREGROUND/1 state=(unavailable|inactive)\n", result.stderr
-        )
-        require(
-            not (
-                mode == "request" and result.returncode == 65 and not result.stdout and foreground
-            ),
-            "Normal owned Automation sender foreground precondition refused: "
-            + (foreground[1] if foreground is not None else "unadmitted"),
-        )
-        prefix = "OWNED_APPLEEVENT_PREFLIGHT/1 mode=" + mode + " osstatus="
-        matched = re.fullmatch(re.escape(prefix) + r"(-?[0-9]{1,11})\n", result.stdout)
-        require(matched is not None and not result.stderr, "Malformed owned Automation receipt")
-        encoded = matched[1]
-        status = int(encoded)
-        require(
-            -(2**31) <= status < 2**31 and str(status) == encoded,
-            "Unadmitted owned Automation status",
-        )
-        require(
-            result.returncode == (0 if status == 0 else 67),
-            "Owned Automation exit disagrees with its native status",
-        )
-        entry = {"mode": mode, "osstatus": status}
-        if ui_observation:
-            entry["native_ui"] = ui_observation["state"]
-        statuses.append(entry)
-        return status
-
-    status = query("query")
-    if status == -1744:
-        status = query("request")
-    require(status == 0, "Normal OS Automation consent was not granted: osstatus=" + str(status))
-    require(query("query") == 0, "Fresh nonprompt Automation permission was not admitted")
-    return {
-        "sender_sha256": original_digest,
-        "policy_sha256": original_policy,
-        "statuses": statuses,
-    }
 
 
 def _appkit_joint_registration_fact(value):
@@ -2817,8 +1727,8 @@ def appleevent_sender_fact(value):
                 return {}
         elif error_size is None or (error_size == 4) != (error_number is not None):
             return {}
-        if phase == "send":
-            admitted = send != 0 and (read, size, match) == (None, None, None)
+        if phase == "consent-status":
+            admitted = send not in (0, -1744) and (read, size, match) == (None, None, None)
         elif phase == "denied-status":
             admitted = send not in (-1742, -1743) and (read, size, match) == (None, None, None)
         elif phase == "reply-read":
@@ -2828,7 +1738,8 @@ def appleevent_sender_fact(value):
         elif phase == "reply-length":
             admitted = send == 0 and read == 0 and size is not None and size != 36 and match is None
         elif phase == "reply-match":
-            admitted = send == 0 and read == 0 and size == 36 and match is False
+            # Any reply is an unexpected consent-free delivery, matching or not.
+            admitted = send == 0 and read == 0 and size == 36 and match is not None
         else:
             admitted = False
         if not admitted:
@@ -2848,7 +1759,7 @@ def appleevent_sender_fact(value):
 
 
 def appleevent_sender_marker_fact(value):
-    """Preserve existing failure facts; add only a closed sender-owned snapshot."""
+    """Preserve existing failure facts; add only a closed sender-owned delivery snapshot."""
     if not isinstance(value, str):
         return {}
     if len(value.splitlines(keepends=True)) == 3:
@@ -2859,7 +1770,7 @@ def appleevent_sender_marker_fact(value):
             return {}
     if len(value) > 256:
         return {}
-    delimiter = ", marker2="
+    delimiter = ", marker1="
     if delimiter not in value:
         return appleevent_sender_fact(value)
     if value.count(delimiter) != 1 or not value.endswith("\n"):
@@ -2870,7 +1781,7 @@ def appleevent_sender_marker_fact(value):
     facts = appleevent_sender_fact(original + "\n")
     if facts.get("phase") not in ("reply-read", "reply-length", "reply-match"):
         return {}
-    return {**facts, "marker2_snapshot": snapshot}
+    return {**facts, "marker1_snapshot": snapshot}
 
 
 def _combined_sender_diagnostic(value):
@@ -2993,7 +1904,8 @@ def _composed_sender_identity_frame(value):
 def run_appleevent_sender(children, arguments, control, *, confined=False):
     """Retain normal ownership retirement and admit the exact native sender outcome."""
     require(
-        control in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"),
+        control
+        in ("unconfined-consent-required", "deny-removal-consent-required", "full-policy-denial"),
         "Unadmitted AppleEvent control label",
     )
     result = children.run(arguments, check=False, confined=confined)
@@ -3027,11 +1939,11 @@ def run_appleevent_sender(children, arguments, control, *, confined=False):
         expected = ("native_appleevent_status=-1742\n", "native_appleevent_status=-1743\n")
         message = "Full native policy did not report a documented AppleEvent refusal"
     else:
-        expected = ("native_appleevent_status=0\n",)
+        expected = ("native_appleevent_status=-1744\n",)
         message = (
-            "Owned unconfined AppleEvent route was not independently admitted"
-            if control == "unconfined-positive"
-            else "Same-policy deny-removal AppleEvent route was not independently admitted"
+            "Owned unconfined AppleEvent route did not reach its consent step"
+            if control == "unconfined-consent-required"
+            else "Same-policy deny-removal AppleEvent route did not reach its consent step"
         )
     require(result.stdout in expected and not result.stderr, message)
     return result
@@ -3069,7 +1981,6 @@ def _build_appleevent_pair(children, repository, root, compiler, nonce):
             "-framework",
             "Security",
             str(repository / "tools/diagnostics/native_appleevent_probe_pair.m"),
-            str(repository / "tools/diagnostics/native_appleevent_permission.c"),
             "-o",
             str(executable),
         ],
@@ -3080,85 +1991,12 @@ def _build_appleevent_pair(children, repository, root, compiler, nonce):
     return {role: [str(executable), role] for role in ("receiver", "sender")}
 
 
-def _build_appleevent_consent_pair(children, repository, root, compiler, nonce):
-    """Explicit opt-in preserves two named identities for qualified consent UI."""
-    executables = {}
-    for role in ("receiver", "sender"):
-        app = root / ("OwnedAppleEvent-" + role + ".app")
-        executable = app / "Contents/MacOS" / role
-        executable.parent.mkdir(parents=True)
-        (app / "Contents/Info.plist").write_bytes(
-            plistlib.dumps(
-                {
-                    "CFBundleIdentifier": "com.ergopti.private.appleevent." + role + "." + nonce,
-                    "CFBundleName": "Owned AppleEvent " + role + " " + nonce,
-                    "CFBundleExecutable": role,
-                    "CFBundlePackageType": "APPL",
-                    "LSUIElement": True,
-                    "NSAppleEventsUsageDescription": "Private native sandbox delivery admission.",
-                }
-            )
-        )
-        # Both current role sources use AppKit/Security and the shared private
-        # protocol. Keep their exact source bodies, with one SDK compile recipe.
-        command = [
-            *compiler,
-            "-std=c11",
-            "-O2",
-            "-x",
-            "objective-c",
-            "-fobjc-arc",
-            "-framework",
-            "ApplicationServices",
-            "-framework",
-            "Carbon",
-            "-framework",
-            "AppKit",
-            "-framework",
-            "Security",
-        ]
-        command += [
-            str(repository / ("tools/diagnostics/native_appleevent_probe_" + role + ".c")),
-            "-o",
-            str(executable),
-        ]
-        if role == "sender":
-            command += [str(repository / "tools/diagnostics/native_appleevent_permission.c")]
-        children.run(command, confined=True)
-        children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
-        children.run(
-            ["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True
-        )
-        executables[role] = [str(executable)]
-    if getattr(children, "allow_owned_consent_ui", False) is True:
-        require(
-            getattr(children, "allow_automation_consent", False) is True,
-            "Owned consent UI requires separate Automation request opt-in",
-        )
-        children.automation_sender_name = "Owned AppleEvent sender " + nonce
-        children.automation_receiver_name = "Owned AppleEvent receiver " + nonce
-        children.run(
-            [
-                *compiler,
-                "-fobjc-arc",
-                "-O2",
-                "-framework",
-                "AppKit",
-                "-framework",
-                "ApplicationServices",
-                "-framework",
-                "Security",
-                str(repository / "tools/diagnostics/native_appleevent_consent.m"),
-                "-o",
-                str(root / "native-appleevent-consent"),
-            ],
-            confined=True,
-        )
-    return executables
-
-
 def _admit_appleevent_boundary(children, repository):
-    """Require two real owned deliveries before admitting the full policy's refusal."""
+    """Prove the deny rule alone turns a consent-gated route into a sandbox refusal.
+
+    No event is ever delivered: every send forbids the consent prompt, so the
+    two controls without the rule must stop at the target's consent step.
+    """
     root = children.root
     nonce = str(uuid.uuid4())
     compiler = native_compiler(children)
@@ -3178,7 +2016,6 @@ def _admit_appleevent_boundary(children, repository):
             "-framework",
             "Security",
             str(repository / "tools/diagnostics/native_appleevent_registration_test.m"),
-            str(repository / "tools/diagnostics/native_appleevent_permission.c"),
             "-o",
             str(registration_test),
         ],
@@ -3191,14 +2028,10 @@ def _admit_appleevent_boundary(children, repository):
         and not registration_controls.stderr,
         "Controlled AppKit registration refusals were not independently admitted",
     )
-    if getattr(children, "allow_automation_consent", False) is True:
-        executables = _build_appleevent_consent_pair(children, repository, root, compiler, nonce)
-    else:
-        # Two separately signed application identities need TCC consent even for
-        # this private event. Keep distinct acquired PIDs but one fixture image.
-        # The native positive/deny-removal/denied controls remain mandatory; this
-        # construction does not qualify authorization to any external application.
-        executables = _build_appleevent_pair(children, repository, root, compiler, nonce)
+    # Keep distinct acquired PIDs but one fixture image. Its bundle identifier
+    # carries a fresh nonce, so no Automation decision can exist for it yet and
+    # the no-prompt send deterministically reaches the consent step.
+    executables = _build_appleevent_pair(children, repository, root, compiler, nonce)
     ready = root / "appleevent-ready"
     marker = root / "appleevent-delivered"
     receiver = children.start([*executables["receiver"], str(ready), str(marker), nonce])
@@ -3280,50 +2113,52 @@ def _admit_appleevent_boundary(children, repository):
     require(
         policy.count(deny) == 1, "Full native policy does not contain exactly one AppleEvent denial"
     )
-    removed = root / "sandbox-appleevent-positive.sb"
+    removed = root / "sandbox-appleevent-removed.sb"
     removed.write_text(policy.replace(deny, ""), encoding="utf-8", newline="\n")
-    permission = None
-    if getattr(children, "allow_automation_consent", False) is True:
-        permission = admit_appleevent_permission_prerequisite(
-            children, sender, removed, same_live_receiver
-        )
-    same_live_receiver("before-unconfined-positive")
-    positive = _run_appleevent_sender(
-        children, receiver, group, "unconfined-positive", [*sender, "success"]
-    )
-    require(
-        positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
-        "Owned unconfined AppleEvent route was not independently admitted",
-    )
 
-    def marker_bytes(index):
-        path = Path(str(marker) + "." + str(index))
+    def undelivered(checkpoint):
+        # The receiver writes one marker per accepted event. Any marker means an
+        # event crossed the consent step without consent and voids the proof.
+        delivered = sorted(
+            path.name for path in root.iterdir() if path.name.startswith(marker.name)
+        )
         require(
-            path.is_file() and not path.is_symlink() and owned_path(root, path) == path,
-            "Owned AppleEvent marker is not an ordinary private file",
+            not delivered,
+            "Owned AppleEvent was delivered without consent: checkpoint=" + checkpoint,
         )
-        value = path.read_bytes()
-        require(value == nonce.encode(), "Owned AppleEvent marker nonce differs")
-        return value
 
-    first = marker_bytes(1)
-    require(
-        not Path(str(marker) + ".2").exists(), "Unexpected delivery preceded deny-removal control"
-    )
-    same_live_receiver("before-deny-removal-positive")
-    positive = _run_appleevent_sender(
+    def consent_status(result, message):
+        require(result.stdout == "native_appleevent_status=-1744\n" and not result.stderr, message)
+        return -1744
+
+    # errAEEventWouldRequireUserConsent (-1744) is returned only once the route
+    # reaches the target's Automation consent step. The deny-removed policy is
+    # the full policy minus the deny rule, so the full policy's distinct sandbox
+    # refusal is attributable to that rule alone.
+    same_live_receiver("before-unconfined-consent")
+    unconfined = _run_appleevent_sender(
         children,
         receiver,
         group,
-        "deny-removal-positive",
-        ["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "success"],
+        "unconfined-consent-required",
+        [*sender, "consent-required"],
     )
-    require(
-        positive.stdout == "native_appleevent_status=0\n" and not positive.stderr,
-        "Same-policy deny-removal AppleEvent route was not independently admitted",
+    unconfined_status = consent_status(
+        unconfined, "Owned unconfined AppleEvent route did not reach its consent step"
     )
-    second = marker_bytes(2)
-    require(marker_bytes(1) == first, "Deny-removal delivery altered the first positive marker")
+    undelivered("after-unconfined-consent")
+    same_live_receiver("before-deny-removal-consent")
+    removal = _run_appleevent_sender(
+        children,
+        receiver,
+        group,
+        "deny-removal-consent-required",
+        ["/usr/bin/sandbox-exec", "-f", str(removed), *sender, "consent-required"],
+    )
+    removal_status = consent_status(
+        removal, "Same-policy deny-removal AppleEvent route did not reach its consent step"
+    )
+    undelivered("after-deny-removal-consent")
     same_live_receiver("before-full-policy-denial")
     refused = _run_appleevent_sender(
         children, receiver, group, "denied", [*sender, "denied"], confined=True
@@ -3334,28 +2169,17 @@ def _admit_appleevent_boundary(children, repository):
         "Full native policy did not report a documented AppleEvent refusal",
     )
     same_live_receiver("after-full-policy-denial")
-    require(
-        marker_bytes(1) == first
-        and marker_bytes(2) == second
-        and not Path(str(marker) + ".3").exists(),
-        "Denied AppleEvent altered actual delivery state",
-    )
+    undelivered("after-full-policy-denial")
     children.settle(receiver)
     require(group.reaped, "Owned AppleEvent receiver retirement remains incomplete")
     children.active.remove(receiver)
-    receipt = {
-        "unconfined_status": 0,
-        "deny_removal_status": 0,
+    return {
+        "unconfined_status": unconfined_status,
+        "deny_removal_status": removal_status,
         "denied_status": int(refused.stdout.split("=")[1]),
-        "positive_markers_sha256": [
-            digest(Path(str(marker) + ".1")),
-            digest(Path(str(marker) + ".2")),
-        ],
+        "delivered_events": 0,
         "receiver_retired": True,
     }
-    if permission is not None:
-        receipt["permission_prerequisite"] = permission
-    return receipt
 
 
 def admit_brew(children, source, host):
@@ -3605,8 +2429,6 @@ def observe(
     *,
     fixture_parent=None,
     evidence_directory=None,
-    allow_automation_consent=False,
-    allow_owned_consent_ui=False,
 ):
     evidence = PhaseEvidence(evidence_directory)
     try:
@@ -3616,8 +2438,6 @@ def observe(
             output,
             fixture_parent=fixture_parent,
             evidence=evidence,
-            allow_automation_consent=allow_automation_consent,
-            allow_owned_consent_ui=allow_owned_consent_ui,
         )
         require(not evidence.failed, "Native phase evidence could not be safely published")
         return receipt
@@ -3634,8 +2454,6 @@ def _observe(
     *,
     fixture_parent=None,
     evidence,
-    allow_automation_consent=False,
-    allow_owned_consent_ui=False,
 ):
     """Require ZIP install, XZ upgrade, two refusals and recovery with real Brew."""
     evidence.record("prerequisites.begin")
@@ -3657,8 +2475,6 @@ def _observe(
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
-                "tools/diagnostics/native_appleevent_permission.c",
-                "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
                 "tools/diagnostics/native_appleevent_probe_pair.m",
@@ -3685,14 +2501,6 @@ def _observe(
         for name in ("home", "temp", "cache", "logs", "apps"):
             (root / name).mkdir()
         children = Children(root, evidence=evidence)
-        require(type(allow_automation_consent) is bool, "Automation consent opt-in is not Boolean")
-        children.allow_automation_consent = allow_automation_consent
-        require(type(allow_owned_consent_ui) is bool, "Owned consent UI opt-in is not Boolean")
-        require(
-            not allow_owned_consent_ui or allow_automation_consent,
-            "Owned consent UI requires separate Automation request opt-in",
-        )
-        children.allow_owned_consent_ui = allow_owned_consent_ui
         for sig in (signal.SIGTERM, signal.SIGINT):
             previous = signal.getsignal(sig)
             signal.signal(sig, interrupted)
@@ -3921,16 +2729,6 @@ if __name__ == "__main__":
     parser.add_argument("receipt")
     parser.add_argument("--fixture-parent")
     parser.add_argument("--evidence-directory")
-    parser.add_argument(
-        "--allow-automation-consent",
-        action="store_true",
-        help="Request normal OS consent for this exact signed private sender; requires interactive approval",
-    )
-    parser.add_argument(
-        "--allow-owned-consent-ui",
-        action="store_true",
-        help="Approve only the exact private fixture's qualified normal OS prompt using existing Accessibility permission",
-    )
     arguments = parser.parse_args()
     try:
         observe(
@@ -3938,8 +2736,6 @@ if __name__ == "__main__":
             arguments.receipt,
             fixture_parent=arguments.fixture_parent,
             evidence_directory=arguments.evidence_directory,
-            allow_automation_consent=arguments.allow_automation_consent,
-            allow_owned_consent_ui=arguments.allow_owned_consent_ui,
         )
     except (AdmissionError, OSError, ValueError) as error:
         print("Native Brew acceptance failed: " + str(error), file=sys.stderr)

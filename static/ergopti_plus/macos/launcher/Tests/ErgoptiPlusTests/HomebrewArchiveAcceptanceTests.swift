@@ -13,11 +13,6 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		case refused(Int32, String)
 	}
 
-	/// Keep normal OS permission requests explicit for each native fixture invocation.
-	private static func consentArguments(_ environment: [String: String]) throws -> [String] {
-		return try HomebrewAutomationConsent.arguments(environment)
-	}
-
 	private static var repositoryURL: URL {
 		var url = URL(fileURLWithPath: #filePath)
 		for _ in 0..<7 { url.deleteLastPathComponent() }
@@ -63,8 +58,6 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		process.arguments = ["python3", Self.repositoryURL.appendingPathComponent(
 			"tools/diagnostics/macos_brew_archive_acceptance.py").path,
 			Self.repositoryURL.path, receiptURL.path, "--fixture-parent", root.path, "--evidence-directory", evidenceDirectory.path]
-		let ordinaryArguments = try XCTUnwrap(process.arguments)
-		process.arguments = ordinaryArguments + (try Self.consentArguments(ProcessInfo.processInfo.environment))
 		process.environment = NativeFixtureChildEnvironment.make()
 		process.currentDirectoryURL = root
 		process.standardOutput = output
@@ -152,6 +145,15 @@ final class HomebrewArchiveAcceptanceTests: XCTestCase {
 		XCTAssertEqual(receipt["fixture_retained"] as? Bool, false)
 		XCTAssertEqual(receipt["cleanup_errors"] as? [String], [])
 		XCTAssertEqual(receipt["signature_identity_boundary"] as? String, "upstream-publication")
+		// The AppleEvent rule is proven without consent: both controls without the
+		// deny rule stop at the consent step (-1744) and nothing is ever delivered.
+		let boundary = try XCTUnwrap(receipt["appleevent_boundary"] as? [String: Any])
+		XCTAssertEqual(boundary["unconfined_status"] as? Int, -1744)
+		XCTAssertEqual(boundary["deny_removal_status"] as? Int, -1744)
+		let denied = try XCTUnwrap(boundary["denied_status"] as? Int)
+		XCTAssertTrue([-1742, -1743].contains(denied), "Full policy must return the sandbox refusal")
+		XCTAssertEqual(boundary["delivered_events"] as? Int, 0)
+		XCTAssertEqual(boundary["receiver_retired"] as? Bool, true)
 		let cases = try XCTUnwrap(receipt["cases"] as? [String: Bool])
 		XCTAssertEqual(cases, ["zip_install": true, "xz_upgrade": true,
 			"checksum_refusal_preserved": true, "checksum_retry": true,

@@ -321,8 +321,8 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.ifError(result.error);
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
-	// Retain 205 original controls, three published UI controls and thirteen Dev controls.
-	assert.match(result.stderr, /Ran 221 tests in /);
+	// The consent-free AppleEvent boundary retired every consent request and UI control.
+	assert.match(result.stderr, /Ran 116 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });
@@ -432,7 +432,7 @@ check(
 		assert.strictEqual(typeof pairRecipe, 'string');
 		assert.strictEqual(
 			require('node:crypto').createHash('sha256').update(pairRecipe).digest('hex'),
-			'a6cb300a26bc105bfa0fc6ad2ec00d97b2710e7c68014aa7d235f70eb4552297',
+			'31e50ced3bd9fa1012a51113b601a38da098c7fbd6bc1dba288ac6b27defbf3d',
 			'the unique active pair builder must retain its exact compiler/signature/nonce recipe'
 		);
 		assert.match(
@@ -521,8 +521,8 @@ check('owned AppleEvent liveness refusal preserves its nonreaping numeric observ
 	assert.doesNotMatch(observation, /\.(?:poll|wait|settle|read_bytes|read_text)\(/);
 	for (const checkpoint of [
 		'readiness',
-		'before-unconfined-positive',
-		'before-deny-removal-positive',
+		'before-unconfined-consent',
+		'before-deny-removal-consent',
 		'before-full-policy-denial',
 		'after-full-policy-denial'
 	]) {
@@ -628,7 +628,11 @@ check(
 		assert.match(admission, /result\.stdout in expected and not result\.stderr/);
 		assert.doesNotMatch(admission, /result\.stderr\[:|\.(?:poll|wait|settle)\(/);
 		assert.match(helper, /len\(value\) > 256/);
-		for (const control of ['unconfined-positive', 'deny-removal-positive', 'full-policy-denial']) {
+		for (const control of [
+			'unconfined-consent-required',
+			'deny-removal-consent-required',
+			'full-policy-denial'
+		]) {
 			assert.ok(admission.includes(`"${control}"`));
 		}
 	}
@@ -663,8 +667,8 @@ check(
 			/\.(?:poll|wait|settle|sleep)\(|killpg|signal\(|reservation_lost\s*=/
 		);
 		assert.doesNotMatch(observation, /repr\(|str\(error|\.path|nonce|stdout|stderr\[/);
-		assert.equal((helper.match(/positive = _run_appleevent_sender\(/g) || []).length, 2);
-		assert.equal((helper.match(/refused = _run_appleevent_sender\(/g) || []).length, 1);
+		for (const owner of ['unconfined', 'removal', 'refused'])
+			assert.equal(helper.split(`${owner} = _run_appleevent_sender(`).length - 1, 1);
 	}
 );
 // BREW_POST_FAILED_SENDER_TARGET_OBSERVATION_END
@@ -1247,45 +1251,50 @@ check(
 );
 
 // SENDER_INTERNAL_MARKER_DIAGNOSTIC_BEGIN
-check('sender-owned marker snapshots never change nonce admission or parent lifetime', () => {
-	const sender = fs.readFileSync(
-		path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_sender.c'),
-		'utf8'
-	);
-	const helper = fs.readFileSync(
-		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
-		'utf8'
-	);
-	const marker = sender.slice(
-		sender.indexOf('static const char *owned_second_marker_snapshot('),
-		sender.indexOf('int main(')
-	);
-	assert.match(marker, /open\("\.", O_RDONLY \| O_DIRECTORY \| O_CLOEXEC \| O_NOFOLLOW\)/);
-	assert.match(
-		marker,
-		/openat\(directory, "appleevent-delivered\.2",[\s\S]*O_NOFOLLOW \| O_NONBLOCK/
-	);
-	assert.match(marker, /before\.st_nlink != 1 \|\| before\.st_size != 36/);
-	assert.match(marker, /char bytes\[37\]/);
-	assert.match(marker, /read\(descriptor, bytes, sizeof\(bytes\)\)/);
-	assert.match(marker, /close\(descriptor\) != 0\) snapshot = "unavailable"/);
-	assert.match(marker, /close\(directory\) != 0\) snapshot = "unavailable"/);
-	assert.doesNotMatch(marker, /wait|kill|sleep|Permission|Entitlement|fprintf|printf/);
-	assert.match(sender, /strcmp\(argv\[3\], "success"\) == 0 && status == noErr/);
-	assert.match(
-		sender,
-		/if \(read == noErr && actual_length == 36 && memcmp\(echoed, argv\[2\], 36\) == 0\)/
-	);
-	assert.match(
-		sender,
-		/if \(marker_attempted\) fprintf\(stderr, ", marker2=%s", marker_snapshot\)/
-	);
-	assert.match(
-		helper,
-		/facts\.get\("phase"\) not in \("reply-read", "reply-length", "reply-match"\)/
-	);
-	assert.match(helper, /result\.returncode == 66/);
-});
+check(
+	'sender-owned delivery snapshots never change consent-step admission or parent lifetime',
+	() => {
+		const sender = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/native_appleevent_probe_sender.c'),
+			'utf8'
+		);
+		const helper = fs.readFileSync(
+			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
+			'utf8'
+		);
+		const marker = sender.slice(
+			sender.indexOf('static const char *owned_delivery_marker_snapshot('),
+			sender.indexOf('int main(')
+		);
+		assert.match(marker, /open\("\.", O_RDONLY \| O_DIRECTORY \| O_CLOEXEC \| O_NOFOLLOW\)/);
+		assert.match(
+			marker,
+			/openat\(directory, "appleevent-delivered\.1",[\s\S]*O_NOFOLLOW \| O_NONBLOCK/
+		);
+		assert.match(marker, /before\.st_nlink != 1 \|\| before\.st_size != 36/);
+		assert.match(marker, /char bytes\[37\]/);
+		assert.match(marker, /read\(descriptor, bytes, sizeof\(bytes\)\)/);
+		assert.match(marker, /close\(descriptor\) != 0\) snapshot = "unavailable"/);
+		assert.match(marker, /close\(directory\) != 0\) snapshot = "unavailable"/);
+		assert.doesNotMatch(marker, /wait|kill|sleep|Permission|Entitlement|fprintf|printf/);
+		assert.match(sender, /strcmp\(argv\[3\], "consent-required"\) == 0 && status == noErr/);
+		// A reply to a consent-required send is observed only; it never admits.
+		assert.match(
+			sender,
+			/nonce_observation\.matches = read == noErr && actual_length == 36 && memcmp\(echoed, argv\[2\], 36\) == 0;\s*nonce_read_attempted/
+		);
+		assert.match(sender, /nonce_match = nonce_observation\.matches;\s*\}/);
+		assert.match(
+			sender,
+			/if \(marker_attempted\) fprintf\(stderr, ", marker1=%s", marker_snapshot\)/
+		);
+		assert.match(
+			helper,
+			/facts\.get\("phase"\) not in \("reply-read", "reply-length", "reply-match"\)/
+		);
+		assert.match(helper, /result\.returncode == 66/);
+	}
+);
 // SENDER_INTERNAL_MARKER_DIAGNOSTIC_END
 
 check('owned AppKit readiness diagnosis preserves native enum and refusal authority', () => {
@@ -1472,15 +1481,15 @@ check(
 			assert.ok(begin >= 0 && end > begin, 'The original failed native send branch is present');
 			const failure = executable.slice(begin, end);
 			assert.equal((executable.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
-			const queryAt = failure.indexOf('if (strcmp(argv[3], "success") == 0) {');
+			const queryAt = failure.indexOf('if (strcmp(argv[3], "consent-required") == 0) {');
 			assert.ok(
 				queryAt > failure.indexOf('fprintf(stderr, "\\n");'),
-				'Only the original failed positive is observed'
+				'Only the original failed consent-required send is observed'
 			);
 			const query = failure.slice(queryAt);
 			assert.match(
 				query,
-				/if \(strcmp\(argv\[3\], "success"\) == 0\) \{\s*const OSStatus permission = AEDeterminePermissionToAutomateTarget\(\s*&address, probe_class, probe_event, false\);\s*printf\("OWNED_APPLEEVENT_PERMISSION\/1 osstatus=%d\\n", \(int\)permission\);/
+				/if \(strcmp\(argv\[3\], "consent-required"\) == 0\) \{\s*const OSStatus permission = AEDeterminePermissionToAutomateTarget\(\s*&address, probe_class, probe_event, false\);\s*printf\("OWNED_APPLEEVENT_PERMISSION\/1 osstatus=%d\\n", \(int\)permission\);/
 			);
 			assert.doesNotMatch(
 				query,
@@ -1525,97 +1534,82 @@ check(
 );
 // SENDER_NONPROMPT_PERMISSION_DIAGNOSTIC_END
 
-check('normal Automation consent stays explicitly scoped and independently admitted', () => {
+check('AppleEvent boundary proves the deny rule without consent or delivery', () => {
 	const source = (name) => fs.readFileSync(path.join(ROOT, 'tools/diagnostics', name), 'utf8');
 	const helper = source('macos_brew_archive_acceptance.py');
 	const sender = source('native_appleevent_probe_sender.c');
-	const worker = source('native_appleevent_permission.c');
-	const ui = source('native_appleevent_consent.m');
-	function assertScopedConsent(candidate) {
-		const begin = candidate.helper.indexOf('def approve_owned_automation_prompt(');
-		const end = candidate.helper.indexOf('def appleevent_registration_fact(', begin);
-		assert.ok(begin >= 0 && end > begin, 'New consent has its own source scope');
-		const scope = candidate.helper.slice(begin, end);
-		assert.match(scope, /getattr\(children, "allow_automation_consent", False\) is True/);
+	function assertConsentFree(candidate) {
+		const begin = candidate.helper.indexOf('def _admit_appleevent_boundary(');
+		const end = candidate.helper.indexOf('def admit_brew(', begin);
+		assert.ok(begin >= 0 && end > begin, 'The actual boundary owner is present');
+		const boundary = candidate.helper.slice(begin, end);
+		assert.match(boundary, /\[\*sender, "consent-required"\],/);
 		assert.match(
-			scope,
-			/mode == "request" and getattr\(children, "allow_owned_consent_ui", False\) is True/
-		);
-		assert.match(scope, /timeout=30/);
-		assert.match(scope, /timeout=min\(3, remaining\)/);
-		assert.match(scope, /children\.groups\[process\]\.process is process/);
-		assert.match(scope, /not children\.groups\[process\]\.reaped/);
-		assert.match(
-			scope,
-			/digest\(executable\) == original_digest and digest\(policy\) == original_policy/
-		);
-		assert.match(scope, /if status == -1744:\s*status = query\("request"\)/);
-		assert.match(scope, /require\(status == 0,/);
-		assert.match(scope, /require\(query\("query"\) == 0,/);
-		assert.match(scope, /result\.returncode == \(0 if status == 0 else 67\)/);
-		assert.match(
-			candidate.helper,
-			/deadline = time\.monotonic\(\) \+ timeout\s*after_start\(process, deadline\)\s*self\.groups\[process\]\.wait_for_exit\(max\(0, deadline - time\.monotonic\(\)\)\)/
+			boundary,
+			/\["\/usr\/bin\/sandbox-exec", "-f", str\(removed\), \*sender, "consent-required"\]/
 		);
 		assert.match(
-			candidate.sender,
-			/owned_appleevent_permission\(&address, probe_class, probe_event,\s*strcmp\(argv\[3\], "permission-request"\) == 0\)/
+			boundary,
+			/result\.stdout == "native_appleevent_status=-1744\\n" and not result\.stderr/
 		);
-		assert.match(candidate.worker, /pthread_create\(&worker, NULL, query_permission, &request\)/);
-		assert.match(candidate.worker, /pthread_join\(worker, NULL\)/);
 		assert.match(
-			candidate.worker,
-			/request->target, request->event_class, request->event_id, request->ask/
+			boundary,
+			/refused\.stdout in \("native_appleevent_status=-1742\\n", "native_appleevent_status=-1743\\n"\)/
 		);
-		assert.match(candidate.worker, /return request\.status == noErr \? 0 : 67/);
-		assert.match(candidate.ui, /kAXTrustedCheckOptionPrompt: @NO/);
-		assert.match(candidate.ui, /SecRequirementCreateWithString\(CFSTR\("anchor apple"\)/);
-		assert.match(candidate.ui, /SecCodeCopyDesignatedRequirement/);
-		assert.match(candidate.ui, /SecCodeCheckValidity\(code, kSecCSStrictValidate, designated\)/);
-		assert.match(candidate.ui, /identifier isEqualToString:application\.bundleIdentifier/);
-		assert.equal((candidate.ui.match(/same_signed_sender\(/g) || []).length, 3);
-		assert.match(candidate.ui, /@"com\.ergopti\.private\.appleevent\.sender\."/);
-		assert.match(candidate.ui, /if \(!senderSeen \|\| !denySeen \|\| buttons\.count != 1\)/);
-		assert.match(candidate.ui, /if \(targetUnqualified \|\| approvedButtons\.count > 1\)/);
-		assert.match(
-			candidate.ui,
-			/agent\.terminated \|\| !apple_signed_process\(agent\) \|\| !same_signed_sender\(requester, sender\)/
-		);
-		assert.match(candidate.ui, /\+\+examined > 256/);
-		assert.match(candidate.ui, /windows\.count > 8/);
-		assert.match(candidate.ui, /applications\.count > 512/);
-		assert.equal((candidate.ui.match(/AXUIElementPerformAction\(/g) || []).length, 1);
+		for (const checkpoint of [
+			'after-unconfined-consent',
+			'after-deny-removal-consent',
+			'after-full-policy-denial'
+		])
+			assert.equal(boundary.split(`undelivered("${checkpoint}")`).length - 1, 1);
+		assert.match(boundary, /path\.name\.startswith\(marker\.name\)/);
+		assert.match(boundary, /"delivered_events": 0,/);
 		assert.doesNotMatch(
-			scope + candidate.worker + candidate.ui,
-			/tccutil|TCC\.db|kAEInteractWithAll|sqlite3|typeWildCard/
+			candidate.helper,
+			/allow_automation_consent|allow_owned_consent_ui|permission-request|native-appleevent-consent|OwnedAutomationRequest|AXUIElement/
+		);
+		const executable = candidate.sender.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '');
+		assert.match(executable, /kAEWaitReply \| kAENeverInteract \| kAEDoNotPromptForUserConsent/);
+		assert.match(
+			executable,
+			/\} else if \(status == errAEEventWouldRequireUserConsent\) \{\s*result = 0;\s*\} else if \(status == noErr\) \{/
+		);
+		assert.equal((executable.match(/result = 0;/g) || []).length, 2);
+		assert.equal((executable.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
+		assert.match(
+			executable,
+			/AEDeterminePermissionToAutomateTarget\(\s*&address, probe_class, probe_event, false\)/
+		);
+		assert.doesNotMatch(
+			executable,
+			/permission-request|permission-query|activateIgnoringOtherApps|kAEInteractWithAll|kAECanInteract|"success"/
 		);
 	}
-	const original = { helper, sender, worker, ui };
-	assertScopedConsent(original);
+	const original = { helper, sender };
+	assertConsentFree(original);
 	for (const [file, before, after] of [
 		[
 			'helper',
-			'getattr(children, "allow_automation_consent", False) is True,\n        "Automation consent request',
-			'True,\n        "Automation consent request'
+			'result.stdout == "native_appleevent_status=-1744\\n"',
+			'result.stdout == "native_appleevent_status=0\\n"'
 		],
-		['helper', 'timeout=30,', 'timeout=180,'],
-		['helper', 'query("query") == 0', 'True'],
+		['helper', 'undelivered("after-full-policy-denial")', 'pass'],
+		['helper', '        "delivered_events": 0,', '        "delivered_events": None,'],
+		['sender', 'status == errAEEventWouldRequireUserConsent', 'status == noErr'],
 		[
 			'sender',
-			'owned_appleevent_permission(&address, probe_class, probe_event,',
-			'owned_appleevent_permission(&address, typeWildCard, typeWildCard,'
+			'&address, probe_class, probe_event, false);',
+			'&address, probe_class, probe_event, true);'
 		],
-		['worker', 'return request.status == noErr ? 0 : 67;', 'return 0;'],
-		['ui', 'kAXTrustedCheckOptionPrompt: @NO', 'kAXTrustedCheckOptionPrompt: @YES'],
-		['ui', 'CFSTR("anchor apple")', 'CFSTR("identifier anything")'],
-		['ui', 'approvedButtons.count > 1', 'approvedButtons.count > 2']
+		[
+			'sender',
+			'        nonce_match = nonce_observation.matches;\n    }',
+			'        nonce_match = nonce_observation.matches;\n        result = 0;\n    }'
+		]
 	]) {
-		assert.equal(original[file].split(before).length - 1, 1, 'One independent scope mutation');
+		assert.equal(original[file].split(before).length - 1, 1, 'One independent source mutation');
 		assert.throws(() =>
-			assertScopedConsent({
-				...original,
-				[file]: original[file].replace(before, after)
-			})
+			assertConsentFree({ ...original, [file]: original[file].replace(before, after) })
 		);
 	}
 });
@@ -1646,8 +1640,8 @@ check(
 			assert.match(publish, /terminal = packet\["native_terminal"\]/);
 			assert.match(publish, /fact\["state"\] = "no-terminal-observation"/);
 			assert.doesNotMatch(publish, /observe_exit|\.(?:poll|wait|settle)\(|"live"/);
-			assert.equal((source.match(/positive = _run_appleevent_sender\(/g) || []).length, 2);
-			assert.equal((source.match(/refused = _run_appleevent_sender\(/g) || []).length, 1);
+			for (const owner of ['unconfined', 'removal', 'refused'])
+				assert.equal(source.split(`${owner} = _run_appleevent_sender(`).length - 1, 1);
 			assert.match(source, /packet\["send_status"\] == facts\["send_osstatus"\]/);
 			assert.match(source, /len\(lines\) == 3/);
 			assert.match(source, /len\(encoded\) <= 1024/);
@@ -1665,7 +1659,7 @@ check(
 				'observation = group.observe_exit()\n        group.observe_exit()'
 			],
 			['fact["state"] = "no-terminal-observation"', 'fact["state"] = "live"'],
-			['positive = _run_appleevent_sender(', 'positive = run_appleevent_sender_observed('],
+			['unconfined = _run_appleevent_sender(', 'unconfined = run_appleevent_sender_observed('],
 			['packet["send_status"] == facts["send_osstatus"]', 'True'],
 			['len(encoded) <= 1024', 'True'],
 			['if len(value) > 128:', 'if False:']
@@ -1763,202 +1757,6 @@ check(
 		);
 	}
 );
-
-check(
-	'passive identity facts retain the exact refused window and original action admission',
-	() => {
-		const ui = fs.readFileSync(
-			path.join(ROOT, 'tools/diagnostics/native_appleevent_consent.m'),
-			'utf8'
-		);
-		// Mask C/Objective-C comments and literals before inspecting executable
-		// spelling. Line splicing precedes lexical boundaries as in C phase 2.
-		function executableSource(source) {
-			const joined = source.replace(/\\\r?\n/g, '');
-			let output = '',
-				at = 0;
-			while (at < joined.length) {
-				const start = at;
-				if (joined.startsWith('//', at)) {
-					const end = joined.indexOf('\n', at + 2);
-					at = end < 0 ? joined.length : end;
-				} else if (joined.startsWith('/*', at)) {
-					const end = joined.indexOf('*/', at + 2);
-					at = end < 0 ? joined.length : end + 2;
-				} else if (joined[at] === '"' || joined[at] === "'") {
-					const quote = joined[at++];
-					while (at < joined.length) {
-						if (joined[at] === '\\') at += Math.min(2, joined.length - at);
-						else if (joined[at++] === quote) break;
-					}
-				} else {
-					output += joined[at++];
-					continue;
-				}
-				output += joined.slice(start, at).replace(/[^\n]/g, ' ');
-			}
-			return output;
-		}
-		function assertPassive(source) {
-			source = executableSource(source);
-			const begin = source.indexOf('static id identity_attribute(');
-			const end = source.indexOf('static BOOL inspect_window(', begin);
-			assert.ok(begin >= 0 && end > begin);
-			const passive = source.slice(begin, end);
-			assert.match(passive, /arrayWithObject:\(__bridge id\)window/);
-			assert.match(passive, /identityDeadline - NSProcessInfo\.processInfo\.systemUptime/);
-			assert.match(passive, /MIN\(0\.1, remaining\)/);
-			assert.match(passive, /factIdentityNodes >= 256/);
-			assert.match(passive, /\[value length\] > 4096/);
-			assert.match(passive, /pending\.count \+ children\.count > 256/);
-			assert.doesNotMatch(
-				passive,
-				/AXUIElementPerformAction|AXUIElementCreateApplication|NSWorkspace|senderSeen|targetSeen|allowButtons|factCandidates|factMatches/
-			);
-			assert.match(
-				source,
-				/if \(firstButton && title == nil && titleError == kAXErrorAttributeUnsupported\)\s*observe_refused_identity\(window, sender, receiver\);\s*return NO;/
-			);
-			assert.match(source, /identityDeadline = NSProcessInfo\.processInfo\.systemUptime \+ 3;/);
-			assert.match(
-				source,
-				/if \(extendedLength > 0 && extendedLength < \(int\)sizeof\(extended\)\) \{/
-			);
-			assert.equal((source.match(/char (?:packet|extended)\[1024\]/g) || []).length, 2);
-		}
-		assertPassive(ui);
-		const activeInvocation = ui.match(
-			/if \(firstButton && title == nil && titleError == kAXErrorAttributeUnsupported\)\s*observe_refused_identity\(window, sender, receiver\);\s*return NO;/
-		);
-		assert.ok(activeInvocation, 'One genuine executable refusal sequence');
-		assert.equal(ui.split(activeInvocation[0]).length - 1, 1);
-		const literalInvocation = activeInvocation[0].replace(/\s+/g, ' ');
-		for (const hidden of [
-			`/* ${activeInvocation[0]} */\nreturn NO;`,
-			`NSString *lookalike = @${JSON.stringify(literalInvocation)};\nreturn NO;`,
-			`// removed diagnostic \\\n${literalInvocation}\nreturn NO;`
-		]) {
-			assert.throws(() => assertPassive(ui.replace(activeInvocation[0], hidden)));
-		}
-		const quotedMarkers = executableSource(
-			'id text = @"/* comment marker */ // still a string \\\"quote\\\"";\nactive(); // inactive();\n'
-		);
-		assert.match(quotedMarkers, /active\(\);/);
-		assert.doesNotMatch(quotedMarkers, /comment marker|still a string|inactive\(\)/);
-
-		for (const [before, after] of [
-			['MIN(0.1, remaining)', '3'],
-			['factIdentityNodes >= 256', 'factIdentityNodes >= 1024'],
-			[
-				'observe_refused_identity(window, sender, receiver);',
-				'observe_refused_identity(otherWindow, sender, receiver);'
-			],
-			['extendedLength < (int)sizeof(extended)', 'extendedLength < 8192']
-		]) {
-			assert.equal(ui.split(before).length - 1, 1);
-			assert.throws(() => assertPassive(ui.replace(before, after)));
-		}
-	}
-);
-
-check(
-	'first discovery metadata reuses the existing traversal without action or identity credit',
-	() => {
-		const ui = fs.readFileSync(
-			path.join(ROOT, 'tools/diagnostics/native_appleevent_consent.m'),
-			'utf8'
-		);
-		const helper = fs.readFileSync(
-			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
-			'utf8'
-		);
-		const controls = fs.readFileSync(
-			path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance_test.py'),
-			'utf8'
-		);
-		function guard(source) {
-			const begin = source.indexOf('static void record_discovery(');
-			const end = source.indexOf('static bool scope_before_deadline(void)', begin);
-			assert.ok(begin >= 0 && end > begin);
-			const metadata = source.slice(begin, end);
-			assert.match(metadata, /if \(discoveryObserved\) return;/);
-			assert.match(metadata, /discoveryScope = scope;/);
-			assert.match(metadata, /discoveryComplete = complete;/);
-			assert.match(metadata, /discoveryNodes = nodes;/);
-			assert.doesNotMatch(
-				metadata,
-				/AXUIElement|CFString|NSWorkspace|PerformAction|open\(|write\(|fsync\(|systemUptime|clock|factCandidates|factMatches/
-			);
-			const start = source.indexOf('static enum OwnedWindowScope discover_window_scope(');
-			const finish = source.indexOf(
-				'// Passive traversal of only the retained refused window.',
-				start
-			);
-			const core = source.slice(start, finish);
-			assert.equal(
-				(
-					core.match(
-						/record_discovery\(result, sender_seen, receiver_seen, complete, examined\);/g
-					) || []
-				).length,
-				2
-			);
-			assert.match(core, /if \(scope_before_deadline\(\)\) \{\s*complete = true;/);
-			assert.match(
-				core,
-				/while \(count > 0\) CFRelease\(pending\[--count\]\);\s*record_discovery\(result, sender_seen, receiver_seen, complete, examined\);\s*return result;/
-			);
-			assert.match(source, /char discoveryPacket\[256\];/);
-			assert.match(source, /length \+ discoveryLength < \(int\)sizeof\(packet\)/);
-			assert.match(source, /if \(scope == OwnedWindowScopeUnrelated\) continue;/);
-		}
-		guard(ui);
-		for (const [before, after] of [
-			['if (discoveryObserved) return;', ''],
-			['discoveryNodes = nodes;', 'discoveryNodes = 0;'],
-			['complete = true;', 'complete = false;'],
-			['length + discoveryLength < (int)sizeof(packet)', 'length + discoveryLength < 8192']
-		]) {
-			assert.equal(ui.split(before).length - 1, 1);
-			assert.throws(() => guard(ui.replace(before, after)));
-		}
-		assert.match(helper, /set\(packet\) - \{"discovery"\}/);
-		assert.match(helper, /0 <= discovery\["nodes"\] <= 257/);
-		assert.match(
-			helper,
-			/require\(discovery\["scope"\] == "refused", "Incomplete discovery gained a scope"\)/
-		);
-		assert.match(controls, /class FirstDiscoveryFactControls\(unittest\.TestCase\)/);
-		assert.match(controls, /discovery_same_traversal_controls=5/);
-	}
-);
-
-// PERMISSION_WORKER_MILESTONES_BEGIN
-check('permission worker diagnostics keep the same API, thread and settlement authority', () => {
-	const helper = fs.readFileSync(
-		path.join(ROOT, 'tools/diagnostics/macos_brew_archive_acceptance.py'),
-		'utf8'
-	);
-	const worker = fs.readFileSync(
-		path.join(ROOT, 'tools/diagnostics/native_appleevent_permission.c'),
-		'utf8'
-	);
-	assert.equal((worker.match(/AEDeterminePermissionToAutomateTarget\(/g) || []).length, 1);
-	assert.equal((worker.match(/pthread_create\(/g) || []).length, 1);
-	assert.equal((worker.match(/pthread_join\(/g) || []).length, 1);
-	assert.match(worker, /phase=api-call-starting/);
-	assert.match(worker, /phase=api-returned osstatus=%d/);
-	assert.match(worker, /phase=worker-joined/);
-	assert.match(worker, /_Exit\(68\)/);
-	assert.match(helper, /group\.process is process\s+and group\.reaped/);
-	assert.match(
-		helper,
-		/_observe_permission_worker\(self, process, failure\)\s*if failure is not None:\s*raise failure/
-	);
-	assert.match(helper, /stderr = _permission_result_stderr\(stdout, stderr\)/);
-	assert.match(helper, /if permission_capture == \(stdout, stderr\):/);
-});
-// PERMISSION_WORKER_MILESTONES_END
 
 check('profile-bound native HTTP routing preserves mandatory owners and closed refusals', () => {
 	const workflow = require('yaml').parse(

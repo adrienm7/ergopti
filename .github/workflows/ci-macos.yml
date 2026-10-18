@@ -1469,8 +1469,6 @@ jobs:
         shell: bash
         env:
           SWIFT_BACKTRACE: enable=yes
-          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'
-          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'
         run: |
           set -euo pipefail
           test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"
@@ -1482,7 +1480,7 @@ jobs:
           set +e
           script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \
             --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \
-            --filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests' 2>&1 | tee "$transcript"
+            --filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests' 2>&1 | tee "$transcript"
           item36_statuses=("${PIPESTATUS[@]}")
           set -e
           node tools/diagnostics/item36_xctest_evidence.cjs judge "$transcript" "${item36_statuses[0]}" "${item36_statuses[1]}" "$GITHUB_SHA" "$source_receipt" "$evidence/item36-verdict.json"
@@ -1761,9 +1759,6 @@ jobs:
         id: swift-launcher-tests
         env:
           SWIFT_BACKTRACE: enable=yes
-          # Consent is restricted to the exact disposable signed fixture pair.
-          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'
-          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/swift-launcher-evidence"

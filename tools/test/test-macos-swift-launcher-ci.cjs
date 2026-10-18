@@ -1074,8 +1074,7 @@ check(
 			...[
 				'ReleaseArchiveStagingTests',
 				'SparkleArchiveUpdateAcceptanceTests',
-				'HomebrewArchiveAcceptanceTests',
-				'HomebrewAutomationConsentTests'
+				'HomebrewArchiveAcceptanceTests'
 			].map((suite) => `static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/${suite}.swift`)
 		];
 		for (const relative of paths) {

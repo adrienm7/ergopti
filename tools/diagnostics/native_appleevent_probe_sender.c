@@ -9,9 +9,6 @@
 #include <stdbool.h>
 #include <sys/stat.h>
 #include <limits.h>
-#include <stdint.h>
-#include <inttypes.h>
-#include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,9 +18,6 @@
 static const AEEventClass probe_class = ERGOPTI_PROBE_EVENT_CLASS;
 static const AEEventID probe_event = ERGOPTI_PROBE_EVENT_ID;
 static const AEKeyword nonce_parameter = ERGOPTI_PROBE_NONCE_PARAMETER;
-
-int owned_appleevent_permission(const AEAddressDesc *target,
-    AEEventClass event_class, AEEventID event_id, bool ask);
 
 static int valid_nonce(const char *value) {
     if (strlen(value) != 36) return 0;
@@ -36,69 +30,6 @@ static int valid_nonce(const char *value) {
         }
     }
     return 1;
-}
-
-static int readiness_number(const char *encoded, uintmax_t *value) {
-    if (encoded == NULL || *encoded == '\0') return 0;
-    for (const char *byte = encoded; *byte != '\0'; byte++) {
-        if (*byte < '0' || *byte > '9') return 0;
-    }
-    errno = 0;
-    char *end = NULL;
-    *value = strtoumax(encoded, &end, 10);
-    if (errno != 0 || end == encoded || *end != '\0') return 0;
-    char canonical[32];
-    snprintf(canonical, sizeof(canonical), "%ju", *value);
-    return strcmp(canonical, encoded) == 0;
-}
-
-static int acknowledge_sender_readiness(const char *nonce) {
-    // A private startup signal only: subsequent signed identity and actual
-    // permission, reply and delivery checks retain their original authority.
-    const char *name = getenv("ERGOPTI_OWNED_AUTOMATION_READY_NAME");
-    const char *encoded_device = getenv("ERGOPTI_OWNED_AUTOMATION_READY_DEV");
-    const char *encoded_inode = getenv("ERGOPTI_OWNED_AUTOMATION_READY_INO");
-    if (name == NULL && encoded_device == NULL && encoded_inode == NULL) return 1;
-    static const char prefix[] = "automation-ready-";
-    uintmax_t device = 0, inode = 0;
-    if (name == NULL || strncmp(name, prefix, sizeof(prefix) - 1) != 0 ||
-        !valid_nonce(name + sizeof(prefix) - 1) ||
-        !readiness_number(encoded_device, &device) ||
-        !readiness_number(encoded_inode, &inode)) return 0;
-    int directory = open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
-    if (directory < 0) return 0;
-    int descriptor = -1;
-    int acknowledged = 0;
-    struct stat root, before, after, named;
-    if (fstat(directory, &root) != 0 || !S_ISDIR(root.st_mode) ||
-        root.st_uid != getuid() || (root.st_mode & 0777) != 0700) goto done;
-    descriptor = openat(directory, name, O_WRONLY | O_NOFOLLOW | O_CLOEXEC | O_NONBLOCK);
-    if (descriptor < 0 || fstat(descriptor, &before) != 0 ||
-        !S_ISREG(before.st_mode) || before.st_uid != getuid() ||
-        (before.st_mode & 0777) != 0600 || before.st_nlink != 1 || before.st_size != 0 ||
-        (uintmax_t)before.st_dev != device || (uintmax_t)before.st_ino != inode) goto done;
-    char bytes[128];
-    const int length = snprintf(bytes, sizeof(bytes),
-        "OWNED_APPLEEVENT_READY/1 pid=%ld nonce=%s\n", (long)getpid(), nonce);
-    if (length <= 0 || length >= (int)sizeof(bytes)) goto done;
-    size_t offset = 0;
-    while (offset < (size_t)length) {
-        const ssize_t count = write(descriptor, bytes + offset, (size_t)length - offset);
-        if (count < 0 && errno == EINTR) continue;
-        if (count <= 0) goto done;
-        offset += (size_t)count;
-    }
-    if (fsync(descriptor) != 0 || fstat(descriptor, &after) != 0 ||
-        fstatat(directory, name, &named, AT_SYMLINK_NOFOLLOW) != 0 ||
-        !S_ISREG(after.st_mode) || after.st_uid != getuid() ||
-        (after.st_mode & 0777) != 0600 || after.st_nlink != 1 || after.st_size != length ||
-        after.st_dev != before.st_dev || after.st_ino != before.st_ino ||
-        named.st_dev != before.st_dev || named.st_ino != before.st_ino) goto done;
-    acknowledged = 1;
-done:
-    if (descriptor >= 0 && close(descriptor) != 0) acknowledged = 0;
-    if (close(directory) != 0) acknowledged = 0;
-    return acknowledged;
 }
 
 /* Fixed scalar diagnostics only; neither reply contents nor target identity escape. */
@@ -242,75 +173,6 @@ static int observe_sender_policy(NSApplication *application) {
     }
 }
 
-/* Python's macOS monotonic_ns clock is this same public mach clock. */
-static bool foreground_now_ns(uint64_t *value) {
-    mach_timebase_info_data_t base;
-    if (mach_timebase_info(&base) != KERN_SUCCESS || base.numer == 0 || base.denom == 0)
-        return false;
-    const unsigned __int128 ns = (unsigned __int128)mach_absolute_time() * base.numer / base.denom;
-    if (ns > UINT64_MAX) return false;
-    *value = (uint64_t)ns;
-    return true;
-}
-
-static bool foreground_deadline_ns(uint64_t *value) {
-    const char *encoded = getenv("ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS");
-    if (encoded == NULL || encoded[0] < '1' || encoded[0] > '9') return false;
-    size_t count = 0;
-    while (count < 21 && encoded[count] != '\0') count++;
-    if (count > 20) return false;
-    for (size_t index = 0; index < count; index++)
-        if (encoded[index] < '0' || encoded[index] > '9') return false;
-    errno = 0;
-    char *end = NULL;
-    const unsigned long long parsed = strtoull(encoded, &end, 10);
-    if (errno != 0 || end == encoded || *end != '\0' || parsed == 0) return false;
-    *value = (uint64_t)parsed;
-    return true;
-}
-
-/* Normal activation can complete asynchronously. Only this explicitly opted-in
- * same app pumps its own events; fresh activity before the original deadline is
- * mandatory, and neither activation nor event processing grants permission. */
-static int admit_sender_foreground_request(NSApplication *application) {
-    if (application == nil) return 1;
-    uint64_t deadline, now, previous;
-    if (!foreground_deadline_ns(&deadline) || !foreground_now_ns(&now) || now >= deadline)
-        return 2;
-    previous = now;
-    if ([application isActive]) {
-        return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
-    }
-    [application finishLaunching];
-    if ([application activationPolicy] != NSApplicationActivationPolicyAccessory) return 2;
-    [application activateIgnoringOtherApps:YES];
-    while (true) {
-        if (!foreground_now_ns(&now) || now < previous || now >= deadline) return 2;
-        previous = now;
-        if ([application isActive]) {
-            return foreground_now_ns(&now) && now >= previous && now < deadline ? 0 : 2;
-        }
-        const double remaining = (double)(deadline - now) / 1000000000.0;
-        const double slice = remaining < 0.05 ? remaining : 0.05;
-        NSEvent *event = [application nextEventMatchingMask:NSEventMaskAny
-            untilDate:[NSDate dateWithTimeIntervalSinceNow:slice]
-            inMode:NSDefaultRunLoopMode dequeue:YES];
-        if (event != nil) [application sendEvent:event];
-    }
-}
-
-static bool sender_foreground_after_readiness(NSApplication *application,
-    uint64_t deadline, uint64_t previous) {
-    // The private file write can block or yield focus. It cannot preserve an
-    // earlier activity observation or extend the original request deadline.
-    uint64_t now;
-    if (application == nil || !foreground_now_ns(&now) || now < previous || now >= deadline)
-        return false;
-    previous = now;
-    if (![application isActive]) return false;
-    return foreground_now_ns(&now) && now >= previous && now < deadline;
-}
-
 /* A separate closed metadata frame never changes nonce/reply admission. */
 static void emit_sender_identity(const struct SenderIdentityObservation *identity,
     int before_policy, int after_policy) {
@@ -320,7 +182,7 @@ static void emit_sender_identity(const struct SenderIdentityObservation *identit
         identity->identifier_equal, identity->hash_equal);
 }
 
-static const char *owned_second_marker_snapshot(const char *expected_nonce) {
+static const char *owned_delivery_marker_snapshot(const char *expected_nonce) {
     // Information only: the sender already has the exact owned private cwd.
     // Any ambiguous process-local descriptor retires with this failed sender.
     // No marker observation changes the original send/reply admission result.
@@ -338,7 +200,7 @@ static const char *owned_second_marker_snapshot(const char *expected_nonce) {
         !S_ISDIR(before_directory.st_mode) || before_directory.st_uid != getuid() ||
         (before_directory.st_mode & 0777) != 0700) goto finished;
     directory_admitted = 1;
-    descriptor = openat(directory, "appleevent-delivered.2",
+    descriptor = openat(directory, "appleevent-delivered.1",
         O_RDONLY | O_CLOEXEC | O_NOFOLLOW | O_NONBLOCK);
     if (descriptor < 0) {
         snapshot = errno == ENOENT ? "absent" : errno == ELOOP ? "invalid" : "unavailable";
@@ -375,9 +237,7 @@ finished:
 
 int main(int argc, char **argv) {
     if (argc != 4 || !valid_nonce(argv[2]) ||
-        (strcmp(argv[3], "success") != 0 && strcmp(argv[3], "denied") != 0 &&
-         strcmp(argv[3], "permission-query") != 0 &&
-         strcmp(argv[3], "permission-request") != 0)) return 64;
+        (strcmp(argv[3], "consent-required") != 0 && strcmp(argv[3], "denied") != 0)) return 64;
     errno = 0;
     char *end = NULL;
     const long parsed = strtol(argv[1], &end, 10);
@@ -405,44 +265,6 @@ int main(int argc, char **argv) {
     AppleEvent event = {typeNull, NULL};
     AppleEvent reply = {typeNull, NULL};
     OSStatus status = AECreateDesc(typeKernelProcessID, &recipient, sizeof(recipient), &address);
-    if (strcmp(argv[3], "permission-query") == 0 ||
-        strcmp(argv[3], "permission-request") == 0) {
-        if (status != noErr) {
-            fputs("Owned Automation target construction failed\n", stderr);
-            AEDisposeDesc(&address);
-            return 65;
-        }
-        if (strcmp(argv[3], "permission-request") == 0) {
-            const int foreground = admit_sender_foreground_request(application);
-            if (foreground != 0) {
-                const char *state = foreground == 1 ? "unavailable" :
-                    foreground == 2 ? "inactive" : "unadmitted";
-                fprintf(stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=%s\n", state);
-                AEDisposeDesc(&address);
-                return 65;
-            }
-            uint64_t readiness_deadline, readiness_before;
-            if (!foreground_deadline_ns(&readiness_deadline) ||
-                !foreground_now_ns(&readiness_before) || readiness_before >= readiness_deadline) {
-                fputs("OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n", stderr);
-                AEDisposeDesc(&address);
-                return 65;
-            }
-            if (!acknowledge_sender_readiness(argv[2])) {
-                AEDisposeDesc(&address);
-                return 65;
-            }
-            if (!sender_foreground_after_readiness(application, readiness_deadline, readiness_before)) {
-                fputs("OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n", stderr);
-                AEDisposeDesc(&address);
-                return 65;
-            }
-        }
-        const int outcome = owned_appleevent_permission(&address, probe_class, probe_event,
-            strcmp(argv[3], "permission-request") == 0);
-        AEDisposeDesc(&address);
-        return outcome;
-    }
     if (status == noErr) {
         status = AECreateAppleEvent(probe_class, probe_event, &address,
             kAutoGenerateReturnID, kAnyTransactionID, &event);
@@ -460,7 +282,8 @@ int main(int argc, char **argv) {
     }
     // Only this acquired process receives the event; no bundle lookup or launch.
     // kAENeverInteract governs the receiver, not TCC's Automation prompt.
-    // Refuse a consent requirement without ever displaying or changing it.
+    // kAEDoNotPromptForUserConsent makes TCC answer -1744 instead of prompting:
+    // the route reaches the target's consent step, which never grants delivery.
     status = AESendMessage(&event, &reply,
         kAEWaitReply | kAENeverInteract | kAEDoNotPromptForUserConsent, 5 * 60);
     struct ProbeNonceObservation nonce_observation = {0, 0, 0, 0};
@@ -480,7 +303,11 @@ int main(int argc, char **argv) {
     }
     if (strcmp(argv[3], "denied") == 0) {
         if (status == errAETargetAddressNotPermitted || status == errAEEventNotPermitted) result = 0;
+    } else if (status == errAEEventWouldRequireUserConsent) {
+        result = 0;
     } else if (status == noErr) {
+        // Delivery without consent is a refused outcome; the reply is observed
+        // only to describe it, never to admit it.
         char echoed[37] = {0};
         Size actual_length = 0;
         const OSStatus read = AEGetParamPtr(&reply, nonce_parameter, typeUTF8Text,
@@ -493,15 +320,12 @@ int main(int argc, char **argv) {
         nonce_read_status = nonce_observation.status;
         nonce_length = nonce_observation.size;
         nonce_match = nonce_observation.matches;
-        if (read == noErr && actual_length == 36 && memcmp(echoed, argv[2], 36) == 0) {
-            result = 0;
-        }
     }
     if (result != 0) {
         fprintf(stderr, "Owned AppleEvent outcome admission failed: %d\n", (int)status);
         emit_sender_diagnostic(status, strcmp(argv[3], "denied") == 0, &nonce_observation, &reply);
         const char *phase = strcmp(argv[3], "denied") == 0 ? "denied-status" :
-            status != noErr ? "send" : nonce_read_status != noErr ? "reply-read" :
+            status != noErr ? "consent-status" : nonce_read_status != noErr ? "reply-read" :
             nonce_length != 36 ? "reply-length" : "reply-match";
         char read_detail[16] = "unobserved";
         char length_detail[16] = "unobserved";
@@ -535,19 +359,20 @@ int main(int argc, char **argv) {
                 }
             }
         }
-        // Snapshot only a failed positive reply; a full-policy denial never
-        // acquires this diagnostic. No native policy/permission query is added.
-        const int marker_attempted = strcmp(argv[3], "success") == 0 && status == noErr;
-        const char *marker_snapshot = marker_attempted ? owned_second_marker_snapshot(argv[2]) : NULL;
+        // Snapshot only an unexpected consent-free delivery; a full-policy
+        // denial never acquires this diagnostic.
+        const int marker_attempted = strcmp(argv[3], "consent-required") == 0 && status == noErr;
+        const char *marker_snapshot = marker_attempted ? owned_delivery_marker_snapshot(argv[2]) : NULL;
         fprintf(stderr, "Owned AppleEvent outcome admission failed: phase=%s, send=%d, read=%s, length=%s, match=%s, error_read=%s, error_length=%s, error_value=%s",
             phase, (int)status, read_detail, length_detail, match_detail,
             error_read_detail, error_length_detail, error_value_detail);
-        if (marker_attempted) fprintf(stderr, ", marker2=%s", marker_snapshot);
+        if (marker_attempted) fprintf(stderr, ", marker1=%s", marker_snapshot);
         fprintf(stderr, "\n");
         emit_sender_identity(&identity, before_policy, after_policy);
-        // Observe only this failed positive sender's existing target and event.
-        // False forbids a consent prompt; the original refusal remains authoritative.
-        if (strcmp(argv[3], "success") == 0) {
+        // Observe only this failed consent-required sender's existing target and
+        // event. False forbids a consent prompt; the original refusal remains
+        // authoritative.
+        if (strcmp(argv[3], "consent-required") == 0) {
             const OSStatus permission = AEDeterminePermissionToAutomateTarget(
                 &address, probe_class, probe_event, false);
             printf("OWNED_APPLEEVENT_PERMISSION/1 osstatus=%d\n", (int)permission);

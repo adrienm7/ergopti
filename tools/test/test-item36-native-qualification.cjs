@@ -15,10 +15,9 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	const classes = [
 		'ReleaseArchiveStagingTests',
 		'SparkleArchiveUpdateAcceptanceTests',
-		'HomebrewArchiveAcceptanceTests',
-		'HomebrewAutomationConsentTests'
+		'HomebrewArchiveAcceptanceTests'
 	];
-	const counts = [8, 15, 1, 1];
+	const counts = [8, 15, 1];
 	let passed = 0;
 	const check = (label, action) => {
 		action();
@@ -51,12 +50,12 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	}
 	lines.push(
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-09 00:00:01.",
-		summary(25),
+		summary(24),
 		"Test Suite 'Selected tests' passed at 2026-10-09 00:00:01.",
-		summary(25)
+		summary(24)
 	);
 	const valid = lines.join('\n') + '\n';
-	check('exact-independent-25', () => assert.equal(reader.evaluate(valid, 0, 0).complete, true));
+	check('exact-independent-24', () => assert.equal(reader.evaluate(valid, 0, 0).complete, true));
 	check('PTY-normalization', () =>
 		assert.equal(
 			reader.evaluate('\x1b[32m' + valid.replaceAll('\n', '\r\n') + '\x1b[0m', 0, 0).complete,
@@ -76,9 +75,9 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	const stale = valid
 		.replace(`${signalOpening}\n${signalTerminal}\n`, '')
 		.replace(summary(15), summary(14))
-		.replaceAll(summary(25), summary(24));
+		.replaceAll(summary(24), summary(23));
 	for (const [label, bad] of [
-		['stale-independent-24', stale],
+		['stale-independent-23', stale],
 		['new-signal-missing', valid.replace(`${signalOpening}\n${signalTerminal}\n`, '')],
 		['new-signal-duplicate', valid.replace(signalOpening, `${signalOpening}\n${signalOpening}`)],
 		[
@@ -129,8 +128,8 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 			valid.replace(`Test Case '${firstName}' passed`, `Test Case '${firstName}' skipped`)
 		],
 		['wrong-class-census', valid.replace(summary(8), summary(7))],
-		['wrong-bundle-census', valid.replace(summary(25), summary(24))],
-		['wrong-root-census', valid.slice(0, valid.lastIndexOf(summary(25))) + summary(24) + '\n'],
+		['wrong-bundle-census', valid.replace(summary(24), summary(23))],
+		['wrong-root-census', valid.slice(0, valid.lastIndexOf(summary(24))) + summary(23) + '\n'],
 		['wrong-root', valid.replaceAll("'Selected tests'", "'All tests'")],
 		['foreign-bundle', valid.replaceAll('ErgoptiPlusPackageTests.xctest', 'Foreign.xctest')],
 		[
@@ -204,9 +203,9 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 			'item36_xctest_evidence.cjs begin "fake"'
 		],
 		[
-			'lost-consent',
-			"ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'",
-			"ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '0'"
+			'reintroduced-consent-opt-in',
+			'          SWIFT_BACKTRACE: enable=yes\n        run: |\n          set -euo pipefail\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"',
+			'          SWIFT_BACKTRACE: enable=yes\n          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: \'1\'\n        run: |\n          set -euo pipefail\n          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"'
 		],
 		[
 			'filtered-package',
@@ -248,7 +247,7 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 		check('real-Git-source-binding', () => {
 			before = reader.sourceReceipt(temporary, candidate);
 			assert.equal(before.candidate, candidate);
-			assert.equal(Object.keys(before.sources).length, 4);
+			assert.equal(Object.keys(before.sources).length, 3);
 		});
 		check('foreign-candidate-refused', () =>
 			assert.throws(() => reader.sourceReceipt(temporary, '0'.repeat(40)))

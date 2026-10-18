@@ -46,10 +46,10 @@ const brewSource = fs.readFileSync(
 	path.join(ROOT, 'static/ergopti_plus/macos/launcher', brew.path),
 	'utf8'
 );
-const consentFile = 'HomebrewAutomationConsentTests.swift';
-const consentSource = fs.readFileSync(
-	path.join(ROOT, 'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests', consentFile),
-	'utf8'
+// The retired consent opt-in test file must never return beside the Brew owner.
+const consentFile = path.join(
+	ROOT,
+	'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/HomebrewAutomationConsentTests.swift'
 );
 const stableConfiguration = JSON.parse(
 	fs.readFileSync(path.join(ROOT, '.github/ci/stable_release_qualification_exception.json'), 'utf8')
@@ -293,7 +293,7 @@ function admitRawWorkflow(mac) {
 }
 // Admit only the additional manual diagnostic selector and its exact source owner.
 const ITEM36_FILTER =
-	"--filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'";
+	"--filter 'ReleaseArchiveStagingTests|SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests'";
 function admitItem36Selector(mac) {
 	const jobs = [...mac.matchAll(/^  e2e-hs:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
 	if (jobs.length !== 1) return null;
@@ -373,9 +373,9 @@ function admitItem36Selector(mac) {
 		'            --scratch-path "$RUNNER_TEMP/swift-launcher-ci" \\\n' +
 		`            ${ITEM36_FILTER} 2>&1 | tee "$transcript"\n`;
 	if (step.split(command).length !== 2 || job.split(ITEM36_FILTER).length !== 2) return null;
+	// The Brew AppleEvent boundary is consent-free; no step may opt back in.
+	if (step.includes('ERGOPTI_BREW_ALLOW_')) return null;
 	for (const line of [
-		"          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'",
-		"          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'",
 		'          set -euo pipefail',
 		'          test -z "${ERGOPTI_DEV_QUALIFICATION_PROFILE:-}"',
 		'          export ERGOPTI_ARCHIVE_EVIDENCE_DIR="$(mktemp -d "$evidence/archive-session.XXXXXX")"',
@@ -481,7 +481,7 @@ function admitNativeNumberRowSelector(mac) {
 }
 
 function sourceProblems(pkg, mac, rootCaller) {
-	const errors = consentSourceProblems(brewSource, consentSource, pkg);
+	const errors = consentFreeProblems(brewSource, mac);
 	const requireText = (value, token, name) => {
 		if (!value.includes(token)) errors.push(name);
 	};
@@ -612,31 +612,17 @@ function sourceProblems(pkg, mac, rootCaller) {
 		errors.push('release-preflight');
 	return errors;
 }
-function consentSourceProblems(native, portable, pkg) {
+/** The Brew owner proves its AppleEvent rule without consent, prompts or opt-ins. */
+function consentFreeProblems(native, mac) {
 	const errors = [];
-	const method = 'func testAutomationConsentArgumentsRequireBothExplicitOptIns() throws';
-	if (native.includes(method) || portable.split(method).length !== 2)
-		errors.push('portable-consent-method-always-included');
-	if (
-		portable.split('enum HomebrewAutomationConsent {').length !== 2 ||
-		portable.split('static func arguments(').length !== 2 ||
-		native.includes('func enabled(')
-	)
-		errors.push('consent-helper-single-owner');
-	for (const source of [native, portable])
-		if (!source.includes('return try HomebrewAutomationConsent.arguments(environment)'))
-			errors.push('consent-wrapper-forwards');
 	for (const token of [
-		'guard value == "0" || value == "1" else {',
-		'let request = try enabled("ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT")',
-		'let approve = try enabled("ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI")',
-		'guard !approve || request else {',
-		'ConsentError.refused(-1, "Malformed owned Automation consent opt-in")',
-		'ConsentError.refused(-1, "Owned consent UI requires an explicit permission request")'
+		'HomebrewAutomationConsent',
+		'ERGOPTI_BREW_ALLOW_',
+		'--allow-automation-consent',
+		'--allow-owned-consent-ui'
 	])
-		if (!portable.includes(token)) errors.push('consent-explicit-opt-in-guards');
-	if (pkg.includes(consentFile) || !pkg.includes('path: launcherTestTargetPath,'))
-		errors.push('portable-consent-file-not-excluded');
+		if (native.includes(token) || mac.includes(token)) errors.push('consent-free-brew-acceptance');
+	if (fs.existsSync(consentFile)) errors.push('consent-opt-in-tests-retired');
 	return errors;
 }
 /** Runs this source owner; standalone CLI also receives its two leaf owners. */
@@ -874,68 +860,18 @@ function run({ includeLeafControls = true } = {}) {
 		assert.equal(brewSource.split('func ' + brew.name + '() throws').length - 1, 1);
 		assert.equal((brewSource.match(/\n\tfunc test/g) || []).length, 1);
 	});
-	check('portable-consent-file-and-helper-remain-included', () => {
-		assert.deepEqual(consentSourceProblems(brewSource, consentSource, packageSource), []);
-		assert.equal((consentSource.match(/\n\tfunc test/g) || []).length, 1);
+	check('brew-acceptance-stays-consent-free', () => {
+		assert.deepEqual(consentFreeProblems(brewSource, workflow), []);
+		assert.equal(fs.existsSync(consentFile), false);
 	});
-	check('portable-consent-file-exclusion-is-red', () => {
-		assert.ok(
-			consentSourceProblems(
-				brewSource,
-				consentSource,
-				packageSource.replace(
-					'exclude: deferredDevReleaseTestFiles()',
-					`exclude: ["${consentFile}"]`
-				)
-			).length > 0
-		);
-		assert.throws(
-			() =>
-				validateSwiftExclusionDump(
-					{
-						targets: [
-							{
-								name: 'ErgoptiPlusTests',
-								path: path.posix.dirname(brew.path),
-								exclude: [consentFile]
-							}
-						]
-					},
-					policy.resolveQualificationProfile(context, clock)
-				),
-			/Swift target join must identify the canonical declared Brew file/
-		);
-	});
-	check('portable-consent-method-removal-is-red', () => {
-		assert.ok(
-			consentSourceProblems(
-				brewSource,
-				consentSource.replace(
-					'func testAutomationConsentArgumentsRequireBothExplicitOptIns() throws',
-					'func removed() throws'
-				),
-				packageSource
-			).length > 0
-		);
-	});
-	check('consent-helper-moved-into-deferred-file-is-red', () => {
-		assert.ok(
-			consentSourceProblems(
-				brewSource + '\nfunc enabled(',
-				consentSource.replace('enum HomebrewAutomationConsent {', 'enum ForeignConsent {'),
-				packageSource
-			).length > 0
-		);
-	});
-	check('consent-guard-or-wrapper-bypass-is-red', () => {
-		for (const changed of [
-			consentSource.replace('guard !approve || request else {', 'guard true else {'),
-			consentSource.replace(
-				'return try HomebrewAutomationConsent.arguments(environment)',
-				'return []'
-			)
+	check('reintroduced-consent-dependency-is-red', () => {
+		for (const [native, mac] of [
+			[brewSource + '\n// try HomebrewAutomationConsent.arguments(environment)\n', workflow],
+			[brewSource + '\n// "--allow-automation-consent"\n', workflow],
+			[brewSource, workflow + "\n          ERGOPTI_BREW_ALLOW_AUTOMATION_CONSENT: '1'\n"],
+			[brewSource, workflow + "\n          ERGOPTI_BREW_ALLOW_OWNED_CONSENT_UI: '1'\n"]
 		])
-			assert.ok(consentSourceProblems(brewSource, changed, packageSource).length > 0);
+			assert.ok(consentFreeProblems(native, mac).includes('consent-free-brew-acceptance'));
 	});
 	check('actual-helper-rejects-main-pr-version-clock', () => {
 		for (const changed of [
@@ -1266,7 +1202,7 @@ function run({ includeLeafControls = true } = {}) {
 			assert.equal(admitRawNativeSdkSelector(changed), null);
 		});
 
-	assert.equal(passed, 79);
+	assert.equal(passed, 76);
 	let publicationControls = 0;
 	for (const lane of ['core', 'macos', 'windows', 'linux']) {
 		const entry = `      - ${lane}\n`;
@@ -1310,7 +1246,7 @@ function run({ includeLeafControls = true } = {}) {
 	assert.equal(publicationControls, 11);
 	console.log('PASS: publication lane membership controls=11; no release or native execution.');
 	console.log(
-		'PASS: Mac qualification deferral source/typed-receipt controls=79; Swift/native execution unqualified.'
+		'PASS: Mac qualification deferral source/typed-receipt controls=76; Swift/native execution unqualified.'
 	);
 
 	// Keep the original source/receipt census separate from public emission controls.

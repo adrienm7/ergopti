@@ -1084,7 +1084,10 @@ check('v101 retains the full dispatch-only Item36 cohort and public Brew receipt
 		Raw.step(item.body, 'Qualify scoped item 36 native archive XCTest controls')
 	).join('\n');
 	assert.equal(itemCode.includes('--skip'), false);
-	assert.ok(itemCode.includes('HomebrewArchiveAcceptanceTests|HomebrewAutomationConsentTests'));
+	assert.ok(
+		itemCode.includes("SparkleArchiveUpdateAcceptanceTests|HomebrewArchiveAcceptanceTests'")
+	);
+	assert.equal(itemCode.includes('HomebrewAutomationConsent'), false);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
 	const prepare = Raw.runOf(Raw.step(job.body, 'Prepare scoped native qualification profile')).join(
 		'\n'
