@@ -1,7 +1,5 @@
 --- tests/unit/adapters/test_system_proxy_runtime_executable.lua
 
---- tests/unit/adapters/test_system_proxy.lua
-
 --- ==============================================================================
 --- MODULE: Native System Proxy Ownership Controls (Linux)
 --- DESCRIPTION:

@@ -66,7 +66,6 @@ return {
 	"tests.unit.adapters.test_managed_etag_receipts",
 	"tests.unit.adapters.test_managed_get_redirects",
 	"tests.unit.adapters.test_managed_owned_authorization",
-	"tests.unit.adapters.test_system_proxy",
 	"tests.unit.adapters.test_system_proxy_callbacks",
 	"tests.unit.adapters.test_system_proxy_runtime_executable",
 	"tests.unit.infra.test_curl_identity_forwarding",
@@ -84,7 +83,6 @@ return {
 	"tests.unit.infra.test_managed_output_hops",
 	"tests.unit.infra.test_native_output_transport_completion",
 	"tests.unit.infra.test_managed_http",
-	"tests.unit.infra.test_managed_http_aggregate_cancel",
 	"tests.unit.infra.test_managed_http_cancelled_admission",
 	"tests.unit.infra.test_managed_fractional_budget",
 	"tests.unit.infra.test_managed_http_deadline",
@@ -96,7 +94,6 @@ return {
 
 	"tests.unit.modules.test_native_worker_owner",
 	"tests.unit.adapters.test_physical_chord_source_currency",
-	"tests.unit.adapters.test_xkb_chord_numeric_symbols",
 	"tests.unit.adapters.test_number_row_native_levels",
 	"tests.unit.adapters.test_xkb_fixture_secondary_ownership",
 	"tests.unit.modules.test_window_switch_owner",

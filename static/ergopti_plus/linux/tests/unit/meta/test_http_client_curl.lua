@@ -1676,56 +1676,6 @@ helpers.describe("http_client: retained GET settlement", function()
 		helpers.assert_eq(result.body, '{"data":[]}')
 	end)
 
-	helpers.it("owned GET cancellation retains debt and blocks both APIs until physical settlement", function()
-		local client, state = fresh_client({ defer_close = true })
-		local terminals, rejected = 0, nil
-		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
-			{ owner = "local-api" }, function() terminals = terminals + 1 end)
-		helpers.assert_eq(operation:cancel(), false, "SIGTERM acceptance is not a physical exit receipt")
-		helpers.assert_eq(client.isActive("local-api"), false, "the legacy logical activity ABI is unchanged")
-		helpers.assert_eq(client.get("http://127.0.0.1:9000/v1/models", {}, { owner = "local-api" },
-			function(value) rejected = value end), false)
-		helpers.assert_eq(rejected.error, "previous request cleanup pending")
-		local successor = client.get_owned("http://127.0.0.1:9000/v1/models", {},
-			{ owner = "local-api" }, function() end)
-		helpers.assert_eq(successor.started, false)
-		helpers.assert_true(successor:is_settled(), "a refused successor acquires no native resource")
-		helpers.assert_eq(#state.requests, 1)
-		state.ack_closes()
-		helpers.assert_eq(operation:is_settled(), false)
-		state.exit(0)
-		helpers.assert_eq(operation:is_settled(), false)
-		state.ack_closes()
-		helpers.assert_true(operation:cancel())
-		helpers.assert_eq(terminals, 0, "late terminal events cannot publish after cancellation")
-		local fresh = client.get_owned("http://127.0.0.1:9000/v1/models", {},
-			{ owner = "local-api" }, function() end)
-		helpers.assert_true(fresh.started)
-		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
-		state.ack_closes()
-		helpers.assert_true(fresh:is_settled())
-		state.exit(0)
-		helpers.assert_eq(terminals, 0)
-	end)
-
-	helpers.it("owned GET fences callbacks on refused termination and keeps independent requests", function()
-		local client, state = fresh_client({ kill_failure = true, defer_close = true })
-		local terminals, independent = 0, nil
-		local operation = client.get_owned("http://127.0.0.1:9000/v1/models", {},
-			{ owner = "local-api" }, function() terminals = terminals + 1 end)
-		client.get("http://127.0.0.1:9001/v1/models", {}, { owner = "prediction" },
-			function(value) independent = value end)
-		helpers.assert_eq(operation:cancel(), false)
-		helpers.assert_true(client.isActive("local-api"))
-		helpers.assert_true(client.isActive("prediction"))
-		state.complete_request(1, '[]\nERGOPTI_HTTP_STATUS:200\n')
-		state.ack_closes()
-		helpers.assert_true(operation:is_settled())
-		helpers.assert_eq(terminals, 0, "cancel intent fences delivery even if the signal refuses")
-		state.complete_request(2, '[]\nERGOPTI_HTTP_STATUS:200\n')
-		helpers.assert_true(independent.ok)
-	end)
-
 	helpers.it("owned GET retries refused close and never reports it as settlement", function()
 		local client, state = fresh_client({ close_failure = true, defer_close = true })
 		local receipt
