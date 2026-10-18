@@ -292,9 +292,11 @@ local function _is_secure_context()
 	if url_enabled then
 		local ok_app, app_id = pcall(function()
 			local lifecycle = require("adapters.process_lifecycle")
-			return lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
+			local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
+			return type(foreground) == "table" and rawget(foreground, "appId") or nil
 		end)
-		if not ok_app or type(app_id) ~= "string" or app_id == "" then return true end
+		if not ok_app or type(app_id) ~= "string" or not app_id:find("%S")
+			or app_id:find("\0", 1, true) then return true end
 		local ok_url, is_url = pcall(detector.isUrlBar, app_id)
 		if not ok_url or is_url then return true end
 	end
