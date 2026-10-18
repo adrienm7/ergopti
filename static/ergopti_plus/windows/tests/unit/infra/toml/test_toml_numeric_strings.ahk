@@ -150,3 +150,34 @@ _TNS_EditorNumericSectionPreference() {
 }
 Test("TOML: editor restores the exact numeric section name (toml-numeric-string-read)",
 	_TNS_EditorNumericSectionPreference)
+
+_TNS_EditorSemanticPreference(Shape) {
+	global ConfigurationFile
+	OldPath := ConfigurationFile
+	Path := _CTU_NewPath()
+	switch Shape {
+		case "dotted": Source := 'personal_editor.default_section = "001"`npersonal_editor.close_on_add = "1"`n'
+		case "inline": Source := 'personal_editor = { default_section = "001", close_on_add = "1" }`n'
+		case "quoted": Source := '["personal_editor"]`ndefault_section = "001"`nclose_on_add = "1"`n'
+		default: throw ValueError("Unknown personal-editor semantic fixture")
+	}
+	try {
+		AssertTrue(FSWrite(Path, Source))
+		Admitted := ConfigTomlDecodeSnapshot(Source).Cache
+		AssertEqual("001", Admitted["personal_editor"]["default_section"],
+			"the canonical config reader must already admit this source identity")
+		ConfigurationFile := Path
+		Actual := _EditorPrefGet("default_section", "")
+		AssertTrue(Actual is String)
+		AssertEqual("001", Actual, "the native editor must select the authored section")
+		AssertEqual("1", _EditorPrefGet("close_on_add", "0"))
+		AssertEqual("absent", _EditorPrefGet("missing", "absent"))
+		AssertEqual(Source, FSReadUtf8Exact(Path), "reading preferences must not normalize their source")
+	} finally {
+		ConfigurationFile := OldPath
+		FSDelete(Path)
+	}
+}
+for Shape in ["dotted", "inline", "quoted"]
+	Test("TOML: editor reads " . Shape . " preferences (editor-semantic-preference)",
+		_TNS_EditorSemanticPreference.Bind(Shape))

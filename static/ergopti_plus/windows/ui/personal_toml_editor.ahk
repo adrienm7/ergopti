@@ -42,7 +42,9 @@ _EditorPrefGet(Key, Default) {
 	if !IsSet(ConfigurationFile) or !FileExist(ConfigurationFile) {
 		return Default
 	}
-	Val := TOML_Read(ConfigurationFile, "personal_editor", Key, "_MISSING_")
+	; Preference keys can be owned by dotted assignments or an inline namespace.
+	Cache := ConfigTomlDecodeSnapshot(FileRead(ConfigurationFile, "UTF-8")).Cache
+	Val := IniCacheGet(Cache, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }
 _EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
