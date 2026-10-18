@@ -328,7 +328,7 @@ KL_WriteAtomic(path, content) {
     ; Force replaces an instance only at the END of the successor's load, so two
     ; drivers can briefly be alive and writing the same metrics directory. It is
     ; a built-in rather than a GetCurrentProcessId DllCall on purpose — the
-    ; OS-call purity ratchet (tests/meta/test_ahk_os_purity_ratchet.ahk) counts
+    ; OS-call purity ratchet (tests/meta/suite/test_ahk_os_purity_ratchet.ahk) counts
     ; direct OS calls outside adapters/, and this needs none.
     tmp := path . "." . A_ScriptHwnd . "-" . WriteSeq . ".tmp"
     _KL_ReapStaleTemps(path, STALE_TEMP_MS)

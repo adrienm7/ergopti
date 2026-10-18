@@ -190,7 +190,7 @@ const brightnessFiles = {
 	adapter: 'adapters/screen_brightness.ahk',
 	registry: 'infra/lifecycle_transition.ahk',
 	lifecycle: 'infra/lifecycle.ahk',
-	meta: 'tests/meta/test_fast_timer_inventory.ahk'
+	meta: 'tests/meta/suite/test_fast_timer_inventory.ahk'
 };
 const brightnessSources = Object.fromEntries(
 	Object.entries(brightnessFiles).map(([key, rel]) => [

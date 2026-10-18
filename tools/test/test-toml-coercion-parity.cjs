@@ -67,7 +67,7 @@ if (fs.existsSync(macosTestPath)) {
 }
 
 // ─── 3. AHK corpus consumer test exists ──────────────────────────────
-const ahkTestPath = path.join(WINDOWS, 'tests', 'meta', 'test_corpus_toml_coercion.ahk');
+const ahkTestPath = path.join(WINDOWS, 'tests', 'meta', 'corpus', 'test_corpus_toml_coercion.ahk');
 assert(fs.existsSync(ahkTestPath), 'AHK corpus test exists');
 if (fs.existsSync(ahkTestPath)) {
 	const src = fs.readFileSync(ahkTestPath, 'utf8');

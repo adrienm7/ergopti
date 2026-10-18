@@ -240,7 +240,7 @@ const parserInclude = principal.indexOf('#Include ../infra/json.ahk');
 const parserRegistration = principal.indexOf('TestQualificationRegisterParser(JsonParse)');
 assert(parserInclude >= 0 && parserRegistration > parserInclude);
 assert.equal((principal.match(/^TestQualificationRegisterParser\(JsonParse\)$/gm) || []).length, 1);
-assert(principal.includes('#Include unit/test_qualification_parser_owner.ahk'));
+assert(principal.includes('#Include unit/suite/test_qualification_parser_owner.ahk'));
 const cliOwner = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-qualification-model-'));
 try {
 	const envFile = path.join(cliOwner, 'github-env.txt');
