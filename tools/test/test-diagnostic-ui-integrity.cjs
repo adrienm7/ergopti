@@ -295,7 +295,7 @@ report(
 );
 // Any reference, not only a call: the old collectors ran pcall(hs.execute, "sysctl …"),
 // which a pattern requiring "hs.execute(" never saw. The behaviour is pinned by
-// macos/tests/unit/ui/test_healthcheck_phase_a_no_subprocess.lua.
+// macos/tests/unit/ui/healthcheck/test_healthcheck_phase_a_no_subprocess.lua.
 report(
 	'macOS: no synchronous subprocess in the diagnostics window',
 	!/\bhs\.execute\b|\bio\.popen\b|\bos\.execute\b/.test(macCore) && macCore.length > 1000,
