@@ -814,3 +814,6 @@ _RemoteUsage_CostIncluded() {
 	Assert(out["est_cost_usd"] > 0, "estimated cost must be positive for known model + nonzero tokens")
 }
 Test("_LLMRemoteExtractUsage: estimated cost is included in result map", _RemoteUsage_CostIncluded)
+
+
+#Include %A_LineFile%/../test_llm_api_remote_retirement.ahk

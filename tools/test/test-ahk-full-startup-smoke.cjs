@@ -132,6 +132,12 @@ function hotstringsRenderTimes(configRoot) {
 // These fields are foreign data after the dedicated Metrics bindings retired.
 // The real boot and its existing acknowledged full save must retain both their
 // values and their independently written source comments.
+// Valid TOML literal settings and a numeric-looking editor section exercise
+// both typed admission and the single-key consumer across the real full save.
+const CONFIG_TYPES_FIXTURE = 'literal-config-types';
+const CONFIG_TYPES_SOURCE =
+	"[script]\nlocale = 'en'\nlog_level = 'DEBUG'\n" + '[personal_editor]\ndefault_section = "001"\n';
+
 const RETIRED_METRICS_SOURCE =
 	'# retained legacy dashboard bindings\n[metrics]\n' +
 	'metrics_shortcut_typing = "Ctrl+Alt+M" # retained typing\n' +
@@ -348,6 +354,44 @@ function retiredMetricsProblem(configRoot) {
 	return null;
 }
 
+/**
+ * Receives live string types and independently parses the acknowledged disk image.
+ * @param {string} configRoot Exclusive startup fixture directory.
+ * @param {number} pid Current launch PID.
+ * @param {string} nonce Current launch nonce.
+ * @returns {string|null} Refusal reason, or null for matching live and saved data.
+ */
+function configTypesProblem(configRoot, pid, nonce) {
+	let receipt, saved;
+	try {
+		receipt = JSON.parse(
+			fs.readFileSync(path.join(configRoot, 'config-types.json'), 'utf8').replace(/^\uFEFF/, '')
+		);
+		saved = parseToml(
+			fs
+				.readFileSync(path.join(configRoot, 'config/autohotkey/config.toml'), 'utf8')
+				.replace(/^\uFEFF/, '')
+		);
+	} catch {
+		return 'the configuration type receipt or saved image is missing or invalid';
+	}
+	if (
+		receipt?.pid !== pid ||
+		receipt?.nonce !== nonce ||
+		receipt?.locale !== 'en' ||
+		receipt?.level !== 'DEBUG' ||
+		receipt?.section !== '001'
+	)
+		return 'the configuration type receipt is foreign or the live strings changed';
+	if (
+		saved.script?.locale !== 'en' ||
+		saved.script?.log_level !== 'DEBUG' ||
+		saved.personal_editor?.default_section !== '001'
+	)
+		return 'the configuration full save changed a typed string';
+	return null;
+}
+
 function logTail(configRoot) {
 	// Under the smoke, boot puts the default logs folder at
 	// <smoke dir>\<AppDirsWindowsLogsRelative()>.
@@ -428,7 +472,7 @@ async function main() {
 			'\uFEFF#Requires AutoHotkey v2.0+\n_DriverStartupSmokeInspect := _StartupSmokeReceipts\n_DriverStartupSmokeInspectShell := _StartupSmokeShellReceipt\n_DriverStartupSmokeInspectAdmission := _StartupSmokeAdmissionReceipt\n_DriverStartupSmokeInspectBootstrap := _StartupSmokeEarlyClick\n#Include ErgoptiPlus.ahk\n' +
 				'_StartupSmokeEarlyClick(*) {\n\tglobal _TrayStartupClick\n\t_TrayStartupClick.PopupFn := (*) => SetTimer(_StartupSmokePumpReceipt, -1)\n\tPostMessage(0x404, 0, 0x205, , A_ScriptHwnd)\n}\n' +
 				'_StartupSmokePumpReceipt(*) {\n\tglobal _TrayStartupClick, _DriverReady\n\tif !_TrayStartupClick.Pending || (IsSet(_DriverReady) && _DriverReady) || _TrayStartupClick.MenuLoopOpen\n\t\tthrow Error("the retained probe must leave bootstrap and timers running")\n\tFileAppend("pumped", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\startup-pump.txt", "UTF-8")\n}\n' +
-				'_StartupSmokeReceipts(*) {\n\t_StartupSmokeFullSaveReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
+				'_StartupSmokeReceipts(*) {\n\t_StartupSmokeFullSaveReceipt()\n\t_StartupSmokeConfigTypesReceipt()\n\t_ScriptChordSmokeReceipt()\n\t_LayoutExtensionSmokeReceipt()\n}\n' +
 				'_StartupSmokeShellReceipt(*) {\n\tglobal _TrayFeatureHeadLabels, _TrayRootBootDetailsPending, _TrayStartupClick, _DriverReady, _DriverMenuReady, _MenuStartupCommands\n\tif _DriverReady || !_DriverMenuReady || _TrayRootBootDetailsPending || _TrayFeatureHeadLabels.Length < 4\n\t\tthrow Error("the complete configured root must be published before input readiness")\n\tif _TrayStartupClick.RequestCount != 1\n\t\tthrow Error("the early native context request was lost")\n\tglobal _StartupSmokeSelections\n\tSelections := []\n\t_StartupSmokeSelections := Selections\n\tMenuCommandRun((*) => Selections.Push(1), [])\n\tif Selections.Length || _MenuStartupCommands.Pending.Length != 1\n\t\tthrow Error("an early feature command bypassed startup admission")\n\tRows := Map()\n\tloop TrayMenuItemCount(A_TrayMenu) {\n\t\tText := Buffer(2048, 0)\n\t\tDllCall("GetMenuStringW", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "ptr", Text, "int", 1024, "uint", 0x400)\n\t\tRows[StrGet(Text, "UTF-16")] := DllCall("GetMenuState", "ptr", A_TrayMenu.Handle, "uint", A_Index - 1, "uint", 0x400, "uint")\n\t}\n\tif Rows.Has(t("common.loading")) || Rows.Has(t("menu.global.starting"))\n\t\tthrow Error("the usable root still advertises driver startup")\n\tfor Key in ["menu.global.suspend", "menu.global.reload", "menu.global.quit"] {\n\t\tLabel := t(Key)\n\t\tif !Rows.Has(Label) || (Rows[Label] & 3) || (Rows[Label] & 0x10)\n\t\t\tthrow Error("the configured root has no enabled command for " . Key)\n\t}\n\tFileAppend("ready", EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\tray-shell.txt", "UTF-8")\n}\n' +
 				'_StartupSmokeAdmissionReceipt(*) {\n\tglobal _StartupSmokeSelections\n\tExpected := EnvGet("ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED") == "1" ? 0 : 1\n\tStarted := A_TickCount\n\tif Expected\n\t\twhile !_StartupSmokeSelections.Length && !TickExpired(Started, 1000)\n\t\t\tSleep(10)\n\telse\n\t\tSleep(50)\n\tif _StartupSmokeSelections.Length != Expected\n\t\tthrow Error("retained startup selection did not obey restored pause or execute exactly once")\n}\n' +
 				'_StartupSmokeFullSaveReceipt() {\n\tglobal DriverPid\n\t_StartupSmokeRequireFullSaveAcknowledged()\n\tSaveState := _ConfigFullSaveCoordinator()\n\tPreviousCritical := Critical("On")\n\ttry {\n\t\tRequested := SaveState.requested_generation\n\t\tCommitted := SaveState.committed_generation\n\t\tSettled := SaveState.settled_generation\n\t\tPending := _ConfigFullSaveHasPending()\n\t} finally Critical(PreviousCritical)\n\tNonce := EnvGet("ERGOPTI_STARTUP_SMOKE_NONCE")\n\tif !RegExMatch(Nonce, "^[0-9a-f]{32}$")\n\t\tthrow ValueError("Invalid startup full-save nonce.")\n\tReceipt := \'{"schema_version":1,"nonce":\' . JsonStringLiteral(Nonce)\n\t\t. \',"pid":\' . DriverPid . \',"requested":\' . Requested\n\t\t. \',"committed":\' . Committed . \',"settled":\' . Settled\n\t\t. \',"pending":\' . (Pending ? "true" : "false") . \'}\' . "`n"\n\tif !FSWriteCreateDurable(EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\full-save.json", Receipt)\n\t\tthrow Error("The startup full-save receipt could not be created durably.")\n}\n' +
@@ -454,6 +498,12 @@ async function main() {
 				'\tFileAppend(State, EnvGet("ERGOPTI_STARTUP_SMOKE_DIR") . "\\extension-receipt.txt", "UTF-8")\n}\n' +
 				fs
 					.readFileSync(path.join(WINDOWS, 'tests/fixtures/startup_full_save_observer.ahk'), 'utf8')
+					.replace(/^\uFEFF/, '') +
+				fs
+					.readFileSync(
+						path.join(WINDOWS, 'tests/fixtures/startup_config_types_observer.ahk'),
+						'utf8'
+					)
 					.replace(/^\uFEFF/, ''),
 			'utf8'
 		);
@@ -465,6 +515,7 @@ async function main() {
 			'extension-enabled',
 			'extension-master-off',
 			'retired-metrics-config',
+			CONFIG_TYPES_FIXTURE,
 			REALISTIC_HOTSTRINGS_FIXTURE,
 			...Object.keys(CHORD_CONFIGS),
 			...Object.keys(SEEDED_CONFIGS)
@@ -472,6 +523,11 @@ async function main() {
 			stage = `${fixture}/setup`;
 			const configRoot = path.join(scratch, fixture);
 			fs.mkdirSync(configRoot, { recursive: true });
+			if (fixture === CONFIG_TYPES_FIXTURE) {
+				const config = path.join(configRoot, 'config', 'autohotkey');
+				fs.mkdirSync(config, { recursive: true });
+				fs.writeFileSync(path.join(config, 'config.toml'), CONFIG_TYPES_SOURCE);
+			}
 			if (fixture === 'retired-metrics-config') {
 				const config = path.join(configRoot, 'config', 'autohotkey');
 				fs.mkdirSync(config, { recursive: true });
@@ -542,7 +598,8 @@ async function main() {
 					LOCALAPPDATA: configRoot,
 					ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
 					ERGOPTI_STARTUP_SMOKE_NONCE: nonce,
-					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : ''
+					ERGOPTI_STARTUP_SMOKE_EXPECT_SUSPENDED: markerBearing ? '1' : '',
+					ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : ''
 				}
 			});
 			stage = `${fixture}/cold-verdict`;
@@ -566,6 +623,11 @@ async function main() {
 			if (readiness) return fail(fixture + ': ' + readiness);
 			const fullSave = fullSaveReceiptProblem(configRoot, result.pid, nonce);
 			if (fullSave) return fail(fixture + ': ' + fullSave);
+			if (fixture === CONFIG_TYPES_FIXTURE) {
+				const types = configTypesProblem(configRoot, result.pid, nonce);
+				if (types) return fail(fixture + ': ' + types);
+			}
+
 			if (fixture === 'retired-metrics-config') {
 				const retiredMetrics = retiredMetricsProblem(configRoot);
 				if (retiredMetrics) return fail(fixture + ': ' + retiredMetrics);
@@ -619,8 +681,10 @@ async function main() {
 				return fail(
 					`${fixture}: a Hotstrings menu render took ${slowest} ms (budget ${HOTSTRINGS_RENDER_BUDGET_MS} ms; renders ${renders.join(', ')} ms)`
 				);
-			// Reuse the first fixture once so the no-bootstrap path is exercised too.
-			if (fixture === 'fresh-config') {
+			// Reuse fresh defaults and authored typed settings to prove warm boots.
+			if (fixture === 'fresh-config' || fixture === CONFIG_TYPES_FIXTURE) {
+				if (fixture === CONFIG_TYPES_FIXTURE)
+					fs.unlinkSync(path.join(configRoot, 'config-types.json'));
 				fs.unlinkSync(path.join(configRoot, 'ready.json'));
 				fs.unlinkSync(path.join(configRoot, 'full-save.json'));
 				const warmNonce = crypto.randomBytes(16).toString('hex');
@@ -631,7 +695,8 @@ async function main() {
 						...process.env,
 						LOCALAPPDATA: configRoot,
 						ERGOPTI_STARTUP_SMOKE_DIR: configRoot,
-						ERGOPTI_STARTUP_SMOKE_NONCE: warmNonce
+						ERGOPTI_STARTUP_SMOKE_NONCE: warmNonce,
+						ERGOPTI_STARTUP_SMOKE_EXPECT_CONFIG_TYPES: fixture === CONFIG_TYPES_FIXTURE ? '1' : ''
 					}
 				});
 				stage = `${fixture}/warm-verdict`;
@@ -651,13 +716,18 @@ async function main() {
 				if (warmReadiness) return fail('reloaded-config: ' + warmReadiness);
 				const warmFullSave = fullSaveReceiptProblem(configRoot, second.pid, warmNonce);
 				if (warmFullSave) return fail('reloaded-config: ' + warmFullSave);
+				if (fixture === CONFIG_TYPES_FIXTURE) {
+					const types = configTypesProblem(configRoot, second.pid, warmNonce);
+					if (types) return fail(fixture + '/warm: ' + types);
+				}
+
 				const reloaded = failOnLoggedErrors('reloaded-config', configRoot);
 				if (reloaded !== null) return reloaded;
 			}
 		}
 		console.log(
 			'\x1b[32m[OK] full AHK startup smoke: fresh, reloaded, independent, suspend-marker, extension opt-in, ' +
-				'script-chord, retired-Metrics, realistic-hotstrings, neutral-defaults and older-release boots reached ' +
+				'script-chord, literal-config-types, retired-Metrics, realistic-hotstrings, neutral-defaults and older-release boots reached ' +
 				'ready with no error logged, every Hotstrings menu render within budget and every script chord registered.\x1b[0m'
 		);
 		passed = true;

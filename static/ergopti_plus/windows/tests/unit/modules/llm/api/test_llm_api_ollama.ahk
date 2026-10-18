@@ -765,3 +765,6 @@ _OllamaTrimRegistry_NoOpBelowCap() {
 	_LLM_Ollama_Async := Map()
 }
 Test("_LLM_Ollama_TrimAsyncRegistry: no-op when registry is below cap", _OllamaTrimRegistry_NoOpBelowCap)
+
+
+#Include %A_LineFile%/../test_llm_api_ollama_retirement.ahk

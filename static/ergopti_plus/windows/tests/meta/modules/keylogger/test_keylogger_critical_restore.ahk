@@ -118,7 +118,7 @@ _KCR_AssertScrollTransaction(Body) {
 	_KCR_ScrollRequire(RegExMatch(Restoration,
 		"i)^\{\s*Critical\s*\(\s*" . Saved . "\s*\)\s*\}$"))
 	_KCR_ScrollRequire(_KCR_ScrollWriteCount(Code, Saved) == 1)
-	_KCR_ScrollRequire(!RegExMatch(Claim, "i)\b(?:Call|Critical|MF_ShouldFilter|SetTimer|MouseGetPos|CoordMode|KL_AppendLog)\s*\("))
+	_KCR_ScrollRequire(!RegExMatch(Claim, "i)\b(?:Call|Critical|MF_ShouldFilter|_KL_Mouse_ShouldFilter|SetTimer|MouseGetPos|CoordMode|KL_AppendLog)\s*\("))
 	for Pair in [["ticks", "scroll_ticks"], ["h_ticks", "scroll_h_ticks"], ["start", "scroll_start"]] {
 		CapturedAt := _KCR_ScrollUnique(Claim,
 			"\b" . Pair[1] . "\s*:=\s*KLMouse\." . Pair[2] . "\b", &Captured)
@@ -129,7 +129,7 @@ _KCR_AssertScrollTransaction(Body) {
 	}
 	_KCR_ScrollUnique(Claim, "\bKLMouse\.scroll_last\s*:=\s*0\b", &LastReset)
 	Tail := SubStr(Code, FinallyClosing + 1)
-	for Call in ["FilterFn.Call", "MF_ShouldFilter", "RefreshFn.Call", "SetTimer",
+	for Call in ["_KL_Mouse_ShouldFilter", "RefreshFn.Call", "SetTimer",
 		"PositionFn.Call", "CoordMode", "MouseGetPos", "AppendFn.Call", "KL_AppendLog"] {
 		Pattern := "\b" . StrReplace(Call, ".", "\.") . "\s*\("
 		_KCR_ScrollUnique(Tail, Pattern, &Dispatch)
@@ -165,7 +165,8 @@ _KCR_ScrollTransactionMutations() {
 		StrReplace(Body, "KLMouse.scroll_last := 0", "KLMouse.scroll_last := 1"),
 		StrReplace(Body, "start := KLMouse.scroll_start", 'Decoy := "start := KLMouse.scroll_start"'),
 		StrReplace(Body, "finally {", "if true {"),
-		StrReplace(Body, "filtered := false", "previous_critical := 0`n`tfiltered := false")
+		StrReplace(Body, "filtered := _KL_Mouse_ShouldFilter(FilterFn?)",
+			"previous_critical := 0`n`tfiltered := _KL_Mouse_ShouldFilter(FilterFn?)")
 	]
 	for Mutant in Mutants
 		_KCR_ExpectScrollRefusal(Mutant)
