@@ -44,6 +44,7 @@ local Monotonic = require("infra.monotonic")
 local RuntimeLog = require("diagnostics.runtime_log")
 local LibuvExit = require("infra.libuv_exit")
 local NativeTimer = require("infra.native_timer")
+local NumberPolicy = require("number_policy")
 local ok_luv, luv = pcall(require, "luv")
 if not ok_luv then luv = nil end
 
@@ -544,7 +545,9 @@ function M.run_async(executable, args, options, callback)
 	if refusal ~= "" then return nil, refusal end
 	if type(callback) ~= "function" then return nil, "a callback is required" end
 	local timeout_ms = type(options) == "table" and tonumber(options.timeout_ms) or nil
-	if not timeout_ms or timeout_ms <= 0 then return nil, "a positive timeout_ms is required" end
+	if not NumberPolicy.is_finite(timeout_ms) or timeout_ms <= 0 then
+		return nil, "a positive finite timeout_ms is required"
+	end
 	local request = {
 		name = executable, callback = callback, started = Monotonic.now_ms(),
 		stdout_text = "", stderr_text = "", stdout_eof = false, stderr_eof = false,

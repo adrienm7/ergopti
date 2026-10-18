@@ -89,6 +89,26 @@ local function fresh_runner(luv)
 end
 
 helpers.describe("shell_runner.run_async (linux)", function()
+	for _, case in ipairs({
+		{ name = "NaN", value = 0 / 0 },
+		{ name = "positive infinity", value = math.huge },
+		{ name = "negative infinity", value = -math.huge },
+		{ name = "overflowed numeric string", value = "1e999" },
+	}) do
+		helpers.it("(shell-finite-deadline) refuses " .. case.name .. " before acquiring native resources", function()
+			local luv, state = fake_luv()
+			local runner, callbacks = fresh_runner(luv), 0
+			local operation, reason = runner.run_async("df", {}, { timeout_ms = case.value }, function()
+				callbacks = callbacks + 1
+			end)
+			helpers.assert_nil(operation, "a nonfinite duration cannot bound a native process")
+			helpers.assert_contains(reason, "timeout_ms")
+			helpers.assert_eq(state.allocations, 0, "reject the deadline before allocating pipes or timers")
+			helpers.assert_eq(state.spawns, 0, "a refused deadline must not launch the program")
+			helpers.assert_eq(callbacks, 0, "the synchronous refusal is reported through nil/error only")
+		end)
+	end
+
 	for _, receipt in ipairs({ "nil", "false", "raised" }) do
 		for allocation = 1, 3 do
 			helpers.it("linux-shell-async-admission: allocation " .. allocation .. " " .. receipt .. " refuses without losing earlier handles", function()
