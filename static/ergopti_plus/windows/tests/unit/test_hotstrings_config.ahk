@@ -831,26 +831,37 @@ Test("HotstringsConfig: clearOverride empty field also clears priority",
 ; HotstringsResolveExt must expose Priority too — extensions edited from the
 ; window default to the package tier (30), and a user override beats it.
 TestHotstringsConfig_ResolveExtPriority() {
-	global _HotstringsOverrides
+	global _HotstringsOverrides, _HotstringsOverridesPath
 	Saved := _HotstringsOverrides
-	_HotstringsOverrides := Map()
-	HotstringsResolveBumpGen()
+	SavedPath := _HotstringsOverridesPath
+	; The setter publishes only after a successful write, so this case owns its
+	; writable override file instead of inheriting a path an earlier test set.
+	Path := A_Temp . "\hotstrings_ext_prio_overrides.toml"
 	ExtPath := A_Temp . "\hotstrings_ext_prio.toml"
+	try FileDelete(Path)
 	try FileDelete(ExtPath)
-	FileAppend("[_meta]`ndelay = 0.5`n", ExtPath, "UTF-8")   ; ships no priority
-
-	R := HotstringsResolveExt("demo", ExtPath, "")
-	AssertEqual(30, R.Priority,
-		"extension with no override resolves to the package source default (30)")
-
-	HotstringsSetOverride("ext.demo", "", "priority", 88)
-	R2 := HotstringsResolveExt("demo", ExtPath, "")
-	AssertEqual(88, R2.Priority,
-		"a user override beats the extension package source default")
-
-	try FileDelete(ExtPath)
-	_HotstringsOverrides := Saved
+	_HotstringsOverrides := Map()
+	_HotstringsOverridesPath := Path
 	HotstringsResolveBumpGen()
+	try {
+		FileAppend("[_meta]`ndelay = 0.5`n", ExtPath, "UTF-8")   ; ships no priority
+
+		R := HotstringsResolveExt("demo", ExtPath, "")
+		AssertEqual(30, R.Priority,
+			"extension with no override resolves to the package source default (30)")
+
+		AssertTrue(HotstringsSetOverride("ext.demo", "", "priority", 88),
+			"the extension priority override must be persisted and published")
+		R2 := HotstringsResolveExt("demo", ExtPath, "")
+		AssertEqual(88, R2.Priority,
+			"a user override beats the extension package source default")
+	} finally {
+		try FileDelete(ExtPath)
+		try FileDelete(Path)
+		_HotstringsOverrides := Saved
+		_HotstringsOverridesPath := SavedPath
+		HotstringsResolveBumpGen()
+	}
 }
 Test("HotstringsResolveExt: exposes priority with the package source default + override",
 	TestHotstringsConfig_ResolveExtPriority)
