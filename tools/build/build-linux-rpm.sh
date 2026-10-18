@@ -171,6 +171,8 @@ Requires:       libayatana-appindicator-gtk3
 Requires:       zenity
 Requires:       shadow-utils
 Requires:       util-linux
+Requires:       openssl
+Requires:       sqlite
 Requires:       libxkbcommon-x11
 Requires:       libX11
 Requires:       libX11-xcb
