@@ -15,12 +15,13 @@ local Clock = require("infra.monotonic")
 local Logger = require("logger.shim")
 
 --- Creates one explicit-action selection owner without loading native libraries.
---- @param options table Live focus and privacy admission callbacks.
+--- @param options table Live focus, privacy and capture_text_owner callbacks.
 --- @return table owner
 function M.new(options)
 	assert(type(options) == "table" and type(options.focus_id) == "function"
 		and type(options.privacy_guard) == "function", "selection admission callbacks required")
-	local owner, active, stopped = {}, nil, false
+	local owner, active, writing, stopped, generation = {}, nil, nil, false, 0
+	local capture_text_owner = options.capture_text_owner
 	local receipts = setmetatable({}, { __mode = "k" })
 	local native_owner = "selection:" .. tostring(owner)
 
@@ -53,7 +54,7 @@ function M.new(options)
 	end
 
 	local function capture(focus, authorized, callback)
-		if active or stopped then callback(nil); return false end
+		if active or writing or stopped then callback(nil); return false end
 		local request = { revoked = false, dispatching = true }
 		active = request
 		local function authorized_request()
@@ -126,41 +127,90 @@ function M.new(options)
 	--- @param receipt table Opaque receipt returned by read().
 	--- @param text string Replacement.
 	--- @param authorized function Originating action remains current.
-	--- @param emit function Physical injector returning its structured receipt.
+	--- @param emit function emit(text, publication) returns its physical cleanup receipt.
 	--- @param callback function Receives literal true only for a committed edit.
 	--- @return boolean accepted Workflow accepted; completion requires callback.
 	function owner.replace(receipt, text, authorized, emit, callback)
 		assert(type(callback) == "function", "selection replacement callback required")
 		local held = receipts[receipt]
-		if not held or active or type(text) ~= "string" or text == "" or type(emit) ~= "function" then callback(false); return false end
+		if not held or active or writing or stopped or type(text) ~= "string" or text == "" or type(emit) ~= "function" then callback(false); return false end
 		return capture(held.focus, authorized, function(observed)
 			local original = held.snapshot
 			if not observed or observed.bus ~= original.bus or observed.path ~= original.path or observed.role ~= original.role
 				or observed.first ~= original.first or observed.last ~= original.last or observed.text ~= original.text
-				or receipts[receipt] ~= held or not admitted(held.focus, authorized) then callback(false); return end
-			-- Consume before calling the injector: a nested accept cannot reuse it.
+				or receipts[receipt] ~= held then callback(false); return end
+			-- Reserve before callbacks: the native capture has settled, but the
+			-- physical writer and its cleanup have not acquired an ACK yet.
+			local write = { generation = generation, revoked = false }
+			writing = write
+			local function retained()
+				return writing == write and not write.revoked and not stopped and generation == write.generation
+			end
+			local admitted_write = retained() and admitted(held.focus, authorized) and retained()
+			local captured, field = false, nil
+			if admitted_write and type(capture_text_owner) == "function" then
+				captured, field = pcall(capture_text_owner, held.focus)
+			end
+			local current = captured and type(field) == "table" and getmetatable(field) == nil and rawget(field, "current") or nil
+			local cached = captured and type(field) == "table" and getmetatable(field) == nil and rawget(field, "cached") or nil
+			if type(current) ~= "function" or type(cached) ~= "function" or not retained()
+				or not admitted(held.focus, authorized) or not retained() then
+				if writing == write then writing = nil end
+				callback(false); return
+			end
+			local checking = false
+			local function check(use_cached)
+				if checking or not retained() then return false end
+				checking = true
+				local ok, allowed = pcall(function()
+					if authorized() ~= true or not retained() then return false end
+					if (use_cached and cached or current)() ~= true or not retained() then return false end
+					if authorized() ~= true or not retained() then return false end
+					return cached() == true and retained()
+				end)
+				checking = false
+				return ok and allowed == true and retained()
+			end
+			local publication = { current = function() return check(false) end, cached = function() return check(true) end }
+			if not check(false) then
+				if writing == write then writing = nil end
+				callback(false); return
+			end
+			-- A consumed read receipt never becomes the private write lease.
 			receipts[receipt] = nil
-			local ok, result = pcall(emit, text)
-			callback(ok and type(result) == "table" and result.ok == true)
+			local ok, result = pcall(emit, text, publication)
+			-- Injector.cleanup_ok covers native keys/modifiers. Clipboard restore
+			-- has its own canonical failed phase and must remain physical debt.
+			local cleaned = ok and type(result) == "table" and getmetatable(result) == nil
+				and rawget(result, "cleanup_ok") == true and rawget(result, "failed_phase") ~= "clipboard restoration"
+			local committed = cleaned and rawget(result, "ok") == true and check(false)
+			write.revoked = true
+			if cleaned and writing == write then writing = nil end
+			callback(committed == true)
 		end)
 	end
 
-	--- Revokes a pending operation while retaining physical cleanup ownership.
+	--- Revokes range and write authority while retaining physical cleanup ownership.
 	--- @return boolean settled
 	function owner.cancel()
-		return not active or retire(active)
+		-- An idle read is an immutable observation, not action authority. A new
+		-- translation may revalidate it after cancelling a superseded tone step.
+		generation = generation + 1
+		if writing then writing.revoked = true end
+		local native_settled = not active or retire(active)
+		return not writing and native_settled
 	end
 
 	--- Reports whether this owner retains any native operation or dispatch frame.
 	--- @return boolean settled
-	function owner.is_settled() return active == nil end
+	function owner.is_settled() return active == nil and writing == nil end
 
 	--- Revokes all range authority and acknowledges only physical settlement.
 	--- @return boolean settled
 	function owner.stop()
 		stopped = true
 		receipts = setmetatable({}, { __mode = "k" })
-		return not active or retire(active)
+		return owner.cancel()
 	end
 
 	return owner

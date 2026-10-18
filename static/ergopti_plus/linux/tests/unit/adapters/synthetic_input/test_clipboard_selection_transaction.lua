@@ -236,11 +236,15 @@ local function with_native_selection(body)
 			return world.focus
 		end,
 		privacy_guard = function() return world.blocked == true end,
+		capture_text_owner = function(expected_focus)
+			local function current() return world.focus == expected_focus and not world.blocked end
+			return { current = current, cached = current }
+		end,
 	})
 	local function authorized() return world.allowed end
 	local function emit()
 		world.emitted = world.emitted + 1
-		return world.ack or { ok = true }
+		return world.ack or { ok = true, cleanup_ok = true }
 	end
 	function world.read()
 		local delivered, success, text, receipt = false

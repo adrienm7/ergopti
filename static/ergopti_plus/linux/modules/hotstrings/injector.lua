@@ -993,8 +993,9 @@ end
 --- to it.
 --- @param text string Non-empty text to type.
 --- @param is_private boolean|nil True when `text` must not be logged.
+--- @param publication table|nil Original action and exact field admission guards.
 --- @return table Commit result { ok, error?, cleanup_ok }.
-function M.inject_selected(text, is_private)
+function M.inject_selected(text, is_private, publication)
 	if type(text) ~= "string" or text == "" then
 		Logger.error(LOG, "inject_selected(): text is %s, expected a non-empty string.", type(text))
 		return { ok = false, error = "invalid arguments", cleanup_ok = true }
@@ -1004,13 +1005,14 @@ function M.inject_selected(text, is_private)
 		if not send_text(tx, text, is_private) then error(tx.error(), 0) end
 		-- The typed text must reach the application before it is selected back.
 		sleep_ms(INTER_PHASE_DELAY_MS)
+		require_publication(publication, false)
 		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_DOWN, "selection shift down")
 		for _ = 1, steps do
 			must_emit(tx, KEY_LEFT, EVDEV_VALUE_DOWN, "selection left down")
 			must_emit(tx, KEY_LEFT, EVDEV_VALUE_UP, "selection left up")
 		end
 		must_emit(tx, EvdevCodes.KEY_LEFTSHIFT, EVDEV_VALUE_UP, "selection shift up")
-	end)
+	end, publication)
 	if result.ok then Logger.done(LOG, "inject_selected(): done (%d step(s) selected).", steps) end
 	return result
 end
