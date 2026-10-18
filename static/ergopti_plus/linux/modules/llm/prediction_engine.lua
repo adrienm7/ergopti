@@ -1973,7 +1973,9 @@ function M.translate_selection(value)
 		Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 			M.get_backend(), model, code, #selection)
 		send_paced(epoch, "Translation", function()
-			if current_focus() ~= focus then
+			local observed_focus = current_focus()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if observed_focus ~= focus then
 				Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
 				_predicting = false
 				clear_offer()
