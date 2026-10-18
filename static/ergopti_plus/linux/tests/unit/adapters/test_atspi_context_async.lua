@@ -6,7 +6,7 @@ local Json = require("json")
 -- Native transitive owners must initialize before a scoped transport substitution.
 require("adapters.atspi_focus")
 
-local function fixture(body)
+local function fixture(body, selection_mode)
 	local names = { "adapters.atspi_focus", "adapters.owned_process", "luv" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -22,7 +22,8 @@ local function fixture(body)
 		local focus = require("adapters.atspi_focus")
 		local field = { bus = ":1.7", path = "/field/A", role = 61 }
 		state.field = field
-		focus.start_context_capture(field, { owner = "generation:1", authorized = function() return true end }, function(context)
+		local start = selection_mode and focus.start_selection_capture or focus.start_context_capture
+		start(field, { owner = "generation:1", authorized = function() return true end }, function(context)
 			state.deliveries, state.context = state.deliveries + 1, context
 		end)
 		function state.frame(receipt)
@@ -41,7 +42,7 @@ helpers.describe("owned asynchronous AT-SPI context protocol", function()
 			assert(state.executable == "/owned/lua")
 			assert(state.argv[1]:match("/adapters/atspi_context_worker%.lua$"))
 			assert(state.argv[5] == require("infra.paths").shared("lua"))
-			assert(state.argv[6] == "1234")
+			assert(state.argv[6] == "1234" and #state.argv == 6)
 			assert(state.options.timeout_ms == 1000 and state.options.capture_output == false and state.options.capture_tail == false)
 			for _, value in ipairs(state.argv) do assert(not value:find("PRIVATE_TITLE_CANARY", 1, true)) end
 			local encoded = state.frame()
@@ -76,5 +77,46 @@ helpers.describe("owned asynchronous AT-SPI context protocol", function()
 			state.callback({ ok = true })
 			assert(state.context == nil, "revoked output must not remain after physical settlement")
 		end)
+	end)
+end)
+
+helpers.describe("owned asynchronous AT-SPI selected-range protocol", function()
+	helpers.it("ai-pass2-span adds one explicit mode and emits no selected text in argv", function()
+		fixture(function(state)
+			helpers.assert_eq(#state.argv, 7)
+			helpers.assert_eq(state.argv[7], "selection")
+			helpers.assert_eq(state.argv[5], require("infra.paths").shared("lua"))
+			helpers.assert_eq(state.options.timeout_ms, require("infra.timings").ms("privacy", "atspi_probe_timeout_ms"))
+			helpers.assert_eq(state.options.capture_output, false)
+			helpers.assert_eq(state.options.capture_tail, false)
+			local selected = { bus = ":1.7", path = "/field/A", role = 61, first = 14, last = 20, text = "ORIGIN" }
+			local frame = "SELECTION:" .. Json.encode({ field = state.field, selection = selected })
+			for _, value in ipairs(state.argv) do assert(not value:find("ORIGIN", 1, true)) end
+			state.options.on_output(frame:sub(1, 11), "stdout")
+			state.options.on_output(frame:sub(12), "stdout")
+			helpers.assert_eq(state.deliveries, 0)
+			state.callback({ ok = true })
+			helpers.assert_eq(state.deliveries, 1)
+			helpers.assert_eq(state.context, selected)
+		end, true)
+	end)
+	helpers.it("ai-pass2-span refuses missing malformed foreign-field and invalid-range native replies", function()
+		for _, fault in ipairs({ "empty", "malformed", "duplicate", "stderr", "failed", "foreign", "password", "negative", "fractional", "inverted", "blank" }) do
+			fixture(function(state)
+				local selected = { bus = ":1.7", path = "/field/A", role = 61, first = 0, last = 6, text = "ORIGIN" }
+				if fault == "foreign" then selected.path = "/field/B"
+				elseif fault == "password" then selected.role = 40
+				elseif fault == "negative" then selected.first = -1
+				elseif fault == "fractional" then selected.first = 0.5
+				elseif fault == "inverted" then selected.last = 0
+				elseif fault == "blank" then selected.text = "" end
+				local frame = "SELECTION:" .. Json.encode({ field = state.field, selection = selected })
+				if fault == "malformed" then frame = "SELECTION:{" end
+				if fault == "duplicate" then frame = frame .. frame end
+				if fault ~= "empty" then state.options.on_output(frame, fault == "stderr" and "stderr" or "stdout") end
+				state.callback({ ok = fault ~= "failed" })
+				helpers.assert_eq(state.context, nil, fault)
+			end, true)
+		end
 	end)
 end)

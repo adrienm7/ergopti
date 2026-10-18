@@ -437,6 +437,27 @@ function savedLinuxOneShotClosure(sources) {
 	const assignment = bodies.build.match(
 		/actions = \{ is_assignable = function\(action\)([\s\S]*?)end \}/
 	)?.[1];
+	const protectedPorts =
+		hook
+			.match(/local INPUT_HOOK_PORT_NAMES = \{([^}]*)\}/)?.[1]
+			.split(',')
+			.map((token) => token.trim()) ?? [];
+	const requiredPorts = [
+		'capture_input_owner',
+		'input_owner_current',
+		'arm_one_shot',
+		'arm_caps_word',
+		'plan_caps_word',
+		'set_remapper',
+		'stop',
+		'emergency_stop',
+		'key_text',
+		'capture_buffered_input',
+		'buffered_input_current',
+		'buffered_input_view',
+		'retire_buffered_input',
+		'refresh_capture'
+	];
 	const capture = '_native_hook = package.loaded["adapters.keyboard_hook"]';
 	const managerAt = daemon.indexOf('require("modules.keylogger.keylogger")');
 	const hookAt = daemon.indexOf('require("adapters.keyboard_hook")');
@@ -474,12 +495,9 @@ function savedLinuxOneShotClosure(sources) {
 		!/M\.(?:capture_input_owner|input_owner_current|arm_one_shot|arm_caps_word)\s*\(/.test(
 			bodies.frame
 		) &&
-		(hook.includes(
-			'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text" }'
-		) ||
-			hook.includes(
-				'local INPUT_HOOK_PORT_NAMES = { "capture_input_owner", "input_owner_current", "arm_one_shot", "arm_caps_word", "plan_caps_word", "set_remapper", "stop", "emergency_stop", "key_text", "capture_buffered_input", "buffered_input_current", "buffered_input_view", "retire_buffered_input" }'
-			)) &&
+		protectedPorts.every((token) => /^"[a-z_]+"$/.test(token)) &&
+		new Set(protectedPorts).size === protectedPorts.length &&
+		requiredPorts.every((name) => protectedPorts.includes(JSON.stringify(name))) &&
 		hook.includes(
 			'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'
 		) &&
@@ -694,6 +712,7 @@ for (const [index, token] of [
 	[4, 'local NativeCapsWord = assert(original_caps_constructor())'],
 	[4, 'and original_input_hook_ports.input_owner_current(lease) == true'],
 	[4, '"stop", "emergency_stop", "key_text"'],
+	[4, '"refresh_capture"'],
 	[
 		4,
 		'for _, name in ipairs(INPUT_HOOK_PORT_NAMES) do original_input_hook_ports[name] = rawget(M, name) end'

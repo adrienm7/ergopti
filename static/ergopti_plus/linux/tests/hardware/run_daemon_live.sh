@@ -94,6 +94,15 @@ if ! luajit tests/hardware/run_hook_text_custody.lua; then
 	exit 1
 fi
 
+# NumLock must survive genuine source changes with fresh native LED feedback.
+for mode in add remove; do
+	if ! python3 tests/hardware/run_native_subreaper.py luajit tests/hardware/run_numlock_hotplug.lua "$mode"; then
+		# shellcheck disable=SC2086
+		kill ${PIDS} 2>/dev/null
+		exit 1
+	fi
+done
+
 # The kernel prerequisites need XKB but no focused editor. Starting the bounded
 # editor before them let its 30-second lifetime expire before daemon admission.
 # This host's lifetime covers the tray host's 60-second budget and startup.

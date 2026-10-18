@@ -513,3 +513,43 @@ helpers.describe("tray indicator: destroy", function()
 	end)
 
 end)
+
+helpers.describe("tray-disabled-admission: protocol activation", function()
+	for _, nested in ipairs({ false, true }) do
+		helpers.it("tray-disabled-admission: native activation cannot dispatch disabled scope nested=" .. tostring(nested), function()
+			local indicator, log = with_fake()
+			helpers.assert_true(indicator.create("disabled-test", "icon", "title"))
+			local denied, allowed = 0, 0
+			local child = { title = "Blocked", checked = true, disabled = not nested, fn = function() denied = denied + 1 end }
+			local row = nested and { title = "Unavailable parent", disabled = true, menu = {
+				{ title = "Intermediate", disabled = false, menu = { child } },
+			} } or child
+			indicator.set_menu({ row, { title = "Allowed", fn = function() allowed = allowed + 1 end } })
+			-- D-Bus Event reaches activate even for an insensitive GTK item.
+			-- Dispatch every registered capability instead of trusting sensitivity.
+			for _, signal in ipairs(log.signals) do signal.fire() end
+			helpers.assert_eq(denied, 0, "A visible disabled reason must also revoke the action capability")
+			helpers.assert_eq(allowed, 1, "Ordinary native activation remains available")
+			helpers.assert_eq(widget_named(log, "Blocked").sensitive, 0)
+			helpers.assert_eq(widget_named(log, "Blocked").active, 1, "Disabling does not rewrite the saved check state")
+			indicator.destroy(); indicator._set_binding_for_test(nil)
+		end)
+	end
+	helpers.it("tray-disabled-admission: rebuild can enable a successor without reviving retired callbacks", function()
+		local indicator, log = with_fake()
+		helpers.assert_true(indicator.create("disabled-test", "icon", "title"))
+		local denied, current = 0, 0
+		indicator.set_menu({ { title = "Old", fn = function() denied = denied + 1 end } })
+		local old = log.signals[1]
+		indicator.set_menu({ { title = "Blocked", disabled = true, fn = function() denied = denied + 1 end } })
+		local blocked = {}
+		for index = 2, #log.signals do blocked[#blocked + 1] = log.signals[index] end
+		old.fire(); for _, signal in ipairs(blocked) do signal.fire() end
+		helpers.assert_eq(denied, 0)
+		indicator.set_menu({ { title = "Enabled", fn = function() current = current + 1 end } })
+		log.signals[#log.signals].fire(); helpers.assert_eq(current, 1)
+		indicator.destroy(); log.signals[#log.signals].fire()
+		helpers.assert_eq(current, 1, "Stop retires the enabled successor capability too")
+		indicator._set_binding_for_test(nil)
+	end)
+end)

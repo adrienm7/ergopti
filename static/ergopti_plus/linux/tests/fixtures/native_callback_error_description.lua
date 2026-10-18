@@ -18,7 +18,7 @@ local Loop = require("adapters.event_loop")
 local scenario = assert(arg[1])
 local bad_calls, sibling_calls, watchdog_calls, formatter_calls = 0, 0, 0, 0
 local object = arg[2] == "string" and "owned ordinary callback failure" or setmetatable({}, { __tostring = function() formatter_calls = formatter_calls + 1; error("owned error formatter failure", 0) end })
-local bad_token, sibling
+local bad_token, sibling, watchdog
 local function bad()
 	bad_calls = bad_calls + 1
 	if bad_calls == 1 then
@@ -26,13 +26,16 @@ local function bad()
 		-- callback. Start continuation only after this actual failing callback.
 		sibling = Scheduler.after(0.005, function()
 			sibling_calls = sibling_calls + 1
+			assert(uv.timer_stop(watchdog) == 0)
 			if bad_token then assert(Scheduler.cancel(bad_token)) end
 			if Loop.isRunning() then Loop.stop() else uv.stop() end
 		end)
+		-- A real blocked callback can make both continuation and watchdog due.
+		if arg[3] == "blocked_callback" then uv.sleep(40) end
 	end
 	error(object, 0)
 end
-local watchdog = assert(uv.new_timer())
+watchdog = assert(uv.new_timer())
 assert(uv.timer_start(watchdog, 30, 0, function()
 	watchdog_calls = watchdog_calls + 1
 	Scheduler.cancelAll()

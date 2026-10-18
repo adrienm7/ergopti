@@ -276,6 +276,7 @@ helpers.describe("keylogger privacy — focus and titles obey the same gate", fu
 				return true
 			end,
 		}, { __index = function() return function() return true end end })
+		require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keylogger.sqlite_writer"])
 		local ok, err = pcall(function()
 			local kl = fresh_keylogger()
 			kl.on_app_focus("code", 1000)

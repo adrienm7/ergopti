@@ -225,7 +225,21 @@ helpers.describe("asynchronous native privacy context", function()
 		local bridge = source:match('(privacy_owners%.watch%.pump%(%)%s*.-)if not RuntimeGuard%.call%("keyboard pump"')
 		assert(type(bridge) == "string" and #bridge > 0, "the actual idle bridge must exist")
 		local retained, calls, pumps = false, 0, 0
-		local env = { privacy_owners = { watch = { pump = function() pumps = pumps + 1 end } },
+		local metrics_pumps, guarded_calls = 0, 0
+		local function pump_metrics()
+			assert(pumps == metrics_pumps + 1, "each SQLite receipt poll follows its watch pump")
+			metrics_pumps = metrics_pumps + 1
+		end
+		local env = {
+			RuntimeGuard = { call = function(name, callback)
+				assert(name == "metrics SQLite flush acknowledgement", "only the declared metrics idle owner is guarded")
+				assert(callback == pump_metrics, "the actual keylogger receipt callback must be forwarded")
+				guarded_calls = guarded_calls + 1
+				callback()
+				return true
+			end },
+			keylogger = { pump_flush = pump_metrics },
+			privacy_owners = { watch = { pump = function() pumps = pumps + 1 end } },
 			secure_focus_guard = { has_context_operation = function() return retained end,
 				refresh = function(immediate) assert(immediate == false); calls = calls + 1; retained = false end } }
 		local compiled, why
@@ -234,10 +248,13 @@ helpers.describe("asynchronous native privacy context", function()
 		assert(compiled, why)
 		for _ = 1, 100 do compiled() end
 		assert(pumps == 100 and calls == 0)
+		assert(metrics_pumps == 100 and guarded_calls == 100, "idle must consume SQLite receipts without requiring a privacy operation")
 		retained = true; compiled()
 		assert(calls == 1, "a completed observation must not wait for the next 250ms periodic callback")
+		assert(metrics_pumps == 101 and guarded_calls == 101, "the pending privacy path must still pump SQLite exactly once")
 		for _ = 1, 100 do compiled() end
 		assert(calls == 1, "unknown/password/no-owner idle iterations cannot dispatch native queries")
+		assert(pumps == 201 and metrics_pumps == 201 and guarded_calls == 201, "each idle iteration retains one watch and one SQLite pump")
 	end)
 
 	helpers.it("(context-async) live policy and publication reentry remain closed", function()

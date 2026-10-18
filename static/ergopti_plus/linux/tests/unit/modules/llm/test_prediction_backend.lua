@@ -33,8 +33,10 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		isUrlBar = function() return false end,
 	}
 	package.loaded["modules.llm.api_ollama"] = {
-		chat = function(target, model) calls.ollama[#calls.ollama + 1] = { target = target, model = model } end,
-		cancel = function() end,
+		chat = function(target, model, _, _, chunk, done)
+			calls.ollama[#calls.ollama + 1] = { target = target, model = model, chunk = chunk, done = done }
+		end,
+		cancel = function() return true end,
 	}
 	package.loaded["modules.llm.api_remote"] = {
 		provider = function() return { default_model = "qwen-default" } end,
@@ -54,6 +56,9 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 		init = function() end,
 		is_enabled = function() return true end,
 		get_current_model = function() if not without_local_model then return "ollama-model" end end,
+		set_model = function(name, source, admission)
+			return require("infra.llm_preferences").set_many({ ["llm.models.ollama"] = name }, source, admission)
+		end,
 		get_base_url = function() return "http://127.0.0.1:11434" end,
 	}
 	package.loaded["modules.llm.profile_settings"] = {
@@ -93,6 +98,20 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 end
 
 helpers.describe("prediction backend: the selected backend answers", function()
+
+	helpers.it("withdraws a pending prediction after changing local model (ai-pass2-model)", function()
+		local engine, calls, _, restore = load("ollama", ENTRY, nil, false, true)
+		local ok, err = pcall(function()
+			engine.predict("Bonjour à tous", nil, { num_predictions = 1 })
+			helpers.assert_eq(#calls.ollama, 1, "the original model owns the request")
+			helpers.assert_eq(engine.set_model("replacement-model"), true)
+			helpers.assert_eq(engine.is_predicting(), false, "model selection retires the old request")
+			calls.ollama[1].done(" qui vous souhaite une bonne journée", nil)
+			helpers.assert_eq(#engine.get_suggestions(), 0, "late old-model output cannot reappear")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
 
 	helpers.it("manual API prediction works without a local model (manual-selected-backend)", function()
 		local engine, calls, scheduler, restore = load("api", ENTRY, nil, true)

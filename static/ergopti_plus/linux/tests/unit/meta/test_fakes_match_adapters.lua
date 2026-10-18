@@ -338,6 +338,29 @@ helpers.describe("fakes: exact controlled output and unsupported native origin",
 		helpers.assert_true(writer.closed)
 	end)
 
+	helpers.it("scripted Reader reconciliation refuses without consuming rows or acquiring native ownership", function()
+		local row = { type = 1, code = 42, value = 1 }
+		local reader = Fakes.evdev_reader({ events = { row }, pressed_keys = { [42] = true } })
+		for _, slot in ipairs({ "a", "b" }) do
+			helpers.assert_true(reader.open("controlled-" .. slot, slot)); helpers.assert_true(reader.grab(slot))
+		end
+		local restored = false
+		helpers.assert_eq(reader.reconcile_sources({ "a", "b" }, function() restored = true; return true end,
+			{ {}, {} }), false, "ordinary scripted state cannot certify native restoration")
+		helpers.assert_eq(restored, false, "the native restoration callback must never run")
+		local input, cleanup, same_open = reader.source_owner_current({}, function() return true end,
+			reader.capture_source_owner, reader.source_owner_current, reader.retire_source)
+		helpers.assert_eq(input, false); helpers.assert_eq(cleanup, false); helpers.assert_eq(same_open, false)
+		for _, slot in ipairs({ "a", "b" }) do
+			helpers.assert_nil(reader.capture_source_owner(slot))
+			helpers.assert_true(reader.is_open(slot) and reader.is_grabbed(slot), "refusal preserves controlled slot state")
+		end
+		helpers.assert_eq(reader.pressed_keys("a"), { [42] = true })
+		helpers.assert_eq(reader.cursor, 0, "refusal does not drain ordinary callback input")
+		helpers.assert_eq(reader.read_event(), row)
+		helpers.assert_eq(reader.read_event(), nil)
+	end)
+
 	helpers.it("scripted rows and held tables cannot mint native Reader receipts", function()
 		local row = { type = 1, code = 42, value = 1, origin = "native-evdev" }
 		local reader = Fakes.evdev_reader({ events = { row }, pressed_keys = { [42] = true } })

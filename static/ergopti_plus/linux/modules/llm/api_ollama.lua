@@ -166,21 +166,24 @@ end
 --- @param chunk string
 --- @param flush boolean Whether this is the final transport callback.
 local function consume_chunk(request, chunk, flush)
+	if request.stream_error then return end
 	request.pending = request.pending .. (chunk or "")
 	while true do
 		local newline = request.pending:find("\n", 1, true)
 		if not newline then break end
 		local line = request.pending:sub(1, newline - 1):gsub("\r$", "")
 		request.pending = request.pending:sub(newline + 1)
-		local content = bridge_mod.parse_stream_line(line)
+		local content, parse_error = bridge_mod.parse_stream_line(line)
+		if parse_error then request.stream_error, request.pending = parse_error, ""; return end
 		if content and request_current(request) then
 			request.full_text = request.full_text .. content
 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
 		end
 	end
 	if flush and request.pending ~= "" then
-		local content = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
+		local content, parse_error = bridge_mod.parse_stream_line(request.pending:gsub("\r$", ""))
 		request.pending = ""
+		if parse_error then request.stream_error = parse_error; return end
 		if content and request_current(request) then
 			request.full_text = request.full_text .. content
 			if type(request.on_chunk) == "function" then pcall(request.on_chunk, content) end
@@ -276,6 +279,8 @@ function M.chat(base_url, model, messages, opts, on_chunk, on_done)
 			if type(result) ~= "table" or result.ok ~= true then
 				finish_request(request, LocalModelPolicy.response_failure(result, base_url)
 					or (type(result) == "table" and result.error or "HTTP transport failed"))
+			elseif request.stream_error then
+				finish_request(request, request.stream_error)
 			elseif request.full_text == "" then
 				finish_request(request, "no response from Ollama")
 			else

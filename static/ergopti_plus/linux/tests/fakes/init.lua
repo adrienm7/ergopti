@@ -124,7 +124,11 @@ function M.evdev_reader(opts)
 	function fake.event_view() return nil end
 	function fake.source_current() return false end
 	function fake.capture_source_owner() return nil end
-	function fake.source_owner_current() return false end
+	function fake.source_owner_current(_, observer, capture, current, retire)
+		if observer == nil and capture == nil and current == nil and retire == nil then return false end
+		return false, false, false -- No native input, cleanup or per-open identity.
+	end
+	function fake.reconcile_sources(_slots, _restore, _originals) return false end
 	function fake.retire_source() return false end
 	function fake.capture_pressed_keys() return nil end
 	function fake.pressed_keys_current() return false end
@@ -654,6 +658,7 @@ function M.sqlite_writer(opts)
 	}
 
 	function fake.is_available() return available end
+	function fake.flush_transport_available() return available end
 	function fake.open_db(path) fake.path = path ; return available end
 	function fake.close_db() fake.path = nil ; return true end
 	function fake.get_db_path() return fake.path end
@@ -676,7 +681,23 @@ function M.sqlite_writer(opts)
 			return true
 		end
 	end
-	fake.insert_typing_events = collect(fake.typing)
+	local record_typing = collect(fake.typing)
+	function fake.insert_typing_events(device_id, rows, derived)
+		if derived then
+			for _, group in ipairs(derived.ngrams) do
+				fake.upsert_ngrams(device_id, group.date, group.app, group.ngrams, group.table_name)
+			end
+			local methods = {
+				chars_class = "upsert_chars_class", errors = "upsert_errors", hourly = "upsert_hourly",
+				hourly_min5 = "upsert_hourly_min5", app_buckets = "upsert_app_bucket", bursts = "upsert_burst",
+				sessions = "upsert_session", ergo = "upsert_ergo", layouts = "upsert_layout",
+			}
+			for family, entries in pairs(derived.daily) do
+				for _, row in ipairs(entries) do fake[assert(methods[family])](device_id, row) end
+			end
+		end
+		return record_typing(device_id, rows)
+	end
 	fake.insert_hotstring_events = collect(fake.hotstrings)
 	fake.insert_shortcut_events = collect(fake.shortcuts)
 	fake.insert_app_switch_events = collect(fake.app_switches)
@@ -838,6 +859,7 @@ function M.sqlite_writer(opts)
 	function fake.get_meta(key) return fake.meta[key] end
 	function fake.set_meta(key, value) fake.meta[key] = value ; return true end
 
+	require("tests.support.sqlite_flush_fake").attach(fake)
 	return fake
 end
 

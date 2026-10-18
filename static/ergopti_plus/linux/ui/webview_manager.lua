@@ -767,7 +767,11 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
-	local handler = _windows[app_name] and _windows[app_name].handler or _load_handler(app_name)
+	local owned = _windows[app_name]
+	-- Cleanup debt retains resource ownership, never permission to mutate settings.
+	-- Initial ready messages remain admitted while a live page is acquiring.
+	if source_epoch ~= nil and owned and (owned.debt or owned.failed or owned.closing or owned.cancelled) then return nil end
+	local handler = owned and owned.handler or _load_handler(app_name)
 	if not handler or handler.bridge_name ~= expected_bridge
 		or type(handler.on_message) ~= "function" then
 		Logger.warn(LOG, "Owned handler for '%s' is unavailable or mismatched.", app_name)
@@ -1021,8 +1025,9 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			local js_value = js_result:get_js_value()
 			local payload = _js_value_to_lua(js_value)
 			local response, document_owner = M.route_message(app_name, bridge_name, payload, window_epoch)
-			if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
-				_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response, app_name, document_owner)
+			if response ~= nil and _gtk_windows[app_name] == attempt and not attempt.cancelled
+				and M.current_epoch(app_name) == window_epoch and attempt.webview then
+				_send_response_to_js(attempt.webview, bridge_name, response, app_name, document_owner)
 			end
 		end
 
@@ -1182,26 +1187,21 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			return M._handle_delete_event(app_name, window_epoch)
 		end
 
-		-- A renderer crash can bypass blur/delete-event while leaving the native
-		-- window object alive. Release only the epoch owned by this WebView.
+		-- A renderer crash retires the complete exact page, including ordinary
+		-- windows. Keeping its registry entry would refocus a dead view on retry.
 		pcall(function()
 			webview.on_web_process_terminated = function()
-				if document_entry then
-					-- A process crash does not acknowledge view/signal/window cleanup.
-					retire_document_entry(document_entry, true)
-					attempt.cancelled = true
-					local owned = _windows[app_name]
-					if owned and owned.epoch == window_epoch then
-						owned.cancelled = true
-						if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
-					elseif not attempt.acquiring and not attempt.retiring then
-						M._destroy_gtk_window(app_name, window_epoch)
-					end
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-				else
-					Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
-					_release_app_ownership(app_name, window_epoch)
+				-- Process death does not acknowledge view/signal/window cleanup.
+				retire_document_entry(document_entry, true)
+				attempt.cancelled = true
+				local owned = _windows[app_name]
+				if owned and owned.epoch == window_epoch then
+					owned.cancelled = true
+					if not owned.acquiring and not owned.closing then M.hide(app_name, window_epoch) end
+				elseif not attempt.acquiring and not attempt.retiring then
+					M._destroy_gtk_window(app_name, window_epoch)
 				end
+				Logger.error(LOG, "WebKit process for '%s' terminated.", app_name)
 			end
 		end)
 

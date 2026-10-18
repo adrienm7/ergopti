@@ -190,7 +190,10 @@ function M.start()
 	if _running then return end
 	_running = true
 	_last_focus_key = _focus_key(_focused_identity())
-	local seed = _snapshot_processes()
+	-- The daemon subscribes only to focus. Enumerating the whole machine has
+	-- no consumer until a launch/quit observer explicitly asks for it.
+	local seed
+	if #_launch_callbacks > 0 or #_quit_callbacks > 0 then seed = _snapshot_processes() end
 	_last_processes = seed or {}
 	_have_proc_baseline = seed ~= nil
 
@@ -242,7 +245,7 @@ function M.tick(tick_count)
 
 	-- Process-list check (every N ticks to stay within PROCESS_POLL_S)
 	local process_every = math.max(1, math.floor(PROCESS_POLL_S / FOCUS_POLL_S))
-	if tick_count % process_every == 0 then
+	if (#_launch_callbacks > 0 or #_quit_callbacks > 0) and tick_count % process_every == 0 then
 		local ok_p = pcall(function()
 			local current = _snapshot_processes()
 			-- A failed snapshot keeps the last known set: there is nothing to

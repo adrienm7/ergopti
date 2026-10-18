@@ -485,7 +485,7 @@ helpers.describe("Single shipped source binding admission", function()
 			write(choices, '[hotstrings]\ngroups = { magickey = true }\n[hotstrings.modules.magickey]\nreplace = false\n')
 			helpers.assert_true(Config._set_config_file_for_test(choices))
 			local ok, err = pcall(function()
-				helpers.assert_true(Config.init({ load_mappings = function() return true end }, selected))
+				helpers.assert_true(Config.init(require("hotstring_engine").new(), selected))
 				local _, committed = Config.load_all()
 				helpers.assert_true(committed)
 				local categories, count = Config.get_categories(), 0

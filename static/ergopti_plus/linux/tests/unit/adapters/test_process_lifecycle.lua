@@ -72,6 +72,58 @@ local PS_AC = "COMMAND\na\nc\n"
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.describe("linux-process-poll-demand", function()
+	local function with_demand(body)
+		local names = { "adapters.window_info", "adapters.shell_runner", "adapters.process_lifecycle" }
+		local saved, queries, output = {}, 0, "existing\n"
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		package.loaded["adapters.window_info"] = {
+			focused_snapshot = function() return { appId = "editor", windowTitle = "stable" }, "x11:1" end,
+		}
+		package.loaded["adapters.shell_runner"] = {
+			exec_checked = function()
+				queries = queries + 1
+				return true, output
+			end,
+		}
+		local ok, failure = pcall(function()
+			local lifecycle = helpers.load_module("adapters.process_lifecycle")
+			body(lifecycle, function() return queries end, function(value) output = value end)
+			lifecycle.stop()
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		helpers.assert_true(ok, tostring(failure))
+	end
+
+	helpers.it("linux-process-poll-demand: focus-only users never spawn process snapshots", function()
+		with_demand(function(lifecycle, queries)
+			lifecycle.onFocusChange(function() end)
+			lifecycle.start()
+			for tick = 1, PROCESS_TICK * 20 do lifecycle.tick(tick) end
+			helpers.assert_eq(queries(), 0, "process enumeration has no consumer in the focus-only daemon")
+		end)
+	end)
+
+	helpers.it("linux-process-poll-demand: a late subscriber adopts a fresh baseline before emitting changes", function()
+		with_demand(function(lifecycle, queries, set_output)
+			lifecycle.start()
+			lifecycle.tick(PROCESS_TICK)
+			set_output("current\n")
+			local launched, quit = {}, {}
+			lifecycle.onAppLaunch(function(name) launched[#launched + 1] = name end)
+			lifecycle.onAppQuit(function(name) quit[#quit + 1] = name end)
+			lifecycle.tick(PROCESS_TICK * 2)
+			helpers.assert_eq(queries(), 1, "the first demanded poll establishes current ownership")
+			helpers.assert_eq(launched, {}, "unobserved history is not a launch")
+			helpers.assert_eq(quit, {}, "unobserved history is not a quit")
+			set_output("next\n")
+			lifecycle.tick(PROCESS_TICK * 3)
+			helpers.assert_eq(launched, { "next" })
+			helpers.assert_eq(quit, { "current" })
+		end)
+	end)
+end)
+
 helpers.describe("linux-native-focus-identity", function()
 	helpers.it("(linux-focus-coherent-poll) queries one native snapshot per unchanged lifecycle tick", function()
 		local names = { "adapters.shell_runner", "infra.display_server", "adapters.window_info", "adapters.process_lifecycle" }

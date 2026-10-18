@@ -269,8 +269,11 @@ helpers.describe("keylogger", function()
         register_device = function() return true end,
         is_available = function() return true end,
         bump_rev = function() return true end,
-        insert_typing_events = function(_, events)
+        insert_typing_events = function(_, events, derived)
           calls.typing[#calls.typing + 1] = events
+          for _, group in ipairs(derived and derived.ngrams or {}) do
+            calls.ngrams[#calls.ngrams + 1] = group.ngrams
+          end
           return true
         end,
         insert_hotstring_events = function(_, events)
@@ -301,6 +304,7 @@ helpers.describe("keylogger", function()
       -- moment the writer grew a method, and the failure surfaced as a nil call
       -- inside the code under test.
       setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
+      require("tests.support.sqlite_flush_fake").attach(fake_writer)
       local writer_name = "modules.keylogger.sqlite_writer"
       local logger_name = "modules.keylogger.keylogger"
       local previous_writer = package.loaded[writer_name]
@@ -487,13 +491,25 @@ helpers.describe("keylogger", function()
     end)
 
     it("keeps raw hotstring and foreground transitions pending for canonical persistence", function()
-      local path = helpers.driver_root() .. "/modules/keylogger/keylogger.lua"
-      local fh = assert(io.open(path, "r"))
-      local src = fh:read("*a"); fh:close()
-      helpers.assert_true(src:find("_pending_hotstring_events", 1, true) ~= nil)
-      helpers.assert_true(src:find("_pending_app_switch_events", 1, true) ~= nil)
-      helpers.assert_true(src:find("insert_hotstring_events", 1, true) ~= nil)
-      helpers.assert_true(src:find("insert_app_switch_events", 1, true) ~= nil)
+      local previous_writer, previous_keylogger = package.loaded["modules.keylogger.sqlite_writer"], package.loaded["modules.keylogger.keylogger"]
+      local writer = Fakes.sqlite_writer()
+      package.loaded["modules.keylogger.sqlite_writer"], package.loaded["modules.keylogger.keylogger"] = writer, nil
+      local ok, err = pcall(function()
+        local collector = require("modules.keylogger.keylogger")
+        collector.init({ sqlite_path = fresh_db() })
+        require("tests.support.metrics_consent_fixture").enable(collector)
+        collector.on_app_focus("before", 1000)
+        collector.on_app_focus("after", 1100)
+        collector.record_hotstring("after", "q", "replacement", 1200)
+        helpers.assert_true(collector._pending_buffer_count_for_test() > 0)
+        helpers.assert_true(collector.flush())
+        helpers.assert_eq(writer.hotstrings[1].row.replacement, "replacement")
+        helpers.assert_eq(writer.app_switches[1].row.prev_app, "before")
+        helpers.assert_eq(writer.app_switches[1].row.next_app, "after")
+        helpers.assert_eq(collector._pending_buffer_count_for_test(), 0)
+      end)
+      package.loaded["modules.keylogger.sqlite_writer"], package.loaded["modules.keylogger.keylogger"] = previous_writer, previous_keylogger
+      if not ok then error(err, 0) end
     end)
   end)
 
@@ -560,6 +576,7 @@ helpers.describe("keylogger events_json controls are escaped (json-controls)", f
         return true
       end,
     }, { __index = function() return function() return true end end })
+    require("tests.support.sqlite_flush_fake").attach(package.loaded["modules.keylogger.sqlite_writer"])
     local ok, err = pcall(function()
       package.loaded["adapters.storage"] = Fakes.storage()
       package.loaded["modules.keylogger.keylogger"] = nil

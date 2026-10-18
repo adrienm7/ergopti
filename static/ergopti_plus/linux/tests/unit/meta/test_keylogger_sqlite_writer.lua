@@ -1062,6 +1062,30 @@ end)
 
 
 helpers.describe("linux-sqlite-ngram-group-transaction", function()
+	helpers.it("linux-sqlite-typing-derived-transaction: raw source and derivatives share one receipt", function()
+		local writes = {}
+		with_writer_read_receipts(function(command)
+			if command:find("SELECT CAST(value AS INTEGER)", 1, true) then return "1\n" end
+			if command:find("INSERT OR IGNORE INTO events_typing", 1, true) then writes[#writes + 1] = command end
+			return ""
+		end, 0, function(writer)
+			helpers.assert_true(writer.insert_typing_events("owned", {
+				{ app = "owned", text = "a", events_json = '[["a",0]]' },
+			}, {
+				ngrams = { { table_name = "ngram_chars", date = "2000-01-01", app = "owned", ngrams = { a = 1 } } },
+				daily = { chars_class = { { date = "2000-01-01", app = "owned", letter = 1 } } },
+			}))
+		end)
+		helpers.assert_eq(#writes, 1)
+		local command = writes[1]
+		helpers.assert_contains(command, "INSERT INTO ngram_chars")
+		helpers.assert_contains(command, "INSERT INTO agg_app_day_chars_class")
+		local _, starts = command:gsub("BEGIN IMMEDIATE;", "")
+		local _, commits = command:gsub("COMMIT;", "")
+		helpers.assert_eq(starts, 1, "nested or separate connections cannot own an atomic typing batch")
+		helpers.assert_eq(commits, 1)
+	end)
+
 	helpers.it("linux-sqlite-ngram-group-transaction: one checked transaction owns admitted tokens", function()
 		with_ngram_sql(function(writer, statements)
 			helpers.assert_true(writer.upsert_ngrams("owned", "2000-01-01", "owned", {
@@ -1154,5 +1178,62 @@ helpers.describe("linux-sqlite-media-startup-boundary", function()
 		writer.close_db()
 		os.remove(path)
 		if not ok then error(reason, 0) end
+	end)
+end)
+
+helpers.describe("SQLite scancode no-op receipts", function()
+	for _, values in ipairs({ {}, { [30] = 0 }, { [30] = -1 }, { ["invalid"] = 1 } }) do
+		it("preserves the acknowledged no-op without submitting a non-SQL boolean", function()
+			with_writer_read_receipts("", 0, function(writer)
+				helpers.assert_true(writer.upsert_scancodes("owned", "2000-01-01", "app", values))
+			end)
+		end)
+	end
+end)
+
+helpers.describe("SQLite flush native capability", function()
+	it("refuses absent luv before any reservation or native ownership", function()
+		local name = "infra.sqlite_batch_process"
+		local previous = package.loaded[name]
+		package.loaded[name] = { is_available = function() return false end,
+			start = function() error("unavailable transport dispatched") end }
+		local ok, err = pcall(function()
+			with_writer_read_receipts("", 0, function(writer)
+				helpers.assert_eq(writer.flush_transport_available(), false)
+				local operation = writer.start_flush("owned", { raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} }, upserts = {} })
+				helpers.assert_eq(operation, nil)
+			end)
+		end)
+		package.loaded[name] = previous
+		if not ok then error(err, 0) end
+	end)
+end)
+
+helpers.describe("SQLite terminal flush retry fence", function()
+	it("cannot acquire another child after committed cleanup dispatch is refused", function()
+		local name, calls = "infra.sqlite_batch_process", 0
+		local previous = package.loaded[name]
+		package.loaded[name] = { is_available = function() return true end,
+			start = function()
+				calls = calls + 1
+				if calls == 3 then return nil end -- No marker-GC child acquired.
+				return { poll = function() return { ok = true, output = "1\n" } end,
+					is_settled = function() return true end, cancel = function() return true end }
+			end }
+		local ok, err = pcall(function()
+			with_writer_read_receipts("", 0, function(writer)
+				local operation = assert(writer.start_flush("owned", {
+					raw = { typing = {}, hotstrings = {}, shortcuts = {}, switches = {} }, upserts = {},
+				}))
+				operation:pump(); operation:pump()
+				helpers.assert_true(operation:is_settled())
+				helpers.assert_true(operation.result.committed)
+				helpers.assert_eq(operation:is_retryable(), false)
+				helpers.assert_eq(operation:retry(), false)
+				helpers.assert_eq(calls, 3, "a retired operation cannot own a new unobserved native child")
+			end)
+		end)
+		package.loaded[name] = previous
+		if not ok then error(err, 0) end
 	end)
 end)

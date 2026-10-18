@@ -5,8 +5,8 @@
 --- DESCRIPTION:
 --- Runs production predictions, tone rewrites and translations against real GTK
 --- fields. Extracts the daemon's exact focus callback; accessibility queries,
---- privacy verdicts and XTest output are native. Provider and selection replies
---- are controlled. This does not claim evdev/uinput or physical keyboard input.
+--- privacy verdicts, selected-range snapshots and XTest output are native. Only
+--- provider replies are controlled. This does not claim evdev/uinput or physical keyboard input.
 --- ==============================================================================
 
 require("compat.utf8").install()
@@ -66,7 +66,12 @@ local function await_join()
 	error("native AI privacy context did not join within five seconds")
 end
 
+local Selection = require("adapters.selection_transaction")
+local selection_owner
+
 local function initialize()
+	assert(not selection_owner or selection_owner.stop(), "the previous range owner must settle")
+	selection_owner = Selection.new({ focus_id = focus_id, privacy_guard = Guard.blocks_text })
 	callback, applied, request, reads = nil, 0, 0, 0
 	scheduler = require("tests.fakes").timer_scheduler()
 	local function type_text(text)
@@ -78,8 +83,16 @@ local function initialize()
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 		focus_id = focus_id,
 		privacy_guard = Guard.blocks_text, privacy_context = Guard.current_context,
-		read_selection = function() reads = reads + 1; return true, "Merci pour ton aide", nil end,
-		replace_selection = type_text,
+		read_selection = function(focus, authorized, callback)
+			reads = reads + 1
+			return selection_owner.read(focus, authorized, callback)
+		end,
+		cancel_selection = function() return selection_owner.cancel() end,
+		replace_selection = function(text, receipt, authorized, callback)
+			return selection_owner.replace(receipt, text, authorized, function(value)
+				return { ok = type_text(value) }
+			end, callback)
+		end,
 		apply_prediction = function(candidate) return type_text(candidate.to_type) end,
 	})
 	Guard.prime()
@@ -115,15 +128,30 @@ for command in io.lines() do
 			Engine.predict("Bonjour à tous", nil, { num_predictions = 1, profile = { id = "raw", system_single = "{context}" } })
 			result.started = request > 0
 		else error("unknown request mode") end
+	elseif command == "selection-range" then
+		local field = assert(Atspi.cached_snapshot(), "native field receipt required")
+		local started = Clock.now_ms()
+		local operation = assert(Atspi.start_selection_capture({
+			bus = field.native_bus_name, path = field.native_object_path, role = field.role,
+		}, { owner = "native-range-probe", authorized = function() return true end }, function(selection)
+			if selection then result.selection_first, result.selection_last = selection.first, selection.last end
+		end))
+		local cleanup_deadline = started + 5000
+		while not operation:is_settled() and Clock.now_ms() < cleanup_deadline do uv.run("nowait"); uv.sleep(1) end
+		assert(operation:is_settled(), "the bounded native range helper must physically settle")
+		result.selection_ms = Clock.now_ms() - started
 	elseif command == "offer" or command == "finish" then
 		assert(callback, "the controlled provider must have an actual pending request")
 		local text = mode == "tone" and "REWRITE: Merci pour votre aide."
 			or mode == "translation" and "TRANSLATION: Thank you for your help."
 			or " que tout le monde aille bien"
-		callback(text, nil)
-		if command == "finish" and mode ~= "tone" then result.accepted = Engine.accept(1) end
+		local delivered = false
+		local timer = uv.new_timer()
+		timer:start(0, 0, function() timer:close(); callback(text, nil); delivered = true end)
+		while not delivered do uv.run("nowait"); uv.sleep(1) end
+		if command == "finish" and mode ~= "tone" then result.workflow_accepted = Engine.accept(1, function(committed) result.accepted = committed end) end
 	elseif command == "accept" then
-		result.accepted = Engine.accept(1)
+		result.workflow_accepted = Engine.accept(1, function(committed) result.accepted = committed end)
 	elseif command == "first-character" then
 		result.helper_calls = 0
 		local originals = {}
@@ -164,9 +192,13 @@ for command in io.lines() do
 	elseif command == "advance" then
 		scheduler.test.advance(10)
 	elseif command ~= "probe" then error("unknown native fixture command") end
+	local selection_deadline = Clock.now_ms() + 5000
+	while selection_owner and not selection_owner.is_settled() and Clock.now_ms() < selection_deadline do uv.run("nowait"); uv.sleep(1) end
+	assert(not selection_owner or selection_owner.is_settled(), "the actual native range owner must settle")
 	snapshot(result)
 	io.flush()
 end
+assert(not selection_owner or selection_owner.stop(), "the native selected-range owner must settle")
 Guard.stop()
 Watch.stop()
 local deadline = Clock.now_ms() + 5000

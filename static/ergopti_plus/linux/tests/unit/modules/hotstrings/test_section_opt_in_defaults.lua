@@ -43,12 +43,17 @@ local function with_config(body, source, reject_candidate)
 	local ok, err = pcall(function()
 		local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
 		Choices.with_file(Config, source, function(path)
-			local published = {}
-			Config.init({ load_mappings = function(_, mappings)
-				published[#published + 1] = mappings
-				return not (reject_candidate and #published == 2)
-			end },
-				"virtual.toml", nil)
+			local published, attempts = {}, 0
+			local engine = require("hotstring_engine").new()
+			local load = engine.load_mappings
+			engine.load_mappings = function(self, mappings)
+				attempts = attempts + 1
+				if reject_candidate and attempts == 2 then return false end
+				local committed = load(self, mappings)
+				if committed then published[#published + 1] = mappings end
+				return committed
+			end
+			Config.init(engine, "virtual.toml", nil)
 			local _, committed = Config.load_all()
 			helpers.assert_true(committed, "the fixture catalogue must publish")
 			body(Config, path, published)

@@ -404,7 +404,6 @@ helpers.describe("scope fixture native loop custody", function()
 		helpers.assert_true(settled, "the exact native timer must physically close")
 	end)
 end)
-local result=helpers.get_results();print('GLOBAL_PAIR_SUMMARY '..result.passed..'/'..result.failed);if result.failed~=0 then os.exit(1) end
 
 -- These additive controls use actual declared Linux data, pair source leases,
 -- parameter owners and conditional publication. Device/file edges are controlled.

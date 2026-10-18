@@ -17,7 +17,7 @@ helpers.describe("ui.bridge_handlers", function()
   local function build_mock_state()
     return {
       engine    = { loaded = true },
-      keylogger = {
+      keylogger = require("tests.fakes.metrics_keylogger").synchronous({
         get_session_stats = function() return { keystrokes = 42, words = 8, duration_ms = 120000 } end,
         get_wpm           = function() return 35.5 end,
         get_app_stats     = function() return { firefox = { keystrokes = 20 }, code = { keystrokes = 22 } } end,
@@ -42,9 +42,9 @@ helpers.describe("ui.bridge_handlers", function()
         is_suppressed     = function() return false end,
         suppress          = function() end,
         unsuppress        = function() end,
-        reset_session     = function() end,
+        reset_session     = function() return true end,
         export_json       = function() return '{"keystrokes":42}' end,
-      },
+      }),
       config = {
         -- Flat functions, matching how hotstrings_config actually defines them.
         -- This mock used to take a leading `self` because the bridge called
@@ -2315,7 +2315,7 @@ helpers.describe("ui.bridge_handlers", function()
 				config_paths = {
 					get_config_dir = function() return values.config_dir end,
 					default_config_dir = function() return "/tmp/ergopti-default" end,
-					set_config_dir = function(value)
+					set_paths = function(value)
 						if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return false end
 						values.config_dir = value:gsub("/+$", "")
 						return true

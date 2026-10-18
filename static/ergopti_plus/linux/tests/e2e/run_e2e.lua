@@ -406,9 +406,12 @@ local DAEMON_SCENARIOS = {
 	-- Backspace edits the buffer instead of wiping it and declaring a word start.
 	{ name = "a corrected typo still expands", keys = " adx{BS}n ", screen = " ADN " },
 	{ name = "a word-only trigger does not fire mid-word after a Backspace", keys = "xy{BS}adn ", screen = "xadn " },
-	-- hotstrings.arrow_resets_word defaults to true: an arrow starts a new word,
-	-- so a word-start trigger fires after it (the off state is a unit test).
+	-- hotstrings.arrow_resets_word defaults to true: an arrow starts a new word.
 	{ name = "a word-only trigger fires after an arrow key (arrow_resets_word)", keys = "x{LEFT}adn ", screen = "xADN " },
+	{ name = "an arrow preserves a mid-word prefix when resets are disabled",
+		keys = "{ARROWRESETOFF}x{LEFT}adn {ARROWRESETON}", screen = "xadn " },
+	{ name = "an arrow preserves a partial trigger when resets are disabled",
+		keys = "{ARROWRESETOFF} ad{LEFT}n {ARROWRESETON}", screen = " ADN " },
 	-- Ctrl+Backspace deletes a word, not one character: it neither undoes the
 	-- expansion over text that is already gone nor leaves the rest of the word
 	-- in the buffer to complete a trigger (modified-backspace-2026-09-25).

@@ -122,15 +122,24 @@ local function scenario(opts, body)
 				return true
 			end,
 			-- The daemon's seams: a copy probe, the injector's select-back, the window probe
-			read_selection = function()
-				world.reads = world.reads + 1
-				if world.on_read_selection then world.on_read_selection() end
-				if world.selection == nil then return false, "", "no_selection" end
-				return true, world.selection, nil
+			read_selection = function(_, authorized, callback)
+				local function complete()
+					world.reads = world.reads + 1
+					if world.on_read_selection then world.on_read_selection() end
+					if world.selection == nil then callback(false, "", "no_selection"); return true end
+					callback(true, world.selection, nil, world.selection_receipt); return true
+				end
+				if world.defer_selection_read then world.complete_selection_read = complete else complete() end
+				return true
 			end,
-			replace_selection = function(text)
-				world.replaced[#world.replaced + 1] = text
-				world.selection = text
+			replace_selection = function(text, _, authorized, callback)
+				local function complete()
+					if not authorized() then callback(false); return end
+					world.replaced[#world.replaced + 1] = text
+					world.selection = text
+					callback(true)
+				end
+				if world.defer_selection_replace then world.complete_selection_replace = complete else complete() end
 				return true
 			end,
 			focus_id = function() return world.focus end,
@@ -418,7 +427,7 @@ helpers.describe("selected translations require a known stable native focus", fu
 	helpers.it("refuses translation when focus moves during selection capture (selection-native-focus)", function()
 		scenario({selection = SELECTION}, function(world)
 			world.focus = "x11:10:100"
-			world.on_read_selection = function() world.focus = "x11:10:101" end
+			world.on_read_selection = function(_, authorized, callback) world.focus = "x11:10:101" end
 			helpers.assert_eq(world.engine.translate_selection("en"), false)
 			helpers.assert_eq(world.reads, 1)
 			helpers.assert_eq(#world.posts, 0)
@@ -468,4 +477,51 @@ helpers.describe("translation resident global privacy admission", function()
 			helpers.assert_true(world.engine.is_enabled())
 		end)
 	end)
+end)
+
+helpers.describe("selection capture originating action authority", function()
+	for _, action in ipairs({ "cancel", "backend" }) do
+		helpers.it("ai-pass2-span does not revive translate_selection after " .. action .. " during capture", function()
+			scenario({ selection = "merci pour ton aide" }, function(world)
+				world.on_read_selection = function(_, authorized, callback)
+					if action == "cancel" then world.engine.cancel() else world.engine.set_backend("ollama") end
+				end
+				helpers.assert_eq(world.engine.translate_selection("en"), false)
+				helpers.assert_eq(world.reads, 1)
+				helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.replaced, 0)
+			end)
+		end)
+	end
+end)
+
+helpers.describe("asynchronous translation native ownership", function()
+	helpers.it("ai-pass2-span waits for capture ACK before translating and fences cancellation", function()
+		scenario({ selection = SELECTION }, function(world)
+			world.defer_selection_read = true
+			helpers.assert_true(world.engine.translate_selection("en"))
+			helpers.assert_eq(#world.posts, 0)
+			world.engine.cancel()
+			world.complete_selection_read()
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+	for _, cancel in ipairs({ false, true }) do
+		helpers.it("ai-pass2-span closes an accepted offer only after physical ACK cancel=" .. tostring(cancel), function()
+			scenario({ selection = SELECTION }, function(world)
+			world.defer_selection_replace = true
+			helpers.assert_true(world.engine.translate_selection("en"))
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_true(world.engine.accept(1))
+			helpers.assert_true(world.engine.has_suggestions(), "pending native verification must not announce completion")
+			helpers.assert_eq(#world.replaced, 0)
+			helpers.assert_true(not world.engine.accept(1), "a second acceptance cannot borrow pending range custody")
+			if cancel then world.engine.cancel() end
+			world.complete_selection_replace()
+			helpers.assert_eq(#world.replaced, cancel and 0 or 1)
+			helpers.assert_true(not world.engine.has_suggestions())
+			helpers.assert_true(not world.engine.accept(1))
+		end)
+		end)
+	end
 end)

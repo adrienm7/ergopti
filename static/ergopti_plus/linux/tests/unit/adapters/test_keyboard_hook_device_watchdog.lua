@@ -748,7 +748,7 @@ local function aggregate_consumer_session(streams, options)
 	options = options or {}
 	local Input = require("infra.input_event")
 	local paths, queues, desired = {}, {}, {}
-	for _, id in ipairs({ "a", "b" }) do
+	for _, id in ipairs({ "a", "b", "c" }) do
 		if streams[id] then
 			local path = fake_node("aggregate-" .. id)
 			paths[id], desired[#desired + 1], queues[path] = path, path, {}
@@ -757,12 +757,22 @@ local function aggregate_consumer_session(streams, options)
 			end
 		end
 	end
+	if options.initial_sources then
+		desired = {}
+		for _, id in ipairs(options.initial_sources) do desired[#desired + 1] = assert(paths[id]) end
+	end
 	package.loaded["modules.hotstrings.device_finder"] = {
 		find_devices = function() return desired, {} end,
 		is_key_device = function() return true end,
 	}
 	local reader = helpers.load_module("adapters.evdev_reader")
-	reader._set_backend((multi_recorder(queues)))
+	local backend = multi_recorder(queues)
+	local open, refused = backend.open, {}
+	backend.open = function(path)
+		if refused[path] then return nil, "controlled permission refusal" end
+		return open(path)
+	end
+	reader._set_backend(backend)
 	local writer = helpers.load_module("adapters.uinput_writer")
 	local session = { rows = {}, captures = {}, chars = {}, paths = paths, queues = queues, Input = Input }
 	writer._set_backend({
@@ -804,6 +814,11 @@ local function aggregate_consumer_session(streams, options)
 	end })
 	assert(hook.isRunning())
 	function session.pump() hook.pump() end
+	function session.select(ids)
+		desired = {}
+		for _, id in ipairs(ids) do desired[#desired + 1] = assert(paths[id]) end
+	end
+	function session.refuse_open(id) refused[assert(paths[id])] = true end
 	function session.queue(id, code, value, at)
 		queues[paths[id]][#queues[paths[id]] + 1] = Input.encode(1, code, value, nil, at)
 	end
@@ -946,6 +961,59 @@ helpers.describe("Hook aggregate modifier contract: preserved red controls", fun
 		helpers.assert_eq(held, { 42 }, "the lost source must leave the live held-owner roster")
 	end)
 
+	helpers.it("(linux-retained-source-hotplug) retains held Shift while another keyboard reconnects", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } }, b = {} })
+		session.pump()
+		session.retire("b"); session.pump()
+		tick_until_check(session.hook, 1)
+		session.queue("a", 30, 1, 2); session.pump()
+		local held, view, chars = session.hook.held_text_modifier_codes(), session.view(), session.chars
+		session.close()
+		helpers.assert_eq(view.down, { 30, 42 }, "the desktop still owns the retained physical Shift")
+		helpers.assert_eq(held, { 42 }, "reopening another source must retain the original Shift owner")
+		helpers.assert_eq(chars, { "A" }, "matcher text must follow the Shift still down on the desktop")
+	end)
+
+	for _, scenario in ipairs({ { "Ctrl", 29, "ctrl" }, { "Alt", 56, "alt" }, { "Super", 125, "meta" },
+		{ "layout-assigned Ctrl", 139, "ctrl" } }) do
+		helpers.it("(linux-retained-source-hotplug) retains " .. scenario[1] .. " shortcut suppression after source removal", function()
+			local session = aggregate_consumer_session({ a = { { scenario[2], 1, 1 } }, b = {} },
+				{ roles = { [scenario[2]] = scenario[3] } })
+			session.pump(); session.select({ "a" }); tick_until_check(session.hook, 1)
+			session.queue("a", 30, 1, 2); session.pump()
+			local held, chars = session.hook.held_modifiers(), session.chars
+			session.close()
+			helpers.assert_eq(held[scenario[3]], true)
+			helpers.assert_eq(chars, {}, "a held shortcut cannot become learned text during another keyboard's removal")
+		end)
+	end
+
+	helpers.it("(linux-retained-source-hotplug) restores one XKB Shift edge while retaining both physical owners", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } }, b = { { 42, 1, 2 } }, c = {} })
+		session.pump(); session.select({ "a", "b" }); tick_until_check(session.hook, 1)
+		session.queue("a", 42, 0, 3); session.queue("b", 30, 1, 4); session.queue("b", 30, 0, 5)
+		session.pump()
+		local held, chars = session.hook.held_text_modifier_codes(), session.chars
+		session.queue("b", 42, 0, 6); session.pump()
+		local modifier_rows = {}
+		for _, row in ipairs(session.rows) do if row[1] == 42 then modifier_rows[#modifier_rows + 1] = row end end
+		session.close()
+		helpers.assert_eq(held, { 42 })
+		helpers.assert_eq(chars, { "A" })
+		helpers.assert_eq(modifier_rows, { { 42, 1 }, { 42, 0 } }, "capture restoration cannot synthesize a second desktop Shift")
+	end)
+
+	helpers.it("(linux-retained-source-hotplug) keeps XKB state when the replacement source refuses to open", function()
+		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } }, b = {} }, { initial_sources = { "a" } })
+		session.pump(); session.select({ "a", "b" }); session.refuse_open("b")
+		tick_until_check(session.hook, 1)
+		session.queue("a", 30, 1, 2); session.pump()
+		local held, chars = session.hook.held_text_modifier_codes(), session.chars
+		session.close()
+		helpers.assert_eq(held, { 42 })
+		helpers.assert_eq(chars, { "A" }, "a refused source acquisition cannot reset the surviving capture session")
+	end)
+
 	helpers.it("does not publish a modifier ACK after emitter reentry closes its input source", function()
 		local stopped = false
 		local session = aggregate_consumer_session({ a = { { 42, 1, 1 } } }, {
@@ -1027,6 +1095,103 @@ helpers.describe("actual shared-output handoff dependencies: green controls", fu
 end)
 
 -- Controlled actual Reader/Hook lifecycle; no kernel or physical claim.
+helpers.describe("native source state restoration", function()
+	local Fixture = require("tests.support.input_owner_fixture")
+
+	for _, code in ipairs({ 42, 29 }) do
+		helpers.it("(linux-native-reconciliation) keeps a modal-consumed modifier out of matcher text " .. code, function()
+			local chars, wire, held = {}, {}, {}
+			Fixture.with_session({ position_bits = true, after_sync = function(_, key, value)
+				if key == 42 or key == 29 then held[key] = value ~= 0 end
+				if key == 30 and value == 1 and not held[29] then wire[#wire + 1] = held[42] and "A" or "a" end
+			end }, function(s)
+				s.hook.stop(); assert(s.hook.set_remapper(nil))
+				s.start_options.onChar = function(char) chars[#chars + 1] = char end
+				s.hook.start(s.start_options); assert(s.hook.isRunning())
+				s.edge("a", code, 1, 1); s.edge("a", 30, 1, 2); s.edge("a", 30, 0, 3)
+				helpers.assert_true(held[code], "the independent output model actually saw the modifier down")
+				helpers.assert_eq(chars, wire)
+				helpers.assert_eq(s.hook.while_released(function() return "completed" end), "completed")
+				helpers.assert_true(s.held[s.paths.a][code], "the original physical key is still held")
+				helpers.assert_eq(held[code], false, "modal entry retired its virtual output")
+				s.edge("a", 30, 1, 4); s.edge("a", 30, 0, 5)
+				helpers.assert_eq(chars, wire, "the matcher must follow output, not a consumed physical modifier")
+				s.edge("a", code, 0, 6)
+				s.edge("a", code, 1, 7); s.edge("a", 30, 1, 8); s.edge("a", 30, 0, 9); s.edge("a", code, 0, 10)
+				helpers.assert_eq(chars, wire, "a fresh physical press restores the modifier normally")
+			end)
+		end)
+	end
+
+	for _, grabbed in ipairs({ false, true }) do
+		helpers.it("(linux-modal-original-open) refuses a replacement without taking over its grab " .. tostring(grabbed), function()
+			Fixture.with_session({ position_bits = true, on_capture_reacquired = function() return true end }, function(s)
+				local a, b = "keyboard:" .. s.paths.a, "keyboard:" .. s.paths.b
+				local old_a, old_b = assert(s.reader.capture_source_owner(a)), assert(s.reader.capture_source_owner(b))
+				local successor
+				helpers.assert_eq(s.hook.while_released(function()
+					assert(s.reader.close(a)); assert(s.reader.open(s.paths.a, a)); if grabbed then assert(s.reader.grab(a)) end
+					successor = assert(s.reader.capture_source_owner(a))
+					return "completed"
+				end), "completed")
+				helpers.assert_eq(s.hook.isRunning(), false, "the original cohort cannot adopt a foreign open lifetime")
+				helpers.assert_eq(s.reader.source_owner_current(old_a), false)
+				helpers.assert_eq(s.reader.source_owner_current(old_b), false)
+				helpers.assert_eq(s.reader.is_open(b), false, "the original peer is retired")
+				helpers.assert_true(s.reader.is_open(a), "cleanup must leave the successor open")
+				helpers.assert_eq(s.reader.is_grabbed(a), grabbed, "the hook must never take over or ungrab its successor")
+				helpers.assert_eq(s.reader.source_owner_current(successor), grabbed, "the successor retains its own native currency")
+				helpers.assert_eq(s.hook.capture_input_owner(), nil)
+				assert(s.reader.close(a))
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "SYN_DROPPED", "modal" }) do
+		helpers.it("(linux-native-reconciliation) restores logical input admission after " .. boundary, function()
+			local session, published
+			local options = { position_bits = true, on_capture_reacquired = function()
+				published = true
+				helpers.assert_eq(session.hook.capture_input_owner(), nil)
+				helpers.assert_eq(session.hook.start(session.start_options), false)
+				return true
+			end }
+			Fixture.with_session(options, function(s)
+				session = s
+				local old = assert(s.reader.capture_source_owner("keyboard:" .. s.paths.a))
+				if boundary == "SYN_DROPPED" then
+					s.event("a", 0, 3, 0, 2); s.event("a", 0, 0, 0, 3)
+				else
+					helpers.assert_eq(s.hook.while_released(function() return "completed" end), "completed")
+				end
+				helpers.assert_true(s.hook.isRunning())
+				for _, path in pairs(s.paths) do helpers.assert_true(s.reader.is_grabbed("keyboard:" .. path)) end
+				helpers.assert_true(published)
+				helpers.assert_eq(s.reader.source_owner_current(old), false)
+				s.pair(); helpers.assert_eq(s.armed, true, "the original logical consumer uses the restored native cohort")
+			end)
+		end)
+	end
+
+	for _, boundary in ipairs({ "query", "restore", "publisher" }) do
+		helpers.it("(linux-native-reconciliation) closes original sources when recovery " .. boundary .. " refuses", function()
+			local session, recovering
+			local options = { position_bits = true, on_capture_reacquired = function() return boundary ~= "publisher" end,
+				on_capture_reset = function()
+					if recovering and boundary == "restore" then session.hook.stop() end
+				end }
+			Fixture.with_session(options, function(s)
+				session, recovering = s, true
+				options.short_key_query = boundary == "query"
+				s.event("a", 0, 3, 0, 1); s.event("a", 0, 0, 0, 2)
+				helpers.assert_eq(s.hook.isRunning(), false)
+				for _, path in pairs(s.paths) do helpers.assert_eq(s.reader.is_open("keyboard:" .. path), false) end
+				helpers.assert_eq(s.hook.capture_input_owner(), nil)
+			end)
+		end)
+	end
+end)
+
 helpers.describe("managed source cohort reconciliation", function()
 	helpers.it("authenticates pre-event input and cleanup currencies separately", function()
 require('tests.support.input_owner_fixture').with_session({}, function(s)
