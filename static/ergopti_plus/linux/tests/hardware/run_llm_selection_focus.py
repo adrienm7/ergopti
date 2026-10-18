@@ -126,8 +126,14 @@ def session(root):
                 processes.append(worker)
 
                 def command(text):
-                    worker.stdin.write(text + "\n")
-                    worker.stdin.flush()
+                    try:
+                        worker.stdin.write(text + "\n")
+                        worker.stdin.flush()
+                    except BrokenPipeError as error:
+                        raise AssertionError(
+                            "owned AI worker closed its command input: "
+                            + (root / "worker.log").read_text()
+                        ) from error
                     with selectors.DefaultSelector() as selector:
                         selector.register(worker.stdout, selectors.EVENT_READ)
                         assert selector.select(10), "owned AI worker exceeded its command deadline"
