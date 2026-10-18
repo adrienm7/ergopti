@@ -439,33 +439,23 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		; Open Regedit and navigate to RegPath.
 		; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
-		RegJump(RegPath) {
-				; Normalize leading Computer\ prefix to French "Ordinateur\"
-				if SubStr(RegPath, 1, 9) == "Computer\" {
-						RegPath := "Ordinateur\" . SubStr(RegPath, 10)
-				}
+		RegJump(RegPath, CommitFn := _RegJumpCommit) {
+				return CommitFn.Call(_RegJumpNormalizePath(RegPath), Reg_WriteString, WMExists, WMKill, Run)
+		}
 
-				; Remove trailing backslash if present
-				RegPath := Trim(RegPath, "\")
-
-				; Extract root key (first component of path)
+		; Search accepts roots and optional machine labels without regard to case.
+		; Strip that label before finding the root, then expand only its own span.
+		_RegJumpNormalizePath(RegPath) {
+				RegPath := Trim(RegExReplace(RegPath, "i)^(?:Computer|Ordinateur)\\"), "\")
 				RootKey := StrSplit(RegPath, "\")[1]
-
-				; Convert short root key forms to long forms if necessary
-				if !InStr(RootKey, "HKEY_") {
-						KeyMap := Map(
-								"HKCR", "HKEY_CLASSES_ROOT",
-								"HKCU", "HKEY_CURRENT_USER",
-								"HKLM", "HKEY_LOCAL_MACHINE",
-								"HKU", "HKEY_USERS",
-								"HKCC", "HKEY_CURRENT_CONFIG"
-						)
-						if KeyMap.Has(RootKey) {
-								RegPath := StrReplace(RegPath, RootKey, KeyMap[RootKey], , , 1)
-						}
-				}
-
-				return _RegJumpCommit(RegPath, Reg_WriteString, WMExists, WMKill, Run)
+				KeyMap := Map(
+						"HKCR", "HKEY_CLASSES_ROOT",
+						"HKCU", "HKEY_CURRENT_USER",
+						"HKLM", "HKEY_LOCAL_MACHINE",
+						"HKU", "HKEY_USERS",
+						"HKCC", "HKEY_CURRENT_CONFIG"
+				)
+				return KeyMap.Get(StrUpper(RootKey), RootKey) . SubStr(RegPath, StrLen(RootKey) + 1)
 		}
 
 		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
