@@ -13,7 +13,7 @@
 ; _TextSenderInvokeCallback helper that wraps the call in try/catch +
 ; LoggerError; http_client.ahk's single site (HTTPPost) gets an inline
 ; try/catch + LoggerError. Source-scan style, matching the existing precedent
-; in tests/meta/test_gesture_toggle_ui_errors_logged.ahk for the identical
+; in tests/meta/modules/gestures/test_gesture_toggle_ui_errors_logged.ahk for the identical
 ; bug class (bare try silently swallowing a callback exception).
 ; ==============================================================================
 
