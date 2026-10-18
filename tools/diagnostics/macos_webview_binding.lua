@@ -152,13 +152,15 @@ local function message_identity(controller)
 	end) == controller, "shared controller binding refused")
 	local function post(view, kind)
 		view:evaluateJavaScript("window.webkit.messageHandlers.ergopti_binding.postMessage(" ..
-			assert(json.encode({ nonce = config.nonce, kind = kind })) .. ")", function(_, error)
+			assert(json.encode({ nonce = config.nonce, kind = kind })) .. "); true", function(value, error)
 			guarded(function()
-				local details = { kind = kind, value_type = type(error), metatable_type = type(getmetatable(error)) }
+				local details = { kind = kind, value_type = type(error), metatable_type = type(getmetatable(error)),
+					result_type = type(value), result = value }
 				details.value = error
 				probe.evaluations[#probe.evaluations + 1] = details
 				assert(not WebViewResult.is_error(error), "native JavaScript message failed: " ..
 					assert(json.encode(details), "native error serialization refused"))
+				assert(value == true, "native JavaScript completion did not return primitive true")
 				evaluated[kind] = true
 			end)
 		end)

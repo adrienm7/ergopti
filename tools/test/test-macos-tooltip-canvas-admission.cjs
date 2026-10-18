@@ -162,7 +162,7 @@ const root = path.resolve(__dirname, '..', '..');
 const calls = [];
 const silent = { log: () => {}, error: () => {} };
 const completed = { status: 0, stdout: '', stderr: 'Ran 54 tests in 0.01s\n\nOK\n' };
-const bindingCompleted = { ...completed, stderr: 'Ran 33 tests in 0.01s\n\nOK\n' };
+const bindingCompleted = { ...completed, stderr: 'Ran 34 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
@@ -230,7 +230,9 @@ for (const receipt of [
 	{ ...bindingCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK (skipped=1)\n' },
 	{ ...bindingCompleted, stderr: 'Ran 22 tests in 0.01s\n\nOK (skipped=1)\n' },
 	{ ...bindingCompleted, stderr: 'Ran 32 tests in 0.01s\n\nOK\n' },
-	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK (skipped=1)\n' }
+	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 34 tests in 0.01s\n\nOK (skipped=1)\n' }
 ]) {
 	assert.equal(
 		run({
