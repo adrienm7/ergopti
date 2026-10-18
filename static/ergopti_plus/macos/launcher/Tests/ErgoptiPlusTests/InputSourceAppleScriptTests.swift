@@ -11,6 +11,7 @@ import XCTest
 final class InputSourceAppleScriptTests: XCTestCase {
 	private struct SourceState: Equatable {
 		let currentID: String
+		let installedIDs: [String]
 		let enabledIDs: [String]
 		let selectedIDs: [String]
 	}
@@ -67,14 +68,18 @@ final class InputSourceAppleScriptTests: XCTestCase {
 		let currentID = try XCTUnwrap(currentState.id.value)
 		let sources = TISCreateInputSourceList(nil, true).takeRetainedValue()
 		let inventory = try XCTUnwrap(sources as? [TISInputSource])
+		var installed: [String] = []
 		var enabled: [String] = []
 		var selected: [String] = []
 		for source in inventory {
 			let state = KeyboardSourceTestState.read(source)
-			if state.enabled.value == true { enabled.append(try XCTUnwrap(state.id.value)) }
-			if state.selected.value == true { selected.append(try XCTUnwrap(state.id.value)) }
+			let identifier = try XCTUnwrap(state.id.value)
+			installed.append(identifier)
+			if state.enabled.value == true { enabled.append(identifier) }
+			if state.selected.value == true { selected.append(identifier) }
 		}
-		return SourceState(currentID: currentID, enabledIDs: enabled.sorted(), selectedIDs: selected.sorted())
+		return SourceState(currentID: currentID, installedIDs: installed.sorted(),
+			enabledIDs: enabled.sorted(), selectedIDs: selected.sorted())
 	}
 
 	/// Captures bounded native child execution without blocking on full stdout pipes.
@@ -140,9 +145,8 @@ final class InputSourceAppleScriptTests: XCTestCase {
 	func testActualSelectionTemplateReturnsMissForAbsentSourceWithoutStateChanges() throws {
 		let before = try sourceState()
 		let identifier = "org.ergopti.native-test.absent." + UUID().uuidString
-		let filter = [kTISPropertyInputSourceID as String: identifier] as CFDictionary
-		let matches = TISCreateInputSourceList(filter, true).takeRetainedValue()
-		guard CFArrayGetCount(matches) == 0 else {
+		// A filtered no-match result can be NULL; prove absence from the full native inventory.
+		guard !before.installedIDs.contains(identifier) else {
 			XCTFail("The refused source must be genuinely absent")
 			throw CocoaError(.executableRuntimeMismatch)
 		}
