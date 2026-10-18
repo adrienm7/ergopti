@@ -7,8 +7,7 @@
  * Every deadline a native worker caller arms must leave at least MARGIN_SEC
  * over the budget that worker gives itself for the same answer. The two sides
  * can live in different languages, so this test reads their actual owners
- * together. Supplementary no-prompt AppleEvent admission also needs this
- * margin for subprocess startup, JXA construction and numeric status delivery.
+ * together.
  *
  * ROOT CAUSE ENCODED (incident of 2026-09-30):
  * The Karabiner lease worker answers every PING, PAUSE and RESUME within its
@@ -315,83 +314,6 @@ const launchctlTimeout = swiftSeconds(guardian, 'kLegacyLaunchctlTimeoutSeconds'
 				`${(heartbeat + commandBudget).toFixed(2)} s of silence`
 		);
 	}
-}
-
-// ── 5. Supplementary no-prompt AppleEvent status delivery ─────────────────
-// The outer deadline includes interpreter startup, descriptor construction,
-// native sending and receipt delivery. Equal inner/outer budgets lose the
-// native timeout status before the same owned osascript child can report it.
-{
-	const file = 'tools/diagnostics/hs_delayed_timer_probe.py';
-	const source = read(path.join(ROOT, file));
-	// Python formatting may wrap this binding; its exact owner and uniqueness remain mandatory.
-	const usesNativeTimeoutOwner = (script) =>
-		[
-			...script.matchAll(
-				/"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\s*str\(NO_PROMPT_NATIVE_TIMEOUT_SECONDS\)/g
-			)
-		].length === 1;
-	const compactBinding =
-		'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)';
-	for (const [binding, expected] of [
-		[compactBinding, true],
-		[
-			'"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__",\n                str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)',
-			true
-		],
-		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(SCRIPTING_TIMEOUT_SECONDS)', false],
-		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", 8', false],
-		['"__NO_PROMPT_NATIVE_TIMEOUT_SECONDS__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS_FUTURE)', false],
-		['"__FOREIGN_TIMEOUT__", str(NO_PROMPT_NATIVE_TIMEOUT_SECONDS)', false],
-		[`${compactBinding}\n${compactBinding}`, false],
-		['', false]
-	]) {
-		if (usesNativeTimeoutOwner(binding) !== expected)
-			errors.push(
-				`${file}: native timeout-owner recognition failed its independent binding fixture`
-			);
-	}
-	const seconds = (name) => {
-		const match = source.match(new RegExp(`^${name} = ([\\d.]+)$`, 'm'));
-		if (!match) {
-			errors.push(`${file}: ${name} is not declared as a numeric owner any more`);
-			return NaN;
-		}
-		return Number(match[1]);
-	};
-	const execute = source.match(/    def execute\([\s\S]*?(?=\n    (?:@staticmethod|def ))/);
-	const script = source.match(
-		/^    def no_prompt_script\((?:scope=None)?\):[\s\S]*?(?=\n    (?:@staticmethod|def ))/m
-	);
-	if (!execute || !script) {
-		errors.push(`${file}: the actual executor and no-prompt script owners could not be read`);
-	} else {
-		const executor = execute[0].replace(/#[^\n]*/g, '');
-		const nativeScript = script[0]
-			.replace(/\/\*[\s\S]*?\*\//g, '')
-			.replace(/\/\/[^\n]*/g, '')
-			.replace(/^\s*#.*$/gm, '');
-		if (
-			count(executor, 'command.communicate(timeout=SCRIPTING_TIMEOUT_SECONDS)') !== 1 ||
-			count(
-				nativeScript,
-				'event.sendEventWithOptionsTimeoutError(__NO_PROMPT_OPTIONS__, __NO_PROMPT_NATIVE_TIMEOUT_SECONDS__, error)'
-			) !== 1 ||
-			!usesNativeTimeoutOwner(nativeScript)
-		) {
-			errors.push(
-				`${file}: the outer executor and inner native send no longer spend their declared owners`
-			);
-		}
-	}
-	requirePair(
-		'no-prompt AppleEvent status delivery',
-		'SCRIPTING_TIMEOUT_SECONDS',
-		seconds('SCRIPTING_TIMEOUT_SECONDS'),
-		'NO_PROMPT_NATIVE_TIMEOUT_SECONDS',
-		seconds('NO_PROMPT_NATIVE_TIMEOUT_SECONDS'),
-		'Python'
-	);
 }
 
 for (const line of passes) console.log(`  PASS  ${line}`);

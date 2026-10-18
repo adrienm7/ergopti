@@ -783,9 +783,7 @@ class VerdictTests(unittest.TestCase):
             output = Path(folder)
             owners = (
                 Path("/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"),
-                timer_probe.NativeDelayedTimerProbe.executable_path(
-                    Path("/Applications/ErgoptiPlus.app")
-                ),
+                timer_probe.executable_path(Path("/Applications/ErgoptiPlus.app")),
             )
             with (
                 mock.patch.object(gate, "processes", return_value=[]) as resolve,
@@ -914,7 +912,7 @@ class VerdictTests(unittest.TestCase):
             app = Path(folder) / "ErgoptiPlus.app"
             for executable in (
                 app / "Contents/MacOS/ErgoptiPlus",
-                timer_probe.NativeDelayedTimerProbe.executable_path(app),
+                timer_probe.executable_path(app),
             ):
                 executable.parent.mkdir(parents=True, exist_ok=True)
                 executable.write_text("owned fixture executable")

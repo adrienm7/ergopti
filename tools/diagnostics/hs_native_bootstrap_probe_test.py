@@ -25,7 +25,7 @@ class NativeFixture:
         self.app = root / "ErgoptiPlus.app"
         self.output = root / "evidence"
         self.output.mkdir()
-        self.executable = probe.NativeDelayedTimerProbe.executable_path(self.app)
+        self.executable = probe.executable_path(self.app)
         self.launcher = self.app / "Contents/MacOS/ErgoptiPlus"
         self.embedded = self.app / "Contents/Frameworks/Hammerspoon.app"
         self.executable.parent.mkdir(parents=True)
@@ -292,6 +292,23 @@ class StartupOwnershipTests(unittest.TestCase):
                 self.assertEqual(
                     fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
                 )
+
+    def test_private_karabiner_source_must_read_back_its_exact_bytes(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeFixture(Path(root))
+            original_settle = fixture.settle
+
+            def foreign_bytes(path, timeout):
+                result = original_settle(path, timeout)
+                if path.name == "settled.json":
+                    # A receipt flag alone never replaces the physical readback.
+                    path.with_name("karabiner-private.json").write_text("foreign bytes")
+                return result
+
+            fixture.settle = foreign_bytes
+            with self.assertRaisesRegex(RuntimeError, "private source"):
+                fixture.observe(self, "karabiner_config")
+            self.assertEqual(fixture.owners, [])
 
     def test_original_timer_inventory_and_karabiner_graph_assertions_remain_required(self):
         for feature, mutate in (

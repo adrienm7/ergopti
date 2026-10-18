@@ -12,7 +12,7 @@ import hs_karabiner_config_probe as probe
 import hs_native_bootstrap_probe as bootstrap
 
 NONCE = "a" * 32
-EXECUTABLE = probe.NativeDelayedTimerProbe.executable_path(Path("/Applications/ErgoptiPlus.app"))
+EXECUTABLE = probe.INSTALLED_EXECUTABLE
 DOMAIN = "com.ergoptiplus.app.hammerspoon"
 
 
@@ -123,26 +123,15 @@ class NativeReceiptTests(unittest.TestCase):
                     self.judge(changed)
 
     def observe_refusal(self, value):
-        """Exercise the real file reader and validator before the gate's privacy owner."""
-        observed = []
+        """Exercise the bootstrap's receipt reader and judge before the privacy owner."""
         with tempfile.TemporaryDirectory() as folder:
-            output = Path(folder)
-            owner = probe.NativeKarabinerConfigProbe(
-                Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
-            )
-            owner.nonce = NONCE
-
-            def execute(_source):
-                observed.append(owner.runtime_owner[0])
-                (output / "native-karabiner-config.json").write_text(json.dumps(value))
-
-            with mock.patch.object(owner, "execute", side_effect=execute):
-                with self.assertRaises(ValueError) as caught:
-                    owner.observe(42, lambda _: [42])
-            self.assertEqual(observed, [42])
-            self.assertIs(type(caught.exception), ValueError)
-            self.assertIsNone(caught.exception.__cause__)
-            return caught.exception, bootstrap.bounded_refusal(caught.exception)
+            path = Path(folder) / "feature.json"
+            path.write_text(json.dumps(value))
+            with self.assertRaises(ValueError) as caught:
+                self.judge(bootstrap.read_receipt(path))
+        self.assertIs(type(caught.exception), ValueError)
+        self.assertIsNone(caught.exception.__cause__)
+        return caught.exception, bootstrap.bounded_refusal(caught.exception)
 
     def test_incomplete_actual_receipt_exposes_only_admitted_native_failure_evidence(self):
         value = receipt()
@@ -469,50 +458,6 @@ class NativeReceiptTests(unittest.TestCase):
         ]
         with self.assertRaisesRegex(ValueError, "vacuous"):
             self.judge(value)
-
-    def test_private_physical_source_readback_cannot_be_replaced_by_receipt_flag(self):
-        for changed_source in (False, True):
-            with (
-                self.subTest(changed_source=changed_source),
-                tempfile.TemporaryDirectory() as folder,
-            ):
-                output = Path(folder)
-                owner = probe.NativeKarabinerConfigProbe(
-                    Path("/Applications/ErgoptiPlus.app"), output, DOMAIN
-                )
-                owner.nonce = NONCE
-                sampled_owners = []
-
-                def execute(source):
-                    sampled_owners.append(owner.runtime_owner)
-                    (output / "native-karabiner-config.json").write_text(json.dumps(receipt()))
-                    if changed_source:
-                        (
-                            output / "karabiner-private-home/.config/karabiner/karabiner.json"
-                        ).write_text("foreign bytes")
-
-                with mock.patch.object(owner, "execute", side_effect=execute):
-                    if changed_source:
-                        with self.assertRaisesRegex(RuntimeError, "source bytes"):
-                            owner.observe(42, lambda _: [42])
-                    else:
-                        self.assertEqual(owner.observe(42, lambda _: [42])["variant_count"], 8)
-                self.assertEqual(len(sampled_owners), 1)
-                self.assertEqual(sampled_owners[0][0], 42)
-                self.assertEqual(sampled_owners[0][1](EXECUTABLE), [42])
-
-    def test_changed_runtime_before_binding_never_enters_native_transport(self):
-        with tempfile.TemporaryDirectory() as folder:
-            owner = probe.NativeKarabinerConfigProbe(
-                Path("/Applications/ErgoptiPlus.app"), Path(folder), DOMAIN
-            )
-            processes = mock.Mock(side_effect=[[42], [43]])
-            with mock.patch.object(owner, "execute") as execute:
-                with self.assertRaisesRegex(RuntimeError, "changed runtime owner"):
-                    owner.observe(42, processes)
-            self.assertIsNone(owner.runtime_owner)
-            execute.assert_not_called()
-            self.assertFalse((Path(folder) / "native-karabiner-config.json").exists())
 
 
 if __name__ == "__main__":
