@@ -8,6 +8,9 @@
 --- only runloop indefinitely. These tests exercise the real subprocess and timer
 --- adapters over faithful native doubles, proving that every mutation starts
 --- only after a deadline commits and retains its exact owner through timeout.
+--- Carbon mutation refusal is an OSStatus, independent of child process exit.
+--- Preserve that status across selection and check every migration mutation
+--- before its script can publish success (tis-osstatus).
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -61,7 +64,7 @@ local function load_fixture(options)
 			self.terminate_calls = self.terminate_calls + 1
 			if options.task_terminate_result == false then return false end
 			if options.task_terminate_completes == true then
-				self:complete(0, "OK\n", "")
+				self:complete(0, "0\n", "")
 			end
 			return self
 		end
@@ -114,7 +117,72 @@ local function load_fixture(options)
 end
 
 
+--- Keeps native-status probes independent of earlier fixtures in this module.
+--- @param name string Regression description.
+--- @param body function Fixture construction and assertions.
+local function status_test(name, body)
+	helpers.it(name, function()
+		helpers.with_stub_scope({
+			"modules.keymap.input_sources", "modules.keymap.layout_install",
+			"adapters.shell_runner", "adapters.timer_scheduler", "adapters.task_lifecycle",
+			"adapters.python_interpreter", "infra.openstep_plist",
+		}, body)
+	end)
+end
+
+
 helpers.describe("input-source mutations: deadline owns the subprocess", function()
+	status_test("(tis-osstatus) publishes selection only for the native success status", function()
+		local cases = {
+			{ stdout = "0\n", exit_code = 0, ok = true },
+			{ stdout = "-50\n", exit_code = 0, ok = false },
+			{ stdout = "1\n", exit_code = 0, ok = false },
+			{ stdout = "OK\n", exit_code = 0, ok = false },
+			{ stdout = "MISS\n", exit_code = 0, ok = false },
+			{ stdout = "0\n", exit_code = 1, ok = false },
+		}
+		for _, case in ipairs(cases) do
+			local f = load_fixture()
+			local terminals = {}
+			helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME,
+				function(ok, out, reason)
+					terminals[#terminals + 1] = { ok = ok, out = out, reason = reason }
+				end), true)
+			f.tasks[1]:complete(case.exit_code, case.stdout, "")
+			helpers.assert_eq(#terminals, 1, "each native result must settle exactly once")
+			helpers.assert_eq(terminals[1].ok, case.ok,
+				"selection must honor the native OSStatus: " .. case.stdout)
+			helpers.assert_eq(terminals[1].out, case.stdout:gsub("[\r\n]+$", ""))
+			reset_fixture_modules()
+		end
+	end)
+
+	status_test("(tis-osstatus) carries the actual selection result across the child boundary", function()
+		local f = load_fixture()
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function() end), true)
+		local script = f.tasks[1].args[2]
+		-- AppleScript cannot execute in the portable Lua harness. Inspect the
+		-- actual child argument so a fabricated success cannot hide native refusal.
+		helpers.assert_true(script:find("return current application's TISSelectInputSource(theSource)", 1, true) ~= nil,
+			"the child must return TISSelectInputSource's OSStatus instead of a success literal")
+		f.tasks[1]:complete(0, "0\n", "")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-osstatus) checks every native migration mutation before counting success", function()
+		local f = load_fixture()
+		helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" }, function() end), true)
+		local script = f.tasks[1].args[2]
+		for _, operation in ipairs({ "TISDisableInputSource", "TISEnableInputSource", "TISSelectInputSource" }) do
+			helpers.assert_true(script:find("set nativeStatus to current application's " .. operation .. "(", 1, true) ~= nil,
+				operation .. " must expose its native status")
+			helpers.assert_true(script:find('if nativeStatus is not 0 then return "' .. operation .. ':" & (nativeStatus as text)', 1, true) ~= nil,
+				operation .. " refusal must stop migration before success is published")
+		end
+		f.tasks[1]:complete(0, "1/1\n", "")
+		reset_fixture_modules()
+	end)
+
 	helpers.it("times out a hung selection without blocking or accepting a sibling", function()
 		local f = load_fixture()
 		local terminals = {}
@@ -156,7 +224,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(set_layout_calls, 0,
 			"the busy owner must reject before an in-process setLayout attempt")
 
-		f.tasks[1]:complete(0, "OK\n", "")
+		f.tasks[1]:complete(0, "0\n", "")
 		helpers.assert_eq(#terminals, 1,
 			"a late successful completion must not replace the timeout terminal")
 
@@ -291,7 +359,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		local cases = {
 			{
 				label = "selection",
-				stdout = "OK\n",
+				stdout = "0\n",
 				invoke = function(IS, done)
 					return IS.set_input_source_async(LOCALISED_NAME, KL_NAME, done)
 				end,
@@ -378,7 +446,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 				terminals[#terminals + 1] = { ok = ok, reason = reason }
 			end), true)
 
-		f.tasks[1]:complete(0, "OK\n", "")
+		f.tasks[1]:complete(0, "0\n", "")
 		helpers.assert_eq(#terminals, 0,
 			"a success must wait while the exact deadline timer refuses cleanup")
 		f.timers[1]:fire()

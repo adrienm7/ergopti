@@ -684,15 +684,16 @@ on run
 	set theSources to current application's TISCreateInputSourceList(theProps, true)
 	if theSources is not missing value and (count of (theSources as list)) > 0 then
 		set theSource to item 1 of (theSources as list)
-		current application's TISSelectInputSource(theSource)
-		return "OK"
+		return current application's TISSelectInputSource(theSource)
 	end if
 	return "MISS"
 end run
 ]], tis_id)
 	return run_osascript_isolated_async(script, function(process_ok, out, reason)
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-		local switched = process_ok == true and out_text == "OK"
+		-- Carbon returns an OSStatus independently of osascript's process exit.
+		-- Finding the source does not prove the native selection was accepted.
+		local switched = process_ok == true and out_text == "0"
 		if switched then
 			Logger.info(LOG, "Active layout switched to '%s' (TIS subprocess, tis_id=%s).",
 				localised_name or kl_name, tis_id)
@@ -700,8 +701,8 @@ end run
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s).",
-			tostring(localised_name), tostring(kl_name), tis_id, failure_reason)
+		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s, result=%s).",
+			tostring(localised_name), tostring(kl_name), tis_id, failure_reason, out_text)
 		invoke_mutation_done("set_input_source.tis", on_done, false, out_text, failure_reason)
 	end)
 end
@@ -1010,18 +1011,22 @@ local function upgrade_active_list_async(legacy_active, on_done)
 		last_new = new_id
 		table.insert(lines, text_utils.applescript_format("\tset oldSrc to my findSource(\"%s\")", old))
 		table.insert(lines, "\tif oldSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISDisableInputSource(oldSrc)")
+		table.insert(lines, "\t\tset nativeStatus to current application's TISDisableInputSource(oldSrc)")
+		table.insert(lines, '\t\tif nativeStatus is not 0 then return "TISDisableInputSource:" & (nativeStatus as text)')
 		table.insert(lines, "\t\tset end of disabled to oldSrc")
 		table.insert(lines, "\tend if")
 		table.insert(lines, text_utils.applescript_format("\tset newSrc to my findSource(\"%s\")", new_id))
 		table.insert(lines, "\tif newSrc is not missing value then")
-		table.insert(lines, "\t\tcurrent application's TISEnableInputSource(newSrc)")
+		table.insert(lines, "\t\tset nativeStatus to current application's TISEnableInputSource(newSrc)")
+		table.insert(lines, '\t\tif nativeStatus is not 0 then return "TISEnableInputSource:" & (nativeStatus as text)')
 		table.insert(lines, "\t\tset end of enabled to newSrc")
 		table.insert(lines, "\tend if")
 	end
 	if last_new then
 		table.insert(lines, text_utils.applescript_format("\tset selSrc to my findSource(\"%s\")", last_new))
-		table.insert(lines, "\tif selSrc is not missing value then current application's TISSelectInputSource(selSrc)")
+		table.insert(lines, '\tif selSrc is missing value then return "MISS"')
+		table.insert(lines, "\tset nativeStatus to current application's TISSelectInputSource(selSrc)")
+		table.insert(lines, '\tif nativeStatus is not 0 then return "TISSelectInputSource:" & (nativeStatus as text)')
 	end
 	-- Both counts coerced to text FIRST. AppleScript's & on two non-string
 	-- operands builds a LIST, so this returned "1, /, 2" rather than "1/2" and the
@@ -1045,7 +1050,7 @@ local function upgrade_active_list_async(legacy_active, on_done)
 			return
 		end
 		local failure_reason = reason or "invalid_output"
-		Logger.error(LOG, "List upgrade failed (reason=%s).", failure_reason)
+		Logger.error(LOG, "List upgrade failed (reason=%s, result=%s).", failure_reason, out_text)
 		invoke_mutation_done("upgrade_active_list.done", on_done, false, out_text, failure_reason)
 	end)
 end
