@@ -310,6 +310,7 @@ function M.open(ctx)
 	end
 	local show_ok, webview_or_err = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame             = ui_builder.get_centered_frame(geo.width, geo.height),
 			title             = i18n.get("model_browser.window_title"),
 			style_masks       = { "titled", "closable", "miniaturizable", "resizable" },
