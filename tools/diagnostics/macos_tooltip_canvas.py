@@ -206,7 +206,7 @@ def qualify_script_scope(copied_app, source_root, scratch, output, version, canv
     of the authentic signed runtime. It cannot qualify an installed release app.
     """
     from hs_native_bootstrap_probe import (
-        SupplementaryNativeBootstrap,
+        NativeStartupBootstrap,
         CONTRACT,
         QUALIFICATION,
     )
@@ -266,7 +266,7 @@ def qualify_script_scope(copied_app, source_root, scratch, output, version, canv
     script_output = output / "script-scope"
     script_output.mkdir(mode=0o700)
     executable = embedded / "Contents/MacOS/Hammerspoon"
-    summary = SupplementaryNativeBootstrap(overlay, script_output, domain, processes).observe(
+    summary = NativeStartupBootstrap(overlay, script_output, domain, processes).observe(
         "script_scope"
     )
     summary = require_summary(summary, executable, domain, CONTRACT, QUALIFICATION)

@@ -29,6 +29,9 @@ FLAGS = {
     "complete",
 }
 VIEW_FIELDS = {"locale", "locale_backend", "log_level", "error_dialog"}
+# The installed product a startup-file bootstrap verified before and after its
+# native run: signed runtime identity plus a digest of the module tree it loaded.
+PRODUCT_FIELDS = {"executable", "bundle_id", "version", "codesign_verified", "module_tree_sha256"}
 
 
 def identity(result, contract, nonce, pid, executable, bundle_id):
@@ -203,6 +206,27 @@ def recover_claim(entries, domain, reader, runner, timeout):
         raise RuntimeError("The private settings cohort did not settle")
 
 
+def validate_installed_product(product, executable, bundle_id):
+    """Require the verified signed runtime and a module-tree digest, never a bare flag."""
+    expected = {
+        "executable": str(executable),
+        "bundle_id": bundle_id,
+        "version": TIMER_CONTRACT["runtime_version"],
+        "codesign_verified": True,
+    }
+    if type(product) is not dict or set(product) != PRODUCT_FIELDS:
+        raise ValueError("The installed native product receipt is incomplete")
+    if any(
+        type(product[key]) is not type(value) or product[key] != value
+        for key, value in expected.items()
+    ):
+        raise ValueError("The installed native product identity differs")
+    digest = product["module_tree_sha256"]
+    if type(digest) is not str or re.fullmatch(r"[0-9a-f]{64}", digest) is None:
+        raise ValueError("The installed native module tree digest is invalid")
+    return product
+
+
 def require_summary(result, executable, bundle_id, bootstrap_contract, qualification):
     """Require the closed native measurement and both physical cleanup receipts."""
     fields = {
@@ -213,12 +237,14 @@ def require_summary(result, executable, bundle_id, bootstrap_contract, qualifica
         "admission",
         "identity",
         "measurement",
+        "installed_product",
         "cleanup_acknowledged",
         "process_retired",
         "preference_restored",
     }
     if type(result) is not dict or set(result) != fields:
         raise ValueError("The required native Script summary is incomplete")
+    validate_installed_product(result["installed_product"], executable, bundle_id)
     if (
         type(result["schema_version"]) is not int
         or result["schema_version"] != 1

@@ -39,6 +39,25 @@ bytes. It never initializes a remap lease, registers a guardian, installs a
 Karabiner driver or publishes an active configuration to the user's file.
 This qualifies private file generation, not live driver activation.
 
+clean and karabiner_config also qualify the installed native runtime without
+any Automation consent, because hosted runners leave every consent request
+unanswered and an osascript transport there only ever timed out:
+
+1. the first AppleEvent the gate sends to the launched runtime comes from the
+   owned C sender with kAEDoNotPromptForUserConsent and kAENeverInteract, and
+   must answer exactly errAEEventWouldRequireUserConsent (-1744): the kernel-PID
+   target is addressable and delivery reaches the consent step, which nobody is
+   asked to answer;
+2. the managed boot journal must report the runtime's scripting getter as
+   allowed=true with a callable bridge, matching HSAppleScriptEnabledKey;
+3. once the managed launch has quit, the startup-file bootstrap
+   (hs_native_bootstrap_probe.py) runs the delayed-timer feature (clean), or the
+   Karabiner build/merge and Script SDK/participant features (karabiner_config),
+   on fresh exact owners of the same verified installed product. Every feature
+   runs whatever failed before it.
+
+A source-bound deferral receipt defers only the AppleEvent boundary of item 1.
+
 `--print-matrix {ci,release}` prints the scenario list of one gate profile as
 the GitHub Actions output line that feeds the workflow matrix. It takes no
 other argument and runs on any host, because it launches nothing.
@@ -57,19 +76,18 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 
 from hs_delayed_timer_probe import (
-    NativeDelayedTimerProbe,
+    AppleScriptPreference,
+    INSTALLED_EXECUTABLE,
     validate_summary,
-    validate_control_summary,
 )
-from hs_karabiner_config_probe import (
-    NativeKarabinerConfigProbe,
-    validate_summary as validate_karabiner_summary,
-)
+from hs_karabiner_config_probe import validate_summary as validate_karabiner_summary
 from hs_native_bootstrap_probe import (
-    SupplementaryNativeBootstrap,
+    NativeStartupBootstrap,
     bounded_refusal,
+    installed_product,
     CONTRACT as BOOTSTRAP_CONTRACT,
     QUALIFICATION as BOOTSTRAP_QUALIFICATION,
 )
@@ -148,6 +166,36 @@ EXPECTED_REFUSALS = {
 READY_MARKERS = {
     "configured_symlink": ACCESSIBILITY_WAIT_MARKER,
 }
+
+
+# The startup-file features each native scenario requires, in execution order.
+NATIVE_FEATURES = {
+    "clean": ("delayed_timer",),
+    "karabiner_config": ("karabiner_config", "script_scope"),
+}
+# The evidence key desktop-ci-evidence.cjs reads for each scenario's feature proof.
+FEATURE_PROOF_KEYS = {
+    "clean": "native_delayed_timer",
+    "karabiner_config": "native_karabiner_config",
+}
+CONSENT_SENDER_SOURCE = Path(__file__).with_name("native_appleevent_probe_sender.c")
+CONSENT_CONTRACT = "hs.appleevent.consent-boundary"
+# The sender mode whose only admitted outcome is errAEEventWouldRequireUserConsent.
+CONSENT_SENDER_MODE = "consent-required"
+CONSENT_REQUIRED_STATUS = -1744
+CONSENT_EXPECTED_STDOUT = f"native_appleevent_status={CONSENT_REQUIRED_STATUS}\n"
+CONSENT_BUILD_TIMEOUT_SECONDS = 180
+# A no-prompt send answers at once; the bound only catches a wedged sender.
+CONSENT_SEND_TIMEOUT_SECONDS = 30
+CONSENT_DIAGNOSTIC_LIMIT = 4000
+# adapters/boot_journal.lua writes this line before onboarding can defer boot.
+SCRIPTING_STATE = re.compile(
+    r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \[INFO\] \[init\] Native scripting server: "
+    r"pid=(\d+); getter=(\w+); allowed=(\w+); bridge=(\w+); "
+    r"handler_registration=unobserved; handler_entry=unobserved\."
+)
+# The gate writes HSAppleScriptEnabledKey=true before launch.
+EXPECTED_SCRIPTING_STATE = ("boolean", "true", "callable")
 
 
 def ready_marker(scenario):
@@ -308,47 +356,133 @@ def seed(scenario, home, seed_tag, today):
 # ===================================
 
 
-def evaluate(scenario, observation, *, defer_native=False):
-    """Return every failed criterion for one scenario; an empty list is a pass."""
+def validate_consent_boundary(receipt, pid):
+    """Require the sender's exact -1744 answer from the launched runtime's PID."""
+    fields = {"schema_version", "contract", "mode", "pid", "executable", "exit_status"}
+    fields |= {"stdout", "stderr"}
+    if not isinstance(receipt, dict) or set(receipt) != fields:
+        raise ValueError("the consent boundary receipt is incomplete")
+    if (
+        receipt["schema_version"] != 1
+        or receipt["contract"] != CONSENT_CONTRACT
+        or receipt["mode"] != CONSENT_SENDER_MODE
+        or type(pid) is not int
+        or type(receipt["pid"]) is not int
+        or receipt["pid"] != pid
+        or receipt["executable"] != INSTALLED_EXECUTABLE
+    ):
+        raise ValueError("the consent boundary receipt does not name the launched runtime")
+    if (
+        receipt["exit_status"] != 0
+        or receipt["stdout"] != CONSENT_EXPECTED_STDOUT
+        or receipt["stderr"] != ""
+    ):
+        answer = str(receipt["stdout"]).strip().splitlines()
+        raise ValueError(
+            f"the no-prompt send did not stop at the consent step (status {CONSENT_REQUIRED_STATUS} "
+            f"expected): exit {receipt['exit_status']}, " + (answer[0] if answer else "no status")
+        )
+    return receipt
+
+
+def scripting_state_failures(boot_log, pid):
+    """Require the launched runtime's journaled scripting getter to match its preference."""
+    rows = []
+    for line in boot_log.splitlines():
+        match = SCRIPTING_STATE.fullmatch(line)
+        if match and type(pid) is int and match[1] == str(pid):
+            rows.append(match.groups()[1:])
+    if len(rows) != 1:
+        return ["the boot journal has no single native scripting state for the launched runtime"]
+    if rows[0] != EXPECTED_SCRIPTING_STATE:
+        getter, allowed, bridge = rows[0]
+        return [
+            "the native scripting state does not reflect HSAppleScriptEnabledKey=true: "
+            f"getter={getter}; allowed={allowed}; bridge={bridge}"
+        ]
+    return []
+
+
+def native_failures(scenario, observation, defer_transport):
+    """Judge the consent-free AppleEvent boundary and every startup-file feature."""
     failures = []
-    if observation.get("managed_launch_observation_error") == "observer-cleanup-unsettled":
-        failures.append("the supplemental managed public observer cleanup has not settled")
-    if not defer_native and scenario in ("clean", "karabiner_config"):
-        if observation.get("native_transport_control_error"):
+    product = observation.get("installed_product")
+    if observation.get("installed_product_error"):
+        failures.append(
+            "the installed native product was not verified: "
+            + observation["installed_product_error"]
+        )
+    elif not isinstance(product, dict):
+        failures.append("the installed native product was never verified")
+    if observation.get("native_scripting_preference_error"):
+        failures.append(
+            "the native scripting preference owner failed: "
+            + observation["native_scripting_preference_error"]
+        )
+    failures.extend(
+        scripting_state_failures(
+            observation.get("boot_log", ""), observation.get("native_child_pid")
+        )
+    )
+    if not defer_transport:
+        if observation.get("appleevent_consent_boundary_error"):
             failures.append(
-                "the native AppleEvent control failed: "
-                + observation["native_transport_control_error"]
+                "the consent-free AppleEvent boundary probe failed: "
+                + observation["appleevent_consent_boundary_error"]
             )
         else:
             try:
-                feature_key = (
-                    "native_delayed_timer" if scenario == "clean" else "native_karabiner_config"
-                )
-                validate_control_summary(
-                    observation.get("native_transport_control"), observation.get(feature_key)
+                validate_consent_boundary(
+                    observation.get("appleevent_consent_boundary"),
+                    observation.get("native_child_pid"),
                 )
             except ValueError as error:
-                failures.append(f"the native AppleEvent control proof is incomplete: {error}")
-    if not defer_native and scenario == "karabiner_config":
-        if observation.get("native_karabiner_config_error"):
-            failures.append(
-                "the native Karabiner build/merge probe failed: "
-                + observation["native_karabiner_config_error"]
+                failures.append(
+                    f"the consent-free AppleEvent boundary proof is incomplete: {error}"
+                )
+    bootstrap = observation.get("native_startup_bootstrap")
+    if observation.get("native_startup_bootstrap_error"):
+        failures.append(
+            "the native startup-file bootstrap failed: "
+            + observation["native_startup_bootstrap_error"]
+        )
+    elif not isinstance(bootstrap, dict) or bootstrap.get("installed_product") != product:
+        failures.append("the native startup-file bootstrap is not bound to the verified product")
+    if scenario == "clean":
+        try:
+            validate_summary(observation.get("native_delayed_timer"))
+        except ValueError as error:
+            failures.append(f"the native delayed-timer proof is incomplete: {error}")
+        return failures
+    try:
+        validate_karabiner_summary(observation.get("native_karabiner_config"))
+    except ValueError as error:
+        failures.append(f"the native Karabiner build/merge proof is incomplete: {error}")
+    script = observation.get("native_script_scope")
+    refusal = observation.get("native_script_scope_error")
+    if not refusal:
+        try:
+            require_summary(
+                script, INSTALLED_EXECUTABLE, HS_DOMAIN, BOOTSTRAP_CONTRACT, BOOTSTRAP_QUALIFICATION
             )
-        else:
-            try:
-                validate_karabiner_summary(observation.get("native_karabiner_config"))
-            except ValueError as error:
-                failures.append(f"the native Karabiner build/merge proof is incomplete: {error}")
-    if not defer_native and scenario == "clean":
-        probe_error = observation.get("native_delayed_timer_error")
-        if probe_error:
-            failures.append(f"the native delayed-timer probe failed: {probe_error}")
-        else:
-            try:
-                validate_summary(observation.get("native_delayed_timer"))
-            except ValueError as error:
-                failures.append(f"the native delayed-timer proof is incomplete: {error}")
+            if script["installed_product"] != product:
+                raise ValueError("the Script owner observed another installed product")
+        except ValueError as error:
+            refusal = str(error)
+    if refusal:
+        failures.append("Required native Script SDK/participant qualification refused: " + refusal)
+    return failures
+
+
+def evaluate(scenario, observation, *, defer_native=False):
+    """Return every failed criterion for one scenario; an empty list is a pass.
+
+    defer_native names a source-bound deferral receipt. It defers only the
+    consent-free AppleEvent boundary; every startup-file feature stays required.
+    """
+    failures = []
+    if scenario in NATIVE_FEATURES:
+        failures.extend(native_failures(scenario, observation, defer_native))
     launcher = observation.get("launcher_log", "")
     fatal = [line for line in launcher.splitlines() if FATAL_WORD.search(line)]
     expected = EXPECTED_REFUSALS.get(scenario)
@@ -674,42 +808,19 @@ def collect(output, state, home, executables):
     return {"errors": errors, "windows": windows, "unified_logs": unified_logs}
 
 
-def print_native_probe_diagnostics(report):
-    """Keep owned native ancestry readable beyond GitHub's annotation limit."""
-    for receipt in report.get("native_probe_diagnostics", []):
-        for line in receipt.get("primary_error", "").splitlines():
-            print(
-                f"native probe command{receipt['command']} ({receipt['phase']}): primary error: {line}"
-            )
-        for line in receipt["observations"].splitlines():
-            # Prefix every line so a sampled symbol or refusal cannot be parsed
-            # as a GitHub workflow command. The native owner bounds and redacts
-            # these observations before putting them in the durable report.
-            print(f"native probe command{receipt['command']} ({receipt['phase']}): {line}")
-        if receipt.get("additional_commands_omitted"):
-            print(
-                f"native probe command{receipt['command']} ({receipt['phase']}): [additional diagnostic commands omitted]"
-            )
-
-    stage = report.get("supplementary_received_lua_stage")
-    if stage is not None:
-        print(
-            "native probe supplementary received Lua body: "
-            f"stage={stage['body_stage']}; publication_ack=unobserved; "
-            "timing=unknown; qualified=false"
-        )
-
-    managed = report.get("managed_launch_observation")
-    if isinstance(managed, dict):
-        value = managed.get("finished_launching")
-        state = "true" if value is True else "false" if value is False else "unknown"
-        timing = managed.get("timing")
-        if timing not in ("before_path", "overlaps_path", "after_path"):
-            timing = "unknown"
-        print(
-            "native probe managed public launch state: "
-            f"finished_launching={state}; timing={timing}; qualified=false; readiness=unobserved"
-        )
+def print_native_diagnostics(report):
+    """Keep the consent boundary's sender output readable beyond the annotation limit."""
+    receipt = report.get("appleevent_consent_boundary")
+    if not isinstance(receipt, dict):
+        return
+    print(
+        "native AppleEvent consent boundary: "
+        f"exit={receipt.get('exit_status')}; expected status {CONSENT_REQUIRED_STATUS}"
+    )
+    for stream in ("stdout", "stderr"):
+        for line in str(receipt.get(stream, "")).splitlines():
+            # The prefix keeps a sender line from being parsed as a workflow command.
+            print(f"native AppleEvent consent boundary {stream}: {line}")
 
 
 def print_tails(output):
@@ -756,6 +867,101 @@ def read_launch_qualification(receipt_path, scenario):
     return json.loads(result.stdout)
 
 
+def build_consent_sender(output):
+    """Compile the owned C sender; the boundary never goes through osascript or JXA."""
+    root = output / "appleevent-consent"
+    root.mkdir(mode=0o700)
+    sender = root / "owned-appleevent-sender"
+    result = subprocess.run(
+        [
+            "/usr/bin/xcrun",
+            "--sdk",
+            "macosx",
+            "clang",
+            "-std=c11",
+            "-O2",
+            "-x",
+            "objective-c",
+            "-fobjc-arc",
+            "-framework",
+            "ApplicationServices",
+            "-framework",
+            "Carbon",
+            "-framework",
+            "AppKit",
+            "-framework",
+            "Security",
+            str(CONSENT_SENDER_SOURCE),
+            "-o",
+            str(sender),
+        ],
+        capture_output=True,
+        text=True,
+        timeout=CONSENT_BUILD_TIMEOUT_SECONDS,
+    )
+    if result.returncode or not sender.is_file():
+        raise RuntimeError(
+            "The owned AppleEvent sender did not compile: "
+            + result.stderr[-CONSENT_DIAGNOSTIC_LIMIT:]
+        )
+    return sender
+
+
+def observe_consent_boundary(sender, pid, executable):
+    """Send one no-prompt event to the exact runtime PID and keep the sender's answer."""
+    if processes(executable) != [pid]:
+        raise RuntimeError("The consent boundary target is not the launcher's exact live runtime")
+    result = subprocess.run(
+        [str(sender), str(pid), str(uuid.uuid4()), CONSENT_SENDER_MODE],
+        cwd=str(sender.parent),
+        capture_output=True,
+        text=True,
+        timeout=CONSENT_SEND_TIMEOUT_SECONDS,
+    )
+    if processes(executable) != [pid]:
+        raise RuntimeError("The consent boundary target changed during the send")
+    return {
+        "schema_version": 1,
+        "contract": CONSENT_CONTRACT,
+        "mode": CONSENT_SENDER_MODE,
+        "pid": pid,
+        "executable": INSTALLED_EXECUTABLE,
+        "exit_status": result.returncode,
+        "stdout": result.stdout[-CONSENT_DIAGNOSTIC_LIMIT:],
+        "stderr": result.stderr[-CONSENT_DIAGNOSTIC_LIMIT:],
+    }
+
+
+def feature_proof(summary):
+    """Project a startup-file summary into the evidence record's feature proof."""
+    measurement = summary.get("measurement") if isinstance(summary, dict) else None
+    if not isinstance(measurement, dict):
+        return None
+    restored = summary.get("process_retired") is True and summary.get("preference_restored") is True
+    return dict(measurement, preference_restored=restored)
+
+
+def qualify_native_features(app, output, scenario, executables, preference_settled):
+    """Run every required startup-file feature on a fresh exact owner, in order.
+
+    Each feature runs whatever failed before it: an earlier refusal must never
+    turn a later required qualification into an unexecuted pass. Live managed
+    processes or an unrestored scripting key still refuse, as recorded failures.
+    """
+    results = {}
+    for feature in NATIVE_FEATURES[scenario]:
+        key = "native_script_scope" if feature == "script_scope" else "native_startup_bootstrap"
+        try:
+            if not preference_settled or any(processes(path) for path in executables):
+                raise RuntimeError("Managed launch owner debt refuses the native startup bootstrap")
+            results[key] = NativeStartupBootstrap(app, output, HS_DOMAIN, processes).observe(
+                feature
+            )
+        except Exception as error:
+            results[key + "_error"] = bounded_refusal(error)
+    return results
+
+
 def run(app, output, scenario, seed_tag, qualification_receipt=None):
     """Seed one state, launch the application, and return the complete report."""
     qualification = (
@@ -763,7 +969,7 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
         if qualification_receipt is not None
         else None
     )
-    defer_native = qualification is not None
+    defer_transport = qualification is not None
     home = Path.home()
     launcher = app / "Contents/MacOS/ErgoptiPlus"
     child = app / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
@@ -776,28 +982,32 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
         bundle_id = plistlib.load(handle)["CFBundleIdentifier"]
     arch = subprocess.run(["uname", "-m"], capture_output=True, text=True).stdout.strip()
     report = {"scenario": scenario, "machine": arch, "samples": []}
-    if defer_native:
+    if defer_transport:
         report["qualification"] = qualification
         report["native_qualified"] = False
     state = seed(scenario, home, seed_tag, datetime.date.today().isoformat())
     started = time.monotonic()
     observation = {}
     diagnostic_errors = []
-    native_probe = None
-    native_result_key = None
-    native_owner_settled = False
-    if not defer_native and scenario == "clean":
-        native_probe = NativeDelayedTimerProbe(app, output, HS_DOMAIN)
-        native_result_key = "native_delayed_timer"
-    elif not defer_native and scenario == "karabiner_config":
-        native_probe = NativeKarabinerConfigProbe(app, output, HS_DOMAIN)
-        native_result_key = "native_karabiner_config"
+    native = scenario in NATIVE_FEATURES
+    scripting = AppleScriptPreference(HS_DOMAIN) if native else None
+    preference_settled = not native
+    sender = None
+    if native:
+        try:
+            observation["installed_product"] = installed_product(app, HS_DOMAIN)
+        except Exception as error:
+            observation["installed_product_error"] = bounded_refusal(error)
+        try:
+            sender = build_consent_sender(output)
+        except Exception as error:
+            observation["appleevent_consent_boundary_error"] = bounded_refusal(error)
+        try:
+            # The journaled getter must then read true, not a constant default.
+            scripting.enable()
+        except Exception as error:
+            observation["native_scripting_preference_error"] = bounded_refusal(error)
     try:
-        if native_probe:
-            try:
-                native_probe.enable()
-            except Exception as error:
-                observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
         result = subprocess.run(
             launch_command(scenario, app), capture_output=True, text=True, timeout=15
         )
@@ -819,71 +1029,22 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
                 break
             time.sleep(1)
         observation["alive_after_window"] = bool(processes(launcher)) and bool(processes(child))
-        if (
-            native_probe
-            and observation["alive_after_window"]
-            and not observation.get(native_result_key + "_error")
-        ):
-            try:
-                child_pids = processes(child)
-                if len(child_pids) != 1:
-                    raise RuntimeError(
-                        "The native probe requires the launcher's single exact child"
-                    )
+        if native and observation["alive_after_window"]:
+            child_pids = processes(child)
+            if len(child_pids) == 1:
+                observation["native_child_pid"] = child_pids[0]
+            if sender is not None:
+                # The first and only event the gate sends to the runtime before Quit.
                 try:
-                    native_probe.start_managed_launch_observation(child_pids[0], processes)
-                except Exception:
-                    observation["managed_launch_observation_error"] = "observer-start-refused"
-                try:
-                    observation["native_transport_control"] = native_probe.control(
-                        child_pids[0], processes
-                    )
-                except Exception as error:
-                    observation["native_transport_control_error"] = (
-                        f"{type(error).__name__}: {error}"
-                    )
-                try:
-                    observation["native_descriptor_constructor"] = native_probe.constructor_control(
-                        child_pids[0], processes
-                    )
-                except Exception as error:
-                    detail = native_probe.pid_control_error_diagnostic(error)
-                    observation["native_descriptor_constructor_error"] = detail
-                    native_probe.retain_primary_error(error, "constructor")
-                try:
-                    observation["native_pid_transport_control"] = native_probe.control_pid(
-                        child_pids[0], processes
-                    )
-                except Exception as error:
-                    # This separate diagnostic cannot replace either original
-                    # proof. Retained scripting-child debt refuses its dispatch.
-                    detail = native_probe.pid_control_error_diagnostic(error)
-                    observation["native_pid_transport_control_error"] = detail
-                    native_probe.retain_primary_error(error, "pid_control")
-                try:
-                    observation["native_pid_no_prompt_control"] = (
-                        native_probe.control_pid_no_prompt(child_pids[0], processes)
-                    )
-                except Exception as error:
-                    observation["native_pid_no_prompt_control_error"] = (
-                        native_probe.pid_control_error_diagnostic(error)
-                    )
-                    native_probe.retain_primary_error(error, "pid_no_prompt")
-                # The control never replaces the original feature proof. Attempt
-                # it independently even after refusal; retained transport debt
-                # may itself refuse this call, which is a second honest failure.
-                observation[native_result_key] = native_probe.observe(child_pids[0], processes)
-            except Exception as error:
-                observation[native_result_key + "_error"] = f"{type(error).__name__}: {error}"
-            finally:
-                observer = native_probe.managed_launch_observation
-                if observer is not None:
-                    try:
-                        observation["managed_launch_observation"] = observer.finish()
-                    except Exception:
-                        observation["managed_launch_observation_error"] = (
-                            "observer-cleanup-unsettled"
+                    if len(child_pids) != 1:
+                        raise RuntimeError(
+                            "The consent boundary requires the launcher's single exact child"
                         )
+                    observation["appleevent_consent_boundary"] = observe_consent_boundary(
+                        sender, child_pids[0], child
+                    )
+                except Exception as error:
+                    observation["appleevent_consent_boundary_error"] = bounded_refusal(error)
         observation["quit_seconds"] = (
             quit_application(bundle_id, (launcher, child))
             if observation["alive_after_window"]
@@ -925,7 +1086,7 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
                     except ProcessLookupError:
                         pass
         finally:
-            if native_probe:
+            if scripting is not None:
                 try:
                     # Evidence collection can itself fail. Reap the exact writer
                     # before restoring its key even when that earlier cleanup aborted.
@@ -941,96 +1102,45 @@ def run(app, output, scenario, seed_tag, qualification_receipt=None):
                                 "The native preference writer did not stop before restoration"
                             )
                         time.sleep(0.05)
-                    native_probe.restore()
-                    native_owner_settled = not native_probe.scripting_commands
-                    if native_result_key in observation:
-                        observation[native_result_key]["preference_restored"] = True
+                    scripting.restore()
+                    preference_settled = True
                 except Exception as error:
-                    previous = observation.get(native_result_key + "_error", "")
-                    observation[native_result_key + "_error"] = (
+                    previous = observation.get("native_scripting_preference_error", "")
+                    observation["native_scripting_preference_error"] = (
                         previous + "; " if previous else ""
                     ) + f"preference restoration failed: {error}"
-    if native_probe:
-        report["managed_launch_observation"] = observation.get("managed_launch_observation")
-        if observation.get("managed_launch_observation_error"):
-            report["managed_launch_observation_error"] = observation[
-                "managed_launch_observation_error"
-            ]
-        report["native_probe_diagnostics"] = native_probe.diagnostic_receipts
-        report["supplementary_received_lua_stage"] = native_probe.observe_early_lua_stage(
-            observation.get("boot_log", "")
+    if native:
+        # The startup-file features need no AppleEvent, so they run in every
+        # profile, after the managed launch and its scripting key have retired.
+        observation.update(
+            qualify_native_features(app, output, scenario, (launcher, child), preference_settled)
         )
-        report["native_transport_control"] = observation.get("native_transport_control")
-        report["native_descriptor_constructor"] = observation.get("native_descriptor_constructor")
-        if observation.get("native_descriptor_constructor_error"):
-            report["native_descriptor_constructor_error"] = observation[
-                "native_descriptor_constructor_error"
-            ]
-        report["native_pid_transport_control"] = observation.get("native_pid_transport_control")
-        if observation.get("native_pid_transport_control_error"):
-            report["native_pid_transport_control_error"] = observation[
-                "native_pid_transport_control_error"
-            ]
-        report["native_pid_no_prompt_control"] = observation.get("native_pid_no_prompt_control")
-        if observation.get("native_pid_no_prompt_control_error"):
-            report["native_pid_no_prompt_control_error"] = observation[
-                "native_pid_no_prompt_control_error"
-            ]
-        if observation.get("native_transport_control_error"):
-            report["native_transport_control_error"] = observation["native_transport_control_error"]
-        report[native_result_key] = observation.get(native_result_key)
-        if observation.get(native_result_key + "_error"):
-            report[native_result_key + "_error"] = observation[native_result_key + "_error"]
+        observation[FEATURE_PROOF_KEYS[scenario]] = feature_proof(
+            observation.get("native_startup_bootstrap")
+        )
+        for key in (
+            "installed_product",
+            "installed_product_error",
+            "native_child_pid",
+            "native_scripting_preference_error",
+            "appleevent_consent_boundary",
+            "appleevent_consent_boundary_error",
+            "native_startup_bootstrap",
+            "native_startup_bootstrap_error",
+            "native_script_scope",
+            "native_script_scope_error",
+            FEATURE_PROOF_KEYS[scenario],
+        ):
+            if key in observation:
+                report[key] = observation[key]
     report["quit_seconds"] = observation.get("quit_seconds")
     report["alive_after_window"] = observation.get("alive_after_window", False)
-    report["failures"] = evaluate(scenario, observation, defer_native=defer_native)
+    report["failures"] = evaluate(scenario, observation, defer_native=defer_transport)
     if observation.get("launch_gate_error"):
         report["failures"].append(observation["launch_gate_error"])
     if diagnostic_errors:
         report["diagnostic_errors"] = diagnostic_errors
         report["failures"].extend(diagnostic_errors)
-    supplementary = None
-    if native_probe:
-        # This separate startup measurement cannot satisfy or overwrite any
-        # required original startup, AppleEvent or feature verdict above.
-        try:
-            if not native_owner_settled or processes(launcher) or processes(child):
-                raise RuntimeError("Original native owner debt refuses supplementary startup")
-            supplementary = SupplementaryNativeBootstrap(app, output, HS_DOMAIN, processes)
-            report["supplementary_native_bootstrap"] = supplementary.observe(
-                "delayed_timer" if scenario == "clean" else "karabiner_config"
-            )
-        except Exception as error:
-            report["supplementary_native_bootstrap_error"] = bounded_refusal(error)
-    if scenario == "karabiner_config" and report["failures"]:
-        report["supplementary_native_script_scope"] = {
-            "status": "not_executed",
-            "reason": "blocked by required original launch failure",
-        }
-    elif not defer_native and scenario == "karabiner_config":
-        # Independent installed SDK/participant proof uses the same exact native
-        # startup owner after every prior owner has retired. It cannot replace
-        # the required managed launch or original feature verdict.
-        try:
-            if not native_owner_settled or processes(launcher) or processes(child):
-                raise RuntimeError(
-                    "Original native owner debt refuses supplementary script startup"
-                )
-            if supplementary is None:
-                raise RuntimeError("Original supplementary owner unavailable for script startup")
-            report["supplementary_native_script_scope"] = require_summary(
-                supplementary.observe_script_scope(),
-                child,
-                HS_DOMAIN,
-                BOOTSTRAP_CONTRACT,
-                BOOTSTRAP_QUALIFICATION,
-            )
-        except Exception as error:
-            report["supplementary_native_script_scope_error"] = bounded_refusal(error)
-            report["failures"].append(
-                "Required native Script SDK/participant qualification refused: "
-                + bounded_refusal(error)
-            )
     return report
 
 
@@ -1112,23 +1222,16 @@ def main(argv=None):
         Path(args.app).resolve(), output, args.scenario, args.seed_tag, args.qualification_receipt
     )
     (output / "result.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-    if report.get("supplementary_native_bootstrap"):
-        print(
-            "supplementary native bootstrap: installed native feature qualified; "
-            "original launch and AppleEvent verdicts remain mandatory"
-        )
-    if report.get("supplementary_native_bootstrap_error"):
-        for line in report["supplementary_native_bootstrap_error"].splitlines():
-            print("supplementary native bootstrap refused: " + line)
     if report["failures"]:
         for annotation in failure_annotations(args.scenario, report["failures"]):
             print(annotation)
-        print_native_probe_diagnostics(report)
+        print_native_diagnostics(report)
         print_tails(output)
         return 1
     if report.get("qualification"):
         print(
-            f"[DEFERRED] macos-launch-appleevents: {args.scenario}; native/feature qualified=false. Lifecycle checks completed; no native PASS recorded."
+            f"[DEFERRED] macos-launch-appleevents: {args.scenario}; AppleEvent consent boundary "
+            "qualified=false. Lifecycle checks and every startup-file native feature passed."
         )
         return 0
     print(

@@ -2,8 +2,6 @@
 """Reject foreign startup owners, incomplete native measurements and cleanup debt."""
 
 import copy
-import json
-import os
 from pathlib import Path
 import plistlib
 import subprocess
@@ -14,7 +12,6 @@ from unittest import mock
 import hs_native_bootstrap_probe as probe
 import hs_delayed_timer_probe_test as timer_cases
 import hs_karabiner_config_probe_test as karabiner_cases
-import macos_launch_gate as gate
 import hs_script_scope_probe as script_probe
 
 DOMAIN = timer_cases.DOMAIN
@@ -49,7 +46,7 @@ class NativeFixture:
         self.settled_mutation = None
         self.feature_mutation = None
         self.fail_open = False
-        self.owner = probe.SupplementaryNativeBootstrap(
+        self.owner = probe.NativeStartupBootstrap(
             self.app, self.output, DOMAIN, self.processes, self.run
         )
         self.owner.nonce = NONCE
@@ -78,9 +75,7 @@ class NativeFixture:
             if self.fail_open:
                 return subprocess.CompletedProcess(arguments, 1, b"", b"refused")
             self.owners = [42]
-            context = probe.read_receipt(
-                self.output / "supplementary-native-bootstrap/context.json"
-            )
+            context = probe.read_receipt(self.output / "native-startup-bootstrap/context.json")
             ready = dict(
                 self.owner.identity,
                 schema_version=1,
@@ -102,7 +97,7 @@ class NativeFixture:
             timeout,
             15
             if probe.read_receipt(path.with_name("context.json"))["feature"] == "delayed_timer"
-            else 10,
+            else probe.KARABINER_FEATURE_TIMEOUT_SECONDS,
         )
         admitted = probe.read_receipt(path.with_name("admit.json"))
         self.test.assertEqual(self.owner.pid, 42)
@@ -185,7 +180,7 @@ class StartupOwnershipTests(unittest.TestCase):
                 self.assertFalse(any("osascript" in cmd[0] for cmd in commands))
                 self.assertFalse(any("HSAppleScriptEnabledKey" in cmd for cmd in commands))
                 context = probe.read_receipt(
-                    fixture.output / "supplementary-native-bootstrap/context.json"
+                    fixture.output / "native-startup-bootstrap/context.json"
                 )
                 self.assertEqual(
                     Path(context["probe_source"]).name,
@@ -195,8 +190,24 @@ class StartupOwnershipTests(unittest.TestCase):
                 )
                 self.assertEqual(context["admission_timeout"], 10)
                 self.assertEqual(
-                    context["feature_timeout"], 15 if feature == "delayed_timer" else 10
+                    context["feature_timeout"],
+                    15 if feature == "delayed_timer" else probe.KARABINER_FEATURE_TIMEOUT_SECONDS,
                 )
+                product = summary["installed_product"]
+                self.assertEqual(product["executable"], str(fixture.executable))
+                self.assertEqual(product["bundle_id"], DOMAIN)
+                self.assertIs(product["codesign_verified"], True)
+                self.assertEqual(
+                    product["module_tree_sha256"], probe.module_tree_sha256(fixture.app)
+                )
+                if feature == "karabiner_config":
+                    self.assertEqual(
+                        summary["variant_elapsed_ms"],
+                        [
+                            variant["elapsed_ms"]
+                            for variant in karabiner_cases.receipt()["variants"]
+                        ],
+                    )
 
     def test_absent_startup_key_is_physically_removed_without_losing_late_values(self):
         with tempfile.TemporaryDirectory() as root:
@@ -235,7 +246,7 @@ class StartupOwnershipTests(unittest.TestCase):
             with tempfile.TemporaryDirectory() as root:
                 fixture = NativeFixture(Path(root))
                 fixture.owners = owners
-                with self.assertRaisesRegex(RuntimeError, "original runtimes"):
+                with self.assertRaisesRegex(RuntimeError, "prior runtimes"):
                     fixture.observe(self)
                 self.assertEqual(fixture.calls, [])
                 self.assertEqual(fixture.preferences, fixture.initial)
@@ -257,9 +268,7 @@ class StartupOwnershipTests(unittest.TestCase):
                 fixture.ready_mutation = lambda receipt, k=key, v=value: receipt.update({k: v})
                 with self.assertRaises(ValueError):
                     fixture.observe(self)
-                self.assertFalse(
-                    (fixture.output / "supplementary-native-bootstrap/admit.json").exists()
-                )
+                self.assertFalse((fixture.output / "native-startup-bootstrap/admit.json").exists())
                 self.assertEqual(
                     fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
                 )
@@ -382,7 +391,7 @@ class StartupOwnershipTests(unittest.TestCase):
             directory.mkdir()
             fixture = NativeFixture(directory)
             fixture.observe(self)
-            source = (fixture.output / "supplementary-native-bootstrap/init.lua").read_text()
+            source = (fixture.output / "native-startup-bootstrap/init.lua").read_text()
             self.assertIn("ù — ★", source)
             self.assertNotIn("\\u", source)
 
@@ -401,115 +410,123 @@ class StartupOwnershipTests(unittest.TestCase):
                         fixture.owner.wait_receipt(path, 10)
 
 
-class PackagedExecutionTests(unittest.TestCase):
-    """Require the supplementary call after original retirement, without substitution."""
+class BudgetAndProductTests(unittest.TestCase):
+    """Bound each feature by its work and bind it to the installed module bytes."""
 
-    def test_packaged_scenarios_execute_supplementary_probe_after_original_cleanup(self):
-        for scenario, feature in (
-            ("clean", "delayed_timer"),
-            ("karabiner_config", "karabiner_config"),
-        ):
-            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as root:
+    def test_karabiner_budget_scales_with_the_variant_inventory(self):
+        self.assertEqual(
+            probe.KARABINER_FEATURE_TIMEOUT_SECONDS,
+            probe.KARABINER_VARIANT_ALLOWANCE_SECONDS * len(karabiner_cases.probe.VARIANTS),
+        )
+        # The former fixed 10 s budget timed out every Intel Karabiner run.
+        self.assertGreater(probe.KARABINER_FEATURE_TIMEOUT_SECONDS, 10)
+        self.assertEqual(probe.NativeStartupBootstrap.feature_timeout("delayed_timer"), 15)
+        self.assertEqual(
+            probe.NativeStartupBootstrap.feature_timeout("karabiner_config"),
+            probe.KARABINER_FEATURE_TIMEOUT_SECONDS,
+        )
+        self.assertEqual(probe.NativeStartupBootstrap.feature_timeout("script_scope"), 10)
+
+    def test_lua_bootstrap_accepts_the_gate_budget_and_contract(self):
+        source = Path(probe.__file__).with_name("hs_native_bootstrap.lua").read_text()
+        self.assertIn('context.contract == "' + probe.CONTRACT + '"', source)
+        self.assertNotIn('context.feature == "delayed_timer" and 15 or 10', source)
+        self.assertIn("context.feature_timeout > 0", source)
+
+    def test_unfinished_karabiner_run_still_fails_and_reports_variant_timings(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeFixture(Path(root))
+            fixture.test = self
+            original_settle = fixture.settle
+
+            def stalled(path, timeout):
+                if path.name == "ready.json":
+                    return original_settle(path, timeout)
+                self.assertEqual(timeout, probe.KARABINER_FEATURE_TIMEOUT_SECONDS)
+                progress = Path(str(path.with_name("feature.json")) + ".progress")
+                progress.write_text(
+                    '{"variant":1,"elapsed_ms":2100}\n{"variant":2,"elapsed_ms":2300}\n'
+                )
+                raise RuntimeError("The native startup receipt timed out or its owner changed")
+
+            with (
+                mock.patch.object(fixture.owner, "wait_receipt", side_effect=stalled),
+                mock.patch.object(probe.os, "kill", side_effect=fixture.kill),
+            ):
+                with self.assertRaisesRegex(RuntimeError, "timed out") as caught:
+                    fixture.owner.observe("karabiner_config")
+            self.assertIn(
+                "Karabiner variants completed: 2/8; elapsed_ms=[2100, 2300]", str(caught.exception)
+            )
+            self.assertEqual(fixture.owners, [])
+            self.assertEqual(
+                fixture.preferences[probe.CONFIG_KEY], fixture.initial[probe.CONFIG_KEY]
+            )
+
+    def test_module_tree_changed_during_the_feature_refuses_its_measurement(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeFixture(Path(root))
+            original_settle = fixture.settle
+
+            def swapped(path, timeout):
+                result = original_settle(path, timeout)
+                if path.name == "settled.json":
+                    macos = fixture.app / "Contents/Resources/static/ergopti_plus/macos"
+                    (macos / "init.lua").write_text("-- swapped during qualification")
+                return result
+
+            fixture.settle = swapped
+            with self.assertRaisesRegex(RuntimeError, "module tree changed"):
+                fixture.observe(self)
+            self.assertEqual(fixture.owners, [])
+
+    def test_module_tree_digest_covers_paths_bytes_and_both_roots(self):
+        with tempfile.TemporaryDirectory() as root:
+            fixture = NativeFixture(Path(root))
+            macos, shared = probe.module_roots(fixture.app)
+            (shared / "core.lua").write_text("return 1")
+            digest = probe.module_tree_sha256(fixture.app)
+            self.assertRegex(digest, r"^[0-9a-f]{64}$")
+            self.assertEqual(probe.module_tree_sha256(fixture.app), digest)
+            for change in (
+                lambda: (shared / "core.lua").write_text("return 2"),
+                lambda: (shared / "core.lua").rename(shared / "renamed.lua"),
+                lambda: (macos / "added.lua").write_text(""),
+            ):
+                change()
+                changed = probe.module_tree_sha256(fixture.app)
+                self.assertNotEqual(changed, digest)
+                digest = changed
+
+    def test_foreign_identity_or_unverified_signature_refuses_before_launch(self):
+        for mutate in ("bundle", "signature"):
+            with self.subTest(mutate=mutate), tempfile.TemporaryDirectory() as root:
                 fixture = NativeFixture(Path(root))
-                fixture.launcher.parent.mkdir(parents=True)
-                fixture.launcher.write_text("fixture launcher")
-                with (fixture.app / "Contents/Info.plist").open("wb") as handle:
-                    plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
-                owner = mock.Mock()
-                owner.scripting_commands = []
-                owner.diagnostic_receipts = []
-                owner.control.side_effect = RuntimeError("original control refused")
-                owner.observe.side_effect = RuntimeError("original feature refused")
-                supplement = mock.Mock()
-                supplement.observe.return_value = {"qualification": probe.QUALIFICATION}
-                live = {"value": False}
-                events = []
+                if mutate == "bundle":
+                    with (fixture.embedded / "Contents/Info.plist").open("wb") as handle:
+                        plistlib.dump(
+                            {
+                                "CFBundleIdentifier": "org.hammerspoon.Hammerspoon",
+                                "CFBundleShortVersionString": "1.1.1",
+                            },
+                            handle,
+                        )
+                else:
+                    original_run = fixture.run
 
-                def processes(executable):
-                    return [42 if executable == fixture.executable else 41] if live["value"] else []
+                    def refused(arguments, **options):
+                        result = original_run(arguments, **options)
+                        if arguments[0] == "/usr/bin/codesign":
+                            result.returncode = 1
+                        return result
 
-                def run_native(arguments, **options):
-                    if arguments[0] == "open":
-                        live["value"] = True
-                    return subprocess.CompletedProcess(arguments, 0, "arm64", "")
-
-                def quit_native(*_):
-                    live["value"] = False
-                    events.append("retired")
-                    return 0.5
-
-                def restored():
-                    self.assertFalse(live["value"])
-                    events.append("restored")
-
-                def supplemental(*arguments):
-                    self.assertEqual(events, ["retired", "restored"])
-                    self.assertFalse(live["value"])
-                    self.assertEqual(arguments[:3], (fixture.app, fixture.output, DOMAIN))
-                    self.assertEqual(arguments[3](fixture.executable), [])
-                    return supplement
-
-                owner.restore.side_effect = restored
-                owner_name = (
-                    "NativeDelayedTimerProbe"
-                    if scenario == "clean"
-                    else "NativeKarabinerConfigProbe"
+                    fixture.owner.runner = refused
+                with self.assertRaisesRegex(RuntimeError, "foreign identity|signature"):
+                    fixture.observe(self)
+                self.assertFalse(
+                    any(call[0][0] == "/usr/bin/open" for call in fixture.calls),
+                    "an unverified product must never be launched",
                 )
-                with (
-                    mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
-                    mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
-                    mock.patch.object(gate, owner_name, return_value=owner),
-                    mock.patch.object(
-                        gate, "SupplementaryNativeBootstrap", create=True, side_effect=supplemental
-                    ) as invoked,
-                    mock.patch.object(gate, "processes", side_effect=processes),
-                    mock.patch.object(gate.subprocess, "run", side_effect=run_native),
-                    mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                    mock.patch.object(
-                        gate,
-                        "read_text",
-                        return_value="embedded Hammerspoon bootstrap logger configured\n",
-                    ),
-                    mock.patch.object(
-                        gate, "driver_logs", return_value="Onboarding wizard opened.\n"
-                    ),
-                    mock.patch.object(gate, "check_state", return_value=[]),
-                    mock.patch.object(gate, "quit_application", side_effect=quit_native),
-                    mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
-                ):
-                    # The gate's actual resolver is the mocked callable, not
-                    # the stand-in function supplying its external observations.
-                    report = gate.run(fixture.app, fixture.output, scenario, "")
-                invoked.assert_called_once()
-                supplement.observe.assert_called_once_with(feature)
-                self.assertEqual(
-                    report["supplementary_native_bootstrap"], supplement.observe.return_value
-                )
-                self.assertTrue(
-                    any("original control refused" in item for item in report["failures"])
-                )
-                self.assertTrue(
-                    any("original feature refused" in item for item in report["failures"])
-                )
-                self.assertIsNone(report.get("native_delayed_timer"))
-                self.assertIsNone(report.get("native_karabiner_config"))
-
-    def test_supplementary_success_cannot_change_any_original_verdict(self):
-        from macos_launch_gate_test import HEALTHY
-
-        missing = dict(
-            HEALTHY,
-            native_transport_control_error="required path refused",
-            native_delayed_timer=None,
-        )
-        expected = gate.evaluate("clean", missing)
-        supplemented = dict(
-            missing,
-            supplementary_native_bootstrap={"complete": True, "measurement": timer_cases.receipt()},
-        )
-        self.assertEqual(gate.evaluate("clean", supplemented), expected)
-        self.assertTrue(any("required path refused" in failure for failure in expected))
-        self.assertTrue(any("native delayed-timer" in failure for failure in expected))
 
 
 class NativeScriptFixture(NativeFixture):
@@ -521,7 +538,7 @@ class NativeScriptFixture(NativeFixture):
         self.calls.append((arguments, options))
         self.owners = [42]
         context = probe.read_receipt(
-            self.output / "supplementary-native-bootstrap-script_scope/context.json"
+            self.output / "native-startup-bootstrap-script_scope/context.json"
         )
         ready = dict(
             self.owner.identity, schema_version=1, contract=probe.CONTRACT, phase="ready", pid=42
@@ -681,113 +698,6 @@ class NativeScriptOwnershipTests(unittest.TestCase):
             )
             self.assertEqual(fixture.preferences[f"ergopti.scope_probe.{NONCE}.alias_1"], "fr")
 
-    def test_actual_launch_gate_requires_script_smoke_and_preserves_original_failures(self):
-        for mode in ("complete", "missing", "unknown", "false", "cleanup", "exception", "original"):
-            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as root:
-                fixture = NativeScriptFixture(Path(root))
-                complete = fixture.observe(self, "script_scope")
-                outcome = copy.deepcopy(complete)
-                if mode == "missing":
-                    outcome["measurement"].pop("sdk_void_set")
-                elif mode == "unknown":
-                    outcome["measurement"]["unknown"] = True
-                elif mode == "false":
-                    outcome["measurement"]["participant_inverse"] = False
-                elif mode == "cleanup":
-                    outcome["preference_restored"] = False
-                elif mode == "exception":
-                    outcome = RuntimeError("script cleanup refused")
-                fixture.launcher.parent.mkdir(parents=True)
-                fixture.launcher.write_text("fixture launcher")
-                with (fixture.app / "Contents/Info.plist").open("wb") as handle:
-                    plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
-                owner = mock.Mock()
-                owner.scripting_commands = []
-                owner.diagnostic_receipts = []
-                from macos_launch_gate_test import control_summary
-
-                original = karabiner_cases.probe.validate_receipt(
-                    karabiner_cases.receipt(), NONCE, 42, karabiner_cases.EXECUTABLE, DOMAIN
-                )
-                owner.control.return_value = control_summary()
-                owner.observe.return_value = original
-                if mode == "original":
-                    owner.control.side_effect = RuntimeError("original control refused")
-                    owner.observe.side_effect = RuntimeError("original feature refused")
-                supplement = mock.Mock()
-                live = {"value": False}
-
-                def observed_processes(executable):
-                    return [42 if executable == fixture.executable else 41] if live["value"] else []
-
-                def launch(arguments, **options):
-                    if arguments[0] == "open":
-                        live["value"] = True
-                    return subprocess.CompletedProcess(arguments, 0, "arm64", "")
-
-                def quit_native(*_):
-                    live["value"] = False
-                    return 0.5
-
-                if isinstance(outcome, Exception):
-                    supplement.observe_script_scope.side_effect = outcome
-                else:
-                    supplement.observe_script_scope.return_value = outcome
-                with (
-                    mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
-                    mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
-                    mock.patch.object(gate, "NativeKarabinerConfigProbe", return_value=owner),
-                    mock.patch.object(
-                        gate, "SupplementaryNativeBootstrap", return_value=supplement
-                    ),
-                    mock.patch.object(gate, "processes", side_effect=observed_processes),
-                    mock.patch.object(gate.subprocess, "run", side_effect=launch),
-                    mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                    mock.patch.object(
-                        gate,
-                        "read_text",
-                        return_value="embedded Hammerspoon bootstrap logger configured\n",
-                    ),
-                    mock.patch.object(
-                        gate, "driver_logs", return_value="Onboarding wizard opened.\n"
-                    ),
-                    mock.patch.object(gate, "check_state", return_value=[]),
-                    mock.patch.object(gate, "quit_application", side_effect=quit_native),
-                    mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
-                ):
-                    report = gate.run(fixture.app, fixture.output, "karabiner_config", "")
-                supplement.observe.assert_called_once_with("karabiner_config")
-                if mode == "original":
-                    supplement.observe_script_scope.assert_not_called()
-                    self.assertEqual(len(report["failures"]), 2)
-                    self.assertTrue(
-                        any("original control refused" in item for item in report["failures"])
-                    )
-                    self.assertTrue(
-                        any("original feature refused" in item for item in report["failures"])
-                    )
-                    self.assertEqual(
-                        report["supplementary_native_script_scope"],
-                        {
-                            "status": "not_executed",
-                            "reason": "blocked by required original launch failure",
-                        },
-                    )
-                else:
-                    supplement.observe_script_scope.assert_called_once_with()
-                    refused = any(
-                        item.startswith(
-                            "Required native Script SDK/participant qualification refused:"
-                        )
-                        for item in report["failures"]
-                    )
-                    self.assertEqual(refused, mode != "complete")
-                    self.assertEqual(len(report["failures"]), 0 if mode == "complete" else 1)
-                    if mode == "complete":
-                        self.assertEqual(report["supplementary_native_script_scope"], complete)
-                    else:
-                        self.assertNotIn("supplementary_native_script_scope", report)
-
     def test_required_script_summary_rejects_unknown_identity_false_fields_and_cleanup_debt(self):
         with tempfile.TemporaryDirectory() as root:
             fixture = NativeScriptFixture(Path(root))
@@ -804,25 +714,16 @@ class NativeScriptOwnershipTests(unittest.TestCase):
                 lambda r: r["measurement"].update(sdk_void_set=1),
                 lambda r: r["measurement"].update(nonce="c" * 32),
                 lambda r: r["identity"].update(pid=True),
+                lambda r: r.pop("installed_product"),
+                lambda r: r["installed_product"].update(codesign_verified=False),
+                lambda r: r["installed_product"].update(module_tree_sha256="not-a-digest"),
+                lambda r: r["installed_product"].update(bundle_id="org.hammerspoon.Hammerspoon"),
             ]
             for change in changes:
                 rejected = copy.deepcopy(result)
                 change(rejected)
                 with self.assertRaises(ValueError):
                     require(rejected)
-
-    def test_followup_feature_creates_fresh_exact_owner_without_reusing_retired_pid(self):
-        with tempfile.TemporaryDirectory() as root:
-            fixture = NativeFixture(Path(root))
-            fixture.owner.pid = 42
-            with mock.patch.object(probe, "SupplementaryNativeBootstrap") as constructor:
-                expected = object()
-                constructor.return_value.observe.return_value = expected
-                self.assertIs(fixture.owner.observe_script_scope(), expected)
-                constructor.assert_called_once_with(
-                    fixture.app, fixture.output, DOMAIN, fixture.processes, fixture.run
-                )
-                constructor.return_value.observe.assert_called_once_with("script_scope")
 
 
 if __name__ == "__main__":

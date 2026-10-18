@@ -3,6 +3,7 @@
 
 import importlib.util
 import contextlib
+import copy
 import gzip
 import io
 import json
@@ -17,14 +18,23 @@ import unittest
 from unittest import mock
 
 import hs_delayed_timer_probe as timer_probe
-import hs_delayed_timer_probe_test as timer_probe_test
 import hs_karabiner_config_probe as karabiner_probe
+import hs_native_bootstrap_probe as bootstrap
 
 spec = importlib.util.spec_from_file_location(
     "launch_gate", Path(__file__).with_name("macos_launch_gate.py")
 )
 gate = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gate)
+
+EXECUTABLE = timer_probe.INSTALLED_EXECUTABLE
+PRODUCT = {
+    "executable": EXECUTABLE,
+    "bundle_id": gate.HS_DOMAIN,
+    "version": timer_probe.CONTRACT["runtime_version"],
+    "codesign_verified": True,
+    "module_tree_sha256": "c" * 64,
+}
 
 
 def timer_summary():
@@ -38,22 +48,91 @@ def timer_summary():
         "checks": timer_probe.CHECK_COUNT,
         "nonce": "a" * 32,
         "pid": 42,
-        "executable": "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon",
+        "executable": EXECUTABLE,
         "preference_restored": True,
     }
 
 
-def control_summary():
-    """Return an independent native transport acknowledgement, not feature proof."""
+def karabiner_summary():
+    """Return the measured graph proof of the real Karabiner receipt judge."""
+    from hs_karabiner_config_probe_test import receipt, NONCE, DOMAIN
+
+    measured = dict(receipt(), executable=EXECUTABLE)
+    summary = karabiner_probe.validate_receipt(measured, NONCE, 42, EXECUTABLE, DOMAIN)
+    summary["preference_restored"] = True
+    return summary
+
+
+def startup_summary(feature, measurement, nonce="d" * 32, pid=44):
+    """Return one startup-file bootstrap summary bound to the verified product."""
     return {
         "schema_version": 1,
-        "contract": "hs.applescript.control",
-        "phase": "control",
-        "acknowledged": True,
-        "nonce": "a" * 32,
-        "pid": 42,
-        "executable": "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon",
+        "contract": bootstrap.CONTRACT,
+        "feature": feature,
+        "qualification": bootstrap.QUALIFICATION,
+        "admission": "owned startup file",
+        "identity": {
+            "schema_version": 1,
+            "contract": bootstrap.CONTRACT,
+            "phase": "ready",
+            "nonce": nonce,
+            "pid": pid,
+            "executable": EXECUTABLE,
+            "bundle_id": gate.HS_DOMAIN,
+            "version": timer_probe.CONTRACT["runtime_version"],
+        },
+        "measurement": measurement,
+        "installed_product": dict(PRODUCT),
+        "cleanup_acknowledged": True,
+        "process_retired": True,
+        "preference_restored": True,
     }
+
+
+def script_summary():
+    """Return a complete Script SDK/participant summary from a fresh exact owner."""
+    return startup_summary(
+        "script_scope",
+        {
+            "contract": "script.scope-native",
+            "runtime": "native Hammerspoon",
+            "publication_scope": "private-file-and-nonce-settings-only",
+            "alias_count": 3,
+            "sdk_void_set": True,
+            "sdk_clear": True,
+            "participant_inverse": True,
+            "nonce": "e" * 32,
+            "pid": 45,
+            "executable": EXECUTABLE,
+        },
+        nonce="e" * 32,
+        pid=45,
+    )
+
+
+def consent_boundary(**changes):
+    """Return the owned sender's exact consent-step answer for the launched runtime."""
+    receipt = {
+        "schema_version": 1,
+        "contract": gate.CONSENT_CONTRACT,
+        "mode": gate.CONSENT_SENDER_MODE,
+        "pid": 42,
+        "executable": EXECUTABLE,
+        "exit_status": 0,
+        "stdout": "native_appleevent_status=-1744\n",
+        "stderr": "",
+    }
+    receipt.update(changes)
+    return receipt
+
+
+def scripting_line(pid=42, getter="boolean", allowed="true", bridge="callable"):
+    """Return the boot-journal line adapters/boot_journal.lua writes at startup."""
+    return (
+        "2026-10-18 00:00:00 [INFO] [init] Native scripting server: "
+        f"pid={pid}; getter={getter}; allowed={allowed}; bridge={bridge}; "
+        "handler_registration=unobserved; handler_entry=unobserved.\n"
+    )
 
 
 HEALTHY = {
@@ -62,8 +141,12 @@ HEALTHY = {
     "alive_after_window": True,
     "quit_seconds": 1.5,
     "state_problems": [],
+    "boot_log": "2026-10-18 00:00:00 [INFO] [init] boot started\n" + scripting_line(),
+    "installed_product": dict(PRODUCT),
+    "native_child_pid": 42,
+    "appleevent_consent_boundary": consent_boundary(),
+    "native_startup_bootstrap": startup_summary("delayed_timer", timer_summary()),
     "native_delayed_timer": timer_summary(),
-    "native_transport_control": control_summary(),
 }
 
 
@@ -73,7 +156,20 @@ REFUSED_BOOT_LOG = "t [ERROR] [init] FATAL at boot stage 'native_logger_transpor
 
 def observe(**changes):
     """Return a healthy observation with only the named criteria changed."""
-    observation = dict(HEALTHY)
+    observation = copy.deepcopy(HEALTHY)
+    observation.update(changes)
+    return observation
+
+
+def karabiner_observation(**changes):
+    """Return a healthy karabiner_config observation with the named criteria changed."""
+    summary = karabiner_summary()
+    observation = observe(
+        native_startup_bootstrap=startup_summary("karabiner_config", summary),
+        native_karabiner_config=summary,
+        native_script_scope=script_summary(),
+    )
+    observation.pop("native_delayed_timer")
     observation.update(changes)
     return observation
 
@@ -92,34 +188,150 @@ class VerdictTests(unittest.TestCase):
                 failures = gate.evaluate("clean", observe(native_delayed_timer=value))
                 self.assertTrue(any("native delayed-timer" in failure for failure in failures))
 
-    def test_karabiner_scenario_requires_actual_graph_and_existing_error_assertions(self):
-        from hs_karabiner_config_probe_test import receipt, EXECUTABLE, NONCE, DOMAIN
-
-        summary = karabiner_probe.validate_receipt(receipt(), NONCE, 42, EXECUTABLE, DOMAIN)
-        summary["preference_restored"] = True
-        self.assertEqual(
-            gate.evaluate("karabiner_config", observe(native_karabiner_config=summary)), []
-        )
+    def test_karabiner_scenario_requires_graph_script_scope_and_existing_error_assertions(self):
+        self.assertEqual(gate.evaluate("karabiner_config", karabiner_observation()), [])
+        summary = karabiner_summary()
         for changed in (
             None,
             dict(summary, private_source_restored=False),
             dict(summary, lease_initialized=True),
         ):
             self.assertTrue(
-                gate.evaluate("karabiner_config", observe(native_karabiner_config=changed))
+                gate.evaluate(
+                    "karabiner_config", karabiner_observation(native_karabiner_config=changed)
+                )
             )
+        for script in (
+            None,
+            dict(script_summary(), preference_restored=False),
+            dict(script_summary(), installed_product=dict(PRODUCT, module_tree_sha256="f" * 64)),
+        ):
+            with self.subTest(script=script):
+                failures = gate.evaluate(
+                    "karabiner_config", karabiner_observation(native_script_scope=script)
+                )
+                self.assertTrue(any("Script SDK/participant" in value for value in failures))
         failures = gate.evaluate(
             "karabiner_config",
-            observe(
-                native_karabiner_config=summary,
-                driver_log=HEALTHY["driver_log"] + "[ERROR] actual production refusal\n",
+            karabiner_observation(native_script_scope_error="RuntimeError: script owner refused"),
+        )
+        self.assertTrue(any("script owner refused" in value for value in failures))
+        failures = gate.evaluate(
+            "karabiner_config",
+            karabiner_observation(
+                driver_log=HEALTHY["driver_log"] + "[ERROR] actual production refusal\n"
             ),
         )
         self.assertTrue(any("actual production refusal" in failure for failure in failures))
 
-    def test_clean_launch_retains_native_probe_refusal(self):
-        failures = gate.evaluate("clean", observe(native_delayed_timer_error="scripting refused"))
-        self.assertTrue(any("scripting refused" in failure for failure in failures))
+    def test_clean_launch_retains_startup_bootstrap_refusal(self):
+        failures = gate.evaluate(
+            "clean", observe(native_startup_bootstrap_error="RuntimeError: startup refused")
+        )
+        self.assertTrue(any("startup refused" in failure for failure in failures))
+
+    def test_startup_bootstrap_must_observe_the_verified_installed_product(self):
+        foreign = startup_summary("delayed_timer", timer_summary())
+        foreign["installed_product"]["module_tree_sha256"] = "f" * 64
+        for changes in (
+            {"native_startup_bootstrap": foreign},
+            {"native_startup_bootstrap": None},
+            {"installed_product": None},
+            {"installed_product_error": "RuntimeError: signature refused"},
+        ):
+            with self.subTest(changes=changes):
+                self.assertTrue(gate.evaluate("clean", observe(**changes)))
+
+    def test_consent_boundary_admits_only_the_exact_consent_step(self):
+        self.assertEqual(gate.evaluate("clean", observe()), [])
+        for receipt in (
+            None,
+            consent_boundary(stdout="native_appleevent_status=0\n"),
+            consent_boundary(exit_status=66, stdout="native_appleevent_status=-1743\n"),
+            consent_boundary(exit_status=66, stdout="native_appleevent_status=-1712\n"),
+            consent_boundary(stderr="Owned AppleEvent outcome admission failed: -1744\n"),
+            consent_boundary(pid=43),
+            consent_boundary(mode="denied"),
+            consent_boundary(executable="/private/foreign/Hammerspoon"),
+            dict(consent_boundary(), prompt=True),
+        ):
+            with self.subTest(receipt=receipt):
+                failures = gate.evaluate("clean", observe(appleevent_consent_boundary=receipt))
+                self.assertTrue(any("AppleEvent boundary" in value for value in failures))
+        failures = gate.evaluate(
+            "clean", observe(appleevent_consent_boundary_error="RuntimeError: sender refused")
+        )
+        self.assertTrue(any("sender refused" in value for value in failures))
+
+    def test_deferral_defers_only_the_consent_boundary(self):
+        refused = observe(
+            appleevent_consent_boundary=consent_boundary(
+                exit_status=66, stdout="native_appleevent_status=-1712\n"
+            )
+        )
+        self.assertTrue(gate.evaluate("clean", refused))
+        self.assertEqual(gate.evaluate("clean", refused, defer_native=True), [])
+        for changes in (
+            {"native_delayed_timer": None},
+            {"native_startup_bootstrap_error": "RuntimeError: startup refused"},
+            {"boot_log": scripting_line(allowed="false")},
+            {"quit_seconds": None},
+        ):
+            with self.subTest(changes=changes):
+                self.assertTrue(gate.evaluate("clean", observe(**changes), defer_native=True))
+        self.assertTrue(
+            gate.evaluate(
+                "karabiner_config",
+                karabiner_observation(native_script_scope=None),
+                defer_native=True,
+            )
+        )
+
+    def test_journaled_scripting_state_must_reflect_the_enabled_preference(self):
+        for boot_log in (
+            "",
+            scripting_line(allowed="false"),
+            scripting_line(getter="error", allowed="unknown"),
+            scripting_line(bridge="missing"),
+            scripting_line(pid=43),
+            scripting_line() + scripting_line(),
+        ):
+            with self.subTest(boot_log=boot_log):
+                failures = gate.evaluate("clean", observe(boot_log=boot_log))
+                self.assertTrue(any("scripting state" in value for value in failures))
+        failures = gate.evaluate("clean", observe(native_child_pid=None))
+        self.assertTrue(any("scripting state" in value for value in failures))
+
+    def test_feature_proofs_cannot_hide_a_consent_boundary_refusal(self):
+        for scenario, observation in (
+            ("clean", observe),
+            ("karabiner_config", karabiner_observation),
+        ):
+            with self.subTest(scenario=scenario):
+                failures = gate.evaluate(
+                    scenario,
+                    observation(appleevent_consent_boundary_error="RuntimeError: refused send"),
+                )
+                self.assertEqual(len(failures), 1)
+                self.assertIn("refused send", failures[0])
+
+    def test_consent_boundary_cannot_substitute_for_missing_feature_proofs(self):
+        for scenario, observation, field in (
+            ("clean", observe, "native_delayed_timer"),
+            ("karabiner_config", karabiner_observation, "native_karabiner_config"),
+            ("karabiner_config", karabiner_observation, "native_script_scope"),
+        ):
+            with self.subTest(scenario=scenario, field=field):
+                failures = gate.evaluate(scenario, observation(**{field: None}))
+                self.assertTrue(failures)
+                self.assertFalse(any("AppleEvent" in value for value in failures))
+
+    def test_scripting_preference_owner_failure_is_retained(self):
+        failures = gate.evaluate(
+            "clean",
+            observe(native_scripting_preference_error="preference restoration failed: x"),
+        )
+        self.assertTrue(any("preference restoration failed" in value for value in failures))
 
     def test_cli_annotates_the_failure_cause_without_weakening_its_exit(self):
         cause = "native scripting refused: 50%\r\n::notice::foreign text"
@@ -145,276 +357,48 @@ class VerdictTests(unittest.TestCase):
             )
             self.assertEqual(json.loads((output / "result.json").read_text())["failures"], [cause])
 
-    def test_cli_retains_owned_native_context_beyond_the_annotation_limit(self):
-        # GitHub renders at most4096 characters of one error annotation. The
-        # sampled background ancestry is later than the complete primary cause.
-        context = (
-            "observed native Hammerspoon server thread: Thread_42\n" + "native ancestry\n" * 310
-        )
-        context += "TCCAccessRequest (native final frame)"
-        cause = "native scripting TimeoutExpired: " + "p" * 4096 + context
-        report = {
-            "failures": [cause],
-            "native_probe_diagnostics": [
-                {"command": 2, "phase": "observation", "observations": context}
-            ],
-        }
-        with tempfile.TemporaryDirectory(prefix="ergopti-native-plain-") as root:
-            output = Path(root) / "evidence"
-            stdout = io.StringIO()
-            with (
-                mock.patch.object(gate.sys, "platform", "darwin"),
-                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
-                mock.patch.object(gate, "run", return_value=report),
-                mock.patch.object(gate, "print_tails"),
-                contextlib.redirect_stdout(stdout),
-            ):
-                status = gate.main(["/Applications/ErgoptiPlus.app", str(output), "clean"])
-            self.assertEqual(status, 1)
-            lines = stdout.getvalue().splitlines()
-            plain = [
-                line for line in lines if line.startswith("native probe command2 (observation): ")
-            ]
-            self.assertTrue(plain, "owned context must have a plain-log channel")
-            self.assertIn(
-                "native probe command2 (observation): TCCAccessRequest (native final frame)", plain
-            )
-            self.assertTrue(all(not line.startswith("::") for line in plain))
-            self.assertEqual(json.loads((output / "result.json").read_text()), report)
-
-    def test_plain_native_diagnostic_lines_cannot_inject_workflow_commands(self):
+    def test_consent_sender_output_is_printed_without_workflow_commands(self):
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            gate.print_native_probe_diagnostics(
+            gate.print_native_diagnostics(
                 {
-                    "native_probe_diagnostics": [
-                        {
-                            "command": 1,
-                            "phase": "observation",
-                            "observations": "native frame\r\n::notice::foreign annotation\n%0A::error::text",
-                        }
-                    ],
+                    "appleevent_consent_boundary": consent_boundary(
+                        exit_status=66,
+                        stdout="native_appleevent_status=-1712\n::error::foreign\n",
+                        stderr="Owned AppleEvent outcome admission failed: -1712\r\n%0A::notice::x",
+                    )
                 }
             )
         lines = stdout.getvalue().splitlines()
         self.assertEqual(
             lines,
             [
-                "native probe command1 (observation): native frame",
-                "native probe command1 (observation): ::notice::foreign annotation",
-                "native probe command1 (observation): %0A::error::text",
+                "native AppleEvent consent boundary: exit=66; expected status -1744",
+                "native AppleEvent consent boundary stdout: native_appleevent_status=-1712",
+                "native AppleEvent consent boundary stdout: ::error::foreign",
+                "native AppleEvent consent boundary stderr: "
+                "Owned AppleEvent outcome admission failed: -1712",
+                "native AppleEvent consent boundary stderr: %0A::notice::x",
             ],
         )
+        self.assertTrue(all(not line.startswith("::") for line in lines))
 
-    def test_launch_report_retains_its_own_probe_diagnostics_after_refusal(self):
-        for scenario in ("clean", "karabiner_config"):
-            with tempfile.TemporaryDirectory(prefix="ergopti-owned-native-log-") as root:
-                app, output = Path(root) / "ErgoptiPlus.app", Path(root) / "evidence"
-                output.mkdir()
-                child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
-                launcher = app / "Contents/MacOS/ErgoptiPlus"
-                for executable in (launcher, child):
-                    executable.parent.mkdir(parents=True, exist_ok=True)
-                    executable.write_text("owned fixture executable")
-                with (app / "Contents/Info.plist").open("wb") as handle:
-                    plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
-                owner_type = (
-                    timer_probe.NativeDelayedTimerProbe
-                    if scenario == "clean"
-                    else karabiner_probe.NativeKarabinerConfigProbe
+    def test_deferred_cli_names_only_the_deferred_boundary(self):
+        report = {"failures": [], "qualification": {"status": "deferred"}}
+        with tempfile.TemporaryDirectory() as root:
+            stdout = io.StringIO()
+            with (
+                mock.patch.object(gate.sys, "platform", "darwin"),
+                mock.patch.dict(gate.os.environ, {"GITHUB_ACTIONS": "true"}),
+                mock.patch.object(gate, "run", return_value=report),
+                contextlib.redirect_stdout(stdout),
+            ):
+                status = gate.main(
+                    ["/Applications/ErgoptiPlus.app", str(Path(root) / "evidence"), "clean"]
                 )
-                owner = owner_type(app, output, gate.HS_DOMAIN)
-                live = {"started": False}
-
-                def processes(executable):
-                    return [42 if executable == child else 41] if live["started"] else []
-
-                def native_run(arguments, **options):
-                    if arguments[0] == "open":
-                        live["started"] = True
-                    return subprocess.CompletedProcess(arguments, 0, "arm64", "")
-
-                def observe_native(pid, resolve):
-                    self.assertEqual(pid, 42)
-                    self.assertEqual(resolve(child), [42])
-                    owner.scripting_command_number = 1
-                    owner.retain_diagnostics(
-                        ["observed native Hammerspoon server thread: Thread_42"]
-                    )
-                    raise RuntimeError("primary refusal with unrelated secret")
-
-                def quit_native(*_):
-                    live["started"] = False
-                    return 0.5
-
-                with (
-                    mock.patch.object(gate.Path, "home", return_value=Path(root) / "home"),
-                    mock.patch.object(gate, "seed", return_value={"logs_dir": Path(root) / "logs"}),
-                    mock.patch.object(gate, owner_type.__name__, return_value=owner),
-                    mock.patch.object(owner, "enable"),
-                    mock.patch.object(
-                        owner, "control", side_effect=RuntimeError("control refused")
-                    ) as control,
-                    mock.patch.object(
-                        owner, "constructor_control", return_value={"constructed": "only"}
-                    ) as constructor,
-                    mock.patch.object(
-                        owner, "control_pid", return_value={"diagnostic": "only"}
-                    ) as pid_control,
-                    mock.patch.object(
-                        owner, "control_pid_no_prompt", create=True, return_value={"status": -1744}
-                    ) as no_prompt,
-                    mock.patch.object(owner, "observe", side_effect=observe_native),
-                    mock.patch.object(owner, "restore"),
-                    mock.patch.object(gate, "processes", side_effect=processes) as resolver,
-                    mock.patch.object(gate.subprocess, "run", side_effect=native_run),
-                    mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                    mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
-                    mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
-                    mock.patch.object(gate, "check_state", return_value=[]),
-                    mock.patch.object(gate, "quit_application", side_effect=quit_native),
-                    mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
-                ):
-                    report = gate.run(app, output, scenario, "")
-                self.assertEqual(report["native_probe_diagnostics"], owner.diagnostic_receipts)
-                control.assert_called_once_with(42, resolver)
-                constructor.assert_called_once_with(42, resolver)
-                self.assertEqual(report["native_descriptor_constructor"], {"constructed": "only"})
-                pid_control.assert_called_once_with(42, resolver)
-                self.assertEqual(report["native_pid_transport_control"], {"diagnostic": "only"})
-                no_prompt.assert_called_once_with(42, resolver)
-                self.assertEqual(report["native_pid_no_prompt_control"], {"status": -1744})
-                self.assertEqual(len(report["failures"]), 2)
-                self.assertIn("control refused", report["failures"][0])
-                self.assertIn("primary refusal", report["failures"][1])
-                self.assertNotIn("unrelated secret", str(report["native_probe_diagnostics"]))
-                self.assertEqual(report["quit_seconds"], 0.5)
-
-    def test_primary_control_error_is_printed_even_when_native_samples_exist(self):
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            gate.print_native_probe_diagnostics(
-                {
-                    "native_probe_diagnostics": [
-                        {
-                            "command": 3,
-                            "phase": "pid_no_prompt",
-                            "observations": "native frame",
-                            "primary_error": "Native status -1743\n::error::foreign annotation",
-                        }
-                    ]
-                }
-            )
-        self.assertEqual(
-            stdout.getvalue().splitlines(),
-            [
-                "native probe command3 (pid_no_prompt): primary error: Native status -1743",
-                "native probe command3 (pid_no_prompt): primary error: ::error::foreign annotation",
-                "native probe command3 (pid_no_prompt): native frame",
-            ],
-        )
-
-    def test_successful_feature_proofs_cannot_hide_native_control_refusal(self):
-        from hs_karabiner_config_probe_test import receipt, EXECUTABLE, NONCE, DOMAIN
-
-        summary = karabiner_probe.validate_receipt(receipt(), NONCE, 42, EXECUTABLE, DOMAIN)
-        summary["preference_restored"] = True
-        for scenario in ("clean", "karabiner_config"):
-            with self.subTest(scenario=scenario):
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_karabiner_config=summary,
-                        native_transport_control_error="actual control owner refused",
-                    ),
-                )
-                self.assertTrue(any("actual control owner refused" in value for value in failures))
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_karabiner_config=summary,
-                        native_transport_control=None,
-                    ),
-                )
-                self.assertTrue(any("control" in value for value in failures))
-
-    def test_constructor_cannot_replace_original_path_pid_or_feature_proofs(self):
-        constructed = timer_probe.validate_constructor_receipt(
-            json.dumps(timer_probe_test.constructor_receipt()) + "\n",
-            timer_probe_test.NONCE,
-            42,
-            timer_probe_test.constructor_receipt()["direct_text"],
-        )
-        for scenario, feature in (
-            ("clean", "native_delayed_timer"),
-            ("karabiner_config", "native_karabiner_config"),
-        ):
-            with self.subTest(scenario=scenario):
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_descriptor_constructor=constructed,
-                        native_transport_control_error="original control refusal",
-                        **{feature + "_error": "original feature refusal"},
-                    ),
-                )
-                self.assertTrue(any("original control refusal" in value for value in failures))
-                self.assertTrue(any("original feature refusal" in value for value in failures))
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_descriptor_constructor=constructed,
-                        native_transport_control=constructed,
-                        **{feature: None},
-                    ),
-                )
-                self.assertTrue(any("control" in value for value in failures))
-                self.assertTrue(any("proof is incomplete" in value for value in failures))
-        with self.assertRaises(ValueError):
-            timer_probe.validate_pid_control_summary(constructed)
-
-    def test_pid_diagnostic_cannot_replace_path_control_or_original_feature(self):
-        alternative = dict(
-            control_summary(), contract="hs.applescript.pid-control", phase="pid_control"
-        )
-        for scenario, feature in (
-            ("clean", "native_delayed_timer"),
-            ("karabiner_config", "native_karabiner_config"),
-        ):
-            with self.subTest(scenario=scenario):
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_pid_transport_control=alternative,
-                        native_transport_control_error="original path refusal",
-                        **{feature + "_error": "original feature refusal"},
-                    ),
-                )
-                self.assertTrue(any("original path refusal" in value for value in failures))
-                self.assertTrue(any("original feature refusal" in value for value in failures))
-                failures = gate.evaluate(
-                    scenario,
-                    observe(
-                        native_transport_control=alternative,
-                        native_pid_transport_control=alternative,
-                        **{feature: None},
-                    ),
-                )
-                self.assertTrue(any("control" in value for value in failures))
-                self.assertTrue(any("proof is incomplete" in value for value in failures))
-
-    def test_control_receipt_cannot_substitute_for_missing_native_feature_proofs(self):
-        for scenario, field in (
-            ("clean", "native_delayed_timer"),
-            ("karabiner_config", "native_karabiner_config"),
-        ):
-            with self.subTest(scenario=scenario):
-                failures = gate.evaluate(scenario, observe(**{field: None}))
-                self.assertTrue(failures)
-                self.assertFalse(
-                    any("control" in value for value in failures),
-                    "the valid control remains separate from the absent feature proof",
-                )
+        self.assertEqual(status, 0)
+        self.assertIn("AppleEvent consent boundary qualified=false", stdout.getvalue())
+        self.assertIn("every startup-file native feature passed", stdout.getvalue())
 
     def test_healthy_launch_passes(self):
         self.assertEqual(gate.evaluate("clean", observe()), [])
@@ -1291,286 +1275,170 @@ def load_tests(loader, tests, pattern):
     return tests
 
 
-class EarlyLuaJournalObservationTests(unittest.TestCase):
-    """Early location evidence cannot change any mandatory launch verdict."""
+class NativeQualificationRunTests(unittest.TestCase):
+    """The actual run sends one consent-free event, then qualifies features by startup file."""
 
-    def test_actual_run_reads_only_its_owned_journal_after_original_refusals(self):
-        with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
-            app, output, home = root / "app", root / "evidence", root / "home"
-            child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
-            for executable in (app / "Contents/MacOS/ErgoptiPlus", child):
+    def exercise(
+        self,
+        scenario,
+        deferred=False,
+        boundary=None,
+        refuse=(),
+        leave_child=False,
+    ):
+        events = []
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home, app, output = root / "home", root / "ErgoptiPlus.app", root / "evidence"
+            output.mkdir()
+            launcher = app / "Contents/MacOS/ErgoptiPlus"
+            child = app / "Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon"
+            for executable in (launcher, child):
                 executable.parent.mkdir(parents=True, exist_ok=True)
-                executable.write_text("inert native fixture executable")
+                executable.write_text("inert exact executable")
             with (app / "Contents/Info.plist").open("wb") as handle:
                 plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, handle)
-            output.mkdir()
-            logs = gate.logs_folder(home)
-            logs.mkdir(parents=True)
-            owner = timer_probe.NativeDelayedTimerProbe(app, output, gate.HS_DOMAIN)
-            owner.nonce = "a" * 32
-            live = {"started": False}
+            live = {"launcher": False, "child": False}
 
             def processes(executable):
-                return [42 if executable == child else 41] if live["started"] else []
+                if executable == child:
+                    return [42] if live["child"] else []
+                return [41] if live["launcher"] else []
 
             def native_run(arguments, **options):
+                self.assertNotIn("osascript", " ".join(map(str, arguments)))
                 if arguments[0] == "open":
-                    live["started"] = True
-                    (logs / gate.LAUNCHER_LOG_NAME).write_text(HEALTHY["launcher_log"])
-                    (logs / gate.FALLBACK_BOOT_LOG_NAME).write_text(
-                        "2026-10-04 00:00:00 [INFO] [init] Native scripting Lua body stage: "
-                        "phase=received_lua_body; pid=42; nonce=" + owner.nonce + ".\n"
-                    )
+                    live.update(launcher=True, child=True)
                 return subprocess.CompletedProcess(arguments, 0, "arm64", "")
 
-            def refuse_feature(pid, resolve):
-                owner.bind_runtime(pid, resolve)
-                raise RuntimeError("original feature refused")
+            def read_text(path):
+                if Path(path).name == gate.FALLBACK_BOOT_LOG_NAME:
+                    return scripting_line()
+                return HEALTHY["launcher_log"]
+
+            preference = mock.Mock()
+            preference.enable.side_effect = lambda: events.append("enable")
+            preference.restore.side_effect = lambda: events.append("restore")
+
+            def send(sender, pid, executable):
+                self.assertEqual((pid, executable), (42, child))
+                events.append("boundary")
+                if isinstance(boundary, Exception):
+                    raise boundary
+                return boundary or consent_boundary()
 
             def quit_owned(*arguments):
-                live["started"] = False
+                events.append("quit")
+                live["launcher"] = False
+                if not leave_child:
+                    live["child"] = False
                 return 0.5
 
-            with (
-                mock.patch.object(gate.Path, "home", return_value=home),
-                mock.patch.object(gate, "seed", return_value={"logs_dir": logs}),
-                mock.patch.object(gate, "NativeDelayedTimerProbe", return_value=owner),
-                mock.patch.object(owner, "enable"),
-                mock.patch.object(
-                    owner, "control", side_effect=RuntimeError("original control refused")
-                ),
-                mock.patch.object(
-                    owner, "constructor_control", return_value={"constructed": "only"}
-                ),
-                mock.patch.object(
-                    owner, "control_pid", side_effect=RuntimeError("original PID refused")
-                ),
-                mock.patch.object(owner, "control_pid_no_prompt", return_value={"status": -1712}),
-                mock.patch.object(owner, "observe", side_effect=refuse_feature),
-                mock.patch.object(owner, "restore"),
-                mock.patch.object(gate, "processes", side_effect=processes),
-                mock.patch.object(gate.subprocess, "run", side_effect=native_run),
-                mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
-                mock.patch.object(gate, "check_state", return_value=[]),
-                mock.patch.object(gate, "quit_application", side_effect=quit_owned),
-                mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
-                mock.patch.object(
-                    gate.SupplementaryNativeBootstrap,
-                    "observe",
-                    side_effect=RuntimeError("supplement refused"),
-                ),
-            ):
-                report = gate.run(app, output, "clean", "")
-            stage = report["supplementary_received_lua_stage"]
-            self.assertEqual(stage["body_stage"], "observed")
-            self.assertFalse(stage["qualified"])
-            self.assertEqual(stage["publication_ack"], "unobserved")
-            self.assertEqual(stage["timing"], "unknown")
-            self.assertTrue(
-                any("original control refused" in error for error in report["failures"])
-            )
-            self.assertTrue(
-                any("original feature refused" in error for error in report["failures"])
-            )
-            self.assertEqual(report["quit_seconds"], 0.5)
+            def startup_owner(owner_app, owner_output, domain, resolver):
+                self.assertEqual((owner_app, owner_output, domain), (app, output, gate.HS_DOMAIN))
+                owner = mock.Mock()
 
-    def test_closed_plain_output_carries_no_journal_payload_and_never_qualifies(self):
-        with io.StringIO() as output, contextlib.redirect_stdout(output):
-            gate.print_native_probe_diagnostics(
-                {
-                    "supplementary_received_lua_stage": {
-                        "body_stage": "observed",
-                        "publication_ack": "unobserved",
-                        "timing": "unknown",
-                        "qualified": False,
-                        "private": "PRIVATE_SHOULD_NOT_PRINT",
-                    }
-                }
-            )
-            printed = output.getvalue()
-        self.assertIn(
-            "stage=observed; publication_ack=unobserved; timing=unknown; qualified=false",
-            printed,
-        )
-        self.assertNotIn("PRIVATE_SHOULD_NOT_PRINT", printed)
+                def observe_feature(feature):
+                    # Each feature starts only after the managed runtime and its
+                    # scripting key retired, never as a substitute for them.
+                    self.assertFalse(live["launcher"] or live["child"])
+                    self.assertIn("restore", events)
+                    events.append(feature)
+                    if feature in refuse:
+                        raise RuntimeError(f"{feature} refused")
+                    if feature == "delayed_timer":
+                        return startup_summary(
+                            feature, dict(timer_summary(), preference_restored=False)
+                        )
+                    if feature == "karabiner_config":
+                        return startup_summary(
+                            feature, dict(karabiner_summary(), preference_restored=False)
+                        )
+                    return script_summary()
 
-    def test_observed_stage_cannot_satisfy_transport_feature_or_cleanup(self):
-        for scenario in ("clean", "karabiner_config"):
-            before = observe(
-                native_delayed_timer=None,
-                native_karabiner_config=None,
-                native_transport_control_error="controlled native transport refusal",
-            )
-            expected = gate.evaluate(scenario, before)
-            self.assertTrue(expected)
-            after = dict(
-                before,
-                supplementary_received_lua_stage={
-                    "body_stage": "observed",
-                    "publication_ack": "unobserved",
-                    "timing": "unknown",
-                    "qualified": False,
-                },
-            )
-            self.assertEqual(gate.evaluate(scenario, after), expected)
-            after["quit_seconds"] = None
-            self.assertTrue(gate.evaluate(scenario, after))
+                owner.observe.side_effect = observe_feature
+                return owner
 
-
-class ConcurrentManagedLaunchGateTests(unittest.TestCase):
-    """The gate retires the independent reader after every original control attempt."""
-
-    def test_public_launch_stdout_never_prints_foreign_payload_or_promotes_readiness(self):
-        output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            gate.print_native_probe_diagnostics(
-                {
-                    "managed_launch_observation": {
-                        "finished_launching": "PRIVATE",
-                        "timing": "PRIVATE",
-                        "qualified": True,
-                    }
-                }
-            )
-        self.assertNotIn("PRIVATE", output.getvalue())
-        self.assertIn(
-            "finished_launching=unknown; timing=unknown; qualified=false", output.getvalue()
-        )
-
-    def exercise(self, refuse_feature=False, refuse_cleanup=False):
-        with tempfile.TemporaryDirectory() as directory:
-            home, app = Path(directory) / "home", Path(directory) / "ErgoptiPlus.app"
-            output = Path(directory) / "evidence"
-            output.mkdir()
-            child = timer_probe.NativeDelayedTimerProbe.executable_path(app)
-            launcher = app / "Contents/MacOS/ErgoptiPlus"
-            for executable in (launcher, child):
-                executable.parent.mkdir(parents=True)
-                executable.write_text("inert exact executable")
-            with (app / "Contents/Info.plist").open("wb") as file:
-                plistlib.dump({"CFBundleIdentifier": "com.ergoptiplus.app"}, file)
-            owner = timer_probe.NativeDelayedTimerProbe(app, output, gate.HS_DOMAIN)
-            owner.nonce = "a" * 32
-            seen, live = [], {"started": False}
-            observer = mock.Mock()
-
-            def begin(pid, resolve):
-                seen.append("observer-start")
-                owner.managed_launch_observation = observer
-                return observer
-
-            def finish():
-                seen.append("observer-join")
-                if refuse_cleanup:
-                    raise RuntimeError("arbitrary private worker text")
-                return {"observation": "unobserved", "qualified": False, "timing": "unknown"}
-
-            observer.finish.side_effect = finish
-
-            def step(name, value):
-                def invoke(*arguments):
-                    seen.append(name)
-                    return value
-
-                return invoke
-
-            def feature(*arguments):
-                seen.append("feature")
-                if refuse_feature:
-                    raise RuntimeError("original feature refused")
-                return timer_summary()
-
-            def quit_owned(*arguments):
-                seen.append("quit")
-                live["started"] = False
-                return 0.5
-
-            def native_run(arguments, **options):
-                if arguments[0] == "open":
-                    live["started"] = True
-                return subprocess.CompletedProcess(arguments, 0, "arm64", "")
-
-            def processes(executable):
-                return [42 if executable == child else 41] if live["started"] else []
-
+            qualification = {"status": "deferred", "scope": "macos-launch-appleevents"}
             with (
                 mock.patch.object(gate.Path, "home", return_value=home),
                 mock.patch.object(gate, "seed", return_value={"logs_dir": gate.logs_folder(home)}),
-                mock.patch.object(gate, "NativeDelayedTimerProbe", return_value=owner),
-                mock.patch.object(owner, "enable"),
-                mock.patch.object(owner, "start_managed_launch_observation", side_effect=begin),
-                mock.patch.object(owner, "control", side_effect=step("path", control_summary())),
-                mock.patch.object(
-                    owner, "constructor_control", side_effect=step("constructor", {})
-                ),
-                mock.patch.object(owner, "control_pid", side_effect=step("pid", {})),
-                mock.patch.object(
-                    owner, "control_pid_no_prompt", side_effect=step("no-prompt", {})
-                ),
-                mock.patch.object(owner, "observe", side_effect=feature),
-                mock.patch.object(owner, "restore"),
+                mock.patch.object(gate, "installed_product", return_value=dict(PRODUCT)),
+                mock.patch.object(gate, "build_consent_sender", return_value=root / "sender"),
+                mock.patch.object(gate, "observe_consent_boundary", side_effect=send),
+                mock.patch.object(gate, "AppleScriptPreference", return_value=preference),
+                mock.patch.object(gate, "NativeStartupBootstrap", side_effect=startup_owner),
+                mock.patch.object(gate, "read_launch_qualification", return_value=qualification),
                 mock.patch.object(gate, "processes", side_effect=processes),
                 mock.patch.object(gate.subprocess, "run", side_effect=native_run),
                 mock.patch.object(gate, "STARTUP_TIMEOUT_SECONDS", 0),
-                mock.patch.object(gate, "read_text", return_value=HEALTHY["launcher_log"]),
+                mock.patch.object(gate, "read_text", side_effect=read_text),
                 mock.patch.object(gate, "driver_logs", return_value=HEALTHY["driver_log"]),
                 mock.patch.object(gate, "check_state", return_value=[]),
                 mock.patch.object(gate, "quit_application", side_effect=quit_owned),
                 mock.patch.object(gate, "collect", return_value={"errors": [], "windows": {}}),
                 mock.patch.object(
-                    gate.SupplementaryNativeBootstrap,
-                    "observe",
-                    side_effect=RuntimeError("supplement refused"),
+                    gate.os,
+                    "kill",
+                    side_effect=lambda pid, _: None if leave_child else live.update(child=False),
                 ),
+                mock.patch.object(gate.signal, "SIGKILL", 9, create=True),
             ):
-                report = gate.run(app, output, "clean", "")
-            return seen, report
+                report = gate.run(
+                    app, output, scenario, "", "explicit-record" if deferred else None
+                )
+        return events, report
 
-    def test_original_controls_proceed_before_observer_join(self):
-        seen, report = self.exercise()
-        self.assertEqual(
-            seen,
-            [
-                "observer-start",
-                "path",
-                "constructor",
-                "pid",
-                "no-prompt",
-                "feature",
-                "observer-join",
-                "quit",
-            ],
+    def test_clean_sends_one_consent_free_event_before_quit_then_qualifies_the_timer(self):
+        events, report = self.exercise("clean")
+        self.assertEqual(events, ["enable", "boundary", "quit", "restore", "delayed_timer"])
+        self.assertEqual(report["failures"], [])
+        self.assertEqual(report["appleevent_consent_boundary"], consent_boundary())
+        timer_probe.validate_summary(report["native_delayed_timer"])
+        self.assertEqual(report["installed_product"], PRODUCT)
+
+    def test_karabiner_runs_script_scope_whatever_failed_before_it(self):
+        events, report = self.exercise(
+            "karabiner_config",
+            boundary=consent_boundary(exit_status=66, stdout="native_appleevent_status=-1712\n"),
+            refuse=("karabiner_config",),
         )
-        self.assertEqual(report["managed_launch_observation"]["qualified"], False)
-        self.assertEqual(report["native_transport_control"], control_summary())
-
-    def test_original_feature_refusal_still_precedes_independent_retirement(self):
-        seen, report = self.exercise(refuse_feature=True)
         self.assertEqual(
-            seen,
-            [
-                "observer-start",
-                "path",
-                "constructor",
-                "pid",
-                "no-prompt",
-                "feature",
-                "observer-join",
-                "quit",
-            ],
+            events,
+            ["enable", "boundary", "quit", "restore", "karabiner_config", "script_scope"],
         )
-        self.assertTrue(any("original feature refused" in reason for reason in report["failures"]))
-        self.assertFalse(report["managed_launch_observation"]["qualified"])
+        self.assertEqual(report["native_script_scope"], script_summary())
+        self.assertNotIn("not_executed", json.dumps(report))
+        self.assertTrue(any("AppleEvent boundary" in value for value in report["failures"]))
+        self.assertTrue(any("karabiner_config refused" in value for value in report["failures"]))
+        self.assertFalse(any("Script SDK" in value for value in report["failures"]))
 
-    def test_unsettled_cleanup_adds_failure_without_masking_original(self):
-        seen, report = self.exercise(refuse_feature=True, refuse_cleanup=True)
-        self.assertEqual(seen.index("observer-join"), 6)
-        self.assertEqual(report["managed_launch_observation_error"], "observer-cleanup-unsettled")
-        self.assertTrue(any("public observer cleanup" in reason for reason in report["failures"]))
-        self.assertTrue(any("original feature refused" in reason for reason in report["failures"]))
-        self.assertNotIn("arbitrary private", json.dumps(report))
+    def test_healthy_karabiner_run_passes_with_every_native_feature(self):
+        events, report = self.exercise("karabiner_config")
+        self.assertEqual(report["failures"], [])
+        karabiner_probe.validate_summary(report["native_karabiner_config"])
+
+    def test_deferral_still_requires_every_startup_file_feature(self):
+        events, report = self.exercise(
+            "karabiner_config",
+            deferred=True,
+            boundary=RuntimeError("consent boundary unavailable"),
+        )
+        self.assertEqual(events[-2:], ["karabiner_config", "script_scope"])
+        self.assertEqual(report["failures"], [])
+        self.assertIs(report["native_qualified"], False)
+        events, report = self.exercise("clean", deferred=True, refuse=("delayed_timer",))
+        self.assertIn("delayed_timer", events)
+        self.assertTrue(any("delayed_timer refused" in value for value in report["failures"]))
+
+    def test_live_managed_runtime_refuses_features_as_recorded_failures(self):
+        with mock.patch.object(gate, "QUIT_TIMEOUT_SECONDS", 0):
+            events, report = self.exercise("karabiner_config", leave_child=True)
+        self.assertNotIn("karabiner_config", events)
+        self.assertNotIn("script_scope", events)
+        self.assertIn("native_startup_bootstrap_error", report)
+        self.assertIn("native_script_scope_error", report)
+        self.assertTrue(any("Script SDK" in value for value in report["failures"]))
 
 
 if __name__ == "__main__":

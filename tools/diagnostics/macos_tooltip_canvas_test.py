@@ -688,6 +688,13 @@ class NativeScriptOverlayControls(unittest.TestCase):
             "qualification": bootstrap.QUALIFICATION,
             "admission": "owned startup file",
             "identity": identity,
+            "installed_product": {
+                "executable": str(executable),
+                "bundle_id": "org.hammerspoon.Hammerspoon",
+                "version": "1.1.1",
+                "codesign_verified": True,
+                "module_tree_sha256": "e" * 64,
+            },
             "cleanup_acknowledged": True,
             "process_retired": True,
             "preference_restored": True,
@@ -714,7 +721,7 @@ class NativeScriptOverlayControls(unittest.TestCase):
             change(summary)
         with (
             patch.object(probe.subprocess, "run", side_effect=self.native_run),
-            patch.object(bootstrap, "SupplementaryNativeBootstrap") as constructor,
+            patch.object(bootstrap, "NativeStartupBootstrap") as constructor,
             patch.object(launch, "processes", return_value=observed or []) as census,
         ):
             constructor.return_value.observe.return_value = summary
@@ -767,7 +774,7 @@ class NativeScriptOverlayControls(unittest.TestCase):
                 canvas.update(altered)
                 with (
                     patch.object(probe.subprocess, "run") as native,
-                    patch.object(bootstrap, "SupplementaryNativeBootstrap") as begin,
+                    patch.object(bootstrap, "NativeStartupBootstrap") as begin,
                     self.assertRaisesRegex(ValueError, "Canvas"),
                 ):
                     probe.qualify_script_scope(

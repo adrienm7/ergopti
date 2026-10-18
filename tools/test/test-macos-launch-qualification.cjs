@@ -54,6 +54,43 @@ const scenarios = [
 	'plain_open'
 ];
 const runners = ['macos-15', 'macos-15-intel'];
+const timerContract = require('../diagnostics/hs_delayed_timer_contract.json');
+const karabinerContract = require('../diagnostics/hs_karabiner_config_contract.json');
+const installedExecutable =
+	'/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app/Contents/MacOS/Hammerspoon';
+
+/** Returns the startup-file delayed-timer proof a clean launch owes in every profile. */
+function timerProof() {
+	return {
+		schema_version: 1,
+		contract: timerContract.contract,
+		runtime: 'native Hammerspoon',
+		version: timerContract.runtime_version,
+		complete: true,
+		checks:
+			Object.keys(timerContract.boolean_observations).length +
+			Object.keys(timerContract.remaining_limits).length +
+			Object.keys(timerContract.deliveries).length,
+		nonce: 'a'.repeat(32),
+		pid: 42,
+		executable: installedExecutable,
+		preference_restored: true
+	};
+}
+
+/** Returns the startup-file Karabiner proof a karabiner_config launch owes in every profile. */
+function karabinerProof() {
+	return {
+		...karabinerContract.summary_fixed,
+		version: timerContract.runtime_version,
+		nonce: 'b'.repeat(32),
+		pid: 43,
+		executable: installedExecutable,
+		variant_count: karabinerContract.presets.length * karabinerContract.switches.length ** 2,
+		manipulator_count: 480,
+		preference_restored: true
+	};
+}
 const modelRoot = path.resolve(os.tmpdir());
 const owner = fs.mkdtempSync(path.join(modelRoot, 'ergopti-mac-launch-proposal-'));
 const previousEnvironment = ['GITHUB_SHA', 'MATRIX_RUNNER'].map((name) => [
@@ -94,16 +131,41 @@ try {
 			if (receipt.status === 'deferred') {
 				process.env.GITHUB_SHA = sha;
 				process.env.MATRIX_RUNNER = runner;
-				const result = { scenario, failures: [], qualification: receipt, native_qualified: false };
+				// A deferral covers only the AppleEvent consent boundary: the
+				// startup-file feature proof stays mandatory in the deferred record.
+				const proofKey = scenario === 'clean' ? 'native_delayed_timer' : 'native_karabiner_config';
+				const result = {
+					scenario,
+					failures: [],
+					qualification: receipt,
+					native_qualified: false,
+					[proofKey]: scenario === 'clean' ? timerProof() : karabinerProof()
+				};
 				fs.writeFileSync(resultPath, JSON.stringify(result));
 				check(() => assert.throws(() => recordMac(resultPath, archive, output), /Explicit launch/));
+				const withoutProof = { ...result };
+				delete withoutProof[proofKey];
+				fs.writeFileSync(resultPath, JSON.stringify(withoutProof));
+				check(() =>
+					assert.throws(
+						() =>
+							recordMac(resultPath, archive, output, {
+								qualificationContext: context,
+								qualificationNow: now
+							}),
+						/Missing native/
+					)
+				);
+				fs.writeFileSync(resultPath, JSON.stringify(result));
 				check(() =>
 					recordMac(resultPath, archive, output, {
 						qualificationContext: context,
 						qualificationNow: now
 					})
 				);
-				records.push(JSON.parse(fs.readFileSync(output, 'utf8')));
+				const record = JSON.parse(fs.readFileSync(output, 'utf8'));
+				check(() => assert.deepEqual(record[proofKey], result[proofKey]));
+				records.push(record);
 				for (const update of [
 					{ qualified: true },
 					{ source_sha: 'a'.repeat(40) },
@@ -127,8 +189,8 @@ try {
 				for (const update of [
 					{ failures: ['original lifecycle failure'] },
 					{ native_qualified: true },
-					{ native_delayed_timer: {} },
-					{ native_karabiner_config: {} }
+					{ [proofKey]: {} },
+					{ [proofKey]: { ...result[proofKey], preference_restored: false } }
 				]) {
 					fs.writeFileSync(resultPath, JSON.stringify({ ...result, ...update }));
 					check(() =>
@@ -329,7 +391,7 @@ try {
 	assert.equal(model.status, 0, model.stderr + model.stdout);
 	const result = JSON.parse(model.stdout);
 	assert.equal(result.native_calls, 0);
-	assert.equal(result.controls, 11);
+	assert.equal(result.controls, 19);
 	summary = {
 		controls: count,
 		python_controls: result.controls,
