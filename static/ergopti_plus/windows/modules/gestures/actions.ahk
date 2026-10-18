@@ -308,7 +308,7 @@ for _EmitId, _Emit in GestureEmitActionsData() {
 				; Raw send sequence — no portable key/modifier form exists for it.
 				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeSeqEmitter(_Emit.Seq) }
 		} else {
-				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods),
+				GESTURE_ACTIONS[_EmitId] := { Fn: _GestureMakeKeyEmitter(_Emit.Key, _Emit.Mods, _EmitId == "paste"),
 						Key: _Emit.Key, Mods: _Emit.Mods }
 		}
 }
@@ -356,8 +356,23 @@ GestureActionIsAssignable(ActionName, AllowNative := false) {
 ; captures the LOOP VARIABLE, so every handler would end up emitting whatever
 ; the last iteration happened to leave there. Passing the values as parameters
 ; gives each closure its own copy.
-_GestureMakeKeyEmitter(Key, Mods) {
+_GestureMakeKeyEmitter(Key, Mods, OwnClipboard := false) {
+		if OwnClipboard
+				return (*) => _GestureWithPasteAdmission(TextPressKey.Bind(Key, Mods))
 		return (*) => TextPressKey(Key, Mods)
+}
+
+; A catalogue paste must not consume a selection capture's clear or another
+; producer's temporary text. Keep the lease only through the actual emission;
+; there is no snapshot or mutation, and user-paste observation stays enabled.
+_GestureWithPasteAdmission(EmitFn) {
+		OwnerToken := CB_TryBeginOwnedTransaction("gesture_paste")
+		if !OwnerToken {
+				try LoggerWarn("gestures", "Paste refused while another clipboard transaction is active.")
+				return false
+		}
+		try return EmitFn.Call()
+		finally CB_EndOwnedTransaction(OwnerToken)
 }
 
 _GestureMakeSeqEmitter(Seq) {
