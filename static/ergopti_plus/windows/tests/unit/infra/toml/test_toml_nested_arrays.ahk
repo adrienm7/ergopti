@@ -89,3 +89,29 @@ _TNA_RecoveryBoundary() {
 }
 Test("TOML: continuation priority preserves section recovery (toml-nested-array-recovery)",
 	_TNA_RecoveryBoundary)
+
+_TNA_MetadataOrder(Raw, Expected) {
+	global _TomlFileCache
+	Path := _CTU_NewPath()
+	try {
+		; The payload is deliberately outside the metadata reader's ownership.
+		AssertTrue(FSWrite(Path, "[_meta]`nsections_order = " . Raw
+			. " # authored order`n[[code]]`nnot a parsed metadata assignment`n"))
+		_TNA_Equal(Expected, ReadTomlSectionsOrder("", Path))
+	} finally {
+		if _TomlFileCache.Has(Path)
+			_TomlFileCache.Delete(Path)
+		FSDelete(Path)
+	}
+}
+Test("TOML: section order decodes Unicode names (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["\u0063ode", "-", "\u0065mail"]', ["code", "-", "email"]))
+Test("TOML: section order retains quoted boundaries (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["first,part", "quote\"key", "path\\key"]',
+		["first,part", 'quote"key', "path\key"]))
+Test("TOML: section order retains numeric-looking names (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["001", "0", "1"]', ["001", "0", "1"]))
+Test("TOML: section order accepts trailing commas (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind('["code", "email", ]', ["code", "email"]))
+Test("TOML: section order preserves empty arrays (toml-section-order-codec)",
+	_TNA_MetadataOrder.Bind("[]", []))
