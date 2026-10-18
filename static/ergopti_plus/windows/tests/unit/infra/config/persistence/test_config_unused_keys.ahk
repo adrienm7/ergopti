@@ -763,3 +763,5 @@ _CUK_ProtectedSourceHasNoCleanupOffer() {
 }
 Test("config unused keys: protected schema refuses preview and startup offer (protected-schema-cleanup)",
 	_CUK_ProtectedSourceHasNoCleanupOffer)
+
+#Include test_config_cleanup_refresh_lifecycle.ahk
