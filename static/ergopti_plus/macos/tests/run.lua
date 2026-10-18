@@ -9,7 +9,8 @@
 --- each `test_*.lua` file once.
 ---
 --- USAGE:
----     lua tests/run.lua            # Run from the hammerspoon driver root
+---     lua tests/run.lua                  # Run from the hammerspoon driver root
+---     lua tests/run.lua --module=meta    # One CI shard (tests/support/module_groups.lua)
 ---
 --- The runner exits non-zero when at least one assertion fails so it can be
 --- wired into CI without further glue.
@@ -69,14 +70,21 @@ local shell_quote = require("text_utils").shell_quote
 helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
+local ModuleGroups = require("tests.support.module_groups")
 
 -- --only accepts an exact test module path/name or a historical case-name
 -- substring, so one file or behaviour can be re-run from a red message
 -- arg is the global Lua args table.
+-- --module selects one domain group so CI can shard the suite.
 local only_filter = nil
+local module_group = nil
 if arg then
 	for i = 1, #arg do
-		if arg[i] == "--only" then
+		if arg[i] == "--module" then
+			module_group = arg[i + 1]
+		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-module=") then
+			module_group = arg[i]:gsub("^%-%-module=", "")
+		elseif arg[i] == "--only" then
 			only_filter = arg[i + 1]
 		elseif type(arg[i]) == "string" and arg[i]:match("^%-%-only=") then
 			only_filter = arg[i]:gsub("^%-%-only=", "")
@@ -199,6 +207,11 @@ for _, dir in ipairs(TEST_DIRS) do
 	for _, mod_name in ipairs(discover_tests(dir)) do
 		discovered_modules[#discovered_modules + 1] = mod_name
 	end
+end
+if module_group then
+	local total = #discovered_modules
+	discovered_modules = ModuleGroups.select(discovered_modules, module_group)
+	print(string.format("Module group %q: %d of %d module(s)", module_group, #discovered_modules, total))
 end
 local modules_to_load, narrowed, case_filter = OnlySelector.select_modules(
 	discovered_modules,
