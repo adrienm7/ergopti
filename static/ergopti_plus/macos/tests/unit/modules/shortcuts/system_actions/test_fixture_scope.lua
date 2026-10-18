@@ -143,7 +143,7 @@ helpers.describe("System action fixture isolation", function()
 			local native = rawget(_G, "hs")
 			local modules = {
 				"tests.support.system_actions_fixture",
-				"tests.unit.modules.shortcuts.test_actions_system",
+				"tests.unit.modules.shortcuts.system_actions.test_actions_system",
 			}
 			for _, suffix in ipairs({ "capslock", "keep_awake", "wrap_decisions", "screenshots",
 				"selection_cache", "random_bounds", "provenance_fences" }) do
