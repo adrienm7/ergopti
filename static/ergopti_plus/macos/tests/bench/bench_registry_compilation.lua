@@ -1,4 +1,4 @@
---- tests/benchmarks/registry_compilation.lua
+--- tests/bench/bench_registry_compilation.lua
 
 --- ==============================================================================
 --- MODULE: Matched Registry Compilation Benchmark
@@ -11,7 +11,7 @@
 
 package.path = "./?.lua;./?/init.lua;../_shared/lua/?.lua;../_shared/lua/?/init.lua;" .. package.path
 local helpers = require("tests.helpers")
-local pbt = require("tests.lib.pbt")
+local pbt = require("tests.helpers.pbt")
 local isolation = require("tests.support.module_isolation")
 local check = pbt.check
 local root = helpers.driver_root():gsub("/+$", "")

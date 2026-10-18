@@ -1,4 +1,4 @@
---- tests/lib/pbt.lua
+--- tests/helpers/pbt.lua
 
 --- ==============================================================================
 --- MODULE: Property-Based Testing Library (PBT)
