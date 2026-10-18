@@ -96,6 +96,9 @@ local function scenario(opts, body)
 		for _, name in ipairs(FAKED) do previous[name] = package.loaded[name] end
 		local world = { posts = {}, ollama = {}, notices = {}, reads = 0, focus = "editor\1Draft",
 			selection = opts.selection, preferences = preferences, emitted = {} }
+		world.active_entry = ENTRY
+		world.alternate_entry = { id = "cerebras-2", provider = "cerebras", label = "Cerebras",
+			token = "k", model = "replacement-model", base_url = "" }
 		package.loaded["adapters.secure_field_detector"] = {
 			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
@@ -108,7 +111,15 @@ local function scenario(opts, body)
 			end,
 			cancel = function() return true end,
 		}
-		package.loaded["modules.llm.api_entries"] = { active = function() return ENTRY end }
+		package.loaded["modules.llm.api_entries"] = {
+			active = function() return world.active_entry end,
+			list = function() return { ENTRY, world.alternate_entry } end,
+			set_active = function(id)
+				if id ~= world.alternate_entry.id then return false end
+				world.active_entry = world.alternate_entry
+				return true
+			end,
+		}
 		package.loaded["modules.llm.profiles"] = {
 			init = function() end,
 			is_enabled = function() return opts.disabled ~= true end,
@@ -469,6 +480,24 @@ helpers.describe("tone actions: refusals and dropped answers", function()
 			helpers.assert_eq(world.engine.set_model("replacement-model"), true)
 			world.ollama[1].on_done("REWRITE: Merci pour votre aide.", nil)
 			helpers.assert_eq(#world.emitted, 0, "the retired model cannot replace the selection")
+		end)
+	end)
+
+	helpers.it("drops a pending tone answer after choosing another API entry (ai-pass2-entry)", function()
+		scenario({ selection = "merci pour ton aide" }, function(world)
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), true)
+			local rows = require("ui.menu.llm_backend_rows").rows(world.engine, {}, nil, function() return {} end)
+			local selected = false
+			for _, row in ipairs(rows) do
+				if row.label and row.label:find("replacement-model", 1, true) then
+					helpers.assert_eq(row.action(), true, "the real API entry action succeeds")
+					selected = true
+				end
+			end
+			helpers.assert_eq(selected, true, "the alternative API entry is an actionable row")
+			helpers.assert_eq(world.active_entry.id, "cerebras-2")
+			world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_eq(#world.emitted, 0, "the retired API entry cannot replace the selection")
 		end)
 	end)
 
