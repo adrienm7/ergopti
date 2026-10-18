@@ -9,6 +9,8 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.processes.test_desktop_opener",
+	"tests.unit.ui.healthcheck.test_desktop_report_shutdown",
 	"tests.unit.ui.menu.structure.test_menu_rebuild_owner",
 	"tests.unit.adapters.atspi.test_atspi_context_async",
 	"tests.unit.adapters.atspi.test_atspi_focus_watch",
