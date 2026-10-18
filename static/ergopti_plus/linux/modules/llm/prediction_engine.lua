@@ -1843,6 +1843,9 @@ end
 --- @param err string|nil The backend's error.
 --- @param focus string Exact native text destination captured before selection.
 local function finish_translation(epoch, meta, config, full_text, err, focus)
+	local function current()
+		return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+	end
 	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
@@ -1856,7 +1859,13 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		clear_offer()
 		return
 	end
-	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
+	local blocked = global_privacy_blocks()
+	if not current() then return end
+	if not blocked and focus ~= "" then
+		blocked = current_focus() ~= focus
+		if not current() then return end
+	end
+	if blocked or focus == "" then
 		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
 		M.dismiss()
 		return

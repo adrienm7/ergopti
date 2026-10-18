@@ -142,7 +142,10 @@ local function scenario(opts, body)
 				if world.defer_selection_replace then world.complete_selection_replace = complete else complete() end
 				return true
 			end,
-			focus_id = function() return world.focus end,
+			focus_id = function()
+				if world.on_focus then world.on_focus() end
+				return world.focus
+			end,
 			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
@@ -566,6 +569,49 @@ helpers.describe("paced translations retain their originating owner", function()
 						helpers.assert_true(world.engine.release_configuration(owner))
 					end
 					helpers.assert_eq(#world.replaced, 0, "no selection is replaced before acceptance")
+				end)
+			end)
+		end
+	end
+end)
+
+helpers.describe("translation completions retain their originating owner", function()
+	for _, boundary in ipairs({ "privacy", "focus" }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(translation-completion-owner) rechecks " .. action .. " after " .. boundary, function()
+				local subject, armed, observed, action_result
+				local owner = { pending = function() return false end }
+				local function intervene()
+					if not armed then return end
+					armed, observed = false, true
+					if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
+					elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
+					else
+						subject.selection = "A successor owns this selection"
+						action_result = subject.engine.translate_selection("de")
+						subject.respond(2, "TRANSLATION: Successor answer")
+					end
+				end
+				scenario({ selection = SELECTION, privacy_guard = function()
+					if boundary == "privacy" then intervene() end
+					return false
+				end }, function(world)
+					subject = world
+					helpers.assert_true(world.engine.translate_selection("en"))
+					-- Let the old request's rate floor expire before its answer arrives.
+					-- A successor can then complete inside the scripted native barrier.
+					world.wait_for(2)
+					helpers.assert_eq(#world.posts, 1)
+					if boundary == "focus" then world.on_focus = intervene end
+					armed = true
+					world.respond(1, "TRANSLATION: Retired answer")
+					helpers.assert_true(observed, "the actual completion barrier must dispatch the action")
+					helpers.assert_true(action_result, "the competing action must acquire its real owner")
+					helpers.assert_eq(table.concat(offered(world), "|"), action == "successor" and "Successor answer" or "",
+						"an old completion must neither publish nor dismiss a successor")
+					helpers.assert_eq(#world.posts, action == "successor" and 2 or 1)
+					helpers.assert_eq(#world.replaced, 0)
+					if action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
 				end)
 			end)
 		end
