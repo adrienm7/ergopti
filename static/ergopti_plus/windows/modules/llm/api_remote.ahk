@@ -982,6 +982,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         return
     entry := _LLM_Remote_Async[req_id]
     terminal := ReadTerminalFn.Call(entry["tmp_status"], entry["tmp_exit"], entry["tmp_stdout"])
+    ; Receipt reads and cleanup can yield to cancellation or registry trimming.
+    ; Only exact-owner retirement after the last I/O may authorize delivery.
     ; The exit sidecar is written last by _LLM_CurlOwnedCommand. Resolve that
     ; durable receipt before cancellation, deadline or PID state: the numeric PID
     ; may already name an unrelated process by the time this timer runs.
@@ -989,7 +991,7 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         _LLM_CurlReleaseEntryProcess(entry, false, Port)
         if entry["cancelled"] {
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            _LLMRemote_DeleteOwned(req_id, entry)
             return
         }
         on_success := entry["on_success"]
@@ -1002,7 +1004,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
             try LoggerWarn("LLM.remote", "curl terminal failure req_id={1} exit={2} status={3} body_chars={4} reason={5} server_msg={6}.",
                 req_id, terminal["exit"], terminal["status"], StrLen(body), Classified["reason"], Classified["server_message"])
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+                return
             _LLM_InvokeCallback(on_fail, "on_fail",
                 _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
@@ -1011,20 +1014,22 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
             try LoggerWarn("LLM.remote", "curl response for req_id={1} carried no completion (reason={2}, status={3}, body_chars={4}, server_msg={5}).",
                 req_id, Classified["reason"], terminal["status"], StrLen(body), Classified["server_message"])
             CleanupFn.Call(entry)
-            _LLM_Remote_Async.Delete(req_id)
+            if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+                return
             _LLM_InvokeCallback(on_fail, "on_fail",
                 _LLMRemote_FailInfo(Classified["reason"], terminal["status"], Classified["server_message"]))
             return
         }
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         _LLM_InvokeCallback(on_success, "on_success", Classified["text"], Classified["usage"])
         return
     }
     if entry["cancelled"] {
         _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        _LLMRemote_DeleteOwned(req_id, entry)
         return
     }
     if (_LLM_DeadlineExpired(entry["start_tick"], entry["timeout_ms"])) {
@@ -1033,7 +1038,8 @@ _LLMRemote_PollCurl(req_id, Port := 0) {
         on_fail := entry["on_fail"]
         _LLM_CurlReleaseEntryProcess(entry, true, Port)
         CleanupFn.Call(entry)
-        _LLM_Remote_Async.Delete(req_id)
+        if !_LLMRemote_DeleteOwned(req_id, entry) || entry["cancelled"]
+            return
         try LoggerWarn("LLM.remote", "curl poll deadline exceeded for req_id={1} - aborting.", req_id)
         _LLM_InvokeCallback(on_fail, "on_fail", _LLMRemote_FailInfo("timeout"))
         return
