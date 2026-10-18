@@ -556,6 +556,8 @@ class WireFixture:
                         else f"http://{owner.host}:{owner.origin_port}/blocked"
                     )
                     self.send_header("Location", location)
+                    # Untyped, this held redirect would also wait for sniffing.
+                    self.send_header("Content-Type", WIRE_BODY_TYPE)
                     self.send_header("Content-Length", "1048576")
                     self.send_header("Connection", "close")
                     self.end_headers()
