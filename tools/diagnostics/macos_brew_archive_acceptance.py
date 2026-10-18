@@ -40,6 +40,17 @@ RESOURCE = "Independent Unicode bytes: café 😀\n".encode()
 # producer's ditto ZIP round trip restores NFD. A precomposed Python name would
 # come back renamed and be refused as a changed bundle, so model the native form.
 RESOURCE_NAME = unicodedata.normalize("NFD", "données.txt")
+# A mode no default umask produces proves Brew preserves permission bits. It is
+# applied after signing: codesign rewrites the Mach-O through codesign_allocate,
+# which can recreate it as 0777 minus the umask (0755); modes are not sealed.
+FIXTURE_EXECUTABLE_MODE = 0o751
+
+
+def file_mode(path):
+    """Permission bits of one regular file, never following a symbolic link."""
+    return stat.S_IMODE(os.lstat(path).st_mode)
+
+
 VERSIONS = ("71.36.1", "71.36.2", "71.36.3", "71.36.4")
 
 
@@ -2357,7 +2368,6 @@ def signed_bundle(children, version):
     resources.mkdir(parents=True)
     executable.parent.mkdir(parents=True)
     shutil.copyfile("/usr/bin/true", executable)
-    executable.chmod(0o751)
     (resources / RESOURCE_NAME).write_bytes(RESOURCE)
     (resources / "owned-link").symlink_to(RESOURCE_NAME)
     (app / "Contents/Info.plist").write_bytes(
@@ -2374,6 +2384,12 @@ def signed_bundle(children, version):
         )
     )
     children.run(["/usr/bin/codesign", "--force", "--sign", "-", str(app)], confined=True)
+    executable.chmod(FIXTURE_EXECUTABLE_MODE)
+    require(
+        file_mode(executable) == FIXTURE_EXECUTABLE_MODE,
+        "Signed fixture executable mode is not the distinctive fixture mode",
+    )
+    # Verification follows the mode change, so the signed source is admitted as published.
     children.run(["/usr/bin/codesign", "--verify", "--deep", "--strict", str(app)], confined=True)
     return app
 
@@ -2456,9 +2472,12 @@ def verify_installed(children, version, source):
         os.readlink(app / "Contents/Resources/owned-link") == RESOURCE_NAME,
         "Installed symlink changed",
     )
+    installed_mode = file_mode(app / "Contents/MacOS/OwnedFixture")
+    source_mode = file_mode(source / "Contents/MacOS/OwnedFixture")
     require(
-        stat.S_IMODE((app / "Contents/MacOS/OwnedFixture").stat().st_mode) == 0o751,
-        "Installed executable mode changed",
+        installed_mode == source_mode == FIXTURE_EXECUTABLE_MODE,
+        f"Installed executable mode changed: installed={installed_mode:#o}, "
+        f"source={source_mode:#o}, expected={FIXTURE_EXECUTABLE_MODE:#o}",
     )
     require(
         tree_receipt(app) == tree_receipt(source),
