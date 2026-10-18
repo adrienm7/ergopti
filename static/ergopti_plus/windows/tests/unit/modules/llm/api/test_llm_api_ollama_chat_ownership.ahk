@@ -52,7 +52,7 @@ _OllamaChatOwnership_Accepted(Raw, Expected) {
 	}
 }
 
-for Case in [
+for ChatCase in [
 	["reasoning only", '{"message":{"content":"","thinking":"private reasoning"}}'],
 	["reasoning after whitespace", '{"message":{"content":"  ","thinking":"private reasoning"}}'],
 	["canonical empty before root decoy", '{"message":{"content":""},"response":"legacy decoy"}'],
@@ -65,16 +65,16 @@ for Case in [
 	["non-object root", '[{"response":"array decoy"}]'],
 	["non-string legacy response", '{"response":42}']
 ] {
-	Test("Ollama chat: reject " . Case[1] . " (ollama-chat-content-ownership)",
-		_OllamaChatOwnership_Rejected.Bind(Case[2]))
+	Test("Ollama chat: reject " . ChatCase[1] . " (ollama-chat-content-ownership)",
+		_OllamaChatOwnership_Rejected.Bind(ChatCase[2]))
 }
 
-for Case in [
+for ChatCase in [
 	["canonical content", '{"message":{"content":"  answer  ","thinking":"private reasoning"}}', "answer"],
 	["chat before legacy decoy", '{"response":"legacy decoy","message":{"content":"answer"}}', "answer"],
 	["legacy root before metadata decoy", '{"metadata":{"response":"nested decoy"},"response":"legacy answer"}', "legacy answer"],
 	["escaped legacy content", '{"response":"line one\nline two"}', "line one`nline two"]
 ] {
-	Test("Ollama chat: accept " . Case[1] . " (ollama-chat-content-ownership)",
-		_OllamaChatOwnership_Accepted.Bind(Case[2], Case[3]))
+	Test("Ollama chat: accept " . ChatCase[1] . " (ollama-chat-content-ownership)",
+		_OllamaChatOwnership_Accepted.Bind(ChatCase[2], ChatCase[3]))
 }
