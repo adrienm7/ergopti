@@ -555,3 +555,5 @@ _RPP_NativeVariants(ProviderId, Context) {
 for ProviderId in ["autohotkey", "python", "powershell"]
 	Test("program providers: real installed " . ProviderId . " script argv and exact Job retirement",
 		_RPA_WithFixture.Bind(_RPA_WithCapturedProgramLogs.Bind(_RPP_NativeVariants.Bind(ProviderId))))
+
+#Include test_program_picker_modal_owner.ahk
