@@ -107,9 +107,111 @@ end
 
 helpers.describe("window_info: X11", function()
 
+	helpers.it("(linux-focus-coherent-poll) retains one window's metadata and identity while focus changes", function()
+		local shell = helpers.load_module("adapters.shell_runner")
+		local display = helpers.load_module("infra.display_server")
+		display._set_for_test(display.X11, "coherent focus fixture")
+		local queries, id = 0, "1"
+		shell._set_runner(function(command)
+			if command:find("getactivewindow", 1, true) then
+				queries = queries + 1
+				local captured = id
+				id = "2"
+				return captured .. "\n"
+			end
+			if command:find("getwindowname '1'", 1, true) then return "Private window\n" end
+			if command:find("getwindowname '2'", 1, true) then return "Public window\n" end
+			if command:find("getwindowpid", 1, true) then return "1337\n" end
+			if command:find("/proc/1337/comm", 1, true) then return "browser\n" end
+			return ""
+		end)
+		local ok, failure = pcall(function()
+			local window = helpers.load_module("adapters.window_info")
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata, { appId = "browser", windowTitle = "Private window", bundleId = "", executablePath = "" })
+			helpers.assert_eq(identity, "x11:1337:1")
+			helpers.assert_eq(queries, 1, "the snapshot must not mix a later window with the first title")
+			local current = window.focused_identity()
+			helpers.assert_eq(current, "x11:1337:2", "asynchronous output must query fresh focus after an earlier snapshot")
+			helpers.assert_eq(queries, 2)
+		end)
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(linux-focus-window-identity) distinguishes identically titled windows of one process", function()
+		local id = "0x1"
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return "firefox\n" end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return id .. "\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		local original = wi.focused_identity()
+		id = "0x2"
+		local switched = wi.focused_identity()
+		id = "0x1"
+		local restored = wi.focused_identity()
+		restore()
+		helpers.assert_eq(original, "x11:1337:0x1")
+		helpers.assert_eq(switched, "x11:1337:0x2")
+		helpers.assert_eq(restored, original, "returning to the original window preserves its identity")
+	end)
+
+	helpers.it("(linux-focus-window-identity) distinguishes applications with the same window title", function()
+		local id, comm = "0x1", "firefox"
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return comm .. "\n" end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return id .. "\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		helpers.assert_eq(wi.getFocused().appId, "firefox")
+		id, comm = "0x2", "keepassxc"
+		local second = wi.getFocused()
+		restore()
+		helpers.assert_eq(second.windowTitle, "Untitled")
+		helpers.assert_eq(second.appId, "keepassxc",
+			"a title shared by two applications cannot identify the focused process")
+	end)
+
+	helpers.it("(linux-focus-window-identity) retries an unavailable process identity", function()
+		local comm = ""
+		local Shell = helpers.load_module("adapters.shell_runner")
+		local ds = helpers.load_module("infra.display_server")
+		ds._set_for_test("x11", "xfce")
+		package.loaded["infra.display_server"] = ds
+		Shell._set_runner(function(cmd)
+			if cmd:find("getwindowname", 1, true) then return "Untitled\n" end
+			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
+			if cmd:find("/proc/1337/comm", 1, true) then return comm end
+			if cmd:find("xdotool getactivewindow 2", 1, true) then return "0x1\n" end
+			return ""
+		end)
+		local wi = helpers.load_module("adapters.window_info")
+		helpers.assert_eq(wi.getFocused().appId, "")
+		comm = "firefox\n"
+		local recovered = wi.getFocused()
+		restore()
+		helpers.assert_eq(recovered.appId, "firefox",
+			"a transient process query failure must not poison an unchanged window's identity")
+	end)
+
 	helpers.it("reports the title and the owning process", function()
 		local wi = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "Ergopti — Mozilla Firefox\n" },
+			{ "xdotool getwindowname", "Ergopti — Mozilla Firefox\n" },
 			{ "getwindowpid", "1337\n" },
 			{ "/proc/1337/comm", "firefox\n" },
 			{ "xdotool getactivewindow 2", "0x3400007\n" },
@@ -123,9 +225,9 @@ helpers.describe("window_info: X11", function()
 		restore()
 	end)
 
-	helpers.it("costs one subprocess while the focus does not change", function()
+	helpers.it("avoids repeated process lookups while the focus does not change", function()
 		local wi, log = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "Same Window\n" },
+			{ "xdotool getwindowname", "Same Window\n" },
 			{ "getwindowpid", "1337\n" },
 			{ "/proc/1337/comm", "firefox\n" },
 			{ "xdotool getactivewindow 2", "0x3400007\n" },
@@ -133,11 +235,10 @@ helpers.describe("window_info: X11", function()
 		wi.getFocused()
 		local after_first = #log
 		for _ = 1, 5 do wi.getFocused() end
-		-- This runs on the focus poll, four times a second. Re-resolving the
-		-- application every time would be twelve subprocesses a second to learn
-		-- something that changes a few times a minute.
-		helpers.assert_eq(#log - after_first, 5,
-			"an unchanged title must cost exactly one probe per call, got "
+		-- The window ID and title must stay current; the owning process needs
+		-- resolving only when either changes or its identity is still unknown.
+		helpers.assert_eq(#log - after_first, 10,
+			"an unchanged window needs only the identity and title probes, got "
 				.. tostring(#log - after_first) .. " for five calls")
 		restore()
 	end)
@@ -150,7 +251,7 @@ helpers.describe("window_info: X11", function()
 		package.loaded["infra.display_server"] = ds
 		local comm = "firefox"
 		Shell._set_runner(function(cmd)
-			if cmd:find("getactivewindow getwindowname", 1, true) then return title .. "\n" end
+			if cmd:find("xdotool getwindowname", 1, true) then return title .. "\n" end
 			if cmd:find("getwindowpid", 1, true) then return "1337\n" end
 			if cmd:find("/proc/1337/comm", 1, true) then return comm .. "\n" end
 			if cmd:find("xdotool getactivewindow 2", 1, true) then return "0x1\n" end
@@ -170,7 +271,7 @@ helpers.describe("window_info: X11", function()
 
 	helpers.it("answers empty when there is no focused window", function()
 		local wi = under("x11", "xfce", {
-			{ "getactivewindow getwindowname", "" },
+			{ "xdotool getwindowname", "" },
 		})
 		local info = wi.getFocused()
 		helpers.assert_eq(info.windowTitle, "", "no window means no title")
@@ -192,6 +293,95 @@ end)
 -- =================================================================
 
 helpers.describe("window_info: Wayland", function()
+
+	helpers.it("(linux-focus-native-query-error) refuses unexpected compositor errors before accessible fallback", function()
+		local name = "adapters.user_hotstring_destination"
+		local saved, captures = package.loaded[name], 0
+		package.loaded[name] = {
+			capture_current = function()
+				captures = captures + 1
+				return { bus = ":1.42", path = "/controlled-fallback" }
+			end,
+		}
+		local ok, failure = pcall(function()
+			local window = under("wayland", "sway", {})
+			require("adapters.shell_runner")._set_runner(function() error("controlled unexpected compositor query error") end)
+			helpers.assert_nil(window.focused_identity(), "an unexpected native query failure cannot authorize output through a different lookup")
+			helpers.assert_eq(captures, 0)
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata, { appId = "", windowTitle = "", bundleId = "", executablePath = "" })
+			helpers.assert_nil(identity)
+			helpers.assert_eq(captures, 0, "periodic snapshot errors also remain free of accessible fallback")
+		end)
+		package.loaded[name] = saved
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(linux-focus-coherent-poll) reserves accessible focus lookup for fresh native targeting", function()
+		local name = "adapters.user_hotstring_destination"
+		local saved, captures = package.loaded[name], 0
+		local saved_lifecycle = package.loaded["adapters.process_lifecycle"]
+		package.loaded[name] = {
+			capture_current = function()
+				captures = captures + 1
+				return { bus = ":1.42", path = "/control/" .. captures }
+			end,
+		}
+		local ok, failure = pcall(function()
+			local window = under("wayland", "GNOME", {})
+			helpers.assert_eq(window.getFocused(), { appId = "", windowTitle = "", bundleId = "", executablePath = "" })
+			helpers.assert_eq(captures, 0, "metadata consumers must not acquire an unnecessary accessible destination")
+			local metadata, identity = window.focused_snapshot()
+			helpers.assert_eq(metadata.appId, "")
+			helpers.assert_nil(identity, "unsupported compositors retain unknown native identity during metadata polling")
+			local lifecycle = helpers.load_module("adapters.process_lifecycle")
+			lifecycle.start()
+			for tick = 1, 5 do lifecycle.tick(tick) end
+			lifecycle.stop()
+			helpers.assert_eq(captures, 0, "periodic lifecycle polling must not spawn an additional accessible helper")
+			helpers.assert_eq(window.focused_identity(), "atspi::1.42:/control/1")
+			helpers.assert_eq(window.focused_identity(), "atspi::1.42:/control/2", "asynchronous targeting cannot reuse a previous accessible snapshot")
+			helpers.assert_eq(captures, 2)
+		end)
+		package.loaded[name] = saved
+		package.loaded["adapters.process_lifecycle"] = saved_lifecycle
+		restore()
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	for _, case in ipairs({
+		{ desktop = "sway", probe = "command -v 'swaymsg'", query = "swaymsg -t get_tree",
+			payload = '{"focused":true,"id":7,"pid":1337,"name":"Untitled","app_id":"editor"}', identity = "sway:1337:7" },
+		{ desktop = "Hyprland", probe = "command -v 'hyprctl'", query = "hyprctl activewindow",
+			payload = '{"address":"0x55","pid":1337,"title":"Untitled","class":"editor"}', identity = "hyprland:1337:0x55" },
+		{ desktop = "niri", probe = "command -v 'niri'", query = "niri msg",
+			payload = '{"id":7,"title":"Untitled","app_id":"editor"}', identity = "niri::7" },
+	}) do
+		helpers.it("(linux-focus-window-identity) reads native identity from " .. case.desktop, function()
+			local wi = under("wayland", case.desktop, { { case.probe, true }, { case.query, case.payload } })
+			local identity = wi.focused_identity()
+			restore()
+			helpers.assert_eq(identity, case.identity)
+		end)
+	end
+
+	helpers.it("(linux-focus-window-identity) refuses unknown compositor window identity", function()
+		local wi = under("wayland", "GNOME", {})
+		local identity = wi.focused_identity()
+		restore()
+		helpers.assert_eq(identity, nil, "application metadata cannot replace a native window identity")
+	end)
+
+	helpers.it("(linux-focus-window-identity) rejects Hyprland's no-active-window sentinel", function()
+		local wi = under("wayland", "Hyprland", {
+			{ "command -v 'hyprctl'", true },
+			{ "hyprctl activewindow", '{"address":"0x0","pid":0,"title":"","class":""}' },
+		})
+		local identity = wi.focused_identity()
+		restore()
+		helpers.assert_eq(identity, nil, "a compositor sentinel does not name an output target")
+	end)
 
 	helpers.it("walks the sway tree to the focused leaf", function()
 		local wi = under("wayland", "sway", {
@@ -299,4 +489,71 @@ helpers.describe("window_info: no session", function()
 		restore()
 	end)
 
+end)
+
+helpers.describe("window_info: native privacy context", function()
+	for _, scenario in ipairs({ "admitted", "other field", "other app", "other role", "unknown" }) do
+		helpers.it("(focus-context-join) unsupported compositor context " .. scenario, function()
+			local previous = package.loaded["adapters.atspi_focus"]
+			local called, detail = pcall(function()
+				local receipt = { bus = ":1.8", path = "/owned/field", role = 61 }
+				local reads = 0
+				package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+					reads = reads + 1
+					if scenario == "unknown" then return nil, false end
+					return { native_bus_name = scenario == "other app" and ":1.9" or receipt.bus,
+						native_object_path = scenario == "other field" and "/other/field" or receipt.path,
+						role = scenario == "other role" and 40 or receipt.role,
+						app_id = "owned-native-process", window_title = "Owned native frame",
+						window_bus_name = receipt.bus, window_object_path = "/owned/frame" }, true
+				end }
+				local wi = under("wayland", "GNOME", {})
+				local context = wi.focused_privacy_context(receipt)
+				helpers.assert_eq(reads, 1)
+				if scenario == "admitted" then
+					helpers.assert_eq(context.app_id, "owned-native-process")
+					helpers.assert_eq(context.title, "Owned native frame")
+					helpers.assert_eq(context.native_identity, "atspi::1.8:/owned/frame")
+				else helpers.assert_eq(context, nil, "context belongs to the exact native field receipt") end
+			end)
+			package.loaded["adapters.atspi_focus"] = previous
+			restore()
+			if not called then error(detail, 0) end
+		end)
+	end
+end)
+
+helpers.describe("window_info: compositor privacy context binding", function()
+	for _, scenario in ipairs({ "matched", "different PID", "different title", "missing PID" }) do
+		helpers.it("(focus-context-join) compositor class requires native frame binding: " .. scenario, function()
+			local previous = package.loaded["adapters.atspi_focus"]
+			local wi, original_snapshot
+			local called, detail = pcall(function()
+				package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+					return { native_bus_name = ":1.8", native_object_path = "/owned/field", role = 61,
+						process_id = 123, app_id = "bitwarden", window_title = "Owned private frame",
+						window_bus_name = ":1.8", window_object_path = "/owned/frame" }, true
+				end }
+				wi = under("unknown", "", {})
+				original_snapshot = wi.focused_process_snapshot
+				wi.focused_process_snapshot = function()
+					local pid = scenario == "different PID" and 456 or 123
+					if scenario == "missing PID" then pid = nil end
+					return { appId = "compositor-class", windowTitle = scenario == "different title" and "Other frame" or "Owned private frame" }, "native-window", pid
+				end
+				local context = wi.focused_privacy_context({ bus = ":1.8", path = "/owned/field", role = 61 })
+				if scenario == "matched" then
+					helpers.assert_eq(context.app_id, "compositor-class")
+					helpers.assert_eq(context.native_identity, "native-window")
+				else
+					helpers.assert_eq(context.app_id, "bitwarden", "unrelated compositor metadata cannot override protected native owner")
+					helpers.assert_eq(context.native_identity, "atspi::1.8:/owned/frame")
+				end
+			end)
+			if wi then wi.focused_process_snapshot = original_snapshot end
+			package.loaded["adapters.atspi_focus"] = previous
+			restore()
+			if not called then error(detail, 0) end
+		end)
+	end
 end)

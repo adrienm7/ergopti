@@ -485,6 +485,13 @@ focus_settle_ms = 250
 # Hard deadline for one libatspi tree query. The verdict is already unknown and
 # fail-closed while this helper runs, so expiry affects availability, not privacy.
 atspi_probe_timeout_ms = 1000
+# Retry failed context observations after retirement, independently of execution deadlines.
+context_retry_ms = 1000
+
+# Maximum wait for one already-running accessibility worker to answer an input
+# admission barrier. A busy application withholds automation and metrics; input
+# callbacks wait no longer than this budget before physical pass-through resumes.
+focus_barrier_timeout_ms = 20
 
 
 # ──────────────────────────────────────────────────────────────────────

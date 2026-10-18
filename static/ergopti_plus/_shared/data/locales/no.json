@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "Ingenting er skrevet ennå som AI-en kan fortsette.",
 	"llm.manual_prediction.paused": "Ergopti+ er satt på pause: ingen forslag generert.",
 	"llm.prompt_prediction.unknown_prompt": "Prompten som er valgt for denne snarveien, finnes ikke lenger: velg en annen.",
+	"llm.text_target_unavailable": "KI er ikke tilgjengelig i det aktive tekstfeltet. Klikk i et annet tekstfelt og prøv igjen.",
 	"llm.tone.most_formal": "Teksten er allerede i den mest formelle tonen.",
 	"llm.tone.most_familiar": "Teksten er allerede i den mest uformelle tonen.",
 	"llm.live.on": "Direktemodus på: {1}",

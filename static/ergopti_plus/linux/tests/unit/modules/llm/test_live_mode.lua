@@ -103,7 +103,7 @@ local function scenario(opts, body)
 		}
 		local scheduler = Fakes.timer_scheduler()
 		local engine = require("modules.llm.prediction_engine")
-		engine.init({
+		engine.init({ focus_id = function() return "owned-prediction-window" end,
 			scheduler = scheduler,
 			clock_ms = function() return scheduler.now * 1000 end,
 			engine = {
@@ -494,7 +494,7 @@ helpers.describe("live mode: turning it on and off", function()
 	helpers.it("is off at every start", function()
 		scenario({}, function(world)
 			helpers.assert_eq(world.handlers.llm_live_prompt_toggle("tap_3", "translate_en|1"), true)
-			world.engine.init({ scheduler = world.scheduler })
+			world.engine.init({ focus_id = function() return "owned-prediction-window" end, scheduler = world.scheduler })
 			helpers.assert_eq(world.engine.get_live(), nil)
 		end)
 	end)

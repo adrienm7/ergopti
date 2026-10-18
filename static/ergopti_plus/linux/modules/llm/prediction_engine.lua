@@ -88,12 +88,16 @@ local Collision = { navigation = NavigationSettings.capture_collision_configurat
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _notify = nil
+local _privacy_guard = nil
+local _privacy_context = nil
 
 -- Injected by init() for the tone actions: how the selection is read, how it is
 -- replaced (typed over, then selected back), and which window has the focus.
 local _read_selection = nil
 local _replace_selection = nil
 local _focus_id = nil
+local _buffer_focus = nil
+local current_focus
 
 -- The tone actions' state. The generation drops a stale answer: a newer tone
 -- step, typing, a cancel or a pause make the one in flight obsolete. The memory
@@ -166,6 +170,7 @@ local MANUAL_REFUSAL_KEYS = {
 -- exists (a deleted custom prompt). Kept apart from MANUAL_REFUSAL_KEYS, which
 -- the three drivers declare identically.
 local UNKNOWN_PROMPT_KEY = "llm.prompt_prediction.unknown_prompt"
+local TEXT_TARGET_UNAVAILABLE_KEY = "llm.text_target_unavailable"
 
 -- The screen actions, each with the capture mode it runs and the vision.json
 -- list of answers it offers, in that order; and their notices
@@ -273,7 +278,38 @@ local function max_context_chars()
 	return Settings.get("context_length") or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
+--- Validates native application identities without accepting labels as a fallback.
+--- @param app_id any
+--- @return boolean
+local function known_app_id(app_id)
+	return type(app_id) == "string" and app_id:find("%S") ~= nil and not app_id:find("\0", 1, true)
+end
+
+--- Rechecks the daemon's resident privacy owner without probing per streamed token.
+--- Cancellation during a barrier revokes the original request even if the new
+--- owner becomes ordinary before that barrier returns.
+--- @return boolean blocked
+--- @return string|nil app_id Application metadata joined to the same native owner.
+local function global_privacy_blocks()
+	local epoch, guard, context = _request_epoch, _privacy_guard, _privacy_context
+	if guard ~= nil then
+		local ok, blocked = pcall(guard)
+		if not ok or blocked ~= false then return true end
+	end
+	if epoch ~= _request_epoch or guard ~= _privacy_guard or context ~= _privacy_context then return true end
+	if context ~= nil then
+		local ok, current = pcall(context)
+		if not ok or type(current) ~= "table" or not known_app_id(rawget(current, "app_id"))
+			or type(rawget(current, "title")) ~= "string" or not known_app_id(rawget(current, "native_identity"))
+			or epoch ~= _request_epoch or guard ~= _privacy_guard or context ~= _privacy_context then return true end
+		return false, rawget(current, "app_id")
+	end
+	return false
+end
+
 local function _is_secure_context()
+	local blocked, app_id = global_privacy_blocks()
+	if blocked then return true end
 	local secure_enabled = TriggerSettings.get("secure_filter_enabled")
 	local url_enabled = TriggerSettings.get("url_bar_filter_enabled")
 	if secure_enabled == nil then secure_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS end
@@ -287,11 +323,15 @@ local function _is_secure_context()
 		if not ok or secure then return true end
 	end
 	if url_enabled then
-		local ok_app, app_id = pcall(function()
-			local lifecycle = require("adapters.process_lifecycle")
-			return lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
-		end)
-		if not ok_app or type(app_id) ~= "string" or app_id == "" then return true end
+		if app_id == nil then
+			local ok_app
+			ok_app, app_id = pcall(function()
+				local lifecycle = require("adapters.process_lifecycle")
+				local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
+				return type(foreground) == "table" and rawget(foreground, "appId") or nil
+			end)
+			if not ok_app or not known_app_id(app_id) then return true end
+		end
 		local ok_url, is_url = pcall(detector.isUrlBar, app_id)
 		if not ok_url or is_url then return true end
 	end
@@ -466,7 +506,8 @@ local function advance_request_epoch(resync_owner)
 end
 
 --- Initialises the engine and its explicit side-effect seams.
---- @param opts table|nil
+--- @param opts table|nil Optional privacy_guard returns false only for admitted
+--- ownership; privacy_context returns its joined { app_id, title, native_identity }.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
 	Collision.construction = nil
@@ -492,9 +533,11 @@ function M.init(opts)
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
+	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
+	_buffer_focus = nil
 	_capture_screen = type(options.capture_screen) == "function" and options.capture_screen or nil
 	_on_live_change = type(options.on_live_change) == "function" and options.on_live_change or nil
 	_focused_window = type(options.focused_window) == "function" and options.focused_window or nil
@@ -553,6 +596,9 @@ function M.on_char(ch, buffer, output_context)
 		arm_agent(buffer, output_context)
 		return
 	end
+	-- Retain the first character's native target across debounce/manual requests.
+	-- Querying only once per buffer keeps native subprocesses off later keystrokes.
+	if _buffer_focus == nil then _buffer_focus = current_focus() end
 	-- Typing replaced the selection a tone step was about to rewrite.
 	M.drop_tone("typing")
 	-- The user went on typing: the screen answers would be dismissed at once.
@@ -673,9 +719,14 @@ function M.predict(context, output_context, override)
 	if _predicting or type(context) ~= "string" or context == "" then return end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
-		return
+		return false
 	end
 
+	local focus = _buffer_focus or current_focus()
+	if focus == "" or current_focus() ~= focus then
+		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
+		return false
+	end
 	local backend, target, model, runtime_response = M.resolve_backend()
 	if not backend then return end
 
@@ -729,6 +780,7 @@ function M.predict(context, output_context, override)
 		input_chars = trigger_chars,
 		model = model,
 		profile = profile.id,
+		focus = focus,
 		live = override ~= nil and override.live == true,
 		automatic = type(output_context) == "table" and output_context.automatic == true,
 	}
@@ -761,9 +813,19 @@ function M.predict(context, output_context, override)
 		if #visible > 0 or meta.loading then show_candidates(visible, meta) end
 	end
 
+	local function request_current(verify_focus)
+		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+		if verify_focus and (global_privacy_blocks() or current_focus() ~= focus) then
+			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
+			M.dismiss()
+			return false
+		end
+		return true
+	end
+
 	local dispatch
 	dispatch = function()
-		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+		if not request_current(true) then return end
 		local kind = M.get_backend()
 		local now = _clock_ms()
 		local wait_ms = (_last_request_ms[kind] or -math.huge) + Inference.min_interval_ms(kind) - now
@@ -813,14 +875,14 @@ function M.predict(context, output_context, override)
 			-- user's copy of "basic" never got the single-line stops.
 			line_mode = not is_batch and not system_prompt:find("TAIL_CORRECTED", 1, true),
 		}, function(delta)
-			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if not request_current(false) then return end
 			streamed = streamed .. think_filter:feed(delta)
 			if DisplaySettings.get("streaming") ~= true then return end
 			if requested > 1 and DisplaySettings.get("streaming_multi") ~= true then return end
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
-			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if not request_current(true) then return end
 			if err then
 				_predicting = false
 				meta.loading = false
@@ -903,6 +965,10 @@ local function run_manual(output_context, prompt)
 	Logger.info(LOG, "Manual prediction requested (%d context byte(s), prompt %s).", #context,
 		override and override.profile.id or "from the menu")
 	local refusal = M.predict(context, output_context, override)
+	if refusal == false then
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
 	if type(refusal) == "string" then
 		Logger.info(LOG, "Manual prediction refused (%s).", refusal)
 		show_notice(MANUAL_REFUSAL_KEYS[refusal], refusal)
@@ -1109,7 +1175,7 @@ end
 
 --- The focused window's identity, "" when unknown.
 --- @return string
-local function current_focus()
+current_focus = function()
 	if not _focus_id then return "" end
 	local ok, id = pcall(_focus_id)
 	return (ok and type(id) == "string") and id or ""
@@ -1142,12 +1208,9 @@ local function finish_tone(generation, plan, focus, full_text, err)
 		Logger.warn(LOG, "Tone rewrite dropped: the answer holds no REWRITE line (%d chars).", #(full_text or ""))
 		return
 	end
-	-- Compared, not trusted: typing into another window would put the rewrite
-	-- where the user never selected anything. An identity the desktop cannot
-	-- tell (GNOME and KDE under Wayland) reads "" on both ends; typing, clicks
-	-- and Escape still drop the step there.
-	-- The identities hold window titles, which are private: never logged.
-	if current_focus() ~= focus then
+	-- An unreadable target cannot authorize insertion: comparing two unknown
+	-- identities would mistake a programmatic window switch for unchanged focus.
+	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
 		Logger.info(LOG, "Tone rewrite dropped: another window took the focus while it ran.")
 		return
 	end
@@ -1196,10 +1259,22 @@ function M.shift_tone(direction, cycle)
 	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Tone step suppressed: secure field or excluded context.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	M.drop_tone("superseded")
+	local focus = current_focus()
+	if focus == "" then
+		Logger.warn(LOG, "Tone step refused: the focused window cannot be identified.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
 	local read_ok, selection, read_err = _read_selection()
+	if current_focus() ~= focus then
+		Logger.info(LOG, "Tone step refused: focus changed while the selection was read.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
 	if not read_ok then
 		if read_err == "no_selection" then
 			Logger.info(LOG, "Tone step ignored: nothing is selected.")
@@ -1243,7 +1318,6 @@ function M.shift_tone(direction, cycle)
 
 	local messages = PromptBuilder.build_messages(system_prompt, plan.source, plan.source)
 	local generation = _tone_generation
-	local focus = current_focus()
 	local request_opts = {
 		runtime_response = runtime_response,
 		stream = false,
@@ -1270,6 +1344,10 @@ function M.shift_tone(direction, cycle)
 				_tone_timer = nil
 				Logger.error(LOG, "Tone rewrite could not be paced: timer unavailable.")
 			end
+			return
+		end
+		if global_privacy_blocks() or current_focus() ~= focus then
+			Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 			return
 		end
 		_last_request_ms[kind] = now
@@ -1349,7 +1427,7 @@ local function open_offer(action, label, model, focus)
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
-	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus }
+	_suggestion_context = { app_id = nil, input_chars = 0, model = model, profile = action, focus = focus or current_focus() }
 	_offer_notified = false
 	_predicting = true
 	advance_request_epoch()
@@ -1382,6 +1460,11 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 			Logger.error(LOG, "%s could not be paced: timer unavailable.", what)
 			on_unpaced()
 		end
+		return
+	end
+	if global_privacy_blocks() then
+		Logger.info(LOG, "%s dropped: global text privacy no longer admits the request.", what)
+		M.dismiss()
 		return
 	end
 	_last_request_ms[kind] = now
@@ -1723,7 +1806,8 @@ end
 --- @param config table Decoded translate.json.
 --- @param full_text string|nil The model's answer.
 --- @param err string|nil The backend's error.
-local function finish_translation(epoch, meta, config, full_text, err)
+--- @param focus string Exact native text destination captured before selection.
+local function finish_translation(epoch, meta, config, full_text, err, focus)
 	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
@@ -1735,6 +1819,11 @@ local function finish_translation(epoch, meta, config, full_text, err)
 	if _is_paused() or not _enabled then
 		Logger.info(LOG, "Translation dropped: the AI was paused or switched off while it ran.")
 		clear_offer()
+		return
+	end
+	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
+		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
+		M.dismiss()
 		return
 	end
 	if err then
@@ -1793,9 +1882,21 @@ function M.translate_selection(value)
 	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Translation suppressed: secure field or excluded context.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
+	local focus = current_focus()
+	if focus == "" then
+		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
 		return false
 	end
 	local read_ok, selection, read_err = _read_selection()
+	if current_focus() ~= focus then
+		Logger.info(LOG, "Translation refused: focus changed while the selection was read.")
+		show_notice(TEXT_TARGET_UNAVAILABLE_KEY, "text_target_unavailable")
+		return false
+	end
 	if not read_ok or type(selection) ~= "string" or not selection:find("%S") then
 		if read_ok or read_err == "no_selection" then
 			Logger.info(LOG, "Translation refused: nothing is selected.")
@@ -1815,8 +1916,7 @@ function M.translate_selection(value)
 	-- and a tone step would rewrite the text being translated.
 	M.drop_vision("superseded")
 	M.drop_tone("superseded")
-	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model,
-		current_focus())
+	local epoch, meta = open_offer(TRANSLATE_ACTION, i18n.get("sg_actions." .. TRANSLATE_ACTION), model, focus)
 	local messages = {
 		{ role = "system", content = Translate.system_prompt(config, language) },
 		{ role = "user", content = Translate.user_text(config, selection) },
@@ -1824,9 +1924,15 @@ function M.translate_selection(value)
 	Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 		M.get_backend(), model, code, #selection)
 	send_paced(epoch, "Translation", function()
+		if current_focus() ~= focus then
+			Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
+			_predicting = false
+			clear_offer()
+			return
+		end
 		_inflight_backend = backend
 		backend.chat(backend_target, model, messages, offer_request_opts(config.max_tokens, nil, runtime_response), nil,
-			function(full_text, err) finish_translation(epoch, meta, config, full_text, err) end)
+			function(full_text, err) finish_translation(epoch, meta, config, full_text, err, focus) end)
 	end, function()
 		_predicting = false
 		clear_offer()
@@ -2490,6 +2596,11 @@ function M.withdraw(resync_owner)
 	M.drop_vision("withdrawn")
 	M.drop_agent_triage("withdrawn")
 	M.dismiss(resync_owner)
+	-- An empty matcher retires the typing context as well as its offer. Retained
+	-- text must keep its original target even if a fresh focus query now succeeds.
+	if _engine and type(_engine.current_buffer) == "function" and _engine:current_buffer() == "" then
+		_buffer_focus = nil
+	end
 end
 
 
@@ -2504,6 +2615,7 @@ function M.cancel()
 	if _enable_admission and _enable_admission.cancel() ~= true then return false end
 	M.withdraw(_modal_resync_owner)
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	_buffer_focus = nil
 end
 
 --- Dismisses in-flight and visible suggestions without changing the buffer.
@@ -2524,6 +2636,25 @@ function M.dismiss(resync_owner)
 end
 
 
+--- Retires an accepted offer without recording an automatic agent rejection.
+--- A streaming partial or an early sequential variant can be accepted while its
+--- request still runs. Revoke callbacks before cancelling native work: cancellation
+--- may synchronously deliver a final response, and the physical edit is committed.
+local function close_accepted_offer()
+	advance_request_epoch()
+	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
+	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
+	local backend = _predicting and _inflight_backend or nil
+	_inflight_backend, _predicting = nil, false
+	clear_offer()
+	if backend then
+		local ok, cancelled = pcall(backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "Accepted prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
+end
+
 --- Accepts one displayed prediction after the daemon commits its physical edit.
 --- @param index integer
 --- @return boolean
@@ -2531,6 +2662,11 @@ function M.accept(index)
 	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
+	if global_privacy_blocks() then
+		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
+		M.dismiss()
+		return false
+	end
 	local ok, committed
 	if candidate.on_accept then
 		-- An agent action: its connector runs, nothing is typed.
@@ -2538,7 +2674,7 @@ function M.accept(index)
 		if ok and committed == true then
 			local agent = _suggestion_context and _suggestion_context.agent or nil
 			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
-			clear_offer()
+			close_accepted_offer()
 			return true
 		end
 	elseif candidate.replaces_selection then
@@ -2547,13 +2683,19 @@ function M.accept(index)
 		-- window the text would land where nothing was selected.
 		if not _replace_selection then return false end
 		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if current_focus() ~= focus then
+		if focus == "" or current_focus() ~= focus then
 			Logger.info(LOG, "Translation not inserted: another window has the focus.")
 			return false
 		end
 		ok, committed = pcall(_replace_selection, candidate.to_type)
 	else
 		if type(_apply_prediction) ~= "function" then return false end
+		local focus = _suggestion_context and _suggestion_context.focus or ""
+		if focus == "" or current_focus() ~= focus then
+			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
+			M.dismiss()
+			return false
+		end
 		ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
 	end
 	if not ok or committed ~= true then
@@ -2564,10 +2706,10 @@ function M.accept(index)
 		local observed, observe_err = pcall(_on_output, candidate.to_type, _suggestion_context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
-	clear_offer()
+	close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
-	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	_buffer_focus = nil
 	return true
 end
 

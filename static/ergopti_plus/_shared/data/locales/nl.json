@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "Er is nog niets getypt dat de AI kan voortzetten.",
 	"llm.manual_prediction.paused": "Ergopti+ is gepauzeerd: geen suggestie gegenereerd.",
 	"llm.prompt_prediction.unknown_prompt": "De prompt die voor deze snelkoppeling is gekozen, bestaat niet meer: kies een andere.",
+	"llm.text_target_unavailable": "AI is niet beschikbaar in het huidige tekstveld. Klik in een ander tekstveld en probeer het opnieuw.",
 	"llm.tone.most_formal": "De tekst staat al in de formeelste toon.",
 	"llm.tone.most_familiar": "De tekst staat al in de informeelste toon.",
 	"llm.live.on": "Live-modus aan: {1}",

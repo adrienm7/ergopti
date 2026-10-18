@@ -1070,6 +1070,15 @@ function M.is_password_app(app_id)
 	return false
 end
 
+--- Applies the live application/window privacy filters to a joined context.
+--- Reads only in-memory policy; native metadata must already belong to its field.
+--- @param app_id string Exact current application's identifier.
+--- @param title string Exact current native frame title.
+--- @return boolean protected
+function M.is_context_protected(app_id, title)
+	return M.is_password_app(app_id) or (_private_filter_enabled and PrivateWindow.matches(title))
+end
+
 local hold_password_app = M.is_password_app
 settle_hold_policy = function()
 	if not may_record() or hold_password_app(_hold_focus_app) then

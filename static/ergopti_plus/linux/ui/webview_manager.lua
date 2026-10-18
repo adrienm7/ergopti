@@ -152,6 +152,7 @@ local _lgi = nil
 
 -- Native GTK window references: { [app_name] = { window, webview } }
 local _gtk_windows = {}
+local _gtk_pump_registered = false
 local _native_ready = false
 local _native_query_generation = 0
 local _shutting_down = false
@@ -1215,23 +1216,28 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 
 		Logger.success(LOG, "GTK window '%s' created (%dx%d).", app_name, geometry.width, geometry.height)
 
-		-- Pump GTK events: if the daemon has a luv event loop, integrate.
-		local ok_pump, pump_err = pcall(function()
-			local event_loop = require("adapters.event_loop")
-			if event_loop and event_loop.add_idle_handler then
-				event_loop.add_idle_handler(function()
+		-- All WebViews share one GTK context. Per-window handlers survive a close
+		-- in the event loop, so reopening a page accumulated an unbounded number
+		-- of dispatches and document polls on each keyboard tick.
+		if not _gtk_pump_registered then
+			local ok_pump = pcall(function()
+				local event_loop = require("adapters.event_loop")
+				assert(type(event_loop.add_idle_handler) == "function", "GTK event pump unavailable")
+				local accepted = event_loop.add_idle_handler(function()
 					poll_documents()
-					if _gtk_windows[app_name] then
+					if next(_gtk_windows) ~= nil then
 						local ctx = GLib.MainContext.default()
 						if ctx then ctx:iteration(false) end
 					end
 				end)
+				assert(accepted ~= false, "GTK event pump refused")
+			end)
+			if not ok_pump then
+				-- A mapped window without event-loop integration cannot be used.
+				Logger.error(LOG, "GTK event pump could not be attached for '%s'.", app_name)
+				return false, "GTK event pump unavailable"
 			end
-		end)
-		if not ok_pump then
-			-- Without this integration the window paints once and then freezes.
-			Logger.error(LOG, "GTK event pump could not be attached for '%s': %s.", app_name,
-				tostring(pump_err))
+			_gtk_pump_registered = true
 		end
 		return true
 	end)

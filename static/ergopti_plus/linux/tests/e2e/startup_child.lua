@@ -144,9 +144,13 @@ package.preload["adapters.uinput_writer"] = function()
 	-- Capability/reservation lifecycle is real Writer logic; syscalls are controlled.
 	return require("tests.fakes").uinput_writer()
 end
+package.preload["adapters.atspi_focus_watch"] = function()
+	return require("tests.support.focus_watch_fixture")
+end
 package.preload["adapters.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
+		publishFocus = function() return true end,
 		refresh = function() return true, "insecure" end,
 		isSecureField = function() return false end,
 		getVerdict = function() return "insecure" end,

@@ -925,6 +925,7 @@
 	"llm.manual_prediction.empty_context": "Rien n'a encore été tapé que l'IA puisse continuer.",
 	"llm.manual_prediction.paused": "Ergopti+ est en pause : aucune suggestion générée.",
 	"llm.prompt_prediction.unknown_prompt": "Le prompt choisi pour ce raccourci n’existe plus : choisissez-en un autre.",
+	"llm.text_target_unavailable": "L'IA n'est pas disponible dans le champ de texte actif. Cliquez dans un autre champ de texte et réessayez.",
 	"llm.tone.most_formal": "Le texte est déjà dans le registre le plus soutenu.",
 	"llm.tone.most_familiar": "Le texte est déjà dans le registre le plus familier.",
 	"llm.live.on": "Mode direct activé : {1}",

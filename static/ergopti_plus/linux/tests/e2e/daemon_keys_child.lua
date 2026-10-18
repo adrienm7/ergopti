@@ -194,6 +194,28 @@ end
 if not MENU_ROWS_FILE and not WITH_LLM then
 	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
 end
+if not MENU_ROWS_FILE then
+	-- All scripted key scenarios declare an ordinary owned application/window.
+	-- The same source owns privacy context and the exact AI output target.
+	package.preload["adapters.window_info"] = function()
+		local function info()
+			return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" }
+		end
+		return {
+			getFocused = info,
+			focused_snapshot = function() return info(), "owned-e2e-window" end,
+			start_privacy_context = function(_, options, callback)
+				local operation = { is_settled = function() return true end, cancel = function() return true end }
+				if options.authorized() then
+					callback({ app_id = "owned-editor", title = "owned-field", native_identity = "owned-e2e-window" })
+				end
+				return operation
+			end,
+			focused_identity = function() return "owned-e2e-window" end,
+			focused_text_identity = function() return "owned-e2e-text-field" end,
+		}
+	end
+end
 
 -- ERGOPTI_E2E_GESTURE_PUMP=fails: a touchpad reader whose pump throws. The
 -- same module is the action catalogue the tap-holds run their actions
@@ -297,9 +319,13 @@ if MAGIC_REPEAT ~= "none" then
 end
 
 -- A focused ordinary text field, conclusively.
+package.preload["adapters.atspi_focus_watch"] = function()
+	return require("tests.support.focus_watch_fixture")
+end
 package.preload["adapters.secure_field_detector"] = function()
 	return {
 		invalidateFocus = function() return 1 end,
+		publishFocus = function() return true end,
 		refresh = function() return true, "insecure" end,
 		isSecureField = function() return false end,
 		getVerdict = function() return "insecure" end,
@@ -307,6 +333,18 @@ package.preload["adapters.secure_field_detector"] = function()
 		isSecureApp = function() return false end,
 		isUrlBar = function() return false end,
 	}
+end
+
+-- A completed desktop selection includes the shared focus-settle interval.
+-- Advance only this controlled selection clock; production never sleeps here.
+local settle_selection = function() end
+if TAP_WRAP ~= "none" then
+	local Clock = require("infra.monotonic")
+	local original, elapsed_ms = Clock.now_ms, 0
+	Clock.now_ms = function() return original() + elapsed_ms end
+	settle_selection = function()
+		elapsed_ms = elapsed_ms + require("infra.timings").ms("privacy", "focus_settle_ms")
+	end
 end
 
 local CONTROL = { BS = "backspace", CBS = "backspace", ESC = "escape", LEFT = "left" }
@@ -318,6 +356,8 @@ package.preload["adapters.event_loop"] = function()
 	-- loop begins, and dropping that boundary would conceal startup failures.
 	local adapter = dofile("adapters/event_loop.lua")
 	adapter.run = function(loop)
+		-- A settled async observation is published by the next actual daemon tick.
+		loop.onPeriodic()
 		if MAGIC_REPEAT ~= "none" then
 			local Source = require("modules.hotstrings.magic_key_source")
 			assert(require("modules.hotstrings.hotstrings_config").set_all_sections("magickey", true),
@@ -449,6 +489,9 @@ package.preload["adapters.event_loop"] = function()
 				selection.primary = selection.primary == "" and "selected" or "fresh"
 				screen = chars(selection.primary)
 				selection.focused = true
+				settle_selection()
+				loop.onPeriodic()
+				loop.onPeriodic()
 			elseif token == "TAPKEY" then
 				i = i + #token + 2
 				local consumed = callbacks.onConsume({ code = 41, char = "(",

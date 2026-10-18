@@ -78,7 +78,7 @@ local function scenario(opts, body)
 		local world = { posts = {}, notices = {}, reads = 0, replaced = {}, typed = {}, shown = nil,
 			focus = "editor\1Draft", selection = opts.selection }
 		package.loaded["adapters.secure_field_detector"] = {
-			isSecureField = function() return false end,
+			isSecureField = function() return opts.secure == true end,
 			isSecureApp = function() return false end,
 			isUrlBar = function() return false end,
 		}
@@ -124,6 +124,7 @@ local function scenario(opts, body)
 			-- The daemon's seams: a copy probe, the injector's select-back, the window probe
 			read_selection = function()
 				world.reads = world.reads + 1
+				if world.on_read_selection then world.on_read_selection() end
 				if world.selection == nil then return false, "", "no_selection" end
 				return true, world.selection, nil
 			end,
@@ -133,6 +134,7 @@ local function scenario(opts, body)
 				return true
 			end,
 			focus_id = function() return world.focus end,
+			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -367,5 +369,103 @@ helpers.it("translates a free language name without changing selection authority
 		helpers.assert_true(world.posts[1].body.messages[1].content:find("into Esperanto", 1, true) ~= nil)
 		helpers.assert_eq(world.reads, 1)
 		helpers.assert_eq(#world.replaced, 0, "no replacement before actual acceptance")
+	end)
+end)
+
+helpers.describe("selected translations require a known stable native focus", function()
+	helpers.it("explains a translation refusal when privacy cannot admit its text field (selection-native-focus)", function()
+		scenario({ selection = SELECTION, secure = true }, function(world)
+			helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
+		end)
+	end)
+	helpers.it("refuses a paced translation after its native field changes (selection-native-focus)", function()
+		scenario({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_eq(#world.posts, 1, "the second request must wait for pacing")
+			world.focus = "atspi::1.42:/different-field"
+			world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1, "a stale selected field cannot be sent after the timer fires")
+		end)
+	end)
+	helpers.it("withdraws a completed translation after its native field changes (selection-native-focus)", function()
+		scenario({ selection = SELECTION }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.focus = "atspi::1.42:/different-field"
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_eq(#world.engine.get_suggestions(), 0, "a stale answer must not become a visible offer")
+			helpers.assert_eq(world.engine.accept(1), false)
+			helpers.assert_eq(#world.replaced, 0)
+		end)
+	end)
+	for _, missing in ipairs({"empty", "unavailable"}) do
+		helpers.it("refuses translation before reading selection when focus is " .. missing .. " (selection-native-focus)", function()
+			scenario({selection = SELECTION}, function(world)
+				world.focus = missing == "empty" and "" or nil
+				helpers.assert_eq(world.engine.translate_selection("en"), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(world.notices[1], require("infra.i18n").get("llm.text_target_unavailable"),
+					"a deliberate action must explain that the active text field is unavailable")
+			end)
+		end)
+	end
+
+	helpers.it("refuses translation when focus moves during selection capture (selection-native-focus)", function()
+		scenario({selection = SELECTION}, function(world)
+			world.focus = "x11:10:100"
+			world.on_read_selection = function() world.focus = "x11:10:101" end
+			helpers.assert_eq(world.engine.translate_selection("en"), false)
+			helpers.assert_eq(world.reads, 1)
+			helpers.assert_eq(#world.posts, 0)
+			helpers.assert_eq(#world.replaced, 0)
+		end)
+	end)
+end)
+
+helpers.describe("translation resident global privacy admission", function()
+	for _, verdict in ipairs({ "protected", "unknown", "throw" }) do
+		helpers.it("refuses " .. verdict .. " ownership before reading translation selection (llm-global-privacy)", function()
+			scenario({ selection = SELECTION, privacy_guard = function()
+				if verdict == "throw" then error("controlled resident barrier failure") end
+				if verdict == "protected" then return true end
+			end }, function(world)
+				helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(#world.replaced, 0)
+			end)
+		end)
+	end
+	helpers.it("rechecks privacy at translation completion and after its pacing timer (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = SELECTION, privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			blocked = true; world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_eq(world.engine.has_suggestions(), false)
+			helpers.assert_eq(#world.replaced, 0)
+			blocked = false
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_eq(#world.posts, 1)
+			blocked = true; world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_true(world.engine.is_enabled())
+		end)
+	end)
+	helpers.it("refuses a translation accepted after global privacy is revoked (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = SELECTION, privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_true(world.engine.has_suggestions())
+			blocked = true
+			helpers.assert_eq(world.engine.accept(1), false)
+			helpers.assert_eq(#world.replaced, 0)
+			helpers.assert_true(world.engine.is_enabled())
+		end)
 	end)
 end)

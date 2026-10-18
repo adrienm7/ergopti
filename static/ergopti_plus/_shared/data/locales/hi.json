@@ -930,6 +930,7 @@
 	"llm.manual_prediction.empty_context": "अभी तक कुछ भी टाइप नहीं किया गया है जिसे AI आगे बढ़ा सके।",
 	"llm.manual_prediction.paused": "Ergopti+ रुका हुआ है: कोई सुझाव नहीं बनाया गया।",
 	"llm.prompt_prediction.unknown_prompt": "इस शॉर्टकट के लिए चुना गया प्रॉम्प्ट अब मौजूद नहीं है: कोई दूसरा चुनें।",
+	"llm.text_target_unavailable": "मौजूदा टेक्स्ट फ़ील्ड में AI उपलब्ध नहीं है। किसी दूसरे टेक्स्ट फ़ील्ड पर क्लिक करके फिर से कोशिश करें।",
 	"llm.tone.most_formal": "पाठ पहले से ही सबसे औपचारिक लहजे में है।",
 	"llm.tone.most_familiar": "पाठ पहले से ही सबसे अनौपचारिक लहजे में है।",
 	"llm.live.on": "लाइव मोड चालू: {1}",

@@ -20,6 +20,119 @@
 local helpers = require("tests.helpers")
 local sh      = helpers.load_module("adapters.shell_runner")
 
+helpers.describe("linux-picker-native-capabilities", function()
+	helpers.it("linux-picker-native-capabilities: checks executable access without spawning and observes filesystem changes", function()
+		local native = require("luv")
+		local shell = helpers.load_module("adapters.shell_runner")
+		local directory = assert(native.fs_mkdtemp("/tmp/ergopti-capability-XXXXXX"))
+		local binary = directory .. "/literal '$(touch SHOULD_NOT_EXIST)'"
+		local descriptor = assert(native.fs_open(binary, "w", 448))
+		assert(native.fs_write(descriptor, "#!/bin/sh\nexit 0\n"))
+		assert(native.fs_close(descriptor))
+		local original_path, original_cwd, original_execute = os.getenv("PATH"), native.cwd(), os.execute
+		local calls = 0
+		os.execute = function(...) calls = calls + 1; return original_execute(...) end
+		local ok, err = xpcall(function()
+			assert(native.os_setenv("PATH", directory))
+			helpers.assert_true(shell.has_command("literal '$(touch SHOULD_NOT_EXIST)'", true))
+			assert(native.os_setenv("PATH", "/absent-capability-path"))
+			helpers.assert_eq(shell.has_command("literal '$(touch SHOULD_NOT_EXIST)'", true), false, "PATH changes revoke earlier availability")
+			assert(native.os_setenv("PATH", directory))
+			helpers.assert_true(shell.has_command("literal '$(touch SHOULD_NOT_EXIST)'", true), "PATH additions are immediately visible")
+			helpers.assert_eq(shell.has_command("missing-capability", true), false)
+			helpers.assert_eq(shell.has_command(".", true), false, "directories cannot be executed as tools")
+			assert(native.fs_chmod(binary, 292))
+			helpers.assert_eq(shell.has_command(binary, true), false, "read permission does not confer execution")
+			assert(native.fs_chmod(binary, 73))
+			helpers.assert_true(shell.has_command(binary, true), "execute-only tools remain available")
+			assert(native.chdir(directory))
+			assert(native.os_setenv("PATH", ":/absent-capability-path:"))
+			helpers.assert_true(shell.has_command("literal '$(touch SHOULD_NOT_EXIST)'", true), "empty PATH components mean current directory")
+			assert(native.fs_unlink(binary))
+			helpers.assert_eq(shell.has_command("literal '$(touch SHOULD_NOT_EXIST)'", true), false, "removal cannot reuse an earlier answer")
+			helpers.assert_eq(calls, 0, "a native capability query must never fork a shell")
+		end, debug.traceback)
+		os.execute = original_execute
+		assert(native.chdir(original_cwd))
+		if original_path then assert(native.os_setenv("PATH", original_path)) else assert(native.os_unsetenv("PATH")) end
+		native.fs_unlink(binary)
+		assert(native.fs_rmdir(directory))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-picker-native-capabilities: absent luv preserves external lookup with empty and unset PATH", function()
+		local native = require("luv")
+		local previous_preload, previous_shell = package.preload["luv"], package.loaded["adapters.shell_runner"]
+		package.loaded["luv"] = nil
+		package.preload["luv"] = function() error("controlled absent native binding") end
+		local loaded, shell = pcall(helpers.load_module, "adapters.shell_runner")
+		package.loaded["luv"], package.preload["luv"] = native, previous_preload
+		package.loaded["adapters.shell_runner"] = previous_shell
+		assert(loaded, shell)
+		helpers.assert_eq(shell.HAS_ASYNC, false, "the subject must have captured the genuinely absent binding")
+		local directory = assert(native.fs_mkdtemp("/tmp/ergopti-capability-shell-XXXXXX"))
+		local name = "literal '$(touch SHOULD_NOT_EXIST)'"
+		local binary = directory .. "/" .. name
+		local external_command = directory .. "/command"
+		local descriptor = assert(native.fs_open(binary, "w", 448))
+		assert(native.fs_write(descriptor, "#!/bin/sh\nexit 0\n"))
+		assert(native.fs_close(descriptor))
+		local original_path, original_cwd = os.getenv("PATH"), native.cwd()
+		local ok, err = xpcall(function()
+			assert(native.os_setenv("PATH", directory))
+			helpers.assert_true(shell.has_command(name, true))
+			helpers.assert_true(shell.has_command(binary, true))
+			helpers.assert_eq(shell.has_command("command", true), false)
+			helpers.assert_eq(shell.has_command(".", true), false)
+			assert(native.chdir(directory))
+			for _, path in ipairs({ "", ":/absent-capability-path:" }) do
+				assert(native.os_setenv("PATH", path))
+				helpers.assert_true(shell.has_command(name, true), "empty components retain cwd semantics without luv")
+			end
+			assert(native.fs_chmod(binary, 292))
+			helpers.assert_eq(shell.has_command(name, true), false)
+			assert(native.fs_chmod(binary, 73))
+			helpers.assert_true(shell.has_command(name, true), "execute-only tools require no read permission")
+			-- Some distributions ship an external wrapper for a shell builtin.
+			-- Availability depends on the executable, not a blacklist of names.
+			local command_fd = assert(native.fs_open(external_command, "w", 448))
+			assert(native.fs_write(command_fd, "#!/bin/sh\nexit 0\n"))
+			assert(native.fs_close(command_fd))
+			assert(native.os_setenv("PATH", directory))
+			for _, owner in ipairs({ sh, shell }) do
+				helpers.assert_true(owner.has_command("command", true), "an actual external builtin wrapper is executable")
+			end
+			assert(native.os_unsetenv("PATH"))
+			-- Both native and missing-luv modules must defer to the actual shell's
+			-- initialized default, while excluding builtins without executable files.
+			for _, owner in ipairs({ sh, shell }) do
+				helpers.assert_true(owner.has_command("sh", true))
+				helpers.assert_eq(owner.has_command(".", true), false)
+			end
+		end, debug.traceback)
+		assert(native.chdir(original_cwd))
+		if original_path then assert(native.os_setenv("PATH", original_path)) else assert(native.os_unsetenv("PATH")) end
+		assert(native.fs_unlink(binary))
+		native.fs_unlink(external_command)
+		assert(native.fs_rmdir(directory))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("linux-picker-native-capabilities: keeps shell builtins and the controlled runner contract", function()
+		local shell = helpers.load_module("adapters.shell_runner")
+		helpers.assert_true(shell.has_command("command"), "generic queries retain shell builtin semantics")
+		local calls = 0
+		shell._set_runner(function() calls = calls + 1; return false end)
+		local absent = shell.has_command("sh", true)
+		shell._set_runner(function() calls = calls + 1; return true end)
+		local present = shell.has_command("missing-capability", true)
+		shell._reset_runner()
+		helpers.assert_eq(absent, false)
+		helpers.assert_eq(present, true)
+		helpers.assert_eq(calls, 2)
+	end)
+end)
+
 helpers.describe("linux-shell-command-nul", function()
 	for _, method in ipairs({ "run", "exec", "exec_line", "exec_stdin", "exec_exact_stdin", "exec_checked" }) do
 		for index, command in ipairs({ "printf literal\0private-suffix", "printf literal\0", "\0printf literal" }) do

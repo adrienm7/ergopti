@@ -72,6 +72,65 @@ local PS_AC = "COMMAND\na\nc\n"
 -- process_every = floor(2.0 / 0.25) = 8: the process poll runs on these ticks.
 local PROCESS_TICK = 8
 
+helpers.describe("linux-native-focus-identity", function()
+	helpers.it("(linux-focus-coherent-poll) queries one native snapshot per unchanged lifecycle tick", function()
+		local names = { "adapters.shell_runner", "infra.display_server", "adapters.window_info", "adapters.process_lifecycle" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+		local ok, failure = pcall(function()
+			local shell = helpers.load_module("adapters.shell_runner")
+			local display = helpers.load_module("infra.display_server")
+			display._set_for_test(display.X11, "focus poll fixture")
+			local probes = 0
+			shell._set_runner(function(command)
+				if command:find("xdotool", 1, true) then probes = probes + 1 end
+				if command:find("getactivewindow", 1, true) then return "1\n" end
+				if command:find("getwindowname", 1, true) then return "Unchanged editor\n" end
+				if command:find("getwindowpid", 1, true) then return "1337\n" end
+				if command:find("/proc/1337/comm", 1, true) then return "editor\n" end
+				if command:find("ps -eo", 1, true) then return "review-daemon\n" end
+				return ""
+			end)
+			helpers.load_module("adapters.window_info")
+			local lifecycle = helpers.load_module("adapters.process_lifecycle")
+			lifecycle.start()
+			probes = 0
+			for tick = 1, 5 do lifecycle.tick(tick) end
+			lifecycle.stop()
+			helpers.assert_eq(probes, 10, "five polls need one window ID and one title query each, never a second focus snapshot")
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		helpers.assert_true(ok, tostring(failure))
+	end)
+
+	helpers.it("(linux-native-focus-identity) emits focus changes between identical metadata windows", function()
+		local original = package.loaded["adapters.window_info"]
+		local identity, title = "x11:1337:1", "Untitled"
+		package.loaded["adapters.window_info"] = {
+			focused_snapshot = function() return { appId = "editor", windowTitle = title }, identity end,
+		}
+		local events = {}
+		local ok, failure = pcall(function()
+			with_ps({ PS_AB }, function()
+				local lifecycle = helpers.load_module("adapters.process_lifecycle")
+				lifecycle.onFocusChange(function(app, caption) events[#events + 1] = { app, caption } end)
+				lifecycle.start(); lifecycle.tick(1)
+				helpers.assert_eq(#events, 0, "unchanged native focus is not a transition")
+				identity = "x11:1337:2"
+				lifecycle.tick(2)
+				helpers.assert_eq(events, { { "editor", "Untitled" } },
+					"a second native window must invalidate matcher and AI context even with identical metadata")
+				title = "Private window"
+				lifecycle.tick(3)
+				lifecycle.stop()
+				helpers.assert_eq(events[2], { "editor", "Private window" }, "title changes still invalidate privacy context")
+			end)
+		end)
+		package.loaded["adapters.window_info"] = original
+		helpers.assert_true(ok, tostring(failure))
+	end)
+end)
+
 helpers.describe("linux-process-snapshot-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 143 }) do
 		helpers.it("linux-process-snapshot-receipts: failed status " .. status .. " cannot replace a successful baseline", function()

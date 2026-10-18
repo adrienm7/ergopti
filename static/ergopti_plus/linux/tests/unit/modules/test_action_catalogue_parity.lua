@@ -105,6 +105,25 @@ end
 
 helpers.describe("action catalogue parity (Linux)", function()
 
+	helpers.it("linux-picker-native-capabilities: builds the actual catalogue without a shell process per tool", function()
+		local manager = recording_manager()
+		local original_execute, original_popen = os.execute, io.popen
+		local probes, executions, captures = 0, 0, 0
+		os.execute = function(command, ...)
+			executions = executions + 1
+			if command:find("command -v ", 1, true) then probes = probes + 1 end
+			return original_execute(command, ...)
+		end
+		io.popen = function(...) captures = captures + 1; return original_popen(...) end
+		local ok, items = pcall(manager.get_picker_items)
+		os.execute, io.popen = original_execute, original_popen
+		helpers.assert_true(ok, tostring(items))
+		helpers.assert_true(#items > 100, "measure the complete real picker, including modifier chords")
+		helpers.assert_eq(probes, 0, "external capability discovery must not fork the keyboard event loop per tool")
+		helpers.assert_true(executions <= 1, "only the native GNU timeout admission may execute a command")
+		helpers.assert_eq(captures, 0, "an exit-status-only capability must not create stdout receipt processes")
+	end)
+
 	helpers.it("declares tap actions before the daemon registers their handlers", function()
 		-- TapHold.init reads this catalogue before the daemon calls Gestures.init.
 		-- Handler registration must not make valid persisted taps look unsupported.
@@ -402,14 +421,14 @@ helpers.describe("Cursor-window native picker admission", function()
 			local Shell = require("adapters.shell_runner")
 			local previous = Display.kind()
 			local cached_switch = package.loaded["adapters.window_switch"]
-			local supported, has_command, exec_checked = Runner.supported, Shell.has_command, Shell.exec_checked
+			local supported, has_command, run = Runner.supported, Shell.has_command, Shell.run
 			local probes = 0
 			Display._set_for_test(Display.X11, "native picker fixture")
 			Runner.supported = function() return true end
 			Shell.has_command = function() return true end
-			Shell.exec_checked = function(command)
+			Shell.run = function(command)
 				probes = probes + 1
-				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' 2>/dev/null")
+				helpers.assert_eq(command, "timeout --foreground 1 sh -c ':' >/dev/null 2>&1")
 				if receipt == "throw" then error("controlled native capability refusal") end
 				if receipt == "supported" then return true, "" end
 				if receipt == "refused" then return false, "" end
@@ -434,7 +453,7 @@ helpers.describe("Cursor-window native picker admission", function()
 				end
 			end)
 			package.loaded["adapters.window_switch"] = cached_switch
-			Runner.supported, Shell.has_command, Shell.exec_checked = supported, has_command, exec_checked
+			Runner.supported, Shell.has_command, Shell.run = supported, has_command, run
 			Display._set_for_test(previous, "restored")
 			if not ok then error(err, 0) end
 		end)

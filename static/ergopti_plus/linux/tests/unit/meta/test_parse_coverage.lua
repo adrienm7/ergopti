@@ -153,10 +153,83 @@ local function jit_upvalue_budget(chunk, limit)
 	return result
 end
 
+--- Inspects named PUC prototypes without counting their lexical environment.
+--- LuaJIT keeps globals outside its capture array; PUC names that carrier _ENV.
+--- Every listed capture must have its own compiler-provided name before exclusion.
+--- @param listing string Full luac listing, including named upvalue tables.
+--- @param limit integer Portable LuaJIT capture budget.
+--- @return table Prototype count, largest capture count and over-budget locations.
+local function luac_upvalue_budget(listing, limit)
+	local result = { count = 0, maximum = 0, raw_maximum = 0, over = {} }
+	local current, reading_names = nil, false
+	local function finish()
+		if not current then return end
+		assert(type(current.raw_count) == "number" and current.named_count == current.raw_count,
+			"compiled prototype must provide matching upvalue counts: " .. current.header
+				.. " (" .. tostring(current.raw_count) .. "/" .. tostring(current.named_count) .. ")")
+		assert(#current.names == current.raw_count, "every compiled upvalue must have a listed name")
+		local captures = 0
+		for _, name in ipairs(current.names) do
+			if name ~= "_ENV" then captures = captures + 1 end
+		end
+		result.count = result.count + 1
+		result.maximum = math.max(result.maximum, captures)
+		result.raw_maximum = math.max(result.raw_maximum, current.raw_count)
+		if captures > limit then
+			result.over[#result.over + 1] = string.format("%s: %d upvalues", current.header, captures)
+		end
+	end
+	for line in listing:gmatch("[^\r\n]+") do
+		local header = line:match("^main <(.-)>") or line:match("^function <(.-)>")
+		if header then
+			finish()
+			current, reading_names = { header = header, names = {} }, false
+		elseif current then
+			local count = tonumber(line:match("^%d+%+? params?,.- (%d+) upvalues?,"))
+			local named = tonumber(line:match("^upvalues %((%d+)%) for "))
+			if count then
+				assert(current.raw_count == nil, "compiled prototype metadata cannot be repeated")
+				current.raw_count = count
+			elseif named then
+				assert(current.named_count == nil, "compiled upvalue table cannot be repeated")
+				current.named_count, reading_names = named, true
+			elseif reading_names then
+				local index, name = line:match("^%s*(%d+)%s+(%S+)")
+				if index then
+					assert(tonumber(index) == #current.names, "compiled upvalue names must retain every index")
+					current.names[#current.names + 1] = name
+				else
+					reading_names = false
+				end
+			end
+		end
+	end
+	finish()
+	assert(result.count > 0, "compiled prototype discovery must not be empty")
+	return result
+end
+
+--- Requires successful compilation and a complete named listing for every batch.
+--- @param files table Source paths passed literally to the compiler.
+--- @param limit integer Portable LuaJIT capture budget.
+--- @return table Inspected compiler prototype counts and violations.
+local function listed_upvalue_budget(files, limit)
+	local quoted = {}
+	for _, path in ipairs(files) do quoted[#quoted + 1] = '"' .. path .. '"' end
+	local pipe = assert(io.popen("luac -l -l -p " .. table.concat(quoted, " ") .. " 2>&1", "r"),
+		"compiled prototype listing process is required")
+	local listing = pipe:read("*a") or ""
+	local closed, kind, code = pipe:close()
+	assert(closed == 0 or (closed == true and (kind == nil or kind == "exit") and (code == nil or code == 0)),
+		"luac must successfully list every compiled prototype")
+	return luac_upvalue_budget(listing, limit)
+end
+
 --- Produces an independent nested function that captures exactly the given count.
 --- @param count integer Number of outer locals captured by the nested function.
+--- @param globals boolean Whether the nested function also reads a global.
 --- @return string Lua source with three compiled prototype levels.
-local function nested_upvalue_source(count)
+local function nested_upvalue_source(count, globals)
 	local names, values = {}, {}
 	for index = 1, count do
 		names[index] = "value_" .. index
@@ -164,7 +237,28 @@ local function nested_upvalue_source(count)
 	end
 	return "return function()\nlocal " .. table.concat(names, ",") .. " = "
 		.. table.concat(values, ",") .. "\nreturn function() return "
-		.. table.concat(names, ",") .. " end\nend\n"
+		.. (globals and "independent_global," or "") .. table.concat(names, ",") .. " end\nend\n"
+end
+
+--- Compiles independent boundary fixtures without executing their functions.
+--- @param source string Nested fixture source.
+--- @param limit integer Portable LuaJIT capture budget.
+--- @return table|nil Inspection, or nil when LuaJIT itself refuses compilation.
+--- @return string|nil Compiler refusal.
+local function fixture_upvalue_budget(source, limit)
+	if jit then
+		local chunk, err = loadstring(source, "=independent-upvalue-boundary")
+		if not chunk then return nil, err end
+		return jit_upvalue_budget(chunk, limit)
+	end
+	local path = os.tmpname()
+	local file = assert(io.open(path, "w"))
+	assert(file:write(source))
+	assert(file:close())
+	local ok, result = pcall(listed_upvalue_budget, { path }, limit)
+	os.remove(path)
+	if not ok then error(result, 0) end
+	return result
 end
 
 helpers.describe("linux: every production Lua file compiles", function()
@@ -213,7 +307,7 @@ helpers.describe("linux: every production Lua file compiles", function()
 		-- PUC Lua accepts up to 255: four file-scope requires pushed main() of the
 		-- entry point to 62, the local suite stayed green and only CI's LuaJIT
 		-- failed. Newer LuaJIT accepts larger functions, so inspect its compiled
-		-- prototypes too; PUC Lua's compiler listing supplies the same counts.
+		-- prototypes too; PUC's named listing excludes only its explicit _ENV.
 		local LIMIT = 60
 		if jit then
 			local over = {}
@@ -240,54 +334,52 @@ helpers.describe("linux: every production Lua file compiles", function()
 		if luac_probe then luac_probe:close() end
 		helpers.assert_true(banner:find("Lua", 1, true) ~= nil,
 			"luac must be on PATH next to lua: without it this gate cannot see LuaJIT's upvalue limit")
-		local over = {}
+		local over, inspected = {}, 0
 		for first = 1, #files, BATCH do
-			local quoted = {}
+			local batch = {}
 			for i = first, math.min(first + BATCH - 1, #files) do
-				quoted[#quoted + 1] = '"' .. files[i] .. '"'
+				batch[#batch + 1] = files[i]
 			end
-			local pipe = io.popen("luac -l -p " .. table.concat(quoted, " ") .. " 2>&1", "r")
-			local listing = pipe and pipe:read("*a") or ""
-			if pipe then pipe:close() end
-			local header
-			for line in listing:gmatch("[^\n]+") do
-				if line:match("^main <") or line:match("^function <") then
-					header = line:match("<(.-)>")
-				else
-					local count = tonumber(line:match("(%d+) upvalues?,"))
-					if count and count > LIMIT then
-						over[#over + 1] = string.format("%s: %d upvalues", tostring(header), count)
-					end
-				end
-			end
+			local result = listed_upvalue_budget(batch, LIMIT)
+			inspected = inspected + result.count
+			for _, location in ipairs(result.over) do over[#over + 1] = location end
 		end
+		helpers.assert_true(inspected >= #files, "the prototype scan must reach every production source")
 		helpers.assert_eq(#over, 0, "function(s) over LuaJIT's " .. LIMIT
 			.. "-upvalue limit (move file-scope requires into the function that uses them):\n  "
 			.. table.concat(over, "\n  "))
 	end)
 
-	helpers.it("LuaJIT's upvalue inspection reaches a nested function at the 60 boundary", function()
-		if not jit then return end
-		local chunk, err = loadstring(nested_upvalue_source(60), "=independent-upvalue-boundary")
-		helpers.assert_not_nil(chunk, tostring(err))
-		local result = jit_upvalue_budget(chunk, 60)
-		helpers.assert_eq(result.count, 3, "root, outer and nested function must all be inspected")
-		helpers.assert_eq(result.maximum, 60)
-		helpers.assert_eq(#result.over, 0)
-	end)
+	for _, globals in ipairs({ false, true }) do
+		local suffix = globals and " with globals" or " without globals"
+		helpers.it("compiled inspection accepts 60 independent captures" .. suffix, function()
+			local result, err = fixture_upvalue_budget(nested_upvalue_source(60, globals), 60)
+			helpers.assert_not_nil(result, tostring(err))
+			helpers.assert_eq(result.count, 3, "root, outer and nested function must all be inspected")
+			helpers.assert_eq(result.maximum, 60)
+			helpers.assert_eq(#result.over, 0)
+			if not jit then helpers.assert_eq(result.raw_maximum, globals and 61 or 60) end
+		end)
+		helpers.it("compiled inspection rejects 61 independent captures" .. suffix, function()
+			local result, err = fixture_upvalue_budget(nested_upvalue_source(61, globals), 60)
+			if not result then
+				-- Older LuaJIT rejects this source before a prototype can exist.
+				helpers.assert_true(jit ~= nil and tostring(err):find("upvalue", 1, true) ~= nil,
+					"only an explicit compiler upvalue refusal proves this fixture was rejected")
+				return
+			end
+			helpers.assert_eq(result.count, 3)
+			helpers.assert_eq(result.maximum, 61)
+			helpers.assert_eq(#result.over, 1, "the over-budget nested prototype must be rejected")
+			if not jit then helpers.assert_eq(result.raw_maximum, globals and 62 or 61) end
+		end)
+	end
 
-	helpers.it("LuaJIT's upvalue inspection rejects an independent nested function with 61", function()
-		if not jit then return end
-		local chunk, err = loadstring(nested_upvalue_source(61), "=independent-upvalue-rejection")
-		if not chunk then
-			-- Older LuaJIT rejects this source before a prototype can exist.
-			helpers.assert_true(tostring(err):find("upvalue", 1, true) ~= nil,
-				"only an explicit compiler upvalue refusal proves this fixture was rejected")
-			return
+	helpers.it("refuses empty discovery and unnamed compiler upvalues", function()
+		for _, listing in ipairs({ "", "compiler failed", "main <fixture:0,0>\n"
+			.. "0+ params, 1 slot, 1 upvalue, 0 locals, 0 constants, 0 functions\nupvalues (1) for 0x1:\n" }) do
+			local ok = pcall(luac_upvalue_budget, listing, 60)
+			helpers.assert_eq(ok, false, "missing compiled prototypes or names must never report success")
 		end
-		local result = jit_upvalue_budget(chunk, 60)
-		helpers.assert_eq(result.count, 3)
-		helpers.assert_eq(result.maximum, 61)
-		helpers.assert_eq(#result.over, 1, "the over-budget nested prototype must be rejected")
 	end)
 end)

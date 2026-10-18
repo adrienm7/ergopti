@@ -73,6 +73,7 @@ helpers.describe("keyboard_hook: modifiers that start a shortcut", function()
 		local chars, keys = drive({
 			key(codes.KEY_LEFTCTRL, 1),
 			key(30, 1),                    -- KEY_A, while Ctrl is down
+			key(30, 0),
 			key(codes.KEY_LEFTCTRL, 0),
 			key(30, 1),                    -- KEY_A again, on its own
 		})

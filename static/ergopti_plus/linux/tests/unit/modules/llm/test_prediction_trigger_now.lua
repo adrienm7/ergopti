@@ -54,7 +54,7 @@ local function fixture(state)
 	end
 	package.loaded["modules.llm.prediction_engine"] = nil
 	local engine = require("modules.llm.prediction_engine")
-	engine.init({
+	engine.init({ focus_id = function() return "owned-prediction-window" end,
 		scheduler = Fakes.timer_scheduler(),
 		engine = { current_buffer = function() return state.buffer or "" end, reset = function() end },
 		is_paused = function() return state.paused == true end,
@@ -124,6 +124,16 @@ helpers.describe("Linux manual prediction trigger (llm-manual-prediction-feedbac
 			helpers.assert_eq(#seen.fired, 1, "predict() runs once, without waiting for a timer")
 			helpers.assert_eq(seen.fired[1].context, "hello wor", "the context is the whole typing buffer")
 			helpers.assert_eq(#seen.notices, 0, "an accepted request shows no refusal")
+		end)
+		restore()
+		if not ok then error(err, 0) end
+	end)
+	helpers.it("explains a manual prediction refused by its native text destination", function()
+		local engine, seen = fixture({ buffer = "hello wor", model = "m" })
+		engine.predict = function() return false end
+		local ok, err = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), false)
+			helpers.assert_eq(seen.notices[1], require("infra.i18n").get("llm.text_target_unavailable"))
 		end)
 		restore()
 		if not ok then error(err, 0) end

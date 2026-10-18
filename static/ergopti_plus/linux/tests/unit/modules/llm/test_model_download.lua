@@ -430,6 +430,7 @@ helpers.describe("actual daemon keeps model host until physical retirement", fun
 		local capture = assert(text:match("(local shutdown_runtime = prediction_engine and prediction_engine%.shutdown_runtime.-)\nlocal shutdown = ShutdownCoordinator"))
 		local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"))
 		local env = setmetatable({
+			privacy_owners = {},
 			ShutdownCoordinator = require("infra.shutdown_coordinator"), prediction_engine = prediction,
 			webview_manager = webviews, dyn_hotstrings = false, updater = false, file_watchers = false,
 			process_lifecycle = false, secure_field_detector = false, metrics = false,

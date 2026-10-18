@@ -52,11 +52,13 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 			cancel = function() end,
 		}
 		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
 			get_current_model = function() return "test-model" end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
 
 		local pe = helpers.load_module("modules.llm.prediction_engine")
+		pe.init({ focus_id = function() return "owned-prediction-window" end })
 		local ok, err = pcall(pe.predict, "the quick brown fox //")
 
 		-- Restore the module cache before asserting so a failure can't leak mocks.
@@ -112,6 +114,7 @@ helpers.describe("prediction_engine.predict: no nil-global crash on the prompt b
 		package.loaded["modules.llm.prediction_engine"] = nil
 
 		helpers.assert_true(ok, "the privacy guard must not raise: " .. tostring(err))
+		helpers.assert_eq(err, false, "manual requests must observe privacy refusal rather than report a request started")
 		helpers.assert_eq(detector_calls, 1,
 			"the secure-field verdict must be consulted for every prediction attempt")
 		helpers.assert_eq(request_dependency_loads, 0,
@@ -143,6 +146,7 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 		}
 		-- Profile with NO model selected.
 		package.loaded["modules.llm.profiles"] = {
+			init = function() end,
 			get_current_model = function() return nil end,
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
@@ -155,6 +159,7 @@ helpers.describe("prediction_engine.predict: 'no model selected' guard is not de
 		end
 
 		local pe = helpers.load_module("modules.llm.prediction_engine")
+		pe.init({ focus_id = function() return "owned-prediction-window" end })
 		local ok, err = pcall(pe.predict, "the quick brown fox //")
 
 		-- Restore before asserting so mocks/spies never leak into later tests.
@@ -195,7 +200,7 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 		}
 
 		local pe = helpers.load_module("modules.llm.prediction_engine")
-		pe.init({
+		pe.init({ focus_id = function() return "owned-prediction-window" end,
 			apply_prediction = function(candidate, context)
 				applied = { candidate = candidate, context = context }
 				return true
@@ -241,7 +246,7 @@ helpers.describe("prediction_engine: durable logical-output callback", function(
 			get_base_url = function() return "http://127.0.0.1:11434" end,
 		}
 		local pe = helpers.load_module("modules.llm.prediction_engine")
-		pe.init({ auto_inject = true, on_output = function() callback_count = callback_count + 1 end })
+		pe.init({ focus_id = function() return "owned-prediction-window" end, auto_inject = true, on_output = function() callback_count = callback_count + 1 end })
 		pe.predict("Bonjour //", { app_id = "firefox", input_chars = 2 })
 
 		package.loaded["modules.llm.api_ollama"] = nil

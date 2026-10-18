@@ -925,6 +925,7 @@
 	"llm.manual_prediction.empty_context": "Nothing typed yet for the AI to continue.",
 	"llm.manual_prediction.paused": "Ergopti+ is paused: no suggestion generated.",
 	"llm.prompt_prediction.unknown_prompt": "The prompt chosen for this shortcut no longer exists: choose another one.",
+	"llm.text_target_unavailable": "AI is unavailable in the current text field. Click another text field and try again.",
 	"llm.tone.most_formal": "The text is already in the most formal register.",
 	"llm.tone.most_familiar": "The text is already in the most familiar register.",
 	"llm.live.on": "Live mode on: {1}",

@@ -143,7 +143,13 @@ else echo "users input uinput"; fi`
 		'sg',
 		logCall + '\nexport ACQUIRED_GROUPS="${ACQUIRED_GROUPS:-} $1"\nexec /bin/bash -c "$3"'
 	);
-	stub('flock', logCall + '\nif [ "$TEST_CASE" = busy ]; then exit 75; fi');
+	stub(
+		'flock',
+		logCall +
+			'\n[ "$*" = "-n 9" ] || { echo "unsupported flock arguments" >&2; exit 64; }\n' +
+			'if [ "$TEST_CASE" = busy ]; then exit 1; fi\n' +
+			'if [ "$TEST_CASE" = lock-error ]; then echo "flock: Bad file descriptor" >&2; exit 1; fi'
+	);
 	if (process.platform === 'win32') {
 		// NTFS does not implement the POSIX directory mode. Linux runs the real
 		// install command; this seam changes only its filesystem mode operation.
@@ -166,6 +172,7 @@ else echo "users input uinput"; fi`
 		],
 		['cancel', ['--service', '--tray'], 78, /pkexec .*setup_permissions.sh --user 1000/, /luajit/],
 		['busy', ['--service', '--tray'], 0, /flock /, /luajit|pkexec/],
+		['lock-error', ['--service', '--tray'], 1, /flock /, /luajit|pkexec/],
 		['help', ['--help'], 0, /luajit .* --help/, /flock|pkexec|systemctl/],
 		[
 			'stale',
@@ -190,6 +197,13 @@ else echo "users input uinput"; fi`
 		const invoked = fs.readFileSync(callLog, 'utf8');
 		assert.match(invoked, expected, scenario);
 		assert.doesNotMatch(invoked, forbidden, scenario);
+		if (scenario === 'lock-error') {
+			assert.match(
+				launched.stderr,
+				/flock: Bad file descriptor/,
+				'a native lock error must remain visible instead of being treated as contention'
+			);
+		}
 		if (scenario === 'stale') {
 			assert.equal((invoked.match(/^sg /gm) || []).length, 2, 'both stale groups are acquired');
 			assert.equal(
