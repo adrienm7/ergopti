@@ -186,14 +186,16 @@ function M.session(reader, sqlite_path, today, pacer)
 			Logger.info(LOG, "Manifest projected from scratch (%s).",
 				_manifest and "past data changed" or "no cached projection")
 		end
-		for date, day in pairs(reader.read_manifest(sqlite_path, read_from, nil, pacer)) do
+		local fresh, complete = reader.read_manifest(sqlite_path, read_from, nil, pacer)
+		for date, day in pairs(fresh) do
 			days[date] = day
 			encoded[date] = nil
 		end
 		for date, day in pairs(days) do
 			if not encoded[date] then encoded[date] = PacedJson.encode(day, pacer) end
 		end
-		if target_fp then
+		-- A fingerprint certifies stored rows, not a projection's successful reads.
+		if target_fp and complete == true then
 			_manifest = { through = yesterday, fingerprint = target_fp, days = days, json = encoded }
 		else
 			_manifest = nil
