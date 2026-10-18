@@ -659,19 +659,14 @@ TOML_Unescape(s) {
 ; =================================
 
 ; Read a single key. Returns ``Default`` when the file, the section, or the
-; key is missing. Coerces back to the closest AHK type — booleans become
-; integers (1 / 0) so legacy callers that compare against ``true`` / ``1``
-; keep working without changes.
+; key is missing. The parser already returns booleans as integer 1/0.
+; Preserve its types directly: comparing quoted numeric text to true/false
+; would coerce section names such as "001" to integer 1.
 TOML_Read(Path, Section, Key, Default := "") {
 		Sections := ParseTomlFile(Path)
 		if !Sections.Has(Section) || !Sections[Section].Has(Key)
 				return Default
-		v := Sections[Section][Key]
-		if (v = true)
-				return 1
-		if (v = false)
-				return 0
-		return v
+		return Sections[Section][Key]
 }
 
 ; Write a single (Section, Key, Value) triple. Atomic via .tmp + rename.
