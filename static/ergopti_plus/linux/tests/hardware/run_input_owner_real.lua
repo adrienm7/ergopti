@@ -322,6 +322,7 @@ end
 --- @param first_signal string Actual initial terminal signal.
 local function signal_shutdown(first_signal)
 	local uv = require("luv")
+	local NativeTimer = require("infra.native_timer")
 	local signals = require("infra.signal_handlers")
 	assert(signals.is_settled(), "no preceding signal installation may remain owned")
 	local file = assert(io.open("ergopti_hotstrings.lua", "r"))
@@ -367,10 +368,10 @@ local function signal_shutdown(first_signal)
 	signal_timer = assert(uv.new_timer())
 	signal_deadline = assert(uv.new_timer())
 	-- The existing native signal child is also bounded by this 2.5-second owner.
-	uv.timer_start(signal_deadline, 2500, 0, function() error("native input signal owner deadline expired") end)
+	NativeTimer.start(uv, signal_deadline, 2500, 0, function() error("native input signal owner deadline expired") end)
 	local sent, checked = 0, false
 	-- Preserve the existing native_signal_shutdown timer cadence and tick bound.
-	uv.timer_start(signal_timer, 1, 5, function()
+	NativeTimer.start(uv, signal_timer, 1, 5, function()
 		state.ticks = state.ticks + 1
 		assert(state.ticks < 300, "native input signal cleanup failed to settle")
 		if sent == 0 then sent = 1; assert(uv.kill(uv.os_getpid(), first_signal)); return end
