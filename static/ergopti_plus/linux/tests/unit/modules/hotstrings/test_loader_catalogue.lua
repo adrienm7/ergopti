@@ -584,3 +584,63 @@ helpers.describe("native hotstring discovery preserves filename bytes", function
 		if not ok then error(err, 0) end
 	end)
 end)
+
+
+helpers.describe("literal POSIX backslash filenames", function()
+	helpers.it("keeps personal bundled-stem filenames independent (native-backslash-components)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows uses backslash as a separator")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
+		local path = root .. "/team\\autocorrection.toml"
+		local file = assert(io.open(path, "w"))
+		assert(file:write('[probe]\n"nativeq" = { output = "Owned", auto_expand = true }\n'))
+		assert(file:close())
+		local ok, err = pcall(function()
+			local Config = helpers.load_module("modules.hotstrings.hotstrings_config")
+			Config._set_override_config_dir_for_test(root)
+			require("tests.support.hotstring_choices").with_file(Config, {}, function()
+				local engine = require("hotstring_engine").new()
+				helpers.assert_true(Config.init(engine, root))
+				local _, published = Config.load_all()
+				helpers.assert_eq(published, true)
+				helpers.assert_true(Config.get_category("autocorrection").path ~= path,
+					"a literal backslash filename cannot replace the common source")
+				local source = require("hotstrings.personal_files").describe({ "team\\autocorrection.toml" })
+				helpers.assert_eq(Config.get_category(source.id).path, path)
+				for _, char in ipairs({ "n", "a", "t", "i", "v", "e" }) do
+					helpers.assert_eq(engine:on_char(char), nil, "a partial trigger must not expand")
+				end
+				local match = engine:on_char("q")
+				helpers.assert_eq(match.replacement, "Owned")
+				helpers.assert_eq(match.personal_source_id, source.id)
+			end)
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+
+	helpers.it("classifies metadata and writer backups by the native filename (native-backslash-components)", function()
+		if package.config:sub(1, 1) == "\\" then
+			print("  SKIP native POSIX filename probe: Windows uses backslash as a separator")
+			return
+		end
+		local root = os.tmpname(); os.remove(root)
+		local Shell = require("adapters.shell_runner")
+		assert(Shell.run("mkdir -p " .. Shell.quote(root)))
+		local ok, err = pcall(function()
+			for _, name in ipairs({ "team\\_index.toml", "team\\defaults.toml", "team\\.backup-20261017.toml", "_index.toml" }) do
+				local file = assert(io.open(root .. "/" .. name, "w")); assert(file:close())
+			end
+			local found = helpers.load_module("modules.hotstrings.loader").find_toml_files(root)
+			table.sort(found)
+			helpers.assert_eq(found, { root .. "/team\\_index.toml", root .. "/team\\defaults.toml" },
+				"metadata prefixes and backup suffixes belong to exact native filename components")
+		end)
+		assert(Shell.run("rm -rf -- " .. Shell.quote(root)))
+		if not ok then error(err, 0) end
+	end)
+end)

@@ -1041,7 +1041,7 @@ function M.route_bound_sources(paths, found, user_paths)
 	local routed, placed, kept = {}, {}, {}
 	for _, source in ipairs(paths) do
 		local path = type(source) == "table" and source.path or source
-		local category = type(source) == "table" and source.category or path:match("([^/\\]+)%.toml$")
+		local category = type(source) == "table" and source.category or path:match("([^/]+)%.toml$")
 		local user = user_paths[path] == true
 		if whole[category] and user then
 			Logger.info(LOG, "Extensions: the user's copy of '%s' overrides the file extension '%s' binds.",
@@ -1149,7 +1149,7 @@ local function resolve_paths()
 
 	--- @param path string
 	local function add(path)
-		local stem = path:match("([^/\\]+)%.toml$")
+		local stem = path:match("([^/]+)%.toml$")
 		if not stem then return end
 		if not by_stem[stem] then order[#order + 1] = stem end
 		by_stem[stem] = path
@@ -1159,7 +1159,7 @@ local function resolve_paths()
 	-- file names its logical category, including sections supplied by its bound
 	-- extension; loading only its common fragment would lose the native controls.
 	if _config_dir and _config_dir:match("%.toml$") then
-		local category = _config_dir:match("([^/\\]+)%.toml$")
+		local category = _config_dir:match("([^/]+)%.toml$")
 		local canonical = category and Paths.shared("modules/hotstrings/" .. category .. ".toml")
 		if canonical and type(Loader.same_file) == "function" and Loader.same_file(_config_dir, canonical) then
 			local found = Extensions.category_bindings(M.discover_extensions(), category)
@@ -1179,7 +1179,7 @@ local function resolve_paths()
 		for _, path in ipairs(Loader.find_toml_files(bundled)) do
 			if not in_language_folder(path, bundled) then
 				add(path)
-				local stem = path:match("([^/\\]+)%.toml$")
+				local stem = path:match("([^/]+)%.toml$")
 				if stem then shipped_stems[stem] = true end
 			end
 		end
@@ -1200,7 +1200,7 @@ local function resolve_paths()
 		for _, path in ipairs(Loader.find_toml_files(_config_dir, PersonalFiles.additional_scan_max_depth)) do
 			if not in_language_folder(path, _config_dir) then
 				discover_personal(path, _config_dir:gsub("/+$", ""))
-				local stem = path:match("([^/\\]+)%.toml$")
+				local stem = path:match("([^/]+)%.toml$")
 				if shipped_stems[stem] or not descriptors_by_path[path] then
 					add(path)
 				else
@@ -1266,7 +1266,7 @@ local function resolve_paths()
 		end
 	end
 	for _, source in ipairs(personal_sources) do
-		local legacy = source.path:match("([^/\\]+)%.toml$")
+		local legacy = source.path:match("([^/]+)%.toml$")
 		records[#records + 1] = { source = source.descriptor, path = source.path,
 			legacy_name = legacy, legacy_stored = _overrides[legacy] ~= nil }
 	end
@@ -1318,7 +1318,7 @@ function M.load_all(personal_owner, cold_boot)
 		for _, source in ipairs(staged_paths) do
 			local path = type(source) == "table" and source.path or source
 			local category = type(source) == "table" and source.category or nil
-			category = category or (type(path) == "string" and path:match("([^/\\]+)%.toml$"))
+			category = category or (type(path) == "string" and path:match("([^/]+)%.toml$"))
 			if category ~= "autocorrection" then admitted_paths[#admitted_paths + 1] = source end
 		end
 		staged_paths = admitted_paths
@@ -2233,7 +2233,7 @@ function M.bundled_categories()
 	local set = {}
 	local bundled = Paths.shared("modules/hotstrings")
 	for _, path in ipairs(Loader.find_toml_files(bundled)) do
-		local stem = path:match("([^/\\]+)%.toml$")
+		local stem = path:match("([^/]+)%.toml$")
 		if stem and not in_language_folder(path, bundled) then set[stem] = true end
 	end
 	for _, pack in ipairs(M.language_packs()) do

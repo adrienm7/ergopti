@@ -62,6 +62,26 @@ function M.run(helpers, corpus)
 			helpers.assert_eq(Catalogue.is_category_file("/x/words.backup-20261017-190645.toml"), false)
 			helpers.assert_eq(Catalogue.is_category_file("/x/words.toml"), true)
 		end)
+
+		helpers.it("(native-backslash-components) follows POSIX and Windows separator identity", function()
+			local previous = package.config
+			local ok, err = pcall(function()
+				local Catalogue = require("hotstrings.catalogue_files")
+				for _, separator in ipairs({ "/", "\\" }) do
+					package.config = separator .. previous:sub(2)
+					local posix = separator == "/"
+					helpers.assert_eq(Catalogue.is_category_file("team\\_index.toml"), posix)
+					helpers.assert_eq(Catalogue.is_category_file("team\\defaults.toml"), posix)
+					helpers.assert_eq(Files.is_backup("team\\.backup-20261017.toml"), posix)
+					helpers.assert_eq(Catalogue.is_category_file("team\\words.toml"), true)
+					helpers.assert_eq(Catalogue.is_category_file("team\\words.backup-20261017.toml"), false)
+					helpers.assert_eq(Files.is_backup("team\\words.backup-20261017.toml"), true)
+					helpers.assert_eq(Catalogue.is_category_file("team/_index.toml"), false)
+				end
+			end)
+			package.config = previous
+			if not ok then error(err, 0) end
+		end)
 	end)
 end
 

@@ -23,7 +23,9 @@ M.additional_scan_max_depth = 16
 --- @return boolean
 function M.is_backup(name)
 	if type(name) ~= "string" then return false end
-	local lower = (name:match("([^/\\]+)$") or ""):lower()
+	-- Backslash is a literal filename byte on POSIX, and a separator on Windows.
+	local pattern = package.config:sub(1, 1) == "\\" and "([^/\\]+)$" or "([^/]+)$"
+	local lower = (name:match(pattern) or ""):lower()
 	if #lower <= #EXTENSION or lower:sub(-#EXTENSION) ~= EXTENSION then return false end
 	local stem, start, from = lower:sub(1, -#EXTENSION - 1), nil, 1
 	while true do
