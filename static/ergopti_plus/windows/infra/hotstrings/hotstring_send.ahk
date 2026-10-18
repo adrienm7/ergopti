@@ -790,8 +790,7 @@ _SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn) {
 		global _SelectionCaptureJob
 		if _SelectionCaptureJob == Job
 				_SelectionCaptureJob := false
-		if IsObject(Job["timer"])
-				SetTimer(Job["timer"], 0)
+		_SelectionCaptureReleaseTimer(Job)
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
 		if Job["owner_token"] {
@@ -804,6 +803,15 @@ _SelectionCaptureAbortStart(Job, RestoreFn, SequenceFn) {
 				}
 		}
 		Job["clipboard"] := ""
+}
+
+; Cancelling the native timer does not break Map -> BoundFunc -> Map ownership.
+; Clear the job's callback reference only after the exact timer is cancelled.
+_SelectionCaptureReleaseTimer(Job) {
+		Timer := Job["timer"]
+		if IsObject(Timer)
+				SetTimer(Timer, 0)
+		Job["timer"] := 0
 }
 
 _SelectionCapturePoll(Job) {
@@ -849,7 +857,7 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 
 		if !IsObject(_SelectionCaptureJob) || _SelectionCaptureJob["id"] != Job["id"]
 				return
-		SetTimer(Job["timer"], 0)
+		_SelectionCaptureReleaseTimer(Job)
 		_SelectionCaptureJob := false
 
 		; On a physical-input cancellation, preserve clipboard data which arrived
