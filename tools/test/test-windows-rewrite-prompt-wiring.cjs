@@ -171,16 +171,16 @@ check(
 );
 
 const TESTS = {
-	'unit/test_llm_rewrite.ahk': 'rewrite_vectors.json',
-	'unit/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
-	'unit/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
-	'unit/test_llm_parser.ahk': 'process_prediction_vectors.json',
-	'unit/test_llm_tone.ahk': 'tone_vectors.json',
-	'unit/test_llm_vision.ahk': 'vision_vectors.json',
-	'unit/test_llm_translate.ahk': 'translate_vectors.json',
-	'unit/test_llm_agent.ahk': 'agent_vectors.json',
-	'unit/test_llm_remote_formats.ahk': 'remote_formats_vectors.json',
-	'unit/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
+	'unit/modules/llm/actions/test_llm_rewrite.ahk': 'rewrite_vectors.json',
+	'unit/modules/llm/actions/test_llm_prompt_action.ahk': 'llm_prompt_vectors.json',
+	'unit/modules/llm/prediction/test_llm_prompt_prediction.ahk': 'llm_prompt_prediction',
+	'unit/modules/llm/prediction/test_llm_parser.ahk': 'process_prediction_vectors.json',
+	'unit/modules/llm/actions/test_llm_tone.ahk': 'tone_vectors.json',
+	'unit/modules/llm/actions/test_llm_vision.ahk': 'vision_vectors.json',
+	'unit/modules/llm/actions/test_llm_translate.ahk': 'translate_vectors.json',
+	'unit/modules/llm/actions/test_llm_agent.ahk': 'agent_vectors.json',
+	'unit/modules/llm/api/test_llm_remote_formats.ahk': 'remote_formats_vectors.json',
+	'unit/modules/llm/prediction/test_llm_live_mode.ahk': 'llm_live_prompt_toggle'
 };
 for (const [test, needle] of Object.entries(TESTS)) {
 	check(runAll.includes(test), `tests/run_all.ahk must #Include ${test}`);

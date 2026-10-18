@@ -236,7 +236,7 @@ jobs:
               $env:PSModulePath = (Join-Path $windowsPowerShellDirectory 'Modules') + ';' + $oldModulePath
               $out = Join-Path $evidence 'native.stdout'
               $err = Join-Path $evidence 'native.stderr'
-              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/test_ollama_install_files.ps1" 1> $out 2> $err
+              & "$windowsPowerShellDirectory/powershell.exe" -NoLogo -NoProfile -NonInteractive -File "$root/static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_install_files.ps1" 1> $out 2> $err
               $nativeExit = $LASTEXITCODE
               $stdout = [IO.File]::ReadAllText($out)
               $stderr = [IO.File]::ReadAllText($err)

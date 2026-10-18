@@ -163,7 +163,7 @@ assert.notEqual(withdrawnCleanup, flow, 'Withdraw the actual native-construction
 assert.throws(() => assertNativePullFailureScope(withdrawnCleanup), { code: 'ERR_ASSERTION' });
 assertNativePullFailureScope(withdrawnCleanup.replace('finally Sleep(0)', nativeCleanup));
 const nativeCases = fs.readFileSync(
-	path.join(root, 'tests/unit/test_ollama_managed_bootstrap.ahk'),
+	path.join(root, 'tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk'),
 	'utf8'
 );
 for (const name of [

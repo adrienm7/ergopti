@@ -180,7 +180,7 @@ function validateNaturalZeroCustody(source, tests) {
 
 const source = fs.readFileSync(path.join(DRIVER, 'adapters/terminal_output_custody.ahk'), 'utf8');
 const tests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/llm_nav_event_owner/test_terminal_output_custody.ahk'),
+	path.join(DRIVER, 'tests/unit/modules/llm/nav_event_owner/test_terminal_output_custody.ahk'),
 	'utf8'
 );
 validate(source, tests);
@@ -1038,7 +1038,7 @@ function validateExplicitSender(sender, receivingTests) {
 	);
 	assert.ok(
 		receivingTests.includes(
-			String.raw`#Include %A_LineFile%\..\..\..\..\adapters\terminal_output_sendinput.ahk`
+			String.raw`#Include %A_LineFile%\..\..\..\..\..\..\adapters\terminal_output_sendinput.ahk`
 		)
 	);
 	for (const caseName of [
@@ -1706,7 +1706,7 @@ function validateTerminalRegistrationCustody(loader, authored) {
 		assert.ok(authored.includes(literal), `Missing independent custody vector ${literal}.`);
 }
 const registrationTests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/llm_nav_event_owner/test_terminal_route_metadata.ahk'),
+	path.join(DRIVER, 'tests/unit/modules/llm/nav_event_owner/test_terminal_route_metadata.ahk'),
 	'utf8'
 );
 validateTerminalRegistrationCustody(packetLoader, registrationTests);

@@ -16,19 +16,18 @@ _RSH_Partition() {
 	global TEST_REGISTRY, TEST_MODULE_GROUPS
 	Seen := 0
 	Counts := Map()
+	; One identity index instead of a registry scan per selected test: the scan
+	; made this check quadratic in the suite size (about 16 s on CI).
+	Positions := Map()
+	for Index, Candidate in TEST_REGISTRY
+		Positions[ObjPtr(Candidate)] := Index
 	for Group in TEST_MODULE_GROUPS {
 		Selected := _SelectModule(TEST_REGISTRY, Group[1])
 		Counts[Group[1]] := Selected.Length
 		Seen += Selected.Length
 		Previous := 0
 		for Entry in Selected {
-			Position := 0
-			for Index, Candidate in TEST_REGISTRY {
-				if Candidate == Entry {
-					Position := Index
-					break
-				}
-			}
+			Position := Positions.Get(ObjPtr(Entry), 0)
 			AssertTrue(Position > Previous, "a module group keeps the registry order")
 			Previous := Position
 		}
@@ -42,9 +41,9 @@ Test("runner module: the module groups partition the suite in order (runner-modu
 
 _RSH_GroupRules() {
 	AssertEqual("meta", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\meta\test_x.ahk"))
-	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_local_server_panel.ahk"))
-	AssertEqual("llm-servers-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_local_server_join.ahk"))
-	AssertEqual("llm-terminal", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\llm_nav_event_owner\test_terminal_route_metadata.ahk"))
+	AssertEqual("llm-servers-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_panel.ahk"))
+	AssertEqual("llm-servers-b", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\servers\test_local_server_join.ahk"))
+	AssertEqual("llm-terminal", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\modules\llm\nav_event_owner\test_terminal_route_metadata.ahk"))
 	AssertEqual("config-transition", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\transition\test_config_transition_windows_port.ahk"))
 	AssertEqual("config-scope-a", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\infra\config\scope\test_global_config_scope.ahk"))
 	AssertEqual("hotstrings", _TestModuleOf("C:\repo\static\ergopti_plus\windows\tests\unit\test_user_hotstrings.ahk"))
