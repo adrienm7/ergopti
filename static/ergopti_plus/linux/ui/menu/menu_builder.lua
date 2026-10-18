@@ -2175,8 +2175,9 @@ local function _manifest_hotstring_rows(ctx, config)
 				return RepeatKey.is_enabled()
 			end
 			-- When the engine forgets the current word: the `idle_reset` choice
-			-- (presets plus a free entry) and the `click_resets_word` checkbox.
-			-- The renderer draws both rows; these are their owners and states.
+			-- (presets plus a free entry) and the click, arrow, shortcut and
+			-- tap-hold checkboxes. The renderer draws the rows; these are their
+			-- owners and states.
 			-- Required here, not with the module imports: the menu manifest gate pins
 			-- this file's top-level bindings.
 			local WordReset = require("modules.hotstrings.word_reset")
@@ -2204,11 +2205,29 @@ local function _manifest_hotstring_rows(ctx, config)
 			params_ctx.commands["click_resets_word"] = function()
 				return word_reset_changed(WordReset.toggle_click_resets_word())
 			end
+			params_ctx.commands["arrow_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_arrow_resets_word())
+			end
+			params_ctx.commands["shortcut_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_shortcut_resets_word())
+			end
+			params_ctx.commands["tap_hold_resets_word"] = function()
+				return word_reset_changed(WordReset.toggle_tap_hold_resets_word())
+			end
 			params_ctx.state_getters["hotstrings.idle_reset_seconds"] = function()
 				return WordReset.idle_seconds()
 			end
 			params_ctx.state_getters["hotstrings_click_resets_word"] = function()
 				return WordReset.click_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_arrow_resets_word"] = function()
+				return WordReset.arrow_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function()
+				return WordReset.shortcut_resets_word()
+			end
+			params_ctx.state_getters["hotstrings_tap_hold_resets_word"] = function()
+				return WordReset.tap_hold_resets_word()
 			end
 			return ManifestMenu.build("hotstrings_params_group", "HotstringsParams",
 				params_handlers, nil, params_ctx, params_providers)

@@ -656,7 +656,7 @@ function M.build_management(ctx)
 		return ctx.do_reload("menu")
 	end
 	-- The word-reset policy: the idle-reset choice (presets and free entry) and
-	-- the click checkbox. The renderer draws both rows from the declarations;
+	-- the click, arrow and shortcut checkboxes. The renderer draws both rows from the declarations;
 	-- this driver supplies the keymap setters, the native prompt and the state.
 	local function commit_word_reset(state_key, setter, value)
 		if not ctx.keymap or type(ctx.keymap[setter]) ~= "function" then return false end
@@ -702,11 +702,25 @@ function M.build_management(ctx)
 	params_ctx.commands["click_resets_word"] = function()
 		return commit_word_reset("click_resets_word", "set_click_resets_word", not click_enabled)
 	end
+	-- The arrow and shortcut checkboxes (tap_hold_resets_word is greyed by the
+	-- manifest on macOS: Karabiner owns tap-hold, so it has no command here).
+	local arrow_enabled = ctx.keymap and type(ctx.keymap.is_arrow_resets_word_enabled) == "function"
+		and ctx.keymap.is_arrow_resets_word_enabled()
+	params_ctx.commands["arrow_resets_word"] = function()
+		return commit_word_reset("arrow_resets_word", "set_arrow_resets_word", not arrow_enabled)
+	end
+	local shortcut_enabled = ctx.keymap and type(ctx.keymap.is_shortcut_resets_word_enabled) == "function"
+		and ctx.keymap.is_shortcut_resets_word_enabled()
+	params_ctx.commands["shortcut_resets_word"] = function()
+		return commit_word_reset("shortcut_resets_word", "set_shortcut_resets_word", not shortcut_enabled)
+	end
 	params_ctx.state_getters = {}
 	for key, value in pairs(ctx.state_getters or {}) do params_ctx.state_getters[key] = value end
 	params_ctx.state_getters["hotstrings_repeat_enabled"] = function() return repeat_enabled end
 	params_ctx.state_getters["hotstrings.idle_reset_seconds"] = current_idle_reset
 	params_ctx.state_getters["hotstrings_click_resets_word"] = function() return click_enabled == true end
+	params_ctx.state_getters["hotstrings_arrow_resets_word"] = function() return arrow_enabled == true end
+	params_ctx.state_getters["hotstrings_shortcut_resets_word"] = function() return shortcut_enabled == true end
 
 	-- The manifest's rows for this group, dispatched by id, and then the two rows
 	-- it does not describe.

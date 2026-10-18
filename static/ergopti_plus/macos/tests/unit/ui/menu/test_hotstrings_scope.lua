@@ -145,7 +145,7 @@ local function fake_keymap(controls)
 	local lua_sections = { dynamichotstrings = { { name = "datefr" } } }
 	local km = { DELAY_KEY_TO_CATEGORY = { autocorrection = "autocorrection", rolls = "rolls" },
 		delays = {}, chosen = {}, previews = {}, reloads = {}, repeat_enabled = false, base = 0.9, trigger = "§",
-		idle_reset = 5, click_resets = false, projected = {} }
+		idle_reset = 5, click_resets = false, arrow_resets = false, shortcut_resets = false, projected = {} }
 	km.get_terminator_defs = Terminators.get_terminator_defs
 	km.is_terminator_enabled = Terminators.is_terminator_enabled
 	km.add_custom_terminator = Terminators.add_custom_terminator
@@ -231,6 +231,10 @@ local function fake_keymap(controls)
 	function km.set_idle_reset_seconds(value) km.idle_reset = value; return true end
 	function km.is_click_resets_word_enabled() return km.click_resets end
 	function km.set_click_resets_word(value) km.click_resets = value; return true end
+	function km.is_arrow_resets_word_enabled() return km.arrow_resets end
+	function km.set_arrow_resets_word(value) km.arrow_resets = value; return true end
+	function km.is_shortcut_resets_word_enabled() return km.shortcut_resets end
+	function km.set_shortcut_resets_word(value) km.shortcut_resets = value; return true end
 	function km.get_magic_key_source() return km.magic_key_source end
 	function km.set_magic_key_source(value) km.magic_key_source = value; return true end
 	function km.get_trigger_char() return km.trigger end
@@ -484,6 +488,8 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.base, 0.75)
 		helpers.assert_eq(f.km.idle_reset, 3, "restore applies the recommended idle reset")
 		helpers.assert_eq(f.km.click_resets, true, "restore applies the recommended click reset")
+		helpers.assert_eq(f.km.arrow_resets, true, "restore applies the recommended arrow reset")
+		helpers.assert_eq(f.km.shortcut_resets, true, "restore applies the recommended shortcut reset")
 		helpers.assert_eq(f.km.previews.star, true)
 		helpers.assert_eq(f.km.previews.ai, nil, "consent is not re-applied")
 		helpers.assert_eq(f.km.is_group_enabled("rolls"), true)
@@ -639,6 +645,8 @@ helpers.describe("macOS hotstrings scope", function()
 		helpers.assert_eq(f.km.repeat_enabled, false)
 		helpers.assert_eq(f.km.idle_reset, 5, "revert restores the idle reset")
 		helpers.assert_eq(f.km.click_resets, false, "revert restores the click reset")
+		helpers.assert_eq(f.km.arrow_resets, false, "revert restores the arrow reset")
+		helpers.assert_eq(f.km.shortcut_resets, false, "revert restores the shortcut reset")
 		helpers.assert_eq(f.km.trigger, "§")
 		helpers.assert_eq(f.editor.trigger, "§")
 		helpers.assert_eq(f.state.delays, { autocorrection = 3.0, dynamichotstrings = 1.5 })

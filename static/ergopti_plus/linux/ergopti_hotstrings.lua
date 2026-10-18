@@ -793,6 +793,12 @@ local function main()
 		execute_action = function(action, binding)
 			if not action_catalogue then error("the action catalogue (gestures module) is not loaded") end
 			action_catalogue.execute_action(action, binding)
+			-- The command's keys (Ctrl+V for paste) go straight to the virtual
+			-- keyboard and never reach the hook: hotstrings.tap_hold_resets_word
+			-- decides here whether the next key starts a word.
+			local effect = WordReset.apply_tap_action(engine, binding)
+			if effect == "word_start" then _undoable = nil end
+			Logger.debug(LOG, "Tap action '%s' — hotstring word %s.", tostring(action), effect)
 		end,
 		-- Every action the catalogue runs here, not only the gesture picker's
 		-- list: a tap set to one of the others must not read as unsupported.
@@ -1422,14 +1428,17 @@ local function main()
 		end
 		_undoable = nil
 
-		-- Backspace edits the buffer as it edited the text; every other control
-		-- key (and a word-deleting Backspace) moves or leaves the caret, so what
-		-- follows is not known to start a word. Escape alone leaves the caret
-		-- where it was.
+		-- Backspace edits the buffer as it edited the text. An arrow and a
+		-- shortcut follow hotstrings.arrow_resets_word, shortcut_resets_word or,
+		-- for a chord a tap-hold produced, tap_hold_resets_word: a new word when
+		-- on, the word kept when off. Every other control key (and a
+		-- word-deleting Backspace) moves the caret by an unknown amount, so what
+		-- follows is not known to start a word; Escape leaves it where it was.
+		local effect = "edited"
 		if one_character then
 			engine:backspace()
 		else
-			engine:reset(key_name == "escape")
+			effect = WordReset.apply_control(engine, key_name, detail)
 		end
 		-- Withdraw any LLM prediction on Backspace or Escape. Withdraw, not
 		-- cancel: the buffer was just edited above, and cancel resets it.
@@ -1438,7 +1447,7 @@ local function main()
 				pcall(function() prediction_engine.withdraw() end)
 			end
 		end
-		Logger.debug(LOG, "Control key '%s' — buffer updated.", key_name)
+		Logger.debug(LOG, "Control key '%s' — buffer %s.", key_name, effect)
 	end
 	local on_control = input_capture_gate.guard(handle_control)
 

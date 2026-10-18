@@ -36,7 +36,13 @@
 			]
 		},
 		"word_reset": {
-			"members": ["hotstrings.idle_reset_seconds", "hotstrings.click_resets_word"],
+			"members": [
+				"hotstrings.idle_reset_seconds",
+				"hotstrings.click_resets_word",
+				"hotstrings.arrow_resets_word",
+				"hotstrings.shortcut_resets_word",
+				"hotstrings.tap_hold_resets_word"
+			],
 			"registered": "yes",
 			"production_caller": "yes",
 			"persisted": "yes",
@@ -48,7 +54,8 @@
 				"static/ergopti_plus/linux/modules/hotstrings/word_reset.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_word_reset.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_word_reset.lua",
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_word_reset_events.lua"
 			]
 		},
 		"magic_key_source": {

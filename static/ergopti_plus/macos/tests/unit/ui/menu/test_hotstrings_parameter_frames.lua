@@ -375,9 +375,10 @@ helpers.describe("parameter parent is owned only by its existing shared consumer
 	end)
 end)
 
--- The word-reset rows (hotstrings.idle_reset_seconds and hotstrings.click_resets_word):
--- the shared renderer draws the presets, the free entry and the checkbox, and
--- this driver answers with the keymap setters and the native prompt.
+-- The word-reset rows (hotstrings.idle_reset_seconds, click_resets_word,
+-- arrow_resets_word and shortcut_resets_word): the shared renderer draws the
+-- presets, the free entry and the checkboxes, and this driver answers with the
+-- keymap setters and the native prompt. tap_hold_resets_word is greyed here.
 local function with_word_reset(body, idle_seconds, prompt_answer)
 	with_frame(function(f)
 		local keymap, set = f.context.keymap, {}
@@ -386,6 +387,13 @@ local function with_word_reset(body, idle_seconds, prompt_answer)
 		keymap.set_idle_reset_seconds = function(value) set[#set + 1] = { "idle", value }; idle = value; return true end
 		keymap.is_click_resets_word_enabled = function() return click end
 		keymap.set_click_resets_word = function(value) set[#set + 1] = { "click", value }; click = value; return true end
+		local arrow, shortcut = true, false
+		keymap.is_arrow_resets_word_enabled = function() return arrow end
+		keymap.set_arrow_resets_word = function(value) set[#set + 1] = { "arrow", value }; arrow = value; return true end
+		keymap.is_shortcut_resets_word_enabled = function() return shortcut end
+		keymap.set_shortcut_resets_word = function(value)
+			set[#set + 1] = { "shortcut", value }; shortcut = value; return true
+		end
 		f.context.do_reload = function() return true end
 		local dialog = require("infra.dialog_util")
 		local prompt, alert = dialog.text_prompt, dialog.block_alert
@@ -449,6 +457,47 @@ helpers.describe("hotstrings word-reset rows", function()
 			helpers.assert_eq(f.context.state.idle_reset_seconds, 1.5)
 			helpers.assert_eq(alerts(), 0)
 		end, 3, " 1,5 ")
+	end)
+
+	helpers.it("draws the arrow and shortcut checkboxes from the keymap and toggles each", function()
+		with_word_reset(function(f, set)
+			local arrow_row, shortcut_row
+			for _, row in ipairs(assert(f.build()).menu) do
+				if row.title == f.captions("menu.hotstrings.arrow_resets_word") then arrow_row = row end
+				if row.title == f.captions("menu.hotstrings.shortcut_resets_word") then shortcut_row = row end
+			end
+			assert(arrow_row, "the arrow checkbox must be drawn")
+			assert(shortcut_row, "the shortcut checkbox must be drawn")
+			helpers.assert_eq(arrow_row.checked, true, "the arrow row reads the keymap's live value")
+			helpers.assert_true(shortcut_row.checked ~= true, "the shortcut row reads the keymap's live value")
+			helpers.assert_true(arrow_row.disabled ~= true and shortcut_row.disabled ~= true,
+				"both options are live on macOS")
+			arrow_row.fn()
+			helpers.assert_eq(set, { { "arrow", false } })
+			helpers.assert_eq(f.context.state.arrow_resets_word, false)
+			shortcut_row.fn()
+			helpers.assert_eq(set[2], { "shortcut", true })
+			helpers.assert_eq(f.context.state.shortcut_resets_word, true)
+			helpers.assert_eq(f.calls.writes, 2, "each change is saved once")
+		end, 3)
+	end)
+
+	helpers.it("greys the tap-hold row with its Karabiner reason and gives it no command", function()
+		with_word_reset(function(f)
+			local label = f.captions("menu.hotstrings.tap_hold_resets_word")
+			local found
+			for _, row in ipairs(assert(f.build()).menu) do
+				if type(row.title) == "string" and row.title:sub(1, #label) == label then found = row end
+			end
+			assert(found, "the tap-hold row must be drawn greyed, not hidden")
+			helpers.assert_eq(found.disabled, true)
+			helpers.assert_nil(found.fn, "Karabiner owns tap-hold on macOS: the row has no command")
+			local reason = f.captions("platform_reason.tap_hold_word_reset_not_on_macos")
+			local cut = reason:find(":", 1, true)
+			local head = (cut and reason:sub(1, cut - 1) or reason):gsub("%s+$", "")
+			helpers.assert_true(found.title:find(head, 1, true) ~= nil,
+				"the greyed row names why it is unavailable: " .. found.title)
+		end, 3)
 	end)
 
 	for _, answer in ipairs({ "-1", "abc", "", "inf" }) do

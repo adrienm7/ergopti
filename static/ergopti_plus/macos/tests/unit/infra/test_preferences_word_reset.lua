@@ -57,10 +57,32 @@ helpers.describe("word-reset preferences", function()
 		end)
 	end)
 
+	helpers.it("reads, saves and reloads the arrow and shortcut settings", function()
+		with_source("[hotstrings]\narrow_resets_word = false\nshortcut_resets_word = false\n", function(preferences, path)
+			local state, status = preferences.load(path)
+			helpers.assert_eq(status, "ok")
+			helpers.assert_eq(state.arrow_resets_word, false)
+			helpers.assert_eq(state.shortcut_resets_word, false)
+			helpers.assert_eq(preferences.save(path, { arrow_resets_word = true, shortcut_resets_word = false }, {}, {}),
+				true)
+			package.loaded["infra.preferences"] = nil
+			local restarted = helpers.load_with_stubs("infra.preferences").load(path)
+			-- A save is sparse: the default (on) is stored as absent.
+			helpers.assert_nil(restarted.arrow_resets_word, "the default arrow setting is stored as absent")
+			helpers.assert_eq(restarted.shortcut_resets_word, false)
+			local file = assert(io.open(path, "rb")); local text = file:read("*a"); assert(file:close())
+			helpers.assert_true(text:find("shortcut_resets_word = false", 1, true) ~= nil,
+				"the off value is written under [hotstrings]: " .. text)
+		end)
+	end)
+
 	for _, vector in ipairs({
 		{ name = "a negative idle delay", source = "[hotstrings]\nidle_reset_seconds = -2\n", key = "idle_reset_seconds" },
 		{ name = "a text idle delay", source = '[hotstrings]\nidle_reset_seconds = "3"\n', key = "idle_reset_seconds" },
 		{ name = "a text click flag", source = '[hotstrings]\nclick_resets_word = "yes"\n', key = "click_resets_word" },
+		{ name = "a text arrow flag", source = '[hotstrings]\narrow_resets_word = "yes"\n', key = "arrow_resets_word" },
+		{ name = "a numeric shortcut flag", source = '[hotstrings]\nshortcut_resets_word = 1\n',
+			key = "shortcut_resets_word" },
 	}) do
 		helpers.it("reports " .. vector.name .. " as outdated and reads it as absent", function()
 			with_source(vector.source, function(preferences, path, warnings)
