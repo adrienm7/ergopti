@@ -6,18 +6,37 @@ Windows** under plain Lua 5.4 — no external dependencies required.
 
 ## Layout
 
+The tree mirrors the driver source: a test of `modules/keymap/…` lives in
+`tests/unit/modules/keymap/<stage>/`, a test of `ui/menu/…` in
+`tests/unit/ui/menu/<submenu>/`.
+
 ```
 tests/
-├── run.lua                 Test runner entry point (zero-dep)
-├── stubs/
-│   └── hs.lua              Hammerspoon API shim
-├── helpers/
-│   └── init.lua            Shared assertions, mini test runner, fixture loader
-├── fixtures/               Static test inputs (TOML, JSON, …)
-├── meta/                   Architectural-invariant checks (file headers, etc.)
-├── unit/                   Per-module unit tests
-└── integration/            Mac-only end-to-end tests run inside Hammerspoon
+├── run.lua              Runner entry point (zero-dep): --only, --module
+├── helpers/             Shared assertions, mini test runner, pbt.lua
+├── stubs/hs.lua         Hammerspoon API shim
+├── support/             Fixtures and harness modules that tests require
+├── fixtures/            Static test inputs (TOML, JSON, …)
+├── meta/<topic>/        Source-scanning invariants and harness self-tests:
+│                        architecture, boot, shutdown, corpus, gestures,
+│                        harness, lua_safety, menu, regressions, runloop,
+│                        shell_quoting
+├── unit/
+│   ├── adapters/<family>/         contracts, file_system, keyboard, …
+│   ├── infra/<area>/              config, logger, preferences, toml, …
+│   ├── modules/<module>/<part>/   keylogger, keymap, llm, gestures, …
+│   ├── platform/remap/<part>/     config, generator, lease, watchers, …
+│   └── ui/<surface>/              menu/<submenu>/, tooltip, onboarding, …
+├── e2e/                 Stubbed virtual-keyboard and boot scenarios
+├── bench/               Benchmarks, never run by the unit suite
+└── integration/         Mac-only tests run inside Hammerspoon
 ```
+
+Put a new test in the folder of the code it exercises. Open a subfolder
+rather than letting one folder grow past a few dozen files, and split a test
+file along its `describe` blocks before it passes about 800 lines; a prelude
+the parts share goes to `tests/support/<same path>/<name>_fixture.lua`, and
+each part loads it fresh so no state leaks between files.
 
 ## Running locally
 
@@ -48,6 +67,18 @@ cd static\ergopti_plus\macos
 lua tests\run.lua
 ```
 
+### One file or one shard
+
+```bash
+lua tests/run.lua --only tests/unit/modules/keymap/registry/test_registry.lua
+lua tests/run.lua --module=menu_llm
+```
+
+`--module` runs one group of `tests/support/module_groups.lua`: meta, core,
+modules, menu_llm, menu_input, ui and the catch-all other. CI runs each group
+as its own job; together they are exactly the whole suite
+(`tests/meta/harness/test_module_groups.lua`).
+
 ### With busted (optional)
 
 If [busted](https://lunarmodules.github.io/busted/) is installed (`luarocks install busted`),
@@ -56,12 +87,15 @@ constructs from `tests/helpers`.
 
 ## What each layer covers
 
-| Directory       | Purpose                                                                                                                                                                                    |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `meta/`         | Architectural invariants — file headers, banner alignment, logger pairing, defaults uniqueness. Most are **warnings**, never hard failures, so legitimate refactors don't break the build. |
-| `unit/lib/`     | Pure-function libraries (`text_utils`, `toml_reader`, `keycodes`, `logger`, `perf`, …).                                                                                                    |
-| `unit/modules/` | Domain modules: keymap, llm parser/profiles/api, karabiner config, gestures, dynamic_hotstrings, keylogger, shortcuts.                                                                     |
-| `integration/`  | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API.                                                         |
+| Directory        | Purpose                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `meta/`          | Invariants no runtime call can check: boot order, teardown paths, ports, Lua and Hammerspoon foot-guns, the test harness itself.   |
+| `unit/adapters/` | The OS-isolation layer, one folder per port family, plus the cross-driver contract vectors.                                        |
+| `unit/infra/`    | Infrastructure: configuration, preferences, logger, TOML, file watchers, i18n, lifecycle.                                          |
+| `unit/modules/`  | Domain modules: keymap, keylogger, llm, gestures, shortcuts, dynamic_hotstrings, hotstrings, updater, diagnostics.                 |
+| `unit/platform/` | The Karabiner remap bridge.                                                                                                        |
+| `unit/ui/`       | Windows, dialogs, tooltips and the tray menu.                                                                                      |
+| `integration/`   | Mac-only — exercised via a "Run Self-Tests" menu item inside Hammerspoon to validate end-to-end behavior with the real `hs.*` API. |
 
 ## Updating snapshot fixtures
 
