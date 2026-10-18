@@ -72,7 +72,7 @@
 				"static/ergopti_plus/linux/infra/hotstring_preferences.lua",
 				"static/ergopti_plus/linux/ergopti_hotstrings.lua",
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
-				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key_source.lua"
+				"static/ergopti_plus/linux/tests/unit/modules/hotstrings/magic_key/test_magic_key_source_config_toml_leaf.lua"
 			]
 		},
 		"script_chords": {
