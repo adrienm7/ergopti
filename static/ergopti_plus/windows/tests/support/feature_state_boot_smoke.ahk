@@ -39,6 +39,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\wall_clock.ahk
 #Include ..\..\infra\logger.ahk
+#Include ..\..\infra\redact.ahk
 #Include ..\..\adapters\crypto.ahk
 #Include ..\..\adapters\file_system.ahk
 #Include ..\..\adapters\key_state.ahk
@@ -58,6 +59,8 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\config_migrate.ahk
 #Include ..\..\infra\first_boot.ahk
 #Include ..\..\modules\gestures\config.ahk
+; LoggerInit admits the real shared privacy policy through this native codec.
+#Include ..\..\infra\json.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
