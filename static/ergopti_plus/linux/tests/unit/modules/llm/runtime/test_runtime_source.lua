@@ -25,6 +25,7 @@ package.loaded['infra.i18n']={get=function(k)return k end}
 package.loaded['llm.profile_selector']={};package.loaded['infra.llm_bridge']={}
 local Writer = helpers.load_module("toml_codec.writer")
 local function world()
+	Writer = helpers.load_module("toml_codec.writer")
 	w={bytes='[llm]\nenabled = false\n[llm.models]\nselected = "ollama"\nollama = "llama3.2:3b"\n',state={
 		paused=false,blocked=false,enabled=false,backend='ollama',model='llama3.2:3b',
 		origin='http://127.0.0.1:11434',revision=5,app_epoch=2},writes=0}
@@ -77,7 +78,11 @@ local function world()
 	package.loaded['infra.llm_preferences']=prefs
 	local profiles = helpers.load_module("modules.llm.profiles")
 	owner.preferences,owner.profiles=prefs,profiles
-	local engine={state=function()local copy={};for k,v in pairs(owner.state)do copy[k]=v end;return copy end}
+	local engine={state=function()
+		local backend=prefs.get('llm.models.selected') or manifest.default_for('llm.models.selected')
+		local copy={};for k,v in pairs(owner.state)do copy[k]=v end
+		copy.backend=backend;return copy
+	end}
 	function engine.admit_write(revision,app_epoch,enabled,observe_source)
 		if owner.on_native_pause then owner.on_native_pause()end
 		local observed=observe_source()
