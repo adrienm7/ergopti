@@ -34,6 +34,7 @@ return {
 	"tests.unit.infra.test_native_artifact_cleanup_retry",
 	"tests.unit.infra.test_native_install_admission",
 	"tests.unit.infra.test_fd_crypto_projection",
+	"tests.unit.infra.test_openssl_cipher",
 	"tests.unit.infra.test_global_shortcuts_pair_scope",
 	"tests.unit.infra.test_physical_shortcut_scope",
 	"tests.unit.modules.shortcuts.test_physical_editor_inventory",

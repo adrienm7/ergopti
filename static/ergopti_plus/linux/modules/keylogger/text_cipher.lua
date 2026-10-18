@@ -10,8 +10,8 @@
 --- FEATURES & RATIONALE:
 --- 1. The key is derived ONCE and cached. `openssl enc -pbkdf2 -iter 600000`
 ---    costs roughly half a second per invocation, so deriving per row — or even
----    per flush — would make the keylogger unusable. Every subsequent call passes
----    the raw key with -K/-iv and costs only the process spawn.
+---    per flush — would make the keylogger unusable. Subsequent AES operations
+---    use native EVP byte buffers, without processes or key-bearing arguments.
 --- 2. The machine ID is read by openssl itself via `-pass file:/etc/machine-id`.
 ---    Passing it as an argument would publish it in the process table, and
 ---    piping it through a shell would put it in a command line too.
@@ -28,8 +28,8 @@ local M = {}
 
 local Logger  = require("logger.shim")
 local Crypto  = require("adapters.crypto")
-local Base64  = require("compat.base64")
 local OpenSSL = require("infra.openssl_command")
+local NativeCipher = require("infra.openssl_cipher")
 local TextCrypto = require("keylogger.text_crypto")
 
 local LOG = "modules.keylogger.text_cipher"
@@ -174,7 +174,7 @@ end
 --- to refuse to tick a box the backend cannot honour.
 --- @return boolean
 function M.is_available()
-	return ensure_key() ~= nil
+	return NativeCipher.available and ensure_key() ~= nil
 end
 
 --- Encrypts one value for storage.
@@ -190,6 +190,10 @@ function M.encrypt(device_id, event_id, plaintext)
 	-- Already an envelope: re-encrypting would double-wrap and make the value
 	-- undecryptable in one pass.
 	if TextCrypto.is_encrypted(plaintext) then return plaintext end
+	if not NativeCipher.available then
+		Logger.error(LOG, "Native AES unavailable — refusing to store plaintext.")
+		return nil
+	end
 
 	local key = ensure_key()
 	if not key then return nil end
@@ -201,32 +205,18 @@ function M.encrypt(device_id, event_id, plaintext)
 		return nil
 	end
 
-	local cmd, reason = TextCrypto.encrypt_command(key, iv)
-	if not cmd then
-		Logger.error(LOG, "Cannot compose the encryption command: %s.", reason)
-		return nil
-	end
-
-	-- Byte-exact stdin, never the plain heredoc: that one normalises the payload's
-	-- trailing newlines away, so "line\n\n" would be stored as the ciphertext of
-	-- "line" and read back as a value the user never typed.
-	local input, pipeline_options = plaintext, nil
-	if plaintext:find("\0", 1, true) then
-		-- The shell command reaches exec as a C string; a raw NUL truncates the
-		-- heredoc while OpenSSL still encrypts the surviving prefix successfully.
-		-- Transport only textual bytes, then restore them at the native boundary.
-		input = Base64.encode(plaintext)
-		cmd = "openssl base64 -d -A | " .. cmd
-		pipeline_options = { pipefail = true }
-	end
-	local ciphertext, native_error = OpenSSL.exec(cmd, input, pipeline_options)
+	local ciphertext = NativeCipher.encrypt(key, iv, plaintext)
 	if type(ciphertext) ~= "string" or ciphertext == "" then
-		Logger.error(LOG, "Encryption did not complete successfully — %s; refusing to store plaintext.",
-			native_error or "empty ciphertext")
+		Logger.error(LOG, "Native encryption refused — refusing to store plaintext.")
 		return nil
 	end
 
-	return (TextCrypto.wrap(iv, (ciphertext:gsub("%s+$", ""))))
+	local encoded = NativeCipher.encode_base64(ciphertext)
+	if not encoded then
+		Logger.error(LOG, "Native ciphertext encoding refused.")
+		return nil
+	end
+	return TextCrypto.wrap(iv, encoded)
 end
 
 --- Decrypts one stored value.
@@ -235,6 +225,15 @@ end
 function M.decrypt(value)
 	local iv, ciphertext = TextCrypto.unwrap(value)
 	if not iv then return value end
+	if not NativeCipher.available then
+		Logger.warn(LOG, "Encrypted row cannot be read: native AES unavailable.")
+		return ""
+	end
+	local bytes = NativeCipher.decode_base64(ciphertext)
+	if not bytes then
+		Logger.error(LOG, "Encrypted row has invalid Base64.")
+		return ""
+	end
 
 	local key = ensure_key()
 	if not key then
@@ -242,15 +241,9 @@ function M.decrypt(value)
 		return ""
 	end
 
-	local cmd, reason = TextCrypto.decrypt_command(key, iv)
-	if not cmd then
-		Logger.error(LOG, "Cannot compose the decryption command: %s.", reason)
-		return ""
-	end
-
-	local plaintext, native_error = OpenSSL.exec(cmd, ciphertext)
+	local plaintext = NativeCipher.decrypt(key, iv, bytes)
 	if type(plaintext) ~= "string" then
-		Logger.error(LOG, "Decryption did not complete successfully — %s.", native_error or "invalid plaintext output")
+		Logger.error(LOG, "Native decryption refused.")
 		return ""
 	end
 	return plaintext
