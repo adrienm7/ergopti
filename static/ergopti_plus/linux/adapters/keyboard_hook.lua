@@ -2472,6 +2472,10 @@ local function _read_source(source)
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
 	if source.keyboard then
+		if _source_recovery.retire_remaps({ source.path }) ~= true then
+			M.emergency_stop("could not retire the failed source remapper")
+			return nil
+		end
 		local released, release_err = _release_forwarded_sources({ source.path })
 		if not released then
 			M.emergency_stop("could not release keys from failed source: " .. tostring(release_err))
@@ -2973,6 +2977,43 @@ local function _source_transaction_current(tx)
 	return true
 end
 
+--- Retires the shared engine only when a departing source owns consumed input.
+--- A retained physical press stays swallowed until UP rather than becoming a tap
+--- or replaying its remapped DOWN after the engine's state was retired.
+--- @param paths table Departing keyboard paths.
+--- @return boolean retired
+function _source_recovery.retire_remaps(paths)
+	if not _remapper then return true end
+	local departing, needed = {}, false
+	for _, path in ipairs(paths) do departing[path] = true end
+	for key in pairs(_remap_owned) do
+		local physical = _physical_down[key]
+		if physical and departing[physical.source] then needed = true; break end
+	end
+	if not needed then return true end
+	local exact, generation, output, session, issuer = _remapper, _remapper_generation, _broker, _capture_session, _remapper_input_owner
+	local tx, owned = _source_reconciliation, _remap_owned
+	local function current()
+		return _remapper == exact and _remapper_generation == generation and _broker == output
+			and _capture_session == session and _remapper_input_owner == issuer
+			and (not tx or _source_transaction_current(tx))
+	end
+	if not current() or _release_remapped() ~= true or not current() then return false end
+	if exact.activate and exact:activate() ~= true then return false end
+	if not current() then return false end
+	local replacement = _input_ports.capture_input_owner(exact)
+	if exact.has_combinations and (not replacement or not _input_ports.input_owner_current(replacement)) then return false end
+	if not current() then return false end
+	for key in pairs(owned) do
+		local physical = _physical_down[key]
+		if physical and not departing[physical.source] then _remap_orphans[key] = true end
+	end
+	_remap_owned, _remap_source_of = {}, {}
+	_remapper_input_owner = replacement
+	if tx then tx.issuer = replacement end
+	return true
+end
+
 --- Refuses a previously captured native slot that a callback has replaced.
 --- @param tx table Original transaction.
 --- @param slot string Already-open slot.
@@ -3105,6 +3146,7 @@ local function _acquire(paths, force_path, tx)
 	for _, path in ipairs(paths) do
 		local slot = keyboard_slot(path)
 		if path == force_path then
+			if _source_recovery.retire_remaps({ path }) ~= true then return false, "reconnected source remapper retirement refused" end
 			local released, release_err = _release_forwarded_sources({ path })
 			if not released then return false, release_err end
 			_close_paths({ path }, keyboard_slot, tx)
@@ -3133,6 +3175,7 @@ local function _acquire(paths, force_path, tx)
 	local retired = {}
 	for path in pairs(retained) do retired[#retired + 1] = path end
 	table.sort(retired)
+	if _source_recovery.retire_remaps(retired) ~= true then return false, "departed source remapper retirement refused" end
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then
 		_close_paths(opened, keyboard_slot, tx)

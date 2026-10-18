@@ -72,6 +72,7 @@ function M.with_session(options, body)
 			return 0
 		end,
 		read = function(fd, buffer)
+			if options.eof_path == descriptors[fd] then return 0 end
 			local queue = queues[descriptors[fd]]; local bytes = queue and table.remove(queue, 1)
 			if not bytes then return -1 end
 			if options.position_bits then
@@ -184,7 +185,7 @@ function M.with_session(options, body)
 		end
 		if options.before_hook then options.before_hook(s) end
 		if not s.hook then s.hook = h.load_module("adapters.keyboard_hook") end
-		s.base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+		s.base = Engine.new({ keys = options.keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
 			tap_min_ms = 0, one_shot_timeout_ms = 1000,
 			key_text = function(code) return s.hook.key_text(code) end,
 			plan_text = function(text)
