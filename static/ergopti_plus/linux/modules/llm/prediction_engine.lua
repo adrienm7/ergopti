@@ -819,10 +819,18 @@ function M.predict(context, output_context, override)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
-		if verify_focus and (global_privacy_blocks() or current_focus() ~= focus) then
-			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
-			M.dismiss()
-			return false
+		if verify_focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native focus and privacy barriers can dispatch cancellation, a scope
+			-- change or a successor request. Only this request may be withdrawn.
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if blocked then
+				Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
+				M.dismiss()
+				return false
+			end
 		end
 		return true
 	end
