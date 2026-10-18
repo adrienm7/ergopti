@@ -23,6 +23,6 @@ const result = spawnSync(pythonExecutable(), ['tools/test/test_compact_data_sql.
 });
 assert.ifError(result.error);
 assert.equal(result.status, 0, result.stdout + result.stderr);
-assert.match(result.stderr, /Ran 13 tests/);
+assert.match(result.stderr, /Ran 15 tests/);
 assert.match(result.stderr, /\nOK\s*$/);
-console.log('PASS lossless SQL compaction: 13 native SQLite and public CLI regressions.');
+console.log('PASS lossless SQL compaction: 15 native SQLite and public CLI regressions.');
