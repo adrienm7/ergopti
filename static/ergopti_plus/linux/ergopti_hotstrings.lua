@@ -1225,6 +1225,8 @@ local function main()
 					_undoable = {
 						trigger     = result.trigger,
 						replacement = result.replacement,
+						is_private  = result.is_private,
+						destination = destination,
 						-- The terminator typed back AFTER the replacement: it is the
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
@@ -1565,17 +1567,21 @@ local function main()
 		-- replacement is still on screen. Counting the replacement alone left its
 		-- first character behind: "adn " then Backspace read "Aadn".
 		if one_character and _undoable and not opts.dry_run then
+			-- The original expansion owns both the field and its privacy policy.
+			-- Focus/log/clipboard callbacks can retire the global Undo while this
+			-- operation is in progress, so read only this captured commit record.
+			local undo = _undoable
+			_undoable = nil
 			local remaining = 0
-			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			for _ in (undo.replacement .. (undo.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
 				-- The trigger is typed text: its length is the diagnostic, not its content.
 				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
-					utf8.len(_undoable.trigger) or #_undoable.trigger)
-				injector.inject(remaining - 1, _undoable.trigger)
+					utf8.len(undo.trigger) or #undo.trigger)
+				injector.inject(remaining - 1, undo.trigger, undo.is_private, nil, undo.destination)
 				engine:reset()
-				_undoable = nil
 				return
 			end
 		end
