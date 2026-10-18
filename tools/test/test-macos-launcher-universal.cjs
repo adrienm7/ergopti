@@ -19,6 +19,8 @@
  * the post-build lipo verification disappears. Framework assembly also replays
  * strict-shell discovery: a missing preferred SPM layout must reach the next
  * supported layout instead of aborting silently through grep under pipefail.
+ * A failed Swift invocation must also refuse a previous product while the
+ * function runs inside the production command-substitution boundary.
  * ==============================================================================
  */
 
@@ -81,7 +83,8 @@ if (
 
 // Behavioural replay: run the real declaration and build_launcher() with stubbed
 // toolchain commands, so a flag or verification regression cannot hide behind
-// matching source text.
+// matching source text. Capture stdout exactly as production does: Bash clears
+// errexit there, so failed compilation or path discovery needs an explicit guard.
 const archStart = build.indexOf('LAUNCHER_ARCHS=(');
 const archEnd = build.indexOf('\ndone\n', archStart);
 if (buildFunction && archStart >= 0 && archEnd > archStart) {
@@ -89,29 +92,39 @@ if (buildFunction && archStart >= 0 && archEnd > archStart) {
 	const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-launcher-archs-'));
 	try {
 		fs.writeFileSync(path.join(tmp, 'ErgoptiPlus'), 'product');
-		const replay = (lipoOutput) =>
+		const replay = (lipoOutput, swiftFailure = '') =>
 			spawnSync(
 				bashExecutable(),
 				[
 					'-c',
 					`
-set -e
+set -euo pipefail
 LAUNCHER_DIR="$1"
 log() { :; }
 fail() { printf 'FAIL:%s\\n' "$*" >&2; exit 1; }
 swift() {
 	printf 'SWIFT:%s\\n' "$*" >&2
-	if [[ "$*" == *--show-bin-path* ]]; then printf '%s\\n' "$LAUNCHER_DIR"; fi
+	if [[ "$*" == *--show-bin-path* ]]; then
+		printf '%s\\n' "$LAUNCHER_DIR"
+		if [[ "$SWIFT_FAILURE" == query ]]; then return 24; fi
+	elif [[ "$SWIFT_FAILURE" == build ]]; then
+		return 23
+	fi
 }
 lipo() { printf '%s\\n' "$LIPO_OUTPUT"; }
 ${archBlock}
 ${buildFunction[0]}
-build_launcher
+launcher_bin="$(build_launcher)"
+printf '%s\\n' "$launcher_bin"
 `,
 					'fixture',
 					tmp.replaceAll('\\', '/')
 				],
-				{ encoding: 'utf8', timeout: 10000, env: { ...process.env, LIPO_OUTPUT: lipoOutput } }
+				{
+					encoding: 'utf8',
+					timeout: 10000,
+					env: { ...process.env, LIPO_OUTPUT: lipoOutput, SWIFT_FAILURE: swiftFailure }
+				}
 			);
 
 		const universal = replay('x86_64 arm64');
@@ -126,6 +139,22 @@ build_launcher
 			errors.push(
 				`build_launcher() did not pass both architectures to every swift call: ${swiftLines.join(' | ')}`
 			);
+		}
+		for (const [phase, diagnostic] of [
+			['build', 'Swift launcher compilation failed'],
+			['query', 'Swift launcher binary path query failed']
+		]) {
+			const failed = replay('x86_64 arm64', phase);
+			if (
+				failed.error ||
+				failed.status === 0 ||
+				!failed.stderr.includes(diagnostic) ||
+				failed.stdout.trim()
+			) {
+				errors.push(
+					`(swift-stale-product-${phase}) failed Swift ${phase} must refuse the existing previous product.`
+				);
+			}
 		}
 		const thin = replay('arm64');
 		if (thin.error || thin.status === 0 || !thin.stderr.includes('lacks the x86_64 slice')) {
