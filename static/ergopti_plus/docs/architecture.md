@@ -95,6 +95,7 @@ graph TD
         MACOS_hotkey_registrar["HotkeyRegistrar.lua"]
         MACOS_http_client["HttpClient.lua"]
         MACOS_input_source_broker["InputSourceBroker.lua"]
+        MACOS_input_source_selector["InputSourceSelector.lua"]
         MACOS_json_codec["JsonCodec.lua"]
         MACOS_key_state["KeyState.lua"]
         MACOS_keyboard_geometry["KeyboardGeometry.lua"]
