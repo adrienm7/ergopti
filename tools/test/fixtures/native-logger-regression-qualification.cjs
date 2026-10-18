@@ -225,7 +225,6 @@ module.exports = function run({
 			'ReleaseArchiveStagingTests',
 			'SparkleArchiveUpdateAcceptanceTests',
 			'HomebrewArchiveAcceptanceTests',
-			'HomebrewAutomationConsentTests',
 			'OwnedSuspendedImageTests',
 			'LoggerDatagramWorkerTests',
 			'OwnedLogDirectoryTests'

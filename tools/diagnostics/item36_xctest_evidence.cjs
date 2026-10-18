@@ -39,9 +39,6 @@ const METHODS = Object.freeze({
 	]),
 	HomebrewArchiveAcceptanceTests: Object.freeze([
 		'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
-	]),
-	HomebrewAutomationConsentTests: Object.freeze([
-		'testAutomationConsentArgumentsRequireBothExplicitOptIns'
 	])
 });
 const SOURCE_ROOTS = Object.freeze([
@@ -87,7 +84,8 @@ function evaluate(text, scriptStatus, teeStatus) {
 				/^\s*Executed (0|[1-9][0-9]*) tests?, with (\d+) failures? \((\d+) unexpected\) in /.exec(
 					line
 				);
-			const expected = summary === 'root' || summary === 'bundle' ? 25 : METHODS[summary].length;
+			const expected =
+				summary === 'root' || summary === 'bundle' ? NAMES.length : METHODS[summary].length;
 			if (!count || Number(count[1]) !== expected || count[2] !== '0' || count[3] !== '0')
 				reject('summary');
 			if (summary === 'root') root = 'after';
@@ -163,9 +161,9 @@ function evaluate(text, scriptStatus, teeStatus) {
 		suite !== null ||
 		active !== null ||
 		summary !== null ||
-		suites.size !== 4 ||
-		starts.size !== 25 ||
-		terminals.size !== 25 ||
+		suites.size !== Object.keys(METHODS).length ||
+		starts.size !== NAMES.length ||
+		terminals.size !== NAMES.length ||
 		NAMES.some((name) => !starts.has(name) || !terminals.has(name))
 	)
 		reject('incomplete');

@@ -6701,8 +6701,7 @@ function checkNativePacSourceReceipts() {
 			'ManagedPACSourceTests',
 			'ReleaseArchiveStagingTests',
 			'SparkleArchiveUpdateAcceptanceTests',
-			'HomebrewArchiveAcceptanceTests',
-			'HomebrewAutomationConsentTests'
+			'HomebrewArchiveAcceptanceTests'
 		]) {
 			const relative = tests + suite + '.swift';
 			write(relative, fs.readFileSync(path.join(root, relative)));

@@ -12,6 +12,7 @@ import os
 from pathlib import Path, PurePosixPath
 import stat
 import subprocess
+import sys
 import tempfile
 import textwrap
 from tempfile import TemporaryDirectory
@@ -468,8 +469,6 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
-                "tools/diagnostics/native_appleevent_permission.c",
-                "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
                 "tools/diagnostics/native_appleevent_probe_pair.m",
@@ -520,8 +519,6 @@ class ArchiveAcceptanceControls(unittest.TestCase):
                 "tools/diagnostics/macos_owned_process.py",
                 "tools/diagnostics/native_appleevent_probe_receiver.c",
                 "tools/diagnostics/native_appleevent_probe_sender.c",
-                "tools/diagnostics/native_appleevent_permission.c",
-                "tools/diagnostics/native_appleevent_consent.m",
                 "tools/diagnostics/native_appleevent_registration_test.m",
                 "tools/diagnostics/native_appleevent_probe_protocol.h",
                 "tools/diagnostics/native_appleevent_probe_pair.m",
@@ -840,8 +837,9 @@ class AppleEventBoundaryControls(unittest.TestCase):
         root,
         *,
         outcome=-1743,
+        consent=(-1744, -1744),
         failure=None,
-        unexpected_delivery=False,
+        unexpected_delivery=None,
         partial_ready=False,
         registration_output=None,
     ):
@@ -858,25 +856,16 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.deliveries = 0
 
             def start(self, arguments):
-                if getattr(self, "allow_automation_consent", False) is True:
-                    judge.assertEqual(
-                        arguments[0],
-                        str(root / "OwnedAppleEvent-receiver.app/Contents/MacOS/receiver"),
-                    )
-                    judge.assertEqual(len(arguments), 4)
-                    ready_index = 1
-                else:
-                    judge.assertEqual(
-                        arguments[:2],
-                        [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
-                    )
-                    judge.assertEqual(len(arguments), 5)
-                    ready_index = 2
+                judge.assertEqual(
+                    arguments[:2],
+                    [str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe"), "receiver"],
+                )
+                judge.assertEqual(len(arguments), 5)
                 child = Mock(pid=73136)
                 self.active.append(child)
                 self.groups[child] = Mock(reaped=False)
                 self.groups[child].observe_exit.return_value = None
-                Path(arguments[ready_index]).write_bytes(
+                Path(arguments[2]).write_bytes(
                     b"" if partial_ready else b"73136\n" + judge.nonce.encode() + b"\n"
                 )
                 return child
@@ -897,7 +886,7 @@ class AppleEventBoundaryControls(unittest.TestCase):
                         else registration_output,
                         "",
                     )
-                if arguments[-1] not in ("success", "denied"):
+                if arguments[-1] not in ("consent-required", "denied"):
                     return subprocess.CompletedProcess(arguments, 0, "", "")
                 self.sender_calls.append((arguments, options))
                 if failure == len(self.sender_calls):
@@ -905,23 +894,25 @@ class AppleEventBoundaryControls(unittest.TestCase):
                         arguments, 65, "", "independent native prerequisite failure"
                     )
                 judge.assertEqual(arguments[-3:-1], ["73136", judge.nonce])
-                if arguments[-1] == "success":
+                if unexpected_delivery == len(self.sender_calls):
+                    # A consent-free delivery the sender did not report.
+                    (root / "appleevent-delivered.1").write_bytes(judge.nonce.encode())
+                if arguments[-1] == "consent-required":
                     self.deliveries += 1
+                    judge.assertFalse(options.get("confined", False))
                     if self.deliveries == 2:
                         judge.assertEqual(arguments[:2], ["/usr/bin/sandbox-exec", "-f"])
                         judge.assertEqual(
                             Path(arguments[2]).read_text(),
                             "(version 1)\n(deny file-write*)\n(deny network-outbound)\n",
                         )
-                    (root / ("appleevent-delivered." + str(self.deliveries))).write_bytes(
-                        judge.nonce.encode()
-                    )
+                    else:
+                        judge.assertNotEqual(arguments[0], "/usr/bin/sandbox-exec")
+                    status = consent[self.deliveries - 1]
                     return subprocess.CompletedProcess(
-                        arguments, 0, "native_appleevent_status=0\n", ""
+                        arguments, 0, "native_appleevent_status=" + str(status) + "\n", ""
                     )
                 judge.assertTrue(options["confined"])
-                if unexpected_delivery:
-                    (root / "appleevent-delivered.3").write_bytes(judge.nonce.encode())
                 return subprocess.CompletedProcess(
                     arguments, 0, "native_appleevent_status=" + str(outcome) + "\n", ""
                 )
@@ -956,17 +947,42 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 self.assertFalse((Path(directory) / "appleevent-ready").exists())
                 self.assertFalse((Path(directory) / "appleevent-delivered.1").exists())
 
-    def test_two_independent_positive_routes_precede_each_documented_refusal(self):
+    def test_two_consent_gated_routes_precede_each_documented_refusal(self):
         for status in (-1742, -1743):
             with self.subTest(status=status), TemporaryDirectory() as directory:
                 children, receipt = self.invoke(directory, outcome=status)
-                self.assertEqual(receipt["unconfined_status"], 0)
-                self.assertEqual(receipt["deny_removal_status"], 0)
-                self.assertEqual(receipt["denied_status"], status)
-                self.assertTrue(receipt["receiver_retired"])
+                self.assertEqual(
+                    receipt,
+                    {
+                        "unconfined_status": -1744,
+                        "deny_removal_status": -1744,
+                        "denied_status": status,
+                        "delivered_events": 0,
+                        "receiver_retired": True,
+                    },
+                )
                 self.assertEqual(children.active, [])
-                self.assertEqual(len(children.sender_calls), 3)
+                self.assertEqual(
+                    [arguments[-1] for arguments, _ in children.sender_calls],
+                    ["consent-required", "consent-required", "denied"],
+                )
+                self.assertEqual(list(Path(directory).glob("appleevent-delivered*")), [])
                 self.assertEqual((Path(directory) / "sandbox.sb").read_text(), self.policy)
+
+    def test_consent_controls_admit_only_the_no_prompt_consent_step(self):
+        # 0 is the old consented delivery; the others never reached the consent step.
+        for index in (0, 1):
+            for status in (0, -1743, -1742, -600, -609, -1712, -10004):
+                consent = [-1744, -1744]
+                consent[index] = status
+                with (
+                    self.subTest(control=index, status=status),
+                    TemporaryDirectory() as directory,
+                ):
+                    with self.assertRaisesRegex(
+                        probe.AppleEventBoundaryError, "did not reach its consent step"
+                    ):
+                        self.invoke(directory, consent=tuple(consent))
 
     def test_exclusive_readiness_creation_waits_for_complete_native_acknowledgement(self):
         expected = b"73136\n" + self.nonce.encode() + b"\n"
@@ -1006,23 +1022,32 @@ class AppleEventBoundaryControls(unittest.TestCase):
                 ):
                     self.invoke(directory, outcome=status)
 
-    def test_missing_positive_or_deny_removal_prerequisite_cannot_count_as_denial(self):
+    def test_missing_consent_or_deny_removal_prerequisite_cannot_count_as_denial(self):
         for phase in (1, 2):
             with self.subTest(phase=phase), TemporaryDirectory() as directory:
                 with self.assertRaises(probe.AppleEventBoundaryError):
                     self.invoke(directory, failure=phase)
-                self.assertFalse((Path(directory) / "appleevent-delivered.3").exists())
+                self.assertEqual(list(Path(directory).glob("appleevent-delivered*")), [])
 
-    def test_delivered_third_event_cannot_pass_even_with_an_admitted_refusal_status(self):
-        with TemporaryDirectory() as directory:
-            with self.assertRaisesRegex(probe.AppleEventBoundaryError, "delivery state"):
-                self.invoke(directory, unexpected_delivery=True)
+    def test_any_delivery_marker_refuses_even_with_admitted_statuses(self):
+        checkpoints = (
+            "after-unconfined-consent",
+            "after-deny-removal-consent",
+            "after-full-policy-denial",
+        )
+        for index, checkpoint in enumerate(checkpoints, start=1):
+            with self.subTest(checkpoint=checkpoint), TemporaryDirectory() as directory:
+                with self.assertRaisesRegex(
+                    probe.AppleEventBoundaryError,
+                    "delivered without consent: checkpoint=" + checkpoint + "$",
+                ):
+                    self.invoke(directory, unexpected_delivery=index)
 
     def test_dead_receiver_retains_exact_nonreaping_status_and_checkpoint(self):
         checkpoints = (
             "readiness",
-            "before-unconfined-positive",
-            "before-deny-removal-positive",
+            "before-unconfined-consent",
+            "before-deny-removal-consent",
             "before-full-policy-denial",
             "after-full-policy-denial",
         )
@@ -1078,6 +1103,42 @@ class AppleEventBoundaryControls(unittest.TestCase):
                     child.poll.assert_not_called()
                     child.wait.assert_not_called()
                     self.assertEqual((root / "sandbox.sb").read_text(), self.policy)
+
+
+class ConsentFreeBoundaryControls(unittest.TestCase):
+    """The AppleEvent proof needs no consent request, prompt approval or opt-in."""
+
+    def test_retired_consent_opt_ins_are_refused_by_the_actual_command_line(self):
+        script = Path(probe.__file__).resolve(strict=True)
+        for option in ("--allow-automation-consent", "--allow-owned-consent-ui"):
+            with self.subTest(option=option), TemporaryDirectory() as directory:
+                result = subprocess.run(
+                    [sys.executable, str(script), directory, directory + "/receipt.json", option],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    env={**os.environ, "PYTHONDONTWRITEBYTECODE": "1"},
+                )
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("unrecognized arguments: " + option, result.stderr)
+                self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_consent_request_and_prompt_approval_owners_are_absent(self):
+        for function in (probe.observe, probe._observe, probe.Children.run):
+            parameters = inspect.signature(function).parameters
+            self.assertFalse([name for name in parameters if "consent" in name or "after" in name])
+        for name in (
+            "OwnedAutomationRequest",
+            "OwnedAutomationReadiness",
+            "approve_owned_automation_prompt",
+            "admit_appleevent_permission_prerequisite",
+            "_build_appleevent_consent_pair",
+            "_owned_automation_ui_run",
+        ):
+            self.assertFalse(hasattr(probe, name), name)
+        directory = Path(probe.__file__).resolve(strict=True).parent
+        for name in ("native_appleevent_consent.m", "native_appleevent_permission.c"):
+            self.assertFalse((directory / name).exists(), name)
 
 
 class RegistrationFactControls(unittest.TestCase):
@@ -1291,11 +1352,13 @@ class SenderFactControls(unittest.TestCase):
                 )
                 self.assertEqual(facts["reply_length"], size)
                 self.assertIsNone(facts["reply_match"])
-        facts = probe.appleevent_sender_fact(
-            self.line(phase="reply-match", read=0, size=36, match=0)
-        )
-        self.assertIs(facts["reply_match"], False)
-        for phase, send in (("send", -1712), ("denied-status", -1744)):
+        # Any reply to a consent-required send is a refused consent-free delivery.
+        for match, expected in ((0, False), (1, True)):
+            facts = probe.appleevent_sender_fact(
+                self.line(phase="reply-match", read=0, size=36, match=match)
+            )
+            self.assertIs(facts["reply_match"], expected)
+        for phase, send in (("consent-status", -1712), ("denied-status", -1744)):
             with self.subTest(phase=phase):
                 facts = probe.appleevent_sender_fact(
                     self.line(
@@ -1330,7 +1393,15 @@ class SenderFactControls(unittest.TestCase):
             self.line(read=0),
             self.line(size=0),
             self.line(match=0),
-            self.line(phase="reply-match", read=0, size=36, match=1),
+            self.line(
+                phase="consent-status",
+                send=-1744,
+                read="unobserved",
+                error_read="unobserved",
+                error_size="unobserved",
+                error="unobserved",
+            ),
+            self.line(phase="consent-status", send=0),
             self.line(phase="reply-length", read=0, size=36),
             self.line(phase="reply-length", read=0, size=4097),
             self.line(
@@ -1363,10 +1434,10 @@ class SenderFactControls(unittest.TestCase):
                 )
                 with self.assertRaises(probe.AdmissionError) as failed:
                     probe.run_appleevent_sender(
-                        children, ["private-path", "private-nonce"], "deny-removal-positive"
+                        children, ["private-path", "private-nonce"], "deny-removal-consent-required"
                     )
                 detail = str(failed.exception)
-                self.assertIn("control=deny-removal-positive", detail)
+                self.assertIn("control=deny-removal-consent-required", detail)
                 self.assertIn("exit=" + str(status), detail)
                 self.assertEqual("sender_fact=" in detail, status == 66 and value == self.line())
                 self.assertNotIn("private nonce/raw path", detail)
@@ -1379,8 +1450,8 @@ class SenderFactControls(unittest.TestCase):
 
     def test_zero_exit_alone_cannot_bypass_exact_stdout_stderr_or_denial_oracles(self):
         for control, expected in (
-            ("unconfined-positive", "native_appleevent_status=0\n"),
-            ("deny-removal-positive", "native_appleevent_status=0\n"),
+            ("unconfined-consent-required", "native_appleevent_status=-1744\n"),
+            ("deny-removal-consent-required", "native_appleevent_status=-1744\n"),
             ("full-policy-denial", "native_appleevent_status=-1743\n"),
         ):
             with self.subTest(control=control):
@@ -1389,10 +1460,17 @@ class SenderFactControls(unittest.TestCase):
                 accepted = probe.run_appleevent_sender(children, [], control, confined=True)
                 self.assertEqual(accepted.stdout, expected)
                 children.run.assert_called_with([], check=False, confined=True)
+                # A consented delivery (0) never satisfies any control.
                 for stdout, stderr in (
                     ("", ""),
                     (expected, "private noise"),
-                    ("native_appleevent_status=-1744\n", ""),
+                    ("native_appleevent_status=0\n", ""),
+                    (
+                        "native_appleevent_status=-1744\n"
+                        if control == "full-policy-denial"
+                        else "native_appleevent_status=-1743\n",
+                        "",
+                    ),
                 ):
                     children.run.return_value = subprocess.CompletedProcess([], 0, stdout, stderr)
                     with self.assertRaises(probe.AdmissionError):
@@ -1421,7 +1499,7 @@ class SenderFactControls(unittest.TestCase):
                 with self.assertRaises(probe.AppleEventBoundaryError) as failed:
                     probe.admit_appleevent_boundary(children, root)
             detail = str(failed.exception)
-            self.assertIn("control=deny-removal-positive", detail)
+            self.assertIn("control=deny-removal-consent-required", detail)
             self.assertIn('"error_number": -1743', detail)
             self.assertNotIn(directory, detail)
             self.assertNotIn(boundary.nonce, detail)
@@ -1430,9 +1508,7 @@ class SenderFactControls(unittest.TestCase):
             receiver = children.active[0]
             self.assertFalse(children.groups[receiver].reaped)
             self.assertEqual(children.groups[receiver].observe_exit.call_count, 3)
-            self.assertTrue((root / "appleevent-delivered.1").exists())
-            self.assertFalse((root / "appleevent-delivered.2").exists())
-            self.assertFalse((root / "appleevent-delivered.3").exists())
+            self.assertEqual(list(root.glob("appleevent-delivered*")), [])
             self.assertEqual((root / "sandbox.sb").read_text(), boundary.policy)
 
 
@@ -2086,7 +2162,7 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
             return_value=(b"", b"Owned AppleEvent dispatch failed: -36\n"),
         ):
             result = probe._observe_sender_failure(
-                children, receiver, group, "unconfined-positive", self.marker(), original
+                children, receiver, group, "unconfined-consent-required", self.marker(), original
             )
         self.assertEqual(result["receiver_state"], "terminal")
         self.assertEqual(result["native_terminal"]["si_status"], 68)
@@ -2101,20 +2177,20 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
         children, receiver, group = self.world()
         original = probe.AdmissionError("ORIGINAL_REFUSAL")
         result = probe._observe_sender_failure(
-            children, receiver, group, "unconfined-positive", self.marker(), original
+            children, receiver, group, "unconfined-consent-required", self.marker(), original
         )
         self.assertEqual(result["receiver_state"], "pending")
         self.assertIsNone(result["native_terminal"])
         group.observe_exit.side_effect = OSError("PRIVATE_PATH")
         result = probe._observe_sender_failure(
-            children, receiver, group, "unconfined-positive", "PRIVATE_NONCE", original
+            children, receiver, group, "unconfined-consent-required", "PRIVATE_NONCE", original
         )
         self.assertEqual(result["receiver_state"], "unavailable")
         self.assertEqual(result["sender_observation"], "unclassified")
         self.assertNotIn("PRIVATE", json.dumps(result))
         children.evidence.record.return_value = False
         probe._observe_sender_failure(
-            children, receiver, group, "unconfined-positive", None, original
+            children, receiver, group, "unconfined-consent-required", None, original
         )
         self.assertEqual(str(original), "ORIGINAL_REFUSAL")
         self.assertEqual(
@@ -2136,7 +2212,7 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
                         children,
                         receiver,
                         group,
-                        "unconfined-positive",
+                        "unconfined-consent-required",
                         None,
                         probe.AdmissionError("ORIGINAL_REFUSAL"),
                     )
@@ -2147,7 +2223,11 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
                 children.run = Mock(side_effect=interruption)
                 with self.assertRaises(type(interruption)) as primary_caught:
                     probe._run_appleevent_sender(
-                        children, receiver, group, "unconfined-positive", ["sender", "success"]
+                        children,
+                        receiver,
+                        group,
+                        "unconfined-consent-required",
+                        ["sender", "consent-required"],
                     )
                 self.assertIs(primary_caught.exception, interruption)
         interruption = process_owner.OwnedProcessInterrupted("CONTROL_CANCEL")
@@ -2162,21 +2242,31 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
         children.run = Mock(side_effect=original)
         with self.assertRaises(probe.AdmissionError) as caught:
             probe._run_appleevent_sender(
-                children, receiver, group, "unconfined-positive", ["sender", "success"]
+                children,
+                receiver,
+                group,
+                "unconfined-consent-required",
+                ["sender", "consent-required"],
             )
         self.assertIs(caught.exception, original)
-        children.run.assert_called_once_with(["sender", "success"], check=False, confined=False)
+        children.run.assert_called_once_with(
+            ["sender", "consent-required"], check=False, confined=False
+        )
         self.assertEqual(
             children.evidence.record.call_args.kwargs["sender_failure"]["sender_observation"],
             "unavailable",
         )
         children.run.side_effect = None
         children.run.return_value = subprocess.CompletedProcess(
-            ["sender", "success"], 66, "", self.marker()
+            ["sender", "consent-required"], 66, "", self.marker()
         )
         with self.assertRaisesRegex(probe.AdmissionError, "Owned sender failed with exit 66"):
             probe._run_appleevent_sender(
-                children, receiver, group, "unconfined-positive", ["sender", "success"]
+                children,
+                receiver,
+                group,
+                "unconfined-consent-required",
+                ["sender", "consent-required"],
             )
         self.assertEqual(
             children.evidence.record.call_args.kwargs["sender_failure"]["sender"], self.packet()
@@ -2200,7 +2290,7 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
                 return receiver
 
             def run(arguments, **options):
-                if arguments[-1] == "success":
+                if arguments[-1] == "consent-required":
                     children.sender_calls.append((arguments, options))
                     return subprocess.CompletedProcess(arguments, 66, "", self.marker())
                 return original_run(arguments, **options)
@@ -2217,15 +2307,13 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
                 ):
                     probe.admit_appleevent_boundary(children, root)
             self.assertEqual(len(children.sender_calls), 1)
-            self.assertEqual(children.sender_calls[0][0][-1], "success")
+            self.assertEqual(children.sender_calls[0][0][-1], "consent-required")
             self.assertEqual(children.deliveries, 0)
-            self.assertFalse((root / "appleevent-delivered.1").exists())
-            self.assertFalse((root / "appleevent-delivered.2").exists())
-            self.assertFalse((root / "appleevent-delivered.3").exists())
+            self.assertEqual(list(root.glob("appleevent-delivered*")), [])
             self.assertEqual(len(children.active), 1)
             self.assertFalse(children.groups[children.active[0]].reaped)
             fact = children.evidence.record.call_args.kwargs["sender_failure"]
-            self.assertEqual(fact["role"], "unconfined-positive")
+            self.assertEqual(fact["role"], "unconfined-consent-required")
             self.assertEqual(fact["sender"], self.packet())
             self.assertEqual(fact["receiver_state"], "pending")
 
@@ -2233,7 +2321,7 @@ class AppleEventSenderDiagnosticControls(unittest.TestCase):
         children, receiver, group = self.world()
         original = probe.AdmissionError("ORIGINAL_REFUSAL")
         packet = probe._observe_sender_failure(
-            children, receiver, group, "unconfined-positive", self.marker(), original
+            children, receiver, group, "unconfined-consent-required", self.marker(), original
         )
         evidence = object.__new__(probe.PhaseEvidence)
         evidence.descriptor = 19
@@ -2321,21 +2409,21 @@ class SenderOwnedMarkerSnapshotControls(unittest.TestCase):
             with self.subTest(snapshot=snapshot):
                 self.assertEqual(
                     probe.appleevent_sender_marker_fact(
-                        self.FAILURE + ", marker2=" + snapshot + "\n"
+                        self.FAILURE + ", marker1=" + snapshot + "\n"
                     ),
-                    {**expected, "marker2_snapshot": snapshot},
+                    {**expected, "marker1_snapshot": snapshot},
                 )
 
     def test_snapshot_noise_or_incompatible_causal_phase_never_exports_private_bytes(self):
         for value in [
-            self.FAILURE + ", marker2=private-path-nonce\n",
-            self.FAILURE + ", marker2=absent, marker2=conforming\n",
-            self.FAILURE + ", marker2=absent\nnoise",
-            self.FAILURE + ", marker2=absent\0\n",
-            self.FAILURE + ", marker2=absent\n" + "x" * 256,
-            "Owned AppleEvent outcome admission failed: phase=send, send=-1743, read=unobserved, "
+            self.FAILURE + ", marker1=private-path-nonce\n",
+            self.FAILURE + ", marker1=absent, marker1=conforming\n",
+            self.FAILURE + ", marker1=absent\nnoise",
+            self.FAILURE + ", marker1=absent\0\n",
+            self.FAILURE + ", marker1=absent\n" + "x" * 256,
+            "Owned AppleEvent outcome admission failed: phase=consent-status, send=-1743, read=unobserved, "
             "length=unobserved, match=unobserved, error_read=unobserved, error_length=unobserved, "
-            "error_value=unobserved, marker2=conforming\n",
+            "error_value=unobserved, marker1=conforming\n",
         ]:
             with self.subTest(value=value):
                 self.assertEqual(probe.appleevent_sender_marker_fact(value), {})
@@ -2343,19 +2431,19 @@ class SenderOwnedMarkerSnapshotControls(unittest.TestCase):
     def test_conforming_snapshot_cannot_change_existing_sender_failure_or_acceptance(self):
         owner = Mock()
         owner.run.return_value = subprocess.CompletedProcess(
-            [], 66, "", self.FAILURE + ", marker2=conforming\n"
+            [], 66, "", self.FAILURE + ", marker1=conforming\n"
         )
         with self.assertRaises(probe.AdmissionError) as failure:
-            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-positive")
+            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-consent-required")
         owner.run.assert_called_once_with(["owned-sender"], check=False, confined=False)
         self.assertIn("exit=66", str(failure.exception))
         self.assertIn('"error_number": -10004', str(failure.exception))
-        self.assertIn('"marker2_snapshot": "conforming"', str(failure.exception))
+        self.assertIn('"marker1_snapshot": "conforming"', str(failure.exception))
         owner.run.return_value = subprocess.CompletedProcess(
-            [], 0, "native_appleevent_status=0\n", self.FAILURE + ", marker2=conforming\n"
+            [], 0, "native_appleevent_status=0\n", self.FAILURE + ", marker1=conforming\n"
         )
         with self.assertRaises(probe.AdmissionError):
-            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-positive")
+            probe.run_appleevent_sender(owner, ["owned-sender"], "deny-removal-consent-required")
 
 
 class FailedSenderReceiverObservationControls(unittest.TestCase):
@@ -2368,7 +2456,7 @@ class FailedSenderReceiverObservationControls(unittest.TestCase):
         owner = SimpleNamespace(groups={receiver: group}, active=[receiver], debt=[])
         return owner, receiver, group
 
-    def invoke(self, owner, receiver, group, control="unconfined-positive"):
+    def invoke(self, owner, receiver, group, control="unconfined-consent-required"):
         return probe.run_appleevent_sender_observed(
             owner, ["owned-sender"], control, receiver=receiver, group=group, confined=True
         )
@@ -2380,13 +2468,17 @@ class FailedSenderReceiverObservationControls(unittest.TestCase):
             with patch("builtins.print") as output:
                 self.assertIs(self.invoke(owner, receiver, group), result)
         sender.assert_called_once_with(
-            owner, ["owned-sender"], "unconfined-positive", confined=True
+            owner, ["owned-sender"], "unconfined-consent-required", confined=True
         )
         group.observe_exit.assert_not_called()
         output.assert_not_called()
 
     def test_failed_send_observes_target_once_and_preserves_identical_primary_and_owner(self):
-        for control in ("unconfined-positive", "deny-removal-positive", "full-policy-denial"):
+        for control in (
+            "unconfined-consent-required",
+            "deny-removal-consent-required",
+            "full-policy-denial",
+        ):
             with self.subTest(control=control):
                 owner, receiver, group = self.world()
                 primary = probe.AdmissionError("independent original sender refusal")
@@ -2436,7 +2528,7 @@ class FailedSenderReceiverObservationControls(unittest.TestCase):
                     project.assert_called_once_with(owner, receiver, group, observation)
                     expected = {
                         "schema": 1,
-                        "control": "unconfined-positive",
+                        "control": "unconfined-consent-required",
                         "state": "terminal",
                         "si_code": code,
                         "si_status": status,
@@ -2874,7 +2966,7 @@ class SenderNonpromptPermissionControls(unittest.TestCase):
     FAILURE = (
         "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, read=-1701, "
         "length=unobserved, match=unobserved, error_read=0, error_length=4, "
-        "error_value=-10004, marker2=absent\n"
+        "error_value=-10004, marker1=absent\n"
     )
 
     def test_fixed_signed_statuses_are_projected_without_permission_cause_labels(self):
@@ -2919,19 +3011,19 @@ class SenderNonpromptPermissionControls(unittest.TestCase):
                 )
                 with self.assertRaises(probe.AdmissionError) as failure:
                     probe.run_appleevent_sender(
-                        owner, ["owned-sender"], "deny-removal-positive", confined=True
+                        owner, ["owned-sender"], "deny-removal-consent-required", confined=True
                     )
                 detail = str(failure.exception)
-                self.assertIn("control=deny-removal-positive, exit=66", detail)
+                self.assertIn("control=deny-removal-consent-required, exit=66", detail)
                 self.assertIn('"error_number": -10004', detail)
-                self.assertIn('"marker2_snapshot": "absent"', detail)
+                self.assertIn('"marker1_snapshot": "absent"', detail)
                 self.assertIn('permission_query_fact={"osstatus": ' + str(status) + "}", detail)
                 owner.run.assert_called_once_with(["owned-sender"], check=False, confined=True)
                 self.assertEqual(len(owner.mock_calls), 1)
                 owner.settle.assert_not_called()
 
     def test_other_exit_or_full_denial_cannot_borrow_a_positive_permission_frame(self):
-        for status, control in ((65, "deny-removal-positive"), (66, "full-policy-denial")):
+        for status, control in ((65, "deny-removal-consent-required"), (66, "full-policy-denial")):
             with self.subTest(status=status, control=control):
                 owner = Mock()
                 owner.run.return_value = subprocess.CompletedProcess(
@@ -2947,526 +3039,14 @@ class SenderNonpromptPermissionControls(unittest.TestCase):
         for capture in ("", "noise-private-input\n"):
             owner.run.return_value = subprocess.CompletedProcess([], 66, capture, self.FAILURE)
             with self.assertRaises(probe.AdmissionError) as failure:
-                probe.run_appleevent_sender(owner, [], "unconfined-positive")
+                probe.run_appleevent_sender(owner, [], "unconfined-consent-required")
             self.assertIn('"error_number": -10004', str(failure.exception))
             self.assertNotIn("permission_query_fact=", str(failure.exception))
         owner.run.return_value = subprocess.CompletedProcess(
             [], 0, "OWNED_APPLEEVENT_PERMISSION/1 osstatus=0\n", ""
         )
         with self.assertRaises(probe.AdmissionError):
-            probe.run_appleevent_sender(owner, [], "unconfined-positive")
-
-
-class AutomationPrerequisiteControls(unittest.TestCase):
-    """Model normal consent receipt admission, without claiming a native OS grant."""
-
-    def invoke(self, root, statuses, *, allow=True, mutate=None, error=None, raw=None, ui=False):
-        sender = root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"
-        sender.parent.mkdir(parents=True)
-        sender.write_bytes(b"Independent final signed executable identity\n")
-        policy = root / "sandbox-appleevent-positive.sb"
-        policy.write_text("(version 1)\n(deny file-write*)\n(deny network-outbound)\n")
-        owner = Mock(allow_automation_consent=allow)
-        owner.allow_owned_consent_ui = ui
-        owner.automation_sender_name = "Owned sender identity"
-        owner.automation_receiver_name = "Owned receiver identity"
-        observed = []
-        queue = iter(statuses)
-
-        def run(arguments, **options):
-            self.assertEqual(arguments[:3], ["/usr/bin/sandbox-exec", "-f", str(policy)])
-            self.assertEqual(arguments[3:6], [str(sender), "73136", "owned-nonce"])
-            mode = arguments[-1].removeprefix("permission-")
-            callback = options.pop("after_start", None)
-            self.assertEqual(options, {"check": False, "timeout": 30})
-            if ui and mode == "request":
-                self.assertTrue(callable(callback))
-                callback("exact-owned-requester", 30)
-            else:
-                self.assertIsNone(callback)
-            if error is not None:
-                raise error
-            status = next(queue)
-            if mutate is not None:
-                (sender if mutate == "sender" else policy).write_bytes(b"Replaced identity\n")
-            if raw is not None:
-                stdout, stderr, code = raw
-            else:
-                stdout = f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={mode} osstatus={status}\n"
-                stderr, code = "", 0 if status == 0 else 67
-            return subprocess.CompletedProcess(arguments, code, stdout, stderr)
-
-        owner.run.side_effect = run
-        receipt = probe.admit_appleevent_permission_prerequisite(
-            owner, [str(sender), "73136", "owned-nonce"], policy, observed.append
-        )
-        return owner, observed, receipt
-
-    def test_missing_explicit_boolean_opt_in_never_starts_a_native_request(self):
-        for value in (False, None, 1, "true"):
-            with self.subTest(value=value), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(probe.AdmissionError, "not explicitly authorized"):
-                    self.invoke(Path(directory).resolve(strict=True), (), allow=value)
-
-    def test_existing_permission_requires_two_fresh_exact_context_queries(self):
-        with TemporaryDirectory() as directory:
-            owner, observed, receipt = self.invoke(Path(directory).resolve(strict=True), (0, 0))
-            self.assertEqual(owner.run.call_count, 2)
-            self.assertEqual(
-                observed,
-                [
-                    "before-automation-query",
-                    "after-automation-query",
-                    "before-automation-query",
-                    "after-automation-query",
-                ],
-            )
-            self.assertEqual(receipt["statuses"], [{"mode": "query", "osstatus": 0}] * 2)
-
-    def test_ui_opt_in_only_observes_the_exact_owned_request_mode(self):
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(
-                probe, "approve_owned_automation_prompt", return_value="pressed"
-            ) as approval,
-        ):
-            owner, observed, receipt = self.invoke(
-                Path(directory).resolve(strict=True), (-1744, 0, 0), ui=True
-            )
-        approval.assert_called_once_with(
-            owner, "exact-owned-requester", 30, "Owned sender identity", "Owned receiver identity"
-        )
-        self.assertEqual(
-            receipt["statuses"][1],
-            {
-                "mode": "request",
-                "osstatus": 0,
-                "native_ui": "pressed",
-            },
-        )
-        self.assertEqual(receipt["statuses"][2], {"mode": "query", "osstatus": 0})
-
-    def test_consent_required_request_and_fresh_query_keep_original_sender_and_policy(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory).resolve(strict=True)
-            owner, observed, receipt = self.invoke(root, (-1744, 0, 0))
-            self.assertEqual(owner.run.call_count, 3)
-            self.assertEqual(
-                [call.args[0][-1] for call in owner.run.call_args_list],
-                [
-                    "permission-query",
-                    "permission-request",
-                    "permission-query",
-                ],
-            )
-            self.assertEqual(len(observed), 6)
-            self.assertEqual(
-                receipt["statuses"],
-                [
-                    {"mode": "query", "osstatus": -1744},
-                    {"mode": "request", "osstatus": 0},
-                    {"mode": "query", "osstatus": 0},
-                ],
-            )
-            self.assertEqual(
-                receipt["sender_sha256"],
-                probe.digest(root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"),
-            )
-
-    def test_refused_permission_or_unavailable_target_never_becomes_a_grant(self):
-        for statuses in ((-1743,), (-600,), (-1744, -1743), (-1744, -600), (-1744, -1744)):
-            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(probe.AdmissionError, "was not granted"):
-                    self.invoke(Path(directory).resolve(strict=True), statuses)
-
-    def test_initial_or_requested_grant_requires_fresh_nonprompt_confirmation(self):
-        for statuses in ((0, -1744), (-1744, 0, -1743)):
-            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(probe.AdmissionError, "Fresh nonprompt"):
-                    self.invoke(Path(directory).resolve(strict=True), statuses)
-
-    def test_prompt_timeout_preserves_the_native_owner_failure(self):
-        failure = probe.AdmissionError("Owned native command exceeded deadline")
-        with TemporaryDirectory() as directory:
-            with self.assertRaises(probe.AdmissionError) as caught:
-                self.invoke(Path(directory).resolve(strict=True), (), error=failure)
-            self.assertIs(caught.exception, failure)
-
-    def test_changed_executable_or_policy_cannot_borrow_permission_receipt(self):
-        for target in ("sender", "policy"):
-            with self.subTest(target=target), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(probe.AdmissionError, "identity changed"):
-                    self.invoke(Path(directory).resolve(strict=True), (0,), mutate=target)
-
-    def test_dirty_mismatched_or_noncanonical_receipts_cannot_grant_permission(self):
-        for raw in (
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n", "dirty", 0),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n", "", 0),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=00\n", "", 0),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-0\n", "", 0),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=2147483648\n", "", 67),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n", "", 67),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1744\n", "", 0),
-            ("OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=0\n" * 2, "", 0),
-        ):
-            with self.subTest(raw=raw), TemporaryDirectory() as directory:
-                with self.assertRaises(probe.AdmissionError):
-                    self.invoke(Path(directory).resolve(strict=True), (0,), raw=raw)
-
-    def test_consented_prerequisite_never_replaces_original_positive_or_denial_receipts(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory).resolve(strict=True)
-            (root / "sandbox.sb").write_text(AppleEventBoundaryControls.policy)
-            judge = AppleEventBoundaryControls()
-            owner = judge.model(root)
-            owner.allow_automation_consent = True
-            permission = {"sender_sha256": "a" * 64, "statuses": [{"mode": "query", "osstatus": 0}]}
-            with (
-                patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
-                patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
-                patch.object(
-                    probe, "admit_appleevent_permission_prerequisite", return_value=permission
-                ) as request,
-            ):
-                receipt = probe.admit_appleevent_boundary(owner, root)
-            self.assertEqual(len(owner.sender_calls), 3)
-            self.assertEqual(owner.deliveries, 2)
-            self.assertEqual(receipt["unconfined_status"], 0)
-            self.assertEqual(receipt["deny_removal_status"], 0)
-            self.assertEqual(receipt["denied_status"], -1743)
-            self.assertEqual(receipt["permission_prerequisite"], permission)
-            self.assertTrue(receipt["receiver_retired"])
-            request.assert_called_once()
-            arguments = request.call_args.args
-            self.assertIs(arguments[0], owner)
-            self.assertEqual(arguments[1][1:], ["73136", judge.nonce])
-            self.assertEqual(arguments[2], root / "sandbox-appleevent-positive.sb")
-
-
-class OwnedConsentUIControls(unittest.TestCase):
-    """Bounded exact-requester controls; actual secure OS UI is native-only."""
-
-    def owner(self, packets, *, terminal=None, reaped=False):
-        process = Mock(pid=73136)
-        group = Mock(process=process, reaped=reaped)
-        group.observe_exit.return_value = terminal
-        owner = Mock(root=Path("/owned-private-root"), groups={process: group})
-        owner.run.side_effect = [
-            subprocess.CompletedProcess([], code, out, err) for code, out, err in packets
-        ]
-        return owner, process, group
-
-    def test_absent_then_unique_pressed_prompt_stays_inside_request_deadline(self):
-        owner, process, group = self.owner(
-            [
-                (0, "OWNED_AUTOMATION_UI/1 state=absent\n", ""),
-                (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
-            ]
-        )
-        with (
-            patch.object(probe.time, "monotonic", return_value=20),
-            patch.object(probe.time, "sleep") as sleep,
-        ):
-            probe.approve_owned_automation_prompt(owner, process, 22, "sender", "receiver")
-        self.assertEqual(owner.run.call_count, 2)
-        self.assertEqual(group.observe_exit.call_count, 2)
-        sleep.assert_called_once_with(0.05)
-        for call in owner.run.call_args_list:
-            self.assertEqual(
-                call.args[0],
-                [str(owner.root / "native-appleevent-consent"), "sender", "receiver", "73136"],
-            )
-            self.assertEqual(call.kwargs, {"check": False, "timeout": 2})
-
-    def test_terminal_requester_never_acquires_or_presses_a_consent_window(self):
-        owner, process, group = self.owner([], terminal=object())
-        probe.approve_owned_automation_prompt(owner, process, 0, "sender", "receiver")
-        owner.run.assert_not_called()
-
-    def test_lost_or_replaced_requester_reservation_never_acquires_ui(self):
-        for fault in ("reaped", "replaced", "missing"):
-            owner, process, group = self.owner([], reaped=fault == "reaped")
-            if fault == "replaced":
-                group.process = Mock()
-            if fault == "missing":
-                owner.groups = {}
-            with (
-                self.subTest(fault=fault),
-                self.assertRaisesRegex(probe.AdmissionError, "reservation changed"),
-            ):
-                probe.approve_owned_automation_prompt(owner, process, 100, "sender", "receiver")
-            owner.run.assert_not_called()
-
-    def test_missing_permission_identity_or_unqualified_native_ui_never_grants(self):
-        for state in (
-            "accessibility-unavailable",
-            "identity-unqualified",
-            "observation-refused",
-            "approval-refused",
-            "requester-unavailable",
-        ):
-            owner, process, group = self.owner(
-                [(67, "OWNED_AUTOMATION_UI/1 state=" + state + "\n", "")]
-            )
-            with self.subTest(state=state), patch.object(probe.time, "monotonic", return_value=0):
-                with self.assertRaisesRegex(probe.AdmissionError, state):
-                    probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
-            self.assertEqual(owner.run.call_count, 1)
-
-    def test_dirty_or_ambiguous_frame_never_exposes_private_capture(self):
-        for packet in (
-            (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", "private-capture"),
-            (67, "private-path-or-nonce\n", ""),
-            (67, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
-            (0, "OWNED_AUTOMATION_UI/1 state=pressed\n" * 2, ""),
-        ):
-            owner, process, group = self.owner([packet])
-            with patch.object(probe.time, "monotonic", return_value=0):
-                with self.assertRaises(probe.AdmissionError) as caught:
-                    probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
-            self.assertNotIn("private-", str(caught.exception))
-
-    def test_expired_outer_deadline_never_acquires_native_ui(self):
-        owner, process, group = self.owner([])
-        with patch.object(probe.time, "monotonic", return_value=30):
-            with self.assertRaisesRegex(probe.AdmissionError, "deadline"):
-                probe.approve_owned_automation_prompt(owner, process, 30, "sender", "receiver")
-        owner.run.assert_not_called()
-
-    def test_after_start_exception_physically_settles_same_native_requester(self):
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(probe, "NativeProcessGroups"),
-            patch.object(probe.os, "getuid", return_value=501, create=True),
-        ):
-            owner = probe.Children(Path(directory))
-            child = Mock(pid=73136, returncode=None)
-            refusal = probe.AdmissionError("Normal UI refused owned prompt")
-            callback = Mock(side_effect=refusal)
-            with (
-                patch.object(probe.subprocess, "Popen", return_value=child),
-                patch.object(owner, "settle") as settle,
-                patch.object(OwnedProcessGroup, "wait_for_exit") as wait,
-            ):
-                with self.assertRaises(probe.AdmissionError) as caught:
-                    owner.run(["owned-requester"], timeout=30, after_start=callback)
-                self.assertIs(caught.exception, refusal)
-                callback.assert_called_once()
-                self.assertIs(callback.call_args.args[0], child)
-                wait.assert_not_called()
-                settle.assert_called_once_with(child)
-            self.assertEqual(owner.active, [])
-
-    def test_ui_callback_does_not_restart_original_native_request_deadline(self):
-        with (
-            TemporaryDirectory() as directory,
-            patch.object(probe, "NativeProcessGroups"),
-            patch.object(probe.os, "getuid", return_value=501, create=True),
-        ):
-            owner = probe.Children(Path(directory))
-            child = Mock(pid=73136, returncode=0)
-            callback = Mock()
-            with (
-                patch.object(probe.subprocess, "Popen", return_value=child),
-                patch.object(owner, "settle") as settle,
-                patch.object(OwnedProcessGroup, "wait_for_exit") as wait,
-                patch.object(probe.time, "monotonic", side_effect=(20, 45)),
-            ):
-                result = owner.run(["owned-requester"], timeout=30, after_start=callback)
-                self.assertEqual(result.returncode, 0)
-                callback.assert_called_once_with(child, 50)
-                wait.assert_called_once_with(5)
-                settle.assert_called_once_with(child)
-            self.assertEqual(owner.active, [])
-
-    def test_pending_native_ipc_then_pressed_reuses_requester_and_original_budget(self):
-        owner, process, group = self.owner(
-            [
-                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
-                (0, "OWNED_AUTOMATION_UI/1 state=pressed\n", ""),
-            ]
-        )
-        with (
-            patch.object(probe.time, "monotonic", side_effect=(20, 20, 21)),
-            patch.object(probe.time, "sleep") as sleep,
-        ):
-            self.assertEqual(
-                probe.approve_owned_automation_prompt(owner, process, 22, "sender", "receiver"),
-                "pressed",
-            )
-        self.assertEqual(group.observe_exit.call_count, 2)
-        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
-        self.assertTrue(all(c.args[0][-1] == "73136" for c in owner.run.call_args_list))
-        sleep.assert_called_once_with(0.05)
-
-    def test_persistent_pending_native_ipc_is_refused_at_original_deadline(self):
-        owner, process, group = self.owner(
-            [
-                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
-                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
-            ]
-        )
-        with (
-            patch.object(probe.time, "monotonic", side_effect=(0, 0, 1, 1, 2)),
-            patch.object(probe.time, "sleep"),
-        ):
-            with self.assertRaisesRegex(probe.AdmissionError, "deadline"):
-                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver")
-        self.assertEqual(owner.run.call_count, 2)
-        self.assertEqual(group.observe_exit.call_count, 3)
-        self.assertEqual([c.kwargs["timeout"] for c in owner.run.call_args_list], [2, 1])
-
-    def test_terminal_requester_after_pending_never_acquires_another_ui(self):
-        owner, process, group = self.owner(
-            [
-                (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
-            ]
-        )
-        group.observe_exit.side_effect = (None, 0)
-        with (
-            patch.object(probe.time, "monotonic", return_value=0),
-            patch.object(probe.time, "sleep"),
-        ):
-            self.assertEqual(
-                probe.approve_owned_automation_prompt(owner, process, 2, "sender", "receiver"),
-                "request-ended",
-            )
-        self.assertEqual(owner.run.call_count, 1)
-
-    def test_pending_native_frame_requires_zero_exit_and_complete_clean_capture(self):
-        for packet in (
-            (67, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", ""),
-            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n", "private"),
-            (0, "OWNED_AUTOMATION_UI/1 state=observation-pending\n" * 2, ""),
-        ):
-            with self.subTest(packet=packet):
-                owner, process, group = self.owner([packet])
-                with patch.object(probe.time, "monotonic", return_value=0):
-                    with self.assertRaises(probe.AdmissionError):
-                        probe.approve_owned_automation_prompt(
-                            owner, process, 2, "sender", "receiver"
-                        )
-                self.assertEqual(owner.run.call_count, 1)
-
-
-class OwnedAutomationUIFactControls(unittest.TestCase):
-    """Private enum evidence controls do not claim macOS AX observation."""
-
-    @staticmethod
-    def packet():
-        return {
-            "schema": 1,
-            "ax_trusted": True,
-            "requester_qualified": True,
-            "scanned_agents": 2,
-            "windows": 1,
-            "nodes": 7,
-            "candidates": 0,
-            "matches": 0,
-            "first_agent": 1,
-            "first_attribute": "windows",
-            "first_type": "absent",
-            "first_error": -25205,
-        }
-
-    def test_literal_ax_error_and_agent_enum_remain_closed_without_ui_text(self):
-        packet = self.packet()
-        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-        for key, value in (
-            ("schema", True),
-            ("ax_trusted", 1),
-            ("scanned_agents", True),
-            ("nodes", 1048577),
-            ("first_agent", 4),
-            ("first_error", 2**31),
-            ("first_attribute", "private-window-title"),
-            ("first_type", "private-text"),
-        ):
-            invalid = dict(packet)
-            invalid[key] = value
-            with self.subTest(key=key), self.assertRaises(probe.AdmissionError):
-                probe._validate_owned_automation_ui_fact(invalid)
-        packet["private_text"] = "not-admitted"
-        with self.assertRaises(probe.AdmissionError):
-            probe._validate_owned_automation_ui_fact(packet)
-
-    def test_private_capture_preserves_primary_native_refusal_and_exports_only_enum_facts(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            evidence_dir = root / "evidence"
-            evidence_dir.mkdir(mode=0o700)
-            evidence = probe.PhaseEvidence(evidence_dir)
-            owner = probe.Children(root, evidence=evidence)
-            packet = self.packet()
-            primary = subprocess.CompletedProcess(
-                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-            )
-
-            def producer(arguments, **kwargs):
-                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
-                self.assertEqual(kwargs, {"check": False, "timeout": 2})
-                path = Path(arguments[-1])
-                self.assertEqual(path.parent, root)
-                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-                path.write_text(json.dumps(packet))
-                return primary
-
-            owner.run = Mock(side_effect=producer)
-            try:
-                result = probe._owned_automation_ui_run(
-                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
-                )
-                self.assertIs(result, primary)
-                exported = json.loads((evidence_dir / "checkpoint.json").read_text())
-                self.assertEqual(exported["native_ui"], packet)
-                self.assertEqual(exported["phase"], "automation.ui-observation")
-                self.assertEqual(exported["status"], "refused")
-                self.assertFalse(exported["ownership_closed"])
-                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
-            finally:
-                evidence.close()
-
-    def test_replaced_diagnostic_path_is_neither_read_as_fact_nor_unlinked(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            owner = probe.Children(root)
-            captured = []
-
-            def producer(arguments, **kwargs):
-                path = Path(arguments[-1])
-                path.unlink()
-                path.write_text("foreign-replacement")
-                captured.append(path)
-                return subprocess.CompletedProcess(
-                    [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-                )
-
-            owner.run = Mock(side_effect=producer)
-            with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
-                probe._owned_automation_ui_run(
-                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
-                )
-            self.assertEqual(captured[0].read_text(), "foreign-replacement")
-
-    def test_observation_packet_cannot_claim_acceptance_or_physical_closure(self):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            root.chmod(0o700)
-            for status, closed in (("accepted", False), ("pending", True)):
-                evidence = probe.PhaseEvidence(root)
-                try:
-                    self.assertFalse(
-                        evidence.record(
-                            "automation.ui-observation",
-                            status=status,
-                            closed=closed,
-                            native_ui=self.packet(),
-                        )
-                    )
-                    self.assertTrue(evidence.failed)
-                    self.assertFalse((root / "checkpoint.json").exists())
-                finally:
-                    evidence.close()
+            probe.run_appleevent_sender(owner, [], "unconfined-consent-required")
 
 
 class ComposedNativeDiagnosticControls(unittest.TestCase):
@@ -3474,7 +3054,7 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
 
     def combined(self):
         root = AppleEventSenderDiagnosticControls().marker()
-        phase = "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, read=-1701, length=unobserved, match=unobserved, error_read=0, error_length=4, error_value=-1708, marker2=absent\n"
+        phase = "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, read=-1701, length=unobserved, match=unobserved, error_read=0, error_length=4, error_value=-1708, marker1=absent\n"
         return root + phase
 
     def test_joint_sender_preserves_both_closed_projections_without_success(self):
@@ -3483,7 +3063,7 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
             probe._appleevent_sender_diagnostic(value),
             AppleEventSenderDiagnosticControls().packet(),
         )
-        self.assertEqual(probe.appleevent_sender_marker_fact(value)["marker2_snapshot"], "absent")
+        self.assertEqual(probe.appleevent_sender_marker_fact(value)["marker1_snapshot"], "absent")
         owner = SimpleNamespace(
             run=Mock(
                 return_value=subprocess.CompletedProcess(
@@ -3492,7 +3072,7 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
             )
         )
         with self.assertRaises(probe.AdmissionError) as caught:
-            probe.run_appleevent_sender(owner, [], "unconfined-positive")
+            probe.run_appleevent_sender(owner, [], "unconfined-consent-required")
         self.assertIn('"error_number": -1708', str(caught.exception))
         self.assertIn('"osstatus": 0', str(caught.exception))
         self.assertNotIn("native_appleevent_status=0", str(caught.exception))
@@ -3505,10 +3085,10 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
             value.replace("error_value=-1708", "error_value=-10004"),
             value.replace("read=-1701,", "read=-1700,"),
             value.replace('"schema":1', '"schema":1,"schema":1'),
-            value.replace("marker2=absent", "marker2=PRIVATE"),
+            value.replace("marker1=absent", "marker1=PRIVATE"),
             value.replace("phase=reply-read", "phase=PRIVATE"),
-            value.replace("marker2=absent", "marker2=absent, marker2=absent"),
-            value.replace("marker2=absent", "marker2=\ud800"),
+            value.replace("marker1=absent", "marker1=absent, marker1=absent"),
+            value.replace("marker1=absent", "marker1=\ud800"),
         )
         for changed in mutations:
             with self.subTest(value=repr(changed[-80:])):
@@ -3595,9 +3175,11 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
         owner.run = Mock(return_value=subprocess.CompletedProcess([], 66, "", self.combined()))
         with patch("builtins.print") as output:
             with self.assertRaises(probe.AdmissionError) as caught:
-                probe._run_appleevent_sender(owner, receiver, group, "deny-removal-positive", [])
-        self.assertIn("control=deny-removal-positive", str(caught.exception))
-        self.assertIn('"marker2_snapshot": "absent"', str(caught.exception))
+                probe._run_appleevent_sender(
+                    owner, receiver, group, "deny-removal-consent-required", []
+                )
+        self.assertIn("control=deny-removal-consent-required", str(caught.exception))
+        self.assertIn('"marker1_snapshot": "absent"', str(caught.exception))
         group.observe_exit.assert_called_once_with()
         self.assertEqual(
             owner.evidence.record.call_args.kwargs["sender_failure"]["sender"], control.packet()
@@ -3613,7 +3195,7 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
         original = probe.AdmissionError("original native refusal")
         with patch("builtins.print", side_effect=OSError("PRIVATE")):
             probe._observe_sender_failure(
-                owner, receiver, group, "unconfined-positive", None, original
+                owner, receiver, group, "unconfined-consent-required", None, original
             )
         self.assertEqual(str(original), "original native refusal")
         self.assertNotIn("PRIVATE", "".join(original.__notes__))
@@ -3621,7 +3203,7 @@ class ComposedNativeDiagnosticControls(unittest.TestCase):
         with patch("builtins.print", side_effect=cancellation):
             with self.assertRaises(probe.OwnedProcessInterrupted) as caught:
                 probe._observe_sender_failure(
-                    owner, receiver, group, "unconfined-positive", None, original
+                    owner, receiver, group, "unconfined-consent-required", None, original
                 )
         self.assertIs(caught.exception, cancellation)
 
@@ -3711,7 +3293,7 @@ class SenderRegistrationIdentityControls(unittest.TestCase):
     FAILURE = (
         "Owned AppleEvent outcome admission failed: phase=reply-read, send=0, "
         "read=-1701, length=unobserved, match=unobserved, error_read=0, "
-        "error_length=4, error_value=-1744, marker2=absent\n"
+        "error_length=4, error_value=-1744, marker1=absent\n"
     )
     FRAME = (
         "OWNED_APPLEEVENT_IDENTITY/1 before=1 after=1 self=1 target=1 "
@@ -3741,7 +3323,7 @@ class SenderRegistrationIdentityControls(unittest.TestCase):
         )
         with self.assertRaises(probe.AdmissionError) as failed:
             probe.run_appleevent_sender(
-                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-consent-required"
             )
         self.assertIn("sender_identity_fact=", str(failed.exception))
         self.assertIn('"error_number": -1744', str(failed.exception))
@@ -3786,14 +3368,14 @@ class SenderRegistrationIdentityControls(unittest.TestCase):
         result = subprocess.CompletedProcess([], 65, "", failure + frame)
         with self.assertRaisesRegex(probe.AdmissionError, "exit=65"):
             probe.run_appleevent_sender(
-                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-consent-required"
             )
 
     def test_success_cannot_adopt_identity_output_instead_of_exact_nonce_receipt(self):
         result = subprocess.CompletedProcess([], 0, "native_appleevent_status=0\n", self.FRAME)
         with self.assertRaises(probe.AdmissionError):
             probe.run_appleevent_sender(
-                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-positive"
+                SimpleNamespace(run=Mock(return_value=result)), [], "unconfined-consent-required"
             )
 
     def test_security_recipe_and_each_native_control_marker_are_mandatory(self):
@@ -3825,78 +3407,6 @@ class SenderRegistrationIdentityControls(unittest.TestCase):
                     )
 
 
-class ConsentPairMergeJoinControls(unittest.TestCase):
-    def test_explicit_consent_keeps_two_named_roles_and_default_shared_image(self):
-        import plistlib
-
-        nonce = "54bc7a36-e2f0-43f8-917e-ce3d286d7520"
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            calls = []
-            owner = SimpleNamespace(
-                run=lambda args, **options: calls.append((args, options)),
-                allow_automation_consent=True,
-                allow_owned_consent_ui=True,
-            )
-            roles = probe._build_appleevent_consent_pair(owner, root, root, ["owned-clang"], nonce)
-            self.assertEqual(set(roles), {"sender", "receiver"})
-            self.assertNotEqual(roles["sender"][0], roles["receiver"][0])
-            for role in ("sender", "receiver"):
-                app = root / ("OwnedAppleEvent-" + role + ".app")
-                properties = plistlib.loads((app / "Contents/Info.plist").read_bytes())
-                self.assertEqual(
-                    properties["CFBundleIdentifier"],
-                    "com.ergopti.private.appleevent." + role + "." + nonce,
-                )
-                self.assertEqual(
-                    properties["CFBundleName"], "Owned AppleEvent " + role + " " + nonce
-                )
-                self.assertEqual(roles[role], [str(app / "Contents/MacOS" / role)])
-                self.assertTrue(properties["LSUIElement"])
-                self.assertFalse(any("Entitlement" in key for key in properties))
-            self.assertEqual(owner.automation_sender_name, "Owned AppleEvent sender " + nonce)
-            self.assertEqual(owner.automation_receiver_name, "Owned AppleEvent receiver " + nonce)
-            compilations = [args for args, _ in calls if args[0] == "owned-clang"]
-            self.assertEqual(len(compilations), 3)
-            sender = [
-                args
-                for args in compilations
-                if str(root / "tools/diagnostics/native_appleevent_probe_sender.c") in args
-            ]
-            receiver = [
-                args
-                for args in compilations
-                if str(root / "tools/diagnostics/native_appleevent_probe_receiver.c") in args
-            ]
-            self.assertEqual(len(sender), 1)
-            self.assertEqual(len(receiver), 1)
-            for recipe in (sender[0], receiver[0]):
-                self.assertIn("-fobjc-arc", recipe)
-                self.assertEqual(recipe[recipe.index("-x") + 1], "objective-c")
-                for framework in ("ApplicationServices", "Carbon", "AppKit", "Security"):
-                    self.assertIn(framework, recipe)
-            self.assertIn(str(root / "tools/diagnostics/native_appleevent_permission.c"), sender[0])
-            self.assertNotIn(
-                str(root / "tools/diagnostics/native_appleevent_permission.c"), receiver[0]
-            )
-            self.assertTrue(all(options == {"confined": True} for _, options in calls))
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            calls = []
-            owner = SimpleNamespace(run=lambda args, **options: calls.append(args))
-            roles = probe._build_appleevent_pair(owner, root, root, ["owned-clang"], nonce)
-            image = str(root / "OwnedAppleEvent.app/Contents/MacOS/owned-probe")
-            self.assertEqual(roles["sender"], [image, "sender"])
-            self.assertEqual(roles["receiver"], [image, "receiver"])
-            shared_compile = [args for args in calls if args[0] == "owned-clang"]
-            self.assertEqual(len(shared_compile), 1)
-            self.assertIn(
-                str(root / "tools/diagnostics/native_appleevent_permission.c"), shared_compile[0]
-            )
-            self.assertFalse(hasattr(owner, "automation_sender_name"))
-            self.assertFalse(hasattr(owner, "automation_receiver_name"))
-
-
 class ComposedSenderIdentityControls(unittest.TestCase):
     """Both old closed frames remain independent and share no native authority."""
 
@@ -3913,7 +3423,7 @@ class ComposedSenderIdentityControls(unittest.TestCase):
         self.assertTrue(identity["target_available"])
         self.assertTrue(identity["identifier_equal"])
         self.assertEqual(
-            probe.appleevent_sender_marker_fact(original)["marker2_snapshot"], "absent"
+            probe.appleevent_sender_marker_fact(original)["marker1_snapshot"], "absent"
         )
         self.assertEqual(
             probe._appleevent_sender_diagnostic(original),
@@ -3926,9 +3436,11 @@ class ComposedSenderIdentityControls(unittest.TestCase):
         owner.run = Mock(return_value=subprocess.CompletedProcess([], 66, "", self.value()))
         with patch("builtins.print"):
             with self.assertRaises(probe.AdmissionError) as caught:
-                probe._run_appleevent_sender(owner, receiver, group, "deny-removal-positive", [])
+                probe._run_appleevent_sender(
+                    owner, receiver, group, "deny-removal-consent-required", []
+                )
         self.assertIn("sender_identity_fact=", str(caught.exception))
-        self.assertIn('"marker2_snapshot": "absent"', str(caught.exception))
+        self.assertIn('"marker1_snapshot": "absent"', str(caught.exception))
         group.observe_exit.assert_called_once_with()
         self.assertEqual(
             owner.evidence.record.call_args.kwargs["sender_failure"]["sender"], control.packet()
@@ -3955,7 +3467,7 @@ class ComposedSenderIdentityControls(unittest.TestCase):
                 self.assertEqual(probe.appleevent_sender_identity_frame(changed), (changed, {}))
 
     def test_identity_metadata_never_replaces_exact_success_or_denial(self):
-        for control, status in (("unconfined-positive", 0), ("full-policy-denial", -1742)):
+        for control, status in (("unconfined-consent-required", 0), ("full-policy-denial", -1742)):
             owner = SimpleNamespace(
                 run=Mock(
                     return_value=subprocess.CompletedProcess(
@@ -3983,7 +3495,7 @@ class PhysicalFixtureRootControls(unittest.TestCase):
                 self.assertEqual(alias.resolve(strict=True), physical)
                 with patch.object(tempfile, "tempdir", str(alias)):
                     suite = unittest.TestLoader().loadTestsFromTestCase(AppleEventBoundaryControls)
-                    self.assertEqual(suite.countTestCases(), 7)
+                    self.assertEqual(suite.countTestCases(), 8)
                     for name in (
                         "test_observed_symlink_cannot_admit_a_host_cache_or_tap",
                         "test_missing_declared_format_fails_before_cask_install",
@@ -3996,7 +3508,7 @@ class PhysicalFixtureRootControls(unittest.TestCase):
                     )
                     result = unittest.TestResult()
                     suite.run(result)
-                self.assertEqual(result.testsRun, 10)
+                self.assertEqual(result.testsRun, 11)
                 self.assertEqual(result.skipped, [])
                 self.assertEqual(result.failures, [])
                 self.assertEqual(result.errors, [])
@@ -4070,1582 +3582,6 @@ class PhysicalFixtureRootControls(unittest.TestCase):
         self.assertEqual(acquisitions, 6, "all six real root acquisitions must be present")
 
 
-class FirstPositiveAutomationPrerequisiteControls(unittest.TestCase):
-    """Model the first-send prerequisite order, without claiming native TCC consent."""
-
-    def invoke(self, root, statuses, *, allow=True):
-        judge = AppleEventBoundaryControls()
-        (root / "sandbox.sb").write_text(judge.policy)
-        owner = judge.model(root)
-        owner.allow_automation_consent = allow
-        owner.allow_owned_consent_ui = False
-        original_run = owner.run
-        observations = []
-        queue = iter(statuses)
-        confirmed = False
-
-        def run(arguments, **options):
-            nonlocal confirmed
-            if "-o" in arguments:
-                executable = Path(arguments[arguments.index("-o") + 1])
-                executable.write_bytes(
-                    b"Independent modeled signed input " + executable.name.encode()
-                )
-            mode = arguments[-1]
-            if mode.startswith("permission-"):
-                self.assertTrue(allow)
-                self.assertEqual(
-                    arguments[:3],
-                    ["/usr/bin/sandbox-exec", "-f", str(root / "sandbox-appleevent-positive.sb")],
-                )
-                self.assertEqual(
-                    arguments[3:6],
-                    [
-                        str(root / "OwnedAppleEvent-sender.app/Contents/MacOS/sender"),
-                        "73136",
-                        judge.nonce,
-                    ],
-                )
-                self.assertEqual(options, {"check": False, "timeout": 30})
-                self.assertEqual((root / "sandbox.sb").read_text(), judge.policy)
-                self.assertEqual(
-                    Path(arguments[2]).read_text(),
-                    judge.policy.replace("(deny appleevent-send)\n", ""),
-                )
-                status = next(queue)
-                observations.append((mode, status))
-                confirmed = status == 0 and mode == "permission-query" and len(observations) >= 2
-                return subprocess.CompletedProcess(
-                    arguments,
-                    0 if status == 0 else 67,
-                    f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={mode.removeprefix('permission-')} osstatus={status}\n",
-                    "",
-                )
-            if mode in ("success", "denied"):
-                self.assertTrue(
-                    not allow or confirmed,
-                    "first mandatory send preceded normal consent prerequisite",
-                )
-                observations.append((mode, None))
-            return original_run(arguments, **options)
-
-        owner.run = run
-        self.last_owner = owner
-        self.last_observations = observations
-        with (
-            patch.object(probe.uuid, "uuid4", return_value=judge.nonce),
-            patch.object(probe, "native_compiler", return_value=["modeled-native-clang"]),
-        ):
-            receipt = probe.admit_appleevent_boundary(owner, root)
-        return owner, observations, receipt
-
-    def test_fresh_owned_permission_precedes_first_positive_and_keeps_all_three_routes(self):
-        with TemporaryDirectory() as directory:
-            owner, observations, receipt = self.invoke(
-                Path(directory).resolve(strict=True), (-1744, 0, 0)
-            )
-            self.assertEqual(
-                observations,
-                [
-                    ("permission-query", -1744),
-                    ("permission-request", 0),
-                    ("permission-query", 0),
-                    ("success", None),
-                    ("success", None),
-                    ("denied", None),
-                ],
-            )
-            self.assertEqual(len(owner.sender_calls), 3)
-            self.assertEqual(owner.deliveries, 2)
-            self.assertTrue(receipt["receiver_retired"])
-            self.assertEqual(receipt["denied_status"], -1743)
-            self.assertEqual(
-                receipt["permission_prerequisite"]["statuses"],
-                [
-                    {"mode": "query", "osstatus": -1744},
-                    {"mode": "request", "osstatus": 0},
-                    {"mode": "query", "osstatus": 0},
-                ],
-            )
-
-    def test_refused_or_unconfirmed_permission_never_acquires_first_positive(self):
-        for statuses in ((-1743,), (-1744, -1743), (-1744, -1744), (0, -1744)):
-            with self.subTest(statuses=statuses), TemporaryDirectory() as directory:
-                with self.assertRaises(probe.AppleEventBoundaryError) as refusal:
-                    self.invoke(Path(directory).resolve(strict=True), statuses)
-                self.assertIsInstance(refusal.exception.__cause__, probe.AdmissionError)
-                self.assertEqual(self.last_owner.sender_calls, [])
-                self.assertEqual(self.last_owner.deliveries, 0)
-                self.assertEqual(len(self.last_owner.active), 1)
-                self.assertFalse(self.last_owner.groups[self.last_owner.active[0]].reaped)
-
-    def test_default_shared_image_never_requests_consent_and_keeps_original_routes(self):
-        with TemporaryDirectory() as directory:
-            owner, observations, receipt = self.invoke(
-                Path(directory).resolve(strict=True), (), allow=False
-            )
-            self.assertEqual(observations, [("success", None), ("success", None), ("denied", None)])
-            self.assertEqual(len(owner.sender_calls), 3)
-            self.assertTrue(receipt["receiver_retired"])
-            self.assertNotIn("permission_prerequisite", receipt)
-
-
-class RefusedButtonSubroleFactControls(unittest.TestCase):
-    """Receive fixed diagnostic enums on real private files, never native AX/TCC credit."""
-
-    def packet(self, subrole="close", kind="string", error=0):
-        packet = OwnedAutomationUIFactControls.packet()
-        packet.update(first_attribute="button-title", first_error=-25205)
-        packet["first_button"] = {"schema": 1, "subrole": subrole, "type": kind, "error": error}
-        return packet
-
-    def test_closed_subrole_evidence_preserves_original_unsupported_title_refusal(self):
-        for subrole, kind, error in (
-            ("close", "string", 0),
-            ("minimize", "string", 0),
-            ("zoom", "string", 0),
-            ("unknown", "string", 0),
-            ("absent", "absent", -25205),
-            ("wrong-type", "number", 0),
-        ):
-            with self.subTest(subrole=subrole):
-                packet = self.packet(subrole, kind, error)
-                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-                self.assertEqual(packet["first_attribute"], "button-title")
-                self.assertEqual(packet["first_error"], -25205)
-
-    def test_foreign_private_malformed_or_unbound_button_facts_are_refused(self):
-        for replacement in (
-            None,
-            {"schema": True, "subrole": "close", "type": "string", "error": 0},
-            {"schema": 1, "subrole": "private-description", "type": "string", "error": 0},
-            {"schema": 1, "subrole": "close", "type": "string", "error": -25205},
-            {"schema": 1, "subrole": "close", "type": "absent", "error": 0},
-            {"schema": 1, "subrole": "close", "type": "string", "error": True},
-            {"schema": 1, "subrole": "close", "type": "string", "error": 2**31},
-            {"schema": 1, "subrole": "unknown", "type": "other", "error": 0},
-            {"schema": 1, "subrole": "close", "type": "string", "error": 0, "accepted": True},
-        ):
-            with self.subTest(replacement=replacement), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                packet["first_button"] = replacement
-                probe._validate_owned_automation_ui_fact(packet)
-        for attribute in ("none", "windows", "button-enabled"):
-            with self.subTest(attribute=attribute), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                packet["first_attribute"] = attribute
-                probe._validate_owned_automation_ui_fact(packet)
-
-    def test_real_owned_capture_exports_subrole_without_grant_or_retirement_credit(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            evidence_dir = root / "evidence"
-            evidence_dir.mkdir(mode=0o700)
-            evidence = probe.PhaseEvidence(evidence_dir)
-            owner = probe.Children(root, evidence=evidence)
-            packet = self.packet()
-            primary = subprocess.CompletedProcess(
-                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-            )
-
-            def producer(arguments, **options):
-                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
-                self.assertEqual(options, {"check": False, "timeout": 2})
-                path = Path(arguments[-1])
-                self.assertEqual(path.parent, root)
-                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-                path.write_text(json.dumps(packet))
-                return primary
-
-            owner.run = Mock(side_effect=producer)
-            try:
-                result = probe._owned_automation_ui_run(
-                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
-                )
-                self.assertIs(result, primary)
-                self.assertEqual(result.returncode, 67)
-                self.assertEqual(result.stdout, "OWNED_AUTOMATION_UI/1 state=observation-refused\n")
-                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
-                self.assertEqual(receipt["native_ui"], packet)
-                self.assertEqual(receipt["status"], "refused")
-                self.assertFalse(receipt["ownership_closed"])
-                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
-            finally:
-                evidence.close()
-
-
-class RefusedButtonWindowControlFactControls(unittest.TestCase):
-    """Fixed same-window identity receipts are observations, never native AX consent."""
-
-    def packet(self):
-        packet = RefusedButtonSubroleFactControls().packet("absent", "absent", -25205)
-        packet["first_button"]["window"] = {
-            "schema": 1,
-            "role": "window",
-            "type": "string",
-            "error": 0,
-            "controls": {
-                "close": {"type": "ax-element", "error": 0, "relation": "same"},
-                "minimize": {"type": "ax-element", "error": 0, "relation": "different"},
-                "zoom": {"type": "absent", "error": -25205, "relation": "unobserved"},
-            },
-        }
-        return packet
-
-    def test_closed_window_reference_facts_preserve_absent_subrole_and_primary_refusal(self):
-        packet = self.packet()
-        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-        self.assertEqual(packet["first_error"], -25205)
-        self.assertEqual(packet["first_button"]["subrole"], "absent")
-        self.assertEqual(packet["candidates"], 0)
-        self.assertEqual(packet["matches"], 0)
-        for role, kind, error in (
-            ("sheet", "string", 0),
-            ("other", "string", 0),
-            ("absent", "absent", -25205),
-            ("wrong-type", "number", 0),
-        ):
-            with self.subTest(role=role):
-                packet = self.packet()
-                packet["first_button"]["window"].update(role=role, type=kind, error=error)
-                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-
-    def test_unobserved_or_foreign_reference_cannot_claim_same_native_button(self):
-        for control in (
-            {"type": "absent", "error": -25205, "relation": "same"},
-            {"type": "string", "error": 0, "relation": "same"},
-            {"type": "ax-element", "error": -25204, "relation": "same"},
-            {"type": "ax-element", "error": 0, "relation": "unobserved"},
-            {"type": "ax-element", "error": True, "relation": "same"},
-            {"type": "ax-element", "error": 0, "relation": "private-title"},
-            {"type": "ax-element", "error": 0, "relation": "same", "accepted": True},
-        ):
-            with self.subTest(control=control), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                packet["first_button"]["window"]["controls"]["close"] = control
-                probe._validate_owned_automation_ui_fact(packet)
-        for change in (
-            "missing-control",
-            "foreign-control",
-            "wrong-role",
-            "private-role",
-            "boolean-status",
-        ):
-            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                window = packet["first_button"]["window"]
-                if change == "missing-control":
-                    del window["controls"]["zoom"]
-                elif change == "foreign-control":
-                    window["controls"]["other"] = window["controls"]["close"]
-                elif change == "wrong-role":
-                    window["role"] = "wrong-type"
-                elif change == "private-role":
-                    window["role"] = "private-window-role"
-                else:
-                    window["error"] = True
-                probe._validate_owned_automation_ui_fact(packet)
-
-    def test_real_private_window_receipt_cannot_authorize_action_or_closure(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            evidence_dir = root / "evidence"
-            evidence_dir.mkdir(mode=0o700)
-            evidence = probe.PhaseEvidence(evidence_dir)
-            owner = probe.Children(root, evidence=evidence)
-            packet = self.packet()
-            primary = subprocess.CompletedProcess(
-                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-            )
-
-            def producer(arguments, **options):
-                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
-                self.assertEqual(options, {"check": False, "timeout": 2})
-                path = Path(arguments[-1])
-                self.assertEqual(path.parent, root)
-                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-                path.write_text(json.dumps(packet))
-                return primary
-
-            owner.run = Mock(side_effect=producer)
-            try:
-                result = probe._owned_automation_ui_run(
-                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
-                )
-                self.assertIs(result, primary)
-                self.assertEqual(result.returncode, 67)
-                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
-                self.assertEqual(receipt["native_ui"], packet)
-                self.assertEqual(receipt["status"], "refused")
-                self.assertFalse(receipt["ownership_closed"])
-                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
-            finally:
-                evidence.close()
-
-
-class RefusedButtonLabelFactControls(unittest.TestCase):
-    """Closed labels are observations; no localized string or consent authority crosses the frame."""
-
-    def packet(self):
-        packet = RefusedButtonWindowControlFactControls().packet()
-        packet["first_button"]["labels"] = {
-            "description": {"type": "string", "error": 0, "family": "close"},
-            "value": {"type": "absent", "error": -25205, "family": "absent"},
-        }
-        return packet
-
-    def test_closed_label_families_retain_original_title_refusal(self):
-        for family in ("allow", "deny", "close", "minimize", "zoom", "other"):
-            with self.subTest(family=family):
-                packet = self.packet()
-                packet["first_button"]["labels"]["description"]["family"] = family
-                self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-                self.assertEqual(packet["first_attribute"], "button-title")
-                self.assertEqual(packet["first_error"], -25205)
-                self.assertEqual(packet["candidates"], 0)
-                self.assertEqual(packet["matches"], 0)
-        packet = self.packet()
-        packet["first_button"]["labels"]["value"] = {
-            "type": "number",
-            "error": 0,
-            "family": "wrong-type",
-        }
-        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-
-    def test_failed_private_or_malformed_labels_cannot_claim_observation(self):
-        for replacement in (
-            {"type": "absent", "error": -25205, "family": "allow"},
-            {"type": "string", "error": -25204, "family": "close"},
-            {"type": "number", "error": 0, "family": "close"},
-            {"type": "string", "error": True, "family": "close"},
-            {"type": "string", "error": 2**31, "family": "close"},
-            {"type": "string", "error": 0, "family": "private-description"},
-            {"type": "string", "error": 0, "family": "close", "accepted": True},
-        ):
-            with self.subTest(replacement=replacement), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                packet["first_button"]["labels"]["description"] = replacement
-                probe._validate_owned_automation_ui_fact(packet)
-        for labels in (
-            None,
-            {},
-            {"description": {"type": "string", "error": 0, "family": "close"}},
-            {"description": {}, "value": {}, "title": {}},
-        ):
-            with self.subTest(labels=labels), self.assertRaises(probe.AdmissionError):
-                packet = self.packet()
-                packet["first_button"]["labels"] = labels
-                probe._validate_owned_automation_ui_fact(packet)
-
-    def test_real_private_label_receipt_never_admits_consent_or_closure(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            evidence_dir = root / "evidence"
-            evidence_dir.mkdir(mode=0o700)
-            evidence = probe.PhaseEvidence(evidence_dir)
-            owner = probe.Children(root, evidence=evidence)
-            packet = self.packet()
-            primary = subprocess.CompletedProcess(
-                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-            )
-
-            def producer(arguments, **options):
-                self.assertEqual(arguments[:-1], ["/owned/helper", "sender", "receiver", "73"])
-                self.assertEqual(options, {"check": False, "timeout": 2})
-                path = Path(arguments[-1])
-                self.assertEqual(path.parent, root)
-                self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o600)
-                path.write_text(json.dumps(packet))
-                return primary
-
-            owner.run = Mock(side_effect=producer)
-            try:
-                result = probe._owned_automation_ui_run(
-                    owner, ["/owned/helper", "sender", "receiver", "73"], 2
-                )
-                self.assertIs(result, primary)
-                self.assertEqual(result.returncode, 67)
-                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
-                self.assertEqual(receipt["native_ui"], packet)
-                self.assertEqual(receipt["status"], "refused")
-                self.assertFalse(receipt["ownership_closed"])
-                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
-            finally:
-                evidence.close()
-
-
-class ForegroundRequestRefusalControls(unittest.TestCase):
-    """A normal activation refusal is not a permission status or a grant."""
-
-    def invoke(self, root, frame, *, code=65, stdout="", mode="request"):
-        executable = root / "owned-sender"
-        executable.write_bytes(b"independent acquired image")
-        policy = root / "owned-policy.sb"
-        policy.write_text("(version 1)\n(deny default)\n")
-        owner = SimpleNamespace(allow_automation_consent=True, allow_owned_consent_ui=False)
-        calls = []
-
-        def run(arguments, **options):
-            self.assertEqual(options, {"check": False, "timeout": 30})
-            calls.append(arguments[-1])
-            if mode == "request" and len(calls) == 1:
-                return subprocess.CompletedProcess(
-                    arguments, 67, "OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1744\n", ""
-                )
-            return subprocess.CompletedProcess(arguments, code, stdout, frame)
-
-        owner.run = run
-        try:
-            probe.admit_appleevent_permission_prerequisite(
-                owner, [str(executable), "73136", "independent-nonce"], policy, lambda phase: None
-            )
-        finally:
-            self.calls = calls
-
-    def test_exact_owned_request_foreground_refusal_never_reaches_fresh_grant_query(self):
-        for state in ("unavailable", "inactive"):
-            with self.subTest(state=state), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(
-                    probe.AdmissionError, "foreground precondition refused: " + state
-                ):
-                    self.invoke(
-                        Path(directory), "OWNED_APPLEEVENT_FOREGROUND/1 state=" + state + "\n"
-                    )
-                self.assertEqual(self.calls, ["permission-query", "permission-request"])
-
-    def test_foreign_mode_exit_or_dirty_frame_has_no_foreground_or_permission_credit(self):
-        for mode, code, stdout, frame in (
-            ("query", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
-            ("request", 0, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
-            ("request", 65, "PRIVATE", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n"),
-            ("request", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=private-label\n"),
-            ("request", 65, "", "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\nPRIVATE\n"),
-        ):
-            with self.subTest(mode=mode, code=code, frame=frame), TemporaryDirectory() as directory:
-                with self.assertRaisesRegex(
-                    probe.AdmissionError, "Malformed owned Automation receipt"
-                ):
-                    self.invoke(Path(directory), frame, mode=mode, code=code, stdout=stdout)
-                self.assertEqual(len(self.calls), 1 if mode == "query" else 2)
-
-
-class CanonicalPermissionFixtureRootControls(unittest.TestCase):
-    """Keep modeled permission expectations on the same physical fixture root."""
-
-    def test_all_permission_fixture_root_acquisitions_are_physical(self):
-        acquisitions = 0
-        for cls in (AutomationPrerequisiteControls, FirstPositiveAutomationPrerequisiteControls):
-            tree = ast.parse(textwrap.dedent(inspect.getsource(cls)))
-            parents = {
-                child: node for node in ast.walk(tree) for child in ast.iter_child_nodes(node)
-            }
-            for node in ast.walk(tree):
-                if not (
-                    isinstance(node, ast.Call)
-                    and isinstance(node.func, ast.Name)
-                    and node.func.id == "Path"
-                    and len(node.args) == 1
-                    and isinstance(node.args[0], ast.Name)
-                    and node.args[0].id == "directory"
-                ):
-                    continue
-                resolver = parents.get(node)
-                self.assertIsInstance(resolver, ast.Attribute)
-                self.assertEqual(resolver.attr, "resolve")
-                call = parents.get(resolver)
-                self.assertIsInstance(call, ast.Call)
-                self.assertEqual(call.args, [])
-                self.assertEqual(
-                    [(kw.arg, ast.dump(kw.value)) for kw in call.keywords],
-                    [("strict", "Constant(value=True)")],
-                )
-                acquisitions += 1
-        self.assertEqual(
-            acquisitions, 13, "every original permission fixture acquisition must remain"
-        )
-
-
-class ForegroundOriginalDeadlineControls(unittest.TestCase):
-    """Portable exact owner calls; the child port is explicit, not macOS credit."""
-
-    def owner(self, root):
-        with (
-            patch.object(probe, "NativeProcessGroups"),
-            patch.object(probe.os, "getuid", return_value=501, create=True),
-        ):
-            return probe.Children(root)
-
-    def physical_port(self, owner, *, acquired=None):
-        observed = {}
-
-        def acquire(arguments, native, register, **options):
-            observed["arguments"] = tuple(arguments)
-            observed["environment"] = options["env"]
-            process = subprocess.Popen(
-                [probe.sys.executable, "-I", "-B", "-c", "import time; time.sleep(0.05)"],
-                **options,
-            )
-            observed["process"] = process
-            group = SimpleNamespace(process=process, reaped=False)
-
-            def wait(timeout):
-                observed["wait"] = timeout
-                process.wait(timeout=timeout)
-
-            def settle():
-                if process.poll() is None:
-                    process.terminate()
-                process.wait(timeout=5)
-                group.reaped = True
-                return True
-
-            group.wait_for_exit, group.settle = wait, settle
-            observed["group"] = group
-            register(group)
-            if acquired is not None:
-                acquired()
-            return group
-
-        return observed, acquire
-
-    def test_expired_request_refuses_before_native_child_or_capture_allocation(self):
-        with TemporaryDirectory() as directory:
-            owner = self.owner(Path(directory))
-            with patch.object(probe.time, "monotonic_ns", return_value=1_000_000_000):
-                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            with (
-                patch.object(probe.time, "monotonic_ns", return_value=31_000_000_000),
-                patch.object(owner, "start") as start,
-            ):
-                with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
-                    owner.run(command, timeout=30)
-                start.assert_not_called()
-            self.assertEqual(owner.sequence, 0)
-            self.assertEqual(list(Path(directory).iterdir()), [])
-
-    def test_mutated_argv_or_changed_budget_never_acquires_a_child(self):
-        with TemporaryDirectory() as directory:
-            owner = self.owner(Path(directory))
-            for fault in ("argv", "budget"):
-                with (
-                    self.subTest(fault=fault),
-                    patch.object(probe.time, "monotonic_ns", return_value=1_000_000_000),
-                ):
-                    command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                    if fault == "argv":
-                        command.append("foreign")
-                    with patch.object(owner, "start") as start:
-                        with self.assertRaises(probe.AdmissionError):
-                            owner.run(command, timeout=31 if fault == "budget" else 30)
-                        start.assert_not_called()
-
-    def test_expired_ui_callback_physically_retires_actual_child_without_late_permission_credit(
-        self,
-    ):
-        with TemporaryDirectory() as directory:
-            owner = self.owner(Path(directory))
-            clock = [1_000_000_000]
-            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
-                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                with self.assertRaises(AttributeError):
-                    command.deadline_ns = 61_000_000_000
-                with self.assertRaises(AttributeError):
-                    command.timeout = 60
-                observed, acquire = self.physical_port(owner)
-
-                def callback(process, deadline):
-                    self.assertIs(process, observed["process"])
-                    self.assertEqual(deadline, 31)
-                    process.wait(timeout=5)
-                    clock[0] = 31_000_000_000
-
-                with patch.object(probe, "acquire_owned", side_effect=acquire):
-                    with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
-                        owner.run(command, timeout=30, after_start=callback)
-            self.assertNotIn("wait", observed)
-            self.assertTrue(observed["group"].reaped)
-            self.assertIsNotNone(observed["process"].returncode)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-
-    def test_clock_invalidity_or_regression_refuses_before_child(self):
-        for invalid in (True, -1, "clock", None):
-            with (
-                self.subTest(invalid=invalid),
-                patch.object(probe.time, "monotonic_ns", return_value=invalid),
-            ):
-                with self.assertRaisesRegex(probe.AdmissionError, "clock unavailable"):
-                    probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-        with patch.object(probe.time, "monotonic_ns", side_effect=(2, 1)):
-            command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            with self.assertRaisesRegex(probe.AdmissionError, "clock unavailable"):
-                command.remaining()
-
-    def test_actual_child_environment_is_private_and_start_ui_wait_share_original_deadline(self):
-        with TemporaryDirectory() as directory:
-            owner = self.owner(Path(directory))
-            original = owner.environment.copy()
-            clock = [1_000_000_000]
-            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
-                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                clock[0] = 6_000_000_000
-                observed, acquire = self.physical_port(
-                    owner, acquired=lambda: clock.__setitem__(0, 21_000_000_000)
-                )
-
-                def callback(process, deadline):
-                    self.assertIs(process, observed["process"])
-                    self.assertEqual(deadline, 31)
-                    clock[0] = 26_000_000_000
-
-                with patch.object(probe, "acquire_owned", side_effect=acquire):
-                    result = owner.run(command, timeout=30, after_start=callback)
-            self.assertEqual(result.returncode, 0)
-            self.assertEqual(observed["wait"], 5)
-            self.assertEqual(observed["arguments"], ("owned", "permission-request"))
-            self.assertEqual(
-                observed["environment"],
-                {**original, "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS": "31000000000"},
-            )
-            self.assertEqual(owner.environment, original)
-            self.assertEqual(owner.active, [])
-            self.assertTrue(observed["group"].reaped)
-            self.assertEqual(observed["process"].returncode, 0)
-
-    def test_clock_failure_after_actual_acquisition_keeps_primary_and_retires_same_child(self):
-        with TemporaryDirectory() as directory:
-            owner = self.owner(Path(directory))
-            failure = RuntimeError("independent clock refused after real acquire")
-            acquired = [False]
-
-            def clock():
-                if acquired[0]:
-                    raise failure
-                return 1_000_000_000
-
-            with patch.object(probe.time, "monotonic_ns", side_effect=clock):
-                command = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                observed, acquire = self.physical_port(
-                    owner, acquired=lambda: acquired.__setitem__(0, True)
-                )
-                callback = Mock()
-                with patch.object(probe, "acquire_owned", side_effect=acquire):
-                    with self.assertRaises(RuntimeError) as caught:
-                        owner.run(command, timeout=30, after_start=callback)
-            self.assertIs(caught.exception, failure)
-            callback.assert_not_called()
-            self.assertNotIn("wait", observed)
-            self.assertTrue(observed["group"].reaped)
-            self.assertIsNotNone(observed["process"].returncode)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-
-    def test_request_deadline_is_captured_before_checkpoint_without_changing_original_argv_options(
-        self,
-    ):
-        with TemporaryDirectory() as directory:
-            root = Path(directory)
-            sender, policy = root / "sender", root / "policy"
-            sender.write_bytes(b"source-bound original sender")
-            policy.write_bytes(b"source-bound original policy")
-            owner = SimpleNamespace(allow_automation_consent=True, allow_owned_consent_ui=False)
-            clock = [1_000_000_000]
-            calls = []
-
-            def checkpoint(phase):
-                if phase == "before-automation-request":
-                    clock[0] = 6_000_000_000
-
-            def run(arguments, **options):
-                self.assertEqual(options, {"check": False, "timeout": 30})
-                mode = arguments[-1]
-                self.assertEqual(
-                    arguments[:6],
-                    ["/usr/bin/sandbox-exec", "-f", str(policy), str(sender), "73136", "nonce"],
-                )
-                calls.append(mode)
-                if mode == "permission-request":
-                    self.assertIs(type(arguments), probe.OwnedAutomationRequest)
-                    self.assertEqual(arguments.deadline_ns, 31_000_000_000)
-                    self.assertEqual(arguments.remaining(), 25)
-                else:
-                    self.assertIs(type(arguments), list)
-                status = -1744 if len(calls) == 1 else 0
-                label = mode.removeprefix("permission-")
-                return subprocess.CompletedProcess(
-                    arguments,
-                    67 if status else 0,
-                    f"OWNED_APPLEEVENT_PREFLIGHT/1 mode={label} osstatus={status}\n",
-                    "",
-                )
-
-            owner.run = run
-            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
-                receipt = probe.admit_appleevent_permission_prerequisite(
-                    owner, [str(sender), "73136", "nonce"], policy, checkpoint
-                )
-            self.assertEqual(calls, ["permission-query", "permission-request", "permission-query"])
-            self.assertEqual([entry["osstatus"] for entry in receipt["statuses"]], [-1744, 0, 0])
-
-    def test_native_request_pump_uses_original_public_deadline_and_same_app_only(self):
-        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
-        start = source.index("static int admit_sender_foreground_request(")
-        body = source[start : source.index("/* A separate closed metadata frame", start)]
-        self.assertIn("foreground_deadline_ns(&deadline)", body)
-        self.assertIn("now < previous || now >= deadline", body)
-        self.assertIn("now >= previous && now < deadline ? 0 : 2", body)
-        self.assertIn("[application finishLaunching]", body)
-        self.assertIn("NSApplicationActivationPolicyAccessory", body)
-        self.assertIn("remaining < 0.05 ? remaining : 0.05", body)
-        self.assertIn("nextEventMatchingMask:NSEventMaskAny", body)
-        self.assertIn("inMode:NSDefaultRunLoopMode dequeue:YES", body)
-        self.assertIn("if (event != nil) [application sendEvent:event]", body)
-        self.assertNotIn("owned_appleevent_permission", body)
-        self.assertNotIn("NSApplicationActivationPolicyRegular", body)
-        self.assertNotIn("sleep(", body)
-
-
-class PassiveWindowIdentityControls(unittest.TestCase):
-    """Closed portable facts; these controls never claim native AX traversal."""
-
-    @staticmethod
-    def packet():
-        packet = RefusedButtonLabelFactControls().packet()
-        packet["identity"] = {
-            "schema": 1,
-            "sender": True,
-            "receiver": False,
-            "complete": True,
-            "nodes": 8,
-            "refusal": "none",
-            "error": 0,
-        }
-        return packet
-
-    def test_complete_and_partial_scalar_observations_preserve_original_refusal(self):
-        for sender, receiver in ((False, False), (True, False), (False, True), (True, True)):
-            packet = self.packet()
-            packet["identity"].update(sender=sender, receiver=receiver)
-            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-            self.assertEqual(packet["candidates"], 0)
-            self.assertEqual(packet["matches"], 0)
-            self.assertEqual(packet["first_error"], -25205)
-        for refusal in (
-            "deadline",
-            "timeout",
-            "node-limit",
-            "node-type",
-            "role",
-            "value",
-            "children",
-        ):
-            packet = self.packet()
-            packet["identity"].update(complete=False, refusal=refusal, error=-25212)
-            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-
-    def test_unadmitted_text_and_wrong_scalar_or_completion_cannot_enter_evidence(self):
-        for key, value in (
-            ("schema", True),
-            ("sender", 1),
-            ("receiver", "private receiver"),
-            ("complete", 1),
-            ("nodes", True),
-            ("nodes", 257),
-            ("nodes", -1),
-            ("error", True),
-            ("error", 2**31),
-            ("refusal", "private UI title"),
-            ("refusal", "deadline"),
-            ("complete", False),
-            ("nodes", 0),
-        ):
-            packet = self.packet()
-            packet["identity"][key] = value
-            with self.subTest(key=key, value=value), self.assertRaises(probe.AdmissionError):
-                probe._validate_owned_automation_ui_fact(packet)
-        for change in ("extra", "missing", "different-primary", "missing-button"):
-            packet = self.packet()
-            if change == "extra":
-                packet["identity"]["title"] = "private"
-            elif change == "missing":
-                del packet["identity"]["sender"]
-            elif change == "different-primary":
-                packet["first_error"] = -25212
-            else:
-                del packet["first_button"]
-            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
-                probe._validate_owned_automation_ui_fact(packet)
-
-    def test_real_private_capture_keeps_primary_refusal_even_when_both_names_observed(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            evidence_dir = root / "evidence"
-            evidence_dir.mkdir(mode=0o700)
-            evidence = probe.PhaseEvidence(evidence_dir)
-            owner = probe.Children(root, evidence=evidence)
-            packet = self.packet()
-            packet["identity"]["receiver"] = True
-            primary = subprocess.CompletedProcess(
-                [], 67, "OWNED_AUTOMATION_UI/1 state=observation-refused\n", ""
-            )
-
-            def producer(arguments, **options):
-                self.assertEqual(options, {"check": False, "timeout": 2})
-                Path(arguments[-1]).write_text(json.dumps(packet, separators=(",", ":")))
-                return primary
-
-            owner.run = Mock(side_effect=producer)
-            try:
-                self.assertIs(
-                    probe._owned_automation_ui_run(
-                        owner, ["helper", "sender", "receiver", "73"], 2
-                    ),
-                    primary,
-                )
-                receipt = json.loads((evidence_dir / "checkpoint.json").read_text())
-                self.assertEqual(receipt["native_ui"], packet)
-                self.assertEqual(receipt["status"], "refused")
-                self.assertFalse(receipt["ownership_closed"])
-                self.assertEqual(list(root.glob("automation-ui-fact-*")), [])
-            finally:
-                evidence.close()
-
-    def test_legacy_projection_without_optional_identity_remains_exact(self):
-        packet = self.packet()
-        del packet["identity"]
-        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-        self.assertLess(len(json.dumps(self.packet(), separators=(",", ":")).encode()), 1024)
-
-
-class AutomationStartupReadinessControls(unittest.TestCase):
-    """Private filesystem/explicit child-port controls; none grant macOS signed identity."""
-
-    NONCE = "11111111-2222-3333-4444-555555555555"
-
-    @contextmanager
-    def fixture(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            owner = probe.Children(Path(directory))
-            clock = [1_000_000_000]
-            with patch.object(probe.time, "monotonic_ns", side_effect=lambda: clock[0]):
-                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                request.readiness_nonce = self.NONCE
-                ready = probe.OwnedAutomationReadiness(owner, request)
-                process = Mock(pid=73136, returncode=None)
-                group = SimpleNamespace(
-                    process=process, reaped=False, observe_exit=Mock(return_value=None)
-                )
-                owner.groups[process] = group
-                try:
-                    yield owner, request, ready, process, group, clock
-                finally:
-                    ready.close()
-
-    def bytes(self, process):
-        return (
-            b"OWNED_APPLEEVENT_READY/1 pid="
-            + str(process.pid).encode()
-            + b" nonce=11111111-2222-3333-4444-555555555555\n"
-        )
-
-    def test_observer_cannot_run_during_launcher_or_partial_sender_acknowledgement(self):
-        with self.fixture() as (owner, request, ready, process, group, clock):
-            observations = []
-
-            def advance(seconds):
-                observations.append(ready.accepted)
-                self.assertLessEqual(seconds, 0.02)
-                ready.path.write_bytes(
-                    self.bytes(process)[:17] if len(observations) == 1 else self.bytes(process)
-                )
-                clock[0] += 10_000_000
-
-            with patch.object(probe.time, "sleep", side_effect=advance):
-                self.assertTrue(ready.wait(process))
-            self.assertEqual(observations, [False, False])
-            self.assertTrue(ready.accepted)
-            self.assertEqual(request.deadline_ns, 31_000_000_000)
-            self.assertEqual(request.remaining(), 29.98)
-            self.assertFalse(group.reaped)
-
-    def test_forged_pid_nonce_or_extra_bytes_never_admit_startup(self):
-        for payload in (
-            b"OWNED_APPLEEVENT_READY/1 pid=73 nonce=11111111-2222-3333-4444-555555555555\n",
-            b"OWNED_APPLEEVENT_READY/1 pid=73136 nonce=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n",
-            b"OWNED_APPLEEVENT_READY/1 pid=73136 nonce=11111111-2222-3333-4444-555555555555\nextra",
-            b"private arbitrary bytes",
-        ):
-            with self.subTest(payload=payload), self.fixture() as (_, _, ready, process, _, _):
-                ready.path.write_bytes(payload)
-                with self.assertRaises(probe.AdmissionError):
-                    ready.wait(process)
-                self.assertFalse(ready.accepted)
-
-    def test_truncated_acknowledgement_exhausts_only_original_deadline(self):
-        with self.fixture() as (_, request, ready, process, _, clock):
-            ready.path.write_bytes(self.bytes(process)[:-1])
-
-            def expire(seconds):
-                clock[0] = request.deadline_ns
-
-            with patch.object(probe.time, "sleep", side_effect=expire):
-                with self.assertRaisesRegex(probe.AdmissionError, "exceeded deadline"):
-                    ready.wait(process)
-            self.assertEqual(request.deadline_ns, 31_000_000_000)
-            self.assertFalse(ready.accepted)
-
-    def test_replaced_or_symlinked_name_refuses_and_preserves_foreign_inode(self):
-        for symlink in (False, True):
-            with self.subTest(symlink=symlink), self.fixture() as (owner, _, ready, process, _, _):
-                replacement = owner.root / "independent-replacement"
-                replacement.write_bytes(self.bytes(process))
-                replacement.chmod(0o600)
-                ready.path.unlink()
-                if symlink:
-                    ready.path.symlink_to(replacement)
-                else:
-                    replacement.rename(ready.path)
-                foreign = ready.path.lstat()
-                with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
-                    ready.wait(process)
-                ready.close()
-                self.assertEqual(ready.path.lstat().st_ino, foreign.st_ino)
-                self.assertEqual(
-                    owner.debt, [{"kind": "automation-readiness", "path": str(ready.path)}]
-                )
-
-    def test_hardlink_or_changed_permissions_never_admit_or_retire_ambiguous_input(self):
-        for fault in ("hardlink", "mode"):
-            with self.subTest(fault=fault), self.fixture() as (owner, _, ready, process, _, _):
-                ready.path.write_bytes(self.bytes(process))
-                if fault == "hardlink":
-                    os.link(ready.path, owner.root / "independent-link")
-                else:
-                    ready.path.chmod(0o644)
-                with self.assertRaisesRegex(probe.AdmissionError, "identity or bound"):
-                    ready.wait(process)
-                ready.close()
-                self.assertTrue(ready.path.exists())
-                self.assertEqual(len(owner.debt), 1)
-
-    def test_terminal_requester_before_ack_never_arms_ui_or_borrows_readiness(self):
-        with self.fixture() as (_, _, ready, process, group, _):
-            group.observe_exit.return_value = SimpleNamespace(si_status=65)
-            self.assertFalse(ready.wait(process))
-            self.assertFalse(ready.accepted)
-
-    def test_complete_ack_and_terminal_requester_admit_no_ui_action(self):
-        with self.fixture() as (_, _, ready, process, group, _):
-            ready.path.write_bytes(self.bytes(process))
-            group.observe_exit.return_value = SimpleNamespace(si_status=0)
-            self.assertFalse(ready.wait(process))
-            self.assertTrue(ready.accepted)
-
-    def test_lost_reservation_or_expired_original_clock_never_reads_ready_credit(self):
-        for fault in ("reservation", "reaped", "expired", "regressed"):
-            with (
-                self.subTest(fault=fault),
-                self.fixture() as (owner, request, ready, process, group, clock),
-            ):
-                ready.path.write_bytes(self.bytes(process))
-                if fault == "reservation":
-                    owner.groups = {}
-                elif fault == "reaped":
-                    group.reaped = True
-                else:
-                    clock[0] = request.deadline_ns if fault == "expired" else 0
-                with self.assertRaises(probe.AdmissionError):
-                    ready.wait(process)
-                self.assertFalse(ready.accepted)
-
-    def test_unlink_refusal_and_live_child_keep_owned_cleanup_debt(self):
-        for fault in ("unlink", "live"):
-            with self.subTest(fault=fault), self.fixture() as (owner, _, ready, _, _, _):
-                if fault == "unlink":
-                    with patch.object(probe.os, "unlink", side_effect=OSError("private refusal")):
-                        ready.close()
-                else:
-                    ready.close(retire=False)
-                self.assertTrue(ready.path.exists())
-                self.assertEqual(
-                    owner.debt, [{"kind": "automation-readiness", "path": str(ready.path)}]
-                )
-
-    def run_port(self, root, *, code=0, acknowledge=True, callback=None):
-        """Model the reserved process port while exercising the real parent owner and files."""
-        owner = probe.Children(root)
-        request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-        request.readiness_nonce = self.NONCE
-        observations = {}
-
-        def acquire(arguments, native, register, **options):
-            process = Mock(pid=73136, returncode=None)
-            group = SimpleNamespace(
-                process=process, reaped=False, observe_exit=Mock(return_value=None)
-            )
-            observations.update(process=process, group=group, environment=options["env"])
-
-            def wait(timeout):
-                process.returncode = code
-
-            def settle():
-                process.returncode = code
-                group.reaped = True
-                return True
-
-            group.wait_for_exit, group.settle = wait, settle
-            register(group)
-            os.write(
-                options["stdout"].fileno(),
-                b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n" if code == 0 else b"",
-            )
-            os.write(
-                options["stderr"].fileno(),
-                b"" if code == 0 else b"OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n",
-            )
-            if acknowledge:
-                request.readiness.path.write_bytes(self.bytes(process))
-            else:
-                group.observe_exit.return_value = SimpleNamespace(si_status=code)
-            return group
-
-        after_start = Mock() if callback is None else callback
-        observations["callback"] = after_start
-        with patch.object(probe, "acquire_owned", side_effect=acquire):
-            result = owner.run(request, timeout=30, check=False, after_start=after_start)
-        return owner, result, observations
-
-    def test_real_parent_awaits_ack_without_changing_native_receipts_or_budget(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            owner, result, observed = self.run_port(root)
-            self.assertEqual(result.returncode, 0)
-            self.assertEqual(
-                result.stdout, "OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=0\n"
-            )
-            self.assertEqual(result.stderr, "")
-            observed["callback"].assert_called_once()
-            self.assertIs(observed["callback"].call_args.args[0], observed["process"])
-            self.assertTrue(observed["group"].reaped)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertEqual(list(root.glob("automation-ready-*")), [])
-            self.assertNotIn("ERGOPTI_OWNED_AUTOMATION_READY_NAME", owner.environment)
-            self.assertEqual(
-                set(observed["environment"]) - set(owner.environment),
-                {
-                    "ERGOPTI_OWNED_AUTOMATION_DEADLINE_NS",
-                    "ERGOPTI_OWNED_AUTOMATION_READY_NAME",
-                    "ERGOPTI_OWNED_AUTOMATION_READY_DEV",
-                    "ERGOPTI_OWNED_AUTOMATION_READY_INO",
-                },
-            )
-
-    def test_pre_ready_native_refusal_retains_original_foreground_capture(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            owner, result, observed = self.run_port(Path(directory), code=65, acknowledge=False)
-            self.assertEqual(result.returncode, 65)
-            self.assertEqual(result.stdout, "")
-            self.assertEqual(result.stderr, "OWNED_APPLEEVENT_FOREGROUND/1 state=inactive\n")
-            observed["callback"].assert_not_called()
-            self.assertTrue(observed["group"].reaped)
-            self.assertEqual(owner.debt, [])
-
-    def test_zero_exit_without_acknowledgement_cannot_pass_original_owner(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            with self.assertRaisesRegex(probe.AdmissionError, "without readiness acknowledgement"):
-                self.run_port(Path(directory), acknowledge=False)
-            self.assertEqual(list(Path(directory).glob("automation-ready-*")), [])
-
-    def test_callback_failure_physically_settles_request_before_private_input_retirement(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            root = Path(directory)
-            refusal = probe.AdmissionError("independent original identity refusal")
-
-            def callback(process, deadline):
-                self.assertEqual(len(list(root.glob("automation-ready-*"))), 1)
-                raise refusal
-
-            with self.assertRaises(probe.AdmissionError) as caught:
-                self.run_port(root, callback=callback)
-            self.assertIs(caught.exception, refusal)
-            self.assertEqual(list(root.glob("automation-ready-*")), [])
-
-    def test_native_ack_is_after_foreground_before_permission_without_receipt_changes(self):
-        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
-        start = source.index(
-            'if (strcmp(argv[3], "permission-request") == 0) {', source.index("int main(")
-        )
-        caller = source[
-            start : source.index("const int outcome = owned_appleevent_permission", start)
-        ]
-        self.assertLess(
-            caller.index("admit_sender_foreground_request(application)"),
-            caller.index("acknowledge_sender_readiness(argv[2])"),
-        )
-        body_start = source.index("static int acknowledge_sender_readiness(")
-        body = source[body_start : source.index("\nstatic ", body_start + 10)]
-        self.assertNotIn("printf(", body.replace("snprintf(", "packing("))
-        self.assertNotIn("fprintf(", body)
-        self.assertIn("O_NOFOLLOW", body)
-        self.assertIn("before.st_nlink != 1", body)
-        self.assertIn("before.st_size != 0", body)
-        self.assertIn("(uintmax_t)before.st_dev != device", body)
-        self.assertIn("(uintmax_t)before.st_ino != inode", body)
-        self.assertIn("fsync(descriptor)", body)
-
-    def test_close_refusal_before_syscall_retains_live_fd_and_path_without_retry(self):
-        with self.fixture() as (owner, _, ready, _, _, _):
-            close = os.close
-            try:
-                with patch.object(
-                    probe.os, "close", side_effect=OSError("independent pre-close refusal")
-                ) as attempted:
-                    ready.close()
-                    ready.close()
-                attempted.assert_called_once_with(ready.descriptor)
-                self.assertFalse(ready.closed)
-                self.assertTrue(ready.close_attempted)
-                self.assertTrue(ready.close_uncertain)
-                self.assertEqual(os.fstat(ready.descriptor).st_ino, ready.identity.st_ino)
-                self.assertTrue(ready.path.exists())
-                self.assertEqual(
-                    owner.debt,
-                    [
-                        {
-                            "kind": "automation-readiness",
-                            "path": str(ready.path),
-                            "descriptor": ready.descriptor,
-                            "descriptor_close": "unacknowledged",
-                        }
-                    ],
-                )
-            finally:
-                # The explicit test port proves this FD never reached close().
-                close(ready.descriptor)
-
-    def test_constructor_fstat_and_close_refusal_keep_exact_acquisition_debt(self):
-        with TemporaryDirectory() as directory, patch.object(probe, "NativeProcessGroups"):
-            owner = probe.Children(Path(directory))
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            request.readiness_nonce = self.NONCE
-            acquired = []
-            open_file, close = os.open, os.close
-
-            def allocate(*args, **options):
-                descriptor = open_file(*args, **options)
-                acquired.append(descriptor)
-                return descriptor
-
-            try:
-                with (
-                    patch.object(probe.os, "open", side_effect=allocate),
-                    patch.object(
-                        probe.os, "fstat", side_effect=OSError("independent identity refusal")
-                    ),
-                    patch.object(
-                        probe.os, "close", side_effect=OSError("independent close refusal")
-                    ) as attempted,
-                ):
-                    with self.assertRaisesRegex(OSError, "identity refusal"):
-                        probe.OwnedAutomationReadiness(owner, request)
-                self.assertEqual(len(acquired), 1)
-                attempted.assert_called_once_with(acquired[0])
-                self.assertEqual(len(owner.debt), 1)
-                debt = owner.debt[0]
-                self.assertEqual(debt["descriptor"], acquired[0])
-                self.assertEqual(debt["descriptor_close"], "unacknowledged")
-                self.assertEqual(os.fstat(acquired[0]).st_ino, Path(debt["path"]).stat().st_ino)
-            finally:
-                for descriptor in acquired:
-                    close(descriptor)
-
-    def test_close_error_after_syscall_never_closes_reused_foreign_fd_or_unlinks_input(self):
-        with self.fixture() as (owner, _, ready, _, _, _):
-            close = os.close
-
-            def released_then_refused(descriptor):
-                close(descriptor)
-                raise OSError("independent post-close refusal")
-
-            with patch.object(probe.os, "close", side_effect=released_then_refused) as attempted:
-                ready.close()
-            attempted.assert_called_once_with(ready.descriptor)
-            foreign_path = owner.root / "independently-acquired-foreign-fd"
-            foreign = os.open(foreign_path, os.O_RDWR | os.O_CREAT | os.O_EXCL, 0o600)
-            try:
-                self.assertEqual(foreign, ready.descriptor)
-                with patch.object(probe.os, "close", wraps=close) as retry:
-                    ready.close()
-                retry.assert_not_called()
-                self.assertEqual(os.fstat(foreign).st_ino, foreign_path.stat().st_ino)
-                self.assertTrue(ready.path.exists())
-                self.assertFalse(ready.closed)
-                self.assertTrue(ready.close_uncertain)
-                self.assertEqual(owner.debt[0]["descriptor_close"], "unacknowledged")
-            finally:
-                close(foreign)
-
-    def test_post_ack_native_clock_and_activity_are_fresh_in_compiled_explicit_port(self):
-        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
-        start = source.index("static bool sender_foreground_after_readiness(")
-        body = source[start : source.index("\n/* A separate closed metadata", start)]
-        body = body.replace("NSApplication *", "struct Application *").replace("nil", "NULL")
-        body = body.replace("[application isActive]", "model_is_active(application)")
-        port = r"""
-#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdio.h>
-struct Application { bool active; int reads; };
-static uint64_t clocks[2];
-static bool available[2];
-static int cursor;
-static bool foreground_now_ns(uint64_t *value) {
-    if (cursor >= 2) return false;
-    *value = clocks[cursor];
-    return available[cursor++];
-}
-static bool model_is_active(struct Application *app) { app->reads++; return app->active; }
-"""
-        cases = r"""
-int main(void) {
-    // Independent receiving values: acknowledgement I/O may cross the clock
-    // boundary, focus may be lost, and even the fresh getter may consume time.
-    const struct { uint64_t first, second; bool first_ok, second_ok, active, missing, expected; int reads; } cases[] = {
-        {110,111,true,true,true,false,true,1},
-        {200,201,true,true,true,false,false,0},
-        {210,211,true,true,true,false,false,0},
-        {99,110,true,true,true,false,false,0},
-        {110,111,true,true,false,false,false,1},
-        {110,200,true,true,true,false,false,1},
-        {110,109,true,true,true,false,false,1},
-        {110,111,false,true,true,false,false,0},
-        {110,111,true,false,true,false,false,1},
-        {110,111,true,true,true,true,false,0},
-        {199,199,true,true,true,false,true,1}
-    };
-    for (size_t index=0; index<sizeof(cases)/sizeof(cases[0]); index++) {
-        struct Application app={cases[index].active,0};
-        clocks[0]=cases[index].first; clocks[1]=cases[index].second;
-        available[0]=cases[index].first_ok; available[1]=cases[index].second_ok;
-        cursor=0;
-        bool result=sender_foreground_after_readiness(cases[index].missing ? NULL : &app,200,100);
-        if (result!=cases[index].expected || app.reads!=cases[index].reads) return 3;
-    }
-    puts("foreground_after_readiness_controls=11");
-    return 0;
-}
-"""
-        compiler = probe.shutil.which("cc")
-        self.assertIsNotNone(compiler, "An actual C compiler is required for the explicit port")
-        with TemporaryDirectory() as directory:
-            model, binary = Path(directory) / "model.c", Path(directory) / "model"
-            model.write_text(port + body + cases)
-            built = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            self.assertEqual(built.returncode, 0, built.stderr)
-            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "foreground_after_readiness_controls=11\n")
-            self.assertEqual(result.stderr, "")
-
-    def test_native_permission_call_is_guarded_after_ack_io_without_new_activation(self):
-        source = Path(probe.__file__).with_name("native_appleevent_probe_sender.c").read_text()
-        start = source.index(
-            'if (strcmp(argv[3], "permission-request") == 0) {', source.index("int main(")
-        )
-        caller = source[
-            start : source.index("const int outcome = owned_appleevent_permission", start)
-        ]
-        self.assertLess(
-            caller.index("foreground_deadline_ns(&readiness_deadline)"),
-            caller.index("acknowledge_sender_readiness(argv[2])"),
-        )
-        self.assertLess(
-            caller.index("acknowledge_sender_readiness(argv[2])"),
-            caller.index(
-                "sender_foreground_after_readiness(application, readiness_deadline, readiness_before)"
-            ),
-        )
-        final_guard = caller[caller.index("if (!sender_foreground_after_readiness(") :]
-        self.assertIn("AEDisposeDesc(&address)", final_guard)
-        self.assertIn("return 65", final_guard)
-        body = source[
-            source.index("static bool sender_foreground_after_readiness(") : source.index(
-                "\n/* A separate closed metadata"
-            )
-        ]
-        self.assertNotIn("activateIgnoringOtherApps", body)
-        self.assertNotIn("admit_sender_foreground_request", body)
-
-
-class IndependentWindowDiscoveryScopeControls(unittest.TestCase):
-    """Compiled CF/AX interface port; these controls grant no native UI or consent credit."""
-
-    def test_actual_scope_core_and_original_dispatch_keep_unknown_and_owned_refusals(self):
-        source = Path(probe.__file__).with_name("native_appleevent_consent.m").read_text()
-        begin = source.index("enum OwnedWindowScope {")
-        end = source.index("// Passive traversal of only the retained refused window.", begin)
-        body = source[begin:end]
-        clock_begin = body.index("static bool scope_before_deadline(void) {")
-        clock_end = body.index("static AXError scope_copy_attribute(", clock_begin)
-        body = body[:clock_begin] + body[clock_end:]
-        self.assertNotIn("AXUIElementSetMessagingTimeout", body)
-        self.assertNotIn("AXUIElementPerformAction", body)
-        self.assertNotIn("factIdentity", body)
-        anchor = "                if (!inspect_window(window, sender, receiver, buttons, &targetSeen, &senderSeen, &denySeen, agentIndex)) {"
-        original_begin = source.index(anchor)
-        original_end = source.index("                if (!targetSeen) continue;", original_begin)
-        legacy = source[original_begin:original_end]
-        scope_begin = source.rindex(
-            "                enum OwnedWindowScope scope =", 0, original_begin
-        )
-        scoped = source[scope_begin:original_end]
-        scoped = scoped.replace("(__bridge CFStringRef)", "").replace(
-            "application.processIdentifier", "31337"
-        )
-        port = r"""#include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/types.h>
-typedef long CFIndex;
-typedef int AXError;
-struct Object;
-typedef struct Object *CFTypeRef;
-typedef struct Object *AXUIElementRef;
-typedef struct Object *CFStringRef;
-typedef struct Object *CFArrayRef;
-struct Object {
-    int kind;
-    const char *text;
-    CFIndex length;
-    pid_t pid;
-    AXError pid_error, role_error, value_error, children_error;
-    struct Object *role, *value, *children;
-    struct Object **items;
-    CFIndex count;
-};
-struct CFRange { CFIndex location, length; };
-enum { TYPE_AX=1, TYPE_STRING=2, TYPE_ARRAY=3, TYPE_OTHER=4 };
-enum { kAXErrorSuccess=0, kAXErrorCannotComplete=-25204,
-       kAXErrorAttributeUnsupported=-25205, kAXErrorNoValue=-25212,
-       kAXErrorInvalidUIElement=-25202 };
-static const CFIndex kCFNotFound=-1;
-static struct Object role_key={.kind=TYPE_STRING,.text="AXRole"};
-static struct Object value_key={.kind=TYPE_STRING,.text="AXValue"};
-static struct Object children_key={.kind=TYPE_STRING,.text="AXChildren"};
-static struct Object static_role={.kind=TYPE_STRING,.text="AXStaticText"};
-#define kAXRoleAttribute (&role_key)
-#define kAXValueAttribute (&value_key)
-#define kAXChildrenAttribute (&children_key)
-#define kAXStaticTextRole (&static_role)
-static struct Object scope_window_role={.kind=TYPE_STRING,.text="AXWindow"};
-#define kAXWindowRole (&scope_window_role)
-static int references=0, deadline_calls=0, expire_after=-1;
-static double remaining=1;
-static bool scope_before_deadline(void) {
-    deadline_calls++;
-    return remaining>0 && remaining<=3 && (expire_after<0 || deadline_calls<=expire_after);
-}
-static int CFGetTypeID(CFTypeRef value) { return value->kind; }
-static int AXUIElementGetTypeID(void) { return TYPE_AX; }
-static int CFStringGetTypeID(void) { return TYPE_STRING; }
-static int CFArrayGetTypeID(void) { return TYPE_ARRAY; }
-static CFTypeRef CFRetain(CFTypeRef value) { references++; return value; }
-static void CFRelease(CFTypeRef value) { if (value==NULL) abort(); references--; }
-static CFIndex CFStringGetLength(CFStringRef value) { return value->length ? value->length : (CFIndex)strlen(value->text); }
-static bool CFEqual(CFTypeRef first, CFTypeRef second) {
-    return first->kind==TYPE_STRING && second->kind==TYPE_STRING && strcmp(first->text,second->text)==0;
-}
-static struct CFRange CFStringFind(CFStringRef value, CFStringRef needle, unsigned flags) {
-    (void)flags;
-    const char *found=strstr(value->text,needle->text);
-    return (struct CFRange){found ? (CFIndex)(found-value->text) : kCFNotFound, 0};
-}
-static CFIndex CFArrayGetCount(CFArrayRef value) { return value->count; }
-static CFTypeRef CFArrayGetValueAtIndex(CFArrayRef value, CFIndex index) { return value->items[index]; }
-static AXError AXUIElementGetPid(AXUIElementRef value,pid_t *pid) {
-    *pid=value->pid;
-    return value->pid_error;
-}
-static AXError AXUIElementCopyAttributeValue(AXUIElementRef value,CFStringRef key,CFTypeRef *result) {
-    AXError status;
-    if (key==kAXRoleAttribute) { *result=value->role; status=value->role_error; }
-    else if (key==kAXValueAttribute) { *result=value->value; status=value->value_error; }
-    else if (key==kAXChildrenAttribute) { *result=value->children; status=value->children_error; }
-    else abort();
-    if (*result!=NULL) CFRetain(*result);
-    return status;
-}
-"""
-        cases = r"""static struct Object sender_name={.kind=TYPE_STRING,.text="Owned AppleEvent sender 11111111-2222-3333-4444-555555555555"};
-static struct Object receiver_name={.kind=TYPE_STRING,.text="Owned AppleEvent receiver 11111111-2222-3333-4444-555555555555"};
-static struct Object window_role={.kind=TYPE_STRING,.text="AXWindow"};
-static struct Object button_role={.kind=TYPE_STRING,.text="AXButton"};
-static struct Object other={.kind=TYPE_OTHER};
-static int run_case(int which) {
-    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
-    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
-    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
-    struct Object button={.kind=TYPE_AX,.pid=31337,.role=&button_role};
-    struct Object extra[6];
-    for (int index=0;index<6;index++) extra[index]=(struct Object){.kind=TYPE_AX,.pid=31337,.role=&button_role};
-    struct Object *items[257]={&sender,&receiver};
-    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
-    struct Object bad_text={.kind=TYPE_STRING,.text="unrelated",.length=4097};
-    root.children=&array;
-    remaining=1;expire_after=-1;deadline_calls=0;references=0;
-    int expected=OwnedWindowScopeRefused;
-    switch(which) {
-        case 0: /* Complete unrelated seven-node graph, including an untitled button. */
-            for(int index=0;index<6;index++)items[index]=&extra[index];
-            array.count=6;expected=OwnedWindowScopeUnrelated;break;
-        case 1: expected=OwnedWindowScopeCandidate;break;
-        case 2: array.count=1;break;
-        case 3: items[0]=&receiver;array.count=1;break;
-        case 4: root.role_error=kAXErrorCannotComplete;break;
-        case 5: root.role=&other;break;
-        case 6: root.role=&bad_text;break;
-        case 7: sender.value=NULL;sender.value_error=kAXErrorNoValue;break;
-        case 8: sender.value=&other;break;
-        case 9: sender.value=&bad_text;break;
-        case 10: root.children=NULL;root.children_error=kAXErrorNoValue;expected=OwnedWindowScopeUnrelated;break;
-        case 11: root.children=NULL;root.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeUnrelated;break;
-        case 12: root.children=NULL;root.children_error=kAXErrorCannotComplete;break;
-        case 13: root.children=NULL;root.children_error=kAXErrorInvalidUIElement;break;
-        case 14: root.children=&other;break;
-        case 15: items[0]=&other;break;
-        case 16: sender.pid=31338;break;
-        case 17: root.pid_error=kAXErrorInvalidUIElement;break;
-        case 18: array.count=257;break;
-        case 19: {
-            struct Object *nested_items[2]={&sender,&receiver};
-            struct Object nested={.kind=TYPE_ARRAY,.items=nested_items,.count=2};
-            button.children=&nested;
-            for(int index=0;index<256;index++)items[index]=&button;
-            array.count=256;
-            int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
-            return got==expected && references==0 ? 0 : 3;
-        }
-        case 20: items[0]=&root;array.count=1;break;
-        case 21: remaining=0;break;
-        case 22: remaining=4;break;
-        case 23: expire_after=3;break;
-        case 24: items[0]=&other;items[1]=&sender;items[2]=&receiver;array.count=3;break;
-        case 25: root.children=NULL;root.role=&button_role;break;
-        case 26: sender.children=NULL;sender.children_error=kAXErrorNoValue;expected=OwnedWindowScopeCandidate;break;
-        case 27: sender.children=NULL;sender.children_error=kAXErrorAttributeUnsupported;expected=OwnedWindowScopeCandidate;break;
-        case 28: root.children=NULL;expire_after=7;break; /* Final clock check. */
-        case 29: root.children=NULL;expire_after=4;break; /* Read completes after deadline. */
-        case 30: root.pid=31338;break;
-        case 31: items[0]=NULL;break;
-        case 32: root.children_error=kAXErrorNoValue;break; /* Nonnull/error is ambiguous. */
-        case 33: root.role_error=kAXErrorAttributeUnsupported;break;
-        case 34: sender.value_error=kAXErrorCannotComplete;break;
-        default: return 2;
-    }
-    int got=discover_window_scope(&root,&sender_name,&receiver_name,31337);
-    return got==expected && references==0 ? 0 : 3;
-}
-"""
-        selector = r"""
-static int inspector_calls=0;
-static bool inspector_answer=false;
-#define YES true
-static bool inspect_window(AXUIElementRef window, CFStringRef sender, CFStringRef receiver,
-    void *buttons, bool *targetSeen, bool *senderSeen, bool *denySeen, int agentIndex) {
-    (void)window;(void)sender;(void)receiver;(void)buttons;
-    (void)targetSeen;(void)senderSeen;(void)denySeen;(void)agentIndex;
-    inspector_calls++;
-    return inspector_answer;
-}
-static int legacy_dispatch(AXUIElementRef window) {
-    CFStringRef sender=&sender_name,receiver=&receiver_name;
-    void *buttons=NULL;
-    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
-    int agentIndex=0;
-    do {
-LEGACY_FRAGMENT
-    } while(false);
-    return observationRefused ? 1 : 0;
-}
-static int scoped_dispatch(AXUIElementRef window) {
-    CFStringRef sender=&sender_name,receiver=&receiver_name;
-    void *buttons=NULL;
-    bool targetSeen=false,senderSeen=false,denySeen=false,observationRefused=false;
-    int agentIndex=0;
-    do {
-SCOPED_FRAGMENT
-    } while(false);
-    return observationRefused ? 1 : 0;
-}
-static int selector_case(int which) {
-    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&window_role};
-    struct Object sender={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&sender_name};
-    struct Object receiver={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&receiver_name};
-    struct Object *items[2]={&sender,&receiver};
-    struct Object array={.kind=TYPE_ARRAY,.items=items,.count=2};
-    remaining=1;expire_after=-1;deadline_calls=0;references=0;
-    inspector_calls=0;inspector_answer=false;
-    int expected=1,calls=0,got;
-    switch(which) {
-        case 0: /* Actual old call order cannot exclude a malformed unrelated window. */
-            got=legacy_dispatch(&root);calls=1;break;
-        case 1: /* Independent complete zero-identity census can exclude only this scope. */
-            got=scoped_dispatch(&root);expected=0;break;
-        case 2: /* Both private names still require the unchanged failing inspector. */
-            root.children=&array;got=scoped_dispatch(&root);calls=1;break;
-        case 3: /* Partial private identity remains refusal. */
-            root.children=&array;array.count=1;got=scoped_dispatch(&root);break;
-        case 4: /* Unknown traversal remains refusal, with no inspector/action credit. */
-            root.children_error=kAXErrorCannotComplete;got=scoped_dispatch(&root);break;
-        case 5: /* A candidate can progress only through the existing inspector. */
-            root.children=&array;inspector_answer=true;
-            got=scoped_dispatch(&root);expected=0;calls=1;break;
-        default:return 2;
-    }
-    return got==expected && inspector_calls==calls && references==0 ? 0 : 4;
-}
-int main(void) {
-    for(int index=0;index<35;index++)if(run_case(index)!=0) {
-        fprintf(stderr,"scope_case=%d\n",index);return 3;
-    }
-    for(int index=0;index<6;index++)if(selector_case(index)!=0) {
-        fprintf(stderr,"selector_case=%d\n",index);return 4;
-    }
-    puts("window_scope_controls=35; selector_controls=6");
-    return 0;
-}
-"""
-        selector = selector.replace("LEGACY_FRAGMENT", legacy).replace("SCOPED_FRAGMENT", scoped)
-        compiler = probe.shutil.which("cc")
-        self.assertIsNotNone(
-            compiler, "An actual C compiler is required for the explicit CF/AX interface port"
-        )
-        with TemporaryDirectory() as directory:
-            model, binary = Path(directory) / "model.c", Path(directory) / "model"
-            model.write_text(port + body + cases + selector)
-            built = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            self.assertEqual(built.returncode, 0, built.stderr)
-            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "window_scope_controls=35; selector_controls=6\n")
-            self.assertEqual(result.stderr, "")
-
-
 class TimeoutEvidenceUnavailableFixture:
     """Closed test sentinel: actual capability refusal, never positive publication credit."""
 
@@ -5699,10 +3635,7 @@ class FirstCommandTimeoutControls(unittest.TestCase):
     def fact():
         return {
             "schema": 1,
-            "command": "consent-observer",
-            "stage": "exit-wait",
             "budget_seconds": 0.12345678901234568,
-            "request_deadline_ns": 40_000_000_000,
             "started_ns": 11_000_000_000,
             "expired_ns": 14_000_000_000,
             "spent_ns": 3_000_000_000,
@@ -5773,10 +3706,6 @@ class FirstCommandTimeoutControls(unittest.TestCase):
         faults = [
             ("schema", True),
             ("schema", 2),
-            ("command", "PRIVATE_COMMAND"),
-            ("command", 1),
-            ("stage", "PRIVATE_STAGE"),
-            ("stage", True),
             ("budget_seconds", True),
             ("budget_seconds", 0),
             ("budget_seconds", -1),
@@ -5784,11 +3713,6 @@ class FirstCommandTimeoutControls(unittest.TestCase):
             ("budget_seconds", float("nan")),
             ("budget_seconds", float("inf")),
             ("budget_seconds", "PRIVATE_BUDGET"),
-            ("request_deadline_ns", True),
-            ("request_deadline_ns", 0),
-            ("request_deadline_ns", -1),
-            ("request_deadline_ns", 2**64),
-            ("request_deadline_ns", float("nan")),
             ("started_ns", True),
             ("started_ns", -1),
             ("started_ns", 2**64),
@@ -5805,21 +3729,21 @@ class FirstCommandTimeoutControls(unittest.TestCase):
             packet[key] = value
             with self.subTest(key=key, value=repr(value)), self.assertRaises(probe.AdmissionError):
                 probe._validate_command_timeout(packet)
-        for change in ("extra", "missing", "subclass", "request-without-deadline"):
+        for change in ("extra", "missing", "subclass", "retired-consent-fields"):
             packet = self.fact()
             if change == "extra":
                 packet["argv"] = ["PRIVATE_ARGV"]
             elif change == "missing":
-                del packet["stage"]
+                del packet["started_ns"]
             elif change == "subclass":
                 packet = type("ForeignTimeoutDict", (dict,), {})(packet)
             else:
-                packet.update(command="permission-request", request_deadline_ns=None)
+                # The retired consent request labels can never re-enter evidence.
+                packet.update(
+                    command="permission-request", stage="ui-observer", request_deadline_ns=1
+                )
             with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
                 probe._validate_command_timeout(packet)
-        packet = self.fact()
-        packet["request_deadline_ns"] = None
-        self.assertIsNone(probe._validate_command_timeout(packet)["request_deadline_ns"])
 
     def test_first_fact_survives_omitted_history_later_timeout_and_final_closure(self):
         with self.world() as timeout_world:
@@ -5830,9 +3754,9 @@ class FirstCommandTimeoutControls(unittest.TestCase):
                 self.assertTrue(writer.record("initial-" + str(index)))
             first = self.fact()
             self.assertTrue(writer.retain_timeout(first))
-            first["command"] = "other"  # Caller mutation cannot rewrite the retained snapshot.
+            first["budget_seconds"] = 1  # Caller mutation cannot rewrite the retained snapshot.
             second = self.fact()
-            second.update(command="permission-request", stage="ui-observer", budget_seconds=30)
+            second.update(budget_seconds=30)
             self.assertTrue(writer.retain_timeout(second))
             self.assertTrue(writer.retain_timeout(second))
             for phase, status, closed in (
@@ -5898,7 +3822,7 @@ class FirstCommandTimeoutControls(unittest.TestCase):
             (owner, writer, evidence_root, _, acquired, retired, waits, _) = timeout_world
             for index in range(258):
                 self.assertTrue(writer.record("pre-timeout-" + str(index)))
-            foreign = owner.root / "foreign" / "native-appleevent-consent"
+            foreign = owner.root / "foreign" / "owned-native-command"
             with self.assertRaisesRegex(
                 probe.AdmissionError, "^Owned native command exceeded deadline$"
             ):
@@ -5917,114 +3841,13 @@ class FirstCommandTimeoutControls(unittest.TestCase):
             self.assertEqual(final["cases"], {})
             expected = {
                 "schema": 1,
-                "command": "other",
-                "stage": "exit-wait",
                 "budget_seconds": 0.12345678901234568,
-                "request_deadline_ns": None,
                 "started_ns": 10_000_000_000,
                 "expired_ns": 14_000_000_000,
                 "spent_ns": 4_000_000_000,
             }
             self.assertEqual(final.get("first_timeout"), expected)
             self.assertNotIn("PRIVATE", (evidence_root / "checkpoint.json").read_text())
-
-    def test_nested_consent_observer_timeout_keeps_first_identity_parent_deadline_and_exact_cleanup(
-        self,
-    ):
-        with self.world() as timeout_world:
-            if timeout_evidence_unavailable_fixture(self, timeout_world):
-                return
-            (owner, writer, evidence_root, clock, acquired, retired, waits, _) = timeout_world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            original = []
-
-            def callback(process, deadline):
-                self.assertIs(process, acquired[0])
-                self.assertEqual(deadline, 40)
-                clock[0] = 11_000_000_000
-                try:
-                    owner.run(
-                        [str(owner.root / "native-appleevent-consent"), "PRIVATE_UI_NAMES"],
-                        timeout=3,
-                        check=False,
-                    )
-                except probe.AdmissionError as primary:
-                    original.append(primary)
-                    raise
-
-            with self.assertRaises(probe.AdmissionError) as caught:
-                owner.run(request, timeout=30, after_start=callback)
-            self.assertIs(caught.exception, original[0])
-            self.assertEqual(str(caught.exception), "Owned native command exceeded deadline")
-            self.assertEqual(waits, [(acquired[1], 3)])
-            self.assertEqual(retired, [acquired[1], acquired[0]])
-            self.assertTrue(all(owner.groups[p].reaped for p in acquired))
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertIsNone(owner._timeout_request_deadline_ns)
-            expected = self.fact()
-            expected["budget_seconds"] = 3
-            self.assertEqual(writer.first_timeout, expected)
-            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
-            self.assertEqual(
-                json.loads((evidence_root / "checkpoint.json").read_bytes())["first_timeout"],
-                expected,
-            )
-            self.assertNotIn("PRIVATE", (evidence_root / "checkpoint.json").read_text())
-
-    def test_request_readiness_timeout_preserves_original_deadline_and_retires_its_private_file(
-        self,
-    ):
-        with self.world() as timeout_world:
-            if timeout_evidence_unavailable_fixture(self, timeout_world):
-                return
-            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            request.readiness_nonce = "11111111-2222-3333-4444-555555555555"
-            callback = Mock()
-            with patch.object(
-                probe.OwnedAutomationReadiness,
-                "wait",
-                side_effect=subprocess.TimeoutExpired("PRIVATE_READINESS", 30),
-            ):
-                with self.assertRaisesRegex(
-                    probe.AdmissionError, "^Owned native command exceeded deadline$"
-                ):
-                    owner.run(request, timeout=30, after_start=callback)
-            callback.assert_not_called()
-            self.assertEqual(waits, [])
-            self.assertEqual(retired, acquired)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertIsNone(request.readiness)
-            self.assertEqual(list(owner.root.glob("automation-ready-*")), [])
-            self.assertEqual(writer.first_timeout["command"], "permission-request")
-            self.assertEqual(writer.first_timeout["stage"], "readiness")
-            self.assertEqual(writer.first_timeout["request_deadline_ns"], 40_000_000_000)
-            self.assertEqual(request.deadline_ns, 40_000_000_000)
-            self.assertEqual(writer.first_timeout["budget_seconds"], 30)
-
-    def test_raw_ui_callback_timeout_labels_actual_stage_without_claiming_permission_entry(self):
-        with self.world() as timeout_world:
-            if timeout_evidence_unavailable_fixture(self, timeout_world):
-                return
-            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            callback = Mock(side_effect=subprocess.TimeoutExpired("PRIVATE_CALLBACK", 30))
-            with self.assertRaisesRegex(
-                probe.AdmissionError, "^Owned native command exceeded deadline$"
-            ):
-                owner.run(request, timeout=30, after_start=callback)
-            callback.assert_called_once_with(acquired[0], 40)
-            self.assertEqual(waits, [])
-            self.assertEqual(retired, acquired)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertEqual(writer.first_timeout["command"], "permission-request")
-            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
-            self.assertEqual(writer.first_timeout["request_deadline_ns"], 40_000_000_000)
-            self.assertEqual(writer.first_timeout["spent_ns"], 0)
-            self.assertIsNone(owner._timeout_request_deadline_ns)
 
     def test_optional_publication_fault_or_signal_cannot_replace_timeout_primary_or_skip_retirement(
         self,
@@ -6066,34 +3889,6 @@ class FirstCommandTimeoutControls(unittest.TestCase):
             self.assertIsNone(writer.first_timeout)
 
 
-class GenericCallbackTimeoutStageControls(unittest.TestCase):
-    """Keep the literal existing deadline/callback/wait sequence and its stage facts."""
-
-    world = FirstCommandTimeoutControls.world
-
-    def test_generic_callback_failure_preserves_callback_arguments_and_ui_stage(self):
-        with self.world() as timeout_world:
-            if timeout_evidence_unavailable_fixture(self, timeout_world):
-                return
-            (owner, writer, _, _, acquired, retired, waits, _) = timeout_world
-            callback = Mock(side_effect=subprocess.TimeoutExpired("PRIVATE_CALLBACK", 3))
-            with patch.object(probe.time, "monotonic", return_value=20):
-                with self.assertRaisesRegex(
-                    probe.AdmissionError, "^Owned native command exceeded deadline$"
-                ):
-                    owner.run(["owned"], timeout=3, after_start=callback)
-            callback.assert_called_once_with(acquired[0], 23)
-            self.assertEqual(waits, [])
-            self.assertEqual(retired, acquired)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertEqual(writer.first_timeout["command"], "other")
-            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
-            self.assertEqual(writer.first_timeout["budget_seconds"], 3)
-            self.assertIsNone(writer.first_timeout["request_deadline_ns"])
-            self.assertEqual(writer.first_timeout["spent_ns"], 0)
-
-
 class TimeoutEvidenceMissingCapabilityControls(unittest.TestCase):
     """Forced real constructor refusal; positive publication remains explicitly unexecuted."""
 
@@ -6130,1131 +3925,6 @@ class TimeoutEvidenceMissingCapabilityControls(unittest.TestCase):
             if present:
                 probe.os.O_NOFOLLOW = original
         self.assertEqual(hasattr(probe.os, "O_NOFOLLOW"), present)
-
-
-class FirstDiscoveryFactControls(unittest.TestCase):
-    """Literal closed projections and actual C scope core with a modeled CF/AX port."""
-
-    @staticmethod
-    def packet():
-        return {
-            "schema": 1,
-            "ax_trusted": True,
-            "requester_qualified": True,
-            "scanned_agents": 1,
-            "windows": 1,
-            "nodes": 0,
-            "candidates": 0,
-            "matches": 0,
-            "first_agent": -1,
-            "first_attribute": "none",
-            "first_type": "none",
-            "first_error": 0,
-        }
-
-    def test_completed_scopes_are_observations_without_candidate_or_action_credit(self):
-        for scope, sender, receiver in (
-            ("unrelated", False, False),
-            ("refused", True, False),
-            ("refused", False, True),
-            ("candidate", True, True),
-        ):
-            packet = self.packet()
-            packet["discovery"] = {
-                "schema": 1,
-                "scope": scope,
-                "sender": sender,
-                "receiver": receiver,
-                "complete": True,
-                "nodes": 8,
-            }
-            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-            self.assertEqual(packet["candidates"], 0)
-            self.assertEqual(packet["matches"], 0)
-            self.assertEqual(packet["nodes"], 0)
-
-    def test_incomplete_discovery_keeps_partial_bits_without_claiming_scope(self):
-        for nodes in (0, 1, 256, 257):
-            packet = self.packet()
-            packet["discovery"] = {
-                "schema": 1,
-                "scope": "refused",
-                "sender": nodes >= 2,
-                "receiver": False,
-                "complete": False,
-                "nodes": nodes,
-            }
-            self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-
-    def test_scalar_types_bounds_noise_and_completion_laws_refuse(self):
-        original = {
-            "schema": 1,
-            "scope": "unrelated",
-            "sender": False,
-            "receiver": False,
-            "complete": True,
-            "nodes": 8,
-        }
-        changes = (
-            {"schema": True},
-            {"scope": "approved"},
-            {"sender": 1},
-            {"receiver": 0},
-            {"complete": 1},
-            {"nodes": True},
-            {"nodes": -1},
-            {"nodes": 258},
-            {"nodes": 0},
-            {"nodes": 257},
-            {"sender": True},
-            {"receiver": True},
-            {"complete": False},
-            {"scope": "candidate"},
-            {"raw_text": "forbidden"},
-            {"scope": "refused", "complete": False, "sender": True, "nodes": 0},
-            {"scope": "candidate", "sender": True, "receiver": True, "nodes": 1},
-        )
-        for change in changes:
-            packet = self.packet()
-            packet["discovery"] = {**original, **change}
-            with self.subTest(change=change), self.assertRaises(probe.AdmissionError):
-                probe._validate_owned_automation_ui_fact(packet)
-        packet = self.packet()
-        packet["windows"] = 0
-        packet["discovery"] = original
-        with self.assertRaises(probe.AdmissionError):
-            probe._validate_owned_automation_ui_fact(packet)
-
-    def test_discovery_coexists_with_prior_refused_button_and_identity_facts(self):
-        packet = PassiveWindowIdentityControls.packet()
-        packet["windows"] = 1
-        packet["discovery"] = {
-            "schema": 1,
-            "scope": "candidate",
-            "sender": True,
-            "receiver": True,
-            "complete": True,
-            "nodes": 9,
-        }
-        original_button = dict(packet["first_button"])
-        original_identity = dict(packet["identity"])
-        self.assertEqual(probe._validate_owned_automation_ui_fact(packet), packet)
-        self.assertEqual(packet["first_button"], original_button)
-        self.assertEqual(packet["identity"], original_identity)
-        self.assertEqual(packet["first_error"], -25205)
-
-    def test_actual_c_scope_serializes_only_first_existing_traversal(self):
-        # Reuse only the pre-existing literal CF/AX interface declarations, never
-        # derive a result or expected JSON from either implementation.
-        tree = ast.parse(Path(__file__).read_text())
-        classes = [
-            node
-            for node in tree.body
-            if isinstance(node, ast.ClassDef)
-            and node.name == "IndependentWindowDiscoveryScopeControls"
-        ]
-        self.assertEqual(len(classes), 1, "One original CF/AX port owner is required")
-        methods = [
-            node
-            for node in classes[0].body
-            if isinstance(node, ast.FunctionDef)
-            and node.name
-            == "test_actual_scope_core_and_original_dispatch_keep_unknown_and_owned_refusals"
-        ]
-        self.assertEqual(len(methods), 1, "One original scope control is required")
-        ports = [
-            node.value.value
-            for node in methods[0].body
-            if isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(node.targets[0], ast.Name)
-            and node.targets[0].id == "port"
-            and isinstance(node.value, ast.Constant)
-            and type(node.value.value) is str
-        ]
-        self.assertEqual(len(ports), 1, "One literal CF/AX interface port is required")
-        port = ports[0]
-        source = Path(probe.__file__).with_name("native_appleevent_consent.m").read_text()
-        begin = source.index("enum OwnedWindowScope {")
-        end = source.index("// Passive traversal of only the retained refused window.", begin)
-        body = source[begin:end]
-        clock_begin = body.index("static bool scope_before_deadline(void) {")
-        clock_end = body.index("static AXError scope_copy_attribute(", clock_begin)
-        body = body[:clock_begin] + body[clock_end:]
-        cases = r"""static struct Object sender_name={.kind=TYPE_STRING,.text="sender"};
-static struct Object receiver_name={.kind=TYPE_STRING,.text="receiver"};
-static int check(int which, const char *expected, enum OwnedWindowScope expected_scope) {
-    struct Object root={.kind=TYPE_AX,.pid=31337,.role=&scope_window_role};
-    struct Object text={.kind=TYPE_STRING,.text=which==2 ? "sender" : "sender receiver"};
-    struct Object leaf={.kind=TYPE_AX,.pid=31337,.role=&static_role,.value=&text};
-    struct Object *items[]={&leaf};
-    struct Object children={.kind=TYPE_ARRAY,.items=items,.count=1};
-    if (which==1 || which==2) root.children=&children;
-    if (which==3) root.pid_error=kAXErrorInvalidUIElement;
-    remaining=which==4 ? 0 : 1; deadline_calls=0; expire_after=-1;
-    discoveryObserved=false;
-    enum OwnedWindowScope scope=discover_window_scope(&root,&sender_name,&receiver_name,31337);
-    if (scope!=expected_scope || references!=0) return 1;
-    char encoded[256]; int length=owned_discovery_fact(encoded,sizeof(encoded));
-    if (length!=(int)strlen(expected) || strcmp(encoded,expected)!=0) return 2;
-    // A later different window must not replace the retained first observation.
-    remaining=1;
-    struct Object second={.kind=TYPE_AX,.pid=31337,.role=&scope_window_role};
-    if (discover_window_scope(&second,&sender_name,&receiver_name,31337)!=OwnedWindowScopeUnrelated)
-        return 3;
-    if (owned_discovery_fact(encoded,sizeof(encoded))!=length || strcmp(encoded,expected)!=0 || references!=0)
-        return 4;
-    return 0;
-}
-int main(void) {
-    char absent[256];
-    if (owned_discovery_fact(absent,sizeof(absent))!=0) return 1;
-    const char *expected[]={
-        ",\"discovery\":{\"schema\":1,\"scope\":\"unrelated\",\"sender\":false,\"receiver\":false,\"complete\":true,\"nodes\":1}",
-        ",\"discovery\":{\"schema\":1,\"scope\":\"candidate\",\"sender\":true,\"receiver\":true,\"complete\":true,\"nodes\":2}",
-        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":true,\"receiver\":false,\"complete\":true,\"nodes\":2}",
-        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":false,\"receiver\":false,\"complete\":false,\"nodes\":1}",
-        ",\"discovery\":{\"schema\":1,\"scope\":\"refused\",\"sender\":false,\"receiver\":false,\"complete\":false,\"nodes\":0}"
-    };
-    const enum OwnedWindowScope scopes[]={OwnedWindowScopeUnrelated,OwnedWindowScopeCandidate,
-        OwnedWindowScopeRefused,OwnedWindowScopeRefused,OwnedWindowScopeRefused};
-    for (int which=0;which<5;which++) if (check(which,expected[which],scopes[which])) return 2+which;
-    puts("discovery_same_traversal_controls=5");
-    return 0;
-}
-"""
-        compiler = probe.shutil.which("cc")
-        self.assertIsNotNone(compiler, "Actual compiler required for the explicit CF/AX port")
-        with TemporaryDirectory() as directory:
-            model, binary = Path(directory) / "scope.c", Path(directory) / "scope"
-            model.write_text(port + body + cases)
-            built = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Werror", str(model), "-o", str(binary)],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            self.assertEqual(built.returncode, 0, built.stderr)
-            result = subprocess.run([str(binary)], capture_output=True, text=True, timeout=5)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertEqual(result.stdout, "discovery_same_traversal_controls=5\n")
-            self.assertEqual(result.stderr, "")
-
-
-class PermissionWorkerMilestoneControls(unittest.TestCase):
-    entry = b"OWNED_PERMISSION_WORKER/1 phase=api-call-starting\n"
-    returned = b"OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=-1744\n"
-    joined = b"OWNED_PERMISSION_WORKER/1 phase=worker-joined\n"
-
-    def test_literal_prefix_records_never_grant_api_or_process_success(self):
-        for data, stage, status in (
-            (b"", "no-milestone", None),
-            (self.entry, "api-call-starting", None),
-            (self.entry + self.returned, "api-returned", -1744),
-            (self.entry + self.returned + self.joined, "worker-joined", -1744),
-        ):
-            with self.subTest(stage=stage):
-                self.assertEqual(
-                    probe._permission_worker_trace(data),
-                    {"schema": 1, "stage": stage, "api_osstatus": status},
-                )
-        for value in (-2147483648, 2147483647, 0):
-            data = (
-                self.entry
-                + (
-                    "OWNED_PERMISSION_WORKER/1 phase=api-returned osstatus=" + str(value) + "\n"
-                ).encode()
-            )
-            self.assertEqual(probe._permission_worker_trace(data)["api_osstatus"], value)
-
-    def test_noise_duplicate_truncation_order_bounds_and_noncanonical_status_refuse(self):
-        for data in (
-            self.joined,
-            self.returned,
-            self.entry * 2,
-            self.entry[:-1],
-            self.entry + self.joined,
-            self.entry + self.returned + self.joined * 2,
-            self.entry + self.returned + b"noise\n",
-            b"\0",
-            b"x" * 257,
-            self.entry + self.returned.replace(b"-1744", b"-0"),
-            self.entry + self.returned.replace(b"-1744", b"01"),
-            self.entry + self.returned.replace(b"-1744", b"2147483648"),
-            self.entry + self.returned.replace(b"-1744", b"-2147483649"),
-        ):
-            with self.subTest(data=data):
-                with self.assertRaises(probe.AdmissionError):
-                    probe._permission_worker_trace(data)
-        with self.assertRaises(probe.AdmissionError):
-            probe._permission_worker_trace("not-bytes")
-
-    def test_normal_result_only_extracts_complete_status_agreeing_joined_frames(self):
-        output = b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=-1744\n"
-        complete = self.entry + self.returned + self.joined
-        self.assertEqual(probe._permission_result_stderr(output, complete), b"")
-        for errors in (
-            self.entry,
-            self.entry + self.returned,
-            complete + b"noise\n",
-            b"Owned Automation worker retirement failed\n",
-        ):
-            self.assertEqual(probe._permission_result_stderr(output, errors), errors)
-        for foreign in (
-            output.replace(b"request", b"query"),
-            output.replace(b"-1744", b"0"),
-            output.replace(b"-1744", b"-01744"),
-        ):
-            self.assertEqual(probe._permission_result_stderr(foreign, complete), complete)
-
-    def test_deadline_primary_retains_call_boundary_only_after_exact_existing_settlement(self):
-        process = SimpleNamespace(pid=19)
-        group = SimpleNamespace(process=process, reaped=True)
-        evidence = Mock(descriptor=7)
-        owner = SimpleNamespace(groups={19: group}, debt=[], evidence=evidence)
-
-        # Model only the existing exact process dictionary; no fake kernel closure credit.
-        class Key:
-            pid = 19
-
-        process = Key()
-        group.process = process
-        owner.groups = {process: group}
-        primary = probe.AdmissionError("original owned deadline")
-        with patch.object(probe, "_permission_worker_capture", return_value=self.entry) as capture:
-            probe._observe_permission_worker(owner, process, primary)
-        capture.assert_called_once_with(owner, process)
-        self.assertEqual(
-            evidence.record.call_args.kwargs["permission_worker"],
-            {"schema": 1, "stage": "api-call-starting", "api_osstatus": None},
-        )
-        self.assertEqual(evidence.record.call_args.kwargs["status"], "refused")
-        self.assertEqual(str(primary), "original owned deadline")
-
-    def test_debt_foreign_owner_capture_refusal_and_cancel_do_not_fabricate_call_boundary(self):
-        class Key:
-            pid = 19
-
-        process = Key()
-        primary = probe.AdmissionError("same primary")
-        for fault in (
-            "unreaped",
-            "foreign",
-            "debt",
-            "noisy",
-            "capture",
-            "interrupted",
-            "keyboard",
-            "exit",
-        ):
-            group = SimpleNamespace(process=process, reaped=fault != "unreaped")
-            if fault == "foreign":
-                group.process = Key()
-            evidence = Mock(descriptor=7)
-            owner = SimpleNamespace(
-                groups={process: group},
-                debt=[{"pid": 19}] if fault == "debt" else [],
-                evidence=evidence,
-            )
-            with (
-                self.subTest(fault=fault),
-                patch.object(probe, "_permission_worker_capture") as capture,
-            ):
-                capture.return_value = b"noise\n"
-                if fault in ("capture", "interrupted", "keyboard", "exit"):
-                    capture.side_effect = {
-                        "capture": OSError("refused"),
-                        "interrupted": probe.OwnedProcessInterrupted("cancel"),
-                        "keyboard": KeyboardInterrupt("cancel"),
-                        "exit": SystemExit(9),
-                    }[fault]
-                probe._observe_permission_worker(owner, process, primary)
-                self.assertEqual(
-                    evidence.record.call_args.kwargs["permission_worker"],
-                    {"schema": 1, "stage": "unavailable", "api_osstatus": None},
-                )
-                if fault in ("unreaped", "foreign", "debt"):
-                    capture.assert_not_called()
-                self.assertEqual(str(primary), "same primary")
-                self.assertEqual(owner.debt, [{"pid": 19}] if fault == "debt" else [])
-
-    def test_capture_close_refusal_retains_exact_acquisition_without_retry_or_call_credit(self):
-        class Key:
-            pid = 19
-
-        process = Key()
-        with TemporaryDirectory() as directory:
-            root = Path(directory).resolve()
-            path = root / "child.stderr"
-            path.write_bytes(self.entry)
-            info = path.stat()
-            close = os.close
-            open_original = os.open
-            nofollow = getattr(os, "O_NOFOLLOW", 1 << 24)
-            nonblock = getattr(os, "O_NONBLOCK", 1 << 25)
-            modeled_bits = (0 if hasattr(os, "O_NOFOLLOW") else nofollow) | (
-                0 if hasattr(os, "O_NONBLOCK") else nonblock
-            )
-            for failure_type in (
-                OSError,
-                probe.OwnedProcessInterrupted,
-                KeyboardInterrupt,
-                SystemExit,
-            ):
-                for point in ("before-syscall", "after-syscall"):
-                    with self.subTest(error=failure_type.__name__, point=point):
-                        acquired, debts = [], []
-                        physical_close = []
-                        owner = SimpleNamespace(
-                            root=root,
-                            captures={process: (root / "unused", path)},
-                            capture_identities={process: ((0, 0), (info.st_dev, info.st_ino))},
-                            record_debt=debts.append,
-                        )
-                        failure = failure_type("unknown close")
-
-                        def capture_open(value, flags, **kwargs):
-                            self.assertEqual(flags, os.O_RDONLY | nofollow | nonblock)
-                            fd = open_original(value, flags & ~modeled_bits, **kwargs)
-                            acquired.append(fd)
-                            return fd
-
-                        def refuse_close(fd):
-                            self.assertEqual(fd, acquired[0])
-                            if point == "after-syscall":
-                                close(fd)
-                                physical_close.append(fd)
-                            raise failure
-
-                        try:
-                            with (
-                                patch.object(probe.os, "O_NOFOLLOW", nofollow, create=True),
-                                patch.object(probe.os, "O_NONBLOCK", nonblock, create=True),
-                                patch.object(
-                                    probe.os, "getuid", return_value=info.st_uid, create=True
-                                ),
-                                patch.object(probe.os, "open", side_effect=capture_open),
-                                patch.object(
-                                    probe.os, "close", side_effect=refuse_close
-                                ) as refused_close,
-                            ):
-                                with self.assertRaises(failure_type) as caught:
-                                    probe._permission_worker_capture(owner, process)
-                            self.assertIs(caught.exception, failure)
-                            self.assertEqual(refused_close.call_count, 1)
-                            self.assertEqual(len(acquired), 1)
-                            self.assertEqual(
-                                debts,
-                                [
-                                    {
-                                        "kind": "permission-capture",
-                                        "descriptor": acquired[0],
-                                        "identity": [info.st_dev, info.st_ino],
-                                        "close": "unacknowledged",
-                                    }
-                                ],
-                            )
-                            if point == "before-syscall":
-                                self.assertEqual(os.fstat(acquired[0]).st_ino, info.st_ino)
-                            self.assertEqual(
-                                physical_close, acquired if point == "after-syscall" else []
-                            )
-                        finally:
-                            if acquired and not physical_close:
-                                close(acquired[0])
-                                physical_close.append(acquired[0])
-                        self.assertEqual(physical_close, acquired)
-
-    def test_actual_worker_body_preserves_query_and_request_on_the_explicit_thread_api_port(self):
-        source = (
-            Path(__file__).resolve().parents[2] / "tools/diagnostics/native_appleevent_permission.c"
-        ).read_text()
-        start = source.index("struct permission_request {")
-        body = source[start:]
-        port = r"""
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <string.h>
-typedef int32_t OSStatus;
-typedef unsigned AEEventClass;
-typedef unsigned AEEventID;
-typedef struct { int value; } AEAddressDesc;
-static int calls;
-typedef int pthread_t;
-static int pthread_create(pthread_t *worker, const void *attributes,
-    void *(*entry)(void *), void *argument) {
-    if (worker == NULL || attributes != NULL || entry == NULL) abort();
-    *worker = 7;
-    if (entry(argument) != NULL) abort();
-    return 0;
-}
-static int pthread_join(pthread_t worker, void **value) {
-    if (worker != 7 || value != NULL) abort();
-    return 0;
-}
-static OSStatus AEDeterminePermissionToAutomateTarget(const AEAddressDesc *target,
-    AEEventClass cls, AEEventID event, bool ask) {
-    if (target == NULL || target->value != 8 || cls != 9 || event != 10) abort();
-    calls++;
-    return ask ? -1744 : -1743;
-}
-static const OSStatus noErr = 0;
-"""
-        main = r"""
-int main(int argc, char **argv) {
-    if (argc != 2) return 91;
-    AEAddressDesc target = {8};
-    int result = owned_appleevent_permission(&target, 9, 10, strcmp(argv[1], "request") == 0);
-    return result == 67 && calls == 1 ? 0 : 92;
-}
-"""
-        compiler = probe.shutil.which("cc")
-        self.assertIsNotNone(compiler, "Actual compiler needed for the explicit API port")
-        with TemporaryDirectory() as directory:
-            unit, binary = Path(directory) / "worker.c", Path(directory) / "worker"
-            unit.write_text(port + body + main)
-            built = subprocess.run(
-                [compiler, "-std=c11", "-Wall", "-Werror", str(unit), "-o", str(binary)],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            self.assertEqual(built.returncode, 0, built.stderr)
-            query = subprocess.run([str(binary), "query"], capture_output=True, timeout=5)
-            self.assertEqual(query.returncode, 0)
-            self.assertEqual(
-                query.stdout, b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=query osstatus=-1743\n"
-            )
-            self.assertEqual(query.stderr, b"")
-            request = subprocess.run([str(binary), "request"], capture_output=True, timeout=5)
-            self.assertEqual(request.returncode, 0)
-            self.assertEqual(
-                request.stdout, b"OWNED_APPLEEVENT_PREFLIGHT/1 mode=request osstatus=-1744\n"
-            )
-            self.assertEqual(request.stderr, self.entry + self.returned + self.joined)
-
-
-class FirstPermissionWorkerRetentionControls(unittest.TestCase):
-    """Actual bounded publication; these facts never grant permission or native closure."""
-
-    def test_late_worker_fact_survives_full_history_and_later_checkpoints_without_grant(self):
-        with FirstCommandTimeoutControls().world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            (_, writer, evidence_root, _, acquired, _, _, _) = world
-            for index in range(260):
-                self.assertTrue(writer.record("pre-worker-" + str(index)))
-            first = {"schema": 1, "stage": "api-call-starting", "api_osstatus": None}
-            self.assertTrue(
-                writer.record(
-                    "automation.permission-worker", status="refused", permission_worker=first
-                )
-            )
-            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
-            self.assertEqual(current.get("first_permission_worker"), first)
-            self.assertFalse(current["ownership_closed"])
-            self.assertEqual(current["status"], "refused")
-            later = {"schema": 1, "stage": "worker-joined", "api_osstatus": 0}
-            self.assertTrue(writer.record("automation.permission-worker", permission_worker=later))
-            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
-            self.assertEqual(current["permission_worker"], later)
-            self.assertEqual(current.get("first_permission_worker"), first)
-            for index in range(260):
-                self.assertTrue(writer.record("post-worker-" + str(index)))
-            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
-            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
-            self.assertEqual(current.get("first_permission_worker"), first)
-            self.assertNotIn("permission_worker", current)
-            self.assertEqual(current["phase"], "candidate.failed")
-            self.assertEqual(current["status"], "refused")
-            self.assertEqual(current["cases"], {})
-            self.assertGreater(current["history_omitted"], 0)
-            self.assertLessEqual(len(json.dumps(current).encode()), 4096)
-            self.assertEqual(len(list(evidence_root.glob("phase-*.json"))), 256)
-            self.assertEqual(len(list(evidence_root.iterdir())), 257)
-            self.assertTrue(
-                all(
-                    "first_permission_worker" not in json.loads(path.read_bytes())
-                    for path in evidence_root.glob("phase-*.json")
-                )
-            )
-            self.assertEqual(acquired, [])
-
-    def test_only_validated_copy_can_seed_first_and_corrupt_replacement_cannot_publish(self):
-        faults = (
-            (
-                "automation.permission-worker",
-                "pending",
-                {"schema": 1, "stage": "PRIVATE", "api_osstatus": None},
-            ),
-            (
-                "automation.permission-worker",
-                "pending",
-                {"schema": True, "stage": "api-call-starting", "api_osstatus": None},
-            ),
-            (
-                "automation.permission-worker",
-                "pending",
-                {"schema": 1, "stage": "api-call-starting", "api_osstatus": 0},
-            ),
-            (
-                "automation.permission-worker",
-                "accepted",
-                {"schema": 1, "stage": "worker-joined", "api_osstatus": 0},
-            ),
-            (
-                "candidate.failed",
-                "refused",
-                {"schema": 1, "stage": "api-call-starting", "api_osstatus": None},
-            ),
-        )
-        for phase, status, fact in faults:
-            with self.subTest(phase=phase, status=status, fact=fact):
-                with FirstCommandTimeoutControls().world() as world:
-                    if timeout_evidence_unavailable_fixture(self, world):
-                        return
-                    (_, writer, evidence_root, _, acquired, _, _, _) = world
-                    self.assertTrue(writer.record("candidate.begin"))
-                    before = (evidence_root / "checkpoint.json").read_bytes()
-                    self.assertFalse(writer.record(phase, status=status, permission_worker=fact))
-                    self.assertIsNone(getattr(writer, "first_permission_worker", None))
-                    self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
-                    self.assertEqual(acquired, [])
-        with FirstCommandTimeoutControls().world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            (_, writer, evidence_root, _, acquired, _, _, _) = world
-            supplied = {"schema": 1, "stage": "api-returned", "api_osstatus": -1744}
-            self.assertTrue(
-                writer.record(
-                    "automation.permission-worker", status="refused", permission_worker=supplied
-                )
-            )
-            supplied["api_osstatus"] = 0
-            expected = {"schema": 1, "stage": "api-returned", "api_osstatus": -1744}
-            self.assertTrue(writer.record("candidate.failed", status="refused"))
-            current = json.loads((evidence_root / "checkpoint.json").read_bytes())
-            self.assertEqual(current.get("first_permission_worker"), expected)
-            self.assertEqual(writer.first_permission_worker, expected)
-            self.assertIsNot(writer.first_permission_worker, supplied)
-            before = (evidence_root / "checkpoint.json").read_bytes()
-            writer.first_permission_worker["private_path"] = "PRIVATE"
-            self.assertFalse(writer.record("cleanup.closed", status="accepted", closed=True))
-            self.assertEqual((evidence_root / "checkpoint.json").read_bytes(), before)
-            self.assertNotIn(b"PRIVATE", before)
-            self.assertEqual(acquired, [])
-
-
-class LastNativeUIEvidenceControls(unittest.TestCase):
-    """Actual recorder decisions with explicit in-memory filesystem boundaries."""
-
-    @contextmanager
-    def recorder(self):
-        writer = probe.PhaseEvidence(None)
-        writer.descriptor = 73136
-        files, descriptors = {}, {}
-        serial = [0]
-        clock = [10.0]
-
-        class CapturedStream(io.BytesIO):
-            def __init__(self, name):
-                super().__init__()
-                self.name = name
-
-            def fileno(self):
-                return 73136
-
-            def close(self):
-                files[self.name] = self.getvalue()
-                super().close()
-
-        def acquire(name, flags, mode, *, dir_fd):
-            self.assertEqual(dir_fd, 73136)
-            self.assertEqual(mode, 0o600)
-            self.assertNotIn(name, files)
-            serial[0] += 1
-            descriptors[serial[0]] = name
-            return serial[0]
-
-        def link(source, target, *, src_dir_fd, dst_dir_fd, follow_symlinks):
-            self.assertEqual((src_dir_fd, dst_dir_fd, follow_symlinks), (73136, 73136, False))
-            self.assertNotIn(target, files)
-            files[target] = files[source]
-
-        def replace(source, target, *, src_dir_fd, dst_dir_fd):
-            self.assertEqual((src_dir_fd, dst_dir_fd), (73136, 73136))
-            files[target] = files.pop(source)
-
-        def unlink(name, *, dir_fd):
-            self.assertEqual(dir_fd, 73136)
-            if name not in files:
-                raise FileNotFoundError(name)
-            del files[name]
-
-        with (
-            patch.object(probe.os, "O_NOFOLLOW", 0x10000000, create=True),
-            patch.object(probe.os, "open", side_effect=acquire),
-            patch.object(
-                probe.os, "fdopen", side_effect=lambda fd, mode: CapturedStream(descriptors[fd])
-            ),
-            patch.object(probe.os, "fsync"),
-            patch.object(probe.os, "link", side_effect=link),
-            patch.object(probe.os, "replace", side_effect=replace),
-            patch.object(probe.os, "unlink", side_effect=unlink),
-            patch.object(probe.time, "monotonic", side_effect=lambda: clock[0]),
-        ):
-            writer.started = 0.0
-            yield writer, files, clock
-
-    @staticmethod
-    def ui():
-        return {
-            "schema": 1,
-            "ax_trusted": True,
-            "requester_qualified": True,
-            "scanned_agents": 1,
-            "windows": 1,
-            "nodes": 0,
-            "candidates": 0,
-            "matches": 0,
-            "first_agent": -1,
-            "first_attribute": "none",
-            "first_type": "none",
-            "first_error": 0,
-        }
-
-    def test_last_ui_survives_full_history_and_terminal_without_claiming_consent(self):
-        with self.recorder() as (writer, files, clock):
-            for index in range(300):
-                self.assertTrue(
-                    writer.record("command.begin", command="one" if index % 2 else "two")
-                )
-            packet = self.ui()
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=packet))
-            packet["windows"] = 7
-            clock[0] = 20.0
-            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
-            terminal = json.loads(files["checkpoint.json"])
-            self.assertIn("last_native_ui", terminal)
-            self.assertEqual(terminal["last_native_ui"], self.ui())
-            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 10.0)
-            self.assertEqual(terminal["elapsed_seconds"], 20.0)
-            self.assertEqual(terminal["phase"], "candidate.failed")
-            self.assertEqual(terminal["status"], "refused")
-            self.assertTrue(terminal["ownership_closed"])
-            self.assertEqual(terminal["debt_kinds"], [])
-            self.assertNotIn("native_ui", terminal)
-            self.assertEqual(terminal["history_omitted"], 46)
-            self.assertEqual(len(files), 257)
-            self.assertTrue(all(len(image) <= 4096 for image in files.values()))
-            self.assertFalse(
-                any(
-                    "last_native_ui" in json.loads(image)
-                    for name, image in files.items()
-                    if name.startswith("phase-")
-                )
-            )
-
-    def test_latest_validated_ui_survives_invalid_input_and_retains_cleanup_debt(self):
-        with self.recorder() as (writer, files, clock):
-            first = self.ui()
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
-            latest = dict(
-                first,
-                windows=0,
-                first_agent=0,
-                first_attribute="windows",
-                first_type="absent",
-                first_error=-25204,
-            )
-            clock[0] = 11.0
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=latest))
-            before = files["checkpoint.json"]
-            self.assertFalse(
-                writer.record(
-                    "automation.ui-observation", native_ui=dict(latest, PRIVATE="not-for-export")
-                )
-            )
-            self.assertEqual(files["checkpoint.json"], before)
-            self.assertFalse(
-                writer.record("cleanup.debt", status="cleanup-debt", debt_kinds=["process-group"])
-            )
-            terminal = json.loads(files["checkpoint.json"])
-            self.assertIn("last_native_ui", terminal)
-            self.assertEqual(terminal["last_native_ui"], latest)
-            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 11.0)
-            self.assertFalse(terminal["ownership_closed"])
-            self.assertEqual(terminal["debt_kinds"], ["process-group"])
-            self.assertNotIn("PRIVATE", files["checkpoint.json"].decode())
-
-    def test_identical_later_ui_updates_observation_time_through_terminal(self):
-        with self.recorder() as (writer, files, clock):
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.ui()))
-            clock[0] = 11.0
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.ui()))
-            repeated = json.loads(files["checkpoint.json"])
-            self.assertEqual(repeated["last_native_ui_elapsed_seconds"], 11.0)
-            clock[0] = 20.0
-            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
-            terminal = json.loads(files["checkpoint.json"])
-            self.assertEqual(terminal["last_native_ui"], self.ui())
-            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 11.0)
-            self.assertTrue(terminal["ownership_closed"])
-            self.assertEqual(terminal["status"], "refused")
-            self.assertEqual(len(files), 4)
-
-    def test_optional_ui_facts_keep_scalar_projection_and_time_through_terminal(self):
-        expected = {
-            "schema": 1,
-            "ax_trusted": True,
-            "requester_qualified": True,
-            "scanned_agents": 2,
-            "windows": 1,
-            "nodes": 7,
-            "candidates": 0,
-            "matches": 0,
-            "first_agent": 1,
-            "first_attribute": "button-title",
-            "first_type": "absent",
-            "first_error": -25205,
-            "discovery": {
-                "schema": 1,
-                "scope": "candidate",
-                "sender": True,
-                "receiver": True,
-                "complete": True,
-                "nodes": 9,
-            },
-        }
-        supplied = dict(
-            json.loads(json.dumps(expected)),
-            first_button={"schema": 1, "subrole": "absent", "type": "absent", "error": -25205},
-            identity={
-                "schema": 1,
-                "sender": True,
-                "receiver": True,
-                "complete": True,
-                "nodes": 9,
-                "refusal": "none",
-                "error": 0,
-            },
-        )
-        with self.recorder() as (writer, files, clock):
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=supplied))
-            immediate = json.loads(files["checkpoint.json"])
-            self.assertEqual(immediate["native_ui"], supplied)
-            self.assertEqual(immediate["last_native_ui"], expected)
-            self.assertEqual(immediate["last_native_ui_elapsed_seconds"], 10.0)
-            self.assertFalse(immediate["ownership_closed"])
-            supplied["discovery"]["nodes"] = 11
-            clock[0] = 20.0
-            self.assertTrue(writer.record("candidate.failed", status="refused", closed=True))
-            terminal = json.loads(files["checkpoint.json"])
-            self.assertEqual(terminal["last_native_ui"], expected)
-            self.assertEqual(terminal["last_native_ui_elapsed_seconds"], 10.0)
-            self.assertEqual(terminal["elapsed_seconds"], 20.0)
-            self.assertEqual(terminal["status"], "refused")
-            self.assertTrue(terminal["ownership_closed"])
-            self.assertEqual(terminal["debt_kinds"], [])
-            self.assertNotIn("native_ui", terminal)
-            self.assertNotIn("first_button", terminal["last_native_ui"])
-            self.assertNotIn("identity", terminal["last_native_ui"])
-            self.assertTrue(all(len(image) <= 4096 for image in files.values()))
-
-
-class ActualPromptAdmissionTimeoutControls(unittest.TestCase):
-    world = FirstCommandTimeoutControls.world
-
-    def verify_retired(self, owner, acquired, retired, waits):
-        self.assertEqual(retired, acquired)
-        self.assertEqual(owner.active, [])
-        self.assertEqual(owner.debt, [])
-        self.assertEqual(waits, [])
-        self.assertIsNone(owner._timeout_request_deadline_ns)
-
-    def test_actual_literal_prompt_deadline_keeps_primary_and_publishes_closed_observation(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            owner, writer, root, _, acquired, retired, waits, _ = world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-
-            def callback(process, deadline):
-                probe.approve_owned_automation_prompt(
-                    owner, process, deadline, "sender", "receiver"
-                )
-
-            with (
-                patch.object(probe.time, "monotonic", return_value=40),
-                patch.object(probe, "_owned_automation_ui_run") as native_ui,
-            ):
-                with self.assertRaisesRegex(
-                    probe.AdmissionError, "^Owned Automation prompt exceeded its deadline$"
-                ) as caught:
-                    owner.run(request, timeout=30, after_start=callback)
-                native_ui.assert_not_called()
-            self.assertEqual(
-                caught.exception.args, ("Owned Automation prompt exceeded its deadline",)
-            )
-            self.verify_retired(owner, acquired, retired, waits)
-            expected = {
-                "schema": 1,
-                "command": "permission-request",
-                "stage": "ui-observer",
-                "budget_seconds": 30,
-                "request_deadline_ns": 40_000_000_000,
-                "started_ns": 10_000_000_000,
-                "expired_ns": 10_000_000_000,
-                "spent_ns": 0,
-            }
-            self.assertEqual(writer.first_timeout, expected)
-            packet = json.loads((root / "checkpoint.json").read_bytes())
-            self.assertEqual(packet["first_timeout"], expected)
-            self.assertFalse(packet["ownership_closed"])
-            self.assertNotIn("api_osstatus", packet)
-            self.assertFalse(packet["cases"])
-
-    def test_identical_error_object_is_not_replaced(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            owner, writer, _, _, acquired, retired, waits, _ = world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
-            with self.assertRaises(probe.AdmissionError) as caught:
-                owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
-            self.assertIs(caught.exception, primary)
-            self.verify_retired(owner, acquired, retired, waits)
-            self.assertIsNotNone(writer.first_timeout)
-            self.assertEqual(writer.first_timeout["stage"], "ui-observer")
-
-    def test_optional_publication_errors_never_replace_primary_or_cleanup(self):
-        for secondary in (
-            OSError("PRIVATE_PUBLICATION"),
-            KeyboardInterrupt("PRIVATE_SIGNAL"),
-            SystemExit(9),
-        ):
-            with self.subTest(secondary=type(secondary).__name__), self.world() as world:
-                if timeout_evidence_unavailable_fixture(self, world):
-                    return
-                owner, writer, _, _, acquired, retired, waits, _ = world
-                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
-                with (
-                    patch.object(writer, "retain_timeout", side_effect=secondary),
-                    self.assertRaises(probe.AdmissionError) as caught,
-                ):
-                    owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
-                self.assertIs(caught.exception, primary)
-                self.verify_retired(owner, acquired, retired, waits)
-                self.assertIsNone(writer.first_timeout)
-
-    def test_private_altered_or_subclass_errors_never_claim_timeout(self):
-        class ForeignAdmission(probe.AdmissionError):
-            pass
-
-        errors = (
-            probe.AdmissionError("PRIVATE_DEADLINE"),
-            probe.AdmissionError("Owned Automation prompt exceeded its deadline", "PRIVATE_ARG"),
-            ForeignAdmission("Owned Automation prompt exceeded its deadline"),
-            KeyboardInterrupt("PRIVATE_SIGNAL"),
-            RuntimeError("Owned Automation prompt exceeded its deadline"),
-        )
-        for primary in errors:
-            with (
-                self.subTest(kind=type(primary).__name__, args=primary.args),
-                self.world() as world,
-            ):
-                if timeout_evidence_unavailable_fixture(self, world):
-                    return
-                owner, writer, root, _, acquired, retired, waits, _ = world
-                request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                with self.assertRaises(type(primary)) as caught:
-                    owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
-                self.assertIs(caught.exception, primary)
-                self.verify_retired(owner, acquired, retired, waits)
-                self.assertIsNone(writer.first_timeout)
-                self.assertNotIn(b"PRIVATE", (root / "checkpoint.json").read_bytes())
-
-    def test_foreign_argument_equality_is_never_called_or_credited(self):
-        for string_subclass in (False, True):
-            for raise_signal in (False, True):
-                with (
-                    self.subTest(string_subclass=string_subclass, raise_signal=raise_signal),
-                    self.world() as world,
-                ):
-                    if timeout_evidence_unavailable_fixture(self, world):
-                        return
-                    owner, writer, _, _, acquired, retired, waits, _ = world
-                    equality_calls = []
-
-                    class PrivateArgument(str if string_subclass else object):
-                        def __eq__(self, other):
-                            equality_calls.append(other)
-                            if raise_signal:
-                                raise KeyboardInterrupt("PRIVATE_COMPARISON_SIGNAL")
-                            return True
-
-                    value = (
-                        PrivateArgument("PRIVATE_ARGUMENT")
-                        if string_subclass
-                        else PrivateArgument()
-                    )
-                    primary = probe.AdmissionError(value)
-                    request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-                    observed = None
-                    try:
-                        owner.run(request, timeout=30, after_start=Mock(side_effect=primary))
-                    except BaseException as caught:
-                        observed = caught
-                    self.verify_retired(owner, acquired, retired, waits)
-                    self.assertIs(observed, primary)
-                    self.assertEqual(equality_calls, [])
-                    self.assertIsNone(writer.first_timeout)
-
-    def test_literal_exception_at_exit_wait_does_not_claim_prompt_timeout(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            owner, writer, _, _, acquired, retired, waits, failure = world
-            request = probe.OwnedAutomationRequest(["owned", "permission-request"], 30)
-            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
-            failure[0] = primary
-            with self.assertRaises(probe.AdmissionError) as caught:
-                owner.run(request, timeout=30)
-            self.assertIs(caught.exception, primary)
-            self.assertEqual(retired, acquired)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertEqual(len(waits), 1)
-            self.assertIsNone(writer.first_timeout)
-
-    def test_nonrequest_ui_callback_does_not_claim_permission_timeout(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            owner, writer, _, _, acquired, retired, waits, _ = world
-            primary = probe.AdmissionError("Owned Automation prompt exceeded its deadline")
-            with (
-                patch.object(probe.time, "monotonic", return_value=10),
-                self.assertRaises(probe.AdmissionError) as caught,
-            ):
-                owner.run(["owned"], timeout=30, after_start=Mock(side_effect=primary))
-            self.assertIs(caught.exception, primary)
-            self.assertEqual(retired, acquired)
-            self.assertEqual(owner.active, [])
-            self.assertEqual(owner.debt, [])
-            self.assertEqual(waits, [])
-            self.assertIsNone(writer.first_timeout)
-
-
-class LastUIObservationControls(unittest.TestCase):
-    world = FirstCommandTimeoutControls.world
-
-    @staticmethod
-    def fact():
-        return {
-            "schema": 1,
-            "ax_trusted": True,
-            "requester_qualified": True,
-            "scanned_agents": 1,
-            "windows": 1,
-            "nodes": 0,
-            "candidates": 0,
-            "matches": 0,
-            "first_agent": -1,
-            "first_attribute": "none",
-            "first_type": "none",
-            "first_error": 0,
-            "discovery": {
-                "schema": 1,
-                "scope": "unrelated",
-                "sender": False,
-                "receiver": False,
-                "complete": True,
-                "nodes": 7,
-            },
-        }
-
-    def test_last_scalar_survives_omitted_history_and_original_terminal_cleanup(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            owner, writer, root, _, acquired, retired, _, _ = world
-            first = self.fact()
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
-            prefix = (root / "phase-000.json").read_bytes()
-            for index in range(300):
-                self.assertTrue(writer.record("unchanged-phase-" + str(index)))
-            last = self.fact()
-            last["discovery"]["nodes"] = 9
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=last))
-            self.assertTrue(writer.record("cleanup.closed", status="accepted", closed=True))
-            final = json.loads((root / "checkpoint.json").read_bytes())
-            self.assertEqual(final.get("last_native_ui"), last)
-            self.assertNotIn("native_ui", final)
-            self.assertEqual(final["history_omitted"], 47)
-            self.assertEqual(len(list(root.glob("phase-*.json"))), 256)
-            self.assertEqual((root / "phase-000.json").read_bytes(), prefix)
-            self.assertEqual(json.loads(prefix)["native_ui"], first)
-            self.assertFalse(final["cases"])
-            self.assertEqual(acquired, [])
-            self.assertEqual(retired, [])
-
-    def test_last_observation_is_detached_from_original_nested_discovery(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            _, writer, root, _, _, _, _, _ = world
-            supplied = self.fact()
-            expected = json.loads(json.dumps(supplied))
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=supplied))
-            supplied["discovery"]["private_title"] = "PRIVATE_UI_TITLE"
-            supplied["windows"] = 99
-            self.assertTrue(writer.record("later-phase"))
-            final = json.loads((root / "checkpoint.json").read_bytes())
-            self.assertEqual(final.get("last_native_ui"), expected)
-            self.assertNotIn(b"PRIVATE", (root / "checkpoint.json").read_bytes())
-
-    def test_no_prior_observation_or_missing_legacy_member_never_invents_last_ui(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            _, writer, root, _, _, _, _, _ = world
-            if hasattr(writer, "last_native_ui"):
-                del writer.last_native_ui
-            self.assertTrue(writer.record("legacy-phase"))
-            self.assertNotIn("last_native_ui", json.loads((root / "checkpoint.json").read_bytes()))
-
-    def test_private_candidate_cannot_replace_previously_admitted_last_observation(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            _, writer, root, _, _, _, _, _ = world
-            first = self.fact()
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=first))
-            before = (root / "checkpoint.json").read_bytes()
-            private = self.fact()
-            private["private_title"] = "PRIVATE_UI_TITLE"
-            self.assertFalse(writer.record("automation.ui-observation", native_ui=private))
-            self.assertEqual((root / "checkpoint.json").read_bytes(), before)
-            self.assertEqual(getattr(writer, "last_native_ui", None), first)
-            self.assertTrue(writer.failed)
-
-    def test_retained_scalar_mutation_cannot_publish_unknown_or_permission_data(self):
-        with self.world() as world:
-            if timeout_evidence_unavailable_fixture(self, world):
-                return
-            _, writer, root, _, _, _, _, _ = world
-            self.assertTrue(writer.record("automation.ui-observation", native_ui=self.fact()))
-            before = (root / "checkpoint.json").read_bytes()
-            self.assertIsNotNone(getattr(writer, "last_native_ui", None))
-            writer.last_native_ui["api_osstatus"] = 0
-            self.assertFalse(writer.record("cleanup.closed", status="accepted", closed=True))
-            self.assertEqual((root / "checkpoint.json").read_bytes(), before)
-            self.assertFalse(writer.ownership_closed)
 
 
 if __name__ == "__main__":
