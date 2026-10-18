@@ -71,3 +71,19 @@ _TTLO_EverySentinelFilePrecedesBoot() {
 }
 Test("boot: every shared-constant sentinel file loads before boot.ahk (F-18)",
 	_TTLO_EverySentinelFilePrecedesBoot)
+
+; F-31  TapHoldDuration returned the raw TOML value straight into a KeyWait
+; option string; a non-numeric entry produced "Tabc" and KeyWait THREW on
+; the hook thread, with a synthetic modifier already armed.
+_A0720B4_TapHoldDurationIsValidated() {
+	Body := _DriverFuncBody("TapHoldDuration")
+	Assert(Body != "", "TapHoldDuration must exist in platform/remap/tap_hold_loader.ahk")
+	Assert(InStr(Body, "IsNumber(") > 0,
+		"TapHoldDuration must type-check the TOML value: it is concatenated into a KeyWait option string, so a non-numeric entry produces an invalid timeout and KeyWait THROWS on the hook thread with a synthetic modifier already armed")
+	Assert(InStr(Body, "TAPHOLD_MAX_ACTIVATION_SECONDS") > 0,
+		"TapHoldDuration must range-check against a named upper bound, not just reject non-numbers")
+	Assert(InStr(Body, "LoggerWarn") > 0,
+		"an invalid tap-hold duration must be logged, not silently coerced — the failure was invisible precisely because the throw was absorbed by the global error net")
+}
+Test("tap-holds: the activation time is validated at the loader boundary (F-31)",
+	_A0720B4_TapHoldDurationIsValidated)

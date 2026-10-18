@@ -104,3 +104,39 @@ _HSOA_PublicMutatorsDefuseCallerCritical() {
 Test("hotstring-override-global-transaction-20260813: both public mutators "
 	. "defuse inherited Critical spans before I/O",
 	_HSOA_PublicMutatorsDefuseCallerCritical)
+
+; F-15  _SaveGlobalKey used a bare `try` with no catch, no Close and no return,
+; so a read-only or cloud-locked config file made every observable signal
+; say "saved" while the setting silently reverted at next boot.
+_A0720B4_GlobalKeyWriteFailureIsSurfaced() {
+	Body := _DriverFuncBody("_SaveGlobalKey")
+	Assert(Body != "", "_SaveGlobalKey must exist in infra/hotstrings/hotstrings_io.ahk")
+	Assert(InStr(Body, "HotstringsSetWordDelimiters(") > 0
+		and InStr(Body, "HotstringsSetConsumedDelimiters(") > 0,
+		"_SaveGlobalKey must delegate both historical keys to the shared delimiter transaction instead of retaining a second writer")
+	Assert(InStr(Body, "FileOpen(") = 0,
+		"_SaveGlobalKey must not truncate the live override file; the whole-file serializer owns the one staged atomic replacement")
+	Transaction := _DriverFuncBody("HotstringsCommitDelimiterUpdate")
+	Assert(Transaction != "", "HotstringsCommitDelimiterUpdate must exist")
+	LeasePos := InStr(Transaction, "_HotstringsOverrideLeaseAcquire(")
+	BuildPos := InStr(Transaction, "BuildFn.Call(")
+	WritePos := InStr(Transaction, "_SaveOverrides(")
+	PublishPos := InStr(Transaction, "_HotstringsPublishDelimiterCandidate.Bind(")
+	Assert(LeasePos > 0 and BuildPos > LeasePos and WritePos > BuildPos
+		and PublishPos > WritePos,
+		"delimiter writes must acquire before candidate construction and hand detached live publication to the atomic whole-file writer")
+	Writer := _DriverFuncBody("_SaveOverrides")
+	Assert(Writer != "", "_SaveOverrides must exist")
+	AuthorizePos := InStr(Writer, "AuthorizeFn.Call()")
+	ReplacePos := InStr(Writer, "FSAtomicMoveReplace(")
+	PublishCallPos := InStr(Writer, "PublishFn.Call()")
+	Assert(AuthorizePos > 0 and ReplacePos > AuthorizePos
+		and PublishCallPos > ReplacePos,
+		"the complete stage must be re-authorized, atomically replaced, and projected live in that order")
+	Publisher := _DriverFuncBody("_HotstringsPublishDelimiterCandidate")
+	Assert(Publisher != ""
+		and InStr(Publisher, "_HotstringsWordDelimiters :=") > 0
+		and InStr(Publisher, "_HotstringsConsumedDelimiters :=") > 0,
+		"one publisher must project both delimiter caches together")
+}
+Test("hotstrings: global-key writes share the admitted atomic transaction (F-15)", _A0720B4_GlobalKeyWriteFailureIsSurfaced)

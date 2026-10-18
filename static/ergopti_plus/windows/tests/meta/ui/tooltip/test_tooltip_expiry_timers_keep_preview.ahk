@@ -34,9 +34,6 @@
 #Requires AutoHotkey v2.0
 
 
-
-
-
 ; ======================================================================
 ; ======================================================================
 ; ======= 1/ The class of tooltip timer callbacks ======================
@@ -99,9 +96,6 @@ _TETKP_TheClassIsDiscovered() {
 }
 
 
-
-
-
 ; ======================================================================
 ; ======================================================================
 ; ======= 2/ None of them resets the preview ===========================
@@ -138,3 +132,40 @@ Test("meta tooltip-expiry-timers-keep-preview: no expiry timer wipes the preview
 	_TETKP_NoExpiryTimerWipesThePreview)
 Test("meta tooltip-expiry-timers-keep-preview: the dequeue poll still hides the surface",
 	_TETKP_TheDequeuePollStillHides)
+
+;
+; F-13  _TooltipTimerFn had no A_IsSuspended guard. SetTimer bypasses native
+; Suspend, so it fired while paused and mutated hotstring-engine state.
+; The canonical deadline now delegates to an exact-owner helper which
+; preserves the deadline across a compensable raw pause and rejects before
+; Class-wide: direct timer callbacks guard suspension themselves, while the
+; canonical safety deadline delegates to one exact-owner helper which performs
+; the guard before any hide attempt.
+_A0720B2_EveryTooltipTimerIsSuspendGuarded() {
+	for _, Fn in ["_TooltipDeferredShowFn", "_TooltipDequeueDeadlineFn",
+			"_TooltipDequeuePollFn"] {
+		Body := _StripFullLineComments(_DriverFuncBody(Fn))
+		Assert(Body != "", Fn . " must exist in ui/tooltip/core.ahk")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Fn . " must bail out on A_IsSuspended because SetTimer callbacks bypass native Suspend")
+	}
+	Timer := _StripFullLineComments(_DriverFuncBody("_TooltipTimerFn"))
+	Retry := _StripFullLineComments(
+		_DriverFuncBody("_TooltipTimerHideOrRetry"))
+	Assert(Timer != "" and Retry != "",
+		"the canonical tooltip timer and its exact-owner retry helper must remain discoverable")
+	Delegate := InStr(Timer, "_TooltipTimerHideOrRetry(")
+	Assert(Delegate > 0 and InStr(Timer, "TooltipHide(") == 0,
+		"the canonical timer must delegate instead of hiding or mutating tooltip state directly")
+	SuspendGuard := InStr(Retry, "if A_IsSuspended")
+	SuspendedRetry := InStr(Retry,
+		"return _TooltipScheduleTimerRetry(", true, SuspendGuard)
+	HideAttempt := InStr(Retry,
+		'TooltipHide("TimerFn", true, ExpectedGeneration, ExpectedSurface)',
+		true, SuspendedRetry)
+	Assert(SuspendGuard > 0 and SuspendedRetry > SuspendGuard
+		and HideAttempt > SuspendedRetry,
+		"the delegated timer must preserve its exact deadline and return before any hide while suspended")
+}
+Test("tooltip: every tooltip timer honours the suspend invariant (F-13)",
+	_A0720B2_EveryTooltipTimerIsSuspendGuarded)

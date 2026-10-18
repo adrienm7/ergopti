@@ -14,8 +14,6 @@
 #Requires AutoHotkey v2.0
 
 
-
-
 ; =====================================================
 ; =====================================================
 ; ======= 1/ Subscription handle is persisted =========
@@ -43,8 +41,6 @@ Test("model_browser: WebMessageReceived subscription handle is captured into _LL
 	_MBWB_CheckSubscriptionPersisted)
 
 
-
-
 ; =====================================================
 ; =====================================================
 ; ======= 2/ Navigation uses the vhost, not file:// ====
@@ -65,8 +61,6 @@ _MBWB_CheckVirtualHostNavigation() {
 }
 Test("model_browser: navigation uses an https:// virtual host, not an opaque file:// origin (webview-bridge-file-origin)",
 	_MBWB_CheckVirtualHostNavigation)
-
-
 
 
 ; =====================================================
@@ -94,3 +88,26 @@ _MBWB_CheckExecuteScriptDeferred() {
 }
 Test("model_browser: ExecuteScript is deferred via SetTimer and runs fire-and-forget, not synchronously inside the WebMessageReceived callback (webview-bridge-sync-executescript)",
 	_MBWB_CheckExecuteScriptDeferred)
+
+; F-32: the safety flush must be the SAME work as the real ready handler. It
+; latched _LLM_MBW_Ready while skipping the catalogue injection, so once it ran
+; no later message could re-trigger it and the model table stayed empty forever.
+_A0720B4_SafetyFlushMatchesReadyHandler() {
+	Flush := _DriverFuncBody("_LLM_MBW_SafetyFlush")
+	Assert(Flush != "", "_LLM_MBW_SafetyFlush must exist in ui/model_browser/init.ahk")
+	Assert(InStr(Flush, "_LLM_MBW_OnPageReady(") > 0,
+		"_LLM_MBW_SafetyFlush must route through the shared _LLM_MBW_OnPageReady() rather than re-implementing part of it — it previously flushed the queue but skipped _LLM_MBW_InjectCatalogue while still latching Ready, leaving the model table permanently empty")
+
+	Ready := _DriverFuncBody("_LLM_MBW_OnPageReady")
+	Assert(Ready != "", "_LLM_MBW_OnPageReady must exist as the single definition of page-up")
+	Assert(InStr(Ready, "_LLM_MBW_FlushQueue(") > 0 and InStr(Ready, "_LLM_MBW_InjectCatalogue(") > 0,
+		"_LLM_MBW_OnPageReady must both flush the queue AND inject the catalogue")
+
+	Handler := _DriverFuncBody("_LLM_MBW_OnWebMessage")
+	ReadyPos := InStr(Handler, "_LLM_MBW_OnPageReady(")
+	GuardPos := InStr(Handler, "A_IsSuspended")
+	Assert(ReadyPos > 0 and GuardPos > 0 and ReadyPos < GuardPos,
+		"the `ready` page-lifecycle signal must be handled BEFORE the suspend guard — gating it is what made the SafetyFlush fallback reachable in the first place")
+}
+Test("model-browser: the safety flush does the same work as ready (F-32)",
+	_A0720B4_SafetyFlushMatchesReadyHandler)

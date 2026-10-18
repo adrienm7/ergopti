@@ -60,3 +60,13 @@ _TLPNS_ControlCharStrip() {
 		"_LLM_Parser_CleanModelOutput must use RegExReplace to strip NUL and control bytes")
 }
 Test("llm/parser: _LLM_Parser_CleanModelOutput strips NUL and control chars via RegExReplace", _TLPNS_ControlCharStrip)
+
+;
+; F-11  TAIL_CORRECTED was captured unbounded and fed to an O(n^2) allocating
+_A0720B3_TailCorrectedIsWordCapped() {
+	Body := _DriverFuncBody("_LLM_Parser_ProcessPredictionImpl")
+	Assert(RegExMatch(Body, "tc\s*:=\s*_LLM_Parser_EnforceWordLimits\(tc,\s*max_words\)") > 0,
+		"TAIL_CORRECTED must be word-capped like NEXT_WORDS before it reaches _LLM_Parser_TokenDiffOps — that diff is an O(n^2) dynamic program allocating per cell, len2 is unclamped, and it runs on the thread that serves the keyboard hook, so an unbounded correction from a model in a repetition loop stalls typing with nothing logged")
+}
+Test("llm-parser: TAIL_CORRECTED is capped before the token diff (F-11)",
+	_A0720B3_TailCorrectedIsWordCapped)

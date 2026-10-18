@@ -34,9 +34,6 @@ _MM1D_ALLOWED_OWNERS := Map(
 )
 
 
-
-
-
 ; ==============================================================
 ; ==============================================================
 ; ======= 1/ Only the allowed owners open the manifest =========
@@ -117,3 +114,23 @@ _MM1D_RendererAccessorDelegates() {
 }
 Test("menu_manifest: the renderer accessor delegates instead of caching a copy (menu-manifest-decoded-once-per-menu-layer)",
 	_MM1D_RendererAccessorDelegates)
+
+; F-16  _MG_LoadSubCategories re-read and re-parsed a 12.5 KB manifest on every
+; call, including on the live-toggle path that F-01 runs under Critical.
+; F-16 RESOLUTION, also corrected by the suite. Memoizing the manifest read was
+; tried and reverted: it defeats the fail-fast contract that an INVALID canonical
+; manifest must throw on every call, which test_master_gates.ahk pins. The
+; re-read was only harmful because ToggleCategoryAllFeatures ran it under
+; Critical — and F-01 removed that Critical span, so the cost no longer sits on
+; the keyboard-hook starvation path. Correctness beat the micro-optimisation.
+_A0720B4_SubCategoryManifestStaysFailFast() {
+	Body := _DriverFuncBody("_MG_LoadSubCategories")
+	Builder := _DriverFuncBody("_ConfigBuildCategoryIntentPlan")
+	Assert(Body != "" && Builder != "", "manifest reader and candidate builder must exist")
+	Assert(InStr(Body, "static _Cache") == 0,
+		"invalid canonical manifests must fail on every call, never use a stale cache")
+	Assert(InStr(Builder, "ApplyMasterGatesToFeatures(") > 0 && InStr(Builder, 'Critical("On")') == 0,
+		"uncached manifest validation must finish while building the detached candidate outside Critical")
+}
+Test("master-gates: the sub-category manifest stays fail-fast, uncached (F-16)",
+	_A0720B4_SubCategoryManifestStaysFailFast)

@@ -68,3 +68,30 @@ Test("keylogger: unpublished WebView setup failures fail closed (webview-require
 	_KWF_RequiredSetupFailsClosed)
 Test("keylogger: Edge fallback lifecycle retains an exact tree owner (AHK-083)",
 	_KWF_EdgeFallbackRetainsExactOwner)
+
+; F-24  The metrics dashboard navigated to file://, an opaque origin from which
+; window.chrome.webview does not reliably deliver. postMessage returned
+; undefined (so the page looked healthy) while nothing arrived host-side:
+; every interactive control was dead and the loader spun forever.
+_A0720B4_DashboardUsesAVirtualHost() {
+	Body := _DriverFuncBody("KLWV_AssetUrl")
+	Assert(Body != "", "KLWV_AssetUrl must exist in modules/keylogger/keylogger_webview.ahk")
+	Assert(InStr(Body, "file:///") = 0,
+		"KLWV_AssetUrl must not serve the dashboard from file:// — Chromium treats every file:// document as a unique opaque origin, so window.chrome.webview does not reliably deliver: postMessage returns undefined and the page looks healthy while nothing arrives host-side, leaving every interactive control dead")
+	Assert(InStr(Body, "https://") > 0,
+		"KLWV_AssetUrl must serve the dashboard over the virtual host")
+
+	Loc := _DriverFuncBody("KLWV_LocalesUrl")
+	Assert(Loc != "" and InStr(Loc, "file:///") = 0,
+		"KLWV_LocalesUrl must use the same virtual host — a file:// locales fetch hits the same opaque-origin restriction")
+
+	Open := _DriverFuncBody("KLWV_Open")
+	Assert(Open != "", "KLWV_Open must exist")
+	MapPos := InStr(Open, "SetVirtualHostNameToFolderMapping")
+	NavPos := InStr(Open, "webview.Navigate(")
+	Assert(MapPos > 0, "KLWV_Open must map the virtual host")
+	Assert(NavPos > 0 and MapPos < NavPos,
+		"the virtual-host mapping must be installed BEFORE Navigate — the mapping has to exist when the document is created or the https:// URL cannot resolve")
+}
+Test("keylogger-webview: the dashboard is served from a virtual host (F-24)",
+	_A0720B4_DashboardUsesAVirtualHost)

@@ -73,9 +73,6 @@ Test("meta wpm widget: graph renders natively with GDI+, no WebView2 cold-start"
 	_MetaCheckWpmWidgetNativeRender)
 
 
-
-
-
 _MetaCheckWpmGdipAcquisitionOwnership() {
 	Acquire := _DriverFuncBody("_WPMGdipAcquire")
 	Assert(Acquire != "",
@@ -92,9 +89,6 @@ _MetaCheckWpmGdipAcquisitionOwnership() {
 }
 Test("meta wpm widget: GDI+ initialization retains partial ownership",
 	_MetaCheckWpmGdipAcquisitionOwnership)
-
-
-
 
 
 _MetaCheckWpmGdipFrameOwnership() {
@@ -116,3 +110,18 @@ _MetaCheckWpmGdipFrameOwnership() {
 }
 Test("meta wpm widget: every frame retains complete GDI+ ownership",
 	_MetaCheckWpmGdipFrameOwnership)
+
+; wpm-webview-temp-dir-leak: the WPM widget has no live WebView2 (GDI+ migration).
+_ATG_WpmWidgetHasNoLiveWebView2() {
+	; Scope the scan to ui/wpm (both init.ahk and the wpm_widget.ahk render layer
+	; after the F3 split) — NOT _DriverDirConcat("ui"): other ui/ files (changelog,
+	; model browser, healthcheck) reference WebView2 in live code, so a whole-tree
+	; scan would false-trip this module-scoped "wpm widget has none" invariant.
+	Src := _StripFullLineComments(_DriverDirConcat("ui/wpm"))
+	; The graph renderer was migrated to a GDI+ layered window; with no live
+	; WebView2 controller there is no per-process user-data folder to orphan on
+	; Reload, eliminating the temp-dir leak at the source.
+	Assert(InStr(Src, "WebView2") = 0,
+		"wpm_widget.ahk must not instantiate a live WebView2 renderer — the GDI+ migration removed the leaking user-data folder (wpm-webview-temp-dir-leak)")
+}
+Test("wpm_widget: graph renderer has no live WebView2 (wpm-webview-temp-dir-leak)", _ATG_WpmWidgetHasNoLiveWebView2)

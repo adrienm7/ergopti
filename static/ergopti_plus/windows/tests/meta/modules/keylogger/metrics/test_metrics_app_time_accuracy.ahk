@@ -101,3 +101,44 @@ _MATA_LiveProjectionMutations() {
 }
 Test("metrics app time: manifest projection source controls reject decoys (klr-live-reader-call)",
 	_MATA_LiveProjectionMutations)
+
+; F-08  KL_Hook_RefreshContext bailed bare on A_IsSuspended, freezing
+; app_entered_at / title_entered_at while wall-clock kept running. The
+; first refresh after resume then emitted an app_switch whose duration
+; spanned the whole pause, and KLW_WalkAppSwitch adds duration_ms verbatim
+; with no clamp — an overnight pause credited hours of screen time to
+; whichever app was focused, on the RESUME day. The existing gap
+; compensation in KL_Watchers_OnKeystroke cannot help: it is driven by the
+_A0720B3_PausedContextTicksDoNotBillAppTime() {
+	Body := _DriverFuncBody("KL_Hook_RefreshContext")
+	Assert(Body != "", "KL_Hook_RefreshContext must exist")
+
+	GuardIdx := InStr(Body, "A_IsSuspended")
+	Assert(GuardIdx > 0, "KL_Hook_RefreshContext must guard on A_IsSuspended")
+
+	; Assert the ADVANCE form directly. A positional slice will not do here: the
+	; suspended branch is itself the first mention of app_entered_at, so anchoring
+	; on "the next occurrence" measures an empty span and passes vacuously.
+	Assert(InStr(Body, "KLHook.suspend_tick") > 0,
+		"KL_Hook_RefreshContext must track a suspend_tick watermark so the advance is per-tick and wrap-safe — a bare return freezes app_entered_at while wall-clock keeps running")
+	; The advance is asserted through its OWNER rather than by pinning the `+=`
+	; operator. A second compensation for the same span exists in
+	; KL_Watchers_OnKeystroke, and after a long pause both fire — applied as two
+	; raw `+=` they pushed the watermark past the present and the next app_switch
+	; reported a NEGATIVE duration. The two now share one clamped advance, so the
+	; invariant this assertion protects is unchanged (the paused interval must be
+	; compensated) while its implementation has moved.
+	Assert(InStr(Body, "KL_Hook_AdvanceContextWatermarks") > 0,
+		"the A_IsSuspended branch must ADVANCE the context watermarks by the paused interval — otherwise the first refresh after resume emits an app_switch whose duration spans the whole pause, and KLW_WalkAppSwitch adds it to app_time with no clamp")
+
+	Advance := _DriverFuncBody("KL_Hook_AdvanceContextWatermarks")
+	Assert(Advance != "", "KL_Hook_AdvanceContextWatermarks must exist")
+	Assert(RegExMatch(Advance, "app_entered_at\s*:=") > 0,
+		"the shared advance must move app_entered_at")
+	Assert(RegExMatch(Advance, "title_entered_at\s*:=") > 0,
+		"the shared advance must move title_entered_at the same way — the window-switch path bills its duration identically")
+	Assert(InStr(Advance, "Min(") > 0,
+		"and it must clamp against the present, so two compensations for one paused span cannot push the watermark into the future")
+}
+Test("keylogger: a paused context tick is not billed as foreground app time (F-08)",
+	_A0720B3_PausedContextTicksDoNotBillAppTime)

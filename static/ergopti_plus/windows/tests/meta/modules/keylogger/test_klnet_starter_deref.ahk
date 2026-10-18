@@ -74,3 +74,25 @@ _KSD_VpnStarterDerefsBeforeCall() {
 		"KL_Net_VpnStarter must NOT call KLNet.vpn_fn() directly (implicit this crash)")
 }
 Test("keylogger_network: KL_Net_VpnStarter dereferences BoundFunc before call (klnet-starter-deref)", _KSD_VpnStarterDerefsBeforeCall)
+
+; Regression: KL_Net_Start() stagger overwritten by immediate repeating SetTimer calls
+TestAuditV4_NetStartStagger() {
+	Src := _DriverDirConcat("modules/keylogger")
+
+	; The bug: SetTimer(KLNet.wifi_fn, KLNetConst.NETWORK_TICK_MS) called right
+	; after the one-shot, destroying the stagger before it fires.
+	; The fix: starters (wifi_start_fn etc.) arm the repeating timer after first fire.
+	AssertFalse(
+		InStr(Src, "SetTimer(KLNet.wifi_fn,  KLNetConst.NETWORK_TICK_MS)"),
+		"KL_Net_Start must not immediately overwrite stagger with repeating timer for wifi_fn"
+	)
+	AssertTrue(
+		InStr(Src, "wifi_start_fn"),
+		"KL_Net_Start must use wifi_start_fn starters to defer repeating timer arm"
+	)
+	AssertTrue(
+		InStr(Src, "wifi_start_fn") and InStr(Src, "reach_start_fn") and InStr(Src, "vpn_start_fn"),
+		"KL_Net_Stop must cancel all three starters (wifi/reach/vpn_start_fn)"
+	)
+}
+Test("keylogger network: KL_Net_Start stagger not overwritten by immediate repeating SetTimer", TestAuditV4_NetStartStagger)

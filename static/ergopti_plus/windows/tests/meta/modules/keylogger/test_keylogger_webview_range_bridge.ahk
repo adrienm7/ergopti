@@ -46,3 +46,28 @@ _KLWVRange_CheckSelectedRangeBridge() {
 }
 Test("keylogger_webview: date/app range changes use a detached projection instead of retaining the initial all-time n-grams (metrics-range-bridge-stale-filter)",
     _KLWVRange_CheckSelectedRangeBridge)
+
+; F-09  KLWV_IsIsoDate used "\\d" inside a double-quoted AHK string. AHK v2
+; escapes with a BACKTICK, not a backslash, so PCRE received a literal
+; backslash plus a literal "d": the pattern matched only the text
+; \dddd-\dd-\dd and no real date could ever pass. Every dashboard range
+; request was rejected by KLWV_NormalizeRangeRequest with a bare 0 and
+; dropped with no log — the spinner span forever.
+_A0720B2_IsoDatePatternMatchesARealDate() {
+	AssertTrue(KLWV_IsIsoDate("2026-07-20"),
+		"the production guard must accept a real date; an incorrectly escaped pattern rejects every request")
+	AssertFalse(KLWV_IsIsoDate("2026-7-20"), "month width remains canonical")
+	AssertFalse(KLWV_IsIsoDate("not-a-date"), "malformed dates remain rejected")
+}
+Test("keylogger-webview: the ISO-date guard actually matches an ISO date (F-09)",
+	_A0720B2_IsoDatePatternMatchesARealDate)
+
+
+_A0720B2_RangeRejectionIsLogged() {
+	Body := _DriverFuncBody("KLWV_NormalizeRangeRequest")
+	Assert(Body != "", "KLWV_NormalizeRangeRequest must exist")
+	Assert(InStr(Body, "LoggerWarn") > 0,
+		"KLWV_NormalizeRangeRequest must log a rejected range request — a bare `return 0` makes a malformed request indistinguishable from no request, which is exactly why the broken date pattern stayed invisible")
+}
+Test("keylogger-webview: a rejected range request is logged, not dropped silently (F-09)",
+	_A0720B2_RangeRejectionIsLogged)

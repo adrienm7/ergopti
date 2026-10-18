@@ -167,3 +167,26 @@ _MFS_PollIsFeatureGated() {
 		"the boot-time MF_StartFocusRefresh() must sit INSIDE the `if MetricsShortcuts.enabled` block and BEFORE KL_Init — the focus cache's only reader is MF_ShouldFilter, so with metrics off the poll probes metadata nobody reads, and arming it after KL_Init would leave the first events reading an empty cache")
 }
 Test("metrics: the focus poll is gated on MetricsShortcuts.enabled (F-06)", _MFS_PollIsFeatureGated)
+
+; metrics-timers-bypass-pause: the four recurring metrics ticks gate on A_IsSuspended.
+_ATG_MetricsTicksGatedOnSuspend() {
+	; Move-resilient: locate each tick function across the whole driver source
+	; via the framework helper rather than a pinned per-module path. Maps the
+	; bare function name to the original declaration used in assertion messages.
+	Checks := Map(
+		"KL_Sensors_Tick", "KL_Sensors_Tick()",
+		"KL_IngestOnce",   "KL_IngestOnce(",
+		"KL_Hook_Tick",    "KL_Hook_Tick()")
+	for Name, Decl in Checks {
+		Body := _DriverFuncBody(Name)
+		Assert(Body != "", Decl . " must exist")
+		Assert(InStr(Body, "A_IsSuspended") > 0,
+			Decl . " must early-return on A_IsSuspended so metrics timers go quiet while paused (metrics-timers-bypass-pause)")
+	}
+	; KL_Hook_LivePush is the live-push companion tick.
+	Body := _DriverFuncBody("KL_Hook_LivePush")
+	Assert(Body != "", "KL_Hook_LivePush() must exist")
+	Assert(InStr(Body, "A_IsSuspended") > 0,
+		"KL_Hook_LivePush must gate on A_IsSuspended (metrics-timers-bypass-pause)")
+}
+Test("metrics: the recurring keylogger/metrics ticks gate on A_IsSuspended (metrics-timers-bypass-pause)", _ATG_MetricsTicksGatedOnSuspend)

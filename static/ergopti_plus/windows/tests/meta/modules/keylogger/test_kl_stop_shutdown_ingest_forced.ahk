@@ -114,3 +114,36 @@ _KSSI_ShutdownIngestIsForcedAndDrainsOut() {
 
 Test("keylogger: KL_Stop forces the shutdown ingest and drains it out (kl-stop-ingest-defeated-by-idle-guard)",
 	_KSSI_ShutdownIngestIsForcedAndDrainsOut)
+
+; F-07  KL_Stop() raised Keylogger._shutting_down only just before its trailing
+; KL_FlushBuffer(), i.e. AFTER six module drains that each emit a closing
+; lifecycle event through KL_AppendLog. Quitting or reloading while paused
+; therefore discarded session_end / idle_end / vpn_disconnected /
+; screen_recording_end / the final roi_snapshot, leaving events_session
+; with a dangling session_start — which poisons every active-time
+; aggregate downstream. Reload is the standard apply-settings path, so
+; this fired routinely. The old guard test asserted only that the flag
+; precedes the BOTTOM flush, which stayed true.
+; Root cause: the bypass flag must precede EVERY drain, not just the trailing
+; flush. Enumerates the drains rather than asserting one position.
+_A0720B3_ShutdownFlagPrecedesEveryDrain() {
+	Body := _DriverFuncBody("KL_Stop")
+	Assert(Body != "", "KL_Stop must exist in modules/keylogger/keylogger.ahk")
+
+	FlagIdx := InStr(Body, "KL_BeginShutdown()")
+	Assert(FlagIdx > 0, "KL_Stop must publish its shutdown lease through KL_BeginShutdown")
+	BeginBody := _DriverFuncBody("KL_BeginShutdown")
+	Assert(InStr(BeginBody, "_shutting_down := true") > 0,
+		"KL_BeginShutdown must publish Keylogger._shutting_down := true")
+
+	for _, Drain in ["KL_Hook_Stop()", "KL_Watchers_Stop()", "KL_Mouse_Stop()"
+	               , "KL_AV_Stop()", "KL_Net_Stop()", "KL_Roi_Stop()"] {
+		Idx := InStr(Body, Drain)
+		if (Idx == 0)
+			continue
+		Assert(FlagIdx < Idx,
+			"KL_Stop must publish _shutting_down BEFORE " . Drain . " — that drain emits a closing lifecycle event through KL_AppendLog, whose pause guard drops it while the flag is still false, leaving a dangling session_start after a quit or reload issued while paused")
+	}
+}
+Test("keylogger: KL_Stop raises the shutdown bypass before every drain (F-07)",
+	_A0720B3_ShutdownFlagPrecedesEveryDrain)

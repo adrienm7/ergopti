@@ -96,3 +96,26 @@ Test("meta tooltip-debounce: next-turn pixels retain independent idle admission"
 	_TDB_TheDebounceKeepsTheUiaGateReachable)
 Test("meta tooltip-debounce: the deferred render is armed with the named constant, not a computed delay",
 	_TDB_TheArmedDelayIsNotComputed)
+
+; F-17  TOOLTIP_POSITION_CACHE_MS (150) was SHORTER than the combined debounce
+; gating the preview path (150 + 75 = ~225 ms), so the cache was always
+; past its expiry when consulted and never hit — every preview render in a
+; caret-less app paid a fresh out-of-proc UIA COM round-trip.
+; Root cause: a cache TTL shorter than the minimum interval between two
+; consultations is dead code. Derives all three constants from source so a future
+; debounce change re-checks the relationship instead of silently breaking it.
+_A0720B4_PositionCacheOutlivesTheDebounce() {
+	Src := _DriverSourceNoComments()
+	Get(Name) {
+		Assert(RegExMatch(Src, Name . "\s*:=\s*(\d+)", &M) > 0, Name . " must be a numeric global")
+		return M[1] + 0
+	}
+	CacheMs   := Get("TOOLTIP_POSITION_CACHE_MS")
+	PrefixMs  := Get("_PREFIX_RENDER_DEBOUNCE_MS")
+	RenderMs  := Get("TOOLTIP_RENDER_DEBOUNCE_MS")
+
+	Assert(CacheMs > PrefixMs + RenderMs,
+		"TOOLTIP_POSITION_CACHE_MS (" . CacheMs . ") must EXCEED the combined debounce gating the preview path (_PREFIX_RENDER_DEBOUNCE_MS " . PrefixMs . " + TOOLTIP_RENDER_DEBOUNCE_MS " . RenderMs . "). Otherwise the cache is always past its expiry when consulted and never hits, so every preview render in a caret-less app pays a fresh unbounded out-of-proc UIA COM round-trip on the thread that serves the keyboard hook")
+}
+Test("tooltip: the position cache outlives the debounce that gates it (F-17)",
+	_A0720B4_PositionCacheOutlivesTheDebounce)
