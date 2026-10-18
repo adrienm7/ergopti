@@ -33,7 +33,7 @@ end
 local exit = os.exit
 local marker, exit_code = {}, nil
 os.exit = function(code) exit_code = code; error(marker, 0) end
-arg = { "--only", "tests/unit/modules/keymap/test_hotstring_properties.lua" }
+arg = { "--only", "tests/unit/modules/keymap/registry/test_hotstring_properties.lua" }
 local ok, reason = pcall(dofile, root .. "/tests/run.lua")
 os.exit = exit
 assert(not ok and reason == marker, "the real runner must reach its terminal boundary")
