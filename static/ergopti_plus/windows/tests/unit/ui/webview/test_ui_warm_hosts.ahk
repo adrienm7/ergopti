@@ -410,6 +410,8 @@ _UIWH_BuildCallback(State, *) {
 }
 
 _UIWH_CloseDuringBuild(Phase) {
+	global WebView2
+	HadWebView2 := IsSet(WebView2)
 	SavedShow := WebViewHost.Prototype.GetOwnPropDesc("_ShowWindow")
 	SavedCreate := WebViewHost.Prototype.GetOwnPropDesc("_CreateController")
 	SavedInstances := WebViewHost._Instances
@@ -424,16 +426,21 @@ _UIWH_CloseDuringBuild(Phase) {
 	WebViewHost._Instances := Map()
 	WebViewHost._ManifestCache := Map()
 	try {
+		; The headless runner omits the Chromium wrapper. Admit only this
+		; fixture's controlled acquisition port, then restore true absence.
+		if !HadWebView2
+			WebView2 := {}
 		Suspend(false)
 		Critical("Off")
 		Host := WebViewHost.TryOpen("private-build-close", Map("Title", "Private build fixture",
 			"SkipI18nSeed", true, "OnMessage", _UIWH_BuildCallback.Bind(State),
 			"OnReady", _UIWH_BuildCallback.Bind(State)))
+		AssertEqual(Phase == "show" ? 0 : 1, State["creates"],
+			"the real build must reach the controlled controller acquisition boundary")
 		if Phase == "live" {
 			AssertTrue(IsObject(Host), "the live acquisition still succeeds")
 			AssertTrue(WebViewHost._Instances[Host.AppId] == Host)
 			AssertFalse(Host.ResetDone)
-			AssertEqual(1, State["creates"])
 			AssertEqual(1, State["core_reads"])
 			AssertEqual(1, State["navigates"])
 			AssertEqual(1, State["fills"])
@@ -448,7 +455,6 @@ _UIWH_CloseDuringBuild(Phase) {
 			AssertFalse(State["ready_during_cancel"])
 			AssertEqual(0, State["queued_during_cancel"])
 			AssertEqual(0, State["callbacks"], "cancelled messages and readiness cannot publish")
-			AssertEqual(Phase == "show" ? 0 : 1, State["creates"])
 			AssertEqual(Phase == "show" || Phase == "create" || Phase == "create-error" ? 0 : 1,
 				State["core_reads"], "a cancelled controller cannot publish a CoreWebView2")
 			AssertEqual(Phase == "navigate" || Phase == "fill" ? 1 : 0, State["navigates"])
@@ -473,6 +479,8 @@ _UIWH_CloseDuringBuild(Phase) {
 		State["controller"] := 0
 		WebViewHost.Prototype.DefineProp("_ShowWindow", SavedShow)
 		WebViewHost.Prototype.DefineProp("_CreateController", SavedCreate)
+		if !HadWebView2
+			WebView2 := unset
 		WebViewHost._Instances := SavedInstances
 		WebViewHost._ManifestCache := SavedManifest
 		Suspend(SavedSuspended)
