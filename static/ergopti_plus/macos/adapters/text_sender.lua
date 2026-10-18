@@ -54,12 +54,6 @@ local CLIPBOARD_RESTORE_DELAY_S = Timings.sec("debounce", "clipboard_restore_ms"
 local PASTE_KEY      = "v"
 local PASTE_MODIFIER = { "cmd" }
 
--- Explicit inter-key delay for the paste keystroke, matching the 0 default that
--- M.eraseChars/M.pressKey already apply. Omitting the argument makes
--- hs.eventtap.keyStroke() fall back to 200 000 us implemented as a BLOCKING usleep,
--- stalling the run loop that services the typing event tap mid-injection.
-local PASTE_KEY_DELAY_US = 0
-
 -- Terminal hosts whose prompt controls may batch a zero-delay Backspace run
 -- against one stale render. Bundle IDs are normalized before lookup; app-name
 -- fallbacks cover unsigned/custom builds that expose no stable bundle ID.
@@ -415,13 +409,26 @@ function M.send(text, opts, callback)
 			end
 
 			_paste_recovery_only = false
-			producer = SyntheticInput.begin("text_sender.clipboard", "action")
+			local generation, owned_count = _paste_generation, _paste_owned_count
+			local function cached()
+				return _paste_generation == generation and _paste_owns_clipboard
+					and _paste_transaction == producer and _paste_owned_count == owned_count
+			end
+			producer = SyntheticInput.begin("text_sender.clipboard", "action", {
+				cached = cached,
+				current = function()
+					if not cached() then return false end
+					local count = Clipboard._change_count()
+					return count ~= nil and count == owned_count and cached()
+				end,
+			})
 			_paste_transaction = producer
 			_paste_native_pending = true
-			local generation = _paste_generation
 			local dispatched = false
-			SyntheticInput.on_dispatched(producer, function(_, _, status)
-				if status == "dispatched" then dispatched = true end
+			SyntheticInput.on_dispatched(producer, function(_, batch, status)
+				-- A native Down that raised may still have pasted. Failed terminal
+				-- status remains honest while its recipient retains conservative grace.
+				if status == "dispatched" or batch.native_down_attempted == true then dispatched = true end
 			end)
 			SyntheticInput.on_complete(producer, function(_, status)
 				if _paste_transaction ~= producer or generation ~= _paste_generation then return end
@@ -442,7 +449,7 @@ function M.send(text, opts, callback)
 			end)
 			completion_owned = true
 			local ok_emit, emitted = pcall(
-				SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US, producer)
+				SyntheticInput.emit_guarded_key_stroke, PASTE_MODIFIER, PASTE_KEY, producer)
 			if not ok_emit or emitted ~= true then
 				error("synthetic paste keystroke refused: " .. tostring(emitted), 0)
 			end

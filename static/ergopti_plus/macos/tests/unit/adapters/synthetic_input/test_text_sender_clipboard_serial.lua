@@ -26,6 +26,7 @@ local function immediate_synthetic(emit, defer)
 		on_dispatched = function(tx, callback) tx.dispatched = callback end,
 		on_complete = function(tx, callback) tx.callback = callback end,
 		emit_key_stroke = emit,
+		emit_guarded_key_stroke = emit,
 		seal = function(tx) return complete(tx, "complete") end,
 		cancel = function(tx) return complete(tx, "cancelled") end,
 		defer_after_callback = defer,
