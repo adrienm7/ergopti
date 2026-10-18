@@ -28,7 +28,8 @@ function M.new(dependencies)
 	local next_output = type(dependencies.output) == "table" and rawget(dependencies.output, "next") or nil
 	local complete_output = type(dependencies.output) == "table" and rawget(dependencies.output, "complete") or nil
 	if dependencies.output ~= nil and type(next_output) ~= "function" then return nil, "managed-http-initialization-invalid" end
-	local owned = {}
+	local owned, records = {}, {}
+	local stopping, cancelling_all = false, false
 	local coordinator = {}
 	local start_curl
 	local settle_stage
@@ -46,14 +47,14 @@ function M.new(dependencies)
 	--- Rechecks only the captured source under its original public reservation.
 	--- Caller reentry cannot authorize a retired/replaced/cancelled operation.
 	local function source_current(record)
-		if record.operation._cancelled or record.operation._settled or not reservation_current(record) then return false end
+		if stopping or record.operation._cancelled or record.operation._settled or not reservation_current(record) then return false end
 		if not record.authorized then return true end
 		if record.authorization_revoked or record.authorizing or record.operation._cancelled
 			or record.operation._settled or not reservation_current(record) then return false end
 		record.authorizing = true
 		local called, accepted = pcall(record.authorized)
 		record.authorizing = false
-		local current = called and accepted == true and not record.operation._cancelled
+		local current = not stopping and called and accepted == true and not record.operation._cancelled
 			and not record.operation._settled and reservation_current(record)
 		if not current then record.authorization_revoked = true end
 		return current
@@ -131,7 +132,7 @@ function M.new(dependencies)
 	--- @param record table
 	--- @param result table
 	local function publish_logical(record, result)
-		if record.options.owned_api or record.logical_done or record.operation._cancelled then return end
+		if stopping or record.options.owned_api or record.logical_done or record.operation._cancelled then return end
 		record.logical_done, record.visible_active = true, false
 		result = public_result(result)
 		result.proxy_selection_receipt = record.selection_metadata
@@ -158,7 +159,7 @@ function M.new(dependencies)
 		else retained = snapshot_result(result) end
 		record.pending_result, record.pending_settled_result = public_result(result), retained
 		record.pending_receipt_source = record.pending_result
-		if record.constructing or record.deadline_constructing or record.admitting or record.authorizing or not child_settled(record) then return end
+		if record.starting or record.constructing or record.deadline_constructing or record.admitting or record.authorizing or not child_settled(record) then return end
 		if record.deadline_child then
 			if record.finalizing then return end
 			record.finalizing = true
@@ -204,20 +205,21 @@ function M.new(dependencies)
 		end
 		record.predecessor = nil
 		record.operation._settled, record.visible_active = true, false
+		records[record] = nil
 		if owned[record.owner] == record then owned[record.owner] = nil end
 		local successor = record.successor
 		record.successor = nil
 		if successor and not successor.operation._settled then
 			successor.predecessor = nil
 			owned[record.owner] = successor
-			if successor.operation._cancelled or successor.expired or successor.deadline_failed
+			if stopping or successor.operation._cancelled or successor.expired or successor.deadline_failed
 				or successor.replacement_refused then
 				finish(successor, successor.pending_result or refusal("cancelled"))
 			elseif not successor.admitting and not successor.uncertain then
 				dispatch_route(successor, successor.route)
 			end
 		end
-		if not record.operation._cancelled and not record.logical_done and type(record.done) == "function" then
+		if not stopping and not record.operation._cancelled and not record.logical_done and type(record.done) == "function" then
 			local ok
 			if record.options.output_target ~= nil then
 				ok = pcall(record.done, result, result.ok == true and record.output_completion or nil)
@@ -289,6 +291,7 @@ function M.new(dependencies)
 	--- @param record table
 	--- @return boolean
 	local function arm_deadline(record)
+		if stopping or record.operation._cancelled then finish(record, refusal("cancelled")); return false end
 		record.deadline_constructing = true
 		local called, token = pcall(dependencies.deadline, record.deadline, function() expire(record) end)
 		record.deadline_constructing = false
@@ -309,6 +312,7 @@ function M.new(dependencies)
 			pcall(token.cancel, token)
 			return false
 		end
+		if stopping or record.operation._cancelled then finish(record, refusal("cancelled")); return false end
 		if record.expired then finish(record, refusal("timeout")); return false end
 		if token.started ~= true then
 			record.visible_active, record.deadline_failed, record.operation.started = false, true, false
@@ -341,7 +345,7 @@ function M.new(dependencies)
 		-- Capture before the native cancellation call, then recheck its exact
 		-- lineage after any synchronous settlement or callback reentry.
 		local lineage
-		if owned[record.owner] == record
+		if not stopping and owned[record.owner] == record
 			and record.options.owned_api == false and record.admitted == true
 			and record.stage == "curl"
 			and type(record.child) == "table" and rawget(record.child, "started") == true
@@ -365,7 +369,7 @@ function M.new(dependencies)
 		-- Descriptor retirement can refuse after accepting logical revocation;
 		-- a failed process signal keeps the original boolean delivery law.
 		if record.cancellation_attempt == attempt and not accepted and not descriptor_refusal
-			and not record.options.owned_api and not previously_cancelled then
+			and not stopping and not record.options.owned_api and not previously_cancelled then
 			record.operation._cancelled = false
 		end
 		if accepted and record.cancellation_attempt == attempt then record.visible_active = false end
@@ -459,7 +463,7 @@ function M.new(dependencies)
 	--- @param record table
 	--- @param result table
 	local function logical_complete(record, result)
-		if record.options.owned_api or record.logical_done or record.operation._cancelled then return end
+		if stopping or record.options.owned_api or record.logical_done or record.operation._cancelled then return end
 		if type(result) ~= "table" then return end
 		if record.expired or remaining(record) <= 0 then expire(record); return end
 		local decision = redirect_decision(record, result)
@@ -783,8 +787,16 @@ function M.new(dependencies)
 		local record = {
 			url = url, headers = headers, body = body, options = options, owner = options.owner,
 			chunk = on_chunk, done = on_done, operation = operation, generation = 0, delivered_bytes = 0, visible_active = false,
-			deadline = admission and 0 or math.min(dependencies.clock() + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge),
+			deadline = 0, starting = true,
 		}
+		-- Enroll before the first provider callback, including the initial clock.
+		-- Public owner slots alone omit queued starts and in-flight construction.
+		records[record] = true
+		local function release_start()
+			record.starting = false
+			if record.pending_result then finish(record, record.pending_result) end
+			return operation
+		end
 		function operation:is_settled() return self._settled end
 		--- Returns detached final public data only after exact physical retirement.
 		function operation:settled_result() return snapshot_result(record.settled_receipt) end
@@ -798,6 +810,20 @@ function M.new(dependencies)
 		end
 		function operation:cancel() request_cancel(record); return self._settled end
 		function operation:request_cancel() return request_cancel(record) end
+		if stopping then
+			operation._cancelled = true
+			finish(record, refusal("cancelled")); return release_start()
+		end
+		if not admission then
+			local clocked, started = pcall(dependencies.clock)
+			if stopping or operation._cancelled then
+				finish(record, refusal("cancelled")); return release_start()
+			end
+			if not clocked or type(started) ~= "number" or started ~= started or math.abs(started) == math.huge then
+				finish(record, refusal("managed-http-clock-unavailable")); return release_start()
+			end
+			record.deadline = math.min(started + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge)
+		end
 		if admission then
 			-- Reserve before caller source/preflight metadata. Unlike boolean
 			-- successors, this owner never cancels or probes a predecessor source.
@@ -810,9 +836,9 @@ function M.new(dependencies)
 				or incumbent.admitted ~= true or incumbent.uncertain
 				or ((incumbent.visible_active ~= true or incumbent.operation._cancelled) and not cancelled_incumbent)
 				or incumbent.logical_done or incumbent.expired or incumbent.prestart_refused) then
-				if admission.authorized then operation._settled = true
+				if admission.authorized then operation._settled = true; records[record] = nil
 				else finish(record, refusal("previous request cleanup pending")) end
-				return operation
+				return release_start()
 			end
 			if incumbent then
 				incumbent.successor, record.predecessor = record, incumbent
@@ -822,7 +848,7 @@ function M.new(dependencies)
 			local clocked, started = pcall(dependencies.clock)
 			if not clocked or type(started) ~= "number" or started ~= started or math.abs(started) == math.huge then
 				record.admitting = false
-				finish(record, refusal("managed-http-clock-unavailable")); return operation
+				finish(record, refusal("managed-http-clock-unavailable")); return release_start()
 			end
 			record.deadline = math.min(started + options.timeout_ms, rawget(options, "absolute_deadline_ms") or math.huge)
 			if record.predecessor and record.cancelled_predecessor_receipt
@@ -831,30 +857,30 @@ function M.new(dependencies)
 				-- no guessed authorization callback on an expired incumbent.
 				if admission.authorized then operation._cancelled = true end
 				record.admitting = false
-				finish(record, refusal("previous request cleanup pending")); return operation
+				finish(record, refusal("previous request cleanup pending")); return release_start()
 			end
 			if not source_admitted(record) then
 				record.admitting = false
-				finish(record, refusal("cancelled")); return operation
+				finish(record, refusal("cancelled")); return release_start()
 			end
 			local prepared, native_options, preparation_error, prepared_headers = pcall(admission.prepare)
 			if not source_admitted(record) then
 				record.admitting = false
-				finish(record, refusal("cancelled")); return operation
+				finish(record, refusal("cancelled")); return release_start()
 			end
 			if not prepared or type(native_options) ~= "table" then
 				record.admitting = false
-				finish(record, refusal(prepared and preparation_error or "owned request admission failed")); return operation
+				finish(record, refusal(prepared and preparation_error or "owned request admission failed")); return release_start()
 			end
 			if prepared_headers ~= nil then
 				if type(prepared_headers) ~= "table" then
 					record.admitting = false
-					finish(record, refusal("HTTP prepared headers unavailable")); return operation
+					finish(record, refusal("HTTP prepared headers unavailable")); return release_start()
 				end
 				record.headers, headers = prepared_headers, prepared_headers
 			elseif native_options.prepared_headers ~= nil then
 				record.admitting = false
-				finish(record, refusal("HTTP prepared headers unavailable")); return operation
+				finish(record, refusal("HTTP prepared headers unavailable")); return release_start()
 			end
 			record.options = native_options
 		end
@@ -901,49 +927,58 @@ function M.new(dependencies)
 		end
 		if hop_eligible then
 			local loaded, redirect, load_error = pcall(dependencies.redirect)
-			if not redirect_still_current() then return operation end
+			if not redirect_still_current() then return release_start() end
 			if not loaded or type(redirect) ~= "table" or type(redirect.transition) ~= "function" or type(redirect.address) ~= "function" then
 				record.admitting = false
-				finish(record, refusal(load_error or "HTTP redirect policy unavailable")); return operation
+				finish(record, refusal(load_error or "HTTP redirect policy unavailable")); return release_start()
 			end
 			local parsed, initial = pcall(redirect.address, url)
-			if not redirect_still_current() then return operation end
+			if not redirect_still_current() then return release_start() end
 			if not parsed or type(initial) ~= "table" or type(initial.key) ~= "string" then
 				record.admitting = false
-				finish(record, refusal("HTTP redirect URL refused")); return operation
+				finish(record, refusal("HTTP redirect URL refused")); return release_start()
 			end
 			local copied, headers_copy = pcall(function()
 				local copy = {}
 				for name, value in pairs(headers) do copy[name] = value end
 				return copy
 			end)
-			if not redirect_still_current() then return operation end
+			if not redirect_still_current() then return release_start() end
 			if not copied then
 				record.admitting = false
-				finish(record, refusal("HTTP redirect headers refused")); return operation
+				finish(record, refusal("HTTP redirect headers refused")); return release_start()
 			end
 			record.redirect_policy, record.hops, record.visited = redirect, 0, { [initial.key] = true }
 			record.https_floor = redirect_options.https_only == true or initial.scheme == "https"
 			record.headers = headers_copy
 		end
 		local fetched, environment = pcall(dependencies.environment)
-		local route, err
-		if fetched then route, err = dependencies.policy.route(url, environment) end
+		local routed, route, err
+		if stopping or operation._cancelled then
+			record.admitting = false
+			finish(record, refusal("cancelled")); return release_start()
+		end
+		if fetched then routed, route, err = pcall(dependencies.policy.route, url, environment) end
+		if not routed then route, err = nil, "proxy-environment-unavailable" end
+		if stopping or operation._cancelled then
+			record.admitting = false
+			finish(record, refusal("cancelled")); return release_start()
+		end
 		if admission then
 			if not source_admitted(record) then
 				record.admitting = false
-				finish(record, refusal("cancelled")); return operation
+				finish(record, refusal("cancelled")); return release_start()
 			end
 			if record.operation._cancelled then
-				record.admitting = false; finish(record, refusal("cancelled")); return operation
+				record.admitting = false; finish(record, refusal("cancelled")); return release_start()
 			end
 			local budget = remaining(record)
 			if not reservation_current(record) or operation._cancelled or operation._settled then
-				record.admitting = false; finish(record, refusal("cancelled")); return operation
+				record.admitting = false; finish(record, refusal("cancelled")); return release_start()
 			end
-			if budget <= 0 then record.admitting = false; expire(record); return operation end
+			if budget <= 0 then record.admitting = false; expire(record); return release_start() end
 			if not route then
-				record.admitting = false; finish(record, refusal(err or "proxy-environment-unavailable")); return operation
+				record.admitting = false; finish(record, refusal(err or "proxy-environment-unavailable")); return release_start()
 			end
 			record.route, record.admitted, record.visible_active = route, true, true
 			-- Keep the tentative successor fenced while timer ports may reenter
@@ -954,10 +989,10 @@ function M.new(dependencies)
 				-- predecessor; the exact allocated timer debt remains linked.
 				if record.deadline_failed then record.admitted = false end
 				if record.pending_result then finish(record, record.pending_result) end
-				return operation
+				return release_start()
 			end
 			if record.operation._cancelled or record.expired then
-				record.admitting = false; finish(record, record.pending_result or refusal("cancelled")); return operation
+				record.admitting = false; finish(record, record.pending_result or refusal("cancelled")); return release_start()
 			end
 			local incumbent = record.predecessor
 			if incumbent then
@@ -980,25 +1015,25 @@ function M.new(dependencies)
 					record.replacement_refused = true
 					operation.started, record.admitted, record.visible_active, record.admitting = false, false, false, false
 					finish(record, refusal(record.cancelled_predecessor_receipt and "previous request cleanup pending"
-						or "previous request cancellation failed")); return operation
+						or "previous request cancellation failed")); return release_start()
 				end
 			end
 			record.admitting = false
 			if record.operation._cancelled or record.operation._settled or record.expired then
-				finish(record, record.pending_result or refusal("cancelled")); return operation
+				finish(record, record.pending_result or refusal("cancelled")); return release_start()
 			end
 			if not record.predecessor then dispatch_route(record, route) end
-			return operation
+			return release_start()
 		end
-		if not route then finish(record, refusal(err or "proxy-environment-unavailable")); return operation end
+		if not route then finish(record, refusal(err or "proxy-environment-unavailable")); return release_start() end
 		record.route = route
 		local predecessor = owned[record.owner]
 		if predecessor then
-			if options.owned_api or predecessor.options.owned_api then finish(record, refusal("previous request cleanup pending")); return operation end
+			if options.owned_api or predecessor.options.owned_api then finish(record, refusal("previous request cleanup pending")); return release_start() end
 			if predecessor.successor then
 				request_cancel(predecessor.successor)
 				if predecessor.successor and not predecessor.successor.operation._settled then
-					finish(record, refusal("previous request cleanup pending")); return operation
+					finish(record, refusal("previous request cleanup pending")); return release_start()
 				end
 			end
 			record.admitting = true
@@ -1008,23 +1043,23 @@ function M.new(dependencies)
 				if predecessor.successor == record then predecessor.successor = nil end
 				record.predecessor, operation.started, record.admitted, record.admitting = nil, false, false, false
 				finish(record, refusal("previous request cancellation failed"))
-				return operation
+				return release_start()
 			end
 			record.admitting = false
 			-- A synchronous predecessor listener can cancel this adopted record.
 			-- Admission must be rechecked before allocating its deadline or child.
 			if record.operation._settled or record.operation._cancelled then
-				finish(record, refusal("cancelled")); return operation
+				finish(record, refusal("cancelled")); return release_start()
 			end
-			if not arm_deadline(record) then return operation end
+			if not arm_deadline(record) then return release_start() end
 			if not record.predecessor then dispatch_route(record, route) end
-			return operation
+			return release_start()
 		end
 		owned[record.owner] = record
 		record.admitted, record.visible_active = true, true
-		if not arm_deadline(record) then return operation end
+		if not arm_deadline(record) then return release_start() end
 		dispatch_route(record, route)
-		return operation
+		return release_start()
 	end
 
 
@@ -1038,6 +1073,25 @@ function M.new(dependencies)
 		if record.successor then successor_accepted = request_cancel(record.successor) end
 		local accepted = request_cancel(record)
 		return accepted and successor_accepted
+	end
+
+
+	--- Permanently revokes every request; only physical retirement releases debt.
+	--- Owner aliases and writable public operation fields cannot acknowledge it.
+	--- @return boolean All construction frames, children and deadlines retired.
+	function coordinator.shutdown()
+		stopping = true
+		if cancelling_all then return next(records) == nil end
+		cancelling_all = true
+		local snapshot = {}
+		for record in pairs(records) do
+			snapshot[#snapshot + 1] = record
+			record.operation._cancelled, record.visible_active = true, false
+		end
+		-- Revoke the complete ledger before the first synchronous native callback.
+		for _, record in ipairs(snapshot) do pcall(request_cancel, record) end
+		cancelling_all = false
+		return next(records) == nil
 	end
 
 	--- Reports activity across native lookup, curl and retained retirement debt.

@@ -1375,3 +1375,95 @@ helpers.describe("actual Main layout helper retirement", function()
 		end)
 	end
 end)
+
+
+helpers.describe("actual Main HTTP transport retirement", function()
+	local function fixture(loaded, receipt)
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+		local text = file:read("*a"); file:close()
+		local registry = assert(text:match("local shutdown = ShutdownCoordinator%.new%(%{(.-)\n%}%)[\r\n]"),
+			"actual Main shutdown constructor must exist")
+		local capture = assert(text:match("(local shutdown_runtime = prediction_engine and prediction_engine%.shutdown_runtime.-)\nlocal shutdown = ShutdownCoordinator"))
+		local state = { calls = 0, loops = 0, timers = 0, receipt = receipt }
+		local http = { shutdown = function()
+			state.calls = state.calls + 1
+			if state.receipt == "throw" then error("controlled HTTP cleanup failure") end
+			return state.receipt
+		end }
+		local env = setmetatable({ ShutdownCoordinator = ShutdownCoordinator,
+			keylogger = { stop = function() return true end }, privacy_owners = {},
+			dyn_hotstrings = false, updater = false, file_watchers = false, process_lifecycle = false,
+			webview_manager = false, tooltip_preview = false, gestures = false, input_capture_gate = false,
+			prediction_engine = false,
+			package = { loaded = { ["adapters.http_client"] = loaded and http or nil } },
+			require = function(name)
+				assert(name == "modules.llm.agent_connectors" or name == "modules.llm.agent_learning",
+					"cold shutdown must not import " .. tostring(name))
+				return { cleanup = function() end, flush = function() end }
+			end,
+			TimerScheduler = { cancelAll = function() state.timers = state.timers + 1 end },
+			keyboard_hook = { isRunning = function() return false end, stop = function() end, emergency_stop = function() end },
+			event_loop = { stop = function() state.loops = state.loops + 1 end },
+		}, { __index = _G })
+		local body = capture .. "\nreturn ShutdownCoordinator.new({" .. registry .. "\n})"
+		local chunk, why
+		if setfenv then chunk, why = loadstring(body, "actual Main http shutdown"); if chunk then setfenv(chunk, env) end
+		else chunk, why = load(body, "actual Main http shutdown", "t", env) end
+		return assert(chunk, why)(), state, http, env
+	end
+
+	helpers.it("(http-native-shutdown) cold quit imports no HTTP client", function()
+		local coordinator, state = fixture(false)
+		helpers.assert_true(coordinator.request("cold quit"))
+		helpers.assert_eq(coordinator.is_pending(), false)
+		helpers.assert_eq(state.calls, 0)
+		helpers.assert_eq(state.loops, 1)
+	end)
+
+	for _, refusal in ipairs({ "nil", "false", "zero", "throw" }) do
+		helpers.it("(http-native-shutdown) actual Main retains " .. refusal .. " until exact transport ACK", function()
+			local receipt
+			if refusal == "false" then receipt = false elseif refusal == "zero" then receipt = 0
+			elseif refusal == "throw" then receipt = "throw" end
+			local coordinator, state = fixture(true, receipt)
+			helpers.assert_true(coordinator.request("quit while HTTP transport runs"))
+			helpers.assert_true(coordinator.is_pending(), "a logical cancellation cannot acknowledge native transport retirement")
+			helpers.assert_eq(state.calls, 1)
+			helpers.assert_eq(state.loops, 0)
+			helpers.assert_eq(state.timers, 1, "cancelAll must not prevent later native transport ACK")
+			helpers.assert_eq(coordinator.request("repeated TERM"), false)
+			helpers.assert_eq(coordinator.poll(), false)
+			helpers.assert_eq(state.calls, 2)
+			helpers.assert_eq(state.loops, 0)
+			state.receipt = true
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(state.loops, 1)
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(state.loops, 1)
+		end)
+	end
+
+	for _, replacement in ipairs({ "module", "method", "unload" }) do
+		helpers.it("(http-native-shutdown) retains original transport ACK after " .. replacement .. " replacement", function()
+			local coordinator, state, http, env = fixture(true, false)
+			helpers.assert_true(coordinator.request("quit"))
+			helpers.assert_true(coordinator.is_pending())
+			local foreign_calls = 0
+			local function foreign_stop() foreign_calls = foreign_calls + 1; return true end
+			if replacement == "module" then env.package.loaded["adapters.http_client"] = { shutdown = foreign_stop }
+			elseif replacement == "method" then http.shutdown = foreign_stop
+			else env.package.loaded["adapters.http_client"] = nil end
+			helpers.assert_eq(coordinator.poll(), false, "foreign public exports cannot acknowledge the captured transport")
+			helpers.assert_eq(state.calls, 2)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(state.loops, 0)
+			state.receipt = true
+			helpers.assert_true(coordinator.poll())
+			helpers.assert_eq(state.calls, 3)
+			helpers.assert_eq(foreign_calls, 0)
+			helpers.assert_eq(state.loops, 1)
+		end)
+	end
+end)
