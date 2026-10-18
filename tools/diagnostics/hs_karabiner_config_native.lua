@@ -11,6 +11,15 @@ local function read(path)
 	return raw
 end
 
+-- One line per completed variant, flushed before the next one starts: the
+-- synchronous run publishes its receipt only at the end, so a variant that
+-- never completes would otherwise leave no timing behind for the refusal.
+local function record_progress(path, index, elapsed_ms)
+	local file = assert(io.open(path, "ab"))
+	assert(file:write(string.format("{\"variant\":%d,\"elapsed_ms\":%d}\n", index, elapsed_ms)))
+	assert(file:close())
+end
+
 function M.run(receipt_path, destination, nonce)
 	local Codec = require("adapters.json_codec")
 	local Config = require("platform.remap.config")
@@ -57,6 +66,7 @@ function M.run(receipt_path, destination, nonce)
 		for _, preset in ipairs({ "default", "recommended" }) do
 			for _, tap_holds in ipairs({ false, true }) do
 				for _, combinations in ipairs({ false, true }) do
+					local started = hs.timer.absoluteTime()
 					local state = preset == "recommended" and Config.build_recommended_state(keys, combos)
 						or Config.build_default_state(keys, combos)
 					state.tap_holds_enabled, state.mod_combos_enabled = tap_holds, combinations
@@ -76,6 +86,9 @@ function M.run(receipt_path, destination, nonce)
 						generated, destination, legacy, context)
 					assert(repeated == true and repeat_detail == "unchanged" and attempts == 0,
 						"Identical native rules were not confirmed unchanged")
+					-- absoluteTime() is monotonic nanoseconds; whole milliseconds keep
+					-- the receipt an exact JSON integer.
+					local elapsed_ms = math.floor((hs.timer.absoluteTime() - started) / 1000000)
 					result.variants[#result.variants + 1] = {
 						preset = preset,
 						tap_holds = tap_holds,
@@ -83,7 +96,9 @@ function M.run(receipt_path, destination, nonce)
 						config = published,
 						exact_source_snapshot = true,
 						repeated_unchanged = true,
+						elapsed_ms = elapsed_ms,
 					}
+					record_progress(receipt_path .. ".progress", #result.variants, elapsed_ms)
 				end
 			end
 		end

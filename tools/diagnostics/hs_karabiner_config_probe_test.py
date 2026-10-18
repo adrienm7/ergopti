@@ -59,6 +59,7 @@ def receipt():
                         "config": graph(),
                         "exact_source_snapshot": True,
                         "repeated_unchanged": True,
+                        "elapsed_ms": 1200 + len(variants),
                     }
                 )
     return {
@@ -399,6 +400,21 @@ class NativeReceiptTests(unittest.TestCase):
             self.assertNotEqual(
                 fixture.preferences[bootstrap.CONFIG_KEY], fixture.initial[bootstrap.CONFIG_KEY]
             )
+
+    def test_every_variant_carries_its_measured_duration(self):
+        for change in (
+            lambda variant: variant.pop("elapsed_ms"),
+            lambda variant: variant.update(elapsed_ms=-1),
+            lambda variant: variant.update(elapsed_ms=1.5),
+            lambda variant: variant.update(elapsed_ms=True),
+        ):
+            value = receipt()
+            change(value["variants"][-1])
+            with self.assertRaisesRegex(ValueError, "variant"):
+                self.judge(value)
+        source = Path(probe.__file__).with_name("hs_karabiner_config_native.lua").read_text()
+        self.assertIn("elapsed_ms = elapsed_ms", source)
+        self.assertIn('record_progress(receipt_path .. ".progress"', source)
 
     def test_duplicate_or_missing_variant_never_counts_as_full_coverage(self):
         for change in (lambda v: v.pop(), lambda v: v.__setitem__(0, copy.deepcopy(v[1]))):

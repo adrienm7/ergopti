@@ -1,6 +1,7 @@
 -- tools/diagnostics/hs_native_bootstrap.lua
--- Runs the original native probes only after an exact startup-owner admission.
--- This standalone feature proof never loads the managed ErgoptiPlus driver.
+-- Runs the native feature probes only after an exact startup-owner admission.
+-- This standalone feature proof never loads the managed ErgoptiPlus driver and
+-- never needs an AppleEvent, so no Automation consent can block it.
 
 local M = {}
 
@@ -22,11 +23,14 @@ end
 
 function M.run(context_path)
 	local context = read_json(context_path)
-	assert(context.schema_version == 1 and context.contract == "hs.startup.supplementary-feature")
+	assert(context.schema_version == 1 and context.contract == "hs.startup.native-feature")
 	assert(context.feature == "delayed_timer" or context.feature == "karabiner_config" or context.feature == "script_scope")
 	assert(type(context.nonce) == "string" and #context.nonce == 32)
 	assert(context.admission_timeout == 10)
-	assert(context.feature_timeout == (context.feature == "delayed_timer" and 15 or 10))
+	-- The gate owns each feature's budget; only a positive whole number of
+	-- seconds is a budget at all.
+	assert(type(context.feature_timeout) == "number" and context.feature_timeout > 0
+		and context.feature_timeout == math.floor(context.feature_timeout))
 	local identity = {
 		schema_version = 1,
 		contract = context.contract,
@@ -40,7 +44,7 @@ function M.run(context_path)
 		assert(identity[key] == context[key], "The native startup identity differs: " .. key)
 	end
 	local owner = { timers = {}, started = false, settled = false, errors = {} }
-	assert(_G.__ergopti_native_bootstrap == nil, "A supplementary bootstrap already owns admission")
+	assert(_G.__ergopti_native_bootstrap == nil, "A native startup bootstrap already owns admission")
 	_G.__ergopti_native_bootstrap = owner
 	local probe
 

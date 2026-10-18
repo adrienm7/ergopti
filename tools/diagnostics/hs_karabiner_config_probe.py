@@ -7,6 +7,7 @@ from pathlib import Path
 import re
 
 from hs_delayed_timer_probe import (
+    INSTALLED_EXECUTABLE,
     NativeDelayedTimerProbe,
     CONTRACT as TIMER_CONTRACT,
     unique_object,
@@ -320,8 +321,11 @@ def validate_receipt(result, nonce, pid, executable, bundle_id):
             "config",
             "exact_source_snapshot",
             "repeated_unchanged",
+            "elapsed_ms",
         }:
             raise ValueError("Malformed native Karabiner variant inventory")
+        if type(variant["elapsed_ms"]) is not int or variant["elapsed_ms"] < 0:
+            raise ValueError("Native Karabiner variant timing is not a measured duration")
         if type(variant["tap_holds"]) is not bool or type(variant["combinations"]) is not bool:
             raise ValueError("Native Karabiner variant switches are not Boolean")
         seen.append((variant["preset"], variant["tap_holds"], variant["combinations"]))
@@ -450,9 +454,7 @@ def validate_summary(summary):
         or summary["manipulator_count"] < len(VARIANTS) * CONTRACT["minimum_manipulators"]
     ):
         raise ValueError("Missing measured native Karabiner manipulators")
-    if summary["executable"] != str(
-        NativeDelayedTimerProbe.executable_path(Path("/Applications/ErgoptiPlus.app"))
-    ):
+    if summary["executable"] != INSTALLED_EXECUTABLE:
         raise ValueError("Foreign packaged Karabiner qualification executable")
 
 

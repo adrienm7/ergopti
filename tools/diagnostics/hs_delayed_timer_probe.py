@@ -299,9 +299,7 @@ def validate_summary(summary):
         raise ValueError("Invalid native delayed-timer nonce")
     if type(summary["pid"]) is not int or summary["pid"] <= 0:
         raise ValueError("Invalid native delayed-timer process identity")
-    if summary["executable"] != str(
-        NativeDelayedTimerProbe.executable_path(Path("/Applications/ErgoptiPlus.app"))
-    ):
+    if summary["executable"] != INSTALLED_EXECUTABLE:
         raise ValueError("The delayed-timer probe observed a different installed executable")
 
 
@@ -2498,3 +2496,9 @@ function run(argv) {
         if self.no_prompt_scope is not None:
             self.no_prompt_scope.cleanup()
             self.no_prompt_scope = None
+
+
+# The installed runtime every native qualification must observe.
+INSTALLED_EXECUTABLE = str(
+    NativeDelayedTimerProbe.executable_path(Path("/Applications/ErgoptiPlus.app"))
+)

@@ -519,33 +519,30 @@ function verify({
 				3,
 				'Upgrade borrowed the fresh-startup nonce'
 			);
-		} else if (record.qualification) {
-			assert.ok(qualificationContext, 'Explicit launch qualification context required');
-			assert.equal(record.native_qualified, false, 'Deferred native proof cannot become qualified');
-			assert.ok(
-				qualification.validateLaunchQualificationReceipt(
-					record.qualification,
-					record.scenario,
-					record.runner,
-					sha,
-					qualificationContext,
-					qualificationNow
-				)
-			);
-			assert.equal(
-				record.native_delayed_timer,
-				undefined,
-				'Deferred record cannot publish native timer proof'
-			);
-			assert.equal(
-				record.native_karabiner_config,
-				undefined,
-				'Deferred record cannot publish native Karabiner proof'
-			);
-		} else if (record.scenario === 'clean') {
-			verifyNativeTimer(record.native_delayed_timer);
-		} else if (record.scenario === 'karabiner_config') {
-			verifyNativeKarabiner(record.native_karabiner_config);
+		} else {
+			if (record.qualification) {
+				// A deferral covers only the AppleEvent consent boundary.
+				assert.ok(qualificationContext, 'Explicit launch qualification context required');
+				assert.equal(
+					record.native_qualified,
+					false,
+					'Deferred AppleEvent proof cannot become qualified'
+				);
+				assert.ok(
+					qualification.validateLaunchQualificationReceipt(
+						record.qualification,
+						record.scenario,
+						record.runner,
+						sha,
+						qualificationContext,
+						qualificationNow
+					)
+				);
+			}
+			// Startup-file feature proofs need no consent and stay required in every profile.
+			if (record.scenario === 'clean') verifyNativeTimer(record.native_delayed_timer);
+			if (record.scenario === 'karabiner_config')
+				verifyNativeKarabiner(record.native_karabiner_config);
 		}
 	}
 	assert.equal(hashes.size, 1, 'Scenarios launched different packages');
@@ -640,8 +637,13 @@ function recordMac(
 	assert.deepEqual(result.failures, [], 'Launch reported failures');
 	assert.equal(typeof result.scenario, 'string', 'Missing scenario');
 	if (result.qualification) {
+		// A deferral covers only the AppleEvent consent boundary.
 		assert.ok(qualificationContext, 'Explicit launch qualification context required');
-		assert.equal(result.native_qualified, false, 'Deferred native proof cannot become qualified');
+		assert.equal(
+			result.native_qualified,
+			false,
+			'Deferred AppleEvent proof cannot become qualified'
+		);
 		assert.ok(
 			qualification.validateLaunchQualificationReceipt(
 				result.qualification,
@@ -652,21 +654,10 @@ function recordMac(
 				qualificationNow
 			)
 		);
-		assert.equal(
-			result.native_delayed_timer,
-			undefined,
-			'Deferred result cannot publish native timer proof'
-		);
-		assert.equal(
-			result.native_karabiner_config,
-			undefined,
-			'Deferred result cannot publish native Karabiner proof'
-		);
-	} else {
-		if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
-		if (result.scenario === 'karabiner_config')
-			verifyNativeKarabiner(result.native_karabiner_config);
 	}
+	// Startup-file feature proofs need no consent and stay required in every profile.
+	if (result.scenario === 'clean') verifyNativeTimer(result.native_delayed_timer);
+	if (result.scenario === 'karabiner_config') verifyNativeKarabiner(result.native_karabiner_config);
 	fs.writeFileSync(
 		output,
 		JSON.stringify({
@@ -680,10 +671,8 @@ function recordMac(
 			...(result.qualification
 				? { qualification: result.qualification, native_qualified: false }
 				: {}),
-			...(!result.qualification && result.scenario === 'clean'
-				? { native_delayed_timer: result.native_delayed_timer }
-				: {}),
-			...(!result.qualification && result.scenario === 'karabiner_config'
+			...(result.scenario === 'clean' ? { native_delayed_timer: result.native_delayed_timer } : {}),
+			...(result.scenario === 'karabiner_config'
 				? { native_karabiner_config: result.native_karabiner_config }
 				: {})
 		}) + '\n'
