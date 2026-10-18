@@ -1144,13 +1144,9 @@ final class LoggerDatagramProcessor {
 		guard let number = value as? NSNumber,
 			CFGetTypeID(number) != CFBooleanGetTypeID()
 		else { return nil }
-		let double = number.doubleValue
-		guard double.isFinite,
-			double.rounded(.towardZero) == double,
-			double >= Double(Int.min),
-			double <= Double(Int.max)
-		else { return nil }
-		return Int(double)
+		// Double(Int.max) rounds up to 2^63: comparing against that value would
+		// admit a number whose subsequent nonfailable Int conversion traps.
+		return Int(exactly: number.doubleValue)
 	}
 
 	private static func isValidSession(_ value: String) -> Bool {
