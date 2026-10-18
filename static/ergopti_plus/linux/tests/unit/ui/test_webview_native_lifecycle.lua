@@ -6,7 +6,7 @@ local helpers = require("tests.helpers")
 local run_contract = function(helpers,load_manager,load_host)
  local function fixture(body)
   local loaded={};for name,value in pairs(package.loaded)do loaded[name]=value end
-  local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0}
+  local controls={windows={},closed={},register=true,release=true,constructor_calls=0,destroy_calls=0,release_calls=0,release_all_calls=0,logs={},views={},view_destroy_calls=0,unregister_calls=0,disconnect_calls=0,signal_serial=0,ucms={},replies={}}
   local manager
   local noop=function()end
   package.loaded['logger.shim']={success=noop,info=noop,debug=noop,warn=noop,error=function(_,fmt,...)controls.logs[#controls.logs+1]=string.format(fmt,...)end}
@@ -48,9 +48,11 @@ local run_contract = function(helpers,load_manager,load_host)
      if controls.unregister=='throw'then error('private unregister detail')end
      if controls.unregister=='false'then return false end
     end
+    controls.ucms[#controls.ucms+1]=ucm
     return ucm
    end,WebView=function()
     local view={alive=true}
+    function view:run_javascript(code)controls.replies[#controls.replies+1]={view=self,code=code}end
     function view:load_html()if controls.load then error('private load detail')end;if controls.child_during_load then self:destroy()end end
     function view:destroy()
      controls.view_destroy_calls=controls.view_destroy_calls+1
@@ -83,7 +85,7 @@ local run_contract = function(helpers,load_manager,load_host)
    controls.idle_handlers[#controls.idle_handlers+1]=fn
   end}
   package.loaded['infra.i18n']={get=function(key)return key end,get_locale=function()return 'en'end}
-  package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function()return true end,
+  package.loaded['ui.metrics_typing.bridge']={bridge_name='metrics_typing_bridge',on_message=function(...)if controls.message then return controls.message(...)end;return true end,
    on_window_closed=function(epoch)controls.closed[#controls.closed+1]=epoch end}
   local called,detail=pcall(function()
    local titles=require('window_titles');package.loaded['window_titles']={compose=titles.compose,key_for_app=function(app)if app=='physical_shortcuts'then return 'physical_shortcuts.window_title'end;return titles.key_for_app(app)end}
@@ -129,6 +131,24 @@ local run_contract = function(helpers,load_manager,load_host)
     helpers.assert_eq(m.shutdown(),true)
    end)
   end)
+  for _,mode in ipairs({'close','replace','same'})do
+   helpers.it('(native-window-owner) bridge response retains source owner through handler callback: '..mode,function()
+    fixture(function(m,c)
+     helpers.assert_eq(m.show('metrics_typing','en'),true);local old=m.current_epoch('metrics_typing')
+     c.message=function()
+      if mode~='same'then helpers.assert_eq(m.hide('metrics_typing',old),true)end
+      if mode=='replace'then helpers.assert_eq(m.show('metrics_typing','en'),true)end
+      return {source='retired reply'}
+     end
+     local result={get_js_value=function()return{is_string=function()return true end,to_string=function()return 'request'end}end}
+     c.ucms[1].on_script_message_received.metrics_typing_bridge(c.ucms[1],result)
+     helpers.assert_eq(#c.replies,mode=='same'and 1 or 0,'Only the page that issued the request may receive its response')
+     if mode=='same'then helpers.assert_eq(c.replies[1].view,c.views[1])end
+     if mode=='replace'then helpers.assert_true(m.current_epoch('metrics_typing')>old);helpers.assert_eq(c.views[2].alive,true)end
+     helpers.assert_eq(m.shutdown(),true)
+    end)
+   end)
+  end
   helpers.it('(webview-single-pump) reopening pages retains one process-wide GTK handler',function()
    fixture(function(m,c)
     for _=1,25 do

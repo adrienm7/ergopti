@@ -1021,8 +1021,9 @@ function M._create_gtk_window(app_name, html, handler, contextual_receipt)
 			local js_value = js_result:get_js_value()
 			local payload = _js_value_to_lua(js_value)
 			local response, document_owner = M.route_message(app_name, bridge_name, payload, window_epoch)
-			if response ~= nil and _gtk_windows[app_name] and _gtk_windows[app_name].webview then
-				_send_response_to_js(_gtk_windows[app_name].webview, bridge_name, response, app_name, document_owner)
+			if response ~= nil and _gtk_windows[app_name] == attempt and not attempt.cancelled
+				and M.current_epoch(app_name) == window_epoch and attempt.webview then
+				_send_response_to_js(attempt.webview, bridge_name, response, app_name, document_owner)
 			end
 		end
 
