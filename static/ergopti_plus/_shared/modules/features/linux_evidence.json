@@ -738,7 +738,7 @@
 				"static/ergopti_plus/linux/ui/menu/menu_builder.lua",
 				"static/ergopti_plus/linux/ui/prompt_editor/bridge.lua",
 				"static/ergopti_plus/linux/tests/unit/modules/llm/settings/test_profile_settings.lua",
-				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers.lua"
+				"static/ergopti_plus/linux/tests/unit/ui/editors/test_ui_bridge_handlers_webview_manager.lua"
 			]
 		},
 		"llm.profiles.active": {
