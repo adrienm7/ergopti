@@ -566,3 +566,90 @@ Test("clipboard: restore refusal retains snapshot until matching retry (clipboar
 	_CPT_RestoreThrowRetainsDebt)
 Test("clipboard: caller-owned token survives explicit debt-only retirement (clipboard-first-restore-fence)",
 	_CPT_FirstRetirementKeepsCallerOwner)
+
+; The shortcut lives in a conditional hotkey include. Run both unchanged entry
+; definitions and the complete real ownership registry in one owned native
+; child; only clipboard contents, the active-app query and sends are passive.
+_PPH_Script(Entry, Mode) {
+	Source := FileRead(_DriverDir . "\adapters\clipboard.ahk", "UTF-8")
+	Boundary := _DriverFindFunctionDefinition(Source, "CB_Read")
+	AssertTrue(IsObject(Boundary), "the real clipboard registry must precede its OS read adapter")
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . SubStr(Source, 1, Boundary.Idx - 1)
+	Code .= '_PPH_Error(Err, *) {`nFileAppend(Err.Message, "**")`nExitApp(1)`n}`n'
+	for Name in ["GesturePastePlain", "_GesturePastePlainRestore", "PasteWithoutFormatting", "_PasteWithoutFormattingRestore"]
+		Code .= _DriverFuncBody(Name) . "`n"
+	Code .= 'global SEND_INSTANT_PASTE_DELAY_MS := ' . SEND_INSTANT_PASTE_DELAY_MS . "`n"
+	Code .= 'global S := Map("text", "genuine copy", "rich", true, "seq", 42, "reads", 0, "saves", 0, "writes", 0, "restores", 0, "warnings", 0, "errors", 0, "sent", [], "sent_text", [], "active_at_send", 0, "excel", false, "fail_save", false)`n'
+	Code .= 'CB_Read() {`nglobal S`nS["reads"] += 1`nreturn S["text"]`n}`n'
+	Code .= 'CB_SaveAll() {`nglobal S`nS["saves"] += 1`nreturn S["fail_save"] ? "__CB_SAVE_ERROR__" : Map("text", S["text"], "rich", S["rich"])`n}`n'
+	Code .= 'CB_Write(Text) {`nglobal S`nS["writes"] += 1`nS["text"] := Text`nS["rich"] := false`nS["seq"] += 1`nreturn true`n}`n'
+	Code .= 'CB_RestoreAll(Saved) {`nglobal S`nS["restores"] += 1`nS["text"] := Saved["text"]`nS["rich"] := Saved["rich"]`nS["seq"] += 1`nreturn true`n}`n'
+	Code .= 'CB_GetSequenceNumber() {`nglobal S`nreturn S["seq"]`n}`n'
+	Code .= 'WinActive(*) {`nglobal S`nreturn S["excel"]`n}`n'
+	Code .= 'SendFinalResult(Keys) {`nglobal S`nS["sent"].Push(Keys)`nS["sent_text"].Push(S["text"])`nS["active_at_send"] := CBClipboardOwner.active.Count`nreturn true`n}`n'
+	Code .= 'LoggerWarn(*) {`nglobal S`nS["warnings"] += 1`n}`nLoggerError(*) {`nglobal S`nS["errors"] += 1`n}`nLoggerDebug(*) => 0`n'
+	Code .= 'Check(Condition, Message) {`nif !Condition`nthrow Error(Message)`n}`n'
+	Code .= 'Mode := "' . Mode . '"`nBusy := InStr(Mode, "busy-") == 1`nOtherToken := 0`n'
+	Code .= 'if Busy {`nOtherToken := CB_TryBeginOwnedTransaction("other temporary producer")`nCheck(OtherToken > 0, "contender setup")`nOtherRecord := CBClipboardOwner.active[OtherToken]`nS["text"] := Mode == "busy-clear" ? "" : Mode == "busy-external" ? "new external copy" : "temporary payload"`nS["seq"] := Mode == "busy-external" ? 77 : 42`n}`n'
+	Code .= 'S["excel"] := Mode == "excel" or Mode == "busy-excel"`nS["fail_save"] := Mode == "snapshot-failure"`nif Mode == "non-text"`nS["text"] := ""`nBefore := S["text"]`n'
+	Code .= Entry . "()`n"
+	Code .= 'if Busy {`nCheck(S["sent"].Length == 0, "busy plain paste must emit no key, including native fallbacks")`nCheck(S["reads"] == 0 && S["saves"] == 0 && S["writes"] == 0 && S["restores"] == 0, "busy plain paste must not inspect or mutate another owner")`nCheck(S["text"] == Before, "temporary or externally replaced payload must survive")`nCheck(CBClipboardOwner.active.Count == 1 && CBClipboardOwner.active[OtherToken] == OtherRecord, "exact other owner remains live")`nCheck(S["warnings"] == 1, "busy refusal must be explicit")`nCB_EndOwnedTransaction(OtherToken)`n} else {`n'
+	Code .= 'Check(S["sent"].Length == 1, "normal paste must emit once")`nCheck(S["sent"][1] == (Mode == "excel" ? "^+v" : "^v"), "native paste chord")`nCheck(S["sent_text"][1] == Before, "normal paste payload")`nCheck(S["active_at_send"] == 1, "native fallback must retain its exact owner through emission")`n'
+	Code .= 'if Mode == "text" {`nCheck(S["writes"] == 1, "plain text coercion")`nCheck(CBClipboardOwner.active.Count == 1, "deferred restore owns the snapshot")`nStarted := A_TickCount`nwhile CBClipboardOwner.active.Count && A_TickCount - Started < 2000`nSleep(10)`nCheck(S["restores"] == 1, "native timer restores through actual debt coordinator")`n} else {`nCheck(S["writes"] == 0 && S["restores"] == 0, "native bypass must preserve formats")`nCheck(S["saves"] == (Mode == "snapshot-failure" ? 1 : 0), "only failed snapshot fallback attempts a save")`n}`nCheck(S["text"] == Before && S["rich"], "original clipboard formats must survive")`n}`n'
+	Code .= 'Check(CBClipboardOwner.active.Count == 0 && !CBClipboardOwner.restore_debt, "all exact owners retire")`nCheck(S["errors"] == 0, "no hidden failure may be accepted")`nFileAppend("plain-paste-ok", "*")`nExitApp(0)`n'
+	return Code
+}
+
+_PPH_Completed(State, Code, Output, ErrorText) {
+	State.Code := Code
+	State.Output := Output
+	State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_PPH_ActualPlainPaste(Entry, Mode) {
+	Script := A_Temp . "\ergopti_plain_paste_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".ahk"
+	AssertFalse(FileExist(Script))
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _PPH_Script(Entry, Mode)) != 0)
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }
+	Handle := 0
+	Primary := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], _PPH_Completed.Bind(State))
+		AssertTrue(Handle.start())
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "the exact native fixture must settle")
+		AssertEqual(0, State.Code, State.Output . State.ErrorText)
+		AssertEqual("plain-paste-ok", State.Output)
+		AssertEqual("", State.ErrorText)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try FileDelete(Script)
+		catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "retain the source until its exact native tree retires")
+}
+
+for Entry in ["GesturePastePlain", "PasteWithoutFormatting"] {
+	for Mode in ["busy-text", "busy-clear", "busy-external", "busy-excel", "text", "non-text", "excel", "snapshot-failure"] {
+		Test("clipboard: actual " . Entry . " respects " . Mode . " (plain-paste-owner-refusal)",
+			_PPH_ActualPlainPaste.Bind(Entry, Mode))
+	}
+}
