@@ -62,6 +62,7 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
 		text_reselect = 'SyntheticInput.begin("shortcuts.text.reselect", "action")',
 		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
+		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action")',
 	}
 
 	helpers.it("enumerates the complete non-vacuous class", function()
@@ -69,8 +70,8 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		local producer_names = {}
 		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
 		table.sort(producer_names)
-		helpers.assert_eq(#producer_names, 6,
-			"the explicit producer inventory must name all six reviewed owners")
+		helpers.assert_eq(#producer_names, 7,
+			"the explicit producer inventory must name all seven reviewed owners")
 		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
 		for _, name in ipairs(producer_names) do
@@ -169,6 +170,25 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		helpers.assert_true(begin_pos and batch_pos and dispatch_pos and seal_pos and cancel_pos,
 			"deferred action must retain batch, dispatch, seal, and rollback sites")
 		helpers.assert_true(begin_pos < batch_pos and batch_pos < dispatch_pos and dispatch_pos < seal_pos)
+	end)
+
+	helpers.it("text sender observes its exact paste producer before dispatch and terminal cleanup", function()
+		-- test_text_sender_paste_handoff drives this owner through the real broker,
+		-- including delayed handoff, cancellation, grace and exactly-once restore.
+		local source = read_unit("local _paste_transaction = nil")
+		local begin_pos = source:find(producers.text_sender_paste, 1, true)
+		helpers.assert_not_nil(begin_pos)
+		local dispatched_pos = source:find("SyntheticInput.on_dispatched(producer", begin_pos, true)
+		local completion_pos = source:find("SyntheticInput.on_complete(producer", begin_pos, true)
+		local emit_pos = source:find(
+			"SyntheticInput.emit_key_stroke, PASTE_MODIFIER, PASTE_KEY, PASTE_KEY_DELAY_US, producer", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal(producer)", begin_pos, true)
+		local cancel_pos = source:find("SyntheticInput.cancel, producer", begin_pos, true)
+		helpers.assert_true(dispatched_pos and completion_pos and emit_pos and seal_pos and cancel_pos,
+			"paste needs exact dispatch/completion observers, producer-bound emission, seal and cancellation")
+		helpers.assert_true(begin_pos < dispatched_pos and dispatched_pos < completion_pos
+			and completion_pos < emit_pos and emit_pos < seal_pos and seal_pos < cancel_pos,
+			"observers must own native handoff before emission or either terminal route")
 	end)
 
 	helpers.it("parenthesis surround retains one transaction through every terminal path", function()
