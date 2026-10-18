@@ -48,6 +48,60 @@ check('Debian depends on one alternative expression and preserves old requiremen
 	assert.equal(required.includes('libssl3'), false);
 	for (const old of ['luajit (>= 2.1)', 'curl', 'at-spi2-core']) assert.ok(required.includes(old));
 });
+for (const [format, sqlite] of [
+	['deb', 'sqlite3'],
+	['rpm', 'sqlite'],
+	['arch', 'sqlite']
+])
+	check('metrics CLI providers are mandatory for ' + format + ' (metrics-cli-required)', () => {
+		const required = generator.requirements(data, format);
+		for (const provider of ['openssl', sqlite])
+			assert.equal(
+				required.filter((name) => name === provider).length,
+				1,
+				`${format} must provide ${provider} even when optional dependencies are disabled`
+			);
+	});
+check(
+	'source installation admits the OpenSSL executable separately from libcrypto (metrics-cli-required)',
+	() => {
+		assert.match(installer, /^_check_or_install openssl$/m);
+	}
+);
+for (const manager of ['apt', 'dnf', 'zypper', 'pacman', 'xbps', 'apk']) {
+	for (const state of ['present', 'install', 'no-command', 'refused']) {
+		check(
+			'actual OpenSSL source admission ' + manager + '/' + state + ' (metrics-cli-required)',
+			() => {
+				const script = [
+					'set -eu',
+					shellFunction(installer, '_required_dependency_package'),
+					shellFunction(installer, '_check_or_install'),
+					`available=${state === 'present' ? '1' : '0'}`,
+					'command() { [ "$1" = -v ] && [ "$2" = openssl ] && [ "$available" = 1 ]; }',
+					`_detect_pkg_manager() { echo ${manager}; }`,
+					'_install_required_package() {',
+					'  printf "INSTALL %s %s\\n" "$1" "$2"',
+					state === 'refused' ? '  return 7' : state === 'install' ? '  available=1' : '  return 0',
+					'}',
+					'_check_or_install openssl'
+				].join('\n');
+				const result = spawnSync(bashExecutable(), ['-s'], {
+					input: script,
+					encoding: 'utf8',
+					timeout: 5000
+				});
+				assert.ifError(result.error);
+				assert.equal(result.signal, null);
+				const expected =
+					state === 'present' || state === 'install' ? 0 : state === 'refused' ? 7 : 1;
+				assert.equal(result.status, expected, result.stdout + result.stderr);
+				const installs = result.stdout.split('\n').filter((line) => line.startsWith('INSTALL '));
+				assert.deepEqual(installs, state === 'present' ? [] : [`INSTALL ${manager} openssl`]);
+			}
+		);
+	}
+}
 check('actual Lua projection supplies descriptor; no handwritten generated file input', () => {
 	const result = rendered[generator.LUA_OUTPUT];
 	assert.match(
@@ -202,5 +256,5 @@ for (const [name, options, status, installs, queries] of [
 	check(name, () => {
 		assert.deepEqual(run(options), { status, installs, queries });
 	});
-assert.equal(checks, 21, 'Independent fixed case floor');
+assert.equal(checks, 49, 'Independent fixed case floor');
 console.log(checks + ' PASS, 0 FAIL, 0 SKIP; modeled repair/projection only');
