@@ -24,16 +24,22 @@ local PAIRS = { ["("] = { left = "(", right = ")" }, ["«"] = { left = "« ", ri
 local function controller_with(state)
 	state = state or {}
 	local log = { reads = 0, typed = {} }
-	local controller = WrapOnType.new({
-		is_active = function() return state.active ~= false end,
-		get_pair = function(char) return PAIRS[char] end,
+	local controller
+	controller = WrapOnType.new({
+		is_active = function()
+			if state.on_active then state.on_active(controller, log, state) end
+			return state.active ~= false
+		end,
+		get_pair = function(char) return state.pair or PAIRS[char] end,
 		read_primary = function()
 			log.reads = log.reads + 1
+			if state.on_read then state.on_read(controller, log, state) end
 			return true, state.primary or ""
 		end,
 		type_text = function(text)
 			if state.type_ok == false then return false end
 			log.typed[#log.typed + 1] = text
+			if state.on_type then state.on_type(controller, log, state) end
 			return true
 		end,
 	})
@@ -113,6 +119,122 @@ helpers.describe("wrap on type (linux): the decision", function()
 		helpers.assert_true(not controller.on_key(symbol("(")),
 			"a refused wrap must hand the key back so it is typed exactly once")
 		helpers.assert_eq(log.typed, {})
+	end)
+end)
+
+helpers.describe("wrap selection read owner", function()
+	helpers.it("revokes output when PRIMARY reading pauses the feature", function()
+		local controller, log, state = controller_with({ primary = "old", on_read = function(_, observed, current)
+			if observed.reads == 2 then current.active = false end
+		end })
+		controller.on_pointer_down()
+		state.primary = "selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
+		helpers.assert_eq(log.typed, {})
+	end)
+	for _, boundary in ipairs({ "baseline", "selected" }) do
+		helpers.it("explicit retirement during " .. boundary .. " read cannot resurrect or type", function()
+			local controller, log, state = controller_with({ primary = "old", on_read = function(owner, observed)
+				if observed.reads == (boundary == "baseline" and 1 or 2) then owner.end_selection_window() end
+			end })
+			controller.on_pointer_down()
+			if boundary == "baseline" then helpers.assert_eq(controller.selection_window_open(), false) end
+			state.primary = "selected"
+			helpers.assert_eq(controller.on_key(symbol("(")), false)
+			helpers.assert_eq(log.typed, {})
+		end)
+	end
+	helpers.it("a newer ordinary key during PRIMARY reading retires the older wrap", function()
+		local controller, log, state = controller_with({ primary = "old", on_read = function(owner, observed)
+			if observed.reads == 2 then owner.on_key({ char = "x", code = 45, mods = {} }) end
+		end })
+		controller.on_pointer_down()
+		state.primary = "selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
+		helpers.assert_eq(log.typed, {})
+	end)
+	helpers.it("an older baseline read cannot replace a nested pointer's baseline", function()
+		local controller, log, state = controller_with({ primary = "old", on_read = function(owner, observed, current)
+			if observed.reads == 1 then
+				current.primary = "new baseline"
+				owner.on_pointer_down()
+				current.primary = "old baseline"
+			end
+		end })
+		controller.on_pointer_down()
+		state.primary = "new baseline"
+		helpers.assert_eq(controller.selection_window_open(), true)
+		helpers.assert_eq(controller.on_key(symbol("(")), false, "PRIMARY still equals the newer pointer's baseline")
+		helpers.assert_eq(log.typed, {})
+	end)
+	helpers.it("a nested selection opening during a wrap read survives the old request", function()
+		local controller, log, state = controller_with({ primary = "old", on_read = function(owner, observed, current)
+			if observed.reads == 2 then
+				current.primary = "successor baseline"
+				owner.on_pointer_down()
+				current.primary = "old selected"
+			end
+		end })
+		controller.on_pointer_down()
+		state.primary = "old selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), false)
+		helpers.assert_eq(log.typed, {})
+		helpers.assert_eq(controller.selection_window_open(), true)
+		state.primary = "new selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), true)
+		helpers.assert_eq(log.typed, { "(new selected)" })
+	end)
+	for _, boundary in ipairs({ "baseline", "selected" }) do
+		helpers.it("rechecks ownership after the " .. boundary .. " activity callback itself retires it", function()
+			local callbacks = 0
+			local controller, log, state = controller_with({ primary = "old", on_active = function(owner, observed)
+				if observed.reads == (boundary == "baseline" and 1 or 2) then
+					callbacks = callbacks + 1
+					owner.end_selection_window()
+				end
+			end })
+			controller.on_pointer_down()
+			state.primary = "selected"
+			helpers.assert_eq(controller.on_key(symbol("(")), false)
+			helpers.assert_eq(log.typed, {})
+			helpers.assert_eq(controller.selection_window_open(), false)
+			helpers.assert_eq(callbacks, 1)
+		end)
+	end
+	helpers.it("captures the typed pair before PRIMARY reading can mutate its shared table", function()
+		local pair = { left = "(", right = ")" }
+		local controller, log, state = controller_with({ primary = "old", pair = pair, on_read = function(_, observed)
+			if observed.reads == 2 then pair.left, pair.right = "[", "]" end
+		end })
+		controller.on_pointer_down()
+		state.primary = "selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), true)
+		helpers.assert_eq(log.typed, { "(selected)" })
+	end)
+	helpers.it("acknowledged typing consumes the symbol while preserving a newly opened selection", function()
+		local controller, log, state = controller_with({ primary = "old", on_type = function(owner, _, current)
+			current.primary = "successor baseline"
+			owner.on_pointer_down()
+		end })
+		controller.on_pointer_down()
+		state.primary = "selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), true, "Already emitted output cannot also pass the physical symbol through")
+		helpers.assert_eq(log.typed, { "(selected)" })
+		helpers.assert_eq(controller.selection_window_open(), true)
+		state.on_type = nil
+		state.primary = "next"
+		helpers.assert_eq(controller.on_key(symbol("(")), true)
+		helpers.assert_eq(log.typed, { "(selected)", "(next)" })
+	end)
+	helpers.it("Ctrl+A opens a fresh owned window and Shift navigation extends it without rereading", function()
+		local controller, log, state = controller_with({ primary = "old" })
+		helpers.assert_eq(controller.on_key({ char = "a", code = 30, mods = { ctrl = true } }), false)
+		helpers.assert_eq(log.reads, 1)
+		helpers.assert_eq(controller.on_key({ code = KEY_LEFT, mods = { shift = true } }), false)
+		helpers.assert_eq(log.reads, 1)
+		state.primary = "selected"
+		helpers.assert_eq(controller.on_key(symbol("(")), true)
+		helpers.assert_eq(log.typed, { "(selected)" })
 	end)
 end)
 
