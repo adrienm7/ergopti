@@ -16,7 +16,7 @@
 ; race (commit 7b701020d); this file was never touched by that campaign.
 ;
 ; SCOPE: source introspection of infra/window_utils.ahk. The cyclers themselves
-; are not unit-testable without a live desktop (see tests/unit/test_window_utils.ahk).
+; are not unit-testable without a live desktop (see tests/unit/adapters/test_window_utils.ahk).
 ;
 ; MOVED, NOT WEAKENED — 2026-08-03. The enumeration and its guards now live in
 ; _AltTabCycle, shared by AltTabMonitor (this display) and AltTabAll (anywhere),

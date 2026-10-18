@@ -66,7 +66,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../platform/remap/altgr_criteria.ahk
 
 ; Both complete test modules retain their original registrations and callbacks.
-#Include unit/test_console_window.ahk
+#Include unit/adapters/test_console_window.ahk
 #Include unit/test_key_combinations.ahk
 
 RunTests()

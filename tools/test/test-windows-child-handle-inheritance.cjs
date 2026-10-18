@@ -309,9 +309,11 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/test_shell_runner_capture_lock.ahk';
+const testFile = 'tests/unit/adapters/shell_runner/test_shell_runner_capture_lock.ahk';
 check(
-	/^#Include unit\/test_shell_runner_capture_lock\.ahk\s*$/m.test(read('tests/run_all.ahk')),
+	/^#Include unit\/adapters\/shell_runner\/test_shell_runner_capture_lock\.ahk\s*$/m.test(
+		read('tests/run_all.ahk')
+	),
 	`tests/run_all.ahk must include ${testFile}`
 );
 check(

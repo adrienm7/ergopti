@@ -6,7 +6,7 @@
 ; Regression guard for the headless-CI hang introduced when a test added to
 ; run_all.ahk referenced things outside the suite's include graph.
 ;
-; Root cause (commit "Fix clipboard ram leak"): meta/test_clipboard_ram_leak.ahk
+; Root cause (commit "Fix clipboard ram leak"): meta/adapters/input/test_clipboard_ram_leak.ahk
 ; did `#Include ../../infra/testing.ahk` (a file that does not exist) and called
 ; _KL_Clip_CharCountFromByteSize (defined only in keylogger_clipboard.ahk, which
 ; run_all.ahk did not include). In AHK v2 BOTH are load-time errors, and a
