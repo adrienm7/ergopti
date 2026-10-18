@@ -73,6 +73,40 @@ helpers.describe("linux test runner: truthful execution", function()
 
 end)
 
+helpers.describe("linux test runner: unit module continuation", function()
+	helpers.it("(linux-unit-module-continuation) loads the actual pair module after an earlier failure without exiting", function()
+		-- A separate real helper tally retains a deliberate earlier failure. Skip
+		-- pair bodies here: their ordinary cases remain owned by the canonical run.
+		local isolated = assert(loadfile(helpers.driver_root() .. "/tests/helpers.lua"))()
+		isolated.it("controlled earlier unit failure", function() error("controlled preceding failure") end)
+		helpers.assert_eq(isolated.get_results().failed, 1)
+		isolated.set_only_filter("__pair_module_continuation_no_body__")
+		local declared, describe = {}, isolated.describe
+		isolated.describe = function(name, body)
+			declared[name] = true
+			return describe(name, body)
+		end
+		local name = "tests.unit.infra.test_global_shortcuts_pair_scope"
+		local old_helpers, old_module, old_exit = package.loaded["tests.helpers"], package.loaded[name], os.exit
+		local exit_calls = 0
+		package.loaded["tests.helpers"], package.loaded[name] = isolated, nil
+		os.exit = function()
+			exit_calls = exit_calls + 1
+			error("a unit module attempted to terminate its canonical runner", 0)
+		end
+		local loaded, result = pcall(require, name)
+		os.exit = old_exit
+		package.loaded["tests.helpers"], package.loaded[name] = old_helpers, old_module
+		helpers.assert_true(loaded, "the real module must finish loading despite the earlier failure: " .. tostring(result))
+		helpers.assert_eq(exit_calls, 0, "only the canonical runner may terminate the process")
+		helpers.assert_true(declared["global scope includes only original known simultaneous leaves"],
+			"the module must reach its controls after the former premature exit")
+		helpers.assert_eq(isolated.get_results().failed, 1, "loading must preserve the earlier failure")
+		helpers.assert_eq(isolated.get_results().failures[1].name, "controlled earlier unit failure",
+			"the canonical runner retains the exact earlier failing case")
+	end)
+end)
+
 require("test.runner_timing_contract").run(helpers)
 
 require("test.runner_replay_contract").run(helpers, "linux")
