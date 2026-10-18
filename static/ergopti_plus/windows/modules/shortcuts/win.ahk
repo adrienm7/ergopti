@@ -488,6 +488,10 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		_GetPathCopyFlow(PathWithSlash, PathWithBackslash, WriteFn,
 				ScheduleFn, PromptFn, SleepFn, RenameFn) {
+				global _SelectionCaptureNextId
+				SelectionId := _SelectionCaptureNextId
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				if !WriteFn.Call(PathWithSlash) {
 						try LoggerWarn("shortcuts",
 								"GetPath could not copy the slash-form path; success UI was suppressed.")
@@ -495,24 +499,46 @@ if Features["shortcuts"]["search"]["enabled"] {
 				}
 				; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
 				; MsgBox is dismissed before the timer tick, preventing an infinite loop.
-				ScheduleFn.Call(RenameFn, -50)
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
+				ScheduleFn.Call(_GetPathRenameCurrent.Bind(SelectionId, RenameFn), -50)
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				; The shared locale strings use printf-style ``%s`` for cross-platform
 				; compatibility with the Hammerspoon driver. AHK v2's Format() expects
 				; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
 				; substitution is done with StrReplace here.
 				Result := PromptFn.Call(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
 						t("dialog.path_copy.title"), "YesNo")
+				; MsgBox pumps hotkeys: a pause or newer selection revokes this response.
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				if (Result == "No") {
 						if !WriteFn.Call(PathWithBackslash) {
 								try LoggerWarn("shortcuts",
 										"GetPath could not copy the backslash-form path; success UI was suppressed.")
 								return false
 						}
+						if !_GetPathCopyCurrent(SelectionId)
+								return false
 						SleepFn.Call(200)
+						if !_GetPathCopyCurrent(SelectionId)
+								return false
 						PromptFn.Call(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
 				}
 				return true
 		}
+		_GetPathCopyCurrent(SelectionId) {
+				global _SelectionCaptureNextId
+				return !A_IsSuspended && _SelectionCaptureNextId == SelectionId
+		}
+
+		_GetPathRenameCurrent(SelectionId, RenameFn) {
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
+				return RenameFn.Call()
+		}
+
 		ChangeButtonNames() {
 				return _ChangeButtonNamesWith(WMExists, WMActivate, ControlSetText)
 		}

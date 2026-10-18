@@ -682,3 +682,56 @@ TestShortcuts_RegJumpCommitsNormalizedTarget() {
 }
 Test("Shortcuts/win: publish the normalized registry target (regjump-root-normalization)",
 	TestShortcuts_RegJumpCommitsNormalizedTarget)
+
+; A modal path-copy question and its later Sleep keep running after hotkey
+; suspension. Revoke the old response before another clipboard write or dialog.
+_GPC_ContinuationRevocation(Scenario) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live selection capture")
+	PreviousId := _SelectionCaptureNextId
+	PreviousSuspended := A_IsSuspended
+	Events := [], Timers := []
+	Revoke() {
+		if InStr(Scenario, "pause-resume") {
+			Suspend(true)
+			GetSelectionCancel()
+			Suspend(false)
+		} else if InStr(Scenario, "pause")
+			Suspend(true)
+		else
+			GetSelectionCancel()
+	}
+	Prompt(Args*) {
+		Events.Push("prompt")
+		if InStr(Scenario, "prompt")
+			Revoke()
+		return "No"
+	}
+	Wait(Ms) {
+		Events.Push("sleep")
+		if InStr(Scenario, "sleep")
+			Revoke()
+	}
+	try {
+		if Scenario == "entry-pause"
+			Suspend(true)
+		Result := _GetPathCopyFlow("C:/repo", "C:\repo",
+			(Value) => (Events.Push("write"), true),
+			(Callback, Delay) => (Timers.Push(Callback), Events.Push("timer")),
+			Prompt, Wait, (*) => Events.Push("rename"))
+		AssertFalse(Result, "a revoked response cannot complete its copy continuation")
+		ExpectedEvents := Scenario == "entry-pause" ? 0 : InStr(Scenario, "prompt") ? 3 : 5
+		AssertEqual(ExpectedEvents, Events.Length,
+			"revocation must stop before the next clipboard write or success dialog")
+		if Timers.Length > 0 {
+			Timers[1].Call()
+			AssertEqual(ExpectedEvents, Events.Length, "a retained rename timer cannot reactivate the revoked dialog")
+		}
+	} finally {
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+for _GPC_Scenario in ["entry-pause", "prompt-pause", "prompt-cancel", "prompt-pause-resume", "sleep-pause", "sleep-cancel"]
+	Test("Shortcuts/win: path copy continuation " . _GPC_Scenario . " (getpath-continuation-revocation)",
+		_GPC_ContinuationRevocation.Bind(_GPC_Scenario))
