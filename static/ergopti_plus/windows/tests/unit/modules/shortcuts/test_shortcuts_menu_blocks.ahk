@@ -37,7 +37,7 @@ Test("shortcuts menu: a separator splits text rows from modifier groups (shortcu
 ; The key left of 1 used to be one fixed row, "instant screenshot", labelled by
 ; a legend written for two layouts. It is one of three tap keys now: the
 ; manifest lists them, and the provider names each by what it types (see
-; unit/test_tap_keys.ahk for the labels themselves).
+; unit/platform/remap/keys/test_tap_keys.ahk for the labels themselves).
 _SMB_TapKeysReplaceTheScreenshotRow() {
 	Assert(!(ManifestFindEntryByPath("shortcuts.screen_instant") is Map),
 		"the fixed instant-screenshot feature must be gone: the key is a tap key")

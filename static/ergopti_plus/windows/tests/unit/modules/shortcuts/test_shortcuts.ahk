@@ -7,7 +7,7 @@
 ; modules/shortcuts/ (utils, ctrl, win).
 ; Verifies the shortcut registration helpers and the pure logic of the Win
 ; shortcuts. The key combinations (LAlt then CapsLock, AltGr then LAlt...)
-; are tested in unit/test_key_combinations.ahk.
+; are tested in unit/platform/remap/key_combinations/test_key_combinations.ahk.
 ;
 ; FEATURES & RATIONALE:
 ; 1. No real OS hotkeys triggered: the modules are included after all stubs so
@@ -269,7 +269,7 @@ Test("Shortcuts/win: GetKnownFolderDownloads returns a string value", TestShortc
 ; Source-scan assertions where the claim is about AHK's native Suspend() and
 ; hotkey machinery, which the headless harness cannot fire a real hotkey
 ; through; behavioural checks where the claim can be exercised directly. The
-; key-combination dispatch has its own file, unit/test_key_combinations.ahk.
+; key-combination dispatch has its own file, unit/platform/remap/key_combinations/test_key_combinations.ahk.
 
 TestShortcuts_DispatchersRegisteredAsRealHotkeys() {
 	; Native Suspend() disarms Hotkeys/Hotstrings automatically -- it is only a

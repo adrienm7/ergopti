@@ -19,7 +19,7 @@
  * [tap_hold.layers.nav.mappings] table matched no driver at all. Every driver
  * now generates its layer from layer files; this gate proves the preset still
  * equals the layer Windows users had, and the AHK suite
- * (tests/unit/test_nav_layer_table.ahk) proves the Windows table built from it
+ * (tests/unit/platform/remap/layers/test_nav_layer_table.ahk) proves the Windows table built from it
  * registers exactly the frozen hotkeys.
  *
  * WHAT IS COMPARED:

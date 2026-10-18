@@ -67,6 +67,6 @@ global _DefaultLogsDir := _LogsDir
 
 ; Both complete test modules retain their original registrations and callbacks.
 #Include unit/adapters/test_console_window.ahk
-#Include unit/test_key_combinations.ahk
+#Include unit/platform/remap/key_combinations/test_key_combinations.ahk
 
 RunTests()

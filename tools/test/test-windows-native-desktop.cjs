@@ -124,7 +124,7 @@ function checkNativeEntry(source) {
 	}
 	assert.deepEqual(code.match(/^#Include unit\/.*$/gm), [
 		'#Include unit/adapters/test_console_window.ahk',
-		'#Include unit/test_key_combinations.ahk'
+		'#Include unit/platform/remap/key_combinations/test_key_combinations.ahk'
 	]);
 	assert.doesNotMatch(code, /#Include .*run_all\.ahk|#Include .*ErgoptiPlus\.ahk/);
 	assert.match(code, /Arguments\[1\] != "--interactive"/);
@@ -150,7 +150,10 @@ for (const [before, after] of [
 		'#Include unit/adapters/test_console_window.ahk',
 		'#Include unit/adapters/test_console_window.ahk\n#Include unit/infra/toml/test_toml_numeric_strings.ahk'
 	],
-	['#Include unit/test_key_combinations.ahk', '#Include unit/missing_key_combinations.ahk'],
+	[
+		'#Include unit/platform/remap/key_combinations/test_key_combinations.ahk',
+		'#Include unit/missing_key_combinations.ahk'
+	],
 	['Arguments[3] != "todo91-altgr-suffix"', 'false'],
 	['global _AHK_INTERACTIVE := true', 'global _AHK_INTERACTIVE := false'],
 	['RunTests()', 'ExitApp(0)']
@@ -187,7 +190,7 @@ for (const [before, after] of [
 }
 const registrations = [
 	'unit/adapters/test_console_window.ahk',
-	'unit/test_key_combinations.ahk'
+	'unit/platform/remap/key_combinations/test_key_combinations.ahk'
 ].map((file) =>
 	stripComments(
 		fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8'),

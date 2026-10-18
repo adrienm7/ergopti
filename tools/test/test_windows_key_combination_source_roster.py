@@ -389,7 +389,7 @@ def preparer_controls(root, commit, legacy, source, expected_sha, private_parent
         dangling.symlink_to(temp / "absent")
         refused("dangling output symlink", lambda: invoke(args(dangling)))
         refused("unsafe source traversal", lambda: model.disk_image(temp, "../escape"))
-        real_name = "static/ergopti_plus/windows/tests/unit/test_key_combinations.ahk"
+        real_name = "static/ergopti_plus/windows/tests/unit/platform/remap/key_combinations/test_key_combinations.ahk"
         real_image = git(root, "show", commit + ":" + real_name)
         changed = temp / "changed-source"
         changed.write_bytes(real_image + b"; private altered source\n")

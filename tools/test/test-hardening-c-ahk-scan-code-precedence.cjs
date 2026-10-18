@@ -33,7 +33,7 @@
  * HookDispatcher InputHook, which no hotkey precedence reaches.
  *
  * FEATURES & RATIONALE:
- * 1. Mirrors windows/tests/meta/test_hardening_c_scan_code_shadows_key_name.ahk
+ * 1. Mirrors windows/tests/meta/platform/remap/key_combinations/test_scan_code_shadows_key_name.ahk
  *    so the class fails on Linux and macOS before the Windows lane runs: the
  *    AutoHotkey suite cannot run outside Windows.
  * 2. Names are resolved from the physical-key registry

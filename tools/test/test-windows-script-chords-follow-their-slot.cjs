@@ -337,9 +337,10 @@ for (const slot of manifestSlots) {
 
 const runAll = read(path.join(WIN, 'tests', 'run_all.ahk'));
 for (const test of ['test_script_chords_follow_their_slot', 'test_script_control_submenu']) {
+	// The unit tests live in domain folders; any depth below unit/ registers.
 	check(
-		new RegExp(`^#Include unit/${test}\\.ahk$`, 'm').test(runAll),
-		`run_all.ahk must include unit/${test}.ahk`
+		new RegExp(`^#Include unit/(?:[\\w-]+/)*${test}\\.ahk$`, 'm').test(runAll),
+		`run_all.ahk must include ${test}.ahk from its unit/ domain folder`
 	);
 }
 
