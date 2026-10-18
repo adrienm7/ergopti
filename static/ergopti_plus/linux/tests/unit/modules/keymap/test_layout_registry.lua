@@ -575,7 +575,8 @@ helpers.describe("registry workflows lose publication authority at terminal shut
 				helpers.assert_eq(callbacks, 0)
 				helpers.assert_eq(registry.snapshot(deps).active, "")
 				helpers.assert_eq(registry.snapshot(deps).busy, busy, "logical cancellation cannot clear physical debt")
-				helpers.assert_eq(pcall(registry._reset), false, "test reset cannot erase terminal ownership")
+				local reset_ok = pcall(registry._reset)
+				helpers.assert_eq(reset_ok, false, "test reset cannot erase terminal ownership")
 				physical.settled = true
 				helpers.assert_true(registry.shutdown())
 				helpers.assert_nil(registry.snapshot(deps).busy)
