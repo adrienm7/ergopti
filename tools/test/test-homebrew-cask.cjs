@@ -322,7 +322,7 @@ check('portable Brew ownership controls remain registered and mandatory', () => 
 	assert.strictEqual(result.signal, null, result.stderr);
 	assert.strictEqual(result.status, 0, result.stderr);
 	// The consent-free AppleEvent boundary retired every consent request and UI control.
-	assert.match(result.stderr, /Ran 117 tests in /);
+	assert.match(result.stderr, /Ran 118 tests in /);
 	assert.match(result.stderr, /\nOK\s*$/);
 	assert.doesNotMatch(result.stderr, /skipped=/);
 });

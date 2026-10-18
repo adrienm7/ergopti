@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import unicodedata
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
@@ -1134,6 +1135,40 @@ class AppleEventBoundaryControls(unittest.TestCase):
                     child.poll.assert_not_called()
                     child.wait.assert_not_called()
                     self.assertEqual((root / "sandbox.sb").read_text(), self.policy)
+
+
+class NativeFixtureNameControls(unittest.TestCase):
+    """The signed fixture uses the name form the producer's ditto ZIP restores."""
+
+    def test_fixture_resource_uses_the_decomposed_native_name(self):
+        name = probe.RESOURCE_NAME
+        self.assertEqual(name, unicodedata.normalize("NFD", name))
+        # The precomposed spelling is what ditto renamed, failing the producer check.
+        self.assertNotEqual(name, unicodedata.normalize("NFC", name))
+        self.assertEqual(unicodedata.normalize("NFC", name), "données.txt")
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            links = []
+            children = SimpleNamespace(root=root, run=Mock())
+            with (
+                patch.object(
+                    probe.shutil,
+                    "copyfile",
+                    side_effect=lambda _source, target: Path(target).write_bytes(b"owned"),
+                ),
+                patch.object(
+                    probe.Path,
+                    "symlink_to",
+                    autospec=True,
+                    side_effect=lambda link, target: links.append((link.name, target)),
+                ),
+            ):
+                app = probe.signed_bundle(children, "71.36.1")
+            resources = app / "Contents/Resources"
+            self.assertEqual(os.listdir(resources), [name])
+            self.assertEqual((resources / name).read_bytes(), probe.RESOURCE)
+            self.assertEqual(links, [("owned-link", name)])
+            self.assertEqual(children.run.call_count, 2)
 
 
 class ConsentFreeBoundaryControls(unittest.TestCase):

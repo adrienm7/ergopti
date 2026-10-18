@@ -27,6 +27,7 @@ import sys
 import tempfile
 import threading
 import time
+import unicodedata
 import uuid
 from urllib.parse import urlsplit
 
@@ -35,6 +36,10 @@ from macos_owned_process import NativeProcessGroups, OwnedProcessInterrupted, ac
 
 BUNDLE = "ErgoptiPlus.app"
 RESOURCE = "Independent Unicode bytes: café 😀\n".encode()
+# Native macOS writers (Foundation, Finder, ditto) store decomposed names, and the
+# producer's ditto ZIP round trip restores NFD. A precomposed Python name would
+# come back renamed and be refused as a changed bundle, so model the native form.
+RESOURCE_NAME = unicodedata.normalize("NFD", "données.txt")
 VERSIONS = ("71.36.1", "71.36.2", "71.36.3", "71.36.4")
 
 
@@ -2302,8 +2307,8 @@ def signed_bundle(children, version):
     executable.parent.mkdir(parents=True)
     shutil.copyfile("/usr/bin/true", executable)
     executable.chmod(0o751)
-    (resources / "données.txt").write_bytes(RESOURCE)
-    (resources / "owned-link").symlink_to("données.txt")
+    (resources / RESOURCE_NAME).write_bytes(RESOURCE)
+    (resources / "owned-link").symlink_to(RESOURCE_NAME)
     (app / "Contents/Info.plist").write_bytes(
         plistlib.dumps(
             {
@@ -2394,10 +2399,10 @@ def verify_installed(children, version, source):
         plist["CFBundleShortVersionString"] == version,
         "Installed version differs from independent expectation",
     )
-    resource = app / "Contents/Resources/données.txt"
+    resource = app / "Contents/Resources" / RESOURCE_NAME
     require(resource.read_bytes() == RESOURCE, "Installed Unicode resource bytes changed")
     require(
-        os.readlink(app / "Contents/Resources/owned-link") == "données.txt",
+        os.readlink(app / "Contents/Resources/owned-link") == RESOURCE_NAME,
         "Installed symlink changed",
     )
     require(
