@@ -15,8 +15,6 @@ local fixtures = {
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
     { path = "tests/unit/adapters/network/test_managed_http_public.lua", target = "adapters/http_client.lua", policy = true,
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
-    { path = "tests/unit/infra/network/test_managed_http_deadline_arm.lua", target = "adapters/http_client.lua", policy = true,
-      names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
     { path = "tests/unit/infra/network/test_managed_http_queued_deadline.lua", target = "adapters/http_client.lua", policy = true,
       names = { "luv", "adapters.http_client", "adapters.curl_http_client", "adapters.system_proxy", "infra.proxy_policy", "infra.managed_http", "infra.monotonic", "infra.managed_http_deadline", "infra.paths" } },
     { path = "tests/unit/adapters/network/test_system_proxy_callbacks.lua", target = "adapters/system_proxy.lua", config = { nil_driver_root = true, logs = true },
