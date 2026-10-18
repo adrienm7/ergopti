@@ -1230,6 +1230,7 @@ local function capture_pause_controller(Source, state)
 	local finish = assert(source:find("\n\t\tend,\n\t})", last + 1, true))
 	local body = source:sub(last + 1, finish - 1)
 	local callback = assert(load("return function(paused)" .. body .. "\nend", "genuine-daemon-pause", "t", {
+		privacy_owners = {},
 		MagicKeySource = Source,
 		keylogger = require("modules.keylogger.keylogger"),
 		TapHold = { set_paused = function() end },

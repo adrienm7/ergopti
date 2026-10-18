@@ -875,6 +875,7 @@ local function main()
 		-- The tray greys every feature row while paused and its title row
 		-- resumes; without a rebuild here the menu kept showing the old state.
 		on_pause_change = function(paused)
+			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keylogger.cancel_hold_intervals() end
 			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
@@ -935,6 +936,7 @@ local function main()
 	if input_capture_gate ~= nil then error("input capture gate already initialised") end
 	input_capture_gate = InputCaptureGate.new({
 		on_block = function()
+			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			keylogger.cancel_hold_intervals()
 			_undoable = nil
 			_last_offered = nil
@@ -1533,6 +1535,7 @@ local function main()
 				and shortcuts.is_wrap_on_type_enabled()
 				and not script_actions.is_paused()
 				and not secure_focus_guard.blocks_text()
+				and not input_capture_gate.blocks_text()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
 		read_primary = require("adapters.clipboard").read_primary,
@@ -1547,6 +1550,7 @@ local function main()
 			return true
 		end,
 	})
+	privacy_owners.end_wrap_selection = wrap_on_type.end_selection_window
 
 	-- The script-management chords (AltGr + Enter, Backspace, Delete, Escape),
 	-- shared by the three drivers: a chord whose slot runs an action runs it on
@@ -2340,6 +2344,7 @@ local function main()
 
 	if process_lifecycle then
 		process_lifecycle.onFocusChange(function(appName, windowTitle)
+			wrap_on_type.end_selection_window()
 			keylogger.observe_hold_focus(appName)
 			keylogger.set_private_window(keylogger.is_private_window(windowTitle))
 			-- A focus change moves the caret to a different text context. The matcher

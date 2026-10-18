@@ -408,15 +408,19 @@ helpers.describe("Linux terminal shortcut scope", function()
 		file:close()
 		local block = assert(source:match('local wrap_on_type = require%("modules.shortcuts.wrap_on_type"%).new%({(.-)get_pair%s*='))
 		local getter = assert(block:match("is_active%s*=%s*(function%(%).-end),"))
-		local admitted = true
-		local factory = assert((loadstring or load)("return function(shortcuts, script_actions, secure_focus_guard) return " .. getter .. " end"))()
+		local admitted, captured = true, false
+		local factory = assert((loadstring or load)("return function(shortcuts, script_actions, secure_focus_guard, input_capture_gate) return " .. getter .. " end"))()
 		local active = factory({ is_enabled = function() return true end, is_wrap_on_type_enabled = function() return true end,
 			configuration_admitted = function() return admitted end }, { is_paused = function() return false end },
-			{ blocks_text = function() return false end })
+			{ blocks_text = function() return false end }, { blocks_text = function() return captured end })
 		helpers.assert_true(active())
 		admitted = false
 		helpers.assert_eq(active(), false)
 		admitted = true
+		helpers.assert_true(active())
+		captured = true
+		helpers.assert_eq(active(), false)
+		captured = false
 		helpers.assert_true(active())
 	end)
 
