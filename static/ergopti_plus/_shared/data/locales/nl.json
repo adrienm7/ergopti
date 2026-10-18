@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Voorbeeldscript maken",
 	"menu.hotstrings.user_code.error": "Het persoonlijke script voor tekstafkortingen is mislukt. Open het om de fout te herstellen.",
 	"menu.hotstrings.user_code.open_source": "Persoonlijk script openen",
+	"menu.hotstrings.user_code.problem_failed": "scriptfout: open het om te herstellen",
+	"menu.hotstrings.user_code.problem_missing": "script ontbreekt: maak het voorbeeld",
 	"menu.hotstrings.user_code.reload_source": "Persoonlijk script opnieuw laden",
 	"menu.hotstrings.user_code.title": "Programmeerbare tekstafkortingen",
 	"platform_reason.program_runner_unavailable": "Niet beschikbaar: De native programmastarter of deze toewijzing is niet beschikbaar.",

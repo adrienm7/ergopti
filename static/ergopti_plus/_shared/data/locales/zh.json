@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "创建示例脚本",
 	"menu.hotstrings.user_code.error": "个人文本快捷方式脚本运行失败。请打开脚本并修正错误。",
 	"menu.hotstrings.user_code.open_source": "打开个人脚本",
+	"menu.hotstrings.user_code.problem_failed": "脚本错误：请打开并修正",
+	"menu.hotstrings.user_code.problem_missing": "脚本缺失：请创建示例",
 	"menu.hotstrings.user_code.reload_source": "重新加载个人脚本",
 	"menu.hotstrings.user_code.title": "可编程文本快捷方式",
 	"platform_reason.program_runner_unavailable": "不可用: 原生程序运行功能或此绑定不可用。",

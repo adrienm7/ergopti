@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Opret eksempelscript",
 	"menu.hotstrings.user_code.error": "Det personlige script til tekstgenveje mislykkedes. Åbn det for at rette fejlen.",
 	"menu.hotstrings.user_code.open_source": "Åbn personligt script",
+	"menu.hotstrings.user_code.problem_failed": "scriptfejl: åbn det for at rette det",
+	"menu.hotstrings.user_code.problem_missing": "script mangler: opret eksemplet",
 	"menu.hotstrings.user_code.reload_source": "Genindlæs personligt script",
 	"menu.hotstrings.user_code.title": "Programmerbare tekstgenveje",
 	"platform_reason.program_runner_unavailable": "Utilgængelig: Den native programstarter eller denne binding er utilgængelig.",

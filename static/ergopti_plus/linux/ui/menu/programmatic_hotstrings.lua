@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Programmable Hotstring Menu (Linux Native Ports)
 --- DESCRIPTION:
---- Supplies canonical preference receipts and native source/dialog actions to
---- the shared menu. Factory evaluation belongs only to explicit enable/reload.
+--- Supplies canonical preference receipts, native source actions and the
+--- source problem to the shared menu. Factory evaluation belongs only to
+--- explicit enable/reload; a source problem is shown on the row, never a dialog.
 --- ==============================================================================
 
 local M = {}
@@ -12,10 +13,8 @@ local Policy = require("menu.programmable_hotstrings")
 local Manifest = require("infra.manifest_menu")
 local Preferences = require("infra.hotstring_preferences")
 local Shell = require("adapters.shell_runner")
-local Modal = require("ui.modal")
 local Prompt = require("ui.text_prompt")
 local I18n = require("infra.i18n")
-local WindowTitles = require("window_titles")
 local Logger = require("logger.shim")
 local ENABLED = "hotstrings.dynamic.user_code.enabled"
 local TIME = "hotstrings.dynamic.user_code.time_activation_seconds"
@@ -51,15 +50,9 @@ function M.build(ctx)
 		open = open,
 		reload = function() return current() and native.reload_user_code() == true end,
 		create = function() return current() and native.create_user_code_example() == true end,
+		problem = function() return current() and native.user_code_problem() or nil end,
 		prompt = function(milliseconds)
 			return Prompt.ask(I18n.get("menu.hotstrings.user_code.title"), I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds))
-		end,
-		error = function(open_source)
-			local command = "zenity --question --title=" .. Shell.quote(WindowTitles.compose(I18n.get("common.error_title")))
-				.. " --text=" .. Shell.quote(I18n.get("menu.hotstrings.user_code.error"))
-				.. " --ok-label=" .. Shell.quote(I18n.get("menu.hotstrings.user_code.open_source"))
-				.. " --cancel-label=" .. Shell.quote(I18n.get("common.close")) .. " 2>/dev/null"
-			if Modal.run(function() return Shell.run(command) end) == true then open_source() end
 		end,
 	})
 end

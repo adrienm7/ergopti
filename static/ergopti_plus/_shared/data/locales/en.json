@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Create example script",
 	"menu.hotstrings.user_code.error": "The personal hotstring script failed. Open it to correct the error.",
 	"menu.hotstrings.user_code.open_source": "Open personal script",
+	"menu.hotstrings.user_code.problem_failed": "script error: open it to fix it",
+	"menu.hotstrings.user_code.problem_missing": "script missing: create the example",
 	"menu.hotstrings.user_code.reload_source": "Reload personal script",
 	"menu.hotstrings.user_code.title": "Programmable hotstrings",
 	"platform_reason.program_runner_unavailable": "Unavailable: The native program runner or this binding is unavailable.",

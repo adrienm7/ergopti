@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Vytvořit ukázkový skript",
 	"menu.hotstrings.user_code.error": "Osobní skript textových zkratek selhal. Otevřete jej a opravte chybu.",
 	"menu.hotstrings.user_code.open_source": "Otevřít osobní skript",
+	"menu.hotstrings.user_code.problem_failed": "chyba skriptu: otevřete jej a opravte",
+	"menu.hotstrings.user_code.problem_missing": "skript chybí: vytvořte příklad",
 	"menu.hotstrings.user_code.reload_source": "Znovu načíst osobní skript",
 	"menu.hotstrings.user_code.title": "Programovatelné textové zkratky",
 	"platform_reason.program_runner_unavailable": "Nedostupné: Nativní spouštěč nebo tato vazba není dostupná.",

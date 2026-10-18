@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "إنشاء برنامج نصي نموذجي",
 	"menu.hotstrings.user_code.error": "فشل البرنامج النصي الشخصي للاختصارات النصية. افتحه لتصحيح الخطأ.",
 	"menu.hotstrings.user_code.open_source": "فتح البرنامج النصي الشخصي",
+	"menu.hotstrings.user_code.problem_failed": "خطأ في البرنامج النصي: افتحه لإصلاحه",
+	"menu.hotstrings.user_code.problem_missing": "البرنامج النصي مفقود: أنشئ المثال",
 	"menu.hotstrings.user_code.reload_source": "إعادة تحميل البرنامج النصي الشخصي",
 	"menu.hotstrings.user_code.title": "اختصارات نصية قابلة للبرمجة",
 	"platform_reason.program_runner_unavailable": "غير متاح: مشغّل البرامج الأصلي أو هذا الربط غير متاح.",

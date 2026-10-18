@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Utwórz przykładowy skrypt",
 	"menu.hotstrings.user_code.error": "Osobisty skrypt skrótów tekstowych nie powiódł się. Otwórz go, aby poprawić błąd.",
 	"menu.hotstrings.user_code.open_source": "Otwórz osobisty skrypt",
+	"menu.hotstrings.user_code.problem_failed": "błąd skryptu: otwórz go, aby poprawić",
+	"menu.hotstrings.user_code.problem_missing": "brak skryptu: utwórz przykład",
 	"menu.hotstrings.user_code.reload_source": "Wczytaj ponownie osobisty skrypt",
 	"menu.hotstrings.user_code.title": "Programowalne skróty tekstowe",
 	"platform_reason.program_runner_unavailable": "Niedostępne: Natywny mechanizm uruchamiania lub to przypisanie jest niedostępne.",

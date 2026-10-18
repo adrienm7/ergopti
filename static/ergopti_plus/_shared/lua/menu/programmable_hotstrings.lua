@@ -35,14 +35,24 @@ function M.build_entry_rows(manifest, build)
 	return rows
 end
 
+-- The source problems the native owner reports, each shown on the feature row.
+local PROBLEMS = { missing = true, failed = true }
+
 --- Builds equivalent menu controls around one exact native runtime owner.
---- @param ports table Manifest, translation, preference, native and dialog ports.
+---
+--- A source problem is never a dialog: the feature row names it (« — source
+--- missing »), opening a missing source is greyed, and creating the example
+--- loads it at once when the option is on. A refused action redraws the menu
+--- so the row shows the state the owner now reports.
+--- @param ports table Manifest, translation, preference, native and problem ports.
 --- @return table menu Native renderer output.
 function M.build(ports)
 	local function refused()
-		ports.error(ports.open)
+		ports.changed()
 		return false
 	end
+	local problem = ports.problem()
+	assert(problem == nil or PROBLEMS[problem], "unknown programmable source problem: " .. tostring(problem))
 	local function mutation(enabled, seconds)
 		if ports.paused() or ports.master() ~= true or type(enabled) ~= "boolean"
 			or type(seconds) ~= "number" or seconds ~= seconds or seconds < 0 or seconds >= math.huge then return refused() end
@@ -58,11 +68,22 @@ function M.build(ports)
 			return true
 		end
 	end
+	--- Creates the example (never over an existing source), then, when the
+	--- option is on, enables it at once so the problem the row showed is gone.
+	--- @return boolean repaired
+	local function repair_with_example()
+		if ports.create() ~= true then return false end
+		local enabled, seconds = ports.get()
+		if enabled ~= true or ports.paused() or ports.master() ~= true then return true end
+		return ports.set(true, seconds) == true
+	end
 	local feature_rows = {}
 	feature_rows[FEATURE] = function()
 		local enabled, seconds = ports.get()
 		local blocked = ports.paused() or ports.master() ~= true
-		return { label = ports.i18n("menu.hotstrings.user_code.title"), checked = enabled,
+		local label = ports.i18n("menu.hotstrings.user_code.title")
+		if problem then label = label .. " — " .. ports.i18n("menu.hotstrings.user_code.problem_" .. problem) end
+		return { label = label, checked = enabled,
 			items = {
 				{ label = ports.i18n("menu.hotstrings.user_code.title"), checked = enabled, disabled = blocked,
 					action = function()
@@ -83,14 +104,22 @@ function M.build(ports)
 					end },
 			} }
 	end
-	return ports.manifest.build("programmable_hotstrings", "Hotstrings", nil, nil, {
+	local open = command(ports.open)
+	local rows = ports.manifest.build("programmable_hotstrings", "Hotstrings", nil, nil, {
 		feature_rows = feature_rows,
 		commands = {
-			open_user_hotstring_source = command(ports.open),
+			open_user_hotstring_source = open,
 			reload_user_hotstring_source = command(ports.reload),
-			create_user_hotstring_example = command(ports.create),
+			create_user_hotstring_example = command(repair_with_example),
 		},
 	})
+	-- A missing source has nothing to open: the example row creates it.
+	if problem == "missing" then
+		for _, row in ipairs(rows) do
+			if row.fn == open then row.disabled = true end
+		end
+	end
+	return rows
 end
 
 return M

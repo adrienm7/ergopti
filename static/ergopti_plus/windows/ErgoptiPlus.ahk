@@ -1437,8 +1437,6 @@ if _LLM_Menu_RuntimeActivated
 	_MenuStartupCommands.NotifyReady()
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
-; A programmable-source repair offer refused during boot waited for this point.
-UserHotstringsOfferPendingRepair()
 HealthCheck_StartWindowControl()
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.

@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Skapa exempelskript",
 	"menu.hotstrings.user_code.error": "Det personliga skriptet för textgenvägar misslyckades. Öppna det för att rätta felet.",
 	"menu.hotstrings.user_code.open_source": "Öppna personligt skript",
+	"menu.hotstrings.user_code.problem_failed": "skriptfel: öppna det för att rätta det",
+	"menu.hotstrings.user_code.problem_missing": "skript saknas: skapa exemplet",
 	"menu.hotstrings.user_code.reload_source": "Läs in personligt skript igen",
 	"menu.hotstrings.user_code.title": "Programmerbara textgenvägar",
 	"platform_reason.program_runner_unavailable": "Otillgänglig: Den inbyggda programstartaren eller denna koppling är otillgänglig.",

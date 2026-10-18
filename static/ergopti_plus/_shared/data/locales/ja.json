@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "サンプルスクリプトを作成",
 	"menu.hotstrings.user_code.error": "個人用文字列ショートカットのスクリプトが失敗しました。開いてエラーを修正してください。",
 	"menu.hotstrings.user_code.open_source": "個人用スクリプトを開く",
+	"menu.hotstrings.user_code.problem_failed": "スクリプトエラー：開いて修正してください",
+	"menu.hotstrings.user_code.problem_missing": "スクリプトがありません：例を作成してください",
 	"menu.hotstrings.user_code.reload_source": "個人用スクリプトを再読み込み",
 	"menu.hotstrings.user_code.title": "プログラム可能な文字列ショートカット",
 	"platform_reason.program_runner_unavailable": "利用不可: ネイティブのプログラム実行機能またはこの割り当ては利用できません。",
