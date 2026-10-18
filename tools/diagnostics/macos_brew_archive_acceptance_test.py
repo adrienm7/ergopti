@@ -1146,12 +1146,19 @@ class NestedHomebrewSandboxControls(unittest.TestCase):
         brew = probe.brew_sandbox_profile(root)
         self.assertEqual(
             brew,
-            base + '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))\n',
+            base
+            + '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))\n'
+            + '(allow file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))\n',
         )
         self.assertNotIn("no-sandbox", base)
         self.assertNotIn("process-exec", base)
+        self.assertNotIn("/dev/ptmx", base)
+        self.assertNotIn("ttys", base)
         self.assertEqual(brew.count("(deny appleevent-send)"), 1)
         self.assertEqual(brew.count("no-sandbox"), 1)
+        # Writes stay confined: the only new writable objects are pty devices.
+        self.assertEqual(brew.count("(allow file-write* "), 2)
+        self.assertNotIn('(subpath "/dev")', brew)
 
     def test_only_owned_policies_confine_and_brew_commands_use_brew_policy(self):
         with TemporaryDirectory() as directory:
