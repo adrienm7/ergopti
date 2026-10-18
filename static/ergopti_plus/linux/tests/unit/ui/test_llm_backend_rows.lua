@@ -136,6 +136,20 @@ helpers.describe("AI menu: the backend choice", function()
 end)
 
 helpers.describe("AI menu publication acknowledgement (ai-menu-selection-ack)", function()
+	helpers.it("preserves the active API entry when request retirement is refused (ai-pass2-entry)", function()
+		local build, state, restore = setup("api")
+		local previous = { id = "previous", provider = "cerebras", model = "previous", token = "inert" }
+		local chosen = { id = "chosen", provider = "cerebras", model = "qwen", token = "inert" }
+		state.entries, state.active, state.refuse_backend = { previous, chosen }, previous, true
+		local result = exact(build(), "cerebras/qwen").action()
+		restore()
+		helpers.assert_eq(result, false)
+		helpers.assert_eq(state.active, previous, "a refused runtime transition retains the previous selection")
+		helpers.assert_eq(state.selection_sets or 0, 0, "the private writer is not entered")
+		helpers.assert_eq(state.changed or 0, 0, "the menu announces no successful selection")
+		helpers.assert_eq(#state.tests, 0, "selection cannot start a partial provider request")
+	end)
+
 	for _, backend in ipairs({ "api", "ollama" }) do
 		for _, refused in ipairs({ false, true }) do
 			helpers.it("(ai-menu-selection-ack) returns the backend writer acknowledgement for " .. backend .. " refusal=" .. tostring(refused), function()
@@ -469,6 +483,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			local original = [[{"version":1,"entries":[{"id":"chosen","provider":"cerebras","label":"old","token":"inert-key","model":"qwen","base_url":"","future":{"retained":true}}],"active_id":"","future":{"kept":true}}]]
 			local file = assert(io.open(path, "wb")); assert(file:write(original)); assert(file:close())
 			local changes, stages, result, active, after, mode = 0, 0
+			local backend_calls = 0
 			local ok, failure = pcall(function()
 				package.loaded["modules.llm.api_remote"] = {
 					provider_config_receipt = function() return { published = false, ids = { cerebras = true } } end,
@@ -487,7 +502,8 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 					return rename(from, to)
 				end
 				local rows = helpers.load_module("ui.menu.llm_backend_rows").rows(
-					{ get_backend = function() return "api" end }, {},
+					{ get_backend = function() return "api" end,
+						set_backend = function(kind) backend_calls = backend_calls + 1; return kind == "api" end }, {},
 					function() changes = changes + 1 end, function() return {} end)
 				result = exact(rows, "cerebras/qwen").action()
 				active = owner.active()
@@ -500,6 +516,7 @@ helpers.describe("AI menu selection through the private writer (ai-menu-selectio
 			if staging then staging:close() end
 			assert(os.remove(path))
 			helpers.assert_eq(ok, true, tostring(failure))
+			helpers.assert_eq(backend_calls, 1, "request retirement is acknowledged before private publication")
 			helpers.assert_eq(stages, 1)
 			helpers.assert_eq(changes, refused and 0 or 1)
 			helpers.assert_eq(result, not refused)

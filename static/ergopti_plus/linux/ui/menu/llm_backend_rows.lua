@@ -251,6 +251,7 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 				label = label,
 				checked = active ~= nil and entry.id == active.id,
 				action = function()
+					if llm.set_backend("api") ~= true then return false end
 					if entries.set_active(entry.id) ~= true then return false end
 					changed()
 					return true
