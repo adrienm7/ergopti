@@ -361,6 +361,14 @@
 			"cmd": "node",
 			"args": ["tools/test/test-compact-data-sql.cjs"],
 			"repro": "npm run test:compact-data-sql"
+		},
+		{
+			"id": "compact-data-sql-protocol",
+			"ordinal": 445,
+			"name": "SQL compaction wrapper receives native duration and exact failed-child diagnostics",
+			"cmd": "node",
+			"args": ["tools/test/test-compact-data-sql-protocol.cjs"],
+			"repro": "npm run test:compact-data-sql-protocol"
 		}
 	]
 }
