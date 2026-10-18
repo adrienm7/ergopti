@@ -25,6 +25,30 @@ const STABLE_V102_SCOPE_IDS = Object.freeze([
 	'macos-launch-appleevents',
 	'macos-owned-runtime'
 ]);
+const STABLE_V103_POLICY_PATH = path.resolve(
+	__dirname,
+	'../../.github/ci/stable_v103_macos_native_qualification_exception.json'
+);
+const STABLE_V103_PROFILE_ID = 'stable-v1-0-3-20261018-macos-native-scopes';
+// The only scopes the 2026-10-18 decision lets v1.0.3 defer; PAC and HTTP are
+// mandatory again since they passed on hosted runners on both architectures.
+const STABLE_V103_DEFERRABLE_SCOPE_IDS = Object.freeze([
+	'macos-brew-archive',
+	'macos-native-model-receiving',
+	'macos-shortcuts-discovery',
+	'macos-launch-appleevents',
+	'macos-owned-runtime'
+]);
+// The scopes still red at publication time, in the order of the JSON file.
+// Remove a scope here and from the JSON file once it is green; when none is
+// left, also delete the JSON file and v1.0.3 publishes with no profile.
+const STABLE_V103_SCOPE_IDS = Object.freeze([
+	'macos-brew-archive',
+	'macos-native-model-receiving',
+	'macos-shortcuts-discovery',
+	'macos-launch-appleevents',
+	'macos-owned-runtime'
+]);
 const STABLE_V102_PAC_METHODS = freeze({
 	ManagedHTTPWireTests: ['testRealNativeTLSFullURLPACOrderedFallbackAndOwnedClosure'],
 	ManagedHTTPWPADWireTests: [
@@ -38,7 +62,7 @@ const STABLE_V102_BREW_METHODS = freeze({
 	]
 });
 // Approved on 2026-10-17: the owned-runtime custody methods that first ran on
-// hosted macOS runners for v1.0.2 and fail there.
+// hosted macOS runners for v1.0.2 and fail there. v1.0.3 defers the same set.
 const STABLE_V102_OWNED_RUNTIME_METHODS = freeze({
 	OwnedRuntimeCoreProvisionOwnerTests: [
 		'testCustodyEarlyAdmissionRefusalDoesNotRunInitializedSelfRetirement',
@@ -80,6 +104,47 @@ const STABLE_V102_OWNED_RUNTIME_METHODS = freeze({
 		'testRealKernelSelfImageObservationHasCurrentOriginalBirth'
 	]
 });
+// Fixed public sentence per deferred scope, in publication-notice order.
+const STABLE_NATIVE_NOTICE_SENTENCES = Object.freeze({
+	'macos-launch-appleevents':
+		'External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory.',
+	'macos-shortcuts-discovery': 'Native Apple Shortcuts catalogue discovery remains unqualified.',
+	'macos-native-model-receiving':
+		'Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy.',
+	'macos-brew-archive':
+		'Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified.',
+	'macos-owned-runtime': 'The 27 named owned-runtime custody XCTest methods remain unqualified.'
+});
+/** One separately authorized stable release each; no profile extends another tag. */
+const STABLE_NATIVE_SPECS = Object.freeze([
+	Object.freeze({
+		path: STABLE_V102_POLICY_PATH,
+		id: STABLE_V102_PROFILE_ID,
+		authorization_quote: 'Différer pour 1.0.2 (Recommandé)',
+		expires_at: '2026-10-20T22:00:00Z',
+		tag: 'v1.0.2',
+		version: '1.0.2',
+		deferrable: STABLE_V102_SCOPE_IDS,
+		scopes: STABLE_V102_SCOPE_IDS,
+		mandatory:
+			'All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
+	}),
+	Object.freeze({
+		path: STABLE_V103_POLICY_PATH,
+		id: STABLE_V103_PROFILE_ID,
+		authorization_quote: 'v1.0.3 depuis dev complet',
+		expires_at: '2026-10-25T22:00:00Z',
+		tag: 'v1.0.3',
+		version: '1.0.3',
+		deferrable: STABLE_V103_DEFERRABLE_SCOPE_IDS,
+		scopes: STABLE_V103_SCOPE_IDS,
+		mandatory:
+			'All unlisted tests, the native PAC/WPAD XCTest and independent managed HTTP client qualifications, portable model controls, Worker12, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
+	})
+]);
+const STABLE_NATIVE_SCOPE_IDS = Object.freeze([
+	...new Set(STABLE_NATIVE_SPECS.flatMap((spec) => spec.deferrable))
+]);
 const STABLE_PROFILE_ID = 'stable-v1-20261009-macos-native-deferred';
 const SCOPE_IDS = Object.freeze([
 	'windows-pac-full-url',
@@ -186,8 +251,19 @@ function parseClosedJson(raw) {
 	}
 	return value;
 }
-/** One separately authorized stable release; no older profile or future tag is extended. */
-function validateStableV102Policy(value) {
+/**
+ * Validates one stable native profile against its spec. `scopes` is the exact
+ * deferred list, any non-empty subset of the spec's deferrable scopes.
+ */
+function validateStableNativePolicy(value, spec, scopes = spec.scopes) {
+	const label = 'v' + spec.version;
+	if (
+		!Array.isArray(scopes) ||
+		scopes.length === 0 ||
+		new Set(scopes).size !== scopes.length ||
+		scopes.some((scope) => !spec.deferrable.includes(scope))
+	)
+		refuse('Invalid ' + label + ' deferrable scope list.');
 	keys(value, [
 		'schema',
 		'id',
@@ -207,25 +283,27 @@ function validateStableV102Policy(value) {
 	]);
 	if (
 		value.schema !== 1 ||
-		value.id !== STABLE_V102_PROFILE_ID ||
+		value.id !== spec.id ||
 		typeof value.authorized !== 'boolean' ||
-		value.authorization_quote !== 'Différer pour 1.0.2 (Recommandé)' ||
-		value.expires_at !== '2026-10-20T22:00:00Z' ||
+		value.authorization_quote !== spec.authorization_quote ||
+		value.expires_at !== spec.expires_at ||
 		value.repository !== 'adrienm7/ergopti' ||
 		value.event_name !== 'push' ||
 		value.ref !== 'refs/heads/main' ||
 		value.release !== true ||
 		value.prerelease !== 'false' ||
 		value.channel !== 'main' ||
-		value.tag !== 'v1.0.2' ||
-		value.version !== '1.0.2' ||
+		value.tag !== spec.tag ||
+		value.version !== spec.version ||
 		typeof value.authorization_note !== 'string' ||
 		!value.authorization_note ||
 		/[\r\n]/.test(value.authorization_note)
 	)
-		refuse('Invalid approved v1.0.2 boundary.');
-	keys(value.scopes, STABLE_V102_SCOPE_IDS);
-	for (const scope of STABLE_V102_SCOPE_IDS) {
+		refuse('Invalid approved ' + label + ' boundary.');
+	keys(value.scopes, scopes);
+	if (Object.keys(value.scopes).join('|') !== scopes.join('|'))
+		refuse('Invalid ' + label + ' scope order.');
+	for (const scope of scopes) {
 		const row = value.scopes[scope];
 		const brew = scope === 'macos-brew-archive',
 			pac = scope === 'macos-native-pac',
@@ -250,21 +328,21 @@ function validateStableV102Policy(value) {
 									: ['kind', 'path', 'args', 'command', 'reason']
 		);
 		if (typeof row.reason !== 'string' || !row.reason || /[\r\n]/.test(row.reason))
-			refuse('Invalid v1.0.2 scope reason.');
+			refuse('Invalid ' + label + ' scope reason.');
 		if (owned) {
 			if (
 				row.kind !== 'swift_test_methods' ||
 				row.path !== 'Tests/ErgoptiPlusTests' ||
 				JSON.stringify(row.methods) !== JSON.stringify(STABLE_V102_OWNED_RUNTIME_METHODS)
 			)
-				refuse('Invalid exact v1.0.2 owned-runtime methods.');
+				refuse('Invalid exact ' + label + ' owned-runtime methods.');
 		} else if (brew) {
 			if (
 				row.kind !== 'swift_test_file' ||
 				row.path !== 'Tests/ErgoptiPlusTests/HomebrewArchiveAcceptanceTests.swift' ||
 				row.name !== 'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
 			)
-				refuse('Invalid exact v1.0.2 Brew method.');
+				refuse('Invalid exact ' + label + ' Brew method.');
 		} else if (launch) {
 			const expected = POLICY.scopes[scope];
 			if (
@@ -273,7 +351,7 @@ function validateStableV102Policy(value) {
 				JSON.stringify(row.scenarios) !== JSON.stringify(expected.scenarios) ||
 				JSON.stringify(row.runners) !== JSON.stringify(expected.runners)
 			)
-				refuse('Invalid exact v1.0.2 AppleEvent launch matrix.');
+				refuse('Invalid exact ' + label + ' AppleEvent launch matrix.');
 		} else {
 			const expected = shortcuts ? POLICY.scopes[scope] : STABLE_EXTRA_SCOPES[scope];
 			if (
@@ -281,16 +359,16 @@ function validateStableV102Policy(value) {
 				row.path !== expected.path ||
 				JSON.stringify(row.args) !== JSON.stringify(expected.args)
 			)
-				refuse('Invalid exact v1.0.2 command scope.');
+				refuse('Invalid exact ' + label + ' command scope.');
 			if (pac && JSON.stringify(row.methods) !== JSON.stringify(STABLE_V102_PAC_METHODS))
-				refuse('Invalid exact v1.0.2 PAC methods.');
+				refuse('Invalid exact ' + label + ' PAC methods.');
 			if (
 				model &&
 				(JSON.stringify(row.architectures) !== JSON.stringify(['arm64', 'amd64']) ||
 					JSON.stringify(row.profiles) !==
 						JSON.stringify(['pac-inline', 'pac-url', 'explicit-proxy']))
 			)
-				refuse('Invalid exact v1.0.2 native model profiles.');
+				refuse('Invalid exact ' + label + ' native model profiles.');
 			if (
 				!pac &&
 				!model &&
@@ -298,13 +376,21 @@ function validateStableV102Policy(value) {
 				row.command !==
 					'static/ergopti_plus/macos/tests/support/native_http_wire_client_receiving.py'
 			)
-				refuse('Invalid exact v1.0.2 HTTP wire command.');
+				refuse('Invalid exact ' + label + ' HTTP wire command.');
 		}
 	}
 	return value;
 }
+function validateStableV102Policy(value) {
+	return validateStableNativePolicy(value, STABLE_NATIVE_SPECS[0]);
+}
+/** The v1.0.3 profile; tests pass any subset to prove each scope can be dropped. */
+function validateStableV103Policy(value, scopes = STABLE_V103_SCOPE_IDS) {
+	return validateStableNativePolicy(value, STABLE_NATIVE_SPECS[1], scopes);
+}
 function validatePolicy(value) {
-	if (value && value.id === STABLE_V102_PROFILE_ID) return validateStableV102Policy(value);
+	const native = STABLE_NATIVE_SPECS.find((spec) => value && value.id === spec.id);
+	if (native) return validateStableNativePolicy(value, native);
 	const stable = value && value.id === STABLE_PROFILE_ID;
 	if (
 		stable &&
@@ -425,15 +511,28 @@ const POLICY = freeze(validatePolicy(parseClosedJson(fs.readFileSync(POLICY_PATH
 const STABLE_POLICY = freeze(
 	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_POLICY_PATH, 'utf8')))
 );
-const STABLE_V102_POLICY = freeze(
-	validatePolicy(parseClosedJson(fs.readFileSync(STABLE_V102_POLICY_PATH, 'utf8')))
+// A spec whose scope list is empty has no file and no profile at all.
+const STABLE_NATIVE_POLICIES = Object.freeze(
+	STABLE_NATIVE_SPECS.flatMap((spec) => {
+		if (spec.scopes.length === 0) {
+			if (fs.existsSync(spec.path))
+				refuse('Delete the stable profile file of an empty scope list: ' + spec.id);
+			return [];
+		}
+		return [freeze(validatePolicy(parseClosedJson(fs.readFileSync(spec.path, 'utf8'))))];
+	})
 );
+const KNOWN_POLICIES = Object.freeze([POLICY, STABLE_POLICY, ...STABLE_NATIVE_POLICIES]);
+/** Returns the loaded stable native profile with this id, or null. */
+function stableNativeProfile(id) {
+	return STABLE_NATIVE_POLICIES.find((policy) => policy.id === id) || null;
+}
 function eligible(context, now, policy = POLICY) {
 	keys(context, CONTEXT_KEYS);
 	const stamp = now instanceof Date ? now.getTime() : Date.parse(now);
 	if (!Number.isFinite(stamp)) refuse('Invalid qualification clock.');
 	return (
-		(policy !== STABLE_V102_POLICY || policy.authorized === true) &&
+		(!STABLE_NATIVE_POLICIES.includes(policy) || policy.authorized === true) &&
 		context.github_actions === 'true' &&
 		CONTEXT_KEYS.filter((k) => k !== 'github_actions').every((k) => context[k] === policy[k]) &&
 		stamp < Date.parse(policy.expires_at)
@@ -442,30 +541,27 @@ function eligible(context, now, policy = POLICY) {
 /** Automatic mismatch, expiry and later tags retain full default execution. */
 function resolveQualificationProfile(context, now = new Date(), scope = null) {
 	if ((scope === null || SCOPE_IDS.includes(scope)) && eligible(context, now)) return POLICY;
-	if (STABLE_V102_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_V102_POLICY))
-		return STABLE_V102_POLICY;
+	for (const policy of STABLE_NATIVE_POLICIES)
+		if (
+			typeof scope === 'string' &&
+			Object.hasOwn(policy.scopes, scope) &&
+			eligible(context, now, policy)
+		)
+			return policy;
 	return STABLE_SCOPE_IDS.includes(scope) && eligible(context, now, STABLE_POLICY)
 		? STABLE_POLICY
 		: null;
 }
 /** An explicit profile request refuses every unknown or ineligible context. */
 function authorizeQualificationProfile(id, context, now = new Date()) {
-	const policy =
-		id === POLICY.id
-			? POLICY
-			: id === STABLE_POLICY.id
-				? STABLE_POLICY
-				: id === STABLE_V102_POLICY.id
-					? STABLE_V102_POLICY
-					: null;
+	const policy = KNOWN_POLICIES.find((known) => known.id === id) || null;
 	if (!policy || !eligible(context, now, policy))
 		refuse('Qualification profile is not authorized for this context.');
 	return policy;
 }
 function deferredScopes(profile) {
 	if (profile === null) return [];
-	if (profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V102_POLICY)
-		refuse('Unknown qualification profile.');
+	if (!KNOWN_POLICIES.includes(profile)) refuse('Unknown qualification profile.');
 	return Object.keys(profile.scopes);
 }
 function sourceSha(value) {
@@ -475,10 +571,7 @@ function sourceSha(value) {
 }
 /** Closed missing-proof metadata never conveys native lease or feature authority. */
 function qualificationReceipt(profile, scope, details) {
-	if (
-		(profile !== POLICY && profile !== STABLE_POLICY && profile !== STABLE_V102_POLICY) ||
-		!deferredScopes(profile).includes(scope)
-	)
+	if (!KNOWN_POLICIES.includes(profile) || !deferredScopes(profile).includes(scope))
 		refuse('Unknown qualification receipt scope.');
 	keys(details, ['source_sha']);
 	return {
@@ -636,16 +729,20 @@ function ahkQualificationManifest(tap, execution, profile, sha) {
 }
 /** Selects only this one proposed stable publication; existing callers remain full. */
 function stablePublicationProfile(context, now = new Date()) {
-	const selected = resolveQualificationProfile(context, now, 'macos-brew-archive');
-	return selected === STABLE_POLICY || selected === STABLE_V102_POLICY ? selected : null;
+	// A native profile is selected by its release context, whatever scopes it still lists.
+	for (const policy of STABLE_NATIVE_POLICIES) if (eligible(context, now, policy)) return policy;
+	return resolveQualificationProfile(context, now, 'macos-brew-archive') === STABLE_POLICY
+		? STABLE_POLICY
+		: null;
 }
 /** Fresh admission precedes every publication side effect; missing proof stays explicit. */
 function stablePublicationNotice(id, context, sha, now = new Date()) {
 	if (id === '') return '';
-	if (id !== STABLE_POLICY.id && id !== STABLE_V102_PROFILE_ID)
+	if (id !== STABLE_POLICY.id && !stableNativeProfile(id))
 		refuse('Unknown stable publication selection.');
 	const profile = authorizeQualificationProfile(id, context, now);
-	if (profile === STABLE_V102_POLICY)
+	const spec = STABLE_NATIVE_SPECS.find((candidate) => candidate.id === profile.id);
+	if (spec)
 		return (
 			'DEFERRED / qualified:false (source ' +
 			sourceSha(sha) +
@@ -653,7 +750,20 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 			deferredScopes(profile)
 				.map((scope) => scope + ': ' + profile.scopes[scope].reason)
 				.join(' ') +
-			' External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory. Native Apple Shortcuts catalogue discovery remains unqualified. Native model create, pull, inference, cancellation and retirement remain unqualified on arm64/amd64 across pac-inline, pac-url and explicit-proxy. Native Homebrew ZIP installation, XZ upgrade and refusal preservation remain unqualified. The 27 named owned-runtime custody XCTest methods remain unqualified. All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory. Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/v1.0.2) retain source-bound missing-proof receipts. Only stable v1.0.2 main push before 2026-10-20T22:00:00Z is authorized; no permission, trust or sender workaround.'
+			' ' +
+			Object.keys(STABLE_NATIVE_NOTICE_SENTENCES)
+				.filter((scope) => Object.hasOwn(profile.scopes, scope))
+				.map((scope) => STABLE_NATIVE_NOTICE_SENTENCES[scope])
+				.join(' ') +
+			' ' +
+			spec.mandatory +
+			' Windows unsigned disclosure remains separate. [Qualification records](https://github.com/adrienm7/ergopti/releases/tag/' +
+			spec.tag +
+			') retain source-bound missing-proof receipts. Only stable ' +
+			spec.tag +
+			' main push before ' +
+			spec.expires_at +
+			' is authorized; no permission, trust or sender workaround.'
 		);
 	return (
 		'NATIVE AND HARNESS QUALIFICATION DEFERRED / qualified:false (source ' +
@@ -691,27 +801,30 @@ function scopeDisposition(receipt, scope, sha, context, now = new Date()) {
 }
 /** Requires every actually emitted command scope receipt before public disclosure. */
 function admitCommandReceipts(directory, context, sha, now = new Date()) {
-	const expected =
-		stablePublicationProfile(context, now) === STABLE_V102_POLICY
-			? {
+	const selected = stablePublicationProfile(context, now);
+	const native = STABLE_NATIVE_POLICIES.includes(selected) ? selected : null;
+	const expected = native
+		? Object.fromEntries(
+				Object.entries({
 					'macos-native-pac': ['arm64', 'amd64'],
 					'macos-native-http': ['arm64', 'amd64'],
 					'macos-brew-archive': [''],
 					'macos-native-model-receiving': ['arm64', 'amd64'],
 					'macos-shortcuts-discovery': ['']
-				}
-			: {
-					'macos-native-pac': ['arm64', 'amd64'],
-					'macos-native-http': ['arm64', 'amd64'],
-					'macos-stubbed-unit': [''],
-					'macos-stubbed-e2e': [''],
-					'windows-native-desktop': [''],
-					'linux-simultaneous-native': [''],
-					'linux-unit-suite': [''],
-					'linux-e2e-suite': [''],
-					'core-js-suite': [''],
-					'macos-native-model-receiving': ['arm64', 'amd64']
-				};
+				}).filter(([scope]) => Object.hasOwn(native.scopes, scope))
+			)
+		: {
+				'macos-native-pac': ['arm64', 'amd64'],
+				'macos-native-http': ['arm64', 'amd64'],
+				'macos-stubbed-unit': [''],
+				'macos-stubbed-e2e': [''],
+				'windows-native-desktop': [''],
+				'linux-simultaneous-native': [''],
+				'linux-unit-suite': [''],
+				'linux-e2e-suite': [''],
+				'core-js-suite': [''],
+				'macos-native-model-receiving': ['arm64', 'amd64']
+			};
 	for (const [scope, suffixes] of Object.entries(expected)) {
 		for (const suffix of suffixes) {
 			const file = path.join(directory, 'stable-' + scope + (suffix ? '-' + suffix : '') + '.json');
@@ -720,9 +833,9 @@ function admitCommandReceipts(directory, context, sha, now = new Date()) {
 				refuse('Missing approved deferred command receipt.');
 		}
 	}
-	if (stablePublicationProfile(context, now) === STABLE_V102_POLICY) {
+	if (native && Object.hasOwn(native.scopes, 'macos-launch-appleevents')) {
 		const scope = 'macos-launch-appleevents';
-		const matrix = STABLE_V102_POLICY.scopes[scope];
+		const matrix = native.scopes[scope];
 		for (const scenario of matrix.scenarios) {
 			for (const runner of matrix.runners) {
 				const file = path.join(
@@ -791,7 +904,7 @@ function main(argv) {
 		return;
 	}
 	if (options['--validate-scope-receipt']) {
-		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope) && !STABLE_V102_SCOPE_IDS.includes(scope))
+		if (!Object.hasOwn(STABLE_EXTRA_SCOPES, scope) && !STABLE_NATIVE_SCOPE_IDS.includes(scope))
 			refuse('Unknown command qualification scope.');
 		console.log(
 			scopeDisposition(
@@ -842,7 +955,7 @@ function main(argv) {
 		fs.appendFileSync(
 			options['--github-env'],
 			'ERGOPTI_DEV_QUALIFICATION_PROFILE=' +
-				(profile && profile !== STABLE_V102_POLICY ? profile.id : '') +
+				(profile && !STABLE_NATIVE_POLICIES.includes(profile) ? profile.id : '') +
 				'\n'
 		);
 	if (profile) {
@@ -896,7 +1009,13 @@ module.exports = {
 	STABLE_V102_PAC_METHODS,
 	STABLE_V102_BREW_METHODS,
 	STABLE_V102_OWNED_RUNTIME_METHODS,
+	STABLE_V103_POLICY_PATH,
+	STABLE_V103_PROFILE_ID,
+	STABLE_V103_SCOPE_IDS,
+	STABLE_V103_DEFERRABLE_SCOPE_IDS,
 	validateStableV102Policy,
+	validateStableV103Policy,
+	stableNativeProfile,
 	admitCommandReceipts,
 	scopeDisposition,
 	stablePublicationProfile,

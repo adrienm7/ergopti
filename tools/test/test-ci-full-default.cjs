@@ -1338,6 +1338,57 @@ check('v101 package joins only validated PAC and Brew identities', () => {
 	assert.equal(full.includes('brew_evidence_args'), false);
 	assert.equal(full.includes('--brew-qualification-receipt'), false);
 });
+check('v103 package defers Brew and owned-runtime only while PAC stays mandatory', () => {
+	const entry = source.find((file) => file.rel === MAC);
+	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
+	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+	const start = code.indexOf('pac_receipt=');
+	const end = code.indexOf('set +e\nscript -q');
+	assert.ok(start >= 0 && end > start);
+	const admission = code.slice(start, end);
+	const v103 = 'stable-v1-0-3-20261018-macos-native-scopes';
+	const receipt = '/owned path/dev-release-qualification/macos-brew-archive.json';
+	const selected = `4\0--skip\0^exact$\0--brew-qualification-receipt\0${receipt}\0Selected tests\0`;
+	for (const [mode, profile, brewMode, brewProfile, skip, status, stdout] of [
+		['full', '', 'full', '', '', 0, '0\0All tests\0'],
+		['full', '', 'deferred', v103, '^exact$', 0, selected],
+		// Owned-runtime alone: the Brew receipt is full, the policy still defers.
+		['full', '', 'full', '', '^exact$', 0, selected],
+		['full', '', 'deferred', v103, '', 1, ''],
+		['full', v103, 'deferred', v103, '^exact$', 1, ''],
+		['foreign', '', 'full', '', '', 1, '']
+	]) {
+		const shell =
+			`set -euo pipefail
+RUNNER_TEMP="/owned path"
+node() {
+    case "$*" in
+        *"--scope macos-native-pac --validate-scope-receipt-profile"*) printf '%s' "$PROFILE" ;;
+        *"--scope macos-native-pac --validate-scope-receipt "*) printf '%s' "$MODE" ;;
+        *"--scope macos-brew-archive --validate-scope-receipt-profile"*) printf '%s' "$BREW_PROFILE" ;;
+        *"--scope macos-brew-archive --validate-scope-receipt "*) printf '%s' "$BREW_MODE" ;;
+        *--package-skip-pattern*) printf '%s' "$SKIP" ;;
+        *) : ;;
+    esac
+}
+` +
+			admission +
+			'\nargv() { printf "%s\\0" "$#"; for arg in "$@"; do printf "%s\\0" "$arg"; done; }\nargv ${pac_skip_args[@]+"${pac_skip_args[@]}"} ${brew_evidence_args[@]+"${brew_evidence_args[@]}"}\nprintf "%s\\0" "$swift_root_suite"';
+		const result = spawnSync(bashExecutable(), ['--noprofile', '--norc', '-c', shell], {
+			encoding: 'utf8',
+			env: {
+				...process.env,
+				MODE: mode,
+				PROFILE: profile,
+				BREW_MODE: brewMode,
+				BREW_PROFILE: brewProfile,
+				SKIP: skip
+			}
+		});
+		assert.equal(result.status === 0 ? 0 : 1, status, result.stderr);
+		if (status === 0) assert.equal(result.stdout.slice(result.stdout.indexOf('\0') - 1), stdout);
+	}
+});
 
 check('v101 Shortcuts keeps portable/full work and publishes its validated exact receipt', () => {
 	const entry = source.find((file) => file.rel === MAC);

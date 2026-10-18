@@ -1509,3 +1509,185 @@ function stableV101PackageCollectorControls(repository) {
 	);
 }
 stableV101PackageCollectorControls(repository);
+
+/** v1.0.3 keeps PAC mandatory and defers Brew and owned-runtime methods independently. */
+function stableV103PackageCollectorControls(repository) {
+	const evidence = require('../diagnostics/swift_xctest_evidence.cjs');
+	const notice = require('../diagnostics/owned_program_xctest_notice.cjs');
+	const q = require('../ci/dev-release-qualification.cjs');
+	const V103 = require('./fixtures/stable-v103-profile.cjs');
+	const now = new Date('2026-10-19T10:00:00Z');
+	const source = '0123456789abcdef0123456789abcdef01234567';
+	const env = {
+		GITHUB_ACTIONS: 'true',
+		GITHUB_REPOSITORY: 'adrienm7/ergopti',
+		GITHUB_EVENT_NAME: 'push',
+		GITHUB_REF: 'refs/heads/main',
+		GITHUB_SHA: source,
+		ERGOPTI_DEV_RELEASE_RELEASE: 'true',
+		ERGOPTI_DEV_RELEASE_PRERELEASE: 'false',
+		ERGOPTI_DEV_RELEASE_CHANNEL: 'main',
+		ERGOPTI_DEV_RELEASE_TAG: 'v1.0.3',
+		ERGOPTI_DEV_RELEASE_VERSION: '1.0.3'
+	};
+	const brewMethods = {
+		HomebrewArchiveAcceptanceTests: [
+			'testRealBrewZIPInstallXZUpgradeAndRefusalsPreserveInstalledState'
+		]
+	};
+	const ownedMethods = JSON.parse(JSON.stringify(q.STABLE_V102_OWNED_RUNTIME_METHODS));
+	const workers = [
+		...fs
+			.readFileSync(
+				path.join(
+					repository,
+					'static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/ManagedHTTPWorkerTests.swift'
+				),
+				'utf8'
+			)
+			.matchAll(/\bfunc (test\w+)\(/g)
+	].map((match) => match[1]);
+	assert.equal(workers.length, 12);
+	// PAC/WPAD wire and bootstrap methods are mandatory again under v1.0.3.
+	const mandatory = {
+		ManagedHTTPWorkerTests: workers,
+		...JSON.parse(JSON.stringify(q.STABLE_V102_PAC_METHODS)),
+		SparkleArchiveUpdateAcceptanceTests: [
+			'testActualSparkleTarXZUpdateRefusesWrongKeyPreservesOldAppAndRetriesThroughRelaunch'
+		]
+	};
+	function transcript(groups, root) {
+		const lines = [`Test Suite '${root}' started at 2026-10-19 10:00:00.`];
+		let count = 0;
+		for (const methods of groups)
+			for (const [suite, names] of Object.entries(methods))
+				for (const method of names) {
+					const name = `-[ErgoptiPlusTests.${suite} ${method}]`;
+					lines.push(`Test Case '${name}' started.`, `Test Case '${name}' passed (0.001 seconds).`);
+					count++;
+				}
+		lines.push(
+			`Test Suite '${root}' passed at 2026-10-19 10:00:01.`,
+			`Executed ${count} tests, with 0 failures (0 unexpected) in 1 seconds`
+		);
+		return lines.join('\n');
+	}
+	const fullReceipt = (scope) => ({
+		schema: 1,
+		profile_id: null,
+		scope,
+		status: 'full',
+		qualified: false,
+		source_sha: source
+	});
+	const brewScope = 'macos-brew-archive',
+		ownedScope = 'macos-owned-runtime';
+	for (const scopes of [
+		[brewScope, ownedScope],
+		[brewScope],
+		[ownedScope],
+		['macos-shortcuts-discovery'],
+		[]
+	]) {
+		const shrunk = V103.loadWithV103Scopes(scopes);
+		V103.withQualificationModule(shrunk, () => {
+			const context = shrunk.environmentContext(env);
+			const profile = shrunk.stablePublicationProfile(context, now);
+			assert.equal(profile === null, scopes.length === 0);
+			assert.equal(shrunk.resolveQualificationProfile(context, now, 'macos-native-pac'), null);
+			const brewDeferred = scopes.includes(brewScope),
+				ownedDeferred = scopes.includes(ownedScope);
+			const pac = evidence.pacQualification(fullReceipt('macos-native-pac'), env, now);
+			const brewReceipt = brewDeferred
+				? JSON.parse(
+						JSON.stringify(shrunk.qualificationReceipt(profile, brewScope, { source_sha: source }))
+					)
+				: fullReceipt(brewScope);
+			const brew = evidence.brewQualification(brewReceipt, env, now);
+			const omitted = [
+				...(brewDeferred ? [brewMethods] : []),
+				...(ownedDeferred ? [ownedMethods] : [])
+			];
+			const pattern = evidence.packageSkipPattern(pac, brew);
+			if (!omitted.length) {
+				assert.equal(pattern, '');
+				assert.throws(() => evidence.pacSkipPattern(pac, brew));
+				const all = transcript([mandatory, brewMethods, ownedMethods], 'All tests');
+				const result = evidence.evaluate(all, 0, 0, undefined, pac, brew);
+				assert.equal(result.exit_status, 0);
+				assert.equal(result.brew_qualification, undefined);
+				assert.equal(result.owned_runtime_qualification, undefined);
+				return;
+			}
+			const skip = new RegExp(pattern);
+			const matches = (suite, method) => skip.test('ErgoptiPlusTests.' + suite + '/' + method);
+			for (const [suite, names] of Object.entries(mandatory))
+				for (const method of names) assert.equal(matches(suite, method), false, method);
+			for (const [methods, deferred] of [
+				[brewMethods, brewDeferred],
+				[ownedMethods, ownedDeferred]
+			])
+				for (const [suite, names] of Object.entries(methods))
+					for (const method of names) {
+						assert.equal(matches(suite, method), deferred, method);
+						assert.equal(matches(suite, method + 'Extra'), false);
+					}
+			const kept = [
+				mandatory,
+				...(brewDeferred ? [] : [brewMethods]),
+				...(ownedDeferred ? [] : [ownedMethods])
+			];
+			const selected = transcript(kept, 'Selected tests');
+			const result = evidence.evaluate(selected, 0, 0, undefined, pac, brew);
+			assert.equal(result.exit_status, 0, JSON.stringify(result.failures));
+			assert.equal(result.qualification, undefined, 'PAC stays mandatory');
+			assert.equal(result.brew_qualification !== undefined, brewDeferred);
+			assert.equal(result.owned_runtime_qualification !== undefined, ownedDeferred);
+			if (ownedDeferred) {
+				assert.equal(result.owned_runtime_qualification.profile_id, q.STABLE_V103_PROFILE_ID);
+				assert.equal(result.owned_runtime_qualification.qualified, false);
+				assert.deepEqual(
+					JSON.parse(JSON.stringify(result.owned_runtime_qualification.methods)),
+					ownedMethods
+				);
+			}
+			// Running any deferred method, or the full root, refuses.
+			for (const methods of omitted)
+				assert.equal(
+					evidence.evaluate(
+						transcript([...kept, methods], 'Selected tests'),
+						0,
+						0,
+						undefined,
+						pac,
+						brew
+					).exit_status,
+					1
+				);
+			assert.equal(
+				evidence.evaluate(transcript(kept, 'All tests'), 0, 0, undefined, pac, brew).exit_status,
+				1
+			);
+			const brewOutcome = evidence
+				.archiveOutcomes(selected, 0, 0, pac, brew)
+				.find((row) => row.case === 'brew');
+			assert.equal(brewOutcome.outcome, brewDeferred ? 'DEFERRED' : 'PASS');
+			if (brewDeferred)
+				assert.ok(evidence.archiveAnnotation(brewOutcome).includes('"qualified":false'));
+			assert.equal(notice.judge(result, selected, pac, brew).root_qualified, false);
+			// Another source cannot join this package publication.
+			const foreignEnv = { ...env, GITHUB_SHA: 'f'.repeat(40) };
+			const foreignPac = evidence.pacQualification(
+				{ ...fullReceipt('macos-native-pac'), source_sha: 'f'.repeat(40) },
+				foreignEnv,
+				now
+			);
+			assert.throws(() => evidence.packageSkipPattern(foreignPac, brew));
+			assert.throws(() => evidence.packageSkipPattern(null, brew));
+		});
+	}
+	console.log(
+		'[OK] v1.0.3 package keeps PAC mandatory and defers Brew and owned-runtime independently.'
+	);
+}
+stableV103PackageCollectorControls(repository);

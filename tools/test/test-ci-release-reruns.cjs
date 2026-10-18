@@ -233,6 +233,10 @@ function repository(name, branch) {
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
 		'.github/ci/stable_v102_macos_native_qualification_exception.json',
+		// Absent once v1.0.3 defers no scope; its loader then requires that absence.
+		...['.github/ci/stable_v103_macos_native_qualification_exception.json'].filter((file) =>
+			fs.existsSync(path.join(ROOT, file))
+		),
 		'tools/build/publish-verified-release.cjs',
 		'tools/build/macos-release-publication.cjs',
 		'tools/build/macos-release-archives.cjs',
@@ -1040,6 +1044,10 @@ function preflight(
 		'.github/ci/dev_release_qualification_exceptions.json',
 		'.github/ci/stable_release_qualification_exception.json',
 		'.github/ci/stable_v102_macos_native_qualification_exception.json',
+		// Absent once v1.0.3 defers no scope; its loader then requires that absence.
+		...['.github/ci/stable_v103_macos_native_qualification_exception.json'].filter((file) =>
+			fs.existsSync(path.join(ROOT, file))
+		),
 		'static/ergopti_plus/_shared/ui/update_channels.js',
 		'static/ergopti_plus/_shared/modules/updater/defaults.json',
 		'static/ergopti_plus/_shared/modules/updater/channels.json'
