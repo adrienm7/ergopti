@@ -20,6 +20,7 @@ FEATURES & RATIONALE:
 
 <script>
 	import ErgoptiPlus from '$lib/components/ErgoptiPlus.svelte';
+	import { assetUrlOrPage, LINUX_APPIMAGE_ASSET } from '$lib/js/getGitHubRelease.js';
 	import { ui } from './state.svelte.js';
 	import { reveal } from './reveal.js';
 	import { t } from './i18n.svelte.js';
@@ -60,7 +61,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-x86_64.AppImage') ?? '#');
+	let urlLinux = $derived(assetUrlOrPage(ui.release, LINUX_APPIMAGE_ASSET));
 </script>
 
 <section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
