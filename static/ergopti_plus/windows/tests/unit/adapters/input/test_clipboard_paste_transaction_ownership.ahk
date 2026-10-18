@@ -572,7 +572,7 @@ Test("clipboard: caller-owned token survives explicit debt-only retirement (clip
 ; child; only clipboard contents, the active-app query and sends are passive.
 _PPH_Script(Entry, Mode) {
 	Source := FileRead(_DriverDir . "\adapters\clipboard.ahk", "UTF-8")
-	Boundary := _DriverFindFunctionDefinition(Source, "CB_Read")
+	Boundary := _DriverFindFunctionDefinition(&Source, "CB_Read")
 	AssertTrue(IsObject(Boundary), "the real clipboard registry must precede its OS read adapter")
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`nOnError(_PPH_Error)`n" . SubStr(Source, 1, Boundary.Idx - 1)
 	Code .= '_PPH_Error(Err, *) {`nFileAppend(Err.Message, "**")`nExitApp(1)`n}`n'
