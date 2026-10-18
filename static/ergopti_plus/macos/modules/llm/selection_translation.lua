@@ -38,6 +38,7 @@ local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 local WindowInfo = require("adapters.window_info")
+local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.selection_translation"
 
@@ -176,7 +177,7 @@ end
 --- @param translation string The accepted translation.
 --- @param focus string The focused window identity when the selection was read.
 --- @param parent string|nil Stable action parent.
---- @param continuation_current function Retained generation and destination predicate.
+--- @param continuation_current table Retained generation and destination publication receipt.
 --- @return boolean started True when the replacement is under way.
 local function replace_selection(selection, translation, focus, parent, continuation_current)
 	local current_focus = WindowInfo.focused_identity()
@@ -206,7 +207,7 @@ end
 --- @param selection string The selected text.
 --- @param parent string|nil Stable action parent.
 local function request_translation(generation, language, selection, parent, focus, continuation_current)
-	if not is_current(generation, "selection") or not continuation_current() then return end
+	if not is_current(generation, "selection") or not continuation_current.current() then return end
 	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
 	if not engine then return end
 	local session = engine.open_answer_surface(LABEL)
@@ -215,7 +216,7 @@ local function request_translation(generation, language, selection, parent, focu
 		return
 	end
 	local config = M.config()
-	if not continuation_current() then
+	if not continuation_current.current() then
 		engine.close_answer_surface(session)
 		return
 	end
@@ -316,8 +317,11 @@ function M.run(value, parent)
 	local previous = _generation
 	_generation = previous + 1
 	local generation = _generation
-	local function continuation_current()
-		return generation == _generation and WindowInfo.focused_identity() == focus
+	local continuation_current = SelectionPublication.capture(focus, function() return generation == _generation end)
+	if not continuation_current then
+		if _generation == generation then _generation = previous end
+		Logger.info(LOG, "Translation refused: the text destination is not classified.")
+		return false
 	end
 	local started = Text.read_copied_selection(parent, function(selection)
 		if type(selection) ~= "string" or selection:match("^%s*$") then
