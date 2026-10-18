@@ -132,7 +132,7 @@ const CONSUMERS = [
 		needle: 'require("test.desktop_navigation_contract")'
 	},
 	{
-		file: 'windows/tests/unit/test_virtual_desktops.ahk',
+		file: 'windows/tests/unit/modules/gestures/test_virtual_desktops.ahk',
 		needle: '\\tests\\corpus\\desktop_navigation\\vectors.json'
 	}
 ];
@@ -148,8 +148,8 @@ check(
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
 check(
-	/^#Include unit\/test_virtual_desktops\.ahk$/m.test(ahkRunner),
-	'windows/tests/run_all.ahk must #Include unit/test_virtual_desktops.ahk'
+	/^#Include unit\/modules\/gestures\/test_virtual_desktops\.ahk$/m.test(ahkRunner),
+	'windows/tests/run_all.ahk must #Include unit/modules/gestures/test_virtual_desktops.ahk'
 );
 
 // ==================================================

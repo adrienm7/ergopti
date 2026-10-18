@@ -6357,7 +6357,7 @@ Completed L4 layout scope: the [Ergopti manifest](../static/layouts/registry/erg
 and [shared extension owner](../static/ergopti_plus/_shared/lua/layouts/extension.lua)
 route geometry-dependent sections; Windows keeps base/Shift, AltGr/ShiftAltGr
 and number-row choices independent. Existing
-[Windows registry tests](../static/ergopti_plus/windows/tests/unit/test_keylayout_emulation.ahk),
+[Windows registry tests](../static/ergopti_plus/windows/tests/unit/modules/keymap/test_keylayout_emulation.ahk),
 [Linux geometry tests](../static/ergopti_plus/linux/tests/unit/modules/hotstrings/test_extension_geometry_routing.lua)
 and [macOS binding tests](../static/ergopti_plus/macos/tests/unit/modules/keymap/test_registry_bound_sections.lua)
 have named passing cases at [checkpoint 37216141887](https://github.com/adrienm7/ergopti/actions/runs/37216141887),

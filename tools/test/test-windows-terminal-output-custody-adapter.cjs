@@ -1344,7 +1344,7 @@ const kleResetSource = fs.readFileSync(
 	'utf8'
 );
 const kleResetTests = fs.readFileSync(
-	path.join(DRIVER, 'tests/unit/test_keylayout_emulation.ahk'),
+	path.join(DRIVER, 'tests/unit/modules/keymap/test_keylayout_emulation.ahk'),
 	'utf8'
 );
 validateKleResetObserver(kleResetSource, kleResetTests);
