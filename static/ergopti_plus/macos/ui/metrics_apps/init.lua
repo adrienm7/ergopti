@@ -1062,6 +1062,7 @@ function M.show()
 
 	local ok_webview, webview_or_err = xpcall(function()
 		webview = ui_builder.show_webview({
+		delete_on_close = true,
 		frame       = frame,
 		title       = i18n.get("metrics_apps.window_title"),
 		style_masks = 15,

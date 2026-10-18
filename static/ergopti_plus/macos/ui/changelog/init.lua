@@ -758,6 +758,7 @@ local function build_window(channel, opening_generation, focus_owner)
 		return closed ~= true and candidate ~= nil and _wv == candidate and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
+		delete_on_close = true,
 		frame             = frame,
 		title             = title,
 		style_masks       = { "titled", "closable", "miniaturizable", "resizable" },

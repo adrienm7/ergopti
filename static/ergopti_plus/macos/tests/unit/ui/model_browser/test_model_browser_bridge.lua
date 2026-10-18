@@ -70,6 +70,7 @@ local function install_hs_stubs()
 			allowTextEntry  = function(self) return self end,
 			allowGestures   = function(self) return self end,
 			allowNewWindows = function(self) return self end,
+			deleteOnClose   = function(self) return self end,
 			windowCallback  = function(self, callback)
 				self.window_callback = callback
 				return self
