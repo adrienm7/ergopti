@@ -152,12 +152,17 @@ def sandbox_profile(root):
 NESTED_SANDBOX_EXCEPTION = (
     '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))'
 )
+# Homebrew's Sandbox#run starts that launcher inside a pseudo-terminal
+# (PTY.open in brew's own process). Opening the pty pair writes the /dev/ptmx
+# multiplexer and the allocated /dev/ttysNNN device, which the base write
+# denial refuses ("can't get Master/Slave device"). Only those devices open.
+BREW_PTY_EXCEPTION = '(allow file-write* (literal "/dev/ptmx") (regex #"^/dev/ttys[0-9]+$"))'
 SANDBOX_POLICIES = ("sandbox.sb", "sandbox-brew.sb")
 
 
 def brew_sandbox_profile(root):
-    """Differ from the base policy only by Homebrew's nested sandbox launcher."""
-    return sandbox_profile(root) + NESTED_SANDBOX_EXCEPTION + "\n"
+    """Differ from the base policy only by Homebrew's nested sandbox launcher and its pty."""
+    return sandbox_profile(root) + NESTED_SANDBOX_EXCEPTION + "\n" + BREW_PTY_EXCEPTION + "\n"
 
 
 def _validate_appleevent_terminal(packet):
@@ -1442,6 +1447,21 @@ def admit_sandbox(children):
     require(result.returncode != 0, "Base native policy allowed a nested sandbox")
     result = children.run(nested, confined=True, check=False, policy="sandbox-brew.sb")
     require(result.returncode == 0, "Brew native policy refused Homebrew's nested sandbox")
+    # The same differential for the pty Homebrew opens around its sandbox.
+    pty_probe = root / "sandbox-pty.py"
+    pty_probe.write_text(
+        "import errno, os, sys\n"
+        "try:\n    controller, worker = os.openpty()\n"
+        "except OSError as failure:\n    sys.exit(73 if failure.errno == errno.EPERM else 74)\n"
+        "os.close(worker)\nos.close(controller)\n",
+        encoding="utf-8",
+        newline="\n",
+    )
+    pty = [sys.executable, "-I", str(pty_probe)]
+    result = children.run(pty, confined=True, check=False, timeout=10)
+    require(result.returncode == 73, "Base native policy did not refuse a pseudo-terminal")
+    result = children.run(pty, confined=True, check=False, timeout=10, policy="sandbox-brew.sb")
+    require(result.returncode == 0, "Brew native policy refused Homebrew's pseudo-terminal")
 
 
 def admit_appleevent_boundary(children, repository):
