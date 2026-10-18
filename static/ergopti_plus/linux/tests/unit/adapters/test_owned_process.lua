@@ -106,6 +106,66 @@ test("exit and native group absence still wait for every owned close ACK", funct
 	assert(callbacks == 1 and settled == 2)
 end)
 
+test("(context-async-private-output) streams bounded private bytes without retaining result bodies", function(owner, _, state)
+	local chunks, result = {}, nil
+	local operation = owner.start("program", {}, { owner = "private-context", capture_output = false,
+		capture_tail = false, max_output_bytes = 64,
+		on_output = function(chunk, kind) chunks[#chunks + 1] = { chunk, kind } end }, function(value) result = value end)
+	state.output("PRIVATE_APPLICATION_TITLE")
+	state.output("PRIVATE_NATIVE_DIAGNOSTIC", "stderr")
+	state.absent = true; state.finish(0); state.acknowledge()
+	assert(operation:is_settled() and result and result.ok)
+	assert(#chunks == 2 and chunks[1][1] == "PRIVATE_APPLICATION_TITLE")
+	assert(result.stdout == "" and result.stderr == "", "private output cannot remain in retained process results")
+end)
+
+test("(context-async-private-output) counts cumulative streamed bytes even without retained bodies", function(owner, _, state)
+	local chunks, result = 0, nil
+	local operation = owner.start("program", {}, { owner = "private-context", capture_output = false,
+		max_output_bytes = 4, on_output = function() chunks = chunks + 1 end }, function(value) result = value end)
+	state.output("123"); state.output("45")
+	state.absent = true; state.finish(0); state.acknowledge()
+	assert(operation:is_settled() and result and not result.ok)
+	assert(chunks == 1 and result.stdout == "" and result.stderr == "")
+	assert(result.error == "process output exceeds its bound")
+end)
+
+test("(context-async-private-output) rejects ambiguous retention and preserves legacy defaults", function(owner, _, state)
+	for _, options in ipairs({ { capture_output = "false" }, { capture_output = false, capture_tail = true } }) do
+		options.owner = "invalid-private"
+		local operation = owner.start("program", {}, options, function() end)
+		assert(not operation.started and operation:is_settled())
+	end
+	assert(state.spawns == 0)
+end)
+
+test("(context-async-private-output) stderr and callback failures retain no private bytes", function(owner, _, state)
+	local operation = owner.start("program", {}, { owner = "private-context", capture_output = false,
+		max_output_bytes = 4, on_output = function() error("PRIVATE_APPLICATION_TITLE") end }, function() end)
+	state.output("abc", "stderr")
+	state.absent = true; state.finish(0); state.acknowledge()
+	assert(operation:is_settled() and not operation.result.ok)
+	assert(operation.result.error == "process output callback failed")
+	assert(operation.result.stdout == "" and operation.result.stderr == "")
+end)
+
+helpers.it("(context-async-private-output) private callback exceptions cannot enter diagnostics", function()
+	local native, state = backend()
+	local previous, logs = package.loaded["logger.shim"], {}
+	local logger = helpers.make_logger_stub()
+	logger.error = function(...) for index = 1, select("#", ...) do logs[#logs + 1] = tostring(select(index, ...)) end end
+	package.loaded["logger.shim"] = logger
+	local loaded, owner = pcall(load, native)
+	package.loaded["logger.shim"] = previous
+	if not loaded then error(owner, 0) end
+	local operation = owner.start("program", {}, { owner = "private-context", capture_output = false,
+		on_output = function() error("PRIVATE_TITLE_CANARY") end }, function() error("PRIVATE_TITLE_CANARY") end)
+	state.output("PRIVATE_TITLE_CANARY")
+	state.absent = true; state.finish(0); state.acknowledge()
+	assert(operation:is_settled() and #logs > 0)
+	for _, message in ipairs(logs) do assert(not message:find("PRIVATE_TITLE_CANARY", 1, true)) end
+end)
+
 test("accepted cancellation signals cannot release a successor", function(owner, _, state)
 	local callbacks = 0
 	local operation = owner.start("program", {}, { owner = "owner", timeout_ms = 1000 }, function() callbacks = callbacks + 1 end)

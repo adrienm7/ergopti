@@ -9,7 +9,9 @@
 --- ==============================================================================
 
 return {
+	"tests.unit.adapters.test_atspi_context_async",
 	"tests.unit.adapters.test_atspi_focus_watch",
+	"tests.unit.modules.keylogger.test_focus_guard_async",
 	"tests.unit.modules.keylogger.test_pointer_focus_privacy",
 	"tests.unit.infra.test_session_lock",
 	"tests.unit.modules.updater.test_production_dispatch_refusal",

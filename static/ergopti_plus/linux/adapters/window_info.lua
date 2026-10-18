@@ -340,7 +340,16 @@ end
 function M.focused_privacy_context(field)
 	if type(field) ~= "table" then return nil end
 	local snapshot, conclusive = require("adapters.atspi_focus").get_context_snapshot()
-	if conclusive ~= true or type(snapshot) ~= "table" or snapshot.native_bus_name ~= field.bus or snapshot.native_object_path ~= field.path
+	if conclusive ~= true then return nil end
+	return M._privacy_context_from_snapshot(field, snapshot)
+end
+
+--- Resolves native metadata inside the owned context helper, without re-forking AT-SPI.
+--- @param field table Exact requested native field receipt.
+--- @param snapshot table Fresh native active-frame snapshot from this helper.
+--- @return table|nil context Exact application/title and native window owner.
+function M._privacy_context_from_snapshot(field, snapshot)
+	if type(field) ~= "table" or type(snapshot) ~= "table" or snapshot.native_bus_name ~= field.bus or snapshot.native_object_path ~= field.path
 		or snapshot.role ~= field.role then return nil end
 	local info, native, pid = M.focused_process_snapshot()
 	if pid == snapshot.process_id and type(info.appId) == "string" and info.appId ~= ""
@@ -352,6 +361,15 @@ function M.focused_privacy_context(field)
 	-- helper's exact active owner, never the outgoing application's policy.
 	return { app_id = snapshot.app_id, title = snapshot.window_title,
 		native_identity = "atspi:" .. snapshot.window_bus_name .. ":" .. snapshot.window_object_path }
+end
+
+--- Starts one owned context capture without blocking the daemon's native event loop.
+--- @param field table Exact requested native field receipt.
+--- @param options table Owner and current-generation authorization callback.
+--- @param callback function Receives context or nil only after physical retirement.
+--- @return table|nil operation Owned process cleanup obligation.
+function M.start_privacy_context(field, options, callback)
+	return require("adapters.atspi_focus").start_context_capture(field, options, callback)
 end
 
 --- Captures the exact active text control for asynchronous AI input and output.
