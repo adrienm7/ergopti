@@ -220,7 +220,7 @@ const CONSUMERS = [
 		path: '_shared/tests/corpus/action_parameters/send_input_vectors.json'
 	},
 	{
-		file: 'windows/tests/unit/test_send_input_actions.ahk',
+		file: 'windows/tests/unit/modules/shortcuts/test_send_input_actions.ahk',
 		path: '\\tests\\corpus\\action_parameters\\send_input_vectors.json'
 	}
 ];
@@ -236,8 +236,8 @@ check(
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
 check(
-	/^#Include unit\/test_send_input_actions\.ahk$/m.test(ahkRunner),
-	'windows/tests/run_all.ahk must #Include unit/test_send_input_actions.ahk'
+	/^#Include unit\/modules\/shortcuts\/test_send_input_actions\.ahk$/m.test(ahkRunner),
+	'windows/tests/run_all.ahk must #Include unit/modules/shortcuts/test_send_input_actions.ahk'
 );
 
 if (errors.length > 0) {
