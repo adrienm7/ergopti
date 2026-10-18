@@ -162,10 +162,14 @@ const withdrawnCleanup = flow.replace(
 assert.notEqual(withdrawnCleanup, flow, 'Withdraw the actual native-construction cleanup retry.');
 assert.throws(() => assertNativePullFailureScope(withdrawnCleanup), { code: 'ERR_ASSERTION' });
 assertNativePullFailureScope(withdrawnCleanup.replace('finally Sleep(0)', nativeCleanup));
-const nativeCases = fs.readFileSync(
-	path.join(root, 'tests/unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk'),
-	'utf8'
-);
+// The managed bootstrap tests are split by concern; read them as one corpus.
+const nativeCases = [
+	'test_ollama_managed_bootstrap.ahk',
+	'test_ollama_managed_origin.ahk',
+	'test_ollama_managed_model_offer.ahk'
+]
+	.map((file) => fs.readFileSync(path.join(root, 'tests/unit/modules/llm/servers', file), 'utf8'))
+	.join('\n');
 for (const name of [
 	'READY native factory throw preserves bootstrap observer',
 	'READY native start false preserves bootstrap observer',

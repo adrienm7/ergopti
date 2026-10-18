@@ -643,8 +643,13 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/local_server_models.ahk
 #Include ../modules/llm/local_servers.ahk
 #Include unit/modules/llm/api/test_llm_api_ollama.ahk
+#Include unit/modules/llm/api/test_llm_api_ollama_streaming.ahk
+#Include unit/modules/llm/api/test_llm_api_ollama_local_presence.ahk
+#Include unit/modules/llm/api/test_llm_api_ollama_warmup.ahk
 #Include unit/modules/llm/prediction/test_llm_engine_read_guarded_in_timer.ahk
 #Include unit/modules/llm/api/test_llm_api_remote.ahk
+#Include unit/modules/llm/api/test_llm_api_remote_async_registry.ahk
+#Include unit/modules/llm/api/test_llm_api_remote_requests.ahk
 #Include unit/platform/network/test_curl_proxy_auth_integration.ahk
 #Include unit/platform/network/test_curl_proxy_discovery.ahk
 #Include unit/platform/network/test_managed_curl_owner.ahk
@@ -677,6 +682,9 @@ _LLM_Deps_State := "ready"
 #Include unit/modules/llm/api/test_llm_api_test_entry.ahk
 #Include unit/modules/llm/api/test_llm_api_entry_names.ahk
 #Include unit/modules/llm/menu/test_llm_menu_backend_model_labels.ahk
+#Include unit/modules/llm/menu/test_llm_menu_model_hardware.ahk
+#Include unit/modules/llm/menu/test_llm_menu_backend_child.ahk
+#Include unit/modules/llm/menu/test_llm_menu_model_parent.ahk
 #Include unit/modules/llm/menu/test_llm_menu_build_submenu.ahk
 #Include unit/modules/llm/menu/test_llm_menu_prediction_count.ahk
 #Include unit/modules/llm/servers/test_llm_curl_terminal_classification.ahk
@@ -699,6 +707,8 @@ _LLM_Deps_State := "ready"
 #Include ../modules/llm/agent_action.ahk
 #Include ../modules/llm/prediction_engine.ahk
 #Include unit/modules/llm/prediction/test_llm_prediction_engine.ahk
+#Include unit/modules/llm/prediction/test_llm_prediction_engine_state.ahk
+#Include unit/modules/llm/prediction/test_llm_prediction_engine_pointer_dismiss.ahk
 #Include unit/modules/llm/api/test_llm_semantic_config_identity.ahk
 #Include unit/modules/llm/api/test_llm_semantic_config_budget.ahk
 #Include unit/modules/llm/api/test_llm_defaults.ahk
@@ -793,12 +803,23 @@ _LogBootProgress("loading menu_llm/persist")
 #Include unit/modules/llm/menu/test_llm_numeric_option_ranges.ahk
 #Include unit/modules/llm/api/test_llm_sync_target.ahk
 #Include unit/modules/llm/menu/test_llm_menu_transactions.ahk
+#Include unit/modules/llm/menu/test_llm_api_entries_transactions.ahk
+#Include unit/modules/llm/menu/test_llm_menu_display.ahk
+#Include unit/modules/llm/menu/test_llm_menu_generation.ahk
+#Include unit/modules/llm/menu/test_llm_menu_indentation.ahk
+#Include unit/modules/llm/menu/test_llm_menu_privacy.ahk
+#Include unit/modules/llm/menu/test_llm_menu_profiles.ahk
 #Include unit/modules/llm/servers/test_local_server_private_publication.ahk
+#Include unit/modules/llm/servers/test_local_server_publication_rollback.ahk
+#Include unit/modules/llm/servers/test_local_server_receipt_entry.ahk
+#Include unit/modules/llm/servers/test_local_server_source_operations.ahk
 #Include unit/modules/llm/api/test_llm_api_add_production.ahk
 #Include unit/modules/llm/servers/test_local_server_write_admission.ahk
 #Include unit/modules/llm/servers/test_local_server_join.ahk
 #Include unit/modules/llm/servers/test_local_server_scope_cohort.ahk
 #Include unit/modules/llm/servers/test_local_server_panel.ahk
+#Include unit/modules/llm/servers/test_local_server_panel_discovery.ahk
+#Include unit/modules/llm/servers/test_local_server_panel_view_preparation.ahk
 #Include unit/modules/llm/api/test_llm_enable_admission.ahk
 #Include unit/modules/llm/menu/test_llm_menu_fixture_isolation.ahk
 #Include unit/modules/llm/api/test_llm_fixture_setup.ahk
@@ -863,6 +884,10 @@ _LogBootProgress("loading gestures modules")
 #Include unit/modules/llm/actions/test_llm_vision.ahk
 #Include unit/modules/llm/actions/test_llm_translate.ahk
 #Include unit/modules/llm/actions/test_llm_agent.ahk
+#Include unit/modules/llm/actions/test_llm_agent_connectors.ahk
+#Include unit/modules/llm/actions/test_llm_agent_ai_off.ahk
+#Include unit/modules/llm/actions/test_llm_agent_system_menu.ahk
+#Include unit/modules/llm/actions/test_llm_agent_requester.ahk
 #Include unit/modules/llm/api/test_llm_remote_formats.ahk
 #Include unit/modules/llm/prediction/test_llm_live_mode.ahk
 #Include unit/modules/shortcuts/test_send_input_actions.ahk
@@ -1451,9 +1476,11 @@ _LogBootProgress("keylogger modules + tests included")
 ; Reuses the chord helpers of test_llm_tooltip_nav_consumed above.
 #Include unit/modules/llm/navigation/test_llm_nav_cycle_windows.ahk
 #Include unit/modules/llm/navigation/test_llm_nav_hotkey_transaction.ahk
+#Include unit/modules/llm/navigation/test_llm_nav_hotkey_native_transaction.ahk
 #Include unit/modules/llm/navigation/test_llm_profile_hotkey_transaction.ahk
 #Include unit/modules/llm/navigation/test_llm_hotkeys_deferred_by_pause.ahk
 #Include unit/modules/llm/navigation/test_llm_hotkey_cross_owner_collision.ahk
+#Include unit/modules/llm/navigation/test_llm_hotkey_contextual_routes.ahk
 #Include meta/modules/llm/navigation/test_llm_hotkey_cross_owner_policy.ahk
 #Include meta/infra/config/transition/test_config_transition_integration.ahk
 ; Logger behaviour corpus -- severity filtering and the ring buffer, from the
@@ -2104,6 +2131,8 @@ _LogBootProgress("keylogger modules + tests included")
 #Include unit/modules/llm/servers/test_ollama_install_files_port.ahk
 #Include unit/modules/llm/servers/test_ollama_runtime_owner.ahk
 #Include unit/modules/llm/servers/test_ollama_managed_bootstrap.ahk
+#Include unit/modules/llm/servers/test_ollama_managed_origin.ahk
+#Include unit/modules/llm/servers/test_ollama_managed_model_offer.ahk
 #Include unit/modules/shortcuts/test_run_program_actions.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_launch_cleanup.ahk
 #Include unit/adapters/shell_runner/test_shell_runner_native_argv.ahk
