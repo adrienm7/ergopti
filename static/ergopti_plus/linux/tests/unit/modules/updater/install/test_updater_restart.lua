@@ -71,11 +71,21 @@ helpers.describe("updater restart: starting the installed version", function()
 			helpers.assert_eq(how, "relay")
 			local early = io.open(marker, "r")
 			helpers.assert_nil(early, "nothing starts while the old daemon lives")
-			os.execute("sleep 1.5")
-			local started = io.open(marker, "r")
-			helpers.assert_true(started ~= nil, "the launcher ran after the old process exited")
-			helpers.assert_eq(started:read("*l"), "--tray")
-			started:close()
+			-- Poll for the launcher instead of a fixed wait: it runs once the
+			-- stand-in exits, after 0.5 s; 5 s is the ceiling, not the cost.
+			-- The redirect creates the file before echo writes it, so wait for a line.
+			local line
+			for _ = 1, 100 do
+				local started = io.open(marker, "r")
+				if started then
+					line = started:read("*l")
+					started:close()
+				end
+				if line then break end
+				os.execute("sleep 0.05")
+			end
+			helpers.assert_true(line ~= nil, "the launcher ran after the old process exited")
+			helpers.assert_eq(line, "--tray")
 			os.execute("rm -rf '" .. dir .. "'")
 		end)
 	end

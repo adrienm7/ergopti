@@ -504,9 +504,11 @@ helpers.describe("linux actions: modifier chords", function()
 		local chords = declared_chords()
 		helpers.assert_true(#chords >= 15 * 40, string.format(
 			"only %d chord(s) read from the catalogue; this check would prove nothing", #chords))
-		local Gestures = helpers.load_module("modules.gestures.manager")
-		for _, chord in ipairs(chords) do
-			with_fake_device(us_position, function(writer, Gestures)
+		-- One device and one manager serve the whole sweep, as one daemon serves
+		-- every chord; each chord starts from an empty event trail.
+		with_fake_device(us_position, function(writer, Gestures)
+			for _, chord in ipairs(chords) do
+				writer.events = {}
 				with_recorded_shell(function(commands)
 					Gestures.execute_action(chord.id, "tap_hold")
 					helpers.assert_eq(#commands, 0, chord.id .. " must not shell out: `xdotool key` "
@@ -520,31 +522,28 @@ helpers.describe("linux actions: modifier chords", function()
 				helpers.assert_eq(trail(writer.events),
 					table.concat(down, " ") .. " " .. key .. ":1 " .. key .. ":0 " .. table.concat(up, " "),
 					chord.id .. " must hold its modifiers across the key on the uinput device")
-			end)
-		end
+			end
+		end)
 	end)
 
 	helpers.it("falls back to xdotool with keysym names it accepts (modifier-chord-uinput)", function()
 		-- Only when the uinput device cannot be written. `xdotool key ctrl+.`
 		-- fails: xdotool takes X keysym names, and "." is `period`.
 		local Logger = require("logger.shim")
-		local Gestures = helpers.load_module("modules.gestures.manager")
 		local real_error = Logger.error
 		Logger.error = function() end
+		-- One unopened device and one manager serve the whole sweep.
+		local writer = helpers.load_module("tests.fakes").uinput_writer()
+		local saved = package.loaded["adapters.uinput_writer"]
+		local saved_emitter = package.loaded["modules.gestures.combo_emitter"]
+		local saved_manager = package.loaded["modules.gestures.manager"]
+		package.loaded["adapters.uinput_writer"] = writer
 		local ok, err = pcall(function()
+			helpers.load_module("modules.gestures.combo_emitter")
+			local Gestures = helpers.load_module("modules.gestures.manager")
 			for _, chord in ipairs(declared_chords()) do
-				local writer = helpers.load_module("tests.fakes").uinput_writer()
-				local saved = package.loaded["adapters.uinput_writer"]
-				package.loaded["adapters.uinput_writer"] = writer
-				local saved_emitter = package.loaded["modules.gestures.combo_emitter"]
-				local saved_manager = package.loaded["modules.gestures.manager"]
-				helpers.load_module("modules.gestures.combo_emitter")
-				local Gestures = helpers.load_module("modules.gestures.manager")
 				with_recorded_shell(function(commands)
 					Gestures.execute_action(chord.id, "tap_hold")
-					package.loaded["modules.gestures.combo_emitter"] = saved_emitter
-					package.loaded["modules.gestures.manager"] = saved_manager
-					package.loaded["adapters.uinput_writer"] = saved
 					helpers.assert_eq(#commands, 1, chord.id .. " with no uinput device runs xdotool once")
 					local keys = commands[1]:match("^xdotool key (%S+)")
 					helpers.assert_not_nil(keys, chord.id .. " falls back to `xdotool key`: " .. commands[1])
@@ -558,6 +557,9 @@ helpers.describe("linux actions: modifier chords", function()
 				end)
 			end
 		end)
+		package.loaded["modules.gestures.combo_emitter"] = saved_emitter
+		package.loaded["modules.gestures.manager"] = saved_manager
+		package.loaded["adapters.uinput_writer"] = saved
 		Logger.error = real_error
 		if not ok then error(err, 0) end
 	end)
