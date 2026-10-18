@@ -105,4 +105,44 @@ helpers.describe("native input-source selection: exact command", function()
 			helpers.assert_eq(reason, "helper_resolution_failed")
 		end)
 	end)
+
+	helpers.it("copies every upgrade pair into one literal native argv transaction", function()
+		with_fixture({}, function(selector, resolutions)
+			local replacements = {
+				{ old_id = "old1", new_id = "new1" },
+				{ old_id = "old2", new_id = 'new2."literal"%s' },
+			}
+			local executable, args, environment, reason = selector.upgrade(replacements)
+			replacements[1].new_id, replacements[2] = "changed", nil
+			helpers.assert_eq(executable, EXECUTABLE)
+			helpers.assert_eq(resolutions(), 1)
+			helpers.assert_eq(#args, 5)
+			helpers.assert_eq(args[1], "--upgrade-input-sources")
+			helpers.assert_eq(args[2], "old1")
+			helpers.assert_eq(args[3], "new1")
+			helpers.assert_eq(args[4], "old2")
+			helpers.assert_eq(args[5], 'new2."literal"%s')
+			helpers.assert_eq(environment.ERGOPTI_LAUNCHER_EXECUTABLE, EXECUTABLE)
+			helpers.assert_nil(reason)
+		end)
+	end)
+
+	helpers.it("rejects malformed upgrade transactions before resolving or spawning a helper", function()
+		with_fixture({}, function(selector, resolutions)
+			for _, case in ipairs({ {}, { value = {} },
+				{ value = { { old_id = "old", new_id = "" } } },
+				{ value = { { old_id = "old", new_id = "bad\0new" } } },
+				{ value = { { old_id = "old" }, { new_id = "new" } } },
+				{ value = { [1] = { old_id = "old", new_id = "new" },
+					[3] = { old_id = "old3", new_id = "new3" } } },
+				{ value = { { old_id = "old", new_id = "new" }, foreign = true } } }) do
+				local executable, args, environment, reason = selector.upgrade(case.value)
+				helpers.assert_nil(executable)
+				helpers.assert_nil(args)
+				helpers.assert_nil(environment)
+				helpers.assert_eq(reason, "invalid_entries")
+			end
+			helpers.assert_eq(resolutions(), 0)
+		end)
+	end)
 end)

@@ -9,8 +9,8 @@
 --- adapters over faithful native doubles, proving that every mutation starts
 --- only after a deadline commits and retains its exact owner through timeout.
 --- Carbon mutation refusal is an OSStatus, independent of child process exit.
---- Preserve that status across selection and check every migration mutation
---- before its script can publish success (tis-osstatus).
+--- Preserve that status across selection and migration before publishing success
+--- (tis-osstatus); native worker tests verify the individual Carbon mutations.
 --- Discover every replacement before disabling a working legacy source: a
 --- predictable missing target must not partially mutate the enabled list.
 --- ==============================================================================
@@ -203,18 +203,18 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		reset_fixture_modules()
 	end)
 
-	status_test("(tis-osstatus) checks every native migration mutation before counting success", function()
-		local f = load_fixture()
-		helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" }, function() end), true)
-		local script = f.tasks[1].args[2]
+	status_test("(tis-osstatus) refuses every native migration status without counting success", function()
 		for _, operation in ipairs({ "TISDisableInputSource", "TISEnableInputSource", "TISSelectInputSource" }) do
-			helpers.assert_true(script:find("set nativeStatus to current application's " .. operation .. "(", 1, true) ~= nil,
-				operation .. " must expose its native status")
-			helpers.assert_true(script:find('if nativeStatus is not 0 then return "' .. operation .. ':" & (nativeStatus as text)', 1, true) ~= nil,
-				operation .. " refusal must stop migration before success is published")
+			local f = load_fixture()
+			local terminal
+			helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" }, function(ok)
+				terminal = ok
+			end), true)
+			helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+			f.tasks[1]:complete(0, operation .. ":-50\n", "")
+			helpers.assert_eq(terminal, false, operation .. " refusal must not become upgrade success")
+			reset_fixture_modules()
 		end
-		f.tasks[1]:complete(0, "1/1\n", "")
-		reset_fixture_modules()
 	end)
 
 	status_test("(tis-partial-upgrade) requires every requested replacement before reporting success", function()
@@ -224,6 +224,7 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			{ requested = 1, stdout = "1/2\n", ok = false },
 			{ requested = 2, stdout = "2/2\n", ok = true },
 			{ requested = 2, stdout = "0/0\n", ok = false },
+			{ requested = 2, stdout = "1, /, 2\n", ok = false },
 		}
 		for _, case in ipairs(cases) do
 			local f = load_fixture()
@@ -240,30 +241,52 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		end
 	end)
 
-	status_test("(tis-target-preflight) resolves every replacement before mutating native sources", function()
+	status_test("(tis-target-preflight) transfers every replacement in one immutable native transaction", function()
 		local f = load_fixture()
 		local entries = { "com.apple.keylayout.ergopti.plus", "com.apple.keylayout.ergopti.ansi" }
 		helpers.assert_eq(f.IS.upgrade_active_list_async(entries, function() end), true)
-		local script = f.tasks[1].args[2]
-		local first_mutation = #script + 1
-		for _, operation in ipairs({ "TISDisableInputSource", "TISEnableInputSource", "TISSelectInputSource" }) do
-			local at = script:find("current application's " .. operation .. "(", 1, true)
-			helpers.assert_not_nil(at, "the script must retain " .. operation)
-			first_mutation = math.min(first_mutation, at)
-		end
-		local preflight = script:sub(1, first_mutation - 1)
-		for _, target in ipairs({ "com.apple.keyboardlayout.ergopti.plus", "com.apple.keyboardlayout.ergopti.ansi" }) do
-			helpers.assert_true(preflight:find('my findSource("' .. target .. '")', 1, true) ~= nil,
-				"every requested replacement must be discovered before any native mutation: " .. target)
-		end
-		local _, refusals = preflight:gsub('if targetSrc is missing value then return "MISS"', "")
-		helpers.assert_eq(refusals, #entries, "each missing target must refuse before a legacy source can be disabled")
-		for index = 1, #entries do
-			helpers.assert_true(script:find("set newSrc to item " .. index .. " of targetSources", 1, true) ~= nil,
-				"mutation must use the exact replacement retained by preflight")
-		end
+		entries[1], entries[2] = "changed", nil
+		local args = f.tasks[1].args
+		helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+		helpers.assert_eq(#f.tasks, 1, "all replacements belong to one native preflight")
+		helpers.assert_eq(#args, 5)
+		helpers.assert_eq(args[1], "--upgrade-input-sources")
+		helpers.assert_eq(args[2], "com.apple.keylayout.ergopti.plus")
+		helpers.assert_eq(args[3], "com.apple.keyboardlayout.ergopti.plus")
+		helpers.assert_eq(args[4], "com.apple.keylayout.ergopti.ansi")
+		helpers.assert_eq(args[5], "com.apple.keyboardlayout.ergopti.ansi")
 		f.tasks[1]:complete(0, "2/2\n", "")
 		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-upgrade) refuses an unavailable helper before any native transaction", function()
+		local f = load_fixture({ helper_unavailable = true })
+		local terminal
+		helpers.assert_eq(f.IS.upgrade_active_list_async({ "com.apple.keylayout.ergopti.plus" },
+			function(ok, _, reason) terminal = { ok = ok, reason = reason } end), false)
+		helpers.assert_eq(#f.tasks, 0)
+		helpers.assert_eq(#f.timers, 0)
+		helpers.assert_eq(terminal.ok, false)
+		helpers.assert_eq(terminal.reason, "helper_unavailable")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-upgrade) rejects incomplete request tables before any child starts", function()
+		for _, entries in ipairs({
+			{ [1] = "com.apple.keylayout.ergopti.plus", [3] = "com.apple.keylayout.ergopti.ansi" },
+			{ "com.apple.keylayout.ergopti.plus", foreign = "com.apple.keylayout.ergopti.ansi" },
+			{ "com.apple.keylayout.ergopti.plus", true },
+		}) do
+			local f = load_fixture()
+			local terminal
+			helpers.assert_eq(f.IS.upgrade_active_list_async(entries,
+				function(ok, _, reason) terminal = { ok = ok, reason = reason } end), false)
+			helpers.assert_eq(#f.tasks, 0)
+			helpers.assert_eq(#f.timers, 0)
+			helpers.assert_eq(terminal.ok, false)
+			helpers.assert_eq(terminal.reason, "invalid_entries")
+			reset_fixture_modules()
+		end
 	end)
 
 	helpers.it("times out a hung selection without blocking or accepting a sibling", function()
@@ -405,12 +428,12 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 			},
 			{
 				label = "upgrade",
-				executable = "/usr/bin/osascript",
+				executable = NATIVE_HELPER,
 				invoke = function(IS, done)
 					return IS.upgrade_active_list_async({ "Ergopti_v2_2_1_plus" }, done)
 				end,
 				assert_args = function(args)
-					helpers.assert_eq(args[1], "-e")
+					helpers.assert_eq(args[1], "--upgrade-input-sources")
 				end,
 			},
 		}
