@@ -581,11 +581,11 @@ local function restart_daemon(reason)
 end
 
 
---- Logs the cross-driver diagnostic snapshot once the daemon is ready.
+--- Logs the cross-driver diagnostic snapshot after service preparation.
 ---
 --- A probe failure is reported and does not stop the daemon: the snapshot
---- describes a running driver, it is not a precondition of one.
---- @param boot_ms number Total boot duration.
+--- describes the configured driver, it is not a precondition of one.
+--- @param boot_ms number Boot time elapsed before input admission.
 --- @param opts table Parsed CLI options.
 --- @param i18n_mod table|nil Loaded i18n module, for the UI locale.
 local function emit_diagnostic_snapshot(boot_ms, opts, i18n_mod)
@@ -1680,7 +1680,7 @@ local function main()
 	do
 		local installed, signal_error = install_signal_handlers()
 		if installed ~= true then
-			Logger.error(LOG, "Signal handler admission refused: %s.", tostring(signal_error))
+			pcall(Logger.error, LOG, "Signal handler admission refused: %s.", tostring(signal_error))
 			shutdown.request("signal handler startup refused", "signal handler startup refused")
 			if shutdown.is_pending() then
 				event_loop.run({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
@@ -1689,8 +1689,32 @@ local function main()
 			error("Native signal handlers unavailable; refusing input capture", 0)
 		end
 	end
-	BootProfiler.stage("input hooks")
+	-- Native constructors may deliver quit/TERM before committing their handles.
+	-- Keep shutdown visible while parking cleanup until those frames return.
+	privacy_owners.startup = { token = assert(shutdown.begin_preparation()), await_retirement = event_loop.run }
+	privacy_owners.finish_startup = function(reason)
+		if reason and not shutdown.is_requested() then shutdown.request(reason, reason) end
+		if privacy_owners.startup.token then
+			local token = privacy_owners.startup.token
+			privacy_owners.startup.token = nil
+			if not shutdown.finish_preparation(token) then error("Startup preparation ownership refused", 0) end
+		end
+		if shutdown.is_requested() then
+			if shutdown.is_pending() then
+				privacy_owners.startup.await_retirement({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
+			end
+			if shutdown.is_pending() then error("Startup native cleanup remains unacknowledged", 0) end
+			if injector.close_fast_channel() ~= true then error("Startup output retirement remains unacknowledged", 0) end
+		end
+	end
+	privacy_owners.startup_checkpoint = function()
+		if not shutdown.is_requested() then return true end
+		privacy_owners.finish_startup()
+		return false
+	end
+	if not privacy_owners.startup_checkpoint() then return end
 	local fast_channel_ready = injector.open_fast_channel()
+	if not privacy_owners.startup_checkpoint() then return end
 	Logger.info(LOG, "Output channel: /dev/uinput %s (keystrokes are injected directly, not through ydotool).",
 		fast_channel_ready and "open" or "unavailable")
 	if not fast_channel_ready and opts.grab then
@@ -1700,9 +1724,10 @@ local function main()
 		-- uinput group and the module loaded. Silence used to be the answer to all
 		-- three of "wrong permissions", "module absent" and "no FFI".
 		Logger.error(LOG, "Cannot open /dev/uinput — refusing to grab the keyboard.")
-		os.exit(require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
+		require("infra.input_access").report({ i18n = RuntimeGuard.optional_require("infra.i18n"),
 			notifier = notifier, tray = opts.tray and tray_menu or nil },
-			"/dev/uinput cannot be opened for writing (uinput group or module missing)"))
+			"/dev/uinput cannot be opened for writing (uinput group or module missing)")
+		error("Fast output unavailable; refusing input capture", 0)
 	end
 
 	-- Resolve the OUTPUT layout before the first expansion can fire. This is the
@@ -1714,6 +1739,7 @@ local function main()
 	if not keyboard_layout.refresh(opts.keymap) then
 		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
 	end
+	if not privacy_owners.startup_checkpoint() then return end
 	-- A chord bound to a keyboard slot is claimed here, before the hook forwards
 	-- it, so the application never sees a chord Ergopti runs. It comes last: an
 	-- offered prediction's own digit chord is contextual and outranks a binding.
@@ -1779,88 +1805,6 @@ local function main()
 		capture_owned_scancodes[scancode] = nil
 	end)
 
-	-- Retain the selected inverse publisher before any source-acquisition callback.
-	local capture_layout = keyboard_layout
-	local capture_publish, capture_ready = keyboard_layout.publish_current_capture, keyboard_layout.is_ready
-	local capture_override = opts.keymap
-	local function publish_reacquired_capture()
-		local function current()
-			return package.loaded["adapters.keyboard_layout"] == capture_layout
-				and capture_layout.publish_current_capture == capture_publish
-				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
-		end
-		if not current() or type(capture_publish) ~= "function" or type(capture_ready) ~= "function" then return false end
-		if capture_publish(capture_override) ~= true or not current() then return false end
-		return capture_ready() == true and current()
-	end
-
-	keyboard_hook.start({
-		onCaptureReacquired = publish_reacquired_capture,
-		device = device,
-		pinned = opts.device ~= nil,
-		layout = opts.layout,
-		intercept  = opts.grab,
-		onChar  = on_char,
-		onKey   = on_control,
-		onClick = on_click,
-		onPhysical = on_physical,
-		onConsume = on_consume,
-		onDesync = function()
-			_undoable = nil
-			_last_offered = nil
-			if tooltip_preview then tooltip_preview.hide() end
-			if prediction_engine then prediction_engine.cancel() end
-			engine:reset()
-		end,
-		-- How long each key was held. The release is seen only inside the hook,
-		-- which is why the measurement lives there and the accounting here.
-		onHold = on_hold,
-		onHoldAdmission = hold_admission,
-		onEmitRaw  = injector.emit_key,
-		outputBroker = injector.output_broker(),
-		requireOutputBroker = opts.grab == true,
-	})
-	Logger.info(LOG, "Keyboard hook started in %s mode.",
-		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
-
-	if not keyboard_hook.isRunning() then
-		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
-		print("Error: could not start the keyboard hook.")
-		os.exit(1)
-	end
-	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
-	-- Publish the selected inverse on that exact state before any input is pumped.
-	do
-		local await_retirement = event_loop.run
-		local publication, ready, running = keyboard_layout.publish_current_capture,
-			keyboard_layout.is_ready, keyboard_hook.isRunning
-		local ok, published = pcall(function()
-			return type(publication) == "function" and publication(opts.keymap) == true
-				and running() == true and ready() == true
-		end)
-		if not ok or published ~= true or keyboard_layout.publish_current_capture ~= publication
-			or keyboard_layout.is_ready ~= ready or keyboard_hook.isRunning ~= running
-			or event_loop.run ~= await_retirement
-			or running() ~= true then
-			shutdown.request("startup layout publication refused", "startup layout publication refused")
-			if shutdown.is_pending() then
-				await_retirement({ onIdle = shutdown.poll, onPeriodic = shutdown.poll, periodSec = 0.25 })
-			end
-			if shutdown.is_pending() then error("Startup native cleanup remains unacknowledged", 0) end
-			if injector.close_fast_channel() ~= true then error("Startup output retirement remains unacknowledged", 0) end
-			error("Current capture inverse publication refused at startup", 0)
-		end
-	end
-	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
-		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
-		keyboard_layout.is_ready() and "resolved" or "unresolved"))
-
-	-- Tap-holds rewrite the grabbed stream, so they need the grab: without it the
-	-- physical key already reached the desktop and there is nothing to rewrite.
-	Logger.info(LOG, "Tap-holds: %s.", not TapHold.is_active() and "inactive"
-		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
-		or "configured, but inert without the keyboard grab (--no-grab)")
-
 	-- 8.8b) Initialise i18n (loads persisted locale, enables ★ substitution).
 	--
 	-- BEFORE the tray, and this ordering is the whole point. init() is what reads
@@ -1889,6 +1833,7 @@ local function main()
 	if opts.tray and tray_menu then
 		Logger.info(LOG, "Tray icon requested — starting.")
 		tray_menu.setIcon({ title = "Ergopti" })
+		if not privacy_owners.startup_checkpoint() then return end
 
 	if menu_builder then
 		-- Build the menu context once; shared between the initial menu build
@@ -2090,17 +2035,21 @@ local function main()
 		end
 
 		rebuild_tray_menu = function()
+			if shutdown.is_requested() then return end
 			local ctx = _build_menu_ctx()
 			local ok_build, items = pcall(menu_builder.build, ctx)
 			if not ok_build then
 				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
 				return
 			end
+			if shutdown.is_requested() then return end
 			tray_menu.setMenu(items)
+			if shutdown.is_requested() then return end
 			-- Every pause toggle rebuilds the menu, so the logo follows here.
 			if type(tray_menu.setPaused) == "function" then tray_menu.setPaused(ctx.paused == true) end
 		end
 		rebuild_tray_menu()
+		if not privacy_owners.startup_checkpoint() then return end
 		else
 			-- The degraded tray, shown when the menu builder is unavailable.
 			--
@@ -2128,6 +2077,7 @@ local function main()
 		Logger.info(LOG, "Tray icon disabled (no --tray) — running headless.")
 	end
 	BootProfiler.stage_done("tray", (opts.tray and tray_menu) and "tray icon shown" or "headless")
+	if not privacy_owners.startup_checkpoint() then return end
 
 	BootProfiler.stage("services")
 
@@ -2152,6 +2102,7 @@ local function main()
 					end
 				end,
 			})
+			if not privacy_owners.startup_checkpoint() then return end
 			-- Placed where the hotstring preview goes: without these the
 			-- suggestions were centred on an assumed 1920x1080 screen.
 			if llm_overlay and not llm_overlay.init({
@@ -2168,6 +2119,7 @@ local function main()
 		end
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.9c) Apply the user's four preview toggles.
 	--
 	-- Until 2026-08-05 nothing did. preview.lua initialises its switch table to
@@ -2182,9 +2134,11 @@ local function main()
 		PreviewSettings.init(function(name, value)
 			tooltip_preview.set_enabled(name, value)
 		end)
+		if not privacy_owners.startup_checkpoint() then return end
 		PreviewSettings.apply(tooltip_preview)
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10b) Let a magic-key change actually reach the engine.
 	--
 	-- MagicKey.set() has always fired an _on_change callback after persisting, and
@@ -2209,6 +2163,7 @@ local function main()
 		if rebuild_tray_menu then rebuild_tray_menu() end
 	end)
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10b') Put the WPM widget back the way the user left it. Its visibility and
 	-- colour mode were not stored at all until now, so a user who turned it on
 	-- found it gone after the next restart with the menu row unticked — which
@@ -2220,6 +2175,7 @@ local function main()
 			Logger.error(LOG, "WPM widget state could not be restored: %s.", tostring(err_restore))
 		end
 	end
+	if not privacy_owners.startup_checkpoint() then return end
 	-- The tray readout needs a tray: without --tray there is no panel item to sit beside.
 	if wpm_tray_readout and opts.tray and tray_menu then
 		local ok_restore, err_restore = pcall(wpm_tray_readout.restore)
@@ -2228,6 +2184,7 @@ local function main()
 		end
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10c) Initialise the gestures manager (trackpad/mouse gesture recognition).
 	if gestures then
 		-- Required here, not at file scope: main() sits near LuaJIT's 60-upvalue limit.
@@ -2240,12 +2197,14 @@ local function main()
 		Logger.info(LOG, "Gestures manager initialised.")
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10d) Initialise the shortcuts manager (wrap symbols, CapsWord, text transforms).
 	if shortcuts then
 		shortcuts.init({ persist = true })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10e) Wire daemon state into the webview manager so bridge handlers
 	-- can query/control daemon modules (keylogger, LLM, config, engine).
 	if webview_manager then
@@ -2289,6 +2248,7 @@ local function main()
 		Logger.info(LOG, "WebView manager daemon state wired.")
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- Completion belongs to the wizard's committed config, not to window creation.
 	-- Run only after every bridge dependency is ready and never in hardware probes.
 	require("ui.onboarding.startup").run({
@@ -2305,6 +2265,7 @@ local function main()
 		end,
 	})
 
+	if not privacy_owners.startup_checkpoint() then return end
 	if updater then
 		local on_available = function(release)
 			Logger.info(LOG, "Update available: %s — rebuilding menu.", release.tag)
@@ -2338,12 +2299,13 @@ local function main()
 		updater.init({ on_available = on_available, is_paused = script_actions.is_paused })
 	end
 	BootProfiler.stage_done("services")
+	if not privacy_owners.startup_checkpoint() then return end
 
-	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
-		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
-	local boot_ms = BootProfiler.complete()
-	emit_diagnostic_snapshot(boot_ms, opts, ok_i18n and i18n_mod or nil)
+	-- Snapshot discovery can block on external probes, so it precedes capture.
+	-- Its duration describes preparation; complete() below includes input admission.
+	emit_diagnostic_snapshot(BootProfiler.elapsed_ms(), opts, ok_i18n and i18n_mod or nil)
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.11) Start file watchers (inotify-based TOML/.lua hot reload).
 	-- Watches the hotstrings config directory and the project .lua files.
 	-- When luv is available, uses native inotify; otherwise falls back
@@ -2367,6 +2329,7 @@ local function main()
 			file_watchers.has_inotify() and "inotify" or "mtime poll")
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.12) Start process lifecycle polling if the adapter loaded.
 	-- tick() drives focus-change and app-launch/quit detection at 250 ms
 	-- intervals; the event loop calls it periodically.
@@ -2416,6 +2379,7 @@ local function main()
 		-- dashboard opened before the first application switch has an owner for
 		-- its foreground interval.
 		local foreground = process_lifecycle.getForegroundApp()
+		if not privacy_owners.startup_checkpoint() then return end
 		_cached_app_id = foreground and foreground.appId or nil
 		keylogger.observe_hold_focus(_cached_app_id)
 		keylogger.set_private_window(
@@ -2424,6 +2388,7 @@ local function main()
 		-- login that restores a password manager is exactly the window that matters
 		-- — is recorded until the user switches away from it.
 		secure_focus_guard.prime()
+		if not privacy_owners.startup_checkpoint() then return end
 		if type(_cached_app_id) == "string" and _cached_app_id ~= "" then
 			keylogger.on_app_focus(_cached_app_id, math.floor(Monotonic.now_ms()))
 		end
@@ -2528,11 +2493,107 @@ local function main()
 		end
 	end
 
+	if not privacy_owners.startup_checkpoint() then return end
 	-- systemd restarts a crashed daemon, and the crash left no window behind: the
 	-- first tick of the new loop announces the newest crash dump, once
 	if ErrorDialog then
 		event_loop.defer(function() ErrorDialog.notify_last_crash(CrashReporter.get_crash_dir()) end, 0)
 	end
+
+	if not privacy_owners.startup_checkpoint() then return end
+	-- UI preparation can outlive an XKB change; resolve again before grabbing.
+	if not keyboard_layout.refresh(opts.keymap) then
+		Logger.warn(LOG, "Layout unresolved — replacements will not be typed as keystrokes.")
+	end
+	if not privacy_owners.startup_checkpoint() then return end
+	-- Retain the selected inverse publisher before any source-acquisition callback.
+	local capture_layout = keyboard_layout
+	local capture_publish, capture_ready = keyboard_layout.publish_current_capture, keyboard_layout.is_ready
+	local capture_override = opts.keymap
+	local function publish_reacquired_capture()
+		local function current()
+			return package.loaded["adapters.keyboard_layout"] == capture_layout
+				and capture_layout.publish_current_capture == capture_publish
+				and capture_layout.is_ready == capture_ready and opts.keymap == capture_override
+		end
+		if not current() or type(capture_publish) ~= "function" or type(capture_ready) ~= "function" then return false end
+		if capture_publish(capture_override) ~= true or not current() then return false end
+		return capture_ready() == true and current()
+	end
+
+	BootProfiler.stage("input hooks")
+	if not privacy_owners.startup_checkpoint() then return end
+	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
+	keyboard_hook.start({
+		onCaptureReacquired = publish_reacquired_capture,
+		device = device,
+		pinned = opts.device ~= nil,
+		layout = opts.layout,
+		intercept  = opts.grab,
+		onChar  = on_char,
+		onKey   = on_control,
+		onClick = on_click,
+		onPhysical = on_physical,
+		onConsume = on_consume,
+		onDesync = function()
+			_undoable = nil
+			_last_offered = nil
+			if tooltip_preview then tooltip_preview.hide() end
+			if prediction_engine then prediction_engine.cancel() end
+			engine:reset()
+		end,
+		-- How long each key was held. The release is seen only inside the hook,
+		-- which is why the measurement lives there and the accounting here.
+		onHold = on_hold,
+		onHoldAdmission = hold_admission,
+		onEmitRaw  = injector.emit_key,
+		outputBroker = injector.output_broker(),
+		requireOutputBroker = opts.grab == true,
+	})
+	if not privacy_owners.startup_checkpoint() then return end
+	Logger.info(LOG, "Keyboard hook started in %s mode.",
+		opts.grab and "INTERCEPT (device grabbed)" or "OBSERVE (--no-grab)")
+	if not privacy_owners.startup_checkpoint() then return end
+
+	if not keyboard_hook.isRunning() then
+		Logger.error(LOG, "Keyboard hook failed to start — exiting.")
+		print("Error: could not start the keyboard hook.")
+		error("Keyboard hook startup refused", 0)
+	end
+	-- start() recreates capture and seeds CapsLock from the acquired keyboard.
+	-- Publish the selected inverse on that exact state before any input is pumped.
+	do
+		local await_retirement = event_loop.run
+		local publication, ready, running = keyboard_layout.publish_current_capture,
+			keyboard_layout.is_ready, keyboard_hook.isRunning
+		local ok, published = pcall(function()
+			return type(publication) == "function" and publication(opts.keymap) == true
+				and running() == true and ready() == true
+		end)
+		if not ok or published ~= true or keyboard_layout.publish_current_capture ~= publication
+			or keyboard_layout.is_ready ~= ready or keyboard_hook.isRunning ~= running
+			or event_loop.run ~= await_retirement
+			or running() ~= true then
+			error("Current capture inverse publication refused at startup", 0)
+		end
+	end
+	if not privacy_owners.startup_checkpoint() then return end
+	BootProfiler.stage_done("input hooks", string.format("mode %s, layout %s",
+		tostring(keyboard_hook.get_mode and keyboard_hook.get_mode() or "unknown"),
+		keyboard_layout.is_ready() and "resolved" or "unresolved"))
+
+	-- Tap-holds rewrite the grabbed stream, so they need the grab: without it the
+	-- physical key already reached the desktop and there is nothing to rewrite.
+	Logger.info(LOG, "Tap-holds: %s.", not TapHold.is_active() and "inactive"
+		or (keyboard_hook.get_mode and keyboard_hook.get_mode() == "intercept") and "active"
+		or "configured, but inert without the keyboard grab (--no-grab)")
+
+	Logger.success(LOG, "Daemon ready (device=%s layout=%s mappings=%d dry_run=%s tray=%s).",
+		device, opts.layout, mapping_count, tostring(opts.dry_run), tostring(opts.tray and tray_menu ~= nil))
+	BootProfiler.complete()
+	privacy_owners.finish_startup()
+	if not privacy_owners.startup_checkpoint() then return end
+	if event_loop.run ~= privacy_owners.startup.await_retirement then error("Startup event-loop ownership changed", 0) end
 
 	event_loop.run({
 		onIdle = function()
@@ -2603,16 +2664,22 @@ end
 -- protect() rather than a bare xpcall here, so the traceback, the log line and
 -- the crash file all come from one place. It captures the stack inside the
 -- message handler, before the unwind.
-local ok_main, err_main = CrashReporter.protect("ergopti_hotstrings", main)
+local ok_main, err_main = pcall(function()
+	local ok, result = CrashReporter.protect("ergopti_hotstrings", main)
+	if not ok then error(result, 0) end
+end)
 if not ok_main then
 	-- Withheld counts first, so the fatal line stays the last thing in the log.
 	-- Guarded because the crash may have come from the logger itself, and
 	-- nothing may stand between an unhandled error and the non-zero exit below.
 	local flushed, flush_err = pcall(Logger.flush_repeats, true)
 	if not flushed then
-		io.stderr:write("[ergopti_hotstrings] terminal log flush failed: " .. tostring(flush_err) .. "\n")
+		pcall(io.stderr.write, io.stderr, "[ergopti_hotstrings] terminal log flush failed: " .. tostring(flush_err) .. "\n")
 	end
-	Logger.error(LOG, "Daemon terminated by an unhandled error: %s", tostring(err_main))
+	pcall(Logger.error, LOG, "Daemon terminated by an unhandled error: %s", tostring(err_main))
+	-- The protected Main/native frames have unwound, so a late constructor can
+	-- no longer publish an owner after this transaction has acknowledged it.
+	if privacy_owners.startup then privacy_owners.finish_startup("startup runtime failure") end
 	-- Non-zero, so systemd sees a failure and its Restart= policy applies. A daemon
 	-- that crashes and exits 0 is a daemon the supervisor believes finished its work.
 	os.exit(1)
