@@ -60,7 +60,8 @@ end
 ---   is_active    fn() -> boolean  feature on, shortcuts on, script not paused.
 ---   get_pair     fn(char) -> { left, right }|nil  the shared wrap-pair lookup.
 ---   read_primary fn() -> ok, text  the PRIMARY selection.
----   type_text    fn(text) -> boolean  types over the live selection.
+---   type_text    fn(text, owner) -> boolean  types over the retained selection;
+---     owner.current() checks activity and ownership, owner.cached() only RAM.
 ---   context_epoch fn() -> integer|nil  optional pure-memory ownership revision;
 ---     a missing or invalid result refuses selection reads and replacement. }
 --- @return table controller { on_key, on_pointer_down, end_selection_window,
@@ -186,14 +187,24 @@ function M.new(opts)
 		Logger.debug(LOG, "Wrapping a %d-byte selection in %s…%s.", #selected, left, right)
 		active = opts.is_active()
 		if not current(owner, epoch) or not active then return false end
-		local typed_ok, typed = pcall(opts.type_text, left .. selected .. right)
+		local publication = {
+			current = function()
+				if not current(owner, epoch) then return false end
+				local enabled = opts.is_active()
+				return current(owner, epoch) and enabled == true
+			end,
+			-- The context epoch is explicitly a pure-memory revision. Never run
+			-- native focus or PRIMARY reads for individual key-down admissions.
+			cached = function() return current(owner, epoch) end,
+		}
+		local typed_ok, typed = pcall(opts.type_text, left .. selected .. right, publication)
 		if not typed_ok then
 			Logger.error(LOG, "Selection wrap raised before typing: %s — the symbol is typed instead.",
 				tostring(typed))
 			return false
 		end
 		if typed ~= true then
-			Logger.error(LOG, "Selection wrap was refused — the symbol is typed instead.")
+			Logger.warn(LOG, "Selection wrap was refused — the symbol is typed instead.")
 			return false
 		end
 		return true
