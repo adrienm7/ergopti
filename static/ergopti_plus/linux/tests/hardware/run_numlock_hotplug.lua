@@ -102,7 +102,7 @@ local ok,failure=xpcall(function()
 	ownerA=assert(Reader.capture_source_owner('keyboard:'..paths[1]))
 	for _, path in ipairs(paths) do
 		local leds=assert(Reader.active_leds('keyboard:'..path,1))
-		assert(leds[0]==false,'native source LED_NUM starting state is not OFF')
+		assert(leds[0]==nil,'native source LED_NUM starting state is not OFF')
 	end
 	local initial=caps_state()
 	record('native-starting-state',{state=initial})
