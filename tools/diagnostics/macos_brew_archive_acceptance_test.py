@@ -1137,6 +1137,58 @@ class AppleEventBoundaryControls(unittest.TestCase):
                     self.assertEqual((root / "sandbox.sb").read_text(), self.policy)
 
 
+class NestedHomebrewSandboxControls(unittest.TestCase):
+    """Only Brew may start Homebrew's own sandbox; every base denial stays in force."""
+
+    def test_brew_policy_differs_only_by_the_nested_sandbox_launcher(self):
+        root = PurePosixPath('/owned "fixture"')
+        base = probe.sandbox_profile(root)
+        brew = probe.brew_sandbox_profile(root)
+        self.assertEqual(
+            brew,
+            base + '(allow process-exec (literal "/usr/bin/sandbox-exec") (with no-sandbox))\n',
+        )
+        self.assertNotIn("no-sandbox", base)
+        self.assertNotIn("process-exec", base)
+        self.assertEqual(brew.count("(deny appleevent-send)"), 1)
+        self.assertEqual(brew.count("no-sandbox"), 1)
+
+    def test_only_owned_policies_confine_and_brew_commands_use_brew_policy(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory).resolve(strict=True)
+            with (
+                patch.object(probe.os, "getuid", return_value=501, create=True),
+                patch.object(probe, "NativeProcessGroups"),
+            ):
+                owner = probe.Children(root)
+            launched = []
+
+            def acquire(arguments, native, register, **options):
+                launched.append(arguments)
+                raise OSError("modeled acquisition stop")
+
+            with patch.object(probe, "acquire_owned", side_effect=acquire):
+                for policy in probe.SANDBOX_POLICIES:
+                    with self.assertRaises(OSError):
+                        owner.start(["owned-tool"], confined=True, policy=policy)
+                with self.assertRaisesRegex(probe.AdmissionError, "sandbox policy"):
+                    owner.start(["owned-tool"], confined=True, policy="../foreign.sb")
+            self.assertEqual(
+                launched,
+                [
+                    ["/usr/bin/sandbox-exec", "-f", str(root / "sandbox.sb"), "owned-tool"],
+                    ["/usr/bin/sandbox-exec", "-f", str(root / "sandbox-brew.sb"), "owned-tool"],
+                ],
+            )
+        children = Mock()
+        with patch.object(probe, "refuse_foreign_running_apps") as refuse:
+            probe.invoke_brew(children, ["brew", "install"], check=False)
+        refuse.assert_called_once_with()
+        children.run.assert_called_once_with(
+            ["brew", "install"], confined=True, check=False, policy="sandbox-brew.sb"
+        )
+
+
 class NativeFixtureNameControls(unittest.TestCase):
     """The signed fixture uses the name form the producer's ditto ZIP restores."""
 
