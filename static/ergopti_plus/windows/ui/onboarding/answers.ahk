@@ -260,7 +260,7 @@ _OnboardingCharacterCount(Text) {
 ; The configured value of every wizard path a parsed config.toml sets; absent
 ; paths are left out so the page shows their neutral value.
 ; @param Index Map From OnboardingCatalogueIndex.
-; @param Sections Map From TOML_ParseFreshFileTyped.
+; @param Sections Map Typed canonical section/key projection.
 ; @returns {Map} Path -> value (TOML_Bool for a Boolean literal).
 OnboardingCurrentValues(Index, Sections) {
 	Values := Map()
@@ -310,12 +310,21 @@ OnboardingReadCurrentValues(Index, ConfigPath) {
 	try LoggerStart("Onboarding", "Reading the wizard values of {1}…", ConfigPath)
 	Values := Map()
 	if FileExist(ConfigPath) {
-		Sections := TOML_ParseFreshFileTyped(ConfigPath, &DiscardedArrays)
-		if TOML_ReadFailed(ConfigPath) || DiscardedArrays {
+		try {
+			Snapshot := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigPath))
+			Sections := Map()
+			; Canonical rows expand dotted and inline namespaces. Their typed
+			; values retain Boolean intent, unlike the native cache's 1/0 flags.
+			for Row in Snapshot.Rows {
+				if !Sections.Has(Row.Section)
+					Sections[Row.Section] := Map()
+				Sections[Row.Section][Row.Key] := Row.Typed
+			}
+			Values := OnboardingCurrentValues(Index, Sections)
+		} catch {
 			try LoggerError("Onboarding", "The configuration at {1} could not be read.", ConfigPath)
 			return "the configuration at " . ConfigPath . " could not be read"
 		}
-		Values := OnboardingCurrentValues(Index, Sections)
 	}
 	TapHoldPath := TapHoldConfigPathBeside(ConfigPath)
 	Report := TapHoldKeyReport(TapHoldPath, _SharedDir . "\tap_hold\defaults.toml")

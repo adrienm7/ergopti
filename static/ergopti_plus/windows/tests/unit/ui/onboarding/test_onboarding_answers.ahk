@@ -765,3 +765,5 @@ _TOAN_PrepareNativeWizardTarget(Path, Updates, Bundle) {
 	ExpectedOld := ConfigTransitionExpectedOld(Candidate["source_present"], Candidate["source_content"])
 	return Map("status", "prepared", "target", ConfigTransitionPresentTarget(Path, Candidate["content"], ExpectedOld))
 }
+
+#Include test_onboarding_semantic_current_values.ahk
