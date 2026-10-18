@@ -571,10 +571,17 @@ ToggleRepeatKeyEnabled(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 ; The engine global each word-reset setting publishes to.
 _EditorWordResetGlobal(Key, Value) {
 	global HSE_IdleResetSeconds, HSE_ClickResetsWord
+	global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
 	if (Key == "idle_reset_seconds")
 		HSE_IdleResetSeconds := Value
 	else if (Key == "click_resets_word")
 		HSE_ClickResetsWord := Value
+	else if (Key == "arrow_resets_word")
+		HSE_ArrowResetsWord := Value
+	else if (Key == "shortcut_resets_word")
+		HSE_ShortcutResetsWord := Value
+	else if (Key == "tap_hold_resets_word")
+		HSE_TapHoldResetsWord := Value
 	else
 		throw ValueError("Unknown word-reset setting: " . Key)
 }
@@ -697,6 +704,18 @@ PromptHotstringsIdleResetSeconds(PromptFn := 0, WriterFn := 0, NotifyFn := 0, Re
 ToggleHotstringsClickResetsWord(WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
 	return _EditorCommitWordReset("click_resets_word", !HSE_ClickResetsWordCurrent(),
 		"the click word-reset toggle", WriterFn, NotifyFn, RebuildFn)
+}
+
+/**
+ * Flips one event word-reset setting: whether an arrow key, a shortcut, or a
+ * tap-hold key's own output starts a new word.
+ * @param {String} Key "arrow_resets_word", "shortcut_resets_word" or
+ *        "tap_hold_resets_word".
+ * @returns {Integer|Boolean} 1 once persisted and redrawn, otherwise false.
+ */
+ToggleHotstringsWordResetFlag(Key, WriterFn := 0, NotifyFn := 0, RebuildFn := 0) {
+	return _EditorCommitWordReset(Key, !HSE_WordResetFlagCurrent(Key),
+		"the " . Key . " toggle", WriterFn, NotifyFn, RebuildFn)
 }
 
 _PersonalInfoReportSaveFailure(NotifyFn := 0) {

@@ -483,6 +483,49 @@ input_altering = false
 type = "boolean"
 description_key = "menu.hotstrings.click_resets_word"
 
+# Whether an arrow key starts a new word, whatever modifier is held with it and
+# wherever it comes from: the keyboard, or a key the driver itself sends (the
+# navigation layer, a remap, a tap-hold, a gesture). Off, the word in progress
+# survives the caret move; the other navigation keys (Home, End, Page Up, Page
+# Down, Insert, Delete) still forget it, since they move by an unknown amount.
+[[features.hotstrings]]
+id = "arrow_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.arrow_resets_word"
+
+# Whether a shortcut starts a new word: a key struck with Ctrl, Alt or Win held
+# (Cmd or Ctrl on macOS, where Option types characters), Shift added or not.
+# AltGr and Shift alone are typing. Off, Ctrl+V or Ctrl+Z leave the word in
+# progress open. Ctrl+Backspace and its siblings delete text by an unknown
+# amount and forget the word either way.
+[[features.hotstrings]]
+id = "shortcut_resets_word"
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.shortcut_resets_word"
+
+# Whether a tap-hold key's own output starts a new word: the action of its tap
+# (copy, paste, a window switch…) and every shortcut struck under its held
+# modifier or layer. A tap that types its key (Space, Enter, Tab, Backspace…)
+# keeps that key's effect, a Shift or AltGr hold is typing, and an arrow from
+# the navigation layer follows arrow_resets_word. Not on macOS: Karabiner-
+# Elements runs the tap-holds there and its output reaches the driver as the
+# keyboard's own keys, so a shortcut it sends follows shortcut_resets_word.
+[[features.hotstrings]]
+id = "tap_hold_resets_word"
+platforms = ["ahk", "linux"]
+default = true
+recommended = true
+input_altering = false
+type = "boolean"
+description_key = "menu.hotstrings.tap_hold_resets_word"
+reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
+
 [[features.hotstrings]]
 id = "expansion_delay"
 platforms = ["hs"]
@@ -5964,6 +6007,30 @@ type = "check"
 id = "click_resets_word"
 i18n = "menu.hotstrings.click_resets_word"
 checked_when = ["hotstrings_click_resets_word"]
+
+# After an arrow key, a shortcut, or a tap-hold key's tap or hold: the same
+# word start as a click. All three default to on; off keeps the word in
+# progress open across that event.
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "arrow_resets_word"
+i18n = "menu.hotstrings.arrow_resets_word"
+checked_when = ["hotstrings_arrow_resets_word"]
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "shortcut_resets_word"
+i18n = "menu.hotstrings.shortcut_resets_word"
+checked_when = ["hotstrings_shortcut_resets_word"]
+
+[[menu.hotstrings_params_group]]
+type = "check"
+id = "tap_hold_resets_word"
+i18n = "menu.hotstrings.tap_hold_resets_word"
+platforms = ["ahk", "linux"]
+unavailable = "grey"
+reason_key = "platform_reason.tap_hold_word_reset_not_on_macos"
+checked_when = ["hotstrings_tap_hold_resets_word"]
 
 # The "linux" values across this menu were added on 2026-08-04. Before them the
 # manifest projected exactly ONE row for Linux — a bare separator — while

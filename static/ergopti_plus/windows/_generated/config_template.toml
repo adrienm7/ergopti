@@ -17,6 +17,9 @@ magic_key_source_char = "j"
 repeat_key_enabled = false
 idle_reset_seconds = 3
 click_resets_word = true
+arrow_resets_word = true
+shortcut_resets_word = true
+tap_hold_resets_word = true
 
 [hotstrings.autocorrection.names]
 enabled = false

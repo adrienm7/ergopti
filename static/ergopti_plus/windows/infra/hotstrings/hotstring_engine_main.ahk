@@ -263,6 +263,14 @@ global HSE_RepeatEnabled := true
 global HSE_IdleResetSeconds := ""
 global HSE_ClickResetsWord := ""
 
+; hotstrings.arrow_resets_word, hotstrings.shortcut_resets_word and
+; hotstrings.tap_hold_resets_word, published the same way: whether an arrow
+; key, a shortcut, or a tap-hold key's own output starts a new word. "" reads
+; the manifest default (HSE_WordResetFlagCurrent).
+global HSE_ArrowResetsWord := ""
+global HSE_ShortcutResetsWord := ""
+global HSE_TapHoldResetsWord := ""
+
 ; When false the engine-level @-combo resolver (HSE_TryPersonalInfoCombo) is
 ; disabled — typed @<letters>★ sequences fall through unchanged. Mirrors
 ; HSE_RepeatEnabled: the resolver runs on the keystroke path, so the feature
@@ -981,6 +989,24 @@ HSE_ClickResetsWordCurrent() {
 		Value := HSE_ClickResetsWord == ""
 				? ManifestDefaultFor("hotstrings.click_resets_word")
 				: HSE_ClickResetsWord
+		return Value ? true : false
+}
+
+; Whether one of the event word-reset settings is on: the published value, or
+; the manifest default before the loader ran.
+; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
+;        "tap_hold_resets_word".
+; @returns {Boolean}
+HSE_WordResetFlagCurrent(Key) {
+		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+		switch Key {
+				case "arrow_resets_word": Value := HSE_ArrowResetsWord
+				case "shortcut_resets_word": Value := HSE_ShortcutResetsWord
+				case "tap_hold_resets_word": Value := HSE_TapHoldResetsWord
+				default: throw ValueError("Unknown word-reset setting: " . Key)
+		}
+		if (Value == "")
+				Value := ManifestDefaultFor("hotstrings." . Key)
 		return Value ? true : false
 }
 

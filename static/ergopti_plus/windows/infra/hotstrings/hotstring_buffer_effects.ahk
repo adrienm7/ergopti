@@ -51,13 +51,87 @@ global HS_BUFFER_NEUTRAL_PAYLOAD := "i)^\{(?:Volume_Up|Volume_Down|Volume_Mute)(
 ; instead of being mistaken for a plain deletion.
 global HS_BUFFER_BACKSPACE_PAYLOAD := "i)^\{BackSpace(?:\s+(\d+))?\}$"
 
+; One keystroke as TextPressKey and ActionLayer spell it: an optional {Blind},
+; an optional AltGr prefix (<^>!), the modifier symbols, then one braced key
+; with an optional count. Captures: 1 the AltGr prefix, 2 the modifiers, 3 the key.
+global HS_BUFFER_KEYSTROKE_PAYLOAD := "i)^(?:\{Blind\})?(<\^>!)?([\^!+#]*)\{(\w+)(?:\s+\d+)?\}$"
+
+
+
+
+
+; ======================================================
+; ======================================================
+; ======= 1/ The word-reset settings of an event =======
+; ======================================================
+; ======================================================
+
+; What a synthetic keystroke is to the word-reset settings: "neutral" and
+; "backspace" (tracked exactly, never a reset), "arrow" (an arrow key under
+; any modifier: hotstrings.arrow_resets_word), "shortcut" (a key under Ctrl,
+; Alt or Win, AltGr excluded: hotstrings.shortcut_resets_word or, from a
+; tap-hold, hotstrings.tap_hold_resets_word), or "edit" (anything else that
+; moves the caret or rewrites text, Ctrl+Backspace and Ctrl+Delete included:
+; always a reset).
+; @param Payload {String} The exact Send/SendInput payload.
+; @returns {String}
+HS_SyntheticPayloadKind(Payload) {
+	global HS_BUFFER_NEUTRAL_PAYLOAD, HS_BUFFER_BACKSPACE_PAYLOAD, HS_BUFFER_KEYSTROKE_PAYLOAD
+	if RegExMatch(Payload, HS_BUFFER_NEUTRAL_PAYLOAD)
+		return "neutral"
+	if RegExMatch(Payload, HS_BUFFER_BACKSPACE_PAYLOAD)
+		return "backspace"
+	if !RegExMatch(Payload, HS_BUFFER_KEYSTROKE_PAYLOAD, &Stroke)
+		return "edit"
+	if RegExMatch(Stroke[3], "i)^(?:Left|Right|Up|Down)$")
+		return "arrow"
+	if (Stroke[1] == "" and RegExMatch(Stroke[2], "[\^!#]")
+			and !RegExMatch(Stroke[3], "i)^(?:BackSpace|BS|Delete|Del|Insert|Ins)$"))
+		return "shortcut"
+	return "edit"
+}
+
+; The setting a shortcut made now answers to: the tap-hold one when the
+; shortcut is a tap-hold key's own output (TapHoldOwnsShortcut), else the
+; shortcut one.
+; @returns {String} The leaf under [hotstrings].
+HS_ShortcutWordResetKey() {
+	if (IsSet(TapHoldOwnsShortcut) and TapHoldOwnsShortcut())
+		return "tap_hold_resets_word"
+	return "shortcut_resets_word"
+}
+
+; Starts a new word for an event one of the word-reset settings governs, when
+; that setting is on: both buffers empty, the next character at a word start,
+; as after a click. Off, the word in progress stays open.
+; @param Key {String} "arrow_resets_word", "shortcut_resets_word" or
+;        "tap_hold_resets_word".
+; @param Reason {String} The event, for the debug log.
+; @returns {Boolean} True when the word was reset.
+HS_ApplyEventWordReset(Key, Reason) {
+	global _PrefixFocusedControlToken
+	if !HSE_WordResetFlagCurrent(Key) {
+		if LoggerIsDebugEnabled()
+			LoggerDebug("HotstringBuffers", "{1}: hotstrings.{2} is off — the word stays open.", Reason, Key)
+		return false
+	}
+	if IsSet(_PrefixInvalidateInputContext) {
+		_PrefixInvalidateInputContext(_PrefixFocusedControlToken, true)
+	} else if IsSet(HSE_FeedReset) {
+		HSE_FeedReset(true, true)
+	}
+	if LoggerIsDebugEnabled()
+		LoggerDebug("HotstringBuffers", "{1}: new word (hotstrings.{2}).", Reason, Key)
+	return true
+}
+
 
 
 
 
 ; ================================================================
 ; ================================================================
-; ======= 1/ Declaring the effect of a synthetic keystroke =======
+; ======= 2/ Declaring the effect of a synthetic keystroke =======
 ; ================================================================
 ; ================================================================
 
@@ -106,6 +180,17 @@ HS_CommitSyntheticEffect(Payload, SendFailed := false) {
 		}
 	}
 
+	; An arrow or a shortcut whose setting is off leaves the word open, as
+	; the physical key does (_OnPrefixKeyDown). A failed send still resets:
+	; what it did to the text is unknown.
+	if !SendFailed {
+		Kind := HS_SyntheticPayloadKind(Payload)
+		Setting := (Kind == "arrow") ? "arrow_resets_word"
+			: (Kind == "shortcut") ? HS_ShortcutWordResetKey() : ""
+		if (Setting != "" and !HSE_WordResetFlagCurrent(Setting))
+			return { Kind: "kept", Payload: Payload, Setting: Setting }
+	}
+
 	; Everything else moves the caret, changes focus, or rewrites the line. What
 	; sits left of the caret is now unknown, so the next typed run must start
 	; fresh — the same verdict the watcher reaches for a physical arrow key.
@@ -138,6 +223,10 @@ HS_FinishSyntheticEffect(Token) {
 		return
 	if (Token.Kind == "neutral") {
 		try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}' is text-neutral — buffers untouched.", Token.Payload)
+		return
+	}
+	if (Token.Kind == "kept") {
+		try LoggerDebug("HotstringBuffers", "Synthetic payload '{1}': hotstrings.{2} is off — the word stays open.", Token.Payload, Token.Setting)
 		return
 	}
 	if (Token.Kind == "backspace") {

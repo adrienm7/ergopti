@@ -1519,6 +1519,24 @@ function _number_row.deliver(plan, ev, source)
 	return true, nil, nil
 end
 
+--- Whether a chord came from the tap-hold engine rather than the hand: the key
+--- itself is one the engine produced (a navigation-layer chord), or a held
+--- Ctrl, Alt or Super is (a tap-hold hold). Such a modifier is tracked under its
+--- "remapper:" source, a physical one under its device. The daemon gives this
+--- chord to hotstrings.tap_hold_resets_word instead of shortcut_resets_word.
+--- @param ev table The dispatched event.
+--- @return boolean|nil True for a tap-hold chord, nil otherwise.
+local function _tap_hold_chord(ev)
+	if ev.remapped and not ev.original_owner then return true end
+	for _, entry in ipairs(_modifier_order) do
+		local role = _modifier_down[entry.key]
+		if (role == "ctrl" or role == "alt" or role == "meta") and entry.key:sub(1, 9) == "remapper:" then
+			return true
+		end
+	end
+	return nil
+end
+
 --- Dispatches the original post-remapper path without widening the LuaJIT closure.
 --- The event/source and all native capture, modifier, callback and IO guards stay live.
 local function _dispatch_post_remap(ev, source)
@@ -1707,7 +1725,10 @@ local function _dispatch_post_remap(ev, source)
 			-- Alt+Backspace undoes in some applications: reported as a bare
 			-- "backspace", the daemon undid the last expansion over a word already
 			-- gone, or dropped one character of a buffer that had lost a word.
-			_call_callback("control-key callback", _on_key, control, { mods = M.held_modifiers() })
+			-- `tap_hold` says a held Ctrl, Alt or Super (or the key) came from a
+			-- tap-hold, which decides the option that owns the word reset.
+			_call_callback("control-key callback", _on_key, control,
+				{ mods = M.held_modifiers(), tap_hold = _tap_hold_chord(ev) })
 		end
 		return
 	end
@@ -1729,7 +1750,7 @@ local function _dispatch_post_remap(ev, source)
 		-- without any of them changing.
 		if _on_key then
 			_call_callback("shortcut callback", _on_key,
-				"shortcut", { key = identity or char, mods = M.held_modifiers() })
+				"shortcut", { key = identity or char, mods = M.held_modifiers(), tap_hold = _tap_hold_chord(ev) })
 		end
 		return
 	end

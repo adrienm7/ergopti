@@ -87,6 +87,15 @@ M.features = {
 		path = "hotstrings.click_resets_word", id = "click_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.click_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
 	},
 	{
+		path = "hotstrings.arrow_resets_word", id = "arrow_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.arrow_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "hotstrings.shortcut_resets_word", id = "shortcut_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.shortcut_resets_word", platforms = { "ahk", "hs", "linux" }, recommended = true, input_altering = false,
+	},
+	{
+		path = "hotstrings.tap_hold_resets_word", id = "tap_hold_resets_word", section = "hotstrings", default = true, type = "boolean", description_key = "menu.hotstrings.tap_hold_resets_word", platforms = { "ahk", "linux" }, recommended = true, input_altering = false,
+	},
+	{
 		path = "hotstrings.preview_ai_enabled", id = "preview_ai_enabled", section = "hotstrings", default = false, type = "boolean", description_key = "menu.hotstrings.preview_ai_enabled", platforms = { "hs", "linux" }, recommended = true, input_altering = true,
 	},
 	{

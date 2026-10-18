@@ -254,9 +254,26 @@ ReadScriptConfig(Cache) {
 					RawClick, "hotstrings.click_resets_word")
 		else
 				HSE_ClickResetsWord := ManifestDefaultFor("hotstrings.click_resets_word")
+		; ...and after an arrow key, a shortcut, a tap-hold key's own output.
+		global HSE_ArrowResetsWord, HSE_ShortcutResetsWord, HSE_TapHoldResetsWord
+		HSE_ArrowResetsWord := _FeatureStateWordResetFlag(Cache, "arrow_resets_word")
+		HSE_ShortcutResetsWord := _FeatureStateWordResetFlag(Cache, "shortcut_resets_word")
+		HSE_TapHoldResetsWord := _FeatureStateWordResetFlag(Cache, "tap_hold_resets_word")
 		if IsSet(HSE_AdvanceRuntimeDecisionGeneration)
 				HSE_AdvanceRuntimeDecisionGeneration()
 		; Paths are always derived from _ConfigDir at startup and are never persisted.
+}
+
+; One event word-reset setting under [hotstrings], validated like
+; click_resets_word, or its manifest default when absent.
+; @param Cache {Map} The parsed configuration cache.
+; @param Key {String} The leaf under [hotstrings].
+; @returns {Boolean}
+_FeatureStateWordResetFlag(Cache, Key) {
+	Raw := _FeatureStateIniGet(Cache, "hotstrings", Key)
+	if (Raw == "_")
+		return ManifestDefaultFor("hotstrings." . Key)
+	return _FeatureStateValidateBoolean(Raw, "hotstrings." . Key)
 }
 
 _FeatureStateValidateBoolean(Value, Path) {

@@ -10,8 +10,10 @@
 --- word typed after a pause or a click never fired a word-start hotstring.
 ---
 --- Covered: the shared pause rule, the settings owner (defaults, validation,
---- sparse persistence, outdated values), the keystroke stamp, the free-entry
---- parser, the menu's choice row with its free entry, and the daemon wiring.
+--- sparse persistence, outdated values) of the pause, click, arrow, shortcut
+--- and tap-hold leaves, the keystroke stamp, the free-entry parser, the menu's
+--- choice row with its free entry, and the daemon wiring. What an arrow, a
+--- shortcut or a tap-hold does to a typed word is test_word_reset_events.lua.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -107,18 +109,54 @@ local function with_settings(source, body)
 	if not ok then error(err, 0) end
 end
 
+-- The boolean leaves, each with its getter, setter and toggle of the same name.
+local SWITCHES = { "click_resets_word", "arrow_resets_word", "shortcut_resets_word", "tap_hold_resets_word" }
+
 helpers.describe("word reset: the settings", function()
 	helpers.it("word reset, reads the manifest defaults from an empty configuration", function()
 		with_settings(nil, function(subject)
+			local Manifest = require("infra.manifest_reader")
 			helpers.assert_eq(subject.idle_seconds(), 3, "a pause of 3 s starts a new word by default")
 			helpers.assert_eq(subject.click_resets_word(), true, "a click starts a new word by default")
+			for _, key in ipairs(SWITCHES) do
+				local default = Manifest.default_for("hotstrings." .. key)
+				helpers.assert_eq(type(default), "boolean", key .. " has a manifest default")
+				helpers.assert_eq(subject[key](), default, key .. " reads the manifest default")
+			end
+			helpers.assert_eq(subject.arrow_resets_word(), true, "an arrow starts a new word by default")
+			helpers.assert_eq(subject.shortcut_resets_word(), true, "a shortcut starts a new word by default")
+			helpers.assert_eq(subject.tap_hold_resets_word(), true, "a tap-hold command starts a new word by default")
 		end)
 	end)
 
 	helpers.it("word reset, reads stored values, 0 included", function()
-		with_settings("[hotstrings]\nidle_reset_seconds = 0\nclick_resets_word = false\n", function(subject)
+		with_settings("[hotstrings]\nidle_reset_seconds = 0\nclick_resets_word = false\narrow_resets_word = false\n"
+			.. "shortcut_resets_word = false\ntap_hold_resets_word = false\n", function(subject)
 			helpers.assert_eq(subject.idle_seconds(), 0)
-			helpers.assert_eq(subject.click_resets_word(), false)
+			for _, key in ipairs(SWITCHES) do helpers.assert_eq(subject[key](), false, key) end
+		end)
+	end)
+
+	helpers.it("word reset, persists, reloads and toggles every switch on its own", function()
+		with_settings('[hotstrings]\nunknown = "keep"\n', function(subject, _, path, reload, sandbox)
+			local Codec = require("toml_codec")
+			for _, key in ipairs(SWITCHES) do
+				helpers.assert_true(subject["set_" .. key](false), key .. " is persisted")
+				local stored = Codec.decode(sandbox.read_bytes(path)).hotstrings
+				helpers.assert_eq(stored[key], false, key .. " is written")
+				helpers.assert_eq(stored.unknown, "keep", "a neighbour survives " .. key)
+			end
+			local fresh = reload()
+			for _, key in ipairs(SWITCHES) do helpers.assert_eq(fresh[key](), false, key .. " reads back") end
+			for _, key in ipairs(SWITCHES) do
+				helpers.assert_true(fresh["toggle_" .. key](), key .. " toggles")
+				helpers.assert_eq(fresh[key](), true)
+				helpers.assert_eq(Codec.decode(sandbox.read_bytes(path)).hotstrings[key], nil,
+					key .. ": the default is written as an absent leaf")
+			end
+			for _, key in ipairs(SWITCHES) do
+				helpers.assert_eq(fresh["set_" .. key]("no"), false, key .. " refuses a non-boolean")
+			end
 		end)
 	end)
 
@@ -153,26 +191,31 @@ helpers.describe("word reset: the settings", function()
 	end)
 
 	helpers.it("word reset, reads an outdated value as the default with one warning", function()
-		with_settings('[hotstrings]\nidle_reset_seconds = -2\nclick_resets_word = "no"\n', function(subject)
+		with_settings('[hotstrings]\nidle_reset_seconds = -2\nclick_resets_word = "no"\narrow_resets_word = 1\n'
+			.. 'shortcut_resets_word = "off"\ntap_hold_resets_word = []\n', function(subject)
 			require("config_outdated").reset_for_tests()
 			local reported = require("config_outdated").collect_reports(function()
 				helpers.assert_eq(subject.idle_seconds(), 3)
-				helpers.assert_eq(subject.click_resets_word(), true)
+				for _, key in ipairs(SWITCHES) do helpers.assert_eq(subject[key](), true, key .. " falls back") end
 			end)
 			helpers.assert_eq(reported, {
-				["hotstrings.idle_reset_seconds"] = true, ["hotstrings.click_resets_word"] = true })
+				["hotstrings.idle_reset_seconds"] = true, ["hotstrings.click_resets_word"] = true,
+				["hotstrings.arrow_resets_word"] = true, ["hotstrings.shortcut_resets_word"] = true,
+				["hotstrings.tap_hold_resets_word"] = true })
 		end)
 	end)
 
-	helpers.it("word reset, marks both leaves as read for the cleanup", function()
-		with_settings("[hotstrings]\nidle_reset_seconds = 2\nclick_resets_word = false\n", function(_, _, path)
+	helpers.it("word reset, marks every leaf as read for the cleanup", function()
+		with_settings("[hotstrings]\nidle_reset_seconds = 2\nclick_resets_word = false\narrow_resets_word = false\n"
+			.. "shortcut_resets_word = false\ntap_hold_resets_word = false\n", function(_, _, path)
+			local consumed = { ["hotstrings.idle_reset_seconds"] = true }
+			for _, key in ipairs(SWITCHES) do consumed["hotstrings." .. key] = true end
 			package.loaded["ui.menu.unused_keys_cleanup"] = nil
 			local scan = require("ui.menu.unused_keys_cleanup").find(path)
 			helpers.assert_eq(scan.status, "ok")
 			for _, key in ipairs(scan.keys) do
 				local dotted = table.concat(key.path, ".")
-				helpers.assert_true(dotted ~= "hotstrings.idle_reset_seconds" and dotted ~= "hotstrings.click_resets_word",
-					"a consumed leaf is never offered for removal: " .. dotted)
+				helpers.assert_true(not consumed[dotted], "a consumed leaf is never offered for removal: " .. dotted)
 			end
 		end)
 	end)
@@ -180,12 +223,18 @@ helpers.describe("word reset: the settings", function()
 	helpers.it("word reset, adopts and restores a scope candidate", function()
 		with_settings(nil, function(subject)
 			local before = subject.snapshot()
-			helpers.assert_true(subject.adopt_configuration({ hotstrings = { idle_reset_seconds = 10, click_resets_word = false } }))
+			helpers.assert_true(subject.adopt_configuration({ hotstrings = { idle_reset_seconds = 10, click_resets_word = false,
+				arrow_resets_word = false, shortcut_resets_word = false, tap_hold_resets_word = false } }))
 			helpers.assert_eq(subject.idle_seconds(), 10)
-			helpers.assert_eq(subject.click_resets_word(), false)
+			for _, key in ipairs(SWITCHES) do helpers.assert_eq(subject[key](), false, key .. " adopted") end
 			helpers.assert_true(subject.restore_configuration(before))
 			helpers.assert_eq(subject.idle_seconds(), 3)
-			helpers.assert_eq(subject.restore_configuration({ idle_seconds = -1, click_resets_word = true }), false)
+			for _, key in ipairs(SWITCHES) do helpers.assert_eq(subject[key](), true, key .. " restored") end
+			helpers.assert_eq(subject.restore_configuration({ idle_seconds = -1, click_resets_word = true,
+				arrow_resets_word = true, shortcut_resets_word = true, tap_hold_resets_word = true }), false)
+			local incomplete = subject.snapshot()
+			incomplete.tap_hold_resets_word = nil
+			helpers.assert_eq(subject.restore_configuration(incomplete), false, "a snapshot missing a switch is refused")
 		end)
 	end)
 end)
@@ -324,6 +373,36 @@ helpers.describe("word reset: the daemon wiring", function()
 		helpers.assert_contains(body, "engine:reset(at_word_start)")
 		helpers.assert_contains(body, "WordReset.click_resets_word()")
 		helpers.assert_contains(text, "onClick = on_click,")
+	end)
+
+	helpers.it("word reset, hands every control key but a one-character Backspace to the options", function()
+		local text = source("ergopti_hotstrings.lua")
+		local start = text:find("local function handle_control(key_name, detail)", 1, true)
+		helpers.assert_true(start ~= nil)
+		local body = text:sub(start, text:find("\n\tend\n", start, true))
+		helpers.assert_contains(body, "effect = WordReset.apply_control(engine, key_name, detail)")
+		helpers.assert_true(not body:find("engine:reset(key_name", 1, true),
+			"no control key resets the engine around the options")
+	end)
+
+	helpers.it("word reset, tells the engine of each tap-hold command the catalogue runs", function()
+		local text = source("ergopti_hotstrings.lua")
+		local start = text:find("execute_action = function(action, binding)", 1, true)
+		helpers.assert_true(start ~= nil)
+		local body = text:sub(start, text:find("\n\t\tend,\n", start, true))
+		local run = body:find("action_catalogue.execute_action(action, binding)", 1, true)
+		local told = body:find("WordReset.apply_tap_action(engine, binding)", 1, true)
+		helpers.assert_true(run ~= nil and told ~= nil and run < told, "the command runs, then the word follows the option")
+	end)
+
+	helpers.it("word reset, gives each new switch its menu command and checked state", function()
+		local text = source("ui/menu/menu_builder.lua")
+		for _, key in ipairs({ "arrow_resets_word", "shortcut_resets_word", "tap_hold_resets_word" }) do
+			helpers.assert_contains(text, 'params_ctx.commands["' .. key .. '"]')
+			helpers.assert_contains(text, "WordReset.toggle_" .. key .. "()")
+			helpers.assert_contains(text, 'params_ctx.state_getters["hotstrings_' .. key .. '"]')
+			helpers.assert_contains(text, "return WordReset." .. key .. "()")
+		end
 	end)
 
 	helpers.it("word reset, lets the Hotstrings scope adopt and restore both leaves", function()

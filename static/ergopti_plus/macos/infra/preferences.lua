@@ -99,7 +99,9 @@ local KEY_MAP = {
 	expansion_delay                      = { sec = "hotstrings"                                        },
 	idle_reset_seconds                   = { sec = "hotstrings"                                        },
 	click_resets_word                    = { sec = "hotstrings"                                        },
-	personal_info                        = { sec = "hotstrings", path = "modules", key = "personal_info" },
+	arrow_resets_word                    = { sec = "hotstrings"                                        },
+	shortcut_resets_word                 = { sec = "hotstrings"                                        },
+	personal_info                       = { sec = "hotstrings", path = "modules", key = "personal_info" },
 	preview_ai_enabled                   = { sec = "hotstrings"                                        },
 	preview_autocorrect_enabled          = { sec = "hotstrings"                                        },
 	preview_colored_tooltips             = { sec = "hotstrings"                                        },
@@ -524,6 +526,14 @@ local SCALAR_VALUE_RULES = {
 	click_resets_word = function(value)
 		if type(value) == "boolean" then return true end
 		return false, "the click reset is not a boolean"
+	end,
+	arrow_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the arrow reset is not a boolean"
+	end,
+	shortcut_resets_word = function(value)
+		if type(value) == "boolean" then return true end
+		return false, "the shortcut reset is not a boolean"
 	end,
 	llm_agent_mode = function(value)
 		if Agent.MODES[value] then return true end

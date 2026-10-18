@@ -371,6 +371,7 @@ return {
 	"tests.unit.modules.hotstrings.test_private_mapping_sinks",
 	"tests.unit.modules.hotstrings.test_repeat_key",
 	"tests.unit.modules.hotstrings.test_word_reset",
+	"tests.unit.modules.hotstrings.test_word_reset_events",
 	"tests.unit.modules.hotstrings.test_shortcuts_menu_dispatch",
 	"tests.unit.modules.hotstrings.test_terminator_settings",
 	"tests.unit.modules.hotstrings.test_terminator_scope_policy",

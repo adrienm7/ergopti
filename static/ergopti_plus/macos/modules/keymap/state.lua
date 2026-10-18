@@ -135,6 +135,11 @@ function M.new(defaults, delays_default)
 		-- features manifest right after construction and owns their setters.
 		IDLE_RESET_SEC             = 0,
 		click_resets_word          = false,
+		-- Whether an arrow key (hotstrings.arrow_resets_word) and a Cmd/Ctrl
+		-- shortcut (hotstrings.shortcut_resets_word) start a new word. Neutral
+		-- (the word continues) until keymap/init.lua seeds them the same way.
+		arrow_resets_word          = false,
+		shortcut_resets_word       = false,
 		-- The timeout the keyDown tap applies, projected from IDLE_RESET_SEC.
 		WORD_TIMEOUT_SEC           = 0,
 		BASE_DELAY_SEC             = defaults.expansion_delay,
