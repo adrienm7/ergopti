@@ -214,7 +214,9 @@ helpers.describe("native-private managed HTTP bridge", function()
 				curl_executable = "/usr/bin/curl",
 				curl_executable_identity = EXECUTABLE_IDENTITY,
 			}, nil, function(value) result = value end)
-			for character in ("PRIVATE credential suffix\nERGOPTI_PROXY_STATUS:" .. metrics .. "\n"):gmatch(".") do state.stderr(character) end
+			-- Delivered one byte at a time, as a slow pipe would.
+			local stderr = "PRIVATE credential suffix\nERGOPTI_PROXY_STATUS:" .. metrics .. "\n"
+			for index = 1, #stderr do state.stderr(stderr:sub(index, index)) end
 			state.stdout("\nERGOPTI_HTTP_STATUS:000\n"); state.complete(7)
 			helpers.assert_eq(result.error, "curl exited with code 7")
 			helpers.assert_eq(result.failure_receipt.curl_exit, 7)
