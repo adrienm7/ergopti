@@ -790,8 +790,10 @@ function M.select(id, on_done, deps)
 		on_done(false, M.FAILURE_NOT_INSTALLED, "the layout '" .. tostring(id) .. "' is not installed", nil)
 		return false
 	end
+	if not acquire_slot(id, "select", on_done) then return false end
 	Logger.start(LOG, "Activating the '%s' layout…", id)
 	run_installer(deps, { "activate", "--layout-id", id }, function(ok, report, detail)
+		_busy = nil
 		if not ok then
 			Logger.error(LOG, "The '%s' layout could not be activated: %s.", id, tostring(detail))
 			on_done(false, M.FAILURE_SELECT, detail, user_message(deps, report))

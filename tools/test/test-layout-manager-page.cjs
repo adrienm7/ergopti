@@ -414,6 +414,39 @@ check('an operation in flight disables every button and says what runs', () => {
 	assert.ok(textOf(list).includes(strings['layout_manager.busy_install']));
 });
 
+for (const action of ['select', 'uninstall']) {
+	check(`(layout-selection-owner) ${action} disables mutations with an honest busy label`, () => {
+		const { byId, window } = loadPage();
+		window.initData({
+			strings,
+			state: {
+				platform: 'linux',
+				index,
+				source: 'cache',
+				installed: { ergol: index.layouts.find((entry) => entry.id === 'ergol') },
+				active: 'ergopti',
+				busy: { id: 'ergol', action }
+			}
+		});
+		const list = byId.get('layout-list');
+		const buttons = findAll(
+			list,
+			(el) => el.tagName === 'BUTTON' && el.dataset.action !== 'open_homepage'
+		);
+		assert.ok(buttons.length >= 3);
+		assert.ok(buttons.every((button) => button.disabled));
+		assert.equal(byId.get('btn-refresh').disabled, true);
+		assert.ok(
+			!textOf(list).includes(strings['layout_manager.busy_install']),
+			'selection is not an installation'
+		);
+		assert.equal(
+			textOf(list).includes(strings['layout_manager.busy_uninstall']),
+			action === 'uninstall'
+		);
+	});
+}
+
 check(
 	'the catalogue line says where the list comes from and why the network one is missing',
 	() => {
