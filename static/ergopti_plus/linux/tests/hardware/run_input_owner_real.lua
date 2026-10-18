@@ -7,6 +7,8 @@
 --- virtual-source selection/classification and the logical action catalogue are
 --- controlled. Production physical discovery and the picker remain unavailable.
 --- Handwritten KEY/SYN expectations describe observed wire reports, never ACKs.
+--- Signal cases compile actual Main ownership statements with controlled external
+--- cleanup debt and a teardown seam that closes the original real native output.
 --- ==============================================================================
 
 --- Compares dense native KEY/SYN_REPORT rows with an independent literal oracle.
@@ -64,6 +66,8 @@ local output_journal = {}
 local original_find, original_classify = Finder.find_devices, Finder.physical_sources
 local original_read, original_emit = Reader.read_event, Writer.transaction_emit
 local original_acquire, acquisitions = Writer.acquire_transaction, 0
+local signal_timer, signal_deadline
+local original_signal_loaded, original_signal_preload = package.loaded["posix.signal"], package.preload["posix.signal"]
 
 pcall(ffi.cdef, [[
 	long readlink(const char *path, char *buffer, unsigned long size);
@@ -305,6 +309,118 @@ local function finish_session()
 	check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "native session has no retained source/output debt")
 end
 
+--- Compiles unchanged Main signal ownership statements with explicit fixture seams.
+--- @param body string Actual Main source statements.
+--- @param env table Controlled surrounding dependencies.
+--- @return function compiled
+local function compile_signal_code(body, env)
+	if setfenv then return setfenv(assert(loadstring(body, "actual daemon input signal code")), env) end
+	return assert(load(body, "actual daemon input signal code", "t", env))
+end
+
+--- Joins real signal delivery and final close acknowledgments to a held kernel key.
+--- @param first_signal string Actual initial terminal signal.
+local function signal_shutdown(first_signal)
+	local uv = require("luv")
+	local signals = require("infra.signal_handlers")
+	assert(signals.is_settled(), "no preceding signal installation may remain owned")
+	local file = assert(io.open("ergopti_hotstrings.lua", "r"))
+	local text = file:read("*a"); assert(file:close())
+	local installer = assert(text:match("(local function install_signal_handlers%(%).-)%s*%-%- ========================================="))
+	local final = assert(text:match("final_wait%s*=%s*(%b{})"), "actual final signal registry is mandatory")
+	local teardown = assert(text:match('(shutdown.request%("event loop returned"%).-)%s*if file_watchers then'))
+	package.loaded["posix.signal"] = nil
+	package.preload["posix.signal"] = function() error("fixture intentionally has no posix.signal") end
+	start_session()
+	original(sources[1], 58, 1)
+	expect_frames("1:29:1 0:0:0", 2, "signal prerequisite genuinely holds native Ctrl")
+	expect_held("29", "kernel Ctrl bitmap is set before terminal signal")
+	wait_for_long_hold("the signalled original Caps press")
+	local state = { ready = false, terminal = 0, loops = 0, closes = 0, ticks = 0 }
+	local owners = {}
+	local final_registry = compile_signal_code("return " .. final,
+		setmetatable({ privacy_owners = owners }, { __index = _G }))()
+	local coordinator = require("infra.shutdown_coordinator").new({
+		pre_wait = { { name = "external native cleanup", wait_for_ack = true, stop = function() return state.ready end } },
+		final_wait = final_registry,
+		keyboard_hook = Hook,
+		event_loop = { stop = function()
+			check(signals.is_settled() and state.ready and state.closes == 0,
+				"real signal close callbacks acknowledge before loop stop and output close")
+			state.loops = state.loops + 1
+			uv.stop()
+		end },
+	})
+	local env = setmetatable({ shutdown = coordinator, privacy_owners = owners,
+		Logger = { info = function() state.terminal = state.terminal + 1 end },
+		perform_reload = function() error("terminal signal must not dispatch reload") end,
+		tooltip_preview = false, llm_overlay = false,
+		injector = { close_fast_channel = function()
+			check(signals.is_settled() and not coordinator.is_pending() and state.loops == 1,
+				"actual Main teardown reaches native output only after final signal ACK")
+			state.closes = state.closes + 1
+			close_output(session)
+			return true
+		end },
+	}, { __index = _G })
+	assert(compile_signal_code(installer .. "\nreturn install_signal_handlers()", env)())
+	signal_timer = assert(uv.new_timer())
+	signal_deadline = assert(uv.new_timer())
+	-- The existing native signal child is also bounded by this 2.5-second owner.
+	uv.timer_start(signal_deadline, 2500, 0, function() error("native input signal owner deadline expired") end)
+	local sent, checked = 0, false
+	-- Preserve the existing native_signal_shutdown timer cadence and tick bound.
+	uv.timer_start(signal_timer, 1, 5, function()
+		state.ticks = state.ticks + 1
+		assert(state.ticks < 300, "native input signal cleanup failed to settle")
+		if sent == 0 then sent = 1; assert(uv.kill(uv.os_getpid(), first_signal)); return end
+		if state.ready then coordinator.poll(); return end
+		if state.terminal == 0 then return end
+		if state.terminal < sent then return end
+		check(not Hook.isRunning() and coordinator.is_pending() and not signals.is_settled()
+			and state.loops == 0 and state.closes == 0 and Writer.output_current(session.cap),
+			"terminal signal stops Hook while external debt retains handlers, loop and output")
+		if not checked then
+			checked = true
+			expect_frames("1:29:0 0:0:0", 2, "signal shutdown emits exactly one native Ctrl UP without a tap")
+			expect_held("", "signal shutdown clears the real output bitmap before external ACK")
+			for _, source in ipairs(sources) do
+				check(not Reader.source_owner_current(source.owner), "terminal signal revokes the original native source lease")
+				local slot = "input-owner-retirement:" .. source.name
+				assert(Reader.open(source.node, slot)); assert(Reader.grab(slot))
+				local owner = assert(Reader.capture_source_owner(slot))
+				successors[#successors + 1] = owner
+				check(Reader.retire_source(owner), "terminal signal releases the actual source grab for an independent owner")
+			end
+			assert(sources[1].writer.emit_owned(sources[1].cap, 58, 0), "physical Caps UP after capture retirement")
+		end
+		if sent < 3 then
+			sent = sent + 1
+			assert(uv.kill(uv.os_getpid(), sent == 2 and "sigint" or "sigterm"))
+			return
+		end
+		if state.terminal < 3 then return end
+		expect_frames("", 0, "repeated terminal signals and late physical UP emit no duplicate output")
+		expect_held("", "native output stays clear throughout repeated terminal signals")
+		state.ready = true
+		coordinator.poll()
+	end)
+	uv.run()
+	check(checked and state.terminal == 3 and state.loops == 1 and not coordinator.is_pending(),
+		"three real terminal signals settle one exact shutdown transaction")
+	compile_signal_code(teardown, env)()
+	check(state.closes == 1 and signals.is_settled(), "actual Main teardown destroys output once after signal close ACK")
+	uv.timer_stop(signal_timer); uv.close(signal_timer); signal_timer = nil
+	uv.timer_stop(signal_deadline); uv.close(signal_deadline); signal_deadline = nil
+	uv.run()
+	local remaining = 0; uv.walk(function() remaining = remaining + 1 end)
+	check(remaining == 0, "native input signal case retains no luv handles")
+	assert(Hook.set_remapper(nil)); Broker.detach(Writer)
+	check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "signal case leaves no input or output transport debt")
+	package.loaded["posix.signal"], package.preload["posix.signal"] = original_signal_loaded, original_signal_preload
+	completed[#completed + 1] = first_signal == "sigterm" and "signal-term-held-caps" or "signal-int-held-caps"
+end
+
 --- Runs genuine kernel scenarios with separately handwritten wire oracles.
 local function run()
 	assert(rawequal(package.loaded["adapters.keyboard_hook"], Hook), "original cold Hook construction must remain loaded")
@@ -437,6 +553,8 @@ local function run()
 		completed[#completed + 1] = release_order[1] == 1 and "shared-caps-release-ab" or "shared-caps-release-ba"
 	end
 
+	signal_shutdown("sigterm")
+	signal_shutdown("sigint")
 	start_session()
 	local departing, retained = sources[1], sources[2]
 	original(departing, 58, 1)
@@ -491,6 +609,17 @@ local function cleanup(callback, label)
 	if not check(called and settled == true, label) then cleanup_ok = false end
 end
 cleanup(function() if Hook then Hook.stop(); return not Hook.isRunning() end; return true end, "final actual Hook stop")
+cleanup(function()
+	local signals = package.loaded["infra.signal_handlers"]
+	if not signals and not signal_timer and not signal_deadline then return true end
+	local uv = require("luv")
+	if signal_timer then uv.timer_stop(signal_timer); uv.close(signal_timer); signal_timer = nil end
+	if signal_deadline then uv.timer_stop(signal_deadline); uv.close(signal_deadline); signal_deadline = nil end
+	if signals then signals.stop() end
+	uv.run("nowait")
+	return not signals or signals.is_settled()
+end, "final native signal and timer close acknowledgments")
+package.loaded["posix.signal"], package.preload["posix.signal"] = original_signal_loaded, original_signal_preload
 cleanup(function() return not Hook or Hook.set_remapper(nil) end, "final remapper retirement")
 for _, owner in ipairs(successors) do cleanup(function() return Reader.retire_source(owner) end, "captured successor exact native close") end
 for _, output in ipairs(outputs) do
@@ -534,8 +663,8 @@ cleanup(function()
 	end) == true
 end, "all exact owned kernel nodes disappear")
 check(not Reader.has_native_origin_debt() and not Writer.has_output_debt(), "final Reader/Writer transport custody has no debt")
-check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor shared-caps-release-ab shared-caps-release-ba destroy-source-first-surviving-hold",
-	"all seven mandatory native scenarios completed")
+check(table.concat(completed, " ") == "shift-repeat-up replace-frame-source-fd replace-other-original-fd retire-output-protect-successor shared-caps-release-ab shared-caps-release-ba signal-term-held-caps signal-int-held-caps destroy-source-first-surviving-hold",
+	"all nine mandatory native scenarios completed")
 if namespace and cleanup_ok and failures == 0 then
 	cleanup(function() return os.remove(config_path) ~= nil and ffi.C.rmdir(namespace) == 0 end, "exclusive successful fixture namespace removed")
 end
