@@ -24,7 +24,7 @@ done
 [ -n "${BUS_LAUNCHER}" ] || { echo "ENVIRONMENT: at-spi-bus-launcher is missing" >&2; exit 2; }
 python3 tests/hardware/test_atspi_fixture_lifetime.py || exit 1
 # Keep the new race regressions on the native lane, beyond recorder-based units.
-for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py; do
+for probe in run_window_focus_identity.py run_llm_prediction_acceptance.py run_llm_selection_focus.py run_user_hotstring_destination.py run_secure_focus_watch.py; do
 	python3 "tests/hardware/${probe}" || exit 1
 done
 
