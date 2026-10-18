@@ -768,3 +768,5 @@ Test("_LLM_Ollama_TrimAsyncRegistry: no-op when registry is below cap", _OllamaT
 
 
 #Include %A_LineFile%/../test_llm_api_ollama_retirement.ahk
+
+#Include %A_LineFile%/../test_llm_api_ollama_chat_ownership.ahk
