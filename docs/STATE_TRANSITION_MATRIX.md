@@ -74,7 +74,7 @@ and dispatches the correct reactor once.
    `Suspend` from terminating a staging worker that is already running, which is exactly
    the outcome the illegal transition above forbids. Cancellation must stay possible.
 
-   _Pinned by_: `static/ergopti_plus/windows/tests/meta/test_g5_updater_download.ahk`
+   _Pinned by_: `static/ergopti_plus/windows/tests/meta/modules/updater/test_updater_download_resilience.ahk`
    asserts `A_IsSuspended` is
    present, `.terminate()` is present, and `Critical(` is **absent**. Do not reintroduce
    it.

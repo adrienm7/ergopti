@@ -16,7 +16,7 @@ $Observed = New-ErgoptiObservedStagingScript $Source ''
 # Receive the actual AHK fixture's literal seam with the real PowerShell parser.
 # This mode never executes a staging worker, native watch, download or trust operation.
 if ($WorkerSourcePath -eq '') { throw 'The actual worker source is required.' }
-$FixturePath = [IO.Path]::GetFullPath((Join-Path (Split-Path $WorkerSourcePath -Parent) '../../tests/unit/test_updater_managed_transport.ahk'))
+$FixturePath = [IO.Path]::GetFullPath((Join-Path (Split-Path $WorkerSourcePath -Parent) '../../tests/unit/modules/updater/test_updater_managed_transport.ahk'))
 $FixtureText = [IO.File]::ReadAllText($FixturePath)
 $FixtureStart = $FixtureText.IndexOf('_UpdaterNativeObservedStagingScript(OriginalScript) {', [StringComparison]::Ordinal)
 if ($FixtureStart -lt 0) { throw 'Actual fixture constructor is required.' }

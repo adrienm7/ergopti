@@ -110,7 +110,7 @@ for (const [name, rows] of [
 const updaterSource = fs.readFileSync(
 	path.join(
 		__dirname,
-		'../../static/ergopti_plus/windows/tests/unit/test_updater_managed_transport.ahk'
+		'../../static/ergopti_plus/windows/tests/unit/modules/updater/test_updater_managed_transport.ahk'
 	),
 	'utf8'
 );

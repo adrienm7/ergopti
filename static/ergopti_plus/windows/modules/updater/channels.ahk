@@ -13,7 +13,7 @@
 ; FEATURES & RATIONALE:
 ; 1. Port of the canonical JavaScript matcher (_shared/ui/update_channels.js).
 ;    The tag rule is structured data interpreted here, never a regular
-;    expression copied from another dialect. tests/unit/test_updater_channel_registry.ahk
+;    expression copied from another dialect. tests/unit/modules/updater/test_updater_channel_registry.ahk
 ;    replays the shared _shared/modules/updater/channel_vectors.json.
 ; 2. Identity is exact: channel ids, aliases and prerelease labels compare with
 ;    the case-sensitive == and !== operators and Map keys.

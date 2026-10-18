@@ -9,7 +9,7 @@
 ;
 ; FEATURES & RATIONALE:
 ; 1. Port of the canonical JavaScript (_shared/modules/updater/schedule.js).
-;    tests/unit/test_updater_schedule_vectors.ahk replays the shared
+;    tests/unit/modules/updater/test_updater_schedule_vectors.ahk replays the shared
 ;    _shared/modules/updater/schedule_vectors.json with the Lua port, so the
 ;    three drivers agree on catch-up after a power-off, a clock moved back,
 ;    failure backoff, jitter and the snap of a retired interval.
