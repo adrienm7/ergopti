@@ -1,0 +1,71 @@
+# .github/workflows/windows-test-replay.yml
+
+name: Windows test replay
+
+on:
+  push:
+    branches: [fix/windows]
+    paths:
+      - .github/workflows/windows-test-replay.yml
+      - .github/ci/ahk-replay/**
+      - tools/ci/windows-test-replay.cjs
+  workflow_dispatch:
+    inputs:
+      selection:
+        description: Repository-relative replay selection JSON
+        required: false
+        default: .github/ci/ahk-replay/windows-fixes.json
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  replay:
+    name: Isolated tests and reversed selection
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+
+      - name: Verify replay receipt validation
+        run: node tools/ci/windows-test-replay.cjs --self-test
+
+      - name: Install the authenticated AutoHotkey runtime
+        shell: pwsh
+        run: |
+          $contract = Get-Content -Raw static/ergopti_plus/_shared/modules/updater/windows_release_toolchain.json | ConvertFrom-Json
+          $archive = Join-Path $env:RUNNER_TEMP 'ahk-replay-runtime.zip'
+          Invoke-WebRequest -Uri $contract.runtime.url -OutFile $archive
+          $actual = (Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($actual -cne $contract.runtime.sha256) { throw 'AutoHotkey archive digest mismatch.' }
+          $runtimeDirectory = Join-Path $env:RUNNER_TEMP 'ahk-replay-runtime'
+          Expand-Archive -LiteralPath $archive -DestinationPath $runtimeDirectory
+          $runtime = Join-Path $runtimeDirectory 'AutoHotkey64.exe'
+          if (-not (Test-Path -LiteralPath $runtime -PathType Leaf)) { throw 'Authenticated runtime is missing.' }
+          "ERGOPTI_REPLAY_AHK=$runtime" >> $env:GITHUB_ENV
+
+      - name: Build the native navigation prerequisite
+        shell: pwsh
+        run: ./tools/build/build_windows_nav_owner.ps1
+
+      - name: Replay every case alone and the selection in reverse
+        shell: pwsh
+        env:
+          ERGOPTI_REPLAY_SELECTION: ${{ inputs.selection || '.github/ci/ahk-replay/windows-fixes.json' }}
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'ahk-replay-evidence'
+          node tools/ci/windows-test-replay.cjs --ahk "$env:ERGOPTI_REPLAY_AHK" --selection "$env:ERGOPTI_REPLAY_SELECTION" --output "$output"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Retain exact native execution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-test-replay-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ahk-replay-evidence
+          if-no-files-found: error
+          retention-days: 7
