@@ -124,7 +124,7 @@ check(
 );
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/gestures/test_desktop_navigation_vectors.lua',
+		file: 'macos/tests/unit/modules/gestures/parameters/test_desktop_navigation_vectors.lua',
 		needle: 'require("test.desktop_navigation_contract")'
 	},
 	{

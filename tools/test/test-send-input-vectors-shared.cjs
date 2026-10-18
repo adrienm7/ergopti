@@ -212,7 +212,7 @@ for (const [action, kind] of [
 // Each suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/gestures/test_send_input_parameter_vectors.lua',
+		file: 'macos/tests/unit/modules/gestures/parameters/test_send_input_parameter_vectors.lua',
 		path: 'tests/corpus/action_parameters/send_input_vectors.json'
 	},
 	{
