@@ -1103,6 +1103,7 @@ local invalidate_periodic_owner
 local run_pending_action_listeners
 local start_action_dispatcher
 local post_deferred_trigger
+local publication_allowed
 
 
 --- Stops the reusable pump watchdog only when it belongs to this batch.
@@ -1587,6 +1588,11 @@ local function ensure_pump_started()
 				consume = true
 				return
 			end
+			if not publication_allowed(batch.tx.publication, true) then
+				fail_queued_batch(batch, "publication is no longer current", false, true)
+				return
+			end
+			if batch.status ~= "queued" then return end
 			publish_action_epoch(batch)
 			batch.status = "handed_off"
 			events = batch.events
@@ -2367,6 +2373,12 @@ end
 --- @param batch table Deferred batch.
 post_deferred_trigger = function(batch)
 	if batch.status ~= "queued" then return end
+	-- Both the broker and watchdog enter here from owned run-loop timers.
+	if not publication_allowed(batch.tx.publication, false) then
+		fail_queued_batch(batch, "publication is no longer current", false)
+		return
+	end
+	if batch.status ~= "queued" then return end
 	local trigger_tag = nil
 	local post_attempted = false
 	local ok, err = xpcall(function()
@@ -3051,7 +3063,7 @@ end
 --- @param publication table|nil Optional domain owner.
 --- @param cached boolean Selects the RAM-only check.
 --- @return boolean current
-local function publication_allowed(publication, cached)
+publication_allowed = function(publication, cached)
 	if publication == nil then return true end
 	local check = publication.current
 	if cached then check = publication.cached end
@@ -3524,7 +3536,9 @@ function M.cancel_reserved_successor(owner)
 		_owned_completion_depth = _owned_completion_depth + 1
 		pcall(finish_batch, batch, "cancelled")
 		_owned_completion_depth = _owned_completion_depth - 1
-		start_unowned_fifo_head()
+		-- Cancellation can originate in an event tap. Full publication probes for
+		-- the next ordinary head must wait for the broker's run-loop turn.
+		schedule_broker()
 		return true
 	end
 	invalidate_periodic_owner(owner, "cancelled")
@@ -3689,6 +3703,19 @@ local function prepare_pending_adoption(excluded_collector)
 		end
 	end
 
+	-- The full destination probe belongs to the broker timer. Adoption happens
+	-- inside HID callbacks and may consult only the retained RAM authority.
+	local admitted_batches = {}
+	local refused_batches = {}
+	for _, batch in ipairs(batches) do
+		if publication_allowed(batch.tx.publication, true) then
+			admitted_batches[#admitted_batches + 1] = batch
+		else
+			refused_batches[#refused_batches + 1] = batch
+		end
+	end
+	batches = admitted_batches
+
 	local event_groups = {}
 	local event_count = 0
 	for index, batch in ipairs(batches) do
@@ -3725,6 +3752,7 @@ local function prepare_pending_adoption(excluded_collector)
 		events = events,
 		event_groups = event_groups,
 		remaining_batches = remaining_batches,
+		refused_batches = refused_batches,
 	}
 end
 
@@ -3734,7 +3762,8 @@ end
 --- consumed by the still-enabled pump, so the payload cannot replay twice.
 --- @param adoption table Result of prepare_pending_adoption().
 local function commit_pending_adoption(adoption)
-	if #adoption.batches == 0 then return end
+	local refused_batches = adoption.refused_batches or {}
+	if #adoption.batches == 0 and #refused_batches == 0 then return end
 
 	local has_remaining = #adoption.remaining_batches > 0
 	if not has_remaining then
@@ -3746,6 +3775,7 @@ local function commit_pending_adoption(adoption)
 	end
 	local selected = {}
 	for _, batch in ipairs(adoption.batches) do selected[batch] = true end
+	for _, batch in ipairs(refused_batches) do selected[batch] = true end
 	if _inflight_batch and selected[_inflight_batch] then _inflight_batch = nil end
 	_deferred_queue = {}
 	_deferred_head = 1
@@ -3771,6 +3801,9 @@ local function commit_pending_adoption(adoption)
 				"adapters.synthetic_input: pending adoption count underflow")
 			batch.pending_counted = false
 		end
+	end
+	for _, batch in ipairs(refused_batches) do
+		fail_queued_batch(batch, "publication is no longer current", false, true)
 	end
 end
 
@@ -3883,8 +3916,7 @@ function M.leave_callback(consume)
 	local collector = _callback_stack[#_callback_stack]
 	assert(collector ~= nil,
 		"adapters.synthetic_input.leave_callback: no active callback collector")
-	if consume == nil then consume = #collector.events > 0 end
-	assert(type(consume) == "boolean",
+	assert(consume == nil or type(consume) == "boolean",
 		"adapters.synthetic_input.leave_callback: consume must be boolean")
 	-- Validate the entire collector before popping it or handing off any prefix.
 	-- If validation fails, the wrapper can still call abort_callback() and roll
@@ -3897,6 +3929,14 @@ function M.leave_callback(consume)
 			error("adapters.synthetic_input.leave_callback: collector batch already handed off", 0)
 		end
 	end
+	for _, batch in ipairs(collector.batches) do
+		if batch.status == "building"
+			and not publication_allowed(batch.tx.publication, true) then
+			discard_batch_records(batch)
+			finish_batch(batch, "failed")
+		end
+	end
+	if consume == nil then consume = #collector.events > 0 end
 	-- Eligible older FIFO work is returned before this callback's own events. A
 	-- target-mismatched paced batch, the freshly committed paced batch, and every
 	-- later sibling remain queued behind their retained post-return wake
