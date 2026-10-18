@@ -156,7 +156,8 @@ function trace(sources, entry) {
 		vm.runInNewContext(
 			code,
 			{ module, require, ...values, ...extra },
-			{ timeout: 100, contextCodeGeneration: { strings: false, wasm: false } }
+			// Nested fixture parsing shares this finite hang guard; it is not a latency budget.
+			{ timeout: 1_000, contextCodeGeneration: { strings: false, wasm: false } }
 		);
 	}
 	function load(name) {
