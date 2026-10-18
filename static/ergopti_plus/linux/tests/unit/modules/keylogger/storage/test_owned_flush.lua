@@ -166,6 +166,63 @@ helpers.describe("owned SQLite collector flush", function()
 		end, function() error("controlled uncertain acquisition") end)
 	end)
 
+
+	it("(live-range-app-filter) RAM characters, sources and physical keys honor selected apps", function()
+		with_collector(function(k)
+			for _, app in ipairs({ "org.example.selected", "org.example.excluded" }) do
+				k.on_keydown("a", 1000, app)
+				k.record_physical_key(app, 30, 1000)
+				k.record_synthetic_output(app, "s", "hotstring", 1100)
+			end
+			for _, apps in ipairs({ { "org.example.selected" }, { false, "", "org.example.selected" } }) do
+				local today = assert(k.get_range_payload(nil, nil, apps)).today
+				helpers.assert_nil(today["org.example.excluded"], "An excluded app must not be reintroduced from RAM")
+				helpers.assert_eq(today["org.example.selected"].c.a.c, 1)
+				helpers.assert_eq(today["org.example.selected"].c.s.hs, 1)
+				helpers.assert_eq(today["org.example.selected"].sc_kb["30"].c, 1)
+			end
+			helpers.assert_eq(next(assert(k.get_range_payload(nil, nil, { "other" })).today), nil)
+		end)
+	end)
+
+	it("(live-range-app-filter) absent or wholly invalid selection keeps the SQL all-apps contract", function()
+		with_collector(function(k)
+			k.on_keydown("a", 1000, "org.example.selected")
+			k.on_keydown("b", 1100, "org.example.excluded")
+			for _, apps in ipairs({ false, {}, { false, "" } }) do
+				local today = assert(k.get_range_payload(nil, nil, apps)).today
+				helpers.assert_eq(today["org.example.selected"].c.a.c, 1)
+				helpers.assert_eq(today["org.example.excluded"].c.b.c, 1)
+			end
+		end)
+	end)
+
+	it("(live-range-app-filter) rollback retains complete RAM while selection survives the COMMIT watermark", function()
+		with_collector(function(k, ops)
+			k.on_keydown("a", 1000, "selected")
+			k.on_keydown("x", 1100, "excluded")
+			k.flush()
+			k.on_keydown("b", 1200, "selected")
+			k.on_keydown("y", 1300, "excluded")
+			helpers.assert_nil(k.get_range_payload(nil, nil, { "selected" }))
+			ops[1].outcome, ops[1].physical = "abort", true
+			k.pump_flush()
+			local today = assert(k.get_range_payload(nil, nil, { "selected" })).today
+			helpers.assert_nil(today.excluded)
+			helpers.assert_eq(today.selected.c.a.c, 1)
+			helpers.assert_eq(today.selected.c.b.c, 1)
+			k.flush()
+			ops[1].outcome, ops[1].physical = "commit", true
+			k.pump_flush()
+			today = assert(k.get_range_payload(nil, nil, { "selected" })).today
+			helpers.assert_nil(today.excluded)
+			helpers.assert_nil(today.selected.c.a, "Committed characters leave the live delta")
+			helpers.assert_eq(today.selected.c.b.c, 1)
+			local all = assert(k.get_range_payload()).today
+			helpers.assert_eq(all.excluded.c.y.c, 1, "Selection cannot discard retained input")
+		end)
+	end)
+
 	it("healthy reset returns a real ACK and retires its UI generation", function()
 		with_collector(function(k)
 			local generation = k.get_flush_status().generation

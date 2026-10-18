@@ -972,45 +972,56 @@ local function empty_ngrams()
 end
 
 --- Adds only unflushed character n-grams to the per-app today projection.
-local function add_live_ngram_delta(today_payload)
+local function add_live_ngram_delta(today_payload, apps)
+	-- Match the SQL reader: no valid application name means an unrestricted
+	-- projection. A selected range must not regain excluded apps from RAM.
+	local selected = {}
+	if type(apps) == "table" then
+		for _, app in ipairs(apps) do
+			if type(app) == "string" and app ~= "" then selected[app] = true end
+		end
+	end
+	local unrestricted = next(selected) == nil
 	for app_id, stats in pairs(_app_stats) do
-		local previous = _flushed_app_ngrams[app_id] or {}
-		local app_name = dashboard_app_name(app_id)
-		local target = today_payload[app_name] or empty_ngrams()
-		for token, count in pairs(stats.ngrams or {}) do
-			local delta = math.max(0, count - (previous[token] or 0))
-			if delta > 0 then
-				local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-				item.c = item.c + delta
-				local source_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).hotstring or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
-				local llm_delta = math.max(0,
-					((stats.ngram_sources[token] or {}).llm or 0)
-					- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
-				local other_delta = 0
-				local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
-				for label, source_count in pairs(stats.ngram_sources[token] or {}) do
-					if Utils.is_other_synthetic_source(label) then
-						other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+		if unrestricted or selected[dashboard_app_name(app_id)] then
+			local previous = _flushed_app_ngrams[app_id] or {}
+			local app_name = dashboard_app_name(app_id)
+			local target = today_payload[app_name] or empty_ngrams()
+			for token, count in pairs(stats.ngrams or {}) do
+				local delta = math.max(0, count - (previous[token] or 0))
+				if delta > 0 then
+					local item = target.c[token] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					item.c = item.c + delta
+					local source_delta = math.max(0,
+						((stats.ngram_sources[token] or {}).hotstring or 0)
+						- (((_flushed_app_sources[app_id] or {})[token] or {}).hotstring or 0))
+					local llm_delta = math.max(0,
+						((stats.ngram_sources[token] or {}).llm or 0)
+						- (((_flushed_app_sources[app_id] or {})[token] or {}).llm or 0))
+					local other_delta = 0
+					local flushed_sources = (_flushed_app_sources[app_id] or {})[token] or {}
+					for label, source_count in pairs(stats.ngram_sources[token] or {}) do
+						if Utils.is_other_synthetic_source(label) then
+							other_delta = other_delta + math.max(0, source_count - (flushed_sources[label] or 0))
+						end
 					end
+					item.hs = (item.hs or 0) + source_delta
+					item.llm = (item.llm or 0) + llm_delta
+					item.o = (item.o or 0) + other_delta
+					target.c[token] = item
 				end
-				item.hs = (item.hs or 0) + source_delta
-				item.llm = (item.llm or 0) + llm_delta
-				item.o = (item.o or 0) + other_delta
-				target.c[token] = item
 			end
-		end
-		local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
-		for scancode, count in pairs(stats.physical_scancodes or {}) do
-			local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
-			if delta > 0 then
-				local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
-				item.c = item.c + delta
-				target.sc_kb[tostring(scancode)] = item
+			local flushed_scancodes = _flushed_app_scancodes[app_id] or {}
+			for scancode, count in pairs(stats.physical_scancodes or {}) do
+				local delta = math.max(0, count - (flushed_scancodes[scancode] or 0))
+				if delta > 0 then
+					local item = target.sc_kb[tostring(scancode)] or { c = 0, t = 0, e = 0, hs = 0, llm = 0, o = 0 }
+					item.c = item.c + delta
+					target.sc_kb[tostring(scancode)] = item
+				end
 			end
+			today_payload[app_name] = target
 		end
-		today_payload[app_name] = target
 	end
 	return today_payload
 end
@@ -1047,7 +1058,7 @@ function M.get_range_payload(start_date, end_date, apps)
 	end
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
-	payload.today = add_live_ngram_delta(payload.today)
+	payload.today = add_live_ngram_delta(payload.today, apps)
 	return payload
 end
 
