@@ -4,6 +4,8 @@
 from copy import deepcopy
 import json
 from pathlib import Path
+import re
+import shutil
 import subprocess
 import sys
 from tempfile import TemporaryDirectory
@@ -356,6 +358,46 @@ class BindingSupervisorControls(unittest.TestCase):
         receipt = json.loads((self.root / "output/webview-binding/supervisor.json").read_text())
         self.assertEqual(receipt["status"], "error")
         self.assertEqual(receipt["native_log_errors"], [failure])
+
+    def test_each_actual_post_expression_returns_a_supported_primitive_once(self):
+        source = Path(probe.__file__).with_suffix(".lua").read_text()
+        expressions = re.findall(
+            r'view:evaluateJavaScript\("([^"\n]*)" \.\.\s*'
+            r"assert\(json.encode\(\{ nonce = config.nonce, kind = kind \}\)\)\s*"
+            r'\.\. "([^"\n]*)", function\(',
+            source,
+        )
+        self.assertEqual(len(expressions), 1, "actual native post expression must be unique")
+        prefix, suffix = expressions[0]
+        node = shutil.which("node")
+        self.assertIsNotNone(node, "canonical Node interpreter is mandatory")
+        for kind in ("initial-a", "stale-a", "current-b"):
+            payload = {"nonce": 'owned-"nonce\\value-✨', "kind": kind}
+            script = prefix + json.dumps(payload) + suffix
+            with self.subTest(kind=kind):
+                result = subprocess.run(
+                    [
+                        node,
+                        "-e",
+                        """const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const posts = [];
+const scope = { window: { webkit: { messageHandlers: { ergopti_binding: {
+  postMessage(body) { posts.push(body); return Promise.resolve('unsupported return control'); }
+} } } } };
+const value = vm.runInNewContext(input.script, scope, { timeout: 1000 });
+assert.equal(value, true, 'native evaluateJavaScript must receive primitive true');
+assert.deepEqual(JSON.parse(JSON.stringify(posts)), [input.payload]);
+""",
+                    ],
+                    input=json.dumps({"script": script, "payload": payload}),
+                    text=True,
+                    capture_output=True,
+                    timeout=10,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_cli_has_no_fake_native_or_skip_admission_flags(self):
         runner = Path(probe.__file__).with_name("macos_tooltip_canvas.py")
