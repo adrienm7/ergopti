@@ -168,6 +168,7 @@ function M.open()
 	end)
 	local masks = hs.webview.windowMasks
 	local view = ui_builder.show_webview({
+		delete_on_close = true,
 		frame = ui_builder.get_centered_frame(geo.width, geo.height),
 		title = i18n.get("layout_manager.window_title"),
 		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2) + (masks["resizable"] or 8),

@@ -330,6 +330,7 @@ function M.open(opts, on_confirm)
 		return false
 	end
 	local native_options = {
+		delete_on_close = true,
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
 		style_masks   = { "titled", "closable", "utility" },
 		usercontent   = uc,
