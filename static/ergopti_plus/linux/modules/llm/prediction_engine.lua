@@ -1493,7 +1493,11 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 		end
 		return
 	end
-	if global_privacy_blocks() then
+	local blocked = global_privacy_blocks()
+	-- A resident barrier can dispatch scope changes, shutdown or a new offer.
+	-- Its old result owns neither permission to send nor the successor to dismiss.
+	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+	if blocked then
 		Logger.info(LOG, "%s dropped: global text privacy no longer admits the request.", what)
 		M.dismiss()
 		return
