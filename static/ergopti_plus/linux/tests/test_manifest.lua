@@ -119,6 +119,7 @@ return {
 	"tests.unit.infra.config.test_personal_file_adoption_native",
 	"tests.unit.modules.dynamic_hotstrings.test_user_code_contract",
 	"tests.unit.modules.llm.remote.test_local_server_discovery",
+	"tests.unit.modules.llm.remote.test_local_server_startup",
 	"tests.unit.modules.llm.remote.test_api_remote_base_url",
 	"tests.unit.infra.lifecycle.test_callback_error_description",
 	"tests.unit.modules.keymap.test_combination_labels",

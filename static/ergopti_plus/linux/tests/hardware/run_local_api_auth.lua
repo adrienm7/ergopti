@@ -14,6 +14,7 @@ local available, uv = pcall(require, "luv")
 if not available then io.stderr:write("ENVIRONMENT: native lua-luv is required\n"); os.exit(2) end
 require("compat.utf8").install()
 local Http = require("adapters.http_client")
+local EventLoop = require("adapters.event_loop")
 local Remote = require("modules.llm.api_remote")
 local Json = require("json")
 local failures, checks, sockets, requests = {}, 0, {}, {}
@@ -30,7 +31,11 @@ end
 local function run_until(predicate)
 	local deadline = uv.now() + 5000
 	local timer = uv.new_timer()
-	uv.timer_start(timer, 10, 10, function() if predicate() or uv.now() > deadline then uv.stop() end end)
+	uv.timer_start(timer, 10, 10, function()
+		-- The real daemon pumps deferred discovery after its keyboard idle callback.
+		EventLoop._run_idle_tick()
+		if predicate() or uv.now() > deadline then uv.stop() end
+	end)
 	uv.run()
 	uv.timer_stop(timer); close(timer); uv.run("nowait")
 	return predicate() == true
@@ -313,6 +318,8 @@ response = { status = 200, body = '{"data":[{"id":"obsolete-after-source-drift"}
 discovery_done = false
 local drift_before = #requests
 Servers.rescan(function() return true end, function() discovery_done = true end)
+-- Preserve this control's acquisition-before-drift premise under idle dispatch.
+EventLoop._run_idle_tick()
 local source_writer = assert(io.open(private_path, "wb")); source_writer:write(exact_source .. "\n"); source_writer:close()
 check(run_until(function() return discovery_done end) and #requests == drift_before + 6,
 	"all six acquired native probes settle across actual private-file drift")
