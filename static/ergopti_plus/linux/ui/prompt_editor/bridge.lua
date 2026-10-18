@@ -100,6 +100,22 @@ local function notify_save_refused(session, state)
 	return pcall(notify, "prompt_editor.save_failed")
 end
 
+--- Keeps noneditable profile options detached from both seeds and save callbacks.
+--- @param profile table|nil
+--- @return table
+local function copy_options(profile)
+	local copy = {}
+	if type(profile) ~= "table" then return copy end
+	for _, field in ipairs({ "system_single", "system_multi", "system_multi_template", "raw_prompt" }) do
+		if type(profile[field]) == "string" then copy[field] = profile[field] end
+	end
+	if type(profile.stop_sequences) == "table" then
+		copy.stop_sequences = Json.array({})
+		for index, value in ipairs(profile.stop_sequences) do copy.stop_sequences[index] = value end
+	end
+	return copy
+end
+
 local function new_session(existing, on_save, opts)
 	opts = type(opts) == "table" and opts or {}
 	_session_serial = _session_serial + 1
@@ -110,15 +126,16 @@ local function new_session(existing, on_save, opts)
 	local profile_id = edit_id ~= "" and edit_id
 		or (requested_id and requested_id:match("^user_[%w_%-]+$") and requested_id)
 		or next_profile_id()
-	local prompt = seeded and type(existing.system_single) == "string"
-		and existing.system_single or translated("prompt_editor.placeholder_prompt")
+	local options = copy_options(existing)
+	local raw_mode = type(options.raw_prompt) == "string" and options.raw_prompt ~= ""
+	local prompt = raw_mode and options.raw_prompt
+		or options.system_single or translated("prompt_editor.placeholder_prompt")
 	return {
 		epoch = _session_serial,
 		edit_id = edit_id,
 		profile_id = profile_id,
-		system_multi_template = seeded
-			and type(existing.system_multi_template) == "string"
-			and existing.system_multi_template or nil,
+		options = options,
+		raw_mode = raw_mode,
 		on_save = on_save,
 		settled = false,
 		saving = false,
@@ -235,13 +252,15 @@ function M.on_message(payload, state, context)
 	end
 
 	session.saving = true
-	local ok_save, accepted = pcall(session.on_save, {
-		id = session.profile_id,
-		label = name,
-		system_single = prompt,
-		system_multi_template = session.system_multi_template,
-		batch = payload.batch == true,
-	})
+	local candidate = copy_options(session.options)
+	candidate.id, candidate.label, candidate.batch = session.profile_id, name, payload.batch
+	if session.raw_mode then
+		-- Raw prompts are the active verbatim text; the hidden template stays intact.
+		candidate.raw_prompt = payload.prompt
+	else
+		candidate.system_single = prompt
+	end
+	local ok_save, accepted = pcall(session.on_save, candidate)
 	session.saving = false
 	if not ok_save or accepted ~= true then
 		Logger.error(LOG, "Prompt editor save was refused; session remains retryable: %s.",
