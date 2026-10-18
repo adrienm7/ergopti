@@ -491,7 +491,20 @@ const STEP_CONDITIONS = [
 		WINDOWS_BOX,
 		'test-ahk',
 		'Retain native PAC artifact and source identity',
-		"${{ always() && steps.native-pac-build.outcome == 'success' }}"
+		"${{ always() && (steps.native-pac-build.outcome == 'success' || steps.native-pac-cache.outputs.cache-hit == 'true') }}"
+	],
+	// The unit runners alone reuse a PAC evaluator built from identical inputs.
+	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Build and test native full-URL PAC evaluator',
+		"steps.native-pac-cache.outputs.cache-hit != 'true'"
+	],
+	[
+		WINDOWS_BOX,
+		'test-ahk',
+		'Save the native PAC evaluator for identical unit runs',
+		"steps.native-pac-cache.outputs.cache-hit != 'true'"
 	],
 	[
 		LINUX_BOX,
@@ -3593,6 +3606,60 @@ for (const gate of WINDOWS_GATES) {
 			);
 		}
 	}
+}
+
+// The release build never consumes a cached build product: package-windows
+// compiles and tests the shipped native helpers clean on every run, while the
+// unit runners may share one build per exact input set.
+const NATIVE_CACHE_KEY = 'windows-native-pac-unit-';
+function buildCacheProblems(files) {
+	const problems = [];
+	const entry = files.find((file) => file.rel === WINDOWS_BOX);
+	const jobs = entry ? pipeline.jobsOfText(entry.text, WINDOWS_BOX) : [];
+	const build = jobs.find((job) => job.id === 'package-windows');
+	if (!build) return ['package-windows is missing'];
+	// Named or not, any step of the release build that uses a cache action.
+	for (const line of build.body.split('\n'))
+		if (/^\s*(?:-\s+)?uses:\s*['"]?actions\/cache(?:\/(?:restore|save))?@/.test(line))
+			problems.push(
+				`package-windows uses a cache (${line.trim()}); the release build compiles clean`
+			);
+	if (build.body.includes(NATIVE_CACHE_KEY))
+		problems.push('package-windows reads the unit-runner native helper cache');
+	const unit = jobs.find((job) => job.id === 'test-ahk');
+	if (!unit || !unit.body.includes('key: ' + NATIVE_CACHE_KEY))
+		problems.push('the unit-runner native PAC cache key changed; re-derive this rule');
+	return problems;
+}
+{
+	const found = buildCacheProblems(pipeline.files());
+	errors.push(...found);
+	const buildBody = pipeline.job('package-windows');
+	const checkout = '      - uses: actions/checkout@v4\n';
+	if (buildBody.split(checkout).length !== 2)
+		errors.push('package-windows needs one checkout to anchor the cache refusal controls');
+	else
+		for (const [what, step] of [
+			[
+				'a restored native PAC build in package-windows',
+				'      - name: Restore the native PAC evaluator built from these exact inputs\n        uses: actions/cache/restore@v4\n        with:\n          path: static/ergopti_plus/windows/vendor/ergopti_network_pac.exe\n          key: windows-native-pac-unit-x\n'
+			],
+			[
+				'a cached build tree in package-windows',
+				'      - name: Cache the build tree\n        uses: actions/cache@v4\n        with:\n          path: build\n          key: build-tree\n'
+			],
+			[
+				'a saved build in package-windows',
+				'      - name: Save the build\n        uses: actions/cache/save@v4\n        with:\n          path: build\n          key: build-tree\n'
+			]
+		])
+			mustCatch(
+				what,
+				WINDOWS_BOX,
+				buildBody,
+				buildBody.replace(checkout, () => checkout + '\n' + step),
+				buildCacheProblems
+			);
 }
 
 // ==============================================

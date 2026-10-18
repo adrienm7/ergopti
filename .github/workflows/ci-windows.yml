@@ -97,13 +97,52 @@ jobs:
         with:
           python-version: '3.13'
 
+      # The twelve unit runners compiled the same evaluator from the same
+      # inputs. They now share one build per exact input set: every file the
+      # builder and its source preparation read, the Python that prepares them
+      # and the runner image that fixes MSVC. Only these unit runners use the
+      # cache; package-windows still compiles and tests the shipped evaluator
+      # clean on every run, and test-ci-pipeline-wiring.cjs refuses any cache
+      # there.
+      - name: Identify the native PAC toolchain
+        id: native-pac-inputs
+        shell: pwsh
+        run: |
+          if (-not $env:ImageOS -or -not $env:ImageVersion) { throw 'The runner image identity is unavailable.' }
+          $python = (python -c 'import sys; print(sys.version.split()[0])')
+          if ($LASTEXITCODE -ne 0 -or -not $python) { throw 'The PAC source generator Python is unavailable.' }
+          "toolchain=$env:ImageOS-$env:ImageVersion-python$python" >> $env:GITHUB_OUTPUT
+
+      - name: Restore the native PAC evaluator built from these exact inputs
+        id: native-pac-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+          key: windows-native-pac-unit-${{ steps.native-pac-inputs.outputs.toolchain }}-${{ hashFiles('tools/build/build_windows_network_pac.ps1', 'tools/build/prepare_network_pac_sources.py', 'tools/build/build_windows_nav_owner.ps1', 'static/ergopti_plus/windows/native/**', 'static/ergopti_plus/_shared/native/network/**', 'static/ergopti_plus/_shared/modules/network/pac_helpers.js', 'static/ergopti_plus/_shared/modules/network/proxy_policy.json', 'static/ergopti_plus/_shared/modules/updater/defaults.json', 'static/ergopti_plus/_shared/data/linux_native_runtime.json') }}
+
       - name: Build and test native full-URL PAC evaluator
         id: native-pac-build
+        if: steps.native-pac-cache.outputs.cache-hit != 'true'
         shell: pwsh
         run: ./tools/build/build_windows_network_pac.ps1 -Publish
 
+      - name: Save the native PAC evaluator for identical unit runs
+        if: steps.native-pac-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.exe
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.json
+            static/ergopti_plus/windows/vendor/ergopti_network_pac.LICENSE.txt
+            static/ergopti_plus/windows/build/native/network_pac/artifact_receipt.json
+          key: ${{ steps.native-pac-cache.outputs.cache-primary-key }}
+
       - name: Retain native PAC artifact and source identity
-        if: ${{ always() && steps.native-pac-build.outcome == 'success' }}
+        if: ${{ always() && (steps.native-pac-build.outcome == 'success' || steps.native-pac-cache.outputs.cache-hit == 'true') }}
         uses: actions/upload-artifact@v4
         with:
           name: windows-native-pac-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.module }}
