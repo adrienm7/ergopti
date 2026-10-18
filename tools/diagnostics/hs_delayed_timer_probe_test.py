@@ -222,7 +222,7 @@ class DiagnosticPolicyTests(unittest.TestCase):
 
     def test_private_paths_are_redacted_and_long_text_truncated(self):
         # Native diagnostics carry macOS paths whatever host runs this control.
-        private_path = "/Users/runner/private-source.lua"
+        private_path = "/private/var/folders/ergopti/private-source.lua"
         bounded = probe.bounded_diagnostic_text(
             f"frame (in {private_path}:12) {private_path} " + "details " * 3000
         )

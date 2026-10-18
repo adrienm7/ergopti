@@ -413,6 +413,7 @@
 		"test:terminator-labels-localized": "node ./tools/test/test-terminator-labels-localized.cjs",
 		"test:ahk-warning-gate": "node ./tools/test/test-ahk-warning-gate.cjs",
 		"test:ahk-module-matrix": "node ./tools/test/test-ahk-module-matrix.cjs",
+		"test:script-source": "node ./tools/test/test-script-source.cjs",
 		"test:locale-hints-quote-live-labels": "node ./tools/test/test-locale-hints-quote-live-labels.cjs",
 		"test:magic-key-single-source": "node ./tools/test/test-magic-key-single-source.cjs",
 		"test:tap-hold-threshold-parity": "node ./tools/test/test-tap-hold-threshold-parity.cjs",
