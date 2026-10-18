@@ -35,13 +35,13 @@ function M.desktop_id(path)
 end
 
 --- Opens the first available file dialog over the desktop entries.
---- @param shell table Shell-runner authority (has_command, exec_line, quote).
+--- @param shell table Shell-runner authority (has_command, exec_checked, quote).
 --- @param title string Already-translated dialog title.
 --- @return string|nil id The chosen desktop-file id.
 --- @return string|nil error_message Why nothing was chosen.
 function M.pick(shell, title)
 	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
-		or type(shell.exec_line) ~= "function" or type(shell.quote) ~= "function" then
+		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
 	title = WindowTitles.compose(title)
@@ -56,8 +56,14 @@ function M.pick(shell, title)
 	else
 		return nil, "neither zenity nor kdialog is available"
 	end
-	local chosen = require("ui.modal").run(function() return shell.exec_line(command) end)
-	if not chosen then return nil, "application selection was cancelled" end
+	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
+	-- Native cancellation or failure can leave partial stdout; only a confirmed
+	-- dialog result may become a stored application binding.
+	if completed ~= true or type(output) ~= "string" then
+		return nil, "application selection was cancelled or refused"
+	end
+	local chosen = output:match("^([^\r\n]*)")
+	if not chosen or chosen == "" then return nil, "application selection was cancelled" end
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
 	return id

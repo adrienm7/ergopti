@@ -86,7 +86,7 @@ h.describe("native dialog captions (linux-native-titles)", function()
 	for _, backend in ipairs({ "zenity", "kdialog" }) do
 		h.it("(linux-native-titles) the application chooser keeps its backend, filter and id: " .. backend, function()
 			scenario(function(observed, shell)
-				observed.backend, observed.answer = backend, "/usr/share/applications/org.example.Native.desktop"
+				observed.backend, observed.answer, observed.status = backend, "/usr/share/applications/org.example.Native.desktop", 0
 				h.assert_eq(require("ui.app_chooser").pick(shell, "Choose application"), "org.example.Native")
 				local expected = backend == "zenity"
 					and "zenity --file-selection --title='ErgoptiPlus — Choose application' --filename='/usr/share/applications/' --file-filter='*.desktop' 2>/dev/null"
