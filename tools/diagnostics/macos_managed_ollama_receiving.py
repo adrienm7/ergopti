@@ -1204,16 +1204,27 @@ class Receiver:
         rows = []
         with patch.dict(os.environ, self.api_environment, clear=True):
             owner = self.owner()
-            pulled = owner.pull(model_name, rows.append)
-            self.receipt["pull_error_classes"] = pull_error_classes(rows)
-            self.receipt["pull_statuses"] = pull_statuses(rows)
-            if not pulled:
-                # Fixture-only facts: the random fixture host and private home
-                # are redacted; digests name the generated test model.
-                self.receipt["pull_errors"] = fixture_pull_errors(
-                    rows, (self.fixture.host, str(self.home), str(self.work))
-                )
-                self.receipt["origin_requests"] = fixture_origin_requests(self.fixture)
+            pulled = False
+            try:
+                pulled = owner.pull(model_name, rows.append)
+            except BaseException as refusal:
+                # The pull owner's refusals carry one fixed lexical reason.
+                reason = refusal.args[0] if len(refusal.args) == 1 else None
+                self.receipt["pull_refusal"] = {
+                    "exception_class": type(refusal).__name__,
+                    "reason": reason if type(reason) is str and len(reason) <= 32 else None,
+                }
+                raise
+            finally:
+                self.receipt["pull_error_classes"] = pull_error_classes(rows)
+                self.receipt["pull_statuses"] = pull_statuses(rows)
+                if not pulled:
+                    # Fixture-only facts: the random fixture host and private
+                    # home are redacted; digests name the generated test model.
+                    self.receipt["pull_errors"] = fixture_pull_errors(
+                        rows, (self.fixture.host, str(self.home), str(self.work))
+                    )
+                    self.receipt["origin_requests"] = fixture_origin_requests(self.fixture)
             require(pulled, "actual_pull_success")
             require(owner.pending, "http_exit_is_not_daemon_ack")
             self.retirement(owner)
