@@ -483,7 +483,11 @@ package.preload["adapters.event_loop"] = function()
 		local i = 1
 		while i <= #SCRIPT do
 			local token = SCRIPT:match("^{(%u+)}", i)
-			if token == "SELECT" then
+			if token == "ARROWRESETOFF" or token == "ARROWRESETON" then
+				i = i + #token + 2
+				assert(require("modules.hotstrings.word_reset").set_arrow_resets_word(token == "ARROWRESETON"),
+					"the real word-reset owner must acknowledge the arrow policy")
+			elseif token == "SELECT" then
 				i = i + #token + 2
 				callbacks.onClick()
 				selection.primary = selection.primary == "" and "selected" or "fresh"
