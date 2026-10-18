@@ -143,3 +143,15 @@ _LPIL_FilterKeepsAtOrAboveConfiguredLevel() {
 	}
 }
 Test("logger: the pre-init queue filter keeps exactly the lines at or above the configured level (logger-preinit-level-drop)", _LPIL_FilterKeepsAtOrAboveConfiguredLevel)
+
+_LPIL_SemanticThreshold(Fixture) {
+	Harness := A_ScriptDir . "\support\feature_state_boot_smoke.ahk"
+	AssertTrue(FileExist(Harness), "the actual native configuration/logger harness exists")
+	Command := Chr(34) . A_AhkPath . Chr(34) . " /ErrorStdOut "
+		. Chr(34) . Harness . Chr(34) . " " . Fixture
+	AssertEqual(0, RunWait(Command, A_ScriptDir, "Hide"),
+		"the real logger must accept the admitted " . Fixture . " threshold")
+}
+for Fixture in ["logger_dotted", "logger_inline", "logger_quoted"]
+	Test("logger startup: " . Fixture . " applies its threshold (logger-semantic-level)",
+		_LPIL_SemanticThreshold.Bind(Fixture))

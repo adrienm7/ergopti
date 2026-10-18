@@ -472,7 +472,10 @@ LoggerInit() {
 		LOGGER_MIN_LEVEL := LOGGER_DEFAULT_LEVEL
 		if IsSet(ConfigurationFile) and FileExist(ConfigurationFile) {
 				try {
-						Value := TOML_Read(ConfigurationFile, "script", "log_level", LOGGER_DEFAULT_LEVEL)
+						; The ordinary boot reader admits dotted/inline/quoted namespaces.
+						Content := FileRead(ConfigurationFile, "UTF-8")
+						Cache := ConfigTomlDecodeSnapshot(Content).Cache
+						Value := IniCacheGet(Cache, "script", "log_level", LOGGER_DEFAULT_LEVEL)
 						if LOGGER_SEVERITY.Has(Value) {
 								LOGGER_MIN_LEVEL := Value
 						}
