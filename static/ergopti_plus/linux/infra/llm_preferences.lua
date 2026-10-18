@@ -142,16 +142,18 @@ end
 --- @param paths table Declared canonical paths.
 --- @return table values Effective values keyed by path.
 --- @return table source Exact bytes used to resolve the values.
+--- @return integer revision Source revision captured before lookup callbacks.
 function M.get_many(paths)
 	for _, path in ipairs(paths) do entry(path) end
 	local document, source = read()
+	local revision = _generation
 	local values = {}
 	for _, path in ipairs(paths) do
 		local value = lookup(document, path)
 		if value == nil then value = Manifest.default_for(path) end
 		values[path] = value
 	end
-	return values, source
+	return values, source, revision
 end
 
 --- Marks exactly one declared leaf through the same lookup as its reader. A
