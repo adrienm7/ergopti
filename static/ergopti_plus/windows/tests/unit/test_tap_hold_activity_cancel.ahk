@@ -13,70 +13,97 @@
 
 
 
+; Starts a case from no tracked press and no recent wheel, and returns the
+; state it replaced so the case can put it back: a press this file leaves
+; cancelled would otherwise refuse the next test's tap of the same key.
 _THAC_ResetState() {
-	global _TH_TapHoldTrackState
+	global _TH_TapHoldTrackState, _TH_LastTapHoldCancelReason
+	Saved := {
+		Track: _TH_TapHoldTrackState,
+		Wheel: HookDispatcher._last_wheel_tick,
+		Reason: _TH_LastTapHoldCancelReason
+	}
 	_TH_TapHoldTrackState := Map()
 	HookDispatcher._last_wheel_tick := 0
+	return Saved
+}
+
+; Puts back the state _THAC_ResetState replaced.
+_THAC_RestoreState(Saved) {
+	global _TH_TapHoldTrackState, _TH_LastTapHoldCancelReason
+	_TH_TapHoldTrackState := Saved.Track
+	HookDispatcher._last_wheel_tick := Saved.Wheel
+	_TH_LastTapHoldCancelReason := Saved.Reason
 }
 
 _THAC_TrackWheelThroughDispatcher() {
-	_THAC_ResetState()
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
-	HookDispatcher._OnWheelDown()             ; Ctrl+wheel zoom
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated LCtrl key-down while held
-	HookDispatcher._last_wheel_tick := 0      ; release is outside the recent-wheel window
-	HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)   ; LCtrl up
+	Saved := _THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
+		HookDispatcher._OnWheelDown()             ; Ctrl+wheel zoom
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated LCtrl key-down while held
+		HookDispatcher._last_wheel_tick := 0      ; release is outside the recent-wheel window
+		HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)   ; LCtrl up
 
-	AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
-		"Ctrl+wheel must cancel the pending LCtrl tap before release dispatch")
+		AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
+			"Ctrl+wheel must cancel the pending LCtrl tap before release dispatch")
+	} finally _THAC_RestoreState(Saved)
 }
 Test("tap-hold: Ctrl+wheel cancels the tap action before Ctrl release (ctrl-wheel-no-paste)", _THAC_TrackWheelThroughDispatcher)
 
 _THAC_RepeatedKeyDownPreservesCancellation() {
-	_THAC_ResetState()
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
-	HookDispatcher._OnWheelDown()             ; cancellation boundary
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; InputHook repeat while held
+	Saved := _THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
+		HookDispatcher._OnWheelDown()             ; cancellation boundary
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; InputHook repeat while held
 
-	AssertTrue(_TH_TapHoldTrackState["left_ctrl"]["canceled_by_activity"],
-		"a repeated modifier key-down must not clear wheel cancellation")
-	HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)
-	AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
-		"wheel cancellation must survive repeated modifier key-down notifications")
+		AssertTrue(_TH_TapHoldTrackState["left_ctrl"]["canceled_by_activity"],
+			"a repeated modifier key-down must not clear wheel cancellation")
+		HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)
+		AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
+			"wheel cancellation must survive repeated modifier key-down notifications")
+	} finally _THAC_RestoreState(Saved)
 }
 Test("tap-hold: repeated modifier key-downs preserve activity cancellation (ctrl-wheel-repeat-no-paste)", _THAC_RepeatedKeyDownPreservesCancellation)
 
 _THAC_TrackOtherKeyThroughDispatcher() {
-	_THAC_ResetState()
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
-	HookDispatcher._OnKeyDown(0, 0x56, 0x02F) ; V down (not a tap-hold key)
-	AssertTrue(_TH_TapHoldTrackState["left_ctrl"]["canceled_by_activity"],
-		"the non-tap key event must mark the held LCtrl as activity-canceled")
-	HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)   ; LCtrl up
+	Saved := _THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
+		HookDispatcher._OnKeyDown(0, 0x56, 0x02F) ; V down (not a tap-hold key)
+		AssertTrue(_TH_TapHoldTrackState["left_ctrl"]["canceled_by_activity"],
+			"the non-tap key event must mark the held LCtrl as activity-canceled")
+		HookDispatcher._OnKeyUp(0, 0xA2, 0x01D)   ; LCtrl up
 
-	AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
-		"another key used with Ctrl must cancel the pending LCtrl tap")
+		AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
+			"another key used with Ctrl must cancel the pending LCtrl tap")
+	} finally _THAC_RestoreState(Saved)
 }
 Test("tap-hold: another key cancels the modifier tap (ctrl-chord-no-paste)", _THAC_TrackOtherKeyThroughDispatcher)
 
 _THAC_MouseActivityCancelsThroughDispatcher() {
-	_THAC_ResetState()
-	HookDispatcher._OnKeyDown(0, 0xA3, 0x11D) ; RCtrl down
-	HookDispatcher._OnLDown()                ; mouse click while held
-	HookDispatcher._OnKeyUp(0, 0xA3, 0x11D)  ; RCtrl up
+	Saved := _THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA3, 0x11D) ; RCtrl down
+		HookDispatcher._OnLDown()                ; mouse click while held
+		HookDispatcher._OnKeyUp(0, 0xA3, 0x11D)  ; RCtrl up
 
-	AssertTrue(TapHoldShouldCancelTap("right_ctrl", 500) != "",
-		"mouse activity while Ctrl is held must cancel the pending RCtrl tap")
+		AssertTrue(TapHoldShouldCancelTap("right_ctrl", 500) != "",
+			"mouse activity while Ctrl is held must cancel the pending RCtrl tap")
+	} finally _THAC_RestoreState(Saved)
 }
 Test("tap-hold: mouse activity cancels the modifier tap (ctrl-mouse-no-paste)", _THAC_MouseActivityCancelsThroughDispatcher)
 
 _THAC_SameKeyDownDoesNotCancelItsOwnTap() {
-	_THAC_ResetState()
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
-	HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated LCtrl event
+	Saved := _THAC_ResetState()
+	try {
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; LCtrl down
+		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D) ; repeated LCtrl event
 
-	AssertEqual("", TapHoldShouldCancelTap("left_ctrl", 500),
-		"the tap-hold key's own repeated key-down must not count as other activity")
+		AssertEqual("", TapHoldShouldCancelTap("left_ctrl", 500),
+			"the tap-hold key's own repeated key-down must not count as other activity")
+	} finally _THAC_RestoreState(Saved)
 }
 Test("tap-hold: the modifier key itself does not cancel its tap (ctrl-own-keydown)", _THAC_SameKeyDownDoesNotCancelItsOwnTap)
 
@@ -89,7 +116,7 @@ _THAC_RecordTapAction() {
 
 _THAC_WheelDoesNotFireConfiguredTapAction() {
 	global _THAC_TapActionHits, GESTURE_ACTIONS, TapHold
-	_THAC_ResetState()
+	Saved := _THAC_ResetState()
 	_THAC_TapActionHits := 0
 	ActionId := "__test_ctrl_wheel_no_tap"
 	HadAction := GESTURE_ACTIONS.Has(ActionId)
@@ -116,7 +143,7 @@ _THAC_WheelDoesNotFireConfiguredTapAction() {
 			GESTURE_ACTIONS[ActionId] := PreviousAction
 		else
 			GESTURE_ACTIONS.Delete(ActionId)
-		_THAC_ResetState()
+		_THAC_RestoreState(Saved)
 	}
 }
 Test("tap-hold: Ctrl+wheel does not dispatch the configured tap action (ctrl-wheel-no-dispatch)", _THAC_WheelDoesNotFireConfiguredTapAction)
@@ -126,7 +153,7 @@ Test("tap-hold: Ctrl+wheel does not dispatch the configured tap action (ctrl-whe
 ; activity during the LCtrl hold, so that press never taps
 ; (altgr-fake-lctrl-comments-2026-09-26).
 _THAC_AltGrRAltCancelsTheFakeLCtrlTap() {
-	_THAC_ResetState()
+	Saved := _THAC_ResetState()
 	try {
 		HookDispatcher._OnKeyDown(0, 0xA2, 0x01D)
 		HookDispatcher._OnKeyDown(0, 0xA5, 0x138)
@@ -135,7 +162,7 @@ _THAC_AltGrRAltCancelsTheFakeLCtrlTap() {
 		AssertTrue(TapHoldShouldCancelTap("left_ctrl", 500) != "",
 			"the RAlt of an AltGr press must cancel the tap of its fake LCtrl")
 	} finally {
-		_THAC_ResetState()
+		_THAC_RestoreState(Saved)
 	}
 }
 Test("tap-hold: an AltGr RAlt cancels the tap of its fake LCtrl (altgr-fake-lctrl-comments-2026-09-26)",
@@ -206,6 +233,7 @@ _THAC_RunInterrupt(Kind) {
 _THAC_WithSingleKeyConfig(KeyCase, CallbackFn) {
 	global TapHold
 	PreviousTapHold := TapHold
+	Saved := _THAC_ResetState()
 	try {
 		TapHold := Map("keys", Map(KeyCase.Id, Map(
 			"tap_action", "__matrix_tap",
@@ -213,7 +241,7 @@ _THAC_WithSingleKeyConfig(KeyCase, CallbackFn) {
 		CallbackFn.Call()
 	} finally {
 		TapHold := PreviousTapHold
-		_THAC_ResetState()
+		_THAC_RestoreState(Saved)
 	}
 }
 
