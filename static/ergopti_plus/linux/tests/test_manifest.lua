@@ -565,6 +565,7 @@ return {
 	"tests.unit.ui.menu.llm.test_llm_menu_toggle_row",
 	"tests.unit.ui.menu.llm.test_ai_outer_parents",
 	"tests.unit.ui.menu.llm.test_llm_backend_rows_ai_menu_choice",
+	"tests.unit.ui.menu.llm.test_api_selection_errors",
 	"tests.unit.ui.menu.llm.test_llm_backend_rows_shared_inert_empty",
 	"tests.unit.ui.menu.llm.test_llm_enable_refusal",
 	"tests.unit.ui.menu.llm.test_llm_menu_prediction_count",

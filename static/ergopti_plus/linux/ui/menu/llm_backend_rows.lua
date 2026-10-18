@@ -252,7 +252,10 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 				checked = active ~= nil and entry.id == active.id,
 				action = function()
 					if llm.set_backend("api") ~= true then return false end
-					if entries.set_active(entry.id) ~= true then return false end
+					if entries.set_active(entry.id) ~= true then
+						dialogs.error(tr("dialog.bulk_toggle.save_failed"), tr("common.error_title"))
+						return false
+					end
 					changed()
 					return true
 				end,
