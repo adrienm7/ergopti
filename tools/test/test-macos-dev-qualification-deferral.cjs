@@ -484,6 +484,10 @@ function admitNativeNumberRowSelector(mac) {
 // This independent selector qualifies the actual Lua script, retaining the
 // blanket refusal for every full-package or foreign exclusion.
 const INPUT_SOURCE_FILTER = "--filter '(^|[.])InputSourceAppleScriptTests([/.]|$)'";
+const INPUT_SOURCE_STEP_SOURCE = guardedStep(
+	'managed-ollama-native',
+	fs.readFileSync(path.join(__dirname, 'fixtures/input-source-applescript-step.txt'), 'utf8')
+);
 function admitNativeInputSourceSelector(mac) {
 	if (mac.split(INPUT_SOURCE_FILTER).length !== 2) return null;
 	const jobs = [...mac.matchAll(/^  e2e-hs:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
@@ -495,43 +499,7 @@ function admitNativeInputSourceSelector(mac) {
 	];
 	if (steps.length !== 1) return null;
 	const step = steps[0][0];
-	if (
-		pipeline.stepField(step, 'if') !==
-			stageSource.condition('managed-ollama-native', '${{ !cancelled() }}') ||
-		/^        continue-on-error:/m.test(step)
-	)
-		return null;
-	for (const line of [
-		'          set -euo pipefail',
-		'          source="static/ergopti_plus/macos/launcher/Tests/ErgoptiPlusTests/InputSourceAppleScriptTests.swift"',
-		'          producer="static/ergopti_plus/macos/modules/keymap/input_sources.lua"',
-		'          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"',
-		'          git show "$GITHUB_SHA:$source" | cmp - "$source"',
-		'          git show "$GITHUB_SHA:$producer" | cmp - "$producer"',
-		'          case "$(uname -m)" in',
-		'            arm64) architecture=arm64 ;;',
-		'            x86_64) architecture=amd64 ;;',
-		'            *) exit 1 ;;',
-		'          test "$architecture" = "$MACOS_STAGE_ARCHITECTURE"',
-		'          cp "$source" "$evidence/InputSourceAppleScriptTests.swift"',
-		'          cp "$producer" "$evidence/input_sources.lua"',
-		'          printf \'%s\\n\' "$GITHUB_SHA" > "$evidence/tested-sha.txt"',
-		'          printf \'%s\\n\' "$architecture" > "$evidence/architecture.txt"',
-		'          script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher \\',
-		'            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\',
-		`            ${INPUT_SOURCE_FILTER} 2>&1 | tee "$transcript"`,
-		'          input_source_statuses=("${PIPESTATUS[@]}")',
-		'          test "${#input_source_statuses[@]}" -eq 2',
-		'          python3 tools/diagnostics/keyboard_geometry_xctest_receipt.py \\',
-		'            --class InputSourceAppleScriptTests --source "$evidence/InputSourceAppleScriptTests.swift" \\',
-		'            --test-exit "${input_source_statuses[0]}" --capture-exit "${input_source_statuses[1]}"',
-		"          if (!receipt.passed || receipt.scope !== 'InputSourceAppleScriptTests' || receipt.expected_count !== 2 || receipt.received_count !== 2 || receipt.failures.length !== 0 || receipt.test_exit !== 0 || receipt.capture_exit !== 0) throw new Error('exact two-case native input-source AppleScript receiving refused');",
-		'          cmp "$source" "$evidence/InputSourceAppleScriptTests.swift"',
-		'          cmp "$producer" "$evidence/input_sources.lua"',
-		'        timeout-minutes: 10'
-	]) {
-		if (step.split('\n').filter((actual) => actual === line).length !== 1) return null;
-	}
+	if (step !== INPUT_SOURCE_STEP_SOURCE) return null;
 	const carbon = jobs[0][0].indexOf(
 		'      - name: Retain selected number-row Carbon XCTest diagnostics\n'
 	);
@@ -1296,6 +1264,34 @@ function run({ includeLeafControls = true } = {}) {
 	}
 	assert.equal(inputSourceSelectorControls, 12);
 	console.log('PASS: input-source AppleScript exact-selector controls=12; native execution UNRUN.');
+	const inputSourceComparisons =
+		'          cmp "$source" "$evidence/InputSourceAppleScriptTests.swift"\n' +
+		'          cmp "$producer" "$evidence/input_sources.lua"\n';
+	assert.equal(inputSourceStep.split(inputSourceComparisons).length, 2);
+	for (const [name, step] of [
+		[
+			'early success',
+			inputSourceStep.replace('          set +e\n', '          exit 0\n          set +e\n')
+		],
+		[
+			'nonexecuting validator',
+			inputSourceStep.replace('node - "$evidence/input-source-verdict.json"', 'cat')
+		],
+		[
+			'comparisons before native execution',
+			inputSourceStep
+				.replace(inputSourceComparisons, '')
+				.replace('          set +e\n', inputSourceComparisons + '          set +e\n')
+		]
+	]) {
+		assert.notEqual(step, inputSourceStep, name);
+		const changed = workflow.replace(inputSourceStep, () => step);
+		assert.equal(admitNativeInputSourceSelector(changed), null, name);
+		assert.equal(admitNativeSdkSelector(changed), null, name);
+	}
+	console.log(
+		'PASS: input-source AppleScript execution-bypass controls=3; native execution UNRUN.'
+	);
 	let publicationControls = 0;
 	for (const lane of ['core', 'macos', 'windows', 'linux']) {
 		const entry = `      - ${lane}\n`;
