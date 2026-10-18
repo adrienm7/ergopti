@@ -129,7 +129,11 @@ local function scenario(action, phase, body)
 			privacy_guard = function() local blocked = guard.blocks_text(); transition("privacy"); return blocked end,
 			privacy_context = guard.current_context,
 			apply_prediction = apply,
-			on_output = function() state.output = state.output + 1; transition("output-observer") end,
+			on_output = function()
+				state.output = state.output + 1
+				state.output_resets, state.output_candidate = state.resets, engine.get_suggestions()[1]
+				transition("output-observer")
+			end,
 		})
 		assert(guard.prime())
 		state.text = phase == "native" and " ok ok ok ok ok ok" or " ok ok ok ok ok ☃"
@@ -197,6 +201,19 @@ helpers.describe("AI continuation retains its injection authority", function()
 			helpers.assert_true(state.successor ~= nil)
 			helpers.assert_true(rawequal(engine.get_suggestions()[1], state.successor), "the committed predecessor cannot dismiss the observer's new offer")
 			helpers.assert_eq(state.resets, state.successor_resets, "no reset follows publication of the successor")
+		end)
+	end)
+	helpers.it("acknowledges output but preserves the offer when its observer pauses without advancing the request", function()
+		scenario("pause", "output-observer", function(accepted, state, engine)
+			helpers.assert_true(state.triggered and state.paused)
+			helpers.assert_true(accepted and state.completed, "the completed physical edit remains acknowledged")
+			helpers.assert_eq(table.concat(state.rows, " "), "29:1 47:1 47:0 29:0")
+			helpers.assert_eq(state.writes, { " ok ok ok ok ok ☃", "SAVED" })
+			helpers.assert_eq(state.output, 1)
+			helpers.assert_eq(state.stopped, 0)
+			helpers.assert_true(engine.has_suggestions(), "paused continuation authority cannot retire the existing offer")
+			helpers.assert_true(rawequal(engine.get_suggestions()[1], state.output_candidate), "the original offer identity remains current")
+			helpers.assert_eq(state.resets, state.output_resets, "no buffer reset follows the observer's pause")
 		end)
 	end)
 	for _, phase in ipairs({ "privacy", "focus", "read", "write", "settle", "lookup" }) do
