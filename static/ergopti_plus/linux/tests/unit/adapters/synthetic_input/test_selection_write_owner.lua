@@ -58,11 +58,11 @@ helpers.describe("selected writes retain field and action authority", function()
 					checked = true
 					helpers.assert_eq(owner.is_settled(), false)
 					helpers.assert_eq(owner.read("atspi:" .. state.field.bus .. ":" .. state.field.path, state.authorized, function() end), false)
-					helpers.assert_eq(owner.replace(token, "nested", state.authorized, state.emit, function() end), false)
+					helpers.assert_eq(owner.replace_staged(token, "nested", state.authorized, state.construct, function() end), false)
 				end
 				helpers.assert_true(state.replace(token))
 				helpers.assert_true(checked)
-				helpers.assert_eq(state.starts, 2, "no nested range capture starts")
+				helpers.assert_eq(state.starts, 3, "only the original read and two private observations start")
 				helpers.assert_true(owner.is_settled())
 			end)
 		end)
@@ -107,7 +107,8 @@ helpers.describe("selected writes retain field and action authority", function()
 			state.restore_refused = true
 			helpers.assert_eq(state.replace(token), false)
 			helpers.assert_eq(state.held, {})
-			helpers.assert_eq(state.writes, { "☃", "SAVED" })
+			helpers.assert_eq(state.writes[1], "☃")
+			for index = 2, #state.writes do helpers.assert_eq(state.writes[index], "SAVED") end
 			helpers.assert_eq(owner.is_settled(), false)
 			helpers.assert_eq(owner.stop(), false)
 		end)
@@ -201,17 +202,18 @@ helpers.describe("Main selected write publication wiring", function()
 				local compile = loadstring or load
 				local factory = assert(compile("return function(injector,privacy_owners,opts,engine) local _undoable; return " .. callback .. " end"))()
 				local argc, captured
-				local replace = factory({ inject_selected = function(...)
+				local replace = factory({ prepare_selected = function(...)
 					argc = select("#", ...)
-					local text, private, publication = ...
+					local text, publication = ...
 					captured = publication
-					return state.injector.inject_selected(text, private, publication)
+					return state.injector.prepare_selected(text, publication)
 				end }, { selection = state.owner }, { dry_run = false }, { reset = function() state.resets = state.resets + 1 end })
 				if moved then state.on_boundary = function(point) if point == "settle" then state.field.role = 40 end end end
 				local committed
+				state.inserted = { first = 0, last = 1, text = "☃" }
 				helpers.assert_true(replace("☃", token, state.authorized, function(value) committed = value end))
-				state.deliver()
-				helpers.assert_eq(argc, 3)
+				for _ = 1, 2 do if committed == nil then state.deliver() end end
+				helpers.assert_eq(argc, 2)
 				helpers.assert_type(captured, "table")
 				helpers.assert_eq(committed, not moved)
 				helpers.assert_eq(state.resets, moved and 0 or 1)
@@ -265,8 +267,9 @@ helpers.describe("selected reads survive an idle action transfer", function()
 				helpers.assert_true(owner.cancel(), "idle cancellation has no physical writer to retire")
 				helpers.assert_eq(state.replace(token), false, "the original action lost its own authority")
 				local committed
-				helpers.assert_true(owner.replace(token, "ok", function() return true end, state.emit, function(value) committed = value end))
-				state.deliver()
+				helpers.assert_true(owner.replace_staged(token, "ok", function() return true end, state.construct, function(value) committed = value end))
+				state.inserted = { first = 0, last = 2, text = "ok" }
+				state.deliver(); state.deliver()
 				helpers.assert_true(committed, "a new action may revalidate this unchanged native observation")
 				helpers.assert_eq(state.emits, 1)
 				helpers.assert_true(owner.is_settled())
@@ -277,7 +280,7 @@ helpers.describe("selected reads survive an idle action transfer", function()
 		fixture.with(function(state, owner)
 			local token = state.read()
 			helpers.assert_true(owner.stop())
-			helpers.assert_eq(owner.replace(token, "ok", function() return true end, state.emit, function() end), false)
+			helpers.assert_eq(owner.replace_staged(token, "ok", function() return true end, state.construct, function() end), false)
 			helpers.assert_eq(state.emits, 0)
 		end)
 	end)

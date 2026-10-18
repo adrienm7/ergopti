@@ -536,6 +536,8 @@ function M.clipboard(opts)
 		return true
 	end
 
+	require("tests.fakes.clipboard_stage").install(fake, opts)
+
 	return fake
 end
 

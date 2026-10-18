@@ -5,8 +5,9 @@
 --- DESCRIPTION:
 --- Runs production predictions, tone rewrites and translations against real GTK
 --- fields. Extracts the daemon's exact focus callback; accessibility queries,
---- privacy verdicts, selected-range snapshots and XTest output are native. Only
---- provider replies are controlled. This does not claim evdev/uinput or physical keyboard input.
+--- privacy verdicts, selected-range snapshots and XTest output are native.
+--- Provider replies, preferences and a fixed paste-shortcut cohort are controlled.
+--- This does not claim evdev/uinput or physical keyboard input.
 --- ==============================================================================
 
 require("compat.utf8").install()
@@ -25,6 +26,27 @@ local Atspi = require("adapters.atspi_focus")
 local uv = require("luv")
 local Clock = require("infra.monotonic")
 local Timings = require("infra.timings")
+local ffi = require("ffi")
+ffi.cdef([[typedef struct _XDisplay Display;
+	Display *XOpenDisplay(const char *name); int XCloseDisplay(Display *display);
+	int XSync(Display *display, int discard);
+	int XTestFakeKeyEvent(Display *display, unsigned int code, int pressed, unsigned long delay);]])
+local X11, XTest = ffi.load("libX11.so.6"), ffi.load("libXtst.so.6")
+local display = assert(X11.XOpenDisplay(nil), "native X11 output connection required")
+local Injector = require("modules.hotstrings.injector")
+require("adapters.keyboard_layout")._set_table_for_test({ v = { keycode = 47, mods = {} } })
+Injector._set_uinput({ is_open = function() return true end, emit = function(code, value)
+	assert(XTest.XTestFakeKeyEvent(display, code + 8, value == 1 and 1 or 0, 0) ~= 0)
+	X11.XSync(display, 0)
+	return true
+end })
+local Clipboard = require("adapters.clipboard")
+local CLIPBOARD_SEED = "ERGOPTI-NATIVE-SELECTION-CLIPBOARD"
+-- A new Xvfb session has no clipboard owner. The strict stage must snapshot a
+-- known existing owner, rather than guessing that an unavailable read is empty.
+assert(Clipboard.write(CLIPBOARD_SEED), "native clipboard control must be seeded")
+local clipboard_read_ok, clipboard_content = Clipboard.read_checked()
+assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native clipboard control must be readable")
 local Watch = require("adapters.atspi_focus_watch").new()
 package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
@@ -60,7 +82,7 @@ local function await_join()
 	repeat
 		uv.run("nowait")
 		Guard.refresh(true)
-		if not Guard.blocks_text() then return end
+		if not Guard.blocks_text() and focus_id() then return end
 		uv.sleep(1)
 	until Clock.now_ms() > deadline
 	error("native AI privacy context did not join within five seconds")
@@ -89,10 +111,10 @@ local function initialize()
 		end,
 		cancel_selection = function() return selection_owner.cancel() end,
 		replace_selection = function(text, receipt, authorized, callback)
-			return selection_owner.replace(receipt, text, authorized, function(value)
-				local committed = type_text(value)
-				return { ok = committed, cleanup_ok = committed }
-			end, callback)
+			return selection_owner.replace_staged(receipt, text, authorized, Injector.prepare_selected, function(committed)
+				if committed then applied = applied + 1 end
+				callback(committed)
+			end)
 		end,
 		apply_prediction = function(candidate) return type_text(candidate.to_type) end,
 	})
@@ -154,6 +176,7 @@ for command in io.lines() do
 	elseif command == "accept" then
 		result.workflow_accepted = Engine.accept(1, function(committed) result.accepted = committed end)
 	elseif command == "first-character" then
+		result.first_char_target_before = assert(focus_id(), "native text destination must be admitted before measuring the first character")
 		result.helper_calls = 0
 		local originals = {}
 		for _, entry in ipairs({ { Atspi, "get_snapshot" }, { Shell, "exec" }, { Shell, "exec_line" }, { Shell, "exec_checked" } }) do
@@ -207,3 +230,7 @@ while (not Guard.stop() or not Watch.is_settled()) and Clock.now_ms() <= deadlin
 	uv.run("nowait"); uv.sleep(1)
 end
 assert(Guard.stop() and Watch.is_settled(), "native AI focus resources must physically retire")
+clipboard_read_ok, clipboard_content = Clipboard.read_checked()
+assert(clipboard_read_ok and clipboard_content == CLIPBOARD_SEED, "native selected output must restore the original clipboard")
+Injector._set_uinput(nil)
+X11.XCloseDisplay(display)

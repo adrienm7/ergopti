@@ -472,3 +472,118 @@ helpers.describe("fakes: semantic media writer contract", function()
 		helpers.assert_eq(writer.revision, 1)
 	end)
 end)
+
+helpers.describe("fakes: prepared clipboard custody", function()
+	local function channel(events, on_emit)
+		return { emit = function(code, value)
+			events[#events + 1] = { code, value }
+			if on_emit then return on_emit(code, value) end
+			return true
+		end }
+	end
+
+	helpers.it("stages without constructor I/O and restores only on close", function()
+		helpers.assert_eq(Fakes.clipboard().paste_keycode(), 47)
+		local fake = Fakes.clipboard({ initial = "saved", paste_keycode = 38 })
+		local waits, events = {}, {}
+		local stage = fake.new_paste_stage("replacement", function(ms) waits[#waits + 1] = ms end,
+			fake.paste_keycode(), function() return true end)
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_eq(stage.paste(channel(events)), false)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "replacement")
+		helpers.assert_true(stage.paste(channel(events)))
+		helpers.assert_eq(events, { {29, 1}, {38, 1}, {38, 0}, {29, 0} })
+		helpers.assert_eq(waits, { 30, 120 })
+		helpers.assert_eq(fake.last_pasted, "replacement")
+		helpers.assert_eq(fake.pastes, 1)
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(stage.paste(channel(events)), false)
+	end)
+
+	for _, refusal in ipairs({ false, "not a boolean", "throw" }) do
+		helpers.it("refuses a staged admission of " .. tostring(refusal), function()
+			local fake = Fakes.clipboard({ initial = "saved" })
+			local stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47, function()
+				if refusal == "throw" then error("retired") end
+				return refusal
+			end)
+			helpers.assert_eq(stage.prepare(), false)
+			helpers.assert_eq(fake.contents, "saved")
+			helpers.assert_eq(fake.pastes, 0)
+		end)
+	end
+
+	helpers.it("refuses an unavailable or unreadable clipboard before setting", function()
+		for _, unreadable in ipairs({ false, true }) do
+			local fake = Fakes.clipboard({ initial = "saved", available = unreadable })
+			if unreadable then fake.read_checked = function() return false, "", "refused" end end
+			fake.write = function() error("must not set") end
+			local stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47)
+			helpers.assert_eq(stage.prepare(), false)
+			helpers.assert_true(stage.close())
+			helpers.assert_eq(fake.contents, "saved")
+		end
+	end)
+
+	helpers.it("restores a setter that commits after reentrant close", function()
+		local fake, stage = Fakes.clipboard({ initial = "saved" }), nil
+		local write = fake.write
+		fake.write = function(text)
+			if text == "replacement" then helpers.assert_eq(stage.close(), false) end
+			return write(text)
+		end
+		stage = fake.new_paste_stage("replacement", function() error("no wait") end, 47)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "saved")
+		helpers.assert_true(stage.close())
+	end)
+
+	helpers.it("retains restoration debt on failure and retries the original save", function()
+		local fake, failed = Fakes.clipboard({ initial = "saved" }), true
+		local write = fake.write
+		fake.write = function(text)
+			if text == "saved" and failed then return false end
+			return write(text)
+		end
+		local stage = fake.new_paste_stage("replacement", function() end, 47)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.close(), false)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "replacement")
+		failed = false
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+	end)
+
+	helpers.it("does not let an admission callback reopen a closed paste", function()
+		local fake, stage = Fakes.clipboard({ initial = "saved" }), nil
+		local calls, events = 0, {}
+		stage = fake.new_paste_stage("replacement", function() end, 47, function()
+			calls = calls + 1
+			if calls == 7 then helpers.assert_eq(stage.close(), false) end
+			return true
+		end)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.paste(channel(events)), false)
+		helpers.assert_eq(events, { {29, 1} })
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+	end)
+
+	helpers.it("refuses failed waits and wire output without reporting a paste", function()
+		local fake = Fakes.clipboard({ initial = "saved" })
+		local stage = fake.new_paste_stage("replacement", function() return false end, 47)
+		helpers.assert_eq(stage.prepare(), false)
+		helpers.assert_eq(fake.contents, "saved")
+		stage = fake.new_paste_stage("replacement", function() end, 47)
+		helpers.assert_true(stage.prepare())
+		helpers.assert_eq(stage.paste(channel({}, function() return false end)), false)
+		helpers.assert_eq(fake.pastes, 0)
+		helpers.assert_true(stage.close())
+		helpers.assert_eq(fake.contents, "saved")
+	end)
+end)
