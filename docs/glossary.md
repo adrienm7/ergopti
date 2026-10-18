@@ -128,7 +128,7 @@
 
 **Prefix watcher** — Le composant (AHK : `InputHook` ; macOS : buffer dans l'eventtap) qui surveille les caractères tapés pour détecter les séquences de déclenchement de hotstrings et les transmettre au moteur.
 
-**Purity ratchet** — Meta-test (`tests/meta/test_port_adapter_coverage.lua`) qui compte les appels `hs.*` / `io.open` / `os.execute` hors `adapters/` et asserte que le total reste sous un plafond décroissant. Rend impossible la régression vers des appels OS directs dans le code domaine.
+**Purity ratchet** — Meta-test (`tests/meta/architecture/test_port_adapter_coverage.lua`) qui compte les appels `hs.*` / `io.open` / `os.execute` hors `adapters/` et asserte que le total reste sous un plafond décroissant. Rend impossible la régression vers des appels OS directs dans le code domaine.
 
 ---
 

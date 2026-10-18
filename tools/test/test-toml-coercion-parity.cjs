@@ -58,7 +58,7 @@ assert(
 );
 
 // ─── 2. macOS corpus consumer test exists ────────────────────────────
-const macosTestPath = path.join(MACOS, 'tests', 'unit', 'meta', 'test_corpus_toml_coercion.lua');
+const macosTestPath = path.join(MACOS, 'tests', 'meta', 'corpus', 'test_corpus_toml_coercion.lua');
 assert(fs.existsSync(macosTestPath), 'macOS corpus test exists');
 if (fs.existsSync(macosTestPath)) {
 	const src = fs.readFileSync(macosTestPath, 'utf8');

@@ -179,7 +179,7 @@ local _capsword_watcher_gen = 0
 -- GC root can be collected mid-run, which kills the subprocess and means its
 -- completion callback never fires — here that would leave KE with capsword=1 and
 -- the next spacebar would switch CapsLock back on. Canonical spelling recognised
--- by tests/unit/meta/test_gc_retention.lua. Entries are released in the callbacks.
+-- by tests/meta/lua_safety/test_gc_retention.lua. Entries are released in the callbacks.
 local _active_tasks = {}
 -- Partial starts return nil to their caller, so this module must retain any
 -- eventtap whose rollback failed; no outer layer ever received that capability.

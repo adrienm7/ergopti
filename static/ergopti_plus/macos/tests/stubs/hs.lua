@@ -730,7 +730,7 @@ M.eventtap = {
 	-- The third argument is recorded so tests can assert an explicit delay was passed.
 	-- Real hs.eventtap.keyStroke() defaults it to a BLOCKING 200 000 us usleep on the
 	-- main run loop; dropping it here made the harness structurally unable to observe
-	-- the omission (see tests/meta/test_keystroke_explicit_delay.lua).
+	-- the omission (see tests/meta/runloop/test_keystroke_explicit_delay.lua).
 	keyStroke = function(mods, key, delay) table.insert(KEYSTROKES, { mods = mods, key = key, delay = delay }) end,
 	keyStrokes = function(s) table.insert(KEYSTROKES, { text = s }) end,
 	-- Both arguments are recorded, for the same reason the keyStroke delay is:
