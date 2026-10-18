@@ -6,7 +6,7 @@
 --- Enumerates and switches the macOS keyboard input sources (the live HIToolbox
 --- list), maps the layouts an installed bundle declares to their TIS identifiers,
 --- adds or removes any installed .keylayout in the enabled list, and selects a
---- source via isolated osascript. Extracted from ui/menu/menu_keyboard_layout.lua
+--- source via the isolated native launcher. Extracted from ui/menu/menu_keyboard_layout.lua
 --- (audit F4) — the ~660-line input-source layer that the submenu builder drives.
 ---
 --- FEATURES & RATIONALE:
@@ -14,7 +14,7 @@
 ---    _active_layouts_cache and refreshed asynchronously off the click path.
 --- 2. Legacy-id migration: upgrades pre-namespace Ergopti ids to the current TIS
 ---    namespace so older installs keep working.
---- 3. Isolated osascript: TIS calls run in their own subprocess so a hang cannot
+--- 3. Isolated mutations: TIS calls run in their own subprocess so a hang cannot
 ---    stall the Hammerspoon run loop.
 ---
 --- Owns the active-layout probe cache; depends on layout_install for on-disk
@@ -30,6 +30,7 @@ local ShellRunner = require("adapters.shell_runner")
 local TimerScheduler = require("adapters.timer_scheduler")
 local OpenStepPlist = require("infra.openstep_plist")
 local PythonInterpreter = require("adapters.python_interpreter")
+local InputSourceSelector = require("adapters.input_source_selector")
 local LOG     = "menu.keyboard_layout"
 
 -- Install-layer helpers used by the enumeration / selection logic below.
@@ -102,8 +103,9 @@ end
 --- @param executable string Absolute executable path.
 --- @param args table Argument vector.
 --- @param on_done function|nil fn(ok, stdout, reason, stderr).
+--- @param environment table|nil Exact child environment overrides.
 --- @return boolean accepted True only when the subprocess start commits.
-local function run_bounded_process(label, executable, args, on_done)
+local function run_bounded_process(label, executable, args, on_done, environment)
 	if reject_if_mutation_busy(label, on_done) then return false end
 
 	local owner = {
@@ -147,7 +149,7 @@ local function run_bounded_process(label, executable, args, on_done)
 		if deadline_settled == true then owner.deadline_settled = true end
 		publish_pending_terminal()
 		release_mutation_if_settled(owner)
-	end)
+	end, nil, environment)
 	owner.handle = handle
 
 	local observed_task = handle.onSettled(function()
@@ -632,7 +634,7 @@ local build_kl_name_to_tis_id
 ---      "Ergopti_v2_2_2_plus") is NOT accepted by setLayout.
 ---   2. hs.keycodes.setLayout(kl_name) — fallback using the internal name in case
 ---      the localised form differs from what hs.keycodes expects.
----   3. TISSelectInputSource via osascript with the stable TIS ID resolved from
+---   3. TISSelectInputSource via the native launcher with the stable TIS ID resolved from
 ---      kl_name through build_kl_name_to_tis_id() — covers Ergopti variants on
 ---      macOS Sequoia where setLayout fails for third-party bundles.
 --- @param localised_name string The display / localised name (r.name), e.g. "French".
@@ -676,22 +678,16 @@ local function set_input_source_async(localised_name, kl_name, on_done)
 		local kl_map = build_kl_name_to_tis_id() or {}
 		tis_id = kl_map[kl_name] or kl_name
 	end
-	local script = text_utils.applescript_format([[
-use framework "Carbon"
-use framework "Foundation"
-on run
-	set theProps to current application's NSDictionary's dictionaryWithObjects:{"%s"} forKeys:{"TISPropertyInputSourceID"}
-	set theSources to current application's TISCreateInputSourceList(theProps, true)
-	if theSources is not missing value and (count of (theSources as list)) > 0 then
-		set theSource to item 1 of (theSources as list)
-		return current application's TISSelectInputSource(theSource)
-	end if
-	return "MISS"
-end run
-]], tis_id)
-	return run_osascript_isolated_async(script, function(process_ok, out, reason)
+	local executable, arguments, environment, resolve_reason = InputSourceSelector.command(tis_id)
+	if executable == nil then
+		Logger.warn(LOG, "Native input-source selection could not resolve its exact helper: %s.",
+			tostring(resolve_reason))
+		invoke_mutation_done("set_input_source.tis", on_done, false, nil, resolve_reason)
+		return false
+	end
+	return run_bounded_process("Native input-source selection", executable, arguments, function(process_ok, out, reason)
 		local out_text = tostring(out or ""):gsub("[\r\n]+$", "")
-		-- Carbon returns an OSStatus independently of osascript's process exit.
+		-- Carbon returns an OSStatus independently of the helper's process exit.
 		-- Finding the source does not prove the native selection was accepted.
 		local switched = process_ok == true and out_text == "0"
 		if switched then
@@ -704,7 +700,7 @@ end run
 		Logger.warn(LOG, "Failed to switch active layout to '%s' / '%s' (tis_id=%s, reason=%s, result=%s).",
 			tostring(localised_name), tostring(kl_name), tis_id, failure_reason, out_text)
 		invoke_mutation_done("set_input_source.tis", on_done, false, out_text, failure_reason)
-	end)
+	end, environment)
 end
 
 --- Builds a mapping from KeyboardLayout Name (internal HIToolbox name) to stable TIS ID

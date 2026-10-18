@@ -20,6 +20,7 @@ local helpers = require("tests.helpers")
 local LOCALISED_NAME = "Ergopti+"
 local KL_NAME = "Ergopti_v2_2_2_plus"
 local KEYLAYOUT_PATH = "/tmp/Ergopti.bundle/Contents/Resources/Ergopti_v2_2_2_plus.keylayout"
+local NATIVE_HELPER = "/Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus"
 
 
 --- Clears every stateful module owned by this test fixture.
@@ -28,6 +29,8 @@ local function reset_fixture_modules()
 	package.loaded["adapters.shell_runner"] = nil
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["adapters.task_lifecycle"] = nil
+	package.loaded["adapters.input_source_selector"] = nil
+	package.loaded["platform.remap.lease_helper"] = nil
 end
 
 
@@ -37,6 +40,16 @@ end
 local function load_fixture(options)
 	options = options or {}
 	reset_fixture_modules()
+	package.loaded["platform.remap.lease_helper"] = {
+		resolve = function()
+			if options.helper_unavailable == true then return nil, "helper_unavailable" end
+			return NATIVE_HELPER, nil, {
+				ERGOPTI_LAUNCHER_EXECUTABLE = NATIVE_HELPER,
+				ERGOPTI_LAUNCHER_DEVICE = "1",
+				ERGOPTI_LAUNCHER_INODE = "2",
+			}
+		end,
+	}
 
 	local fixture = {
 		order = {},
@@ -53,7 +66,10 @@ local function load_fixture(options)
 			on_done = on_done,
 			running = false,
 			terminate_calls = 0,
+			env = {},
 		}
+		function task:environment() return self.env end
+		function task:setEnvironment(environment) self.env = environment; return self end
 		function task:start()
 			fixture.order[#fixture.order + 1] = "start"
 			if options.task_start_mutates == true then self.running = true end
@@ -128,6 +144,7 @@ local function status_test(name, body)
 			"modules.keymap.input_sources", "modules.keymap.layout_install",
 			"adapters.shell_runner", "adapters.timer_scheduler", "adapters.task_lifecycle",
 			"adapters.python_interpreter", "infra.openstep_plist",
+			"adapters.input_source_selector", "platform.remap.lease_helper",
 		}, body)
 	end)
 end
@@ -159,15 +176,30 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		end
 	end)
 
-	status_test("(tis-osstatus) carries the actual selection result across the child boundary", function()
+	status_test("(tis-native-selector) invokes the bundle helper with the exact source argv and identity", function()
 		local f = load_fixture()
 		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function() end), true)
-		local script = f.tasks[1].args[2]
-		-- AppleScript cannot execute in the portable Lua harness. Inspect the
-		-- actual child argument so a fabricated success cannot hide native refusal.
-		helpers.assert_true(script:find("return current application's TISSelectInputSource(theSource)", 1, true) ~= nil,
-			"the child must return TISSelectInputSource's OSStatus instead of a success literal")
+		helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
+		helpers.assert_eq(#f.tasks[1].args, 2)
+		helpers.assert_eq(f.tasks[1].args[1], "--select-input-source")
+		helpers.assert_eq(f.tasks[1].args[2], KL_NAME)
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_EXECUTABLE, NATIVE_HELPER)
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_DEVICE, "1")
+		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_INODE, "2")
 		f.tasks[1]:complete(0, "0\n", "")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-selector) refuses an unavailable exact helper without spawning", function()
+		local f = load_fixture({ helper_unavailable = true })
+		local terminal
+		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function(ok, _, reason)
+			terminal = { ok = ok, reason = reason }
+		end), false)
+		helpers.assert_eq(#f.tasks, 0)
+		helpers.assert_eq(#f.timers, 0)
+		helpers.assert_eq(terminal.ok, false)
+		helpers.assert_eq(terminal.reason, "helper_unavailable")
 		reset_fixture_modules()
 	end)
 
@@ -337,12 +369,12 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		local cases = {
 			{
 				label = "selection",
-				executable = "/usr/bin/osascript",
+				executable = NATIVE_HELPER,
 				invoke = function(IS, done)
 					return IS.set_input_source_async(LOCALISED_NAME, KL_NAME, done)
 				end,
 				assert_args = function(args)
-					helpers.assert_eq(args[1], "-e")
+					helpers.assert_eq(args[1], "--select-input-source")
 				end,
 			},
 			{
