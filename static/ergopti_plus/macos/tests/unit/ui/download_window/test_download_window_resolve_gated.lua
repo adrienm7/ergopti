@@ -43,7 +43,7 @@ local function make_webview_overrides()
 				for _, method in ipairs({
 					"windowTitle", "windowStyle", "level", "allowTextEntry",
 					"allowGestures", "allowNewWindows", "windowCallback", "shadow",
-					"navigationCallback", "html", "show",
+					"navigationCallback", "html", "show", "deleteOnClose",
 				}) do webview[method] = function(self) return self end end
 				webview.frame = function() return { x = 0, y = 0, w = 460, h = 380 } end
 				webview.evaluateJavaScript = function() end
