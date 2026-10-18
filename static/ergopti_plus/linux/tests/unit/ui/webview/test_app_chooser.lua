@@ -71,6 +71,59 @@ helpers.describe("open_app application chooser (Linux)", function()
 end)
 
 
+--- Runs one mapping under explicit XDG directories without leaking process state.
+--- @param environment table XDG values; false means unset.
+--- @param body function Test body.
+local function with_desktop_environment(environment, body)
+	local real = os.getenv
+	os.getenv = function(name)
+		if environment[name] ~= nil then return environment[name] or nil end
+		return real(name)
+	end
+	local called, detail = pcall(body)
+	os.getenv = real
+	if not called then error(detail, 0) end
+end
+
+helpers.describe("application chooser preserves installed desktop ids", function()
+	local cases = {
+		{ "nested system entry", false, false, "/usr/share/applications/vendor/editor.desktop", "vendor-editor" },
+		{ "nested user entry", "/data/user", false, "/data/user/applications/vendor/editor.desktop", "vendor-editor" },
+		{ "custom system entry", false, "/custom/share", "/custom/share/applications/tools/editor.desktop", "tools-editor" },
+		{ "multiple roots", false, "/first:/second", "/second/applications/tools/editor.desktop", "tools-editor" },
+		{ "default system roots", false, false, "/usr/local/share/applications/editor.desktop", "editor" },
+		{ "empty system roots use defaults", false, "", "/usr/share/applications/editor.desktop", "editor" },
+		{ "relative user root uses canonical default", "relative", false, "/account/.local/share/applications/tools/editor.desktop", "tools-editor" },
+		{ "relative system root is ignored", false, "relative:/custom/share", "/custom/share/applications/editor.desktop", "editor" },
+		{ "relative roots do not become the CWD", false, "relative", "/usr/share/applications/editor.desktop", false },
+		{ "filesystem root data directory", "/", false, "/applications/vendor/editor.desktop", "vendor-editor" },
+		{ "root boundary", "/data", false, "/database/applications/editor.desktop", false },
+		{ "applications boundary", "/data", false, "/data/applications-copy/editor.desktop", false },
+		{ "overlapping roots retain ordered relative path", "/data", "/data/applications/vendor", "/data/applications/vendor/applications/editor.desktop", "vendor-applications-editor" },
+		{ "standalone file has no installed id", false, false, "/downloads/editor.desktop", false },
+		{ "relative desktop path", false, false, "editor.desktop", false },
+		{ "parent traversal", false, false, "/usr/share/applications/vendor/../editor.desktop", false },
+		{ "dot traversal", false, false, "/usr/share/applications/./editor.desktop", false },
+		{ "empty basename", false, false, "/usr/share/applications/vendor/.desktop", false },
+		{ "desktop suffix remains exact", false, false, "/usr/share/applications/vendor/editor.desktop.bak", false },
+		{ "repeated separators", false, false, "/usr//share/applications/vendor//editor.desktop", "vendor-editor" },
+	}
+	for _, row in ipairs(cases) do
+		helpers.it("(linux-desktop-id) " .. row[1], function()
+			with_desktop_environment({ HOME = "/account", XDG_DATA_HOME = row[2], XDG_DATA_DIRS = row[3] }, function()
+				local expected = row[5] ~= false and row[5] or nil
+				local Chooser = require("ui.app_chooser")
+				helpers.assert_eq(Chooser.desktop_id(row[4]), expected)
+				local shell = fake_shell({ zenity = true }, row[4] .. "\n")
+				local selected, reason = Chooser.pick(shell, "Applications")
+				helpers.assert_eq(selected, expected)
+				if expected == nil then helpers.assert_true(type(reason) == "string" and reason ~= "") end
+			end)
+		end)
+	end
+end)
+
+
 --- Exercises a real dialog child and shell status without requiring a desktop prompt.
 --- @param tool string Selected native dialog tool.
 --- @param status number Actual child exit status.

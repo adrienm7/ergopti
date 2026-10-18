@@ -17,6 +17,8 @@
 
 local M = {}
 local WindowTitles = require("window_titles")
+local ConfigPaths = require("infra.config_paths")
+local AppParameter = require("app_parameter")
 
 --- Where the system installs its desktop entries.
 M.APPLICATIONS_DIR = "/usr/share/applications/"
@@ -24,14 +26,51 @@ M.APPLICATIONS_DIR = "/usr/share/applications/"
 --- The extension of a desktop entry, stripped to form its id.
 local DESKTOP_SUFFIX = ".desktop"
 
---- The desktop-file id a chosen desktop entry path names.
+--- Admits absolute native paths without interpreting traversal through symlinks.
+--- @param path any Native path or XDG directory.
+--- @return string|nil normalized
+local function absolute_path(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" or path:find("[%z\1-\31\127]") then return nil end
+	local parts = {}
+	for part in path:gmatch("[^/]+") do
+		if part == "." or part == ".." then return nil end
+		parts[#parts + 1] = part
+	end
+	return "/" .. table.concat(parts, "/")
+end
+
+--- Resolves the effective XDG application directories in native search order.
+--- @return table roots Absolute directories with a trailing separator.
+local function application_roots()
+	local bases = { ConfigPaths.data_home() }
+	local system = os.getenv("XDG_DATA_DIRS")
+	if system == nil or system == "" then system = "/usr/local/share:/usr/share" end
+	for base in system:gmatch("[^:]+") do bases[#bases + 1] = base end
+	local roots = {}
+	for _, base in ipairs(bases) do
+		local normalized = absolute_path(base)
+		if normalized then roots[#roots + 1] = (normalized == "/" and "" or normalized) .. "/applications/" end
+	end
+	return roots
+end
+
+--- The desktop-file id of an entry installed beneath an effective XDG root.
+--- A nested vendor/editor.desktop has the native id vendor-editor.desktop.
 --- @param path any The path the dialog printed.
---- @return string|nil id Nil when the path is not a desktop entry.
+--- @return string|nil id Nil when no installed desktop-file id can be derived.
 function M.desktop_id(path)
-	if type(path) ~= "string" then return nil end
+	if type(path) ~= "string" or path:sub(-1) == "/" then return nil end
+	path = absolute_path(path)
+	if not path then return nil end
 	local name = path:match("([^/]+)$")
 	if not name or name:sub(-#DESKTOP_SUFFIX) ~= DESKTOP_SUFFIX or #name == #DESKTOP_SUFFIX then return nil end
-	return name:sub(1, #name - #DESKTOP_SUFFIX)
+	for _, root in ipairs(application_roots()) do
+		if path:sub(1, #root) == root then
+			local id = path:sub(#root + 1, -#DESKTOP_SUFFIX - 1):gsub("/", "-")
+			return AppParameter.is_valid(id) and id or nil
+		end
+	end
+	return nil
 end
 
 --- Opens the first available file dialog over the desktop entries.
