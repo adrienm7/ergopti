@@ -604,6 +604,7 @@ local function run_agent(generation, source, text, focus, backend, learning)
 				return false
 			end
 			return generation == _generation
+				and (session == nil or engine.current_request_revision() == session)
 		end
 		local function on_raw(raw)
 			if not still_current() then return end

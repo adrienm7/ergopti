@@ -112,6 +112,29 @@ helpers.describe("agent request authority survives pending native credentials", 
 		end)
 	end)
 
+	for index = 1, 2 do
+		local system = SYSTEMS[index]
+		for _, change in ipairs({ "surface closed", "pause and resume" }) do
+			helpers.it(system.name .. " rejects a late credential after " .. change .. " (agent-surface-authority)", function()
+				with_agent(system.options, function(world)
+					local paused = false
+					package.loaded["modules.shortcuts.script_control"] = { is_paused = function() return paused end }
+					helpers.assert_true(system.start(world))
+					helpers.assert_eq(#world.pending, 1)
+					if change == "pause and resume" then
+						paused = true
+						world.runner.cancel_typing("pause")
+					end
+					-- The pause bridge and dismissal both invalidate the answer surface.
+					world.engine.reset()
+					paused = false
+					world.pending[1](true, "fixture-key")
+					helpers.assert_eq(#world.posts, 0, "a retired answer surface cannot send private input")
+				end)
+			end)
+		end
+	end
+
 	for _, system1 in ipairs({ false, true }) do
 		helpers.it("rechecks Backboard authority after assistant creation for System " .. (system1 and "1" or "2")
 			.. " (agent-pending-authority)", function()
