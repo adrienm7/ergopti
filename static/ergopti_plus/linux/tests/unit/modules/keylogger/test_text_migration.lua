@@ -9,11 +9,9 @@
 --- Turning it off had the mirror defect — the rows stayed encrypted.
 ---
 --- WHAT THIS ENCODES:
---- 1. The conversion must be BYTE-EXACT. The cipher shells out through a
----    heredoc, and a heredoc always appends a newline to its body, so the naive
----    framing stored the ciphertext of a value the user never typed. Rewriting
----    rows in place with that framing would have corrupted them permanently, so
----    the round trip is asserted on the bytes, not on "it looks encrypted".
+--- 1. The conversion must be BYTE-EXACT. A native byte-provider port makes
+---    corruption of NUL or trailing newlines visible in the round trip. Actual
+---    AES/legacy OpenSSL equivalence is exercised by the native cipher fixture.
 --- 2. It must be idempotent. A pass interrupted halfway and restarted has to
 ---    converge: an envelope must not be wrapped twice, and text that was never
 ---    encrypted must not be "decrypted".
@@ -53,78 +51,34 @@ local DEVICE = "linux-testhost"
 -- =========================================
 -- =========================================
 
---- Hex helpers standing in for the cipher's base64 payload. Hex is deliberate:
---- it contains no colon and no whitespace, so it survives the envelope's own
---- framing exactly as base64 does.
-local function to_hex(s)
-	return (s:gsub(".", function(c) return string.format("%02X", c:byte()) end))
-end
+--- Shared failure switch is controlled by each scenario, including a peer that
+--- becomes unavailable between the encryption and decryption passes.
+local crypto_options = {}
 
-local function from_hex(h)
-	if h:match("^%x*$") == nil or #h % 2 ~= 0 then return "" end
-	return (h:gsub("%x%x", function(b) return string.char(tonumber(b, 16)) end))
-end
-
---- Returns the first line of a composed command — the part the shell parses.
---- Every decision below is taken on this and never on the whole string: the
---- heredoc body is the user's own text and could contain any flag we look for.
+--- Returns the first line of the KDF/hash program, excluding caller data.
 local function command_line(cmd)
 	return helpers.openssl_script_command(cmd):match("^([^\n]*)") or ""
 end
 
---- Reproduces the bytes the SHELL would hand the command's standard input.
---- This is the point of the whole double: the heredoc body plus the newline the
---- shell always appends, truncated by whatever `head -c` filter sits in front. A
---- framing that mangles the payload therefore fails here exactly as it would on
---- a real machine, instead of being hidden behind a canned answer.
---- @param cmd string The fully composed command.
---- @return string|nil The delivered bytes, or nil when there is no heredoc.
-local function delivered_stdin(cmd)
-	local header = cmd:match("^([^\n]*)") or ""
-	local data_token = header:match(" 4<<'([%w_]+)' 0<&4 4<&%-$")
-	if data_token then
-		local program_token = header:match("<<'([%w_]+)'")
-		local data_document = cmd:match("\n.-\n" .. program_token .. "\n(.*)$")
-		local body = data_document and data_document:match("^(.-)\n" .. data_token .. "\n$")
-		local limit = tonumber(command_line(cmd):match("^head %-c (%d+) "))
-		if body == nil or not limit then return nil end
-		return (body .. "\n"):sub(1, limit)
-	end
-	local token = command_line(cmd):match("<<'([%w_]+)'")
-	if not token then return nil end
-	local body = cmd:match("\n(.-)\n" .. token .. "\n$")
-	if body == nil then return nil end
-	local delivered = body .. "\n"
-	local limit = tonumber(command_line(cmd):match("^head %-c (%d+) "))
-	if limit then delivered = delivered:sub(1, limit) end
-	return delivered
-end
-
---- Installs a shell double that answers every command the cipher issues.
---- @param opts table|nil { fail_crypto = boolean } — simulates openssl refusing.
---- @return table The recorded commands.
+--- Installs only the cold KDF/hash shell port; AES has an explicit byte port.
+--- @param opts table|nil { fail_crypto = boolean }.
+--- @return table Recorded commands.
 local function install_shell(opts)
-	opts = opts or {}
+	crypto_options = opts or {}
 	local seen = {}
 	Shell()._set_runner(function(cmd)
+		if cmd:find("command -v", 1, true) then return true end
 		seen[#seen + 1] = cmd
 		local head = command_line(cmd)
-		-- The one key derivation. Recognised by -pbkdf2, which no per-value
-		-- command carries: re-deriving per value would cost half a second each.
 		if head:find("pbkdf2", 1, true) then
 			return helpers.openssl_stdout_receipt(cmd, "salt=00\nkey=" .. KEY .. "\niv=" .. IV .. "\n")
 		end
-		-- The per-row IV, which also goes through the shell.
-		if head:find("dgst", 1, true) then
+		if cmd:find("dgst", 1, true) then
 			local h = 0
 			for i = 1, #cmd do h = (h * 33 + cmd:byte(i)) % 0xFFFFFFF end
-			return (string.format("%07x", h):rep(10)):sub(1, 64)
+			return helpers.openssl_stdout_receipt(cmd, "SHA2-256(stdin)= " .. (string.format("%07x", h):rep(10)):sub(1, 64))
 		end
-		if opts.fail_crypto then return "" end
-		local payload = delivered_stdin(cmd)
-		if payload == nil then return "" end
-		if head:find("enc %-d ") then return helpers.openssl_stdout_receipt(cmd, from_hex(payload)) end
-		return helpers.openssl_stdout_receipt(cmd, to_hex(payload))
+		error("migration cipher must not issue per-value shell commands")
 	end)
 	return seen
 end
@@ -193,7 +147,17 @@ local function load_runner(store)
 	-- adapters/crypto captures the shell adapter at ITS load time; reload it so
 	-- it binds to the instance currently cached, or sha256 runs a REAL command.
 	helpers.load_module("adapters.crypto")
-	local cipher = helpers.load_module("modules.keylogger.text_cipher")
+	local previous = package.loaded["infra.openssl_cipher"]
+	local function transform(_, _, input)
+		if crypto_options.fail_crypto then return nil, "controlled native refusal" end
+		return input:reverse()
+	end
+	package.loaded["infra.openssl_cipher"] = { available = true, encrypt = transform, decrypt = transform,
+		encode_base64 = require("compat.base64").encode, decode_base64 = require("compat.base64").decode,
+	}
+	local ok, cipher = pcall(helpers.load_module, "modules.keylogger.text_cipher")
+	package.loaded["infra.openssl_cipher"] = previous
+	assert(ok, cipher)
 	local dir  = os.getenv("TEMP") or os.getenv("TMPDIR") or "/tmp"
 	local path = (dir:gsub("[/\\]$", "")) .. "/ergopti_migration_machine_id_test"
 	local fh = assert(io.open(path, "w"))
@@ -623,7 +587,7 @@ helpers.describe("text_migration — failure never leaves data behind", function
 		drain(migration)
 		local encrypted = store.rows[1].values.text
 
-		-- openssl stops answering, exactly as it would on a machine that lost it.
+		-- The native provider refuses after a previously acknowledged encryption pass.
 		Shell()._reset_runner()
 		install_shell({ fail_crypto = true })
 		migration.start(Plan.MODE_DECRYPT, DEVICE)
