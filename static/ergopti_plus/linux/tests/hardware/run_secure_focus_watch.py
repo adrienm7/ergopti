@@ -185,6 +185,8 @@ def session(root):
             pending = bytearray()
             initial = read_line(worker, pending)
             assert initial["ready"] and initial["role"] == 61, initial
+            assert initial["parent_jit"] and initial["warmup_requests"] == 128, initial
+            assert initial["warmup_latency_ms"]["p95"] <= initial["barrier_budget_ms"], initial
 
             def command(action):
                 worker.stdin.write((action + "\n").encode())
@@ -295,6 +297,9 @@ def session(root):
                     {
                         "scope": "native GTK/AT-SPI; controlled logical input seam; no evdev claim",
                         "receipts": receipts,
+                        "parent_jit": initial["parent_jit"],
+                        "warmup_requests": initial["warmup_requests"],
+                        "warmup_latency_ms": initial["warmup_latency_ms"],
                         "source_sha256": {
                             name: hashlib.sha256((DRIVER / name).read_bytes()).hexdigest()
                             for name in (

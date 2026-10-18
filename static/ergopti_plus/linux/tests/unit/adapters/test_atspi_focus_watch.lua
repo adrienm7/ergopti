@@ -80,6 +80,20 @@ end
 -- ===========================================
 
 helpers.describe("AT-SPI focus watcher: current native authority", function()
+	helpers.it("imports the native worker without changing the caller's JIT policy", function()
+		local available, jit = pcall(require, "jit")
+		local before = nil
+		if available then before = jit.status() end
+		local name = "adapters.atspi_focus_watch_worker"
+		local previous = package.loaded[name]
+		package.loaded[name] = nil
+		local loaded, worker = pcall(require, name)
+		package.loaded[name] = previous
+		helpers.assert_true(loaded)
+		helpers.assert_eq(type(worker.run), "function")
+		if available then helpers.assert_eq(jit.status(), before) end
+	end)
+
 	helpers.it("publishes same-window ordinary/password/control changes without a keyboard navigation event", function()
 		local state = fixture()
 		state.watch.on_change(function(snapshot) state.changes[#state.changes + 1] = snapshot or false end)
