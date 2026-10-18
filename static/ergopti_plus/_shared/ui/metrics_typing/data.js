@@ -224,10 +224,21 @@ window.setTypingMetricsFreshness = function (freshness, revision) {
 
 /**
  * Processes the manifest after it is injected by the Lua backend. On first
- * call applies the initial reset; on subsequent calls recomputes KPIs and
+ * call initializes untouched filters; on subsequent calls recomputes KPIs and
  * fetches updated n-gram data.
  */
 function process_manifest() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	// A filtered request or an app-modal selection predates this first reply.
+	// Nonempty date edits also count before the native input dispatches change.
+	// Their projection must retain its original native ownership token.
+	const has_initial_range_intent =
+		app_state.range_request_sequence > 0 ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
+		!!start_input?.value ||
+		!!end_input?.value;
 	if (Object.keys(window.metrics_manifest).length > 0) {
 		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
 
@@ -261,22 +272,27 @@ function process_manifest() {
 			app_state.selected_apps = next_sel;
 			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 		}
-
-		const start_input = document.getElementById('date_start');
-		const end_input = document.getElementById('date_end');
-		if (start_input && end_input && (!start_input.value || !end_input.value)) {
-			apply_default_date_range();
-		}
 	}
 
+	if (start_input && end_input && (!start_input.value || !end_input.value)) {
+		const range = get_default_date_range();
+		if (!start_input.value) start_input.value = range.start;
+		if (!end_input.value) end_input.value = range.end;
+	}
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
-		reset_filters(false);
+		if (app_state.app_selection_mode === APP_SELECTION_MODE.UNINITIALIZED) {
+			app_state.selected_apps = new Set(app_state.available_apps);
+			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+		}
+		update_app_btn_text();
+		compute_manifest_metrics();
+		request_range_data();
 
-		// Initial filters scheduled a range request but must not purge the cache
-		// Prefetch can replace that round-trip unless an explicit Reset owns delivery
-		if (window._prefetch_data && !app_state.active_cache_reset_id) {
+		// Only the untouched default range may borrow the initial full prefetch.
+		// User-owned replies are delivered by the bootstrap with their original id.
+		if (window._prefetch_data && !has_initial_range_intent && !app_state.active_cache_reset_id) {
 			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
 		}
 		window._prefetch_data = null;
