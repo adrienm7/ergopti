@@ -62,7 +62,19 @@ local function with_window(module_name, scenario)
 				webview = { new = new_window, windowMasks = { titled = 1, closable = 2, resizable = 8 },
 					usercontent = { new = function()
 						local controller = {}
-						function controller:setCallback(callback) self.callback = callback; h.script_refs[self] = callback; return self end
+						function controller:setCallback(callback)
+							if callback == nil then
+								h.detach_calls = (h.detach_calls or 0) + 1
+								if h.on_detach then h.on_detach(self) end
+								if h.bridge_refusal == "throw" then error("native callback retirement refused") end
+								if h.bridge_refusal == "false" then return false end
+								if h.bridge_refusal == "nil" then return nil end
+								if h.bridge_refusal == "true" then return true end
+							end
+						self.callback = callback
+						h.script_refs[self] = callback
+						return self
+					end
 						h.bridges[#h.bridges + 1] = controller
 						return controller
 					end } },
@@ -240,4 +252,135 @@ helpers.describe("layout manager settles refused factory candidates", function()
 			healthy_layout_successor(h)
 		end)
 	end)
+end)
+
+--- Closes through native chrome or the actual editor action before fade settlement.
+local function close_callback_editor(h, mode)
+	if mode == "native" then h.windows[1]:user_close() else h.close() end
+	h.drain()
+	helpers.assert_nil(next(h.retained), "window GC must settle independently of controller callbacks")
+end
+
+helpers.describe("editor native message callbacks retire independently of windows", function()
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+		for _, mode in ipairs({ "native", "explicit" }) do
+			helpers.it(module_name .. " unrefs its script callback after " .. mode .. " close", function()
+				with_window(module_name, function(_, h)
+					helpers.assert_true(h.show())
+					local controller, previous = h.bridges[1], h.script_refs[h.bridges[1]]
+					helpers.assert_type(previous, "function")
+					close_callback_editor(h, mode)
+					helpers.assert_nil(h.script_refs[controller], "native window GC does not unref UCC callbacks")
+					helpers.assert_true(h.show())
+					local successor = h.bridges[2]
+					helpers.assert_type(h.script_refs[successor], "function")
+					previous({ body = { action = "cancel" } })
+					helpers.assert_type(h.script_refs[successor], "function", "old callbacks cannot retire the successor")
+					h.close(); h.drain()
+					helpers.assert_nil(next(h.script_refs))
+				end)
+			end)
+			helpers.it(module_name .. " retains exact script debt after " .. mode .. " close", function()
+				for _, refusal in ipairs({ "false", "throw", "nil", "true" }) do
+					with_window(module_name, function(_, h)
+						helpers.assert_true(h.show())
+						local controller, previous = h.bridges[1], h.script_refs[h.bridges[1]]
+						h.bridge_refusal = refusal
+						close_callback_editor(h, mode)
+						helpers.assert_true(h.script_refs[controller] == previous)
+						local attempts = h.detach_calls
+						previous({ body = { action = "cancel" } })
+						helpers.assert_eq(h.detach_calls, attempts, "a retired bridge cannot run business or cleanup")
+						helpers.assert_eq(h.show(), false, "an unacknowledged bridge must block successor admission")
+						helpers.assert_eq(#h.windows, 1)
+						h.bridge_refusal = nil
+						helpers.assert_true(h.show())
+						helpers.assert_nil(h.script_refs[controller])
+						helpers.assert_eq(#h.windows, 2)
+						h.close(); h.drain()
+						helpers.assert_nil(next(h.script_refs))
+					end)
+				end
+			end)
+		end
+		helpers.it(module_name .. " fences reopen while its exact callback is being unrefed", function()
+			with_window(module_name, function(_, h)
+				helpers.assert_true(h.show())
+				local reopened
+				h.on_detach = function() reopened = h.show() end
+				close_callback_editor(h, "native")
+				helpers.assert_eq(reopened, false)
+				helpers.assert_eq(#h.windows, 1)
+				h.on_detach = nil
+				helpers.assert_true(h.show())
+				h.close(); h.drain()
+				helpers.assert_nil(next(h.script_refs))
+			end)
+		end)
+	end
+end)
+
+helpers.describe("editor bridge retirement without a native candidate", function()
+	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
+		for _, refusal in ipairs({ "nil", "false" }) do
+			helpers.it(module_name .. " retires a bound bridge when native creation returns " .. refusal, function()
+				with_window(module_name, function(_, h)
+					local construct = hs.webview.new
+					hs.webview.new = function() if refusal == "false" then return false end end
+					helpers.assert_eq(h.show(), false)
+					helpers.assert_eq(#h.windows, 0)
+					helpers.assert_nil(next(h.script_refs), "a native construction refusal cannot orphan its controller")
+					hs.webview.new = construct
+					helpers.assert_true(h.show())
+					h.close(); h.drain()
+					helpers.assert_nil(next(h.script_refs))
+				end)
+			end)
+		end
+		helpers.it(module_name .. " retains unref debt before a native candidate exists", function()
+			for _, refusal in ipairs({ "false", "throw", "nil", "true" }) do
+				with_window(module_name, function(_, h)
+					local construct = hs.webview.new
+					hs.webview.new = function() return nil end
+					h.bridge_refusal = refusal
+					helpers.assert_eq(h.show(), false)
+					local bridge = h.bridges[1]
+					helpers.assert_type(h.script_refs[bridge], "function")
+					hs.webview.new = construct
+					helpers.assert_eq(h.show(), false)
+					helpers.assert_eq(#h.windows, 0)
+					helpers.assert_eq(#h.bridges, 1, "retry must own the exact old bridge before allocating")
+					h.bridge_refusal = nil
+					helpers.assert_true(h.show())
+					helpers.assert_nil(h.script_refs[bridge])
+					h.close(); h.drain()
+					helpers.assert_nil(next(h.script_refs))
+				end)
+			end
+		end)
+	end
+end)
+
+helpers.describe("layout bridge retirement survives native construction exceptions", function()
+	for _, mode in ipairs({ "frame", "constructor" }) do
+		helpers.it("retires the exact layout callback after a native " .. mode .. " exception", function()
+			with_window("ui.layout_manager", function(_, h)
+				local boundary = mode == "frame" and hs.screen or hs.webview
+				local key = mode == "frame" and "mainScreen" or "new"
+				local original = boundary[key]
+				boundary[key] = function() error("native " .. mode .. " failure marker") end
+				helpers.assert_eq(h.show(), false)
+				helpers.assert_nil(next(h.script_refs))
+				local logged = false
+				for _, message in ipairs(h.errors) do
+					if message:find("native " .. mode .. " failure marker", 1, true) then logged = true end
+				end
+				helpers.assert_true(logged, "native exception diagnostics must retain the original cause")
+				boundary[key] = original
+				helpers.assert_true(h.show(), "an exception must not permanently fence the healthy successor")
+				h.close(); h.drain()
+				helpers.assert_nil(next(h.script_refs))
+			end)
+		end)
+	end
 end)

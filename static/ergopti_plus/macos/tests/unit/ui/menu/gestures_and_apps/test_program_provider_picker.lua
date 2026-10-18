@@ -29,7 +29,7 @@ local function fixture(body)
 		end }
 		_G.hs = { webview = { usercontent = { new = function()
 			local content = {}
-			function content:setCallback(callback) self.callback = callback end
+			function content:setCallback(callback) self.callback = callback; return self end
 			f.content = content
 			return content
 		end } }, json = { encode = function(payload) f.payload = payload; return "{}" end } }
@@ -37,7 +37,7 @@ local function fixture(body)
 			get_app_geometry = function() return { width = 600, height = 500 } end,
 			get_centered_frame = function() return {} end,
 			show_webview = function(options)
-				local page = { options = options, content = options.usercontent, scripts = {}, deletes = 0 }
+				local page = { options = options, content = options.usercontent, callback = options.usercontent.callback, scripts = {}, deletes = 0 }
 				function page:evaluateJavaScript(script) self.scripts[#self.scripts + 1] = script end
 				function page:delete()
 					self.deletes = self.deletes + 1
@@ -70,7 +70,7 @@ local function fixture(body)
 			end)
 		end
 		function f.message(page, body)
-			page.content.callback({ body = body })
+			page.callback({ body = body })
 		end
 		function f.confirm(page, key)
 			f.message(page, { action = "confirm", id = "run_program", providerKey = key or "opaque-choice", programArguments = {} })
