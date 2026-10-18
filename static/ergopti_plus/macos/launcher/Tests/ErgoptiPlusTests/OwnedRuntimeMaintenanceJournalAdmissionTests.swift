@@ -8,8 +8,7 @@ import XCTest
 final class OwnedRuntimeMaintenanceJournalAdmissionTests: XCTestCase {
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	func testActualFixedMaintenanceLedgerBlocksOriginalImageAdmission() throws {
-		let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString)
-		try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+		let parent = try OwnedRuntimeFixtureDirectory.create()
 		defer { try? FileManager.default.removeItem(at: parent) }
 		let held = try OwnedRuntimeServiceLifecycleLock.fixtureAcquire(parent: parent, exclusive: false, create: true)
 		defer { XCTAssertTrue(held.retire()) }
