@@ -16,7 +16,7 @@
 --- it. These tests enforce it.
 ---
 --- ROOT CAUSE ENCODED: refuse by index at the argv boundary, before libuv, on
---- every driver; and prove both luv.spawn sites validate ahead of spawning.
+--- every driver; and prove the native and delegated sites validate before dispatch.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -140,7 +140,8 @@ helpers.describe("ShellRunner: argv typing", function()
 		local sites = {
 			{ file = "adapters/curl_http_client.lua", binary = "curl" },
 			{ file = "adapters/file_digest.lua", binary = "sha256sum" },
-			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)" },
+			{ file = "adapters/process_runner.lua", binary = "any program (python3 for layouts)", boundary = "pcall(OwnedProcess.start," },
+			{ file = "adapters/owned_process.lua", binary = "the retained native process", boundary = "pcall(native.spawn," },
 			{ file = "adapters/system_proxy.lua", binary = "the native proxy lookup helper" },
 		}
 		local checked = 0
@@ -154,18 +155,19 @@ helpers.describe("ShellRunner: argv typing", function()
 			-- The CALL, not the availability probe: both modules also test
 			-- `type(luv.spawn) ~= "function"` near the top, and matching that
 			-- would compare the ordering against the wrong line.
-			local spawn_at = src:find("pcall(luv.spawn,", 1, true)
+			local boundary = site.boundary or "pcall(luv.spawn,"
+			local spawn_at = src:find(boundary, 1, true)
 			helpers.assert_true(validate_at ~= nil,
 				site.file .. " must validate its argv via ShellRunner.validate_spawn_args")
 			helpers.assert_true(spawn_at ~= nil,
-				site.file .. " must still spawn " .. site.binary
-				.. " through pcall(luv.spawn, …) -- otherwise the assertion above "
+				site.file .. " must still dispatch " .. site.binary
+				.. " through " .. boundary .. " -- otherwise the assertion above "
 				.. "is vacuous")
 			helpers.assert_true(validate_at < spawn_at,
 				site.file .. " must validate BEFORE luv.spawn, so a refusal costs no "
 				.. "process (keylogger-worker-timings-must-be-strings)")
 		end
-		helpers.assert_eq(checked, 4, "every spawn site must have been inspected")
+		helpers.assert_eq(checked, 5, "every native spawn and its delegated runner must have been inspected")
 	end)
 
 	-- The three drivers must agree on this contract, or the next audit fixes it
