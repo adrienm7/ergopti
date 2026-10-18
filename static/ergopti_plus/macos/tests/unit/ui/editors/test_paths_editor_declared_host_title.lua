@@ -31,7 +31,7 @@ local function with_fixture(callback)
 				return self
 			end
 			for _, name in ipairs({"windowStyle", "level", "allowTextEntry", "allowGestures",
-				"shadow", "allowNewWindows", "windowCallback", "navigationCallback", "html", "show"}) do
+				"shadow", "allowNewWindows", "deleteOnClose", "windowCallback", "navigationCallback", "html", "show"}) do
 				view[name] = function() return view end
 			end
 			function view:hswindow() return nil end
