@@ -156,48 +156,59 @@ Test("mouse: KL_Mouse_Stop clears scroll_flush_fn after cancellation", _MMSG_Sto
 ; click/scroll in a password field / disabled app / private-browsing window does not
 ; accrue into session_clicks/session_scrolls — counts that ride into a later typing row.
 ; This is distinct from the suspend ordering above (which guards A_IsSuspended).
+; The source-order guards below follow the same boundary as the behavioral
+; failure tests; retain proof that its production default reaches the real filter.
+_MMSG_PrivacyBoundaryReachesClassifier() {
+	Body := _DriverFuncBody("_KL_Mouse_ShouldFilter")
+	Assert(Body != "", "the shared mouse privacy boundary must exist")
+	Code := _DriverMaskNonCode(&Body)
+	Assert(IsObject(_MMSG_ReleaseUnique(Code, "i)\bMF_ShouldFilter\h*\(")),
+		"the mouse boundary must retain one real production privacy query")
+}
+Test("mouse: fail-closed privacy boundary retains the production classifier", _MMSG_PrivacyBoundaryReachesClassifier)
+
 _MMSG_LUpFilterBeforeBump() {
 	Body := _DriverFuncBody("KL_Mouse_OnLUp")
-	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosFilter := InStr(Body, "_KL_Mouse_ShouldFilter")
 	PosBump   := InStr(Body, "KL_BumpMouseClick")
 	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
-		"KL_Mouse_OnLUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick so a filtered window does not bump the click count (mouse-counter-privacy-filter)")
+		"KL_Mouse_OnLUp must consult the fail-closed privacy boundary BEFORE KL_BumpMouseClick so a filtered window does not bump the click count (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_OnLUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_LUpFilterBeforeBump)
 
 _MMSG_RUpFilterBeforeBump() {
 	Body := _DriverFuncBody("KL_Mouse_OnRUp")
-	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosFilter := InStr(Body, "_KL_Mouse_ShouldFilter")
 	PosBump   := InStr(Body, "KL_BumpMouseClick")
 	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
-		"KL_Mouse_OnRUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
+		"KL_Mouse_OnRUp must consult the fail-closed privacy boundary BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_OnRUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_RUpFilterBeforeBump)
 
 _MMSG_MUpFilterBeforeBump() {
 	Body := _DriverFuncBody("KL_Mouse_OnMUp")
-	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosFilter := InStr(Body, "_KL_Mouse_ShouldFilter")
 	PosBump   := InStr(Body, "KL_BumpMouseClick")
 	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
-		"KL_Mouse_OnMUp must consult MF_ShouldFilter BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
+		"KL_Mouse_OnMUp must consult the fail-closed privacy boundary BEFORE KL_BumpMouseClick (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_OnMUp filters before bumping the click count (mouse-counter-privacy-filter)", _MMSG_MUpFilterBeforeBump)
 
 _MMSG_AccumScrollFiltersBeforeBump() {
 	Body := _DriverFuncBody("KL_Mouse_AccumScroll")
-	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosFilter := InStr(Body, "_KL_Mouse_ShouldFilter")
 	PosBump   := InStr(Body, "KL_BumpMouseScroll")
 	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
-		"KL_Mouse_AccumScroll must consult MF_ShouldFilter BEFORE KL_BumpMouseScroll so a filtered window does not bump the scroll count (mouse-counter-privacy-filter)")
+		"KL_Mouse_AccumScroll must consult the fail-closed privacy boundary BEFORE KL_BumpMouseScroll so a filtered window does not bump the scroll count (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_AccumScroll filters before bumping the scroll count (mouse-counter-privacy-filter)", _MMSG_AccumScrollFiltersBeforeBump)
 
 _MMSG_AccumScrollHFiltersBeforeBump() {
 	Body := _DriverFuncBody("KL_Mouse_AccumScrollH")
-	PosFilter := InStr(Body, "MF_ShouldFilter")
+	PosFilter := InStr(Body, "_KL_Mouse_ShouldFilter")
 	PosBump   := InStr(Body, "KL_BumpMouseScroll")
 	Assert(PosFilter > 0 and PosBump > 0 and PosFilter < PosBump,
-		"KL_Mouse_AccumScrollH must consult MF_ShouldFilter BEFORE KL_BumpMouseScroll (mouse-counter-privacy-filter)")
+		"KL_Mouse_AccumScrollH must consult the fail-closed privacy boundary BEFORE KL_BumpMouseScroll (mouse-counter-privacy-filter)")
 }
 Test("mouse: KL_Mouse_AccumScrollH filters before bumping the scroll count (mouse-counter-privacy-filter)", _MMSG_AccumScrollHFiltersBeforeBump)
 
@@ -249,7 +260,7 @@ _MMSG_ReleaseMeasurePolicy(Body) {
 		. "|(?:\+\+|--)\h*" . Member . ")")
 		return false
 	MouseRead := _MMSG_ReleaseUnique(Code, "i)\bMouseGetPos\h*\(")
-	Filter := _MMSG_ReleaseUnique(Code, "i)\bMF_ShouldFilter\h*\(")
+	Filter := _MMSG_ReleaseUnique(Code, "i)\b_KL_Mouse_ShouldFilter\h*\(")
 	Publish := _MMSG_ReleaseUnique(Code,
 		"is)\bKL_Mouse_LogDrag\h*\([^)]*?Round\h*\(\h*" . Distance[1]
 		. "\h*\)\h*,\h*" . Duration[1] . "\h*\)")

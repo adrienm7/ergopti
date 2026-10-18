@@ -253,7 +253,9 @@ KL_Enc_Decrypt(value) {
 				return ""
 		ivHex := SubStr(rest, 1, sepPos - 1)
 		b64   := SubStr(rest, sepPos + StrLen(KL_ENC_SEPARATOR))
-		if (StrLen(ivHex) != KL_ENC_IV_BYTES * 2)
+		; Match the shared codec's unwrap contract before native key work or hex
+		; conversion: a corrupt stored IV is a refused envelope, not an exception.
+		if (StrLen(ivHex) != KL_ENC_IV_BYTES * 2 || !RegExMatch(ivHex, "\A[0-9a-fA-F]+\z"))
 				return ""
 
 		key := _KL_Enc_EnsureKey()

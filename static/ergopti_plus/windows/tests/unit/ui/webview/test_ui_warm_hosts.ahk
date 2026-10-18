@@ -222,3 +222,66 @@ _UIWH_BrowserCaption() {
 	}
 }
 Test("UI: hidden browser host retains its caption and shared title (ui-warm-browser-title)", _UIWH_BrowserCaption)
+
+_UIWH_SingletonCloseOwnership() {
+	Saved := WebViewHost._Instances
+	Live := WebViewHost()
+	Other := WebViewHost()
+	Live.AppId := "private-singleton"
+	Other.AppId := Live.AppId
+	WebViewHost._Instances := Map(Live.AppId, Live)
+	try {
+		Other.Close()
+		AssertTrue(WebViewHost._Instances.Has(Live.AppId),
+			"closing an AllowMultiple host must retain the registered singleton")
+		AssertTrue(WebViewHost._Instances[Live.AppId] == Live)
+		Live.Close()
+		AssertFalse(WebViewHost._Instances.Has(Live.AppId), "the registered owner removes itself")
+		Replacement := WebViewHost()
+		Replacement.AppId := Live.AppId
+		WebViewHost._Instances[Live.AppId] := Replacement
+		Live.Close()
+		AssertTrue(WebViewHost._Instances.Has(Live.AppId),
+			"a repeated close cannot unregister the replacement singleton")
+		AssertTrue(WebViewHost._Instances[Live.AppId] == Replacement)
+		Replacement.Close()
+		AssertEqual(0, WebViewHost._Instances.Count)
+	} finally WebViewHost._Instances := Saved
+}
+Test("WebView host: close removes only its registered singleton (webview-singleton-close-owner)",
+	_UIWH_SingletonCloseOwnership)
+
+_UIWH_FailingCallback(Calls, Failure, Params*) {
+	Calls.Push(Params.Length)
+	throw Failure
+}
+
+_UIWH_DispatchFailure(IsReady) {
+	Calls := []
+	Failure := Error("Private bridge callback failure")
+	Host := WebViewHost()
+	Host.Opts := Map("OnReady", _UIWH_FailingCallback.Bind(Calls, Failure),
+		"OnMessage", _UIWH_FailingCallback.Bind(Calls, Failure))
+	Caught := 0
+	try {
+		if IsReady
+			Host._DispatchReady(Host.Epoch)
+		else
+			Host._DispatchMessage(Host.Epoch, Map("action", "save"))
+	} catch Any as Err {
+		Caught := Err
+	}
+	AssertEqual(1, Calls.Length, "the admitted callback executes exactly once")
+	AssertEqual(IsReady ? 1 : 2, Calls[1], "the callback receives its complete contract")
+	AssertTrue(Caught == Failure, "the original failure must reach the timer's global error owner")
+	Host._Reset()
+	if IsReady
+		Host._DispatchReady(Host.Epoch - 1)
+	else
+		Host._DispatchMessage(Host.Epoch - 1, Map())
+	AssertEqual(1, Calls.Length, "a retired callback stays inert")
+}
+Test("WebView host: message callback failures reach the error owner (webview-callback-error)",
+	_UIWH_DispatchFailure.Bind(false))
+Test("WebView host: ready callback failures reach the error owner (webview-callback-error)",
+	_UIWH_DispatchFailure.Bind(true))

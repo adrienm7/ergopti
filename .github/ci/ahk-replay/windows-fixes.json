@@ -1,0 +1,19 @@
+{
+	"expected_count": 93,
+	"filters": [
+		{ "contains": "toml-literal-string-kind", "expected_count": 2 },
+		{ "contains": "toml-numeric-string-read", "expected_count": 10 },
+		{ "contains": "webview-singleton-close-owner", "expected_count": 1 },
+		{ "contains": "webview-callback-error", "expected_count": 2 },
+		{ "contains": "mouse-privacy-query-failure", "expected_count": 4 },
+		{ "contains": "cipher-malformed-iv", "expected_count": 4 },
+		{ "contains": "tap-hold-roll-pause", "expected_count": 4 },
+		{ "contains": "accented-shortcuts-live-digits", "expected_count": 1 },
+		{ "contains": "remote-poll-io-retirement", "expected_count": 32 },
+		{ "contains": "ollama-poll-io-retirement", "expected_count": 32 },
+		{
+			"contains": "mouse: fail-closed privacy boundary retains the production classifier",
+			"expected_count": 1
+		}
+	]
+}

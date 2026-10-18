@@ -271,7 +271,7 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 		try TapFn.Call()
 		finally State["tapping"] := Previous
 	}
-	if (Queue.Length > 0)
+	if (!A_IsSuspended && Queue.Length > 0)
 		_TapHoldRollPort(Ports, "replay", _TapHoldRollReplay).Call(Queue)
 }
 
@@ -279,13 +279,20 @@ _TapHoldRollResolve(Decision, OnlyKeyId := "", Ports := 0) {
 ; the release of a key whose press a hotkey suppressed, and a key still held
 ; types on through its own auto-repeat.
 ; @param ScanCodes {Array} Scan codes, extended ones above 0x100.
-_TapHoldRollReplay(ScanCodes) {
+; @param SendFn {Func} Keystroke sender; injectable without typing into the OS.
+_TapHoldRollReplay(ScanCodes, SendFn := SendEvent) {
 	global TAPHOLD_ROLL_REPLAY_SEND_LEVEL
+	if A_IsSuspended
+		return
 	PreviousLevel := A_SendLevel
 	SendLevel(TAPHOLD_ROLL_REPLAY_SEND_LEVEL)
 	try {
-		for Sc in ScanCodes
-			SendEvent("{Blind}{" . Format("SC{:03X}", Sc) . "}")
+		for Sc in ScanCodes {
+			; SendEvent may yield between keys: a pause interrupts this same thread.
+			if A_IsSuspended
+				return
+			SendFn.Call("{Blind}{" . Format("SC{:03X}", Sc) . "}")
+		}
 	} finally SendLevel(PreviousLevel)
 }
 
@@ -296,6 +303,8 @@ _TapHoldRollReplay(ScanCodes) {
 ;        "replay"(ScanCodes).
 TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 	global TAPHOLD_ROLL_POLL_MS
+	if A_IsSuspended
+		return
 	Name := IsSet(HotkeyName) ? HotkeyName : A_ThisHotkey
 	if !RegExMatch(Name, "i)SC([0-9A-F]{3})$", &Found)
 		throw ValueError("A typing-key roll hotkey must be named by its scan code.", -1, Name)
@@ -331,6 +340,12 @@ TapHoldRollOtherKey(HotkeyName := unset, Ports := 0) {
 		return
 	}
 	loop {
+		; Suspend leaves this waiting hotkey thread alive. Cancel before another
+		; physical-state poll, and let the owner release its press claim.
+		if A_IsSuspended {
+			_TapHoldRollResolve("tap", , Ports)
+			return
+		}
 		; Decided by a key struck after this one, which sent this one again too.
 		if (State["key"] == "" || State["generation"] != Generation)
 			return

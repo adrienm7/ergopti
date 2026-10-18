@@ -478,6 +478,7 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	if !_LLM_Ollama_Async.Has(req_id)
 		return
 	entry := _LLM_Ollama_Async[req_id]
+	CleanupFn := _LLM_CurlArtifactPortFn(Port, "cleanup", _LLM_Ollama_CleanupCurlFiles)
 	if !_LLM_Ollama_PresenceStillCurrent(entry)
 		entry["cancelled"] := true
 	Terminal := Map("complete", false, "exit", -1,
@@ -490,8 +491,8 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	if _LLM_CurlTerminalComplete(Terminal) {
 		_LLM_CurlReleaseEntryProcess(entry, false, Port)
 		if entry["cancelled"] {
-			_LLM_Ollama_CleanupCurlFiles(entry)
-			_LLM_Ollama_Async.Delete(req_id)
+			CleanupFn.Call(entry)
+			_LLM_Ollama_DeleteAsyncOwned(req_id, entry)
 			_LLM_Ollama_DrainPending()
 			return
 		}
@@ -500,8 +501,11 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 		body := Terminal["body"]
 		if !_LLM_Ollama_PresenceStillCurrent(entry)
 			entry["cancelled"] := true
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		CleanupFn.Call(entry)
+		if !_LLM_Ollama_DeleteAsyncOwned(req_id, entry) || entry["cancelled"] {
+			_LLM_Ollama_DrainPending()
+			return
+		}
 		if !_LLM_CurlTerminalOk(Terminal) or body == "" {
 			try LoggerWarn("LLM.ollama", "curl terminal failure (exit={1}, status={2}, body_chars={3}).",
 				Terminal["exit"], Terminal["status"], StrLen(body))
@@ -520,8 +524,8 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 	}
 	if entry["cancelled"] {
 		_LLM_CurlReleaseEntryProcess(entry, true, Port)
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		CleanupFn.Call(entry)
+		_LLM_Ollama_DeleteAsyncOwned(req_id, entry)
 		_LLM_Ollama_DrainPending()
 		return
 	}
@@ -530,13 +534,30 @@ _LLM_Ollama_PollCurl(req_id, Port := 0) {
 		elapsed := entry.Has("start_tick") ? TickElapsed(entry["start_tick"]) : 0
 		try LoggerWarn("LLM.ollama", "curl request timed out after {1} ms.", elapsed)
 		on_fail := entry["on_fail"]
-		_LLM_Ollama_CleanupCurlFiles(entry)
-		_LLM_Ollama_Async.Delete(req_id)
+		CleanupFn.Call(entry)
+		if !_LLM_Ollama_DeleteAsyncOwned(req_id, entry) || entry["cancelled"] {
+			_LLM_Ollama_DrainPending()
+			return
+		}
 		_LLM_InvokeCallback(on_fail, "on_fail")
 		_LLM_Ollama_DrainPending()
 		return
 	}
 	SetTimer(() => _LLM_Ollama_PollCurl(req_id, Port), -LLM_OLLAMA_POLL_MS)
+}
+
+
+; File reads and artifact cleanup may yield to cancellation or slot eviction.
+; Retire the captured owner only, then let the caller decide public delivery.
+_LLM_Ollama_DeleteAsyncOwned(req_id, Entry) {
+	global _LLM_Ollama_Async
+	PreviousCritical := Critical("On")
+	try {
+		if !_LLM_Ollama_Async.Has(req_id) || _LLM_Ollama_Async[req_id] != Entry
+			return false
+		_LLM_Ollama_Async.Delete(req_id)
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 _LLM_Ollama_CleanupCurlFiles(entry) {
