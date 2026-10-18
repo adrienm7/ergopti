@@ -4,7 +4,8 @@
 --- DESCRIPTION:
 --- Runs the actual daemon signal installer and final signal registry against
 --- real luv watchers in an owned child without posix.signal. Repeated terminal
---- signals must retain external cleanup debt; close callbacks retire every handle.
+--- signals must retain external cleanup debt even when diagnostics throw;
+--- close callbacks retire every handle.
 --- ==============================================================================
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_signal_shutdown%.lua$"))
@@ -44,7 +45,10 @@ if arg[1] == "child" then
 		event_loop = { stop = function() state.loops = state.loops + 1; uv.stop() end },
 	})
 	local env = setmetatable({ shutdown = coordinator, privacy_owners = owners,
-		Logger = { info = function() state.terminal = state.terminal + 1 end,
+		Logger = { info = function()
+			state.terminal = state.terminal + 1
+			if arg[2] == "logger" then error("terminal diagnostic failed") end
+		end,
 			debug = function() end, error = function() end },
 		injector = { close_fast_channel = function() state.closes = state.closes + 1; return true end },
 		perform_reload = function() state.reloads = state.reloads + 1 end,
@@ -123,7 +127,7 @@ env.HOME, env.XDG_CONFIG_HOME, env.XDG_CACHE_HOME, env.XDG_STATE_HOME = scratch,
 env.DISPLAY, env.WAYLAND_DISPLAY, env.DBUS_SESSION_BUS_ADDRESS = "", "", ""
 local environment = {}
 for key, value in pairs(env) do environment[#environment + 1] = key .. "=" .. value end
-for _, mode in ipairs({ "term", "reload", "partial", "help" }) do
+for _, mode in ipairs({ "term", "reload", "partial", "help", "logger" }) do
 	local result, process
 	local timer = assert(uv.new_timer())
 	local stdout, stderr = assert(uv.new_pipe(false)), assert(uv.new_pipe(false))
@@ -159,4 +163,4 @@ end
 remove_tree(scratch)
 local remaining = 0; uv.walk(function() remaining = remaining + 1 end)
 assert(remaining == 0, "native signal parent retained child handles")
-print("Native daemon signal shutdown: 4 cases passed")
+print("Native daemon signal shutdown: 5 cases passed")
