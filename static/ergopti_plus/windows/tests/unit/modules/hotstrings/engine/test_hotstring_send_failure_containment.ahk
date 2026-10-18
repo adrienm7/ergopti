@@ -99,6 +99,9 @@ _SCFC_AfterRestore(CaseName, Expected, RestoreAction := "none",
 		Job := Map("id", ++_SelectionCaptureNextId,
 			"callback", _SCFC_Deliver.Bind(State), "started", Started,
 			"foreground", 101, "clipboard", "owned snapshot", "clear_sequence", 100,
+			; Every ready/completed fixture has admitted the captured sequence.
+			; The physical-copy cancellation still owns only its earlier clear.
+			"owned_sequence", Reason == "superseded by input" ? 100 : 101,
 			"owner_token", Token, "expected_change", 0, "timer", (*) => 0)
 		RetiredTimer := Job["timer"]
 		_SelectionCaptureJob := Job
@@ -479,3 +482,6 @@ Test("hotstrings: startup rollback yields to a newer clipboard (selection-startu
 	_SCO_StartupSettlement.Bind(true))
 Test("hotstrings: startup rollback preserves its settlement successor (selection-startup-owner-settlement)",
 	_SCO_StartupSettlement.Bind(false))
+
+
+#Include test_selection_admitted_clipboard_sequence.ahk

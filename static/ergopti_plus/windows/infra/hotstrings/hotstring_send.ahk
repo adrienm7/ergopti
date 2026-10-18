@@ -720,6 +720,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 				"foreground", 0,
 				"clipboard", "",
 				"clear_sequence", 0,
+				"owned_sequence", 0,
 				"owner_token", 0,
 				"expected_change", 0,
 				"timer", 0,
@@ -752,6 +753,7 @@ GetSelectionAsync(OnReady, Ports := 0) {
 						throw Error("clipboard clear failed")
 				Job["mutated"] := true
 				Job["clear_sequence"] := SequenceFn.Call()
+				Job["owned_sequence"] := Job["clear_sequence"]
 				if !_SelectionCaptureStartCurrent(Job)
 						return false
 				Job["expected_change"] := CB_ExpectOwnedChange()
@@ -839,7 +841,7 @@ _SelectionCapturePoll(Job) {
 		; Zero timeout is a probe, never a blocking wait. Accept every clipboard
 		; format so an image selection resolves immediately to an empty text result.
 		if ClipWait(0, 1) {
-				_SelectionCaptureFinish(Job, A_Clipboard, true, "ready")
+				_SelectionCaptureReadReady(Job)
 				return
 		}
 		if (Elapsed >= Round(GET_SELECTION_TIMEOUT_SEC * 1000)) {
@@ -847,6 +849,63 @@ _SelectionCapturePoll(Job) {
 						"GetSelectionAsync timed out after {1}s; returning no selection.",
 						GET_SELECTION_TIMEOUT_SEC)
 				_SelectionCaptureFinish(Job, "", false, "timeout")
+		}
+}
+
+; Admit the sequence of a ready copy before its potentially blocking text
+; read. A later cancellation or external copy cannot rename the clipboard's
+; new contents as this job's own mutation. Zero never replaces proven ownership.
+_SelectionCaptureReadReady(Job, ReadFn := 0, SequenceFn := 0,
+		RestoreFn := 0, ContextFn := 0) {
+		global _SelectionCaptureJob, _SelectionCaptureNextId
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !IsObject(SequenceFn)
+				SequenceFn := _SelectionClipboardSequence
+		if !IsObject(ReadFn)
+				ReadFn := () => A_Clipboard
+		Sequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		if !Sequence {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership is unavailable.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard sequence unavailable", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		Job["owned_sequence"] := Sequence
+		try Text := ReadFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection clipboard read failed: {1}.", Err.Message)
+				; A failed getter must not retain its repeating timer forever.
+				; Cleanup is permitted while paused, but never for a replaced job.
+				if _SelectionCaptureJob != Job or _SelectionCaptureNextId != Job["id"]
+						return false
+				_SelectionCaptureFinish(Job, "", false, "clipboard read failed", RestoreFn, SequenceFn, ContextFn)
+				return true
+		}
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		VerifiedSequence := _SelectionCaptureProbeSequence(SequenceFn)
+		if !_SelectionCaptureStartCurrent(Job)
+				return false
+		Deliver := VerifiedSequence && VerifiedSequence == Sequence
+		if !Deliver {
+				try LoggerWarn("hotstring_engine", "Selection read refused: clipboard ownership changed or became unavailable while reading.")
+				if !_SelectionCaptureStartCurrent(Job)
+						return false
+		}
+		_SelectionCaptureFinish(Job, Deliver ? Text : "", Deliver,
+				Deliver ? "ready" : "clipboard changed during read", RestoreFn, SequenceFn, ContextFn)
+		return true
+}
+
+_SelectionCaptureProbeSequence(SequenceFn) {
+		try return SequenceFn.Call()
+		catch as Err {
+				try LoggerWarn("hotstring_engine", "Selection ownership probe failed: {1}.", Err.Message)
+				return 0
 		}
 }
 
@@ -860,25 +919,18 @@ _SelectionCaptureFinish(Job, Text, Deliver, Reason, RestoreFn := 0,
 		_SelectionCaptureReleaseTimer(Job)
 		_SelectionCaptureJob := false
 
-		; On a physical-input cancellation, preserve clipboard data which arrived
-		; after our clear: it may be the user's own copy, and restoring the old
-		; snapshot would silently destroy it. All normal completion paths restore
-		; exactly the prior clipboard contents.
+		; Restore only the clear or received-copy sequence this job admitted.
+		; Sampling current contents here would authorize overwriting a newer
+		; copy on cancellation, or one published during the text read above.
 		if !IsObject(SequenceFn)
 				SequenceFn := _SelectionClipboardSequence
-		PreserveCurrent := (Reason == "superseded by input"
-				and SequenceFn.Call() != Job["clear_sequence"])
 		if Job["expected_change"]
 				CB_CancelExpectedChange(Job["expected_change"])
-		if !PreserveCurrent {
-				OwnedSequence := SequenceFn.Call()
-				if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
-						Job["owner_token"], "selection_capture_" . Reason, true,
-						!OwnedSequence, RestoreFn, SequenceFn)
-						try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
-		} else if Job["owner_token"] {
-				CB_EndOwnedTransaction(Job["owner_token"])
-		}
+		OwnedSequence := Job["owned_sequence"]
+		if !CB_RestoreOwnedAllEventually(Job["clipboard"], OwnedSequence,
+				Job["owner_token"], "selection_capture_" . Reason, true,
+				!OwnedSequence, RestoreFn, SequenceFn)
+				try LoggerError("hotstring_engine", "GetSelectionAsync clipboard restore failed ({1}).", Reason)
 		Job["clipboard"] := ""
 
 		if !Deliver || A_IsSuspended
