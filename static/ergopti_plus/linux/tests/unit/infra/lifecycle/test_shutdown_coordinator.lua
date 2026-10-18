@@ -498,3 +498,98 @@ helpers.describe("shutdown coordinator: signal output ownership", function()
 		helpers.assert_eq(state.closes, 1)
 	end)
 end)
+
+helpers.describe("shutdown coordinator: final native output acknowledgement", function()
+	local function with_output(mode, check)
+		local names = { "adapters.uinput_writer", "adapters.modifier_broker", "modules.hotstrings.injector" }
+		local saved = {}
+		for _, name in ipairs(names) do saved[name] = package.loaded[name]; package.loaded[name] = nil end
+		local ok, why = pcall(function()
+			local writer = require("adapters.uinput_writer")
+			local broker = require("adapters.modifier_broker")
+			local injector = require("modules.hotstrings.injector")
+			local calls = { destroy = 0, close = 0, success = 0, writes = 0 }
+			writer._set_backend({
+				open = function() return 47 end,
+				ioctl = function(_, request)
+					if request == writer.UI_DEV_DESTROY then
+						calls.destroy = calls.destroy + 1
+						if mode == "destroy throws" then error("controlled destroy failure") end
+						return mode ~= "destroy refuses"
+					end
+					return true
+				end,
+				write = function() calls.writes = calls.writes + 1; return true end,
+				close = function() calls.close = calls.close + 1; return mode ~= "close refuses" end,
+			})
+			-- The availability check reads this existing node; all native operations
+			-- remain explicit controlled ports on the real Writer and Injector.
+			writer._set_path_for_test("/dev/null")
+			if mode ~= "absent" then helpers.assert_true(injector.open_fast_channel()) end
+			local channel = injector.output_broker()
+			if mode ~= "absent" then
+				local capability = writer.capture_output()
+				helpers.assert_true(writer.emit_owned(capability, 29, 1), "a held Ctrl reaches the acknowledged channel")
+			end
+			local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "r"))
+			local source = file:read("*a"); file:close()
+			local finish = assert(source:match('(shutdown.request%("event loop returned"%).-)\nend\n\n%-%- The daemon runs'),
+				"actual Main final teardown must exist")
+			local env = setmetatable({
+				shutdown = { request = function() end, is_pending = function() return false end },
+				injector = injector, tooltip_preview = false, llm_overlay = false,
+				file_watchers = false, process_lifecycle = false, tray_menu = false,
+				keylogger = { get_session_stats = function() return { keystrokes = 0, words = 0, duration_ms = 0 } end },
+				Logger = { flush_repeats = function() end, info = function() calls.success = calls.success + 1 end },
+			}, { __index = _G })
+			local chunk, err
+			if setfenv then chunk, err = loadstring(finish, "actual final output teardown"); if chunk then setfenv(chunk, env) end
+			else chunk, err = load(finish, "actual final output teardown", "t", env) end
+			check(assert(chunk, err), injector, writer, broker, channel, calls)
+		end)
+		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+		if not ok then error(why, 0) end
+	end
+
+	for _, mode in ipairs({ "destroy refuses", "close refuses", "destroy throws" }) do
+		helpers.it("refuses clean exit when native output " .. mode, function()
+			with_output(mode, function(finish, injector, writer, broker, channel, calls)
+				local ok = pcall(finish)
+				helpers.assert_eq(ok, false, "native retirement failure must reach Main's failure path")
+				helpers.assert_eq(calls.success, 0, "unacknowledged retirement cannot announce a clean exit")
+				helpers.assert_true(writer.has_output_debt())
+				helpers.assert_eq(injector.output_broker(), channel, "retain the exact output owner")
+				helpers.assert_eq(broker.for_channel(writer), channel)
+				helpers.assert_eq(injector.close_fast_channel(), false)
+				helpers.assert_eq(calls.destroy, 1, "unknown retirement must not retry a possibly recycled descriptor")
+				helpers.assert_eq(calls.close, 1)
+				helpers.assert_eq(calls.writes, 2, "retirement cannot replay the held key")
+			end)
+		end)
+	end
+
+	helpers.it("completes final teardown only after destroy and close both acknowledge", function()
+		with_output("acknowledged", function(finish, injector, writer, broker, _, calls)
+			helpers.assert_true(pcall(finish))
+			helpers.assert_eq(calls.success, 2)
+			helpers.assert_eq(calls.destroy, 1)
+			helpers.assert_eq(calls.close, 1)
+			helpers.assert_eq(writer.is_open(), false)
+			helpers.assert_eq(writer.has_output_debt(), false)
+			helpers.assert_eq(broker.for_channel(writer), nil)
+			helpers.assert_eq(injector.close_fast_channel(), true, "already retired output is acknowledged without another native attempt")
+			helpers.assert_eq(calls.close, 1)
+		end)
+	end)
+
+	helpers.it("acknowledges no-grab teardown when no output channel was acquired", function()
+		with_output("absent", function(finish, injector, writer, _, _, calls)
+			helpers.assert_eq(injector.close_fast_channel(), true)
+			helpers.assert_true(pcall(finish))
+			helpers.assert_eq(calls.success, 2)
+			helpers.assert_eq(calls.destroy, 0)
+			helpers.assert_eq(calls.close, 0)
+			helpers.assert_eq(writer.has_output_debt(), false)
+		end)
+	end)
+end)
