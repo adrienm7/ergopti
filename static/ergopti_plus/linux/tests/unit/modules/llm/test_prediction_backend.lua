@@ -18,11 +18,11 @@ local ENTRY = { id = "cerebras-1", provider = "cerebras", label = "Cerebras", to
 --- @param backend string "api" or "ollama"
 --- @param entry table|nil The active API entry.
 --- @return table engine, table calls, table scheduler, function restore
-local function load(backend, entry, stored_settings, without_local_model, asynchronous)
+local function load(backend, entry, stored_settings, without_local_model, asynchronous, privacy)
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
-		"infra.llm_preferences",
+		"infra.llm_preferences", "modules.llm.trigger_settings",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
@@ -65,6 +65,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = stored })
 	-- Settings caches what it read; a fresh copy reads this storage.
 	package.loaded["modules.llm.settings"] = nil
+	package.loaded["modules.llm.trigger_settings"] = nil
 	package.loaded["adapters.storage"] = {
 		get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 		set = function(key, value) stored[key] = value; return true end,
@@ -78,6 +79,8 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
 		focus_id = function() return calls.focus end,
+		privacy_guard = privacy and privacy.guard,
+		privacy_context = privacy and privacy.context,
 		engine = { current_buffer = function() return calls.buffer or "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
 		apply_prediction = function() calls.applied = calls.applied + 1; return calls.refuse_apply ~= true end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
@@ -530,4 +533,115 @@ helpers.describe("buffer-origin ownership follows matcher retirement", function(
 		restore()
 		if not ok then error(err, 0) end
 	end)
+end)
+
+helpers.describe("prediction resident global privacy admission", function()
+	local function request(engine, count)
+		return engine.predict("Bonjour à tous", nil, { num_predictions = count or 1,
+			profile = { id = "raw", system_single = "{context}" } })
+	end
+	local settings = { ["llm.trigger.secure_filter_enabled"] = false, ["llm.trigger.url_bar_filter_enabled"] = false }
+	helpers.it("admits a known ordinary owner without querying the guard per streamed token (llm-global-privacy)", function()
+		local checks = 0
+		local engine, calls, _, restore = load("api", ENTRY, settings, true, true, { guard = function() checks = checks + 1; return false end })
+		local okay, problem = pcall(function()
+			request(engine)
+			helpers.assert_eq(#calls.remote, 1)
+			helpers.assert_true(checks > 0, "the global owner must be checked even with both optional filters disabled")
+			local admitted = checks
+			for _ = 1, 20 do calls.remote[1].chunk(" que") end
+			helpers.assert_eq(checks, admitted, "stream deltas must not perform native privacy barriers")
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_true(engine.accept(1))
+			helpers.assert_eq(calls.applied, 1)
+		end)
+		restore(); if not okay then error(problem, 0) end
+	end)
+	for _, verdict in ipairs({ "protected", "unknown", "throw" }) do
+		helpers.it("refuses " .. verdict .. " global ownership before any provider call (llm-global-privacy)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY, settings, true, true, { guard = function()
+				if verdict == "throw" then error("controlled resident barrier failure") end
+				if verdict == "protected" then return true end
+			end })
+			local okay, problem = pcall(function()
+				helpers.assert_eq(engine.trigger_now(), false)
+				scheduler.settle()
+				helpers.assert_eq(#calls.remote, 0)
+				helpers.assert_eq(calls.applied, 0)
+				helpers.assert_true(engine.is_enabled(), "a privacy refusal must not change the saved AI switch")
+			end)
+			restore(); if not okay then error(problem, 0) end
+		end)
+	end
+	helpers.it("refuses unknown joined context even when optional privacy filters are disabled (llm-global-privacy)", function()
+		local engine, calls, _, restore = load("api", ENTRY, settings, true, true,
+			{ guard = function() return false end, context = function() return nil end })
+		local okay, problem = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), false)
+			helpers.assert_eq(#calls.remote, 0)
+			helpers.assert_true(engine.is_enabled())
+		end)
+		restore(); if not okay then error(problem, 0) end
+	end)
+	helpers.it("refuses a request cancelled synchronously by the resident barrier (llm-global-privacy)", function()
+		local current
+		local engine, calls, _, restore = load("api", ENTRY, settings, true, true, { guard = function() current.cancel(); return false end })
+		current = engine
+		local okay, problem = pcall(function()
+			helpers.assert_eq(engine.trigger_now(), false)
+			helpers.assert_eq(#calls.remote, 0, "a cleared old buffer cannot be sent after nested cancellation")
+		end)
+		restore(); if not okay then error(problem, 0) end
+	end)
+	helpers.it("revokes a paced variant and admits a later ordinary request (llm-global-privacy)", function()
+		local blocked = false
+		local engine, calls, scheduler, restore = load("api", ENTRY, settings, true, true, { guard = function() return blocked end })
+		local okay, problem = pcall(function()
+			request(engine, 2)
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(#calls.remote, 1, "the next variant must still be paced")
+			blocked = true; scheduler.settle()
+			helpers.assert_eq(#calls.remote, 1, "revoked context must not send the next request")
+			helpers.assert_eq(engine.has_suggestions(), false)
+			helpers.assert_true(engine.is_enabled())
+			blocked = false; request(engine); scheduler.settle()
+			helpers.assert_eq(#calls.remote, 2, "privacy recovery permits a new independent request")
+			calls.remote[2].done(" que tout le monde aille bien", nil)
+			helpers.assert_true(engine.accept(1))
+		end)
+		restore(); if not okay then error(problem, 0) end
+	end)
+	helpers.it("withdraws completion after global privacy is revoked (llm-global-privacy)", function()
+		local blocked = false
+		local engine, calls, _, restore = load("api", ENTRY, settings, true, true, { guard = function() return blocked end })
+		local okay, problem = pcall(function()
+			request(engine); blocked = true
+			calls.remote[1].done(" que tout le monde aille bien", nil)
+			helpers.assert_eq(engine.has_suggestions(), false)
+			helpers.assert_eq(engine.accept(1), false)
+			helpers.assert_eq(calls.applied, 0)
+			helpers.assert_true(engine.is_enabled())
+		end)
+		restore(); if not okay then error(problem, 0) end
+	end)
+	for _, kind in ipairs({ "protected", "nested cancel" }) do
+		helpers.it("refuses " .. kind .. " at physical acceptance without changing the AI switch (llm-global-privacy)", function()
+			local accepting, current = false
+			local engine, calls, _, restore = load("api", ENTRY, settings, true, true, { guard = function()
+				if accepting and kind == "nested cancel" then current.cancel(); return false end
+				return accepting
+			end })
+			current = engine
+			local okay, problem = pcall(function()
+				request(engine); calls.remote[1].done(" que tout le monde aille bien", nil)
+				helpers.assert_true(engine.has_suggestions())
+				accepting = true
+				helpers.assert_eq(engine.accept(1), false)
+				helpers.assert_eq(calls.applied, 0, "the locally retained candidate cannot commit after cancellation")
+				helpers.assert_eq(engine.has_suggestions(), false)
+				helpers.assert_true(engine.is_enabled())
+			end)
+			restore(); if not okay then error(problem, 0) end
+		end)
+	end
 end)

@@ -78,7 +78,7 @@ end)
 --- @param options table Native app identity or deliberately malformed adapter output.
 --- @param body function Receives observed request/probe counts and the real lifecycle.
 local function with_url_request(options, body)
-	local observed = { chats = 0, probes = 0 }
+	local observed = { chats = 0, probes = 0, windows = 0 }
 	replace("infra.llm_preferences", PreferencesFixture.new({ initial = {
 		["llm.models.selected"] = "ollama", ["llm.trigger.secure_filter_enabled"] = false,
 		["llm.trigger.url_bar_filter_enabled"] = true,
@@ -97,6 +97,7 @@ local function with_url_request(options, body)
 	end)
 	replace("adapters.secure_field_detector", nil)
 	replace("adapters.window_info", { focused_snapshot = function()
+		observed.windows = observed.windows + 1
 		if options.window_throw then error("controlled native window failure") end
 		return { appId = options.app, windowTitle = "Owned document", bundleId = "", executablePath = "" }, "x11:123:42"
 	end })
@@ -115,7 +116,9 @@ local function with_url_request(options, body)
 		get_base_url = function() return "http://127.0.0.1:11434" end })
 	replace("modules.llm.prediction_engine", nil)
 	local engine = require("modules.llm.prediction_engine")
-	engine.init({ focus_id = function() return "owned-native-text-field" end })
+	engine.init({ focus_id = function() return "owned-native-text-field" end,
+		privacy_guard = options.privacy_guard, privacy_context = options.privacy_context })
+	if options.before then options.before(engine) end
 	local okay, problem = xpcall(function()
 		engine.predict("Bonjour à tous", nil, { num_predictions = 1,
 			profile = { id = "raw", system_single = "{context}" } })
@@ -626,5 +629,44 @@ helpers.describe("Privacy callback native epoch retirement", function()
 				helpers.assert_eq(observed.redraws, 0)
 			end)
 		end
+	end)
+end)
+
+helpers.describe("joined resident AI application context", function()
+	local function context()
+		return { app_id = "code", title = "Owned document", native_identity = "x11:123:42" }
+	end
+	helpers.it("uses the joined owner context instead of a different legacy foreground application (llm-global-context)", function()
+		with_url_request({ app = "firefox", url = true, privacy_guard = function() return false end,
+			privacy_context = context }, function(observed)
+			helpers.assert_eq(observed.chats, 1, "the actual joined editor owner admits this request")
+			helpers.assert_eq(observed.windows, 0, "a joined owner cannot be replaced by an unrelated window lookup")
+			helpers.assert_eq(observed.probes, 0)
+		end)
+	end)
+	for _, kind in ipairs({ "unknown", "scalar", "missing app", "missing title", "missing native identity", "throw" }) do
+		helpers.it("refuses " .. kind .. " joined context without a legacy fallback (llm-global-context)", function()
+			with_url_request({ app = "code", privacy_guard = function() return false end,
+				privacy_context = function()
+					if kind == "unknown" then return nil end
+					if kind == "scalar" then return "code" end
+					if kind == "throw" then error("controlled joined context failure") end
+					local current = context()
+					current[({ ["missing app"] = "app_id", ["missing title"] = "title", ["missing native identity"] = "native_identity" })[kind]] = nil
+					return current
+				end }, function(observed)
+					helpers.assert_eq(observed.chats, 0)
+					helpers.assert_eq(observed.windows, 0, "unknown joined ownership must not fall back to native window labels")
+				end)
+		end)
+	end
+	helpers.it("refuses a joined context callback that cancels its originating request (llm-global-context)", function()
+		local engine
+		with_url_request({ app = "code", privacy_guard = function() return false end,
+			before = function(current) engine = current end,
+			privacy_context = function() engine.cancel(); return context() end }, function(observed)
+			helpers.assert_eq(observed.chats, 0)
+			helpers.assert_eq(observed.windows, 0)
+		end)
 	end)
 end)

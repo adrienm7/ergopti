@@ -490,3 +490,70 @@ helpers.describe("window_info: no session", function()
 	end)
 
 end)
+
+helpers.describe("window_info: native privacy context", function()
+	for _, scenario in ipairs({ "admitted", "other field", "other app", "other role", "unknown" }) do
+		helpers.it("(focus-context-join) unsupported compositor context " .. scenario, function()
+			local previous = package.loaded["adapters.atspi_focus"]
+			local called, detail = pcall(function()
+				local receipt = { bus = ":1.8", path = "/owned/field", role = 61 }
+				local reads = 0
+				package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+					reads = reads + 1
+					if scenario == "unknown" then return nil, false end
+					return { native_bus_name = scenario == "other app" and ":1.9" or receipt.bus,
+						native_object_path = scenario == "other field" and "/other/field" or receipt.path,
+						role = scenario == "other role" and 40 or receipt.role,
+						app_id = "owned-native-process", window_title = "Owned native frame",
+						window_bus_name = receipt.bus, window_object_path = "/owned/frame" }, true
+				end }
+				local wi = under("wayland", "GNOME", {})
+				local context = wi.focused_privacy_context(receipt)
+				helpers.assert_eq(reads, 1)
+				if scenario == "admitted" then
+					helpers.assert_eq(context.app_id, "owned-native-process")
+					helpers.assert_eq(context.title, "Owned native frame")
+					helpers.assert_eq(context.native_identity, "atspi::1.8:/owned/frame")
+				else helpers.assert_eq(context, nil, "context belongs to the exact native field receipt") end
+			end)
+			package.loaded["adapters.atspi_focus"] = previous
+			restore()
+			if not called then error(detail, 0) end
+		end)
+	end
+end)
+
+helpers.describe("window_info: compositor privacy context binding", function()
+	for _, scenario in ipairs({ "matched", "different PID", "different title", "missing PID" }) do
+		helpers.it("(focus-context-join) compositor class requires native frame binding: " .. scenario, function()
+			local previous = package.loaded["adapters.atspi_focus"]
+			local wi, original_snapshot
+			local called, detail = pcall(function()
+				package.loaded["adapters.atspi_focus"] = { get_context_snapshot = function()
+					return { native_bus_name = ":1.8", native_object_path = "/owned/field", role = 61,
+						process_id = 123, app_id = "bitwarden", window_title = "Owned private frame",
+						window_bus_name = ":1.8", window_object_path = "/owned/frame" }, true
+				end }
+				wi = under("unknown", "", {})
+				original_snapshot = wi.focused_process_snapshot
+				wi.focused_process_snapshot = function()
+					local pid = scenario == "different PID" and 456 or 123
+					if scenario == "missing PID" then pid = nil end
+					return { appId = "compositor-class", windowTitle = scenario == "different title" and "Other frame" or "Owned private frame" }, "native-window", pid
+				end
+				local context = wi.focused_privacy_context({ bus = ":1.8", path = "/owned/field", role = 61 })
+				if scenario == "matched" then
+					helpers.assert_eq(context.app_id, "compositor-class")
+					helpers.assert_eq(context.native_identity, "native-window")
+				else
+					helpers.assert_eq(context.app_id, "bitwarden", "unrelated compositor metadata cannot override protected native owner")
+					helpers.assert_eq(context.native_identity, "atspi::1.8:/owned/frame")
+				end
+			end)
+			if wi then wi.focused_process_snapshot = original_snapshot end
+			package.loaded["adapters.atspi_focus"] = previous
+			restore()
+			if not called then error(detail, 0) end
+		end)
+	end
+end)

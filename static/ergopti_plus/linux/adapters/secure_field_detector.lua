@@ -186,10 +186,12 @@ end
 --- Publishes a conclusive role owned by the resident native focus watcher.
 --- @param role number Native AT-SPI role, already scoped to the active control.
 --- @param epoch number Exact detector epoch invalidated by the privacy owner.
+--- @param protected boolean|nil Fresh joined application/private-window policy.
 --- @return boolean accepted
-function M.publishFocus(role, epoch)
+function M.publishFocus(role, epoch, protected)
 	if epoch ~= _focus_epoch or type(role) ~= "number" or role < 0 or role % 1 ~= 0 then return false end
-	_verdict = role == ROLE_PASSWORD_TEXT and VERDICT_SECURE or VERDICT_INSECURE
+	if protected ~= nil and type(protected) ~= "boolean" then return false end
+	_verdict = (protected == true or role == ROLE_PASSWORD_TEXT) and VERDICT_SECURE or VERDICT_INSECURE
 	return true
 end
 

@@ -28,6 +28,7 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 		int atspi_init(void);
 		int atspi_exit(void);
 		typedef struct _AtspiAccessible AtspiAccessible;
+		typedef struct { char *type; AtspiAccessible *source; } ErgoptiAtspiEventPrefix;
 		AtspiAccessible *atspi_get_desktop(int index);
 		void atspi_accessible_clear_cache(AtspiAccessible *object);
 		void atspi_set_timeout(int timeout, int startup_timeout);
@@ -71,7 +72,8 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 	local control_callback, idle_callback = nil, nil
 	local loop, listener, timer = nil, nil, nil
 	local event_callback, timer_callback = nil, nil
-	local events = { "object:state-changed:focused", "window:activate", "window:deactivate" }
+	local events = { "object:state-changed:focused", "window:activate", "window:deactivate",
+		"object:property-change:accessible-name" }
 	local registered = {}
 
 	local function emit(kind, snapshot)
@@ -130,7 +132,15 @@ function M.run(pipe_path, parent_pid, heartbeat_ms, control_path)
 			return 0
 		end)
 		event_callback = ffi.cast("void (*)(void *, void *)", function(event)
-			local accepted = pcall(function() emit("unknown"); schedule() end)
+			local accepted = pcall(function()
+				local native = ffi.cast("ErgoptiAtspiEventPrefix *", event)
+				local kind = native.type ~= nil and ffi.string(native.type) or ""
+				-- Names of child controls or background windows do not change the
+				-- active frame policy. Compare native objects, never label text.
+				if kind == "object:property-change:accessible-name"
+					and (not handles or handles.window ~= native.source) then return end
+				emit("unknown"); schedule()
+			end)
 			gobject.g_boxed_free(atspi.atspi_event_get_type(), event)
 			if not accepted then abort() end
 		end)

@@ -162,6 +162,7 @@ local function scenario(opts, body)
 				return true
 			end,
 			focus_id = function() return world.focus end,
+			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -524,6 +525,45 @@ helpers.describe("selection rewrites require a known stable native focus", funct
 			helpers.assert_eq(world.reads, 1)
 			helpers.assert_eq(#world.posts, 0, "the captured text is never attributed to the replacement target")
 			helpers.assert_eq(#world.emitted, 0)
+		end)
+	end)
+end)
+
+helpers.describe("tone resident global privacy admission", function()
+	for _, verdict in ipairs({ "protected", "unknown", "throw" }) do
+		helpers.it("refuses " .. verdict .. " ownership before reading tone selection (llm-global-privacy)", function()
+			scenario({ selection = "merci pour ton aide", privacy_guard = function()
+				if verdict == "throw" then error("controlled resident barrier failure") end
+				if verdict == "protected" then return true end
+			end }, function(world)
+				helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(#world.emitted, 0)
+			end)
+		end)
+	end
+	helpers.it("refuses nested cancellation before reading tone selection (llm-global-privacy)", function()
+		local current
+		scenario({ selection = "merci pour ton aide", privacy_guard = function() current.engine.cancel(); return false end }, function(world)
+			current = world
+			helpers.assert_eq(world.handlers.llm_tone_more_formal("tap_3", nil), false)
+			helpers.assert_eq(world.reads, 0)
+			helpers.assert_eq(#world.posts, 0)
+		end)
+	end)
+	helpers.it("rechecks global privacy before paced tone send and physical replacement (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = "merci pour ton aide", privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			blocked = true; world.respond(1, "REWRITE: Merci pour votre aide.")
+			helpers.assert_eq(#world.emitted, 0, "a completed protected selection is never replaced")
+			blocked = false
+			helpers.assert_true(world.handlers.llm_tone_more_formal("tap_3", nil))
+			helpers.assert_eq(#world.posts, 1, "the next request must wait for pacing")
+			blocked = true; world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_true(world.engine.is_enabled())
 		end)
 	end)
 end)

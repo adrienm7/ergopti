@@ -883,6 +883,17 @@ local function main()
 		prediction = prediction_engine,
 		now_ms     = Monotonic.now_ms,
 		settle_ms  = Timings.ms("privacy", "focus_settle_ms"),
+		capture_context = function(field)
+			if not window_info or type(window_info.focused_privacy_context) ~= "function" then return nil end
+			return window_info.focused_privacy_context(field)
+		end,
+		publish_context = function(context)
+			_cached_app_id = context.app_id
+			keylogger.set_private_window(keylogger.is_private_window(context.title))
+			local password_app = keylogger.is_password_app(context.app_id)
+			if password_app then keylogger.suppress() else keylogger.unsuppress() end
+			return true, keylogger.is_context_protected(context.app_id, context.title)
+		end,
 		reset_text = function()
 			_undoable = nil
 			_last_offered = nil
@@ -1302,6 +1313,8 @@ local function main()
 			engine        = engine,
 			keyboard_hook = keyboard_hook,
 			is_paused     = script_actions.is_paused,
+			privacy_guard = secure_focus_guard.blocks_text,
+			privacy_context = secure_focus_guard.current_context,
 			-- How a manual prediction request says why it was refused: the daemon's
 			-- one transient surface outside the prediction overlay.
 			notify        = function(text)

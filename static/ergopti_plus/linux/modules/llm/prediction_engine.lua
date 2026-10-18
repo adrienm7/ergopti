@@ -88,6 +88,8 @@ local Collision = { navigation = NavigationSettings.capture_collision_configurat
 local function NEVER_PAUSED() return false end
 local _is_paused = NEVER_PAUSED
 local _notify = nil
+local _privacy_guard = nil
+local _privacy_context = nil
 
 -- Injected by init() for the tone actions: how the selection is read, how it is
 -- replaced (typed over, then selected back), and which window has the focus.
@@ -276,7 +278,38 @@ local function max_context_chars()
 	return Settings.get("context_length") or HttpBridge.DEFAULT_CONTEXT_LENGTH
 end
 
+--- Validates native application identities without accepting labels as a fallback.
+--- @param app_id any
+--- @return boolean
+local function known_app_id(app_id)
+	return type(app_id) == "string" and app_id:find("%S") ~= nil and not app_id:find("\0", 1, true)
+end
+
+--- Rechecks the daemon's resident privacy owner without probing per streamed token.
+--- Cancellation during a barrier revokes the original request even if the new
+--- owner becomes ordinary before that barrier returns.
+--- @return boolean blocked
+--- @return string|nil app_id Application metadata joined to the same native owner.
+local function global_privacy_blocks()
+	local epoch, guard, context = _request_epoch, _privacy_guard, _privacy_context
+	if guard ~= nil then
+		local ok, blocked = pcall(guard)
+		if not ok or blocked ~= false then return true end
+	end
+	if epoch ~= _request_epoch or guard ~= _privacy_guard or context ~= _privacy_context then return true end
+	if context ~= nil then
+		local ok, current = pcall(context)
+		if not ok or type(current) ~= "table" or not known_app_id(rawget(current, "app_id"))
+			or type(rawget(current, "title")) ~= "string" or not known_app_id(rawget(current, "native_identity"))
+			or epoch ~= _request_epoch or guard ~= _privacy_guard or context ~= _privacy_context then return true end
+		return false, rawget(current, "app_id")
+	end
+	return false
+end
+
 local function _is_secure_context()
+	local blocked, app_id = global_privacy_blocks()
+	if blocked then return true end
 	local secure_enabled = TriggerSettings.get("secure_filter_enabled")
 	local url_enabled = TriggerSettings.get("url_bar_filter_enabled")
 	if secure_enabled == nil then secure_enabled = HttpBridge.DEFAULT_DISABLE_PASSWORD_FIELDS end
@@ -290,13 +323,15 @@ local function _is_secure_context()
 		if not ok or secure then return true end
 	end
 	if url_enabled then
-		local ok_app, app_id = pcall(function()
-			local lifecycle = require("adapters.process_lifecycle")
-			local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
-			return type(foreground) == "table" and rawget(foreground, "appId") or nil
-		end)
-		if not ok_app or type(app_id) ~= "string" or not app_id:find("%S")
-			or app_id:find("\0", 1, true) then return true end
+		if app_id == nil then
+			local ok_app
+			ok_app, app_id = pcall(function()
+				local lifecycle = require("adapters.process_lifecycle")
+				local foreground = lifecycle and lifecycle.getForegroundApp and lifecycle.getForegroundApp()
+				return type(foreground) == "table" and rawget(foreground, "appId") or nil
+			end)
+			if not ok_app or not known_app_id(app_id) then return true end
+		end
 		local ok_url, is_url = pcall(detector.isUrlBar, app_id)
 		if not ok_url or is_url then return true end
 	end
@@ -471,7 +506,8 @@ local function advance_request_epoch(resync_owner)
 end
 
 --- Initialises the engine and its explicit side-effect seams.
---- @param opts table|nil
+--- @param opts table|nil Optional privacy_guard returns false only for admitted
+--- ownership; privacy_context returns its joined { app_id, title, native_identity }.
 function M.init(opts)
 	if _runtime_closed or _scope_owner then return false end
 	Collision.construction = nil
@@ -497,6 +533,7 @@ function M.init(opts)
 	_on_offer = type(options.on_offer) == "function" and options.on_offer or nil
 	_is_paused = type(options.is_paused) == "function" and options.is_paused or NEVER_PAUSED
 	_notify = type(options.notify) == "function" and options.notify or nil
+	_privacy_guard, _privacy_context = options.privacy_guard, options.privacy_context
 	_read_selection = type(options.read_selection) == "function" and options.read_selection or nil
 	_replace_selection = type(options.replace_selection) == "function" and options.replace_selection or nil
 	_focus_id = type(options.focus_id) == "function" and options.focus_id or nil
@@ -778,7 +815,7 @@ function M.predict(context, output_context, override)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
-		if verify_focus and current_focus() ~= focus then
+		if verify_focus and (global_privacy_blocks() or current_focus() ~= focus) then
 			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
 			M.dismiss()
 			return false
@@ -1173,7 +1210,7 @@ local function finish_tone(generation, plan, focus, full_text, err)
 	end
 	-- An unreadable target cannot authorize insertion: comparing two unknown
 	-- identities would mistake a programmatic window switch for unchanged focus.
-	if focus == "" or current_focus() ~= focus then
+	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
 		Logger.info(LOG, "Tone rewrite dropped: another window took the focus while it ran.")
 		return
 	end
@@ -1309,7 +1346,7 @@ function M.shift_tone(direction, cycle)
 			end
 			return
 		end
-		if current_focus() ~= focus then
+		if global_privacy_blocks() or current_focus() ~= focus then
 			Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 			return
 		end
@@ -1423,6 +1460,11 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 			Logger.error(LOG, "%s could not be paced: timer unavailable.", what)
 			on_unpaced()
 		end
+		return
+	end
+	if global_privacy_blocks() then
+		Logger.info(LOG, "%s dropped: global text privacy no longer admits the request.", what)
+		M.dismiss()
 		return
 	end
 	_last_request_ms[kind] = now
@@ -1779,9 +1821,9 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		clear_offer()
 		return
 	end
-	if focus == "" or current_focus() ~= focus then
+	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
 		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
-		clear_offer()
+		M.dismiss()
 		return
 	end
 	if err then
@@ -2620,6 +2662,11 @@ function M.accept(index)
 	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
+	if global_privacy_blocks() then
+		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
+		M.dismiss()
+		return false
+	end
 	local ok, committed
 	if candidate.on_accept then
 		-- An agent action: its connector runs, nothing is typed.

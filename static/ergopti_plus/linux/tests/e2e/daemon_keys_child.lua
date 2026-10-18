@@ -194,12 +194,19 @@ end
 if not MENU_ROWS_FILE and not WITH_LLM then
 	package.preload["modules.llm.prediction_engine"] = function() error("disabled for the daemon key scenarios") end
 end
-if not MENU_ROWS_FILE and WITH_LLM then
-	-- The focused-field model also owns the exact AI output target; the real
-	-- daemon must receive the same capability as the native desktop adapter.
+if not MENU_ROWS_FILE then
+	-- All scripted key scenarios declare an ordinary owned application/window.
+	-- The same source owns privacy context and the exact AI output target.
 	package.preload["adapters.window_info"] = function()
+		local function info()
+			return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" }
+		end
 		return {
-			getFocused = function() return { appId = "owned-editor", windowTitle = "owned-field", bundleId = "", executablePath = "" } end,
+			getFocused = info,
+			focused_snapshot = function() return info(), "owned-e2e-window" end,
+			focused_privacy_context = function()
+				return { app_id = "owned-editor", title = "owned-field", native_identity = "owned-e2e-window" }
+			end,
 			focused_identity = function() return "owned-e2e-window" end,
 			focused_text_identity = function() return "owned-e2e-text-field" end,
 		}
