@@ -205,6 +205,9 @@ helpers.describe("gesture load: SYN_DROPPED", function()
 		helpers.assert_true(decoder:peak_fingers() > 0, "the fixture really did put fingers down")
 
 		decoder:feed({ type = Decoder.EV_SYN, code = Decoder.SYN_DROPPED, value = 0 })
+		-- The first SYN_REPORT closes the invalid packet; a new contact belongs
+		-- after that boundary, not inside the queue contents evdev discarded.
+		decoder:feed({ type = Decoder.EV_SYN, code = Decoder.SYN_REPORT, value = 0 })
 
 		local emitted = feed(decoder, gesture_events(3, -600, 4))
 		helpers.assert_eq(#emitted, 1, "the gesture after the drop is decoded normally")
