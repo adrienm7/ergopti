@@ -110,10 +110,10 @@ private final class AutomationQueryTestSession {
 		return records.joined(separator: ";")
 	}
 
-	func wait(_ predicate: () -> Bool) throws {
+	func wait(seconds: TimeInterval = 5, _ predicate: () -> Bool) throws {
 		waitOrdinal += 1
 		let ordinal = waitOrdinal
-		let deadline = ProcessInfo.processInfo.systemUptime + 5
+		let deadline = ProcessInfo.processInfo.systemUptime + seconds
 		repeat {
 			try poll()
 			if predicate() { return }
@@ -453,5 +453,68 @@ final class OwnedAutomationQueryWorkerTests: XCTestCase {
 		XCTAssertEqual(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: true), "Q1 DATA " + bytes.base64EncodedString())
 		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: true, beforeDeadline: true))
 		XCTAssertNil(transcript.publishablePayload(guardianStatus: 0, cancelled: false, beforeDeadline: false))
+	}
+
+	func testPermissionRecheckStartsAnAbsentTargetOnceAndKeepsEveryOtherAnswer() {
+		let absent = OSStatus(procNotFound)
+		func run(_ answers: [OSStatus], launches: Bool = true, budget: Int = 10) -> (OSStatus, Int, Int) {
+			var remaining = answers, queries = 0, launched = 0, clock: TimeInterval = 0
+			let status = OwnedAutomationQueryWorker.determinePermission(deadline: TimeInterval(budget),
+				now: { clock }, query: {
+					queries += 1
+					return remaining.count > 1 ? remaining.removeFirst() : remaining[0]
+				}, launch: { launched += 1; return launches }, pause: { clock += 1 })
+			return (status, queries, launched)
+		}
+		// A running target or a consent answer never starts anything.
+		let granted = OSStatus(noErr)
+		for answer: OSStatus in [granted, -1743, -1744, -50] {
+			let result = run([answer])
+			XCTAssertEqual(result.0, answer); XCTAssertEqual(result.1, 1); XCTAssertEqual(result.2, 0)
+		}
+		// The original bug: an idle on-demand target answered -600 and discovery refused.
+		XCTAssertEqual(run([absent, absent, -1744]).0, -1744)
+		XCTAssertEqual(run([absent, absent, -1744]).2, 1)
+		XCTAssertEqual(run([absent, granted]).0, granted)
+		// A refused launch or a target that never registers stays a closed refusal.
+		XCTAssertEqual(run([absent], launches: false).0, absent)
+		XCTAssertEqual(run([absent], launches: false).1, 1)
+		let exhausted = run([absent], budget: 3)
+		XCTAssertEqual(exhausted.0, absent); XCTAssertEqual(exhausted.2, 1); XCTAssertEqual(exhausted.1, 4)
+	}
+
+	func testActualDiscoverRoleObservesOrRefusesConsentWithoutPrompting() throws {
+		// The shipped role asks with askUserIfNeeded false. An idle Shortcuts Events
+		// must be started first, so the answer is the consent state, never -600.
+		let started = ProcessInfo.processInfo.systemUptime
+		let session = try AutomationQueryTestSession(executable: executable(), operation: "discover")
+		defer { session.cleanup() }
+		try session.wait { session.markers.contains("Q1 HELD") }
+		try session.activate()
+		try session.wait(seconds: OwnedAutomationQueryWorker.targetLaunchSeconds + 5) {
+			session.markers.contains(where: { $0.hasPrefix("Q1 RETIRED ") })
+		}
+		try session.finish()
+		XCTAssertLessThan(ProcessInfo.processInfo.systemUptime - started, OwnedAutomationQueryWorker.targetLaunchSeconds + 10,
+			"No consent prompt may hold the read-only discovery open")
+		XCTAssertEqual(session.markers.count, 3)
+		XCTAssertEqual(session.markers.last, "Q1 RETIRED 0")
+		let data = try XCTUnwrap(session.markers.first(where: { $0.hasPrefix("Q1 DATA ") }))
+		let raw = try XCTUnwrap(Data(base64Encoded: String(data.dropFirst(8))))
+		XCTAssertTrue(OwnedAutomationQueryWorker.bridgePacketMatches(raw, arguments: bridgeArguments()))
+		let packet = try XCTUnwrap(JSONSerialization.jsonObject(with: raw) as? [String: Any])
+		switch packet["status"] as? String {
+		case "observed":
+			// Consent already exists on this host: rows are bounded, never printed.
+			let rows = try XCTUnwrap(packet["rows"] as? [[String: Any]])
+			XCTAssertLessThanOrEqual(rows.count, 64)
+			XCTAssertNotNil(packet["truncated"] as? Bool)
+		case "refused":
+			XCTAssertEqual(packet["reason"] as? String, "automation_permission_refused",
+				"Without consent discovery must refuse on permission, not on an idle target")
+			XCTAssertNil(packet["rows"])
+		default:
+			XCTFail("Discovery must publish an observed catalogue or a closed refusal")
+		}
 	}
 }
