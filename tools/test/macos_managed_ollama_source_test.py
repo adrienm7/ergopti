@@ -23,6 +23,7 @@ FROZEN = {
     "go.mod": "a6b997b339c1de4fcdaaa2e3266d3494863e391e429496973b7da5f05aa898db",
     "go.sum": "27f221ed12b312246074ac797952d26151b1b10f0e2731e3a42445665b950568",
     "auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
+    "cmd/cmd.go": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627",
 }
 SPEC = importlib.util.spec_from_file_location(
     "producer", REPOSITORY / "tools/build/build-macos-managed-ollama.py"
@@ -77,6 +78,11 @@ class Hooks(unittest.TestCase):
         download = (self.candidate / "server/download.go").read_text()
         self.assertIn("retireNativeDownload := nativehttp.TrackBackgroundDownload()", download)
         self.assertIn("defer retireNativeDownload()", download)
+        # Blob parts come from the registry-named direct URL; an unwrapped
+        # DefaultClient bypassed PAC, proxies and anchors (hosted pull failure).
+        self.assertNotIn("http.DefaultClient.Do(req)", download)
+        self.assertIn("chunkClient.Transport = nativehttp.Wrap(chunkClient.Transport)", download)
+        self.assertIn("resp, err := nativehttp.Do(&chunkClient, req)", download)
 
     def test_changed_preimages_refuse_before_any_source_edit(self):
         path = self.candidate / "x/transfer/download.go"
