@@ -378,3 +378,21 @@ _THR_PauseDuringTapDoesNotReplay() {
 }
 Test("tap-hold roll: a tap which pauses prevents queued replay (tap-hold-roll-pause)",
 	_THR_PauseDuringTapDoesNotReplay)
+
+_THR_PauseBetweenReplayedKeys() {
+	WasSuspended := A_IsSuspended
+	PreviousLevel := A_SendLevel
+	Sent := []
+	Emit(Stroke) {
+		Sent.Push(Stroke)
+		Suspend(true)
+	}
+	try {
+		_TapHoldRollReplay([0x10, 0x11], Emit)
+		AssertEqual(1, Sent.Length, "a pause during the first send must stop the second queued key")
+		AssertEqual("{Blind}{SC010}", Sent[1], "only the first admitted key is emitted")
+		AssertEqual(PreviousLevel, A_SendLevel, "cancelled replay must still restore its caller's SendLevel")
+	} finally Suspend(WasSuspended)
+}
+Test("tap-hold roll: pause during replay cancels the remaining keys (tap-hold-roll-pause)",
+	_THR_PauseBetweenReplayedKeys)
