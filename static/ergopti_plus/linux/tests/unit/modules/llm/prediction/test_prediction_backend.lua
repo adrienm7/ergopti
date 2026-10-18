@@ -22,11 +22,11 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	local names = {
 		"adapters.secure_field_detector", "modules.llm.api_ollama", "modules.llm.api_remote",
 		"modules.llm.api_entries", "modules.llm.profiles", "modules.llm.profile_settings", "adapters.storage",
-		"infra.llm_preferences", "modules.llm.trigger_settings",
+		"infra.llm_preferences", "modules.llm.trigger_settings", "modules.llm.display_settings",
 	}
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name] end
-	local calls = { ollama = {}, remote = {}, notices = {}, cancelled = 0, applied = 0, resets = 0, focus = "x11:fixture:1" }
+	local calls = { ollama = {}, remote = {}, notices = {}, outputs = {}, cancelled = 0, applied = 0, resets = 0, focus = "x11:fixture:1" }
 	package.loaded["adapters.secure_field_detector"] = {
 		isSecureField = function() return false end,
 		isSecureApp = function() return false end,
@@ -71,6 +71,7 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	-- Settings caches what it read; a fresh copy reads this storage.
 	package.loaded["modules.llm.settings"] = nil
 	package.loaded["modules.llm.trigger_settings"] = nil
+	package.loaded["modules.llm.display_settings"] = nil
 	package.loaded["adapters.storage"] = {
 		get = function(key, default) if stored[key] ~= nil then return stored[key] end return default end,
 		set = function(key, value) stored[key] = value; return true end,
@@ -83,11 +84,22 @@ local function load(backend, entry, stored_settings, without_local_model, asynch
 	local engine = helpers.load_module("modules.llm.prediction_engine")
 	engine.init({
 		scheduler = scheduler, clock_ms = function() return scheduler.now * 1000 end,
-		focus_id = function() return calls.focus end,
+		focus_id = function()
+			if calls.on_focus then calls.on_focus() end
+			return calls.focus
+		end,
 		privacy_guard = privacy and privacy.guard,
 		privacy_context = privacy and privacy.context,
 		engine = { current_buffer = function() return calls.buffer or "Bonjour à tous" end, reset = function() calls.resets = calls.resets + 1 end },
-		apply_prediction = function() calls.applied = calls.applied + 1; return calls.refuse_apply ~= true end,
+		apply_prediction = function(candidate, context)
+			calls.applied = calls.applied + 1
+			if calls.on_apply then return calls.on_apply(candidate, context) end
+			return calls.refuse_apply ~= true
+		end,
+		on_output = function(text, context)
+			calls.outputs[#calls.outputs + 1] = { text = text, context = context }
+			if calls.on_output then calls.on_output(text, context) end
+		end,
 		notify = function(text) calls.notices[#calls.notices + 1] = text; return true end,
 	})
 	return engine, calls, scheduler, function()
@@ -435,6 +447,72 @@ helpers.describe("acceptance retires the originating prediction request", functi
 end)
 
 helpers.describe("ordinary predictions retain their exact native target", function()
+	for _, boundary in ipairs({ "privacy", "focus" }) do
+		for _, transition in ipairs({ "scope", "shutdown" }) do
+			helpers.it("refuses acceptance when " .. boundary .. " acquires " .. transition .. " (acceptance-owner)", function()
+				local armed, engine, transferred, calls = false
+				local owner = { pending = function() return false end }
+				local function transfer()
+					if not armed then return end
+					armed = false
+					if transition == "scope" then transferred = engine.acquire_configuration(owner)
+					else transferred = engine.shutdown_runtime() end
+				end
+				local scheduler, restore
+				engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true, {
+					guard = function() if boundary == "privacy" then transfer() end; return false end,
+				})
+				local download = package.loaded["modules.llm.model_download"]
+				package.loaded["modules.llm.model_download"] = { shutdown = function() return true end }
+				local ok, err = pcall(function()
+					engine.predict("Original context", nil, { num_predictions = 1 })
+					calls.remote[1].chunk(" original completion is available now")
+					helpers.assert_eq(#engine.get_suggestions(), 1)
+					if boundary == "focus" then calls.on_focus = transfer end
+					armed = true
+					helpers.assert_eq(engine.accept(1), false, "a new admission gate must revoke the old edit")
+					helpers.assert_eq(transferred, true, "the actual configuration/shutdown owner was acquired")
+					helpers.assert_eq(calls.applied, 0)
+					helpers.assert_eq(#calls.outputs, 0)
+				end)
+				package.loaded["modules.llm.model_download"] = download
+				restore()
+				if not ok then error(err, 0) end
+			end)
+		end
+	end
+
+	for _, boundary in ipairs({ "on_apply", "on_output", "on_cancel" }) do
+		helpers.it("preserves a successor request created during " .. boundary .. " (acceptance-owner)", function()
+			local engine, calls, scheduler, restore = load("api", ENTRY, { ["llm.display.streaming"] = true }, nil, true)
+			local ok, err = pcall(function()
+				engine.predict("Original context", { app_id = "original-app" }, { num_predictions = 1 })
+				calls.remote[1].chunk(" original completion is available now")
+				helpers.assert_eq(#engine.get_suggestions(), 1, "the original request must own a real offer")
+				calls[boundary] = function()
+					engine.dismiss()
+					calls.focus = "x11:fixture:2"
+					engine.predict("Successor context", { app_id = "successor-app" }, { num_predictions = 1 })
+					scheduler.settle()
+					helpers.assert_eq(#calls.remote, 2, "the successor must have reached its own backend")
+					calls.remote[2].chunk(" successor completion remains visible now")
+					return true
+				end
+				helpers.assert_eq(engine.accept(1), true, "the original physical edit was committed once")
+				helpers.assert_eq(calls.applied, 1)
+				helpers.assert_eq(#calls.outputs, 1)
+				helpers.assert_eq(calls.outputs[1].context.app_id, "original-app",
+					"committed output retains its originating metrics context")
+				helpers.assert_eq(engine.is_predicting(), true, "old acceptance cannot retire the successor request")
+				helpers.assert_eq(#engine.get_suggestions(), 1, "the successor offer remains visible")
+				helpers.assert_eq(engine.get_suggestions()[1].to_type, " successor completion remains visible now")
+				helpers.assert_eq(calls.resets, 0, "the old commit cannot reset the successor's typing buffer")
+			end)
+			restore()
+			if not ok then error(err, 0) end
+		end)
+	end
+
 	helpers.it("refuses a prediction when native focus is unavailable (prediction-native-focus)", function()
 		local engine, calls, _, restore = load("api", ENTRY)
 		local ok, err = pcall(function()
