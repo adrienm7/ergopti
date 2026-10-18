@@ -2315,7 +2315,7 @@ helpers.describe("ui.bridge_handlers", function()
 				config_paths = {
 					get_config_dir = function() return values.config_dir end,
 					default_config_dir = function() return "/tmp/ergopti-default" end,
-					set_config_dir = function(value)
+					set_paths = function(value)
 						if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return false end
 						values.config_dir = value:gsub("/+$", "")
 						return true

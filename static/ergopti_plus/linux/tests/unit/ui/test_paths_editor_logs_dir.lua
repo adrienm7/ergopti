@@ -38,6 +38,11 @@ local function with_bridge(stored, body)
 		end,
 		set = function(key, value) values[key] = value; return true end,
 		delete = function(key) values[key] = nil; return true end,
+		set_many = function(updates, deletions)
+			for _, key in ipairs(deletions or {}) do values[key] = nil end
+			for key, value in pairs(updates) do values[key] = value end
+			return true
+		end,
 	}
 	package.loaded["infra.config_paths"] = nil
 	package.loaded["ui.config_dir_picker"] = {
@@ -181,6 +186,44 @@ helpers.describe("paths editor: logs folder (paths-editor-logs-dir)", function()
 			local result = handler.on_message({ action = "save", configDir = "", logsDir = "logs" }, state)
 			helpers.assert_true(result.saved == false)
 			helpers.assert_nil(values["paths.logs_dir"])
+		end)
+	end)
+end)
+
+helpers.describe("paths-editor-atomic: related directory overrides", function()
+	for _, refusal in ipairs({ "false", "throw", "missing" }) do
+		helpers.it("paths-editor-atomic: refuses " .. refusal .. " batch without a partial first folder", function()
+			with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/ergopti_plus" }, function(handler, state, values)
+				local storage = package.loaded["adapters.storage"]
+				local set, writes = storage.set, 0
+				storage.set = function(key, value)
+					writes = writes + 1
+					if key == "paths.logs_dir" then return false end
+					return set(key, value)
+				end
+				if refusal == "missing" then storage.set_many = nil
+				else storage.set_many = function() if refusal == "throw" then error("write refused") end; return false end end
+				local result = handler.on_message({ action = "save", configDir = "/new/config", logsDir = "/new/logs" }, state)
+				helpers.assert_eq(result.saved, false)
+				helpers.assert_eq(values["paths.config_dir"], "/original/config", "Refusal cannot relocate the daemon to a different configuration")
+				helpers.assert_eq(values["paths.logs_dir"], "/original/logs/ergopti_plus")
+				helpers.assert_eq(writes, 0, "The editor cannot split related overrides into independent writes")
+				helpers.assert_eq(state.logger_sink.moves, 0)
+			end)
+		end)
+	end
+	helpers.it("paths-editor-atomic: resets both overrides in one acknowledged batch", function()
+		with_bridge({ ["paths.config_dir"] = "/original/config", ["paths.logs_dir"] = "/original/logs/ergopti_plus" }, function(handler, state, values)
+			local storage = package.loaded["adapters.storage"]
+			local many, calls = storage.set_many, 0
+			storage.set_many = function(...) calls = calls + 1; return many(...) end
+			local result = handler.on_message({ action = "save", configDir = "", logsDir = "" }, state)
+			helpers.assert_eq(result.saved, true)
+			helpers.assert_eq(calls, 1)
+			helpers.assert_nil(values["paths.config_dir"]); helpers.assert_nil(values["paths.logs_dir"])
+			local paths = require("infra.config_paths")
+			helpers.assert_eq(paths.get_config_dir(), paths.default_config_dir())
+			helpers.assert_eq(paths.get_logs_dir(), paths.default_logs_dir())
 		end)
 	end)
 end)

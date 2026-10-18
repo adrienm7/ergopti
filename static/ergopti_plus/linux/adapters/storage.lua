@@ -1203,14 +1203,24 @@ end
 
 --- Stores several top-level values in one durable rename transaction.
 --- @param values table Map of storage keys to values.
+--- @param deletions table|nil Dense list of keys removed in the same publication.
 --- @return boolean
-function M.set_many(values)
+function M.set_many(values, deletions)
 	if type(values) ~= "table" or _owned_io_busy or _ordinary_commit_busy or _owned_file_debt ~= nil then return false end
-	for key in pairs(values) do if _owned_aliases[tostring(key)] ~= nil then return false end end
-	local committed
-	local held = next(_owned_aliases) ~= nil
+	local removed = {}
+	if deletions ~= nil then
+		if type(deletions) ~= "table" or getmetatable(deletions) ~= nil then return false end
+		if next(deletions) ~= nil then removed = owned_alias_list(deletions); if not removed then return false end end
+	end
 	local updates = {}
 	for key, value in pairs(values) do updates[tostring(key)] = { present = true, value = value } end
+	for _, key in ipairs(removed) do
+		if updates[key] ~= nil then return false end
+		updates[key] = { present = false }
+	end
+	for key in pairs(updates) do if _owned_aliases[key] ~= nil then return false end end
+	local committed
+	local held = next(_owned_aliases) ~= nil
 	if held then committed = owned_foreign_commit(updates)
 	else committed = released_source_commit(updates) end
 	return committed == true
