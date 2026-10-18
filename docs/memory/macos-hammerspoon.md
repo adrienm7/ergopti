@@ -66,6 +66,25 @@ run in CI, so logger readiness, refusals and even child death went unobserved
 (run 35661113100: the keyless package red, the keyed one green). Every package
 the gate judges must embed the public key.
 
+### project-launch-gate-native-features-without-consent
+
+Hosted macOS runners attribute every AppleEvent from the job to the runner's
+`hosted-compute-agent`, and its Automation consent dialog is never answered:
+`osascript ... execute lua code` against the packaged runtime only ever timed
+out after 10 s in `AESendMessage` (runs 37859679168, 37862861495, 37868449649),
+and a later no-prompt send then returned -1712 because the earlier prompted
+send had left the dialog open. The launch gate therefore never drives the
+runtime through AppleEvents for a feature. The delayed-timer, Karabiner and
+Script features run through `hs_native_bootstrap_probe.py`, which points
+`MJConfigFile` at an owned startup file after the managed launch quits and
+exchanges ready/admit/settled/feature files. The only AppleEvent check is the
+first event the gate sends, a no-prompt send from
+`native_appleevent_probe_sender.c` that must answer exactly -1744
+(errAEEventWouldRequireUserConsent). Never send a prompting event to the
+runtime before it. The Karabiner budget scales with its variant count because
+Intel runners exceed the 10 s that arm64 meets. Each variant journals its
+duration to `feature.json.progress`, so a timeout still reports how far it got.
+
 ### project-macos-bundle-payload-is-declared
 
 `Contents/Resources/static` holds only what
