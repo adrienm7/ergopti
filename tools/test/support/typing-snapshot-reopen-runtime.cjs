@@ -83,7 +83,7 @@ function nativeSnapshots() {
 	}
 }
 
-module.exports = async function checkSnapshotReopen(html) {
+module.exports = async function checkSnapshotReopen(html, data) {
 	if (process.platform !== 'win32') return;
 	const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/g)]
 		.map((match) => match[1])
@@ -106,9 +106,6 @@ module.exports = async function checkSnapshotReopen(html) {
 				metrics_manifest: {},
 				process_manifest() {},
 				apply_local_filters() {},
-				receive_range_data(value) {
-					received.push(JSON.parse(JSON.stringify(value)));
-				},
 				URLSearchParams,
 				location: { search: '', hash: `#prefetch=${encodeURIComponent(sidecar)}` },
 				async fetch(url) {
@@ -123,6 +120,16 @@ module.exports = async function checkSnapshotReopen(html) {
 				}
 			});
 			context.window = context;
+			context.app_state = { active_range_request_id: 0 };
+			vm.runInContext(data, context);
+			context.process_manifest = () => {};
+			context.apply_local_filters = () => {};
+			const receive = context.receive_range_data;
+			context.receive_range_data = (value, request) => {
+				const accepted = receive(value, request);
+				if (accepted) received.push(JSON.parse(JSON.stringify(value)));
+				return accepted;
+			};
 			if (host === 'windows') {
 				context.chrome = {
 					webview: {

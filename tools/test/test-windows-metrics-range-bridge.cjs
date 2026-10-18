@@ -395,7 +395,7 @@ assert.strictEqual(
 	'each manifest refresh must request data for the preserved selection state'
 );
 
-require('./support/typing-prefetch-history-cases.cjs')(html);
+require('./support/typing-prefetch-history-cases.cjs')(html, data);
 
 // Exercise both real message handlers: native queues can cross a controller's navigation.
 for (const pageName of ['metrics_typing', 'metrics_apps']) {
@@ -529,7 +529,7 @@ for (const [existing, mutation] of [
 ])
 	assert.throws(() => snapshotReceiptCustody(existing, mutation), /snapshot receiving preserves/);
 
-require('./support/typing-snapshot-reopen-runtime.cjs')(html)
+require('./support/typing-snapshot-reopen-runtime.cjs')(html, data)
 	.then(() => {
 		console.log('Windows metrics selected-range bridge contract: OK');
 	})
