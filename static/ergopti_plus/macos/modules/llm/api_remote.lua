@@ -2359,10 +2359,14 @@ end
 --- @param on_fail function Receives a short reason when no answer came back.
 --- @param with_extras boolean|nil Merge the model's model_extras of
 ---        api_providers.json into an OpenAI-shape body, as a prediction does.
+--- @param current function|nil Must still return true immediately before HTTP.
 --- @return boolean sent True when the key resolution started.
-local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras)
+local function request_prebuilt(client, label, use, provider_id, model, body, on_text, on_fail, with_extras, current)
 	if type(on_text) ~= "function" or type(on_fail) ~= "function" then
 		error("api_remote." .. label .. " request: on_text and on_fail must be functions")
+	end
+	if current ~= nil and type(current) ~= "function" then
+		error("api_remote." .. label .. " request: current must be a function")
 	end
 	local fail = failure_callback(on_fail)
 	local ready, reason = M.provider_status(provider_id, use)
@@ -2405,6 +2409,16 @@ local function request_prebuilt(client, label, use, provider_id, model, body, on
 		local t0 = TimerScheduler.now()
 		Logger.info(LOG, "%s request to provider '%s' (model %s, %d byte(s)) -> %s.",
 			label, provider_id, model, #encoded, redact_url(url))
+		-- Keychain resolution, body encoding and log sinks can outlive or revoke
+		-- the action that captured this private request. Check its own authority
+		-- at the actual transport boundary, independently of provider selection.
+		if current then
+			local checked, admitted = pcall(current)
+			if not checked then
+				Logger.error(LOG, "%s request authority check failed: %s.", label, tostring(admitted))
+			end
+			if not checked or admitted ~= true then return fail("cancelled") end
+		end
 		client.post(url, build_headers(provider.format, token), encoded, function(r)
 			Logger.pcall(LOG, function()
 				local ms = math.floor((TimerScheduler.now() - t0) * 1000)
@@ -2440,9 +2454,11 @@ end
 --- @param body table The request body (llm/vision.lua build_request).
 --- @param on_text function Receives the answer text, thinking blocks stripped.
 --- @param on_fail function Receives a short reason when no answer came back.
+--- @param current function|nil Must still return true after a pending key resolves.
 --- @return boolean sent True when the key resolution started.
-function M.request_vision(provider_id, model, body, on_text, on_fail)
-	return request_prebuilt(_vision_client, "Vision", ProviderUses.VISION, provider_id, model, body, on_text, on_fail)
+function M.request_vision(provider_id, model, body, on_text, on_fail, current)
+	return request_prebuilt(_vision_client, "Vision", ProviderUses.VISION, provider_id, model, body,
+		on_text, on_fail, nil, current)
 end
 
 --- Posts one prebuilt text chat body (llm/vision.lua build_request without an
