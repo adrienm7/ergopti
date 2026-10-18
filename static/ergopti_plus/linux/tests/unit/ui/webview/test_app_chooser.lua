@@ -15,7 +15,7 @@
 
 local helpers = require("tests.helpers")
 
---- A shell double that answers exec_line with `answer` and records commands.
+--- A shell double that acknowledges only a supplied answer and records commands.
 --- @param tools table binary -> boolean
 --- @param answer string|nil What the dialog prints.
 --- @return table shell, table commands
@@ -24,9 +24,9 @@ local function fake_shell(tools, answer)
 	local shell = {
 		has_command = function(binary) return tools[binary] == true end,
 		quote = function(value) return "'" .. tostring(value):gsub("'", "'\\''") .. "'" end,
-		exec_line = function(command)
+		exec_checked = function(command)
 			commands[#commands + 1] = command
-			return answer
+			return answer ~= nil, answer or ""
 		end,
 	}
 	return shell, commands
@@ -68,4 +68,62 @@ helpers.describe("open_app application chooser (Linux)", function()
 		helpers.assert_eq(Chooser.desktop_id("/x/.desktop"), nil)
 		helpers.assert_eq(Chooser.desktop_id("/x/app.desktop.bak"), nil)
 	end)
+end)
+
+
+--- Exercises a real dialog child and shell status without requiring a desktop prompt.
+--- @param tool string Selected native dialog tool.
+--- @param status number Actual child exit status.
+--- @param output string Actual child stdout.
+--- @return string receipt
+local function native_dialog_receipt(tool, status, output)
+	local Shell = require("adapters.shell_runner")
+	local made, directory = Shell.exec_checked("mktemp -d")
+	assert(made)
+	directory = directory:gsub("[\r\n]+$", "")
+	local executable, worker = directory .. "/" .. tool, directory .. "/worker.lua"
+	local function write(path, content)
+		local file = assert(io.open(path, "wb"))
+		assert(file:write(content) and file:close())
+	end
+	local ok, receipt = xpcall(function()
+		write(executable, "#!/bin/sh\nprintf '%s' " .. Shell.quote(output) .. "\nexit " .. status .. "\n")
+		assert(Shell.run("chmod u+x " .. Shell.quote(executable)))
+		write(worker, "package.path = " .. string.format("%q", package.path) .. "\n"
+			.. "package.loaded['logger.shim']={error=function()end,warn=function()end,debug=function()end}\n"
+			.. "local calls=0;package.loaded['ui.modal']={run=function(fn)calls=calls+1;return fn()end}\n"
+			.. "local S=require('adapters.shell_runner')\n"
+			.. "local shell={quote=S.quote,exec_line=S.exec_line,exec_checked=S.exec_checked,"
+			.. "has_command=function(name)return name==" .. string.format("%q", tool) .. "end}\n"
+			.. "local id=require('ui.app_chooser').pick(shell,'Applications')\n"
+			.. "io.write(id==nil and 'refused' or 'accepted|'..id);io.write('|modal:'..calls)\n")
+		local executed, result, reason = Shell.exec_checked("env PATH="
+			.. Shell.quote(directory .. ":" .. (os.getenv("PATH") or ""))
+			.. " " .. Shell.quote(arg[-1] or "luajit") .. " " .. Shell.quote(worker))
+		assert(executed, tostring(reason))
+		return result
+	end, debug.traceback)
+	os.remove(executable)
+	os.remove(worker)
+	assert(Shell.run("rmdir " .. Shell.quote(directory)), "Private dialog files must retire")
+	assert(ok, receipt)
+	return receipt
+end
+
+helpers.describe("application chooser requires native confirmation", function()
+	for _, tool in ipairs({ "zenity", "kdialog" }) do
+		for _, status in ipairs({ 1, 7 }) do
+			helpers.it("(linux-app-chooser-status) " .. tool .. " exit " .. status .. " rejects partial selection", function()
+				helpers.assert_eq(native_dialog_receipt(tool, status, "/usr/share/applications/firefox.desktop\n"),
+					"refused|modal:1")
+			end)
+		end
+		helpers.it("(linux-app-chooser-status) " .. tool .. " successful choice preserves the first-line id", function()
+			helpers.assert_eq(native_dialog_receipt(tool, 0, "/usr/share/applications/org.gnome.Nautilus.desktop\nignored\n"),
+				"accepted|org.gnome.Nautilus|modal:1")
+		end)
+		helpers.it("(linux-app-chooser-status) " .. tool .. " confirmed empty output is not an application", function()
+			helpers.assert_eq(native_dialog_receipt(tool, 0, ""), "refused|modal:1")
+		end)
+	end
 end)
