@@ -444,9 +444,11 @@ end
 --- Releases both runtime capabilities without hiding a sibling cleanup failure.
 --- @return boolean settled True only when both exact capabilities were released.
 local function release_runtime()
+	local generation = _generation
 	local timer_stopped = release_timer()
+	if generation ~= _generation then return false end
 	local tap_stopped = release_mouse_tap()
-	return timer_stopped and tap_stopped
+	return generation == _generation and timer_stopped and tap_stopped
 end
 
 
@@ -480,12 +482,16 @@ function M.start(show_graph)
 	end
 	-- A destroyed canvas cannot deliver the mouseUp that closes its drag. Never
 	-- let that lease gate positioning or move a later canvas generation.
+	-- Diagnostic sinks can stop or restart this owner before acquisition begins.
+	local before_start = _generation
 	clear_drag_lease()
 	Logger.debug(LOG, "Starting floating WPM widget…")
+	if before_start ~= _generation then return false end
 	if not release_runtime() then
 		Logger.error(LOG, "WPM widget start refused: prior cleanup remains pending.")
 		return false
 	end
+	if before_start ~= _generation then return false end
 	_show_graph = want_graph
 	_generation = _generation + 1
 	local generation = _generation
@@ -559,18 +565,26 @@ function M.stop()
 	clear_drag_lease()
 	-- Idempotent: a menu rebuild while the widget is off re-invokes stop() repeatedly.
 	-- Nothing to tear down means nothing to log — return before the start/stop banner.
-	if not _running and not _timer and not _mouse_tap and not _canvas then return true end
-	Logger.debug(LOG, "Stopping floating WPM widget…")
+	if not _running and not _timer and not _mouse_tap and not _canvas then
+		-- A sink may cancel startup before it acquires its first native handle.
+		_generation = _generation + 1
+		return true
+	end
 	_running = false
 	_generation = _generation + 1
+	local generation = _generation
 	local runtime_stopped = release_runtime()
+	if generation ~= _generation then return false end
 	if _canvas then _canvas:delete(); _canvas = nil end
+	if generation ~= _generation then return false end
+	Logger.debug(LOG, "Stopping floating WPM widget…")
+	if generation ~= _generation then return false end
 	if not runtime_stopped then
 		Logger.error(LOG, "WPM widget stop incomplete: runtime cleanup remains pending.")
 		return false
 	end
 	Logger.info(LOG, "Floating WPM widget stopped.")
-	return true
+	return generation == _generation and not _running
 end
 
 function M.is_running()
