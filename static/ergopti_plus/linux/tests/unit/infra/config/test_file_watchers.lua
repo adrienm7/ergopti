@@ -584,17 +584,19 @@ helpers.describe("file_watchers", function()
 			end)
 
 			helpers.it("detects .lua file changes in base_dir", function()
+				-- The debounce deadline runs on an injected clock: no real second of waiting.
+				local now_ms = 1000
 				local dir = make_non_tmp_dir()
 				write_file(dir .. "/init.lua", "return {}")
 				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
 				local fired_count = 0
-				fw.start({ base_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
+				fw.start({ now_ms = function() return now_ms end, base_dir = dir, on_reload = function() fired_count = fired_count + 1 end })
 
 				fw.pump()
 				sleep_sec(0.1)
 				touch_file(dir .. "/init.lua")
 				fw.pump()
-				sleep_sec(1.0)
+				now_ms = now_ms + 1000
 				fw.pump()
 
 				fw.stop()
@@ -603,19 +605,21 @@ helpers.describe("file_watchers", function()
 			end)
 
 			helpers.it("personal_dir with subdirectory .toml files is watched", function()
+				-- The debounce deadline runs on an injected clock: no real second of waiting.
+				local now_ms = 1000
 				local dir = make_temp_dir()
 				local sub = dir .. "/sub"
 				os.execute("mkdir -p '" .. sub:gsub("'", "'\\''") .. "' 2>/dev/null")
 				write_file(sub .. "/personal.toml")
 				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
 				local fired = 0
-				fw.start({ personal_dir = dir, on_reload = function() fired = fired + 1 end })
+				fw.start({ now_ms = function() return now_ms end, personal_dir = dir, on_reload = function() fired = fired + 1 end })
 
 				fw.pump()
 				sleep_sec(0.1)
 				touch_file(sub .. "/personal.toml")
 				fw.pump()
-				sleep_sec(1.0)
+				now_ms = now_ms + 1000
 				fw.pump()
 
 				fw.stop()
@@ -658,11 +662,13 @@ helpers.describe("file_watchers", function()
 			end)
 		else
 			helpers.it("pcall-guards the callback so a thrown error never reaches pump()", function()
+				-- The debounce deadline runs on an injected clock: no real second of waiting.
+				local now_ms = 1000
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
 				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
 				local fired = false
-				fw.start({
+				fw.start({ now_ms = function() return now_ms end,
 					hotstrings_dir = dir,
 					on_reload = function() fired = true; error("INTENTIONAL CRASH IN CALLBACK") end,
 				})
@@ -671,18 +677,18 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(1.0)
+				now_ms = now_ms + 1000
 				fw.pump()
 				helpers.assert_true(fired, "callback must have been called")
 
 				local fired2 = false
 				fw.stop()
-				fw.start({ hotstrings_dir = dir, on_reload = function() fired2 = true end })
+				fw.start({ now_ms = function() return now_ms end, hotstrings_dir = dir, on_reload = function() fired2 = true end })
 				fw.pump()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(1.0)
+				now_ms = now_ms + 1000
 				fw.pump()
 				helpers.assert_true(fired2, "file_watchers still usable after callback crash")
 
@@ -730,12 +736,14 @@ helpers.describe("file_watchers", function()
 			end)
 		else
 			helpers.it("stop() prevents old callback from firing after restart", function()
+				-- The debounce deadline runs on an injected clock: no real second of waiting.
+				local now_ms = 1000
 				local dir = make_temp_dir()
 				write_file(dir .. "/hotstrings.toml")
 				local fw = helpers.load_module_with_dependency("infra.file_watchers", "luv", false)
 
 				local old_fired = 0
-				fw.start({ hotstrings_dir = dir, on_reload = function() old_fired = old_fired + 1 end })
+				fw.start({ now_ms = function() return now_ms end, hotstrings_dir = dir, on_reload = function() old_fired = old_fired + 1 end })
 				fw.pump()
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
@@ -743,7 +751,7 @@ helpers.describe("file_watchers", function()
 				fw.stop()
 
 				local new_fired = 0
-				fw.start({ hotstrings_dir = dir, on_reload = function() new_fired = new_fired + 1 end })
+				fw.start({ now_ms = function() return now_ms end, hotstrings_dir = dir, on_reload = function() new_fired = new_fired + 1 end })
 				fw.pump()
 				helpers.assert_eq(old_fired, 0, "old callback was cleared by stop()")
 				helpers.assert_eq(new_fired, 0, "new callback not fired yet")
@@ -751,7 +759,7 @@ helpers.describe("file_watchers", function()
 				sleep_sec(0.1)
 				touch_file(dir .. "/hotstrings.toml")
 				fw.pump()
-				sleep_sec(1.0)
+				now_ms = now_ms + 1000
 				fw.pump()
 				helpers.assert_eq(old_fired, 0, "old callback never fired")
 				helpers.assert_eq(new_fired, 1, "new callback fired exactly once")
