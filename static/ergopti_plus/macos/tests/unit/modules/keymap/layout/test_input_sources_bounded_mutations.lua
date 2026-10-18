@@ -180,9 +180,10 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		local f = load_fixture()
 		helpers.assert_eq(f.IS.set_input_source_async(LOCALISED_NAME, KL_NAME, function() end), true)
 		helpers.assert_eq(f.tasks[1].executable, NATIVE_HELPER)
-		helpers.assert_eq(#f.tasks[1].args, 2)
-		helpers.assert_eq(f.tasks[1].args[1], "--select-input-source")
-		helpers.assert_eq(f.tasks[1].args[2], KL_NAME)
+		helpers.assert_eq(#f.tasks[1].args, 3)
+		helpers.assert_eq(f.tasks[1].args[1], "--select-input-source-by-name")
+		helpers.assert_eq(f.tasks[1].args[2], LOCALISED_NAME)
+		helpers.assert_eq(f.tasks[1].args[3], KL_NAME)
 		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_EXECUTABLE, NATIVE_HELPER)
 		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_DEVICE, "1")
 		helpers.assert_eq(f.tasks[1].env.ERGOPTI_LAUNCHER_INODE, "2")
@@ -200,6 +201,21 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 		helpers.assert_eq(#f.timers, 0)
 		helpers.assert_eq(terminal.ok, false)
 		helpers.assert_eq(terminal.reason, "helper_unavailable")
+		reset_fixture_modules()
+	end)
+
+	status_test("(tis-native-selector) resolves the French menu name through one native inventory", function()
+		local f = load_fixture()
+		local terminal = nil
+		hs.keycodes.layouts = function() error("Separate name/ID snapshots cannot prove identity") end
+		helpers.assert_eq(f.IS.set_input_source_async("French", "French", function(ok)
+			terminal = ok
+		end), true)
+		helpers.assert_eq(f.tasks[1].args[1], "--select-input-source-by-name")
+		helpers.assert_eq(f.tasks[1].args[2], "French")
+		helpers.assert_eq(f.tasks[1].args[3], "French")
+		f.tasks[1]:complete(0, "0\n", "")
+		helpers.assert_eq(terminal, true)
 		reset_fixture_modules()
 	end)
 
@@ -397,7 +413,9 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 					return IS.set_input_source_async(LOCALISED_NAME, KL_NAME, done)
 				end,
 				assert_args = function(args)
-					helpers.assert_eq(args[1], "--select-input-source")
+					helpers.assert_eq(args[1], "--select-input-source-by-name")
+					helpers.assert_eq(args[2], LOCALISED_NAME)
+					helpers.assert_eq(args[3], KL_NAME)
 				end,
 			},
 			{

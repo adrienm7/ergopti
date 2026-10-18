@@ -99,8 +99,9 @@ helpers.describe("set_input_source: a setLayout that returns false must fall thr
 			"the native TIS fallback must be reached when hs.keycodes declines both names")
 		helpers.assert_eq(resolutions(), 1)
 		helpers.assert_eq(task_args.executable, EXECUTABLE)
-		helpers.assert_eq(task_args.args[1], "--select-input-source")
-		helpers.assert_eq(task_args.args[2], KL_NAME)
+		helpers.assert_eq(task_args.args[1], "--select-input-source-by-name")
+		helpers.assert_eq(task_args.args[2], LOCALISED_NAME)
+		helpers.assert_eq(task_args.args[3], KL_NAME)
 
 		-- Dispatch succeeded, but the native MISS payload is the business result.
 		helpers.assert_eq(accepted, true)

@@ -128,6 +128,36 @@ if ACTION == "restore_recommended" then
 		if not clicked then World.record("SCENARIO_FAILED", click_error) end
 		World.record("FACT", "restore_timers_fired=" .. idle(VIRTUAL_MINUTE_SEC))
 	end
+elseif ACTION == "select_layout_natively" then
+	-- A real menu click must leave ABC even when setLayout declines the name.
+	local i18n = require("infra.i18n")
+	local path = { i18n.get("menu.layout.title"), "French" }
+	local row = World.find_row(World.menu_items(), path)
+	if type(row) ~= "table" or type(row.fn) ~= "function" or row.disabled then
+		World.record("SCENARIO_FAILED", "no enabled layout row at " .. table.concat(path, " › "))
+	else
+		local clicked, click_error = xpcall(function() return row.fn({}) end, debug.traceback)
+		if not clicked then World.record("SCENARIO_FAILED", click_error) end
+		idle(5)
+	end
+	World.record("FACT", "layout_set_attempts=" .. World.layout_attempts)
+	World.record("FACT", "layout_native_selections=" .. World.native_selections)
+	World.record("FACT", "layout_native_environment=" .. tostring(World.native_selection_environment))
+	World.record("FACT", "layout_native_result=" .. tostring(World.native_selection_result))
+	World.record("FACT", "layout_native_role=" .. tostring(World.native_selection_role))
+	World.record("FACT", "layout_selected_source=" .. tostring(hs.keycodes.currentSourceID()))
+	local refreshed = World.find_row(World.menu_items(), path)
+	World.record("FACT", "layout_french_checked=" .. tostring(type(refreshed) == "table" and refreshed.checked == true))
+	-- A missing identifier must complete with failure and leave that source intact.
+	local before_missing = hs.keycodes.currentSourceID()
+	local missing_refused = false
+	require("modules.keymap.input_sources").set_input_source_async(nil, "com.ergopti.e2e.missing", function(ok)
+		missing_refused = ok == false
+	end)
+	idle(1)
+	World.record("FACT", "layout_missing_refused=" .. tostring(missing_refused))
+	World.record("FACT", "layout_missing_unchanged=" .. tostring(hs.keycodes.currentSourceID() == before_missing))
+	World.record("FACT", "layout_missing_native_result=" .. tostring(World.native_selection_result))
 elseif ACTION == "open_windows" then
 	-- Every window and file the menu, a gesture or a shortcut can open through
 	-- the action catalogue: each must find its data outside the bundle.

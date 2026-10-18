@@ -374,6 +374,9 @@ local HELPER_ROLE_ANSWERS = {
 local LAYOUTS = {
 	abc = { localised = "ABC", hitoolbox = "ABC", id = 252, source_id = "com.apple.keylayout.ABC" },
 	french = { localised = "French", hitoolbox = "French", id = 1, source_id = "com.apple.keylayout.French" },
+	-- A third-party source may share a built-in layout's localized name.
+	french_shadow = { localised = "French", hitoolbox = "French_Custom", id = -1,
+		source_id = "com.ergopti.e2e.french-custom" },
 	ergopti = { localised = "Ergopti+", hitoolbox = "Ergopti_v2_2_2_plus", id = -27340,
 		source_id = "org.sil.ukelele.keyboardlayout.ergopti.ergopti_v2_2_2_plus" },
 }
@@ -430,6 +433,14 @@ M.keyboard_source_answer = keyboard_source_answer
 --- RESUME, while its answer is still due.
 M.MACHINES = {
 	standard = { layout = "abc", worker = { ready_after = 0, answer_after = 0 } },
+	-- Both sources are enabled, but Hammerspoon declines the localized names:
+	-- the real menu must reach the isolated native selection command.
+	native_layout_selection = { layout = "abc", enabled_layouts = { "abc", "french" },
+		decline_set_layout = true, worker = { ready_after = 0, answer_after = 0 } },
+	native_layout_selection_refused = { layout = "abc", enabled_layouts = { "abc", "french" },
+		decline_set_layout = true, selection_status = -50, worker = { ready_after = 0, answer_after = 0 } },
+	native_layout_selection_ambiguous = { layout = "abc", enabled_layouts = { "abc", "french", "french_shadow" },
+		decline_set_layout = true, worker = { ready_after = 0, answer_after = 0 } },
 	-- A user of an Ergopti layout on a start-up busy enough that the worker
 	-- answers late: RESUME is in flight when the first layout poll runs, 2 s
 	-- after the remap init.
@@ -445,8 +456,14 @@ M.MACHINES = {
 -- The machine being booted and what it did; set by M.install.
 local _machine = nil
 local _selected_layout = nil
+local _selected_layout_key = nil
 M.lease_workers_started = 0
 M.native_reloads = 0
+M.layout_attempts = 0
+M.native_selections = 0
+M.native_selection_environment = false
+M.native_selection_result = nil
+M.native_selection_role = nil
 
 --- AppleSelectedInputSources as `defaults read` prints it.
 --- @param layout table One of LAYOUTS.
@@ -456,6 +473,23 @@ local function selected_input_sources(layout)
 	return "(\n        {\n        InputSourceKind = \"Keyboard Layout\";\n"
 		.. "        \"KeyboardLayout ID\" = " .. layout.id .. ";\n"
 		.. "        \"KeyboardLayout Name\" = " .. name .. ";\n    }\n)\n"
+end
+
+--- Returns the machine's enabled layouts independently of its selected source.
+--- @return table layouts LAYOUTS keys in native enumeration order.
+local function enabled_layouts()
+	return _machine.enabled_layouts or { _selected_layout_key }
+end
+
+--- AppleEnabledInputSources includes every selectable source, not only the current one.
+--- @return string plist Native defaults(1) text.
+local function enabled_input_sources()
+	local records = {}
+	for _, name in ipairs(enabled_layouts()) do
+		local source = selected_input_sources(assert(LAYOUTS[name]))
+		records[#records + 1] = source:sub(3, -3)
+	end
+	return "(\n" .. table.concat(records, ",\n") .. ")\n"
 end
 
 -- The options karabiner_cli defines (Karabiner-Elements 16,
@@ -481,6 +515,7 @@ end
 --- @param name string LAYOUTS key.
 local function switch_layout(name)
 	_selected_layout = assert(LAYOUTS[name], "E2E world: unknown layout " .. tostring(name))
+	_selected_layout_key = name
 	record("LAYOUT_SWITCH", _selected_layout.localised)
 	hs.keycodes.__fire_input_source_changed()
 end
@@ -529,9 +564,30 @@ end
 --- @param path string Executable.
 --- @param args table Arguments.
 --- @param helper string The launcher executable.
+--- @param environment table Environment assigned to this native task.
+--- @param launcher_environment table Identity exported by the running launcher.
 --- @return table answer { code, stdout, stderr } or { interactive = fn }
-local function machine_answer(path, args, helper)
+local function machine_answer(path, args, helper, environment, launcher_environment)
 	if path == helper then
+		if args[1] == "--select-input-source" or args[1] == "--select-input-source-by-name" then
+			local sources = {}
+			for _, name in ipairs(enabled_layouts()) do
+				local source = LAYOUTS[name]
+				sources[#sources + 1] = { key = name, source_id = source.source_id, localised = source.localised }
+			end
+			local answer, observation = require("tests.e2e.boot.native_input_sources").answer(
+				args, sources, environment, launcher_environment, _machine.selection_status)
+			if observation then
+				M.native_selection_environment = observation.environment
+				M.native_selection_role = observation.role
+				M.native_selection_result = observation.result
+				if observation.selected then
+					switch_layout(observation.selected)
+					M.native_selections = M.native_selections + 1
+				end
+			end
+			return answer
+		end
 		if args[1] == "--keyboard-source-probe" then return keyboard_source_answer(args, _selected_layout) end
 		if args[1] == "--karabiner-lease-worker" then return { interactive = lease_worker } end
 		if args[1] == "--karabiner-lease-revoke" then return { code = 0 } end
@@ -563,7 +619,7 @@ local function machine_answer(path, args, helper)
 		return { code = 0, stdout = selected_input_sources(_selected_layout) }
 	end
 	if path == "/usr/bin/defaults" and args[1] == "read" and args[3] == "AppleEnabledInputSources" then
-		return { code = 0, stdout = selected_input_sources(_selected_layout) }
+		return { code = 0, stdout = enabled_input_sources() }
 	end
 	if path:match("/python[%d.]*$") and args[1] == "-c" then
 		local source = tostring(args[2])
@@ -768,9 +824,20 @@ local function install_natives(hs, env, arch, machine_root)
 	-- The machine's selected input source, under its localised name.
 	hs.keycodes.currentLayout = function() return _selected_layout.localised end
 	hs.keycodes.currentSourceID = function() return _selected_layout.source_id end
-	hs.keycodes.layouts = function() return { _selected_layout.localised } end
+	hs.keycodes.layouts = function()
+		local names = {}
+		for _, name in ipairs(enabled_layouts()) do names[#names + 1] = LAYOUTS[name].localised end
+		return names
+	end
 	hs.keycodes.methods = function() return {} end
-	hs.keycodes.setLayout = function() return true end
+	hs.keycodes.setLayout = function(requested)
+		M.layout_attempts = M.layout_attempts + 1
+		if _machine.decline_set_layout then return false end
+		for _, name in ipairs(enabled_layouts()) do
+			if LAYOUTS[name].localised == requested then switch_layout(name); return true end
+		end
+		return false
+	end
 
 	-- Windows, dialogs and notifications a user would see.
 	hs.webview.windowMasks = { borderless = 0, titled = 1, closable = 2, miniaturizable = 4, resizable = 8,
@@ -873,7 +940,7 @@ local function install_natives(hs, env, arch, machine_root)
 				for _, slice in ipairs(archs) do native = native or slice == "arm64" end
 				if not native then record("ROSETTA", path .. " [" .. listed .. "] (" .. tostring(source) .. ")") end
 			end
-			local answer = machine_answer(path, args, helper)
+			local answer = machine_answer(path, args, helper, environment, env)
 			if answer.interactive then
 				local api = {
 					emit = function(text, delay)
@@ -1144,6 +1211,7 @@ function M.install(hs, options)
 	_machine = M.MACHINES[options.machine or "standard"]
 	if not _machine then error("E2E world: unknown machine " .. tostring(options.machine), 2) end
 	_selected_layout = assert(LAYOUTS[_machine.layout], "E2E world: unknown layout " .. tostring(_machine.layout))
+	_selected_layout_key = _machine.layout
 	-- The native reload: the old Lua VM would be replaced here.
 	hs.reload = function()
 		M.native_reloads = M.native_reloads + 1

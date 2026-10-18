@@ -230,13 +230,13 @@
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
 				{
-					"name": "Qualify actual input-source AppleScript XCTest controls",
+					"name": "Qualify native input-source and launcher XCTest controls",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
-					"timeout-minutes": 10,
+					"timeout-minutes": 20,
 					"shell": "bash"
 				},
 				{
-					"name": "Retain input-source AppleScript XCTest diagnostics",
+					"name": "Retain native input-source and launcher XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
 					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
 				},
