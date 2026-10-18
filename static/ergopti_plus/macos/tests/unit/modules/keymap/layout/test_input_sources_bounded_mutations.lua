@@ -11,6 +11,8 @@
 --- Carbon mutation refusal is an OSStatus, independent of child process exit.
 --- Preserve that status across selection and check every migration mutation
 --- before its script can publish success (tis-osstatus).
+--- Discover every replacement before disabling a working legacy source: a
+--- predictable missing target must not partially mutate the enabled list.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
@@ -204,6 +206,32 @@ helpers.describe("input-source mutations: deadline owns the subprocess", functio
 				"the native enabled count must equal the requested replacement count")
 			reset_fixture_modules()
 		end
+	end)
+
+	status_test("(tis-target-preflight) resolves every replacement before mutating native sources", function()
+		local f = load_fixture()
+		local entries = { "com.apple.keylayout.ergopti.plus", "com.apple.keylayout.ergopti.ansi" }
+		helpers.assert_eq(f.IS.upgrade_active_list_async(entries, function() end), true)
+		local script = f.tasks[1].args[2]
+		local first_mutation = #script + 1
+		for _, operation in ipairs({ "TISDisableInputSource", "TISEnableInputSource", "TISSelectInputSource" }) do
+			local at = script:find("current application's " .. operation .. "(", 1, true)
+			helpers.assert_not_nil(at, "the script must retain " .. operation)
+			first_mutation = math.min(first_mutation, at)
+		end
+		local preflight = script:sub(1, first_mutation - 1)
+		for _, target in ipairs({ "com.apple.keyboardlayout.ergopti.plus", "com.apple.keyboardlayout.ergopti.ansi" }) do
+			helpers.assert_true(preflight:find('my findSource("' .. target .. '")', 1, true) ~= nil,
+				"every requested replacement must be discovered before any native mutation: " .. target)
+		end
+		local _, refusals = preflight:gsub('if targetSrc is missing value then return "MISS"', "")
+		helpers.assert_eq(refusals, #entries, "each missing target must refuse before a legacy source can be disabled")
+		for index = 1, #entries do
+			helpers.assert_true(script:find("set newSrc to item " .. index .. " of targetSources", 1, true) ~= nil,
+				"mutation must use the exact replacement retained by preflight")
+		end
+		f.tasks[1]:complete(0, "2/2\n", "")
+		reset_fixture_modules()
 	end)
 
 	helpers.it("times out a hung selection without blocking or accepting a sibling", function()
