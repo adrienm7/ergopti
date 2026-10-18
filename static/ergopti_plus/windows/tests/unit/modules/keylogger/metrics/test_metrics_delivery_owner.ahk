@@ -206,7 +206,8 @@ _MDO_CommitIsOwnedAndRestoresCritical() {
 			Entry["last_delivery_seed"] := Map("version", 2,
 				"store", ConfigTransitionNormalizeConfigDir(Entry["metrics_dir"]),
 				"day", FormatTime(A_Now, "yyyy-MM-dd"), "ledgers", Map(),
-				"walker_timings", KL_JsonEncode(KLW_TimingValues()))
+				"walker_timings", KL_JsonEncode(KLW_TimingValues()),
+			"projection_format", KLR_CACHE_FORMAT_VERSION)
 			AssertTrue(KLWV_CommitPaint("typing", 51, true))
 			AssertEqual(Level, A_IsCritical)
 			AssertTrue(Entry["first_paint_done"] && Entry["full_build_done"])
