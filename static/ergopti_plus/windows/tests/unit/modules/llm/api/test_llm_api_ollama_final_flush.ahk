@@ -20,6 +20,14 @@ _OllamaFinalFlush_Partial(State, Handle, Boundary, Text) {
 		LLM_OllamaCancelStream(Handle)
 }
 
+_OllamaFinalFlush_ReadCancelled(Handle, Path, State, Final) {
+	; Preserve the actual reader boundary: only cancellation is injected, after
+	; real JSONL bytes have been read and before the flush can publish them.
+	Chunk := _LLM_Ollama_ReadStreamText(Path, State, Final)
+	LLM_OllamaCancelStream(Handle)
+	return Chunk
+}
+
 _OllamaFinalFlush_CancellationBoundary(Boundary, Newline) {
 	global _LLM_Ollama_ActiveStreams, _LLM_Ollama_IsReady, _LLM_ManagedBootstrap
 	SavedStreams := _LLM_Ollama_ActiveStreams
@@ -40,8 +48,9 @@ _OllamaFinalFlush_CancellationBoundary(Boundary, Newline) {
 		_LLM_Ollama_StreamFinalFlush(Handle, Map("acc", "", "last_pos", 0),
 			_OllamaFinalFlush_Partial.Bind(State, Handle, Boundary),
 			(Text) => (State["successes"] += 1, State["text"] := Text),
-			(*) => State["failures"] += 1)
-		AssertEqual(Boundary == "before" ? 0 : 1, State["partials"],
+			(*) => State["failures"] += 1,
+			Boundary == "read" ? _OllamaFinalFlush_ReadCancelled.Bind(Handle) : _LLM_Ollama_ReadStreamText)
+		AssertEqual(Boundary == "before" || Boundary == "read" ? 0 : 1, State["partials"],
 			"a cancelled final flush must read no further partial completion")
 		AssertEqual(Boundary == "none" ? 1 : 0, State["successes"],
 			"cancellation must prevent the final-flush success handoff")
@@ -60,7 +69,7 @@ _OllamaFinalFlush_CancellationBoundary(Boundary, Newline) {
 	}
 }
 
-for Boundary in ["before", "partial", "none"] {
+for Boundary in ["before", "read", "partial", "none"] {
 	for Newline in [false, true] {
 		Test("Ollama final flush: cancellation " . Boundary . " with newline=" . Newline
 			. " (ollama-final-flush-cancellation)",
