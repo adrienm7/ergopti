@@ -78,9 +78,21 @@ jobs:
   # 1) Linux Lua driver unit and native contract tests
   # ─────────────────────────────────────────────────
   # The lane's entry job: the only one of this file that needs nothing.
+  # One row per domain group of static/ergopti_plus/linux/tests/support/
+  # module_groups.lua (run.lua --module=<group>); the groups partition the
+  # suite, so the rows together run every test module exactly once. The list
+  # below must equal those groups, in order (test-linux-ci-evidence.cjs). The
+  # native qualifications that are not part of the Lua suite run once, in the
+  # meta row.
   test-linux:
     name: 'Unit tests'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [meta, core, infra, input, modules, ui]
+    env:
+      LINUX_UNIT_GROUP: ${{ matrix.group }}
 
     steps:
       - uses: actions/checkout@v4
@@ -93,9 +105,11 @@ jobs:
           luajit -e 'assert(require("luv"), "native luv integration is mandatory")'
 
       - name: Verify native metrics aggregation equivalence
+        if: matrix.group == 'meta'
         run: python3 tools/test/test-linux-metrics-aggregation-native.py
 
       - name: Verify native cross-driver histogram multiplicity
+        if: matrix.group == 'meta'
         run: python3 tools/test/test-metrics-histogram-native.py
 
       - name: Run the driver unit test suite
@@ -115,7 +129,7 @@ jobs:
           elif [ "$mode" = full ]; then
           set -euo pipefail
           set +e
-          node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"
+          node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua --module="$LINUX_UNIT_GROUP" 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"
           unit_pipeline_status=("${PIPESTATUS[@]}")
           set -e
           if [ "${unit_pipeline_status[0]}" -ne 0 ]; then exit "${unit_pipeline_status[0]}"; fi
@@ -128,7 +142,7 @@ jobs:
         if: ${{ failure() && !cancelled() && steps.linux_unit.outcome == 'failure' }}
         uses: actions/upload-artifact@v4
         with:
-          name: linux-unit-failure-log
+          name: linux-unit-failure-log-${{ matrix.group }}
           retention-days: 7
           path: |
             ${{ runner.temp }}/linux-unit.log
@@ -144,7 +158,7 @@ jobs:
       # This external acceptance is deliberate manual validation, separate from
       # the frozen prerequisite gate and every package/installed-driver subject.
       - name: Run manual official runtime and model acceptance
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}
         run: |
           set -euo pipefail
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends curl zstd
@@ -155,7 +169,7 @@ jobs:
         timeout-minutes: 18
 
       - name: Upload manual runtime acceptance evidence
-        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}
+        if: ${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}
         uses: actions/upload-artifact@v4
         with:
           name: ollama-runtime-acceptance-linux
@@ -168,7 +182,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
-          name: lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: lua-timings-linux-unit-${{ matrix.group }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/linux-lua.json
           if-no-files-found: warn
           retention-days: 7
@@ -181,19 +195,20 @@ jobs:
           mode="$(node tools/ci/dev-release-qualification.cjs --scope linux-unit-suite --validate-scope-receipt "$receipt")"
           if [ "$mode" = deferred ]; then
               echo "[DEFERRED] linux-unit-suite: qualified=false; no suite assertion count is claimed."
-              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job test-linux --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
+              node tools/test/linux-ci-evidence.cjs record-deferred-suite --job test-linux --shard "$LINUX_UNIT_GROUP" --output "$RUNNER_TEMP/linux-ci-evidence/test-linux-$LINUX_UNIT_GROUP.json" --sha "$GITHUB_SHA" --architecture "$RUNNER_ARCH" --receipt "$receipt"
           elif [ "$mode" = full ]; then
           set -euo pipefail
           unit_assertions=$(jq -r '.passed' "$RUNNER_TEMP/linux-lua.json")
           node tools/test/linux-ci-evidence.cjs record \
               --job test-linux \
-              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux.json" \
+              --shard "$LINUX_UNIT_GROUP" \
+              --output "$RUNNER_TEMP/linux-ci-evidence/test-linux-$LINUX_UNIT_GROUP.json" \
               --sha "$GITHUB_SHA" \
               --architecture "$RUNNER_ARCH" \
               --distro ubuntu \
               --session x11-wayland-headless \
               --interpreter "$(luajit -v 2>&1 | head -1)" \
-              --subject "unit=$unit_assertions"
+              --subject "unit-$LINUX_UNIT_GROUP=$unit_assertions"
           else
               exit 1
           fi
@@ -201,13 +216,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
-          name: linux-ci-evidence-test-linux
+          name: linux-ci-evidence-test-linux-${{ matrix.group }}
           retention-days: 7
-          path: ${{ runner.temp }}/linux-ci-evidence/test-linux.json
+          path: ${{ runner.temp }}/linux-ci-evidence/test-linux-${{ matrix.group }}.json
           if-no-files-found: error
 
       - name: Retain the source-bound linux-unit-suite qualification
-        if: always()
+        if: ${{ always() && matrix.group == 'meta' }}
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-linux-unit-suite
@@ -218,7 +233,7 @@ jobs:
       # The child-local libXi projection grants no installed runtime or input epoch.
       - name: Qualify actual LuaJIT XI2 ABI and property cookies
         id: native_xi2_luajit
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.group == 'meta' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -228,7 +243,7 @@ jobs:
         timeout-minutes: 7
 
       - name: Retain actual LuaJIT XI2 diagnostic evidence
-        if: always()
+        if: ${{ always() && matrix.group == 'meta' }}
         uses: actions/upload-artifact@v4
         with:
           name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}

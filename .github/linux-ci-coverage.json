@@ -3,8 +3,14 @@
 	"jobs": {
 		"test-linux": {
 			"classification": "mandatory",
+			"shards": ["meta", "core", "infra", "input", "modules", "ui"],
 			"subjects": {
-				"unit": 1
+				"unit-meta": 1,
+				"unit-core": 1,
+				"unit-infra": 1,
+				"unit-input": 1,
+				"unit-modules": 1,
+				"unit-ui": 1
 			}
 		},
 		"e2e-linux": {

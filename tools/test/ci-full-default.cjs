@@ -106,13 +106,13 @@ const FULL_STEPS = [
 		'.github/workflows/ci-linux.yml',
 		'test-linux',
 		'Qualify actual LuaJIT XI2 ABI and property cookies',
-		'${{ !cancelled() }}'
+		"${{ !cancelled() && matrix.group == 'meta' }}"
 	],
 	[
 		'.github/workflows/ci-linux.yml',
 		'test-linux',
 		'Retain actual LuaJIT XI2 diagnostic evidence',
-		'always()'
+		"${{ always() && matrix.group == 'meta' }}"
 	],
 	[
 		'.github/workflows/ci-macos.yml',

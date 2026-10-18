@@ -190,10 +190,13 @@ const RELEASE_INPUT = `\${{ needs.${ROOT}.outputs.release == 'true' }}`;
 const RELEASE_IF =
 	"github.event_name == 'push' && needs.publication-plan.outputs.release == 'true'";
 const NOT_CANCELLED = '${{ !cancelled() }}';
+// The native checks outside the Lua suite run once, in the meta row of the unit matrix.
+const LINUX_UNIT_META_ROW = "matrix.group == 'meta'";
 const MANUAL_RUNTIME_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
-const MANUAL_RUNTIME_EVIDENCE_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && " +
+	LINUX_UNIT_META_ROW +
+	' }}';
+const MANUAL_RUNTIME_EVIDENCE_IF = MANUAL_RUNTIME_IF;
 const MANUAL_VERDICT_IF = 'always() && !cancelled()';
 const LANE_IF = (os) => `needs.${ROOT}.outputs.lane_${os} == 'true'`;
 // Public by design: SUPublicEDKey ships inside every app, and a CI package
@@ -520,8 +523,18 @@ const STEP_CONDITIONS = [
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify three actual XI2 property cookies', NOT_CANCELLED],
 	[LINUX_BOX, 'e2e-linux', 'Retain actual XI2 property-cookie evidence', 'always()'],
-	[LINUX_BOX, 'test-linux', 'Qualify actual LuaJIT XI2 ABI and property cookies', NOT_CANCELLED],
-	[LINUX_BOX, 'test-linux', 'Retain actual LuaJIT XI2 diagnostic evidence', 'always()'],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Qualify actual LuaJIT XI2 ABI and property cookies',
+		'${{ !cancelled() && ' + LINUX_UNIT_META_ROW + ' }}'
+	],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Retain actual LuaJIT XI2 diagnostic evidence',
+		'${{ always() && ' + LINUX_UNIT_META_ROW + ' }}'
+	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
@@ -1121,10 +1134,10 @@ const LUA_TIMING_RETENTION = [
 		directory: 'static/ergopti_plus/linux',
 		step: 'Retain Linux Lua timing diagnostics',
 		artifact:
-			'lua-timings-linux-unit-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
+			'lua-timings-linux-unit-${{ matrix.group }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}',
 		path: '${{ runner.temp }}/linux-lua.json',
 		command:
-			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
+			'node ../../../tools/test/report.cjs --name linux-lua --json "${{ runner.temp }}/linux-lua.json" -- luajit tests/run.lua --module="$LINUX_UNIT_GROUP" 2>&1 | tee "$RUNNER_TEMP/linux-unit.log"'
 	},
 	{
 		file: MACOS_BOX,
