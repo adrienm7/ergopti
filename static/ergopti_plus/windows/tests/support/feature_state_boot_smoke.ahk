@@ -115,6 +115,8 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "kana_auto_lower", "kana_auto_upper", "kana_auto_mixed":
+			_FeatureStateSmokeKanaAutomatic(A_Args[1])
 		case "outdated_source_key":
 			_FeatureStateSmokeOutdatedSourceKey()
 		case "retired_source_scan":
@@ -527,4 +529,28 @@ _FeatureStateSmokePrepareReadonlySource(Path) {
 		throw Error("Native readonly preparation changed the independent semantic source")
 	if ConfigSchemaCanPrepareWrite(Path)
 		throw Error("Readonly semantic preparation manufactured native write permission")
+}
+
+_FeatureStateSmokeKanaAutomatic(Fixture) {
+	global ScriptInformation
+	Raw := Map("kana_auto_lower", "auto", "kana_auto_upper", "AUTO",
+		"kana_auto_mixed", "AuTo")[Fixture]
+	TempConfig := A_Temp . "\ergopti_kana_auto_" . DllCall("GetCurrentProcessId") . ".toml"
+	try {
+		try FileDelete(TempConfig)
+		FileAppend("[script]`nalt_gr_is_kana_remap = " . TOML_RenderString(Raw) . "`n",
+			TempConfig, "UTF-8")
+		_FeatureStateSmokePrepareReadonlySource(TempConfig)
+		Cache := ParseConfigTomlFile(TempConfig)
+		Value := IniCacheGet(Cache, "script", "alt_gr_is_kana_remap")
+		ExpectedType := ""
+		if !(Value is String) || StrCompare(Value, Raw, true) != 0
+				|| !TomlConfigValueMatchesManifest("script", "alt_gr_is_kana_remap",
+					Value, &ExpectedType, TOML_RenderString(Raw))
+			throw Error("The actual configuration enum validator must admit this automatic Kana spelling.")
+		ReadScriptConfig(Cache)
+		Actual := ScriptInformation["AltGrIsKanaRemap"]
+		if !(Actual is String) || StrCompare(Actual, "auto", true) != 0
+			throw Error("An admitted automatic Kana spelling must publish the canonical runtime sentinel.")
+	} finally try FileDelete(TempConfig)
 }
