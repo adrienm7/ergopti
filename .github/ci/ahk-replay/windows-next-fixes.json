@@ -1,5 +1,5 @@
 {
-	"expected_count": 157,
+	"expected_count": 159,
 	"filters": [
 		{
 			"contains": "toml-literal-string-kind",
@@ -111,6 +111,10 @@
 		},
 		{
 			"contains": "getpath-copy-receipt",
+			"expected_count": 2
+		},
+		{
+			"contains": "open-downloads-delegation-guard",
 			"expected_count": 2
 		}
 	]
