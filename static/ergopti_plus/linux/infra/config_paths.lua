@@ -45,6 +45,22 @@ local CONFIG_DIR_STORAGE_KEY = "paths.config_dir"
 -- Bootstrap storage key of the LogsDirPath override, from the shared registry.
 local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 
+--- Admits native absolute bases; XDG requires relative values to be ignored.
+--- @param value any Environment-provided directory.
+--- @return string|nil normalized
+local function absolute_directory(value)
+	if type(value) ~= "string" or value:sub(1, 1) ~= "/" then return nil end
+	return value:match("^/+$") and "/" or value:gsub("/+$", "")
+end
+
+--- Joins a child without giving the filesystem root a second leading slash.
+--- @param base string Absolute parent directory.
+--- @param child string Relative child path.
+--- @return string path
+local function child_directory(base, child)
+	return (base == "/" and "" or base) .. "/" .. child
+end
+
 
 
 
@@ -59,9 +75,7 @@ local LOGS_DIR_STORAGE_KEY = AppDirs.linux_storage_key
 --- home()'s existing temporary-directory policy when HOME is absent.
 --- @return string|nil Account home, or nil when unavailable.
 function M.account_home()
-	local home = os.getenv("HOME")
-	if type(home) ~= "string" or home == "" then return nil end
-	return (home:gsub("/+$", ""))
+	return absolute_directory(os.getenv("HOME"))
 end
 
 --- The user's home directory.
@@ -73,37 +87,25 @@ end
 function M.home()
 	local home = M.account_home()
 	if home ~= nil then return home end
-	local tmp = os.getenv("TMPDIR")
-	if type(tmp) == "string" and tmp ~= "" then
-		return (tmp:gsub("/+$", ""))
-	end
-	return "/tmp"
+	return absolute_directory(os.getenv("TMPDIR")) or "/tmp"
 end
 
 --- The XDG config root ($XDG_CONFIG_HOME, or ~/.config).
 --- @return string Absolute path, no trailing slash.
 function M.config_home()
-	local xdg = os.getenv("XDG_CONFIG_HOME")
-	if type(xdg) == "string" and xdg ~= "" then
-		return (xdg:gsub("/+$", ""))
-	end
-	return M.home() .. "/.config"
+	return absolute_directory(os.getenv("XDG_CONFIG_HOME")) or child_directory(M.home(), ".config")
 end
 
 --- The XDG data root ($XDG_DATA_HOME, or ~/.local/share).
 --- @return string Absolute path, no trailing slash.
 function M.data_home()
-	local xdg = os.getenv("XDG_DATA_HOME")
-	if type(xdg) == "string" and xdg ~= "" then
-		return (xdg:gsub("/+$", ""))
-	end
-	return M.home() .. "/.local/share"
+	return absolute_directory(os.getenv("XDG_DATA_HOME")) or child_directory(M.home(), ".local/share")
 end
 
 --- The default driver configuration directory, without a user override.
 --- @return string Absolute path, no trailing slash.
 function M.default_config_dir()
-	return M.config_home() .. "/ergopti"
+	return child_directory(M.config_home(), "ergopti")
 end
 
 --- The effective driver configuration directory.
@@ -175,7 +177,7 @@ end
 --- @param rel string|nil Path relative to the driver data dir.
 --- @return string Absolute path, no trailing slash.
 function M.data(rel)
-	local base = M.data_home() .. "/ergopti"
+	local base = child_directory(M.data_home(), "ergopti")
 	if type(rel) ~= "string" or rel == "" then return base end
 	return (base .. "/" .. (rel:gsub("^/+", "")))
 end
@@ -200,17 +202,14 @@ end
 --- The XDG state root ($XDG_STATE_HOME, or ~/.local/state): logs are state.
 --- @return string Absolute path, no trailing slash.
 function M.state_home()
-	local xdg = os.getenv(AppDirs.linux.base_env)
-	if type(xdg) == "string" and xdg ~= "" then
-		return (xdg:gsub("/+$", ""))
-	end
-	return M.home() .. "/" .. AppDirs.linux.base_fallback
+	return absolute_directory(os.getenv(AppDirs.linux.base_env))
+		or child_directory(M.home(), AppDirs.linux.base_fallback)
 end
 
 --- The default logs folder, ${XDG_STATE_HOME:-~/.local/state}/ergopti_plus/logs.
 --- @return string Absolute path, no trailing slash.
 function M.default_logs_dir()
-	return M.state_home() .. "/" .. AppDirs.linux.relative
+	return child_directory(M.state_home(), AppDirs.linux.relative)
 end
 
 --- Validates a logs-folder override and makes it a folder the application
