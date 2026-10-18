@@ -2999,6 +2999,14 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **Test parity across the three drivers (audit of October 18).**
+      [The parity audit](audits/2026-10-18-test-parity-audit.md) ranks 15
+      parity work items. First come the three stale Linux conformance skips
+      (parser, PromptBuilder, locale) whose guards stay green although Linux
+      loads those modules, then Windows dynamic hotstrings and capsword
+      behaviour. It also lists verbatim duplicate Lua test files to delete,
+      absence ratchets for deleted code, and one tidy `tests/` tree to adopt
+      on Windows, macOS and Linux.
 - [ ] **Windows log review, October 17: menu clicks that land after a reload.**
       Tray clicks retained during a slow startup run when the configuration
       write they waited for ends. When that write was a hotstring intent that
