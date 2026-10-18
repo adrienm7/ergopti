@@ -354,7 +354,7 @@ console.log(
 const { spawnSync } = require('node:child_process');
 const { pythonExecutable } = require('../lib/python.cjs');
 const LUAJIT_BLOCK =
-	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: always()\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
+	'      # Real LuaJIT cdata is qualified separately from the unchanged C3 baseline.\n      # The child-local libXi projection grants no installed runtime or input epoch.\n      - name: Qualify actual LuaJIT XI2 ABI and property cookies\n        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == \x27meta\x27 }}\n        shell: bash\n        run: |\n          set -euo pipefail\n          python3 -B static/ergopti_plus/linux/tests/hardware/test_xi2_luajit_diagnostic_portable.py\n          sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends gcc luajit libx11-dev libxi-dev libx11-xcb1 libxkbcommon-dev libxkbcommon-x11-dev xkb-data xvfb\n          python3 static/ergopti_plus/linux/tests/hardware/run_xi2_luajit_diagnostic.py "$RUNNER_TEMP/linux-xi2-luajit" "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/static/ergopti_plus/linux/adapters/xkb_source_probe.lua"\n        timeout-minutes: 7\n\n      - name: Retain actual LuaJIT XI2 diagnostic evidence\n        if: ${{ always() && matrix.group == \x27meta\x27 }}\n        uses: actions/upload-artifact@v4\n        with:\n          name: linux-xi2-luajit-${{ github.sha }}-${{ github.run_attempt }}\n          retention-days: 7\n          path: |\n            ${{ runner.temp }}/linux-xi2-luajit/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/original-c3/receiving.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/display.json\n            ${{ runner.temp }}/linux-xi2-luajit/abi-compile.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native.family.json\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stdout\n            ${{ runner.temp }}/linux-xi2-luajit/lua-native/luajit.stderr\n          if-no-files-found: error\n\n';
 function verifyLuaJitEnrollment(value) {
 	assert.strictEqual(
 		value.workflow.split(LUAJIT_BLOCK).length,
@@ -389,8 +389,15 @@ function verifyLuaJitEnrollment(value) {
 	);
 	for (const at of [native, evidence])
 		assert.strictEqual(pipeline.stepField(steps[at].body, 'continue-on-error'), null);
-	assert.strictEqual(pipeline.stepField(steps[native].body, 'if'), '${{ !cancelled() }}');
-	assert.strictEqual(pipeline.stepField(steps[evidence].body, 'if'), 'always()');
+	// Both run once, in the meta row of the unit matrix.
+	assert.strictEqual(
+		pipeline.stepField(steps[native].body, 'if'),
+		"${{ !cancelled() && matrix.group == 'meta' }}"
+	);
+	assert.strictEqual(
+		pipeline.stepField(steps[evidence].body, 'if'),
+		"${{ always() && matrix.group == 'meta' }}"
+	);
 	for (const literal of [
 		'assert original.main() == 0, "original three C cases remain mandatory"',
 		'["git", "show", source_sha + ":" + relative]',
@@ -441,7 +448,7 @@ const luaJitMutations = [
 	[
 		'cancel fence weakened',
 		'workflow',
-		'        id: native_xi2_luajit\n        if: ${{ !cancelled() }}',
+		"        id: native_xi2_luajit\n        if: ${{ !cancelled() && matrix.group == 'meta' }}",
 		'        id: native_xi2_luajit\n        if: success()'
 	],
 	[

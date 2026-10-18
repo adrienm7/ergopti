@@ -64,10 +64,10 @@ const SOURCES = [
 
 const MANUAL_STEP = 'Run manual official runtime and model acceptance';
 const MANUAL_EVIDENCE_STEP = 'Upload manual runtime acceptance evidence';
+// The manual acceptance runs once, in the meta row of the Linux unit matrix.
 const MANUAL_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
-const MANUAL_EVIDENCE_IF =
-	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() }}";
+	"${{ github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && matrix.group == 'meta' }}";
+const MANUAL_EVIDENCE_IF = MANUAL_IF;
 const MANUAL_FIXTURES = [
 	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.lua',
 	'static/ergopti_plus/linux/tests/hardware/run_ollama_runtime_acceptance.py'

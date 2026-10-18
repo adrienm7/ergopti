@@ -212,10 +212,10 @@ function evidenceContract() {
 						shard === null
 							? { ...contract.subjects }
 							: Object.fromEntries(
-									LinuxE2E.fixture.subjects[shard].map((subject) => [
-										subject,
-										contract.subjects[subject]
-									])
+									// A unit row records its own group subject, unit-<group>.
+									(job === 'test-linux' ? ['unit-' + shard] : LinuxE2E.fixture.subjects[shard]).map(
+										(subject) => [subject, contract.subjects[subject]]
+									)
 								)
 				});
 		}
