@@ -27,6 +27,10 @@ import time
 import uuid
 
 
+# An explicit private media type: CFNetwork does not sniff a declared body type.
+WIRE_BODY_TYPE = "application/x-ergopti-native-wire"
+
+
 class FixtureFailure(RuntimeError):
     pass
 
@@ -521,6 +525,10 @@ class WireFixture:
                     owner.records.append({"event": "origin", "route": route, "path": self.path})
                 if self.path in ("/held?case=eight", "/truncated?case=nine"):
                     self.send_response(200)
+                    # A typed body is delivered at its headers. Without a type,
+                    # CFNetwork withholds the response to sniff more body bytes,
+                    # so a held 5-byte prefix never reached the native client.
+                    self.send_header("Content-Type", WIRE_BODY_TYPE)
                     self.send_header(
                         "Content-Length", "1048576" if self.path == "/held?case=eight" else "20"
                     )
@@ -569,6 +577,7 @@ class WireFixture:
                     return
                 payload = b"owned\x00native\xffwire"
                 self.send_response(200)
+                self.send_header("Content-Type", WIRE_BODY_TYPE)
                 self.send_header("Content-Length", str(len(payload)))
                 self.send_header("Connection", "close")
                 self.end_headers()
