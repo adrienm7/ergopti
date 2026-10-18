@@ -11,7 +11,7 @@
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_event_loop%.lua$"))
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
-	.. root .. "/../_shared/lua/?.lua;" .. package.path
+	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 
 local luv = require("luv")
 local native = require("adapters.event_loop")
@@ -92,3 +92,53 @@ assert(not luv.loop_alive(), "native wait fixture left child or pipe handles act
 assert(wait_ok, wait_error)
 assert(exits == #children and exits == 3, "every native child must be reaped exactly once")
 assert(abnormal_exits == 0, "native wait fixture child did not exit normally")
+
+
+-- An actual quit handler and a consumed tap can be queued by one keyboard
+-- pump. Native stop must retire the pending tap before its executor is called.
+local tap_path = os.tmpname()
+local consumer_calls, close_callback, consumer_timeout = {}, false, false
+local consumer_watchdog = assert(luv.new_timer())
+assert(luv.timer_start(consumer_watchdog, 2000, 0, function()
+	consumer_timeout = true
+	native.stop()
+end))
+luv.unref(consumer_watchdog)
+local consumer_ok, consumer_error = xpcall(function()
+	local file = assert(io.open(tap_path, "w"))
+	assert(file:write('[shortcuts.tap_keys]\nnumber_row_left="screen_capture"\n'))
+	assert(file:close())
+	package.loaded["infra.config_paths"] = { config = function() return tap_path end }
+	package.loaded["modules.gestures.manager"] = {
+		is_assignable = function(id) return id == "screen_capture" end,
+		execute_action = function(action) consumer_calls[#consumer_calls + 1] = action end,
+	}
+	local controller = require("modules.shortcuts.script_actions").new({
+		reset = function() end, reload = function() end,
+		quit = function()
+			consumer_calls[#consumer_calls + 1] = "script_quit"
+			local closing = assert(luv.new_timer())
+			luv.close(closing, function() close_callback = true end)
+			native.stop()
+		end,
+	})
+	local tap = require("modules.shortcuts.tap_keys")
+	tap.init({ is_active = function() return not controller.is_paused() end, defer = native.defer })
+	assert(native.defer(controller.handlers.script_quit))
+	assert(tap.on_key({ code = 41, mods = {} }), "actual assigned tap must be consumed and queued")
+	native.run({ onIdle = function() end })
+	assert(table.concat(consumer_calls, ",") == "script_quit", "the tap executor ran after native quit")
+	local restarted = 0
+	native.run({ onIdle = function() restarted = restarted + 1; native.stop() end })
+	assert(restarted == 1 and #consumer_calls == 1, "native restart replayed stopped actions")
+	assert(close_callback, "stop must still drain native close acknowledgements")
+end, debug.traceback)
+native.stop()
+os.remove(tap_path)
+luv.timer_stop(consumer_watchdog)
+luv.close(consumer_watchdog)
+luv.run("nowait")
+assert(consumer_ok, consumer_error)
+assert(not consumer_timeout, "native shortcut stop exceeded its independent deadline")
+assert(not luv.loop_alive(), "native shortcut stop retained handles")
+print("Native queued shortcut stop passed: quit cancels later tap, restart stays clean, close callbacks drain.")
