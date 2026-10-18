@@ -7,12 +7,18 @@
 				"name": "Unit tests",
 				"runs-on": "ubuntu-latest",
 				"timeout-minutes": 360,
+				"strategy": {
+					"fail-fast": false,
+					"matrix": {
+						"lot": ["meta", "core", "modules", "menu_llm", "menu_input", "ui", "other"]
+					}
+				},
 				"outputs": {
 					"e2e_matrix": "${{ steps.stage-plan.outputs.e2e_matrix }}",
 					"e2e_metadata": "${{ steps.stage-plan.outputs.e2e_metadata }}"
 				},
 				"env": {
-					"MACOS_STAGE_LOT": "Lua unit and meta (stubbed)"
+					"MACOS_STAGE_LOT": "${{ matrix.lot }}"
 				}
 			},
 			"steps": [

@@ -34,10 +34,45 @@ function cell(role, runner, architecture, timeout, scenario = '') {
 	return { role, runner, architecture, timeout_minutes: timeout, scenario };
 }
 
+const MODULE_GROUPS = path.resolve(
+	__dirname,
+	'../../static/ergopti_plus/macos/tests/support/module_groups.lua'
+);
+let unitGroupNames;
+
+/**
+ * The Lua runner's domain groups, in order, read from their one owner
+ * (run.lua --module=<group>). Each names one Unit cell; the groups partition
+ * the suite, so the Unit cells together run every test module once.
+ */
+function unitGroups() {
+	if (unitGroupNames) return unitGroupNames.slice();
+	const source = fs.readFileSync(MODULE_GROUPS, 'utf8').replace(/\r\n/g, '\n');
+	const table = /^M\.GROUPS = \{\n([\s\S]*?)\n\}\n/m.exec(source);
+	assert.ok(table, 'module_groups.lua must declare M.GROUPS');
+	const entries = table[1].split('\n').filter((line) => /^\t\{ name = /.test(line));
+	const names = entries.map(
+		(line) => /^\t\{ name = "([a-z][a-z0-9_]*)", prefixes = /.exec(line)?.[1]
+	);
+	assert.ok(names.length > 0, 'module_groups.lua declares no group');
+	assert.ok(names.every(Boolean), 'Every module group needs a one-line literal name');
+	assert.equal(new Set(names).size, names.length, 'Duplicate module group');
+	assert.match(
+		entries[entries.length - 1],
+		/prefixes = \{\} \},?$/,
+		'The last group must be the catch-all'
+	);
+	unitGroupNames = names;
+	return names.slice();
+}
+
 /** Authored roles retain the original operating systems, architectures and job bounds. */
 function plan(stage, context) {
 	validateContext(context);
-	if (stage === 'unit') return [cell('lua-unit-meta', 'ubuntu-latest', 'stubbed', 360)];
+	if (stage === 'unit')
+		return unitGroups().map((group) =>
+			cell('lua-unit-meta', 'ubuntu-latest', 'stubbed', 360, group)
+		);
 	// Each managed-ollama-build cell runs the clean native source build of the
 	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
 	// travel through tools/ci/managed-ollama-handoff.cjs.
@@ -84,15 +119,17 @@ function roleLot(stage, role, architecture, scenario) {
 		assert.ok(['arm64', 'amd64'].includes(architecture), 'Unknown human lot architecture');
 		return architecture === 'arm64' ? 'Apple silicon' : 'Intel';
 	};
+	if (stage === 'unit' && role === 'lua-unit-meta') {
+		assert.equal(architecture, 'stubbed');
+		assert.ok(unitGroups().includes(scenario), 'Unknown Unit module group');
+		return scenario;
+	}
 	if (stage === 'testbuild' && role === 'launch') {
 		assert.match(scenario, /^[a-z][a-z0-9_]*$/);
 		return 'Installed app: ' + scenario.replace(/_/g, ' ') + ' (' + native() + ')';
 	}
 	assert.equal(scenario, '', 'Unexpected scenario for this human lot');
 	switch (stage + '/' + role) {
-		case 'unit/lua-unit-meta':
-			assert.equal(architecture, 'stubbed');
-			return 'Lua unit and meta (stubbed)';
 		case 'e2e/e2e-hs':
 			assert.equal(architecture, 'stubbed');
 			return 'Virtual-keyboard replay (stubbed)';
@@ -139,7 +176,7 @@ function selectLot(stage, lot, metadata, context) {
 	return expected.metadata[lot];
 }
 
-/** Unit has one canonical lot and needs no predecessor to produce its metadata map. */
+/** Unit lots are the module groups and need no predecessor to produce their metadata map. */
 function selectUnitLot(lot, context) {
 	return selectLot('unit', lot, displayPlan('unit', context).metadata, context);
 }
@@ -492,6 +529,7 @@ function main(args) {
 }
 
 module.exports = {
+	unitGroups,
 	STAGES,
 	JOBS,
 	plan,
