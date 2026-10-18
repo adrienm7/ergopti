@@ -609,6 +609,12 @@ local function post_json(epoch, url, headers, payload, fail, on_answer, authoriz
 			fail("the answer is not a JSON object")
 			return
 		end
+		-- Multi-step providers must reject the same explicit error envelope as
+		-- chat completions before its text, typed answers or assistant id escapes.
+		if Formats.response_has_error(root) then
+			fail("the provider returned an error envelope")
+			return
+		end
 		if authorized and not authorized() then return end
 		on_answer(root)
 	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
