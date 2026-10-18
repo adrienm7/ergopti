@@ -536,6 +536,13 @@ const STEP_CONDITIONS = [
 		'${{ always() && ' + LINUX_UNIT_META_ROW + ' }}'
 	],
 	[LINUX_BOX, 'e2e-linux', 'Qualify genuine Nix installed runtime', NOT_CANCELLED],
+	[LINUX_BOX, 'test-linux', 'Verify native metrics aggregation equivalence', LINUX_UNIT_META_ROW],
+	[
+		LINUX_BOX,
+		'test-linux',
+		'Verify native cross-driver histogram multiplicity',
+		LINUX_UNIT_META_ROW
+	],
 	[LINUX_BOX, 'test-linux', 'Run manual official runtime and model acceptance', MANUAL_RUNTIME_IF],
 	[
 		LINUX_BOX,
@@ -4550,8 +4557,8 @@ for (const [what, rel, from, to] of [
 	[
 		'`|| true` after the Linux unit suite',
 		LINUX_BOX,
-		'-- luajit tests/run.lua 2>&1 | tee',
-		'-- luajit tests/run.lua || true 2>&1 | tee'
+		'-- luajit tests/run.lua --module="$LINUX_UNIT_GROUP" 2>&1 | tee',
+		'-- luajit tests/run.lua --module="$LINUX_UNIT_GROUP" || true 2>&1 | tee'
 	],
 	[
 		'`|| true` after the continued evidence verdict',
