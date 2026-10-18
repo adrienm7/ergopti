@@ -42,9 +42,15 @@ local function make_webview_overrides()
 				local webview = setmetatable({}, {})
 				for _, method in ipairs({
 					"windowTitle", "windowStyle", "level", "allowTextEntry",
-					"allowGestures", "allowNewWindows", "windowCallback", "shadow",
+					"allowGestures", "windowCallback", "shadow",
 					"navigationCallback", "html", "show",
 				}) do webview[method] = function(self) return self end end
+				function webview:allowNewWindows(value)
+					if value == nil then return self.allow_new_windows ~= false end
+					assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+					self.allow_new_windows = value
+					return self
+				end
 				function webview:deleteOnClose(value)
 					if value == nil then return self.delete_on_close == true end
 					self.delete_on_close = value

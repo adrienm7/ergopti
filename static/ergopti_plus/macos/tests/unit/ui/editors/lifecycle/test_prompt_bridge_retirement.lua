@@ -43,7 +43,6 @@ local function with_editor(scenario)
 					if self.disposed and h.throw_after_gc then error("native wrapper failed after window GC") end
 				end
 				view.scripts = {}
-				function view:allowNewWindows() return self end
 				function view:evaluateJavaScript(script) self.scripts[#self.scripts + 1] = script; return self end
 				return view
 			end

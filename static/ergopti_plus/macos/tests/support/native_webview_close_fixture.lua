@@ -54,6 +54,12 @@ local function make_windows(h)
 			"allowGestures", "level", "html" }) do
 			window[name] = function(self) assert(not self.disposed); return self end
 		end
+		function window:allowNewWindows(value)
+			if value == nil then return self.allow_new_windows ~= false end
+			assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+			self.allow_new_windows = value
+			return self
+		end
 		function window:deleteOnClose(value)
 			assert(not self.disposed)
 			if value == nil then return self.delete_on_close end

@@ -50,7 +50,6 @@ local function with_dialog(kind, scenario)
 					if self.disposed then setmetatable(self, nil) end
 					return result
 				end
-				function view:allowNewWindows() assert(not self.disposed); return self end
 				function view:evaluateJavaScript() assert(not self.disposed); return self end
 				return view
 			end, usercontent = { new = function()

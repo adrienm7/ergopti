@@ -836,10 +836,16 @@ end
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
 ---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception;
+---        allow_new_windows accepts only false: native children lack an owner;
 ---        delete_on_close = true defers native deletion after user close.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
+	local child_policy = opts.allow_new_windows
+	if child_policy ~= nil and child_policy ~= false then
+		Logger.error(LOG, "WebView factory refused native child windows: each window requires its own lifecycle owner.")
+		return nil
+	end
 	local title_label, declared_caption, title_live
 	if rawget(opts, "presentation_id") ~= nil or rawget(opts, "presentation_receipt") ~= nil
 		or opts.app_id ~= nil then
@@ -892,6 +898,17 @@ function M.show_webview(opts)
 		return nil 
 	end
 	_factory_build_owner = wv
+	local children_blocked, child_detail = xpcall(function()
+		-- WebKit children copy the parent callback and force the unsafe native
+		-- automatic GC flag. Refuse them before exposing any candidate or HTML.
+		assert(wv:allowNewWindows(false) == wv, "native child-window policy was not acknowledged")
+		assert(wv:allowNewWindows() == false, "native child windows remain enabled")
+	end, debug.traceback)
+	if not children_blocked then
+		Logger.error(LOG, "Required webview child-window policy failed: %s.", tostring(child_detail))
+		abandon_factory_candidate(wv, "child-window policy")
+		return nil
+	end
 	if opts.delete_on_close == true then
 		local disarmed, detail = xpcall(function() WebviewCloseOwner.disarm(wv) end, debug.traceback)
 		if not disarmed then
@@ -991,9 +1008,6 @@ function M.show_webview(opts)
 	
 	if not apply_webview_mutation(function()
 		wv:allowGestures(opts.allow_gestures == true)
-	end) then return abandon_required_mutation() end
-	if opts.allow_new_windows ~= nil and not apply_webview_mutation(function()
-		wv:allowNewWindows(opts.allow_new_windows)
 	end) then return abandon_required_mutation() end
 
 	-- Bind closing cleanup callback

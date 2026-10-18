@@ -27,7 +27,13 @@ local function build_fixture(options)
 	function webview:allowTextEntry() return mutation("allowTextEntry") end
 	function webview:allowGestures() return mutation("allowGestures") end
 	function webview:shadow() return mutation("shadow") end
-	function webview:allowNewWindows() return mutation("allowNewWindows") end
+	function webview:allowNewWindows(value)
+		if value == nil then return self.allow_new_windows ~= false end
+		state.child_policy_calls = (state.child_policy_calls or 0) + 1
+		if options.throw_on == "allowNewWindows" then error("fixture allowNewWindows failure") end
+		self.allow_new_windows = value
+		return self
+	end
 	function webview:windowCallback(callback)
 		state.window_callback = callback
 		return mutation("windowCallback")
@@ -121,7 +127,7 @@ helpers.describe("ui_builder exact owned async descendants", function()
 			"the next factory request must retry the same exact candidate")
 	end)
 
-	helpers.it("publishes the webview before mutation and delegates every timer", function()
+	helpers.it("publishes the webview before presentation mutation and delegates every timer", function()
 		local Builder, state, webview = build_fixture()
 		local current = true
 		local result = Builder.show_webview({
@@ -144,6 +150,7 @@ helpers.describe("ui_builder exact owned async descendants", function()
 		})
 		helpers.assert_true(result == webview)
 		helpers.assert_eq(state.mutations_before_acquire, 0)
+		helpers.assert_eq(state.child_policy_calls, 1, "the required native child policy precedes acquisition")
 		helpers.assert_eq(state.raw_timers, 0)
 		helpers.assert_eq(#state.scheduled, 1)
 		helpers.assert_eq(state.scheduled[1].label, "webview focus retry")
@@ -194,6 +201,7 @@ helpers.describe("ui_builder exact owned async descendants", function()
 		})
 		helpers.assert_nil(result)
 		helpers.assert_eq(state.mutations_before_acquire, 0)
+		helpers.assert_eq(state.child_policy_calls, 1, "the required native child policy precedes acquisition")
 		helpers.assert_eq(state.show_calls or 0, 0)
 		helpers.assert_true(webview.live)
 	end)

@@ -70,7 +70,12 @@ local function install_hs_stubs()
 			shadow          = function(self) return self end,
 			allowTextEntry  = function(self) return self end,
 			allowGestures   = function(self) return self end,
-			allowNewWindows = function(self) return self end,
+			allowNewWindows = function(self, value)
+				if value == nil then return self.allow_new_windows ~= false end
+				assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+				self.allow_new_windows = value
+				return self
+			end,
 			deleteOnClose   = function(self, value)
 				if value == nil then return self.delete_on_close == true end
 				self.delete_on_close = value

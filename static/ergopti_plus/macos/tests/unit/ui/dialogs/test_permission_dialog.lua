@@ -142,6 +142,12 @@ local function with_untrusted_factory(body)
 			"windowCallback", "navigationCallback", "html" }) do
 			view[name] = function(self) return self end
 		end
+		function view:allowNewWindows(value)
+			if value == nil then return self.allow_new_windows ~= false end
+			assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+			self.allow_new_windows = value
+			return self
+		end
 		function view:deleteOnClose(value)
 			if value == nil then return self.delete_on_close == true end
 			self.delete_on_close = value

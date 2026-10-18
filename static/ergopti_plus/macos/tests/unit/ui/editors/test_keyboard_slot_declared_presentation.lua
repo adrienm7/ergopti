@@ -47,7 +47,13 @@ local function fixture(callback, cleanup_failures)
 							return self
 						end
 						for _, name in ipairs({ "windowStyle", "level", "allowTextEntry", "allowGestures",
-							"shadow", "allowNewWindows", "html", "show" }) do view[name] = function() return view end end
+							"shadow", "html", "show" }) do view[name] = function() return view end end
+						function view:allowNewWindows(value)
+							if value == nil then return self.allow_new_windows ~= false end
+							assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+							self.allow_new_windows = value
+							return self
+						end
 						function view:windowCallback(fn) self.on_window = fn; return self end
 						function view:navigationCallback(fn) self.on_navigation = fn; return self end
 						local window = {}
