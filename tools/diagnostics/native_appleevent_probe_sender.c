@@ -300,6 +300,11 @@ int main(int argc, char **argv) {
         error_read_attempted = 1;
         error_read_status = AEGetParamPtr(&reply, keyErrorNumber, typeSInt32,
             NULL, &error_number, sizeof(SInt32), &error_length);
+        // macOS 15 accepts the send (noErr) and returns the refusal, such as
+        // -1744, as the reply's error number; that is the event's outcome.
+        if (error_read_status == noErr && error_length == sizeof(SInt32) && error_number != noErr) {
+            status = (OSStatus)error_number;
+        }
     }
     if (strcmp(argv[3], "denied") == 0) {
         if (status == errAETargetAddressNotPermitted || status == errAEEventNotPermitted) result = 0;
