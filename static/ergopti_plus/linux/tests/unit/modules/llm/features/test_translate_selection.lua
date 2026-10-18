@@ -617,3 +617,44 @@ helpers.describe("translation completions retain their originating owner", funct
 		end
 	end
 end)
+
+helpers.describe("translation dispatch retains its native focus owner", function()
+	for _, paced in ipairs({ false, true }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(translation-dispatch-owner) rechecks " .. action .. " after focus paced=" .. tostring(paced), function()
+				scenario({ selection = SELECTION }, function(world)
+					if paced then
+						helpers.assert_true(world.engine.translate_selection("en"))
+						world.respond(1, "TRANSLATION: Earlier answer")
+					end
+					local previous_posts = #world.posts
+					local armed, observed, action_result = true, false, nil
+					local owner = { pending = function() return false end }
+					world.on_focus = function()
+						if not armed or not world.shown or not world.shown.meta.loading then return end
+						armed, observed = false, true
+						if action == "scope" then action_result = world.engine.acquire_configuration(owner)
+						elseif action == "shutdown" then action_result = world.engine.shutdown_runtime()
+						else
+							world.selection = "Only the successor may send this selection"
+							action_result = world.engine.translate_selection("de")
+						end
+					end
+					helpers.assert_true(world.engine.translate_selection("en"))
+					world.wait_for(previous_posts + (action == "successor" and 2 or 1))
+					helpers.assert_true(observed, "the actual pre-send focus probe must dispatch the action")
+					helpers.assert_true(action_result, "the competing action must acquire its real owner")
+					helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
+						"the old selection must not reach HTTP after its focus observer revokes ownership")
+					if action == "successor" then
+						local post = world.posts[#world.posts]
+						helpers.assert_eq(post.body.messages[2].content, Translate.user_text(world.config, world.selection))
+						world.respond(#world.posts, "TRANSLATION: Successor answer")
+						helpers.assert_eq(table.concat(offered(world), "|"), "Successor answer")
+					elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
+					helpers.assert_eq(#world.replaced, 0)
+				end)
+			end)
+		end
+	end
+end)
