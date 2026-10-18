@@ -303,6 +303,7 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 			local heading = (tr("menu.llm.api_remove_confirm_title"):gsub("%%s", function() return active_name end))
 			if dialogs.confirm(heading, tr("menu.llm.api_remove_confirm_body")) ~= true then return false end
 			if not active_commands_ready() then return false end
+			if llm.set_backend("api") ~= true or not active_commands_ready() then return false end
 			if entries.remove(active.id) ~= true then return false end
 			changed()
 			return true
