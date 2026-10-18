@@ -11,11 +11,13 @@ local Remote = require("modules.llm.api_remote")
 local Http = require("adapters.http_client")
 local Timings = require("infra.timings")
 local Clock = require("infra.monotonic")
+local EventLoop = require("adapters.event_loop")
 local Logger = require("logger.shim")
 local LOG = "llm.local_servers"
 local catalogue_order, catalogue_servers = Catalogue.load({})
 local order, servers = catalogue_order, catalogue_servers
 local requests, pending, view_receipts = {}, {}, setmetatable({}, { __mode = "k" })
+local queued = {}
 local closed, view_generation, configuration_generation = false, 0, 0
 local cached_source, source_initialized = nil, false
 local controller = Discovery.new({ order = order, clock = Clock.now_ms,
@@ -27,6 +29,11 @@ local controller = Discovery.new({ order = order, clock = Clock.now_ms,
 		cached_source, source_initialized = Entries.capture_source(), true
 	end,
 	on_error = function(kind) Logger.warn(LOG, "Local discovery %s was refused.", kind) end })
+
+--- Releases queued credentials before native cancellation or event-loop stop.
+local function revoke_queued()
+	for id, record in pairs(queued) do record.job = nil; queued[id] = nil end
+end
 
 --- Synchronizes private source identity and view membership without acknowledging
 --- any retired native owner. Credentials never enter the shared cache authority.
@@ -44,6 +51,7 @@ local function refresh_views()
 	local changed = controller.set_order(next_order, source_changed)
 	order, servers = next_order, next_servers
 	if changed then
+		revoke_queued()
 		view_generation = view_generation + 1
 		for _, record in pairs(requests) do
 			record.successor = nil
@@ -216,6 +224,29 @@ acquire = function(id, job)
 	retire(id, record)
 end
 
+--- Defers native acquisition until after the owning loop pumps physical input.
+--- The mutable receipt releases credentials even if its detached callback survives
+--- cancellation. No HTTP deadline exists until acquire() actually runs.
+--- @param id string Captured server identity.
+--- @param job table Captured source, admission and logical settlement owner.
+--- @return boolean
+local function queue_acquisition(id, job)
+	if queued[id] then queued[id].job = nil end
+	local record = { job = job }
+	queued[id] = record
+	local ok, accepted = pcall(EventLoop.defer, function()
+		if queued[id] ~= record then return end
+		local held = record.job
+		record.job, queued[id] = nil, nil
+		if held then acquire(id, held) end
+	end)
+	if not ok or accepted ~= true then
+		if queued[id] == record then queued[id] = nil; record.job = nil end
+		return false
+	end
+	return true
+end
+
 --- Starts an asynchronous catalogue sweep with source/admission fences.
 function M.rescan(admit, on_done)
 	if closed or type(admit) ~= "function" or not admitted(admit) then return false end
@@ -234,13 +265,13 @@ function M.rescan(admit, on_done)
 			return not closed and ticket.is_current() and admitted(admit)
 				and Entries.source_is_current(source) and same_target(captured, M.target(target.id)) and ticket.is_current()
 		end
-		acquire(target.id, { target = captured, settle = settle, current = current })
-		return true
+		return queue_acquisition(target.id, { target = captured, settle = settle, current = current })
 	end, on_done)
 end
 
 --- Logical fencing precedes physical cancellation; unresolved owners stay retained.
 function M.cancel()
+	revoke_queued()
 	view_generation = view_generation + 1
 	controller.invalidate()
 	local settled = true
