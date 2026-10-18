@@ -248,7 +248,7 @@ if os.getenv("ERGOPTI_E2E_GESTURE_PUMP") == "fails" then
 			is_enabled = function() return true end,
 			set_enabled = function() return true end,
 			pump = function() error("touchpad read failed") end,
-			stop_reading = function() screen[#screen + 1] = "[reader stopped]" end,
+			stop_reading = function() screen[#screen + 1] = "[reader stopped]"; return true end,
 			get_action_names = function() return { "select_all" } end,
 			get_executable_action_names = function() return { "select_all" } end,
 			execute_action = function(action) screen[#screen + 1] = "<" .. action .. ">" end,
