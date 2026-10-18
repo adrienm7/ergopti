@@ -174,7 +174,7 @@ ggml/MLX libraries it loads from its own folder, as in
 `Ollama.app/Contents/Resources`) into the folder
 `ollama_binary.managed_install_dir()` names; never copy the lone binary. Add a
 new runtime trigger through the router, and extend
-`test_ai_runtime_selection_install.lua` (`ai-runtime-*`).
+`test_ai_runtime_selection_install_*.lua` (`ai-runtime-*`).
 
 ### project-macos-local-model-defaults-are-never-pulled
 
@@ -201,7 +201,7 @@ kind whose token may be `""`: `key_missing()` in `api_remote` and
 `validate_api_entries` in `modules/llm/init.lua` must agree on that exception.
 The engine menu gets its rows through `ctx.local_server_rows`, not a
 `backend_panel` require, because the backend fixtures stub `modules.llm`
-without `api_remote`. Extend `test_local_openai_backends.lua`.
+without `api_remote`. Extend `test_local_openai_backends_*.lua`.
 
 ### project-macos-unreachable-ai-backend-is-explained
 
@@ -360,8 +360,8 @@ value in place edits every equal one. dev.148 refused every Karabiner deploy
 because CapsWord's 30 identical conditions lists were one table and each
 manipulator's generation gate was appended to it. `adapters/json_codec.lua`
 returns a tree; decode through it. The test stub shares equal values the same
-way (`tests/unit/adapters/test_json_codec_tree.lua`), and
-`tests/meta/test_json_decode_through_codec.lua` ratchets the remaining direct
+way (`tests/unit/adapters/storage/test_json_codec_tree.lua`), and
+`tests/meta/lua_safety/test_json_decode_through_codec.lua` ratchets the remaining direct
 calls, which only read what they decode.
 
 ### project-hs-modal-dialog-parks-the-logger-pump
@@ -386,7 +386,7 @@ default). A window that cannot become key does not activate the app when
 clicked, so a window of the inactive Hammerspoon app stays behind the user's
 windows however often it is clicked: the error window "never came to the
 front". Every window allows text entry; the factory refuses
-`allow_text_entry` and `tests/meta/test_windows_become_key.lua` forbids
+`allow_text_entry` and `tests/meta/runloop/test_windows_become_key.lua` forbids
 turning it off (`windows-become-key`).
 
 ### project-karabiner-cli-reads-no-user-variables
@@ -611,7 +611,7 @@ helper does not yet satisfy this bootstrap requirement.
 In shared mode, the production path until the owned runtime ships, Ergopti owns
 only token-scoped Karabiner rules and variables and never owns, quits, unloads
 or restarts Karabiner-Elements' UI, daemon, grabber, console user server or
-VirtualHID processes. `tests/meta/test_karabiner_stock_process_isolation.lua`
+VirtualHID processes. `tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
 enforces this; keep it strict until WP6 of the
 [HS-274 plan](../handovers/2026-09-29-overnight/hs274-delivery-plan.md) lands
 the owned runtime together with the exact code it must allow. ADR 011 then
@@ -909,7 +909,7 @@ and the MLX shutdown skips the listener proof when this Lua generation owns no
 server. User quits go through `TerminationCoordinator.request_user_exit`. It
 arms `user_quit_deadline_ms` before the lease fence, so a stuck async stage or a
 failed fence force-exits with status 70 and logs the pending stage.
-`tests/meta/test_quit_teardown_never_blocks.lua` scans every teardown step's
+`tests/meta/shutdown/test_quit_teardown_never_blocks.lua` scans every teardown step's
 callee. Map each new step receiver there.
 
 ### project-swift-sdk-posix-imports
@@ -990,7 +990,7 @@ answer: the event tap (keyDown `kc`, flagsChanged modifier events) and the
 ledger credit only under the legacy source; a selected stream makes both
 silent, and a stream without an admitted complete capture is a gap, not a
 fallback. Gate any new physical writer on it, and keep
-`test_hs274_duplicate_count.lua` and `test_hs274_physical_collision.lua` green:
+`test_hs274_duplicate_count_*.lua` and `test_hs274_physical_collision.lua` green:
 they pin the legacy double count and fail for either the `and nil or` idiom or
 global suppression.
 
