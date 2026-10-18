@@ -409,6 +409,13 @@ function M.new(opts)
 		return called and result or nil
 	end
 
+	--- Reports retained context ownership without querying native focus.
+	--- Idle reconciliation must not start fresh probes for unknown/password fields.
+	--- @return boolean retained
+	function guard.has_context_operation()
+		return context_request ~= nil
+	end
+
 	--- Fences all publication and retains helper resources until native retirement.
 	--- @return boolean settled
 	function guard.stop()
