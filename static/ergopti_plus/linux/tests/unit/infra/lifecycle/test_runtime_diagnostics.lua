@@ -138,8 +138,12 @@ describe("Runtime log: previously swallowed failures now log", function()
 	local src = daemon_source()
 
 	it("reports a signal handler that could not be installed", function()
-		assert_true(src:find("Signal handler for %s could not be installed", 1, true) ~= nil,
-			"install failures must be logged, not discarded by a bare pcall")
+		local diagnostic = src:find('pcall(Logger.error, LOG, "Signal handler admission refused: %s."', 1, true)
+		assert_true(diagnostic ~= nil, "install failures must reach the protected error logger")
+		local request = src:find('shutdown.request("signal handler startup refused"', diagnostic, true)
+		local abort = src:find('error("Native signal handlers unavailable; refusing input capture"', diagnostic, true)
+		assert_true(request ~= nil and abort ~= nil, "refused native signal admission must retire and abort startup")
+		assert_true(diagnostic < request and request < abort, "the diagnostic must precede shutdown and input refusal")
 		assert_eq(nil, src:find("pcall(signal.signal, signal.SIGINT", 1, true),
 			"the bare pcall that discarded the result is gone")
 	end)
