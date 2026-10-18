@@ -46,6 +46,8 @@ local _session = nil
 local _open_revision = 0
 local _retiring_window = nil
 local _settling_retired_window = false
+local _controller = nil
+local _releasing_controller = false
 
 
 
@@ -82,6 +84,24 @@ local function retire_session(expected)
 	if owned ~= nil then owned.retire() end
 end
 
+--- Releases the exact callback only after native acknowledgement.
+--- @param controller userdata|table|nil Exact callback owner to release.
+--- @return boolean released A refused controller remains cleanup-only.
+local function release_controller(controller)
+	if _releasing_controller then return false end
+	if controller == nil or _controller ~= controller then return true end
+	_releasing_controller = true
+	local ok, result = pcall(controller.setCallback, controller, nil)
+	local released = ok and result == controller
+	if released then
+		if _controller == controller then _controller = nil end
+	else
+		Logger.error(LOG, "The update-check callback release did not commit; exact controller retained: %s.", tostring(result))
+	end
+	_releasing_controller = false
+	return released
+end
+
 --- Settles the exact unpublished candidate before another window may open.
 --- @return boolean settled Native retirement committed or already consumed it.
 local function settle_retired_window()
@@ -105,7 +125,7 @@ end
 
 --- Closes the window this module created.
 local function close_window()
-	local view = _webview
+	local view, controller = _webview, _controller
 	_webview = nil
 	retire_session()
 	if view ~= nil then
@@ -113,6 +133,7 @@ local function close_window()
 		if not ok then Logger.error(LOG, "The update-check window did not close: %s.", tostring(err)) end
 		Logger.info(LOG, "Update-check window closed.")
 	end
+	release_controller(controller)
 end
 
 --- Opens today's log in the default application.
@@ -190,7 +211,9 @@ end
 ---   automatic-check owner and channel owner, and the menu refresh.
 --- @return boolean opened
 function M.open(ctx)
+	if _releasing_controller then return false end
 	if not settle_retired_window() then return false end
+	if _webview == nil and not release_controller(_controller) then return false end
 	_open_revision = _open_revision + 1
 	local revision = _open_revision
 	if type(ctx) ~= "table" or type(ctx.channel_owner) ~= "table" then
@@ -225,39 +248,49 @@ function M.open(ctx)
 		return false
 	end
 	local candidate, candidate_session = nil, nil
-	uc:setCallback(function(message)
+	_controller = uc
+	local bound, binding = pcall(uc.setCallback, uc, function(message)
 		if candidate == nil or candidate ~= _webview or _session == nil then return end
 		_session.on_message(type(message) == "table" and message.body or nil)
 	end)
+	if not bound or binding ~= uc then
+		release_controller(uc)
+		Logger.error(LOG, "The update-check callback binding did not commit: %s.", tostring(binding))
+		return false
+	end
 	local masks = hs.webview.windowMasks
-	local view = ui_builder.show_webview({
-		delete_on_close = true,
-		frame = ui_builder.get_centered_frame(geo.width, geo.height),
-		title = i18n.get("update_check.window_title"),
-		style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
-		usercontent = uc,
-		allow_new_windows = false,
-		assets_dir = (Paths.shared("ui/update_check") or "") .. "/",
-		on_close = function()
-			if candidate ~= nil and candidate == _webview then
-				local owned_session = _session
-				_webview = nil
-				retire_session(owned_session)
-			end
-		end,
-		on_webview_created = function(owned)
-			if _webview ~= nil or revision ~= _open_revision then return false end
-			candidate = owned
-			_webview = owned
-			candidate_session = session_for(owned, ctx)
-			_session = candidate_session
-			return true
-		end,
-		schedule_after = function(delay, callback, label)
-			return DeferredWork.after(delay, callback, label or "update_check.webview")
-		end,
-		is_current = function() return candidate ~= nil and candidate == _webview end,
-	})
+	local factory_ok, factory_result = xpcall(function()
+		return ui_builder.show_webview({
+			delete_on_close = true,
+			frame = ui_builder.get_centered_frame(geo.width, geo.height),
+			title = i18n.get("update_check.window_title"),
+			style_masks = (masks["titled"] or 1) + (masks["closable"] or 2),
+			usercontent = uc,
+			allow_new_windows = false,
+			assets_dir = (Paths.shared("ui/update_check") or "") .. "/",
+			on_close = function()
+				if candidate ~= nil and candidate == _webview then
+					local owned_session = _session
+					_webview = nil
+					retire_session(owned_session)
+					release_controller(uc)
+				end
+			end,
+			on_webview_created = function(owned)
+				if _webview ~= nil or revision ~= _open_revision then return false end
+				candidate = owned
+				_webview = owned
+				candidate_session = session_for(owned, ctx)
+				_session = candidate_session
+				return true
+			end,
+			schedule_after = function(delay, callback, label)
+				return DeferredWork.after(delay, callback, label or "update_check.webview")
+			end,
+			is_current = function() return candidate ~= nil and candidate == _webview end,
+		})
+	end, debug.traceback)
+	local view = factory_ok and factory_result or nil
 	if revision ~= _open_revision then return false end
 	if view == nil or view ~= candidate or _session ~= candidate_session then
 		if _webview == candidate then
@@ -268,7 +301,8 @@ function M.open(ctx)
 			_settling_retired_window = false
 			settle_retired_window()
 		end
-		Logger.error(LOG, "The update-check window could not be created.")
+		release_controller(uc)
+		Logger.error(LOG, "The update-check window could not be created: %s.", tostring(factory_result))
 		return false
 	end
 	_session.start()
