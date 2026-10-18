@@ -341,7 +341,10 @@ Test("LLM display: master withdrawal fences held and real dispatcher-deferred Sh
 _LMT_ShowAllCanonicalBoundaries() {
 	global _LLM_Menu, Features, LLM_Defaults, _LLM_Engine
 	Previous := _LMT_InstallFixture()
-	SavedDefaults := LLM_Defaults
+	; The shared defaults are loaded lazily; this test must not depend on an
+	; earlier test having loaded them, so it restores an unset global too.
+	HadDefaults := IsSet(LLM_Defaults)
+	SavedDefaults := HadDefaults ? LLM_Defaults : 0
 	SavedEngine := _LLM_Engine
 	try {
 		for Expected in _LMT_ShowAllCorpus()["states"] {
@@ -360,7 +363,7 @@ _LMT_ShowAllCanonicalBoundaries() {
 				"the acknowledged writer receives canonical progressive display")
 		}
 	} finally {
-		LLM_Defaults := SavedDefaults
+		LLM_Defaults := HadDefaults ? SavedDefaults : unset
 		_LLM_Engine := SavedEngine
 		_LMT_RestoreFixture(Previous)
 	}
