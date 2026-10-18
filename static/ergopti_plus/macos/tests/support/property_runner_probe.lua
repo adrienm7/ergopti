@@ -13,7 +13,7 @@ local root = assert(source:match("^(.*)/tests/support/property_runner_probe%.lua
 package.path = root .. "/?.lua;" .. root .. "/?/init.lua;"
 	.. root .. "/../_shared/lua/?.lua;" .. root .. "/../_shared/lua/?/init.lua;" .. package.path
 
-local pbt = require("tests.lib.pbt")
+local pbt = require("tests.helpers.pbt")
 local check = pbt.check
 local calls, failed_checks, backend_errors = 0, 0, 0
 pbt.check = function(label)

@@ -14,11 +14,11 @@
 ---    hold across the full generated input space, not just representative examples.
 --- 3. Determinism: properties confirm that identical inputs always yield identical
 ---    outputs — essential for a safety-critical hotstring engine.
---- 4. Uses the custom pbt.lua library (tests/lib/pbt.lua) — zero external deps.
+--- 4. Uses the custom pbt.lua library (tests/helpers/pbt.lua) — zero external deps.
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
-local pbt     = require("tests.lib.pbt")
+local pbt     = require("tests.helpers.pbt")
 local Compilation = require("tests.support.compiled_lua_scope")
 local Gen     = pbt.Gen
 
