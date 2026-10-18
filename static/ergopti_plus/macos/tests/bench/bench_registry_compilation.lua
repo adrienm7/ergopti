@@ -81,7 +81,7 @@ for _, phase in ipairs({ "baseline", "validated_cache" }) do
 		end)
 	end
 	local started = os.clock()
-	local ok, reason = pcall(dofile, "tests/unit/modules/keymap/test_hotstring_properties.lua")
+	local ok, reason = pcall(dofile, "tests/unit/modules/keymap/registry/test_hotstring_properties.lua")
 	local elapsed = os.clock() - started
 	scope.with_scope, pbt.check = original_scope, check
 	assert(ok, reason)
