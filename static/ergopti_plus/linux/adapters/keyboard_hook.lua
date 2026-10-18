@@ -2879,6 +2879,12 @@ _release_forwarded_sources = function(paths)
 		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
 		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
 	end
+	-- Reconciliation may already have dropped an orphan's physical record.
+	-- Its encoded source still owns that old suppressed press, not a later
+	-- descriptor that happens to reuse the same path.
+	for key in pairs(_remap_orphans) do
+		if retiring[key:match("^(.*):%d+$")] then _remap_orphans[key] = nil end
+	end
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
 			_physical_down[key], _consumed_down[key], _pressed_at[key] = nil, nil, nil

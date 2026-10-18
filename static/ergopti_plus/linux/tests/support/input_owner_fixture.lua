@@ -18,8 +18,17 @@ function M.with_session(options, body)
 	local previous_preload = package.preload.ffi
 	local Input = require("infra.input_event")
 	local queues, paths, descriptors, serial, released_fds = {}, {}, {}, 100, {}
+	-- Explicit controlled path names can share a prefix and contain a colon;
+	-- native descriptor/open lifetime issuance remains the original Reader's.
+	local suffixes, source_prefix = options.source_suffixes
+	if suffixes then
+		assert(type(suffixes) == "table" and type(suffixes.a) == "string" and type(suffixes.b) == "string"
+			and suffixes.a ~= suffixes.b and not suffixes.a:find("/", 1, true) and not suffixes.b:find("/", 1, true))
+		source_prefix = os.tmpname(); assert(os.remove(source_prefix))
+	end
 	for _, id in ipairs({ "a", "b" }) do
-		local path = os.tmpname(); local file = assert(io.open(path, "w"))
+		local path = source_prefix and source_prefix .. suffixes[id] or os.tmpname()
+		local file = assert(io.open(path, "w"))
 		file:write("controlled input-owner source\n"); file:close()
 		paths[id], queues[path] = path, {}
 	end
