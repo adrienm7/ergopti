@@ -522,7 +522,37 @@ local _dispatch_owned_rows
 local _deliver_owned_rows
 local function _combination_source(source)
 	local receipt = M.physical_source_receipt()
-	return { source = source, generation = receipt.generation, ready = receipt.ready, physical = _physical_sources[source] == true }
+	local slot = keyboard_slot(source)
+	local owner = _input_source_owners and _input_source_owners[slot]
+	local observer = owner and _input_source_observers[slot]
+	local current = owner and _input_reader_ports.source_owner_current(owner, observer,
+		_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current, _input_reader_ports.retire_source)
+	-- A source publication may mint another lease for the SAME native opening.
+	-- Keep its original opaque identity while both that lease and the published
+	-- cohort remain current; a closed/reopened descriptor fails the old join.
+	local cache = _source_recovery.remap_sources
+	if not cache or cache.session ~= _capture_session then
+		cache = { session = _capture_session, sources = _input_source_owners, owners = {} }
+		_source_recovery.remap_sources = cache
+	elseif cache.sources ~= _input_source_owners then
+		local retained = {}
+		for _, path in ipairs(_devices) do retained[path] = cache.owners[path] end
+		cache.sources, cache.owners = _input_source_owners, retained
+	end
+	local original = cache.owners[source]
+	if current == true then
+		local original_current = original and (rawequal(original.owner, owner) or
+			_input_reader_ports.source_owner_current(original.owner, original.observer,
+				_input_reader_ports.capture_source_owner, _input_reader_ports.source_owner_current,
+				_input_reader_ports.retire_source) == true)
+		if not original_current then
+			original = { owner = owner, observer = observer }
+			cache.owners[source] = original
+		end
+	end
+	return { source = source, generation = receipt.generation, ready = receipt.ready,
+		physical = _physical_sources[source] == true,
+		source_owner = original and original.owner or owner, source_current = current }
 end
 
 local function _input_exports_current()
@@ -2472,6 +2502,10 @@ local function _read_source(source)
 		source.path, tostring(reason))
 	_pending_events[source.slot] = nil
 	if source.keyboard then
+		if _source_recovery.retire_remaps({ source.path }) ~= true then
+			M.emergency_stop("could not retire the failed source remapper")
+			return nil
+		end
 		local released, release_err = _release_forwarded_sources({ source.path })
 		if not released then
 			M.emergency_stop("could not release keys from failed source: " .. tostring(release_err))
@@ -2845,6 +2879,12 @@ _release_forwarded_sources = function(paths)
 		for _, current in ipairs(_modifier_order) do if current.code == entry.code then retained = true end end
 		if role and not retained then _capture(entry.code, InputEvent.VALUE_UP) end
 	end
+	-- Reconciliation may already have dropped an orphan's physical record.
+	-- Its encoded source still owns that old suppressed press, not a later
+	-- descriptor that happens to reuse the same path.
+	for key in pairs(_remap_orphans) do
+		if retiring[key:match("^(.*):%d+$")] then _remap_orphans[key] = nil end
+	end
 	for key, entry in pairs(_physical_down) do
 		if retiring[entry.source] then
 			_physical_down[key], _consumed_down[key], _pressed_at[key] = nil, nil, nil
@@ -2970,6 +3010,43 @@ local function _source_transaction_current(tx)
 	for name, port in pairs(tx.output_ports or {}) do
 		if rawget(tx.broker, name) ~= port then return false end
 	end
+	return true
+end
+
+--- Retires the shared engine only when a departing source owns consumed input.
+--- A retained physical press stays swallowed until UP rather than becoming a tap
+--- or replaying its remapped DOWN after the engine's state was retired.
+--- @param paths table Departing keyboard paths.
+--- @return boolean retired
+function _source_recovery.retire_remaps(paths)
+	if not _remapper then return true end
+	local departing, needed = {}, false
+	for _, path in ipairs(paths) do departing[path] = true end
+	for key in pairs(_remap_owned) do
+		local physical = _physical_down[key]
+		if physical and departing[physical.source] then needed = true; break end
+	end
+	if not needed then return true end
+	local exact, generation, output, session, issuer = _remapper, _remapper_generation, _broker, _capture_session, _remapper_input_owner
+	local tx, owned = _source_reconciliation, _remap_owned
+	local function current()
+		return _remapper == exact and _remapper_generation == generation and _broker == output
+			and _capture_session == session and _remapper_input_owner == issuer
+			and (not tx or _source_transaction_current(tx))
+	end
+	if not current() or _release_remapped() ~= true or not current() then return false end
+	if exact.activate and exact:activate() ~= true then return false end
+	if not current() then return false end
+	local replacement = _input_ports.capture_input_owner(exact)
+	if exact.has_combinations and (not replacement or not _input_ports.input_owner_current(replacement)) then return false end
+	if not current() then return false end
+	for key in pairs(owned) do
+		local physical = _physical_down[key]
+		if physical and not departing[physical.source] then _remap_orphans[key] = true end
+	end
+	_remap_owned, _remap_source_of = {}, {}
+	_remapper_input_owner = replacement
+	if tx then tx.issuer = replacement end
 	return true
 end
 
@@ -3105,6 +3182,7 @@ local function _acquire(paths, force_path, tx)
 	for _, path in ipairs(paths) do
 		local slot = keyboard_slot(path)
 		if path == force_path then
+			if _source_recovery.retire_remaps({ path }) ~= true then return false, "reconnected source remapper retirement refused" end
 			local released, release_err = _release_forwarded_sources({ path })
 			if not released then return false, release_err end
 			_close_paths({ path }, keyboard_slot, tx)
@@ -3133,6 +3211,7 @@ local function _acquire(paths, force_path, tx)
 	local retired = {}
 	for path in pairs(retained) do retired[#retired + 1] = path end
 	table.sort(retired)
+	if _source_recovery.retire_remaps(retired) ~= true then return false, "departed source remapper retirement refused" end
 	local released, release_err = _release_forwarded_sources(retired)
 	if not released then
 		_close_paths(opened, keyboard_slot, tx)

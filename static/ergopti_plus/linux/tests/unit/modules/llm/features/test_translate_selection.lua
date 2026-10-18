@@ -142,7 +142,10 @@ local function scenario(opts, body)
 				if world.defer_selection_replace then world.complete_selection_replace = complete else complete() end
 				return true
 			end,
-			focus_id = function() return world.focus end,
+			focus_id = function()
+				if world.on_focus then world.on_focus() end
+				return world.focus
+			end,
 			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
@@ -523,5 +526,135 @@ helpers.describe("asynchronous translation native ownership", function()
 			helpers.assert_true(not world.engine.accept(1))
 		end)
 		end)
+	end
+end)
+
+helpers.describe("paced translations retain their originating owner", function()
+	for _, paced in ipairs({ false, true }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(paced-offer-owner) rechecks " .. action .. " after privacy paced=" .. tostring(paced), function()
+				local subject, armed, observed, action_result
+				local owner = { pending = function() return false end }
+				scenario({ selection = SELECTION, privacy_guard = function()
+					if armed and subject.shown and subject.shown.meta.loading then
+						armed, observed = false, true
+						if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
+						elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
+						else
+							subject.selection = "A successor owns this selection"
+							action_result = subject.engine.translate_selection("de")
+							subject.respond(#subject.posts, "TRANSLATION: Successor answer")
+						end
+					end
+					return false
+				end }, function(world)
+					subject = world
+					if paced then
+						helpers.assert_true(world.engine.translate_selection("en"))
+						world.respond(1, "TRANSLATION: Earlier answer")
+					end
+					local previous_posts = #world.posts
+					armed = true
+					helpers.assert_true(world.engine.translate_selection("en"))
+					world.wait_for(previous_posts + (action == "successor" and 2 or 1))
+					helpers.assert_true(observed, "the actual pre-send privacy callback must dispatch the action")
+					helpers.assert_true(action_result, "the competing action must acquire its real owner")
+					helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
+						"the withdrawn request must never reach the HTTP transport")
+					if action == "successor" then
+						helpers.assert_eq(table.concat(offered(world), "|"), "Successor answer",
+							"an old privacy refusal must not dismiss the successor's answer")
+						helpers.assert_eq(world.shown.meta.loading, false)
+					elseif action == "scope" then
+						helpers.assert_true(world.engine.release_configuration(owner))
+					end
+					helpers.assert_eq(#world.replaced, 0, "no selection is replaced before acceptance")
+				end)
+			end)
+		end
+	end
+end)
+
+helpers.describe("translation completions retain their originating owner", function()
+	for _, boundary in ipairs({ "privacy", "focus" }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(translation-completion-owner) rechecks " .. action .. " after " .. boundary, function()
+				local subject, armed, observed, action_result
+				local owner = { pending = function() return false end }
+				local function intervene()
+					if not armed then return end
+					armed, observed = false, true
+					if action == "scope" then action_result = subject.engine.acquire_configuration(owner)
+					elseif action == "shutdown" then action_result = subject.engine.shutdown_runtime()
+					else
+						subject.selection = "A successor owns this selection"
+						action_result = subject.engine.translate_selection("de")
+						subject.respond(2, "TRANSLATION: Successor answer")
+					end
+				end
+				scenario({ selection = SELECTION, privacy_guard = function()
+					if boundary == "privacy" then intervene() end
+					return false
+				end }, function(world)
+					subject = world
+					helpers.assert_true(world.engine.translate_selection("en"))
+					-- Let the old request's rate floor expire before its answer arrives.
+					-- A successor can then complete inside the scripted native barrier.
+					world.wait_for(2)
+					helpers.assert_eq(#world.posts, 1)
+					if boundary == "focus" then world.on_focus = intervene end
+					armed = true
+					world.respond(1, "TRANSLATION: Retired answer")
+					helpers.assert_true(observed, "the actual completion barrier must dispatch the action")
+					helpers.assert_true(action_result, "the competing action must acquire its real owner")
+					helpers.assert_eq(table.concat(offered(world), "|"), action == "successor" and "Successor answer" or "",
+						"an old completion must neither publish nor dismiss a successor")
+					helpers.assert_eq(#world.posts, action == "successor" and 2 or 1)
+					helpers.assert_eq(#world.replaced, 0)
+					if action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
+				end)
+			end)
+		end
+	end
+end)
+
+helpers.describe("translation dispatch retains its native focus owner", function()
+	for _, paced in ipairs({ false, true }) do
+		for _, action in ipairs({ "scope", "shutdown", "successor" }) do
+			helpers.it("(translation-dispatch-owner) rechecks " .. action .. " after focus paced=" .. tostring(paced), function()
+				scenario({ selection = SELECTION }, function(world)
+					if paced then
+						helpers.assert_true(world.engine.translate_selection("en"))
+						world.respond(1, "TRANSLATION: Earlier answer")
+					end
+					local previous_posts = #world.posts
+					local armed, observed, action_result = true, false, nil
+					local owner = { pending = function() return false end }
+					world.on_focus = function()
+						if not armed or not world.shown or not world.shown.meta.loading then return end
+						armed, observed = false, true
+						if action == "scope" then action_result = world.engine.acquire_configuration(owner)
+						elseif action == "shutdown" then action_result = world.engine.shutdown_runtime()
+						else
+							world.selection = "Only the successor may send this selection"
+							action_result = world.engine.translate_selection("de")
+						end
+					end
+					helpers.assert_true(world.engine.translate_selection("en"))
+					world.wait_for(previous_posts + (action == "successor" and 2 or 1))
+					helpers.assert_true(observed, "the actual pre-send focus probe must dispatch the action")
+					helpers.assert_true(action_result, "the competing action must acquire its real owner")
+					helpers.assert_eq(#world.posts, previous_posts + (action == "successor" and 1 or 0),
+						"the old selection must not reach HTTP after its focus observer revokes ownership")
+					if action == "successor" then
+						local post = world.posts[#world.posts]
+						helpers.assert_eq(post.body.messages[2].content, Translate.user_text(world.config, world.selection))
+						world.respond(#world.posts, "TRANSLATION: Successor answer")
+						helpers.assert_eq(table.concat(offered(world), "|"), "Successor answer")
+					elseif action == "scope" then helpers.assert_true(world.engine.release_configuration(owner)) end
+					helpers.assert_eq(#world.replaced, 0)
+				end)
+			end)
+		end
 	end
 end)

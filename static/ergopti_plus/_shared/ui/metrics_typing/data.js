@@ -224,10 +224,21 @@ window.setTypingMetricsFreshness = function (freshness, revision) {
 
 /**
  * Processes the manifest after it is injected by the Lua backend. On first
- * call applies the initial reset; on subsequent calls recomputes KPIs and
+ * call initializes untouched filters; on subsequent calls recomputes KPIs and
  * fetches updated n-gram data.
  */
 function process_manifest() {
+	const start_input = document.getElementById('date_start');
+	const end_input = document.getElementById('date_end');
+	// A filtered request or an app-modal selection predates this first reply.
+	// Nonempty date edits also count before the native input dispatches change.
+	// Their projection must retain its original native ownership token.
+	const has_initial_range_intent =
+		app_state.range_request_sequence > 0 ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.NONE ||
+		app_state.app_selection_mode === APP_SELECTION_MODE.SUBSET ||
+		!!start_input?.value ||
+		!!end_input?.value;
 	if (Object.keys(window.metrics_manifest).length > 0) {
 		app_state.manifest_dates_sorted = Object.keys(window.metrics_manifest).sort();
 
@@ -261,22 +272,27 @@ function process_manifest() {
 			app_state.selected_apps = next_sel;
 			if (next_sel.size === 0) app_state.app_selection_mode = APP_SELECTION_MODE.NONE;
 		}
-
-		const start_input = document.getElementById('date_start');
-		const end_input = document.getElementById('date_end');
-		if (start_input && end_input && (!start_input.value || !end_input.value)) {
-			apply_default_date_range();
-		}
 	}
 
+	if (start_input && end_input && (!start_input.value || !end_input.value)) {
+		const range = get_default_date_range();
+		if (!start_input.value) start_input.value = range.start;
+		if (!end_input.value) end_input.value = range.end;
+	}
 	if (!app_state.did_apply_initial_reset) {
 		app_state.did_apply_initial_reset = true;
 		ensure_live_refresh();
-		reset_filters(false);
+		if (app_state.app_selection_mode === APP_SELECTION_MODE.UNINITIALIZED) {
+			app_state.selected_apps = new Set(app_state.available_apps);
+			app_state.app_selection_mode = APP_SELECTION_MODE.ALL;
+		}
+		update_app_btn_text();
+		compute_manifest_metrics();
+		request_range_data();
 
-		// Initial filters scheduled a range request but must not purge the cache
-		// Prefetch can replace that round-trip unless an explicit Reset owns delivery
-		if (window._prefetch_data && !app_state.active_cache_reset_id) {
+		// Only the untouched default range may borrow the initial full prefetch.
+		// User-owned replies are delivered by the bootstrap with their original id.
+		if (window._prefetch_data && !has_initial_range_intent && !app_state.active_cache_reset_id) {
 			receive_range_data(window._prefetch_data, app_state.active_range_request_id);
 		}
 		window._prefetch_data = null;
@@ -3597,6 +3613,22 @@ function request_range_data(show_loader = true) {
 }
 
 /**
+ * Checks range ownership before either the renderer or native bootstrap mutates
+ * its caches. Untagged live data waits while a selected range or Reset owns them.
+ * @param {number|null} [request_id=null] - Native range ownership token.
+ * @returns {boolean} Whether this response may publish data for the current view.
+ */
+function can_receive_range_data(request_id = null) {
+	if (app_state.active_cache_reset_id) return false;
+	if (request_id === null) return app_state.active_range_request_id === 0;
+	return (
+		Number.isSafeInteger(request_id) &&
+		request_id > 0 &&
+		request_id === app_state.active_range_request_id
+	);
+}
+
+/**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries.
@@ -3604,13 +3636,8 @@ function request_range_data(show_loader = true) {
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
-	if (app_state.active_cache_reset_id) return false;
-	if (request_id === null) {
-		// Untagged prefetch/live pushes are valid only while no selected-range
-		// request owns the table. Otherwise they would overwrite its filtered
-		// result and release the wrong loading latch.
-		if (app_state.active_range_request_id !== 0) return false;
-	} else if (!complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+	if (!can_receive_range_data(request_id)) return false;
+	if (request_id !== null && !complete_range_request(request_id, payload ? 'ok' : 'failed')) {
 		return false;
 	}
 	if (!payload) return false;

@@ -31,6 +31,7 @@ assert(uv.fs_mkdir(root .. "/config/ergopti", 448))
 write(root .. "/config/ergopti/config.toml", "[metrics]\nenabled = true\n")
 
 local Writer = require("modules.keylogger.sqlite_writer")
+local Reader = require("modules.keylogger.sqlite_reader")
 local Command = require("modules.keylogger.sqlite_command")
 local Bridge = require("ui.metrics_apps.bridge")
 local case_index = 0
@@ -122,6 +123,8 @@ for _, case in ipairs({
 		assert(reply.saved == true)
 		assert_updated(device, "owned ' été app", case[4], case[3])
 		assert(reply.metrics_manifest["2000-01-01"]["owned ' été app"].category == case[4])
+		assert(reply.user_categories["owned ' été app"].type == case[4])
+		assert(reply.user_categories["owned ' été app"].score == tonumber(case[3]))
 	end)
 end
 
@@ -130,6 +133,8 @@ check("native Writer keeps a complete NUL category and score without claiming da
 	local category = "Updated\r\nrow\0tail"
 	assert(Writer.set_app_category(literal_device, "owned-app", category, 1) == true)
 	assert_updated(literal_device, "owned-app", category, "1")
+	assert(Reader.read_user_categories(Writer.get_db_path(), literal_device)["owned-app"].type == category,
+		"category projection shortened the native NUL text")
 end)
 
 local keylogger, device = setup("owned-app")
@@ -139,6 +144,66 @@ check("existing absent-application edit behavior still stores its default score 
 	assert(assert(Writer.query_rows("SELECT count(*) FROM agg_app_day;"))[1] == before)
 	local scores = assert(Writer.query_rows("SELECT value FROM meta WHERE key='app_score.absent-app';"))
 	assert(#scores == 1 and scores[1] == "0")
+	assert(Reader.read_user_categories(Writer.get_db_path(), device)["absent-app"].score == 0)
+end)
+
+check("category metadata keys preserve native NUL and UTF-8 application bytes", function()
+	local app = "owned ' été\0app"
+	assert(Writer.upsert_app_day(device, "2000-01-01", app, { chars = 1 }))
+	assert(Writer.set_app_category(device, app, "Productivity", 1))
+	local categories = assert(Reader.read_user_categories(Writer.get_db_path(), device))
+	assert(categories[app] and categories[app].score == 1 and categories[app].type == "Productivity",
+		"native category metadata key was shortened before JSON quoting")
+end)
+
+check("saved override projection uses local categories rather than foreign synced assignments", function()
+	assert(Writer.exec_sql("UPDATE agg_app_day SET category='zzForeign' WHERE device_id='foreign-device';"))
+	assert(Writer.set_app_category(device, "owned-app", "Productivity", -2))
+	local categories = assert(keylogger.get_dashboard_payload({ include_prefetch = false })).user_categories
+	assert(categories["owned-app"].type == "Productivity" and categories["owned-app"].score == -2)
+	assert(categories["absent-app"].type == "Unknown" and categories["absent-app"].score == 0,
+		"an existing score with no local statistics needs the reader's ordinary missing-category contract")
+end)
+
+check("score-only native edit reaches a dashboard with otherwise identical manifest data", function()
+	-- The preceding direct Writer controls bypassed the collector's cache owner.
+	assert(keylogger.clear_cache())
+	local before = assert(Bridge.on_message("ready", { keylogger = keylogger }))
+	local reply = assert(Bridge.on_message({ action = "edit", app = "owned-app", cat = "Productivity", score = 2 }, { keylogger = keylogger }))
+	assert(reply.saved and reply.user_categories["owned-app"].score == 2)
+	assert(require("test.format").deep_equal(reply.metrics_manifest, before.metrics_manifest),
+		"the score-only fixture must not accidentally exercise manifest replacement")
+end)
+
+check("refused native category read does not manufacture an empty successful dashboard", function()
+	local path = Writer.get_db_path()
+	assert(os.rename(path, path .. ".held"))
+	local categories = Reader.read_user_categories(path, device)
+	local reply, reason = keylogger.get_dashboard_payload({ include_prefetch = false })
+	local absent = uv.fs_stat(path) == nil
+	assert(os.rename(path .. ".held", path))
+	assert(categories == nil and reply == nil and reason == "SQLite projection unavailable" and absent)
+	assert(keylogger.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
+end)
+
+check("malformed score metadata refuses the projection until the exact value is repaired", function()
+	for _, malformed in ipairs({ "not-a-score", "2\0tail", "1e999" }) do
+		assert(Writer.set_meta("app_score.owned-app", malformed))
+		assert(keylogger.get_dashboard_payload({ include_prefetch = false }) == nil)
+	end
+	assert(Writer.set_meta("app_score.owned-app", "2"))
+	assert(keylogger.get_dashboard_payload({ include_prefetch = false }).user_categories["owned-app"].score == 2)
+end)
+
+check("a new collector and page owner recover the durable category and score", function()
+	local path = Writer.get_db_path()
+	Writer.close_db()
+	package.loaded["modules.keylogger.keylogger"] = nil
+	keylogger = require("modules.keylogger.keylogger")
+	assert(keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" }) ~= false)
+	Bridge._reset()
+	local ready = assert(Bridge.on_message("ready", { keylogger = keylogger }))
+	assert(ready.user_categories["owned-app"].score == 2 and ready.user_categories["owned-app"].type == "Productivity")
 end)
 
 Writer.close_db()
@@ -153,6 +218,6 @@ local function remove_owned(path)
 	else assert(uv.fs_unlink(path)) end
 end
 remove_owned(root)
-assert(checks == 15, "native category transaction regression check floor changed")
+assert(checks == 21, "native category transaction regression check floor changed")
 print(string.format("Native SQLite category transactions: %d checks, %d failures", checks, failures))
 os.exit(failures == 0 and 0 or 1)

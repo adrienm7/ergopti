@@ -216,3 +216,122 @@ helpers.describe("the shared empty native-layout status", function()
 		end)
 	end)
 end)
+
+
+--- Keeps native page epochs and asynchronous registry receipts independent.
+--- @return table bridge, table observations, table daemon, function advance
+local function owned_layout_bridge()
+	local Bridge, observed, daemon = bridge()
+	local epoch, refreshes, installs = 1, {}, {}
+	daemon.webview_manager.current_epoch = function() return epoch end
+	daemon.webview_manager.page_current = function(app, expected) return app == "layout_manager" and epoch == expected end
+	daemon.layout_registry.refresh = function(callback) refreshes[#refreshes + 1] = callback end
+	daemon.layout_registry.install = function(_, callback) installs[#installs + 1] = callback end
+	local snapshot = daemon.layout_registry.snapshot
+	observed.snapshot_reads = 0
+	daemon.layout_registry.snapshot = function()
+		observed.snapshot_reads = observed.snapshot_reads + 1
+		return snapshot()
+	end
+	observed.refreshes, observed.installs = refreshes, installs
+	return Bridge, observed, daemon, function(next_epoch) epoch = next_epoch end
+end
+
+helpers.describe("layout manager native page ownership", function()
+	for _, operation in ipairs({ "refresh", "install" }) do
+		helpers.it("(layout-retired-owner) old " .. operation .. " completion cannot reach a replacement", function()
+			local Bridge, observed, daemon, advance = owned_layout_bridge()
+			Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 1 })
+			if operation == "install" then
+				Bridge.on_message({ action = "install", id = "ergol" }, daemon, { app_name = "layout_manager", epoch = 1 })
+			end
+			-- The real WebKit manager calls this optional lifecycle hook on close.
+			if type(Bridge.on_window_closed) == "function" then Bridge.on_window_closed(1) end
+			advance(2)
+			Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 2 })
+			local pushes, reads = #observed.pushes, observed.snapshot_reads
+			if operation == "install" then observed.installs[1](true, {}) else observed.refreshes[1]({}) end
+			local expected = pushes
+			if operation == "install" then
+				expected = pushes + 1
+				helpers.assert_eq(#observed.pushes, expected, "The new ready observer receives fresh global registry state")
+				local body = assert(observed.pushes[expected].js:match("window%.updateState%((.*)%)$"))
+				helpers.assert_nil(assert(EmptyLayoutJson.decode(body)).result,
+					"A fresh global snapshot must not forward the retired page's operation result")
+			else
+				helpers.assert_eq(#observed.pushes, pushes, "An old catalogue response has no publication authority")
+				helpers.assert_eq(observed.snapshot_reads, reads, "Retired refresh callbacks must not read a replacement snapshot")
+			end
+			observed.refreshes[2]({})
+			helpers.assert_eq(#observed.pushes, expected + 1, "The new page's own refresh must still complete")
+		end)
+	end
+
+	helpers.it("(layout-retired-owner) an old close notification cannot revoke the live page", function()
+		local Bridge, observed, daemon, advance = owned_layout_bridge()
+		Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 1 })
+		advance(2)
+		Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 2 })
+		if type(Bridge.on_window_closed) == "function" then Bridge.on_window_closed(1) end
+		local pushes = #observed.pushes
+		observed.refreshes[2]({})
+		helpers.assert_eq(#observed.pushes, pushes + 1)
+	end)
+
+	helpers.it("(layout-retired-owner) stale native requests never dispatch registry work", function()
+		local Bridge, observed, daemon, advance = owned_layout_bridge()
+		Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 1 })
+		advance(2)
+		local pushes = #observed.pushes
+		local result = Bridge.on_message({ action = "install", id = "ergol" }, daemon,
+			{ app_name = "layout_manager", epoch = 1 })
+		helpers.assert_eq(result.handled, false)
+		helpers.assert_eq(#observed.installs, 0)
+		helpers.assert_eq(#observed.pushes, pushes)
+	end)
+end)
+
+helpers.describe("layout manager native admission refusals", function()
+	helpers.it("(layout-retired-owner) missing, refused or throwing native ownership cannot borrow a controller", function()
+		for _, kind in ipairs({ "missing", "refused", "throwing" }) do
+			local Bridge, observed, daemon = owned_layout_bridge()
+			if kind == "missing" then daemon.webview_manager.page_current = nil
+			elseif kind == "refused" then daemon.webview_manager.page_current = function() return false end
+			else daemon.webview_manager.page_current = function() error("native owner unavailable") end end
+			local result = Bridge.on_message({ action = "install", id = "ergol" }, daemon,
+				{ app_name = "layout_manager", epoch = 1 })
+			helpers.assert_eq(result.handled, false)
+			helpers.assert_eq(#observed.installs, 0)
+			helpers.assert_eq(observed.snapshot_reads, 0)
+			helpers.assert_eq(#observed.pushes, 0)
+		end
+	end)
+end)
+
+
+helpers.describe("layout manager observes global operation settlement", function()
+	helpers.it("(layout-retired-owner) a replacement ready clears completed global busy without the old result", function()
+		local Bridge, observed, daemon, advance = owned_layout_bridge()
+		local busy = { id = "ergol", action = "install" }
+		local snapshot = daemon.layout_registry.snapshot
+		daemon.layout_registry.snapshot = function()
+			local state = snapshot()
+			state.busy = busy
+			return state
+		end
+		Bridge.on_message({ action = "install", id = "ergol" }, daemon, { app_name = "layout_manager", epoch = 1 })
+		if type(Bridge.on_window_closed) == "function" then Bridge.on_window_closed(1) end
+		advance(2)
+		Bridge.on_message({ action = "ready" }, daemon, { app_name = "layout_manager", epoch = 2 })
+		local before = #observed.pushes
+		busy = nil
+		observed.installs[1](false, "old operation failure")
+		helpers.assert_eq(#observed.pushes, before + 1)
+		local body = assert(observed.pushes[#observed.pushes].js:match("window%.updateState%((.*)%)$"))
+		local update = assert(EmptyLayoutJson.decode(body))
+		helpers.assert_nil(update.busy, "The replacement must not remain disabled after the global operation settles")
+		helpers.assert_nil(update.result, "The old page's failure is not the replacement's operation result")
+		observed.installs[1](true, {})
+		helpers.assert_eq(#observed.pushes, before + 1, "A duplicate native terminal cannot republish into the observer")
+	end)
+end)

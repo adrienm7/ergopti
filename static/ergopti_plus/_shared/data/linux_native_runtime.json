@@ -80,7 +80,9 @@
 			"gir1.2-webkit2-4.1",
 			"glib-networking",
 			"gsettings-desktop-schemas",
-			"lua-luv"
+			"lua-luv",
+			"openssl",
+			"sqlite3"
 		],
 		"rpm": [
 			"luajit >= 2.1",
@@ -96,9 +98,20 @@
 			"libayatana-appindicator-gtk3",
 			"zenity",
 			"shadow-utils",
-			"util-linux"
+			"util-linux",
+			"openssl",
+			"sqlite"
 		],
-		"arch": ["luajit", "xclip", "libnotify", "curl", "libxkbcommon", "at-spi2-core"],
+		"arch": [
+			"luajit",
+			"xclip",
+			"libnotify",
+			"curl",
+			"libxkbcommon",
+			"at-spi2-core",
+			"openssl",
+			"sqlite"
+		],
 		"nix_library_path": [
 			"libayatana-appindicator",
 			"gtk3",

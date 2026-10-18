@@ -18,8 +18,17 @@ function M.with_session(options, body)
 	local previous_preload = package.preload.ffi
 	local Input = require("infra.input_event")
 	local queues, paths, descriptors, serial, released_fds = {}, {}, {}, 100, {}
+	-- Explicit controlled path names can share a prefix and contain a colon;
+	-- native descriptor/open lifetime issuance remains the original Reader's.
+	local suffixes, source_prefix = options.source_suffixes
+	if suffixes then
+		assert(type(suffixes) == "table" and type(suffixes.a) == "string" and type(suffixes.b) == "string"
+			and suffixes.a ~= suffixes.b and not suffixes.a:find("/", 1, true) and not suffixes.b:find("/", 1, true))
+		source_prefix = os.tmpname(); assert(os.remove(source_prefix))
+	end
 	for _, id in ipairs({ "a", "b" }) do
-		local path = os.tmpname(); local file = assert(io.open(path, "w"))
+		local path = source_prefix and source_prefix .. suffixes[id] or os.tmpname()
+		local file = assert(io.open(path, "w"))
 		file:write("controlled input-owner source\n"); file:close()
 		paths[id], queues[path] = path, {}
 	end
@@ -72,6 +81,7 @@ function M.with_session(options, body)
 			return 0
 		end,
 		read = function(fd, buffer)
+			if options.eof_path == descriptors[fd] then return 0 end
 			local queue = queues[descriptors[fd]]; local bytes = queue and table.remove(queue, 1)
 			if not bytes then return -1 end
 			if options.position_bits then
@@ -184,7 +194,7 @@ function M.with_session(options, body)
 		end
 		if options.before_hook then options.before_hook(s) end
 		if not s.hook then s.hook = h.load_module("adapters.keyboard_hook") end
-		s.base = Engine.new({ keys = { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
+		s.base = Engine.new({ keys = options.keys or { caps_lock = { tap_action = "enter", hold_modifier = "ctrl", time_activation_seconds = .3 } },
 			tap_min_ms = 0, one_shot_timeout_ms = 1000,
 			key_text = function(code) return s.hook.key_text(code) end,
 			plan_text = function(text)

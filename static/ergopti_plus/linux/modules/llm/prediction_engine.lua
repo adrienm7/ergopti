@@ -343,11 +343,13 @@ local function hide_overlay()
 	if _overlay and type(_overlay.hide) == "function" then _overlay.hide() end
 end
 
-local function clear_offer()
-	hide_overlay()
+local function clear_offer(defer_hide)
+	-- Revoke the old offer before a native hide callback can publish a successor.
+	-- Accepted output defers that callback until its transport has been retired.
 	_suggestions = {}
 	_suggestion_context = nil
 	_offer_notified = false
+	if not defer_hide then hide_overlay() end
 end
 
 local function show_candidates(candidates, meta)
@@ -719,17 +721,30 @@ end
 function M.predict(context, output_context, override)
 	if _runtime_closed or _scope_owner then return false end
 	if _predicting or type(context) ~= "string" or context == "" then return end
+	local request, app_epoch, engine, owner = _request_epoch, _runtime_app_epoch, _engine, _runtime_owner
+	local function admission_current()
+		return not _runtime_closed and _scope_owner == nil and not _predicting
+			and request == _request_epoch and app_epoch == _runtime_app_epoch
+			and engine == _engine and owner == _runtime_owner
+	end
 	if _is_secure_context() then
 		Logger.debug(LOG, "Prediction suppressed: secure field or excluded context.")
 		return false
 	end
 
+	if not admission_current() then return false end
 	local focus = _buffer_focus or current_focus()
-	if focus == "" or current_focus() ~= focus then
+	if not admission_current() then return false end
+	local observed_focus = focus ~= "" and current_focus() or ""
+	-- A native admission barrier may dispatch cancellation or a newer request
+	-- even when it returns the same field. The older admission owns no cleanup.
+	if not admission_current() then return false end
+	if focus == "" or observed_focus ~= focus then
 		Logger.info(LOG, "Prediction suppressed: the native typing target is unavailable or changed.")
 		return false
 	end
 	local backend, target, model, runtime_response = M.resolve_backend()
+	if not admission_current() then return false end
 	if not backend then return end
 
 	local clean_context, trigger_chars = context_without_trigger(context,
@@ -777,6 +792,7 @@ function M.predict(context, output_context, override)
 		loading = true,
 		validation_modifiers = NavigationSettings.get(),
 	}
+	if not admission_current() then return false end
 	_suggestion_context = {
 		app_id = type(output_context) == "table" and output_context.app_id or nil,
 		input_chars = trigger_chars,
@@ -817,10 +833,18 @@ function M.predict(context, output_context, override)
 
 	local function request_current(verify_focus)
 		if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
-		if verify_focus and (global_privacy_blocks() or current_focus() ~= focus) then
-			Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
-			M.dismiss()
-			return false
+		if verify_focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native focus and privacy barriers can dispatch cancellation, a scope
+			-- change or a successor request. Only this request may be withdrawn.
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return false end
+			if blocked then
+				Logger.info(LOG, "Prediction withdrawn: another native window took the focus.")
+				M.dismiss()
+				return false
+			end
 		end
 		return true
 	end
@@ -857,7 +881,8 @@ function M.predict(context, output_context, override)
 			M.drop_agent_triage("a prediction needs the backend")
 		end
 		_inflight_backend = backend
-		backend.chat(target, model, messages, {
+		local dispatch_index, terminal_seen = request_index, false
+		local dispatched = backend.chat(target, model, messages, {
 			runtime_response = runtime_response,
 			stream = DisplaySettings.get("streaming") == true,
 			-- A batch asks once, at the builder's temperature. Sequential variants
@@ -884,6 +909,7 @@ function M.predict(context, output_context, override)
 			local partials = parse_response(streamed, is_batch, trigger_chars)
 			publish(partials[#partials])
 		end, function(full_text, err)
+			terminal_seen = true
 			if not request_current(true) then return end
 			if err then
 				_predicting = false
@@ -907,6 +933,17 @@ function M.predict(context, output_context, override)
 			meta.loading = false
 			if #candidates > 0 then publish() else clear_offer() end
 		end)
+		-- A backend can refuse admission while its earlier native transport is
+		-- still settling. A synchronous completion may already own the next
+		-- variant, so only an unacknowledged, current dispatch retires loading.
+		if dispatched == false and not terminal_seen and dispatch_index == request_index and request_current(false) then
+			_inflight_backend = nil
+			_predicting = false
+			meta.loading = false
+			Logger.warn(LOG, "Prediction could not be dispatched: backend unavailable.")
+			if not request_current(false) then return end
+			if #candidates > 0 then publish() else clear_offer() end
+		end
 	end
 	dispatch()
 end
@@ -1364,7 +1401,13 @@ function M.shift_tone(direction, cycle)
 				end
 				return
 			end
-			if global_privacy_blocks() or current_focus() ~= focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native barriers can dispatch shutdown, configuration or a newer step.
+			-- Only the originating tone generation may submit its captured text.
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if blocked then
 				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 				return
 			end
@@ -1483,7 +1526,11 @@ local function send_paced(epoch, what, send, on_unpaced, kind)
 		end
 		return
 	end
-	if global_privacy_blocks() then
+	local blocked = global_privacy_blocks()
+	-- A resident barrier can dispatch scope changes, shutdown or a new offer.
+	-- Its old result owns neither permission to send nor the successor to dismiss.
+	if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+	if blocked then
 		Logger.info(LOG, "%s dropped: global text privacy no longer admits the request.", what)
 		M.dismiss()
 		return
@@ -1829,6 +1876,9 @@ end
 --- @param err string|nil The backend's error.
 --- @param focus string Exact native text destination captured before selection.
 local function finish_translation(epoch, meta, config, full_text, err, focus)
+	local function current()
+		return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+	end
 	if _runtime_closed or _scope_owner then return end
 	if epoch ~= _request_epoch then
 		Logger.info(LOG, "Translation ignored: a newer action or an edit superseded it.")
@@ -1842,7 +1892,13 @@ local function finish_translation(epoch, meta, config, full_text, err, focus)
 		clear_offer()
 		return
 	end
-	if global_privacy_blocks() or focus == "" or current_focus() ~= focus then
+	local blocked = global_privacy_blocks()
+	if not current() then return end
+	if not blocked and focus ~= "" then
+		blocked = current_focus() ~= focus
+		if not current() then return end
+	end
+	if blocked or focus == "" then
 		Logger.info(LOG, "Translation dropped: the active text field changed while it ran.")
 		M.dismiss()
 		return
@@ -1950,7 +2006,9 @@ function M.translate_selection(value)
 		Logger.info(LOG, "Sending translation (backend=%s, model=%s, target=%s, %d byte(s)).",
 			M.get_backend(), model, code, #selection)
 		send_paced(epoch, "Translation", function()
-			if current_focus() ~= focus then
+			local observed_focus = current_focus()
+			if _runtime_closed or _scope_owner or epoch ~= _request_epoch then return end
+			if observed_focus ~= focus then
 				Logger.info(LOG, "Translation request dropped: the active text field changed while pacing.")
 				_predicting = false
 				clear_offer()
@@ -2664,11 +2722,20 @@ function M.dismiss(resync_owner)
 		AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, false)
 	end
 	advance_request_epoch(resync_owner)
-	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
-	if _predicting and _inflight_backend then _inflight_backend.cancel() end
-	_inflight_backend = nil
-	_predicting = false
-	clear_offer()
+	local retired_epoch, timer = _request_epoch, _rate_timer
+	local backend = _predicting and _inflight_backend or nil
+	_rate_timer, _inflight_backend, _predicting = nil, nil, false
+	-- Native cancellation can dispatch another user action synchronously. Detach
+	-- the old state first, then leave any successor request and offer untouched.
+	clear_offer(true)
+	if timer then _scheduler.cancel(timer) end
+	if backend then
+		local ok, cancelled = pcall(backend.cancel)
+		if not ok or cancelled ~= true then
+			Logger.error(LOG, "Dismissed prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
+		end
+	end
+	if _request_epoch == retired_epoch then hide_overlay() end
 end
 
 
@@ -2678,17 +2745,20 @@ end
 --- may synchronously deliver a final response, and the physical edit is committed.
 local function close_accepted_offer()
 	advance_request_epoch()
+	local retired_epoch = _request_epoch
 	if _pending_trigger then _scheduler.cancel(_pending_trigger); _pending_trigger = nil end
 	if _rate_timer then _scheduler.cancel(_rate_timer); _rate_timer = nil end
 	local backend = _predicting and _inflight_backend or nil
 	_inflight_backend, _predicting = nil, false
-	clear_offer()
+	clear_offer(true)
 	if backend then
 		local ok, cancelled = pcall(backend.cancel)
 		if not ok or cancelled ~= true then
 			Logger.error(LOG, "Accepted prediction transport cancellation failed: %s.", ok and "termination refused" or tostring(cancelled))
 		end
 	end
+	if _request_epoch == retired_epoch then hide_overlay() end
+	return retired_epoch
 end
 
 --- Accepts one displayed prediction, or starts selection verification.
@@ -2700,19 +2770,26 @@ local function accept_candidate(index, complete)
 	if _runtime_closed or _scope_owner then return false end
 	local candidate = _suggestions[tonumber(index)]
 	if not candidate then return false end
+	local context, epoch, output = _suggestion_context, _request_epoch, _on_output
+	local function current()
+		return not _runtime_closed and not _scope_owner
+			and _request_epoch == epoch and _suggestion_context == context
+			and _suggestions[tonumber(index)] == candidate
+	end
 	if global_privacy_blocks() then
 		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
-		M.dismiss()
+		if current() then M.dismiss() end
 		return false
 	end
+	if not current() then return false end
 	local ok, committed
 	if candidate.on_accept then
 		-- An agent action: its connector runs, nothing is typed.
 		ok, committed = pcall(candidate.on_accept)
 		if ok and committed == true then
-			local agent = _suggestion_context and _suggestion_context.agent or nil
+			local agent = context and context.agent or nil
 			if agent and agent.auto then AgentLearning.record(agent.config, agent.auto.app, agent.auto.intent, true) end
-			close_accepted_offer()
+			if current() then close_accepted_offer() end
 			complete(true)
 			return true
 		end
@@ -2721,12 +2798,12 @@ local function accept_candidate(index, complete)
 		-- a tone step leaves it. Compared like a tone step's focus: in another
 		-- window the text would land where nothing was selected.
 		if not _replace_selection then return false end
-		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if focus == "" or current_focus() ~= focus then
+		local focus = context and context.focus or ""
+		if focus == "" or current_focus() ~= focus or not current() then
 			Logger.info(LOG, "Translation not inserted: another window has the focus.")
 			return false
 		end
-		local context, epoch, generation = _suggestion_context, _request_epoch, _tone_generation
+		local generation = _tone_generation
 		if context.selection_accepting then return false end
 		local pending = {}
 		context.selection_accepting = pending
@@ -2742,9 +2819,11 @@ local function accept_candidate(index, complete)
 			if not completed then complete(false); return end
 			if _on_output then pcall(_on_output, candidate.to_type, context) end
 			if _suggestion_context ~= context or epoch ~= _request_epoch then complete(true); return end
-			close_accepted_offer()
-			if _engine and type(_engine.reset) == "function" then _engine:reset() end
-			_buffer_focus = nil
+			local retired_epoch = close_accepted_offer()
+			if _request_epoch == retired_epoch then
+				_buffer_focus = nil
+				if _engine and type(_engine.reset) == "function" then _engine:reset() end
+			end
 			complete(true)
 		end)
 		if not ok or committed ~= true then
@@ -2754,26 +2833,29 @@ local function accept_candidate(index, complete)
 		return completed ~= false
 	else
 		if type(_apply_prediction) ~= "function" then return false end
-		local focus = _suggestion_context and _suggestion_context.focus or ""
-		if focus == "" or current_focus() ~= focus then
+		local focus = context and context.focus or ""
+		if focus == "" or current_focus() ~= focus or not current() then
 			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
-			M.dismiss()
+			if current() then M.dismiss() end
 			return false
 		end
-		ok, committed = pcall(_apply_prediction, candidate, _suggestion_context)
+		ok, committed = pcall(_apply_prediction, candidate, context)
 	end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
 		return false
 	end
-	if _on_output then
-		local observed, observe_err = pcall(_on_output, candidate.to_type, _suggestion_context)
+	if output then
+		local observed, observe_err = pcall(output, candidate.to_type, context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
-	close_accepted_offer()
+	if not current() then complete(true); return true end
+	local retired_epoch = close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
-	if _engine and type(_engine.reset) == "function" then _engine:reset() end
-	_buffer_focus = nil
+	if _request_epoch == retired_epoch then
+		_buffer_focus = nil
+		if _engine and type(_engine.reset) == "function" then _engine:reset() end
+	end
 	complete(true)
 	return true
 end

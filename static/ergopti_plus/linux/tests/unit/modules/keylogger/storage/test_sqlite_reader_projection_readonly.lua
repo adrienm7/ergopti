@@ -39,7 +39,7 @@ local helpers, Json, EXPECTED, with_stubbed_sqlite, queried =
 
 
 helpers.describe("linux-sqlite-readonly", function()
-	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today" }) do
+	for _, method in ipairs({ "read_system_days", "read_manifest", "read_ngrams", "read_range_split_today", "read_user_categories" }) do
 		helpers.it("linux-sqlite-readonly: " .. method .. " opens every source through native readonly JSON", function()
 			local statements, commands = with_stubbed_sqlite(function() return "[]" end, function(reader)
 				local result = reader[method]("/db/metrics.sqlite", "2026-10-03", "2026-10-03", {})
@@ -55,8 +55,46 @@ helpers.describe("linux-sqlite-readonly", function()
 	end
 end)
 
-
-
+helpers.describe("linux-sqlite-category-projection", function()
+	helpers.it("category projection joins all overrides in one readonly command with exact device quoting", function()
+		local app, category = "owned ' été app\0tail", "Productivity\r\n\0tail"
+		local statements = with_stubbed_sqlite(function()
+			return Json.encode({ { app_json = Json.encode(app), score_json = Json.encode("-2"), category_json = Json.encode(category) },
+				{ app_json = Json.encode("zero"), score_json = Json.encode("0"), category_json = "null" } })
+		end, function(reader)
+			local categories = reader.read_user_categories("/db/metrics.sqlite", "local ' device")
+			helpers.assert_eq(categories[app], { type = category, score = -2 })
+			helpers.assert_eq(categories.zero, { type = "Unknown", score = 0 })
+		end)
+		helpers.assert_eq(#statements, 1, "Category count cannot multiply CLI requests")
+		helpers.assert_contains(statements[1], "owned.device_id = 'local '' device'")
+		helpers.assert_contains(statements[1], "LEFT JOIN agg_app_day")
+	end)
+	helpers.it("category projection distinguishes an accepted empty map from native query refusal", function()
+		with_stubbed_sqlite(function() return "[]" end, function(reader)
+			helpers.assert_eq(reader.read_user_categories("/db/metrics.sqlite", "local"), {})
+		end)
+		with_stubbed_sqlite(function() return { body = "[]", status = 1 } end, function(reader)
+			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", "local"))
+		end)
+	end)
+	helpers.it("invalid category metadata cannot publish a partially accepted override map", function()
+		for _, value in ipairs({ "private-invalid-score", "2\0tail", "1e999" }) do
+			with_stubbed_sqlite(function()
+				return Json.encode({ { app_json = Json.encode("first"), score_json = Json.encode("1"), category_json = Json.encode("Productivity") },
+					{ app_json = Json.encode("second"), score_json = Json.encode(value), category_json = "null" } })
+			end, function(reader)
+				helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", "local"))
+			end)
+		end
+	end)
+	helpers.it("category projection rejects an absent device before opening SQLite", function()
+		local statements = with_stubbed_sqlite(function() error("must not dispatch") end, function(reader)
+			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", ""))
+		end)
+		helpers.assert_eq(#statements, 0)
+	end)
+end)
 
 helpers.describe("linux-sqlite-calendar-split", function()
 	local fixtures = {
@@ -87,8 +125,50 @@ helpers.describe("linux-sqlite-calendar-split", function()
 	end
 end)
 
+helpers.describe("sqlite-range-date-boundary", function()
+	for _, fixture in ipairs({
+		{ name = "unbounded", includes = true, historical = "2026-10-17" },
+		{ name = "today exact", first = "2026-10-18", last = "2026-10-18", includes = true, historical = "2026-10-17" },
+		{ name = "today lower inclusive", first = "2026-10-18", includes = true, historical = "2026-10-17" },
+		{ name = "today upper inclusive", last = "2026-10-18", includes = true, historical = "2026-10-17" },
+		{ name = "historical", last = "2026-10-17", includes = false, historical = "2026-10-17" },
+		{ name = "future", first = "2026-10-19", includes = false, historical = "2026-10-17" },
+		{ name = "invalid SQL bounds ignored", first = "invalid", last = false, includes = true, historical = "2026-10-17" },
+	}) do
+		helpers.it("(sqlite-range-date-boundary) shared date policy keeps " .. fixture.name, function()
+			with_stubbed_sqlite(function() return "[]" end, function(reader)
+				local bounds = reader.split_bounds(fixture.first, fixture.last, "2026-10-18")
+				helpers.assert_eq(bounds.today, "2026-10-18")
+				helpers.assert_eq(bounds.includes_today, fixture.includes)
+				helpers.assert_eq(bounds.historical_end, fixture.historical)
+			end)
+		end)
+	end
 
-
+	for _, fixture in ipairs({
+		{ name = "historical day", first = "2020-01-01", last = "2020-01-01" },
+		{ name = "future day", first = "2100-01-01", last = "2100-01-01" },
+		{ name = "open historical upper bound", last = "2020-01-01" },
+		{ name = "open future lower bound", first = "2100-01-01" },
+	}) do
+		helpers.it("(sqlite-range-date-boundary) " .. fixture.name .. " never queries today's persisted slice", function()
+			local result
+			local today = os.date("%Y-%m-%d")
+			local statements = with_stubbed_sqlite(function(sql)
+				if sql:find("date >= '" .. today .. "'", 1, true) then
+					return '[{"app":"selected","token_json":"\\\"t\\\"","c":5,"td":0,"e":0,"esrc_json":"{}"}]'
+				end
+				return "[]"
+			end, function(reader)
+				result = reader.read_range_split_today("/db/metrics.sqlite", fixture.first, fixture.last, { "selected" })
+			end)
+			helpers.assert_nil(next(result.today), "Today's rows are outside the inclusive requested interval")
+			for _, sql in ipairs(statements) do
+				helpers.assert_nil(sql:find("date >= '" .. today .. "'", 1, true), "An excluded slice must not be queried")
+			end
+		end)
+	end
+end)
 
 helpers.describe("linux-sqlite-read-receipts", function()
 	for _, status in ipairs({ 1, 7, 127, 137, 255 }) do

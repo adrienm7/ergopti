@@ -165,12 +165,13 @@ local function _run_tap(action, binding)
 		_on_text_injected(action.type_text)
 		return
 	end
-	-- A logging sink may synchronously revoke or republish the selected pair.
-	-- Capture its original source and Manager before the callback, then join
-	-- again immediately before the irreversible action executor.
-	local pair_current
+	-- A logging sink may synchronously revoke or republish the engine. Capture
+	-- its Manager before the callback, then join again before the irreversible
+	-- action. Pair taps additionally retain their original configured source.
+	local pair_current, tap_current
+	local execute = _execute_action
 	if type(binding) == "string" and binding:match("^combination__") then
-		local combinations, engine, generation, execute = _combinations, _engine, _generation, _execute_action
+		local combinations, engine, generation = _combinations, _engine, _generation
 		if type(combinations) ~= "table" or type(combinations.capture_runtime) ~= "function" then return end
 		local captured, guard = pcall(combinations.capture_runtime)
 		if not captured or type(guard) ~= "function" then return end
@@ -181,10 +182,19 @@ local function _run_tap(action, binding)
 				and _generation == generation and _execute_action == execute
 		end
 		if not pair_current() then return end
+	else
+		local loaded, engine, generation = _loaded, _engine, _generation
+		tap_current = function()
+			return _initialized and not _paused and _enabled and loaded ~= nil and loaded.enabled
+				and engine ~= nil and rawequal(_loaded, loaded) and rawequal(_engine, engine)
+				and rawequal(_installed_engine, engine) and _generation == generation and _execute_action == execute
+		end
+		if not tap_current() then return end
 	end
 	Logger.debug(LOG, "Tap action '%s'.", action)
 	if pair_current and not pair_current() then return end
-	local ok, err = pcall(_execute_action, action, binding or "tap_hold")
+	if tap_current and not tap_current() then return end
+	local ok, err = pcall(execute, action, binding or "tap_hold")
 	if not ok then Logger.error(LOG, "Tap action '%s' failed: %s.", action, tostring(err)) end
 end
 

@@ -17,6 +17,8 @@
 
 local M = {}
 local WindowTitles = require("window_titles")
+local ConfigPaths = require("infra.config_paths")
+local AppParameter = require("app_parameter")
 
 --- Where the system installs its desktop entries.
 M.APPLICATIONS_DIR = "/usr/share/applications/"
@@ -24,24 +26,61 @@ M.APPLICATIONS_DIR = "/usr/share/applications/"
 --- The extension of a desktop entry, stripped to form its id.
 local DESKTOP_SUFFIX = ".desktop"
 
---- The desktop-file id a chosen desktop entry path names.
+--- Admits absolute native paths without interpreting traversal through symlinks.
+--- @param path any Native path or XDG directory.
+--- @return string|nil normalized
+local function absolute_path(path)
+	if type(path) ~= "string" or path:sub(1, 1) ~= "/" or path:find("[%z\1-\31\127]") then return nil end
+	local parts = {}
+	for part in path:gmatch("[^/]+") do
+		if part == "." or part == ".." then return nil end
+		parts[#parts + 1] = part
+	end
+	return "/" .. table.concat(parts, "/")
+end
+
+--- Resolves the effective XDG application directories in native search order.
+--- @return table roots Absolute directories with a trailing separator.
+local function application_roots()
+	local bases = { ConfigPaths.data_home() }
+	local system = os.getenv("XDG_DATA_DIRS")
+	if system == nil or system == "" then system = "/usr/local/share:/usr/share" end
+	for base in system:gmatch("[^:]+") do bases[#bases + 1] = base end
+	local roots = {}
+	for _, base in ipairs(bases) do
+		local normalized = absolute_path(base)
+		if normalized then roots[#roots + 1] = (normalized == "/" and "" or normalized) .. "/applications/" end
+	end
+	return roots
+end
+
+--- The desktop-file id of an entry installed beneath an effective XDG root.
+--- A nested vendor/editor.desktop has the native id vendor-editor.desktop.
 --- @param path any The path the dialog printed.
---- @return string|nil id Nil when the path is not a desktop entry.
+--- @return string|nil id Nil when no installed desktop-file id can be derived.
 function M.desktop_id(path)
-	if type(path) ~= "string" then return nil end
+	if type(path) ~= "string" or path:sub(-1) == "/" then return nil end
+	path = absolute_path(path)
+	if not path then return nil end
 	local name = path:match("([^/]+)$")
 	if not name or name:sub(-#DESKTOP_SUFFIX) ~= DESKTOP_SUFFIX or #name == #DESKTOP_SUFFIX then return nil end
-	return name:sub(1, #name - #DESKTOP_SUFFIX)
+	for _, root in ipairs(application_roots()) do
+		if path:sub(1, #root) == root then
+			local id = path:sub(#root + 1, -#DESKTOP_SUFFIX - 1):gsub("/", "-")
+			return AppParameter.is_valid(id) and id or nil
+		end
+	end
+	return nil
 end
 
 --- Opens the first available file dialog over the desktop entries.
---- @param shell table Shell-runner authority (has_command, exec_line, quote).
+--- @param shell table Shell-runner authority (has_command, exec_checked, quote).
 --- @param title string Already-translated dialog title.
 --- @return string|nil id The chosen desktop-file id.
 --- @return string|nil error_message Why nothing was chosen.
 function M.pick(shell, title)
 	if type(shell) ~= "table" or type(shell.has_command) ~= "function"
-		or type(shell.exec_line) ~= "function" or type(shell.quote) ~= "function" then
+		or type(shell.exec_checked) ~= "function" or type(shell.quote) ~= "function" then
 		return nil, "shell runner is unavailable"
 	end
 	title = WindowTitles.compose(title)
@@ -56,8 +95,14 @@ function M.pick(shell, title)
 	else
 		return nil, "neither zenity nor kdialog is available"
 	end
-	local chosen = require("ui.modal").run(function() return shell.exec_line(command) end)
-	if not chosen then return nil, "application selection was cancelled" end
+	local completed, output = require("ui.modal").run(function() return shell.exec_checked(command) end)
+	-- Native cancellation or failure can leave partial stdout; only a confirmed
+	-- dialog result may become a stored application binding.
+	if completed ~= true or type(output) ~= "string" then
+		return nil, "application selection was cancelled or refused"
+	end
+	local chosen = output:match("^([^\r\n]*)")
+	if not chosen or chosen == "" then return nil, "application selection was cancelled" end
 	local id = M.desktop_id(chosen)
 	if not id then return nil, "the chosen file is not a desktop entry" end
 	return id

@@ -5,6 +5,7 @@
 --- Explicitly simulates native constructor refusal and handle invalidation.
 --- Libuv handles, EINVAL receipts, child groups, output, deadlines, cancellation
 --- and reaping are real. No ordinary native allocation failure is claimed.
+--- Nonfinite deadlines must refuse before any actual allocation or dispatch.
 --- ==============================================================================
 local source = debug.getinfo(1, "S").source:gsub("^@", "")
 local root = assert(source:match("^(.*)/tests/fixtures/native_shell_async_admission%.lua$"))
@@ -54,6 +55,31 @@ local function check(name, test)
 		failures = failures + 1
 		io.stderr:write("FAIL " .. name .. ": " .. tostring(err) .. "\n")
 	end
+end
+
+for _, case in ipairs({
+	{ name = "NaN", value = 0 / 0 },
+	{ name = "positive infinity", value = math.huge },
+	{ name = "negative infinity", value = -math.huge },
+	{ name = "overflowed numeric string", value = "1e999" },
+}) do
+	check("nonfinite deadline " .. case.name .. " refuses before native acquisition", function(state)
+		for _, method in ipairs({ "new_pipe", "new_timer" }) do
+			uv[method] = function(...)
+				local handle = originals[method](...)
+				state.allocations[#state.allocations + 1] = handle
+				return handle
+			end
+		end
+		local token, reason = Shell.run_async("/bin/sleep", { "30" }, { timeout_ms = case.value }, function()
+			state.callbacks = state.callbacks + 1
+		end)
+		state.token = token
+		assert(token == nil and type(reason) == "string" and reason:find("timeout_ms", 1, true),
+			"nonfinite deadline admitted a native process")
+		assert(#state.allocations == 0 and state.pid == nil, "deadline refusal still acquired native ownership")
+		assert(state.callbacks == 0, "synchronous deadline refusal also delivered a callback")
+	end)
 end
 
 for _, operation in ipairs({ "timer", "stdout", "stderr", "second pipe raised", "timer allocation nil" }) do

@@ -1913,9 +1913,9 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 		-- This models loader coordinates only. Real ModuleSource compares the
 		-- exact original Manager callback; no positive authentication predicate
 		-- or native source/output authority is replaced by this directory port.
-		rawset(_G, "hs", { fs = { currentDir = function()
+		local loader_hs = { fs = { currentDir = function()
 			return kind ~= "unanchored" and "/controlled-normal-loader" or nil
-		end } })
+		end } }
 		for _, name in ipairs(names) do
 			local relative = name:gsub("%.", "/") .. ".lua"
 			local source = bytes(helpers.driver_root() .. "/" .. relative)
@@ -1923,7 +1923,15 @@ helpers.describe("relative-loader simultaneous source admission (controlled tran
 			if kind == "foreign" and name == "platform.remap.tap_hold_manager" then coordinate = "@./foreign/" .. relative end
 			if kind == "wrong-anchor" and name == "platform.remap.tap_hold_manager" then coordinate = "@/different-loader-root/" .. relative end
 			package.preload[name] = function()
-				return assert((loadstring or load)(source, coordinate))()
+				local constructor = assert((loadstring or load)(source, coordinate))
+				local previous_hs = rawget(_G, "hs")
+				-- Only these two source coordinates are simulated. Hook's actual
+				-- native siblings must load under its genuine process directory.
+				rawset(_G, "hs", loader_hs)
+				local constructed, owner = pcall(constructor)
+				rawset(_G, "hs", previous_hs)
+				if not constructed then error(owner, 0) end
+				return owner
 			end
 		end
 		local ok, failure = pcall(function()

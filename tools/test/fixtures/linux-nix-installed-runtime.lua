@@ -27,6 +27,21 @@ assert(native.ok == true and native.acknowledgement == "native-runtime" and nati
 local digest = require("infra.openssl_digest")
 assert(digest.available == true, "Actual native libcrypto required")
 assert(digest.sha256("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "Independent NIST digest required")
+-- A library in LD_LIBRARY_PATH does not provide its CLI. Require the first
+-- resolvable metrics command to belong to the installed package closure.
+local command_path = assert(os.getenv("PATH"), "Packaged command path required")
+for _, command in ipairs({ "openssl", "sqlite3", "mkdir" }) do
+ local resolved
+ for directory in (command_path .. ":"):gmatch("(.-):") do
+  local candidate = (directory == "" and "." or directory) .. "/" .. command
+  local attributes = uv.fs_stat(candidate)
+  if attributes and attributes.type == "file" and uv.fs_access(candidate, "X") then
+   resolved = uv.fs_realpath(candidate)
+   break
+  end
+ end
+ assert(resolved and resolved:match("^/nix/store/"), "Packaged metrics command required: " .. command)
+end
 local count = 0
 uv.walk(function() count = count + 1 end)
 assert(count == 0, "No native handle debt permitted")
