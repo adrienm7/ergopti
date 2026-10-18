@@ -576,6 +576,8 @@ class WebViewHost {
 				; graph alive for up to 2.5 s after Close().
 				if (this.SafetyTimer)
 						try SetTimer(this.SafetyTimer, 0)
+				; The BoundFunc captures this host; cancellation alone leaves a cycle.
+				this.SafetyTimer := 0
 
 				try {
 						this.MsgSub := unset

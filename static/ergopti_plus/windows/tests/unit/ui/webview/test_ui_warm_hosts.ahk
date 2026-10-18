@@ -285,3 +285,37 @@ Test("WebView host: message callback failures reach the error owner (webview-cal
 	_UIWH_DispatchFailure.Bind(false))
 Test("WebView host: ready callback failures reach the error owner (webview-callback-error)",
 	_UIWH_DispatchFailure.Bind(true))
+
+; A cancelled native timer releases its callback, but the host's own field still
+; retains a BoundFunc back to the host unless teardown breaks that cycle too.
+class _UIWH_TimerLifetimeHost extends WebViewHost {
+	__New(Receipt) {
+		this.Receipt := Receipt
+	}
+	_SafetyFlush() {
+		this.Receipt["fired"] += 1
+	}
+	__Delete() {
+		this.Receipt["released"] += 1
+	}
+}
+
+_UIWH_TimerLifetime(AlreadyFired) {
+	Receipt := Map("fired", 0, "released", 0)
+	Host := _UIWH_TimerLifetimeHost(Receipt)
+	Host.SafetyTimer := Host._SafetyFlush.Bind(Host)
+	SetTimer(Host.SafetyTimer, AlreadyFired ? -1 : -60000)
+	if AlreadyFired {
+		Started := A_TickCount
+		while Receipt["fired"] == 0 && A_TickCount - Started < 2000
+			Sleep(1)
+	}
+	Host.Close()
+	Host := 0
+	AssertEqual(AlreadyFired ? 1 : 0, Receipt["fired"], "close cancels only the retained timer")
+	AssertEqual(1, Receipt["released"], "a closed host must be reclaimable before interpreter shutdown")
+}
+Test("WebView host: closing releases a pending timer's host (webview-timer-release)",
+	_UIWH_TimerLifetime.Bind(false))
+Test("WebView host: closing releases an expired timer's host (webview-timer-release)",
+	_UIWH_TimerLifetime.Bind(true))
