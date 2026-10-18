@@ -2302,9 +2302,16 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 	end
 	local provider = M.PROVIDERS[provider_id]
 	local entry = find_provider_entry(provider_id)
+	local configured_entries, stored_token = _entries, entry.token
 	--- Hands over the request once its key is known.
 	--- @param token string The cleartext key, "" for a local server given none.
 	local function with_token(token)
+		-- Agent/vision requests are independent of the prediction selection, but
+		-- a late Keychain read cannot retain credentials removed from configuration.
+		if _entries ~= configured_entries or entry.token ~= stored_token then
+			fail("stale_identity")
+			return
+		end
 		local base, base_error = resolve_base_url(entry, provider)
 		if not base then
 			log_endpoint_refusal(label:lower(), entry, base_error)
@@ -2313,12 +2320,12 @@ local function with_provider_key(label, provider_id, use, fail, on_ready)
 		end
 		on_ready(provider, entry, token, base)
 	end
-	if type(entry.token) ~= "string" or entry.token == "" then
+	if type(stored_token) ~= "string" or stored_token == "" then
 		-- key_missing() let it through: a local server given no key
 		with_token("")
 		return true
 	end
-	TokenCrypto.decrypt_async(entry.token, function(decrypted, token, token_reason)
+	TokenCrypto.decrypt_async(stored_token, function(decrypted, token, token_reason)
 		if decrypted ~= true or type(token) ~= "string" or token == "" then
 			Logger.error(LOG, "%s request for provider '%s' has no usable key (entry '%s'): %s.",
 				label, provider_id, tostring(entry.id), tostring(token_reason))
