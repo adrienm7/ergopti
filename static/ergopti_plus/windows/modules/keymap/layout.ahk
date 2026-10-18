@@ -609,7 +609,9 @@ WrapTextIfSelected(Symbol, LeftSymbol, RightSymbol) {
 				if !SendInstant(LeftSymbol Selection RightSymbol)
 					SendNewResult(Symbol)
 				else
-					UpdateLastSentCharacter(Symbol)
+					; Wrapping ends at the closing text, which can differ from the
+					; pressed key and can include a no-break prefix or a surrogate pair.
+					UpdateLastSentCharacter(SubStr(RightSymbol, -_TextTailCodeUnits(RightSymbol, 1)))
 				return
 			}
 		} finally {
