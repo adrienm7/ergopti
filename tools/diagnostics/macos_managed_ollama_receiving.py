@@ -568,6 +568,9 @@ class Receiver:
             "_shared/python/managed_source_alias.py",
             "macos/platform/source_alias_owner.py",
             "macos/platform/suspended_image_owner.py",
+            "macos/platform/ollama_bootstrap_owner.py",
+            "_shared/python/managed_ollama_bootstrap.py",
+            "_shared/modules/llm/managed_ollama_bootstrap.json",
             "_shared/python/managed_ollama_pull.py",
             "_shared/modules/llm/managed_python_release.json",
             "macos/platform/network/native_http.py",
@@ -837,6 +840,14 @@ class Receiver:
             "ollama_suspended_native_owner",
             self.http_payload / "macos/platform/suspended_image_owner.py",
         )
+        self.bootstrap_native = load(
+            "ollama_bootstrap_native_owner",
+            self.http_payload / "macos/platform/ollama_bootstrap_owner.py",
+        )
+        self.bootstrap_policy = self.bootstrap_native.BootstrapPolicy(
+            self.http_payload / "_shared/modules/llm/managed_ollama_bootstrap.json",
+            policy.ProxyPolicy(),
+        )
         qualification_source = "tools/diagnostics/macos_qualified_outgoing_worker.py"
         self.source_hashes[qualification_source] = digest(self.root / qualification_source)
         self.receipt["asset_sha256"] = digest(archive)
@@ -909,6 +920,7 @@ class Receiver:
             self.daemon is None
             and getattr(self, "alias_owner", None) is None
             and getattr(self, "session_owner", None) is None
+            and getattr(self, "bootstrap_owner", None) is None
             and getattr(self, "binary_descriptor", None) is None
             and getattr(self, "_source_close_debt", None) is None,
             "actual_receiver_start_state",
@@ -933,6 +945,22 @@ class Receiver:
             register=lambda owner: setattr(self, "alias_owner", owner),
             progress=progress,
         )
+        # The daemon receives its network settings exactly as the product sends
+        # them: one private bootstrap snapshot of the caller environment. It is
+        # the only route by which SSL_CERT_FILE, the model store and an
+        # explicit proxy reach the Go transport and the native worker.
+        snapshot_environment = dict(self.api_environment)
+        if producer:
+            snapshot_environment["OLLAMA_MODELS"] = str(self.home / "producer-models")
+        elif self.options.profile == "explicit-proxy":
+            snapshot_environment["https_proxy"] = f"http://127.0.0.1:{self.fixture.ports['first']}"
+        with patch.dict(os.environ, snapshot_environment, clear=True):
+            snapshot = self.bootstrap_policy.capture(60000)
+        self.bootstrap_owner = self.bootstrap_native.EmptyNetworkBootstrap.acquire(
+            self.session_owner,
+            snapshot,
+            register=lambda owner: setattr(self, "bootstrap_owner", owner),
+        )
         request = {
             "version": 1,
             "executable": str(self.alias_owner.executable),
@@ -942,14 +970,9 @@ class Receiver:
             "session_path": str(self.session_path),
             "remaining_ms": min(30000, int((deadline - time.monotonic()) * 1000)),
             "home": str(self.home.resolve(strict=True)),
-            "models_path": str(self.home / "producer-models") if producer else "",
             "network_policy": str(self.http_payload / "_shared/modules/network/proxy_policy.json"),
             "host": "127.0.0.1:" + str(self.port),
-            "proxy_url": (
-                f"http://127.0.0.1:{self.fixture.ports['first']}"
-                if self.options.profile == "explicit-proxy" and not producer
-                else ""
-            ),
+            **self.bootstrap_owner.fields(),
             **self.outgoing_context.fields(progress=progress),
         }
         progress()
@@ -960,6 +983,7 @@ class Receiver:
             lambda: self.verify_alias_source(deadline),
             self.outgoing_context,
             register=lambda owner: setattr(self, "daemon", owner),
+            bootstrap=self.bootstrap_owner,
         )
         self.alias_owner.bind_operation(self.daemon)
         self.daemon.start()
@@ -996,6 +1020,11 @@ class Receiver:
         if alias is not None:
             alias.retire()
             self.alias_owner = None
+        bootstrap = getattr(self, "bootstrap_owner", None)
+        if bootstrap is not None:
+            # The bootstrap file borrows the session directory: retire it first.
+            bootstrap.retire()
+            self.bootstrap_owner = None
         session = getattr(self, "session_owner", None)
         if session is not None:
             session.retire()
