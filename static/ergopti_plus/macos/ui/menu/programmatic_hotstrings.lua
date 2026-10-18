@@ -3,8 +3,9 @@
 --- ==============================================================================
 --- MODULE: Programmable Hotstring Menu (macOS Native Ports)
 --- DESCRIPTION:
---- Supplies native dialogs, exact runtime preferences and editor opening to the
---- shared programmable-source menu. Opening a source never creates or loads it.
+--- Supplies the delay prompt, exact runtime preferences, editor opening and the
+--- source problem to the shared programmable-source menu. Opening a source
+--- never creates or loads it; a source problem is shown on the row, never a dialog.
 --- ==============================================================================
 
 local M = {}
@@ -59,15 +60,11 @@ function M.build(ctx)
 		end,
 		changed = function() ctx.updateMenu() end,
 		open = open, reload = User.reload_user_code, create = User.create_user_code_example,
+		problem = User.user_code_problem,
 		prompt = function(milliseconds)
 			local button, value = Dialog.text_prompt(I18n.get("menu.hotstrings.user_code.title"),
 				I18n.get("menu.hotstrings.delay_prompt"), tostring(milliseconds), I18n.get("common.ok"), I18n.get("common.cancel"))
 			if button == I18n.get("common.ok") then return value end
-		end,
-		error = function(open_source)
-			local open_label = I18n.get("menu.hotstrings.user_code.open_source")
-			if Dialog.block_alert(I18n.get("common.error_title"), I18n.get("menu.hotstrings.user_code.error"),
-				open_label, I18n.get("common.close"), "warning") == open_label then open_source() end
 		end,
 	})
 end

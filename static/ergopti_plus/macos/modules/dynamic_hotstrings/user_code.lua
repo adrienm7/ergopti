@@ -23,6 +23,14 @@ local _desired_enabled = false
 local _time_activation
 local _active_enabled, _lifecycle_dirty = false, false
 local _scope, set_time
+-- Why the last load of the personal source did not publish: "missing" or
+-- "failed", with the refusal class that set it; nil once a load publishes or
+-- the feature is switched off. The Hotstrings menu shows it on its row.
+local _problem, _problem_kind = nil, nil
+
+-- Failures of the user's own script while it runs: the user repairs them, so
+-- they are warnings, not driver faults for the error window.
+local USER_SCRIPT_FAILURES = { ["execution-failed"] = true, ["invalid-result"] = true }
 
 --- Reports a classified failure without leaking user source or callback output.
 --- @param kind string Stable failure class.
@@ -32,10 +40,40 @@ local function report(kind, id)
 	if SyntheticInput.is_collecting_callback() then
 		return SyntheticInput.defer_after_callback("programmable hotstring error", report, kind, id) == true
 	end
-	Logger.error(LOG, "Programmable hotstring refused (%s; rule=%s; content withheld).",
-		tostring(kind), tostring(id or "source"))
+	if USER_SCRIPT_FAILURES[kind] then
+		Logger.warn(LOG, "Programmable hotstring script failed (%s; rule=%s; content withheld).",
+			tostring(kind), tostring(id or "source"))
+	else
+		Logger.error(LOG, "Programmable hotstring refused (%s; rule=%s; content withheld).",
+			tostring(kind), tostring(id or "source"))
+	end
 	return Notifier.send(I18n.get("menu.hotstrings.user_code.error"), { kind = "error" }) == true
 end
+
+--- Records a load the personal source refused. A missing file is a state the
+--- menu offers to repair (create the example): one warning, no notification.
+--- An unreadable or failing script is the user's to fix: one warning and a
+--- non-modal notification. Neither is a driver error. Repeating the same
+--- refusal logs nothing more.
+--- @param kind string Source refusal class from the loader.
+local function source_refused(kind)
+	local problem = kind == "source-absent" and "missing" or "failed"
+	local repeated = _problem == problem and _problem_kind == kind
+	_problem, _problem_kind = problem, kind
+	if repeated then return end
+	if problem == "missing" then
+		Logger.warn(LOG, "Programmable hotstrings are on but %s does not exist — the Hotstrings menu offers to create an example.",
+			M.source_path())
+		return
+	end
+	Logger.warn(LOG, "Programmable source refused (%s; content withheld) — the Hotstrings menu offers to open it.",
+		tostring(kind))
+	Notifier.send(I18n.get("menu.hotstrings.user_code.error"), { kind = "warn" })
+end
+
+--- Why the personal source is not running, for the Hotstrings menu.
+--- @return string|nil problem "missing", "failed", or nil when nothing is wrong.
+function M.problem() return _problem end
 
 --- Loads the user factory from the configured directory without creating it.
 --- @return boolean loaded
@@ -50,13 +88,15 @@ local function reload(token)
 	if not _scope.current(token) then return false end
 	if not rules or receipt.present ~= true then
 		_lifecycle_dirty = _owner.refuse_source() ~= true
-		report(problem or "source-absent")
+		source_refused(problem or "source-absent")
 		return false
 	end
 	_path = path
 	local committed = _owner.reload(rules, receipt) == true and _owner.set_enabled(_desired_enabled) == true
 	if not _scope.current(token) then return false end
 	_active_enabled = committed and _desired_enabled
+	-- A published source has nothing left to repair.
+	if committed then _problem, _problem_kind = nil, nil end
 	return committed
 end
 
@@ -136,7 +176,12 @@ function M.start(keymap)
 	})
 	_path = M.source_path()
 	local receipt, problem = Source.read(FileSystem.read_with_status, _path)
-	if not receipt then report(problem); return true end
+	if not receipt then
+		-- Boot runs no user code: enabling loads the source and reports its state.
+		Logger.warn(LOG, "Programmable source unreadable at start (%s) — it is read again when enabled.",
+			tostring(problem))
+		return true
+	end
 	-- Reading source at closed boot does not admit executable factory metadata.
 	return _owner.refuse_source() == true
 end
@@ -147,6 +192,8 @@ end
 function M.set_enabled(enabled)
 	local token = _scope.begin()
 	if not _owner or type(enabled) ~= "boolean" then return false, token end
+	-- A switched-off source has no problem to show.
+	if not enabled then _problem, _problem_kind = nil, nil end
 	if not enabled and not _desired_enabled and not _active_enabled and not _lifecycle_dirty then
 		return true, token
 	end
@@ -258,7 +305,7 @@ function M.stop()
 	if _lifecycle_dirty then return false end
 	_owner, _keymap, _path = nil, nil, nil
 	_desired_enabled = false
-	_time_activation = nil
+	_time_activation, _problem, _problem_kind = nil, nil, nil
 	return true
 end
 

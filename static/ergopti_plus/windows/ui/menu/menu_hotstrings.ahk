@@ -1499,19 +1499,27 @@ _HS_ExtensionScopeCommandRows(ExtensionId, Options) {
 }
 
 ; Read intent on the click, so an older menu never inverts a masked runtime flag.
+; An enabled source that does not run shows why on its own row (missing, or
+; failed to load), and the repair stays one click away: creating the example
+; loads it at once, and opening a source that does not exist is greyed.
 _HS_ProgrammableHotstringRows() {
 	Commands := Map("open_user_hotstring_source", UserHotstringsOpenSource,
 		"reload_user_hotstring_source", UserHotstringsReload,
-		"create_user_hotstring_example", UserHotstringsCreateExample)
+		"create_user_hotstring_example", UserHotstringsRepairWithExample)
+	Problem := UserHotstringsProblem()
 	Rows := []
 	for Declaration in _MR_GetMenuDef("programmable_hotstrings") {
 		if !(Declaration is Map)
 			continue
 		if Declaration.Get("type", "") == "feature" {
 			Label := _ApplyMenuLabelDynamicSubstitutions(t(Declaration["i18n"]), Declaration["path"])
+			if (Problem != "")
+				Label .= " — " . t("menu.hotstrings.user_code.problem_" . Problem)
 			Row := MenuRowWithLabel(Declaration["path"], Label, "DynamicHotstrings")
 		} else if Declaration.Get("type", "") == "command" {
 			Row := MenuRenderer_CommandRow("programmable_hotstrings", Declaration["id"], Commands)
+			if (Row is Map and Problem == "missing" and Declaration["id"] == "open_user_hotstring_source")
+				Row["disabled"] := true
 		} else {
 			continue
 		}

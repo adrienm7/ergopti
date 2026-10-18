@@ -685,6 +685,7 @@ M.set_user_code_enabled = UserCode.set_enabled
 M.user_code_source_path = UserCode.source_path
 M.user_code_count = UserCode.count
 M.create_user_code_example = UserCode.create_example
+M.user_code_problem = UserCode.problem
 M.set_user_code_time_activation = UserCode.set_time_activation
 M.user_code_is_enabled = UserCode.is_enabled
 M.user_code_time_activation = UserCode.time_activation

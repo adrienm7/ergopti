@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "יצירת סקריפט לדוגמה",
 	"menu.hotstrings.user_code.error": "סקריפט קיצורי הטקסט האישי נכשל. יש לפתוח אותו כדי לתקן את השגיאה.",
 	"menu.hotstrings.user_code.open_source": "פתיחת הסקריפט האישי",
+	"menu.hotstrings.user_code.problem_failed": "שגיאה בסקריפט: פתחו אותו כדי לתקן",
+	"menu.hotstrings.user_code.problem_missing": "הסקריפט חסר: צרו את הדוגמה",
 	"menu.hotstrings.user_code.reload_source": "טעינה מחדש של הסקריפט האישי",
 	"menu.hotstrings.user_code.title": "קיצורי טקסט ניתנים לתכנות",
 	"platform_reason.program_runner_unavailable": "לא זמין: מפעיל התוכניות המובנה או שיוך זה אינם זמינים.",

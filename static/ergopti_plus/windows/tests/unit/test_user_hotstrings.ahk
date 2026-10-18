@@ -496,7 +496,7 @@ _UCHNativeMenuProjection() {
 			Bytes := FSReadUtf8Exact(UserHotstringsSourcePath())
 			Assert(Bytes is String && InStr(Bytes, "ErgoptiDynamicHotstrings(api)"))
 			AssertEqual(Chr(0xFEFF), SubStr(Bytes, 1, 1), "the explicit AHK example uses UTF-8 with BOM")
-			AssertFalse(Reordered[1]["action"].Call(), "a second explicit create refuses an existing file")
+			AssertTrue(Reordered[1]["action"].Call(), "a second create keeps the existing file, loading it only when on")
 			AssertEqual(Bytes, FSReadUtf8Exact(UserHotstringsSourcePath()), "an existing personal source is byte-preserved")
 			AssertEqual(0, Fixture.calls, "creation never loads or calls the example")
 		} finally {
@@ -514,9 +514,9 @@ _UCHNativePreferences() {
 	Preferences() {
 		global Features, _ConfigDir, ConfigurationFile, CategoryEnabled
 		global _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch
-		global _UserHotstringsLastRepair, _UserHotstringsRepairPending
+		global _UserHotstringsLastRepair, _UserHotstringsProblem
 		Saved := [_ConfigDir, ConfigurationFile, _UserHotstringsOwner, _UserHotstringsLoader, CategoryEnabled,
-			_UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsRepairPending]
+			_UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsProblem]
 		State := MasterGateState(), SavedState := State.Clone()
 		Config := '[hotstrings.dynamic.user_code]`nenabled = false`ntime_activation_seconds = 0.75`n'
 			. '[private]`ncredential = "retain-user-code-preferences"`n'
@@ -525,9 +525,7 @@ _UCHNativePreferences() {
 		Sentinel := Fixture.directory . "\factory-ran.txt"
 		try {
 			State["initialized"] := false
-			; Keep the real classified error receipt without opening a modal repair
-			; prompt inside the native harness. Production offers the same action.
-			_UserHotstringsRepairPending := true
+			Shown := TestMsgBoxCount()
 			_ConfigDir := Fixture.directory . "\", ConfigurationFile := Fixture.path
 			CategoryEnabled := Map("Hotstrings", true)
 			Node := Features["hotstrings"]["dynamic"]["user_code"]
@@ -548,7 +546,9 @@ _UCHNativePreferences() {
 			Assert(Receipt.handled && Receipt.ok, "the actual live menu adapter persists enable")
 			AssertFalse(_UserHotstringsOwner.enabled, "an absent requested source cannot acknowledge native activation")
 			AssertFalse(_UserHotstringsOwner.ready)
-			Assert(InStr(_UserHotstringsLastRepair, ":source-missing:load"), "the actual native owner reports the existing repair action")
+			Assert(InStr(_UserHotstringsLastRepair, ":source-missing:load"), "the actual native owner reports the missing source")
+			AssertEqual("missing", UserHotstringsProblem(), "the menu shows the missing source")
+			AssertEqual(Shown, TestMsgBoxCount(), "enabling without a source opens no dialog")
 			AssertEqual(0, UserHotstringsCount(), "an absent requested source admits no invented mappings")
 			Parsed := TOML_ParseFreshFileTyped(Fixture.path)
 			AssertTrue(Parsed["hotstrings.dynamic.user_code"]["enabled"].Value)
@@ -557,6 +557,7 @@ _UCHNativePreferences() {
 			Receipt := _HS_TryLiveToggleV2("hotstrings.dynamic.user_code")
 			Assert(Receipt.handled && Receipt.ok)
 			AssertFalse(_UserHotstringsOwner.enabled)
+			AssertEqual("", UserHotstringsProblem(), "a disabled source has no problem to show")
 			Before := FSReadUtf8Exact(Fixture.path)
 			WasSuspended := A_IsSuspended
 			try {
@@ -578,7 +579,7 @@ _UCHNativePreferences() {
 			Assert(UserHotstringsInvalidate("fixture-cleanup"))
 			_ConfigDir := Saved[1], ConfigurationFile := Saved[2]
 			_UserHotstringsOwner := Saved[3], _UserHotstringsLoader := Saved[4], CategoryEnabled := Saved[5]
-			_UserHotstringsLoadEpoch := Saved[6], _UserHotstringsLastRepair := Saved[7], _UserHotstringsRepairPending := Saved[8]
+			_UserHotstringsLoadEpoch := Saved[6], _UserHotstringsLastRepair := Saved[7], _UserHotstringsProblem := Saved[8]
 			State.Clear()
 			for Key, Value in SavedState
 				State[Key] := Value
@@ -590,16 +591,16 @@ Test("programmable hotstrings: actual boot live persistence and cancellation ref
 
 _UCHActualSourceAdmission() {
 	global _ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
-	global _UserHotstringsLastRepair, _UserHotstringsRepairPending, _DriverMenuReady
+	global _UserHotstringsLastRepair, _UserHotstringsProblem, _DriverMenuReady
 	AssertEqual(0, _UserHotstringsJobs.Count)
 	AssertFalse(IsObject(_UserHotstringsLoader), "source admission fixtures require prior loader retirement")
 	Saved := [_ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch,
-		_UserHotstringsLastRepair, _UserHotstringsRepairPending]
+		_UserHotstringsLastRepair, _UserHotstringsProblem]
 	SavedMenuReady := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
 	PackageRoots := _UCHPackageRoots(), Fixture := _ScopeOwnerFixture(), Hold := 0
 	Sentinel := Fixture.directory . "\empty-factory-ran.txt"
 	try {
-		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsRepairPending := true
+		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsProblem := ""
 		_UserHotstringsOwner := UserHotstringOwner(Map("capture", _UserHotstringsCaptureRule,
 			"current", _UserHotstringsCurrent, "invoke", _UserHotstringsInvoke,
 			"commit", _UserHotstringsCommit, "report", _UserHotstringsReport))
@@ -610,6 +611,7 @@ _UCHActualSourceAdmission() {
 		AssertFalse(_UserHotstringsOwner.ready)
 		AssertEqual(0, _UserHotstringsJobs.Count, "absence never launches an interpreter")
 		Assert(InStr(_UserHotstringsLastRepair, ":source-missing:load"))
+		AssertEqual("missing", UserHotstringsProblem())
 		BeforeCreateEpoch := _UserHotstringsLoadEpoch
 		Assert(UserHotstringsCreateExample(), "source repair is a deliberate create-only action")
 		AssertFalse(_UserHotstringsOwner.enabled)
@@ -622,6 +624,7 @@ _UCHActualSourceAdmission() {
 		AssertTrue(_UserHotstringsOwner.enabled)
 		AssertTrue(_UserHotstringsOwner.ready)
 		AssertEqual(1, UserHotstringsCount(), "the actual repaired source publishes its declared rule")
+		AssertEqual("", UserHotstringsProblem(), "a published source clears the problem")
 		Assert(FSDelete(Path))
 		AssertFalse(UserHotstringsSetEnabled(true), "repeated enable must reprove the source after disappearance")
 		AssertFalse(_UserHotstringsOwner.enabled)
@@ -655,6 +658,7 @@ _UCHActualSourceAdmission() {
 		AssertFalse(_UserHotstringsOwner.ready)
 		AssertEqual(0, _UserHotstringsJobs.Count)
 		Assert(InStr(_UserHotstringsLastRepair, ":source-unreadable:load"))
+		AssertEqual("failed", UserHotstringsProblem(), "an unreadable source shows as failed")
 		Assert(DllCall("CloseHandle", "Ptr", Hold))
 		Hold := 0
 		AssertEqual(EmptySource, FSReadUtf8Exact(Path), "native refusal never edits executable source")
@@ -663,7 +667,7 @@ _UCHActualSourceAdmission() {
 			DllCall("CloseHandle", "Ptr", Hold)
 		Assert(UserHotstringsInvalidate("source-admission-fixture-cleanup"))
 		_ConfigDir := Saved[1], _UserHotstringsOwner := Saved[2], _UserHotstringsLoader := Saved[3]
-		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsRepairPending := Saved[6]
+		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsProblem := Saved[6]
 		_DriverMenuReady := IsSet(SavedMenuReady) ? SavedMenuReady : unset
 		_UCHRestorePackageRoots(PackageRoots)
 		_ScopeOwnerCleanup(Fixture)
@@ -679,41 +683,86 @@ _UCHActualSourceAdmission() {
 Test("programmable hotstrings: actual absent repaired empty disappeared and unreadable sources acknowledge honest admission", _UCHActualSourceAdmission)
 
 /**
- * The repair offer is modal and runs on a timer thread. Opened during boot it
- * interrupts the auto-execute thread, which then stays frozen wherever it was
- * (the navigation owner start, the prefix index) until someone answers.
+ * A missing programmable source used to open a modal Yes/No offer, first over
+ * the boot thread, then once boot was ready, at every start with the option on
+ * and no file. Now no dialog opens: one WARNING (never the error window), and
+ * the Hotstrings menu row shows the problem with its repair, the example that
+ * loads at once.
  */
-_UCHRepairOfferWaitsForBoot() {
-	global _ConfigDir, _UserHotstringsRepairPending, _DriverBootPhase
-	Saved := [_ConfigDir, _UserHotstringsRepairPending]
-	SavedPhase := IsSet(_DriverBootPhase) ? _DriverBootPhase : unset
-	Fixture := _ScopeOwnerFixture()
+_UCHMissingSourceIsShownNotAsked() {
+	_HSCS_WithDynamicBootState(_UCHMissingSourceBody)
+}
+
+_UCHMissingSourceBody() {
+	global _ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs
+	global _UserHotstringsLoadEpoch, _UserHotstringsLastRepair, _UserHotstringsProblem
+	global _DriverMenuReady, Features, CategoryEnabled
+	AssertEqual(0, _UserHotstringsJobs.Count)
+	Saved := [_ConfigDir, _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsLoadEpoch,
+		_UserHotstringsLastRepair, _UserHotstringsProblem, CategoryEnabled]
+	SavedMenuReady := IsSet(_DriverMenuReady) ? _DriverMenuReady : unset
+	Node := Features["hotstrings"]["dynamic"]["user_code"]
+	SavedEnabled := Node["enabled"]
+	PackageRoots := _UCHPackageRoots(), Fixture := _ScopeOwnerFixture()
+	Lines := []
+	LoggerSetTestSink((Line) => Lines.Push(Line))
 	try {
-		_ConfigDir := Fixture.directory . "\"
-		AssertFalse(FSStrictExists(UserHotstringsSourcePath()))
-		_DriverBootPhase := "starting", _UserHotstringsRepairPending := true
+		_ConfigDir := Fixture.directory . "\", _DriverMenuReady := false, _UserHotstringsProblem := ""
+		CategoryEnabled := Map("Hotstrings", true)
+		Node["enabled"] := true
+		_UserHotstringsOwner := 0
 		Shown := TestMsgBoxCount()
-		_UserHotstringsOfferRepair()
-		AssertEqual(Shown, TestMsgBoxCount(), "a repair offer must not open a modal dialog over the boot thread")
-		AssertTrue(_UserHotstringsRepairPending, "the deferred offer stays pending, so no duplicate is queued")
-		_DriverBootPhase := "ready"
-		_UserHotstringsOfferRepair()
-		AssertEqual(Shown + 1, TestMsgBoxCount(), "the deferred offer still opens once the driver is ready")
-		AssertFalse(_UserHotstringsRepairPending)
-		AssertFalse(FSStrictExists(UserHotstringsSourcePath()), "a declined offer creates nothing")
-		; The boot owns the deferred offer: right after it publishes "ready", it
-		; schedules the offer that stayed pending, without any polling timer.
-		AssertTrue(RegExMatch(_DriverSourceConcat(),
-			'\n_DriverBootPhase := "ready"\r?\n(?:;[^\n]*\n)*UserHotstringsOfferPendingRepair\(\)\r?\n'),
-			"the boot offers a pending repair right after it publishes ready")
+		AssertFalse(UserHotstringsInit(), "an enabled boot without a source does not claim a load")
+		AssertEqual(Shown, TestMsgBoxCount(), "no dialog opens for a missing source")
+		AssertEqual("missing", UserHotstringsProblem())
+		Errors := 0, Warnings := 0
+		for Line in Lines {
+			if InStr(Line, "[UserHotstrings]") {
+				Errors += InStr(Line, "[ERROR]") ? 1 : 0
+				Warnings += InStr(Line, "[WARNING]") ? 1 : 0
+			}
+		}
+		AssertEqual(0, Errors, "a missing personal source is no driver error: the error window stays shut")
+		AssertEqual(1, Warnings, "one warning names the missing source")
+
+		Labels := Map()
+		for Row in _HS_ProgrammableHotstringRows()
+			Labels[Row["label"]] := Row
+		Title := t("menu.hotstrings.user_code.title") . " — " . t("menu.hotstrings.user_code.problem_missing")
+		Found := false
+		for Label in Labels
+			Found := Found || InStr(Label, Title) == 1
+		AssertTrue(Found, "the feature row shows the missing source")
+		Open := Labels[t("menu.hotstrings.user_code.open_source")]
+		AssertTrue(Open.Get("disabled", false), "a source that does not exist cannot be opened")
+		Create := Labels[t("menu.hotstrings.user_code.create_example")]
+		AssertFalse(Create.Get("disabled", false), "the example is offered")
+
+		Create["action"].Call()
+		Started := A_TickCount
+		while _UserHotstringsJobs.Count && TickElapsed(Started) < 10000
+			Sleep(10)
+		AssertEqual(0, _UserHotstringsJobs.Count, "the example loader retires")
+		AssertTrue(FSStrictExists(UserHotstringsSourcePath()), "the example was created")
+		AssertTrue(_UserHotstringsOwner.ready, "the example loads at once")
+		AssertEqual("", UserHotstringsProblem(), "and the menu has no problem left to show")
+		AssertEqual(Shown, TestMsgBoxCount(), "still no dialog")
+		; The boot no longer schedules any offer once it is ready.
+		AssertFalse(InStr(_DriverSourceConcat(), "UserHotstringsOfferPendingRepair"),
+			"no boot step offers a repair dialog")
 	} finally {
-		SetTimer(_UserHotstringsOfferRepair, 0)
-		_ConfigDir := Saved[1], _UserHotstringsRepairPending := Saved[2]
-		_DriverBootPhase := IsSet(SavedPhase) ? SavedPhase : unset
+		LoggerClearTestSink()
+		Assert(UserHotstringsInvalidate("missing-source-fixture-cleanup"))
+		Node["enabled"] := SavedEnabled
+		_ConfigDir := Saved[1], _UserHotstringsOwner := Saved[2], _UserHotstringsLoader := Saved[3]
+		_UserHotstringsLoadEpoch := Saved[4], _UserHotstringsLastRepair := Saved[5], _UserHotstringsProblem := Saved[6]
+		CategoryEnabled := Saved[7]
+		_DriverMenuReady := IsSet(SavedMenuReady) ? SavedMenuReady : unset
+		_UCHRestorePackageRoots(PackageRoots)
 		_ScopeOwnerCleanup(Fixture)
 	}
 }
-Test("programmable hotstrings: the repair offer waits for the end of boot (repair-offer-after-boot)", _UCHRepairOfferWaitsForBoot)
+Test("programmable hotstrings: a missing source is shown in the menu, never asked in a dialog (no-repair-modal)", _UCHMissingSourceIsShownNotAsked)
 
 _UCHNativePrivacyAndPause() {
 	global _ConfigDir, CategoryEnabled, HSE_Buffer, SFD_FIELD_CACHE

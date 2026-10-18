@@ -5,7 +5,8 @@
 --- DESCRIPTION:
 --- Independent behavior checks use each driver's actual manifest renderer.
 --- Rendering is inert; explicit commands, live gates and typing intervals own
---- admission, including visible refusals with an available source-open action.
+--- admission. A refusal never opens a dialog: it redraws the menu, whose
+--- feature row names the source problem the native owner reports.
 --- ==============================================================================
 
 local M = {}
@@ -16,9 +17,10 @@ local M = {}
 --- @param Logger table The exact native logger captured by this renderer.
 function M.run(helpers, manifest, Logger)
 	local Policy = require("menu.programmable_hotstrings")
-	local function fixture()
-		local f = { enabled = false, seconds = 0.5, master = true, paused = false,
-			calls = { open = 0, reload = 0, create = 0, set = 0, changed = 0, error = 0 } }
+	--- @param problem string|nil The source problem the native owner reports.
+	local function fixture(problem)
+		local f = { enabled = false, seconds = 0.5, master = true, paused = false, problem = problem,
+			calls = { open = 0, reload = 0, create = 0, set = 0, changed = 0 } }
 		local ports = { manifest = manifest, i18n = function(key) return key end,
 			get = function() return f.enabled, f.seconds end,
 			master = function() return f.master end, paused = function() return f.paused end,
@@ -33,7 +35,7 @@ function M.run(helpers, manifest, Logger)
 				if f.on_prompt then f.on_prompt() end
 				return f.selected
 			end,
-			error = function(open) f.calls.error = f.calls.error + 1; f.offered = open end }
+			problem = function() return f.problem end }
 		for _, kind in ipairs({ "open", "reload", "create" }) do
 			ports[kind] = function() f.calls[kind] = f.calls[kind] + 1; return not f.refuse end
 		end
@@ -48,7 +50,7 @@ function M.run(helpers, manifest, Logger)
 			helpers.assert_eq(#rows, 1, "the manifest owns one parent without an added native separator")
 			helpers.assert_eq(#rows[1].menu, 4)
 			helpers.assert_type(rows[1].menu[2].fn, "function")
-			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0, error = 0 })
+			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0 })
 		end)
 		helpers.it("(user-hotstrings-menu) keeps the declared source controls reachable through the actual category renderer", function()
 			local f = fixture()
@@ -93,7 +95,7 @@ function M.run(helpers, manifest, Logger)
 			end
 			helpers.assert_not_nil(parent, "declared parent must remain reachable in the actual category")
 			helpers.assert_eq(#parent.menu, 4)
-			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0, error = 0 })
+			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0 })
 			for index, kind in ipairs({ "open", "reload", "create" }) do
 				helpers.assert_type(parent.menu[index + 1].fn, "function")
 				helpers.assert_true(parent.menu[index + 1].fn())
@@ -102,10 +104,10 @@ function M.run(helpers, manifest, Logger)
 		end)
 		helpers.it("(user-hotstrings-menu) rendering and cancellation evaluate no user code", function()
 			local f = fixture()
-			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0, error = 0 })
+			helpers.assert_eq(f.calls, { open = 0, reload = 0, create = 0, set = 0, changed = 0 })
 			helpers.assert_eq(f.rows[1].menu[2].fn(), false)
 			helpers.assert_eq(f.calls.set, 0)
-			helpers.assert_eq(f.calls.error, 0)
+			helpers.assert_eq(f.calls.changed, 0, "a cancelled prompt is no refusal")
 		end)
 		for index, kind in ipairs({ "open", "reload", "create" }) do
 			helpers.it("(user-hotstrings-menu) explicit " .. kind .. " command invokes only its native owner", function()
@@ -141,8 +143,8 @@ function M.run(helpers, manifest, Logger)
 				helpers.assert_eq(f.rows[1].menu[2].fn(), false)
 			end
 			helpers.assert_eq(f.calls.set, 0)
-			helpers.assert_eq(f.calls.changed, 0)
-			helpers.assert_type(f.offered, "function", "every refusal offers the source opener")
+			helpers.assert_eq(f.calls.changed, 6, "every refusal redraws the menu, and opens nothing")
+			helpers.assert_eq(f.calls.open, 0, "a refusal never offers or opens the source")
 		end)
 		for _, changed in ipairs({ "enabled", "seconds" }) do
 			helpers.it("(user-hotstrings-menu-held-prompt) refuses changed " .. changed .. " preference without overwriting it", function()
@@ -155,20 +157,65 @@ function M.run(helpers, manifest, Logger)
 				helpers.assert_eq(f.enabled, changed == "enabled")
 				helpers.assert_eq(f.seconds, changed == "seconds" and 0.75 or 0.5)
 				helpers.assert_eq(f.calls.set, 0)
-				helpers.assert_eq(f.calls.changed, 0)
-				helpers.assert_eq(f.calls.error, 1)
+				helpers.assert_eq(f.calls.changed, 1, "the refusal redraws the menu")
+				helpers.assert_eq(f.calls.open, 0)
 			end)
 		end
-		helpers.it("(user-hotstrings-menu) refused native publication surfaces a source-open action", function()
+		helpers.it("(user-hotstrings-menu) refused native publication redraws the menu and opens nothing", function()
 			local f = fixture()
 			f.refuse = true
 			helpers.assert_eq(f.rows[1].menu[1].fn(), false)
-			helpers.assert_eq(f.calls.changed, 0)
-			helpers.assert_eq(f.calls.error, 1)
-			f.refuse = false
-			helpers.assert_true(f.offered())
-			helpers.assert_eq(f.calls.open, 1)
+			helpers.assert_eq(f.calls.changed, 1, "the redrawn row shows the state the owner now reports")
+			helpers.assert_eq(f.calls.open, 0, "no dialog offers the source opener any more")
 			helpers.assert_eq(f.calls.reload, 0)
+		end)
+		helpers.it("(user-hotstrings-problem) names no problem on a healthy source", function()
+			local f = fixture()
+			helpers.assert_eq(f.rows[1].title, "menu.hotstrings.user_code.title")
+			helpers.assert_true(not f.rows[2].disabled, "an existing source opens")
+		end)
+		for _, problem in ipairs({ "missing", "failed" }) do
+			helpers.it("(user-hotstrings-problem) shows a " .. problem .. " source on the feature row", function()
+				local f = fixture(problem)
+				helpers.assert_eq(f.rows[1].title, "menu.hotstrings.user_code.title — menu.hotstrings.user_code.problem_" .. problem)
+				helpers.assert_eq(f.rows[2].disabled == true, problem == "missing",
+					"only a missing source has nothing to open")
+				helpers.assert_true(not f.rows[3].disabled and not f.rows[4].disabled, "reload and create stay offered")
+			end)
+		end
+		helpers.it("(user-hotstrings-problem) refuses an undeclared problem", function()
+			local ok, err = pcall(fixture, "broken")
+			helpers.assert_eq(ok, false)
+			helpers.assert_contains(tostring(err), "unknown programmable source problem")
+		end)
+		helpers.it("(user-hotstrings-problem) creates the example and enables it at once when the option is on", function()
+			local f = fixture("missing")
+			f.enabled, f.seconds = true, 0.25
+			helpers.assert_true(f.rows[4].fn())
+			helpers.assert_eq(f.calls.create, 1)
+			helpers.assert_eq(f.calls.set, 1, "the created source is loaded at once")
+			helpers.assert_eq(f.enabled, true)
+			helpers.assert_eq(f.seconds, 0.25, "the interval is kept")
+			helpers.assert_eq(f.calls.changed, 1)
+		end)
+		helpers.it("(user-hotstrings-problem) creates the example without enabling it when the option is off or gated", function()
+			for _, gate in ipairs({ "off", "paused", "master" }) do
+				local f = fixture("missing")
+				f.enabled = gate ~= "off"
+				f.paused = gate == "paused"
+				f.master = gate ~= "master"
+				helpers.assert_true(f.rows[4].fn(), gate)
+				helpers.assert_eq(f.calls.create, 1, gate)
+				helpers.assert_eq(f.calls.set, 0, gate .. ": nothing is enabled")
+			end
+		end)
+		helpers.it("(user-hotstrings-problem) a refused creation or load redraws the row and enables nothing", function()
+			local f = fixture("missing")
+			f.enabled, f.refuse = true, true
+			helpers.assert_eq(f.rows[4].fn(), false)
+			helpers.assert_eq(f.calls.create, 1)
+			helpers.assert_eq(f.calls.set, 0, "an example that was not created is not loaded")
+			helpers.assert_eq(f.calls.changed, 1)
 		end)
 	end)
 end

@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "예제 스크립트 만들기",
 	"menu.hotstrings.user_code.error": "개인 텍스트 단축키 스크립트가 실패했습니다. 열어서 오류를 수정하세요.",
 	"menu.hotstrings.user_code.open_source": "개인 스크립트 열기",
+	"menu.hotstrings.user_code.problem_failed": "스크립트 오류: 열어서 수정하세요",
+	"menu.hotstrings.user_code.problem_missing": "스크립트 없음: 예제를 만드세요",
 	"menu.hotstrings.user_code.reload_source": "개인 스크립트 다시 불러오기",
 	"menu.hotstrings.user_code.title": "프로그래밍 가능한 텍스트 단축키",
 	"platform_reason.program_runner_unavailable": "사용 불가: 기본 프로그램 실행 기능 또는 이 할당을 사용할 수 없습니다.",

@@ -443,7 +443,8 @@ helpers.describe("programmable native macOS hotstrings", function()
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.Keymap)); helpers.assert_true(f.User.set_time_activation(0.5))
 			helpers.assert_eq(f.User.set_enabled(true), false); helpers.assert_eq(f.User.is_enabled(), false)
-			helpers.assert_true(f.notified)
+			helpers.assert_nil(f.notified, "a missing source is a menu state, not a notification")
+			helpers.assert_eq(f.User.problem(), "missing")
 			local FileSystem = require("adapters.file_system")
 			FileSystem.write_if_unchanged = function(path, content, expected)
 				helpers.assert_eq(path, f.User.source_path()); helpers.assert_eq(expected.status, "absent")
@@ -451,9 +452,38 @@ helpers.describe("programmable native macOS hotstrings", function()
 			end
 			helpers.assert_true(f.User.create_example()); helpers.assert_eq(f.User.is_enabled(), false)
 			helpers.assert_true(f.User.set_enabled(true)); helpers.assert_eq(f.User.count(), 1)
+			helpers.assert_nil(f.User.problem(), "a published source has nothing left to repair")
 			for char in ("@clock"):gmatch(".") do f.tap.fn(physical(char)) end
 			drain(f.hs); helpers.assert_eq(f.tap.fn(physical("★")), true); drain(f.hs)
 			helpers.assert_eq(#f.outputs, 1); helpers.assert_true(f.outputs[1]:match("^%d%d:%d%d$") ~= nil)
+		end)
+	end)
+	helpers.it("warns once for a missing source, never as a driver error, and forgets it when switched off", function()
+		with_native(function(f)
+			helpers.assert_true(f.User.stop()); f.absent = true
+			helpers.assert_true(f.User.start(f.Keymap)); helpers.assert_true(f.User.set_time_activation(0.5))
+			local Logger = require("infra.logger")
+			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
+			Logger.warn = function(module, message, ...)
+				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				return warn(module, message, ...)
+			end
+			Logger.error = function(module, message, ...)
+				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				return err(module, message, ...)
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(f.User.set_enabled(true), false)
+				helpers.assert_eq(f.User.set_enabled(true), false, "a second attempt meets the same missing file")
+			end)
+			Logger.warn, Logger.error = warn, err
+			if not ok then error(failure, 0) end
+			helpers.assert_eq(#warned, 1, "one warning for the missing source")
+			helpers.assert_eq(errors, {}, "a missing source never reaches the error window")
+			helpers.assert_nil(f.notified)
+			helpers.assert_eq(f.User.problem(), "missing")
+			helpers.assert_true(f.User.set_enabled(false))
+			helpers.assert_nil(f.User.problem(), "a switched-off source has no problem")
 		end)
 	end)
 	helpers.it("admits a present valid empty factory without inventing callbacks", function()
@@ -491,7 +521,8 @@ helpers.describe("programmable native macOS hotstrings", function()
 				helpers.assert_eq(f.User.set_enabled(true), false)
 				helpers.assert_eq(f.User.is_enabled(), false)
 				helpers.assert_eq(f.User.scope_snapshot().policy.ready, false)
-				helpers.assert_true(f.notified)
+				helpers.assert_eq(f.notified == true, changed ~= "absent", "only a failing source notifies")
+				helpers.assert_eq(f.User.problem(), changed == "absent" and "missing" or "failed")
 			end)
 		end)
 	end
@@ -759,7 +790,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 			with_native(function(f)
 				package.loaded["infra.dialog_util"] = {
 					text_prompt = function() return require("infra.i18n").get("common.ok"), "125" end,
-					block_alert = function() return require("infra.i18n").get("common.close") end,
+					block_alert = function() error("a refused publication opens no dialog") end,
 				}
 				local set_time = f.Keymap.set_user_hotstring_time_activation
 				if refusal == "time-port" then
@@ -782,7 +813,8 @@ helpers.describe("programmable native macOS hotstrings", function()
 						return false
 					end })
 				helpers.assert_eq(rows[1].menu[2].fn(), false)
-				helpers.assert_eq(saves, refusal == "time-port" and 0 or 1); helpers.assert_eq(updates, 0)
+				helpers.assert_eq(saves, refusal == "time-port" and 0 or 1)
+				helpers.assert_eq(updates, 1, "the refusal redraws the menu instead of opening a dialog")
 				helpers.assert_eq(state.dynamichotstrings_user_code_enabled, true)
 				helpers.assert_eq(state.dynamichotstrings_user_code_time_activation_seconds, 0.5)
 				helpers.assert_true(f.User.is_enabled())
@@ -798,7 +830,7 @@ helpers.describe("programmable native macOS hotstrings", function()
 	helpers.it("(user-menu-live-pause) fences retained controls after the real pause owner closes", function()
 		with_native(function(f)
 			package.loaded["infra.dialog_util"] = {
-				block_alert = function() return require("infra.i18n").get("common.close") end,
+				block_alert = function() error("a refused control opens no dialog") end,
 			}
 			local paused, saves, updates = false, 0, 0
 			local rows = require("ui.menu.programmatic_hotstrings").build({
@@ -810,7 +842,8 @@ helpers.describe("programmable native macOS hotstrings", function()
 			paused = true
 			helpers.assert_eq(rows[1].menu[1].fn(), false)
 			helpers.assert_true(f.User.is_enabled())
-			helpers.assert_eq(saves, 0); helpers.assert_eq(updates, 0)
+			helpers.assert_eq(saves, 0)
+			helpers.assert_eq(updates, 1, "the refusal redraws the menu instead of opening a dialog")
 		end)
 	end)
 	helpers.it("opens source through the actual menu adapter without loading or creating it", function()

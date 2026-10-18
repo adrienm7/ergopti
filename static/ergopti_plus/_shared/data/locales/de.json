@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Beispielskript erstellen",
 	"menu.hotstrings.user_code.error": "Das persönliche Textkürzel-Skript ist fehlgeschlagen. Öffnen Sie es, um den Fehler zu beheben.",
 	"menu.hotstrings.user_code.open_source": "Persönliches Skript öffnen",
+	"menu.hotstrings.user_code.problem_failed": "Skriptfehler: zum Beheben öffnen",
+	"menu.hotstrings.user_code.problem_missing": "Skript fehlt: Beispiel erstellen",
 	"menu.hotstrings.user_code.reload_source": "Persönliches Skript neu laden",
 	"menu.hotstrings.user_code.title": "Programmierbare Textkürzel",
 	"platform_reason.program_runner_unavailable": "Nicht verfügbar: Der native Programmstarter oder diese Zuordnung ist nicht verfügbar.",

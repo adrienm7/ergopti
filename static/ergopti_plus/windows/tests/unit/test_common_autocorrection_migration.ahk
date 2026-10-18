@@ -193,7 +193,7 @@ Test("common override migration: actual native admission refuses an unacknowledg
 ; global probes keep this fixture executable with the isolated 104 source slice.
 _CAO_IsolateOptionalOwners() {
 	global _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
-	global _UserHotstringsInputSerial, _UserHotstringsCapture, _UserHotstringsLastRepair, _UserHotstringsRepairPending
+	global _UserHotstringsInputSerial, _UserHotstringsCapture, _UserHotstringsLastRepair, _UserHotstringsProblem
 	global _HSE_TerminalOwner, _HSE_TerminalReplayPending, PersonalInformationHotstrings, HSE_PersonalInfoCombosEnabled
 	if IsSet(_UserHotstringsJobs)
 		AssertEqual(0, _UserHotstringsJobs.Count, "an earlier programmable owner cannot leave live native jobs")
@@ -201,7 +201,7 @@ _CAO_IsolateOptionalOwners() {
 		AssertFalse(IsObject(_UserHotstringsLoader), "an earlier fixture cannot leave an owned native loader")
 	Fresh := Map("_UserHotstringsOwner", 0, "_UserHotstringsLoader", 0, "_UserHotstringsJobs", Map(),
 		"_UserHotstringsLoadEpoch", 0, "_UserHotstringsInputSerial", 0, "_UserHotstringsCapture", 0,
-		"_UserHotstringsLastRepair", "", "_UserHotstringsRepairPending", false,
+		"_UserHotstringsLastRepair", "", "_UserHotstringsProblem", "",
 		"_HSE_TerminalOwner", 0, "_HSE_TerminalReplayPending", 0,
 		"PersonalInformationHotstrings", Map(), "HSE_PersonalInfoCombosEnabled", false)
 	Saved := Map()
@@ -215,7 +215,7 @@ _CAO_IsolateOptionalOwners() {
 
 _CAO_RestoreOptionalOwners(Saved) {
 	global _UserHotstringsOwner, _UserHotstringsLoader, _UserHotstringsJobs, _UserHotstringsLoadEpoch
-	global _UserHotstringsInputSerial, _UserHotstringsCapture, _UserHotstringsLastRepair, _UserHotstringsRepairPending
+	global _UserHotstringsInputSerial, _UserHotstringsCapture, _UserHotstringsLastRepair, _UserHotstringsProblem
 	global _HSE_TerminalOwner, _HSE_TerminalReplayPending, PersonalInformationHotstrings, HSE_PersonalInfoCombosEnabled
 	for NativeName, Value in Saved
 		%NativeName% := Value

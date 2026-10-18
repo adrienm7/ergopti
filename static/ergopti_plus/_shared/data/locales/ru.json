@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Создать пример скрипта",
 	"menu.hotstrings.user_code.error": "Личный скрипт текстовых сокращений завершился с ошибкой. Откройте его, чтобы исправить ошибку.",
 	"menu.hotstrings.user_code.open_source": "Открыть личный скрипт",
+	"menu.hotstrings.user_code.problem_failed": "ошибка скрипта: откройте его, чтобы исправить",
+	"menu.hotstrings.user_code.problem_missing": "скрипт отсутствует: создайте пример",
 	"menu.hotstrings.user_code.reload_source": "Перезагрузить личный скрипт",
 	"menu.hotstrings.user_code.title": "Программируемые текстовые сокращения",
 	"platform_reason.program_runner_unavailable": "Недоступно: Нативный запуск программ или эта привязка недоступны.",

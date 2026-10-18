@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "उदाहरण स्क्रिप्ट बनाएँ",
 	"menu.hotstrings.user_code.error": "व्यक्तिगत पाठ शॉर्टकट स्क्रिप्ट विफल हुई। त्रुटि सुधारने के लिए इसे खोलें।",
 	"menu.hotstrings.user_code.open_source": "व्यक्तिगत स्क्रिप्ट खोलें",
+	"menu.hotstrings.user_code.problem_failed": "स्क्रिप्ट त्रुटि: ठीक करने के लिए इसे खोलें",
+	"menu.hotstrings.user_code.problem_missing": "स्क्रिप्ट मौजूद नहीं: उदाहरण बनाएँ",
 	"menu.hotstrings.user_code.reload_source": "व्यक्तिगत स्क्रिप्ट फिर लोड करें",
 	"menu.hotstrings.user_code.title": "प्रोग्राम योग्य पाठ शॉर्टकट",
 	"platform_reason.program_runner_unavailable": "अनुपलब्ध: मूल प्रोग्राम रनर या यह बाइंडिंग उपलब्ध नहीं है।",

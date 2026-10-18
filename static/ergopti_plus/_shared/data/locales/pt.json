@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Criar script de exemplo",
 	"menu.hotstrings.user_code.error": "O script pessoal de abreviações falhou. Abra-o para corrigir o erro.",
 	"menu.hotstrings.user_code.open_source": "Abrir script pessoal",
+	"menu.hotstrings.user_code.problem_failed": "erro do script: abra-o para o corrigir",
+	"menu.hotstrings.user_code.problem_missing": "script em falta: crie o exemplo",
 	"menu.hotstrings.user_code.reload_source": "Recarregar script pessoal",
 	"menu.hotstrings.user_code.title": "Abreviações programáveis",
 	"platform_reason.program_runner_unavailable": "Indisponível: O executor nativo ou esta associação está indisponível.",

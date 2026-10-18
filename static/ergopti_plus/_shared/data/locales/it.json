@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Crea script di esempio",
 	"menu.hotstrings.user_code.error": "Lo script personale delle abbreviazioni non è riuscito. Aprilo per correggere l’errore.",
 	"menu.hotstrings.user_code.open_source": "Apri script personale",
+	"menu.hotstrings.user_code.problem_failed": "errore dello script: aprilo per correggerlo",
+	"menu.hotstrings.user_code.problem_missing": "script mancante: crea l’esempio",
 	"menu.hotstrings.user_code.reload_source": "Ricarica script personale",
 	"menu.hotstrings.user_code.title": "Abbreviazioni programmabili",
 	"platform_reason.program_runner_unavailable": "Non disponibile: Il lanciatore nativo o questa associazione non è disponibile.",

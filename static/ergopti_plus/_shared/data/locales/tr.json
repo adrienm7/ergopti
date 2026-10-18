@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Örnek betik oluştur",
 	"menu.hotstrings.user_code.error": "Kişisel metin kısayolu betiği başarısız oldu. Hatayı düzeltmek için açın.",
 	"menu.hotstrings.user_code.open_source": "Kişisel betiği aç",
+	"menu.hotstrings.user_code.problem_failed": "betik hatası: düzeltmek için açın",
+	"menu.hotstrings.user_code.problem_missing": "betik yok: örneği oluşturun",
 	"menu.hotstrings.user_code.reload_source": "Kişisel betiği yeniden yükle",
 	"menu.hotstrings.user_code.title": "Programlanabilir metin kısayolları",
 	"platform_reason.program_runner_unavailable": "Kullanılamıyor: Yerel program çalıştırıcısı veya bu atama kullanılamıyor.",

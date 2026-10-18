@@ -373,18 +373,48 @@ helpers.describe("programmable native Linux runtime", function()
 			end)
 		end)
 	end)
+	helpers.it("(user-hotstrings-native) warns once for a missing source, never as a driver error, and forgets it when off", function()
+		with_runtime(function(f)
+			helpers.assert_true(f.User.stop()); f.absent = true
+			helpers.assert_true(f.User.start(f.native)); helpers.assert_true(f.User.set_time_activation(0.5))
+			local Logger = require("logger.shim")
+			local warn, err, warned, errors = Logger.warn, Logger.error, {}, {}
+			Logger.warn = function(module, message, ...)
+				if module == "dynamic_hotstrings.user_code" then warned[#warned + 1] = message end
+				return warn(module, message, ...)
+			end
+			Logger.error = function(module, message, ...)
+				if module == "dynamic_hotstrings.user_code" then errors[#errors + 1] = message end
+				return err(module, message, ...)
+			end
+			local ok, failure = pcall(function()
+				helpers.assert_eq(f.User.set_enabled(true), false)
+				helpers.assert_eq(f.User.set_enabled(true), false, "a second attempt meets the same missing file")
+			end)
+			Logger.warn, Logger.error = warn, err
+			if not ok then error(failure, 0) end
+			helpers.assert_eq(#warned, 1, "one warning for the missing source")
+			helpers.assert_eq(errors, {}, "a missing source never reaches the error window")
+			helpers.assert_nil(f.notified)
+			helpers.assert_eq(f.User.problem(), "missing")
+			helpers.assert_true(f.User.set_enabled(false))
+			helpers.assert_nil(f.User.problem(), "a switched-off source has no problem")
+		end)
+	end)
 	helpers.it("(user-hotstrings-native) refuses absent enable then admits explicit creation without automatic execution", function()
 		with_runtime(function(f)
 			helpers.assert_true(f.User.stop()); f.absent = true
 			helpers.assert_true(f.User.start(f.native)); helpers.assert_true(f.User.set_time_activation(0.5))
 			helpers.assert_eq(f.User.set_enabled(true), false); helpers.assert_eq(f.User.is_enabled(), false)
-			helpers.assert_true(f.notified)
+			helpers.assert_nil(f.notified, "a missing source is a menu state, not a notification")
+			helpers.assert_eq(f.User.problem(), "missing")
 			FileSystem.write_if_unchanged = function(path, content, expected)
 				helpers.assert_eq(path, f.User.source_path()); helpers.assert_eq(expected.status, "absent")
 				f.content, f.absent = content, false; return true
 			end
 			helpers.assert_true(f.User.create_example()); helpers.assert_eq(f.User.is_enabled(), false)
 			helpers.assert_true(f.User.set_enabled(true)); helpers.assert_eq(f.User.count(), 1)
+			helpers.assert_nil(f.User.problem(), "a published source has nothing left to repair")
 			for char in ("@clock★"):gmatch("[\1-\127\194-\244][\128-\191]*") do
 				f.native.observe_input(); f.engine:on_char(char, { typed_at_ms = f.now }); f.now = f.now + 10
 			end
@@ -470,6 +500,8 @@ helpers.describe("programmable native Linux runtime", function()
 				if changed == "edit" then f.content = "not valid Lua !" else f[changed] = true end
 				helpers.assert_eq(f.User.set_enabled(true), false); helpers.assert_eq(f.User.is_enabled(), false)
 				helpers.assert_eq(f.User.scope_snapshot().policy.ready, false)
+				helpers.assert_eq(f.notified == true, changed ~= "absent", "only a failing source notifies")
+				helpers.assert_eq(f.User.problem(), changed == "absent" and "missing" or "failed")
 			end)
 		end)
 	end
@@ -657,6 +689,7 @@ helpers.describe("programmable native Linux runtime", function()
 					set_user_code_time_activation = f.User.set_time_activation,
 					set_user_code_enabled = f.User.set_enabled, reload_user_code = f.User.reload,
 					user_code_source_path = f.User.source_path, create_user_code_example = f.User.create_example,
+					user_code_problem = f.User.problem,
 					user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
 					user_code_scope_restore = f.User.scope_restore }
 				package.loaded["ui.menu.programmatic_hotstrings"] = nil
@@ -702,12 +735,12 @@ helpers.describe("programmable native Linux runtime", function()
 						end,
 					}
 					package.loaded["ui.text_prompt"] = { ask = function() return "125" end }
-					package.loaded["ui.modal"] = { run = function() return false end }
+					package.loaded["ui.modal"] = { run = function() error("a refused publication opens no dialog") end }
 					local facade = {
 						is_enabled = function() return f.enabled end,
 						set_user_code_time_activation = f.User.set_time_activation,
 						set_user_code_enabled = f.User.set_enabled,
-						user_code_source_path = f.User.source_path,
+						user_code_source_path = f.User.source_path, user_code_problem = f.User.problem,
 						user_code_scope_snapshot = f.User.scope_snapshot, user_code_scope_adopt = f.User.scope_adopt,
 						user_code_scope_restore = f.User.scope_restore,
 					}
@@ -715,7 +748,8 @@ helpers.describe("programmable native Linux runtime", function()
 						is_paused = function() return false end,
 						on_menu_changed = function() updates = updates + 1 end })
 					helpers.assert_eq(rows[1].menu[2].fn(), false)
-					helpers.assert_eq(writes, 1); helpers.assert_eq(updates, 0)
+					helpers.assert_eq(writes, 1)
+					helpers.assert_eq(updates, 1, "the refusal redraws the menu instead of opening a dialog")
 					helpers.assert_true(f.User.is_enabled()); helpers.assert_eq(f.User.time_activation(), 0.5)
 					f.type_suffix(); helpers.assert_true(f.User.request("@é")); drain()
 					helpers.assert_eq(f.calls, 1)

@@ -192,83 +192,52 @@ h.describe("native menu dialog captions", function()
 end)
 
 
-h.describe("programmable source native dialog caption", function()
-	local replies = {
-		{ name = "affirmative repair", dialog = true, repair = true },
-		{ name = "cancelled dialog", dialog = false },
-		{ name = "unavailable dialog", dialog = nil },
-		{ name = "nonboolean dialog acknowledgement", dialog = "yes" },
-		{ name = "repair command refusal", dialog = true, repair = false },
-		{ name = "foreign owner during affirmative dialog", dialog = true, foreign = true },
-		{ name = "modal handoff refusal", modal_refused = true },
-	}
-	for _, reply in ipairs(replies) do
-		h.it("(linux-native-titles-programmable) actual error callback preserves caption and repair policy: " .. reply.name, function()
+h.describe("programmable source problems open no dialog", function()
+	-- A refused source action used to open a zenity question offering to open
+	-- the source. The row now names the problem instead: a refusal redraws the
+	-- menu and runs no native dialog, whatever the problem.
+	for _, problem in ipairs({ false, "missing", "failed" }) do
+		h.it("(linux-native-titles-programmable) a refused reload opens no dialog and redraws the row, problem "
+			.. tostring(problem), function()
 			scenario(function(observed, shell)
-				local calls = { reload = 0, create = 0, enable = 0, time = 0, path = 0, changed = 0 }
+				local calls = { reload = 0, create = 0, path = 0, changed = 0 }
 				local native = {
 					is_enabled = function() return true end,
 					reload_user_code = function() calls.reload = calls.reload + 1; return false end,
 					create_user_code_example = function() calls.create = calls.create + 1; return false end,
-					set_user_code_enabled = function() calls.enable = calls.enable + 1; return false end,
-					set_user_code_time_activation = function() calls.time = calls.time + 1; return false end,
 					user_code_source_path = function() calls.path = calls.path + 1; return "/owned/source 'programmable'.lua" end,
+					user_code_problem = function() return problem or nil end,
 				}
 				local ctx = { dyn_hotstrings = native, paused = false, is_paused = function() return false end,
 					on_menu_changed = function() calls.changed = calls.changed + 1 end }
 				package.loaded["infra.hotstring_preferences"] = { get = function(key)
-					if key == "hotstrings.dynamic.user_code.enabled" then return false end
+					if key == "hotstrings.dynamic.user_code.enabled" then return true end
 					h.assert_eq(key, "hotstrings.dynamic.user_code.time_activation_seconds")
 					return 0.5
 				end }
-				-- Exercise genuine modal delegation with an exact native keyboard
-				-- handoff receipt, rather than replacing the dialog consumer itself.
-				local released = false
-				package.loaded["adapters.keyboard_hook"] = { while_released = function(fn, options)
-					observed.modals = observed.modals + 1
-					h.assert_nil(options)
-					if reply.modal_refused then return false end
-					released = true
-					local result = fn()
-					released = false
-					return result
+				package.loaded["adapters.keyboard_hook"] = { while_released = function()
+					error("a source problem never releases the keyboard for a dialog")
 				end }
-				package.loaded["ui.modal"] = nil
 				shell.run = function(command)
 					observed.commands[#observed.commands + 1] = command
-					if command:find("zenity --question", 1, true) == 1 then
-						h.assert_true(released, "the native dialog owns a released keyboard")
-						if reply.foreign then ctx.dyn_hotstrings = {} end
-						return reply.dialog
-					end
-					h.assert_eq(released, false, "repair runs after the modal keyboard receipt returns")
-					return reply.repair
+					return false
 				end
 				local rows = require("ui.menu.programmatic_hotstrings").build(ctx)
 				h.assert_eq(#rows, 4, "the actual manifest renderer must expose all declared source controls")
-				h.assert_eq(calls, { reload = 0, create = 0, enable = 0, time = 0, path = 0, changed = 0 },
-					"rendering cannot enter any native source loading or factory execution port")
-				h.assert_eq(#observed.commands, 0)
-				h.assert_eq(observed.modals, 0)
-				h.assert_type(rows[3].fn, "function", "the actual declared reload command must be reachable")
-				h.assert_eq(rows[3].fn(), false, "native reload refusal remains a refusal even after repair is offered")
-				h.assert_eq(calls.reload, 1)
-				h.assert_eq(calls.create, 0); h.assert_eq(calls.enable, 0); h.assert_eq(calls.time, 0)
-				h.assert_eq(calls.changed, 0, "failed source publication cannot refresh successful state")
-				h.assert_eq(observed.modals, 1)
-				h.assert_eq(released, false)
-				if reply.modal_refused then
-					h.assert_eq(observed.commands, {})
+				local title = rows[1].title
+				if problem then
+					h.assert_eq(title, "menu.hotstrings.user_code.title — menu.hotstrings.user_code.problem_" .. problem)
 				else
-					h.assert_eq(observed.commands[1], "zenity --question --title=" .. Shell.quote("ErgoptiPlus — Native 'error'")
-						.. " --text='Preserved <programmable failure>' --ok-label='Open source' --cancel-label='Keep closed' 2>/dev/null")
+					h.assert_eq(title, "menu.hotstrings.user_code.title")
 				end
-				local opened = reply.dialog == true and not reply.foreign
-				h.assert_eq(calls.path, opened and 1 or 0, "only affirmative repair can read the captured owner's source path")
-				h.assert_eq(#observed.commands, reply.modal_refused and 0 or (opened and 2 or 1))
-				if opened then
-					h.assert_eq(observed.commands[2], "xdg-open " .. Shell.quote("/owned/source 'programmable'.lua") .. " >/dev/null 2>&1 &")
-				end
+				h.assert_eq(rows[2].disabled == true, problem == "missing", "only a missing source has nothing to open")
+				h.assert_eq(rows[3].fn(), false, "native reload refusal remains a refusal")
+				h.assert_eq(rows[4].fn(), false, "a refused example creation enables nothing")
+				h.assert_eq(calls.reload, 1); h.assert_eq(calls.create, 1)
+				h.assert_eq(calls.changed, 2, "each refusal redraws the menu so the row shows the state")
+				h.assert_eq(calls.path, 0, "nothing offers or opens the source")
+				h.assert_eq(observed.modals, 0, "no native modal opens")
+				h.assert_eq(observed.commands, {}, "no zenity question or editor command runs")
 			end)
 		end)
 	end
@@ -284,9 +253,6 @@ h.describe("native caption consumer inventory", function()
 			["ui/gesture_conflicts.lua"] = 1,
 			["modules/gestures/system_actions.lua"] = 2,
 			["ui/menu/menu_builder.lua"] = 3,
-			-- The seven real programmable error-callback cases above prove its exact
-			-- branded question caption, modal handoff and affirmative-only repair.
-			["ui/menu/programmatic_hotstrings.lua"] = 1,
 			["modules/llm/local_model_offer.lua"] = 2,
 			-- The enable refusal tests prove both policy-owned native captions and modal receipts.
 			["ui/llm_enable_refusal.lua"] = 2,

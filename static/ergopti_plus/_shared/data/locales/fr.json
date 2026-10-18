@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Créer un script d’exemple",
 	"menu.hotstrings.user_code.error": "Le script de hotstrings personnel a échoué. Ouvrez-le pour corriger l’erreur.",
 	"menu.hotstrings.user_code.open_source": "Ouvrir le script personnel",
+	"menu.hotstrings.user_code.problem_failed": "erreur du script : ouvrez-le pour la corriger",
+	"menu.hotstrings.user_code.problem_missing": "script absent : créez l’exemple",
 	"menu.hotstrings.user_code.reload_source": "Recharger le script personnel",
 	"menu.hotstrings.user_code.title": "Hotstrings programmables",
 	"platform_reason.program_runner_unavailable": "Indisponible : le lanceur natif ou cette association est indisponible.",

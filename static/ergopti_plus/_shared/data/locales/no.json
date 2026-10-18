@@ -3257,6 +3257,8 @@
 	"menu.hotstrings.user_code.create_example": "Opprett eksempelskript",
 	"menu.hotstrings.user_code.error": "Det personlige skriptet for tekstsnarveier mislyktes. Åpne det for å rette feilen.",
 	"menu.hotstrings.user_code.open_source": "Åpne personlig skript",
+	"menu.hotstrings.user_code.problem_failed": "skriptfeil: åpne det for å rette det",
+	"menu.hotstrings.user_code.problem_missing": "skript mangler: opprett eksempelet",
 	"menu.hotstrings.user_code.reload_source": "Last inn personlig skript på nytt",
 	"menu.hotstrings.user_code.title": "Programmerbare tekstsnarveier",
 	"platform_reason.program_runner_unavailable": "Utilgjengelig: Den innebygde programstarteren eller denne tilordningen er utilgjengelig.",
