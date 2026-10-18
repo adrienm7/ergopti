@@ -152,7 +152,7 @@ local function request_step(generation, direction, cycle, selection, parent, foc
 			apply_answer(generation, plan, selection, focus, block, parent, publication)
 		end,
 		function()
-			if generation ~= _generation then return end
+			if generation ~= _generation or not publication.current() then return end
 			Logger.warn(LOG, "Tone rewrite to '%s' failed: the model gave no answer.", plan.profile_id)
 		end, publication.current)
 end

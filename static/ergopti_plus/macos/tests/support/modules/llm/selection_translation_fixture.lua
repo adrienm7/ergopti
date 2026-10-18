@@ -109,8 +109,9 @@ end
 --- Builds the real pipeline around the faked boundaries.
 --- @param selection string What the user has selected.
 --- @param ui_locale string|nil The interface locale, "fr" when omitted.
+--- @param options table|nil Native fixture configuration, including the stored credential.
 --- @return table world
-local function build_world(selection, ui_locale)
+local function build_world(selection, ui_locale, options)
 	local world = {
 		posts = {}, notices = {}, keys = {}, document = {}, renders = {}, loadings = 0, hides = 0,
 		selection = selection, clipboard = USER_CLIPBOARD, pasted = nil, focus = "7:101",
@@ -239,7 +240,7 @@ local function build_world(selection, ui_locale)
 	CoreState.backend = "api"
 	CoreState.active_profile_id = "advanced"
 	local api = core.api_remote
-	api.set_entries({ { id = ENTRY_ID, provider = "cerebras", token = "translate-token", model = MODEL } })
+	api.set_entries({ { id = ENTRY_ID, provider = "cerebras", token = options and options.token or "translate-token", model = MODEL } })
 	api.set_active_entry_id(ENTRY_ID)
 	local _, ready_index = get_upvalue(api.is_ready, "_is_ready")
 	assert(ready_index, "the remote readiness flag must be reachable")

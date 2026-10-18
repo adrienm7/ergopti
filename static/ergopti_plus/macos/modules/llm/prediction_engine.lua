@@ -2231,7 +2231,7 @@ function M.request_selection_rewrite(profile_id, source, on_raw, on_fail, contin
 		end
 	end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_completion, debug.traceback,
-		profile, source, source, model, temperature, max_tokens, on_raw, on_fail)
+		profile, source, source, model, temperature, max_tokens, on_raw, on_fail, continuation_check)
 	if not dispatch_ok then
 		Logger.error(LOG, "Tone rewrite dispatch raised: %s.", tostring(dispatch_err))
 		return false
@@ -2276,9 +2276,13 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the model's answer.
 --- @param on_fail function Called when no answer came back.
+--- @param continuation_check function|nil Exact producer authority until remote HTTP dispatch.
 --- @return boolean requested True when the request was sent.
-function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_raw, on_fail)
+function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_raw, on_fail, continuation_check)
 	if not require_state("request_chat_answer") then return false end
+	local request_revision = fetch_request_counter
+	assert(continuation_check == nil or type(continuation_check) == "function",
+		"request_chat_answer: continuation check must be a function or nil")
 	local reason = manual_refusal()
 	if reason and reason ~= "empty_context" then
 		Logger.info(LOG, "%s refused (%s).", tostring(label), reason)
@@ -2289,8 +2293,17 @@ function M.request_chat_answer(label, system_prompt, user_text, max_tokens, on_r
 		Logger.error(LOG, "%s refused: no current model (%s).", tostring(label), tostring(model))
 		return false
 	end
+	-- Own the surface/reset revision through asynchronous native credential reads.
+	-- Captured on entry, after the caller opened its surface and before lookups.
+	local function current()
+		if fetch_request_counter ~= request_revision or not runtime_available() then return false end
+		local refusal = manual_refusal()
+		if refusal ~= nil and refusal ~= "empty_context" then return false end
+		if continuation_check ~= nil and continuation_check() ~= true then return false end
+		return fetch_request_counter == request_revision
+	end
 	local dispatch_ok, dispatch_err = xpcall(core_llm.fetch_raw_text, debug.traceback,
-		system_prompt, user_text, model, temperature, max_tokens, on_raw, on_fail)
+		system_prompt, user_text, model, temperature, max_tokens, on_raw, on_fail, current)
 	if not dispatch_ok then
 		Logger.error(LOG, "%s dispatch raised: %s.", tostring(label), tostring(dispatch_err))
 		return false

@@ -2146,8 +2146,10 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text.
 --- @param on_fail function Called when no answer came back.
+--- @param current function|nil Original request authority until remote HTTP dispatch.
 function M.fetch_raw_completion(profile, full_text, tail_text, model_name, temperature, max_tokens,
-                                on_raw, on_fail)
+                                on_raw, on_fail, current)
+	assert(current == nil or type(current) == "function", "fetch_raw_completion: current must be a function or nil")
 	if type(profile) ~= "table" then
 		error("fetch_raw_completion: the profile must be a profile table, got " .. type(profile))
 	end
@@ -2156,7 +2158,7 @@ function M.fetch_raw_completion(profile, full_text, tail_text, model_name, tempe
 		error("fetch_raw_completion: backend '" .. tostring(CoreState.backend) .. "' has no single request")
 	end
 	api.request_raw(model_name, Profiles.resolve_system_prompt(profile, 1), full_text, tail_text,
-		temperature, max_tokens, on_raw, on_fail)
+		temperature, max_tokens, on_raw, on_fail, current and { current = current } or nil)
 end
 
 --- Sends one chat request with a system prompt of the caller's own to the
@@ -2171,7 +2173,9 @@ end
 --- @param max_tokens number Output token budget.
 --- @param on_raw function Receives the answer text.
 --- @param on_fail function Called when no answer came back.
-function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max_tokens, on_raw, on_fail)
+--- @param current function|nil Original request authority until remote HTTP dispatch.
+function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max_tokens, on_raw, on_fail, current)
+	assert(current == nil or type(current) == "function", "fetch_raw_text: current must be a function or nil")
 	if type(system_prompt) ~= "string" or system_prompt == "" or type(user_text) ~= "string" then
 		error("fetch_raw_text: a system prompt and a user text are required")
 	end
@@ -2180,7 +2184,7 @@ function M.fetch_raw_text(system_prompt, user_text, model_name, temperature, max
 		error("fetch_raw_text: backend '" .. tostring(CoreState.backend) .. "' has no single request")
 	end
 	api.request_raw(model_name, system_prompt, user_text, "", temperature, max_tokens, on_raw, on_fail,
-		{ chat = true })
+		{ chat = true, current = current })
 end
 
 --- Validates keystroke event modifiers against an expected explicit modifier set.
