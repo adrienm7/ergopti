@@ -1418,14 +1418,15 @@ function run({ includeLeafControls = true } = {}) {
 		'PASS: Shortcuts public receipt emission controls=2; filesystem/native execution unrun.'
 	);
 
+	// Pipeline owns these controls even when standalone leaf delegations are disabled.
+	execFileSync('python3', [path.join(__dirname, 'test_input_source_xctest_isolation.py')], {
+		cwd: ROOT,
+		stdio: 'pipe'
+	});
+	console.log(
+		'PASS: isolated native input-source receipt controls=17; Swift/native execution UNRUN.'
+	);
 	if (includeLeafControls) {
-		execFileSync('python3', [path.join(__dirname, 'test_input_source_xctest_isolation.py')], {
-			cwd: ROOT,
-			stdio: 'pipe'
-		});
-		console.log(
-			'PASS: isolated native input-source receipt controls=17; Swift/native execution UNRUN.'
-		);
 		require('./test-item36-native-qualification.cjs')({
 			workflow,
 			admitItem36Selector,
