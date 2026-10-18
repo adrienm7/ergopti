@@ -36,7 +36,7 @@ Only the `.json` is the source. Editing a `.tsv` does nothing durable.
    backfill tool; review what it writes rather than trusting it blindly.
 3. Reference the key from code via the i18n accessor — never inline the text.
 4. Run the gate. `npm run test:js` carries the translations audit, and
-   `tests/meta/test_locale_json_valid.ahk` enforces key parity in the AHK suite.
+   `tests/meta/infra/i18n/test_locale_json_valid.ahk` enforces key parity in the AHK suite.
 
 A missing key in one locale fails CI. Adding an English string "temporarily"
 with the intent to translate later does not survive the gate — do it in the same

@@ -49,7 +49,7 @@ global _HOTPATH_SLOW_MS := 5.0
 ;
 ; Every entry MUST carry its measured normal cost in a comment: an override
 ; without a measurement behind it is indistinguishable from hiding a regression,
-; and tests/unit/test_hotpath_per_segment_threshold.ahk enforces the comment.
+; and tests/unit/infra/dispatch/test_hotpath_per_segment_threshold.ahk enforces the comment.
 global _HOTPATH_SLOW_MS_BY_SEGMENT := Map(
 	; 2 Hz unattended cross-process UIA/COM round trip on the message thread.
 	; Measured 2026-07-29 21:15-21:46: n=2993, mean 14.3 ms, max 301.0 ms, ~80 %

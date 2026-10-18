@@ -813,7 +813,7 @@ try {
 	}
 	const testsDir = path.join(root, 'static', 'ergopti_plus', 'windows', 'tests');
 	const runtimeTest = fs.readFileSync(
-		path.join(testsDir, 'unit', 'test_runtime_contract_version.ahk'),
+		path.join(testsDir, 'unit', 'infra', 'lifecycle', 'test_runtime_contract_version.ahk'),
 		'utf8'
 	);
 	if (
@@ -827,7 +827,7 @@ try {
 		);
 	}
 	if (
-		!/^#Include unit\/test_runtime_contract_version\.ahk$/m.test(
+		!/^#Include unit\/infra\/lifecycle\/test_runtime_contract_version\.ahk$/m.test(
 			fs.readFileSync(path.join(testsDir, 'run_all.ahk'), 'utf8')
 		)
 	) {

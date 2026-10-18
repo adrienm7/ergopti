@@ -4,7 +4,7 @@
 ; MODULE: Personal Shortcuts Compiled-Mode Include Path Test
 ; DESCRIPTION:
 ; Regression guard for a silent (non-crashing) sibling of the
-; A_LocalAppData startup crash (see meta/test_bundle_resolve_dir_local_appdata.ahk):
+; A_LocalAppData startup crash (see meta/infra/lifecycle/test_bundle_resolve_dir_local_appdata.ahk):
 ; the compiled-mode ``#Include *i ...personal_shortcuts.ahk`` line in
 ; ErgoptiPlus.ahk referenced ``%A_LocalAppData%``, which is not a recognised
 ; token for #Include's load-time ``%...%`` substitution (it is neither one of
