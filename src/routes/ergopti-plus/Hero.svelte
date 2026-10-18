@@ -109,7 +109,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-linux-x86_64.AppImage') ?? '#');
+	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-x86_64.AppImage') ?? '#');
 
 	// A single download button, driven by the OS toggle. The previous layout
 	// showed a second *download* button for a different OS — so picking Linux

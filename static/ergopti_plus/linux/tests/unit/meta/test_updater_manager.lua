@@ -90,7 +90,7 @@ helpers.describe("modules/updater/manager.lua", function()
 			.. '{"name":"' .. M.LINUX_CHECKSUM_ASSET_NAME .. '","browser_download_url":"'
 			.. checksum_url .. '"},'
 			.. '{"name":"' .. M.LINUX_ASSET_NAME .. '","browser_download_url":"' .. canonical_url .. '"},'
-			.. '{"name":"ErgoptiPlus-linux-x86_64.AppImage","browser_download_url":"https://example.invalid/wrong.AppImage"}'
+			.. '{"name":"ErgoptiPlus-x86_64.AppImage","browser_download_url":"https://example.invalid/wrong.AppImage"}'
 			.. ']}'
 
 		helpers.assert_eq(M._select_update_asset(body), canonical_url,

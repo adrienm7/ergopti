@@ -60,7 +60,7 @@ FEATURES & RATIONALE:
 
 	let urlWindows = $derived(ui.release?.url('ErgoptiPlus.exe') ?? '#');
 	let urlMacos = $derived(ui.release?.url('ErgoptiPlus.app.zip') ?? '#');
-	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-linux-x86_64.AppImage') ?? '#');
+	let urlLinux = $derived(ui.release?.url('ErgoptiPlus-x86_64.AppImage') ?? '#');
 </script>
 
 <section class="platforms" id="ep-telecharger" style="--section-accent: var(--accent-blue);">
