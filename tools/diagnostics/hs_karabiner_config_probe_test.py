@@ -19,6 +19,8 @@ DOMAIN = "com.ergoptiplus.app.hammerspoon"
 def graph():
     """Declare an independent published graph, including every condition witness."""
     config = copy.deepcopy(probe.INITIAL_CONFIG)
+    # The published product writes the registered ANSI or ISO form here.
+    config["profiles"][1]["virtual_hid_keyboard"] = {"keyboard_type_v2": "ansi"}
     rules = config["profiles"][1]["complex_modifications"]["rules"]
     for mode, value in (("normal", 1), ("pause", 2)):
         rules.append(
@@ -443,6 +445,31 @@ class NativeReceiptTests(unittest.TestCase):
         ):
             value = receipt()
             change(value["variants"][3]["config"])
+            with self.assertRaises(ValueError):
+                self.judge(value)
+
+    def test_selected_profile_admits_only_the_owned_virtual_keyboard_form(self):
+        # Hosted release run 39153736606 published this exact field and the
+        # former key-set check refused it as changed profile metadata.
+        for form in probe.VIRTUAL_KEYBOARD_FORMS:
+            value = receipt()
+            for variant in value["variants"]:
+                variant["config"]["profiles"][1]["virtual_hid_keyboard"]["keyboard_type_v2"] = form
+            self.assertEqual(self.judge(value)["variant_count"], 8)
+        for change in (
+            lambda selected: selected.pop("virtual_hid_keyboard"),
+            lambda selected: selected.__setitem__("virtual_hid_keyboard", "ansi"),
+            lambda selected: selected["virtual_hid_keyboard"].__setitem__(
+                "keyboard_type_v2", "jis"
+            ),
+            lambda selected: selected["virtual_hid_keyboard"].__setitem__("country_code", 0),
+            lambda selected: selected.__setitem__("devices", []),
+            lambda selected: selected["virtual_hid_keyboard"].__setitem__(
+                "keyboard_type_v2", "iso"
+            ),
+        ):
+            value = receipt()
+            change(value["variants"][5]["config"]["profiles"][1])
             with self.assertRaises(ValueError):
                 self.judge(value)
 
