@@ -1374,7 +1374,13 @@ function M.shift_tone(direction, cycle)
 				end
 				return
 			end
-			if global_privacy_blocks() or current_focus() ~= focus then
+			local blocked = global_privacy_blocks()
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if not blocked then blocked = current_focus() ~= focus end
+			-- Native barriers can dispatch shutdown, configuration or a newer step.
+			-- Only the originating tone generation may submit its captured text.
+			if _runtime_closed or _scope_owner or generation ~= _tone_generation then return end
+			if blocked then
 				Logger.info(LOG, "Tone request dropped: the active text field changed while pacing.")
 				return
 			end
