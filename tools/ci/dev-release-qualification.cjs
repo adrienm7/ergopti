@@ -30,9 +30,10 @@ const STABLE_V103_POLICY_PATH = path.resolve(
 	'../../.github/ci/stable_v103_macos_native_qualification_exception.json'
 );
 const STABLE_V103_PROFILE_ID = 'stable-v1-0-3-20261018-macos-native-scopes';
-// The only scopes the 2026-10-18 decision lets v1.0.3 defer; PAC and HTTP are
-// mandatory again since they passed on hosted runners on both architectures.
+// The only scopes the 2026-10-18 decision lets v1.0.3 defer; PAC is mandatory
+// again since it passed on hosted runners on both architectures.
 const STABLE_V103_DEFERRABLE_SCOPE_IDS = Object.freeze([
+	'macos-native-http',
 	'macos-brew-archive',
 	'macos-native-model-receiving',
 	'macos-shortcuts-discovery',
@@ -43,6 +44,7 @@ const STABLE_V103_DEFERRABLE_SCOPE_IDS = Object.freeze([
 // Remove a scope here and from the JSON file once it is green; when none is
 // left, also delete the JSON file and v1.0.3 publishes with no profile.
 const STABLE_V103_SCOPE_IDS = Object.freeze([
+	'macos-native-http',
 	'macos-brew-archive',
 	'macos-native-model-receiving',
 	'macos-shortcuts-discovery',
@@ -106,6 +108,8 @@ const STABLE_V102_OWNED_RUNTIME_METHODS = freeze({
 });
 // Fixed public sentence per deferred scope, in publication-notice order.
 const STABLE_NATIVE_NOTICE_SENTENCES = Object.freeze({
+	'macos-native-http':
+		'Independent native HTTP wire client receiving remains unqualified; owned-process and client-only HTTP controls remain mandatory.',
 	'macos-launch-appleevents':
 		'External AppleEvent transport and dependent native features remain unqualified only for clean/karabiner_config on macos-15/macos-15-intel; all install and launch lifecycle checks remain mandatory.',
 	'macos-shortcuts-discovery': 'Native Apple Shortcuts catalogue discovery remains unqualified.',
@@ -126,6 +130,8 @@ const STABLE_NATIVE_SPECS = Object.freeze([
 		version: '1.0.2',
 		deferrable: STABLE_V102_SCOPE_IDS,
 		scopes: STABLE_V102_SCOPE_IDS,
+		// The v1.0.2 notice predates the HTTP sentence; its text stays as published.
+		notice_omits: Object.freeze(['macos-native-http']),
 		mandatory:
 			'All unlisted tests, portable model controls, Worker12, owned-process/client-only HTTP controls, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
 	}),
@@ -138,8 +144,9 @@ const STABLE_NATIVE_SPECS = Object.freeze([
 		version: '1.0.3',
 		deferrable: STABLE_V103_DEFERRABLE_SCOPE_IDS,
 		scopes: STABLE_V103_SCOPE_IDS,
+		notice_omits: Object.freeze([]),
 		mandatory:
-			'All unlisted tests, the native PAC/WPAD XCTest and independent managed HTTP client qualifications, portable model controls, Worker12, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
+			'All unlisted tests, the native PAC/WPAD XCTest qualification, owned-process/client-only HTTP controls, portable model controls, Worker12, builds, macOS/Sparkle signing, catalogue/source/asset integrity and ordinary verified archive installation/launch remain mandatory.'
 	})
 ]);
 const STABLE_NATIVE_SCOPE_IDS = Object.freeze([
@@ -752,7 +759,9 @@ function stablePublicationNotice(id, context, sha, now = new Date()) {
 				.join(' ') +
 			' ' +
 			Object.keys(STABLE_NATIVE_NOTICE_SENTENCES)
-				.filter((scope) => Object.hasOwn(profile.scopes, scope))
+				.filter(
+					(scope) => Object.hasOwn(profile.scopes, scope) && !spec.notice_omits.includes(scope)
+				)
 				.map((scope) => STABLE_NATIVE_NOTICE_SENTENCES[scope])
 				.join(' ') +
 			' ' +
