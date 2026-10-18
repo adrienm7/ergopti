@@ -37,7 +37,7 @@
 ; ==================================================================
 
 ; Write Content to a scratch file and return its path. Uses a unique name so a
-; parallel run cannot collide (tests/meta/test_atomic_write_unique_scratch.ahk
+; parallel run cannot collide (tests/meta/adapters/test_atomic_write_unique_scratch.ahk
 ; enforces the same discipline in the driver).
 _GRZ_ScratchWith(Content) {
 	Path := A_Temp . "\ergopti_grz_" . A_TickCount . "_" . A_Index . ".txt"

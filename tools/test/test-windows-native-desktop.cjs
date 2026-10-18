@@ -123,7 +123,7 @@ function checkNativeEntry(source) {
 		assert.equal(code.split('#Include ../' + owner + '\n').length, 2);
 	}
 	assert.deepEqual(code.match(/^#Include unit\/.*$/gm), [
-		'#Include unit/test_console_window.ahk',
+		'#Include unit/adapters/test_console_window.ahk',
 		'#Include unit/test_key_combinations.ahk'
 	]);
 	assert.doesNotMatch(code, /#Include .*run_all\.ahk|#Include .*ErgoptiPlus\.ahk/);
@@ -147,8 +147,8 @@ for (const [before, after] of [
 	['#Include ../adapters/text_sender.ahk', '; omitted sender owner'],
 	['#Include ../platform/remap/altgr_criteria.ahk', '; omitted AltGr criteria owner'],
 	[
-		'#Include unit/test_console_window.ahk',
-		'#Include unit/test_console_window.ahk\n#Include unit/test_toml_numeric_strings.ahk'
+		'#Include unit/adapters/test_console_window.ahk',
+		'#Include unit/adapters/test_console_window.ahk\n#Include unit/test_toml_numeric_strings.ahk'
 	],
 	['#Include unit/test_key_combinations.ahk', '#Include unit/missing_key_combinations.ahk'],
 	['Arguments[3] != "todo91-altgr-suffix"', 'false'],
@@ -185,12 +185,14 @@ for (const [before, after] of [
 	);
 	assert.throws(() => admittedNativeWorkflow(changed), /ambiguous\/missing job/);
 }
-const registrations = ['unit/test_console_window.ahk', 'unit/test_key_combinations.ahk'].map(
-	(file) =>
-		stripComments(
-			fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8'),
-			'.ahk'
-		)
+const registrations = [
+	'unit/adapters/test_console_window.ahk',
+	'unit/test_key_combinations.ahk'
+].map((file) =>
+	stripComments(
+		fs.readFileSync(path.join(root, 'static/ergopti_plus/windows/tests', file), 'utf8'),
+		'.ahk'
+	)
 );
 for (const name of expected) {
 	assert.equal(registrations.join('\n').split('Test("' + name + '",').length, 2);

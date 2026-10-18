@@ -955,7 +955,9 @@ function main() {
 	const files = windowsFiles();
 	const model = new DriverModel(files);
 	selfCheck(model);
-	const metaFiles = files.filter((file) => /^tests\/meta\/test_[^/]+\.ahk$/.test(file.rel));
+	const metaFiles = files.filter((file) =>
+		/^tests\/meta\/(?:[^/]+\/)*test_[^/]+\.ahk$/.test(file.rel)
+	);
 	const mirrored = [];
 	const skipped = [];
 	const fileCount = new Set();
