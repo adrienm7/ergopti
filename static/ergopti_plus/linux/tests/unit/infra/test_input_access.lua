@@ -89,7 +89,9 @@ helpers.describe("input_access: a tray launch stays visible", function()
 		local tray = { calls = {}, menu = nil, pumps = 0, destroyed = false }
 		function tray.setIcon(opts) tray.calls[#tray.calls + 1] = opts end
 		function tray.getBackend() return backend end
-		function tray.setMenu(items) tray.menu = items end
+		function tray.setFallbackMenu(title, quit_label, on_quit)
+			tray.menu = { { title = title, disabled = true }, { title = quit_label, fn = on_quit } }
+		end
 		function tray.pump() tray.pumps = tray.pumps + 1 end
 		function tray.destroy() tray.destroyed = true end
 		return tray

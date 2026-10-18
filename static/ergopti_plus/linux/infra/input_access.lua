@@ -113,10 +113,7 @@ function M.hold_tray(deps, label)
 		if ok and type(translated) == "string" then quit_label = translated:gsub("^%S+%s+", "") end
 	end
 	local quit = false
-	tray.setMenu({
-		{ title = label, disabled = true },
-		{ title = quit_label, fn = function() quit = true end },
-	})
+	tray.setFallbackMenu(label, quit_label, function() quit = true end)
 	local sleep_ms = deps.sleep_ms or require("adapters.event_loop").sleep_ms
 	while not quit do
 		tray.pump()

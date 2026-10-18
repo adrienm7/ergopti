@@ -2122,10 +2122,8 @@ local function main()
 			if ok_i18n and i18n_mod then
 				quit_label = (i18n_mod.get("menu.global.quit"):gsub("^%S+%s+", ""))
 			end
-			tray_menu.setMenu({
-				{ title = "Ergopti " .. (opts.layout or "qwerty"), fn = function() end },
-				{ title = quit_label, fn = function() shutdown.request("degraded tray quit") end },
-			})
+			tray_menu.setFallbackMenu("Ergopti " .. (opts.layout or "qwerty"), quit_label,
+				function() shutdown.request("degraded tray quit") end)
 		end
 	elseif opts.tray and not tray_menu then
 		Logger.warn(LOG, "Tray icon requested but the tray adapter could not load.")
