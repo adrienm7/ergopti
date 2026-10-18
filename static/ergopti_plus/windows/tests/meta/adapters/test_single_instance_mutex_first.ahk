@@ -104,7 +104,7 @@ Test("boot: every detached worker is exempt from the single-owner mutex before i
 ; (worker-tray-icon-2026-09-25). The entry must declare #NoTrayIcon, reveal the
 ; icon only on the driver path after the safe bootstrap tray, and make a worker
 ; release its hotkeys and retitle itself before any other statement. The
-; real-process twin is tests/unit/test_worker_tray_icon_hidden.ahk.
+; real-process twin is tests/unit/adapters/test_worker_tray_icon_hidden.ahk.
 _SIMF_WorkerHidesTrayIconFirst() {
 	Code := _SIMF_EntryCode()
 	Assert(RegExMatch(Code, "m)^#NoTrayIcon\b") > 0,

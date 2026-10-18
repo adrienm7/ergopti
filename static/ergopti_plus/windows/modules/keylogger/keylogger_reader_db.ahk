@@ -514,7 +514,7 @@ KLR_PublishCandidate(candidate, sizes, snapshots) {
 		; sqlite3_close_v2 may enter the OS allocator. Keep it outside the critical
 		; publication window. Immediate close relies on KLR_BuildDatabase running in
 		; the disposable, single-flow /force worker guarded by
-		; tests/meta/test_keylogger_prefetch_worker.ahk. A future in-process caller
+		; tests/meta/modules/keylogger/test_keylogger_prefetch_worker.ahk. A future in-process caller
 		; must add borrower ownership/deferred close before reusing this publication.
 		if (old_db && old_db != candidate)
 				try SQLite_Close(old_db)
