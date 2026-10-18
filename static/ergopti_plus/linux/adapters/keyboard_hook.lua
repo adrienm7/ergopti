@@ -3745,9 +3745,16 @@ function M.while_released(fn, opts)
 	if not released then
 		M.emergency_stop("could not release virtual keys before a dialog: " .. tostring(release_err))
 		observe("refused", { ok = false, reason = "release_failed" })
-		return fn()
+		return nil, "virtual key retirement refused"
 	end
-	for _, path in ipairs(paths) do EvdevReader.ungrab(keyboard_slot(path)) end
+	for _, path in ipairs(paths) do
+		local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
+		if not called or acknowledged ~= true then
+			M.emergency_stop("could not release the keyboard before a dialog: " .. path)
+			observe("refused", { ok = false, reason = "ungrab_failed" })
+			return nil, "keyboard release refused"
+		end
+	end
 	Logger.debug(LOG, "Keyboard released to the desktop for a dialog.")
 
 	local results = { n = 0 }
@@ -3755,23 +3762,26 @@ function M.while_released(fn, opts)
 	local ok, err = pcall(function() keep(fn()) end)
 	if ok then err = nil end
 
-	for _, path in ipairs(paths) do
-		local slot = keyboard_slot(path)
-		repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
-		_pending_events[slot] = nil
-		if not EvdevReader.grab(slot) then
-			M.emergency_stop("could not take the keyboard back after a dialog: " .. path)
-			observe("refused", { ok = false, reason = "regrab_failed" })
-			return (table.unpack or unpack)(results, 1, results.n)
+	-- Restoration can acquire one source before a later native operation raises.
+	-- Keep the entire cohort under one cleanup boundary so no grab escapes it.
+	local restored_call, restored, restore_reason = pcall(function()
+		for _, path in ipairs(paths) do
+			local slot = keyboard_slot(path)
+			repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
+			_pending_events[slot] = nil
+			if EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
+			local held = EvdevReader.pressed_keys(slot, KEY_MAX)
+			for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
+			if not _resynchronise(path) then return false, "resynchronisation_failed" end
 		end
-		local held = EvdevReader.pressed_keys(slot, KEY_MAX)
-		for code in pairs(held or {}) do _consumed_down[source_key(path, code)] = true end
-		local synced, sync_err = _resynchronise(path)
-		if not synced then
-			M.emergency_stop("could not resynchronise after a dialog: " .. tostring(sync_err))
-			observe("refused", { ok = false, reason = "resynchronisation_failed" })
-			return (table.unpack or unpack)(results, 1, results.n)
-		end
+		return true
+	end)
+	if not restored_call or restored ~= true then
+		restore_reason = restored_call and restore_reason or "restoration_failed"
+		M.emergency_stop("could not restore keyboard capture after a dialog: " .. tostring(restore_reason))
+		observe("refused", { ok = false, reason = restore_reason })
+		if err then error(err, 0) end
+		return (table.unpack or unpack)(results, 1, results.n)
 	end
 	if not observe("before", { ok = true }) then
 		observe("refused", { ok = false, reason = "observer_failed" })
