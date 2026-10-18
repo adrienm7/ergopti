@@ -3597,6 +3597,22 @@ function request_range_data(show_loader = true) {
 }
 
 /**
+ * Checks range ownership before either the renderer or native bootstrap mutates
+ * its caches. Untagged live data waits while a selected range or Reset owns them.
+ * @param {number|null} [request_id=null] - Native range ownership token.
+ * @returns {boolean} Whether this response may publish data for the current view.
+ */
+function can_receive_range_data(request_id = null) {
+	if (app_state.active_cache_reset_id) return false;
+	if (request_id === null) return app_state.active_range_request_id === 0;
+	return (
+		Number.isSafeInteger(request_id) &&
+		request_id > 0 &&
+		request_id === app_state.active_range_request_id
+	);
+}
+
+/**
  * Receives the decoded n-gram payload from the Lua backend and triggers the
  * local filter/render pipeline.
  * @param {Object} payload - Contains { historical, today } n-gram dictionaries.
@@ -3604,13 +3620,8 @@ function request_range_data(show_loader = true) {
  * @returns {boolean} Whether the payload was current and rendered.
  */
 function receive_range_data(payload, request_id = null) {
-	if (app_state.active_cache_reset_id) return false;
-	if (request_id === null) {
-		// Untagged prefetch/live pushes are valid only while no selected-range
-		// request owns the table. Otherwise they would overwrite its filtered
-		// result and release the wrong loading latch.
-		if (app_state.active_range_request_id !== 0) return false;
-	} else if (!complete_range_request(request_id, payload ? 'ok' : 'failed')) {
+	if (!can_receive_range_data(request_id)) return false;
+	if (request_id !== null && !complete_range_request(request_id, payload ? 'ok' : 'failed')) {
 		return false;
 	}
 	if (!payload) return false;

@@ -1281,6 +1281,14 @@
 				// global state and re-render.
 				function apply_prefetch(blob) {
 					if (!blob) return;
+					const has_prefetch = blob._prefetch_data !== undefined;
+					// Reject stale native replies before metadata, mailbox or history
+					// changes; a later live delta must not resurrect rejected history.
+					if (
+						(has_prefetch || blob.range_request_id !== undefined) &&
+						!window.can_receive_range_data(blob.range_request_id ?? null)
+					)
+						return;
 					// A partial rebuild snapshot is labelled until a complete one lands.
 					if (window.metrics_rebuild) window.metrics_rebuild.mark_snapshot(blob);
 					window.metrics_manifest = blob.metrics_manifest || {};
@@ -1294,7 +1302,6 @@
 						typeof window.build_keycode_layout_for_driver === 'function'
 							? window.build_keycode_layout_for_driver(window.driver_meta, blob.keycode_layout)
 							: blob.keycode_layout || {};
-					const has_prefetch = blob._prefetch_data !== undefined;
 					let merged = null;
 					if (has_prefetch) {
 						const incoming = blob._prefetch_data || {};
