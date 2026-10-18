@@ -247,7 +247,7 @@ local _secure_field = false
 -- keepassxc). The adapter is consulted IN ADDITION to this list, never instead
 -- of it: it matches exactly, so delegating would NARROW coverage and leak
 -- keystrokes. The broad coverage is locked by the "coverage must never narrow"
--- guard in tests/unit/meta/test_keylogger.lua.
+-- guard in tests/unit/modules/keylogger/core/test_keylogger.lua.
 local _SECURE_APPS = {
 	"1password", "bitwarden", "keepass", "lastpass",
 }

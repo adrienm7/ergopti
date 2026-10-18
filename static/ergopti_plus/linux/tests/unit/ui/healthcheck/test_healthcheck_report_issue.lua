@@ -1,0 +1,615 @@
+--- tests/unit/ui/healthcheck/test_healthcheck_report_issue.lua
+
+--- ==============================================================================
+--- MODULE: Diagnostics Page Actions And Report A Bug (Linux)
+--- DESCRIPTION:
+--- The diagnostics page asks, the host does (ui.healthcheck.report.perform):
+--- copy the report, save it as a Markdown file under the logs folder and open
+--- that folder, report it on GitHub (copy the report, then open the bug form
+--- with that whole report prefilled, the browser last so the form keeps the
+--- focus), open a folder it collected.
+--- Whatever the page sent, the home folder and the account name reach neither
+--- the clipboard, the file nor the URL (report-bug-flow). Debug > Report a bug
+--- opens the window at its preview.
+--- ==============================================================================
+
+local helpers = require("tests.helpers")
+local Json = require("json")
+local Share = require("healthcheck.share")
+
+local HOME = "/home/jdoe"
+local LOGS_DIR = "/var/tmp/ergopti_report_logs"
+local NAME = "ergopti-diagnostics-linux-2026-09-24T10_00_00Z.md"
+local REPORT = "# ErgoptiPlus diagnostics\n\nconfig_dir: /home/jdoe/.config/ergopti_plus (jdoe)\n"
+
+--- Reads a shared JSON document.
+--- @param rel string Path under _shared/.
+--- @return table
+local function shared_json(rel)
+	local fh = assert(io.open(helpers.driver_root() .. "/../_shared/" .. rel, "rb"))
+	local data = Json.decode(fh:read("*a"))
+	fh:close()
+	return data
+end
+
+--- The documents a host works from, read from their single sources.
+--- @return table
+local function documents()
+	local schema = shared_json("modules/diagnostics/schema.json")
+	schema.export_strings = shared_json("data/locales/en.json")
+	return {
+		schema     = schema,
+		templates  = shared_json("modules/diagnostics/issue_templates.json"),
+		redaction  = shared_json("modules/diagnostics/redaction.json"),
+		repository = shared_json("modules/updater/defaults.json").github,
+	}
+end
+
+--- Side effects that record every call instead of acting.
+--- @param calls table Receives the calls by name.
+--- @return table overrides
+local function recording(calls)
+	for _, name in ipairs({ "copy", "save", "reveal", "make_dir", "open", "open_url", "notify" }) do calls[name] = {} end
+	return {
+		identity = function() return { home = HOME, user = "jdoe" } end,
+		copy = function(text) calls.copy[#calls.copy + 1] = text; return true end,
+		save = function(dir, name, text)
+			calls.save[#calls.save + 1] = { dir = dir, name = name, text = text }
+			return dir .. "/" .. name
+		end,
+		reveal = function(path, done) calls.reveal[#calls.reveal + 1] = path; done({ ok = true, code = 0 }) end,
+		make_dir = function(dir) calls.make_dir[#calls.make_dir + 1] = dir; return true end,
+		exists = function() return true end,
+		open = function(target, done) calls.open[#calls.open + 1] = target; done({ ok = true, code = 0 }) end,
+		open_url = function(url, done) calls.open_url[#calls.open_url + 1] = url; done({ ok = true, code = 0 }) end,
+		notify = function(_, _, level) calls.notify[#calls.notify + 1] = level; return true end,
+	}
+end
+
+--- Wraps recorded side effects so their order is kept in calls.order.
+--- @param calls table
+--- @param overrides table
+local function ordered(calls, overrides)
+	calls.order = {}
+	for name, fn in pairs(overrides) do
+		if name ~= "identity" then
+			overrides[name] = function(...)
+				calls.order[#calls.order + 1] = name
+				return fn(...)
+			end
+		end
+	end
+end
+
+--- Decodes one percent-encoded query parameter of a URL.
+--- @param url string
+--- @param key string
+--- @return string|nil
+local function query_value(url, key)
+	local raw = url:match("[?&]" .. key .. "=([^&]*)")
+	if raw == nil then return nil end
+	return (raw:gsub("%%(%x%x)", function(hex) return string.char(tonumber(hex, 16)) end))
+end
+
+local function host_snapshot(long)
+	local snapshot = { schema_version = 2, driver = "linux", generated_at = "2026-09-24T10:00:00Z",
+		sections = { versions = { ergopti_version = "2.4.0" }, issues = { recent = REPORT } },
+		probes = { github_api = { state = "error", cleanup = "pending", ms = 1 } } }
+	if long then
+		snapshot.retired_probes = {}
+		for index = 1, 300 do
+			snapshot.retired_probes[index] = { probes = { github_api = { state = "timeout", cleanup = "unknown", ms = index } } }
+		end
+	end
+	return snapshot
+end
+
+local function approved_text(long)
+	local config = documents()
+	return Share.document(host_snapshot(long), config.schema,
+		require("infra.i18n").get(config.schema.share_policy.notice_key)).text
+end
+
+--- Receives the explicit completion from these deliberately inline effect ports.
+local function completed(Report, action, paths, config, context, overrides, snapshot)
+	local answer
+	Report.perform(action, paths, config, context, overrides, snapshot, {
+		current = function() return true end, complete = function(result) answer = result end,
+	})
+	assert(answer ~= nil, "the inline fixture must deliver its completion")
+	return answer
+end
+
+--- Performs one action as the bridge does.
+--- @param action table
+--- @param adjust function|nil Changes the recorded side effects.
+--- @return table result, table calls
+local function perform(action, adjust)
+	local Report = helpers.load_module("ui.healthcheck.report")
+	local calls = {}
+	local overrides = recording(calls)
+	ordered(calls, overrides)
+	if adjust then adjust(overrides) end
+	local paths = { logs_dir = LOGS_DIR, diagnostics_dir = LOGS_DIR .. "/diagnostics" }
+	local snapshot = host_snapshot(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+	if action.action == "copy" or action.action == "save" or action.action == "report" then
+		local request = {}
+		for key, value in pairs(action) do request[key] = value end
+		request.text = approved_text(type(action.text) == "string" and #action.text > documents().templates.max_url_bytes)
+		action = request
+	end
+	return completed(Report, action, paths, documents(), Report.redaction_context(overrides), overrides, snapshot), calls
+end
+
+helpers.describe("healthcheck page actions (linux)", function()
+	helpers.it("report copies, then opens the bug form with the whole report, all redacted (report-bug-flow)", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {
+			version = "2.4.0", os = "Fedora Linux 41 (/home/jdoe)", driver = "linux",
+		} })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(calls.copy, { approved_text(false) })
+		helpers.assert_eq(result.path, calls.reveal[1], "the complete local attachment is returned")
+		helpers.assert_eq(query_value(calls.open_url[1], "diagnostics"), nil,
+			"the form receives no query default that could reset an edit")
+		helpers.assert_eq(query_value(calls.open_url[1], "os"), "linux")
+		local repo = documents().repository
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=linux&driver=linux"
+		helpers.assert_eq(calls.open_url[1], prefix, "the canonical bug URL contains only stable host metadata")
+		helpers.assert_eq(query_value(calls.open_url[1], "driver"), "linux")
+		helpers.assert_true(not calls.open_url[1]:find("jdoe", 1, true), "the URL carries no account name")
+	end)
+
+	-- The report used to be saved and its folder opened too: the file manager
+	-- came up after the browser and took the focus from the form (report-focus)
+	helpers.it("report saves its attachment and opens the browser last (report-focus)", function()
+		local _, calls = perform({ action = "report", text = REPORT, fields = { driver = "linux" } })
+		helpers.assert_eq(#calls.save, 1, "a report saves the complete local attachment")
+		helpers.assert_eq(#calls.reveal, 1, "the attachment is revealed before the browser")
+		helpers.assert_eq(#calls.open, 0, "a report opens no folder")
+		helpers.assert_eq(#calls.notify, 0, "a report raises no notification")
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" }, "the browser opens last, after the clipboard and local attachment")
+	end)
+
+	helpers.it("report cuts a long report in the URL and keeps it whole in the clipboard (report-bug-flow)", function()
+		local long = REPORT .. string.rep("line of diagnostics é\n", 2000)
+		local result, calls = perform({ action = "report", text = long, fields = { version = "2.4.0", driver = "linux" } })
+		helpers.assert_eq(result.ok, true)
+		local templates = documents().templates
+		helpers.assert_true(#calls.copy[1] > templates.max_url_bytes, "the fixture exceeds the URL budget")
+		local url = calls.open_url[1]
+		helpers.assert_true(#url <= templates.max_url_bytes, "the URL fits its budget")
+		helpers.assert_eq(query_value(url, "version"), "2.4.0", "only validated host identity is prefilled")
+		local prefilled = query_value(url, "diagnostics")
+		helpers.assert_eq(prefilled, nil, "long output never prefills or resets the issue form")
+		helpers.assert_true(#url < 1200, "the editable URL stays short independently of report length")
+		helpers.assert_eq(calls.save[1].text, calls.copy[1], "the saved attachment preserves the whole report")
+	end)
+
+	helpers.it("report stops before the browser when the clipboard refuses (report-bug-flow)", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = { driver = "linux" } },
+			function(overrides) overrides.copy = function() return false end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.save, 0, "nothing is saved")
+		helpers.assert_eq(#calls.open_url, 0, "the form never opens without its report")
+	end)
+
+	helpers.it("save still writes the redacted report and opens its folder", function()
+		local result, calls = perform({ action = "save", text = REPORT, name = NAME })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(#calls.copy, 0, "saving leaves the clipboard alone")
+		helpers.assert_eq(calls.save[1].dir, LOGS_DIR .. "/diagnostics")
+		helpers.assert_true(not calls.save[1].text:find(HOME, 1, true), "the file carries no home folder")
+		helpers.assert_eq(calls.reveal, { LOGS_DIR .. "/diagnostics/" .. NAME })
+	end)
+
+	helpers.it("open_path opens the folder the host collected, creating it first", function()
+		local result, calls = perform({ action = "open_path", id = "diagnostics_dir" })
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(calls.make_dir, { LOGS_DIR .. "/diagnostics" })
+		helpers.assert_eq(calls.open, { LOGS_DIR .. "/diagnostics" })
+	end)
+
+	-- Today's errors file exists only once something went wrong today, so
+	-- asking to open it earlier is no failure of the program. It was logged as
+	-- an ERROR, which created that very file, counted as a session error and
+	-- would raise the error dialog (open-missing-file)
+	helpers.it("open_path on a file not created yet says so, without an error (open-missing-file)", function()
+		local Logger = require("logger")
+		local emitted = 0
+		Logger.set_sink(function(_, variant)
+			if variant == "warn" or variant == "error" then emitted = emitted + 1 end
+		end)
+		local ok, result, calls = pcall(function()
+			local Report = helpers.load_module("ui.healthcheck.report")
+			local recorded = {}
+			local overrides = recording(recorded)
+			overrides.exists = function() return false end
+			return completed(Report, { action = "open_path", id = "errors_today" },
+				{ errors_today = LOGS_DIR .. "/ergopti_plus_errors_2026-09-24.log" }, documents(),
+				Report.redaction_context(overrides), overrides), recorded
+		end)
+		Logger.set_sink(nil)
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(result.missing, true, "the page is told the file does not exist yet")
+		helpers.assert_eq(#calls.open, 0)
+		helpers.assert_eq(#calls.make_dir, 0, "a file is never created")
+		helpers.assert_eq(emitted, 0, "a file not created yet is neither an error nor a warning")
+	end)
+
+	helpers.it("refuses to redact without the home folder (report-bug-flow)", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local ok, err = pcall(Report.redaction_context, { identity = function() return { user = "jdoe" } end })
+		helpers.assert_eq(ok, false)
+		helpers.assert_contains(tostring(err), "home folder")
+	end)
+end)
+
+helpers.describe("healthcheck debug menu reports (linux)", function()
+	helpers.it("Report a bug opens the diagnostics window at its preview", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local saved = package.loaded["ui.healthcheck.bridge"]
+		local mode = nil
+		package.loaded["ui.healthcheck.bridge"] = { open = function(value) mode = value; return true end }
+		local ok, opened = pcall(Report.report_bug)
+		package.loaded["ui.healthcheck.bridge"] = saved
+		helpers.assert_true(ok, tostring(opened))
+		helpers.assert_eq(opened, true)
+		helpers.assert_eq(mode, "report")
+	end)
+
+	helpers.it("Suggest a feature opens the feature form with the version and the system", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local calls = {}
+		local previous_bridge = package.loaded["ui.healthcheck.bridge"]
+		local previous_manager = package.loaded["ui.webview_manager"]
+		package.loaded["ui.healthcheck.bridge"] = { DRIVER = "linux", config = documents,
+			build_snapshot = function() return host_snapshot(false) end }
+		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		local ok, result = pcall(function()
+			local outcome
+			Report.suggest_feature(recording(calls), function(value) outcome = value end)
+			return outcome
+		end)
+		package.loaded["ui.healthcheck.bridge"] = previous_bridge
+		package.loaded["ui.webview_manager"] = previous_manager
+		helpers.assert_true(ok, tostring(result))
+		helpers.assert_eq(result, true)
+		local repo = documents().repository
+		local prefix = "https://github.com/" .. repo.owner .. "/" .. repo.repo
+			.. "/issues/new?template=feature_request.yml&"
+		helpers.assert_eq(calls.open_url[1]:sub(1, #prefix), prefix)
+		helpers.assert_contains(calls.open_url[1], "driver=linux")
+		helpers.assert_eq(#calls.copy, 0, "a feature request copies nothing")
+	end)
+end)
+
+
+-- These adapter receipts are simulated; the native fixture separately exercises
+-- real regular-file write and close failures through the production save effect.
+helpers.describe("healthcheck checked save receipts (linux)", function()
+	local function default_save(write, mkdir_ok, reveal_ok)
+		local saved_fs = package.loaded["adapters.file_system"]
+		local saved_shell = package.loaded["adapters.shell_runner"]
+		local writes, directories = {}, {}
+		package.loaded["adapters.file_system"] = { write = function(path, text)
+			writes[#writes + 1] = { path = path, text = text }
+			return write(path, text)
+		end }
+		package.loaded["adapters.shell_runner"] = {
+			quote = function(value) return "'" .. value .. "'" end,
+			run = function(command) directories[#directories + 1] = command; return mkdir_ok ~= false end,
+		}
+		local ok, result, calls = pcall(function()
+			return perform({ action = "save", text = REPORT, name = NAME }, function(overrides)
+				overrides.save = nil
+				if reveal_ok == false then overrides.reveal = function(_, done) done({ ok = false, code = 23 }) end end
+			end)
+		end)
+		package.loaded["adapters.file_system"] = saved_fs
+		package.loaded["adapters.shell_runner"] = saved_shell
+		helpers.assert_true(ok, tostring(result))
+		return result, calls, writes, directories
+	end
+
+	helpers.it("save requires the filesystem's completed write receipt (report-save-receipt)", function()
+		local result, calls, writes, directories = default_save(function() return true end)
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(writes, { { path = LOGS_DIR .. "/diagnostics/" .. NAME,
+			text = approved_text(false) } })
+		helpers.assert_eq(#directories, 1)
+		helpers.assert_eq(calls.reveal, { result.path })
+	end)
+
+	for _, receipt in ipairs({ "false", "nil", "zero", "string", "throw" }) do
+		helpers.it("save refuses the filesystem " .. receipt .. " receipt before reveal (report-save-receipt)", function()
+			local result, calls, writes = default_save(function()
+				if receipt == "false" then return false end
+				if receipt == "nil" then return nil end
+				if receipt == "zero" then return 0 end
+				if receipt == "string" then return "true" end
+				error("simulated adapter exception")
+			end)
+			helpers.assert_eq(#writes, 1)
+			helpers.assert_eq(result.ok, false)
+			helpers.assert_nil(result.path)
+			helpers.assert_eq(#calls.reveal, 0)
+		end)
+	end
+
+	helpers.it("save refuses directory creation before acquiring a write (report-save-receipt)", function()
+		local result, calls, writes = default_save(function() return true end, false)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#writes, 0)
+		helpers.assert_eq(#calls.reveal, 0)
+	end)
+
+	helpers.it("save keeps a completed file successful when revealing its folder fails (report-save-receipt)", function()
+		local result, _, writes = default_save(function() return true end, true, false)
+		helpers.assert_eq(result.ok, true)
+		helpers.assert_eq(result.path, LOGS_DIR .. "/diagnostics/" .. NAME)
+		helpers.assert_eq(#writes, 1)
+	end)
+end)
+
+
+helpers.describe("closed diagnostic sharing corpus", function()
+	helpers.it("excludes synthetic private fields on all driver snapshots", function()
+		local corpus = shared_json("tests/corpus/healthcheck/share_vectors.json")
+		local config = documents()
+		for _, vector in ipairs(corpus.vectors) do
+			local document = Share.document(vector.snapshot, config.schema,
+				require("infra.i18n").get(config.schema.share_policy.notice_key))
+			for _, canary in ipairs(vector.canaries) do
+				helpers.assert_true(not document.text:find(canary, 1, true), vector.name)
+			end
+			local readable = document.text:match("^(.-)```json")
+			for _, id in ipairs({ "versions", "hardware", "system", "input", "ai", "permissions", "issues" }) do
+				assert(readable:find("## " .. config.schema.export_strings["healthcheck.section." .. id], 1, true), "readable section omitted")
+			end
+			assert(readable:find("| probes.appleevent_transport.native_status | -1744 |", 1, true))
+			assert(readable:find("| probes.appleevent_transport.cleanup | pending |", 1, true))
+			assert(readable:find("| retired_probes.1.probes.appleevent_transport.cleanup | unknown |", 1, true))
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.state, "timeout")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.cleanup, "pending")
+			helpers.assert_eq(document.snapshot.probes.appleevent_transport.native_status, -1744)
+		end
+	end)
+end)
+
+helpers.describe("English attachment export boundaries", function()
+	helpers.it("does not consult localized labels or copy free private fields", function()
+		local config = documents()
+		local doc = Share.document(host_snapshot(false), config.schema, "LOCALIZED-EXPORT-CANARY")
+		helpers.assert_true(not doc.text:find("LOCALIZED-EXPORT-CANARY", 1, true))
+		helpers.assert_contains(doc.text, config.schema.export_strings[config.schema.share_policy.notice_key])
+		helpers.assert_true(not doc.text:find(HOME, 1, true))
+	end)
+	helpers.it("retains clipboard and refuses browser when attachment save fails", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.save = function() return nil, "inert write refusal" end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.copy, 1)
+		helpers.assert_eq(#calls.reveal, 0)
+		helpers.assert_eq(#calls.open_url, 0)
+	end)
+	helpers.it("browser refusal never claims successful report after saving attachment", function()
+		local result, calls = perform({ action = "report", text = REPORT, fields = {} },
+			function(overrides) overrides.open_url = function(_, done) done({ ok = false, code = 23 }) end end)
+		helpers.assert_eq(result.ok, false)
+		helpers.assert_eq(#calls.save, 1)
+		helpers.assert_eq(calls.save[1].text, calls.copy[1])
+	end)
+end)
+
+helpers.describe("stable-metadata report URL", function()
+	helpers.it("stable-metadata report URL keeps complete output local and rejects page-derived query fields", function()
+		local result, calls = perform({ action = "report", text = REPORT,
+			fields = { diagnostics = "private query text", title = "PRIVATE_TITLE", description = "PRIVATE_DESCRIPTION", reproduction = "PRIVATE_REPRODUCTION", version = "9.9.9", os = "private host", driver = "foreign" } })
+		helpers.assert_eq(result.ok, true)
+		local repo = documents().repository
+		helpers.assert_eq(calls.open_url[1], "https://github.com/" .. repo.owner .. "/" .. repo.repo .. "/issues/new?template=bug_report.yml&version=2.4.0&os=linux&driver=linux")
+		for _, id in ipairs({ "title", "description", "reproduction", "diagnostics", "architecture" }) do helpers.assert_nil(query_value(calls.open_url[1], id)) end
+		helpers.assert_eq(calls.save[1].text, calls.copy[1])
+		helpers.assert_eq(calls.copy[1], approved_text(false))
+		helpers.assert_eq(calls.order, { "copy", "save", "reveal", "open_url" })
+	end)
+end)
+
+helpers.describe("retained installed-page observations", function()
+	helpers.it("keeps useful page outcomes without qualifying suites and refuses stale identity", function()
+		local config = documents()
+		local rows = {}
+		for _, spec in ipairs(config.schema.diagnostic_checks.items) do
+			rows[spec.id] = spec.reason and { state = "not_run", scope = spec.scope, reason = spec.reason }
+				or { state = "ok", scope = spec.scope, ms = 3 }
+		end
+		local observed = assert(Share.page_checks(rows, config.schema))
+		local snapshot = host_snapshot(false)
+		snapshot.export_revision = 1
+		local action = { page_check_observations = observed, generated_at = snapshot.generated_at, snapshot_revision = 2 }
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), false)
+		helpers.assert_eq(snapshot.page_check_observations, nil)
+		action.snapshot_revision = 1
+		helpers.assert_eq(Share.capture_page_checks(snapshot, action), true)
+		local doc = Share.document(snapshot, config.schema, "PRIVATE_LOCALE")
+		helpers.assert_contains(doc.text, "installed_page_reported (unqualified)")
+		helpers.assert_contains(doc.text, "page_check_observations.results.redaction.ms")
+		helpers.assert_eq(doc.snapshot.page_check_observations.results.driver_suites.state, "not_run")
+		rows.redaction.text = "PRIVATE_TEXT"
+		helpers.assert_eq(Share.page_checks(rows, config.schema), nil)
+	end)
+end)
+
+helpers.describe("closed recent error facts", function()
+	helpers.it("keeps observed technical failure codes and excludes every private message", function()
+		local config = documents()
+		local corpus = shared_json("tests/corpus/healthcheck/recent_error_fact_vectors.json")
+		for _, vector in ipairs(corpus.vectors) do
+			local original = Json.encode(vector.snapshot)
+			local doc = Share.document(vector.snapshot, config.schema, "PRIVATE_LOCALE")
+			helpers.assert_eq(doc.snapshot.sections.issues.recent_error_facts, vector.expected)
+			for _, canary in ipairs(corpus.canaries) do
+				helpers.assert_true(not doc.text:find(canary, 1, true), canary)
+			end
+			helpers.assert_contains(doc.text, "lease_watchdog_exit")
+			helpers.assert_contains(doc.text, "log_observation_only")
+			for _, action in ipairs({ "copy", "save", "report" }) do
+				local Report = helpers.load_module("ui.healthcheck.report")
+				local calls = {}
+				local overrides = recording(calls)
+				ordered(calls, overrides)
+				local outcome = completed(Report, { action = action, text = doc.text, name = doc.name, fields = {} },
+					{ logs_dir = LOGS_DIR, diagnostics_dir = LOGS_DIR .. "/diagnostics" }, config,
+					Report.redaction_context(overrides), overrides, vector.snapshot)
+				helpers.assert_eq(outcome.ok, true, "the real report sink receives the retained fact snapshot")
+				if action ~= "save" then helpers.assert_eq(calls.copy[1], doc.text) end
+				if action ~= "copy" then helpers.assert_eq(calls.save[1].text, doc.text) end
+				for _, canary in ipairs(corpus.canaries) do
+					-- The fixed public GitHub scheme is intentional; private identities remain forbidden.
+					if canary ~= "https://" then
+						for _, url in ipairs(calls.open_url) do helpers.assert_true(not url:find(canary, 1, true), canary) end
+					end
+				end
+			end
+			helpers.assert_eq(Json.encode(vector.snapshot), original)
+		end
+	end)
+end)
+
+
+--- Real private launcher children; the only substituted boundary maps the
+--- production argv executable to an owned file, never to a desktop handler.
+local function with_native_opener(script, controls, body)
+	local uv = require("luv")
+	local old_shell = package.loaded["adapters.shell_runner"]
+	local timer = require("infra.native_timer")
+	local timer_port = {}
+	for key, value in pairs(timer) do timer_port[key] = value end
+	function timer_port.start(loop, handle, ms, interval, callback)
+		helpers.assert_eq(ms, require("infra.timings").ms("ui", "desktop_open_timeout_ms"))
+		return timer.start(loop, handle, controls.timeout and 1 or ms, interval, callback)
+	end
+	local shell = helpers.load_module_with_dependency("adapters.shell_runner", "infra.native_timer", timer_port)
+	local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/diagnostic_opener_XXXXXX"))
+	local executable, target = root .. "/private-opener", root .. "/report.md"
+	local function write(path, text)
+		local file = assert(io.open(path, "wb")); assert(file:write(text)); assert(file:close())
+	end
+	write(executable, "#!/bin/sh\n" .. script); assert(uv.fs_chmod(executable, 448)); write(target, "synthetic report\n")
+	local state = { outcomes = {}, requests = 0, current = true, root = root, target = target }
+	local port = {}
+	for key, value in pairs(shell) do port[key] = value end
+	function port.run_async(program, args, options, done)
+		helpers.assert_eq(program, "xdg-open"); helpers.assert_eq(args, { target })
+		state.requests = state.requests + 1
+		if controls.refuse then return nil, "controlled opener admission refused" end
+		return shell.run_async(executable, args, options, done)
+	end
+	package.loaded["adapters.shell_runner"] = port
+	local Report = helpers.load_module("ui.healthcheck.report")
+	function state.start()
+		state.operation = Report.perform({ action = "open_path", id = "log_today" }, { log_today = target }, {}, {}, nil, nil, {
+			current = function() return state.current end,
+			complete = function(result) state.outcomes[#state.outcomes + 1] = result end,
+		})
+	end
+	function state.drain(until_result)
+		local deadline = uv.hrtime() + (until_result and 2000000000 or 50000000)
+		repeat uv.run("nowait"); uv.sleep(1) until (until_result and #state.outcomes > 0) or uv.hrtime() >= deadline
+	end
+	function state.release() write(target .. ".release", "release\n") end
+	local ok, detail = xpcall(function() body(state) end, debug.traceback)
+	if state.operation then state.operation.cancel() end
+	state.drain(false)
+	package.loaded["adapters.shell_runner"] = old_shell
+	for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
+	assert(uv.fs_rmdir(root))
+	if not ok then error(detail, 0) end
+end
+
+helpers.describe("diagnostic opener actual child completion", function()
+	for _, status in ipairs({ 0, 23 }) do
+		helpers.it("(diagnostic-opener-native) receives private child exit " .. status, function()
+			with_native_opener("exit " .. status .. "\n", {}, function(s)
+				s.start(); helpers.assert_eq(#s.outcomes, 0, "admission cannot acknowledge completion")
+				s.drain(true); helpers.assert_eq(#s.outcomes, 1)
+				helpers.assert_eq(s.outcomes[1].ok, status == 0); helpers.assert_eq(s.outcomes[1].exit_code, status)
+			end)
+		end)
+	end
+	local held = 'while [ ! -f "$1.release" ]; do /bin/sleep 0.01; done\nexit 23\n'
+	helpers.it("(diagnostic-opener-native) keeps the loop live while awaiting the owned child", function()
+		with_native_opener(held, {}, function(s)
+			s.start(); s.drain(false); helpers.assert_eq(#s.outcomes, 0)
+			local heartbeat = false; local uv = require("luv"); local tick = assert(uv.new_timer())
+			assert(uv.timer_start(tick, 1, 0, function() heartbeat = true; uv.close(tick) end))
+			s.drain(false); helpers.assert_true(heartbeat, "other native work runs while the launcher waits")
+			s.release(); s.drain(true); helpers.assert_eq(s.outcomes[1].ok, false); helpers.assert_eq(s.outcomes[1].exit_code, 23)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) receives the controlled native deadline without a blocking fallback", function()
+		with_native_opener(held, { timeout = true }, function(s)
+			s.start(); s.drain(true); helpers.assert_eq(#s.outcomes, 1); helpers.assert_eq(s.outcomes[1].ok, false)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) cancellation retires the child without a completion", function()
+		with_native_opener(held, {}, function(s)
+			s.start(); s.operation.cancel(); s.drain(false); helpers.assert_eq(#s.outcomes, 0)
+		end)
+	end)
+	helpers.it("(diagnostic-opener-native) refuses unavailable spawn without inventing a child result", function()
+		with_native_opener("exit 0\n", { refuse = true }, function(s)
+			s.start(); helpers.assert_eq(#s.outcomes, 1); helpers.assert_eq(s.outcomes[1].ok, false)
+			helpers.assert_nil(s.outcomes[1].exit_code); helpers.assert_eq(s.requests, 1)
+		end)
+	end)
+end)
+
+helpers.describe("feature opener cancellation ownership", function()
+	helpers.it("(feature-opener-cancel) a nested request survives cancellation of its predecessor", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local old_bridge, old_manager = package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"]
+		package.loaded["ui.healthcheck.bridge"] = { config = documents, build_snapshot = function() return host_snapshot(false) end }
+		package.loaded["ui.webview_manager"] = { get_daemon_state = function() return {} end }
+		local calls, outcomes, cancellations, reenter = {}, {}, 0, true
+		local effects = recording({})
+		effects.open_url = function(_, done)
+			calls[#calls + 1] = done
+			return { cancel = function()
+				cancellations = cancellations + 1
+				if reenter then reenter = false; Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end) end
+			end }
+		end
+		local ok, detail = xpcall(function()
+			Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end)
+			Report.suggest_feature(effects, function(value) outcomes[#outcomes + 1] = value end)
+			helpers.assert_eq(#calls, 2); helpers.assert_eq(cancellations, 1)
+			calls[1]({ ok = true, code = 0 }); helpers.assert_eq(#outcomes, 0)
+			calls[2]({ ok = false, code = 23, error = "private opener refused" })
+			helpers.assert_eq(outcomes, { false })
+		end, debug.traceback)
+		package.loaded["ui.healthcheck.bridge"], package.loaded["ui.webview_manager"] = old_bridge, old_manager
+		if not ok then error(detail, 0) end
+	end)
+end)
+
+helpers.describe("diagnostic opener late port failure", function()
+	helpers.it("(diagnostic-opener-late) logs an exception after inline completion without a second outcome", function()
+		local Report = helpers.load_module("ui.healthcheck.report")
+		local Logger = require("logger.shim")
+		local held, errors, results = Logger.error, {}, {}
+		Logger.error = function(_, format, ...) errors[#errors + 1] = string.format(format, ...) end
+		local ok, detail = xpcall(function()
+			Report.perform({ action = "open_path", id = "log_today" }, { log_today = "/controlled/log" }, {}, {}, {
+				exists = function() return true end,
+				open = function(_, done) done({ ok = true, code = 0 }); error("independent late opener failure") end,
+			}, nil, { current = function() return true end, complete = function(value) results[#results + 1] = value end })
+		end, debug.traceback)
+		Logger.error = held
+		if not ok then error(detail, 0) end
+		helpers.assert_eq(#results, 1); helpers.assert_eq(results[1].ok, true)
+		helpers.assert_eq(#errors, 1)
+		helpers.assert_true(errors[1]:find("independent late opener failure", 1, true) ~= nil)
+	end)
+end)

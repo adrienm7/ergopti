@@ -15,7 +15,7 @@
 --- recogniser nothing fed, a stub whose `hs.keycodes` lacked the one function the
 --- module called.
 ---
---- `tests/unit/meta/test_fakes_match_adapters.lua` is what makes these
+--- `tests/meta/harness/test_fakes_match_adapters.lua` is what makes these
 --- trustworthy: it asserts every function the REAL adapter exports exists on the
 --- fake. A fake that falls behind fails the suite instead of quietly testing a
 --- contract nobody has.

@@ -552,7 +552,7 @@ const RULES = [
 				'static/ergopti_plus/linux/modules/llm/api_ollama.lua',
 				'static/ergopti_plus/linux/modules/llm/local_model_probe.lua',
 				'static/ergopti_plus/linux/modules/llm/local_model_offer.lua',
-				'static/ergopti_plus/linux/tests/unit/meta/test_http_client_curl.lua',
+				'static/ergopti_plus/linux/tests/unit/adapters/network/test_http_client_curl.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_http_stream_receipts.lua',
 				'static/ergopti_plus/linux/tests/hardware/run_local_api_auth.lua',
 				'static/ergopti_plus/linux/modules/llm/api_remote.lua',

@@ -114,7 +114,7 @@ const CONSUMERS = [
 		path: 'tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
-		file: 'linux/tests/unit/modules/shortcuts/test_wrap_pair_parameter_vectors.lua',
+		file: 'linux/tests/unit/modules/shortcuts/text_actions/test_wrap_pair_parameter_vectors.lua',
 		path: '_shared/tests/corpus/action_parameters/wrap_pair_vectors.json'
 	},
 	{
@@ -129,7 +129,9 @@ for (const consumer of CONSUMERS) {
 }
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
-	linuxManifest.includes('"tests.unit.modules.shortcuts.test_wrap_pair_parameter_vectors"'),
+	linuxManifest.includes(
+		'"tests.unit.modules.shortcuts.text_actions.test_wrap_pair_parameter_vectors"'
+	),
 	'the Linux test manifest must list test_wrap_pair_parameter_vectors'
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');

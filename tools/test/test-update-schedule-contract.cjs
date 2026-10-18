@@ -59,10 +59,10 @@ const PORTS = [
 	},
 	{
 		port: '_shared/lua/updater/schedule.lua',
-		test: 'linux/tests/unit/meta/test_update_schedule_vectors.lua',
+		test: 'linux/tests/unit/modules/updater/vectors/test_update_schedule_vectors.lua',
 		wiring: {
 			file: 'linux/tests/test_manifest.lua',
-			needle: '"tests.unit.meta.test_update_schedule_vectors"'
+			needle: '"tests.unit.modules.updater.vectors.test_update_schedule_vectors"'
 		}
 	},
 	{

@@ -328,7 +328,7 @@ Bâtir le menu Linux **sur la fondation partagée** (§3.8), pas en Linux-only.
       contexte était mal orthographiée. Cette ligne est déclarée, gérée,
       invisible, et tout reste vert. C est arrivé deux fois (les onze lignes de
       gestes, la catégorie dynamique grisée).
-      → `linux/tests/unit/meta/test_menu_matches_manifest.lua` construit le plateau
+      → `linux/tests/unit/ui/menu/structure/test_menu_matches_manifest.lua` construit le plateau
       entier avec le builder du démon et vérifie chaque `action`, `group` et
       `section_header` que le manifeste promet à `linux`. Il tourne dans la suite
       du pilote, donc sur un vrai Linux en CI et sur le LuaJIT de chaque distro.
