@@ -94,17 +94,26 @@ end
 --- @param dialogs table
 --- @param entry table
 --- @param name string The entry's automatic name.
-local function run_test(remote, dialogs, entry, name)
+--- @param admit function|nil Exact source-bound runtime admission.
+local function run_test(remote, dialogs, entry, name, admit)
+	local function allowed()
+		if admit == nil then return true end
+		local ok, value = pcall(admit)
+		return ok and value == true
+	end
+	if not allowed() then return false end
 	local dispatched = remote.test(entry, function(ok, detail, elapsed_ms)
+		if not allowed() then return end
 		Logger.info(LOG, "API test of '%s': %s.", name, ok and "answered" or "failed")
+		if not allowed() then return end
 		report_test(dialogs, name, ok, detail, elapsed_ms)
-	end)
+	end, admit)
 	if not dispatched then Logger.warn(LOG, "API test of '%s' could not be sent.", name) end
 	return dispatched
 end
 
 --- Asks for a provider's key (and URL and model where needed), stores the
---- entry, selects the API backend and tests it.
+--- entry under the already-selected API backend and tests it.
 --- @param llm table Prediction engine.
 --- @param remote table api_remote
 --- @param entries table api_entries
@@ -138,28 +147,61 @@ local function add_entry(llm, remote, entries, dialogs, provider, on_changed)
 	if model == "" then return end
 
 	local chat = remote.serves(provider.id, "chat")
+	local ticket, current, finish
+	if chat then
+		local begin = llm.begin_api_selection
+		current, finish = llm.api_selection_is_current, llm.finish_api_selection
+		if type(begin) ~= "function" or type(current) ~= "function" or type(finish) ~= "function" then
+			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			return false
+		end
+		local captured, receipt = pcall(begin)
+		if not captured or type(receipt) ~= "table" then
+			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			return false
+		end
+		ticket = receipt
+	end
+	local function admitted()
+		local ok, value = pcall(current, ticket)
+		return ok and value == true
+	end
 	-- The label is required by the builds before 2026-10 that read this file;
 	-- it holds the automatic name and no tray reads it.
-	local entry, err = entries.add({
+	local called, entry, _, settled, source = pcall(entries.add, {
 		provider = provider.id,
 		token = token,
 		label = provider.id .. "/" .. model,
 		model = model ~= provider.default_model and model or "",
 		base_url = base_url,
-	}, chat)
-	if not entry then
-		dialogs.error(tostring(err), heading)
-		return
-	end
+	}, chat, chat and admitted or nil)
 	if chat then
-		llm.set_backend("api")
-	else
+		local retired, ack = pcall(finish, ticket, called and type(entry) == "table", called and settled == true)
+		if not retired or ack ~= true then
+			dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+			return false
+		end
+	end
+	if not called or not entry then
+		dialogs.error(tr("dialog.bulk_toggle.save_failed"), heading)
+		return false
+	end
+	local function published_current()
+		if not admitted() then return false end
+		local checked, fresh = pcall(current, ticket, function()
+			return entries.source_is_current(source) == true and entries.active() == entry
+		end)
+		return checked and fresh == true
+	end
+	if chat and not published_current() then return false end
+	if not chat then
 		-- Only the agent's System 1 reads this key: predictions keep their entry.
 		Logger.info(LOG, "API entry '%s' serves the agent's System 1 only; predictions keep their entry.",
 			entry.id)
 	end
 	if type(on_changed) == "function" then on_changed() end
-	run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id])
+	if chat and not published_current() then return false end
+	return run_test(remote, dialogs, entry, entry_names(remote, entries.list())[entry.id], chat and published_current or nil)
 end
 
 --- The name of the model that answers predictions: the active API entry's
@@ -282,7 +324,7 @@ function M.rows(llm, dialogs, on_changed, ollama_rows, context)
 	for _, provider in ipairs(remote.providers()) do
 		add_items[#add_items + 1] = {
 			label = "➕ " .. provider.label,
-			action = function() add_entry(llm, remote, entries, dialogs, provider, on_changed) end,
+			action = function() return add_entry(llm, remote, entries, dialogs, provider, on_changed) end,
 		}
 	end
 	if #add_items == 0 then
