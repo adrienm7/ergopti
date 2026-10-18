@@ -337,6 +337,7 @@ class PublishedArchiveTests(unittest.TestCase):
             root = Path(folder)
             for relative in (
                 "tools/build/macos-release-archives.cjs",
+                "tools/lib/owned-descriptor-read.cjs",
                 "tools/lib/paths.cjs",
                 "static/ergopti_plus/_shared/modules/updater/defaults.json",
             ):
