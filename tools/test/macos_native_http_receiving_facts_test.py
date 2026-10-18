@@ -94,8 +94,56 @@ NATIVE_FAILURE_STAGE_MARKERS = (
 )
 
 
+# Closed inverse for the reviewed bare CFNetwork proxy-connection failover repair.
+# It composes before every other projection, so each historical whole-source pin
+# still covers every byte outside these three exact spans.
+PROXY_CONNECTION_FAILURE_INVERSE = (
+    (
+        "/// macOS 15 reports a proxy whose TCP connect is refused as the bare CFNetwork\n"
+        "/// kCFErrorHTTPSProxyConnectionFailure (310), or kCFErrorHTTPProxyConnectionFailure\n"
+        "/// (306) for plain HTTP, with no NSURLErrorDomain wrapper and no POSIX cause.\n"
+        "/// Both fail before any proxy reply: a CONNECT that the proxy answers with an\n"
+        "/// error is the separate code 311\n"
+        "/// (kCFStreamErrorHTTPSProxyFailureUnexpectedResponseToCONNECTMethod).\n"
+        "func managedHTTPProxyConnectionFailed(_ error: NSError) -> Bool {\n"
+        "\treturn error.domain == kCFErrorDomainCFNetwork as String\n"
+        "\t\t&& [CFNetworkErrors.cfErrorHTTPSProxyConnectionFailure, .cfErrorHTTPProxyConnectionFailure]\n"
+        "\t\t\t.contains { error.code == Int($0.rawValue) }\n"
+        "}\n\n",
+        "",
+    ),
+    (
+        '\tif managedHTTPProxyConnectionFailed(error) { return "connect" }\n',
+        "",
+    ),
+    (
+        "\t\t\t\t// The bare proxy connection failure names the proxy route itself, so\n"
+        "\t\t\t\t// it does not depend on metrics for a connection that never opened.\n"
+        "\t\t\t\tif managedHTTPProxyConnectionFailed(native) {\n"
+        "\t\t\t\t\trefusedTCPConnect = true; proxyObserved = true; break\n"
+        "\t\t\t\t}\n",
+        "",
+    ),
+)
+
+
+def proxy_connection_failure_projection(source):
+    """Invert the complete reviewed repair, or keep a source that has none of it."""
+    marker = "managedHTTPProxyConnectionFailed"
+    if marker not in source:
+        return source
+    if source.count(marker) != 3 or any(
+        source.count(new) != 1 for new, _ in PROXY_CONNECTION_FAILURE_INVERSE
+    ):
+        raise ValueError("Proxy connection failover enrollment refused")
+    for new, old in PROXY_CONNECTION_FAILURE_INVERSE:
+        source = source.replace(new, old, 1)
+    return source
+
+
 def native_failure_stage_projection(source):
     """Invert one complete closed overlay, preserving unrelated source bytes."""
+    source = proxy_connection_failure_projection(source)
     if not any(marker in source for marker in NATIVE_FAILURE_STAGE_MARKERS):
         return source
     if any(
