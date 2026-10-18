@@ -28,7 +28,7 @@ local function make_webview_overrides(state)
 				for _, method in ipairs({
 					"windowTitle", "windowStyle", "level", "allowTextEntry",
 					"allowGestures", "allowNewWindows", "shadow",
-					"navigationCallback", "html", "show",
+					"navigationCallback", "html", "show", "deleteOnClose",
 				}) do webview[method] = function(self) return self end end
 				webview.windowCallback = function(self, callback)
 					state.window_callback = callback

@@ -41,6 +41,7 @@ local function make_webview_overrides()
 					allowGestures      = function(self) return self end,
 					shadow             = function(self) return self end,
 					allowNewWindows    = function(self) return self end,
+					deleteOnClose      = function(self) return self end,
 					html               = function(self) return self end,
 					show               = function(self) return self end,
 				}

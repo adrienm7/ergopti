@@ -837,6 +837,7 @@ function M.show()
 		frame       = frame,
 		title       = i18n.get("metrics_apps.title"),
 		style_masks = 15,
+		delete_on_close = true,
 		assets_dir = assets_dir,
 		on_close   = function()
 			if generation ~= _generation then return end
