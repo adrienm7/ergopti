@@ -308,6 +308,11 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
+			name = "metrics SQLite flush",
+			wait_for_ack = true,
+			stop = function() return keylogger.stop() == true end,
+		},
+		{
 			name = "privacy context capture",
 			wait_for_ack = true,
 			stop = function()
@@ -611,10 +616,8 @@ local function install_signal_handlers()
 	local function on_term(sig)
 		Logger.info(LOG, "Signal %d received — shutting down…", sig)
 		shutdown.request("signal " .. tostring(sig))
-		-- Keep the signal path self-contained after quiescence. The ordinary clean
-		-- exit repeats both operations idempotently, but an unexpected loop backend
-		-- failure must not leave the last metrics batch or the uinput FD behind.
-		keylogger.flush()
+		-- The coordinator owns the final SQLite flush and its native ACK.
+		-- Signal callbacks never dispatch an independent persistence attempt.
 		-- The coordinator stopped and ungrabbed the hook first. Closing this channel
 		-- before that point can strand held keys because the hook restores them
 		-- through the same uinput device.
@@ -2547,6 +2550,7 @@ local function main()
 				end)
 			end
 			privacy_owners.watch.pump()
+			RuntimeGuard.call("metrics SQLite flush acknowledgement", keylogger.pump_flush)
 			-- Consume owned results promptly; fresh dispatch/retry stays periodic.
 			if secure_focus_guard.has_context_operation() then secure_focus_guard.refresh(false) end
 			if not RuntimeGuard.call("keyboard pump", keyboard_hook.pump, stop_input_loop) then return end
@@ -2584,7 +2588,7 @@ local function main()
 	local stats = keylogger.get_session_stats()
 	Logger.info(LOG, "Session ended: %d keystroke(s), ~%d word(s), %ds.",
 		stats.keystrokes, stats.words, math.floor(stats.duration_ms / 1000))
-	keylogger.flush()
+	-- Metrics persistence was acknowledged by the shutdown coordinator.
 	-- The last chance to emit the withheld counts of every open streak.
 	Logger.flush_repeats(true)
 	Logger.info(LOG, "Daemon exiting.")

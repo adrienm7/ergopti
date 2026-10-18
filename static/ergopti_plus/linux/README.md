@@ -107,6 +107,12 @@ luajit tests/run.lua
 
 Requires LuaJIT 2.x. Plain Lua 5.4 works for the meta tests (no luv dependency).
 
+The installed driver requires `lua-luv` for owned asynchronous SQLite flushes.
+A manually started minimal daemon without it retains collected metrics in RAM;
+`flush()` returns false, merged views remain readable, and shutdown acknowledges
+only that no native write is acquired. It warns once and never claims those
+metrics were saved. Install the required package to restore durable flushes.
+
 ## Installation
 
 For Ubuntu, Zorin OS and Debian desktops, open the downloaded `.deb` in the

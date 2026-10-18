@@ -78,6 +78,7 @@ local function flush_expansion(is_private)
 	-- method added to the writer does not surface here as a nil call inside the
 	-- code under test.
 	setmetatable(fake_writer, { __index = Fakes.sqlite_writer() })
+	require("tests.support.sqlite_flush_fake").attach(fake_writer)
 
 	local writer_name = "modules.keylogger.sqlite_writer"
 	local logger_name = "modules.keylogger.keylogger"
@@ -201,6 +202,7 @@ helpers.describe("private mapping: the synthetic character record", function()
 			upsert_scancodes = function() return true end,
 		}
 		setmetatable(package.loaded[writer_name], { __index = Fakes.sqlite_writer() })
+		require("tests.support.sqlite_flush_fake").attach(package.loaded[writer_name])
 		package.loaded[logger_name] = nil
 
 		local ok, err = pcall(function()

@@ -24,6 +24,7 @@ local M = {}
 M.bridge_name = "metrics_typing_bridge"
 
 local AppsBridge = require("ui.metrics_apps.bridge")
+local Flush = require("ui.metrics_flush_bridge")
 local Logger = require("logger.shim")
 local LOG = "bridge.metrics_typing"
 
@@ -36,6 +37,7 @@ local REFRESH_DELAY_MS = 250
 -- The last complete "ready" payload, and the generation of the latest refresh
 -- (a newer request supersedes an older pending one).
 local _cached_ready = nil
+local _cached_keylogger, _cached_generation = nil, nil
 local _refresh_generation = 0
 
 --- Builds the dashboard payload from the daemon state.
@@ -65,45 +67,33 @@ end
 --- Default page channel: the host response hook the page installs.
 --- @param payload table
 --- @return boolean pushed
-local function default_push(payload)
-	local ok_manager, Manager = pcall(require, "ui.webview_manager")
-	if not ok_manager or type(Manager.eval_js) ~= "function" then
-		Logger.error(LOG, "Cannot push the dashboard refresh: webview_manager.eval_js is unavailable.")
-		return false
-	end
-	local Json = require("json")
-	local Base64 = require("compat.base64")
-	return Manager.eval_js(APP_NAME, string.format(
-		"if(window.__hostBridgeResponse)window.__hostBridgeResponse('%s',true,'%s')",
-		M.bridge_name, Base64.encode(Json.encode(payload)))) == true
+local function default_push(payload, state, context)
+	return Flush.push(APP_NAME, M.bridge_name, payload, state, context)
 end
 
 -- Injectable seams for tests; production uses the event loop and WebKit.
 M._defer = default_defer
 M._push = default_push
+local Requests = Flush.new(APP_NAME, function(...) return M._push(...) end,
+	function(reply, cache, keylogger, generation)
+		if cache then
+			_cached_ready, _cached_keylogger, _cached_generation = reply, keylogger, generation
+		end
+	end)
 
 --- Schedules a fresh "ready" payload after the cached answer has painted.
 --- @param state table
-local function schedule_refresh(state)
+local function schedule_refresh(state, context, request)
 	_refresh_generation = _refresh_generation + 1
 	local generation = _refresh_generation
 	local queued = M._defer(function()
-		if generation ~= _refresh_generation then
+		if generation ~= _refresh_generation or not request.valid() then
 			Logger.debug(LOG, "Discarded a superseded dashboard refresh (generation %d).", generation)
 			return
 		end
-		Logger.start(LOG, "Refreshing the typing dashboard after its cached first paint…")
-		local fresh = build_payload(state, true)
-		if fresh == nil then
-			Logger.error(LOG, "The dashboard refresh produced no payload — the page keeps the cached one.")
-			return
-		end
-		_cached_ready = fresh
-		if M._push(fresh) then
-			Logger.success(LOG, "Typing dashboard refreshed.")
-		else
-			Logger.success(LOG, "Typing dashboard refresh computed and kept; no open window received it.")
-		end
+		Requests.run(state, context, function()
+			return build_payload(state, true), true
+		end, false, true)
 	end, REFRESH_DELAY_MS)
 	if not queued then
 		Logger.error(LOG, "The dashboard refresh could not be scheduled — the page shows the cached payload.")
@@ -114,17 +104,17 @@ end
 --- @param payload any Request payload from the WebKit bridge.
 --- @param state table Daemon state.
 --- @return table|nil Shared metrics prefetch payload.
-function M.on_message(payload, state)
+local function handle(payload, state, context, request)
 	local action = type(payload) == "table" and payload.action or payload
 	if action == "ready" then
-		if _cached_ready ~= nil then
+		if _cached_ready ~= nil and _cached_keylogger == state.keylogger
+			and _cached_generation == request.generation then
 			Logger.debug(LOG, "Typing metrics UI ready — answering from the cached payload.")
-			schedule_refresh(state)
+			schedule_refresh(state, context, request)
 			return _cached_ready
 		end
 		Logger.debug(LOG, "Typing metrics UI ready — first payload of this session.")
-		_cached_ready = build_payload(state, true)
-		return _cached_ready
+		return build_payload(state, true), true
 	end
 	if action == "refresh" then
 		Logger.debug(LOG, "Typing metrics UI requested refresh.")
@@ -138,26 +128,30 @@ function M.on_message(payload, state)
 	-- The answer is the rebuilt payload itself: the page applies every reply as
 	-- dashboard data, and a bare { cleared = true } emptied the dashboard.
 	if action == "clear_cache" then
-		_cached_ready = nil
+		_refresh_generation = _refresh_generation + 1
 		local cleared = false
 		if state.keylogger and type(state.keylogger.clear_cache) == "function" then
-			state.keylogger.clear_cache()
-			cleared = true
-			Logger.info(LOG, "Dashboard caches cleared by user reset.")
+			local ok, result = pcall(state.keylogger.clear_cache)
+			cleared = ok and result == true
+			if cleared then Logger.info(LOG, "Dashboard caches cleared by user reset.") end
 		else
 			Logger.error(LOG, "Reset requested but the keylogger exposes no clear_cache — nothing was cleared.")
 		end
+		if not request.valid() then return nil end
 		local fresh = build_payload(state, true)
-		if cleared then _cached_ready = fresh end
+		if not fresh then return nil end
 		fresh.cleared = cleared
-		return fresh
+		return fresh, cleared
 	end
 
 	if action == "range" and type(payload) == "table" then
 		if state.keylogger and type(state.keylogger.get_range_payload) == "function" then
 			local range = state.keylogger.get_range_payload(payload.start_date, payload.end_date, payload.apps)
+			if not range or not request.valid() then return nil end
+			local dashboard = build_payload(state, false)
+			if not dashboard then return nil end
 			return {
-				metrics_manifest = state.keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest,
+				metrics_manifest = dashboard.metrics_manifest,
 				app_icons = {},
 				_prefetch_data = range,
 				range_request_id = payload.request_id,
@@ -168,9 +162,36 @@ function M.on_message(payload, state)
 	return nil
 end
 
+--- Defers requests until the database/RAM view and native page are both current.
+--- @param payload any
+--- @param state table
+--- @param context table|nil
+--- @return table|nil
+function M.on_message(payload, state, context)
+	if type(payload) == "table" then
+		local apps = payload.apps
+		if type(apps) == "table" then
+			apps = {}
+			for key, value in pairs(payload.apps) do apps[key] = value end
+		end
+		payload = { action = payload.action, start_date = payload.start_date, end_date = payload.end_date,
+			request_id = payload.request_id, apps = apps }
+	end
+	local action = type(payload) == "table" and payload.action or payload
+	if action ~= "ready" and action ~= "refresh" and action ~= "clear_cache" and action ~= "range" then return nil end
+	return Requests.run(state, context, function(request)
+		return handle(payload, state, request.context, request)
+	end, action == "clear_cache")
+end
+
+--- Revokes requests belonging to the retired native page.
+--- @param epoch number
+function M.on_window_closed(epoch) Requests.close(epoch) end
+
 --- Test seam: forgets the cached payload and restores the default channels.
 function M._reset()
-	_cached_ready = nil
+	Requests.reset()
+	_cached_ready, _cached_keylogger, _cached_generation = nil, nil, nil
 	_refresh_generation = 0
 	M._defer = default_defer
 	M._push = default_push
