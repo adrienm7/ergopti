@@ -12,8 +12,10 @@ local M = {}
 
 --- Starts the real classified-destination tracker over native boundary doubles.
 --- @param world table Translation fixture.
+--- @param application table|nil Native application metadata; defaults to the translation fixture app.
 --- @return table tracker Native-boundary observations and controls.
-function M.attach(world)
+function M.attach(world, application)
+	application = application or { name = "TranslateApp", bundleID = "test.translate", path = "/Applications/Translate.app" }
 	local native = { reads = 0, callbacks = {}, windows = {} }
 	local function watcher(callback)
 		local item = { running = false }
@@ -34,7 +36,12 @@ function M.attach(world)
 		if native.windows[world.focus] then return native.windows[world.focus] end
 		local pid, id = world.focus:match("^(%d+):(%d+)$")
 		assert(pid and id, "native fixture requires a pid:window identity")
-		local app = { pid = function() return tonumber(pid) end, name = function() return "TranslateApp" end }
+		local app = {
+			pid = function() return tonumber(pid) end,
+			name = function() return application.name end,
+			bundleID = function() return application.bundleID end,
+			path = function() return application.path end,
+		}
 		function app:newWatcher(callback) return watcher(callback) end
 		local element = {}
 		function element:attributeValue(attribute)
@@ -77,7 +84,7 @@ function M.attach(world)
 	function native.change_focus(identity)
 		world.focus = identity
 		local last = #native.callbacks
-		for index = 1, last do native.callbacks[index]:notify("TranslateApp", hs.application.watcher.activated) end
+		for index = 1, last do native.callbacks[index]:notify(application.name, hs.application.watcher.activated) end
 	end
 	world.native_destination = native
 	return native
