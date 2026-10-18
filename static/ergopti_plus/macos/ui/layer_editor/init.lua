@@ -374,6 +374,7 @@ function M.open(opts)
 		M._on_message(session, type(message) == "table" and message.body or nil)
 	end)
 	local ok_view, webview = pcall(ui_builder.show_webview, {
+		delete_on_close = true,
 		frame         = ui_builder.get_centered_frame(geo.width, geo.height),
 		title         = i18n.get("layer_editor.window_title"),
 		style_masks   = { "titled", "closable", "resizable" },

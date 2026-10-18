@@ -41,6 +41,7 @@ local function fixture(callback, cleanup_failures)
 						state.creates = state.creates + 1
 						local view = { captions = {}, scripts = {}, deletes = 0 }
 						function view:windowTitle(caption) self.captions[#self.captions + 1] = caption; return self end
+						function view:deleteOnClose(value) self.delete_on_close = value; return self end
 						for _, name in ipairs({ "windowStyle", "level", "allowTextEntry", "allowGestures",
 							"shadow", "allowNewWindows", "html", "show" }) do view[name] = function() return view end end
 						function view:windowCallback(fn) self.on_window = fn; return self end

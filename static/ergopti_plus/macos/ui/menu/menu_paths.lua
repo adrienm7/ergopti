@@ -543,6 +543,7 @@ local function open_editor_impl()
 			and _webview == candidate and _usercontent == uc and _focus_owner == focus_owner
 	end
 	local webview = ui_builder.show_webview({
+		delete_on_close = true,
 		frame       = ui_builder.get_centered_frame(win_w, win_h),
 		app_id      = "paths_editor",
 		style_masks = style_masks,
