@@ -1358,7 +1358,7 @@ local function main()
 			end,
 			-- Retain the exact active text control: programmatic field changes can
 			-- happen inside one native window without any pointer or keyboard event.
-			focus_id = window_info and window_info.focused_text_identity or nil,
+			focus_id = secure_focus_guard.focused_text_identity,
 			-- The AI agent's context: the application and the window title the
 			-- user is in, read live like focus_id.
 			focused_window = window_info and function()

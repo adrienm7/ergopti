@@ -186,18 +186,21 @@ def session(root):
                         assert initial["bus"] == moved["bus"], (
                             "all fields and windows belong to the same native process"
                         )
-                        assert moved["cached_verdict"] == "insecure", (
-                            "programmatic change deliberately bypasses the cached verdict"
-                        )
                         result = command("finish")
                         assert result["applied"] == (0 if target else 1), (mode, name, result)
                         if target == 2:
                             assert moved["role"] == 40 and "target" not in moved, (
                                 "native password must never own AI output"
                             )
+                            assert moved["cached_verdict"] in ("secure", "unknown"), (
+                                "the resident watcher must revoke an ordinary verdict for a password"
+                            )
                         elif target:
-                            assert moved["target"] != initial["target"], (
-                                "each native text control owns a different target"
+                            assert moved["path"] != initial["path"], (
+                                "each native text control owns a different accessible path"
+                            )
+                            assert moved.get("target") != initial["target"], (
+                                "an incoming or pending field cannot borrow the original text target"
                             )
                         if target:
                             assert not result["offered"], (
@@ -261,11 +264,24 @@ def session(root):
                     unchanged(before)
                     cases += 1
                 focus(0, True)
+                command("reset")
+                first = command("first-character")
+                assert first["helper_calls"] == 0, (
+                    "the AI first character cannot call a synchronous focus helper",
+                    first,
+                )
+                assert first["target"] and (
+                    first["heartbeat_delay_ms"] < first["barrier_budget_ms"] + 100
+                ), first
+                cases += 1
+                print(
+                    f"Native AI first character: {first['first_char_ms']:.1f}ms; synchronous helpers={first['helper_calls']}"
+                )
                 timing = command("benchmark")
                 durations = sorted(timing["probe_ms"])
                 assert len(durations) == 20 and durations[-1] < 1000
                 print(
-                    f"Native fresh AT-SPI destination: median={durations[10]:.1f}ms max={durations[-1]:.1f}ms (20 probes)"
+                    f"Native resident AT-SPI destination: median={durations[10]:.1f}ms max={durations[-1]:.1f}ms (20 probes)"
                 )
                 app.send_signal(signal.SIGSTOP)
                 try:
@@ -273,7 +289,7 @@ def session(root):
                     assert "deadline_target" not in timeout, (
                         "a wedged native application cannot authorize output"
                     )
-                    assert 900 <= timeout["deadline_ms"] < 1800, timeout
+                    assert 0 <= timeout["deadline_ms"] < timeout["barrier_budget_ms"] + 100, timeout
                 finally:
                     app.send_signal(signal.SIGCONT)
                 print(f"Native wedged AT-SPI refusal: {timeout['deadline_ms']:.1f}ms")
@@ -283,6 +299,12 @@ def session(root):
         finally:
             if app.poll() is None:
                 app.send_signal(signal.SIGCONT)
+            if worker is not None and worker.poll() is None:
+                worker.stdin.close()
+                try:
+                    worker.wait(timeout=6)
+                except subprocess.TimeoutExpired:
+                    pass
             for process in reversed(processes):
                 stop(process)
 
