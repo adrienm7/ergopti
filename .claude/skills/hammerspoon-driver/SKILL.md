@@ -13,7 +13,7 @@ and most of them shipped **green**.
 The unit suite never loads `init.lua` (running it needs a live Hammerspoon), so
 boot-path logic is only reachable through static source tests — that is why so
 many guards here are meta-tests rather than behavioural ones
-(`tests/meta/test_lua_sources_compile.lua` exists because a stray `end` in
+(`tests/meta/boot/test_lua_sources_compile.lua` exists because a stray `end` in
 `init.lua` shipped with CI green).
 
 ## An unpinned `hs.task` is collected, SIGTERMed, and never calls back
@@ -31,7 +31,7 @@ module may pin into a root injected by its parent (`active_tasks_gc_root`,
 `ui/menu/menu_llm/models_manager_mlx.lua:213`).
 
 **The broad guard is file-granular, not call-site-granular.**
-`tests/unit/meta/test_gc_retention.lua` walks every driver `.lua` and only asks
+`tests/meta/lua_safety/test_gc_retention.lua` walks every driver `.lua` and only asks
 whether a file that constructs a task contains an ownership spelling. One
 pinned task can therefore mask an unpinned sibling. The historical
 `models_manager_mlx.check_task` defect is fixed and now has a dedicated guard in
@@ -71,7 +71,7 @@ exists — a grep-shaped test stayed green over the live bug.
 
 ## The `hs.` purity ratchet counts comments — a docstring can fail CI
 
-`tests/meta/test_port_adapter_coverage.lua` counts every **line** matching
+`tests/meta/architecture/test_port_adapter_coverage.lua` counts every **line** matching
 `%f[%w]hs%.` (and `io.open` / `os.execute`) across `macos/modules/` and
 `macos/lib/` only — `adapters/`, `ui/` and root `init.lua` are outside the scan —
 and fails if the total rises above a baseline. It is a raw line scan with **no
@@ -133,7 +133,7 @@ state and crashes at boot. The only blessed form is the iterator expression
 directly in a generic-for, inside a pcall'ed closure — already centralised in
 `lib/fs_dir.lua:42-55`. Use `fs_dir.entries(dir)` rather than re-deriving it.
 
-Guard: `tests/meta/test_fs_dir_iterator_contract.lua` asserts per file that every
+Guard: `tests/meta/lua_safety/test_fs_dir_iterator_contract.lua` asserts per file that every
 `hs.fs.dir` reference flows into a generic-for (`:135-148`), that `fs_dir.entries`
 wraps its loop in pcall (`:167-176`), and pins the test stub to the faithful
 `(iterator, state)` arity (`:194-208`).
@@ -166,7 +166,7 @@ fix applied to only one of the two paths.
 
 **Whenever you add a teardown step, add it to all three sites** — the shutdown
 callback and both `os.exit` paths. Guards:
-`tests/meta/test_init_shutdown_quit_ke.lua`,
+`tests/meta/shutdown/test_init_shutdown_quit_ke.lua`,
 `test_menu_quit_karabiner_ownership.lua`, `test_menu_quit_mlx_teardown.lua`.
 
 ## Other traps
@@ -177,16 +177,16 @@ callback and both `os.exit` paths. Guards:
   handoff, not for shell, filesystem, Accessibility, or heavy work. Blocking
   work needs an owned asynchronous task/native worker and a completion
   protocol. Guards include
-  `tests/unit/meta/test_interactive_actions_do_not_block_runloop.lua` and
+  `tests/meta/runloop/test_interactive_actions_do_not_block_runloop.lua` and
   `tests/unit/modules/diagnostics/test_crash_report_deferred_off_hot_path.lua`.
 - **`string.format("%q", path)` is not shell quoting.** `%q` escapes for a _Lua_
   literal and leaves `$`, backticks and `!` live for `/bin/sh`. Every driver path
   is user-configurable. Use `text_utils.shell_quote`. Guard:
-  `tests/meta/test_shell_quoting_not_lua_q.lua` (it found 41 sites in 15 files).
+  `tests/meta/shell_quoting/test_shell_quoting_not_lua_q.lua` (it found 41 sites in 15 files).
 - **`%` in a gsub REPLACEMENT raises.** Any outside-world value (app name, magic
   key, URL fragment, release tag) used as a gsub replacement must go through
   `text_utils.escape_gsub_replacement`. This class has bitten four times. Guard:
-  `tests/meta/test_gsub_replacement_escaping.lua`.
+  `tests/meta/lua_safety/test_gsub_replacement_escaping.lua`.
 - **Splitting a stateful module?** Add it to the force-reload list in
   `tests/helpers/init.lua`. Modules capture `local hs = hs` at require time, so a
   cached instance silently ignores a freshly injected stub and assertions see

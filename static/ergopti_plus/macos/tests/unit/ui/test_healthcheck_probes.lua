@@ -121,7 +121,7 @@ local function with_probes(body)
 		if not ok then error(err, 0) end
 	end)
 	-- The scope already restored it; written out so the suite-wide stub hygiene
-	-- scan (tests/meta/test_shell_runner_stub_restore.lua) sees the restore
+	-- scan (tests/meta/harness/test_shell_runner_stub_restore.lua) sees the restore
 	package.loaded["adapters.shell_runner"] = saved_shell_runner
 end
 

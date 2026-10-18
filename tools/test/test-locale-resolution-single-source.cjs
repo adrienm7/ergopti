@@ -95,9 +95,9 @@ if (!fileExistsSP(corpusPath)) {
 }
 
 // ── 6. macOS must have a corpus consumer test ──────────────────────────────
-if (!fileExistsSP('macos/tests/unit/meta/test_corpus_locale_resolution.lua')) {
+if (!fileExistsSP('macos/tests/meta/corpus/test_corpus_locale_resolution.lua')) {
 	errors.push(
-		'macos/tests/unit/meta/test_corpus_locale_resolution.lua: missing — must replay locale corpus'
+		'macos/tests/meta/corpus/test_corpus_locale_resolution.lua: missing — must replay locale corpus'
 	);
 }
 

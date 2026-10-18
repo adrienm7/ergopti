@@ -20,7 +20,7 @@
 ---    (ui.healthcheck.probes) and push their answers into that window only.
 --- 4. The module contract check stays: a developer section of the page. Its
 ---    `wired` flag is a build-time fact kept honest by
----    tests/meta/test_adapter_wiring_reachability.lua.
+---    tests/meta/architecture/test_adapter_wiring_reachability.lua.
 --- ==============================================================================
 
 local M = {}
@@ -242,7 +242,7 @@ end
 -- adapter that is NOT wired can load fine and expose every method yet still be
 -- completely unreachable from any real feature — the migration onto the port/
 -- adapter architecture is incomplete for it. Keeping this flag in lock-step with
--- reality is enforced by tests/meta/test_adapter_wiring_reachability.lua, which
+-- reality is enforced by tests/meta/architecture/test_adapter_wiring_reachability.lua, which
 -- greps production sources for a require("adapters.<id>") call site and fails if
 -- the flag disagrees with what it finds.
 local ADAPTER_SPECS = {

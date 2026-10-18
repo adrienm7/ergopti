@@ -93,7 +93,7 @@ local _observed_failure_marker = nil
 -- it goes out of scope as soon as the spawning function returns while the
 -- subprocess is still running — an unreferenced hs.task can be collected mid-run,
 -- killing the install and dropping its completion callback. Canonical spelling
--- recognised by tests/unit/meta/test_gc_retention.lua; released in the callback.
+-- recognised by tests/meta/lua_safety/test_gc_retention.lua; released in the callback.
 local _active_tasks = {}
 
 local _owned_timers = { initial = nil, hide = nil, deadline = nil }

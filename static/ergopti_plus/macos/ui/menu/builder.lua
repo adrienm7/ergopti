@@ -423,7 +423,7 @@ local function build_hotstrings_rows(ctx, menu_mods)
 	-- from the day it was written — the manifest declared two bulk commands, a
 	-- params group, four section headers and five list rows, and this file read
 	-- none of it. The repository carries a drift gate
-	-- (tests/meta/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
+	-- (tests/meta/menu/test_menu_hotstrings_layout_drift_gate.lua) whose entire job
 	-- was to notice when the two descriptions disagreed, because nothing else
 	-- could.
 	local hotstrings_menu = {}

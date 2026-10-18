@@ -183,7 +183,7 @@ end
 
 -- This section tests the /api/generate response shape (resp.response field).
 -- Vectors scoped to driver=["macos"] use the /api/chat shape (message.content)
--- and are covered by tests/unit/meta/test_corpus_llm_parser.lua instead.
+-- and are covered by tests/meta/corpus/test_corpus_llm_parser.lua instead.
 helpers.describe("LLM parser corpus — Ollama non-streaming", function()
 	if not corpus then return end
 

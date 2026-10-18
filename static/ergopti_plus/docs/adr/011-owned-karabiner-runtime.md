@@ -15,7 +15,7 @@ modifications. Up to `v0.0.0-dev.147` onboarding installs the official
 Karabiner-Elements 16.0.0 application (UI, system extension and root grabber)
 and ErgoptiPlus merges token-scoped rules into the user's own
 `~/.config/karabiner/karabiner.json`. Ergopti never owns a Karabiner process:
-that is rule R3, and `tests/meta/test_karabiner_stock_process_isolation.lua`
+that is rule R3, and `tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
 enforces it.
 
 That arrangement cannot count physical keys exactly (HS-274). Karabiner rewrites
@@ -130,5 +130,5 @@ its section 6 asked the maintainer five questions, answered on 2026-09-29 in the
 - The dual-mode description: `static/ergopti_plus/macos/platform/remap/README.md`
   and `static/ergopti_plus/macos/launcher/README.md`.
 - R3 stays enforced for stock processes by
-  `static/ergopti_plus/macos/tests/meta/test_karabiner_stock_process_isolation.lua`
+  `static/ergopti_plus/macos/tests/meta/architecture/test_karabiner_stock_process_isolation.lua`
   until the owned runtime lands together with the exact code it must allow.

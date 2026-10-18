@@ -830,7 +830,7 @@ helpers.describe("ScriptControl pause invariant actually quiesces the modules (F
 		-- script-control eventtap callback, and the karabiner redeploy writes a
 		-- 100 kB+ config (resume regenerates the full one), which would stall the tap
 		-- long enough for macOS to disable it — see
-		-- tests/meta/test_pause_path_defers_blocking_work.lua. The stub records timers
+		-- tests/meta/runloop/test_pause_path_defers_blocking_work.lua. The stub records timers
 		-- instead of running them, so the deferred work is flushed here. The
 		-- assertions themselves are unchanged: the calls must still happen.
 		SC.pause_all()
