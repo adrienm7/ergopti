@@ -139,7 +139,7 @@ local function with_untrusted_factory(body)
 		}
 		local view = {}
 		for _, name in ipairs({ "windowTitle", "windowStyle", "shadow", "allowTextEntry", "allowGestures",
-			"windowCallback", "navigationCallback", "html" }) do
+			"windowCallback", "navigationCallback", "html", "deleteOnClose" }) do
 			view[name] = function(self) return self end
 		end
 		function view.level(self, level) h.levels[#h.levels + 1] = level; return self end

@@ -377,6 +377,7 @@ function M.show(spec)
 			usercontent   = usercontent,
 			html_string   = M.render(content, spec.bundle_path, app_icon_url()),
 			inject_i18n   = false,
+			delete_on_close = true,
 			-- Accessibility is the factory's one floating exception (see
 			-- ui_builder.PERMISSION_DIALOG_CHROME); every other kind is focused.
 			focus         = not floating,

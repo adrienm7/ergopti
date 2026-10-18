@@ -831,7 +831,8 @@ end
 --- only when no app identity is supplied. Unknown app identities refuse.
 --- @param opts table The configuration options for the webview; focus = false
 ---        shows the window without activating the app or changing its level;
----        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception.
+---        chrome = M.PERMISSION_DIALOG_CHROME is the one floating exception;
+---        delete_on_close = true releases native references on user close.
 --- @return userdata|nil The configured webview instance.
 function M.show_webview(opts)
 	if type(opts) ~= "table" then return nil end
@@ -969,6 +970,9 @@ function M.show_webview(opts)
 	for _, step in ipairs(M.window_chrome_steps(wv, opts)) do
 		if not apply_webview_mutation(step.apply) then return abandon_required_mutation() end
 	end
+	if opts.delete_on_close == true and not apply_required_webview_mutation(function()
+		assert(wv:deleteOnClose(true) == wv, "native automatic close cleanup was not acknowledged")
+	end, "automatic close cleanup") then return abandon_required_mutation() end
 	-- Hammerspoon's webview window becomes key only while it allows text entry
 	-- (libwebview.m canBecomeKeyWindow): without it a click never brings the
 	-- window of the inactive app in front, and the window stays buried.
