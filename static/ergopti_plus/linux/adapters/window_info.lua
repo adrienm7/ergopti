@@ -97,7 +97,7 @@ end
 
 -- Window titles are not identities: two applications can both show "Untitled".
 -- Retain the window ID too, while avoiding repeated process lookups at each poll.
-local _x11_cache = { id = nil, title = nil, appId = "", identity = nil }
+local _x11_cache = { id = nil, title = nil, appId = "", identity = nil, pid = nil }
 
 --- Builds a native window identity without substituting application metadata.
 --- @param server string Display-server namespace.
@@ -136,7 +136,7 @@ local function focused_x11()
 
 	if win_id == _x11_cache.id and title == _x11_cache.title and _x11_cache.appId ~= "" then
 		info.appId = _x11_cache.appId
-		return info, _x11_cache.identity
+		return info, _x11_cache.identity, _x11_cache.pid
 	end
 
 	-- The identity is the process name, deliberately, and not WM_CLASS. It is
@@ -150,7 +150,8 @@ local function focused_x11()
 	_x11_cache.title = title
 	_x11_cache.appId = info.appId
 	_x11_cache.identity = native_identity("x11", win_id, pid)
-	return info, _x11_cache.identity
+	_x11_cache.pid = tonumber(pid)
+	return info, _x11_cache.identity, _x11_cache.pid
 end
 
 --- Lists every visible window through xdotool.
@@ -211,7 +212,7 @@ local function focused_sway()
 		or (type(node.window_properties) == "table" and node.window_properties.class)
 		or "")
 	if info.appId == "" then info.appId = comm_of(node.pid) end
-	return info, native_identity("sway", node.id, node.pid)
+	return info, native_identity("sway", node.id, node.pid), tonumber(node.pid)
 end
 
 --- Queries Hyprland.
@@ -223,7 +224,7 @@ local function focused_hyprland()
 	info.windowTitle = tostring(win.title or "")
 	info.appId = tostring(win.class or "")
 	if info.appId == "" then info.appId = comm_of(win.pid) end
-	return info, native_identity("hyprland", win.address, win.pid)
+	return info, native_identity("hyprland", win.address, win.pid), tonumber(win.pid)
 end
 
 --- Queries niri.
@@ -235,7 +236,7 @@ local function focused_niri()
 	info.windowTitle = tostring(win.title or "")
 	info.appId = tostring(win.app_id or "")
 	if info.appId == "" then info.appId = comm_of(win.pid) end
-	return info, native_identity("niri", win.id, win.pid)
+	return info, native_identity("niri", win.id, win.pid), tonumber(win.pid)
 end
 
 local WAYLAND_QUERIES = {
@@ -250,8 +251,8 @@ local function focused_wayland()
 	for _, name in ipairs(WAYLAND_BACKENDS) do
 		local backend = WAYLAND_QUERIES[name]
 		if Shell.has_command(backend.binary) then
-			local info, identity = backend.query()
-			if info then return info, identity end
+			local info, identity, pid = backend.query()
+			if info then return info, identity, pid end
 		end
 	end
 
@@ -311,12 +312,46 @@ end
 --- @return table info Original four-field WindowInfo shape.
 --- @return string|nil identity Native server/process/window identity.
 function M.focused_snapshot()
-	local ok, info, identity = pcall(query_focused)
+	local info, identity = M.focused_process_snapshot()
+	return info, identity
+end
+
+--- Captures compositor metadata and its native owning process in one query.
+--- Privacy joins may compare the PID to an independently scoped native frame.
+--- The ordinary public snapshot and metadata table retain their original shape.
+--- @return table info Original four-field WindowInfo shape.
+--- @return string|nil identity Native server/process/window identity.
+--- @return number|nil pid Exact compositor process, absent when unavailable.
+function M.focused_process_snapshot()
+	local ok, info, identity, pid = pcall(query_focused)
 	if not ok then
-		Logger.error(LOG, "focused_snapshot(): native focus query failed.")
-		return empty_info(), nil
+		Logger.error(LOG, "focused_process_snapshot(): native focus query failed.")
+		return empty_info(), nil, nil
 	end
-	return info or empty_info(), identity
+	if type(pid) ~= "number" or pid <= 0 or pid % 1 ~= 0 then pid = nil end
+	return info or empty_info(), identity, pid
+end
+
+--- Captures application/title policy without treating an unknown app as ordinary.
+--- On compositors without window queries, a bounded native helper resolves the
+--- active frame's process and title, tied to the caller's exact field receipt.
+--- @param field table Exact fresh { bus, path, role } from the resident watcher.
+--- @return table|nil context Fresh application/title and native window owner.
+function M.focused_privacy_context(field)
+	if type(field) ~= "table" then return nil end
+	local snapshot, conclusive = require("adapters.atspi_focus").get_context_snapshot()
+	if conclusive ~= true or type(snapshot) ~= "table" or snapshot.native_bus_name ~= field.bus or snapshot.native_object_path ~= field.path
+		or snapshot.role ~= field.role then return nil end
+	local info, native, pid = M.focused_process_snapshot()
+	if pid == snapshot.process_id and type(info.appId) == "string" and info.appId ~= ""
+		and info.windowTitle == snapshot.window_title and type(native) == "string" and native ~= "" then
+		return { app_id = info.appId, title = info.windowTitle, native_identity = native }
+	end
+	-- A compositor can lag behind accessibility focus. Its class/title may be
+	-- used only for the same native process and frame; disagreement retains the
+	-- helper's exact active owner, never the outgoing application's policy.
+	return { app_id = snapshot.app_id, title = snapshot.window_title,
+		native_identity = "atspi:" .. snapshot.window_bus_name .. ":" .. snapshot.window_object_path }
 end
 
 --- Captures the exact active text control for asynchronous AI input and output.
@@ -379,6 +414,7 @@ function M._reset_state()
 	_x11_cache.title = nil
 	_x11_cache.appId = ""
 	_x11_cache.identity = nil
+	_x11_cache.pid = nil
 end
 
 return M

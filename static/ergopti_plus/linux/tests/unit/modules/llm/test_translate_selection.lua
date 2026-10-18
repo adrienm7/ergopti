@@ -134,6 +134,7 @@ local function scenario(opts, body)
 				return true
 			end,
 			focus_id = function() return world.focus end,
+			privacy_guard = opts.privacy_guard,
 		})
 		world.engine = engine
 		world.handlers = engine.action_handlers()
@@ -422,6 +423,49 @@ helpers.describe("selected translations require a known stable native focus", fu
 			helpers.assert_eq(world.reads, 1)
 			helpers.assert_eq(#world.posts, 0)
 			helpers.assert_eq(#world.replaced, 0)
+		end)
+	end)
+end)
+
+helpers.describe("translation resident global privacy admission", function()
+	for _, verdict in ipairs({ "protected", "unknown", "throw" }) do
+		helpers.it("refuses " .. verdict .. " ownership before reading translation selection (llm-global-privacy)", function()
+			scenario({ selection = SELECTION, privacy_guard = function()
+				if verdict == "throw" then error("controlled resident barrier failure") end
+				if verdict == "protected" then return true end
+			end }, function(world)
+				helpers.assert_eq(world.handlers.llm_translate_selection("tap_3", "en"), false)
+				helpers.assert_eq(world.reads, 0)
+				helpers.assert_eq(#world.posts, 0)
+				helpers.assert_eq(#world.replaced, 0)
+			end)
+		end)
+	end
+	helpers.it("rechecks privacy at translation completion and after its pacing timer (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = SELECTION, privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			blocked = true; world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_eq(world.engine.has_suggestions(), false)
+			helpers.assert_eq(#world.replaced, 0)
+			blocked = false
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			helpers.assert_eq(#world.posts, 1)
+			blocked = true; world.wait_for(2)
+			helpers.assert_eq(#world.posts, 1)
+			helpers.assert_true(world.engine.is_enabled())
+		end)
+	end)
+	helpers.it("refuses a translation accepted after global privacy is revoked (llm-global-privacy)", function()
+		local blocked = false
+		scenario({ selection = SELECTION, privacy_guard = function() return blocked end }, function(world)
+			helpers.assert_true(world.handlers.llm_translate_selection("tap_3", "en"))
+			world.respond(1, "TRANSLATION: See you tomorrow?")
+			helpers.assert_true(world.engine.has_suggestions())
+			blocked = true
+			helpers.assert_eq(world.engine.accept(1), false)
+			helpers.assert_eq(#world.replaced, 0)
+			helpers.assert_true(world.engine.is_enabled())
 		end)
 	end)
 end)

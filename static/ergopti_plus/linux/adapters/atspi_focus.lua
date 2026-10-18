@@ -59,6 +59,7 @@ local function load_native_backend()
 		int atspi_state_set_contains(AtspiStateSet *set, int state);
 		unsigned int atspi_accessible_get_role(AtspiAccessible *obj, void **error);
 		char *atspi_accessible_get_name(AtspiAccessible *obj, void **error);
+		unsigned int atspi_accessible_get_process_id(AtspiAccessible *obj, void **error);
 		GHashTable *atspi_accessible_get_attributes(AtspiAccessible *obj, void **error);
 		void *g_hash_table_lookup(GHashTable *hash_table, const void *key);
 		void g_hash_table_unref(GHashTable *hash_table);
@@ -115,6 +116,12 @@ local function load_native_backend()
 		local role = tonumber(atspi.atspi_accessible_get_role(node, error_slot))
 		if release_error(error_slot) then return nil end
 		return role
+	end
+	function backend.process_id(node)
+		local error_slot = ffi.new("void *[1]")
+		local pid = tonumber(atspi.atspi_accessible_get_process_id(node, error_slot))
+		if release_error(error_slot) or not pid or pid <= 0 then return nil end
+		return pid
 	end
 	function backend.identity(node)
 		local identity = { name = "", attributes = {} }
@@ -307,6 +314,35 @@ function M._get_native_snapshot()
 	}, true
 end
 
+--- Captures process metadata from the exact active frame owning the focused field.
+--- Executed only in the bounded helper, never on the daemon's input path.
+--- @return table|nil snapshot Native field/frame ownership and process metadata.
+--- @return boolean conclusive
+function M._get_native_context_snapshot()
+	local backend = _backend_for_test or load_native_backend()
+	local role, conclusive, identity, handles = traverse(backend, true)
+	if not conclusive or not handles or not handles.window or not identity.active_scope then
+		M._release_native_watch_focus(handles)
+		return nil, false
+	end
+	local called, snapshot = pcall(function()
+		local frame = backend.identity(handles.window)
+		local pid = backend.process_id(handles.window)
+		if not frame or not pid then return nil end
+		local file = io.open("/proc/" .. tostring(pid) .. "/comm", "r")
+		if not file then return nil end
+		local app = file:read("*l")
+		local closed = file:close()
+		if closed ~= true or type(app) ~= "string" or app == "" then return nil end
+		return { role = role, attributes = {}, active_scope = true,
+			native_bus_name = identity.native_bus_name, native_object_path = identity.native_object_path,
+			process_id = pid, app_id = app, window_title = frame.name,
+			window_bus_name = frame.native_bus_name, window_object_path = frame.native_object_path }
+	end)
+	M._release_native_watch_focus(handles)
+	return called and snapshot or nil, called and snapshot ~= nil
+end
+
 --- Retains exact native control/frame references for one resident worker.
 --- Each full scan discards libatspi's old tree cache first; daemon code never
 --- receives native pointers or invokes this in the keyboard process.
@@ -370,7 +406,7 @@ end
 --- The native call is isolated behind the same hard deadline as get_role().
 --- @return table|nil snapshot { role, name, attributes }
 --- @return boolean conclusive
-local function read_snapshot()
+local function read_snapshot(include_context)
 	if _backend_for_test then
 		local role, conclusive, identity = traverse(_backend_for_test)
 		if not conclusive then return nil, false end
@@ -387,8 +423,9 @@ local function read_snapshot()
 	local executable = Interpreter.from_arguments(arg) or "luajit"
 	local timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms")
 	local timeout_seconds = math.max(1, math.ceil(timeout_ms / 1000))
+	local query = include_context and "_get_native_context_snapshot" or "_get_native_snapshot"
 	local child_code = "local m=require('adapters.atspi_focus'); local j=require('json'); "
-		.. "local s,ok=m._get_native_snapshot(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
+		.. "local s,ok=m." .. query .. "(); if ok then io.write('FOCUS:'..j.encode(s)) else os.exit(2) end"
 	local command = string.format("env LUA_PATH=%s timeout -s KILL %ds %s -e %s 2>/dev/null",
 		ShellRunner.quote(package.path), timeout_seconds,
 		ShellRunner.quote(executable), ShellRunner.quote(child_code))
@@ -431,6 +468,22 @@ function M.get_snapshot()
 	if conclusive ~= true then return nil, false end
 	_last_snapshot = copy_snapshot(snapshot)
 	return copy_snapshot(_last_snapshot), true
+end
+
+--- Returns fresh active-frame context without replacing the resident privacy cache.
+--- @return table|nil snapshot Exact field/frame/process metadata from one helper.
+--- @return boolean conclusive
+function M.get_context_snapshot()
+	local snapshot, conclusive = read_snapshot(true)
+	if conclusive ~= true or type(snapshot) ~= "table" or snapshot.active_scope ~= true
+		or type(snapshot.native_bus_name) ~= "string" or not snapshot.native_bus_name:match("^:%d+%.%d+$")
+		or type(snapshot.native_object_path) ~= "string" or snapshot.native_object_path:sub(1, 1) ~= "/"
+		or type(snapshot.window_bus_name) ~= "string" or not snapshot.window_bus_name:match("^:%d+%.%d+$")
+		or type(snapshot.window_object_path) ~= "string" or snapshot.window_object_path:sub(1, 1) ~= "/"
+		or type(snapshot.process_id) ~= "number" or snapshot.process_id <= 0 or snapshot.process_id % 1 ~= 0
+		or type(snapshot.app_id) ~= "string" or snapshot.app_id == ""
+		or type(snapshot.window_title) ~= "string" then return nil, false end
+	return snapshot, true
 end
 
 --- Reads only the receipt already obtained by the daemon's privacy probe.

@@ -379,6 +379,7 @@ return {
 	"tests.unit.modules.hotstrings.test_terminator_settings",
 	"tests.unit.modules.hotstrings.test_terminator_scope_policy",
 	"tests.unit.modules.keylogger.test_focus_guard",
+	"tests.unit.modules.keylogger.test_focus_guard_app_context",
 	"tests.unit.modules.keylogger.test_aggregate_walker",
 	"tests.unit.modules.keylogger.test_unicode_character_classes",
 	"tests.unit.modules.keylogger.test_app_switch_aggregate",
