@@ -82,6 +82,10 @@ end
 local ok,failure=xpcall(function()
 	assert(Reader.use_ffi_backend());create(1)
 	if mode=='remove' then create(2) end
+	-- The kernel keyboard handler may initialize a new source with the console's
+	-- ambient NumLock LED. Establish the fixture's OFF starting state through
+	-- real EV_LED writes before Hook seeds capture, matching the fresh sink.
+	for index, keyboard in ipairs(keyboards) do keyboard.set_led(paths[index],0,0) end
 	selected={paths[1]};if paths[2] then selected[2]=paths[2] end
 	Injector=require('modules.hotstrings.injector');assert(Injector.open_fast_channel())
 	assert(Reader.open(assert(await(function() return node(oldname) end,5000)),'pass2-output'))
@@ -96,6 +100,13 @@ local ok,failure=xpcall(function()
 		onCaptureReacquired=function() return Layout.publish_current_capture() end,onEmitRaw=Injector.emit_key,onChar=function(char) chars[#chars+1]=char end})
 	assert(Hook.isRunning());assert(Layout.publish_current_capture())
 	ownerA=assert(Reader.capture_source_owner('keyboard:'..paths[1]))
+	for _, path in ipairs(paths) do
+		local leds=assert(Reader.active_leds('keyboard:'..path,1))
+		assert(leds[0]==false,'native source LED_NUM starting state is not OFF')
+	end
+	local initial=caps_state()
+	record('native-starting-state',{state=initial})
+	assert(initial.hook_KP1=='' and initial.sink_KP1=='','native NumLock states did not start neutral')
 	emit(1,69,1);emit(1,69,0)
 	keyboards[1].set_led(paths[1],0,1)
 	assert(Reader.active_leds('keyboard:'..paths[1],1)[0]==true,'real source LED_NUM did not turn on')
