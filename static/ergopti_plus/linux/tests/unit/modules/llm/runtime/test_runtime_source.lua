@@ -15,15 +15,29 @@ local function run_registered()
 local Source = helpers.load_module("modules.llm.runtime_source")
 local w
 local function eq(a,b,why)assert(a==b,(why or 'value')..': expected '..tostring(b)..' got '..tostring(a))end
-local function test(name, body) helpers.it(name .. " (ollama-runtime)", body) end
+local Writer, fixture_ports
+local function test(name, body)
+	helpers.it(name .. " (ollama-runtime)", function()
+		-- Port ownership belongs to each execution, not module registration:
+		-- a runner may collect and replay cases after the module cache restores.
+		local loaded = {}; for name, value in pairs(package.loaded) do loaded[name] = value end
+		local prior_world, prior_writer = w, Writer
+		for name, value in pairs(fixture_ports) do package.loaded[name] = value end
+		local ok, detail = xpcall(body, debug.traceback)
+		for name in pairs(package.loaded) do if loaded[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(loaded) do package.loaded[name] = value end
+		w, Writer = prior_world, prior_writer
+		if not ok then error(detail, 0) end
+	end)
+end
 local logger={}
 for _,name in ipairs({'info','warn','debug','error'})do
 	logger[name]=function(_,message)if w and w.on_log then w.on_log(message)end end
 end
-package.loaded['logger.shim']=logger;package.loaded['infra.logger']=logger
-package.loaded['infra.i18n']={get=function(k)return k end}
-package.loaded['llm.profile_selector']={};package.loaded['infra.llm_bridge']={}
-local Writer = helpers.load_module("toml_codec.writer")
+fixture_ports={['logger.shim']=logger,['infra.logger']=logger,
+	['infra.i18n']={get=function(k)return k end},['llm.profile_selector']={},['infra.llm_bridge']={}}
+for name,value in pairs(fixture_ports)do package.loaded[name]=value end
+Writer = helpers.load_module("toml_codec.writer")
 local function world()
 	Writer = helpers.load_module("toml_codec.writer")
 	w={bytes='[llm]\nenabled = false\n[llm.models]\nselected = "ollama"\nollama = "llama3.2:3b"\n',state={
@@ -303,6 +317,82 @@ test('canonical protected writer refuses runtime publication without effects',fu
 	eq(v.source.capture(),nil);eq(v.writes,0);eq(v.bytes,before)
 	eq(v.state.enabled,false);eq(v.profiles.is_enabled(),false)
 end)
+
+-- Fresh native backend reads use the real Preferences.get below. A concurrent
+-- file edit can therefore advance its revision after Source.get_many returned.
+local function diagnostic_test(name,body)
+	test(name,function()body(world())end)
+end
+local function diagnostic_origin(v, branch)
+	v:capture()
+	if branch ~= 'original' then eq(v:publish(), true) end
+	if branch == 'compensated' then eq(v.source.compensate(v.handle), true) end
+end
+for _, branch in ipairs({ 'original', 'saved', 'compensated' }) do
+	diagnostic_test('runtime diagnostic retains its healthy '..branch..' source', function(v)
+		diagnostic_origin(v, branch); v.reads=0
+		eq(v.source.diagnostic_current(v.handle), true)
+		eq(v.reads, 2, 'one source snapshot and the existing native backend read')
+	end)
+	diagnostic_test('runtime diagnostic refuses a source revision observed during native read: '..branch, function(v)
+		diagnostic_origin(v, branch); v.reads=0
+		local edited=false
+		v.on_read=function(count)
+			if count==2 then edited=true;v.bytes=v.bytes..'# concurrent external edit\n' end
+		end
+		eq(v.source.diagnostic_current(v.handle), false)
+		eq(edited, true);eq(v.reads, 2, 'the final fence must be RAM-only')
+	end)
+end
+for _, mutation in ipairs({ 'backend', 'model', 'same-byte-write' }) do
+	diagnostic_test('runtime diagnostic refuses '..mutation..' during native preference read', function(v)
+		diagnostic_origin(v, 'original');v.reads=0
+		local changed=false
+		v.on_read=function(count)
+			if count~=2 then return end
+			v.on_read=nil;changed=true
+			if mutation=='backend' then v.bytes=v.bytes:gsub('selected = "ollama"','selected = "api"')
+			elseif mutation=='model' then v.bytes=v.bytes:gsub('llama3.2:3b','new:model')
+			else
+				local before=v.bytes
+				eq(v.preferences.set('llm.models.ollama','llama3.2:3b'), true)
+				eq(v.bytes,before,'real acknowledged write retained exactly the same bytes')
+			end
+		end
+		eq(v.source.diagnostic_current(v.handle),false);eq(changed,true)
+	end)
+end
+diagnostic_test('runtime diagnostic cannot revive a retired notice source from native read',function(v)
+	diagnostic_origin(v,'original');v.reads=0
+	v.on_read=function(count)if count==2 then v.source.retire(v.handle)end end
+	eq(v.source.diagnostic_current(v.handle),false)
+end)
+
+for _, stale in ipairs({ false, true }) do
+	diagnostic_test('runtime diagnostic exact failure caller '..(stale and 'withholds stale notice' or 'delivers current notice'),function(v)
+		diagnostic_origin(v,'original');v.reads=0
+		if stale then v.on_read=function(count)if count==2 then v.bytes=v.bytes..'# external source edit\n'end end end
+		local notices, logs=0,0
+		package.loaded['adapters.notifier']={send=function(_,options)
+			notices=notices+1;eq(options.level,'error');return true
+		end}
+		v.on_log=function(template)
+			if template:find('Local Ollama repair refused',1,true)then logs=logs+1 end
+		end
+		local file=assert(io.open(helpers.driver_root()..'/modules/llm/prediction_engine.lua','rb'))
+		local text=file:read('*a');file:close()
+		local callback=assert(text:match('request:on_result%((function%(result%).-\n\t\t\t\tend)%)'), 'actual production runtime failure observer')
+		local env={type=type,tostring=tostring,require=require,Logger=logger,LOG='runtime-notice-test',
+			owner={source=v.source},handle=v.handle,I18n=require('infra.i18n')}
+		local chunk
+		if setfenv then chunk=assert(loadstring('return '..callback));setfenv(chunk,env)
+		else chunk=assert(load('return '..callback,'actual-runtime-error-observer','t',env))end
+		chunk()({ok=false,error='fixture_runtime_refusal'})
+		eq(notices,stale and 0 or 1);eq(v.reads,2)
+		-- This change owns the notifier lifetime, not the existing error log.
+		eq(logs,1)
+	end)
+end
 
 end
 local called, detail = pcall(run_registered)

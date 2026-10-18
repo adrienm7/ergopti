@@ -97,7 +97,10 @@ function M.new(deps)
 		local restored=record.compensated and revision==record.restored_revision and same_source(image,record.restored_image)
 		local saved=record.candidate~=nil and revision==record.preference_revision+2
 			and image.status=='ok' and image.content==record.candidate
-		return (original or saved or restored) and not record.retired
+		-- Native state readers can observe a newer preference image after read_source.
+		-- Close the notice lifetime with the same RAM-only revision fence as writes.
+		return (original or saved or restored) and revision_current(revision)==true
+			and records[handle]==record and not record.retired
 	end
 	function source.retire(handle)
 		local record=records[handle];if record then record.retired=true end
