@@ -345,9 +345,11 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/test_llm_nav_cycle_windows.ahk';
+const testFile = 'tests/unit/modules/llm/navigation/test_llm_nav_cycle_windows.ahk';
 check(
-	/^#Include unit\/test_llm_nav_cycle_windows\.ahk\s*$/m.test(read('tests/run_all.ahk')),
+	/^#Include unit\/modules\/llm\/navigation\/test_llm_nav_cycle_windows\.ahk\s*$/m.test(
+		read('tests/run_all.ahk')
+	),
 	`tests/run_all.ahk must include ${testFile}`
 );
 check(

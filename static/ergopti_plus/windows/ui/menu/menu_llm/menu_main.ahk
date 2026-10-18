@@ -377,7 +377,7 @@ _LLM_Menu_ReleaseModelMenu(RootMenu) {
  *
  * Falls back to a built-in mirror if the manifest is missing/corrupt so the menu
  * always renders; the built-in list is pinned to the manifest by the
- * cross-platform contract test (tests/meta/test_llm_menu_layout_shared.ahk), so
+ * cross-platform contract test (tests/meta/modules/llm/menu/test_llm_menu_layout_shared.ahk), so
  * it cannot drift.
  * @returns {Array} Array of Maps, each with "id" (string) and "disabled_when_off" (bool).
  */

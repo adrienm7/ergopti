@@ -323,7 +323,7 @@ function receiveWindowsRuntimeHandoff() {
 			'-File',
 			path.join(
 				repository,
-				'static/ergopti_plus/windows/tests/unit/test_ollama_runtime_launch.ps1'
+				'static/ergopti_plus/windows/tests/unit/modules/llm/servers/test_ollama_runtime_launch.ps1'
 			),
 			'-Source',
 			path.join(repository, 'static/ergopti_plus/windows/modules/llm/ollama-runtime-launch.ps1'),

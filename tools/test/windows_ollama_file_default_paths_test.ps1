@@ -5,7 +5,7 @@ param([Parameter(Mandatory = $true)][string]$Helper,
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 if ($FixtureTest -eq '') {
-	$FixtureTest = [IO.Path]::GetFullPath([IO.Path]::Combine([IO.Path]::GetDirectoryName($Helper), '..\..\tests\unit\test_ollama_install_files.ps1'))
+	$FixtureTest = [IO.Path]::GetFullPath([IO.Path]::Combine([IO.Path]::GetDirectoryName($Helper), '..\..\tests\unit\modules\llm\servers\test_ollama_install_files.ps1'))
 }
 $tokens = $null; $errors = $null
 $source = [IO.File]::ReadAllText($FixtureTest, [Text.UTF8Encoding]::new($false, $true))
@@ -24,13 +24,13 @@ $prefix += "[Convert]::ToBase64String([Text.UTF8Encoding]::new(`$false, `$true).
 if ($errors.Count -ne 0) { throw 'The actual fixture entry prefix must parse.' }
 $owned = [IO.Path]::Combine([IO.Path]::GetTempPath(), 'ergopti-file-path-entry-' + [Guid]::NewGuid().ToString('N'))
 $tests = [IO.Path]::Combine($owned, 'tests')
-$directory = [IO.Path]::Combine($tests, 'unit')
+$directory = [IO.Path]::Combine($tests, 'unit', 'modules', 'llm', 'servers')
 [void][IO.Directory]::CreateDirectory($directory)
 $entry = [IO.Path]::Combine($directory, 'test_ollama_install_files.ps1')
 [IO.File]::WriteAllText($entry, $prefix, [Text.UTF8Encoding]::new($false))
 $powershell = [IO.Path]::Combine($PSHOME, 'powershell.exe')
-$expectedCandidate = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\modules\llm'))
-$expectedFixture = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\fixtures\ollama-install-files'))
+$expectedCandidate = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\..\..\modules\llm'))
+$expectedFixture = [IO.Path]::GetFullPath([IO.Path]::Combine($directory, '..\..\..\..\fixtures\ollama-install-files'))
 $oldLocation = (Get-Location).Path
 $oldDirectory = [Environment]::CurrentDirectory
 $oldOutputEncoding = [Console]::OutputEncoding
@@ -77,9 +77,10 @@ try {
 	Set-Location -LiteralPath $oldLocation
 	[Environment]::CurrentDirectory = $oldDirectory
 	[IO.File]::Delete($entry)
-	[IO.Directory]::Delete($directory)
-	[IO.Directory]::Delete($tests)
-	[IO.Directory]::Delete($owned)
+	# Remove each created level, innermost first, without a recursive delete.
+	for ($level = $directory; $level.Length -ge $owned.Length; $level = [IO.Path]::GetDirectoryName($level)) {
+		[IO.Directory]::Delete($level)
+	}
 }
 Write-Output ("RESULT passed=$passed failed=$failed native_calls=0 real_file_acquisitions=0")
 if ($failed) { exit 1 }

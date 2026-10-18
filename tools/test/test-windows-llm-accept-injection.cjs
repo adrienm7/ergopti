@@ -151,9 +151,11 @@ check(
 );
 
 // 4. The behavioural regression runs in the AHK suite.
-const testFile = 'tests/unit/test_llm_accept_injects_exact_text.ahk';
+const testFile = 'tests/unit/modules/llm/navigation/test_llm_accept_injects_exact_text.ahk';
 check(
-	/^#Include unit\/test_llm_accept_injects_exact_text\.ahk\s*$/m.test(read('tests/run_all.ahk')),
+	/^#Include unit\/modules\/llm\/navigation\/test_llm_accept_injects_exact_text\.ahk\s*$/m.test(
+		read('tests/run_all.ahk')
+	),
 	`tests/run_all.ahk must include ${testFile}`
 );
 check(

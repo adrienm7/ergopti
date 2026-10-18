@@ -37,8 +37,8 @@ global _LLM_Menu_Loaded := false
 #Include ../ui/menu/menu_llm/hotkey_identity.ahk
 #Include ../ui/menu/menu_llm/persist.ahk
 #Include ../ui/menu/menu_llm/init.ahk
-#Include unit/test_llm_menu_persistence.ahk
-#Include unit/test_llm_menu_regressions.ahk
+#Include unit/modules/llm/menu/test_llm_menu_persistence.ahk
+#Include unit/modules/llm/menu/test_llm_menu_regressions.ahk
 
 ; Isolated suite should finish in seconds; exit if a stale lock/hang blocks RunTests.
 _LlmPersistWatchdog(*) {
