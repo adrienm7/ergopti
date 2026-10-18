@@ -176,9 +176,14 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 	helpers.it("publishes the initial Main menu, coalesces callbacks and pumps after physical input", function()
 		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
 		local source = file:read("*a"); file:close()
-		local order, menus, stopped = {}, {}, false
+		local order, menus, stopped, checkpoints = {}, {}, false, 0
 		local environment = setmetatable({
-			privacy_owners = { watch = { pump = function() end } },
+			privacy_owners = { watch = { pump = function() end }, startup_checkpoint = function()
+				checkpoints = checkpoints + 1
+				helpers.assert_eq(#menus, 1, "checkpoint follows acknowledged initial publication")
+				helpers.assert_eq(table.concat(order, ","), "build", "checkpoint precedes input pumping")
+				return true
+			end },
 			shutdown = { is_requested = function() return stopped end, request = function() error("unexpected shutdown") end },
 			menu_builder = { build = function(ctx)
 				order[#order + 1] = "build"
@@ -200,6 +205,7 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 		local ending = assert(source:find("\n\t\telse\n", start, true))
 		compile(source:sub(start, ending - 1), environment)()
 		helpers.assert_eq(#menus, 1, "startup must publish before the loop")
+		helpers.assert_eq(checkpoints, 1, "Main retains its post-publication shutdown checkpoint")
 		local previous = menus[1][1].fn
 		environment.rebuild_tray_menu(); environment.rebuild_tray_menu()
 		helpers.assert_eq(#menus, 1); helpers.assert_eq(previous(), false)
@@ -210,6 +216,41 @@ helpers.describe("menu rebuild: actual Main and tray boundaries", function()
 		helpers.assert_eq(#menus, 2); helpers.assert_eq(previous(), false)
 		helpers.assert_eq(menus[2][1].fn(), "current")
 		stopped = true; helpers.assert_eq(menus[2][1].fn(), false)
+	end)
+
+	helpers.it("(menu-startup-checkpoint) refuses continuation after shutdown during initial publication", function()
+		local file = assert(io.open(helpers.driver_root() .. "/ergopti_hotstrings.lua", "rb"))
+		local source = assert(file:read("*a")); assert(file:close())
+		local order, menus, requested, retired = {}, {}, false, 0
+		local environment = setmetatable({
+			continued = false,
+			privacy_owners = { finish_startup = function()
+				retired = retired + 1; order[#order + 1] = "retire"
+			end },
+			shutdown = { is_requested = function() return requested end },
+			menu_builder = { build = function()
+				order[#order + 1] = "build"
+				return { { title = "Action", fn = function() error("retired menu action") end } }
+			end },
+			tray_menu = { setMenu = function(items)
+				menus[#menus + 1] = items; order[#order + 1] = "publish"
+				requested = true
+				return true
+			end, setPaused = function() end },
+			_build_menu_ctx = function() return { paused = false } end,
+			Logger = { error = function() error("unexpected publication error") end }, LOG = "test",
+		}, { __index = _G })
+		local checkpoint = assert(source:find("privacy_owners.startup_checkpoint = function()", 1, true))
+		local checkpoint_end = assert(source:find("\n\tif not privacy_owners.startup_checkpoint()", checkpoint, true))
+		compile(source:sub(checkpoint, checkpoint_end - 1), environment)()
+		local start = assert(source:find("privacy_owners.menu_rebuild = (function(", 1, true))
+		local ending = assert(source:find("\n\t\telse\n", start, true))
+		compile(source:sub(start, ending - 1) .. "\ncontinued = true\n", environment)()
+		helpers.assert_eq(#menus, 1, "native publication reached the shutdown boundary")
+		helpers.assert_eq(retired, 1, "the actual Main checkpoint retires startup on refusal")
+		helpers.assert_eq(table.concat(order, ","), "build,publish,retire")
+		helpers.assert_eq(environment.continued, false, "refusal returns before the continuation sentinel")
+		helpers.assert_eq(menus[1][1].fn(), false, "shutdown revokes the published callback")
 	end)
 
 	helpers.it("returns an exact native publication receipt and retains refused trees", function()
