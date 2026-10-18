@@ -1052,13 +1052,15 @@ end
 --- @param apps table|nil Selected application IDs.
 function M.get_range_payload(start_date, end_date, apps)
 	if M.is_flush_pending() then return nil, "SQLite flush pending" end
+	if not SqliteReader then return nil, "SQLite projection unavailable" end
+	local bounds = SqliteReader.split_bounds(start_date, end_date)
 	local payload = { historical = empty_ngrams(), today = {} }
-	if SqliteWriter and SqliteWriter.is_available() and SqliteReader then
-		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps)
+	if SqliteWriter and SqliteWriter.is_available() then
+		payload = SqliteReader.read_range_split_today(_sqlite_path, start_date, end_date, apps, bounds.today)
 	end
 	payload.historical = payload.historical or empty_ngrams()
 	payload.today = payload.today or {}
-	payload.today = add_live_ngram_delta(payload.today, apps)
+	if bounds.includes_today then payload.today = add_live_ngram_delta(payload.today, apps) end
 	return payload
 end
 

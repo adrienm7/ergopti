@@ -114,6 +114,30 @@ H.describe("metrics flush bridge", function()
 			H.assert_eq(#F.pushed, 0)
 		end)
 	end
+	for _, mode in ipairs({ "immediate", "deferred" }) do
+		H.it("(range-projection-unavailable) " .. mode .. " nil projection cannot publish or poison the next read", function()
+			local F = fixture("metrics_typing")
+			if mode == "immediate" then F.read_safe() end
+			local available = F.K.get_range_payload
+			F.K.get_range_payload = function()
+				F.c.reads = F.c.reads + 1
+				return nil, "SQLite projection unavailable"
+			end
+			H.assert_nil(F.B.on_message({ action = "range", request_id = 80 }, F.state, F.context))
+			if mode == "deferred" then
+				H.assert_eq(F.c.reads, 0, "Pending ownership must defer even an unavailable projection")
+				F.settle()
+			end
+			H.assert_eq(F.c.reads, 1, "A nil range must stop before reading/caching another dashboard payload")
+			H.assert_eq(#F.pushed, 0, "No incomplete range may be published")
+			F.K.get_range_payload = available
+			local reply = F.B.on_message({ action = "range", request_id = 81 }, F.state, F.context)
+			H.assert_eq(reply.range_request_id, 81)
+			H.assert_eq(reply._prefetch_data.historical.witness, 9)
+			H.assert_eq(F.c.reads, 3, "Recovery must read a fresh range and dashboard exactly once")
+		end)
+	end
+
 	H.it("typing range preserves request identity after deferred settlement", function()
 		local F = fixture("metrics_typing")
 		H.assert_nil(F.B.on_message({ action = "range", request_id = 71 }, F.state, F.context))

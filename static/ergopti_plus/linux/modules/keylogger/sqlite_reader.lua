@@ -539,19 +539,44 @@ function M.read_ngrams(sqlite_path, start_date, end_date, apps)
 	return out
 end
 
---- Returns historical n-grams before today plus per-app n-grams for today.
-function M.read_range_split_today(sqlite_path, start_date, end_date, apps)
-	local today = os.date("%Y-%m-%d")
-	-- Calendar days can contain 23 or 25 hours. Derive the preceding day from
-	-- the captured date at noon, so DST and a clock crossing midnight cannot
-	-- duplicate today's rows or omit yesterday from the historical projection.
+--- Resolves inclusive date bounds against one captured local calendar day.
+--- Invalid optional bounds are ignored, matching the reader's SQL filters.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param today string|nil Captured current day; defaults to the local date.
+--- @return table { today, includes_today, historical_end }.
+function M.split_bounds(start_date, end_date, today)
+	today = today or os.date("%Y-%m-%d")
+	assert(valid_date(today), "Invalid current calendar day")
+	-- Calendar days can contain 23 or 25 hours. Normalize yesterday at noon
+	-- using this captured date, without subtracting a fixed day in seconds.
 	local year, month, day = today:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)$")
 	local yesterday = os.date("%Y-%m-%d", os.time({
 		year = tonumber(year), month = tonumber(month), day = tonumber(day) - 1, hour = 12,
 	}))
-	local historical_end = valid_date(end_date) and end_date < today and end_date or yesterday
+	return {
+		today = today,
+		includes_today = (not valid_date(start_date) or start_date <= today)
+			and (not valid_date(end_date) or end_date >= today),
+		historical_end = valid_date(end_date) and end_date < today and end_date or yesterday,
+	}
+end
+
+--- Returns historical n-grams before today plus per-app n-grams for today.
+--- Both slices obey the requested inclusive range and application filters.
+--- @param sqlite_path string Database path.
+--- @param start_date string|nil Inclusive lower bound.
+--- @param end_date string|nil Inclusive upper bound.
+--- @param apps table|nil Selected application names.
+--- @param today string|nil Current day captured by the projection owner.
+--- @return table { historical, today }.
+function M.read_range_split_today(sqlite_path, start_date, end_date, apps, today)
+	local bounds = M.split_bounds(start_date, end_date, today)
+	today = bounds.today
+	local historical_end = bounds.historical_end
 	local historical = M.read_ngrams(sqlite_path, start_date, historical_end, apps)
 	local today_by_app = {}
+	if not bounds.includes_today then return { historical = historical, today = today_by_app } end
 	local today_where = filters(today, today, apps)
 	for _, code in ipairs(NGRAM_CODES) do
 		local rows = read_rows(sqlite_path, grouped_ngram_sql(NGRAM_TYPE_TABLE[code], today_where, true))
