@@ -38,7 +38,7 @@ const PHASE_ALLOWLIST = new Set([
 	'static/ergopti_plus/linux/modules/hotstrings/injector.lua',
 	'static/ergopti_plus/macos/platform/remap/ke_lifecycle.lua',
 	'static/ergopti_plus/macos/modules/llm/api_mlx_discovery.lua',
-	'static/ergopti_plus/macos/tests/unit/modules/keylogger/test_keylogger_privacy.lua',
+	'static/ergopti_plus/macos/tests/unit/modules/keylogger/lifecycle/test_keylogger_privacy.lua',
 	'static/ergopti_plus/windows/modules/keylogger/keylogger_webview.ahk',
 	'static/ergopti_plus/windows/modules/llm/ollama_deps_checker.ahk',
 	'static/ergopti_plus/windows/platform/remap/backspace.ahk',
