@@ -1100,7 +1100,7 @@ async function main() {
 			assert.throws(() => planSiteLots('admit', { ...env, ...change }));
 		assert.throws(() => planSiteLots('unknown', env));
 	});
-	assert.equal(checks, 35, 'every declared behavior control must complete');
+	assert.equal(checks, 36, 'every declared behavior control must complete');
 	console.log(
 		'Website release resolver and branch identity: 35 actual-source controls passed; no network used.'
 	);
