@@ -164,6 +164,11 @@ def session(root):
                         before = focus(0, True)
                         initial = command("reset")
                         assert (
+                            initial["url_filter"] is True and initial["foreground_type"] == "table"
+                        ), (
+                            "native AI must exercise the enabled URL filter with the real lifecycle contract"
+                        )
+                        assert (
                             initial["role"] == 61 and initial["active_scope"] and initial["target"]
                         )
                         started = command("start-" + mode)

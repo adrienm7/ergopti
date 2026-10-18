@@ -26,7 +26,7 @@ local Detector = require("adapters.secure_field_detector")
 local Atspi = require("adapters.atspi_focus")
 package.loaded["infra.llm_preferences"] = require("tests.support.llm_preferences_fixture").new({ initial = {
 	["llm.models.selected"] = "api", ["llm.profiles.auto_profile_for_model"] = false,
-	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = false,
+	["llm.trigger.secure_filter_enabled"] = true, ["llm.trigger.url_bar_filter_enabled"] = true,
 } })
 package.loaded["modules.llm.profiles"] = { init = function() end, is_enabled = function() return true end }
 package.loaded["modules.llm.api_entries"] = { active = function()
@@ -66,6 +66,8 @@ local function snapshot(fields)
 	fields.active_scope = native and native.active_scope
 	fields.conclusive = conclusive
 	fields.cached_verdict = Detector.getVerdict()
+	fields.url_filter = require("modules.llm.trigger_settings").get("url_bar_filter_enabled")
+	fields.foreground_type = type(require("adapters.process_lifecycle").getForegroundApp())
 	fields.window = Window.focused_identity()
 	fields.target = focus_id()
 	fields.applied, fields.requests, fields.reads = applied, request, reads

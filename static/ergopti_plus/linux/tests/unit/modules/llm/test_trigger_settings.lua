@@ -74,6 +74,59 @@ helpers.describe("LLM trigger settings: durable manifest-backed values", functio
 	end)
 end)
 
+--- Runs the real URL privacy detector and lifecycle adapter through their native ports.
+--- @param options table Native app identity or deliberately malformed adapter output.
+--- @param body function Receives observed request/probe counts and the real lifecycle.
+local function with_url_request(options, body)
+	local observed = { chats = 0, probes = 0 }
+	replace("infra.llm_preferences", PreferencesFixture.new({ initial = {
+		["llm.models.selected"] = "ollama", ["llm.trigger.secure_filter_enabled"] = false,
+		["llm.trigger.url_bar_filter_enabled"] = true,
+	} }))
+	replace("modules.llm.trigger_settings", nil)
+	replace("adapters.atspi_focus", nil)
+	local atspi = require("adapters.atspi_focus")
+	atspi._set_command_runner_for_test(function()
+		observed.probes = observed.probes + 1
+		if options.probe_throw then error("controlled accessibility failure") end
+		if options.probe_unknown then return false, "" end
+		return true, "FOCUS:" .. require("json").encode({ role = 61,
+			name = options.url and "Address and search bar" or "Document text",
+			attributes = {}, active_scope = true, native_bus_name = ":1.42",
+			native_object_path = "/org/a11y/atspi/accessible/7" })
+	end)
+	replace("adapters.secure_field_detector", nil)
+	replace("adapters.window_info", { focused_snapshot = function()
+		if options.window_throw then error("controlled native window failure") end
+		return { appId = options.app, windowTitle = "Owned document", bundleId = "", executablePath = "" }, "x11:123:42"
+	end })
+	replace("adapters.process_lifecycle", nil)
+	local lifecycle = require("adapters.process_lifecycle")
+	if options.replace_lifecycle then
+		replace("adapters.process_lifecycle", { getForegroundApp = function()
+			if options.lifecycle_throw then error("controlled lifecycle failure") end
+			return options.foreground
+		end })
+	end
+	replace("modules.llm.api_ollama", { chat = function() observed.chats = observed.chats + 1; return true end,
+		cancel = function() return true end })
+	replace("modules.llm.profiles", { init = function() end, is_enabled = function() return true end,
+		get_current_model = function() return "test-model" end,
+		get_base_url = function() return "http://127.0.0.1:11434" end })
+	replace("modules.llm.prediction_engine", nil)
+	local engine = require("modules.llm.prediction_engine")
+	engine.init({ focus_id = function() return "owned-native-text-field" end })
+	local okay, problem = xpcall(function()
+		engine.predict("Bonjour à tous", nil, { num_predictions = 1,
+			profile = { id = "raw", system_single = "{context}" } })
+		body(observed, lifecycle)
+	end, debug.traceback)
+	engine.dismiss()
+	atspi._set_command_runner_for_test(nil)
+	restore()
+	if not okay then error(problem, 0) end
+end
+
 helpers.describe("prediction engine: trigger settings affect requests", function()
 	helpers.it("waits for the configured debounce and cancels a pending owner", function()
 		local scheduler = Fakes.timer_scheduler()
@@ -119,32 +172,40 @@ helpers.describe("prediction engine: trigger settings affect requests", function
 		restore()
 	end)
 
-	helpers.it("applies the URL-bar toggle to the real detector seam", function()
-		local chat_calls = 0
-		replace("modules.llm.trigger_settings", {
-			get = function(name)
-				if name == "secure_filter_enabled" then return false end
-				if name == "url_bar_filter_enabled" then return true end
-				return 500
-			end,
-			set = function() return true end,
-		})
-		replace("adapters.secure_field_detector", {
-			isSecureField = function() return false end,
-			isUrlBar = function(app_id) return app_id == "firefox" end,
-		})
-		replace("adapters.process_lifecycle", { getForegroundApp = function() return "firefox" end })
-		replace("modules.llm.api_ollama", { chat = function() chat_calls = chat_calls + 1 end })
-		replace("modules.llm.profiles", {
-			get_current_model = function() return "test-model" end,
-			get_base_url = function() return "http://127.0.0.1:11434" end,
-		})
-		package.loaded["modules.llm.prediction_engine"] = nil
-		require("modules.llm.prediction_engine").predict("private browser context")
-		helpers.assert_eq(chat_calls, 0,
-			"the URL toggle must suppress the backend call, not only change a menu tick")
-		restore()
+	helpers.it("allows ordinary editors with the URL filter and the real lifecycle table (llm-url-app-contract)", function()
+		with_url_request({ app = "code" }, function(observed, lifecycle)
+			helpers.assert_eq(lifecycle.getForegroundApp(), { appId = "code", windowTitle = "Owned document" })
+			helpers.assert_eq(observed.chats, 1, "the enabled URL filter must still send an ordinary editor prediction")
+			helpers.assert_eq(observed.probes, 0, "an ordinary editor is not a browser address control")
+		end)
 	end)
+	helpers.it("allows a browser document through the real URL detector (llm-url-app-contract)", function()
+		with_url_request({ app = "firefox" }, function(observed)
+			helpers.assert_eq(observed.chats, 1)
+			helpers.assert_eq(observed.probes, 1, "browser privacy must use the real accessibility detector")
+		end)
+	end)
+	for _, case in ipairs({
+		{ name = "a browser address control", app = "firefox", url = true },
+		{ name = "an inaccessible browser field", app = "firefox", probe_unknown = true },
+		{ name = "a throwing accessibility helper", app = "firefox", probe_throw = true },
+		{ name = "an unknown native application", app = "" },
+		{ name = "a numeric native application", app = 42 },
+		{ name = "a blank native application", app = " \t" },
+		{ name = "a NUL-bearing native application", app = "code\0unexpected" },
+		{ name = "a failed native window query", window_throw = true },
+		{ name = "a failed lifecycle query", replace_lifecycle = true, lifecycle_throw = true },
+		{ name = "a legacy scalar lifecycle answer", replace_lifecycle = true, foreground = "code" },
+		{ name = "an absent lifecycle answer", replace_lifecycle = true },
+		{ name = "a malformed lifecycle table", replace_lifecycle = true, foreground = {} },
+	}) do
+		helpers.it("refuses " .. case.name .. " with the URL filter (llm-url-app-contract)", function()
+			with_url_request(case, function(observed)
+				helpers.assert_eq(observed.chats, 0, "unknown or protected application context must never reach the backend")
+			end)
+		end)
+	end
+
 end)
 
 helpers.describe("LLM trigger settings: tray reachability", function()
