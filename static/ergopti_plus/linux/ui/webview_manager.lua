@@ -767,7 +767,11 @@ function M.route_message(app_name, bridge_name, payload, source_epoch)
 		return nil
 	end
 
-	local handler = _windows[app_name] and _windows[app_name].handler or _load_handler(app_name)
+	local owned = _windows[app_name]
+	-- Cleanup debt retains resource ownership, never permission to mutate settings.
+	-- Initial ready messages remain admitted while a live page is acquiring.
+	if source_epoch ~= nil and owned and (owned.debt or owned.failed or owned.closing or owned.cancelled) then return nil end
+	local handler = owned and owned.handler or _load_handler(app_name)
 	if not handler or handler.bridge_name ~= expected_bridge
 		or type(handler.on_message) ~= "function" then
 		Logger.warn(LOG, "Owned handler for '%s' is unavailable or mismatched.", app_name)
