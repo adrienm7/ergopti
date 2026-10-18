@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "دفعات — تنبؤات على دفعات (نماذج كبيرة)",
 	"prompt_editor.mode.parallel": "قياسي — تنبؤات متوازية",
 	"prompt_editor.placeholder_prompt": "هذا نص، تابعه: {context}",
+	"prompt_editor.save_failed": "تعذّر حفظ ملف تعليمات الذكاء الاصطناعي. بقي المحرّر مفتوحًا لتتمكّن من المحاولة مجددًا.",
 	"prompt_editor.title_edit": "تعديل الملف الشخصي",
 	"prompt_editor.title_new": "ملف شخصي جديد",
 	"script_control.pause_failed": "تعذّر إيقاف البرنامج النصي مؤقتًا؛ تم الاحتفاظ بالحالة السابقة.",

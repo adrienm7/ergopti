@@ -325,6 +325,7 @@ return {
 	"tests.meta.architecture.test_no_method_call_on_plain_function",
 	"tests.unit.adapters.system.test_application_notifier",
 	"tests.unit.adapters.system.test_notifier_adapter",
+	"tests.unit.ui.editors.prompt_editor.test_save_errors",
 	"tests.unit.ui.editors.test_numeric_prompt",
 	"tests.meta.architecture.test_parse_coverage",
 	"tests.meta.architecture.test_port_adapter_presence",

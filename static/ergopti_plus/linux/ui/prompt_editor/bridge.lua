@@ -82,6 +82,24 @@ local function push_init(session, state, context)
 	return ok_push and pushed == true, session.payload
 end
 
+--- Reports a refused save only while its exact native editor still owns the draft.
+--- @param session table
+--- @param state table
+--- @return boolean requested
+local function notify_save_refused(session, state)
+	if _active_session ~= session or session.settled or type(state) ~= "table"
+		or type(state.notify_error) ~= "function" then return false end
+	local manager = dependency(state, "webview_manager", "ui.webview_manager")
+	local current = manager and manager.page_current
+	local epoch, notify = session.window_epoch, state.notify_error
+	if type(current) ~= "function" or type(epoch) ~= "number" then return false end
+	local checked, live = pcall(current, APP_NAME, epoch)
+	if not checked or live ~= true or _active_session ~= session or session.settled
+		or session.window_epoch ~= epoch or manager.page_current ~= current
+		or state.notify_error ~= notify then return false end
+	return pcall(notify, "prompt_editor.save_failed")
+end
+
 local function new_session(existing, on_save, opts)
 	opts = type(opts) == "table" and opts or {}
 	_session_serial = _session_serial + 1
@@ -228,6 +246,7 @@ function M.on_message(payload, state, context)
 	if not ok_save or accepted ~= true then
 		Logger.error(LOG, "Prompt editor save was refused; session remains retryable: %s.",
 			tostring(accepted))
+		notify_save_refused(session, state)
 		return { saved = false, closed = false }
 	end
 

@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Groupé — prédictions par lot (grands modèles)",
 	"prompt_editor.mode.parallel": "Standard — prédictions en parallèle",
 	"prompt_editor.placeholder_prompt": "Voici un texte, continue-le : {context}",
+	"prompt_editor.save_failed": "Le profil de prompt n'a pas pu être enregistré. L'éditeur reste ouvert pour vous permettre de réessayer.",
 	"prompt_editor.title_edit": "Modifier le profil",
 	"prompt_editor.title_new": "Nouveau profil",
 	"script_control.pause_failed": "Impossible de mettre le script en pause ; l’état précédent a été conservé.",

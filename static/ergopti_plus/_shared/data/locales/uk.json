@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Пакетний — передбачення партіями (великі моделі)",
 	"prompt_editor.mode.parallel": "Стандартний — паралельні передбачення",
 	"prompt_editor.placeholder_prompt": "Ось текст, продовжте його: {context}",
+	"prompt_editor.save_failed": "Не вдалося зберегти профіль запиту. Редактор залишається відкритим, щоб ви могли спробувати ще раз.",
 	"prompt_editor.title_edit": "Редагувати профіль",
 	"prompt_editor.title_new": "Новий профіль",
 	"script_control.pause_failed": "Не вдалося призупинити скрипт; попередній стан збережено.",

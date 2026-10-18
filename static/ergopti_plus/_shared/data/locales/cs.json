@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Dávkový — předpovědi v dávkách (velké modely)",
 	"prompt_editor.mode.parallel": "Standardní — paralelní předpovědi",
 	"prompt_editor.placeholder_prompt": "Zde je text, pokračujte v něm: {context}",
+	"prompt_editor.save_failed": "Profil pokynů se nepodařilo uložit. Editor zůstává otevřený, abyste to mohli zkusit znovu.",
 	"prompt_editor.title_edit": "Upravit profil",
 	"prompt_editor.title_new": "Nový profil",
 	"script_control.pause_failed": "Skript se nepodařilo pozastavit; předchozí stav byl zachován.",
