@@ -827,6 +827,41 @@ _TOML_WriteSourceMatches(Path, SourcePresent, SourceBytes) {
 	return SourcePresent ? FSUtf8ExactMatches(Path, SourceBytes) : !FileExist(Path)
 }
 
+; Generic replacement owns exact native section identities. Keep this policy
+; beside its caller; the sealed document codec also serves other write owners.
+_TOML_ExactSectionDropped(Section, Prefixes) {
+	for Prefix in Prefixes {
+		if Section == Prefix || InStr(Section, Prefix . ".", true) == 1
+			return true
+	}
+	return false
+}
+
+; A representable flat source can retire exactly owned lexical rows before the
+; sealed renderer runs. Prove the original source first, then let ordinary
+; admission verify the filtered source and the complete unchanged target model.
+; Unrepresented namespaces retain their existing independent admission rules.
+_TOML_AdmitExactPrefixCandidate(Source, Before, After, Candidate, Updates, Prefixes) {
+	if !Prefixes.Length
+		return TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes)
+	Document := TOML_ParseDocument(Source, , &Physical)
+	if !TOML_SameValue(Document, _TOML_FlatDocument(Before))
+		return TOML_AdmitWriterCandidate(Source, Before, After, Candidate, Updates, Prefixes)
+	FilteredSource := SubStr(Source, 1, 1) == Chr(0xFEFF) ? Chr(0xFEFF) : ""
+	for Record in Physical {
+		if (Record.Kind == "header" || Record.Kind == "assignment")
+				&& _TOML_ExactSectionDropped(Record.Section, Prefixes)
+			continue
+		FilteredSource .= Record.Text
+	}
+	FilteredBefore := Before.Clone()
+	for Section in Before {
+		if _TOML_ExactSectionDropped(Section, Prefixes)
+			FilteredBefore.Delete(Section)
+	}
+	return TOML_AdmitWriterCandidate(FilteredSource, FilteredBefore, After, Candidate, Updates, [])
+}
+
 _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 		ProvidedContent := unset, ProvidedPresence := unset, DocumentMode := false, AdmissionFn := 0) {
 		if !(Mode is String) || (Mode != "write" && Mode != "build")
@@ -925,7 +960,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 			if (ExactSectionPrefixes.Length > 0) {
 					KeptOrder := []
 					for _, SecName in order {
-							DropSection := _TOML_RecordSectionDropped(SecName, ExactSectionPrefixes)
+							DropSection := _TOML_ExactSectionDropped(SecName, ExactSectionPrefixes)
 							if DropSection
 									Sections.Delete(SecName)
 							else
@@ -1008,7 +1043,7 @@ _TOML_BatchWriteImpl(Path, Updates, ExactSectionPrefixes, Mode,
 					for _, k in SortedKeys
 							body .= TOML_RenderKey(k) . " = " . TOML_RenderValue(RenderingSections[sec][k]) . "`n"
 			}
-			try Admitted := TOML_AdmitWriterCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
+			try Admitted := _TOML_AdmitExactPrefixCandidate(SourceBytes, Parsed, Sections, Chr(0xFEFF) . body,
 				Updates, ExactSectionPrefixes)
 			catch as Err {
 					try LoggerError("TomlWrite", "Refusing TOML {1} for '{2}': {3}. No file was changed.", Mode, Path, Err.Message)

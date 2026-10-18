@@ -321,3 +321,50 @@ Test("TOML: detached exact replacement preserves case twins (toml-exact-prefix-c
 	_TBES_CaseDistinctNamespace.Bind(true))
 Test("TOML: published exact replacement preserves case twins (toml-exact-prefix-case)",
 	_TBES_CaseDistinctNamespace.Bind(false))
+
+; Namespace filtering must use complete lexical records, while source admission
+; must still reject a flat projection that hides a genuine root assignment.
+_TBES_ExactPrefixSourceAdmission(BuildOnly) {
+	Path := _CTU_NewPath()
+	Foreign := '[Records]`nkeep = [`n  "001", # exact foreign item`n  false,`n]`n'
+	Source := '[records]`nold = [`n  "discarded", # owned multiline item`n]`n'
+		. '# retained boundary comment`n' . Foreign
+	try {
+		AssertTrue(FSWrite(Path, Source))
+		if BuildOnly {
+			Built := TOML_BuildUpdatedContent(Path, [], ["records"])
+			AssertEqual("ok", Built["status"])
+			Saved := Built["content"]
+			AssertEqual(FSReadUtf8Exact(Path), Built["source_content"])
+			AssertTrue(FSUtf8ExactMatches(Path, Source), "detached filtering retains the original source")
+		} else {
+			AssertTrue(TOML_BatchWrite(Path, [], ["records"]))
+			Saved := FSReadUtf8Exact(Path)
+		}
+		AssertContains(Saved, '# retained boundary comment`n' . Foreign,
+			"standalone comments and complete foreign multiline spans stay exact")
+		AssertFalse(InStr(Saved, "owned multiline item"), "retiring an assignment removes its whole lexical span")
+		Document := TOML_ParseDocument(Saved)
+		AssertFalse(Document.Has("records"))
+		AssertTrue(Document["Records"]["keep"][1] is String)
+		AssertEqual("001", Document["Records"]["keep"][1])
+		AssertTrue(Document["Records"]["keep"][2] is TOML_Bool)
+		AssertFalse(Document["Records"]["keep"][2].Value)
+
+		; Prefix ownership cannot lend authority over an ignored root namespace.
+		FSDelete(Path)
+		Source := 'hidden = "001"`n[records]`nold = false`n' . Foreign
+		AssertTrue(FSWrite(Path, Source))
+		if BuildOnly {
+			Built := TOML_BuildUpdatedContent(Path, [], ["records"])
+			AssertEqual("error", Built["status"])
+		} else {
+			AssertFalse(TOML_BatchWrite(Path, [], ["records"]))
+		}
+		AssertTrue(FSUtf8ExactMatches(Path, Source), "unrepresented source data still refuses before publication")
+	} finally FSDelete(Path)
+}
+Test("TOML: detached exact filtering retains source admission (toml-exact-prefix-source-admission)",
+	_TBES_ExactPrefixSourceAdmission.Bind(true))
+Test("TOML: published exact filtering retains source admission (toml-exact-prefix-source-admission)",
+	_TBES_ExactPrefixSourceAdmission.Bind(false))
