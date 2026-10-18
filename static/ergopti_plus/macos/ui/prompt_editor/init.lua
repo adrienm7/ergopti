@@ -250,7 +250,14 @@ function M.open(existing, on_save)
 		if type(body) ~= "table" then return end
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
-		if window.rollback_pending or active.settled then return end
+		if window.rollback_pending or active.settled then
+			-- A refused native delete leaves this exact page visible. Its queued
+			-- Save/Cancel may retry cleanup without persisting again; a retired
+			-- bridge whose window already closed owns no further actions.
+			if window.presented and window.webview ~= nil and not window.closing
+				and (body.action == "cancel" or body.action == "save") then close_window(window) end
+			return
+		end
 
 		if body.action == "cancel" then
 			active.settled = true
@@ -365,6 +372,7 @@ function M.open(existing, on_save)
 		return false
 	end
 	window.webview = webview
+	window.presented = true
 	_webview = webview
 	Logger.info(LOG, "Prompt editor opened successfully.")
 	return true
