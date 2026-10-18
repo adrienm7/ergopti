@@ -693,7 +693,7 @@ local driver = root .. "/static/ergopti_plus/macos"
 local shared = root .. "/static/ergopti_plus/_shared/lua"
 package.path = driver .. "/?.lua;" .. driver .. "/?/init.lua;" .. shared .. "/?.lua;" .. shared .. "/?/init.lua;" .. driver .. "/tests/stubs/?.lua;" .. package.path
 _G.hs = require("hs")
-assert(loadfile(driver .. "/tests/unit/ui/menu/menu_llm/test_managed_ollama_pull_activation.lua"))()
+assert(loadfile(driver .. "/tests/unit/ui/menu/menu_llm/ollama/test_managed_ollama_pull_activation.lua"))()
 local results = require("tests.helpers").get_results()
 assert(results.failed == 0 and results.passed == 16, "all pull activation controls must pass")
 print("Managed pull activation controls passed: " .. results.passed)
