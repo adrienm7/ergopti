@@ -1089,3 +1089,67 @@ helpers.describe("original Engine native passthrough is not a tap-hold claim", f
 		Manager._reset_for_test(); os.remove(path); if not ok then error(why, 0) end
 	end)
 end)
+
+
+helpers.describe("ordinary tap actions retain their Manager owner through logging", function()
+	for _, transition in ipairs({ "pause", "disable", "reload", "pause/resume", "benign" }) do
+		helpers.it("revalidates an actual Shift tap across a " .. transition .. " logging callback", function()
+			local names = { "logger", "logger.shim", "platform.remap.nav_layer", "platform.remap.tap_hold_manager" }
+			local saved = {}
+			for _, name in ipairs(names) do saved[name] = package.loaded[name] end
+			local Manager, path, Logger
+			local ok, err = pcall(function()
+				-- A fresh genuine logger preserves another test's sink and level.
+				Logger = helpers.load_module("logger")
+				Logger.set_level("DEBUG")
+				package.loaded["logger.shim"] = Logger
+				local hook, actions
+				Manager, hook, actions, path = manager()
+				local engine, dispatch = hook.engine, hook.on_tap
+				engine:process(42, 1, 0)
+				local _, action, binding = engine:process(42, 0, 100)
+				helpers.assert_eq(action, "copy")
+				helpers.assert_eq(binding, "tap_hold__left_shift")
+				local observed, callback_ok, callback_error = false, false, nil
+				Logger.set_sink(function(line)
+					if observed or not line:find("Tap action 'copy'.", 1, true) then return end
+					observed = true
+					Logger.set_sink(nil)
+					-- The real logger intentionally swallows sink errors. Retain the
+					-- transition ACK so that cannot turn a broken fixture green.
+					callback_ok, callback_error = pcall(function()
+						if transition == "pause" then assert(Manager.set_paused(true))
+						elseif transition == "disable" then assert(Manager.set_enabled(false))
+						elseif transition == "reload" then assert(Manager.reload())
+						elseif transition == "pause/resume" then
+							assert(Manager.set_paused(true)); assert(Manager.set_paused(false))
+						end
+					end)
+				end)
+				dispatch(action, binding)
+				Logger.set_sink(nil)
+				helpers.assert_true(observed, "the real synchronous logger sink must be exercised")
+				helpers.assert_true(callback_ok, tostring(callback_error))
+				helpers.assert_eq(actions, transition == "benign" and { "copy@tap_hold__left_shift" } or {})
+				if transition == "pause" or transition == "disable" then
+					dispatch(action, binding)
+					helpers.assert_eq(actions, {}, "an inactive entry cannot dispatch a retained callback")
+				end
+				if transition ~= "benign" then
+					helpers.assert_true(Manager.set_paused(false))
+					helpers.assert_true(Manager.set_enabled(true))
+					helpers.assert_true(Manager.is_active())
+					hook.engine:process(42, 1, 300)
+					local _, fresh_action, fresh_binding = hook.engine:process(42, 0, 400)
+					hook.on_tap(fresh_action, fresh_binding)
+					helpers.assert_eq(actions, { "copy@tap_hold__left_shift" }, "a fresh active tap still executes once")
+				end
+			end)
+			if Logger then Logger.set_sink(nil) end
+			if Manager then Manager._reset_for_test() end
+			if path then os.remove(path) end
+			for _, name in ipairs(names) do package.loaded[name] = saved[name] end
+			if not ok then error(err, 0) end
+		end)
+	end
+end)
