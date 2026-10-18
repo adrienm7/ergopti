@@ -481,12 +481,12 @@ function admitNativeNumberRowSelector(mac) {
 	return mac.slice(0, position) + mac.slice(position + NUMBER_ROW_FILTER.length);
 }
 
-// This independent selector qualifies the actual Lua script, retaining the
+// This independent selector qualifies the native command and launcher cohorts, retaining the
 // blanket refusal for every full-package or foreign exclusion.
-const INPUT_SOURCE_FILTER = "--filter '(^|[.])InputSourceAppleScriptTests([/.]|$)'";
+const INPUT_SOURCE_FILTER = '--filter "(^|[.])$classname([/.]|$)"';
 const INPUT_SOURCE_STEP_SOURCE = guardedStep(
 	'managed-ollama-native',
-	fs.readFileSync(path.join(__dirname, 'fixtures/input-source-applescript-step.txt'), 'utf8')
+	fs.readFileSync(path.join(__dirname, 'fixtures/native-input-source-command-step.txt'), 'utf8')
 );
 function admitNativeInputSourceSelector(mac) {
 	if (mac.split(INPUT_SOURCE_FILTER).length !== 2) return null;
@@ -494,7 +494,7 @@ function admitNativeInputSourceSelector(mac) {
 	if (jobs.length !== 1) return null;
 	const steps = [
 		...jobs[0][0].matchAll(
-			/^      - name: Qualify actual input-source AppleScript XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+			/^      - name: Qualify native input-source and launcher XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
 		)
 	];
 	if (steps.length !== 1) return null;
@@ -1234,22 +1234,22 @@ function run({ includeLeafControls = true } = {}) {
 		});
 
 	assert.equal(passed, 76);
-	// Independent script selection keeps every historical control above unchanged.
+	// Independent native cohorts keep every historical control above unchanged.
 	assert.equal(admitNativeInputSourceSelector(workflow), workflow.replace(INPUT_SOURCE_FILTER, ''));
 	const inputSourceStep =
-		/^      - name: Qualify actual input-source AppleScript XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/m.exec(
+		/^      - name: Qualify native input-source and launcher XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/m.exec(
 			workflow
 		)?.[0];
 	assert.ok(inputSourceStep);
 	let inputSourceSelectorControls = 0;
 	for (const [from, to] of [
-		[INPUT_SOURCE_FILTER, "--filter 'InputSourceAppleScriptTests'"],
+		[INPUT_SOURCE_FILTER, "--filter 'NativeInputSourceSelectionTests'"],
 		[INPUT_SOURCE_FILTER, INPUT_SOURCE_FILTER + ' ' + INPUT_SOURCE_FILTER],
-		['receipt.expected_count !== 2', 'receipt.expected_count !== 1'],
-		['receipt.received_count !== 2', 'receipt.received_count !== 1'],
+		['receipt.expected_count !== expectedCount', 'receipt.expected_count !== expectedCount - 1'],
+		['receipt.received_count !== expectedCount', 'receipt.received_count !== expectedCount - 1'],
 		['${input_source_statuses[0]}', '0'],
 		['${input_source_statuses[1]}', '0'],
-		['InputSourceAppleScriptTests.swift', 'ForeignTests.swift'],
+		['NativeInputSourceSelectionTests.swift', 'ForeignTests.swift'],
 		['modules/keymap/input_sources.lua', 'modules/keymap/foreign.lua'],
 		['test "$(git rev-parse HEAD)" = "$GITHUB_SHA"', ': "$GITHUB_SHA"'],
 		['test "$architecture" = "$MACOS_STAGE_ARCHITECTURE"', ': "$MACOS_STAGE_ARCHITECTURE"'],
@@ -1263,10 +1263,25 @@ function run({ includeLeafControls = true } = {}) {
 		inputSourceSelectorControls++;
 	}
 	assert.equal(inputSourceSelectorControls, 12);
-	console.log('PASS: input-source AppleScript exact-selector controls=12; native execution UNRUN.');
+	console.log('PASS: native input-source exact-selector controls=12; native execution UNRUN.');
+	let inputSourceCohortControls = 0;
+	for (const [from, to] of [
+		['NativeInputSourceSelectionTests:4', 'NativeInputSourceSelectionTests:3'],
+		[' EmbeddedFatalReportTests:11', ''],
+		['then overall_status=1; fi', 'then overall_status=1; break; fi']
+	]) {
+		assert.equal(inputSourceStep.split(from).length, 2);
+		const changed = workflow.replace(inputSourceStep, inputSourceStep.replace(from, to));
+		assert.equal(admitNativeInputSourceSelector(changed), null);
+		assert.equal(admitNativeSdkSelector(changed), null);
+		inputSourceCohortControls++;
+	}
+	assert.equal(inputSourceCohortControls, 3);
+	console.log('PASS: native input-source closed-cohort controls=3; native execution UNRUN.');
 	const inputSourceComparisons =
-		'          cmp "$source" "$evidence/InputSourceAppleScriptTests.swift"\n' +
-		'          cmp "$producer" "$evidence/input_sources.lua"\n';
+		'          for source in "${sources[@]}"; do\n' +
+		'            cmp "$source" "$evidence/$(basename "$source")"\n' +
+		'          done\n';
 	assert.equal(inputSourceStep.split(inputSourceComparisons).length, 2);
 	for (const [name, step] of [
 		[
@@ -1275,7 +1290,7 @@ function run({ includeLeafControls = true } = {}) {
 		],
 		[
 			'nonexecuting validator',
-			inputSourceStep.replace('node - "$evidence/input-source-verdict.json"', 'cat')
+			inputSourceStep.replace('node - "$receipt" "$classname" "$expected_count"', 'cat')
 		],
 		[
 			'comparisons before native execution',
@@ -1289,9 +1304,7 @@ function run({ includeLeafControls = true } = {}) {
 		assert.equal(admitNativeInputSourceSelector(changed), null, name);
 		assert.equal(admitNativeSdkSelector(changed), null, name);
 	}
-	console.log(
-		'PASS: input-source AppleScript execution-bypass controls=3; native execution UNRUN.'
-	);
+	console.log('PASS: native input-source execution-bypass controls=3; native execution UNRUN.');
 	let publicationControls = 0;
 	for (const lane of ['core', 'macos', 'windows', 'linux']) {
 		const entry = `      - ${lane}\n`;
