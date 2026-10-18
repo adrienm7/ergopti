@@ -46,13 +46,7 @@ helpers.describe("State.new: argument validation", function()
 	end)
 end)
 
-helpers.describe("State pause and delay invariants", function()
-	helpers.it("pause must silence state mutations (project_suspend_pause_invariant)", function()
-		-- Real gating is in eventtap / dispatch, but state must support pause checks
-		local s = State.new(make_defaults(), { autocorrection = 0.3 })
-		helpers.assert_true(s ~= nil)
-	end)
-
+helpers.describe("State delay invariants", function()
 	helpers.it("delays_default seeds per-group expansion delays", function()
 		local s = State.new(make_defaults(), { autocorrection = 0.3, rolls = 1.5 })
 		-- State seeds BASE_DELAY_SEC from the defaults.expansion_delay (the per-group values go into DELAYS).
