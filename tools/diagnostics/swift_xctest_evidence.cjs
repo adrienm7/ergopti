@@ -135,10 +135,11 @@ function rootPattern(admission, brewAdmission = null) {
 		throw new TypeError('Unadmitted Brew qualification.');
 	const rows = packageDeferrals(admission, brewAdmission);
 	// Brew and owned-runtime deferrals share one source and one publication
-	// profile with the PAC receipt, whether PAC itself is deferred or full.
+	// profile with the PAC receipt, whether PAC itself is deferred or full; a
+	// deferred PAC receipt also binds the joined Brew receipt to its source.
 	if (
 		brewAdmission !== null &&
-		(brewAdmission.mode === 'deferred' || brewAdmission.owned_runtime_methods) &&
+		rows.length > 0 &&
 		(admission === null ||
 			admission.source_sha !== brewAdmission.source_sha ||
 			rows.some(
