@@ -301,6 +301,10 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 	end
 	local function on_fail(reason, detail)
 		if not is_current(generation, "transcription") then return end
+		if reason == "cancelled" then
+			engine.close_answer_surface(session)
+			return
+		end
 		local Offer = require("modules.llm.local_model_offer")
 		if Offer.is_missing(reason, detail) then
 			-- Named, with its Download button, instead of the vague failure
@@ -317,7 +321,8 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 	-- and generation must still belong to this image at the private POST boundary.
 	local function may_dispatch()
 		if is_current(generation, "vision dispatch")
-			and engine.admit_answer_request("Screen reading") == true then return true end
+			and engine.admit_answer_request("Screen reading") == true
+			and is_current(generation, "dispatch admission") then return true end
 		engine.close_answer_surface(session)
 		return false
 	end
@@ -330,7 +335,7 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		local Remote = dependency("modules.llm.api_remote", "request_vision")
 		if not Remote then return fail("the remote backend is unavailable") end
 		if not may_dispatch() then return end
-		Remote.request_vision(backend.provider, model, body, on_text, on_fail)
+		Remote.request_vision(backend.provider, model, body, on_text, on_fail, may_dispatch)
 	end
 end
 
