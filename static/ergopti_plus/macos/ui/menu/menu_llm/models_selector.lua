@@ -370,6 +370,7 @@ function M.build(ctx)
 			usercontent = uc,
 			html_string = html,
 			inject_i18n = false,
+			delete_on_close = true,
 			on_close    = function()
 				if _custom_model_session == session then
 					_custom_model_session = nil
