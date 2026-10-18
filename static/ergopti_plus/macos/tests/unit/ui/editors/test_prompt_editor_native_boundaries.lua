@@ -23,7 +23,7 @@ local function with_editor(callback)
 			hs_stub.webview.usercontent.new = function()
 				local bridge = {}
 				function bridge:setCallback(fn)
-					if state.bind_throws then error("native bridge bind refused") end
+					if fn ~= nil and state.bind_throws then error("native bridge bind refused") end
 					self.callback = fn
 					return self
 				end
