@@ -6,8 +6,7 @@ import XCTest
 final class OwnedRuntimeLifecycleInitializerCustodyTests: XCTestCase {
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
  private func fixture() throws -> URL {
-  let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString)
-  try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+  let parent = try OwnedRuntimeFixtureDirectory.create()
   return parent
  }
  func testEarlyRefusalDoesNotInvokeInitializedSelfRetirement() throws {

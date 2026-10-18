@@ -8,8 +8,7 @@ import XCTest
 final class OwnedRuntimeNamespaceCloseOrderTests: XCTestCase {
 #if ERGOPTI_GUARDIAN_TEST_SUPPORT
 	private func fixture(_ body: (URL) throws -> Void) throws {
-		let parent = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().appendingPathComponent(UUID().uuidString)
-		try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: false)
+		let parent = try OwnedRuntimeFixtureDirectory.create()
 		defer { try? FileManager.default.removeItem(at: parent) }
 		try body(parent)
 	}
