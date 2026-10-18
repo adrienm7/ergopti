@@ -71,6 +71,7 @@ helpers.initialize_timing()
 local ModuleIsolation = require("tests.support.module_isolation")
 local OnlySelector = require("tests.support.only_selector")
 local ModuleGroups = require("tests.support.module_groups")
+local CommandLines = require("tests.support.command_lines")
 
 -- --only accepts an exact test module path/name or a historical case-name
 -- substring, so one file or behaviour can be re-run from a red message
@@ -143,10 +144,8 @@ local function discover_tests(dir)
 	if package.config:sub(1, 1) == "\\" then
 		cmd = string.format('cmd /c dir /b /s /a-d "%s"', abs:gsub("/", "\\"))
 	else
-		cmd = string.format("find '%s' -type f -name 'test_*.lua'", abs)
+		cmd = string.format("find %s -type f -name 'test_*.lua'", shell_quote(abs))
 	end
-	local pipe = io.popen(cmd)
-	if not pipe then return results end
 	-- Build an absolute, normalized prefix to strip from each result line
 	local strip_prefix
 	if driver_root == "." then
@@ -161,7 +160,7 @@ local function discover_tests(dir)
 	else
 		strip_prefix = driver_root
 	end
-	for raw_line in pipe:lines() do
+	for _, raw_line in ipairs(CommandLines.read(cmd)) do
 		local line = raw_line:gsub("\\", "/")
 		-- Match suffix that starts after the driver root and ends in .lua
 		local rel
@@ -174,7 +173,6 @@ local function discover_tests(dir)
 			results[#results + 1] = rel:gsub("/", ".")
 		end
 	end
-	pipe:close()
 	return results
 end
 
@@ -204,7 +202,9 @@ helpers.reset_results()
 
 local discovered_modules = {}
 for _, dir in ipairs(TEST_DIRS) do
-	for _, mod_name in ipairs(discover_tests(dir)) do
+	local modules = discover_tests(dir)
+	assert(#modules > 0, "no test modules discovered in " .. dir)
+	for _, mod_name in ipairs(modules) do
 		discovered_modules[#discovered_modules + 1] = mod_name
 	end
 end
