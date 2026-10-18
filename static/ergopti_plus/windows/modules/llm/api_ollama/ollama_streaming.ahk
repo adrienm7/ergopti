@@ -995,11 +995,8 @@ _LLM_Ollama_StreamPoll(handle, state, on_partial, on_success, on_fail) {
 ; message pump keeps pumping. Bounded by _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES.
 _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	global _LLM_OLLAMA_STREAM_FLUSH_MAX_RETRIES, _LLM_OLLAMA_STREAM_FLUSH_RETRY_MS
-	if !_LLM_Ollama_StreamOriginCurrent(handle) {
-		_LLM_Ollama_CleanupStreamFiles(handle)
-		_LLM_Ollama_RemoveStreamHandle(handle)
+	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
 		return
-	}
 	try {
 		chunk := _LLM_Ollama_ReadStreamText(handle.TmpStdout, state, true)
 		if chunk != ""
@@ -1008,6 +1005,8 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		state["failed"] := true
 		state["stream_error"] := "Final stream output read failed: " . Err.Message
 	}
+	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
+		return
 	; The process has stopped, but a response can still contain many bounded
 	; JSONL records. Yield between slices instead of collapsing the final tail
 	; into one FileRead-sized allocation on the AHK timer thread.
@@ -1045,11 +1044,8 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		state["leftover"] := ""
 		_LLM_Ollama_ConsumeStreamChunk(_resid . "`n", state, on_partial)
 	}
-	if !_LLM_Ollama_StreamOriginCurrent(handle) {
-		_LLM_Ollama_CleanupStreamFiles(handle)
-		_LLM_Ollama_RemoveStreamHandle(handle)
+	if _LLM_Ollama_StopStaleStreamFlush(handle, on_fail)
 		return
-	}
 	Result := _LLM_Ollama_StreamTerminalResult(state)
 	hint := ""
 	if !Result["ok"] and Result["error"] == "Streaming finished with empty response."
@@ -1058,6 +1054,10 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 	_LLM_Ollama_RemoveStreamHandle(handle)
 	if !_LLM_Ollama_StreamOriginCurrent(handle)
 		return
+	if handle.Cancelled {
+		_LLM_InvokeCallback(on_fail, "on_fail")
+		return
+	}
 	if !Result["ok"] {
 		try LoggerWarn("LLM.ollama", "{1}{2}", Result["error"],
 			hint != "" ? " " . hint : "")
@@ -1065,8 +1065,23 @@ _LLM_Ollama_StreamFinalFlush(handle, state, on_partial, on_success, on_fail) {
 		return
 	}
 	try LLM_OllamaNoteInferenceSuccess()
-	if _LLM_Ollama_StreamOriginCurrent(handle)
+	if handle.Cancelled
+		_LLM_InvokeCallback(on_fail, "on_fail")
+	else if _LLM_Ollama_StreamOriginCurrent(handle)
 		_LLM_InvokeCallback(on_success, "on_success", Result["text"])
+}
+
+
+; Cancellation can land after curl exits, while its timer drains final bytes or
+; invokes a partial callback. Origin currency alone does not carry that intent.
+_LLM_Ollama_StopStaleStreamFlush(handle, on_fail) {
+	if !handle.Cancelled && _LLM_Ollama_StreamOriginCurrent(handle)
+		return false
+	_LLM_Ollama_CleanupStreamFiles(handle)
+	_LLM_Ollama_RemoveStreamHandle(handle)
+	if handle.Cancelled
+		_LLM_InvokeCallback(on_fail, "on_fail")
+	return true
 }
 
 _LLM_Ollama_StreamTerminalResult(state) {
