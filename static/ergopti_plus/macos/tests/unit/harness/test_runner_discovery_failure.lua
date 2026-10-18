@@ -1,4 +1,4 @@
---- tests/meta/harness/test_runner_discovery_failure.lua
+--- tests/unit/harness/test_runner_discovery_failure.lua
 
 --- ==============================================================================
 --- MODULE: Test Discovery Failure Regressions
