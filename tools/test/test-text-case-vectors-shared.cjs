@@ -140,7 +140,7 @@ for (const needed of ['élève', "l'", '-', 'ß', 'Σ']) {
 // Each suite replays the corpus, and each replay is wired into its runner.
 const CONSUMERS = [
 	{
-		file: 'macos/tests/unit/modules/shortcuts/test_text_case_vectors.lua',
+		file: 'macos/tests/unit/modules/shortcuts/text_actions/test_text_case_vectors.lua',
 		path: 'tests/corpus/text_case/vectors.json'
 	},
 	{
@@ -159,7 +159,7 @@ for (const consumer of CONSUMERS) {
 }
 const linuxManifest = fs.readFileSync(path.join(SP, 'linux', 'tests', 'test_manifest.lua'), 'utf8');
 check(
-	linuxManifest.includes('"tests.unit.modules.shortcuts.test_text_case_vectors"'),
+	linuxManifest.includes('"tests.unit.modules.shortcuts.text_actions.test_text_case_vectors"'),
 	'the Linux test manifest must list test_text_case_vectors'
 );
 const ahkRunner = fs.readFileSync(path.join(SP, 'windows', 'tests', 'run_all.ahk'), 'utf8');
