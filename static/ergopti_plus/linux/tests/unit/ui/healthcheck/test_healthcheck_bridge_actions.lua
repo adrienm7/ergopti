@@ -26,6 +26,10 @@ local HOME = "/home/jdoe"
 --- @return table bridge, table context
 local function load_bridge(controls)
 	controls = controls or {}
+	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
+		"ui.webview_manager", "adapters.clipboard", "infra.config_paths" }
+	local loaded = {}
+	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
 	local context = { pushed = {}, copied = {}, warnings = {}, starts = 0, cancels = 0, closed = 0, epoch = 7 }
 	for _, name in ipairs({ "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }) do
 		package.loaded[name] = nil
@@ -65,10 +69,7 @@ local function load_bridge(controls)
 	context.restore = function()
 		sink.log_dir = previous_log_dir
 		logger.warn = warn
-		package.loaded["ui.webview_manager"] = nil
-		package.loaded["adapters.clipboard"] = nil
-		package.loaded["infra.config_paths"] = nil
-		package.loaded["ui.healthcheck.probes"] = nil
+		for _, name in ipairs(replaced) do package.loaded[name] = loaded[name] end
 	end
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	return bridge, context
@@ -83,8 +84,9 @@ local function with_bridge(controls, body)
 	os.getenv = function(name) if name == "USER" then return "jdoe" end return getenv(name) end
 	local ok, err = xpcall(function() body(bridge, context) end, debug.traceback)
 	os.getenv = getenv
-	context.restore()
+	local restored, restore_error = pcall(context.restore)
 	if not ok then error(err, 0) end
+	if not restored then error(restore_error, 0) end
 end
 
 --- The page context the webview manager hands every message.
@@ -454,4 +456,33 @@ helpers.describe("diagnostic opener cancellation reentry", function()
 			end)
 		end)
 	end
+end)
+
+helpers.describe("diagnostics bridge fixture ownership", function()
+	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
+		local paths = require("infra.config_paths")
+		local preferences = require("infra.metrics_preferences")
+		local names = { "infra.config_paths", "infra.metrics_preferences", "ui.webview_manager", "adapters.clipboard",
+			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
+		local before = {}
+		for _, name in ipairs(names) do before[name] = package.loaded[name] end
+		local logger, sink = require("logger.shim"), require("infra.logger_sink")
+		local warn, log_dir, getenv = logger.warn, sink.log_dir, os.getenv
+		local failure, visited = {}, 0
+		local ok, detail = pcall(with_bridge, nil, function(bridge, context)
+			local answer = bridge.on_message("ready", {}, page(context))
+			helpers.assert_eq(answer.config.context.home, HOME)
+			visited = visited + 1
+			error(failure, 0)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(rawequal(detail, failure), "preserve the original body failure after cleanup")
+		helpers.assert_eq(visited, 1, "the real bridge ran before the controlled body failure")
+		for _, name in ipairs(names) do
+			helpers.assert_true(rawequal(package.loaded[name], before[name]), "restore original cache identity: " .. name)
+		end
+		helpers.assert_true(rawequal(require("infra.config_paths"), paths))
+		helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
+		helpers.assert_true(logger.warn == warn and sink.log_dir == log_dir and os.getenv == getenv)
+	end)
 end)
