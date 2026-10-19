@@ -263,6 +263,21 @@ _TED_GlobalHandlerSurfacesThroughTheWindow() {
 Test("error window: uncaught errors reach it by their site, without a toast (error-dialog-windows)",
 	_TED_GlobalHandlerSurfacesThroughTheWindow)
 
+; Boot stage aborts logged Message alone; the unassigned global lives in Extra.
+_TED_DescribeKeepsExtraAndSite() {
+	Exc := Error("This global variable has not been assigned a value.", "Foo", "_UserHotstringsLoadEpoch")
+	SplitPath(Exc.File, &FileName)
+	AssertEqual("This global variable has not been assigned a value. (_UserHotstringsLoadEpoch) at "
+		. FileName . ":" . Exc.Line, ErrorNet_Describe(Exc), "the description names the variable and the site")
+	Plain := ValueError("no extra")
+	SplitPath(Plain.File, &PlainName)
+	AssertEqual("no extra at " . PlainName . ":" . Plain.Line, ErrorNet_Describe(Plain),
+		"an empty Extra adds no parentheses")
+	AssertEqual("thrown text", ErrorNet_Describe("thrown text"), "a thrown string stays itself")
+}
+Test("error window: boot failures describe the unassigned variable and its site (boot-error-extra)",
+	_TED_DescribeKeepsExtraAndSite)
+
 
 ; Supplies only synthetic host data; no collector, window or clipboard runs.
 _TED_SharingSnapshot() {

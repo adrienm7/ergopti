@@ -486,7 +486,7 @@ _TrayRootDrain(IsAutomaticRetry := false, LogFn := 0) {
 				throw Err
 			}
 			FailureOutcome := _TrayRootFinishReportableFailure(
-				TargetGeneration, IsAutomaticRetry, Err.Message, LogFn)
+				TargetGeneration, IsAutomaticRetry, ErrorNet_Describe(Err), LogFn)
 			if FailureOutcome == 0
 				continue
 			return false
