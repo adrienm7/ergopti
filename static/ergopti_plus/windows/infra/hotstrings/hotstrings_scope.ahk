@@ -335,8 +335,13 @@ class HotstringsScopeFiles {
 		RowsByPath := Map(this.overrides, [])
 		for Item in _HCW_BuildResetAllPlan(this.entries, this.sections) {
 			if Item.Kind == "personal" {
+				; A restore leaves the user's own files as they are; only a clear
+				; resets their delay, colour, priority and tooltip. The owned file
+				; still gets its (unchanged) candidate, as the coordinator expects.
 				if !RowsByPath.Has(Item.Path)
 					RowsByPath[Item.Path] := []
+				if this.mode == "recommended"
+					continue
 				Section := Item.Sec == "" ? "_meta" : "_meta.sections." . Item.Sec
 				RowsByPath[Item.Path].Push({ Section: Section, Key: Item.Field, Delete: 1 })
 			} else {
