@@ -441,7 +441,7 @@ helpers.describe("managed response reentrancy and closed authority", function()
 				world.on_observe = nil
 				world.api.chat(world.profiles.get_base_url(), "model:2b", {}, {}, function() end)
 			end
-			original.chunk('{"message":{"content":"old"}}\n')
+			original.chunk('{"message":{"content":"old"},"done":true}\n')
 			helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
 		end)
 	end)
@@ -451,7 +451,7 @@ helpers.describe("managed response reentrancy and closed authority", function()
 			world.api.chat(engine.get_base_url(), "model:2b", {}, {}, function(text)
 				chunks[#chunks + 1] = text; engine.stop_runtime()
 			end)
-			world.posts[1].chunk('{"message":{"content":"first"}}\n{"message":{"content":"second"}}\n')
+			world.posts[1].chunk('{"message":{"content":"first"},"done":false}\n{"message":{"content":"second"},"done":true}\n')
 			helpers.assert_eq(chunks, { "first" })
 		end)
 	end)
@@ -600,7 +600,7 @@ helpers.describe("managed response closes per-line observer currency", function(
 				end
 				return parse(line)
 			end
-			local called, failure = pcall(original.chunk, '{"message":{"content":"old"}}\n')
+			local called, failure = pcall(original.chunk, '{"message":{"content":"old"},"done":true}\n')
 			Bridge.parse_stream_line = parse
 			helpers.assert_true(called, failure); helpers.assert_eq(#world.posts, 2); helpers.assert_eq(chunks, {})
 		end)

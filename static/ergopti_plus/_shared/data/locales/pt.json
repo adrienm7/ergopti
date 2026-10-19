@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Em lote — previsões em lotes (modelos grandes)",
 	"prompt_editor.mode.parallel": "Padrão — previsões paralelas",
 	"prompt_editor.placeholder_prompt": "Aqui está um texto, continue-o: {context}",
+	"prompt_editor.save_failed": "Não foi possível guardar o teu perfil de instruções. O editor continua aberto para poderes tentar novamente.",
 	"prompt_editor.title_edit": "Editar perfil",
 	"prompt_editor.title_new": "Novo perfil",
 	"script_control.pause_failed": "Não foi possível pausar o script; o estado anterior foi mantido.",

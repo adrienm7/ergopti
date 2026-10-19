@@ -26,6 +26,10 @@ local HOME = "/home/jdoe"
 --- @return table bridge, table context
 local function load_bridge(controls)
 	controls = controls or {}
+	local replaced = { "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes",
+		"ui.webview_manager", "adapters.clipboard", "infra.config_paths" }
+	local loaded = {}
+	for _, name in ipairs(replaced) do loaded[name] = package.loaded[name] end
 	local context = { pushed = {}, copied = {}, warnings = {}, starts = 0, cancels = 0, closed = 0, epoch = 7 }
 	for _, name in ipairs({ "ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }) do
 		package.loaded[name] = nil
@@ -65,10 +69,7 @@ local function load_bridge(controls)
 	context.restore = function()
 		sink.log_dir = previous_log_dir
 		logger.warn = warn
-		package.loaded["ui.webview_manager"] = nil
-		package.loaded["adapters.clipboard"] = nil
-		package.loaded["infra.config_paths"] = nil
-		package.loaded["ui.healthcheck.probes"] = nil
+		for _, name in ipairs(replaced) do package.loaded[name] = loaded[name] end
 	end
 	logger.warn = function(_, message, ...) context.warnings[#context.warnings + 1] = string.format(message, ...) end
 	return bridge, context
@@ -83,8 +84,9 @@ local function with_bridge(controls, body)
 	os.getenv = function(name) if name == "USER" then return "jdoe" end return getenv(name) end
 	local ok, err = xpcall(function() body(bridge, context) end, debug.traceback)
 	os.getenv = getenv
-	context.restore()
+	local restored, restore_error = pcall(context.restore)
 	if not ok then error(err, 0) end
+	if not restored then error(restore_error, 0) end
 end
 
 --- The page context the webview manager hands every message.
@@ -317,6 +319,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 			local exported = bridge.on_message({ action = "export_snapshot", export_sequence = 77 }, {}, page(context))
 			local fs = require("adapters.file_system")
 			local old_write, old_shell = fs.write, package.loaded["adapters.shell_runner"]
+			local old_desktop = package.loaded["adapters.desktop_opener"]
 			local calls, written = {}, {}
 			fs.write = function(path, value)
 				assert(path:sub(1, #HOME) == HOME and path:find("/diagnostics/", 1, true))
@@ -325,8 +328,10 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 			package.loaded["adapters.shell_runner"] = {
 				quote = function(value) return string.format("%q", value) end,
 				run = function(command) calls[#calls + 1] = command; return true end,
-				run_async = function(executable, args, _, done)
-					calls[#calls + 1] = { executable = executable, args = args }
+			}
+			package.loaded["adapters.desktop_opener"] = {
+				open = function(target, done)
+					calls[#calls + 1] = { executable = "xdg-open", args = { target } }
 					done({ ok = true, code = 0 })
 				end,
 			}
@@ -345,6 +350,7 @@ helpers.describe("diagnostics bridge stable-metadata report", function()
 				helpers.assert_eq(calls[4], { executable = "xdg-open", args = { url } })
 			end, debug.traceback)
 			fs.write, package.loaded["adapters.shell_runner"] = old_write, old_shell
+			package.loaded["adapters.desktop_opener"] = old_desktop
 			if not ok then error(err, 0) end
 		end)
 	end)
@@ -356,7 +362,7 @@ end)
 local function with_deferred_opener(body)
 	with_bridge({ logs_dir = HOME .. "/.local/state/ergopti_plus" }, function(bridge, context)
 		local shell, fs = package.loaded["adapters.shell_runner"], require("adapters.file_system")
-		local held_write = fs.write
+		local held_write, desktop = fs.write, package.loaded["adapters.desktop_opener"]
 		context.openers, context.writes = {}, 0
 		fs.write = function()
 			context.writes = context.writes + 1
@@ -365,8 +371,10 @@ local function with_deferred_opener(body)
 		end
 		package.loaded["adapters.shell_runner"] = {
 			quote = require("adapters.shell_runner").quote, run = function() return true end,
-			run_async = function(program, args, _, done)
-				local call = { program = program, args = args, done = done, cancelled = 0 }
+		}
+		package.loaded["adapters.desktop_opener"] = {
+			open = function(target, done)
+				local call = { program = "xdg-open", args = { target }, done = done, cancelled = 0 }
 				context.openers[#context.openers + 1] = call
 				return { cancel = function() call.cancelled = call.cancelled + 1; if context.on_cancel then context.on_cancel() end end }
 			end,
@@ -379,6 +387,7 @@ local function with_deferred_opener(body)
 			bridge.on_message("ready", {}, page(context)); body(bridge, context, request)
 		end, debug.traceback)
 		fs.write, package.loaded["adapters.shell_runner"] = held_write, shell
+		package.loaded["adapters.desktop_opener"] = desktop
 		if not ok then error(detail, 0) end
 	end)
 end
@@ -454,4 +463,33 @@ helpers.describe("diagnostic opener cancellation reentry", function()
 			end)
 		end)
 	end
+end)
+
+helpers.describe("diagnostics bridge fixture ownership", function()
+	helpers.it("restores exact collaborators and warm preference paths after a body failure", function()
+		local paths = require("infra.config_paths")
+		local preferences = require("infra.metrics_preferences")
+		local names = { "infra.config_paths", "infra.metrics_preferences", "ui.webview_manager", "adapters.clipboard",
+			"ui.healthcheck.bridge", "ui.healthcheck.report", "ui.healthcheck.probes" }
+		local before = {}
+		for _, name in ipairs(names) do before[name] = package.loaded[name] end
+		local logger, sink = require("logger.shim"), require("infra.logger_sink")
+		local warn, log_dir, getenv = logger.warn, sink.log_dir, os.getenv
+		local failure, visited = {}, 0
+		local ok, detail = pcall(with_bridge, nil, function(bridge, context)
+			local answer = bridge.on_message("ready", {}, page(context))
+			helpers.assert_eq(answer.config.context.home, HOME)
+			visited = visited + 1
+			error(failure, 0)
+		end)
+		helpers.assert_eq(ok, false)
+		helpers.assert_true(rawequal(detail, failure), "preserve the original body failure after cleanup")
+		helpers.assert_eq(visited, 1, "the real bridge ran before the controlled body failure")
+		for _, name in ipairs(names) do
+			helpers.assert_true(rawequal(package.loaded[name], before[name]), "restore original cache identity: " .. name)
+		end
+		helpers.assert_true(rawequal(require("infra.config_paths"), paths))
+		helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
+		helpers.assert_true(logger.warn == warn and sink.log_dir == log_dir and os.getenv == getenv)
+	end)
 end)

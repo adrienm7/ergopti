@@ -36,12 +36,8 @@ local function bad()
 	error(object, 0)
 end
 watchdog = assert(uv.new_timer())
-assert(uv.timer_start(watchdog, 30, 0, function()
-	watchdog_calls = watchdog_calls + 1
-	Scheduler.cancelAll()
-	if Loop.isRunning() then Loop.stop() else uv.stop() end
-end) == 0)
 print("START actual native " .. scenario)
+if arg[4] == "delayed_setup" then uv.sleep(40) end
 local options = {}
 if scenario == "after" then bad_token = Scheduler.after(0.001, bad)
 elseif scenario == "every" then bad_token = Scheduler.every(0.001, bad)
@@ -50,6 +46,14 @@ elseif scenario == "periodic" then options.onPeriodic, options.periodSec = bad, 
 elseif scenario == "registered idle" then Loop.add_idle_handler(bad); options.onIdle = function() end
 elseif scenario == "deferred" then assert(Loop.defer(bad)); options.onIdle = function() end
 else error("unknown scenario") end
+-- Setup is outside the watchdog budget. libuv caches loop time until a
+-- native admission refresh, so arm this independent oracle only when ready.
+uv.update_time()
+assert(uv.timer_start(watchdog, 30, 0, function()
+	watchdog_calls = watchdog_calls + 1
+	Scheduler.cancelAll()
+	if Loop.isRunning() then Loop.stop() else uv.stop() end
+end) == 0)
 local ok, err
 if scenario == "after" or scenario == "every" then ok, err = pcall(uv.run)
 else ok, err = pcall(Loop.run, options) end

@@ -274,12 +274,23 @@ function M.run(opts, body)
 		end
 
 		local ok, err = pcall(body, world)
-		engine.dismiss()
-		os.remove(learning_path)
-		os.remove(learning_path .. ".tmp")
-		Connectors._set_deps_for_test(nil)
+		local cleaned, cleanup_err = pcall(function()
+			engine.dismiss()
+			Connectors.shutdown()
+			-- The scripted launchers must return their outcomes before the strict
+			-- dependency reset; shutdown fences their business callbacks first.
+			for _, run in ipairs(world.runs) do run.callback({ ok = false, code = -1 }) end
+			os.remove(learning_path)
+			os.remove(learning_path .. ".tmp")
+			Connectors._set_deps_for_test(nil)
+		end)
+		-- A failed cleanup must not leave scenario modules in later tests.
 		for _, name in ipairs(RELOADED) do package.loaded[name] = previous[name] end
 		for _, name in ipairs(FAKED) do package.loaded[name] = previous[name] end
+		if not cleaned then
+			if not ok then error(tostring(err) .. "\nScenario cleanup failed: " .. tostring(cleanup_err), 0) end
+			error(cleanup_err, 0)
+		end
 		if not ok then error(err, 0) end
 	end, { initial = stored })
 end

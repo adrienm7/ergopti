@@ -73,6 +73,7 @@ local function load_native_backend()
 		typedef struct { int start_offset; int end_offset; } ErgoptiAtspiSelectionRange;
 		void *atspi_accessible_get_text_iface(AtspiAccessible *object);
 		int atspi_text_get_n_selections(void *object, void **error);
+		int atspi_text_get_caret_offset(void *object, void **error);
 		ErgoptiAtspiSelectionRange *atspi_text_get_selection(void *object, int index, void **error);
 		char *atspi_text_get_text(void *object, int start_offset, int end_offset, void **error);
 		void g_error_free(void *error);
@@ -158,13 +159,18 @@ local function load_native_backend()
 		end
 		return identity
 	end
-	function backend.selection(node)
+	function backend.selection(node, span)
 		local text_object = atspi.atspi_accessible_get_text_iface(node)
 		if text_object == nil then return nil, "selection_unavailable" end
 		local function range()
 			local slot = ffi.new("void *[1]")
 			local count = tonumber(atspi.atspi_text_get_n_selections(text_object, slot))
 			if release_error(slot) then return nil end
+			if span then
+				local caret = tonumber(atspi.atspi_text_get_caret_offset(text_object, slot))
+				if release_error(slot) or count ~= 0 or caret ~= span.last then return nil end
+				return { first = span.first, last = span.last }
+			end
 			if count ~= 1 then return nil, count == 0 and "no_selection" or "selection_unavailable" end
 			local native = atspi.atspi_text_get_selection(text_object, 0, slot)
 			local failed = release_error(slot)
@@ -388,11 +394,15 @@ end
 --- Captures one selected range only in the bounded explicit-action helper.
 --- Native text is never read by the resident privacy worker.
 --- @param expected table Original exact native field receipt.
+--- @param span table|nil Immutable inserted span with a collapsed expected caret.
 --- @return table|nil snapshot Exact field, offsets and selected text.
 --- @return boolean conclusive
 --- @return string|nil reason
-function M._get_native_selection_snapshot(expected)
+function M._get_native_selection_snapshot(expected, span)
 	if type(expected) ~= "table" then return nil, false end
+	if span and (type(span) ~= "table" or type(span.first) ~= "number" or span.first < 0 or span.first % 1 ~= 0
+		or type(span.last) ~= "number" or span.last <= span.first or span.last % 1 ~= 0
+		or span.last - span.first > ProcessLimits.defaults().max_output_bytes) then return nil, false end
 	local backend = _backend_for_test or load_native_backend()
 	local role, conclusive, identity, handles = traverse(backend, true)
 	if not conclusive or not handles or not handles.focus or not handles.window or not identity.active_scope or role == 40
@@ -401,7 +411,7 @@ function M._get_native_selection_snapshot(expected)
 		return nil, false
 	end
 	local called, selection, reason = pcall(function()
-		local selected, why = backend.selection(handles.focus)
+		local selected, why = backend.selection(handles.focus, span)
 		backend.clear(handles.focus)
 		backend.clear(handles.window)
 		if backend.focused(handles.focus) ~= true or backend.active(handles.window) ~= true or backend.role(handles.focus) ~= role then return nil end
@@ -614,16 +624,27 @@ function M.start_selection_capture(field, options, callback)
 		or type(field.role) ~= "number" or field.role <= 0 or field.role % 1 ~= 0
 		or type(options) ~= "table" or type(options.owner) ~= "string" or type(options.authorized) ~= "function"
 		or type(callback) ~= "function" then return nil end
+	local timeout = options.timeout_ms or Timings.ms("privacy", "atspi_probe_timeout_ms")
+	if type(timeout) ~= "number" or timeout < 1 or timeout > Timings.ms("privacy", "atspi_probe_timeout_ms") then return nil end
+	-- The owner uses a fractional monotonic clock; the native timer requires an
+	-- integer. Rounding down never grants time beyond the original deadline.
+	timeout = math.floor(timeout)
+	local span = options.span
+	if span and (type(span) ~= "table" or type(span.first) ~= "number" or span.first < 0 or span.first % 1 ~= 0
+		or type(span.last) ~= "number" or span.last <= span.first or span.last % 1 ~= 0
+		or span.last - span.first > ProcessLimits.defaults().max_output_bytes) then return nil end
 	local loaded, native = pcall(require, "luv")
 	if not loaded or type(native.exepath) ~= "function" then return nil end
 	local executable = native.exepath()
 	if type(executable) ~= "string" or executable == "" then return nil end
 	local expected = { bus = field.bus, path = field.path, role = field.role }
 	local chunks, invalid = {}, false
-	local operation = OwnedProcess.start(executable, { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
-		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()), "selection" }, {
+	local argv = { Paths.driver_root() .. "/adapters/atspi_context_worker.lua",
+		expected.bus, expected.path, tostring(expected.role), Paths.shared("lua"), tostring(native.os_getpid()), span and "span" or "selection" }
+	if span then argv[#argv + 1], argv[#argv + 2] = string.format("%.0f", span.first), string.format("%.0f", span.last) end
+	local operation = OwnedProcess.start(executable, argv, {
 		owner = options.owner, authorized = options.authorized,
-		timeout_ms = Timings.ms("privacy", "atspi_probe_timeout_ms"),
+		timeout_ms = timeout,
 		max_output_bytes = ProcessLimits.defaults().max_output_bytes,
 		capture_tail = false, capture_output = false,
 		on_output = function(chunk, kind)
@@ -641,6 +662,7 @@ function M.start_selection_capture(field, options, callback)
 			or type(selection) ~= "table" or selection.bus ~= expected.bus or selection.path ~= expected.path or selection.role ~= expected.role
 			or type(selection.first) ~= "number" or selection.first < 0 or selection.first % 1 ~= 0
 			or type(selection.last) ~= "number" or selection.last <= selection.first or selection.last % 1 ~= 0
+			or span and (selection.first ~= span.first or selection.last ~= span.last)
 			or type(selection.text) ~= "string" or selection.text == "" then callback(nil); return end
 		callback({ bus = selection.bus, path = selection.path, role = selection.role,
 			first = selection.first, last = selection.last, text = selection.text })

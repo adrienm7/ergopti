@@ -204,7 +204,7 @@ local function with_native_selection(body)
 	local adapter = { cached_snapshot = function()
 		return { native_bus_name = ":1.2", native_object_path = "/field", role = 61 }
 	end }
-	function adapter.start_selection_capture(_, _, callback)
+	function adapter.start_selection_capture(_, options, callback)
 		world.starts = world.starts + 1
 		local operation, listeners, done = {}, {}, false
 		function operation:is_settled() return done end
@@ -218,7 +218,9 @@ local function with_native_selection(body)
 		world.deliver = function()
 			done = true
 			callback({ bus = ":1.2", path = "/field", role = 61,
-				first = world.first, last = world.last, text = world.text })
+				first = options.span and options.span.first or world.first,
+				last = options.span and options.span.last or world.last,
+				text = options.span and "rewritten" or world.text })
 			for _, fn in ipairs(listeners) do fn() end
 		end
 		if world.inline then world.deliver() end
@@ -236,11 +238,28 @@ local function with_native_selection(body)
 			return world.focus
 		end,
 		privacy_guard = function() return world.blocked == true end,
+		capture_text_owner = function(expected_focus)
+			local function current() return world.focus == expected_focus and not world.blocked end
+			return { current = current, cached = current }
+		end,
 	})
 	local function authorized() return world.allowed end
-	local function emit()
-		world.emitted = world.emitted + 1
-		return world.ack or { ok = true }
+	local function construct()
+		local known_cleanup = false
+		return {
+			prepare = function() return true end,
+			payload = function()
+				world.emitted = world.emitted + 1
+				local result = world.ack or { ok = true, cleanup_ok = true }
+				known_cleanup = type(result) == "table" and result.cleanup_ok == true
+				if type(result) == "table" and result.cleanup_ok ~= nil then
+					result.native_cleanup_ok, result.payload_written = known_cleanup, result.ok == true
+				end
+				return result
+			end,
+			reselect = function() return { ok = true, cleanup_ok = true, native_cleanup_ok = true } end,
+			close = function() return known_cleanup end,
+		}
 	end
 	function world.read()
 		local delivered, success, text, receipt = false
@@ -257,12 +276,12 @@ local function with_native_selection(body)
 	end
 	function world.replace(receipt)
 		local delivered, committed = false
-		owner.replace(receipt, "rewritten", authorized, emit, function(ok) delivered, committed = true, ok end)
-		if not delivered then world.deliver() end
+		owner.replace_staged(receipt, "rewritten", authorized, construct, function(ok) delivered, committed = true, ok end)
+		for _ = 1, 2 do if not delivered then world.deliver() end end
 		helpers.assert_true(delivered)
 		return committed
 	end
-	local ok, err = pcall(body, owner, world, authorized, emit)
+	local ok, err = pcall(body, owner, world, authorized, construct)
 	for _, name in ipairs(names) do package.loaded[name] = previous[name] end
 	helpers.assert_true(ok, tostring(err))
 end
@@ -274,7 +293,7 @@ helpers.describe("asynchronous native selected-range transactions", function()
 			helpers.assert_true(world.replace(receipt))
 			helpers.assert_true(not world.replace(receipt))
 			helpers.assert_eq(world.emitted, 1)
-			helpers.assert_eq(world.starts, 2)
+			helpers.assert_eq(world.starts, 3)
 		end)
 	end)
 	for _, changed in ipairs({ "offset", "text", "focus", "privacy", "authorization" }) do

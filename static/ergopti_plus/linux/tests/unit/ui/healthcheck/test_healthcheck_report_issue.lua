@@ -482,15 +482,19 @@ end)
 --- production argv executable to an owned file, never to a desktop handler.
 local function with_native_opener(script, controls, body)
 	local uv = require("luv")
-	local old_shell = package.loaded["adapters.shell_runner"]
-	local timer = require("infra.native_timer")
-	local timer_port = {}
-	for key, value in pairs(timer) do timer_port[key] = value end
-	function timer_port.start(loop, handle, ms, interval, callback)
-		helpers.assert_eq(ms, require("infra.timings").ms("ui", "desktop_open_timeout_ms"))
-		return timer.start(loop, handle, controls.timeout and 1 or ms, interval, callback)
+	local old_owned, old_desktop = package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"]
+	local old_report = package.loaded["ui.healthcheck.report"]
+	local timer, native = require("infra.native_timer"), {}
+	local timeout = require("infra.timings").ms("ui", "desktop_open_timeout_ms")
+	for key, value in pairs(uv) do native[key] = value end
+	function native.timer_start(handle, ms, interval, callback)
+		if ms == timeout then
+			return timer.start(uv, handle, controls.timeout and 1 or ms, interval, callback)
+		end
+		return uv.timer_start(handle, ms, interval, callback)
 	end
-	local shell = helpers.load_module_with_dependency("adapters.shell_runner", "infra.native_timer", timer_port)
+	local Owned = helpers.load_module_with_dependency("adapters.owned_process", "luv", native)
+	local Desktop = helpers.load_module("adapters.desktop_opener")
 	local root = assert(uv.fs_mkdtemp((os.getenv("TMPDIR") or "/tmp") .. "/diagnostic_opener_XXXXXX"))
 	local executable, target = root .. "/private-opener", root .. "/report.md"
 	local function write(path, text)
@@ -498,15 +502,14 @@ local function with_native_opener(script, controls, body)
 	end
 	write(executable, "#!/bin/sh\n" .. script); assert(uv.fs_chmod(executable, 448)); write(target, "synthetic report\n")
 	local state = { outcomes = {}, requests = 0, current = true, root = root, target = target }
-	local port = {}
-	for key, value in pairs(shell) do port[key] = value end
-	function port.run_async(program, args, options, done)
-		helpers.assert_eq(program, "xdg-open"); helpers.assert_eq(args, { target })
+	Desktop._set_deps_for_test({ start = function(program, args, options, done)
+		helpers.assert_eq(program, uv.exepath())
+		helpers.assert_eq(args, { require("infra.paths").driver_root() .. "/adapters/desktop_opener_worker.lua", target, tostring(timeout) })
+		helpers.assert_eq(options.timeout_ms, timeout)
 		state.requests = state.requests + 1
 		if controls.refuse then return nil, "controlled opener admission refused" end
-		return shell.run_async(executable, args, options, done)
-	end
-	package.loaded["adapters.shell_runner"] = port
+		return Owned.start(executable, { target }, options, done)
+	end })
 	local Report = helpers.load_module("ui.healthcheck.report")
 	function state.start()
 		state.operation = Report.perform({ action = "open_path", id = "log_today" }, { log_today = target }, {}, {}, nil, nil, {
@@ -520,11 +523,18 @@ local function with_native_opener(script, controls, body)
 	end
 	function state.release() write(target .. ".release", "release\n") end
 	local ok, detail = xpcall(function() body(state) end, debug.traceback)
-	if state.operation then state.operation.cancel() end
-	state.drain(false)
-	package.loaded["adapters.shell_runner"] = old_shell
-	for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
-	assert(uv.fs_rmdir(root))
+	local cleaned, cleanup_err = pcall(function()
+		if state.operation then state.operation.cancel() end
+		local deadline = uv.hrtime() + 2000000000
+		repeat uv.run("nowait"); uv.sleep(1) until Desktop.shutdown() == true or uv.hrtime() >= deadline
+		assert(Desktop.shutdown() == true, "private opener still owns physical cleanup debt")
+		Desktop._set_deps_for_test(nil)
+		for _, path in ipairs({ target .. ".release", target, executable }) do if uv.fs_lstat(path) then assert(uv.fs_unlink(path)) end end
+		assert(uv.fs_rmdir(root))
+	end)
+	package.loaded["adapters.owned_process"], package.loaded["adapters.desktop_opener"] = old_owned, old_desktop
+	package.loaded["ui.healthcheck.report"] = old_report
+	if not cleaned then error(cleanup_err, 0) end
 	if not ok then error(detail, 0) end
 end
 
@@ -538,7 +548,9 @@ helpers.describe("diagnostic opener actual child completion", function()
 			end)
 		end)
 	end
-	local held = 'while [ ! -f "$1.release" ]; do /bin/sleep 0.01; done\nexit 23\n'
+	-- This control owns only its launcher. A builtin wait creates no orphaned
+	-- sleep; descendant-group retirement has separate canonical subreaper probes.
+	local held = 'while [ ! -f "$1.release" ]; do :; done\nexit 23\n'
 	helpers.it("(diagnostic-opener-native) keeps the loop live while awaiting the owned child", function()
 		with_native_opener(held, {}, function(s)
 			s.start(); s.drain(false); helpers.assert_eq(#s.outcomes, 0)

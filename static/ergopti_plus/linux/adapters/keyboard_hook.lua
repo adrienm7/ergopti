@@ -3552,6 +3552,9 @@ function M.check_device()
 			local sources, suppressed, physical, snapshots = {}, {}, {}, {}
 			for _, path in ipairs(_devices) do sources[path] = true end
 			for key, down in pairs(_physical_down) do
+				-- A retained remap hold still needs its original physical source
+				-- for later unplug retirement, even when no consumer swallowed it.
+				if _remap_owned[key] and sources[down.source] then physical[key] = down end
 				if _consumed_down[key] and sources[down.source] then
 					local snapshot = snapshots[down.source]
 					if snapshot == nil then

@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "In batch — previsioni in batch (modelli grandi)",
 	"prompt_editor.mode.parallel": "Standard — previsioni parallele",
 	"prompt_editor.placeholder_prompt": "Ecco un testo, continualo: {context}",
+	"prompt_editor.save_failed": "Non è stato possibile salvare il profilo del prompt. L’editor resta aperto per consentirti di riprovare.",
 	"prompt_editor.title_edit": "Modifica profilo",
 	"prompt_editor.title_new": "Nuovo profilo",
 	"script_control.pause_failed": "Impossibile mettere in pausa lo script; lo stato precedente è stato mantenuto.",

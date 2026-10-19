@@ -140,10 +140,18 @@ function M.open(options)
 				return true
 			end,
 			picker=function(binding,action,on_confirm)
+				local request = {}
+				candidate.picker = request
+				local reported = false
+				local function picker_current()
+					return candidate.picker == request and current() and candidate.picker == request
+				end
 				local items = Gestures.get_picker_items()
 				local fields = Gestures.get_picker_parameter_fields(items,binding)
 				fields.title, fields.current, fields.items = I18n.get("physical_shortcuts.window_title"), action, items
-				return require("ui.action_picker.bridge").open(fields,function(id,_,parameter)
+				return require("ui.action_picker.bridge").open(fields,function(id,state,parameter)
+					if not picker_current() then return false end
+					local notify = type(state) == "table" and rawget(state,"notify_error")
 					local spec = Gestures.get_action_parameter_spec(id)
 					if spec and parameter == nil then
 						if spec == "app" then
@@ -152,8 +160,21 @@ function M.open(options)
 							parameter = require("ui.text_prompt").ask(I18n.get("physical_shortcuts.window_title"),
 								Gestures.get_action_parameter_prompt(id),Gestures.get_action_parameter(binding,id))
 						end
+						-- Dismissing the native parameter prompt is an ordinary cancellation.
+						if parameter == nil then return false end
 					end
-					return on_confirm(id,parameter)
+					if not picker_current() then return false end
+					local accepted = on_confirm(id,parameter)
+					if accepted == true then return true end
+					if reported or not picker_current() then return false end
+					-- Reserve before publication: native getters and notification observers can reenter.
+					reported = true
+					send("refused","save_failed")
+					if type(notify) == "function" and picker_current()
+						and rawget(state,"notify_error") == notify then
+						pcall(notify,"physical_shortcuts.save_failed")
+					end
+					return false
 				end)
 			end,
 		})

@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Batched — predictions in batches (large models)",
 	"prompt_editor.mode.parallel": "Standard — parallel predictions",
 	"prompt_editor.placeholder_prompt": "Here is a text, continue it: {context}",
+	"prompt_editor.save_failed": "Your prompt profile could not be saved. The editor has been kept open so you can try again.",
 	"prompt_editor.title_edit": "Edit profile",
 	"prompt_editor.title_new": "New profile",
 	"script_control.pause_failed": "The script could not be paused; the previous state was preserved.",

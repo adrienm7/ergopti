@@ -290,8 +290,8 @@ helpers.describe("linux actions: click toggles", function()
 		-- Regression: both branches ran `xdotool mousedown` with no state and
 		-- no mouseup, so firing twice held the button twice and never let go —
 		-- a stuck drag selecting everything until a manual mouseup.
-		local G = helpers.load_module("modules.gestures.manager")
 		with_recorded_shell(function(commands)
+			local G = helpers.load_module("modules.gestures.manager")
 			G.execute_action("left_click_toggle", "test__slot")
 			G.execute_action("left_click_toggle", "test__slot")
 			helpers.assert_eq(#commands, 2,
@@ -304,8 +304,8 @@ helpers.describe("linux actions: click toggles", function()
 	end)
 
 	helpers.it("click-toggle: left and right buttons toggle independently", function()
-		local G = helpers.load_module("modules.gestures.manager")
 		with_recorded_shell(function(commands)
+			local G = helpers.load_module("modules.gestures.manager")
 			G.execute_action("left_click_toggle", "test__slot")
 			G.execute_action("right_click_toggle", "test__slot")
 			G.execute_action("left_click_toggle", "test__slot")

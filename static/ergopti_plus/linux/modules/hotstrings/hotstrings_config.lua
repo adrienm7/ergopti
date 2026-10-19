@@ -510,8 +510,11 @@ end
 --- The load checkpoint crosses both preparation and publication; a fresh disk read
 --- cannot authorize replacing a foreign edit or repairing an unreadable source.
 --- @param overrides table Detached candidate tree.
+--- @param previous table|nil Exact previous override tree during runtime staging.
+--- @param current function|nil Held runtime ownership check before publication.
 --- @return boolean committed
-local function save_overrides(overrides)
+local function save_overrides(overrides, previous, current)
+	previous = previous or _overrides
 	if _override_source.status ~= "ok" and _override_source.status ~= "absent" then return false end
 	local fields = { "delay", "color", "show_tooltip", "priority" }
 	local rows = {}
@@ -525,16 +528,16 @@ local function save_overrides(overrides)
 		end
 	end
 	local categories = {}
-	for category in pairs(_overrides) do categories[category] = true end
+	for category in pairs(previous) do categories[category] = true end
 	for category in pairs(overrides) do categories[category] = true end
 	for category in pairs(categories) do
-		local previous, candidate = _overrides[category] or {}, overrides[category] or {}
-		update({ category }, previous, candidate)
+		local before, candidate = previous[category] or {}, overrides[category] or {}
+		update({ category }, before, candidate)
 		local sections = {}
-		for section in pairs(previous.sections or {}) do sections[section] = true end
+		for section in pairs(before.sections or {}) do sections[section] = true end
 		for section in pairs(candidate.sections or {}) do sections[section] = true end
 		for section in pairs(sections) do
-			update({ category, section }, (previous.sections or {})[section], (candidate.sections or {})[section])
+			update({ category, section }, (before.sections or {})[section], (candidate.sections or {})[section])
 		end
 	end
 	local path = overrides_path()
@@ -551,12 +554,130 @@ local function save_overrides(overrides)
 		Logger.error(LOG, "Cannot create '%s' — overrides were not changed.", config_dir)
 		return false
 	end
+	if current and current() ~= true then return false end
 	local committed, refusal = Writer.publish_if_unchanged(path, content, nil, source)
 	if committed ~= true then
 		Logger.error(LOG, "Cannot publish override leaves: %s.", tostring(refusal))
 		return false
 	end
 	_override_source = { status = "ok", content = content }
+	return true
+end
+
+local function engine_generation(engine)
+	if type(engine) ~= "table" or type(engine.mapping_state) ~= "function" then return nil end
+	local ok, state = pcall(engine.mapping_state, engine)
+	local value = ok and type(state) == "table" and state.generation
+	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then return nil end
+	return value
+end
+
+local function personal_runtime_current(debt)
+	local generation = engine_generation(debt.engine)
+	return _scope_owner == debt.owner and _scope_owner_epoch == debt.owner_epoch
+		and _personal_transaction_owner == debt.owner and _engine == debt.engine and generation == debt.generation
+		and _config_dir == debt.root and _choices == debt.choices
+		and _mappings == debt.mappings and _toml_paths == debt.paths and _personal_sources == debt.sources
+		and _live_mappings == debt.live and _personal_adoptions == debt.adoptions
+		and _categories == debt.categories and _overrides == debt.overrides and _override_source == debt.override_source
+end
+
+--- Resolves priority through the same committed source metadata on every path.
+--- @param mappings table Candidate mapping records, never the live engine's records.
+--- @param categories table Source metadata.
+--- @param overrides table Candidate override tree.
+--- @param adoptions table Personal source identities.
+local function resolve_priorities(mappings, categories, overrides, adoptions)
+	for _, mapping in ipairs(mappings) do
+		if mapping._catalogue_priority == true then
+			local user = overrides[mapping.group] or {}
+			local record = personal_adoption(mapping.group, adoptions)
+			if record and record.admitted and record.legacy_name and overrides[mapping.group] == nil then
+				user = overrides[record.legacy_name] or {}
+			end
+			local meta = categories[mapping.group] or {}
+			local user_section = mapping.section and (user.sections or {})[mapping.section] or nil
+			local meta_section = mapping.section and (meta.sections or {})[mapping.section] or nil
+			local override_priority = type(user_section) == "table" and user_section.priority or nil
+				or user.priority
+				or type(meta_section) == "table" and meta_section.priority or nil
+				or meta.priority
+			mapping.priority = Priority.resolve(
+				mapping._declared_priority, override_priority, nil, mapping.group)
+		elseif type(mapping.priority) ~= "number" then
+			mapping.priority = Priority.source_priority(mapping.group)
+		end
+	end
+end
+
+
+--- Publishes priority from the last committed registry, then saves its overrides.
+--- Unrelated unreadable sources cannot leave a newly displayed priority inactive.
+--- @param candidate table Detached override tree.
+--- @param reorder boolean Whether collision arbitration changes.
+--- @return boolean committed
+local function commit_override_candidate(candidate, reorder)
+	if not reorder or not _engine then
+		if not save_overrides(candidate) then return false end
+		_overrides, _resolve_cache = candidate, {}
+		return true
+	end
+	local engine, original_generation = _engine, engine_generation(_engine)
+	if original_generation == nil then return false end
+	local owner = {}
+	if M.acquire(owner) ~= true then return false end
+	_personal_transaction_owner = owner
+	local snapshot = { paths = _toml_paths, sources = _personal_sources, adoptions = _personal_adoptions,
+		mappings = _mappings, live = _live_mappings, categories = _categories, overrides = _overrides,
+		override_source = _override_source, errors = _parse_errors, published = _published, choices = _choices, resolve_cache = _resolve_cache }
+	local runtime = { owner = owner, owner_epoch = _scope_owner_epoch, engine = engine, snapshot = snapshot,
+		generation = original_generation, root = _config_dir, choices = _choices,
+		live = _live_mappings, adoptions = _personal_adoptions, categories = _categories, overrides = _overrides,
+		mappings = _mappings, paths = _toml_paths, sources = _personal_sources, override_source = _override_source }
+	local ok, committed = pcall(function()
+		local mappings, live, copies = {}, {}, {}
+		local function copy(mapping)
+			if copies[mapping] then return copies[mapping] end
+			local candidate_mapping = {}
+			for field, value in pairs(mapping) do candidate_mapping[field] = value end
+			copies[mapping] = candidate_mapping
+			return candidate_mapping
+		end
+		for index, mapping in ipairs(_mappings) do mappings[index] = copy(mapping) end
+		for index, mapping in ipairs(_live_mappings) do live[index] = copy(mapping) end
+		resolve_priorities(mappings, _categories, candidate, _personal_adoptions)
+		if personal_runtime_current(runtime) ~= true then return false end
+		local loaded = engine:load_mappings(live)
+		if loaded ~= true or engine_generation(engine) ~= original_generation + 1 then
+			-- A pure refusal acquired no image. An unexplained generation stays
+			-- fenced instead of borrowing a foreign registry for the inverse.
+			if engine_generation(engine) == original_generation then runtime.runtime_restored = true end
+			return false
+		end
+		runtime.generation = original_generation + 1
+		if personal_runtime_current(runtime) ~= true then return false end
+		_mappings, _live_mappings, _overrides, _resolve_cache = mappings, live, candidate, {}
+		runtime.mappings, runtime.live, runtime.overrides = mappings, live, candidate
+		if not save_overrides(candidate, snapshot.overrides, function() return personal_runtime_current(runtime) end) then return false end
+		runtime.override_target, runtime.override_source = _override_source, _override_source
+		runtime.override_published = _override_source ~= snapshot.override_source
+		return personal_runtime_current(runtime) == true
+	end)
+	if not ok or committed ~= true then
+		if runtime.generation == original_generation and personal_runtime_current(runtime) == true then
+			runtime.runtime_restored = true
+		end
+		_personal_debt = runtime
+		M.retry_personal_cleanup()
+		Logger.error(LOG, "Hotstring override publication refused; its exact runtime inverse remains owned until acknowledged.")
+		return false
+	end
+	if M.release(owner) ~= true then
+		runtime.release_only = true
+		_personal_debt = runtime
+		return false
+	end
+	_personal_transaction_owner = nil
 	return true
 end
 
@@ -668,10 +789,7 @@ function M.set_override(category, section, field, value)
 	target[field] = value
 	candidate[category] = entry
 
-	if not save_overrides(candidate) then return false end
-	_overrides = candidate
-	_resolve_cache = {}
-	if field == "priority" and _engine then M.load_all() end
+	if not commit_override_candidate(candidate, field == "priority") then return false end
 	notify_change()
 	return true
 end
@@ -765,10 +883,7 @@ function M.clear_override(category, section, field)
 		candidate[category] = nil
 	end
 
-	if not save_overrides(candidate) then return false end
-	_overrides = candidate
-	_resolve_cache = {}
-	if (field == nil or field == "priority") and _engine then M.load_all() end
+	if not commit_override_candidate(candidate, field == nil or field == "priority") then return false end
 	notify_change()
 	return true
 end
@@ -1372,26 +1487,7 @@ function M.load_all(personal_owner, cold_boot)
 	-- Re-resolve catalogue priorities after loading the user's override file. The
 	-- loader owns the per-entry rung; this manager owns user category and section
 	-- rungs, so an edit can take effect without rewriting the source pack.
-	for _, mapping in ipairs(staged_mappings) do
-		if mapping._catalogue_priority == true then
-			local user = _overrides[mapping.group] or {}
-			local record = personal_adoption(mapping.group, staged_personal_adoptions)
-			if record and record.admitted and record.legacy_name and _overrides[mapping.group] == nil then
-				user = _overrides[record.legacy_name] or {}
-			end
-			local meta = staged_categories[mapping.group] or {}
-			local user_section = mapping.section and (user.sections or {})[mapping.section] or nil
-			local meta_section = mapping.section and (meta.sections or {})[mapping.section] or nil
-			local override_priority = type(user_section) == "table" and user_section.priority or nil
-				or user.priority
-				or type(meta_section) == "table" and meta_section.priority or nil
-				or meta.priority
-			mapping.priority = Priority.resolve(
-				mapping._declared_priority, override_priority, nil, mapping.group)
-		elseif type(mapping.priority) ~= "number" then
-			mapping.priority = Priority.source_priority(mapping.group)
-		end
-	end
+	resolve_priorities(staged_mappings, staged_categories, _overrides, staged_personal_adoptions)
 
 	-- Keep what the canonical choices switch on, at both levels. A section is
 	-- chosen separately from its category so re-enabling a category restores
@@ -1464,13 +1560,7 @@ end
 -- ======= 6/ Category Management ==========
 -- =========================================
 
-local function engine_generation(engine)
-	if type(engine) ~= "table" or type(engine.mapping_state) ~= "function" then return nil end
-	local ok, state = pcall(engine.mapping_state, engine)
-	local value = ok and type(state) == "table" and state.generation
-	if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then return nil end
-	return value
-end
+
 
 --- Settles only the exact candidate engine image owned by a refused choice edit.
 --- Foreign runtime generations keep the lease closed rather than being replaced.
@@ -1838,20 +1928,12 @@ restore_personal_runtime = function(snapshot)
 	if not ok or restored ~= true or _engine ~= engine or engine_generation(engine) ~= generation + 1 then return false end
 	_toml_paths, _personal_sources, _personal_adoptions = snapshot.paths, snapshot.sources, snapshot.adoptions
 	_mappings, _live_mappings, _categories = snapshot.mappings, snapshot.live, snapshot.categories
-	_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, {}
+	_overrides, _override_source, _resolve_cache = snapshot.overrides, snapshot.override_source, snapshot.resolve_cache or {}
 	_parse_errors, _published = snapshot.errors, snapshot.published
 	return true
 end
 
-local function personal_runtime_current(debt)
-	local generation = engine_generation(debt.engine)
-	return _scope_owner == debt.owner and _scope_owner_epoch == debt.owner_epoch
-		and _personal_transaction_owner == debt.owner and _engine == debt.engine and generation == debt.generation
-		and _config_dir == debt.root and _choices == debt.choices
-		and _mappings == debt.mappings and _toml_paths == debt.paths and _personal_sources == debt.sources
-		and _live_mappings == debt.live and _personal_adoptions == debt.adoptions
-		and _categories == debt.categories and _overrides == debt.overrides and _override_source == debt.override_source
-end
+
 
 --- Retains the native lease until both exact file and engine inverses commit.
 function M.retry_personal_cleanup()

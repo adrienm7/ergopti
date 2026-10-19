@@ -11,8 +11,10 @@ local M = {}
 --- @param shared string Canonical shared Lua source directory.
 --- @param parent_pid string Exact native daemon process.
 --- @param mode string|nil Explicit selection capture or the original context job.
+--- @param first string|nil Original inserted span start; never replacement text.
+--- @param last string|nil Expected collapsed caret and inserted span end.
 --- @return boolean completed
-function M.run(bus, path, role, shared, parent_pid, mode)
+function M.run(bus, path, role, shared, parent_pid, mode, first, last)
 	local source = debug.getinfo(1, "S").source:gsub("^@", "")
 	local root = assert(source:match("^(.*)/adapters/atspi_context_worker%.lua$"), "context worker source unavailable")
 	assert(type(shared) == "string" and shared:sub(1, 1) == "/", "context worker shared source unavailable")
@@ -29,8 +31,9 @@ function M.run(bus, path, role, shared, parent_pid, mode)
 	local Json = require("json")
 	local field = { bus = bus, path = path, role = tonumber(role) }
 	if mode ~= nil then
-		assert(mode == "selection", "unknown context worker operation")
-		local snapshot, conclusive = require("adapters.atspi_focus")._get_native_selection_snapshot(field)
+		assert(mode == "selection" or mode == "span", "unknown context worker operation")
+		local span = mode == "span" and { first = tonumber(first), last = tonumber(last) } or nil
+		local snapshot, conclusive = require("adapters.atspi_focus")._get_native_selection_snapshot(field, span)
 		if conclusive ~= true or not snapshot then os.exit(2) end
 		io.write("SELECTION:" .. Json.encode({ field = field, selection = snapshot }))
 		return true
@@ -47,6 +50,6 @@ end
 
 -- Requiring the adapter must not run a CLI job or change native ownership.
 local invoked_source = debug.getinfo(1, "S").source:gsub("^@", "")
-if type(arg) == "table" and arg[0] == invoked_source then M.run(arg[1], arg[2], arg[3], arg[4], arg[5], arg[6]) end
+if type(arg) == "table" and arg[0] == invoked_source then M.run(arg[1], arg[2], arg[3], arg[4], arg[5], arg[6], arg[7], arg[8]) end
 
 return M

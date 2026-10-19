@@ -58,6 +58,17 @@ helpers.describe("linux-callback-error-description", function()
 					"the actual successful sibling must acknowledge watchdog retirement before stopping the loop")
 			end)
 		end
+		for _, kind in ipairs({ "object", "string" }) do
+			helpers.it("linux-callback-error-description: slow setup preserves the " .. kind .. " callback watchdog budget", function()
+				local executable = assert(arg and arg[-1], "running Lua interpreter must be identifiable")
+				local fixture = helpers.driver_root() .. "/tests/fixtures/native_callback_error_description.lua"
+				local function quote(value) return "'" .. value:gsub("'", "'\\''") .. "'" end
+				local result = os.execute(quote(executable) .. " " .. quote(fixture) .. " after "
+					.. quote(kind) .. " blocked_callback delayed_setup")
+				helpers.assert_true(result == true or result == 0,
+					"setup before loop admission must not spend the actual callback watchdog budget")
+			end)
+		end
 		for _, scenario in ipairs({ "after", "every", "idle", "periodic", "registered idle", "deferred" }) do
 			for _, kind in ipairs({ "object", "string" }) do
 				helpers.it("linux-callback-error-description: actual " .. scenario .. " isolates " .. kind .. " failure", function()

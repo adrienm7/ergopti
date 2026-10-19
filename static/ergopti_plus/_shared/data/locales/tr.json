@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Toplu — toplu tahminler (büyük modeller)",
 	"prompt_editor.mode.parallel": "Standart — paralel tahminler",
 	"prompt_editor.placeholder_prompt": "İşte bir metin, devam ettir: {context}",
+	"prompt_editor.save_failed": "İstem profiliniz kaydedilemedi. Yeniden deneyebilmeniz için düzenleyici açık bırakıldı.",
 	"prompt_editor.title_edit": "Profili düzenle",
 	"prompt_editor.title_new": "Yeni profil",
 	"script_control.pause_failed": "Betik duraklatılamadı; önceki durum korundu.",

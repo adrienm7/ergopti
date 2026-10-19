@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "बैच किया गया — बैच में भविष्यवाणियाँ (बड़े मॉडल)",
 	"prompt_editor.mode.parallel": "मानक — समानांतर भविष्यवाणियाँ",
 	"prompt_editor.placeholder_prompt": "यहाँ एक पाठ है, इसे जारी रखें: {context}",
+	"prompt_editor.save_failed": "आपकी प्रॉम्प्ट प्रोफ़ाइल सहेजी नहीं जा सकी। संपादक खुला रखा गया है ताकि आप फिर से कोशिश कर सकें।",
 	"prompt_editor.title_edit": "प्रोफ़ाइल संपादित करें",
 	"prompt_editor.title_new": "नई प्रोफ़ाइल",
 	"script_control.pause_failed": "स्क्रिप्ट को विराम नहीं दिया जा सका; पिछली स्थिति बनाए रखी गई।",

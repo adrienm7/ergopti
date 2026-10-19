@@ -25,12 +25,21 @@ local helpers = require("tests.helpers")
 local function with_recorded_shell(body)
 	local commands = {}
 	local real = os.execute
+	local Process = require("adapters.owned_process")
+	local start = Process.start
+	Process.start = function(executable, args, options, callback)
+		if executable ~= "xdotool" then return start(executable, args, options, callback) end
+		commands[#commands + 1] = "xdotool " .. table.concat(args, " ")
+		return { started = true, result = { ok = true },
+			is_settled = function() return true end, cancel = function() return true end }
+	end
 	os.execute = function(cmd)
 		commands[#commands + 1] = tostring(cmd)
 		return true
 	end
 	local ok, err = pcall(body, commands)
 	os.execute = real
+	Process.start = start
 	if not ok then error(err, 0) end
 end
 

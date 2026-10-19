@@ -133,14 +133,16 @@ end
 
 --- Replaces the menu.
 --- @param items table Array of { title, fn?, menu?, checked?, disabled?, separator? }.
+--- @return boolean accepted Native menu accepted; GTK events may remain queued.
 function M.setMenu(items)
 	_items = type(items) == "table" and items or {}
 	if not ensure_started() then
 		Logger.debug(LOG, "setMenu() before an icon exists — kept for when one does.")
-		return
+		return false
 	end
-	Indicator.set_menu(_items)
+	if Indicator.set_menu(_items) ~= true then return false end
 	Logger.debug(LOG, "Tray menu set (%d top-level row(s)).", #_items)
+	return true
 end
 
 --- Installs the two-row fallback menu: a name and a way out.

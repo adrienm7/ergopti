@@ -50,6 +50,30 @@ local UID_BYTES = 16
 -- The temporary .ics files handed to a calendar, deleted at the next run or
 -- at stop: { { path, dir } }
 local _pending_files = {}
+-- Native construction and close debt outlive the logical action result.
+local _jobs = {}
+-- Desktop launchers keep their existing handoff contract, not tool group ownership.
+local _desktop_jobs = {}
+local _stopping = false
+local _admissions = 0
+local _checking_shutdown = false
+
+--- Publishes only after the exact native operation physically retires.
+--- @param job table Captured constructor, native ports and business callback.
+local function retire_job(job)
+	if job.constructing or job.uncertain or not _jobs[job] or not job.operation then return end
+	local checked, settled = pcall(job.is_settled, job.operation)
+	if not checked or settled ~= true then return end
+	_jobs[job] = nil
+	if _stopping or not job.result then return end
+	local result = job.result
+	local ok = type(result) == "table" and result.ok == true
+	local reason = not ok and string.format("%s failed: %s", job.what,
+		tostring(type(result) == "table" and (result.error or ("exit code " .. tostring(result.code))) or result)) or nil
+	local delivered = pcall(job.done, ok, reason)
+	if not delivered then pcall(Logger.error, LOG, "Agent connector completion callback failed.") end
+end
+
 -- The tools list and when it was read: { at, names }
 local _tools_cache = nil
 
@@ -103,6 +127,17 @@ local DEFAULT_DEPS = {
 	run = function(executable, args, options, callback)
 		return ShellRunner.run_async(executable, args, options, callback)
 	end,
+	run_tool = function(executable, args, options, callback)
+		-- Like the previous argv runner, anchor this new relative deadline to
+		-- the current native clock, never to time cached before a blocking UI.
+		local loaded, native = pcall(require, "luv")
+		if not loaded or type(native.update_time) ~= "function" then return nil, "native clock unavailable" end
+		local refreshed = pcall(native.update_time)
+		if not refreshed then return nil, "native clock refresh refused" end
+		return require("adapters.owned_process").start(executable, args, options, function(result)
+			callback({ ok = result.ok, code = result.exit_code, error = result.error })
+		end)
+	end,
 	has_command = function(name) return ShellRunner.has_command(name) end,
 	private_dir = private_dir,
 	write_file = function(path, content)
@@ -135,16 +170,26 @@ local _deps = DEFAULT_DEPS
 --- them long ago: xdg-open returns once it has handed the file over, and the
 --- next action or the daemon's stop comes later still.
 function M.cleanup()
+	if next(_jobs) ~= nil or next(_desktop_jobs) ~= nil then return false end
 	local kept = {}
 	for _, file in ipairs(_pending_files) do
-		local removed_file = _deps.remove(file.path)
-		local removed_dir = _deps.remove(file.dir)
-		if not removed_file or not removed_dir then
-			Logger.warn(LOG, "A temporary calendar file could not be deleted; it is retried later.")
+		if file.preparing and file.preparing.active then
 			kept[#kept + 1] = file
+		else
+			local removed_file = true
+			if file.path then
+				local removed, _, errno = _deps.remove(file.path)
+				removed_file = removed or errno == 2 -- Already absent after an interrupted write.
+			end
+			local removed_dir = _deps.remove(file.dir)
+			if not removed_file or not removed_dir then
+				Logger.warn(LOG, "A temporary calendar file could not be deleted; it is retried later.")
+				kept[#kept + 1] = file
+			end
 		end
 	end
 	_pending_files = kept
+	return #kept == 0
 end
 
 
@@ -161,16 +206,23 @@ end
 --- @param config table Decoded agent.json.
 --- @return table Array of tool names.
 function M.tools(config)
+	if _stopping then return {} end
 	local now = _deps.clock()
+	if _stopping then return {} end
 	if _tools_cache and now - _tools_cache.at < TOOLS_TTL_SEC then return _tools_cache.names end
-	local names, reason = _deps.list_executables(_deps.tools_dir())
+	local directory = _deps.tools_dir()
+	if _stopping then return {} end
+	local names, reason = _deps.list_executables(directory)
+	if _stopping then return {} end
 	local kept = {}
+	local limit = config.max_tools
+	if _stopping then return {} end
 	if not names then
 		Logger.warn(LOG, "The agent's tools could not be listed: %s.", tostring(reason))
 	else
 		table.sort(names)
 		for _, name in ipairs(names) do
-			if #kept >= config.max_tools then break end
+			if #kept >= limit then break end
 			if type(name) == "string" and name:match(TOOL_NAME_PATTERN) and name ~= "." and name ~= ".." then
 				kept[#kept + 1] = name
 			end
@@ -201,20 +253,71 @@ end
 --- @param timeout_ms integer
 --- @param on_done function on_done(ok, reason)
 --- @return boolean started
-local function start(what, executable, args, timeout_ms, on_done)
-	local handle, reason = _deps.run(executable, args, { timeout_ms = timeout_ms }, function(result)
-		if type(result) == "table" and result.ok == true then
-			on_done(true, nil)
-			return
-		end
-		on_done(false, string.format("%s failed: %s", what,
-			tostring(type(result) == "table" and (result.error or ("exit code " .. tostring(result.code))) or result)))
+local function start_tool(what, executable, args, timeout_ms, on_done)
+	if _stopping then return false end
+	local job = { what = what, done = on_done, constructing = true }
+	_jobs[job] = true
+	local called, operation, reason = pcall(_deps.run_tool, executable, args, {
+		timeout_ms = timeout_ms, owner = "agent_connector:" .. tostring(job),
+		authorized = function() return not _stopping and _jobs[job] == true end,
+	}, function(result)
+		job.result = result
+		retire_job(job)
 	end)
-	if not handle then
-		on_done(false, string.format("%s could not start: %s", what, tostring(reason)))
+	job.constructing = false
+	if not called then
+		job.uncertain = true
 		return false
 	end
-	return true
+	if operation == nil then
+		-- Only an explicit pre-acquisition refusal may return no native owner.
+		_jobs[job] = nil
+		if not _stopping then on_done(false, string.format("%s could not start: %s", what, tostring(reason))) end
+		return false
+	end
+	job.operation = operation
+	if type(operation) ~= "table" then job.uncertain = true; return false end
+	job.cancel, job.is_settled = operation.cancel, operation.is_settled
+	local subscribe = operation.on_settled
+	if type(job.cancel) ~= "function" or type(job.is_settled) ~= "function" or type(subscribe) ~= "function" then
+		job.uncertain = true
+		return false
+	end
+	local registered, accepted = pcall(subscribe, operation, function() retire_job(job) end)
+	if not registered or accepted ~= true then job.uncertain = true end
+	if _stopping then pcall(job.cancel, operation) end
+	retire_job(job)
+	return not _stopping and not job.uncertain and operation.started == true and operation.error == nil
+end
+
+--- Keeps the established desktop handoff; accepted GUI applications may outlive
+--- their launcher. These logical records only protect .ics inputs and callbacks;
+--- shutdown() does not claim physical retirement of desktop process groups.
+--- @param executable string Desktop launcher name.
+--- @param args table Launcher arguments.
+--- @param on_done function Completion receiver, fenced by the action frame.
+--- @return boolean started
+local function start_desktop(executable, args, on_done)
+	if _stopping then return false end
+	local job = {}
+	_desktop_jobs[job] = true
+	local called, operation, reason = pcall(_deps.run, executable, args, { timeout_ms = OPEN_TIMEOUT_MS }, function(result)
+		if not _desktop_jobs[job] then return end
+		_desktop_jobs[job] = nil
+		if _stopping then M.cleanup(); return end
+		local ok = type(result) == "table" and result.ok == true
+		local detail = not ok and string.format("%s failed: %s", executable,
+			tostring(type(result) == "table" and (result.error or ("exit code " .. tostring(result.code))) or result)) or nil
+		on_done(ok, detail)
+	end)
+	if not called then error(operation, 0) end
+	if operation == nil then
+		_desktop_jobs[job] = nil
+		if not _stopping then on_done(false, string.format("%s could not start: %s", executable, tostring(reason))) end
+		return false
+	end
+	job.operation = operation
+	return not _stopping
 end
 
 --- Hands a calendar event or a reminder to the default calendar application.
@@ -222,28 +325,40 @@ end
 --- @param action table A validated calendar or reminder action.
 --- @param on_done function
 --- @return boolean started
-local function open_ics(config, action, on_done)
+local function open_ics(config, action, on_done, frame)
 	M.cleanup()
+	if _stopping then return false end
 	local hex = _deps.random_hex()
+	if _stopping then return false end
 	if not hex then
 		on_done(false, "no random identifier could be drawn")
 		return false
 	end
 	local content = Agent.ics(config, action, hex .. "@ergopti", _deps.utc_stamp())
+	if _stopping then return false end
 	local dir = _deps.private_dir()
 	if not dir then
 		on_done(false, "no private directory could be created")
 		return false
 	end
+	-- Own the directory immediately, including a stop while its constructor
+	-- returns. The file becomes ours before a write can partially create it.
+	local pending = { dir = dir, preparing = frame }
+	_pending_files[#_pending_files + 1] = pending
+	if _stopping then return false end
 	local path = dir .. "/" .. (action.type == "calendar" and "event" or "task") .. ".ics"
-	if not _deps.write_file(path, content) then
-		_deps.remove(dir)
+	if _stopping then return false end
+	pending.path = path
+	local written = _deps.write_file(path, content)
+	if _stopping then return false end
+	if not written then
+		M.cleanup()
 		on_done(false, "the calendar file could not be written")
 		return false
 	end
-	_pending_files[#_pending_files + 1] = { path = path, dir = dir }
 	Logger.info(LOG, "Opening a %s entry with the default calendar application.", action.type)
-	return start("xdg-open", "xdg-open", { path }, OPEN_TIMEOUT_MS, on_done)
+	if _stopping then return false end
+	return start_desktop("xdg-open", { path }, on_done)
 end
 
 --- Opens a mail draft in the user's mail client. Never sends.
@@ -251,7 +366,9 @@ end
 --- @param on_done function
 --- @return boolean started
 local function open_mail(action, on_done)
-	if _deps.has_command("xdg-email") then
+	local has_email = _deps.has_command("xdg-email")
+	if _stopping then return false end
+	if has_email then
 		local args = { "--utf8" }
 		if action.subject then
 			args[#args + 1] = "--subject"
@@ -260,11 +377,16 @@ local function open_mail(action, on_done)
 		args[#args + 1] = "--body"
 		args[#args + 1] = action.body
 		for _, address in ipairs(action.to or {}) do args[#args + 1] = address end
+		if _stopping then return false end
 		Logger.info(LOG, "Opening a mail draft through xdg-email (%d recipient(s)).", #(action.to or {}))
-		return start("xdg-email", "xdg-email", args, OPEN_TIMEOUT_MS, on_done)
+		if _stopping then return false end
+		return start_desktop("xdg-email", args, on_done)
 	end
+	local link = Agent.mailto(action)
+	if _stopping then return false end
 	Logger.info(LOG, "Opening a mail draft through a mailto: link (xdg-email is not installed).")
-	return start("xdg-open", "xdg-open", { Agent.mailto(action) }, OPEN_TIMEOUT_MS, on_done)
+	if _stopping then return false end
+	return start_desktop("xdg-open", { link }, on_done)
 end
 
 --- Runs one of the user's tools with the action's input as its only argument.
@@ -273,17 +395,23 @@ end
 --- @param on_done function
 --- @return boolean started
 local function run_tool(config, action, on_done)
+	local name = action.name
+	if _stopping then return false end
 	local known = false
-	for _, name in ipairs(M.tools(config)) do
-		if name == action.name then known = true end
+	for _, candidate in ipairs(M.tools(config)) do
+		if candidate == name then known = true end
 	end
+	if _stopping then return false end
 	if not known then
 		on_done(false, "the tool is no longer in the tools folder")
 		return false
 	end
-	Logger.info(LOG, "Running an agent tool (%s an input).", action.input and "with" or "without")
-	return start("the tool", _deps.tools_dir() .. "/" .. action.name, action.input and { action.input } or {},
-		TOOL_TIMEOUT_MS, on_done)
+	local input = action.input
+	local directory = _deps.tools_dir()
+	if _stopping then return false end
+	Logger.info(LOG, "Running an agent tool (%s an input).", input and "with" or "without")
+	if _stopping then return false end
+	return start_tool("the tool", directory .. "/" .. name, input and { input } or {}, TOOL_TIMEOUT_MS, on_done)
 end
 
 --- Carries out one validated action. on_done(ok, reason) is called once;
@@ -293,17 +421,65 @@ end
 --- @param on_done function
 --- @return boolean started
 function M.run(config, action, on_done)
+	if _stopping then return false end
 	if type(on_done) ~= "function" then error("agent_connectors.run: on_done must be a function", 2) end
 	if type(action) ~= "table" then error("agent_connectors.run: an action is required", 2) end
-	if action.type == "calendar" or action.type == "reminder" then return open_ics(config, action, on_done) end
-	if action.type == "mail" then return open_mail(action, on_done) end
-	if action.type == "shortcut" then return run_tool(config, action, on_done) end
-	error("agent_connectors.run: unknown action type " .. tostring(action.type), 2)
+	_admissions = _admissions + 1
+	local frame, completed, outcome = { active = true }, false, nil
+	local function receive(ok, reason)
+		if _stopping or completed then return end
+		completed = true
+		if frame.active then outcome = { ok = ok, reason = reason }; return end
+		on_done(ok, reason)
+	end
+	local called, result = pcall(function()
+		local kind = action.type
+		if _stopping then return false end
+		if kind == "calendar" or kind == "reminder" then return open_ics(config, action, receive, frame) end
+		if kind == "mail" then return open_mail(action, receive) end
+		if kind == "shortcut" then return run_tool(config, action, receive) end
+		error("agent_connectors.run: unknown action type " .. tostring(kind), 2)
+	end)
+	frame.active = false
+	_admissions = _admissions - 1
+	if _stopping then M.shutdown() elseif not called or result ~= true then M.cleanup() end
+	if not called then error(result, 0) end
+	if _stopping then return false end
+	if outcome then
+		local delivered = pcall(on_done, outcome.ok, outcome.reason)
+		if not delivered then pcall(Logger.error, LOG, "Agent connector completion callback failed.") end
+	end
+	return result
+end
+
+--- Closes action admission before cancelling tools and retaining close debt.
+--- Only user tools receive physical process-group retirement here. Desktop
+--- launchers retain their existing handoff and can leave temporary calendar
+--- inputs until their logical completion; neither FileConsumed nor GUI process
+--- retirement is claimed. File deletion keeps its best-effort retry policy.
+--- @return boolean acknowledged Every user tool exit, group absence and close ACK.
+function M.shutdown()
+	_stopping = true
+	if _checking_shutdown then return false end
+	_checking_shutdown = true
+	local captured = {}
+	for job in pairs(_jobs) do captured[#captured + 1] = job end
+	for _, job in ipairs(captured) do
+		if _jobs[job] and job.operation and type(job.cancel) == "function" then
+			pcall(job.cancel, job.operation)
+			retire_job(job)
+		end
+	end
+	if _admissions > 0 or next(_jobs) ~= nil then _checking_shutdown = false; return false end
+	local cleaned = pcall(M.cleanup)
+	_checking_shutdown = false
+	return cleaned
 end
 
 --- Replaces OS boundaries (tests). Missing ones keep their defaults.
 --- @param deps table|nil nil restores every default.
 function M._set_deps_for_test(deps)
+	if _admissions > 0 or next(_jobs) ~= nil or next(_desktop_jobs) ~= nil then error("agent connectors still own cleanup debt", 2) end
 	if deps == nil then
 		_deps = DEFAULT_DEPS
 	else

@@ -222,6 +222,12 @@ local runtime_shutdown_ack = not prediction_engine
 local shutdown = ShutdownCoordinator.new({
 	pre_wait = {
 		{
+			name = "tray action authority",
+			stop = function()
+				return not privacy_owners.menu_rebuild or privacy_owners.menu_rebuild.stop() == true
+			end,
+		},
+		{
 			name = "cursor-display window operations",
 			stop = function()
 				return not gestures or gestures.stop_window_switches() == true
@@ -305,12 +311,38 @@ local shutdown = ShutdownCoordinator.new({
 			end,
 		},
 		{
-			name = "AI agent files",
-			stop = function()
-				-- The calendar files handed to xdg-open, and the learnt thresholds.
-				require("modules.llm.agent_connectors").cleanup()
-				require("modules.llm.agent_learning").flush()
-			end,
+			name = "AI agent tools",
+			wait_for_ack = true,
+			stop = (function()
+				local resolved, connectors, stop
+				return function()
+					if not resolved then
+						resolved = true
+						connectors = package.loaded["modules.llm.agent_connectors"]
+						stop = connectors and connectors.shutdown
+					end
+					return not connectors or stop() == true
+				end
+			end)(),
+		},
+		{
+			name = "desktop launch confirmations",
+			wait_for_ack = true,
+			stop = (function()
+				local resolved, opener, stop
+				return function()
+					if not resolved then
+						resolved = true
+						opener = package.loaded["adapters.desktop_opener"]
+						stop = opener and opener.shutdown
+					end
+					return not opener or (type(stop) == "function" and stop() == true)
+				end
+			end)(),
+		},
+		{
+			name = "AI agent learning",
+			stop = function() require("modules.llm.agent_learning").flush() end,
 		},
 		{
 			name = "LLM model download",
@@ -369,8 +401,10 @@ local shutdown = ShutdownCoordinator.new({
 		},
 		{
 			name = "gesture reader",
+			wait_for_ack = true,
 			stop = function()
-				if gestures and type(gestures.stop_reading) == "function" then gestures.stop_reading() end
+				if gestures and type(gestures.stop_reading) == "function" then return gestures.stop_reading() == true end
+				return true
 			end,
 		},
 		{
@@ -910,6 +944,7 @@ local function main()
 		on_pause_change = function(paused)
 			if privacy_owners.end_wrap_selection then privacy_owners.end_wrap_selection() end
 			if paused then keylogger.cancel_hold_intervals() end
+			if paused and gestures then gestures.release_clicks() end
 			if paused then MagicKeySource.cancel_capture() end
 			if gestures then gestures.set_program_paused(paused); gestures.set_window_switch_paused(paused) end
 			if user_hotstring_native then user_hotstring_native.observe_input() end
@@ -1145,7 +1180,10 @@ local function main()
 			end
 		end
 
-		if result and secure_focus_guard.blocks_text() then result = nil end
+		-- Ordinary expansions retain their original field through clipboard I/O.
+		-- Tabs between explicitly configured fields keep their separate protocol.
+		local destination = result and secure_focus_guard.capture_text_owner()
+		if result and not destination then result = nil end
 		if result then
 			-- A private mapping's trigger is a fragment of its own secret — the
 			-- first six characters of the IBAN, the first five digits of the SSN —
@@ -1172,7 +1210,8 @@ local function main()
 					result.backspace_count,
 					result.replacement,
 					result.is_private,
-					replay_terminator
+					replay_terminator,
+					destination
 				)
 				local queued_input = injector._end_injection()
 				expansion_committed = ok_delivery and type(delivery) == "table"
@@ -1189,6 +1228,8 @@ local function main()
 					_undoable = {
 						trigger     = result.trigger,
 						replacement = result.replacement,
+						is_private  = result.is_private,
+						destination = destination,
 						-- The terminator typed back AFTER the replacement: it is the
 						-- character an immediate Backspace actually removes.
 						replayed    = replay_terminator,
@@ -1207,7 +1248,9 @@ local function main()
 				else
 					_undoable = nil
 					engine:reset()
-					Logger.error(LOG, "Expansion output did not commit — logical state invalidated: %s.",
+					local report = ok_delivery and type(delivery) == "table" and delivery.cleanup_ok == true
+						and delivery_error == "programmable publication is no longer current" and Logger.warn or Logger.error
+					report(LOG, "Expansion output did not commit — logical state invalidated: %s.",
 						tostring(delivery_error))
 				end
 			end
@@ -1368,6 +1411,7 @@ local function main()
 	-- length is read from its settings, which the menu writes.
 	if prediction_engine then
 		privacy_owners.selection = require("adapters.selection_transaction").new({
+			capture_text_owner = secure_focus_guard.capture_text_owner,
 			focus_id = secure_focus_guard.focused_text_identity,
 			-- Selection reads and writes share the daemon's exact field identity.
 			privacy_guard = secure_focus_guard.blocks_text,
@@ -1388,12 +1432,22 @@ local function main()
 			end,
 			triggers      = { "//", ";;", "--" },
 			overlay       = llm_overlay,
-			apply_prediction = function(candidate)
-				local result = injector.inject(candidate.deletes, candidate.to_type, false)
-				return type(result) == "table" and result.ok == true
+			apply_prediction = function(candidate, context, authorized)
+				if type(context) ~= "table" or type(context.focus) ~= "string" or context.focus == ""
+					or type(authorized) ~= "function" or not authorized() then return false end
+				local destination = secure_focus_guard.capture_text_owner(context.focus)
+				if not destination or not authorized() then return false end
+				-- The offer and the original field must both survive clipboard I/O.
+				-- Per-key authorization remains RAM-only; neither guard borrows a successor.
+				local publication = {
+					current = function() return authorized() and destination.current() and authorized() end,
+					cached = function() return authorized() and destination.cached() and authorized() end,
+				}
+				local result = injector.inject(candidate.deletes, candidate.to_type, false, nil, publication)
+				return type(result) == "table" and result.ok == true and publication.cached()
 			end,
-			-- Selection output is bound to the exact original native range, even
-			-- when an application moves it without any physical input event.
+			-- Revalidate the original range before injection, then retain its exact
+			-- field and originating action across blocking output phases.
 			read_selection = function(focus, authorized, callback)
 				if opts.dry_run then callback(false, "", "dry run"); return false end
 				return privacy_owners.selection.read(focus, authorized, callback)
@@ -1401,16 +1455,19 @@ local function main()
 			cancel_selection = function() return privacy_owners.selection.cancel() end,
 			replace_selection = function(text, receipt, authorized, callback)
 				if opts.dry_run then callback(false); return false end
-				return privacy_owners.selection.replace(receipt, text, authorized, function(value)
-					return injector.inject_selected(value, false)
-				end, function(committed)
-					if committed then
-						-- The buffer no longer describes the physically replaced line.
-						_undoable = nil
-						engine:reset()
-					end
+				local invalidated = false
+				local function invalidate_document()
+					if invalidated then return end
+					invalidated = true
+					_undoable = nil
+					engine:reset()
+				end
+				return privacy_owners.selection.replace_staged(receipt, text, authorized, function(value, publication)
+					return injector.prepare_selected(value, publication)
+				end, function(committed, physical)
+					if committed or (type(physical) == "table" and physical.payload_written == true) then invalidate_document() end
 					callback(committed)
-				end)
+				end, invalidate_document)
 			end,
 			-- Retain the exact active text control: programmatic field changes can
 			-- happen inside one native window without any pointer or keyboard event.
@@ -1513,17 +1570,21 @@ local function main()
 		-- replacement is still on screen. Counting the replacement alone left its
 		-- first character behind: "adn " then Backspace read "Aadn".
 		if one_character and _undoable and not opts.dry_run then
+			-- The original expansion owns both the field and its privacy policy.
+			-- Focus/log/clipboard callbacks can retire the global Undo while this
+			-- operation is in progress, so read only this captured commit record.
+			local undo = _undoable
+			_undoable = nil
 			local remaining = 0
-			for _ in (_undoable.replacement .. (_undoable.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+			for _ in (undo.replacement .. (undo.replayed or "")):gmatch("[%z\1-\127\194-\244][\128-\191]*") do
 				remaining = remaining + 1
 			end
 			if remaining >= 1 then
 				-- The trigger is typed text: its length is the diagnostic, not its content.
 				Logger.info(LOG, "Undo: restoring the trigger (%d char(s)).",
-					utf8.len(_undoable.trigger) or #_undoable.trigger)
-				injector.inject(remaining - 1, _undoable.trigger)
+					utf8.len(undo.trigger) or #undo.trigger)
+				injector.inject(remaining - 1, undo.trigger, undo.is_private, nil, undo.destination)
 				engine:reset()
-				_undoable = nil
 				return
 			end
 		end
@@ -1573,9 +1634,22 @@ local function main()
 		end,
 		get_pair = function(char) return shortcuts and shortcuts.get_wrap_pair(char) or nil end,
 		read_primary = require("adapters.clipboard").read_primary,
-		type_text = function(text)
+		type_text = function(text, owner)
 			if opts.dry_run then return false end
-			local result = injector.inject(0, text, false)
+			if type(owner) ~= "table" or type(owner.current) ~= "function"
+				or type(owner.cached) ~= "function" then return false end
+			local current, cached = owner.current, owner.cached
+			if not current() then return false end
+			local destination = secure_focus_guard.capture_text_owner()
+			if not destination or not current() then return false end
+			local function retained(check)
+				return owner.current == current and owner.cached == cached and check()
+			end
+			local publication = {
+				current = function() return retained(current) and destination.current() and retained(current) end,
+				cached = function() return retained(cached) and destination.cached() and retained(cached) end,
+			}
+			local result = injector.inject(0, text, false, nil, publication)
 			if type(result) ~= "table" or result.ok ~= true then return false end
 			-- The caret moved over replaced text: what the engine buffered no longer
 			-- describes the line.
@@ -2072,21 +2146,28 @@ local function main()
 			}
 		end
 
-		rebuild_tray_menu = function()
-			if shutdown.is_requested() then return end
-			local ctx = _build_menu_ctx()
-			local ok_build, items = pcall(menu_builder.build, ctx)
-			if not ok_build then
-				Logger.error(LOG, "Menu rebuild failed — %s", tostring(items))
-				return
-			end
-			if shutdown.is_requested() then return end
-			tray_menu.setMenu(items)
-			if shutdown.is_requested() then return end
-			-- Every pause toggle rebuilds the menu, so the logo follows here.
-			if type(tray_menu.setPaused) == "function" then tray_menu.setPaused(ctx.paused == true) end
-		end
+		-- Refresh callbacks only revoke RAM authority. GTK publication runs once
+		-- after the keyboard pump, using the latest committed menu context.
+		privacy_owners.menu_rebuild = (function(builder, tray, context)
+			local build, publish, set_paused = builder.build, tray.setMenu, tray.setPaused
+			return require("ui.menu.rebuild_owner").new({
+				current = function()
+					return not shutdown.is_requested() and menu_builder == builder and tray_menu == tray
+						and builder.build == build and tray.setMenu == publish and tray.setPaused == set_paused
+				end,
+				build = function()
+					local ctx = context()
+					return build(ctx), ctx.paused == true
+				end,
+				publish = publish,
+				appearance = type(set_paused) == "function" and function(paused) return set_paused(paused) end or nil,
+				on_error = function(reason) Logger.error(LOG, "Tray menu refresh refused: %s.", reason) end,
+			})
+		end)(menu_builder, tray_menu, _build_menu_ctx)
+		rebuild_tray_menu = privacy_owners.menu_rebuild.request
 		rebuild_tray_menu()
+		privacy_owners.menu_rebuild.pump()
+
 		if not privacy_owners.startup_checkpoint() then return end
 		else
 			-- The degraded tray, shown when the menu builder is unavailable.
@@ -2674,6 +2755,10 @@ local function main()
 			if gestures and type(gestures.pump) == "function" then
 				local owner = gestures
 				RuntimeGuard.call("gesture pump", owner.pump, owner.stop_reading)
+			end
+			if privacy_owners.menu_rebuild then
+				local owner = privacy_owners.menu_rebuild
+				RuntimeGuard.call("tray menu rebuild", owner.pump, owner.stop)
 			end
 		end,
 		onPeriodic = on_periodic,

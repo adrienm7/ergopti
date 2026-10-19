@@ -76,6 +76,8 @@ def session(root):
     driver = pathlib.Path(__file__).resolve().parents[2]
     processes = []
     worker = None
+    worker_ack = False
+    summary = None
     with (root / "wm.log").open("w") as wm_log, (root / "gtk.log").open("w") as gtk_log:
         wm = subprocess.Popen(["openbox"], stdout=wm_log, stderr=wm_log)
         processes.append(wm)
@@ -124,8 +126,14 @@ def session(root):
                 processes.append(worker)
 
                 def command(text):
-                    worker.stdin.write(text + "\n")
-                    worker.stdin.flush()
+                    try:
+                        worker.stdin.write(text + "\n")
+                        worker.stdin.flush()
+                    except BrokenPipeError as error:
+                        raise AssertionError(
+                            "owned AI worker closed its command input: "
+                            + (root / "worker.log").read_text()
+                        ) from error
                     with selectors.DefaultSelector() as selector:
                         selector.register(worker.stdout, selectors.EVENT_READ)
                         assert selector.select(10), "owned AI worker exceeded its command deadline"
@@ -293,8 +301,16 @@ def session(root):
                         cases += 1
                 for stage in ("completion", "acceptance"):
                     before = focus(0, True)
-                    command("reset")
-                    command("start-prediction")
+                    initial = command("reset")
+                    assert initial["conclusive"] and initial["target"] and initial["role"] == 61, (
+                        initial
+                    )
+                    started = command("start-prediction")
+                    assert started["started"] and started["requests"] == 1, (stage, started)
+                    assert started["conclusive"] and started["target"] == initial["target"], (
+                        stage,
+                        started,
+                    )
                     if stage == "acceptance":
                         assert command("offer")["offered"]
                     app.send_signal(signal.SIGSTOP)
@@ -312,7 +328,7 @@ def session(root):
                     "the AI first character cannot call a synchronous focus helper",
                     first,
                 )
-                assert first["target"] and (
+                assert first["first_char_target_before"] and (
                     first["heartbeat_delay_ms"] < first["barrier_budget_ms"] + 100
                 ), first
                 cases += 1
@@ -348,20 +364,28 @@ def session(root):
                 print(
                     f"Native selected-range helper timeout and settlement: {cold_timeout['selection_ms']:.1f}ms"
                 )
-                print(
-                    f"PASS native GTK AI text focus: {cases} cases; correct controls type; changed fields/windows and passwords refuse request/output"
-                )
+                summary = f"PASS native GTK AI text focus: {cases} cases; correct controls type; changed fields/windows and passwords refuse request/output"
         finally:
-            if app.poll() is None:
-                app.send_signal(signal.SIGCONT)
-            if worker is not None and worker.poll() is None:
-                worker.stdin.close()
-                try:
-                    worker.wait(timeout=6)
-                except subprocess.TimeoutExpired:
-                    pass
-            for process in reversed(processes):
-                stop(process)
+            try:
+                if app.poll() is None:
+                    app.send_signal(signal.SIGCONT)
+                if worker is not None:
+                    if worker.poll() is None:
+                        try:
+                            worker.stdin.close()
+                        except BrokenPipeError:
+                            pass
+                        try:
+                            worker.wait(timeout=6)
+                        except subprocess.TimeoutExpired:
+                            pass
+                    worker_ack = worker.returncode == 0
+            finally:
+                for process in reversed(processes):
+                    stop(process)
+        assert worker_ack, "native AI worker did not acknowledge successful retirement"
+        assert summary is not None
+        print(summary)
 
 
 def main():

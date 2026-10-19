@@ -108,13 +108,18 @@ tap-hold engine masks a lone Alt or Super release with KEY_F24.
 
 ### project-linux-coarse-clock-overstates-a-gap
 
-Without luv (optional at install, and absent from the stubbed CI E2E step)
-`infra/monotonic` is `os.time() * 1000`: two keys typed together read 1000 ms
-apart when the second turns over between them. The 0.75 s expansion delay
-dropped such a trigger, which surfaced as a rare E2E flake. Action: compare a
-difference of two readings only after taking off `Monotonic.resolution_ms()`,
-as `within_interkey_delay` and `keyboard_hook` do; a daemon scenario that
-depends on time pins it with `ERGOPTI_E2E_CLOCK=seconds` and `{TICK}`.
+When luv is unavailable while `infra/monotonic` loads, its source is
+`os.time() * 1000`: two keys typed together can read 1000 ms apart across a
+second boundary. Action: subtract `Monotonic.resolution_ms()` when comparing
+a gap, as `within_interkey_delay` and `keyboard_hook` do. Daemon scenarios pin
+that clock with `ERGOPTI_E2E_CLOCK=seconds` and `{TICK}`.
+
+Native signal ownership still requires luv. A coarse-clock fixture hides luv
+only while loading the real Monotonic module, then restores both its loaded
+and preload entries before starting Main. Pump native I/O and finish any
+SQLite flush before advancing virtual time; a readable rollback is not a
+committed configuration snapshot. Shutdown assertions require actual native
+close acknowledgments, independently of the clock being simulated.
 
 ## Website and documentation
 

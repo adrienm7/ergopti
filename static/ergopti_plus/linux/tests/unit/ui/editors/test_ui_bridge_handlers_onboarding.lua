@@ -14,6 +14,17 @@ local helpers =
 
 
 
+--- Runs the real resolver with one fresh owner, restoring the caller's exact cache.
+--- @param body function Receives the freshly reloaded configuration paths module.
+local function with_real_config_paths(body)
+	local previous = package.loaded["infra.config_paths"]
+	local ok, detail = pcall(function()
+		body(helpers.load_module("infra.config_paths"))
+	end)
+	package.loaded["infra.config_paths"] = previous
+	if not ok then error(detail, 0) end
+end
+
 helpers.describe("ui.bridge_handlers", function()
   helpers.describe("onboarding_bridge", function()
     local handler = helpers.load_module("ui.onboarding.bridge")
@@ -262,8 +273,28 @@ helpers.describe("ui.bridge_handlers", function()
 		end)
 
 		helpers.it("(onboarding-metrics-path) the real resolver names the keylogger store", function()
-			local ConfigPaths = helpers.load_module("infra.config_paths")
-			helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
+			local previous = package.loaded["infra.config_paths"]
+			with_real_config_paths(function(ConfigPaths)
+				helpers.assert_eq(ConfigPaths.metrics_path(), ConfigPaths.data("metrics.sqlite"))
+			end)
+			helpers.assert_true(rawequal(package.loaded["infra.config_paths"], previous), "the real resolver retains the original path owner")
+		end)
+
+		helpers.it("(onboarding-metrics-path) restores a warm preference path owner after a resolver failure", function()
+			local paths = require("infra.config_paths")
+			local preferences = require("infra.metrics_preferences")
+			local failure, visited = {}, 0
+			local ok, detail = pcall(with_real_config_paths, function(fresh)
+				helpers.assert_true(not rawequal(fresh, paths), "exercise a genuine fresh resolver")
+				helpers.assert_eq(fresh.metrics_path(), fresh.data("metrics.sqlite"))
+				visited = visited + 1
+				error(failure, 0)
+			end)
+			helpers.assert_eq(ok, false)
+			helpers.assert_true(rawequal(detail, failure), "preserve the resolver's original failure")
+			helpers.assert_eq(visited, 1)
+			helpers.assert_true(rawequal(require("infra.config_paths"), paths), "a failed resolver cannot replace the warm preference path owner")
+			helpers.assert_true(rawequal(require("infra.metrics_preferences"), preferences))
 		end)
 
 		helpers.it("(onboarding-window-title) the product name appears once in the window title", function()

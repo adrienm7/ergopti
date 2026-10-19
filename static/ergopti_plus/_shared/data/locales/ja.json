@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "バッチ — バッチ予測（大規模モデル）",
 	"prompt_editor.mode.parallel": "標準 — 並列予測",
 	"prompt_editor.placeholder_prompt": "テキストがあります、続けてください: {context}",
+	"prompt_editor.save_failed": "プロンプトプロファイルを保存できませんでした。再試行できるよう、エディターは開いたままです。",
 	"prompt_editor.title_edit": "プロフィールを編集",
 	"prompt_editor.title_new": "新しいプロファイル",
 	"script_control.pause_failed": "スクリプトを一時停止できませんでした。以前の状態を維持しました。",

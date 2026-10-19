@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "批量 — 分批预测（大型模型）",
 	"prompt_editor.mode.parallel": "标准 — 并行预测",
 	"prompt_editor.placeholder_prompt": "这是一段文字，请继续：{context}",
+	"prompt_editor.save_failed": "无法保存提示词配置。编辑器保持打开，以便你重试。",
 	"prompt_editor.title_edit": "编辑配置文件",
 	"prompt_editor.title_new": "新建配置",
 	"script_control.pause_failed": "无法暂停脚本；已保留先前状态。",

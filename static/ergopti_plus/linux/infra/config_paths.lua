@@ -132,10 +132,24 @@ end
 --- @param path any Candidate path.
 --- @return string|nil normalized
 local function normalize_config_override(path)
-	if type(path) ~= "string" then return nil end
+	if type(path) ~= "string" or path:find("\0", 1, true) then return nil end
 	local normalized = path:match("^/+$") and "/" or path:gsub("/+$", "")
 	if normalized ~= "" and normalized:sub(1, 1) ~= "/" then return nil end
 	return normalized
+end
+
+--- Requires a real directory before publishing its bootstrap locator.
+--- mkdir acknowledges existing directories and directory symlinks, creates
+--- missing ancestors, and refuses files or failed creates without a probe file.
+--- @param normalized string Absolute override, or empty for the default.
+--- @return boolean prepared
+local function prepare_config_directory(normalized)
+	local target = normalized == "" and M.default_config_dir() or normalized
+	local Shell = require("adapters.shell_runner")
+	local called, ready = pcall(Shell.run, "mkdir -p -- " .. Shell.quote(target) .. " 2>/dev/null")
+	if called and ready == true then return true end
+	require("logger.shim").error("infra.config_paths", "Configuration directory could not be prepared; bootstrap settings are unchanged.")
+	return false
 end
 
 --- Persists a configuration-directory override.
@@ -147,6 +161,7 @@ function M.set_config_dir(path)
 
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or type(Storage) ~= "table" then return false end
+	if not prepare_config_directory(normalized) then return false end
 	if normalized == "" or normalized == M.default_config_dir() then
 		return type(Storage.delete) == "function"
 			and Storage.delete(CONFIG_DIR_STORAGE_KEY) == true
@@ -283,6 +298,7 @@ function M.set_paths(config_dir, logs_dir)
 	if logs_dir ~= nil then append(LOGS_DIR_STORAGE_KEY, logs, M.default_logs_dir()) end
 	local ok, Storage = pcall(require, "adapters.storage")
 	if not ok or type(Storage) ~= "table" or type(Storage.set_many) ~= "function" then return false end
+	if not prepare_config_directory(config) then return false end
 	local called, saved = pcall(Storage.set_many, values, deletions)
 	return called and saved == true
 end

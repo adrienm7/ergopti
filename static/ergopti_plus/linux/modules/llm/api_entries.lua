@@ -95,8 +95,10 @@ end
 --- @param path string
 --- @param text string
 --- @param expected table Exact classified disk source captured at load/publication.
+--- @param admit function|nil Exact live runtime admission.
+--- @param publication table|nil Private native rename acknowledgement.
 --- @return boolean ok, string|nil err
-local function write_private(path, text, expected, admit)
+local function write_private(path, text, expected, admit, publication)
 	local dir = path:match("^(.*)/[^/]+$")
 	if dir then os.execute("mkdir -p '" .. (dir:gsub("'", "'\\''")) .. "'") end
 	local tmp = path .. ".tmp"
@@ -122,7 +124,9 @@ local function write_private(path, text, expected, admit)
 		os.remove(tmp)
 		return false, "source changed after private staging"
 	end
+	if publication then publication.renaming = true end
 	local renamed, rename_err = os.rename(tmp, path)
+	if publication then publication.renaming = false end
 	if not renamed then
 		os.remove(tmp)
 		return false, tostring(rename_err)
@@ -268,10 +272,13 @@ end
 --- Persists the current state, the outdated entries included as they were.
 --- A file this build cannot write back whole is never replaced: the write is
 --- refused with its bytes unchanged, since rewriting it would drop keys.
+--- @param admit function|nil Exact live runtime admission.
+--- @param publication table|nil Private reservation and rename acknowledgement.
+--- @param quiet boolean|nil Defers logging until tentative RAM is restored.
 --- @return boolean
-local function persist(admit)
+local function persist(admit, publication, quiet)
 	local current = state()
-	if current.publishing == true then return false end
+	if current.publishing == true and not (publication and publication.owner == current) then return false end
 	if admit then
 		local accepted, allowed = pcall(admit)
 		if not accepted or allowed ~= true then return false end
@@ -305,13 +312,17 @@ local function persist(admit)
 	-- private 0600 writer stages it. The private writer rechecks after staging.
 	-- Reentrant mutations cannot acquire a second publication owner.
 	current.publishing = true
-	local ok, err = SourceWriter.publish_if_unchanged(M.path(), payload, {
+	local path = M.path()
+	if publication then publication.path = path end
+	local called, ok, err = pcall(SourceWriter.publish_if_unchanged, path, payload, {
 		read_with_status = SourceWriter.read_classified,
-		write_if_unchanged = function(path, text, expected) return write_private(path, text, expected, admit) end,
+		write_if_unchanged = function(target, text, expected) return write_private(target, text, expected, admit, publication) end,
 	}, current.source)
-	current.publishing = false
+	-- An interrupted rename cannot manufacture either commit or rollback ACK.
+	current.publishing = publication ~= nil and publication.renaming == true
+	if not called then ok, err = false, ok end
 	if ok == true then current.source = { status = "ok", content = payload } end
-	if not ok then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
+	if not ok and not quiet then Logger.error(LOG, "API entries could not be saved: %s.", tostring(err)) end
 	return ok
 end
 
@@ -352,10 +363,25 @@ end
 --- Adds an entry, optionally selecting it in the same private publication.
 --- @param fields table { provider, token, label, model?, base_url? }
 --- @param select boolean|nil Defaults to true; false preserves the prediction selection.
---- @return table|nil entry, string|nil err
-function M.add(fields, select)
-	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean" end
+--- @param admit function|nil Exact live runtime admission, checked before RAM and native rename.
+--- @return table|nil entry, string|nil err, boolean settled, table|nil source
+function M.add(fields, select, admit)
+	local function admitted()
+		if admit == nil then return true end
+		if type(admit) ~= "function" then return false end
+		local called, allowed = pcall(admit)
+		return called and allowed == true
+	end
+	if select ~= nil and type(select) ~= "boolean" then return nil, "selection must be a boolean", true end
+	if not admitted() then return nil, "API entry admission changed", true end
 	local current = state()
+	local source, path = current.source, M.path()
+	if current.publishing then return nil, "API entries are already publishing", true end
+	if current.write_refusal then
+		pcall(Logger.error, LOG, "API entries were not saved: '%s' %s; fix or move that file first, "
+			.. "or rewriting it would lose its keys.", path, current.write_refusal)
+		return nil, "the API entries file cannot be rewritten", true
+	end
 	local id
 	id, _sequence = EntryIdentity.next(tostring(fields.provider), os.time(), _sequence, current.entries)
 	local entry = valid_entry({
@@ -366,21 +392,34 @@ function M.add(fields, select)
 		model = fields.model,
 		base_url = fields.base_url,
 	})
-	if not entry then return nil, "provider, label and key are required" end
+	if not entry then return nil, "provider, label and key are required", true end
+	if not admitted() or current ~= state() or current.source ~= source or M.path() ~= path or current.publishing then
+		return nil, "API entry admission changed", true
+	end
+	-- Reserve before tentative RAM: admission and serialization can reenter.
+	local publication = { owner = current }
+	current.publishing = true
 	current.entries[#current.entries + 1] = entry
 	local previous = current.active_id
 	if select ~= false then current.active_id = entry.id end
-	if not persist() then
+	local called, committed = pcall(persist, admit, publication, true)
+	if not called or committed ~= true then
+		if publication.renaming then return nil, "API entry publication remains unacknowledged", false end
+		current.publishing = false
 		table.remove(current.entries)
 		current.active_id = previous
-		return nil, "the entry could not be saved"
+		-- Restore tentative RAM before logging can reenter another mutation.
+		pcall(Logger.error, LOG, "The API entry could not be saved.")
+		return nil, "the entry could not be saved", true
 	end
 	if select ~= false then
 		-- The user chose an entry: a stored selection nothing matched is replaced.
 		current.dangling_active_id = nil
 	end
-	Logger.info(LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
-	return entry
+	local receipt = {}
+	_source_receipts[receipt] = { owner = current, source = current.source, path = publication.path }
+	pcall(Logger.info, LOG, "API entry '%s' (%s) added; selected=%s.", entry.id, entry.provider, tostring(select ~= false))
+	return entry, nil, true, receipt
 end
 
 --- Selects the entry predictions use.

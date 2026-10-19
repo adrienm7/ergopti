@@ -7027,7 +7027,7 @@ const LINUX_SIMULTANEOUS_ENTRY = `bash ${LINUX_SIMULTANEOUS_HARNESS}`;
 const LINUX_SIMULTANEOUS_NATIVE_WORKFLOW = [
 	'sudo modprobe uinput',
 	'sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends at-spi2-core openbox python3-gi gir1.2-gtk-3.0 \\',
-	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv',
+	'  dbus-x11 xvfb x11-xkb-utils libayatana-appindicator3-1 lua-luv xclip',
 	'sudo env \\',
 	'  GITHUB_ACTIONS="$GITHUB_ACTIONS" \\',
 	'  GITHUB_REPOSITORY="$GITHUB_REPOSITORY" \\',
@@ -7117,6 +7117,7 @@ for (const [what, from, to] of [
 		'--no-install-recommends at-spi2-core',
 		'--no-install-recommends'
 	],
+	['missing X11 clipboard prerequisite', 'lua-luv xclip', 'lua-luv'],
 	['missing strict wrapper status', 'set -euo pipefail', 'set +e'],
 	[
 		'wrong workflow selection scope',
@@ -7155,7 +7156,7 @@ for (const [what, from, to] of [
 	);
 	linuxSimultaneousWorkflowRefusals++;
 }
-assert.equal(linuxSimultaneousWorkflowRefusals, 19);
+assert.equal(linuxSimultaneousWorkflowRefusals, 20);
 
 /** Retains exact ordered native calls, status admission and failing teardown. */
 function linuxSimultaneousEnrollmentProblems(source) {

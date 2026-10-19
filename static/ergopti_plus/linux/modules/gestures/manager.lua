@@ -186,22 +186,11 @@ end
 -- held for seconds would report elapsed ~= 0 and be misclassified as a tap.
 local _now_sec = Monotonic.now_sec
 
--- Which mouse buttons the click-toggle actions currently hold down ("1" for
--- left, "3" for right). Without this the toggle fires mousedown on every
--- invocation and the button sticks down in a drag until a manual mouseup.
-local _click_toggle_down = { ["1"] = false, ["3"] = false }
-
---- Returns the xdotool command toggling one button hold, flipping the
---- remembered state: odd fires press, even fires release.
---- @param button string "1" for left, "3" for right.
---- @return string The xdotool command to run.
-local function _click_toggle_command(button)
-	_click_toggle_down[button] = not _click_toggle_down[button]
-	if _click_toggle_down[button] then
-		return "xdotool mousedown " .. button
-	end
-	return "xdotool mouseup " .. button
-end
+-- Click holds are independent from the touchpad reader: keyboard shortcuts
+-- may acquire them on a desktop without a touchpad too.
+local function NEVER_PAUSED() return false end
+local _is_paused = NEVER_PAUSED
+local _click_holds = require("modules.gestures.click_hold").new(function() return not _is_paused() end)
 
 -- =========================================
 -- =========================================
@@ -552,8 +541,8 @@ local BUILTIN_HANDLERS = {
 		Logger.error(LOG, "open_system_settings: none of %s is installed — nothing opened.",
 			table.concat(SETTINGS_APPLICATIONS, ", "))
 	end,
-	["left_click_toggle"] = function() run_background(_click_toggle_command("1")) end,
-	["right_click_toggle"] = function() run_background(_click_toggle_command("3")) end,
+	["left_click_toggle"] = function() return _click_holds.toggle("1") end,
+	["right_click_toggle"] = function() return _click_holds.toggle("3") end,
 	["open_chatgpt"] = function()
 		return require("modules.shortcuts.chatgpt").open()
 	end,
@@ -598,9 +587,6 @@ local BUILTIN_HANDLERS = {
 -- and shutdown state while still giving every catalogue action one executor.
 local _action_handlers = {}
 
--- The daemon's pause state, injected by init(). Declared above every reader.
-local function NEVER_PAUSED() return false end
-local _is_paused = NEVER_PAUSED
 
 local function _execute_action(action_name, go_next, binding)
 	if not action_name or action_name == "none" then return end
@@ -1960,6 +1946,8 @@ end
 --- events consumed so a caller can tell a quiet tick from a stalled reader.
 --- @return integer
 function M.pump()
+	_click_holds.pump()
+	if _is_paused() then M.release_clicks() end
 	if not _reading or not _decoder or _reader_stop_error then return 0 end
 
 	local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
@@ -1977,10 +1965,17 @@ function M.pump()
 	return drained or 0
 end
 
+--- Retires synthetic buttons even when no touchpad reader was opened.
+--- @return boolean True only after every native mouseup was acknowledged.
+function M.release_clicks()
+	return _click_holds.release_all()
+end
+
 --- Stops reading the touchpad.
 --- @return boolean True only when the reader acknowledges closure.
 function M.stop_reading()
 	if not _scope_native and not admit_mutation() then return false end
+	local clicks_retired = M.release_clicks()
 	if _reading then
 		local ok_reader, Reader = pcall(require, "adapters.evdev_reader")
 		local called, acknowledged, detail = false, nil, "reader close is unavailable"
@@ -2001,7 +1996,7 @@ function M.stop_reading()
 	_decoder = nil
 	_touchpad = nil
 	Logger.info(LOG, "Touchpad reader stopped.")
-	return true
+	return clicks_retired
 end
 
 --- The touchpad being read, or nil.
