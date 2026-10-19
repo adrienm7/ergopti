@@ -4070,6 +4070,8 @@ jobs:
           log_path, runner_path, distro, native_status = sys.argv[1:]
           text = pathlib.Path(log_path).read_text(encoding="utf-8", errors="replace")
           runner = pathlib.Path(runner_path).read_text(encoding="utf-8")
+          groups_path = pathlib.Path(runner_path).parent / "support" / "module_groups.lua"
+          groups = re.findall(r'\{ name = "([a-z_]+)"', groups_path.read_text(encoding="utf-8"))
           separator = "=" * 40
           template = r"\n" + separator + r"\nOVERALL RESULTS:\nTotal modules: %d\nPassed tests:  %d\nFailed tests:  %d\n" + separator
 
@@ -4086,27 +4088,37 @@ jobs:
           if runner.count('"' + template + '"') != 1:
               annotation("error", distro + ": native runner summary format is unavailable; inspect the raw artifact")
               raise SystemExit(2)
+          # The helper runs every module group at once and prints each log whole
+          # under its header, in the order tests/support/module_groups.lua declares.
+          parts = re.split(r"(?m)^distro-unit-group ([a-z_]+)\n", text)
+          names = parts[1::2]
+          if not groups or names != groups:
+              annotation("error", distro + ": native exit " + native_status + "; expected the groups " + ", ".join(groups) + ", received " + ", ".join(names) + "; inspect the raw artifact")
+              raise SystemExit(2)
           pattern = re.compile(r"(?m)^" + separator + r"\nOVERALL RESULTS:\nTotal modules: ([0-9]+)\nPassed tests:  ([0-9]+)\nFailed tests:  ([0-9]+)\n" + separator + r"(?:\n|$)")
-          frames = list(pattern.finditer(text))
-          if len(frames) != 1 or len(re.findall(r"(?m)^OVERALL RESULTS:$", text)) != 1:
-              annotation("error", distro + ": native exit " + native_status + "; expected one complete summary, received " + str(len(frames)) + "; inspect the raw artifact")
-              raise SystemExit(2)
-          frame = frames[0]
-          modules, passed, failed = map(int, frame.groups())
-          if modules <= 0 or passed + failed <= 0 or (native_status == "0" and failed != 0):
-              annotation("error", distro + ": native exit/summary contradiction; inspect the raw artifact")
-              raise SystemExit(2)
-          summary = distro + ": native exit " + native_status + "; modules=" + str(modules) + ", passed=" + str(passed) + ", failed=" + str(failed)
+          totals = [0, 0, 0]
+          for name, body in zip(names, parts[2::2]):
+              frames = list(pattern.finditer(body))
+              if len(frames) != 1 or len(re.findall(r"(?m)^OVERALL RESULTS:$", body)) != 1:
+                  annotation("error", distro + " " + name + ": native exit " + native_status + "; expected one complete summary, received " + str(len(frames)) + "; inspect the raw artifact")
+                  raise SystemExit(2)
+              frame = frames[0]
+              modules, passed, failed = map(int, frame.groups())
+              if modules <= 0 or passed + failed <= 0 or (native_status == "0" and failed != 0):
+                  annotation("error", distro + " " + name + ": native exit/summary contradiction; inspect the raw artifact")
+                  raise SystemExit(2)
+              totals = [totals[0] + modules, totals[1] + passed, totals[2] + failed]
+              # Emit the actual runner's failure and module-load first lines without deriving
+              # expected results. Full traceback/replay bytes remain in the uploaded raw log.
+              if native_status != "0":
+                  for line in body[:frame.start()].splitlines():
+                      if line.startswith("  ! load error in "):
+                          annotation("error", distro + " " + name + ": " + line.strip())
+                  for line in body[frame.end():].splitlines():
+                      if line.startswith("  - ") or line.startswith("    replay: "):
+                          annotation("error", distro + " " + name + ": " + line.strip())
+          summary = distro + ": native exit " + native_status + "; groups=" + str(len(names)) + ", modules=" + str(totals[0]) + ", passed=" + str(totals[1]) + ", failed=" + str(totals[2])
           annotation("notice" if native_status == "0" else "error", summary)
-          # Emit the actual runner's failure and module-load first lines without deriving
-          # expected results. Full traceback/replay bytes remain in the uploaded raw log.
-          if native_status != "0":
-              for line in text[:frame.start()].splitlines():
-                  if line.startswith("  ! load error in "):
-                      annotation("error", distro + ": " + line.strip())
-              for line in text[frame.end():].splitlines():
-                  if line.startswith("  - ") or line.startswith("    replay: "):
-                      annotation("error", distro + ": " + line.strip())
           PYTHON
           diagnostic_status=$?
           set -e

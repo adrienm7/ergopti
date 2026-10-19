@@ -95,5 +95,28 @@ for directory in (working, working / "tests"):
 assert(Path.cwd() == working)
 print("Native ordinary-user fixture writes: 2 directories admitted")
 '
-sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
-	LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$unit_tmp" "$interpreter" tests/run.lua
+# The module groups of tests/support/module_groups.lua run at once, each with
+# a private TMPDIR: the whole suite in one process held every archive cell for
+# about four minutes. Logs print whole, in group order, under one header each,
+# so the workflow diagnostic still reads one runner summary per group.
+mapfile -t unit_groups < <("$interpreter" -e 'for _, group in ipairs(dofile("tests/support/module_groups.lua").GROUPS) do print(group.name) end')
+test "${#unit_groups[@]}" -gt 0
+unit_logs="$(mktemp -d "$native_root/logs.XXXXXXXX")"
+unit_pids=()
+for unit_group in "${unit_groups[@]}"; do
+	group_tmp="$(mktemp -d "$native_root/unit-$unit_group.XXXXXXXX")"
+	chown ergopti-ci "$group_tmp"
+	sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \
+		LUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" "$interpreter" tests/run.lua --module="$unit_group" \
+		>"$unit_logs/$unit_group.log" 2>&1 &
+	unit_pids+=("$!")
+done
+unit_status=0
+for index in "${!unit_groups[@]}"; do
+	group_status=0
+	wait "${unit_pids[$index]}" || group_status=$?
+	if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi
+	printf 'distro-unit-group %s\n' "${unit_groups[$index]}"
+	cat "$unit_logs/${unit_groups[$index]}.log"
+done
+exit "$unit_status"
