@@ -339,6 +339,12 @@ syntax gate for entry files outside the normal require graph.
 A successful `pcall` only means no Lua exception occurred. Interpret each native
 API's actual return contract, including false/nil operational refusal.
 
+`hs.pasteboard.clearContents()` returns no Lua values in the pinned native
+binding. Normalize a successful call at its consumer boundary; requiring a
+boolean `true` rejects healthy clearing. `writeAllData()` still requires its
+actual boolean acknowledgement. Preserve both thrown errors and false/nil
+write refusals in tests and diagnostics.
+
 ### project-hs-json-native-test-conversions
 
 The shared pure-Lua JSON decoder is not an exact `hs.json` test double for
@@ -407,6 +413,12 @@ boundaries. Central lifecycle adapters own all of them.
 
 Publish a watcher or process only after activation commits. A teardown refusal
 leaves cleanup debt whose callbacks must already be inert.
+
+Darwin `ps` exposes the command path through `comm`; it is not the executable
+basename that Linux fixtures commonly supply. Use `ucomm` for existing Python
+name guards in MLX cleanup, and keep the independent argument and PID/PGID
+guards. Exercise the emitted shell with recorded signals, including paths
+with spaces and non-Python executables under a directory named `python`.
 
 ### project-hs-timer-commit-contract
 
@@ -1045,6 +1057,13 @@ never repeat an uncertain request while its metatable remains. Observe retiremen
 outside the notification, and release bridge callbacks only after userdata
 consumption and the exact observation timer's stop acknowledgement. A callback
 delivery alone does not prove that its timer retired.
+Do not require another closing notification after an accepted delete: the
+window may already be closed when native destruction runs. Start the owned
+observation from the accepted request and retain it if delivery precedes
+consumption, without issuing another delete. A failed native diagnostic must
+preserve the individual measured retirement facts instead of reporting only a
+timeout. Match exception classes as complete tokens so a startup source name
+such as `SentryCrashMonitor_NSException` is not mistaken for a thrown exception.
 
 WebView GC does not remove the shared user-content controller's script handlers
 or release its Lua callback reference. A successful `setCallback(nil)` detaches
