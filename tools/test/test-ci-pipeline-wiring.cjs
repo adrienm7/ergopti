@@ -5931,7 +5931,7 @@ const DISTRO_UNIT_SUITE =
 const DISTRO_UNIT_GROUP_TAIL = [
 	'wait "${unit_pids[$index]}" || group_status=$?',
 	'if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi',
-	"printf 'distro-unit-group %s\\n' \"${unit_groups[$index]}\"",
+	'printf \'distro-unit-group %s\\n\' "${unit_groups[$index]}"',
 	'cat "$unit_logs/${unit_groups[$index]}.log"',
 	'exit "$unit_status"'
 ];
@@ -6166,7 +6166,11 @@ for (const [what, from, to] of [
 		'"$interpreter" tests/run.lua || true'
 	],
 	['swallowed group exit', 'group_status=$?', 'group_status=0'],
-	['later group exit wins', 'if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi', 'unit_status=0'],
+	[
+		'later group exit wins',
+		'if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi',
+		'unit_status=0'
+	],
 	['missing group header', "printf 'distro-unit-group %s\\n'", "printf 'group %s\\n'"],
 	['helper exits green', 'exit "$unit_status"', 'exit 0']
 ]) {
