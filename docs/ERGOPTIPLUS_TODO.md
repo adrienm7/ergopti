@@ -3009,21 +3009,26 @@ These are software implementations; final hardware verification remains below.
       on v1.0.3, or update). Open question for the maintainer: personal
       sections have `recommended = false`, so « Restaurer les valeurs
       conseillées » switches every personal category off.
-- [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).** - oMLX added by hand: fixed (c67d70f1fe, a pending key with the default
-      address left an empty address that won over the catalogue). - oMLX running but never seen before that: each sweep logs four
+- [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).**
+      (1) oMLX added by hand: fixed (c67d70f1fe; a pending key with the
+      default address left an empty address that won over the catalogue).
+      (2) oMLX running but never seen before that: each sweep logs four
       "Request timed out after 1500ms" (one per catalogue server) instead of
       an instant refusal; check whether `localhost` resolves to ::1 first
       while oMLX binds 127.0.0.1 only (then use 127.0.0.1 in
       local_servers.json for all drivers), or whether oMLX answers 401
-      without a key. - "Check for updates" failed with HTTP 403 then worked: the unauthenticated
-      GitHub API limit (60/h per IP; the changelog window and the healthcheck
-      also call it). Send conditional requests (ETag, `If-None-Match`: a 304
-      does not count against the limit) and report a rate limit as such, on
-      the three drivers' update checks. - Karabiner lease: repeated "timeout waiting for READY", "watchdog exited
-      unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a Mac
-      reproduction (macos/platform/karabiner lease worker). - The shortcut on the key left of "1" still targets the 105th ISO key
-      (keycodes 10 and 50 are swapped on ISO Macs); needs the maintainer's
-      keyboard type and the configured shortcut.
+      without a key. (3) "Check for updates" failed with HTTP 403 then worked:
+      the unauthenticated GitHub API limit (60/h per IP; the changelog window
+      and the healthcheck also call it). macOS already sends `If-None-Match`
+      from a per-session copy (auto_check.lua `list_cache`), so each restart
+      (many in that log) spends a call. Persist the ETag and body across
+      restarts, report a 403/429 with `X-RateLimit-Remaining: 0` as a rate
+      limit with its reset time, and check Windows and Linux do the same.
+      (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
+      exited unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a
+      Mac reproduction. (5) The shortcut on the key left of "1" still targets
+      the 105th ISO key (keycodes 10 and 50 are swapped on ISO Macs); needs
+      the maintainer's keyboard type and the configured shortcut.
 - [ ] **GitHub issue #84 (Linux, open since September 12).** Shift does not
       work on Arch (custom XKB type); waiting for the reporter's diagnostics.
 - [ ] **fix/\* merge of October 19 (dev 73bf713182, CI cancelled on request).**
