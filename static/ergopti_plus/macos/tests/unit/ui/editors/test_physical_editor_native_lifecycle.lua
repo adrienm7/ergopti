@@ -14,7 +14,7 @@ local run_contract = function(helpers, load_host, load_builder)
   package.loaded['infra.i18n']={get=function(k)return k end}
   package.loaded['webview.i18n_seed']={}
   package.loaded['infra.deferred_work']={after=function()return true end}
-  package.loaded['adapters.timer_scheduler']={now_ns=function()return 0 end}
+  package.loaded['adapters.timer_scheduler']=nil -- Exercise actual timer ownership through the native-shaped port.
   package.loaded['adapters.json_codec']=nil -- Use the actual codec over the controlled native JSON port.
   package.loaded['window_titles']={compose=function(k)return k end}
   package.loaded['json']={encode=function()return '{}'end}
@@ -34,7 +34,18 @@ local run_contract = function(helpers, load_host, load_builder)
     c.received=c.received+1;return true
    end}
   end}
-  _G.hs={json={decode=function()
+  c.timers={}
+  local function native_timer(_,receive)
+   local timer={live=false}
+   function timer:start()self.live=true;return self end
+   function timer:stop()self.live=false;return self end
+   function timer:running()return self.live end
+   timer.receive=receive;c.timers[#c.timers+1]=timer;return timer
+  end
+  function c.drain()
+   for _,timer in ipairs(c.timers)do if timer.live then timer.receive()end end
+  end
+  _G.hs={timer={new=native_timer},json={decode=function()
    c.decode_calls=(c.decode_calls or 0)+1
    if c.decode_mode=='throw'then error('malformed bundled JSON')end
    if c.decode_mode=='nil'then return nil end
@@ -149,7 +160,7 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_eq(c.delete_calls,1,'No retry while the original native deletion remains uncertain')
      -- Public delete may already own a fade despite its wrapper refusing.
      -- Independent SDK retirement, not another delete attempt, acknowledges it.
-     setmetatable(c.views[1],nil);c.delete=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(c.bridges[1].callback,nil)
+     setmetatable(c.views[1],nil);c.drain();c.delete=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(c.bridges[1].callback,nil)
      helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.created,2);helpers.assert_eq(host.close(),true)
     end)
    end)
@@ -184,7 +195,7 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_true(getmetatable(c.views[1])~=nil,'Acquired candidate remains physically live before acknowledgement')
      helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1,'No second constructor while exact candidate cleanup refuses')
      helpers.assert_eq(c.delete_calls,1,'No repeated native deletion before independently observed GC')
-     setmetatable(c.views[1],nil);c.delete=nil;c.during_html=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(host.open(options),true);helpers.assert_eq(host.close(),true)
+     setmetatable(c.views[1],nil);c.drain();c.delete=nil;c.during_html=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(host.open(options),true);helpers.assert_eq(host.close(),true)
     end)
    end)
   end
@@ -193,7 +204,7 @@ local run_contract = function(helpers, load_host, load_builder)
     helpers.assert_eq(host.open(options),true);c.delete='pending';helpers.assert_eq(host.close(),false)
     setmetatable(c.views[1],nil);local deletes=c.delete_calls
     c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0)
-    helpers.assert_eq(host.close(),true);helpers.assert_eq(c.delete_calls,deletes,'Terminal SDK readback acknowledges already deleted view')
+    c.drain();helpers.assert_eq(host.close(),true);helpers.assert_eq(c.delete_calls,deletes,'Terminal SDK readback acknowledges already deleted view')
    end)
   end)
   helpers.it('(physical-editor-lifecycle) old native closing callback cannot retire successor',function()

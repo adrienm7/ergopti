@@ -162,6 +162,7 @@ helpers.describe("physical shortcut pending deletion is not an error", function(
 				helpers.assert_eq(h.open(), false)
 				helpers.assert_eq(view.native.deletes, 1)
 				setmetatable(view, nil) -- independent native retirement, not an invented delete retry
+				h.drain()
 				h.delete_refuses = nil
 				helpers.assert_true(host.close())
 				helpers.assert_nil(next(h.script_refs))

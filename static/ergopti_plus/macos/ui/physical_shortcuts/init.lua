@@ -42,22 +42,30 @@ function M.available(scope)
 end
 
 local close
+local schedule_native_retirement
+local NATIVE_RETIREMENT_POLL_SECONDS = 0.05
 
---- Observes an accepted native fade after its closing notification unwinds.
+--- Observes native consumption without requiring another closing notification.
 --- The one-shot callback and its exact stop acknowledgement are independent:
 --- either can arrive first, but neither alone releases the original bridge.
 --- @param candidate table Exact native/editor owner being retired.
+--- @param delay number|nil Delay after a previous observation, or zero initially.
 --- @return boolean scheduled
-local function schedule_native_retirement(candidate)
+schedule_native_retirement = function(candidate, delay)
 	if candidate.retirement_timer ~= nil or candidate.retirement_arming or candidate.retirement_uncertain then return false end
 	candidate.retirement_arming = true
 	local delivered, settled = false, false
 	local function finish()
-		if candidate.retirement_arming or candidate.native_notification or not delivered or not settled then return end
-		close(candidate)
+		if candidate.retirement_arming or not delivered or not settled then return end
+		if active ~= candidate then return end
+		if candidate.webview ~= nil and getmetatable(candidate.webview) ~= nil then
+			-- A timer may precede the fade. Reobserve only after this exact
+			-- delivery and native stop have both committed; never replay delete.
+			schedule_native_retirement(candidate, NATIVE_RETIREMENT_POLL_SECONDS)
+		else close(candidate) end
 	end
 	local ok, committed = xpcall(function()
-		local handle, accepted = TimerScheduler.after(0, function()
+		local handle, accepted = TimerScheduler.after(delay or 0, function()
 			delivered = true
 			finish()
 		end)
@@ -81,7 +89,7 @@ end
 
 close = function(candidate)
 	if active ~= candidate or candidate.closing or candidate.constructing
-		or candidate.native_notification or candidate.retirement_arming
+		or candidate.retirement_arming
 		or candidate.retirement_timer ~= nil or candidate.retirement_uncertain then return false end
 	candidate.closing = true
 	candidate.cancelled = true
@@ -98,15 +106,17 @@ close = function(candidate)
 			return false
 		end
 	end
+	local native_delete_attempted = false
 	local called, acknowledged = pcall(function()
 		if candidate.webview then
 			if getmetatable(candidate.webview) ~= nil then
 				if candidate.native_delete_pending then return false end
 				local delete = candidate.webview.delete
 				-- The public wrapper schedules a native fade even for zero delay.
-				-- Its closing callback runs before the fade consumes udRef. Retain
+				-- Any closing callback precedes the fade consuming udRef. Retain
 				-- that exact request before crossing a possibly mutating boundary.
 				candidate.native_delete_pending = true
+				native_delete_attempted = true
 				local removed = delete(candidate.webview, 0)
 				if removed ~= nil then return false end
 				candidate.native_delete_accepted = true
@@ -129,6 +139,11 @@ close = function(candidate)
 		if called then candidate.bridge = nil end
 	end
 	if not called then
+		if native_delete_attempted and candidate.webview ~= nil and getmetatable(candidate.webview) ~= nil then
+			-- Public delete may consume an already closed window without another
+			-- notification. Ownership observation belongs to the request itself.
+			schedule_native_retirement(candidate)
+		end
 		-- A nil return acknowledges the public fade request, not its completion.
 		-- Keep admission closed while that owner runs without reporting a failure.
 		if candidate.native_delete_accepted == true and candidate.webview ~= nil
@@ -290,12 +305,8 @@ function M.open(options)
 			on_close=function()
 				if candidate.closing then return end
 				candidate.cancelled = true
-				if not candidate.constructing and active == candidate then
-					if candidate.native_delete_pending then
-						candidate.native_notification = true
-						schedule_native_retirement(candidate)
-						candidate.native_notification = false
-					else close(candidate) end
+				if not candidate.constructing and active == candidate and not candidate.native_delete_pending then
+					close(candidate)
 				end
 			end,
 		})
