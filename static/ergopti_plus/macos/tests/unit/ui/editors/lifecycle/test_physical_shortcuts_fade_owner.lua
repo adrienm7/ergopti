@@ -228,6 +228,7 @@ helpers.describe("physical shortcut public fade retains its exact native owner",
 		with_host(function(host, h)
 			helpers.assert_true(h.open())
 			local admitted, entered = {}, false
+			h.delete_refuses = "false" -- A real refusal triggers the diagnostic; accepted fades are silent.
 			h.on_error = function()
 				if entered then return end
 				entered = true
@@ -240,6 +241,7 @@ helpers.describe("physical shortcut public fade retains its exact native owner",
 			helpers.assert_eq(h.windows[1].native.deletes, 1)
 			helpers.assert_eq(#h.windows, 1)
 			h.on_error = nil
+			setmetatable(h.windows[1], nil) -- Independent native retirement acknowledges the ambiguous request.
 			h.drain(); helpers.assert_true(host.close())
 		end)
 	end)

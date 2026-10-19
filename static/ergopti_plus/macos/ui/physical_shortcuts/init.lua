@@ -109,6 +109,7 @@ close = function(candidate)
 				candidate.native_delete_pending = true
 				local removed = delete(candidate.webview, 0)
 				if removed ~= nil then return false end
+				candidate.native_delete_accepted = true
 			end
 		end
 		return candidate.webview == nil or getmetatable(candidate.webview) == nil
@@ -128,6 +129,13 @@ close = function(candidate)
 		if called then candidate.bridge = nil end
 	end
 	if not called then
+		-- A nil return acknowledges the public fade request, not its completion.
+		-- Keep admission closed while that owner runs without reporting a failure.
+		if candidate.native_delete_accepted == true and candidate.webview ~= nil
+			and getmetatable(candidate.webview) ~= nil then
+			candidate.closing = false
+			return false
+		end
 		pcall(Logger.error, "ui.physical_shortcuts", "Physical shortcut window close refused; exact native owner retained.")
 		candidate.closing = false
 		return false
