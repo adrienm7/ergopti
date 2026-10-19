@@ -2964,8 +2964,12 @@ function M.local_server_target(provider_id)
 	if not provider then return nil end
 	local entry = M.local_server_entry(provider_id)
 	local pending = M.is_local_server(provider_id) and LocalServers.pending(provider_id) or {}
+	-- "" is how the default address is stored (api_panel.apply_local_server), in
+	-- the entry and in the pending fields alike: both fall back to the catalogue.
+	-- A pending "" used to win over it, and the server was never probed (#95).
 	local base_url = entry and entry.base_url or ""
-	if base_url == "" then base_url = pending.base_url or provider.base_url end
+	if base_url == "" then base_url = pending.base_url or "" end
+	if base_url == "" then base_url = provider.base_url end
 	local token = entry and entry.token or pending.token or ""
 	return { id = provider_id, entry_id = entry and entry.id, provider = entry and entry.provider, base_url = base_url, token = token }
 end
