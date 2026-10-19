@@ -1468,7 +1468,7 @@ _TrayRootBuildShell(PublishAuthorizeFn) {
 		Published := initMenu(PublishAuthorizeFn, true)
 	} catch as Err {
 		TrayMenuStage_Abort()
-		BootProfile_StageAbort("tray global commands", Err.Message)
+		BootProfile_StageAbort("tray global commands", ErrorNet_Describe(Err))
 		throw Err
 	} finally {
 		_DriverReady := SavedReady

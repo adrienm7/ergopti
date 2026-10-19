@@ -175,7 +175,7 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; those modules are loaded; ExitApp is the only publication boundary here.
 		if (_DriverBootPhase != "ready") {
 				try LoggerError("ErgoptiPlus", "Fatal startup error during phase '{1}': {2}",
-						_DriverBootPhase, Exc.Message
+						_DriverBootPhase, ErrorNet_Describe(Exc)
 								. (Exc.HasProp("Stack") ? " | " . Exc.Stack : ""))
 				; A parse-time hotkey may already own a synthetic modifier even though
 				; the full OnExit transaction is not registered yet. Release that exact
@@ -297,6 +297,32 @@ ErgoptiGlobalErrorHandler(Exc, Mode) {
 		; thread would starve the keyboard hook and drop every key pressed while it
 		; is up.
 		return true
+}
+
+; The message of a thrown value with what AutoHotkey keeps beside it: Extra
+; names the unassigned global or the offending value, File and Line its site.
+; Boot stage aborts logged Message alone, so "This global variable has not been
+; assigned a value." reached the maintainer's log without the variable.
+; @param Exc {Any} The thrown value.
+; @returns {String}
+ErrorNet_Describe(Exc) {
+	if !IsObject(Exc)
+		return String(Exc)
+	Text := Type(Exc)
+	try Text := Exc.HasProp("Message") ? String(Exc.Message) : Text
+	Extra := ""
+	try Extra := Exc.HasProp("Extra") ? String(Exc.Extra) : ""
+	if (Extra != "")
+		Text .= " (" . Extra . ")"
+	SourcePath := ""
+	Line := ""
+	try SourcePath := Exc.HasProp("File") ? String(Exc.File) : ""
+	try Line := Exc.HasProp("Line") ? String(Exc.Line) : ""
+	if (SourcePath != "") {
+		SplitPath(SourcePath, &FileName)
+		Text .= " at " . FileName . ":" . Line
+	}
+	return Text
 }
 
 ; The logger template of an uncaught error: its type and site are part of the
