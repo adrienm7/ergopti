@@ -1,0 +1,23 @@
+{
+	"_comment": "Swipe direction to configuration slot, replayed by the macOS geometry (modules/gestures/geometry.lua) and the Linux evdev decoder (modules/gestures/mt_decoder.lua). Angles use the screen convention both drivers classify in: 0 is right and 90 is down, so y grows downward. Units differ per driver, so each consumer scales the unit vector to a multiple of its own swipe threshold: travel 'swipe' is four times the threshold, travel 'short' a quarter of it, which is no swipe at all (slot null). Both drivers put the axis/diagonal boundary near 25 degrees (macOS at 25 and 65, Linux at a 2:1 axis ratio, about 26.6), so the boundary vectors sit at 15, 35, 55 and 75 degrees, inside the same region on both. A slot is swipe_<fingers>_<direction>, horizontal part first for a diagonal, and must be declared in _shared/modules/actions/actions.toml.",
+	"fingers": [3, 4, 5],
+	"vectors": [
+		{ "angle": 0, "travel": "swipe", "direction": "right" },
+		{ "angle": 45, "travel": "swipe", "direction": "right_down" },
+		{ "angle": 90, "travel": "swipe", "direction": "down" },
+		{ "angle": 135, "travel": "swipe", "direction": "left_down" },
+		{ "angle": 180, "travel": "swipe", "direction": "left" },
+		{ "angle": 225, "travel": "swipe", "direction": "left_up" },
+		{ "angle": 270, "travel": "swipe", "direction": "up" },
+		{ "angle": 315, "travel": "swipe", "direction": "right_up" },
+		{ "angle": 15, "travel": "swipe", "direction": "right" },
+		{ "angle": 35, "travel": "swipe", "direction": "right_down" },
+		{ "angle": 55, "travel": "swipe", "direction": "right_down" },
+		{ "angle": 75, "travel": "swipe", "direction": "down" },
+		{ "angle": 165, "travel": "swipe", "direction": "left" },
+		{ "angle": 255, "travel": "swipe", "direction": "up" },
+		{ "angle": 305, "travel": "swipe", "direction": "right_up" },
+		{ "angle": 90, "travel": "short", "direction": null },
+		{ "angle": 225, "travel": "short", "direction": null }
+	]
+}
