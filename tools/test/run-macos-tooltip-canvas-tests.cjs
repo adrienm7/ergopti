@@ -28,7 +28,8 @@ function run({
 	const python = env.PYTHON || 'python3';
 	for (const [pattern, minimum] of [
 		['macos_tooltip_canvas_test.py', 54],
-		['macos_webview_binding_test.py', 34]
+		['macos_webview_binding_test.py', 34],
+		['macos_physical_shortcuts_close_test.py', 22]
 	]) {
 		const result = spawn(
 			python,
