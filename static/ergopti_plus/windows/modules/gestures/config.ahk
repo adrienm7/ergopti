@@ -1035,8 +1035,11 @@ _GesturePickProgram(BindingId, ActionName, Title, Existing) {
 	Result := false
 	W.OnEvent("Close", Retire)
 	W.OnEvent("Escape", Retire)
+	; Read before Show: a click thread can retire the picker before this
+	; thread resumes, and a destroyed Gui has no Hwnd left to wait on.
+	PickerHwnd := W.Hwnd
 	W.Show()
-	WinWaitClose("ahk_id " . W.Hwnd)
+	WinWaitClose("ahk_id " . PickerHwnd)
 	return Result
 	Retire(*) {
 		; The argument InputBox is unowned and can outlive this picker. Revoke
