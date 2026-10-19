@@ -2999,21 +2999,18 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
-- [ ] **AppImage catalog retest of v1.0.3 is still red (October 18).** The bot
-      (AppImage/appimage.github.io#10422, run 39164737606) now reports glibc
-      2.34 (fine) but the app exits at start with "Error: no keyboard device
-      detected. Specify one with --device." The catalog has no input device:
-      the daemon must start without any keyboard (show the tray icon and the
-      "keyboard access unavailable" state, retry or wait for a device) instead
-      of exiting; the offline ubuntu:22.04 smoke had a device or input group
-      difference — reproduce with no /dev/input device at all. Then release
-      and comment `/retest`.
-- [ ] **Site deployment on main fails (October 18).** Workflow "Deploy site"
-      on main fails in job "Receive tested site without write permission",
-      step "Admit exact completed producer" (exit 1) after v1.0.3; read
-      `gh run view <id> --log-failed` for the latest main run and fix the
-      producer admission (likely the new release run shape or the renamed
-      AppImage asset).
+- [ ] **AppImage catalog: release the tray fix, then `/retest` (October 19).**
+      The full catalog log (run 39164737606) showed the real cause: the daemon
+      already held its "keyboard access unavailable" tray without a keyboard,
+      but the catalog's runner (GTK 3, no libayatana, stalonetray as XEmbed
+      tray) had no tray library, so it exited. Commit 3c4209e947 bundles
+      libayatana-appindicator3 and its non-GTK libraries in the AppImage
+      (XEmbed fallback without a watcher) and makes the ubuntu:22.04 smoke
+      replay the catalog's stalonetray check on a host without libayatana.
+      Not yet proven on Linux: watch `install-linux` (AppImage smoke) on the
+      next dev CI, then release and comment `/retest` on
+      AppImage/appimage.github.io#10422. Remaining polish: without a keyboard
+      device the notification body still talks about the input groups.
 - [ ] **Next release with nothing deferred (state on October 18, after
       v1.0.3).** v1.0.3 still deferred the seven v1.0.2 macOS native scopes
       (`.github/ci/stable_v103_macos_native_qualification_exception.json`,
