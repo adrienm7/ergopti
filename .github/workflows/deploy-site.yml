@@ -25,6 +25,9 @@ permissions:
 jobs:
   preflight:
     name: Receive tested site without write permission
+    # A failed, cancelled or dispatched CI run has no site to publish; the
+    # admission below still refuses anything else this lets through.
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:

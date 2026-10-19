@@ -2053,6 +2053,9 @@ function commonSiteProblems(source) {
 }
 
 /** Publication gets write permission only after receiving the exact tested artifact. */
+const SITE_PRODUCER_CONDITION =
+	"${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}";
+
 function siteDeploymentProblems(source) {
 	const errors = [];
 	try {
@@ -2110,10 +2113,15 @@ function siteDeploymentProblems(source) {
 			),
 			'forward actual admission'
 		);
+		// A failed, cancelled or dispatched CI run has no site to publish: the
+		// receiver used to start for it and fail red on every dev push. The
+		// condition mirrors the admission's own event check, which still refuses.
+		same(pre.if, SITE_PRODUCER_CONDITION, 'only a successful push reaches the receiver');
 		for (const job of [pre, deploy]) {
 			same(job['runs-on'], 'ubuntu-latest', 'publication runner');
 			same(job['timeout-minutes'], 20, 'bounded publication');
-			for (const key of ['if', 'continue-on-error', 'strategy', 'uses'])
+			if (job !== pre && job.if !== undefined) errors.push('publication job if');
+			for (const key of ['continue-on-error', 'strategy', 'uses'])
 				if (job[key] !== undefined) errors.push('publication job ' + key);
 			for (const step of job.steps)
 				for (const key of ['if', 'continue-on-error'])
@@ -2408,6 +2416,21 @@ const SITE_DEPLOY_REFUSALS = [
 	],
 	['missing preflight edge', '    needs: [preflight]\n', '    needs: []\n'],
 	['forgiven preflight', '  preflight:\n', '  preflight:\n    continue-on-error: true\n'],
+	[
+		'receiver switched off',
+		" || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}\n",
+		' && false }}\n'
+	],
+	[
+		'receiver admits a failed producer',
+		"github.event.workflow_run.conclusion == 'success'",
+		"github.event.workflow_run.conclusion != 'cancelled'"
+	],
+	[
+		'publication job skipped on its own',
+		'    needs: [preflight]\n',
+		'    needs: [preflight]\n    if: false\n'
+	],
 	['domain-only changes excluded', '    branches: [main, dev]\n', '    branches: [dev]\n'],
 	['missing exact manual identity', '      run_id:\n', '      latest:\n'],
 	[
