@@ -3009,13 +3009,11 @@ These are software implementations; final hardware verification remains below.
       on v1.0.3, or update). The maintainer then ruled that « Restaurer les
       valeurs conseillées » must not touch personal hotstrings: 20a9858f3d
       excludes them from the restore on the three drivers (manifest
-      `restore_exclude`, shared override planner `personal` flag). Left open:
-      the Windows global restore (Configuration menu) builds
-      `HotstringsScopeFiles(Selected)` without its mode, so it still resets
-      personal-file tuning and never writes the recommended delays; passing
-      `Mode` made test_global_config_scope expect 12 backups and see 3 (the
-      unchanged personal candidates are not backed up). Fix the global owner
-      and that test together. The Linux scope suite passes under LuaJIT once
+      `restore_exclude`, shared override planner `personal` flag). The
+      Windows global restore (Configuration menu) now passes its mode to
+      `HotstringsScopeFiles` too (dc8421f3), so it no longer resets
+      personal-file tuning; test_global_config_scope expects 3 backups for a
+      restore and unchanged personal bytes (green on Windows run 39338588478). The Linux scope suite passes under LuaJIT once
       the release-debt preimage expects the kept `[personal]` tuning
       (a031fe9c).
 - [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).**
@@ -3183,13 +3181,18 @@ These are software implementations; final hardware verification remains below.
       one localized notice that names the restart. `ConfigWriteLeaseBusy`
       deliberately ignores a terminal owner, so the fix belongs in
       `MenuCommandRun` and the startup retention owner, not in the lease.
-- [ ] **Windows log review, October 17: a transient keylogger flush refuses Quit.**
+- [~] **Windows log review, October 17: a transient keylogger flush refuses Quit.**
+      Partial (d474c61d, ffecffff): the refusal now carries its reason and a
+      flush or journal handoff in progress logs at INFO. Still open: retry
+      the same exit once the flush settles.
       `KL_FlushShutdownReady` returns false for a flush in progress, a busy
       journal or SQL append debt alike, and the refusal logs one ERROR without
       the reason; the user had to choose Quit twice. Return the reason, log a
       busy flush at INFO, and retry the same exit once the flush settles instead
       of handing the refusal back to the user.
-- [ ] **Windows log review, October 17: boot failures name no variable.**
+- [x] **Windows log review, October 17: boot failures name no variable.**
+      Done (a19e1431): `ErrorNet_Describe` adds Extra and file:line to the
+      boot stage abort, tray-root retry and fatal startup lines.
       "This global variable has not been assigned a value." reached the boot
       stage abort, the tray-root retry and the fatal startup line without
       `Err.Extra`, file or line (`menu_init.ahk` passes `Err.Message` to
@@ -3291,7 +3294,9 @@ These are software implementations; final hardware verification remains below.
       undefined instead of false) and passed on a rerun. Check whether the prior
       release's first boot writes that key from a deferred save that can lose
       the race with the smoke shutdown, and observe the profile only after it.
-- [ ] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
+- [x] **Selection wrap needs the Hotstrings switch on non-Ergopti layouts.**
+      Done (1136466c): the Hotstrings gate follows the wrap block in
+      `_OnPrefixChar`; a meta test pins the order.
       The typing watcher returns at `IsCategoryGated("Hotstrings")` before its
       wrap block, so wrapping a selection with an OS layout works only when
       Hotstrings is also on. Move the wrap attempt ahead of that gate (meta
