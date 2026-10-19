@@ -625,11 +625,13 @@ KeyCombinationsApplyScope(Mode, Options := unset) {
 ; Read after admission so edits made since boot participate in this scope.
 KeyCombinationScopedOperations(Mode, Path) {
 	global KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION
-	Stored := TOML_ParseFreshFile(Path)
-	if TOML_ReadFailed(Path)
-		throw Error("Key combination configuration could not be read.")
+	; Keep the admitted document's namespace identity: dotted assignments,
+	; inline tables and quoted headers can all describe these same slots.
+	Content := FileExist(Path) ? FSReadStrict(Path) : ""
+	Stored := ConfigTomlDecodeSnapshot(Content).Document
+	ParameterTable := _TOML_DocumentLookup(Stored, ["action_parameters"])
 	Parameters := []
-	for Key in Stored.Get("action_parameters", Map()) {
+	for Key in (ParameterTable.Get("value", 0) is Map ? ParameterTable["value"] : Map()) {
 		ParameterPath := "action_parameters." . Key
 		if ConfigScopeActionParameterDomain(ParameterPath) == "combination"
 			&& (KeyCombinationParsePair(StrSplit(Key, "__")[2]) is Map)
@@ -638,7 +640,8 @@ KeyCombinationScopedOperations(Mode, Path) {
 	Plan := ManifestScopePlan("key_combinations", Mode, Parameters,
 		Map("action_parameter_domain", ConfigScopeActionParameterDomain))
 	for Section in [KEY_COMBINATION_TAP_SECTION, KEY_COMBINATION_HOLD_SECTION] {
-		for PairId in Stored.Get(Section, Map()) {
+		Table := _TOML_DocumentLookup(Stored, TOML_ParseKeyPath(Section, true))
+		for PairId in (Table.Get("value", 0) is Map ? Table["value"] : Map()) {
 			if !(KeyCombinationParsePair(PairId) is Map)
 				continue
 			SlotPath := Section . "." . PairId

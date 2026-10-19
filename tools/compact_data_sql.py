@@ -24,6 +24,7 @@
 # ==============================================================================
 
 import sys
+import re
 import os
 import sqlite3
 import shutil
@@ -66,55 +67,96 @@ def find_schema(metrics_dir: Path) -> Path | None:
 # ============================================================
 # ============================================================
 
-# 2 MB text chunks — two of these + carry stays well under 10 MB peak.
+# Carry retains the unexecuted transaction; complete physical lines are scanned
+# once through SQLite's own lexer. Captured literals can contain COMMIT lines.
 CHUNK_CHARS = 2 * 1024 * 1024
+_COMMIT_LINE = re.compile(r"(?m)^[ \t]*COMMIT;[ \t]*(?:\r?\n|$)")
+_LEXICAL_PREFIXES = ("", "'", '"', "`", "[", "/*")
+_LEXICAL_CLOSERS = (";", "';", '";', "`;", "];", "*/;")
+
+
+def _sqlite_line_state(text: str, state: int) -> int:
+    """Recover SQLite's lexical state only at a physical line boundary.
+
+    Canonical ledgers contain comments, PRAGMA, BEGIN, INSERT and COMMIT, never
+    CREATE TRIGGER. Builders emit physical newlines only inside quoted values.
+    Prefixes reopen the preceding quote/comment; native completeness probes
+    identify its ending state without a second SQL tokenizer. A virtual final
+    LF ends a line comment but never contributes to source offsets.
+    """
+    source = _LEXICAL_PREFIXES[state] + text
+    for result, closer in enumerate(_LEXICAL_CLOSERS):
+        if sqlite3.complete_statement(source + closer):
+            return result
+    raise ValueError("Ledger is outside the canonical SQL framing contract.")
+
+
+def _scan_commit_lines(text: str, state: int) -> tuple[int, int]:
+    """Return the native ending state and last trusted COMMIT character offset.
+
+    Segments partition complete physical lines, so every source character enters
+    at most six native probes, independent of the number of captured markers.
+    """
+    position = 0
+    last_end = 0
+    for match in _COMMIT_LINE.finditer(text):
+        state = _sqlite_line_state(text[position : match.start()], state)
+        if state == 0:
+            last_end = match.end()
+        # Include this candidate in the next probe even when it was quoted.
+        position = match.start()
+    rest = text[position:]
+    state = _sqlite_line_state(rest if rest.endswith("\n") else rest + "\n", state)
+    return state, last_end
 
 
 def exec_large_file(conn: sqlite3.Connection, path: Path) -> None:
-    """Stream a multi-GB SQL file into `conn` with bounded RAM usage.
+    """Stream canonical SQL, retaining every byte until native execution succeeds.
 
-    Flushes at every COMMIT boundary via executescript() which delegates
-    all statement parsing to SQLite's C engine — far faster than a
-    Python-side splitter.
-
-    Args:
-            conn: Open SQLite connection.
-            path: Path to the .sql file to load.
+    Full transaction scripts reach executescript only at SQLite-qualified COMMIT
+    lines. Invalid SQL and incomplete EOF transactions refuse compaction rather
+    than exporting a partial image over the authoritative source.
     """
     carry = ""
+    pending_line = ""
+    state = 0
+    read_chars = 0
+    carry_start = 0
     n_commits = 0
-    with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+    # Preserve captured CRLF exactly and reject malformed UTF-8 before replacing
+    # a source; universal-newline or replacement decoding would alter its data.
+    with open(path, "r", encoding="utf-8-sig", newline="") as fh:
         while True:
             chunk = fh.read(CHUNK_CHARS)
             if not chunk:
                 break
             carry += chunk
-            # Find the last complete COMMIT in the carry buffer.
-            last_end = -1
-            pos = 0
-            while True:
-                idx = carry.find("COMMIT;\n", pos)
-                if idx == -1:
-                    break
-                last_end = idx + len("COMMIT;\n")
-                pos = last_end
-            if last_end > 0:
-                try:
-                    conn.executescript(carry[:last_end])
-                except sqlite3.Error as e:
-                    if "UNIQUE constraint" not in str(e):
-                        print(f"    [warn] {e}")
+            pending_line += chunk
+            read_chars += len(chunk)
+            last_lf = chunk.rfind("\n")
+            if last_lf < 0:
+                continue
+            complete = len(pending_line) - len(chunk) + last_lf + 1
+            scan_start = read_chars - len(pending_line)
+            state, last_end = _scan_commit_lines(pending_line[:complete], state)
+            pending_line = pending_line[complete:]
+            if last_end:
+                consumed = scan_start + last_end - carry_start
+                conn.executescript(carry[:consumed])
+                if conn.in_transaction:
+                    raise sqlite3.DatabaseError("Ledger batch did not close its transaction.")
+                # No exception can authorize dropping unexecuted source bytes.
+                carry = carry[consumed:]
+                carry_start = scan_start + last_end
                 n_commits += 1
-                carry = carry[last_end:]
                 if n_commits % 10 == 0:
                     print(f"    ...{n_commits} batches flushed", flush=True)
-    # Flush any remaining carry.
+    # SQLite accepts a final COMMIT without LF and comment-only tails. A torn
+    # literal raises; a complete INSERT after BEGIN still requires COMMIT.
     if carry.strip():
-        try:
-            conn.executescript(carry)
-        except sqlite3.Error as e:
-            if "UNIQUE constraint" not in str(e):
-                print(f"    [warn] {e}")
+        conn.executescript(carry)
+    if conn.in_transaction:
+        raise sqlite3.DatabaseError("Ledger ended inside an open transaction.")
     print(f"    {n_commits} batches loaded.", flush=True)
 
 
@@ -163,10 +205,16 @@ def dump_table(conn: sqlite3.Connection, fh, table: str, replace: bool) -> int:
             Number of rows exported.
     """
     verb = "INSERT OR REPLACE" if replace else "INSERT OR IGNORE"
-    try:
-        cur = conn.execute(f"SELECT * FROM {table} LIMIT 1")
-    except sqlite3.OperationalError:
+    # Optional historical tables may be absent. A refused SELECT on an existing
+    # table is a real export failure, never an empty table to silently omit.
+    if (
+        conn.execute(
+            "SELECT 1 FROM sqlite_schema WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        is None
+    ):
         return 0
+    cur = conn.execute(f"SELECT * FROM {table} LIMIT 1")
     if cur.fetchone() is None:
         return 0
     cols = [d[0] for d in cur.description]
@@ -262,19 +310,24 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
     tmp_db = sql_path.parent / "_compact_work.db"
     try:
         tmp_db.unlink(missing_ok=True)
-    except Exception:
-        pass
+    except OSError as error:
+        print(f"  ERROR: cannot remove disposable work database '{tmp_db}': {error}", flush=True)
+        return False
 
     conn = sqlite3.connect(str(tmp_db))
-    conn.execute("PRAGMA journal_mode = OFF")
-    conn.execute("PRAGMA synchronous = OFF")
     conn.execute("PRAGMA temp_store = FILE")
     # 64 MB page cache — safe on 8 GB RAM machines.
     conn.execute("PRAGMA cache_size = -65536")
 
+    stage_path = None
     try:
         schema = schema_path.read_text(encoding="utf-8")
         conn.executescript(schema)
+        # The canonical schema sets durable DELETE/FULL defaults. This database
+        # is a disposable projection, so apply its load policy after the schema
+        # rather than syncing every transaction before publishing any output.
+        conn.execute("PRAGMA journal_mode = OFF")
+        conn.execute("PRAGMA synchronous = OFF")
 
         print(f"  Phase 1/3: loading into SQLite...", flush=True)
         exec_large_file(conn, sql_path)
@@ -287,7 +340,8 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
         print(f"  Phase 2/3: exporting compact SQL...", flush=True)
         tmp_sql = sql_path.with_suffix(".compact.tmp")
         total_rows = 0
-        with open(tmp_sql, "w", encoding="utf-8") as fh:
+        with open(tmp_sql, "w", encoding="utf-8", newline="") as fh:
+            stage_path = tmp_sql
             fh.write(f"-- ergopti metrics -- device {device_id} -- schema_version 1\n")
             fh.write("-- This file is APPEND-ONLY. Do not edit by hand.\n")
             fh.write(
@@ -320,6 +374,7 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
         bak = sql_path.with_suffix(".sql.bak")
         shutil.copy2(sql_path, bak)
         os.replace(tmp_sql, sql_path)
+        stage_path = None
         print(f"  Done. Backup kept at {bak.name}", flush=True)
         return True
 
@@ -331,6 +386,8 @@ def compact_device(sql_path: Path, schema_path: Path) -> bool:
         return False
     finally:
         conn.close()
+        if stage_path is not None:
+            stage_path.unlink(missing_ok=True)
         try:
             tmp_db.unlink(missing_ok=True)
         except Exception:
@@ -378,6 +435,8 @@ def main() -> None:
     print("\n=== Summary ===", flush=True)
     for dev_id, ok in results.items():
         print(f"  {dev_id}: {'OK' if ok else 'FAILED'}", flush=True)
+    if not all(results.values()):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

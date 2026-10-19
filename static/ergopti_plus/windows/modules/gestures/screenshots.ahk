@@ -368,9 +368,10 @@ GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
 }
 
 GestureScreenshotCancelAll(Reason := "canceled") {
-	global _GestureDirectCaptures, _GestureRegionCapture
+	global _GestureDirectCaptures, _GestureRegionCapture, _GestureRegionCaptureEpoch
 	PreviousCritical := Critical("On")
 	try {
+		RegionGeneration := ++_GestureRegionCaptureEpoch
 		DirectSnapshot := _GestureDirectCaptures.Clone()
 		RegionEpoch := (_GestureRegionCapture is Map) ? _GestureRegionCapture["epoch"] : 0
 	} finally {
@@ -387,6 +388,7 @@ GestureScreenshotCancelAll(Reason := "canceled") {
 	finally Critical(PreviousCritical)
 	for WorkerId, _ in WorkerSnapshot
 		GestureScreenshotCancelWorker(WorkerId, Reason)
+	return RegionGeneration
 }
 
 
@@ -709,53 +711,77 @@ GestureScreenshotFullscreen(Mode) {
 ;     the screenshots folder.
 ; @param {Integer} MaxEdge Save mode only: longest edge of the saved image, 0
 ;     to keep the selection's size.
-GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0) {
+GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0, Ports := 0) {
 	global _GestureRegionCapture, _GestureRegionCaptureEpoch
 	if A_IsSuspended {
 		_GestureRegionNotify(OnComplete, false, "suspended")
-		return
+		return false
 	}
-	GestureScreenshotCancelAll("superseded")
+	if !(Ports is Map)
+		Ports := Map()
+	Epoch := GestureScreenshotCancelAll("superseded")
 	if Mode == "clipboard" {
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		LoggerStart("gestures", "Region screenshot to clipboard — opening Snip & Sketch…")
-		TextPressKey("s", ["Shift", "Win"])
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		ClipboardSendFn := Ports.Get("send", TextPressKey.Bind("s", ["Shift", "Win"]))
+		ClipboardSendFn.Call()
 		LoggerSuccess("gestures", "Snip & Sketch invoked (clipboard mode).")
-		return
+		return true
 	}
 	if Mode != "save" {
 		LoggerError("gestures", "Region screenshot rejected invalid mode '{1}'.", Mode)
-		return
+		return false
 	}
 
-	if (Path == "")
-		Path := GestureScreenshotPath()
-	LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
-	PreviousCritical := Critical("On")
-	try Epoch := ++_GestureRegionCaptureEpoch
-	finally Critical(PreviousCritical)
+	SaveFn := Ports.Get("save", CB_SaveAll)
+	ClearFn := Ports.Get("clear", CB_Write.Bind(""))
+	SequenceFn := Ports.Get("sequence", CB_GetSequenceNumber)
+	SendFn := Ports.Get("send", SendEvent.Bind("#+s"))
+	RestoreFn := Ports.Get("restore", CB_RestoreAll)
 	OldClip := ""
+	SnapshotValid := false
+	Mutated := false
+	OwnedSequence := 0
 	OwnerToken := 0
 	ExpectedChange := 0
 	StatePublished := false
 	try {
+		if (Path == "")
+			Path := GestureScreenshotPath()
+		LoggerStart("gestures", "Region screenshot to disk — opening Snip & Sketch…")
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		OwnerToken := CB_TryBeginOwnedTransaction("gesture_region_capture")
 		if !OwnerToken
 			throw Error("clipboard transaction busy")
-		OldClip := CB_SaveAll()
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		OldClip := SaveFn.Call()
 		if (Type(OldClip) == "String" && OldClip == "__CB_SAVE_ERROR__")
 			throw Error("clipboard snapshot failed")
-		if !CB_Write("")
+		SnapshotValid := true
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
+		if !ClearFn.Call()
 			throw Error("clipboard clear failed")
+		; An empty A_Clipboard assignment fails before EmptyClipboard succeeds.
+		; Record a successful clear once; retirement must not adopt a later copy.
+		Mutated := true
+		OwnedSequence := SequenceFn.Call()
+		if !_GestureRegionCaptureStartCurrent(Epoch)
+			return false
 		ExpectedChange := CB_ExpectOwnedChange()
-		if A_IsSuspended
-			throw Error("driver suspended before Snipping Tool launch")
 		State := Map(
 			"epoch", Epoch,
 			"path", Path,
 			"original_clipboard", OldClip,
-			"clipboard_sequence", CB_GetSequenceNumber(),
+			"clipboard_sequence", OwnedSequence,
 			"owner_token", OwnerToken,
 			"expected_change", ExpectedChange,
+			"poll_timer", 0,
 			"selection_started_tick", A_TickCount,
 			"selection_timeout_ms", GESTURE_REGION_CAPTURE_TIMEOUT_MS,
 			"save_started_tick", 0,
@@ -766,33 +792,54 @@ GestureScreenshotRegion(Mode, OnComplete := 0, Path := "", MaxEdge := 0) {
 			"callback", OnComplete)
 		PreviousCritical := Critical("On")
 		try {
+			if !_GestureRegionCaptureStartCurrent(Epoch)
+				return false
 			_GestureRegionCapture := State
 			StatePublished := true
 		} finally {
 			Critical(PreviousCritical)
 		}
-		SendEvent("#+s")
+		if A_IsSuspended || _GestureRegionCaptureEpoch != Epoch
+				|| !IsObject(_GestureRegionCaptureState(Epoch)) {
+			GestureRegionCaptureFinish(Epoch, "suspended", true)
+			return false
+		}
+		SendFn.Call()
 		if A_IsSuspended {
 			GestureRegionCaptureFinish(Epoch, "suspended", true)
-			return
+			return false
 		}
-		if IsObject(_GestureRegionCaptureState(Epoch))
-			SetTimer(GestureRegionCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
+		if !IsObject(_GestureRegionCaptureState(Epoch))
+			return false
+		State["poll_timer"] := GestureRegionCapturePoll.Bind(Epoch)
+		SetTimer(State["poll_timer"], -GESTURE_REGION_CAPTURE_POLL_MS)
+		return true
 	} catch as Err {
-		if StatePublished {
+		if StatePublished
 			GestureRegionCaptureFinish(Epoch, "start failure", true)
-		} else {
+		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
+		return false
+	} finally {
+		if !StatePublished {
 			if ExpectedChange
 				CB_CancelExpectedChange(ExpectedChange)
 			if OwnerToken {
-				try CB_RestoreOwnedAllEventually(OldClip, CB_GetSequenceNumber(),
-					OwnerToken, "gesture_region_capture_rollback", true, true)
+				if SnapshotValid && Mutated
+					CB_RestoreOwnedAllEventually(OldClip, OwnedSequence, OwnerToken,
+						"gesture_region_capture_rollback", true, true, RestoreFn, SequenceFn)
+				else
+					CB_EndOwnedTransaction(OwnerToken)
 			}
-			; A published capture reports through its finish; this one never began
+			; A published capture reports through its finish; this one never began.
 			_GestureRegionNotify(OnComplete, false, "start failure")
 		}
-		LoggerError("gestures", "Region screenshot could not start: {1}.", Err.Message)
 	}
+}
+
+_GestureRegionCaptureStartCurrent(Epoch) {
+	global _GestureRegionCapture, _GestureRegionCaptureEpoch
+	return !A_IsSuspended && _GestureRegionCaptureEpoch == Epoch
+		&& !IsObject(_GestureRegionCapture)
 }
 
 _GestureScreenshotRegionSaveScript(Stage, MaxEdge := 0) {

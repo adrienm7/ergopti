@@ -25,21 +25,35 @@ class ConfigCleanupSession {
 
 	; Captures the exact source around the scanner so a racing writer cannot
 	; associate an older preview with newer confirmation bytes.
-	Refresh() {
-		Before := FSReadUtf8Exact(this.Path)
-		this.Scan := ConfigUnusedKeysFind(this.Path)
-		After := FSReadUtf8Exact(this.Path)
-		this.State["keys"] := this.Scan["keys"]
-		this.State["reason_key"] := "dialog.unused_keys.reason.unreadable"
-		if (this.Scan["status"] != "ok")
-			this.State["status"] := "failed"
-		else if !(Before == After)
-			this.State["status"] := "changed"
-		else {
-			this.Source := After
-			this.State["status"] := this.Scan["keys"].Length ? "ready" : "empty"
-		}
-		return this.State
+	Refresh(ReadFn := FSReadUtf8Exact, FindFn := ConfigUnusedKeysFind) {
+		if this.Closed
+			return 0
+		Before := ReadFn.Call(this.Path)
+		if this.Closed
+			return 0
+		Scan := FindFn.Call(this.Path)
+		if this.Closed
+			return 0
+		After := ReadFn.Call(this.Path)
+		; Every I/O may pump a close. Publish one snapshot only while the session
+		; still owns it; a closed window must not recover its discarded scan.
+		PreviousCritical := Critical("On")
+		try {
+			if this.Closed
+				return 0
+			this.Scan := Scan
+			this.State["keys"] := Scan["keys"]
+			this.State["reason_key"] := "dialog.unused_keys.reason.unreadable"
+			if (Scan["status"] != "ok")
+				this.State["status"] := "failed"
+			else if !(Before == After)
+				this.State["status"] := "changed"
+			else {
+				this.Source := After
+				this.State["status"] := Scan["keys"].Length ? "ready" : "empty"
+			}
+			return this.State
+		} finally Critical(PreviousCritical)
 	}
 
 	Close() {

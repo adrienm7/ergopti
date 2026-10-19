@@ -816,12 +816,12 @@ ReadTomlSectionsOrder(CategoryName, FilePath := "") {
 				if !RegExMatch(Line, "^sections_order\s*=\s*\[(.+)\]", &M) {
 						continue
 				}
+				; Decode only this metadata value; category payloads can be huge.
+				; Commas and escapes inside quoted names belong to the name itself.
 				Out := []
-				loop parse, M[1], "," {
-						Token := Trim(A_LoopField, " `t" Chr(34))
-						if (Token != "") {
+				for Token in TOML_CoerceValue("[" . M[1] . "]") {
+						if Token is String && Token != ""
 								Out.Push(Token)
-						}
 				}
 				return Out
 		}

@@ -79,3 +79,5 @@ Test("onboarding WebView: empty-folder initData names the default destination fr
 	_TOFP_EmptyFolderInitDestination.Bind(true))
 Test("onboarding WebView: empty-folder initData preserves the default-folder display contract",
 	_TOFP_EmptyFolderInitDestination.Bind(false))
+
+#Include test_onboarding_publication_owner.ahk

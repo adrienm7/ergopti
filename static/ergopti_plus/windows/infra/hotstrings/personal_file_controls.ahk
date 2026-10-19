@@ -138,9 +138,12 @@ class PersonalFileControls {
 	static Refresh() {
 		global ConfigurationFile
 		Inventory := this.Scan(), Owners := Map()
-		Stored := TOML_ParseFreshFileTyped(ConfigurationFile)
-		if TOML_ReadFailed(ConfigurationFile)
+		Content := FileExist(ConfigurationFile) ? FSReadUtf8Exact(ConfigurationFile) : ""
+		if !(Content is String)
 			throw Error("The personal-file activation configuration is unreadable.")
+		; Dynamic choices may be dotted assignments or inline containers. Read
+		; their typed semantic tree without publishing another boot snapshot.
+		Stored := ConfigTomlDecodeSnapshot(Content).Document
 		for Record in Inventory {
 			if Record["admitted"] && Record["exclusive"] {
 				Owner := PersonalFileAdoptedOwner(Record, Stored)
@@ -224,8 +227,10 @@ class PersonalFileAdoptedOwner {
 		this.parsed := Record["parsed"]
 		this.parsedContent := PersonalFileControls.ParseContent(this.content)
 		this.config := this.ReadMetadata(this.parsedContent)
-		this.groups := Stored.Get("hotstrings.groups", Map())
-		this.sections := Stored.Get("hotstrings.modules." . TOML_RenderKey(this.id), Map())
+		Groups := _TOML_DocumentLookup(Stored, ["hotstrings", "groups"])
+		Sections := _TOML_DocumentLookup(Stored, ["hotstrings", "modules", this.id])
+		this.groups := Groups.Get("value", 0) is Map ? Groups["value"] : Map()
+		this.sections := Sections.Get("value", 0) is Map ? Sections["value"] : Map()
 		this.sectionNames := Map(), this.counts := Map(), Current := ""
 		global HS_TOML_SECTION_HEADER_PATTERN, _HOTSTRING_ENTRY_PATTERN, _HOTSTRING_SIMPLE_ENTRY_PATTERN
 		loop parse, this.parsedContent, "`n", "`r" {

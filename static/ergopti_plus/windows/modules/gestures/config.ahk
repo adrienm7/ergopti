@@ -1022,6 +1022,7 @@ _GesturePickProgram(BindingId, ActionName, Title, Existing) {
 		return false
 	Current := ProgramParameterParse(Existing)
 	Arguments := (Current is Map) ? Current["arguments"].Clone() : []
+	Active := true
 	W := Gui_Create("", Title)
 	W.Add("Text", "xm", t("dialog.action_picker.program_executable"))
 	Executable := W.Add("Edit", "xm w560", (Current is Map) ? Current["executable"] : "")
@@ -1030,22 +1031,37 @@ _GesturePickProgram(BindingId, ActionName, Title, Existing) {
 	W.Add("Button", "xm", t("dialog.action_picker.program_add_argument")).OnEvent("Click", AddArgument)
 	W.Add("Button", "x+8", t("dialog.action_picker.program_remove_argument")).OnEvent("Click", RemoveArgument)
 	W.Add("Button", "xm", t("button.save")).OnEvent("Click", Save)
-	W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", (*) => W.Destroy())
+	W.Add("Button", "x+8", t("button.cancel")).OnEvent("Click", Retire)
 	Result := false
-	W.OnEvent("Close", (*) => W.Destroy())
-	W.OnEvent("Escape", (*) => W.Destroy())
+	W.OnEvent("Close", Retire)
+	W.OnEvent("Escape", Retire)
 	W.Show()
 	WinWaitClose("ahk_id " . W.Hwnd)
 	return Result
-	AddArgument(*) {
-		Picked := Ui_InputBox(t("dialog.action_picker.program_arguments"), Title, "w560 h240", "")
-		if Picked.Result != "OK"
+	Retire(*) {
+		; The argument InputBox is unowned and can outlive this picker. Revoke
+		; its continuation before destroying the controls it captured.
+		if !Active
 			return
-		Arguments.Push(Picked.Value)
-		List.Delete()
-		List.Add(Arguments)
+		Active := false
+		W.Destroy()
+	}
+	AddArgument(*) {
+		if !Active
+			return
+		Picked := Ui_InputBox(t("dialog.action_picker.program_arguments"), Title, "w560 h240", "")
+		PreviousCritical := Critical("On")
+		try {
+			if Picked.Result != "OK" || !Active
+				return
+			Arguments.Push(Picked.Value)
+			List.Delete()
+			List.Add(Arguments)
+		} finally Critical(PreviousCritical)
 	}
 	RemoveArgument(*) {
+		if !Active
+			return
 		Index := List.Value
 		if Index <= 0
 			return
@@ -1054,6 +1070,8 @@ _GesturePickProgram(BindingId, ActionName, Title, Existing) {
 		List.Add(Arguments)
 	}
 	Save(*) {
+		if !Active
+			return
 		Items := ""
 		for Index, Argument in Arguments
 			Items .= (Index == 1 ? "" : ",") . JsonStringLiteral(Argument)
@@ -1061,6 +1079,6 @@ _GesturePickProgram(BindingId, ActionName, Title, Existing) {
 		if !(ProgramParameterParse(Scalar) is Map)
 			return
 		Result := Map("has_value", true, "key", GestureActionParameterKey(BindingId, ActionName), "value", Scalar)
-		W.Destroy()
+		Retire()
 	}
 }

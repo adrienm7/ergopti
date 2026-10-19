@@ -515,7 +515,12 @@ def acquire_owned(arguments,native,register,**options):
   start_new_session=True,stdout=options['stdout'],stderr=options['stderr'])
  children.append(process)
  register(Group(process))
- Path(os.environ['CONTROL_PID']).write_text(str(process.pid))
+ # Readiness must expose only the closed, complete numeric PID.
+ pid=Path(os.environ['CONTROL_PID'])
+ pending=pid.with_name(pid.name+'.pending')
+ with pending.open('x',encoding='ascii') as output:
+  output.write(str(process.pid))
+ os.replace(pending,pid)
  if os.environ['CONTROL_MODE']=='acquisition': os.kill(os.getpid(),signal.SIGTERM)
 def rescue():
  for process in children:

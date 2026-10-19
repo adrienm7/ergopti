@@ -4,8 +4,8 @@
 ; MODULE: Keylogger Reader — Newest-first cold rebuild
 ; DESCRIPTION:
 ; Rebuilds a large reader image from its ledgers newest day first, so the
-; dashboard can show exact statistics for the most recent days within seconds
-; and refine them while older history is still being replayed.
+; dashboard can show exact statistics for recent days after a forward framing
+; index, and refine them while older history is still being replayed.
 ;
 ; WHY IT EXISTS:
 ; The one-pass cold build loads the whole data.sql, then projects, aggregates
@@ -33,6 +33,7 @@
 
 #Requires Autohotkey v2.0+
 #Include ../../infra/tick_count.ahk
+#Include keylogger_reader_frames.ahk
 
 
 
@@ -45,13 +46,15 @@
 ; ============================
 
 class KLRRebuildConst {
-	; One backward read. Large enough that per-read overhead is negligible,
-	; small enough that the newest day is on screen after a few reads.
+	; One indexing read; inverse replay uses the same LF-aligned frames.
+	; A final partial physical line is carried until the following read.
 	static CHUNK_BYTES := 4 * 1024 * 1024
 	; A carry is the unexecuted prefix before the first batch header of a read.
 	; A header-less compacted transaction can make it large; beyond this the
 	; ledger is not in batch form and the one-pass build owns it.
 	static MAX_CARRY_CHARS := 64 * 1024 * 1024
+	; A UTF-8 physical line can use four bytes per UTF-16 character.
+	static MAX_FRAME_BYTES := KLRRebuildConst.MAX_CARRY_CHARS * 4
 	; Below this the one-pass build finishes in seconds and stays the reference.
 	static MIN_LEDGER_BYTES := 32 * 1024 * 1024
 	; Rollup rounds after the first one are batched: each round rescans the
@@ -61,7 +64,7 @@ class KLRRebuildConst {
 	; both that write volume and the work a killed worker can lose.
 	static CHECKPOINT_INTERVAL_MS := 60000
 	; Bump when the checkpoint tables or the meaning of their columns change.
-	static CHECKPOINT_FORMAT := "1"
+	static CHECKPOINT_FORMAT := "2"
 	; A peer rebuilding the same store is polled at this cadence.
 	static PEER_POLL_MS := 1000
 	static BATCH_MARKER := "`n-- === ingest batch "
@@ -82,6 +85,8 @@ class KLRRebuild {
 	static stop_after_rounds := 0
 	; Called after each rollup round with a progress Map; see _KLR_RebuildNotify.
 	static observer := 0
+	; Forward indexing progress has no rolled-up image or replay clock sample.
+	static index_observer := 0
 	; Optional owner-local monotonic clock for real disk rebuild regressions.
 	static now_fn := 0
 }
@@ -202,7 +207,10 @@ KLR_BuildColdSegmented(md, logPath, LedgerPaths) {
 			Ledger := _KLR_RebuildNextLedger(State)
 			if !IsObject(Ledger)
 				break
-			_KLR_RebuildStep(State, Ledger)
+			; A carry-only read has not changed the private image. Only an
+			; executed transaction can authorize a round or its checkpoint.
+			if !_KLR_RebuildStep(State, Ledger)
+				continue
 			if !LastRound || TickElapsed64(LastRound, _KLR_RebuildNow()) >= KLRRebuild.round_interval_ms {
 				_KLR_RebuildRound(State, false)
 				LastRound := _KLR_RebuildNow()
@@ -341,58 +349,46 @@ _KLR_RebuildDoneBytes(State) {
 ; Read the bytes just before the ledger cursor and execute every complete batch
 ; they contain. The prefix before the first batch header is carried to the next
 ; (older) read, so only whole transactions ever reach SQLite.
+; @returns {Boolean} Whether this step executed a complete SQL span.
 _KLR_RebuildStep(State, Ledger) {
+	if !Ledger.Has("frames")
+		_KLR_RebuildIndex(State, Ledger)
+	if Ledger["finished"]
+		return false
 	Cursor := Ledger["cursor"]
-	Start := Max(0, Cursor - KLRRebuild.chunk_bytes)
-	Count := Cursor - Start
-	Read := _KLR_RebuildReadBytes(Ledger, Start, Count)
+	Frames := Ledger["frames"]
+	while Ledger["frame_cursor"] > 0 && Frames[Ledger["frame_cursor"]][1] >= Cursor
+		Ledger["frame_cursor"] -= 1
+	if !Ledger["frame_cursor"]
+		throw KLRRebuildRefusal("the replay cursor has no indexed source frame")
+	Frame := Frames[Ledger["frame_cursor"]]
+	Ledger["frame_cursor"] -= 1
+	NewCursor := Frame[1]
+	Count := Cursor - NewCursor
+	Read := _KLR_RebuildReadBytes(Ledger, NewCursor, Count)
 	Buf := Read["buffer"]
 	State["nul_bytes"] += Read["nul_bytes"]
-	Skip := 0
-	; A read that starts inside a multi-byte character begins at the next one;
-	; the skipped bytes belong to the following read.
-	if Start > 0 {
-		while Skip < Count && (NumGet(Buf, Skip, "UChar") & 0xC0) = 0x80
-			Skip += 1
-	}
-	Text := Count - Skip > 0 ? StrGet(Buf.Ptr + Skip, Count - Skip, "UTF-8") : ""
-	Combined := Text . Ledger["carry"]
-	NewCursor := Start + Skip
-	if !Ledger["trimmed"] {
-		Last := InStr(Combined, "`nCOMMIT;`n", true, -1)
-		if Last {
-			Combined := SubStr(Combined, 1, Last + StrLen("`nCOMMIT;`n") - 1)
-			Ledger["end"] := NewCursor + StrPut(Combined, "UTF-8") - 1
-			Ledger["trimmed"] := true
-		} else if NewCursor > 0 {
-			; No complete batch yet: keep reading backward before executing.
-			Ledger["carry"] := Combined
-			Ledger["cursor"] := NewCursor
-			return
-		} else {
-			Ledger["trimmed"] := true
-		}
-	}
+	Text := Count ? StrGet(Buf, -Count, "UTF-8") : ""
 	if NewCursor = 0 {
-		Executable := Combined
+		Executable := Text . Ledger["carry"]
 		Carry := ""
+	} else if Frame[3] >= NewCursor && Frame[3] < Cursor {
+		PrefixBytes := Frame[3] - NewCursor
+		Executable := StrGet(Buf.Ptr + PrefixBytes, -(Count - PrefixBytes), "UTF-8") . Ledger["carry"]
+		Carry := PrefixBytes ? StrGet(Buf, -PrefixBytes, "UTF-8") : ""
 	} else {
-		Found := InStr(Combined, KLRRebuildConst.BATCH_MARKER, true)
-		if !Found {
-			if StrLen(Combined) > KLRRebuildConst.MAX_CARRY_CHARS
-				throw KLRRebuildRefusal("a ledger holds no batch boundary within "
-					. KLRRebuildConst.MAX_CARRY_CHARS . " characters")
-			Ledger["carry"] := Combined
-			Ledger["cursor"] := NewCursor
-			return
-		}
-		Executable := SubStr(Combined, Found)
-		Carry := SubStr(Combined, 1, Found - 1)
+		Combined := Text . Ledger["carry"]
+		if StrLen(Combined) > KLRRebuildConst.MAX_CARRY_CHARS
+			throw KLRRebuildRefusal("a ledger holds no batch boundary within "
+				. KLRRebuildConst.MAX_CARRY_CHARS . " characters")
+		Ledger["carry"] := Combined
+		Ledger["cursor"] := NewCursor
+		return false
 	}
 	_KLR_RebuildExecute(State["db"], Executable)
 	Ledger["cursor"] := NewCursor
 	Ledger["carry"] := Carry
-	if RegExMatch(Executable, "^\n-- === ingest batch (\d{4}-\d{2}-\d{2}) ", &Header)
+	if RegExMatch(Executable, "^\n?-- === ingest batch (\d{4}-\d{2}-\d{2}) ", &Header)
 			&& StrCompare(Header[1], Ledger["frontier"]) < 0
 		Ledger["frontier"] := Header[1]
 	if NewCursor = 0
@@ -401,6 +397,7 @@ _KLR_RebuildStep(State, Ledger) {
 	for Day in KLR_CacheAffectedDates(Map(Ledger["path"], Map("sql", Executable)))
 		if StrCompare(Day, State["done_boundary"]) > 0
 			State["dirty"][Day] := true
+	return true
 }
 
 _KLR_RebuildReadBytes(Ledger, Start, Count) {

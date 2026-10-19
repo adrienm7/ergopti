@@ -250,8 +250,7 @@ TestShortcuts_DOMPathToFilesystem_EmptyInput() {
 Test("Shortcuts/win: DOMPathToFilesystem returns empty string for empty input", TestShortcuts_DOMPathToFilesystem_EmptyInput)
 
 TestShortcuts_GetKnownFolderDownloads_ReturnsStringOrEmpty() {
-	; The function returns a path string or "" when no Downloads folder found.
-	; We only assert on the return type — not the exact path (machine-dependent).
+	; The Shell chooses the current user's known folder, which is machine-dependent.
 	Result := GetKnownFolderDownloads()
 	AssertTrue(Result is String, "GetKnownFolderDownloads must return a string")
 }
@@ -585,3 +584,154 @@ for _SRCT_Scenario in ["pause", "cancel", "pause-resume", "ordinary", "absent",
 	"write-refused", "close-refused", "close-throws", "launch-throws"]
 	Test("Shortcuts/win: registry continuation " . _SRCT_Scenario . " (regjump-continuation-revocation)",
 		_SRCT_Continuation.Bind(_SRCT_Scenario))
+
+; Downloads can be moved away from USERPROFILE while an old Downloads folder
+; still exists there. Only the Shell known-folder identity selects the target.
+TestShortcuts_DownloadsUsesShellPath() {
+	Target := "Z:\Company\Alice\Downloads"
+	Calls := []
+	NativeCall(Name, Args*) {
+		Calls.Push(Name)
+		if Name == "shell32\SHGetKnownFolderPath" {
+			AssertEqual(0x374DE290, NumGet(Args[2], 0, "UInt"), "the Shell receives FOLDERID_Downloads")
+			AssertEqual(0xC4396491, NumGet(Args[2], 8, "UInt"), "the GUID tail keeps its native byte order")
+			AssertEqual(0x4000, Args[4], "a temporarily offline folder still resolves to its configured path")
+			AssertEqual(0, Args[6], "the current user owns the known-folder lookup")
+			NumPut("Ptr", StrPtr(Target), Args[8])
+			return 0
+		}
+		AssertEqual("ole32\CoTaskMemFree", Name, "the only other native call frees the Shell string")
+		AssertEqual(StrPtr(Target), Args[2], "the exact returned allocation is freed")
+	}
+	AssertEqual(Target, GetKnownFolderDownloads(NativeCall), "the redirected path wins over translated profile folders")
+	AssertEqual(2, Calls.Length, "one native lookup and one allocation release")
+}
+Test("Shortcuts/win: resolve redirected Downloads through the Shell (downloads-known-folder)",
+	TestShortcuts_DownloadsUsesShellPath)
+
+TestShortcuts_DownloadsRefusesNativeFailure() {
+	_TestShortcuts_DownloadsNativeFailure(false)
+	_TestShortcuts_DownloadsNativeFailure(true)
+}
+
+_TestShortcuts_DownloadsNativeFailure(OwnsPath) {
+	Calls := []
+	Target := "Z:\Company\Downloads"
+	NativeCall(Name, Args*) {
+		Calls.Push(Name)
+		if Name == "shell32\SHGetKnownFolderPath" {
+			if OwnsPath
+				NumPut("Ptr", StrPtr(Target), Args[8])
+			return -2147024891
+		}
+		AssertEqual("ole32\CoTaskMemFree", Name, "a failed lookup must release any returned allocation")
+		AssertEqual(StrPtr(Target), Args[2], "failure releases only its own allocation")
+	}
+	Failure := ""
+	try GetKnownFolderDownloads(NativeCall)
+	catch as Err
+		Failure := Err.Message
+	AssertContains(Failure, "HRESULT 0x80070005", "an access denial must not silently choose a different folder")
+	AssertEqual(OwnsPath ? 2 : 1, Calls.Length, "only an owned allocation requires a release")
+}
+Test("Shortcuts/win: refuse a failed Downloads lookup (downloads-known-folder)",
+	TestShortcuts_DownloadsRefusesNativeFailure)
+
+TestShortcuts_OpenDownloadsKeepsResolvedTarget() {
+	Targets := []
+	AssertTrue(_OpenDownloadsWith(() => "Z:\Company\Alice Downloads", (Command) => Targets.Push(Command)))
+	AssertEqual('explorer.exe "Z:\Company\Alice Downloads"', Targets[1], "the resolved directory remains one quoted Explorer argument")
+	FailedResolve() {
+		throw Error("Downloads lookup denied")
+	}
+	AssertThrows(() => _OpenDownloadsWith(FailedResolve, (Command) => Targets.Push(Command)))
+	AssertEqual(1, Targets.Length, "a failed lookup cannot launch Explorer at a guessed folder")
+}
+Test("Shortcuts/win: open only the resolved Downloads target (downloads-known-folder)",
+	TestShortcuts_OpenDownloadsKeepsResolvedTarget)
+
+; The selector accepts mixed-case aliases and both machine labels. Normalize
+; the same accepted forms before the registry publisher sees its LastKey value.
+TestShortcuts_RegJumpNormalizesAcceptedAliases() {
+	Vectors := [
+		["HKLM\Software", "HKEY_LOCAL_MACHINE\Software"],
+		["hklm\Software", "HKEY_LOCAL_MACHINE\Software"],
+		["Computer\HKCU\Software", "HKEY_CURRENT_USER\Software"],
+		["computer\hKcR\.txt", "HKEY_CLASSES_ROOT\.txt"],
+		["Ordinateur\HKCC\System", "HKEY_CURRENT_CONFIG\System"],
+		["ordinateur\hku\.DEFAULT", "HKEY_USERS\.DEFAULT"],
+		["Computer\HKEY_LOCAL_MACHINE\Software\", "HKEY_LOCAL_MACHINE\Software"],
+		["HKCU\Software\HKCU\Computer", "HKEY_CURRENT_USER\Software\HKCU\Computer"]
+	]
+	for Vector in Vectors
+		AssertEqual(Vector[2], _RegJumpNormalizePath(Vector[1]), "accepted registry target: " . Vector[1])
+}
+Test("Shortcuts/win: normalize case-insensitive registry roots (regjump-root-normalization)",
+	TestShortcuts_RegJumpNormalizesAcceptedAliases)
+
+TestShortcuts_RegJumpCommitsNormalizedTarget() {
+	Targets := []
+	Commit(Target, Ports*) {
+		Targets.Push(Target)
+		AssertEqual(4, Ports.Length, "normalization must retain the native registry, window and launch ports")
+		return true
+	}
+	AssertTrue(RegJump("computer\hklm\Software\Ergopti", Commit))
+	AssertEqual("HKEY_LOCAL_MACHINE\Software\Ergopti", Targets[1],
+		"the real RegJump entry must pass the normalized root to its publisher")
+}
+Test("Shortcuts/win: publish the normalized registry target (regjump-root-normalization)",
+	TestShortcuts_RegJumpCommitsNormalizedTarget)
+
+; A modal path-copy question and its later Sleep keep running after hotkey
+; suspension. Revoke the old response before another clipboard write or dialog.
+_GPC_ContinuationRevocation(Scenario) {
+	global _SelectionCaptureJob, _SelectionCaptureNextId
+	AssertFalse(IsObject(_SelectionCaptureJob), "fixture refuses a live selection capture")
+	PreviousId := _SelectionCaptureNextId
+	PreviousSuspended := A_IsSuspended
+	Events := [], Timers := []
+	Revoke() {
+		if InStr(Scenario, "pause-resume") {
+			Suspend(true)
+			GetSelectionCancel()
+			Suspend(false)
+		} else if InStr(Scenario, "pause")
+			Suspend(true)
+		else
+			GetSelectionCancel()
+	}
+	Prompt(Args*) {
+		Events.Push("prompt")
+		if InStr(Scenario, "prompt")
+			Revoke()
+		return "No"
+	}
+	Wait(Ms) {
+		Events.Push("sleep")
+		if InStr(Scenario, "sleep")
+			Revoke()
+	}
+	try {
+		if Scenario == "entry-pause"
+			Suspend(true)
+		Result := _GetPathCopyFlow("C:/repo", "C:\repo",
+			(Value) => (Events.Push("write"), true),
+			(Callback, Delay) => (Timers.Push(Callback), Events.Push("timer")),
+			Prompt, Wait, (*) => Events.Push("rename"))
+		AssertFalse(Result, "a revoked response cannot complete its copy continuation")
+		ExpectedEvents := Scenario == "entry-pause" ? 0 : InStr(Scenario, "prompt") ? 3 : 5
+		AssertEqual(ExpectedEvents, Events.Length,
+			"revocation must stop before the next clipboard write or success dialog")
+		if Timers.Length > 0 {
+			Timers[1].Call()
+			AssertEqual(ExpectedEvents, Events.Length, "a retained rename timer cannot reactivate the revoked dialog")
+		}
+	} finally {
+		_SelectionCaptureNextId := PreviousId
+		Suspend(PreviousSuspended)
+	}
+}
+for _GPC_Scenario in ["entry-pause", "prompt-pause", "prompt-cancel", "prompt-pause-resume", "sleep-pause", "sleep-cancel"]
+	Test("Shortcuts/win: path copy continuation " . _GPC_Scenario . " (getpath-continuation-revocation)",
+		_GPC_ContinuationRevocation.Bind(_GPC_Scenario))

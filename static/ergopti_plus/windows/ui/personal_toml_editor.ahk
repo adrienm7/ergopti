@@ -42,7 +42,9 @@ _EditorPrefGet(Key, Default) {
 	if !IsSet(ConfigurationFile) or !FileExist(ConfigurationFile) {
 		return Default
 	}
-	Val := TOML_Read(ConfigurationFile, "personal_editor", Key, "_MISSING_")
+	; Preference keys can be owned by dotted assignments or an inline namespace.
+	Cache := ConfigTomlDecodeSnapshot(FSReadStrict(ConfigurationFile)).Cache
+	Val := IniCacheGet(Cache, "personal_editor", Key, "_MISSING_")
 	return (Val == "_MISSING_") ? Default : Val
 }
 _EditorPrefSet(Key, Value, WriterFn := 0, NotifyFn := 0) {
@@ -565,7 +567,7 @@ _SaveEntry(W, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, C
 }
 
 _DeleteEntry(W, LV, StatusText) {
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	Row := LV.GetNext(0)
 	if !Row {
 		StatusText.Value := t("editor.hotstrings.err_select_to_delete")
@@ -582,6 +584,9 @@ _DeleteEntry(W, LV, StatusText) {
 	if Row > Entries.Length {
 		return
 	}
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection, Source := _PersonalEditorOpeningSource
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
 	E := Entries[Row]
 	Confirm := Ui_MsgBox(
 		t("editor.hotstrings.btn_delete") . ' "' . E["trigger"] . '" → "' . E["output"] . '" ?',
@@ -590,8 +595,10 @@ _DeleteEntry(W, LV, StatusText) {
 	if Confirm != "Yes" {
 		return
 	}
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
 	Entries.RemoveAt(Row)
-	_SaveData(W, LV, StatusText)
+	return _SaveData(W, LV, StatusText)
 }
 
 _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
@@ -605,50 +612,84 @@ _OnSectionChange(SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp
 }
 
 _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection, Source := _PersonalEditorOpeningSource
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
 	Res := Ui_InputBox(t("editor.hotstrings.new_section_prompt"), t("editor.hotstrings.new_section_title"), "w300 h120")
-	if Res.Result != "OK" or Trim(Res.Value) == "" {
-		return
-	}
+	if Res.Result != "OK" or Trim(Res.Value) == ""
+		return false
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
 	SecName := StrLower(Trim(Res.Value))
 	SecName := RegExReplace(SecName, "[^a-z0-9_]", "_")
-	if _PersonalEditorData["sections"].Has(SecName) {
+	if Data["sections"].Has(SecName) {
 		Ui_MsgBox(t("editor.hotstrings.err_section_exists"), t("editor.hotstrings.title_error"), "Icon!")
-		return
+		return false
 	}
 	Res2 := Ui_InputBox(t("editor.hotstrings.desc_prompt"), t("editor.hotstrings.desc_title"), "w300 h120", SecName)
-	if Res2.Result != "OK" {
-		return
-	}
+	if Res2.Result != "OK"
+		return false
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
 	Desc := Trim(Res2.Value)
-	if (Desc == "") {
+	if Desc == ""
 		Desc := SecName
-	}
-	_PersonalEditorData["sections_order"].Push(SecName)
-	_PersonalEditorData["sections"][SecName] := Map(
-		"description", Desc,
-		"entries", [],
-		"line_start", 0,
-	)
-	; Seed the Features node for this brand-new section right away — without this,
-	; ToggleFeatureV2's live-toggle fast path (WriteFeatureV2) silently no-ops on
-	; the unresolved "hotstrings.personal.<name>" path, because the boot-time
-	; seeding pass (ErgoptiPlus.ahk) and the bulk enable/disable-all path
-	; (HS_TogglePersonalAllSections) are the only other call sites and neither
-	; runs again for a section created live in this editor session
-	; (personal-hotstring-live-toggle-seed).
-	EnsurePersonalHotstringFeature(SecName)
-	; Persist and rebuild dropdown
-	WritePersonalToml(_PersonalEditorData)
-	_RebuildDropdown(SectionDrop, _PersonalEditorData)
-	_SelectDropDown(SectionDrop, SecName)
-	_PersonalEditorSection := SecName
+	Candidate := _PersonalTomlCloneDetached(Data)
+	Candidate["sections_order"].Push(SecName)
+	Candidate["sections"][SecName] := Map("description", Desc, "entries", [], "line_start", 0)
+	if !_PersonalEditorCommitSectionAction(W, Source, Data, SectionName, Candidate, SecName)
+		return false
+	; Seed only the section whose exact opening image was committed. A retired
+	; dialog must not register a new feature in its replacement's live map.
+	PreviousCritical := Critical("On")
+	try {
+		if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
+			return false
+		EnsurePersonalHotstringFeature(SecName)
+	} finally Critical(PreviousCritical)
+	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
+		return false
 	_EditorPrefSet("default_section", SecName)
-	; Refresh the list and form to reflect the (empty) new section —
-	; without this the ListView keeps showing the previous section's entries
-	_PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
+	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
+		return false
+	_RebuildDropdown(SectionDrop, Candidate)
+	_SelectDropDown(SectionDrop, SecName)
+	_PopulateList(LV, Candidate, SecName)
 	_ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
 	StatusText.Value := ""
+	return true
+}
+
+; Native modals pump Close and replacement-editor callbacks. The dialog's
+; original source, window, model and selected section remain one authority.
+_PersonalEditorSectionActionCurrent(Window, Source, Data, SectionName) {
+	global _PersonalEditorData, _PersonalEditorSection
+	return _PersonalTomlOpeningSessionCurrent(Source) && Window is Gui
+		&& ObjPtr(Window) == ObjPtr(Source["window"])
+		&& Data is Map && _PersonalEditorData is Map
+		&& ObjPtr(Data) == ObjPtr(_PersonalEditorData)
+		&& SectionName == _PersonalEditorSection
+}
+
+; Refused or retired writes leave the mutable editor model untouched. The
+; writer independently fences the exact captured source at native replacement.
+_PersonalEditorCommitSectionAction(Window, Source, Data, SectionName, Candidate, NextSection) {
+	global _PersonalEditorData, _PersonalEditorSection
+	if !_PersonalEditorSectionActionCurrent(Window, Source, Data, SectionName)
+		return false
+	if !WritePersonalToml(Candidate, 0, 0, 0, 0, 0, Source) {
+		try LoggerError("PersonalEditor", "The section change was not saved; the editor model remains unchanged.")
+		return false
+	}
+	PreviousCritical := Critical("On")
+	try {
+		if !_PersonalEditorSectionActionCurrent(Window, Source, Data, SectionName)
+			return false
+		_PersonalEditorData := Candidate
+		_PersonalEditorSection := NextSection
+		return true
+	} finally Critical(PreviousCritical)
 }
 
 ; Guard every consumer of the _PersonalEditorSection pointer.
@@ -675,60 +716,64 @@ _PersonalEditorRequireSection(FuncName) {
 }
 
 _RenameSection(W, SectionDrop) {
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	if !_PersonalEditorRequireSection("_RenameSection")
-		return
-	OldDesc := _PersonalEditorData["sections"][_PersonalEditorSection]["description"]
-	Res := Ui_InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), _PersonalEditorSection), t("editor.hotstrings.rename_title"),
+		return false
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection, Source := _PersonalEditorOpeningSource
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
+	OldDesc := Data["sections"][SectionName]["description"]
+	Res := Ui_InputBox(Format(t("editor.hotstrings.rename_desc_prompt"), SectionName), t("editor.hotstrings.rename_title"),
 		"w300 h120", OldDesc)
-	if Res.Result != "OK" or Trim(Res.Value) == "" {
-		return
-	}
-	_PersonalEditorData["sections"][_PersonalEditorSection]["description"] := Trim(Res.Value)
-	WritePersonalToml(_PersonalEditorData)
-	_RebuildDropdown(SectionDrop, _PersonalEditorData)
-	_SelectDropDown(SectionDrop, _PersonalEditorSection)
+	if Res.Result != "OK" or Trim(Res.Value) == ""
+		return false
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
+	Candidate := _PersonalTomlCloneDetached(Data)
+	Candidate["sections"][SectionName]["description"] := Trim(Res.Value)
+	if !_PersonalEditorCommitSectionAction(W, Source, Data, SectionName, Candidate, SectionName)
+		return false
+	_RebuildDropdown(SectionDrop, Candidate)
+	_SelectDropDown(SectionDrop, SectionName)
+	return true
 }
 
 _DeleteSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal, StatusText) {
-	global _PersonalEditorData, _PersonalEditorSection
+	global _PersonalEditorData, _PersonalEditorSection, _PersonalEditorOpeningSource
 	if !_PersonalEditorRequireSection("_DeleteSection")
-		return
-	EntryCount := _PersonalEditorData["sections"][_PersonalEditorSection]["entries"].Length
+		return false
+	Data := _PersonalEditorData, SectionName := _PersonalEditorSection, Source := _PersonalEditorOpeningSource
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
+	EntryCount := Data["sections"][SectionName]["entries"].Length
 	Confirm := Ui_MsgBox(
-		t("editor.hotstrings.btn_delete") . ' "' . _PersonalEditorSection . '" (' . EntryCount . ') ?',
+		t("editor.hotstrings.btn_delete") . ' "' . SectionName . '" (' . EntryCount . ') ?',
 		t("editor.hotstrings.title_confirm"), "YesNo Icon?"
 	)
-	if Confirm != "Yes" {
-		return
-	}
-	; Remove from order array
-	NewOrder := []
-	for SecName in _PersonalEditorData["sections_order"] {
-		if (SecName != _PersonalEditorSection) {
+	if Confirm != "Yes"
+		return false
+	if !_PersonalEditorSectionActionCurrent(W, Source, Data, SectionName)
+		return false
+	Candidate := _PersonalTomlCloneDetached(Data), NewOrder := []
+	for SecName in Candidate["sections_order"] {
+		if SecName != SectionName
 			NewOrder.Push(SecName)
-		}
 	}
-	_PersonalEditorData["sections_order"] := NewOrder
-	_PersonalEditorData["sections"].Delete(_PersonalEditorSection)
-	WritePersonalToml(_PersonalEditorData)
-	_PersonalEditorSection := NewOrder.Length > 0 ? NewOrder[1] : ""
-	; Repoint the PERSISTED pointer too. Without this the deleted section stayed
-	; in [personal_editor] default_section; the next OpenPersonalEditor() with
-	; no explicit argument read that stale name, and because it is non-empty the
-	; sections_order[1] fallback was skipped — leaving _PersonalEditorSection set
-	; to a section that no longer exists. The dropdown silently fell back to item 1
-	; (Choose() fires no Change event) while the global stayed stale, so the next
-	; Add / Modify / Delete indexed a missing key and threw.
-	_EditorPrefSet("default_section", _PersonalEditorSection)
-	_RebuildDropdown(SectionDrop, _PersonalEditorData)
-	if (_PersonalEditorSection != "") {
-		_SelectDropDown(SectionDrop, _PersonalEditorSection)
-	}
-	; Refresh list and form to reflect the newly active section (or empty state)
-	_PopulateList(LV, _PersonalEditorData, _PersonalEditorSection)
+	Candidate["sections_order"] := NewOrder
+	Candidate["sections"].Delete(SectionName)
+	NextSection := NewOrder.Length > 0 ? NewOrder[1] : ""
+	if !_PersonalEditorCommitSectionAction(W, Source, Data, SectionName, Candidate, NextSection)
+		return false
+	_EditorPrefSet("default_section", NextSection)
+	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, NextSection)
+		return false
+	_RebuildDropdown(SectionDrop, Candidate)
+	if NextSection != ""
+		_SelectDropDown(SectionDrop, NextSection)
+	_PopulateList(LV, Candidate, NextSection)
 	_ClearForm(TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, ChkCaseSens, ChkFinal)
 	StatusText.Value := ""
+	return true
 }
 
 ; Switch the open editor to a different section (called when reopening with a target).

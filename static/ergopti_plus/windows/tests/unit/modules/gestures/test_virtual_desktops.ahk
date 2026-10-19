@@ -162,10 +162,17 @@ Test("virtual desktops: reads the Windows 10 and Windows 11 registry layouts", _
 _VDT_Presses(Direction, State) {
 	Pressed := []
 	ReadState := (*) => (IsObject(State) ? State : _VDT_Throw())
-	Press := (Key, Mods) => Pressed.Push(Key . ":" . _VDT_JoinMods(Mods))
+	Press := _VDT_RecordPress.Bind(Pressed)
 	Count := GestureDesktopNavigateWrap(Direction, ReadState, Press)
 	AssertEqual(Pressed.Length, Count, "the action must report the presses it sent")
 	return Pressed
+}
+
+; Recording alone has no return value in AHK. Model the sender's explicit
+; success receipt so the production loop can distinguish it from refusal.
+_VDT_RecordPress(Pressed, Key, Mods) {
+	Pressed.Push(Key . ":" . _VDT_JoinMods(Mods))
+	return true
 }
 
 _VDT_Throw() {
@@ -199,14 +206,14 @@ _VDT_WrapActionPresses() {
 	AssertEqual("", _VDT_Join(_VDT_Presses("next", { Index: 0, Count: 1 })),
 		"a single desktop has nowhere to wrap to")
 }
-Test("virtual desktops: desktop_*_wrap walk across the row at the edge", _VDT_WrapActionPresses)
+Test("virtual desktops: desktop_*_wrap walk across the row at the edge (desktop-wrap-press-receipts)", _VDT_WrapActionPresses)
 
 _VDT_UnreadableStateMovesOneDesktop() {
 	AssertEqual("Right:Ctrl+Win", _VDT_Join(_VDT_Presses("next", "fail")),
 		"without a readable position the step is the plain one")
 	AssertEqual("Left:Ctrl+Win", _VDT_Join(_VDT_Presses("prev", "fail")))
 }
-Test("virtual desktops: an unreadable state moves one desktop without wrapping", _VDT_UnreadableStateMovesOneDesktop)
+Test("virtual desktops: an unreadable state moves one desktop without wrapping (desktop-wrap-press-receipts)", _VDT_UnreadableStateMovesOneDesktop)
 
 _VDT_ActionsAreRegistered() {
 	global GESTURE_ACTIONS
@@ -221,3 +228,58 @@ _VDT_ActionsAreRegistered() {
 		"the wrap is not one keystroke a tap-hold could replay")
 }
 Test("virtual desktops: plain and wrapping actions are both registered", _VDT_ActionsAreRegistered)
+
+
+; A pause can arrive while a registry query or an earlier key send pumps AHK
+; messages. Each fixture restores the real suspend flag before returning.
+_VDT_InterruptedOutput(Mode) {
+	PriorPause := A_IsSuspended
+	State := {reads: 0, attempts: 0}
+	try {
+		Suspend(Mode == "entry")
+		Read := _VDT_InterruptRead.Bind(Mode, State)
+		Press := _VDT_InterruptPress.Bind(Mode, State)
+		Sent := GestureDesktopNavigateWrap("next", Read, Press)
+		switch Mode {
+			case "entry":
+				AssertEqual(0, State.reads, "a paused action cannot query or send")
+				AssertEqual(0, State.attempts)
+				AssertEqual(0, Sent)
+			case "read", "failed-read":
+				AssertEqual(1, State.reads, "the actual query must run")
+				AssertEqual(0, State.attempts, "neither wrap nor fallback may send after a query pauses")
+				AssertEqual(0, Sent)
+			case "send":
+				AssertEqual(1, State.attempts, "a pause inside the first send must stop the remaining two")
+				AssertEqual(1, Sent, "only the completed first press may be counted")
+			case "refusal":
+				AssertEqual(2, State.attempts, "a rejected second press must stop the third")
+				AssertEqual(1, Sent, "a rejected press must not be counted")
+			case "fallback-refusal":
+				AssertEqual(1, State.attempts, "the plain fallback must make one actual attempt")
+				AssertEqual(0, Sent, "a rejected fallback must not be counted")
+		}
+	} finally Suspend(PriorPause)
+}
+
+_VDT_InterruptRead(Mode, State) {
+	State.reads += 1
+	if Mode == "read" || Mode == "failed-read"
+		Suspend(true)
+	if Mode == "failed-read" || Mode == "fallback-refusal"
+		throw Error("scripted registry read failure")
+	return {Index: 3, Count: 4}
+}
+
+_VDT_InterruptPress(Mode, State, Key, Mods) {
+	State.attempts += 1
+	AssertEqual("Ctrl+Win", _VDT_JoinMods(Mods), "the real action must keep the navigation chord")
+	AssertEqual(Mode == "fallback-refusal" ? "Right" : "Left", Key)
+	if Mode == "send"
+		Suspend(true)
+	return Mode != "fallback-refusal" && !(Mode == "refusal" && State.attempts == 2)
+}
+
+for Mode in ["entry", "read", "failed-read", "send", "refusal", "fallback-refusal"]
+	Test("virtual desktops: stop interrupted output at " . Mode . " (desktop-wrap-interrupted-output)",
+		_VDT_InterruptedOutput.Bind(Mode))

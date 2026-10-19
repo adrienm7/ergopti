@@ -677,7 +677,7 @@ _TextSendClipboard(Text, Saved, Callback := 0, Opts := 0) {
 ; stale restore can never overwrite a clipboard a later injection just populated.
 ; @param Saved      {ClipboardAll|String} Snapshot returned by CB_SaveAll().
 ; @param Generation {Integer}             Counter value captured at scheduling.
-_TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
+_TextSendRestoreClipboard(Saved, Generation, OwnedSequence, RestoreFn := 0, SequenceFn := 0) {
 	global _TEXT_CLIPBOARD_GENERATION, _TEXT_CLIPBOARD_OWNER_TOKEN
 	; Also a SetTimer callback — bypasses native Suspend() like its sibling
 	; above. Restoring the clipboard is harmless while paused (it undoes the
@@ -687,15 +687,14 @@ _TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {
 		_TextSenderTryClipboardDiagnostic("restore-skipped-generation", 0, 0, Generation, OwnedSequence)
 		return
 	}
-	; The user may have copied something after this request pasted. Restore only
-	; while this transaction still owns the exact clipboard sequence; otherwise
-	; any restore would silently overwrite the user's newer clipboard content.
-	if (!OwnedSequence or CB_GetSequenceNumber() != OwnedSequence) {
+	if !OwnedSequence {
 		_TextSenderTryClipboardDiagnostic("restore-skipped-sequence", 0, 0, Generation, OwnedSequence)
 		return
 	}
+	; The central owner distinguishes a newer positive sequence from an unavailable
+	; zero. An unavailable probe retains the snapshot and lease for a later retry.
 	RestoreSettled := CB_RestoreOwnedAllEventually(Saved, OwnedSequence,
-		_TEXT_CLIPBOARD_OWNER_TOKEN, "text_sender", false)
+		_TEXT_CLIPBOARD_OWNER_TOKEN, "text_sender", false, false, RestoreFn, SequenceFn)
 	; Observe the request after it is owned: logging cannot open a new admission gap.
 	_TextSenderTryClipboardDiagnostic(RestoreSettled ? "restore-owner-settled"
 		: "restore-owner-pending", 0, 0, Generation, OwnedSequence)

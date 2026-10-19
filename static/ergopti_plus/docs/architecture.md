@@ -177,6 +177,7 @@ graph TD
         WINDOWS_screen_brightness["ScreenBrightness.ahk"]
         WINDOWS_secure_field_detector["SecureFieldDetector.ahk"]
         WINDOWS_shell_runner["ShellRunner.ahk"]
+        WINDOWS_sqlite_native["SqliteNative.ahk"]
         WINDOWS_storage["Storage.ahk"]
         WINDOWS_system_control["SystemControl.ahk"]
         WINDOWS_terminal_output_custody["TerminalOutputCustody.ahk"]

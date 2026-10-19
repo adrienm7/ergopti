@@ -22,6 +22,7 @@
 
 #Requires AutoHotkey v2.0
 #Include ../../../../support/altgr_probe_ordinary_owner.ahk
+#Include test_key_combination_semantic_scope.ahk
 
 
 

@@ -39,6 +39,7 @@ global HSE_RepeatEnabled := true
 #Include ..\..\infra\tick_count.ahk
 #Include ..\..\infra\wall_clock.ahk
 #Include ..\..\infra\logger.ahk
+#Include ..\..\infra\redact.ahk
 #Include ..\..\adapters\crypto.ahk
 #Include ..\..\adapters\file_system.ahk
 #Include ..\..\adapters\key_state.ahk
@@ -58,6 +59,8 @@ TapKeyAssignments["feature_state_include_once_probe"] := "none"
 #Include ..\..\infra\config_migrate.ahk
 #Include ..\..\infra\first_boot.ahk
 #Include ..\..\modules\gestures\config.ahk
+; LoggerInit admits the real shared privacy policy through this native codec.
+#Include ..\..\infra\json.ahk
 
 try {
     if (A_Args.Length != 1 && !(A_Args.Length == 3 && A_Args[1] == "distance_gate")
@@ -115,6 +118,10 @@ try {
 			_FeatureStateSmokeInvalidValue("hotstrings", "repeat_key_enabled", "false")
 		case "invalid_kana":
 			_FeatureStateSmokeInvalidValue("script", "alt_gr_is_kana_remap", "sometimes")
+		case "kana_auto_lower", "kana_auto_upper", "kana_auto_mixed":
+			_FeatureStateSmokeKanaAutomatic(A_Args[1])
+		case "logger_dotted", "logger_inline", "logger_quoted":
+			_FeatureStateSmokeLoggerSemantic(A_Args[1])
 		case "outdated_source_key":
 			_FeatureStateSmokeOutdatedSourceKey()
 		case "retired_source_scan":
@@ -527,4 +534,65 @@ _FeatureStateSmokePrepareReadonlySource(Path) {
 		throw Error("Native readonly preparation changed the independent semantic source")
 	if ConfigSchemaCanPrepareWrite(Path)
 		throw Error("Readonly semantic preparation manufactured native write permission")
+}
+
+_FeatureStateSmokeKanaAutomatic(Fixture) {
+	global ScriptInformation
+	Raw := Map("kana_auto_lower", "auto", "kana_auto_upper", "AUTO",
+		"kana_auto_mixed", "AuTo")[Fixture]
+	TempConfig := A_Temp . "\ergopti_kana_auto_" . DllCall("GetCurrentProcessId") . ".toml"
+	try {
+		try FileDelete(TempConfig)
+		FileAppend("[script]`nalt_gr_is_kana_remap = " . TOML_RenderString(Raw) . "`n",
+			TempConfig, "UTF-8")
+		_FeatureStateSmokePrepareReadonlySource(TempConfig)
+		Cache := ParseConfigTomlFile(TempConfig)
+		Value := IniCacheGet(Cache, "script", "alt_gr_is_kana_remap")
+		ExpectedType := ""
+		if !(Value is String) || StrCompare(Value, Raw, true) != 0
+				|| !TomlConfigValueMatchesManifest("script", "alt_gr_is_kana_remap",
+					Value, &ExpectedType, TOML_RenderString(Raw))
+			throw Error("The actual configuration enum validator must admit this automatic Kana spelling.")
+		ReadScriptConfig(Cache)
+		Actual := ScriptInformation["AltGrIsKanaRemap"]
+		if !(Actual is String) || StrCompare(Actual, "auto", true) != 0
+			throw Error("An admitted automatic Kana spelling must publish the canonical runtime sentinel.")
+	} finally try FileDelete(TempConfig)
+}
+
+_FeatureStateSmokeLoggerSemantic(Fixture) {
+	global ConfigurationFile, _LogsDir, LOGGER_MIN_LEVEL, _LOGGER_FLUSH_TIMER_STARTED
+	Root := A_Temp . "\ergopti_logger_semantic_" . DllCall("GetCurrentProcessId") . "_" . A_TickCount
+	if DirExist(Root)
+		throw Error("The native logger fixture requires a fresh private root.")
+	DirCreate(Root)
+	try {
+		Source := Map(
+			"logger_dotted", 'script.log_level = "ERROR"`n',
+			"logger_inline", 'script = { log_level = "ERROR" }`n',
+			"logger_quoted", '["script"]`nlog_level = "ERROR"`n')[Fixture]
+		ConfigurationFile := Root . "\config.toml"
+		_LogsDir := Root . "\logs\"
+		if !FSWriteCreateDurable(ConfigurationFile, Source)
+			throw Error("The private native logger source could not be created.")
+		Cache := ConfigTomlDecodeSnapshot(Source).Cache
+		Value := IniCacheGet(Cache, "script", "log_level")
+		ExpectedType := ""
+		if !TomlConfigValueMatchesManifest("script", "log_level", Value, &ExpectedType, '"ERROR"')
+			throw Error("The real typed config boundary must admit this logger source.")
+		LoggerInit()
+		if StrCompare(LOGGER_MIN_LEVEL, "ERROR", true) != 0
+			throw Error("The actual logger did not apply its admitted semantic threshold.")
+		if !LoggerPrepareShutdown()
+			throw Error("The native logger fixture did not settle its owned disk writes.")
+		if StrCompare(Source, FSReadUtf8Exact(ConfigurationFile), true) != 0
+			throw Error("Logger initialization rewrote the private configuration source.")
+	} finally {
+		if _LOGGER_FLUSH_TIMER_STARTED {
+			SetTimer(_LoggerFlush, 0)
+			OnExit(_LoggerOnExitFlush, 0)
+			_LoggerRepeatDisable()
+		}
+		DirDelete(Root, true)
+	}
 }

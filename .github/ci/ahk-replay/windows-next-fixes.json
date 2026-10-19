@@ -1,0 +1,125 @@
+{
+	"expected_count": 161,
+	"filters": [
+		{
+			"contains": "toml-literal-string-kind",
+			"expected_count": 2
+		},
+		{
+			"contains": "toml-numeric-string-read",
+			"expected_count": 10
+		},
+		{
+			"contains": "webview-singleton-close-owner",
+			"expected_count": 1
+		},
+		{
+			"contains": "webview-callback-error",
+			"expected_count": 2
+		},
+		{
+			"contains": "mouse-privacy-query-failure",
+			"expected_count": 4
+		},
+		{
+			"contains": "cipher-malformed-iv",
+			"expected_count": 4
+		},
+		{
+			"contains": "tap-hold-roll-pause",
+			"expected_count": 4
+		},
+		{
+			"contains": "accented-shortcuts-live-digits",
+			"expected_count": 1
+		},
+		{
+			"contains": "remote-poll-io-retirement",
+			"expected_count": 32
+		},
+		{
+			"contains": "ollama-poll-io-retirement",
+			"expected_count": 32
+		},
+		{
+			"contains": "mouse: fail-closed privacy boundary retains the production classifier",
+			"expected_count": 1
+		},
+		{
+			"contains": "toml-literal-array-recovery",
+			"expected_count": 1
+		},
+		{
+			"contains": "toml-nested-array-recovery",
+			"expected_count": 1
+		},
+		{
+			"contains": "keylogger-backspace-unicode",
+			"expected_count": 1
+		},
+		{
+			"contains": "ollama-chat-content-ownership",
+			"expected_count": 15
+		},
+		{
+			"contains": "webview-timer-release",
+			"expected_count": 2
+		},
+		{
+			"contains": "downloads-known-folder",
+			"expected_count": 3
+		},
+		{
+			"contains": "ollama-final-flush-cancellation",
+			"expected_count": 8
+		},
+		{
+			"contains": "cipher-nul-roundtrip:",
+			"expected_count": 5
+		},
+		{
+			"contains": "desktop-wrap-interrupted-output",
+			"expected_count": 6
+		},
+		{
+			"contains": "tooltip-position-owner-release",
+			"expected_count": 3
+		},
+		{
+			"contains": "regjump-root-normalization",
+			"expected_count": 2
+		},
+		{
+			"contains": "managed-render-timer-release",
+			"expected_count": 3
+		},
+		{
+			"contains": "getpath-continuation-revocation",
+			"expected_count": 6
+		},
+		{
+			"contains": "kana-auto-case-runtime",
+			"expected_count": 3
+		},
+		{
+			"contains": "open-downloads-hotpath-nonblocking",
+			"expected_count": 1
+		},
+		{
+			"contains": "regjump-receipt-fail-closed",
+			"expected_count": 2
+		},
+		{
+			"contains": "getpath-copy-receipt",
+			"expected_count": 2
+		},
+		{
+			"contains": "open-downloads-delegation-guard",
+			"expected_count": 2
+		},
+		{
+			"contains": "desktop-wrap-press-receipts",
+			"expected_count": 2
+		}
+	]
+}
