@@ -27,7 +27,7 @@ local function load_window(controls)
 	controls = controls or {}
 	for _, name in ipairs({
 		"ui.healthcheck.core", "ui.healthcheck.helpers", "ui.healthcheck.probes", "ui.healthcheck.report",
-		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "adapters.timer_scheduler",
+		"infra.logger", "infra.i18n", "infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler",
 		"adapters.clipboard", "adapters.webview_result",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
@@ -87,11 +87,23 @@ local function load_window(controls)
 		end,
 	}
 
-	local webview = {}
+	local webview = setmetatable({}, {})
 	for _, method in ipairs({
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows", "allowGestures", "level", "html",
 		"show", "shadow",
 	}) do webview[method] = function(self) return self end end
+	-- The packaged methods have boolean getters, fluent setters and C defaults.
+	function webview:allowNewWindows(value)
+		if value == nil then return self.children ~= false end
+		self.children = value
+		return self
+	end
+	function webview:deleteOnClose(value)
+		if value == nil then return self.automatic_close == true end
+		self.automatic_close = value
+		return self
+	end
+	function webview:show() self.presented = true; return self end
 	webview.windowCallback = function(self, callback) context.window_callback = callback; return self end
 	webview.navigationCallback = function(self, callback) context.navigation_callback = callback; return self end
 	webview.evaluateJavaScript = function(self, script, callback)
@@ -99,8 +111,12 @@ local function load_window(controls)
 		if callback then callback(nil, nil) end
 		return self
 	end
-	webview.delete = function() context.deleted = context.deleted + 1 end
+	webview.delete = function(self) context.deleted = context.deleted + 1; setmetatable(self, nil) end
 	hs_stub.webview.new = function(_, _, controller)
+		if webview.presented or getmetatable(webview) == nil then
+			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
+			webview = setmetatable(fresh, {})
+		end
 		context.new_controller = controller
 		return webview
 	end
