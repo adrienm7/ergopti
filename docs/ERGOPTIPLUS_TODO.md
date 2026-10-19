@@ -3091,6 +3091,11 @@ These are software implementations; final hardware verification remains below.
       workers created, `session_wait` 4 but `session_done`, `returned` and
       `first_frame` 3, one `selected_route` "unknown", one `exit_killed`:
       one URLSession task never completes and the deadline kills its worker.
+      Its peer counters also show `handshake_started` 3, `handshake_complete`
+      2, `handshake_refused` 1: check first whether the fixture peer keeps the
+      socket open after refusing that TLS handshake, which would leave the
+      task waiting for `timeoutIntervalForRequest` (ManagedHTTPWorker.swift
+      `execute`) past the request deadline.
       The Managed Ollama build job of that run failed in the native Go tests
       with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade fails where
       Homebrew clones `homebrew/core` on the hosted runner. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
