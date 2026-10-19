@@ -1038,6 +1038,14 @@ child can therefore notify its parent's owner and enter recursive GC. Factory
 windows must commit `allowNewWindows(false)` before owner hooks or HTML;
 rejecting a child in `policyCallback` happens after its native allocation.
 
+The public `webview:delete()` wrapper normalizes an omitted delay to zero;
+for a visible window it still schedules a fade. Its close notification precedes
+native userdata consumption. Latch the exact request before calling delete and
+never repeat an uncertain request while its metatable remains. Observe retirement
+outside the notification, and release bridge callbacks only after userdata
+consumption and the exact observation timer's stop acknowledgement. A callback
+delivery alone does not prove that its timer retired.
+
 ### project-hs-development-runtime-registers-stock-peers
 
 Launching custom Karabiner core/console paths does not isolate their IPC peers:

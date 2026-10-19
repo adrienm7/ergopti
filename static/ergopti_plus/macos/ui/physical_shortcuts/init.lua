@@ -13,6 +13,7 @@ local Files = require("adapters.file_system")
 local I18n = require("infra.i18n")
 local ui_builder = require("ui.ui_builder")
 local Logger = require("infra.logger")
+local TimerScheduler = require("adapters.timer_scheduler")
 local active = nil
 
 --- Checks the native window constructor and declared geometry without input capture.
@@ -40,44 +41,98 @@ function M.available(scope)
 	return PhysicalAvailability.ready(scope.physical_delivery_available) and M.native_available()
 end
 
-local function close(candidate)
-	if active ~= candidate or candidate.closing or candidate.constructing then return false end
+local close
+
+--- Observes an accepted native fade after its closing notification unwinds.
+--- The one-shot callback and its exact stop acknowledgement are independent:
+--- either can arrive first, but neither alone releases the original bridge.
+--- @param candidate table Exact native/editor owner being retired.
+--- @return boolean scheduled
+local function schedule_native_retirement(candidate)
+	if candidate.retirement_timer ~= nil or candidate.retirement_arming or candidate.retirement_uncertain then return false end
+	candidate.retirement_arming = true
+	local delivered, settled = false, false
+	local function finish()
+		if candidate.retirement_arming or candidate.native_notification or not delivered or not settled then return end
+		close(candidate)
+	end
+	local ok, committed = xpcall(function()
+		local handle, accepted = TimerScheduler.after(0, function()
+			delivered = true
+			finish()
+		end)
+		candidate.retirement_timer = handle
+		assert(TimerScheduler.onSettled(handle, function()
+			settled = true
+			if candidate.retirement_timer == handle then candidate.retirement_timer = nil end
+			finish()
+		end) == true, "physical shortcut timer settlement observer refused")
+		return accepted
+	end, debug.traceback)
+	candidate.retirement_arming = false
+	if not ok then candidate.retirement_uncertain = true end
+	if not ok or committed ~= true then
+		pcall(Logger.error, "ui.physical_shortcuts", "Physical shortcut deferred retirement refused; exact owner retained: %s.",
+			tostring(committed))
+		return false
+	end
+	return true
+end
+
+close = function(candidate)
+	if active ~= candidate or candidate.closing or candidate.constructing
+		or candidate.native_notification or candidate.retirement_arming
+		or candidate.retirement_timer ~= nil or candidate.retirement_uncertain then return false end
 	candidate.closing = true
 	candidate.cancelled = true
 	if candidate.retire_observation and candidate.retire_observation() ~= true then
+		pcall(Logger.error, "ui.physical_shortcuts", "Physical position cancellation refused; exact owner retained.")
 		candidate.closing = false
-		Logger.error("ui.physical_shortcuts", "Physical position cancellation refused; exact owner retained.")
 		return false
 	end
 	if candidate.window then
 		local retired, acknowledged = pcall(candidate.window.retire)
 		if not retired or acknowledged ~= true then
+			pcall(Logger.error, "ui.physical_shortcuts", "Physical shortcut editor retirement refused; exact owner retained.")
 			candidate.closing = false
-			Logger.error("ui.physical_shortcuts", "Physical shortcut editor retirement refused; exact owner retained.")
 			return false
 		end
 	end
 	local called, acknowledged = pcall(function()
 		if candidate.webview then
 			if getmetatable(candidate.webview) ~= nil then
-				local removed = candidate.webview:delete(0)
+				if candidate.native_delete_pending then return false end
+				local delete = candidate.webview.delete
+				-- The public wrapper schedules a native fade even for zero delay.
+				-- Its closing callback runs before the fade consumes udRef. Retain
+				-- that exact request before crossing a possibly mutating boundary.
+				candidate.native_delete_pending = true
+				local removed = delete(candidate.webview, 0)
 				if removed ~= nil then return false end
 			end
 		end
 		return candidate.webview == nil or getmetatable(candidate.webview) == nil
 	end)
-	called = called and acknowledged == true
+	if not called then
+		pcall(Logger.error, "ui.physical_shortcuts", "Physical shortcut native deletion raised; exact ownership retained or observed consumed: %s.",
+			tostring(acknowledged))
+	end
+	-- Metadata consumption remains authoritative even if a wrapper raised after
+	-- native GC; indexing that userdata or reissuing delete would be unsafe.
+	called = (called and acknowledged == true)
+		or (candidate.webview ~= nil and getmetatable(candidate.webview) == nil)
 	if called then candidate.webview = nil end
 	if called and candidate.bridge then
 		local detached, accepted = pcall(function() return candidate.bridge:setCallback(nil) end)
 		called = detached and accepted == candidate.bridge
 		if called then candidate.bridge = nil end
 	end
-	candidate.closing = false
 	if not called then
-		Logger.error("ui.physical_shortcuts", "Physical shortcut window close refused; exact native owner retained.")
+		pcall(Logger.error, "ui.physical_shortcuts", "Physical shortcut window close refused; exact native owner retained.")
+		candidate.closing = false
 		return false
 	end
+	candidate.closing = false
 	if active == candidate then active = nil end
 	return true
 end
@@ -227,7 +282,13 @@ function M.open(options)
 			on_close=function()
 				if candidate.closing then return end
 				candidate.cancelled = true
-				if not candidate.constructing and active == candidate then close(candidate) end
+				if not candidate.constructing and active == candidate then
+					if candidate.native_delete_pending then
+						candidate.native_notification = true
+						schedule_native_retirement(candidate)
+						candidate.native_notification = false
+					else close(candidate) end
+				end
 			end,
 		})
 	end)

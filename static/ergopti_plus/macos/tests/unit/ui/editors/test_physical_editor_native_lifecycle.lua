@@ -146,7 +146,10 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_eq(host.open(options),true,table.concat(c.diagnostics,' | '));c.delete=mode
      helpers.assert_eq(host.close(),false);helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
      c.bridges[1].callback({body={action='ready'}});helpers.assert_eq(c.received,0,'Closing debt cannot publish or admit page callbacks')
-     c.delete=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(c.bridges[1].callback,nil)
+     helpers.assert_eq(c.delete_calls,1,'No retry while the original native deletion remains uncertain')
+     -- Public delete may already own a fade despite its wrapper refusing.
+     -- Independent SDK retirement, not another delete attempt, acknowledges it.
+     setmetatable(c.views[1],nil);c.delete=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(c.bridges[1].callback,nil)
      helpers.assert_eq(host.open(options),true);helpers.assert_eq(c.created,2);helpers.assert_eq(host.close(),true)
     end)
    end)
@@ -180,7 +183,8 @@ local run_contract = function(helpers, load_host, load_builder)
      helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1)
      helpers.assert_true(getmetatable(c.views[1])~=nil,'Acquired candidate remains physically live before acknowledgement')
      helpers.assert_eq(host.open(options),false);helpers.assert_eq(c.created,1,'No second constructor while exact candidate cleanup refuses')
-     c.delete=nil;c.during_html=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(host.open(options),true);helpers.assert_eq(host.close(),true)
+     helpers.assert_eq(c.delete_calls,1,'No repeated native deletion before independently observed GC')
+     setmetatable(c.views[1],nil);c.delete=nil;c.during_html=nil;helpers.assert_eq(host.close(),true);helpers.assert_eq(host.open(options),true);helpers.assert_eq(host.close(),true)
     end)
    end)
   end
