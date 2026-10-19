@@ -22,6 +22,7 @@ import time
 
 import macos_owned_process as owner
 from macos_webview_binding import qualify as qualify_webview_binding
+from macos_physical_shortcuts_close import qualify as qualify_physical_shortcuts_close
 
 
 def require(condition, message):
@@ -332,6 +333,8 @@ def run(repo, app, output):
             "macos_webview_binding.py",
             "macos_webview_binding.lua",
             "macos_webview_raw_delete.lua",
+            "macos_physical_shortcuts_close.py",
+            "macos_physical_shortcuts_close.lua",
             "hs_native_bootstrap_probe.py",
             "hs_native_bootstrap.lua",
             "hs_script_scope_native.lua",
@@ -410,6 +413,16 @@ def run(repo, app, output):
             copied_app, source_root, scratch, output, version, report, unchanged
         )
         report["native_webview_binding"] = qualify_webview_binding(
+            repo,
+            executable,
+            scratch,
+            output,
+            version,
+            unchanged,
+            owned_observation,
+            owner.NativeProcessGroups(),
+        )
+        report["native_physical_shortcuts_close"] = qualify_physical_shortcuts_close(
             repo,
             executable,
             scratch,

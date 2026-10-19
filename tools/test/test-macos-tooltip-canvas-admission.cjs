@@ -163,19 +163,24 @@ const calls = [];
 const silent = { log: () => {}, error: () => {} };
 const completed = { status: 0, stdout: '', stderr: 'Ran 54 tests in 0.01s\n\nOK\n' };
 const bindingCompleted = { ...completed, stderr: 'Ran 34 tests in 0.01s\n\nOK\n' };
+const physicalCompleted = { ...completed, stderr: 'Ran 22 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
 		env: { PYTHON: 'selected-python' },
 		spawn: (...args) => {
 			calls.push(args);
-			return args[1][6] === 'macos_webview_binding_test.py' ? bindingCompleted : completed;
+			return args[1][6] === 'macos_webview_binding_test.py'
+				? bindingCompleted
+				: args[1][6] === 'macos_physical_shortcuts_close_test.py'
+					? physicalCompleted
+					: completed;
 		}
 	}),
 	0
 );
 assert.equal(calls[0][0], 'selected-python');
-assert.equal(calls.length, 2);
+assert.equal(calls.length, 3);
 assert.equal(calls[0][2].cwd, root);
 assert.deepEqual(calls[0][1], [
 	'-m',
@@ -199,6 +204,37 @@ assert.deepEqual(calls[1][1], [
 	'macos_webview_binding_test.py',
 	'-v'
 ]);
+assert.deepEqual(calls[2][1], [
+	'-m',
+	'unittest',
+	'discover',
+	'-s',
+	'tools/diagnostics',
+	'-p',
+	'macos_physical_shortcuts_close_test.py',
+	'-v'
+]);
+for (const receipt of [
+	{ ...physicalCompleted, status: 1 },
+	{ ...physicalCompleted, status: null },
+	{ ...physicalCompleted, error: new Error('Physical interpreter unavailable') },
+	{ ...physicalCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
+	{ ...physicalCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK\n' },
+	{ ...physicalCompleted, stderr: 'Ran 22 tests in 0.01s\n\nOK (skipped=1)\n' }
+]) {
+	assert.equal(
+		run({
+			...silent,
+			spawn: (_python, args) =>
+				args[6] === 'macos_physical_shortcuts_close_test.py'
+					? receipt
+					: args[6] === 'macos_webview_binding_test.py'
+						? bindingCompleted
+						: completed
+		}),
+		1
+	);
+}
 for (const receipt of [
 	{ ...completed, status: 1 },
 	{ ...completed, status: null },
@@ -253,6 +289,9 @@ for (const file of [
 	'tools/diagnostics/macos_webview_binding.py',
 	'tools/diagnostics/macos_webview_binding_test.py',
 	'tools/diagnostics/macos_webview_raw_delete.lua',
+	'tools/diagnostics/macos_physical_shortcuts_close.lua',
+	'tools/diagnostics/macos_physical_shortcuts_close.py',
+	'tools/diagnostics/macos_physical_shortcuts_close_test.py',
 	'tools/diagnostics/macos_owned_process.py',
 	'tools/test/run-macos-tooltip-canvas-tests.cjs'
 ]) {
