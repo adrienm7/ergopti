@@ -1330,10 +1330,6 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		else if IsSet(LLM_Bridge_FeedCharForPrefix)
 			LLM_Bridge_FeedCharForPrefix(Char)
 		HotPath_LogIfSlow("LLM.PrefixMirror", MirrorStarted)
-		if !IsCategoryGated("Hotstrings") {
-			_PrefixRecordMagicOutcome(Char, "disabled")
-			return
-		}
 		; The pass-through character is already on screen. Before it can participate
 		; in a match, prove that the screen target still owns the buffered prefix. This
 		; guard sits before the main dispatch try, so contain it independently: an
@@ -1395,6 +1391,13 @@ _OnPrefixChar(IH, Char, PrefeedFn := unset, ContextFn := unset) {
 		Critical("On")
 		if ContextReleased && !(IsSet(ContextFn) ? ContextFn.Call() : _PrefixEnsureInputContext())
 			return
+		; The Hotstrings gate comes after the wrap: wrapping a selection is a
+		; shortcut of its own, and with an OS layout it worked only while
+		; Hotstrings was also on (selection-wrap-without-hotstrings).
+		if !IsCategoryGated("Hotstrings") {
+			_PrefixRecordMagicOutcome(Char, "disabled")
+			return
+		}
 		try {
 			; Serialize the whole match -> fire -> buffer-sync region: Critical makes
 			; this keystroke uninterruptible, so AHK cannot start the NEXT physical
