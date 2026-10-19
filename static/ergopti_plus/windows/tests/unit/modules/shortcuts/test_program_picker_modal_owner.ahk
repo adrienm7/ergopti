@@ -12,7 +12,7 @@ _PPMO_Click(Hwnd, ClassNN) {
 
 _PPMO_Release(State) {
 	; The unique label also finds a window when caption admission itself failed.
-	for Hwnd in WinGetList("ahk_pid " . A_Pid) {
+	for Hwnd in WinGetList("ahk_pid " . DriverPid) {
 		if InStr(WinGetTitle("ahk_id " . Hwnd), State["label"], true)
 			PostMessage(0x10, 0, 0, , "ahk_id " . Hwnd)
 	}
@@ -30,7 +30,7 @@ _PPMO_Pump(State) {
 		if A_TickCount - State["started"] > 5000
 			throw Error("The real native program picker exceeded its fixture deadline")
 		if State["phase"] == "open" {
-			for Hwnd in WinGetList("ahk_pid " . A_Pid) {
+			for Hwnd in WinGetList("ahk_pid " . DriverPid) {
 				if WinGetTitle("ahk_id " . Hwnd) != State["title"] || WinGetClass("ahk_id " . Hwnd) == "#32770"
 					continue
 				State["picker"] := Hwnd
@@ -42,7 +42,7 @@ _PPMO_Pump(State) {
 				return
 			}
 		} else if State["phase"] == "input" {
-			for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . A_Pid) {
+			for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . DriverPid) {
 				if WinGetTitle("ahk_id " . Hwnd) != State["title"]
 					continue
 				State["input"] := Hwnd

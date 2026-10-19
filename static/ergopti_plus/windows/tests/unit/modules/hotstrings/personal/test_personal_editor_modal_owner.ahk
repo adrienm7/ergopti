@@ -1,7 +1,8 @@
 ﻿; tests/unit/modules/hotstrings/personal/test_personal_editor_modal_owner.ahk
 
-; Real InputBox/MsgBox return into the production section handlers. Only their
-; native controls are automated: source admission, writes and Close are real.
+; Real InputBox dialogs, and the suite's MsgBox stub answered by a responder,
+; return into the production section handlers. Only the replies are automated:
+; source admission, writes and Close are real.
 
 _PEMO_OnClose(Window, Epoch, *) {
 	return _OnEditorClose(Window, Epoch)
@@ -50,12 +51,67 @@ _PEMO_Respond(State, Hwnd, Kind) {
 	PostMessage(0x111, Kind == "delete" ? 6 : 1, 0, , "ahk_id " . Hwnd)
 }
 
+; The successor event that happens while the modal is open. Returns false while
+; a posted Close is still pending, so the pump retries on its next tick; Wait
+; lets a synchronous caller (the MsgBox responder) pump messages until it lands.
+; The editor window is hidden, which WinTitle lookups skip: its Close goes
+; straight to the HWND.
+_PEMO_Act(State, Wait) {
+	global _PersonalEditorGui, _PersonalEditorSection, _PersonalEditorSessionEpoch
+	Old := State["old"]
+	if State["mode"] == "closed" || State["mode"] == "reopened" {
+		if !State["close_posted"] {
+			State["close_posted"] := true
+			AssertTrue(DllCall("PostMessage", "Ptr", Old.Window.Hwnd, "UInt", 0x10, "Ptr", 0, "Ptr", 0),
+				"the editor window must receive its real WM_CLOSE")
+		}
+		while Wait && _PersonalEditorGui == Old.Window {
+			if A_TickCount - State["started"] > 5000
+				throw Error("The real editor Close did not run within its fixture deadline")
+			Sleep(10)
+		}
+		if _PersonalEditorGui == Old.Window
+			return false
+		AssertTrue(_PersonalEditorSessionEpoch > Old.Source["epoch"], "the real Close event must revoke its epoch")
+		State["closed"] := true
+		if State["mode"] == "reopened" {
+			State["successor"] := _PEMO_Open(State, "beta")
+			State["successor_json"] := KL_JsonEncode(State["successor"].Data)
+		}
+	} else if State["mode"] == "section" {
+		; The native dropdown's published selected-section state changed
+		; while its owner remained live; the old confirmation still names alpha.
+		Old.Drop.Choose(2)
+		_PersonalEditorSection := "beta"
+	} else if State["mode"] == "external" {
+		State["expected_source"] .= "# An independent file edit won during the modal.`n"
+		AssertTrue(FSWriteDurable(State["path"], State["expected_source"]))
+	}
+	State["acted"] := true
+	return true
+}
+
+; The suite replaces MsgBox with a non-blocking stub (test_framework.ahk), so a
+; confirmation never reaches a native window. The responder stands in for the
+; user at the moment the production handler asks, with the same successor
+; events as the native InputBox cases.
+_PEMO_Confirm(State, Text, Title, Options) {
+	AssertEqual(WindowTitle(t("editor.hotstrings.title_confirm")), Title, "the production confirmation caption")
+	AssertTrue(InStr(Options, "YesNo") > 0, "the production confirmation offers Yes and No")
+	State["dialogs"] += 1
+	if State["mode"] == "cancel"
+		return "No"
+	if State["mode"] != "live"
+		_PEMO_Act(State, true)
+	return "Yes"
+}
+
 _PEMO_Pump(State) {
 	global _PersonalEditorGui, _PersonalEditorSection, _PersonalEditorSessionEpoch
 	try {
 		if A_TickCount - State["started"] > 5000
 			throw Error("The real editor modal exceeded its fixture deadline")
-		for Hwnd in WinGetList("ahk_pid " . A_Pid) {
+		for Hwnd in WinGetList("ahk_pid " . DriverPid) {
 			if WinGetClass("ahk_id " . Hwnd) != "#32770"
 				continue
 			Title := WinGetTitle("ahk_id " . Hwnd)
@@ -65,31 +121,8 @@ _PEMO_Pump(State) {
 			Target := State["boundary"] == "new-name" ? "name" : State["boundary"] == "new-description" ? "description"
 				: State["boundary"] == "rename" ? "rename" : "delete"
 			if Kind == Target && !State["acted"] && State["mode"] != "live" && State["mode"] != "cancel" {
-				Old := State["old"]
-				if State["mode"] == "closed" || State["mode"] == "reopened" {
-					if !State["close_posted"] {
-						State["close_posted"] := true
-						PostMessage(0x10, 0, 0, , "ahk_id " . Old.Window.Hwnd)
-						return
-					}
-					if _PersonalEditorGui == Old.Window
-						return
-					AssertTrue(_PersonalEditorSessionEpoch > Old.Source["epoch"], "the real Close event must revoke its epoch")
-					State["closed"] := true
-					if State["mode"] == "reopened" {
-						State["successor"] := _PEMO_Open(State, "beta")
-						State["successor_json"] := KL_JsonEncode(State["successor"].Data)
-					}
-				} else if State["mode"] == "section" {
-					; The native dropdown's published selected-section state changed
-					; while its owner remained live; the old confirmation still names alpha.
-					Old.Drop.Choose(2)
-					_PersonalEditorSection := "beta"
-				} else if State["mode"] == "external" {
-					State["expected_source"] .= "# An independent file edit won during the modal.`n"
-					AssertTrue(FSWriteDurable(State["path"], State["expected_source"]))
-				}
-				State["acted"] := true
+				if !_PEMO_Act(State, false)
+					return
 			}
 			State["seen"][Hwnd . ":" . Title] := true
 			State["dialogs"] += 1
@@ -98,7 +131,7 @@ _PEMO_Pump(State) {
 	} catch as Err {
 		State["error"] := Err
 		; A failing observation must release the real blocking dialog as well.
-		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . A_Pid) {
+		for Hwnd in WinGetList("ahk_class #32770 ahk_pid " . DriverPid) {
 			; Yes/No boxes have no cancel action, so WM_CLOSE can be ignored.
 			if DllCall("GetDlgItem", "Ptr", Hwnd, "Int", 7, "Ptr")
 				PostMessage(0x111, 7, 0, , "ahk_id " . Hwnd)
@@ -155,6 +188,8 @@ _PEMO_Case(Boundary, Mode) {
 		Original := KL_JsonEncode(Old.Data)
 		Timer := _PEMO_Pump.Bind(State)
 		State["started"] := A_TickCount
+		if Boundary == "delete-section" || Boundary == "delete-entry"
+			TestMsgBoxResponder(_PEMO_Confirm.Bind(State))
 		SetTimer(Timer, 10)
 		Result := _PEMO_Invoke(Boundary, Old)
 		SetTimer(Timer, 0)
@@ -192,6 +227,7 @@ _PEMO_Case(Boundary, Mode) {
 			AssertEqual(Original, KL_JsonEncode(Old.Data), "the committed model is detached from its captured predecessor")
 		}
 	} finally {
+		TestMsgBoxResponder("")
 		if IsObject(Timer)
 			SetTimer(Timer, 0)
 		for Owned in State["windows"] {
