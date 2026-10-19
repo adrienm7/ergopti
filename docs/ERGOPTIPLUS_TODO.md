@@ -3017,7 +3017,7 @@ These are software implementations; final hardware verification remains below.
       unchanged personal candidates are not backed up). Fix the global owner
       and that test together. The Linux scope suite passes under LuaJIT once
       the release-debt preimage expects the kept `[personal]` tuning
-      (d96938bc).
+      (a031fe9c).
 - [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).**
       (1) oMLX added by hand: fixed (c67d70f1fe; a pending key with the
       default address left an empty address that won over the catalogue).
@@ -3033,7 +3033,7 @@ These are software implementations; final hardware verification remains below.
       (many in that log) spends a call. macOS now reports a 403/429 with
       `X-RateLimit-Remaining: 0` as an exhausted rate limit with its UTC reset
       time (auto_check.lua, unit case), and keeps the list ETag with a reduced
-      copy across restarts (`check_state.list_storage_key`, f09d51dc). Still
+      copy across restarts (`check_state.list_storage_key`, 1d341534). Still
       to do: Linux keeps the ETag in ~/.cache but its curl
       adapter exposes no response headers for the reset time; Windows keeps
       both in memory only (`_UpdaterFetchCache`).
