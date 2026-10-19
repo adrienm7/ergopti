@@ -1046,13 +1046,15 @@ Ergopti_OnShutdown(reason, code) {
 		if !KeyloggerFlushReady {
 			; A flush or journal handoff in progress settles on its own: the user
 			; quits again once it ends, which is no fault of the persistence.
-			if (KeyloggerFlushReason == "flush_in_progress" || KeyloggerFlushReason == "journal_busy")
+			; Braces: a one-line try would claim this else as its own clause.
+			if (KeyloggerFlushReason == "flush_in_progress" || KeyloggerFlushReason == "journal_busy") {
 				try LoggerInfo("Lifecycle",
 					"Shutdown deferred while a keylogger flush settles ({1}).", KeyloggerFlushReason)
-			else
+			} else {
 				try LoggerError("Lifecycle",
 					"Shutdown refused because keylogger persistence debt is not durable yet ({1}).",
 					KeyloggerFlushReason)
+			}
 			try KL_CancelShutdown()
 			try _Updater_DeferExitIntentRetry()
 			try _Updater_DeferRecoveryHandoffRetry()
