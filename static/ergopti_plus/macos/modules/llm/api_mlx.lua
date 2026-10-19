@@ -262,7 +262,7 @@ kill_zombie_on_mlx_port = function()
 	--      relinked binary, or a child fork whose argv was replaced).
 	-- For each candidate PID, compare its PGID against the active server's PGID;
 	-- kill -9 only if PGID differs. This preserves the legitimate server.
-	local cmd = "PIDS_AWK=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
+	local cmd = "PIDS_AWK=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'); " ..
 		"PIDS_PORT=$(lsof -ti TCP:" .. MLX_PORT .. " 2>/dev/null); " ..
 		"PIDS=$(printf '%s\\n%s\\n' \"$PIDS_AWK\" \"$PIDS_PORT\" | sort -u | grep -v '^$'); " ..
 		"[ -z \"$PIDS\" ] && echo 'none' && exit 0; " ..
