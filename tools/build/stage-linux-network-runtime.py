@@ -696,6 +696,43 @@ def recipient_base(name):
     }
 
 
+# The tray binding (platform/tray/appindicator.lua) and the libraries it pulls
+# in that are not GTK itself. The AppImage catalogue runs Ubuntu 22.04 with GTK 3
+# but without libayatana, and v1.0.3 exited there with no icon. Bundled, the
+# library shows a StatusNotifierItem when the session has a watcher and falls
+# back to an XEmbed GtkStatusIcon otherwise, which is the tray the catalogue
+# provides (stalonetray). GTK, GDK, cairo, pango and their dependencies stay the
+# recipient's: the webview windows load the recipient's GTK into the same
+# process. An exact list, so a build host that links another library fails here.
+TRAY_ROOT = "libayatana-appindicator3.so.1"
+TRAY_LIBRARIES = frozenset(
+    {
+        TRAY_ROOT,
+        "libayatana-indicator3.so.7",
+        "libayatana-ido3-0.4.so.0",
+        "libdbusmenu-glib.so.4",
+        "libdbusmenu-gtk3.so.4",
+    }
+)
+
+
+def tray_sources():
+    """Resolve the tray libraries from the build host's own dynamic linker."""
+    listing = run(["ldconfig", "-p"], env={**os.environ, "LC_ALL": "C"})
+    roots = re.findall(
+        r"^\s*" + re.escape(TRAY_ROOT) + r" \(libc6,x86-64\) => (/\S+)$", listing, re.MULTILINE
+    )
+    if len(roots) != 1:
+        raise RuntimeRefused("Tray library absent from the build host.")
+    sources = {TRAY_ROOT: regular_source(roots[0])}
+    for name, dependency in dependency_paths(run(["ldd", str(sources[TRAY_ROOT])])):
+        if name in TRAY_LIBRARIES:
+            sources[name] = regular_source(dependency)
+    if set(sources) != TRAY_LIBRARIES:
+        raise RuntimeRefused("Tray library closure differs from the reviewed list.")
+    return sources
+
+
 def copy_elf_closure(seeds, library_directory, owners):
     pending = list(seeds)
     visited = set()
@@ -794,6 +831,9 @@ def stage(appdir, catalogue, template):
                 source, prefix / "lib" / catalogue_data["archive_digest_runtime"]["soname"], owners
             )
         copy_elf_closure([*binaries, luv_source, *modules, *digest_sources], prefix / "lib", owners)
+        # Not through the closure walk: it would stage GTK with them.
+        for name, source in sorted(tray_sources().items()):
+            copy_unique(source, prefix / "lib" / name, owners)
         # The oldest supported LTS ships libproxy 0.4, whose optional plugins
         # (GNOME settings, PAC runners) load from an absolute build-host path
         # and so are absent from the image. Its built-in environment, sysconfig

@@ -318,6 +318,16 @@ the name); installed AppImages never self-update, so a rename breaks no updater.
 Action: keep the build in that container until the catalogue's LTS moves, then
 raise `GLIBC_CEILING` and the image together.
 
+The catalogue's runner has GTK 3 but no libayatana, no StatusNotifier host and
+no keyboard; its tray retry docks XEmbed icons into stalonetray. v1.0.3 held its
+"keyboard access unavailable" tray correctly but exited because the tray
+library was missing. The image therefore bundles libayatana-appindicator3 and
+its non-GTK libraries (`TRAY_LIBRARIES` in `stage-linux-network-runtime.py`);
+without a watcher the library falls back to an XEmbed GtkStatusIcon. The smoke
+replays that check on a host without libayatana. Action: read the catalogue's
+full log (`gh run view <id> --repo AppImage/appimage.github.io --log`) before
+trusting its "first error", which is only the first stderr line.
+
 ### project-the-drift-guard-crashes-on-this-windows-box
 
 When a cross-platform drift tool fails on Windows path/process semantics, use
