@@ -3165,7 +3165,8 @@ jobs:
           elif [ "$mode" = full ]; then
           sudo python3 "$GITHUB_WORKSPACE/tools/ci/ubuntu_apt.py" -y --no-install-recommends \
             luajit lua-luv curl binutils pkg-config libglib2.0-dev \
-            glib-networking dconf-gsettings-backend gsettings-desktop-schemas
+            glib-networking dconf-gsettings-backend gsettings-desktop-schemas \
+            libayatana-appindicator3-1
           else
               exit 1
           fi
