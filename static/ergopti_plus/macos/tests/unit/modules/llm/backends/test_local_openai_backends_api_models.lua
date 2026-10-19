@@ -156,6 +156,25 @@ helpers.describe("Local discovery: native credential admission (local-openai-bac
 		end)
 	end)
 
+	-- Issue #95: the form stores the default address as "" (apply_local_server);
+	-- with a key typed before any model, that "" won over the catalogue address
+	-- and oMLX was never probed ("base URL is empty").
+	helpers.it("a pending key with the default address probes the catalogue address (local-openai-backends)", function()
+		with_held_probe_credentials(function(api, LocalServers, world, credentials)
+			LocalServers.set_pending("omlx", { base_url = "", token = "owned-reference" })
+			local target = api.local_server_target("omlx")
+			api.detect_local_servers()
+			credentials[1].callback(true, "omlx-cleartext")
+			local probe = world.probe("omlx")
+			return {
+				target_url = { actual = target.base_url, expected = LocalServers.SERVERS.omlx.base_url },
+				probed = { actual = probe ~= nil, expected = true },
+				probe_url = { actual = probe and probe.url, expected = LocalServers.SERVERS.omlx.base_url .. "/models" },
+				probe_key = { actual = probe and probe.headers.Authorization, expected = "Bearer omlx-cleartext" },
+			}
+		end)
+	end)
+
 	helpers.it("a changed current target refuses held credentials and unchanged retry still acquires (local-openai-backends)", function()
 		with_held_probe_credentials(function(api, LocalServers, world, credentials)
 			LocalServers.set_pending("omlx", { base_url = "http://localhost:9801/v1", token = "first-reference" })
