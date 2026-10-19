@@ -3006,9 +3006,17 @@ These are software implementations; final hardware verification remains below.
       d31776170a enables the sections an editor save creates (Windows both
       editors, Linux bridge; macOS already treats them as enabled). After the
       next release, reply on the issue (the reporter must tick "metiers" once
-      on v1.0.3, or update). Open question for the maintainer: personal
-      sections have `recommended = false`, so « Restaurer les valeurs
-      conseillées » switches every personal category off.
+      on v1.0.3, or update). The maintainer then ruled that « Restaurer les
+      valeurs conseillées » must not touch personal hotstrings: 20a9858f3d
+      excludes them from the restore on the three drivers (manifest
+      `restore_exclude`, shared override planner `personal` flag). Left open:
+      the Windows global restore (Configuration menu) builds
+      `HotstringsScopeFiles(Selected)` without its mode, so it still resets
+      personal-file tuning and never writes the recommended delays; passing
+      `Mode` made test_global_config_scope expect 12 backups and see 3 (the
+      unchanged personal candidates are not backed up). Fix the global owner
+      and that test together. The Linux scope test change is unverified
+      locally (the suite cannot read layout defaults on this Windows host).
 - [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).**
       (1) oMLX added by hand: fixed (c67d70f1fe; a pending key with the
       default address left an empty address that won over the catalogue).
