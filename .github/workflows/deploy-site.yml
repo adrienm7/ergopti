@@ -5,6 +5,10 @@
 # The read-only receiver must finish before publication receives write permission.
 
 name: Deploy site
+# GitHub labels every workflow_run with the default branch (main), so a dev
+# producer used to read as a main deployment. Name the producer's branch.
+run-name: >-
+  Deploy site (${{ github.event_name == 'workflow_dispatch' && format('manual, run {0}', inputs.run_id) || github.event.workflow_run.head_branch }})
 
 on:
   workflow_run:

@@ -2056,6 +2056,9 @@ function commonSiteProblems(source) {
 const SITE_PRODUCER_CONDITION =
 	"${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}";
 
+const SITE_RUN_NAME =
+	"Deploy site (${{ github.event_name == 'workflow_dispatch' && format('manual, run {0}', inputs.run_id) || github.event.workflow_run.head_branch }})";
+
 function siteDeploymentProblems(source) {
 	const errors = [];
 	try {
@@ -2079,6 +2082,7 @@ function siteDeploymentProblems(source) {
 			},
 			'all completed source changes and exact manual run'
 		);
+		same(doc['run-name'], SITE_RUN_NAME, 'the run names its producer branch, not main');
 		same(doc.permissions, { contents: 'read', actions: 'read' }, 'read-only before preflight');
 		same(Object.keys(doc.jobs), ['preflight', 'deploy'], 'closed publication chain');
 		const pre = doc.jobs.preflight,
@@ -2416,6 +2420,11 @@ const SITE_DEPLOY_REFUSALS = [
 	],
 	['missing preflight edge', '    needs: [preflight]\n', '    needs: []\n'],
 	['forgiven preflight', '  preflight:\n', '  preflight:\n    continue-on-error: true\n'],
+	[
+		'run labelled with the default branch',
+		'  Deploy site (${{ github.event_name',
+		'  Deploy site (main ${{ github.event_name'
+	],
 	[
 		'receiver switched off',
 		" || (github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success') }}\n",
