@@ -357,4 +357,29 @@ function M.protected_call(fn, name, ...)
 	return Logger.callback(LOG, name, fn, ...)
 end
 
+
+--- Writes a streaming request only after both native file operations acknowledge it.
+--- Failed paths are retained: the pathname may have been replaced after opening,
+--- so it cannot authorize deleting a concurrent file. Always close before reporting
+--- a write failure, including one raised by the native file boundary.
+--- @param path string Temporary payload pathname.
+--- @param content string Encoded JSON request.
+--- @return boolean written True only after exact write and close acknowledgements.
+--- @return string|nil detail Local I/O failure, before any transport is allocated.
+function M.write_stream_payload(path, content)
+	local opened, file, open_error = pcall(io.open, path, "w")
+	if not opened or not file then
+		return false, tostring(opened and open_error or file)
+	end
+	local wrote, written, write_error = pcall(function() return file:write(content) end)
+	local closed, close_result, close_error = pcall(function() return file:close() end)
+	if not wrote or written ~= file then
+		return false, "payload write failed: " .. tostring(wrote and write_error or written)
+	end
+	if not closed or close_result ~= true then
+		return false, "payload close failed: " .. tostring(closed and close_error or close_result)
+	end
+	return true
+end
+
 return M

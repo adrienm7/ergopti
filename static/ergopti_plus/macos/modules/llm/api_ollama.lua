@@ -1688,14 +1688,12 @@ local function post_and_parse_streaming(model_name, system_prompt, full_text, ta
 	local _tmp_base = os.tmpname()
 	local tmp_path = _tmp_base .. "_ollama_stream.json"
 	os.remove(_tmp_base)
-	local fh = io.open(tmp_path, "w")
-	if not fh then
-		Logger.error(LOG, "Failed to open temp file '%s' for Ollama streaming payload.", tmp_path)
+	local written, write_error = ApiCommon.write_stream_payload(tmp_path, encoded)
+	if not written then
+		Logger.error(LOG, "Failed to write temp file '%s' for Ollama streaming payload: %s.", tmp_path, tostring(write_error))
 		if type(on_fail) == "function" then ApiCommon.protected_call(on_fail, "on_fail") end
 		return
 	end
-	fh:write(encoded)
-	fh:close()
 
 	local accumulated = ""
 	local line_buf    = ""
