@@ -46,6 +46,8 @@ graph TD
         LINUX_clipboard["Clipboard.lua"]
         LINUX_crypto["Crypto.lua"]
         LINUX_curl_http_client["CurlHttpClient.lua"]
+        LINUX_desktop_opener["DesktopOpener.lua"]
+        LINUX_desktop_opener_worker["DesktopOpenerWorker.lua"]
         LINUX_evdev_reader["EvdevReader.lua"]
         LINUX_event_loop["EventLoop.lua"]
         LINUX_file_digest["FileDigest.lua"]

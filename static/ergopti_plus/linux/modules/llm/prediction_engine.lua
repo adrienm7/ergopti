@@ -81,7 +81,8 @@ local _runtime_closed = false
 local _runtime_owner, _runtime_request = nil, nil
 local retire_runtime_request, stop_runtime_app
 local _request_epoch = 0
-local Collision = { navigation = NavigationSettings.capture_collision_configuration }
+local Collision = { navigation = NavigationSettings.capture_collision_configuration,
+	api_selections = setmetatable({}, { __mode = "k" }) }
 
 -- Injected by init(): whether the daemon is paused, and how a manual request
 -- tells the user it was refused (a desktop notification in the daemon).
@@ -2776,7 +2777,30 @@ local function accept_candidate(index, complete)
 			and _request_epoch == epoch and _suggestion_context == context
 			and _suggestions[tonumber(index)] == candidate
 	end
-	if global_privacy_blocks() then
+	local continuation_current, continuation_context, continuation_apply
+	if not candidate.on_accept and not candidate.replaces_selection then
+		-- These are original request identities, captured before privacy/focus
+		-- callbacks can cancel, pause or publish a successor offer.
+		local context, epoch, runtime, engine, apply, paused = _suggestion_context, _request_epoch,
+			_runtime_owner, _engine, _apply_prediction, _is_paused
+		local focus = context and context.focus
+		local function retained()
+			return not _runtime_closed and _scope_owner == nil and epoch == _request_epoch
+				and rawequal(_runtime_owner, runtime) and rawequal(_engine, engine)
+				and rawequal(_suggestion_context, context) and context ~= nil and context.focus == focus
+				and rawequal(_suggestions[tonumber(index)], candidate) and _apply_prediction == apply and _is_paused == paused
+		end
+		continuation_current = function()
+			if not retained() then return false end
+			local checked, is_paused = pcall(paused)
+			return checked and is_paused == false and retained()
+		end
+		continuation_context, continuation_apply = context, apply
+		if not continuation_current() then return false end
+	end
+	local blocked = global_privacy_blocks()
+	if continuation_current and not continuation_current() then return false end
+	if blocked then
 		Logger.info(LOG, "AI offer withdrawn: global text privacy no longer admits output.")
 		if current() then M.dismiss() end
 		return false
@@ -2832,14 +2856,16 @@ local function accept_candidate(index, complete)
 		end
 		return completed ~= false
 	else
-		if type(_apply_prediction) ~= "function" then return false end
-		local focus = context and context.focus or ""
-		if focus == "" or current_focus() ~= focus or not current() then
+		if type(continuation_apply) ~= "function" then return false end
+		local focus = continuation_context.focus or ""
+		local observed = current_focus()
+		if not continuation_current() then return false end
+		if focus == "" or observed ~= focus then
 			Logger.info(LOG, "Prediction not inserted: the native typing target is unavailable or changed.")
 			if current() then M.dismiss() end
 			return false
 		end
-		ok, committed = pcall(_apply_prediction, candidate, context)
+		ok, committed = pcall(continuation_apply, candidate, continuation_context, continuation_current)
 	end
 	if not ok or committed ~= true then
 		Logger.error(LOG, "Prediction acceptance failed: %s", ok and "commit refused" or tostring(committed))
@@ -2849,6 +2875,7 @@ local function accept_candidate(index, complete)
 		local observed, observe_err = pcall(output, candidate.to_type, context)
 		if not observed then Logger.warn(LOG, "Prediction output observer failed: %s", tostring(observe_err)) end
 	end
+	if continuation_current and not continuation_current() then complete(true); return true end
 	if not current() then complete(true); return true end
 	local retired_epoch = close_accepted_offer()
 	-- The accepted text is not asked about again until the user types.
@@ -3459,6 +3486,85 @@ function M.set_backend(kind, admit)
 	if require("infra.llm_preferences").set_many({ [BACKEND_KEY] = kind }, nil, current) ~= true
 		or not current() then return false end
 	Logger.info(LOG, "Prediction backend set to '%s'.", kind)
+	return true
+end
+
+--- Revalidates one private API publication without exposing its configuration gate.
+--- @param receipt table Opaque API selection receipt.
+--- @param source_current function|nil Exact private source check inside the runtime bracket.
+--- @return boolean current
+function M.api_selection_is_current(receipt, source_current)
+	local held = type(receipt) == "table" and Collision.api_selections[receipt] or nil
+	if not held then return false end
+	local expected_owner
+	if not held.published then expected_owner = held.owner end
+	if _runtime_closed or _scope_owner ~= expected_owner or held.revision ~= _enable_generation
+		or held.epoch ~= _runtime_app_epoch then return false end
+	local paused_ok, paused = pcall(_is_paused)
+	local paths = require("infra.config_paths")
+	local path_ok, path = pcall(paths.config, "config.toml")
+	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
+	local final_path_ok, final_path = pcall(paths.config, "config.toml")
+	local source_ok, source_live = true, true
+	if source_current ~= nil then
+		if type(source_current) ~= "function" then return false end
+		source_ok, source_live = pcall(source_current)
+	end
+	return source_ok and source_live == true and paused_ok and paused == false and path_ok and final_path_ok and path == held.path and final_path == held.path
+		and loaded and type(values) == "table" and type(source) == "table" and values[BACKEND_KEY] == "api"
+		and source.status == held.source.status and source.content == held.source.content
+		and Collision.api_selections[receipt] == held and not _runtime_closed and _scope_owner == expected_owner
+		and held.revision == _enable_generation and held.epoch == _runtime_app_epoch
+end
+
+--- Quiesces an already-selected API backend and owns its tentative private RAM.
+--- This action never writes config.toml or changes an Ollama selection.
+--- @return table|nil receipt Opaque admission; finish_api_selection must retire it.
+function M.begin_api_selection()
+	local revision, epoch = _enable_generation, _runtime_app_epoch
+	if _runtime_closed or _scope_owner then return nil end
+	local paused_ok, paused = pcall(_is_paused)
+	local paths = require("infra.config_paths")
+	local path_ok, path = pcall(paths.config, "config.toml")
+	local loaded, values, source = pcall(require("infra.llm_preferences").get_many, { BACKEND_KEY })
+	local function initial()
+		return not _runtime_closed and _scope_owner == nil and revision == _enable_generation
+			and epoch == _runtime_app_epoch
+	end
+	if not paused_ok or paused ~= false or not path_ok or not loaded or type(values) ~= "table" or type(source) ~= "table"
+		or values[BACKEND_KEY] ~= "api" or not initial() then return nil end
+	if not retire_runtime_request() or not initial() then return nil end
+	_enable_generation = _enable_generation + 1
+	revision = _enable_generation
+	if _enable_admission and _enable_admission.cancel() ~= true then return nil end
+	if not initial() then return nil end
+	M.withdraw()
+	if not initial() then return nil end
+	local owner, receipt = { unsettled = true }, {}
+	function owner.pending() return owner.unsettled end
+	if not M.acquire_configuration(owner) then return nil end
+	Collision.api_selections[receipt] = { owner = owner, source = source, path = path, revision = _enable_generation, epoch = _runtime_app_epoch }
+	local checked, current = pcall(M.api_selection_is_current, receipt)
+	if not checked or current ~= true then
+		M.finish_api_selection(receipt, false, true)
+		return nil
+	end
+	return receipt
+end
+
+--- Releases tentative API state only after an acknowledged commit or rollback.
+--- Unknown publication keeps its private gate; a caller cannot forge its token.
+--- @param receipt table Opaque original admission.
+--- @param committed boolean Whether the private entry was committed.
+--- @param settled boolean Literal true acknowledges the private publication.
+--- @return boolean acknowledged
+function M.finish_api_selection(receipt, committed, settled)
+	local held = type(receipt) == "table" and Collision.api_selections[receipt] or nil
+	if not held or held.published or _scope_owner ~= held.owner or settled ~= true
+		or type(committed) ~= "boolean" then return false end
+	held.owner.unsettled = false
+	if not M.release_configuration(held.owner) then held.owner.unsettled = true; return false end
+	if committed == true then held.published = true else Collision.api_selections[receipt] = nil end
 	return true
 end
 

@@ -263,6 +263,23 @@ end
 -- ===============================================
 -- ===============================================
 
+--- Requires a caller's live destination without making native focus atomic.
+--- Cleanup never uses this admission: the saved clipboard must still be restored.
+--- @param admission function|nil Full-phase destination check.
+--- @return boolean accepted
+local function admitted(admission)
+	if admission == nil then return true end
+	if type(admission) ~= "function" then return false end
+	local checked, current = pcall(admission)
+	return checked and current == true
+end
+
+--- Resolves the paste shortcut before a caller's final native range observation.
+--- @return integer code Exact layout key or the adapter's canonical US fallback.
+function M.paste_keycode()
+	return require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+end
+
 --- Emits Ctrl+V through the caller's uinput channel.
 ---
 --- Ctrl+V and not Shift+Insert: it is what every graphical toolkit binds, and
@@ -270,14 +287,91 @@ end
 --- anyway. There is no keystroke that works in every application, which is a
 --- property of the desktop rather than a choice available here.
 --- @param uinput table Channel exposing emit(code, value) -> boolean.
+--- @param admission function|nil Full-phase destination check.
 --- @return boolean True only when the complete chord reached the wire.
-local function press_paste(uinput)
-	local key_v = require("adapters.keyboard_layout").shortcut_keycode("v", US_KEY_V)
+local function press_paste(uinput, admission)
+	local key_v = M.paste_keycode()
+	if not admitted(admission) then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_DOWN) ~= true then return false end
 	if uinput.emit(key_v, VALUE_UP) ~= true then return false end
 	if uinput.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
 	return true
+end
+
+--- Reserves reversible clipboard preparation before any desktop I/O starts.
+--- The caller retains this owner across its final native range observation.
+--- @param text string Private replacement bytes.
+--- @param sleep_ms function Existing blocking wait implementation.
+--- @param key_v integer Previously resolved paste shortcut.
+--- @param admission function Original write admission.
+--- @return table stage Explicit prepare, paste and close lifetime.
+function M.new_paste_stage(text, sleep_ms, key_v, admission)
+	assert(type(text) == "string" and text ~= "" and type(key_v) == "number", "invalid clipboard preparation")
+	local stage, b, saved = {}, nil, nil
+	local busy, revoked, restore_required, prepared = false, false, false, false
+	local function current()
+		return not revoked and admitted(admission) and not revoked
+	end
+	local function restore()
+		if busy then return false end
+		if not restore_required then return true end
+		busy = true
+		local ok, restored = pcall(write_backend_checked, b, saved)
+		busy = false
+		if ok and restored == true then restore_required, saved = false, nil end
+		return not restore_required
+	end
+	--- Revokes first; an in-flight set must unwind before restoration can run.
+	--- @return boolean settled
+	function stage.close()
+		revoked = true
+		return not busy and restore()
+	end
+	--- Prepares the saved clipboard and canonical settle delay without key output.
+	--- @return boolean ready
+	function stage.prepare()
+		if busy or revoked or prepared then return false end
+		busy = true
+		local ok, ready = pcall(function()
+			if not current() then return false end
+			b = backend()
+			if not b or not current() then return false end
+			local read_ok, bytes = read_backend_checked(b)
+			if not read_ok then return false end
+			saved = bytes
+			if not current() then return false end
+			-- A failed/throwing setter may already have changed the clipboard.
+			restore_required = true
+			if not write_backend_checked(b, text) then return false end
+			if not current() then return false end
+			if not wait_checked(sleep_ms, SETTLE_MS) then return false end
+			return current()
+		end)
+		busy = false
+		prepared = ok and ready == true and not revoked
+		if not prepared then stage.close() end
+		return prepared
+	end
+	--- Pastes already-prepared bytes without a new lookup, write or settle delay.
+	--- @param channel table Checked short output transaction.
+	--- @return boolean issued
+	function stage.paste(channel)
+		if busy or revoked or not prepared then return false end
+		busy = true
+		local ok, issued = pcall(function()
+			if not current() then return false end
+			if channel.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_DOWN) ~= true then return false end
+			if not current() then return false end
+			if channel.emit(key_v, VALUE_DOWN) ~= true then return false end
+			if channel.emit(key_v, VALUE_UP) ~= true then return false end
+			if channel.emit(EvdevCodes.KEY_LEFTCTRL, VALUE_UP) ~= true then return false end
+			return wait_checked(sleep_ms, RESTORE_DELAY_MS)
+		end)
+		busy = false
+		return ok and issued == true
+	end
+	return stage
 end
 
 --- Delivers text by clipboard: save, set, paste, restore.
@@ -288,8 +382,10 @@ end
 --- @param text string Text to deliver.
 --- @param uinput table Channel exposing emit(code, value).
 --- @param sleep_ms function Blocking sleep, injected so this module owns no timer.
+--- @param admission function|nil Rechecks the retained destination after blocking phases.
 --- @return boolean True when the paste was issued.
-function M.paste_text(text, uinput, sleep_ms)
+--- @return string|nil Fixed failure reason when clipboard restoration was refused.
+function M.paste_text(text, uinput, sleep_ms, admission)
 	if type(text) ~= "string" or text == "" then return false end
 	if type(uinput) ~= "table" or type(uinput.emit) ~= "function" then
 		Logger.error(LOG, "paste_text(): no uinput channel to press the paste chord with.")
@@ -303,6 +399,7 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
+	if not admitted(admission) then return false end
 	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
 	if not snapshot_ok then
 		Logger.error(LOG, "paste_text(): could not snapshot the clipboard via %s — %s.",
@@ -310,16 +407,23 @@ function M.paste_text(text, uinput, sleep_ms)
 		return false
 	end
 
+	if not admitted(admission) then return false end
 	if not write_backend_checked(b, text) then
+		-- A failed launcher may already have transferred clipboard ownership.
+		local restored = write_backend_checked(b, saved)
 		Logger.error(LOG, "paste_text(): could not set the clipboard via %s.", b.name)
+		if not restored then return false, "clipboard restoration failed" end
 		return false
 	end
 
 	local paste_ok, issued = pcall(function()
+		if not admitted(admission) then return false end
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
-		if not press_paste(uinput) then return false end
+		-- The shortcut lookup may query the layout, so validate after it and
+		-- immediately before Ctrl DOWN, not merely before the settle delay.
+		if not press_paste(uinput, admission) then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
-		return true
+		return admitted(admission)
 	end)
 
 	-- Restored even when it was empty: writing "" back is what leaves the
@@ -327,10 +431,12 @@ function M.paste_text(text, uinput, sleep_ms)
 	-- would leave our replacement sitting there.
 	if not write_backend_checked(b, saved) then
 		Logger.warn(LOG, "paste_text(): the previous clipboard content could not be restored.")
-		return false
+		return false, "clipboard restoration failed"
 	end
 	if not paste_ok or not issued then
-		Logger.error(LOG, "paste_text(): checked paste chord emission failed.")
+		-- An admitted transaction distinguishes expected destination retirement
+		-- from real wire failures after cleanup; only it should notify errors.
+		if admission == nil then Logger.error(LOG, "paste_text(): checked paste chord emission failed.") end
 		return false
 	end
 
@@ -414,6 +520,7 @@ function M.read_selection_uri_list(emit_combo, sleep_ms)
 	-- A text sentinel first, as copy_selection does: files copied earlier
 	-- would otherwise still answer the uri-list read when nothing is selected.
 	if not write_backend_checked(b, "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__") then
+		if not write_backend_checked(b, saved) then return false, "", "clipboard_restore_failed" end
 		return false, "", "clipboard_probe_write_failed"
 	end
 	local copy_ok, copied = pcall(emit_combo, "ctrl+c")

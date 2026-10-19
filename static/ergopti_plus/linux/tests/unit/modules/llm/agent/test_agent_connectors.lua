@@ -36,11 +36,23 @@ local function with_connectors(opts, body)
 	package.loaded["modules.llm.agent_connectors"] = nil
 	local Connectors = require("modules.llm.agent_connectors")
 	local world = { runs = {}, written = {}, removed = {}, listed = 0, outcomes = {} }
-	Connectors._set_deps_for_test({
+	local boundaries = {
 		run = function(executable, args, options, callback)
+			local settled, listeners = false, {}
+			local operation = { started = true }
+			local function acknowledge()
+				settled = true
+				for _, listener in ipairs(listeners) do listener() end
+			end
+			function operation:is_settled() return settled end
+			function operation:on_settled(listener)
+				if settled then listener() else listeners[#listeners + 1] = listener end
+				return true
+			end
+			function operation:cancel() acknowledge(); return true end
 			world.runs[#world.runs + 1] = { executable = executable, args = args, timeout_ms = options.timeout_ms,
-				callback = callback }
-			return { cancel = function() end }
+				callback = function(result) settled = true; callback(result); acknowledge() end }
+			return operation
 		end,
 		has_command = function(name) return name == "xdg-email" and opts.has_xdg_email == true end,
 		private_dir = function() return PRIVATE_DIR end,
@@ -61,9 +73,13 @@ local function with_connectors(opts, body)
 			return opts.tools or {}
 		end,
 		clock = function() return world.clock or 0 end,
-	})
+	}
+	boundaries.run_tool = boundaries.run
+	Connectors._set_deps_for_test(boundaries)
 	local function done(ok, reason) world.outcomes[#world.outcomes + 1] = { ok = ok, reason = reason } end
 	local ok, err = pcall(body, Connectors, world, done)
+	Connectors.shutdown()
+	for _, run in ipairs(world.runs) do run.callback({ ok = false, code = -1 }) end
 	Connectors._set_deps_for_test(nil)
 	package.loaded["modules.llm.agent_connectors"] = previous
 	if not ok then error(err, 0) end
@@ -94,9 +110,11 @@ helpers.describe("AI agent connectors: one program per action, never a shell", f
 			Connectors.run(cfg, { type = "reminder", title = "Rappeler Paul", due = "2026-10-02T09:00" }, done)
 			helpers.assert_eq(world.written[1].path, PRIVATE_DIR .. "/task.ics")
 			helpers.assert_contains(world.written[1].content, "BEGIN:VTODO")
+			world.runs[1].callback({ ok = true, code = 0 }) -- The first calendar has read its input.
 			Connectors.run(cfg, { type = "reminder", title = "Encore" }, done)
 			helpers.assert_eq(table.concat(world.removed, "|"), PRIVATE_DIR .. "/task.ics|" .. PRIVATE_DIR,
 				"the first file and its folder go when the second is written")
+			world.runs[2].callback({ ok = true, code = 0 })
 			Connectors.cleanup()
 			helpers.assert_eq(#world.removed, 4, "the second goes at stop")
 		end)

@@ -39,9 +39,8 @@ end
 -- The whole-second clock the daemon uses without luv, advanced only by the
 -- soak below, so delayed start-up work (the updater's boot delay, the tray's
 -- periodic refresh) runs within a bounded, deterministic time.
-package.preload["luv"] = function() error("the start-up scenarios run the daemon without luv") end
--- Removing luv also removes real owned HTTP dispatch. Control that independent
--- OS edge with typed ordinary listener refusal while retaining production policy.
+-- Control discovery independently with typed ordinary listener refusal while
+-- retaining production policy and native signal ownership.
 -- The real HTTP adapter and errors remain observable for every unrelated owner.
 package.preload["adapters.http_client"] = function()
 	return require("tests.support.owned_http_fixture").local_discovery(dofile("adapters/http_client.lua"))
@@ -53,6 +52,16 @@ os.time = function(date)
 	if date ~= nil then return system_time(date) end
 	return clock_seconds
 end
+
+-- Only Monotonic captures the deliberately degraded clock. Restore the native
+-- runtime before Main loads: signals and their close acknowledgments are real.
+local previous_luv, previous_preload = package.loaded.luv, package.preload.luv
+package.loaded.luv = nil
+package.preload.luv = function() error("the scripted clock selects the coarse source") end
+local clock_loaded, coarse_clock = pcall(require, "infra.monotonic")
+package.loaded.luv, package.preload.luv = previous_luv, previous_preload
+assert(clock_loaded, coarse_clock)
+assert(coarse_clock.backend() == "os.time" and not coarse_clock.has_hires(), "expected real coarse clock")
 
 
 
@@ -227,15 +236,34 @@ local SOAK_SECONDS = 30
 package.preload["adapters.event_loop"] = function()
 	-- The real deferred queue: start-up schedules work on it.
 	local adapter = dofile("adapters/event_loop.lua")
+	local function settle_metrics()
+		local uv, collector = require("luv"), require("modules.keylogger.keylogger")
+		if not collector.has_flush_debt() then return end
+		record("FACT", "metrics_pending_before_pump=" .. tostring(collector.is_flush_pending()))
+		local deadline = uv.hrtime() + require("infra.timings").ms("keylogger", "sqlite_operation_timeout_ms") * 1e6
+		-- Virtual seconds must not age a real SQLite child before its stdin and
+		-- COMMIT callbacks have had a native loop turn. Its deadline is unchanged.
+		repeat
+			uv.run("nowait")
+			collector.pump_flush()
+			if not collector.has_flush_debt() then break end
+			assert(uv.hrtime() < deadline, "metrics native acknowledgement exceeded its canonical deadline")
+			uv.sleep(1)
+		until false
+		assert(collector.get_flush_status().committed == true, "expected a real SQLite COMMIT")
+		record("FACT", "metrics_native_commit=true")
+	end
 	local function soak(loop)
 		for _ = 1, SOAK_SECONDS do
 			clock_seconds = clock_seconds + 1
 			if type(loop.onIdle) == "function" then loop.onIdle() end
 			if type(loop.onPeriodic) == "function" then loop.onPeriodic() end
 			adapter._run_idle_tick()
+			settle_metrics()
 		end
 	end
-	adapter.run = function(loop)
+	local native_run = adapter.run
+	local function play(loop)
 		adapter._run_idle_tick()
 		soak(loop)
 		if ACTION == "restore_recommended" then
@@ -299,9 +327,38 @@ package.preload["adapters.event_loop"] = function()
 		if ok_nav then for _ in pairs(layer) do bindings = bindings + 1 end end
 		record("FACT", "nav_layer_bindings=" .. bindings)
 		record("FACT", "nav_layer_keys=" .. layer_keys)
-		record("DONE", ACTION)
 	end
+	adapter.run = function(loop)
+		local uv, signals = require("luv"), require("infra.signal_handlers")
+		local active_signals = 0
+		uv.walk(function(handle)
+			if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then
+				active_signals = active_signals + 1
+			end
+		end)
+		assert(not signals.is_settled() and active_signals == 3, "expected real native signal ownership")
+		play(loop)
+		-- The scripted loop cannot acknowledge libuv close callbacks by returning.
+		-- Deliver the real terminal signal, then let the actual loop retire every
+		-- owner through Main's unchanged shutdown coordinator before returning.
+		if not signals.is_settled() then
+			local listening = false
+			uv.walk(function(handle)
+				if uv.handle_get_type(handle) == "signal" and uv.is_active(handle) then listening = true end
+			end)
+			if listening then assert(uv.kill(uv.os_getpid(), "sigterm") == 0, "could not request native shutdown") end
+			native_run(loop)
+		end
+		assert(signals.is_settled(), "native signal close acknowledgments remain pending")
+		local retained_signals = 0
+		uv.walk(function(handle)
+			if uv.handle_get_type(handle) == "signal" then retained_signals = retained_signals + 1 end
+		end)
+		assert(retained_signals == 0, "native signal handles survived clean shutdown")
+	end
+
 	return adapter
 end
 
 dofile("ergopti_hotstrings.lua")
+record("DONE", ACTION)

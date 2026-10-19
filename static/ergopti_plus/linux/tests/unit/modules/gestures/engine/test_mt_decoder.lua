@@ -381,3 +381,129 @@ helpers.describe("mt decoder: what must not go wrong", function()
 	end)
 
 end)
+
+helpers.describe("mt decoder: lost queue recovery", function()
+	local function dropped(decoder)
+		decoder:feed({ type = EV_SYN, code = SYN_DROPPED, value = 0 })
+	end
+	local function report(decoder)
+		return decoder:feed({ type = EV_SYN, code = SYN_REPORT, value = 0 })
+	end
+	local function partial_start(decoder)
+		feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, 101 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 100 },
+			{ EV_ABS, Decoder.ABS_MT_POSITION_Y, 100 },
+			{ EV_KEY, BTN_TOOL[3], 1 }, { EV_KEY, BTN_TOUCH, 1 },
+		})
+	end
+
+	helpers.it("mt-drop-recovery: ignores a stale count and lift in the discarded packet", function()
+		local decoder = Decoder.new()
+		partial_start(decoder); report(decoder); dropped(decoder)
+		local result = feed_all(decoder, {
+			{ EV_KEY, BTN_TOOL[3], 1 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "discarded queue contents cannot dispatch a tap")
+		helpers.assert_eq(decoder:peak_fingers(), 0)
+	end)
+
+	helpers.it("mt-drop-recovery: cannot borrow a contact start from the discarded packet", function()
+		local decoder = Decoder.new()
+		dropped(decoder); partial_start(decoder); report(decoder)
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_POSITION_Y, 800 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_ABS, Decoder.ABS_MT_TRACKING_ID, -1 },
+			{ EV_KEY, BTN_TOOL[3], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "invalid slot coordinates cannot start a later swipe")
+	end)
+
+	helpers.it("mt-drop-recovery: count changes of fingers still held do not become new taps", function()
+		local decoder = Decoder.new()
+		partial_start(decoder); report(decoder); dropped(decoder); report(decoder)
+		local result = feed_all(decoder, {
+			-- One of three held fingers lifts. BTN_TOUCH stays down in the kernel,
+			-- so no fresh BTN_TOUCH DOWN accompanies the count's three-to-two edge.
+			{ EV_KEY, BTN_TOOL[3], 0 }, { EV_KEY, BTN_TOOL[2], 1 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_KEY, BTN_TOOL[2], 0 }, { EV_KEY, BTN_TOOL[1], 1 }, { EV_SYN, SYN_REPORT, 0 },
+			{ EV_KEY, BTN_TOOL[1], 0 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "a finger-count edge without an observed start owns no gesture")
+	end)
+
+	helpers.it("mt-drop-recovery: a release and old positions cannot invent an observed start", function()
+		local decoder = Decoder.new()
+		partial_start(decoder); report(decoder); dropped(decoder); report(decoder)
+		local result = feed_all(decoder, {
+			{ EV_ABS, Decoder.ABS_MT_POSITION_X, 900 }, { EV_ABS, Decoder.ABS_MT_POSITION_Y, 900 },
+			{ EV_KEY, BTN_TOOL[2], 1 }, { EV_KEY, BTN_TOUCH, 0 },
+			{ EV_SYN, SYN_REPORT, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		})
+		helpers.assert_nil(result, "reports alone cannot initialize the gesture's start timestamp")
+	end)
+
+	for _, motion in ipairs({ { name = "tap", dx = 0, dy = 0 }, { name = "swipe", dx = 0, dy = -400 } }) do
+		helpers.it("mt-drop-recovery: immediately accepts the first fresh " .. motion.name, function()
+			local decoder = Decoder.new()
+			dropped(decoder); report(decoder)
+			local result = feed_all(decoder, gesture_events(3, motion.dx, motion.dy))
+			helpers.assert_true(result ~= nil, "no extra gesture or idle timeout is required")
+			helpers.assert_eq(result.fingers, 3)
+			helpers.assert_eq(result.tap, motion.name == "tap")
+			helpers.assert_eq(result.direction, motion.name == "swipe" and "up" or nil)
+		end)
+	end
+
+	helpers.it("mt-drop-recovery: a second loss and explicit reset cannot expose a discarded packet", function()
+		local decoder = Decoder.new()
+		dropped(decoder); partial_start(decoder); dropped(decoder); decoder:reset()
+		helpers.assert_nil(feed_all(decoder, {
+			{ EV_KEY, BTN_TOOL[3], 1 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 },
+		}))
+		local result = feed_all(decoder, gesture_events(2, 400, 0))
+		helpers.assert_true(result ~= nil)
+		helpers.assert_eq(result.fingers, 2); helpers.assert_eq(result.direction, "right")
+	end)
+
+	helpers.it("mt-drop-recovery: retains packet loss across actual binary Reader drain calls", function()
+		local saved = {}; for name, value in pairs(package.loaded) do saved[name] = value end
+		local reader = helpers.load_module("adapters.evdev_reader")
+		local codec = require("infra.input_event")
+		local pending, cursor, closed = {}, 1, 0
+		reader._set_backend({
+			open = function() return 123 end,
+			read = function(_, count)
+				local bytes = pending[cursor]
+				if not bytes then return nil, "would_block" end
+				helpers.assert_eq(#bytes, count); cursor = cursor + 1; return bytes
+			end,
+			close = function() closed = closed + 1; return true end,
+		})
+		local decoder, fired = Decoder.new(), {}
+		local function enqueue(events)
+			for _, event in ipairs(events) do
+				pending[#pending + 1] = codec.encode(event[1], event[2], event[3], codec.native_size())
+			end
+		end
+		local function drain()
+			return reader.drain(function(event)
+				local result = decoder:feed(event)
+				if result then fired[#fired + 1] = result end
+			end, reader.TOUCHPAD)
+		end
+		local ok, detail = xpcall(function()
+			helpers.assert_eq(reader.open("/controlled/binary-touchpad", reader.TOUCHPAD), true)
+			enqueue({ { EV_SYN, SYN_DROPPED, 0 } }); helpers.assert_eq(drain(), 1)
+			enqueue({ { EV_KEY, BTN_TOOL[3], 1 }, { EV_KEY, BTN_TOUCH, 0 }, { EV_SYN, SYN_REPORT, 0 } })
+			helpers.assert_eq(drain(), 3); helpers.assert_eq(#fired, 0)
+			enqueue(gesture_events(3, 0, -400)); drain()
+			helpers.assert_eq(#fired, 1); helpers.assert_eq(fired[1].direction, "up")
+			helpers.assert_eq(reader.close(reader.TOUCHPAD), true); helpers.assert_eq(closed, 1)
+		end, debug.traceback)
+		reader._reset_backend()
+		for name in pairs(package.loaded) do if saved[name] == nil then package.loaded[name] = nil end end
+		for name, value in pairs(saved) do package.loaded[name] = value end
+		if not ok then error(detail, 0) end
+	end)
+end)

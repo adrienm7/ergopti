@@ -51,9 +51,10 @@ local FOLDER_IDS = { config_dir = true, logs_dir = true, crash_dir = true, diagn
 --- Receives the launcher exit and both closed streams without blocking GTK.
 --- @param target string A path or a URL.
 --- @param done function Receives the real native exit receipt.
+--- @param current function Exact page/action authority.
 --- @return table|nil cancellable native request
-local function xdg_open(target, done)
-	return require("adapters.shell_runner").run_async("xdg-open", { target }, { timeout_ms = require("infra.timings").ms("ui", "desktop_open_timeout_ms") }, done)
+local function xdg_open(target, done, current)
+	return require("adapters.desktop_opener").open(target, done, current)
 end
 
 --- The production side effects; a test replaces any of them.
@@ -83,7 +84,7 @@ local DEFAULT_EFFECTS = {
 	end,
 	-- No portable "select this file" exists across file managers; the folder
 	-- holding it is the next best thing
-	reveal = function(path, done) return xdg_open(path:match("^(.*)/[^/]*$") or path, done) end,
+	reveal = function(path, done, current) return xdg_open(path:match("^(.*)/[^/]*$") or path, done, current) end,
 	open = xdg_open,
 	open_url = xdg_open,
 	notify = function(title, body, level)
@@ -180,7 +181,7 @@ function M.perform(action, paths, documents, context, overrides, snapshot, owner
 			pending, child = nil, nil
 			invoke(next_step, type(receipt) == "table" and receipt or { ok = false, error = "invalid launcher receipt" })
 		end
-		local called, handle, detail = pcall(effects[kind], target, completed)
+		local called, handle, detail = pcall(effects[kind], target, completed, current)
 		if pending == ticket and current() then
 			if called and type(handle) == "table" and type(handle.cancel) == "function" then child = handle
 			else completed({ ok = false, error = tostring(called and detail or handle) }) end

@@ -126,36 +126,38 @@ end
 --- @param fn   function   Body to run inside the sandbox.
 --- @return table Capture: { path, mode, content }.
 local function with_sandbox(opts, fn)
-	opts = opts or {}
-	local real_open, real_exec, real_popen = io.open, os.execute, io.popen
-	local cap = { path = nil, mode = nil, parts = {} }
+	return require("tests.support.modules.diagnostics.crash_admission").with_admission(function()
+		opts = opts or {}
+		local real_open, real_exec, real_popen = io.open, os.execute, io.popen
+		local cap = { path = nil, mode = nil, parts = {} }
 
-	io.open = function(path, mode)
-		cap.path, cap.mode = path, mode
-		return {
-			write = function(_, s) cap.parts[#cap.parts + 1] = s; return true end,
-			close = function() return true end,
-		}
-	end
-	-- mkdir -p is a no-op here; the sandbox owns the (virtual) directory already.
-	os.execute = function() return true end
-	io.popen = function()
-		if not opts.popen_read then return nil end
-		return {
-			read  = function() return opts.popen_read end,
-			lines = function() return function() return nil end end,
-			close = function() return true end,
-		}
-	end
+		io.open = function(path, mode)
+			cap.path, cap.mode = path, mode
+			return {
+				write = function(_, s) cap.parts[#cap.parts + 1] = s; return true end,
+				close = function() return true end,
+			}
+		end
+		-- mkdir -p is a no-op here; the sandbox owns the (virtual) directory already.
+		os.execute = function() return true end
+		io.popen = function()
+			if not opts.popen_read then return nil end
+			return {
+				read  = function() return opts.popen_read end,
+				lines = function() return function() return nil end end,
+				close = function() return true end,
+			}
+		end
 
-	local ok, err = pcall(with_resolution, fn)
+		local ok, err = pcall(with_resolution, fn)
 
-	-- Restore globals unconditionally so a failing assertion cannot leak stubs.
-	io.open, os.execute, io.popen = real_open, real_exec, real_popen
-	if not ok then error(err, 0) end
+		-- Restore globals unconditionally so a failing assertion cannot leak stubs.
+		io.open, os.execute, io.popen = real_open, real_exec, real_popen
+		if not ok then error(err, 0) end
 
-	cap.content = table.concat(cap.parts, "")
-	return cap
+		cap.content = table.concat(cap.parts, "")
+		return cap
+	end, { home = TMP_HOME, user = REAL_GETENV("USER") or REAL_GETENV("LOGNAME") or "fixtureuser" })
 end
 
 

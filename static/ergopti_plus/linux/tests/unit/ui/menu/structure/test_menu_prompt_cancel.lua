@@ -25,8 +25,12 @@ local writer_calls = {}
 local function install_fake_writer()
 	local previous = package.loaded["platform.remap.tap_hold_writer"]
 	package.loaded["platform.remap.tap_hold_writer"] = {
-		set_threshold = function(...)
-			writer_calls[#writer_calls + 1] = { ... }
+		set_threshold = function(key_id, seconds, guard)
+			if guard ~= nil then
+				assert(type(guard) == "function", "deferred editor guard")
+				assert(guard() == true, "the confirmed editor remains current")
+			end
+			writer_calls[#writer_calls + 1] = { key_id, seconds }
 			return true
 		end,
 	}
@@ -88,7 +92,8 @@ end
 --- @param manager table An initialised tap-hold manager.
 --- @return function|nil
 local function find_delay_row(mb, manager)
-	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = manager })
+	local items = mb.build({ _version = "test", on_quit = function() end, tap_holds = manager,
+		is_paused = function() return false end })
 	local title = require("infra.i18n").get("menu.tapholds.title")
 	local section = nil
 	for _, item in ipairs(items) do

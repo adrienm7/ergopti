@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "배치 — 배치 예측 (대형 모델)",
 	"prompt_editor.mode.parallel": "표준 — 병렬 예측",
 	"prompt_editor.placeholder_prompt": "텍스트가 있습니다, 계속 작성하세요: {context}",
+	"prompt_editor.save_failed": "프롬프트 프로필을 저장하지 못했습니다. 다시 시도할 수 있도록 편집기를 열어 두었습니다.",
 	"prompt_editor.title_edit": "프로필 편집",
 	"prompt_editor.title_new": "새 프로필",
 	"script_control.pause_failed": "스크립트를 일시 중지할 수 없습니다. 이전 상태를 유지했습니다.",

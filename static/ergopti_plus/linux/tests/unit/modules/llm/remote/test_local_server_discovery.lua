@@ -5,9 +5,11 @@ local helpers = require("tests.helpers")
 local Json = require("json")
 local function isolated(body)
 	local names = { "modules.llm.local_servers", "modules.llm.api_entries", "modules.llm.api_remote",
-		"adapters.http_client", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows" }
+		"adapters.http_client", "adapters.event_loop", "ui.menu.local_server_rows", "ui.menu.llm_backend_rows" }
 	local previous = {}
 	for _, name in ipairs(names) do previous[name] = package.loaded[name]; package.loaded[name] = nil end
+	-- Native scheduling is covered independently by test_local_server_startup.
+	package.loaded["adapters.event_loop"] = { defer = function(fn) fn(); return true end }
 	local path = os.tmpname(); os.remove(path)
 	local calls = {}
 	package.loaded["adapters.http_client"] = { get_owned = function(url, headers, options, callback)

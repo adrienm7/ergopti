@@ -703,6 +703,45 @@ function M.get_tap_action(key_id)
 	return key and key.id == key_id and key.tap or nil
 end
 
+--- Captures an editor's original configuration, independently of input authority.
+--- Disabled features and an absent user file remain editable; pause retires it.
+--- @return function|nil current Strict true only while the original scope survives.
+function M.capture_configuration_edit()
+	if not _initialized or not _loaded or _paused or not config_exports_current() then return nil end
+	local Files = require("adapters.file_system")
+	local read, factory = Files.read_with_status, M.capture_configuration_edit
+	local path, defaults, loaded = _user_path, _defaults_path, _loaded
+	local engine, installed, generation = _engine, _installed_engine, _generation
+	local enabled, combinations = _enabled, _combinations
+	local keys = copy_fields(loaded.keys)
+	local file_enabled = loaded.enabled
+	local function runtime()
+		return rawequal(package.loaded["platform.remap.tap_hold_manager"], M)
+			and M.capture_configuration_edit == factory and _initialized and not _paused
+			and _generation == generation and _user_path == path and _defaults_path == defaults
+			and rawequal(_loaded, loaded) and rawequal(_engine, engine) and rawequal(_installed_engine, installed)
+			and _enabled == enabled and rawequal(_combinations, combinations)
+			and loaded.enabled == file_enabled and fields_equal(loaded.keys, keys) and config_exports_current()
+			and rawequal(package.loaded["adapters.file_system"], Files) and Files.read_with_status == read
+	end
+	local bytes, status = read(path)
+	local shipped, shipped_status = read(defaults)
+	if not runtime() or (status ~= "ok" and status ~= "absent") or shipped_status ~= "ok"
+		or (status == "ok" and type(bytes) ~= "string") or type(shipped) ~= "string" then return nil end
+	local ok, decoded = pcall(original_config_load, defaults, path)
+	if not ok or type(decoded) ~= "table" or decoded.enabled ~= file_enabled
+		or not fields_equal(decoded.keys, keys) or not runtime() then return nil end
+	local function current()
+		if not runtime() then return false end
+		local content, classification = read(path)
+		local current_defaults, defaults_status = read(defaults)
+		return content == bytes and classification == status and current_defaults == shipped
+			and defaults_status == shipped_status and runtime()
+	end
+	if current() ~= true then return nil end
+	return current
+end
+
 --- Captures the effective native tap and its own canonical configuration source.
 --- @param binding string Exact tap_hold__ key identity transported by the engine.
 --- @param action string Expected native action.

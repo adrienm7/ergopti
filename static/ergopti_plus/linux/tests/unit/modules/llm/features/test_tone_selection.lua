@@ -41,7 +41,7 @@ local RESERVED_CODES = { [42] = true, [54] = true, [29] = true, [97] = true, [56
 local RELOADED = {
 	"modules.llm.prediction_engine", "modules.llm.settings", "modules.llm.profile_settings",
 	"modules.llm.display_settings", "modules.llm.trigger_settings", "modules.llm.navigation_settings",
-	"modules.llm.api_remote", "modules.hotstrings.injector", "adapters.keyboard_layout", "adapters.xkb_capture",
+	"modules.llm.api_remote", "modules.hotstrings.injector", "modules.hotstrings.selected_output", "adapters.keyboard_layout", "adapters.xkb_capture",
 }
 local FAKED = {
 	"adapters.secure_field_detector", "adapters.http_client", "modules.llm.api_entries",
@@ -185,8 +185,14 @@ local function scenario(opts, body)
 			replace_selection = function(text, _, authorized, callback)
 				local function complete()
 					if not authorized() then callback(false); return end
-					local result = injector.inject_selected(text, false)
-					local committed = type(result) == "table" and result.ok == true
+					-- The native range/caret observations are controlled selection
+					-- boundaries in this Engine scenario; both output phases are real.
+					local stage = injector.prepare_selected(text, { current = authorized, cached = authorized })
+					local prepared = stage.prepare()
+					local payload = prepared and stage.payload() or nil
+					local result = payload and payload.ok and stage.reselect() or nil
+					local cleaned = stage.close()
+					local committed = cleaned and type(result) == "table" and result.ok == true
 					if committed then world.selection = text end
 					callback(committed)
 				end

@@ -67,9 +67,16 @@ end
 
 --- Finds a table header terminator outside quoted segments and validates it.
 --- @param text string Trimmed physical header line, optionally with a comment.
+--- @param literal_array boolean|nil Preserve the hotstring reader's comment-stripped literal array identity.
 --- @return table header Array flag and decoded segments when valid.
-function M.header(text)
+function M.header(text, literal_array)
 	local array = text:sub(1, 2) == "[["
+	if literal_array and array then
+		-- Hotstring names predate TOML paths: quotes, dots and even an empty
+		-- name are literal identity bytes, not key-path grammar.
+		local name = text:match("^%[%[(.-)%]%]$")
+		return { array = true, segments = name ~= nil and { name } or nil }
+	end
 	local start = array and 3 or 2
 	local index, quote = start, nil
 	while index <= #text do

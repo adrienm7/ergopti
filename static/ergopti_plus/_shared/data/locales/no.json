@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Battet — prediksjoner i serier (store modeller)",
 	"prompt_editor.mode.parallel": "Standard — parallelle prediksjoner",
 	"prompt_editor.placeholder_prompt": "Her er en tekst, fortsett den: {context}",
+	"prompt_editor.save_failed": "Promptprofilen din kunne ikke lagres. Redigeringsvinduet er fortsatt åpent, slik at du kan prøve igjen.",
 	"prompt_editor.title_edit": "Rediger profil",
 	"prompt_editor.title_new": "Ny profil",
 	"script_control.pause_failed": "Skriptet kunne ikke settes på pause; forrige tilstand ble beholdt.",

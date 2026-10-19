@@ -31,7 +31,12 @@ local function chars(manifest)
 	end
 	return count
 end
-local function payload() return Keylogger.get_dashboard_payload({ include_prefetch = false }).metrics_manifest end
+local function payload()
+	local result, reason = Keylogger.get_dashboard_payload({ include_prefetch = false })
+	assert(type(result) == "table" and reason == nil, "healthy dashboard projection must acknowledge its public payload")
+	assert(type(result.metrics_manifest) == "table", "healthy dashboard projection must retain its manifest")
+	return result.metrics_manifest
+end
 Keylogger.init({ sqlite_path = path, log_dir = root .. "/logs" })
 assert(Keylogger.is_enabled() and Writer.is_available())
 check("healthy empty native projection acknowledges completion", function()
@@ -52,12 +57,20 @@ for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_
 	Keylogger.clear_cache()
 	assert(Writer.exec_sql("ALTER TABLE " .. table_name .. " RENAME TO owned_hidden;"))
 	local partial, complete = Reader.read_manifest(path)
-	local refused_payload = payload()
+	local refused_payload, refusal = Keylogger.get_dashboard_payload({ include_prefetch = false })
 	assert(Writer.exec_sql("ALTER TABLE owned_hidden RENAME TO " .. table_name .. ";"))
 	check("native refusal in " .. table_name .. " preserves the partial first return without acknowledging completion", function()
 		assert(complete == false)
 		assert(chars(partial) == (table_name == "agg_app_day" and 0 or 3))
-		assert(chars(refused_payload) == chars(partial))
+		if table_name == "agg_app_day" then
+			-- Saved category projection also owns this table, before manifest cache lookup.
+			assert(refused_payload == nil and refusal == "SQLite projection unavailable",
+				"an unreadable category source must refuse the complete public dashboard")
+		else
+			assert(type(refused_payload) == "table" and refusal == nil,
+				"an independently refused derived table retains the public partial manifest")
+			assert(chars(refused_payload.metrics_manifest) == chars(partial))
+		end
 	end)
 	local fresh, recovered = Reader.read_manifest(path)
 	local rebuilt = payload()
@@ -70,12 +83,15 @@ for _, table_name in ipairs({ "agg_app_day", "agg_app_day_errors", "agg_app_day_
 		assert(table.concat(assert(Writer.query_rows("SELECT date,app,llm_chars,llm_triggers FROM agg_app_day;")), "\n") == accepted)
 	end)
 end
--- A completed projection still uses the revision cache. The obstruction occurs
--- after a successful read and is removed before any cache invalidation.
-assert(Writer.exec_sql("ALTER TABLE agg_app_day RENAME TO owned_hidden;"))
+-- Obstruct only a manifest-derived table: category projection still needs its
+-- primary table before cache lookup, even when the manifest cache is complete.
+assert(Writer.exec_sql("ALTER TABLE agg_app_day_errors RENAME TO owned_hidden;"))
 local cached = payload()
-assert(Writer.exec_sql("ALTER TABLE owned_hidden RENAME TO agg_app_day;"))
-check("successful completed projection retains healthy cache reuse", function() assert(chars(cached) == 3) end)
+assert(Writer.exec_sql("ALTER TABLE owned_hidden RENAME TO agg_app_day_errors;"))
+check("successful completed projection retains healthy cache reuse", function()
+	assert(chars(cached) == 3 and cell(cached).bs_total == 7 and cell(cached).session_count_total == 2,
+		"a completed revision cache must retain even the temporarily hidden derived table")
+end)
 Keylogger.clear_cache()
 check("explicit cache clear still rebuilds the healthy native projection", function() assert(chars(payload()) == 3) end)
 Writer.close_db()

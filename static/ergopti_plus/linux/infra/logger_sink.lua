@@ -510,4 +510,23 @@ function M.is_file_sink_active()
 	return _installed and not _stdout_only and _main_handle ~= nil
 end
 
+--- Captures this exact privacy admission without acquiring output resources.
+--- Closing/reinstalling retires both functions; no successor is substituted.
+--- @return function|nil redact Returns a string only while the admission is live.
+--- @return function|nil current Strict lifetime acknowledgement.
+function M.capture_redactor()
+	if not _installed or type(_redact) ~= "function" then return nil end
+	local active, factory = _redact, M.capture_redactor
+	local function current()
+		return _installed and _redact == active and M.capture_redactor == factory
+			and rawequal(package.loaded["infra.logger_sink"], M)
+	end
+	return function(text)
+		if type(text) ~= "string" or not current() then return nil end
+		local ok, result = pcall(active, text)
+		if not ok or type(result) ~= "string" or not current() then return nil end
+		return result
+	end, current
+end
+
 return M

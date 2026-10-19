@@ -181,11 +181,22 @@ local function render_document(document, shapes)
 	return table.concat(out, "\n") .. "\n"
 end
 
---- Replaces a tap_hold.toml with `document`.
+--- Requires an exact editor acknowledgement; legacy synchronous writers omit it.
+--- @param guard function|nil
+--- @return boolean
+local function edit_current(guard)
+	if guard == nil then return true end
+	local ok, current = pcall(guard)
+	if ok and current == true then return true end
+	Logger.error(LOG, "Tap-hold editor is no longer current — nothing written.")
+	return false
+end
+
+--- Replaces a tap_hold.toml only while its source and optional editor survive.
 --- @param path string
 --- @param document table
 --- @return boolean
-local function write_document(path, document, shapes, expected_source)
+local function write_document(path, document, shapes, expected_source, guard)
 	local text = render_document(document, shapes)
 	if type(TomlCodec.decode(text)) ~= "table" then
 		Logger.error(LOG, "'%s' rendered an invalid tap-hold candidate — nothing written.", path)
@@ -219,6 +230,11 @@ local function write_document(path, document, shapes, expected_source)
 		Logger.error(LOG, "'%s' changed before tap-hold publication — the source is preserved.", path)
 		return false
 	end
+	if not edit_current(guard) then
+		local removed, remove_err = os.remove(tmp)
+		if not removed then Logger.error(LOG, "Cannot remove refused staging file '%s' (%s).", tmp, tostring(remove_err)) end
+		return false
+	end
 	local ok, rename_err = os.rename(tmp, path)
 	if not ok then
 		os.remove(tmp)
@@ -233,25 +249,30 @@ end
 --- @param mutate function(document, shapes) Changes the decoded document in place.
 --- @return boolean True when the change is saved and in force.
 --- @return boolean saved True once the file holds the change, reloaded or not.
-local function save_and_reload(what, mutate, prepare)
+local function save_and_reload(what, mutate, prepare, guard)
 	if not _path then
 		Logger.error(LOG, "Tap-hold writer used before init() — '%s' not saved.", what)
 		return false, false
 	end
-	local document, err, text, shapes = read_document(_path)
+	local path, reload = _path, _reload
+	local function current()
+		return _path == path and _reload == reload and edit_current(guard)
+	end
+	local document, err, text, shapes = read_document(path)
 	if not document then
 		Logger.error(LOG, "'%s' is %s — '%s' refused rather than overwrite it.", _path, tostring(err), what)
 		return false, false
 	end
+	if guard ~= nil and not current() then return false, false end
 	local changed, detail = pcall(mutate, document, shapes)
 	if not changed then
 		Logger.error(LOG, "Tap-hold change '%s' refused: %s.", what, tostring(detail))
 		return false, false
 	end
 	if prepare and prepare() ~= true then return false, false end
-	if not write_document(_path, document, shapes, { status = text and "ok" or "absent", content = text }) then return false, false end
+	if not write_document(path, document, shapes, { status = text and "ok" or "absent", content = text }, guard ~= nil and current or nil) then return false, false end
 	Logger.info(LOG, "Tap-hold change saved: %s.", what)
-	local called, reloaded = pcall(_reload)
+	local called, reloaded = pcall(reload)
 	if not called or reloaded ~= true then
 		Logger.error(LOG, "Tap-hold change '%s' saved but the engine did not reload.", what)
 		return false, true
@@ -263,8 +284,8 @@ end
 --- @param what string For the logs.
 --- @param mutate function(document, shapes) Changes the decoded document in place.
 --- @return boolean True when the change is saved and in force.
-local function commit(what, mutate)
-	local in_force = save_and_reload(what, mutate)
+local function commit(what, mutate, guard)
+	local in_force = save_and_reload(what, mutate, nil, guard)
 	return in_force
 end
 
@@ -387,8 +408,9 @@ end
 --- Sets a key's tap: an action id, "" for the key itself, "none" for nothing.
 --- @param key_id string
 --- @param action string
+--- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
-function M.set_tap(key_id, action)
+function M.set_tap(key_id, action, guard)
 	if not valid_key(key_id, "set_tap") then return false end
 	if action ~= "" and action ~= "none" and not (type(action) == "string" and _is_tap_action(action)) then
 		Logger.error(LOG, "set_tap: '%s' is not a tap action here — nothing written.", tostring(action))
@@ -398,7 +420,7 @@ function M.set_tap(key_id, action)
 		local entry = key_entry(document, key_id, shapes)
 		entry.tap_action = action
 		entry.enabled = nil
-	end)
+	end, guard)
 end
 
 --- Sets a key's hold: kind "modifier" (id "ctrl", "ctrl+shift"…), "layer" (id
@@ -457,8 +479,9 @@ end
 --- Sets a key's tap/hold threshold, in seconds; nil returns to the default.
 --- @param key_id string
 --- @param seconds number|nil
+--- @param guard function|nil Original deferred editor, strict true required.
 --- @return boolean
-function M.set_threshold(key_id, seconds)
+function M.set_threshold(key_id, seconds, guard)
 	if not valid_key(key_id, "set_threshold") then return false end
 	if seconds ~= nil and (type(seconds) ~= "number" or seconds <= 0 or seconds > MAX_THRESHOLD_SECONDS) then
 		Logger.error(LOG, "set_threshold: %s s is outside 0..%d s — nothing written.",
@@ -467,7 +490,7 @@ function M.set_threshold(key_id, seconds)
 	end
 	return commit(key_id .. " threshold = " .. tostring(seconds or "<default>"), function(document, shapes)
 		key_entry(document, key_id, shapes).time_activation_seconds = seconds
-	end)
+	end, guard)
 end
 
 --- Switches the feature on or off in the file ([tap_hold] enabled).

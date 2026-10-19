@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "Batchad — förutsägelser i batchar (stora modeller)",
 	"prompt_editor.mode.parallel": "Standard — parallella förutsägelser",
 	"prompt_editor.placeholder_prompt": "Här är en text, fortsätt på den: {context}",
+	"prompt_editor.save_failed": "Din promptprofil kunde inte sparas. Redigeraren är fortfarande öppen så att du kan försöka igen.",
 	"prompt_editor.title_edit": "Redigera profil",
 	"prompt_editor.title_new": "Ny profil",
 	"script_control.pause_failed": "Skriptet kunde inte pausas; det föregående tillståndet bevarades.",

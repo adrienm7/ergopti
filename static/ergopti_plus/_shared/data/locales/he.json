@@ -1995,6 +1995,7 @@
 	"prompt_editor.mode.batch": "אצווה — ניבויים באצוות (מודלים גדולים)",
 	"prompt_editor.mode.parallel": "סטנדרטי — ניבויים מקבילים",
 	"prompt_editor.placeholder_prompt": "הנה טקסט, המשך אותו: {context}",
+	"prompt_editor.save_failed": "לא ניתן לשמור את פרופיל ההנחיות. העורך נשאר פתוח כדי לאפשר לך לנסות שוב.",
 	"prompt_editor.title_edit": "ערוך פרופיל",
 	"prompt_editor.title_new": "פרופיל חדש",
 	"script_control.pause_failed": "לא ניתן היה להשהות את הסקריפט; המצב הקודם נשמר.",

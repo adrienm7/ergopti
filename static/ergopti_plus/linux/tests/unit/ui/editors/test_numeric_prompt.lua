@@ -36,12 +36,13 @@ local function fake_webview()
 	local shown = {}
 	local pushed = {}
 	local hidden = 0
-	local visible = false
+	local visible, native_epoch = false, 0
 	local fake = {
 		shown = shown,
 		pushed = pushed,
 		show = function(name)
 			shown[#shown + 1] = name
+			if not visible then native_epoch = native_epoch + 1 end
 			visible = true
 			return true
 		end,
@@ -49,12 +50,16 @@ local function fake_webview()
 			pushed[#pushed + 1] = { name = name, code = code }
 			return true
 		end,
-		hide = function(name)
+		hide = function(name, expected_epoch)
 			helpers.assert_eq(name, "numeric_prompt")
+			if expected_epoch ~= native_epoch then return false end
 			hidden = hidden + 1
 			visible = false
+			return true
 		end,
 		is_visible = function() return visible end,
+		current_epoch = function() return visible and native_epoch or nil end,
+		page_current = function(_, epoch) return visible and epoch == native_epoch end,
 	}
 	function fake.hidden_count() return hidden end
 	return fake

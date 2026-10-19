@@ -26,7 +26,7 @@ function M.with_session(options, body)
 			and suffixes.a ~= suffixes.b and not suffixes.a:find("/", 1, true) and not suffixes.b:find("/", 1, true))
 		source_prefix = os.tmpname(); assert(os.remove(source_prefix))
 	end
-	for _, id in ipairs({ "a", "b" }) do
+	for _, id in ipairs(options.source_ids or { "a", "b" }) do
 		local path = source_prefix and source_prefix .. suffixes[id] or os.tmpname()
 		local file = assert(io.open(path, "w"))
 		file:write("controlled input-owner source\n"); file:close()

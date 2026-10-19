@@ -186,6 +186,7 @@ end
 --- @param line string One line of NDJSON.
 --- @return string|nil The token content, or nil if the line is empty/unparseable.
 --- @return string|nil An explicit protocol or provider failure.
+--- @return table|nil The decoded record for terminal validation, without a second JSON parse.
 function M.parse_stream_line(line)
 	if type(line) ~= "string" or line:match("^%s*$") then return nil end
 	local data = M.json_decode(line)
@@ -193,10 +194,10 @@ function M.parse_stream_line(line)
 	if data.error ~= nil then return nil, "Ollama reported a stream error" end
 	if type(data.message) == "table" and type(data.message.content) == "string" then
 		if data.message.content ~= "" then
-			return data.message.content
+			return data.message.content, nil, data
 		end
 	end
-	return nil
+	return nil, nil, data
 end
 
 -- ============================================================================

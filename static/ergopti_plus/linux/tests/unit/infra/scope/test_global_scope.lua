@@ -299,7 +299,7 @@ helpers.describe("Linux global scope: the Configuration clear", function()
 				helpers.assert_true(type(rows) == "table", "the Configuration submenu")
 				helpers.assert_eq(rows[1].title, i18n.get("common.restore_recommended"))
 				helpers.assert_eq(rows[2].title, i18n.get("common.clear_to_system"))
-				rows[2].fn()
+				helpers.assert_eq(rows[2].fn(), true, "the real global clear must acknowledge every composed owner")
 			end)
 			os.execute = execute
 			if not ran then error(raised, 0) end

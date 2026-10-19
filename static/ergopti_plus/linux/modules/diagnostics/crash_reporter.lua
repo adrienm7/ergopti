@@ -43,14 +43,14 @@ end
 -- =========================================
 
 --- Ensures the crash directory exists.
-local function _ensure_dir()
-	os.execute("mkdir -p '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null")
+local function _ensure_dir(directory)
+	return os.execute("mkdir -p '" .. directory:gsub("'", "'\\''") .. "' 2>/dev/null")
 end
 
 --- Rotates old crash files when the directory exceeds MAX_CRASH_FILES.
-local function _rotate()
+local function _rotate(directory)
 	local files = {}
-	local pipe = io.popen("ls -1t '" .. crash_dir():gsub("'", "'\\''") .. "' 2>/dev/null")
+	local pipe = io.popen("ls -1t '" .. directory:gsub("'", "'\\''") .. "' 2>/dev/null")
 	if not pipe then return end
 	for line in pipe:lines() do
 		files[#files + 1] = line
@@ -59,7 +59,7 @@ local function _rotate()
 
 	while #files > MAX_CRASH_FILES do
 		local oldest = files[#files]
-		os.remove(crash_dir() .. "/" .. oldest)
+		os.remove(directory .. "/" .. oldest)
 		files[#files] = nil
 	end
 end
@@ -108,58 +108,66 @@ local function _build_facts()
 	return commit_line, config_line, version_line, app_dir_line
 end
 
---- Writes a crash dump to the crash directory.
---- Safe to call from pcall error handlers — never throws.
----
---- @param module_name string Name of the module where the error occurred.
---- @param error_msg    string The error message (tostring(err) from pcall).
---- @param context      table|nil Optional context: { stack_trace?, state? }.
-function M.dump(module_name, error_msg, context)
-	if type(module_name) ~= "string" then return end
-	if type(error_msg) ~= "string" or error_msg == "" then return end
-
-	_ensure_dir()
-
-	local ts = os.date("!%Y-%m-%dT%H-%M-%S")
-	local safe_name = module_name:gsub("[^%w_.-]", "_")
-	local path = crash_dir() .. "/crash_" .. ts .. "_" .. safe_name .. ".txt"
-	local commit_line, config_line, version_line, app_dir_line = _build_facts()
-
-	local fh = io.open(path, "w")
-	if not fh then
-		-- Last resort: log to stderr.
-		io.stderr:write(string.format("[crash_reporter] Cannot write to %s\n", path))
-		return
-	end
-
-	fh:write(string.format("=== Ergopti Linux Crash Dump ===\n"))
-	fh:write(string.format("Timestamp: %s\n", os.date()))
-	fh:write(string.format("Module:    %s\n", module_name))
-	fh:write(string.format("Error:     %s\n", error_msg))
-	fh:write(string.format("Version:   %s\n", version_line))
-	fh:write(string.format("Commit:    %s\n", commit_line))
-	fh:write(string.format("App dir:   %s\n", app_dir_line))
-	fh:write(string.format("Config:    %s\n", config_line))
-
-	if type(context) == "table" then
-		if type(context.stack_trace) == "string" then
-			fh:write(string.format("Stack:\n%s\n", context.stack_trace))
-		end
-		if type(context.layout) == "string" then
-			fh:write(string.format("Layout: %s\n", context.layout))
-		end
-		if type(context.locale) == "string" then
-			fh:write(string.format("Locale: %s\n", context.locale))
-		end
-	end
-
-	fh:close()
-
-	Logger.error(LOG, "Crash dump written: %s", path)
-
-	_rotate()
+--- Only a fixed failure may bypass the admitted sink through stderr.
+local function refused()
+	pcall(function() io.stderr:write("[crash_reporter] Crash dump refused; privacy or output acknowledgement unavailable.\n") end)
+	return false
 end
 
+--- Writes a fully redacted document under the original sink admission.
+--- Safe in error handlers: a reporting failure must not replace the real error.
+--- @param module_name string Name of the module where the error occurred.
+--- @param error_msg string Error message (tostring(err) from pcall).
+--- @param context table|nil Optional { stack_trace?, layout?, locale? }.
+--- @return boolean True after the redacted file's write and close acknowledge.
+function M.dump(module_name, error_msg, context)
+	if type(module_name) ~= "string" or type(error_msg) ~= "string" or error_msg == "" then return false end
+	local available, Sink = pcall(require, "infra.logger_sink")
+	if not available or type(Sink) ~= "table" or type(Sink.capture_redactor) ~= "function"
+		or type(Sink.crash_reports_dir) ~= "function" then return refused() end
+	local capture, resolve = Sink.capture_redactor, Sink.crash_reports_dir
+	local admitted, redact, current = pcall(capture)
+	if not admitted or type(redact) ~= "function" or type(current) ~= "function" then return refused() end
+	local function live()
+		if package.loaded["infra.logger_sink"] ~= Sink or Sink.capture_redactor ~= capture
+			or Sink.crash_reports_dir ~= resolve then return false end
+		local ok, value = pcall(current)
+		return ok and value == true
+	end
+	local resolved, directory = pcall(resolve)
+	if not resolved or type(directory) ~= "string" or directory == "" or not live() then return refused() end
+	local prepared, document, name = pcall(function()
+		local commit, config, version, app = _build_facts()
+		local parts = { "=== Ergopti Linux Crash Dump ===\n", "Timestamp: " .. os.date() .. "\n",
+			"Module:    " .. module_name .. "\n", "Error:     " .. error_msg .. "\n",
+			"Version:   " .. version .. "\n", "Commit:    " .. commit .. "\n",
+			"App dir:   " .. app .. "\n", "Config:    " .. config .. "\n" }
+		if type(context) == "table" then
+			for _, field in ipairs({ { "stack_trace", "Stack:\n" }, { "layout", "Layout: " }, { "locale", "Locale: " } }) do
+				local value = context[field[1]]
+				if type(value) == "string" then parts[#parts + 1] = field[2] .. value .. "\n" end
+			end
+		end
+		return redact(table.concat(parts)), redact(module_name)
+	end)
+	if not prepared or type(document) ~= "string" or type(name) ~= "string" or not live() then return refused() end
+	local path = directory .. "/crash_" .. os.date("!%Y-%m-%dT%H-%M-%S") .. "_" .. name:gsub("[^%w_.-]", "_") .. ".txt"
+	local made, status = pcall(_ensure_dir, directory)
+	if not made or (status ~= true and status ~= 0) or not live() then return refused() end
+	local opened, file = pcall(io.open, path, "w")
+	if not opened or not file then return refused() end
+	local written, ack
+	if live() then written, ack = pcall(file.write, file, document) end
+	local closed, close_ack = pcall(file.close, file)
+	if not written or (ack ~= true and ack ~= file) or not closed or close_ack ~= true or not live() then
+		-- The bytes were redacted before opening. Do not unlink by path here:
+		-- a reentrant close may already have published a successor at that name.
+		return refused()
+	end
+	pcall(Logger.error, LOG, "Crash dump written: %s", path)
+	if live() then pcall(_rotate, directory) end
+	return true
+end
 
 -- =========================================
 -- =========================================

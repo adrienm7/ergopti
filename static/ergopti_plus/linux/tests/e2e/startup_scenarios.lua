@@ -191,9 +191,8 @@ function M.run(check, options)
 				scenario.seed and q(options.driver .. scenario.seed) or "''",
 				"2>&1",
 			}, " ")
-			local pipe = io.popen(command, "r")
-			local output = pipe:read("*a")
-			pipe:close()
+			local output, status = options.capture_child(command)
+			if status ~= 0 then problems[#problems + 1] = action .. ": child exited with " .. tostring(status) end
 			local step_problems
 			step_problems, facts = judge(output, action, scenario.wizard == true)
 			for _, problem in ipairs(step_problems) do problems[#problems + 1] = action .. ": " .. problem end
