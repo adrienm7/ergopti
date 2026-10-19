@@ -2999,6 +2999,31 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **GitHub issue #96 (Windows, v1.0.3, October 19).** A personal hotstring
+      `sru -> SRU` (priority P1) is still corrected to "sur" by the French
+      autocorrection; the screenshot shows "Hotstrings personnels (0)" with an
+      unchecked category "metiers (2)" and the main menu has lost a counter.
+      Find why the new personal category is not active (and whether priority
+      P1 must beat autocorrection when both are active), and restore the
+      counter.
+- [ ] **GitHub issue #95 (macOS, v1.0.3, October 19, maintainer's log
+      attached).** Four bugs: Karabiner lease errors in the log; "check for
+      updates" failed several times then worked; a running oMLX server is not
+      seen by the AI menu and adding it by hand fails; the shortcut on the key
+      left of "1" still targets the wrong key (the 105th ISO key).
+- [ ] **GitHub issue #84 (Linux, open since September 12).** Shift does not
+      work on Arch (custom XKB type); waiting for the reporter's diagnostics.
+- [ ] **fix/\* merge of October 19 (dev 73bf713182, CI cancelled on request).**
+      fix/windows, fix/macos and fix/linux merged into dev and fast-forwarded.
+      fix/windows' head was red: two fixtures read the undefined `A_Pid`, the
+      personal editor fixture waited for a MsgBox the suite stubs, the program
+      picker read a destroyed Gui's Hwnd, and `_Onboarding_Translate` was not
+      loadable by the harness (all fixed, hotstrings/core/meta/keymap groups
+      green locally except three network fixtures that need the hosted
+      runner). fix/macos' head was red on the known deferred scopes (managed
+      network deadline, archive update controls; see the release item). The
+      merged dev has not had a CI run yet. The `deploy-site.yml` changes only
+      take effect once on main (workflow_run reads the default branch).
 - [ ] **AppImage catalog: release the tray fix, then `/retest` (October 19).**
       The full catalog log (run 39164737606) showed the real cause: the daemon
       already held its "keyboard access unavailable" tray without a keyboard,
