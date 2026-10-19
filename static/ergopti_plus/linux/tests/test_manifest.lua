@@ -58,6 +58,7 @@ return {
 	"tests.unit.modules.shortcuts.physical.test_physical_slots",
 	"tests.unit.ui.editors.test_physical_editor",
 	"tests.unit.ui.editors.test_physical_editor_host",
+	"tests.unit.ui.editors.physical.test_picker_refusal",
 	"tests.unit.ui.editors.test_physical_shortcut_native_ready",
 	"tests.unit.ui.webview.test_webview_native_lifecycle",
 	"tests.unit.ui.menu.shortcuts.test_key_combinations_menu",
