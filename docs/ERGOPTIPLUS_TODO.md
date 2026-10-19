@@ -3015,8 +3015,9 @@ These are software implementations; final hardware verification remains below.
       personal-file tuning and never writes the recommended delays; passing
       `Mode` made test_global_config_scope expect 12 backups and see 3 (the
       unchanged personal candidates are not backed up). Fix the global owner
-      and that test together. The Linux scope test change is unverified
-      locally (the suite cannot read layout defaults on this Windows host).
+      and that test together. The Linux scope suite passes under LuaJIT once
+      the release-debt preimage expects the kept `[personal]` tuning
+      (d96938bc).
 - [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).**
       (1) oMLX added by hand: fixed (c67d70f1fe; a pending key with the
       default address left an empty address that won over the catalogue).
@@ -3029,9 +3030,12 @@ These are software implementations; final hardware verification remains below.
       the unauthenticated GitHub API limit (60/h per IP; the changelog window
       and the healthcheck also call it). macOS already sends `If-None-Match`
       from a per-session copy (auto_check.lua `list_cache`), so each restart
-      (many in that log) spends a call. Persist the ETag and body across
-      restarts, report a 403/429 with `X-RateLimit-Remaining: 0` as a rate
-      limit with its reset time, and check Windows and Linux do the same.
+      (many in that log) spends a call. macOS now reports a 403/429 with
+      `X-RateLimit-Remaining: 0` as an exhausted rate limit with its UTC reset
+      time (auto_check.lua, unit case). Still to do: persist the ETag and body
+      across restarts on macOS; Linux keeps the ETag in ~/.cache but its curl
+      adapter exposes no response headers for the reset time; Windows keeps
+      both in memory only (`_UpdaterFetchCache`).
       (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
       exited unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a
       Mac reproduction. (5) The shortcut on the key left of "1" still targets
