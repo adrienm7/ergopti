@@ -3092,13 +3092,18 @@ These are software implementations; final hardware verification remains below.
       `first_frame` 3, one `selected_route` "unknown", one `exit_killed`:
       one URLSession task never completes and the deadline kills its worker.
       Its peer counters also show `handshake_started` 3, `handshake_complete`
-      2, `handshake_refused` 1. Likely cause, fixed in 91c0638b: the shared
-      wire fixture (`native_http_wire_fixture.py`, used by the three deferred
-      PAC/WPAD methods and the HTTPX receiving) ran each TLS handshake inside
-      its accept loop with a 10 s timeout, so one tunnel that never started
-      TLS held back every later origin connection past the deadline. Confirm
-      on the next hosted macOS run, then drop `macos-native-pac` and
-      `macos-native-http` from the v1.0.3 profile if both pass.
+      2, `handshake_refused` 1. Dev run 39328401408 (October 19) repeats it
+      exactly. Read against test01's order: the refused handshake is the
+      deliberate `/certificate` case, `/alpha` and `/beta` complete, and the
+      killed worker is `/fallback` (`PROXY <bound, not listening>; PROXY
+      first`, `selected_route` "default_refused_with_successor"): it never
+      reaches the second proxy (`accept_proxy` 3) and its URLSession task
+      never completes (`session_done` 3 of 4). Next: on a Mac, check whether
+      CFNetwork retries DIRECT after the refused proxy and blocks resolving
+      the fixture's `.test` origin instead of completing with ECONNREFUSED.
+      91c0638b separately moved the wire fixture's TLS handshake out of its
+      accept loop (a stalled tunnel held back every later origin connection
+      for 10 s); that hardening is not this failure's cause.
       `native_pac_source_fixture.py` has the same accept-loop handshake (2 s).
       The Managed Ollama build job of that run failed in the native Go tests
       with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade fails where
