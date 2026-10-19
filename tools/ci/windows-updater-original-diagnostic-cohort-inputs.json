@@ -59,8 +59,8 @@
 		"static/ergopti_plus/windows/modules/updater/release_install.ahk": "c4ea711e38ca3827e884dc84dc8ab579cf18086e3df59bd7ecb132c7b23110d4",
 		"static/ergopti_plus/windows/modules/updater/schedule.ahk": "546a68c7f6524297d2309847dba6ee43f21ae5f7aaf88c1776df56062272de40",
 		"static/ergopti_plus/windows/modules/updater/self_update.ahk": "964896291f50265e5222a62591ebe7f9aafa139a15463203f8b930ba8bda15ce",
-		"static/ergopti_plus/windows/tests/run_all.ahk": "47de51e4ba5872a464aec4a84771b868b4d78f015ed197044eb4b39cde8b9d9a",
-		"static/ergopti_plus/windows/tests/test_framework.ahk": "ee2c8b82ce83895f0465f6a19a9a46d77b4dce74a9ed40c987ffdb77e357f2be",
+		"static/ergopti_plus/windows/tests/run_all.ahk": "944e178e8a6f9218232b2001c40a6f4414dccebf6137899dcd2e619f729c6d32",
+		"static/ergopti_plus/windows/tests/test_framework.ahk": "8ffa072e221afd4f6b422ab8d1abb6b680301cd5b09aa20b22038ce35b6e2a11",
 		"static/ergopti_plus/windows/tests/unit/test_config_scope_manifest.ahk": "91cbd592c28a9b473bc9e7c7e28e08703a8a6203b7bce6a6e3a57d2ef36e0266",
 		"static/ergopti_plus/windows/tests/unit/test_updater.ahk": "01662ae4e36fbcd5981dc19363d241b068d1dbb70999e8fac03852b69fedbf4d",
 		"static/ergopti_plus/windows/tests/unit/updater/test_global_config_admission.ahk": "7b18aa55409e939a0e5a7685f041bf2a7a72867c97cfca2018ceae1eb414a5b1",
@@ -70,7 +70,7 @@
 	"diagnostic_only": true,
 	"private_cost_fixture_admitted": false,
 	"role": "candidate",
-	"source_pin_base": "ed92daff17d94a0d260426fedda06e6f024faedb",
+	"source_pin_base": "13943ab87214ce3154a5b2fd08de747a1e84a29d",
 	"runtime_qualification": "UNRUN",
 	"source_authority": "Pins are data; actual HEAD/Git object/API/artifact receiving remains independently required."
 }
