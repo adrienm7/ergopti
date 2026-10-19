@@ -352,6 +352,11 @@ function M.new(opts)
 			list_cache = etag and { body = result.body, etag = etag } or nil
 			return result.body
 		end
+		if (status == 403 or status == 429) and header_value(result.headers, "x-ratelimit-remaining") == "0" then
+			local reset = tonumber(header_value(result.headers, "x-ratelimit-reset"))
+			return nil, "no_connection", string.format("HTTP %d: the GitHub API rate limit is exhausted%s",
+				status, reset and (", it resets at " .. os.date("!%Y-%m-%d %H:%M:%S UTC", reset)) or "")
+		end
 		return nil, "no_connection",
 			tostring(type(result) == "table" and (result.error or ("HTTP " .. tostring(status))) or "no result")
 	end
