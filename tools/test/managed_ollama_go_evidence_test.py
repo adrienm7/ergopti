@@ -332,6 +332,26 @@ class NativeGoEvidenceTests(unittest.TestCase):
         self.assertFalse(owned.exists())
 
 
+class NativeGoFailureSummaryTests(unittest.TestCase):
+    def test_names_failed_tests_with_their_output_and_the_stderr_tail(self):
+        transcript = b"\n".join(
+            [
+                b'{"Action":"run","Test":"TestPasses"}',
+                b'{"Action":"output","Test":"TestPasses","Output":"ok\\n"}',
+                b'{"Action":"pass","Test":"TestPasses"}',
+                b'{"Action":"output","Test":"TestDeadline","Output":"transport_test.go:91: deadline\\n"}',
+                b'{"Action":"fail","Test":"TestDeadline"}',
+                b"not json",
+                b'{"Action":"fail"}',
+            ]
+        )
+        summary = PRODUCER.native_go_failure_summary(transcript, b"exit status 1\n")
+        self.assertEqual(
+            summary.splitlines(),
+            ["FAIL TestDeadline", "    transport_test.go:91: deadline", "exit status 1"],
+        )
+
+
 class NativeCliPublicationTests(unittest.TestCase):
     """Real owned file replacement with recording Go/lipo, never native compilation."""
 

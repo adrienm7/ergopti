@@ -21,6 +21,7 @@ import shutil
 import shlex
 import signal
 import subprocess
+import sys
 import tarfile
 import tempfile
 import time
@@ -364,6 +365,35 @@ class NativeGoCancellation:
         return False
 
 
+def native_go_failure_summary(transcript: bytes, errors: bytes, limit: int = 40) -> str:
+    """Names the failed Go tests of a go test -json transcript with their last output lines.
+
+    The receipt files stay on the runner, so without this the job log shows only
+    that the native Go process failed, never which test or why.
+    """
+    failed, output = [], {}
+    for raw in transcript.splitlines():
+        try:
+            event = json.loads(raw)
+        except ValueError:
+            continue
+        if type(event) is not dict:
+            continue
+        test = event.get("Test") if type(event.get("Test")) is str else None
+        if event.get("Action") == "output" and type(event.get("Output")) is str:
+            output.setdefault(test, []).append(event["Output"].rstrip("\n"))
+        elif event.get("Action") == "fail" and test is not None and test not in failed:
+            failed.append(test)
+    lines = []
+    for test in failed:
+        lines.append("FAIL " + test)
+        lines.extend("    " + line for line in output.get(test, [])[-limit:])
+    if not failed:
+        lines.extend(output.get(None, [])[-limit:])
+    lines.extend(errors.decode("utf-8", "replace").splitlines()[-limit:])
+    return "\n".join(lines)
+
+
 def run_native_go_tests(options, candidate, env, contract, fingerprint, architecture) -> None:
     """Cancel only this native receiving call and restore exact prior handlers."""
     with NativeGoCancellation() as cancellation:
@@ -445,6 +475,11 @@ def _run_native_go_tests(
                     raise NativeGoRetirementDebt("Native Go retirement remains unacknowledged")
         cancellation.check()
         if group is None or group.process.returncode != 0:
+            if group is not None:
+                print(
+                    native_go_failure_summary(transcript.read_bytes(), errors.read_bytes()),
+                    file=sys.stderr,
+                )
             raise ValueError("The genuine native Go receiving process failed")
     if transcript.stat().st_size + errors.stat().st_size > maximum:
         raise ValueError("The native Go receiving byte bound was exceeded")
