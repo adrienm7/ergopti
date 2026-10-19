@@ -46,7 +46,9 @@ local function build(opts)
 		channel = "dev", pending = {},
 	}
 	ctx.state_key = defaults.check_state.storage_key
+	ctx.list_key = defaults.check_state.list_storage_key
 	if opts.record then ctx.values[ctx.state_key] = opts.record end
+	if opts.list_copy then ctx.values[ctx.list_key] = opts.list_copy end
 	ctx.timing = defaults.timing
 	ctx.owner = AutoCheck.new({
 		state = ctx.state,
@@ -59,7 +61,8 @@ local function build(opts)
 			return ctx.notification_refusal ~= "false"
 		end,
 		config = {
-			timing = defaults.timing, state_key = ctx.state_key, releases_url = URL, timeout_sec = 15,
+			timing = defaults.timing, state_key = ctx.state_key, list_key = ctx.list_key, releases_url = URL,
+			timeout_sec = 15,
 		},
 		timer = {
 			after = function(delay, fn)
@@ -483,6 +486,42 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
 		helpers.assert_contains(answers[1].detail, "timed out")
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
+	end)
+
+	helpers.it("stores the fields it reads from a listed release with its ETag", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = LIST, headers = { ETag = '"v1"' } } } })
+		check_now(ctx, "dev")
+		local copy = ctx.values[ctx.list_key]
+		helpers.assert_eq(copy.url, URL)
+		helpers.assert_eq(copy.etag, '"v1"')
+		local kept = Json.decode(copy.body)
+		helpers.assert_eq(#kept, 2)
+		helpers.assert_eq(kept[1].tag_name, "v0.0.0-dev.150")
+		helpers.assert_eq(kept[1].published_at, "2026-09-02T00:00:00Z")
+		helpers.assert_eq(kept[1].prerelease, true)
+		helpers.assert_nil(kept[1].assets, "asset lists and notes are not kept")
+	end)
+
+	helpers.it("a restarted owner revalidates the stored copy and reads a 304 from it", function()
+		local first = build({ now = T0, record = { seed = SEED },
+			responses = { { ok = true, status = 200, body = LIST, headers = { etag = '"v1"' } } } })
+		check_now(first, "dev")
+		local ctx = build({ now = T0, record = { seed = SEED }, list_copy = first.values[first.list_key],
+			responses = { { ok = false, status = 304, headers = {} } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(ctx.requests[1].headers["If-None-Match"], '"v1"')
+		helpers.assert_eq(answers[1].state, "available")
+		helpers.assert_eq(answers[1].latest, "v0.0.0-dev.150")
+	end)
+
+	helpers.it("drops a stored copy of another list URL and sends a full request", function()
+		local ctx = build({ now = T0, record = { seed = SEED },
+			list_copy = { url = URL .. "&page=2", etag = '"v1"', body = "[]" },
+			responses = { { ok = true, status = 200, body = LIST, headers = {} } } })
+		check_now(ctx, "dev")
+		helpers.assert_nil(ctx.requests[1].headers["If-None-Match"], "no validator from another list")
+		helpers.assert_nil(ctx.values[ctx.list_key], "a response without an ETag leaves no copy")
 	end)
 
 	helpers.it("names an exhausted GitHub rate limit and its reset time", function()
