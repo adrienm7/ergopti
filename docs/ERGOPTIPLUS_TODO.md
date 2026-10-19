@@ -3093,8 +3093,8 @@ These are software implementations; final hardware verification remains below.
       2, `handshake_refused` 1. Dev run 39328401408 (October 19) repeats it
       exactly. Read against test01's order: the refused handshake is the
       deliberate `/certificate` case, `/alpha` and `/beta` complete, and the
-      killed worker is `/fallback` (`PROXY <bound, not listening>; PROXY
-      first`, `selected_route` "default_refused_with_successor"): it never
+      killed worker is `/fallback` (a refused proxy, then proxy "first";
+      `selected_route` "default_refused_with_successor"): it never
       reaches the second proxy (`accept_proxy` 3) and its URLSession task
       never completes (`session_done` 3 of 4). Next: on a Mac, check whether
       CFNetwork retries DIRECT after the refused proxy and blocks resolving
@@ -3182,14 +3182,14 @@ These are software implementations; final hardware verification remains below.
       deliberately ignores a terminal owner, so the fix belongs in
       `MenuCommandRun` and the startup retention owner, not in the lease.
 - [~] **Windows log review, October 17: a transient keylogger flush refuses Quit.**
-      Partial (d474c61d, ffecffff): the refusal now carries its reason and a
-      flush or journal handoff in progress logs at INFO. Still open: retry
-      the same exit once the flush settles.
-      `KL_FlushShutdownReady` returns false for a flush in progress, a busy
-      journal or SQL append debt alike, and the refusal logs one ERROR without
-      the reason; the user had to choose Quit twice. Return the reason, log a
-      busy flush at INFO, and retry the same exit once the flush settles instead
-      of handing the refusal back to the user.
+  Partial (d474c61d, ffecffff): the refusal now carries its reason and a
+  flush or journal handoff in progress logs at INFO. Still open: retry
+  the same exit once the flush settles.
+  `KL_FlushShutdownReady` returns false for a flush in progress, a busy
+  journal or SQL append debt alike, and the refusal logs one ERROR without
+  the reason; the user had to choose Quit twice. Return the reason, log a
+  busy flush at INFO, and retry the same exit once the flush settles instead
+  of handing the refusal back to the user.
 - [x] **Windows log review, October 17: boot failures name no variable.**
       Done (a19e1431): `ErrorNet_Describe` adds Extra and file:line to the
       boot stage abort, tray-root retry and fatal startup lines.
