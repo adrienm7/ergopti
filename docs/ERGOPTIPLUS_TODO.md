@@ -3120,9 +3120,11 @@ These are software implementations; final hardware verification remains below.
       macOS unit rows 2-4 min each (7-row matrix), macOS lane ~23 min once the
       Managed Ollama receiving cell passes or is deferred. The critical path is
       now Linux: Build (~7 min, one packaging step builds every format) then the installed-archive install cells (~5 min).
-      Next steps: build the Linux packages per format in parallel (keeping
-      every install cell bound to the exact bytes it installs), speed up the
-      installed-archive cells, and keep the graph symmetric (one row per OS,
+      The installed-archive cells now run their unit suite as parallel
+      module groups (04159f1c): 4-5 min each before, 2 min on run 39332388305
+      (unit step 95-120 s instead of about 250 s). Next steps: build the Linux
+      packages per format in parallel (keeping every install cell bound to the
+      exact bytes it installs), and keep the graph symmetric (one row per OS,
       the same columns). All unit suites are already sharded by module group:
       Windows `TEST_MODULE_GROUPS` (12 rows), macOS
       `tests/support/module_groups.lua` (7), Linux
