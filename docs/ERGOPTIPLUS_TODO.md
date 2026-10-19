@@ -3164,7 +3164,13 @@ These are software implementations; final hardware verification remains below.
       error envelope's decoy completion was inserted) and
       `local_model_presence.json`; the two document contracts do not apply to
       macOS, which has neither `webview.document_lease` nor the Linux download
-      bridge. Next come Windows dynamic hotstrings and capsword behaviour. It also lists verbatim duplicate Lua test files to delete,
+      bridge. Item 12 is done (`_shared/tests/corpus/gestures/direction_vectors.json`,
+      51 cases per driver). Duplicates 1-3 are gone; duplicate 6 is a false
+      alarm (the two describes cover tooltip_llm and tooltip_hotstring). For
+      item 5, `linux/ui/personal_info_editor/bridge_toml.lua` is registered in
+      no `webview_manager.lua` BRIDGE_MODULES entry and only its own tests load
+      it: retire it with those tests, or wire it, before adding coverage.
+      Next come Windows dynamic hotstrings and capsword behaviour. It also lists verbatim duplicate Lua test files to delete,
       absence ratchets for deleted code, and one tidy `tests/` tree to adopt
       on Windows, macOS and Linux.
 - [ ] **Windows log review, October 17: menu clicks that land after a reload.**
