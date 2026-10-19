@@ -590,18 +590,24 @@ class WireFixture:
         class TLSOrigin(Server):
             receiving_kind = "origin"
 
-            def get_request(self):
-                raw, address = super().get_request()
+            def finish_request(self, request, client_address):
+                # The handshake runs in this request's own thread. In
+                # get_request it held the accept loop, so one client stalled
+                # mid-handshake kept every later connection waiting for its
+                # ten-second timeout, as long as the receiving client's own.
                 try:
-                    raw.settimeout(10)
+                    request.settimeout(10)
                     owner._receive("handshake_started")
-                    connection = owner.context.wrap_socket(raw, server_side=True)
+                    connection = owner.context.wrap_socket(request, server_side=True)
                     owner._receive("handshake_complete")
-                    return connection, address
                 except BaseException:
                     owner._receive("handshake_refused")
-                    raw.close()
-                    raise
+                    request.close()
+                    return
+                try:
+                    super().finish_request(connection, client_address)
+                finally:
+                    self.shutdown_request(connection)
 
             def handle_error(self, *_):
                 pass  # The deliberate untrusted-CA test fails before HTTP.
