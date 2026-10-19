@@ -5922,15 +5922,26 @@ const DISTRO_UNIT_HELPER = fs.readFileSync(
 	path.join(__dirname, 'prepare-linux-distro-unit.sh'),
 	'utf8'
 );
+// Every module group runs at once under the ordinary user, each in its own TMPDIR.
 const DISTRO_UNIT_SUITE =
-	'sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$unit_tmp" "$interpreter" tests/run.lua\n';
+	'\tsudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\\n' +
+	'\t\tLUA_CPATH="$native_root/modules/?.so;;" TMPDIR="$group_tmp" "$interpreter" tests/run.lua --module="$unit_group" \\\n' +
+	'\t\t>"$unit_logs/$unit_group.log" 2>&1 &\n';
+// A group's exit, its order and its header reach the workflow diagnostic.
+const DISTRO_UNIT_GROUP_TAIL = [
+	'wait "${unit_pids[$index]}" || group_status=$?',
+	'if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi',
+	"printf 'distro-unit-group %s\\n' \"${unit_groups[$index]}\"",
+	'cat "$unit_logs/${unit_groups[$index]}.log"',
+	'exit "$unit_status"'
+];
 
 // The supervised form adds diagnostics around the same one actual helper call.
 // Pin its shell ownership envelope separately from the existing direct form;
 // a comment, unreachable call or extra helper cannot satisfy this contract.
 const DISTRO_DIAGNOSTIC_COMMAND =
 	'python3 - "$unit_log" "$unit_root/static/ergopti_plus/linux/tests/run.lua" \'${{ env.INSTALL_DISTRO }}\' "$native_status" <<\'PYTHON\'';
-const DISTRO_DIAGNOSTIC_SHA256 = '2788cc3783304c8424e34de365bff105acd60068ca892a802ae6a273251da9dc';
+const DISTRO_DIAGNOSTIC_SHA256 = '2b5eacc87b0cdb4aa1f04c6ef95cc60248245cbbb2389757070db20f2ed1196d';
 const DISTRO_LOGGED_ENVELOPE = [
 	'set -euo pipefail',
 	'case "${{ env.INSTALL_DISTRO }}" in',
@@ -6022,7 +6033,7 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 		.filter((line) => !/^\s*(?:#|--)/.test(line))
 		.join('\n');
 	if (
-		(code.match(/^sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
+		(code.match(/^\s*sudo -H -u ergopti-ci env -u SUDO_UID -u SUDO_GID -u SUDO_USER \\$/gm) || [])
 			.length !== 4
 	) {
 		problems.push(
@@ -6031,6 +6042,10 @@ function distroUnitProblems(files, helper = DISTRO_UNIT_HELPER) {
 	}
 	if (!code.includes(DISTRO_UNIT_SUITE)) {
 		problems.push('the unchanged distro suite must inherit the exact admitted native modules');
+	}
+	for (const line of DISTRO_UNIT_GROUP_TAIL) {
+		if (!code.split('\n').some((row) => row.trim() === line))
+			problems.push('every parallel distro group must keep its exit, order and header: ' + line);
 	}
 	const lua = code.match(/"\$interpreter" -e '\n([\s\S]*?)\n'/)?.[1] || '';
 	for (const statement of [
@@ -6149,7 +6164,11 @@ for (const [what, from, to] of [
 		'swallowed unchanged unit suite',
 		'"$interpreter" tests/run.lua',
 		'"$interpreter" tests/run.lua || true'
-	]
+	],
+	['swallowed group exit', 'group_status=$?', 'group_status=0'],
+	['later group exit wins', 'if [ "$unit_status" -eq 0 ]; then unit_status="$group_status"; fi', 'unit_status=0'],
+	['missing group header', "printf 'distro-unit-group %s\\n'", "printf 'group %s\\n'"],
+	['helper exits green', 'exit "$unit_status"', 'exit 0']
 ]) {
 	const changed = DISTRO_UNIT_HELPER.replace(from, to);
 	assert.notEqual(changed, DISTRO_UNIT_HELPER, what + ' must actually mutate the native wrapper');
@@ -6336,15 +6355,32 @@ try {
 		'\n' +
 		'='.repeat(40) +
 		'\n';
+	// One log per module group, under the header the parallel helper prints.
+	const groups = [
+		...fs
+			.readFileSync(path.join(path.dirname(runner), 'support', 'module_groups.lua'), 'utf8')
+			.matchAll(/\{ name = "([a-z_]+)"/g)
+	].map((match) => match[1]);
+	assert(groups.length > 1, 'the controls cover more than one module group');
+	const grouped = (last, order = groups) =>
+		order
+			.map(
+				(name, index) =>
+					'distro-unit-group ' + name + '\n' + (index === order.length - 1 ? last : frame(1, 7, 0))
+			)
+			.join('');
 	for (const [what, text, native, expected] of [
-		['complete successful native log', frame(1, 7, 0), '0', 0],
-		['complete refused native log', frame(1, 6, 1), '17', 0],
+		['complete successful native log', grouped(frame(1, 7, 0)), '0', 0],
+		['complete refused native log', grouped(frame(1, 6, 1)), '17', 0],
 		['missing native summary', 'no terminal frame\n', '0', 2],
-		['duplicate native summaries', frame(1, 7, 0) + frame(1, 7, 0), '0', 2],
-		['zero native modules', frame(0, 7, 0), '0', 2],
-		['zero native cases', frame(1, 0, 0), '0', 2],
-		['green native exit with failed cases', frame(1, 6, 1), '0', 2],
-		['partial native frame', frame(1, 7, 0).slice(0, -42), '0', 2]
+		['ungrouped native summary', frame(1, 7, 0), '0', 2],
+		['duplicate native summaries', grouped(frame(1, 7, 0) + frame(1, 7, 0)), '0', 2],
+		['missing native group', grouped(frame(1, 7, 0), groups.slice(0, -1)), '0', 2],
+		['reordered native groups', grouped(frame(1, 7, 0), [...groups].reverse()), '0', 2],
+		['zero native modules', grouped(frame(0, 7, 0)), '0', 2],
+		['zero native cases', grouped(frame(1, 0, 0)), '0', 2],
+		['green native exit with failed cases', grouped(frame(1, 6, 1)), '0', 2],
+		['partial native frame', grouped(frame(1, 7, 0).slice(0, -42)), '0', 2]
 	]) {
 		fs.writeFileSync(log, text);
 		const result = spawnSync(distroControlPython, ['-', log, runner, 'debian', native], {
