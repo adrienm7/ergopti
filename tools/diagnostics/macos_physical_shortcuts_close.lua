@@ -31,7 +31,7 @@ function M.run(config, done)
  local bridge_mt = assert(hs.getObjectMetatable('hs.webview.usercontent'))
  local original = { windowCallback = assert(view_mt.windowCallback),
   delete = assert(view_mt.delete), setCallback = assert(bridge_mt.setCallback) }
- local state = { cases = {}, timers = {}, finished = false, observing = false, errors = {} }
+ local state = { cases = {}, timers = {}, finished = false, observing = false, errors = {}, phase = 'starting' }
  local baseline_timers = Scheduler.activeCount()
  local started = hs.timer.absoluteTime()
  local finish
@@ -97,16 +97,20 @@ function M.run(config, done)
   end
   local consumed_before_detach = entry ~= nil and callback == nil
   and entry.view ~= nil and getmetatable(entry.view) == nil
+  if entry then
+   if type(callback) == 'function' then entry.binds = entry.binds + 1
+   elseif callback == nil then
+    entry.detaches = entry.detaches + 1
+    entry.consumed_before_detach = consumed_before_detach
+   end
+  end
   local results = table.pack(original.setCallback(controller, callback, ...))
   if entry then
    if type(callback) == 'function' then
-    entry.binds = entry.binds + 1
     entry.weak.callback = callback
     entry.bind_ack = rawequal(results[1], controller)
    elseif callback == nil then
-    entry.detaches = entry.detaches + 1
     entry.detach_ack = rawequal(results[1], controller)
-    entry.consumed_before_detach = consumed_before_detach
    end
   end
   return table.unpack(results, 1, results.n)
@@ -133,6 +137,23 @@ function M.run(config, done)
   receipt.native_input = 'not attempted; no physical capture, eventtap, synthetic key or AppleEvent'
   receipt.product_timer_baseline = baseline_timers
   receipt.product_timer_final = Scheduler.activeCount()
+  if #state.errors > 0 then
+   local observation = { phase = state.phase, cases = {}, timer_active_count = receipt.product_timer_final }
+   for _, entry in ipairs(state.cases) do
+    observation.cases[#observation.cases + 1] = {
+     name = entry.name, window_id = entry.window_id, host_pid = entry.host_pid,
+     view_observed = entry.view ~= nil, bridge_observed = entry.bridge ~= nil,
+     visible_before = entry.visible_before == true,
+     native_delete_requests = entry.deletes, notifications = entry.notifications,
+     userdata_consumed = entry.view ~= nil and getmetatable(entry.view) == nil,
+     bind_attempts = entry.binds, bind_acknowledged = entry.bind_ack == true,
+     detach_attempts = entry.detaches, detach_acknowledged = entry.detach_ack == true,
+     consumed_before_detach = entry.consumed_before_detach == true,
+     callback_alive = entry.weak.callback ~= nil, timer_active_count = receipt.product_timer_final,
+    }
+   end
+   receipt.failure_observation = observation
+  end
   done(receipt)
  end
  local token = {}
@@ -149,6 +170,7 @@ function M.run(config, done)
   get_action_label = function(value) return tostring(value) end,
  } }
  local function open_case(name)
+  state.phase = name .. '.open'
   local entry = { name = name, deletes = 0, binds = 0, detaches = 0, notifications = {},
    weak = setmetatable({}, { __mode = 'v' }) }
   state.cases[#state.cases + 1], state.current = entry, entry
@@ -166,9 +188,11 @@ function M.run(config, done)
   assert(math.type(entry.window_id) == 'integer' and entry.window_id > 0)
   collectgarbage('collect'); collectgarbage('collect')
   assert(entry.weak.callback ~= nil, 'missing native registry retention control')
+  state.phase = name .. '.await_visible'
   return entry, window
  end
  local function verify_retirement(entry, after)
+  state.phase = entry.name .. '.await_retirement'
   await(function()
    collectgarbage('collect'); collectgarbage('collect')
    return getmetatable(entry.view) == nil and entry.detach_ack == true
@@ -194,6 +218,8 @@ function M.run(config, done)
  guarded(function()
   local user, user_window = open_case('ax_user_close')
   await(function() return user.view:isVisible() == true end, function()
+   user.visible_before = true
+   state.phase = 'ax_user_close.request_ax_close'
    local accepted = user_window:close()
    receipt.ax_close_ack = accepted == true
    assert(accepted == true, 'actual AX close refused; no Lua-delete fallback')
@@ -201,6 +227,8 @@ function M.run(config, done)
     local explicit = open_case('public_close')
     assert(not rawequal(explicit.view, user.view), 'successor reused consumed userdata')
     await(function() return explicit.view:isVisible() == true end, function()
+     explicit.visible_before = true
+     state.phase = 'public_close.request_public_close'
      receipt.public_close_initial_return = Host.close()
      verify_retirement(explicit, function()
       assert(package.loaded['modules.keylogger.physical_capture'] == nil, 'probe created a capture owner')

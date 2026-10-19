@@ -291,6 +291,30 @@ class PhysicalNativeControls(unittest.TestCase):
                 probe.check_logs(self.output)
             path.write_text("")
 
+    def test_ci7_sentry_source_names_are_not_exceptions_but_real_failures_remain_refused(self):
+        startup = (
+            "[Sentry] [debug] [1792371722.8890882] [SentryCrashMonitor_NSException:126] Backing up original handler.\n"
+            "[Sentry] [debug] [1792371722.8891] [SentryCrashMonitor_NSException:129] Setting new handler.\n"
+        )
+        for name in ("launch.stdout", "launch.stderr", "console.txt"):
+            path = self.output / name
+            path.write_text(startup)
+            probe.check_logs(self.output)
+            for failure in (
+                "NSInternalInconsistencyException: udRef missing",
+                "*** Terminating app due to uncaught exception 'NSInvalidArgumentException'",
+                "[SentryCrashMonitor_NSException:126] ERROR genuine failure",
+                "[SentryCrashMonitor_NSException:129] C stack overflow",
+                "NOREF/REFNIL",
+                "assertion failure",
+                "ERRRUN",
+                "exception in callback",
+            ):
+                path.write_text(startup + failure)
+                with self.subTest(name=name, failure=failure), self.assertRaises(ValueError):
+                    probe.check_logs(self.output)
+            path.write_text("")
+
     def test_native_owner_still_alive_or_reservation_lost_is_refused(self):
         self.assertEqual(probe.validate_retirement(retired()), 711)
         for field, value in (

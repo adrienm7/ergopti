@@ -154,7 +154,7 @@ def check_logs(output):
         text = path.read_text(encoding="utf-8")
         require(
             re.search(
-                r"\b(?:error|exception|ERRRUN)\b|NOREF/REFNIL|C stack overflow|NS\w*Exception|assertion failure",
+                r"\b(?:error|exception|ERRRUN)\b|NOREF/REFNIL|C stack overflow|\bNS\w*Exception\b|assertion failure",
                 text,
                 re.I,
             )

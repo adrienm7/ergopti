@@ -29,7 +29,8 @@ function run({
 	for (const [pattern, minimum] of [
 		['macos_tooltip_canvas_test.py', 54],
 		['macos_webview_binding_test.py', 34],
-		['macos_physical_shortcuts_close_test.py', 22]
+		['macos_physical_shortcuts_close_test.py', 23],
+		['macos_action_picker_pool_test.py', 19]
 	]) {
 		const result = spawn(
 			python,

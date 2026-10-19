@@ -436,6 +436,7 @@ const RULES = [
 			f.startsWith('tools/diagnostics/macos_tooltip_canvas') ||
 			f.startsWith('tools/diagnostics/macos_webview_binding') ||
 			f.startsWith('tools/diagnostics/macos_physical_shortcuts_close') ||
+			f.startsWith('tools/diagnostics/macos_action_picker_pool') ||
 			f.startsWith('tools/diagnostics/macos_webview_raw_delete') ||
 			f === 'tools/diagnostics/macos_owned_process.py' ||
 			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'
@@ -474,6 +475,7 @@ const RULES = [
 		// break a Lua suite, and running one for a README edit trains people to
 		// ignore the tool's answer.
 		match: (f) =>
+			f === 'tools/diagnostics/macos_action_picker_pool_observer.lua' ||
 			(f.startsWith('static/ergopti_plus/macos/') && !f.endsWith('.md')) ||
 			isCrossDriverContract(f) ||
 			isSharedLuaSource(f)
