@@ -45,9 +45,10 @@ local ProviderConfig = require("llm.provider_config_policy")
 
 local LOG = "modules.llm.api_remote"
 
--- Remote requests get their own transport owner, so switching backends never
--- cancels a model download or an update check.
+-- Remote inference never shares its owner with downloads or update checks.
+-- A non-chat connection test also keeps the active prediction's owner intact.
 local OWNER = "llm_remote"
+local PROBE_OWNER = "llm_remote_probe"
 local ANTHROPIC_VERSION = "2023-06-01"
 -- What each format serves: "chat" (predictions, tone, translation, the screen
 -- answers' text step, the agent's System 2 and chat triage), "vision" (an image
@@ -499,49 +500,69 @@ end
 -- =========================================
 -- =========================================
 
-local _epoch = 0
-local _active = nil
+local _inference = { epoch = 0, owner = OWNER }
+local _probe = { epoch = 0, owner = PROBE_OWNER }
 -- The Backboard assistant of each key, created by the first request and reused
 -- for the session: { [base_url .. "\n" .. key] = assistant_id }. In memory only.
 local _assistants = {}
 
---- Opens one exchange, cancelling the one in flight. Its terminal callback runs
---- at most once, and only while the exchange is still the current one.
+--- Retires only the original scope epoch, preserving any reentrant successor.
+--- @param scope table Private inference or connectivity-test lifetime.
+--- @param expected_epoch integer Epoch captured before either cancellation callback.
+--- @return boolean accepted Original native cancellation was accepted.
+--- @return boolean current No successor replaced the cancelled lifetime.
+local function cancel_exchange(scope, expected_epoch)
+	-- An earlier cancellation may have synchronously admitted another scope's
+	-- successor. Its new epoch does not belong to the original cancel-all call.
+	if scope.epoch ~= expected_epoch then return true, false end
+	if HttpClient.cancel(scope.owner) ~= true then return false, false end
+	if scope.epoch ~= expected_epoch then return true, false end
+	scope.epoch, scope.active = expected_epoch + 1, nil
+	return true, true
+end
+
+--- Opens one exchange, superseding only its own scope's earlier exchange.
+--- @param scope table Private inference or connectivity-test lifetime.
 --- @param on_done function|nil
 --- @param admission function|nil Exact caller authorization, when supplied.
---- @return integer|nil epoch Nil when the exchange in flight could not be cancelled.
+--- @return integer|nil epoch Nil when the previous exchange could not be cancelled.
 --- @return function|nil done
 --- @return function|nil authorized Pinned authorization for each acquisition.
-local function open_exchange(on_done, admission)
+local function open_exchange(scope, on_done, admission)
 	local function permitted()
 		if admission == nil then return true end
 		if type(admission) ~= "function" then return false end
-		local epoch = _epoch
+		local epoch = scope.epoch
 		local called, allowed = pcall(admission)
-		return called and allowed == true and _epoch == epoch
+		return called and allowed == true and scope.epoch == epoch
 	end
 	if not permitted() then return nil end
-	if _active and M.cancel() ~= true then return nil end
+	if scope.active then
+		local retired, current = cancel_exchange(scope, scope.epoch)
+		if not retired or not current then return nil end
+	end
 	if not permitted() then return nil end
-	_epoch = _epoch + 1
-	local epoch = _epoch
+	scope.epoch = scope.epoch + 1
+	local epoch = scope.epoch
 	local finished = false
 	local owner = { epoch = epoch }
-	_active = owner
+	-- A terminal callback can precede physical HTTP settlement. Remember that
+	-- this alias was used even after active clears, so cancel-all still visits it.
+	scope.active, scope.used = owner, true
 	local function authorized()
-		if _active ~= owner or _epoch ~= epoch then return false end
-		local allowed = permitted() and _active == owner and _epoch == epoch
-		if not allowed and _active == owner and _epoch == epoch then
-			finished, _active = true, nil
+		if scope.active ~= owner or scope.epoch ~= epoch then return false end
+		local allowed = permitted() and scope.active == owner and scope.epoch == epoch
+		if not allowed and scope.active == owner and scope.epoch == epoch then
+			finished, scope.active = true, nil
 		end
 		return allowed
 	end
 	local function done(...)
-		if finished or epoch ~= _epoch then return end
+		if finished or epoch ~= scope.epoch then return end
 		finished = true
 		local deliver = admission == nil or authorized()
-		if _active ~= owner or epoch ~= _epoch then return end
-		_active = nil
+		if scope.active ~= owner or epoch ~= scope.epoch then return end
+		scope.active = nil
 		if deliver and type(on_done) == "function" then
 			local ok, callback_err = pcall(on_done, ...)
 			if not ok then Logger.error(LOG, "Terminal callback raised — %s", ErrorDescription.describe(callback_err)) end
@@ -590,7 +611,7 @@ end
 --- @param fail function
 --- @param on_answer function
 --- @param authorized function|nil Exact exchange authorization.
-local function post_json(epoch, url, headers, payload, fail, on_answer, authorized)
+local function post_json(scope, epoch, url, headers, payload, fail, on_answer, authorized)
 	if authorized and not authorized() then return end
 	local body = Json.encode(payload)
 	if type(body) ~= "string" then
@@ -598,7 +619,7 @@ local function post_json(epoch, url, headers, payload, fail, on_answer, authoriz
 		return
 	end
 	local dispatched = HttpClient.post(url, headers, body, function(result)
-		if epoch ~= _epoch then return end
+		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
 			fail(failure_detail(result), failure_receipt(result))
@@ -617,7 +638,7 @@ local function post_json(epoch, url, headers, payload, fail, on_answer, authoriz
 		end
 		if authorized and not authorized() then return end
 		on_answer(root)
-	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
+	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then fail("HTTP transport unavailable") end
 end
 
@@ -645,7 +666,7 @@ end
 --- @param fail function fail(detail, failure_receipt?)
 --- @param on_answer function on_answer(root)
 --- @param authorized function|nil Exact exchange authorization.
-local function backboard_send(epoch, prepared, spec, fail, on_answer, authorized)
+local function backboard_send(scope, epoch, prepared, spec, fail, on_answer, authorized)
 	if authorized and not authorized() then return end
 	local endpoint = prepared.endpoint
 	local cache_key = endpoint.url .. "\n" .. endpoint.headers[Formats.BACKBOARD_KEY_HEADER]
@@ -654,7 +675,7 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer, authorized
 			assistant_id = assistant_id, model = prepared.model, system = spec.system, text = spec.text,
 			questions = spec.questions,
 		})
-		post_json(epoch, request.url, endpoint.headers, request.body, fail, on_answer, authorized)
+		post_json(scope, epoch, request.url, endpoint.headers, request.body, fail, on_answer, authorized)
 	end
 	if _assistants[cache_key] then
 		send_message(_assistants[cache_key])
@@ -663,7 +684,7 @@ local function backboard_send(epoch, prepared, spec, fail, on_answer, authorized
 	local creation = Formats.backboard_assistant_request(endpoint.url)
 	Logger.info(LOG, "Creating the Backboard assistant for this key.")
 	-- fail() logs the reason with the request it fails.
-	post_json(epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
+	post_json(scope, epoch, creation.url, endpoint.headers, creation.body, function(detail, receipt)
 		fail("the Backboard assistant could not be created: " .. detail, receipt)
 	end, function(root)
 		if authorized and not authorized() then return end
@@ -694,9 +715,10 @@ end
 --- @param on_done function
 function M.chat(entry, model, messages, opts, on_chunk, on_done)
 	local _ = model
+	local scope = _inference
 	local admission
 	if type(opts) == "table" then admission = rawget(opts, "authorized") end
-	local epoch, done, authorized = open_exchange(on_done, admission)
+	local epoch, done, authorized = open_exchange(scope, on_done, admission)
 	if not epoch then return false end
 	local function refuse(reason)
 		Logger.error(LOG, "Remote request refused before dispatch: %s.", tostring(reason))
@@ -727,24 +749,24 @@ function M.chat(entry, model, messages, opts, on_chunk, on_done)
 		if not prepared then return refuse(reason) end
 		local system, user = split_messages(messages)
 		Logger.debug(LOG, "chat() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
-		backboard_send(epoch, prepared, { system = system, text = user }, fail, function(root)
+		backboard_send(scope, epoch, prepared, { system = system, text = user }, fail, function(root)
 			deliver(Formats.backboard_text(root))
 		end, authorized)
-		return _active ~= nil and _active.epoch == epoch
+		return scope.active ~= nil and scope.active.epoch == epoch
 	end
 
 	local request, reason = M.build_request(entry, messages, opts)
 	if not request then return refuse(reason) end
 	Logger.debug(LOG, "chat() → %s (model=%s)", M.redact_url(request.url), request.model)
 	local dispatched = HttpClient.post(request.url, request.headers, request.body, function(result)
-		if epoch ~= _epoch then return end
+		if epoch ~= scope.epoch then return end
 		if authorized and not authorized() then return end
 		if type(result) ~= "table" or result.ok ~= true then
 			fail(failure_detail(result), failure_receipt(result))
 			return
 		end
 		deliver(M.extract_text(request.format, result.body))
-	end, { owner = OWNER, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
+	end, { owner = scope.owner, timeout_ms = Timings.sec("llm", "request_timeout_ms") * 1000, authorized = authorized })
 	if dispatched ~= true then
 		done("", "HTTP transport unavailable")
 		return false
@@ -762,8 +784,8 @@ end
 --- @param on_done function
 --- @param admission function|nil Exact caller authorization, when supplied.
 --- @return boolean dispatched
-function M.decide(entry, state, questions, on_done, admission)
-	local epoch, done, authorized = open_exchange(on_done, admission)
+local function decide(scope, entry, state, questions, on_done, admission)
+	local epoch, done, authorized = open_exchange(scope, on_done, admission)
 	if not epoch then return false end
 	local function refuse(reason)
 		Logger.error(LOG, "Decision request refused before dispatch: %s.", tostring(reason))
@@ -782,7 +804,7 @@ function M.decide(entry, state, questions, on_done, admission)
 		local endpoint, reason = M.endpoint(entry, model)
 		if not endpoint then return refuse(reason) end
 		Logger.debug(LOG, "decide() → %s (model=%s)", M.redact_url(endpoint.url), model)
-		post_json(epoch, endpoint.url, endpoint.headers, Formats.decisions_body(model, state, questions), fail,
+		post_json(scope, epoch, endpoint.url, endpoint.headers, Formats.decisions_body(model, state, questions), fail,
 			function(root)
 				local answers = Formats.decisions_answers(root)
 				if not answers then
@@ -791,7 +813,7 @@ function M.decide(entry, state, questions, on_done, admission)
 				end
 				done(answers, nil)
 			end, authorized)
-		return _active ~= nil and _active.epoch == epoch
+		return scope.active ~= nil and scope.active.epoch == epoch
 	end
 
 	if provider.format == "backboard" then
@@ -799,7 +821,7 @@ function M.decide(entry, state, questions, on_done, admission)
 		if not prepared then return refuse(reason) end
 		if type(state) ~= "string" then return refuse("a Backboard message carries a text state only") end
 		Logger.debug(LOG, "decide() → Backboard %s (model=%s)", M.redact_url(prepared.endpoint.url), prepared.model)
-		backboard_send(epoch, prepared, { system = "", text = state, questions = questions }, fail, function(root)
+		backboard_send(scope, epoch, prepared, { system = "", text = state, questions = questions }, fail, function(root)
 			local answers, where = Formats.backboard_decision_answers(root, Json.decode)
 			if not answers then
 				Logger.warn(LOG, "Backboard returned no Jev answers; its top-level keys: %s.", top_level_keys(root))
@@ -809,24 +831,35 @@ function M.decide(entry, state, questions, on_done, admission)
 			Logger.info(LOG, "Jev answers read from Backboard's '%s'.", where)
 			done(answers, nil)
 		end, authorized)
-		return _active ~= nil and _active.epoch == epoch
+		return scope.active ~= nil and scope.active.epoch == epoch
 	end
 	return refuse(provider.label .. " does not answer typed questions")
 end
 
---- Cancels the request in flight; its callback is not called.
---- @return boolean
-function M.cancel()
-	if HttpClient.cancel(OWNER) ~= true then return false end
-	_epoch = _epoch + 1
-	_active = nil
-	return true
+--- Asks one agent decision through the ordinary inference owner.
+--- @param entry table Provider entry.
+--- @param state string|table What the questions are about.
+--- @param questions table Typed questions.
+--- @param on_done function
+--- @param admission function|nil Exact caller authorization.
+--- @return boolean dispatched
+function M.decide(entry, state, questions, on_done, admission)
+	return decide(_inference, entry, state, questions, on_done, admission)
 end
 
---- Returns true while a request is in flight.
+--- Cancels both original exchanges; neither callback is called after retirement.
+--- @return boolean
+function M.cancel()
+	local inference_epoch, probe_epoch, probe_used = _inference.epoch, _probe.epoch, _probe.used
+	local inference = cancel_exchange(_inference, inference_epoch)
+	local probe = not probe_used or cancel_exchange(_probe, probe_epoch)
+	return inference and probe
+end
+
+--- Returns true while inference or its independent non-chat probe is in flight.
 --- @return boolean
 function M.is_active()
-	return _active ~= nil
+	return _inference.active ~= nil or _probe.active ~= nil
 end
 
 --- Lists models for a manually configured local API through the existing owner.
@@ -834,7 +867,8 @@ end
 --- @param on_done function Receives (model_ids, reason, failure_receipt?).
 --- @return boolean dispatched
 function M.models(entry, on_done)
-	local epoch, done = open_exchange(on_done)
+	local scope = _inference
+	local epoch, done = open_exchange(scope, on_done)
 	if not epoch then return false end
 	local endpoint, reason = M.endpoint(entry, "models-probe")
 	if not endpoint or endpoint.format ~= "openai" then
@@ -845,9 +879,9 @@ function M.models(entry, on_done)
 	for _, key in ipairs({ "id", "provider", "base_url", "token", "model" }) do captured[key] = entry[key] end
 	local url = endpoint.url:gsub("/chat/completions$", "/models")
 	local dispatched = HttpClient.get(url, endpoint.headers,
-		{ owner = OWNER, timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false },
+		{ owner = scope.owner, timeout_ms = Timings.ms("llm", "local_server_probe_timeout_ms"), follow_redirects = false },
 		function(result)
-			if epoch ~= _epoch then return end
+			if epoch ~= scope.epoch then return end
 			for _, key in ipairs({ "id", "provider", "base_url", "token", "model" }) do
 				if entry[key] ~= captured[key] then done(nil, "identity_changed"); return end
 			end
@@ -868,16 +902,23 @@ end
 --- @param admission function|nil Exact caller authorization, when supplied.
 --- @return boolean Whether the probe was dispatched.
 function M.test(entry, on_done, admission)
-	local origin_epoch = _epoch
+	local inference_epoch, probe_epoch = _inference.epoch, _probe.epoch
+	local scope
 	local function admitted()
 		if admission == nil then return true end
-		if type(admission) ~= "function" or _epoch ~= origin_epoch then return false end
+		local function current()
+			if scope == _inference then return _inference.epoch == inference_epoch end
+			if scope == _probe then return _probe.epoch == probe_epoch end
+			return _inference.epoch == inference_epoch and _probe.epoch == probe_epoch
+		end
+		if type(admission) ~= "function" or not current() then return false end
 		local called, allowed = pcall(admission)
-		return called and allowed == true and _epoch == origin_epoch
+		return called and allowed == true and current()
 	end
 	if not admitted() then return false end
 	local started = Monotonic.now_ms()
 	local provider = type(entry) == "table" and M.provider(entry.provider) or nil
+	scope = provider and provider.format == "decisions" and _probe or _inference
 	if provider and provider.format == "decisions" then
 		local probe = catalogue().decisions_test
 		if not probe then
@@ -886,7 +927,7 @@ function M.test(entry, on_done, admission)
 			return false
 		end
 		if not admitted() then return false end
-		return M.decide(entry, probe.state, probe.questions, function(answers, err, receipt)
+		return decide(scope, entry, probe.state, probe.questions, function(answers, err, receipt)
 			local detail = err or Json.encode(answers) or ""
 			local elapsed = Monotonic.now_ms() - started
 			if receipt == nil then on_done(err == nil, detail, elapsed)
@@ -914,8 +955,9 @@ end
 function M._reset_for_test()
 	_catalogue = nil
 	_config_catalogue_failed = false
-	_epoch = _epoch + 1
-	_active = nil
+	for _, scope in ipairs({ _inference, _probe }) do
+		scope.epoch, scope.active, scope.used = scope.epoch + 1, nil, nil
+	end
 	_assistants = {}
 end
 
