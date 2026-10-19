@@ -219,6 +219,57 @@ return function(helpers)
 				helpers.assert_eq(#document.source_entries, 1)
 			end)
 		end
+		for _, name in ipairs({ "Équipe d'été", 'quote"section', 'hash"#section' }) do
+			for _, tail in ipairs({ " # notes", "#notes", "\t# notes" }) do
+				helpers.it("(toml-raw-comment) reads the exact literal name " .. name .. " before " .. tail, function()
+					local document, committed = Reader.parse_text('[[' .. name .. ']]' .. tail .. '\n"entry" = { output = "kept" }\n')
+					helpers.assert_eq(committed, true)
+					helpers.assert_eq(document.sections_order[1], name)
+					helpers.assert_eq(document.sections[name].entries[1].output, "kept")
+					helpers.assert_eq(#document.source_entries, 1)
+				end)
+			end
+		end
+		for _, name in ipairs({ 'quote"section]] # literal', "apostrophe'section]] # literal" }) do
+			helpers.it("(toml-raw-comment) never reinterprets the accepted identity " .. name, function()
+				local document, committed = Reader.parse_text('[[' .. name .. ']]\n"entry" = { output = "kept" }\n')
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(document.sections_order[1], name)
+				helpers.assert_eq(document.sections[name].entries[1].output, "kept")
+			end)
+		end
+		for _, header in ipairs({ '[[quote"section]] # notes ]] # ambiguous',
+			"[[apostrophe'section]]#notes]]#ambiguous", '[[hash#section]]', '[[hash#section]] # notes' }) do
+			helpers.it("(toml-raw-comment) retains the existing refusal for " .. header, function()
+				local document, committed = Reader.parse_text(header .. '\n"entry" = { output = "must not publish" }\n')
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(next(document.sections), nil)
+				helpers.assert_eq(#document.source_entries, 0)
+			end)
+		end
+		helpers.it("(toml-raw-comment) keeps rejected-header substring work linear as markers double", function()
+			local original_sub = string.sub
+			local function measure(markers)
+				local text = '[[quote"' .. string.rep(']]x', markers) .. '! # notes\n'
+				local copied = 0
+				string.sub = function(value, ...)
+					local fragment = original_sub(value, ...)
+					copied = copied + #fragment
+					return fragment
+				end
+				local okay, document, committed = pcall(Reader.parse_text, text)
+				string.sub = original_sub
+				if not okay then error(document, 0) end
+				helpers.assert_eq(committed, false)
+				helpers.assert_eq(#document.source_entries, 0)
+				return copied
+			end
+			local small, large = measure(256), measure(512)
+			helpers.assert_true(small > 0, "the real scanner must execute")
+			-- Doubling a linear scan stays below 3x; quadratic suffix copying
+			-- approaches 4x. Count copied bytes, never wall-clock timing.
+			helpers.assert_true(large <= small * 3, "doubling markers must not quadruple substring work")
+		end)
 		for index, value in ipairs({ 'future_matrix = [\n [1, 2],\n]\n',
 			'future_matrix = [\n [1, { text = "[not a header" }],\n]\n',
 			'future_text = """\n[[not a header\n# """\n',
