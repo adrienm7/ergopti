@@ -127,6 +127,7 @@ return {
 	"tests.unit.modules.llm.remote.test_api_remote_callback_siblings",
 	"tests.unit.modules.llm.remote.test_api_remote_callbacks",
 	"tests.unit.modules.llm.remote.test_api_remote_error_envelopes",
+	"tests.unit.modules.llm.remote.test_nonchat_probe_isolation",
 	"tests.unit.adapters.synthetic_input.test_user_hotstring_destination",
 	"tests.unit.infra.preferences.test_user_hotstring_runtime",
 	"tests.unit.ui.editors.test_ergopti_extension_selection",
