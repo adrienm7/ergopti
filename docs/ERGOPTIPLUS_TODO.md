@@ -3032,8 +3032,9 @@ These are software implementations; final hardware verification remains below.
       from a per-session copy (auto_check.lua `list_cache`), so each restart
       (many in that log) spends a call. macOS now reports a 403/429 with
       `X-RateLimit-Remaining: 0` as an exhausted rate limit with its UTC reset
-      time (auto_check.lua, unit case). Still to do: persist the ETag and body
-      across restarts on macOS; Linux keeps the ETag in ~/.cache but its curl
+      time (auto_check.lua, unit case), and keeps the list ETag with a reduced
+      copy across restarts (`check_state.list_storage_key`, f09d51dc). Still
+      to do: Linux keeps the ETag in ~/.cache but its curl
       adapter exposes no response headers for the reset time; Windows keeps
       both in memory only (`_UpdaterFetchCache`).
       (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
@@ -3052,6 +3053,16 @@ These are software implementations; final hardware verification remains below.
       network deadline, archive update controls; see the release item). The
       merged dev has not had a CI run yet. The `deploy-site.yml` changes only
       take effect once on main (workflow_run reads the default branch).
+      Known red on dev before that run: 3c4209e947 changed
+      tools/build/stage-linux-network-runtime.py without its pin in
+      tools/test/fixtures/validation-curl/PINS.json (`command_owner_sha256`,
+      now 708654f8…b824), so test-linux-managed-http-ci-registration and the
+      validation-curl setup refuse; the change only adds the AppImage tray
+      closure. Re-pin after the maintainer reviews it. A full local pass on
+      October 19 (Linux container) found no other repository failure: macOS
+      and Linux Lua units green, Linux E2E green, the 445 JS gates green
+      except that pin and failures of the container itself (root user, no
+      pwsh, unset USER, Node 22.22.0 instead of 22.22.2).
 - [ ] **AppImage catalog: release the tray fix, then `/retest` (October 19).**
       The full catalog log (run 39164737606) showed the real cause: the daemon
       already held its "keyboard access unavailable" tray without a keyboard,
