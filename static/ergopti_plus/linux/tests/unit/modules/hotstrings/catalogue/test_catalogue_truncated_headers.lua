@@ -14,7 +14,8 @@ local Json = require("json")
 
 --- Runs an isolated real catalogue without replacing any native file owner.
 --- @param body function Receives config, engine, source path and write helper.
-local function with_catalogue(body)
+--- @param name string|nil Exact literal section identity.
+local function with_catalogue(body, name)
 	-- Complete genuine constructor dependencies before any private owner exists.
 	require("toml_codec.writer")
 	require("config_file_inverse")
@@ -28,7 +29,7 @@ local function with_catalogue(body)
 	local Config
 	local okay, detail = pcall(function()
 		local choices = root .. "/choices.toml"
-		write(choices, '[hotstrings.groups]\nmagickey = true\n[hotstrings.modules.magickey]\nprobe = true\n')
+		write(choices, '[hotstrings.groups]\nmagickey = true\n[hotstrings.modules.magickey]\n' .. Json.quote(name or "probe") .. ' = true\n')
 		Config = require("modules.hotstrings.hotstrings_config")
 		assert(Config._set_config_file_for_test(choices)); assert(Config._set_override_config_dir_for_test(root))
 		local engine = require("hotstring_engine").new()
@@ -142,4 +143,82 @@ helpers.describe("real hotstring reload logical-value integrity", function()
 			end)
 		end)
 	end
+end)
+
+
+helpers.describe("raw hotstring header trailing comments", function()
+	for _, name in ipairs({ "Équipe d'été", 'quote"section', 'hash"#section' }) do
+		helpers.it("(catalogue-raw-comment) cold load reload and repair preserve " .. name, function()
+			with_catalogue(function(Config, engine, path, write)
+				local function document(output, tail)
+					return '[[' .. name .. ']]' .. tail .. '\n"audit" = { output = ' .. Json.quote(output) .. ', auto_expand = true }\n'
+				end
+				local bytes = document("cold", " # notes")
+				write(path, bytes)
+				local count, committed = Config.load_all()
+				helpers.assert_eq(committed, true); helpers.assert_eq(count, 1)
+				helpers.assert_eq(Config.parse_error_count(), 0)
+				helpers.assert_eq(expand(engine).replacement, "cold")
+				write(path, document("warm", "#notes"))
+				local warm, published = Config.reload()
+				helpers.assert_eq(published, true); helpers.assert_eq(warm, 1)
+				helpers.assert_eq(Config.parse_error_count(), 0)
+				helpers.assert_eq(expand(engine).replacement, "warm")
+				write(path, '[[' .. name .. ']] # first ]] # ambiguous\n')
+				local held, accepted = Config.reload()
+				helpers.assert_eq(accepted, true); helpers.assert_eq(held, 1)
+				helpers.assert_eq(Config.parse_error_count(), 1)
+				helpers.assert_eq(expand(engine).replacement, "warm")
+				write(path, document("repaired", "\t# notes"))
+				local repaired, restored = Config.reload()
+				helpers.assert_eq(restored, true); helpers.assert_eq(repaired, 1)
+				helpers.assert_eq(Config.parse_error_count(), 0)
+				helpers.assert_eq(expand(engine).replacement, "repaired")
+				local file = assert(io.open(path, "rb"))
+				helpers.assert_eq(file:read("*a"), document("repaired", "\t# notes"))
+				assert(file:close())
+			end, name)
+		end)
+	end
+
+	helpers.it("(catalogue-raw-comment) caches only committed documents and keeps warm literal identities", function()
+		with_catalogue(function(_, _, path, write)
+			local Reader = require("toml_codec.reader")
+			local cache, stored, hits = {}, 0, 0
+			local function bytes()
+				local file = assert(io.open(path, "rb")); local text = assert(file:read("*a")); assert(file:close()); return text
+			end
+			Reader.set_cache_provider({
+				load = function(requested)
+					helpers.assert_eq(requested, path)
+					if cache.source == bytes() then hits = hits + 1; return cache.document end
+				end,
+				capture_source = function() return bytes() end,
+				store = function(_, document, captured)
+					helpers.assert_eq(captured, bytes()); stored = stored + 1
+					cache = { source = captured, document = document }
+				end,
+			})
+			write(path, '[[quote"section\n')
+			local refused, acknowledged = Reader.parse(path)
+			helpers.assert_eq(acknowledged, false); helpers.assert_eq(#refused.source_entries, 0)
+			helpers.assert_eq(stored, 0, "rejected snapshots cannot seed a stale cache")
+			for index, vector in ipairs({
+				{ name = 'quote"section]] # literal', tail = '' },
+				{ name = "Équipe d'été", tail = ' # notes' },
+				{ name = 'quote"section', tail = '#notes' },
+				{ name = 'hash"#section', tail = '\t# notes' },
+			}) do
+				write(path, '[[' .. vector.name .. ']]' .. vector.tail .. '\n"audit" = { output = "kept" }\n')
+				local cold, accepted = Reader.parse(path)
+				helpers.assert_eq(accepted, true); helpers.assert_eq(stored, index)
+				helpers.assert_eq(cold.sections_order[1], vector.name)
+				local warm, cached = Reader.parse(path)
+				helpers.assert_eq(cached, true); helpers.assert_eq(warm, cold)
+				helpers.assert_eq(hits, index); helpers.assert_eq(stored, index)
+				helpers.assert_eq(warm.sections[vector.name].entries[1].output, "kept")
+			end
+			Reader.set_cache_provider(nil)
+		end)
+	end)
 end)

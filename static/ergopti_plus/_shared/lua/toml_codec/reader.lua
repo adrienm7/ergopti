@@ -485,7 +485,25 @@ local function parse_lines(lines)
 			-- The scanner keeps a # inside a quoted semantic segment intact.
 			if line:sub(1, 1) == "[" then
 				local _, _, comment_offset = RecordScanner.advance(line, 0, nil)
-				if comment_offset then line = line:sub(1, comment_offset - 1):match("^%s*(.-)%s*$") end
+				if comment_offset then
+					line = line:sub(1, comment_offset - 1):match("^%s*(.-)%s*$")
+				elseif line:sub(1, 2) == "[[" and not KeyPath.header(line, true).segments then
+					-- Historical raw names can contain an unmatched quote, so the
+					-- value scanner cannot see their trailing comment. Recover only
+					-- rejected, unambiguous lines; never rename a complete identity
+					-- or reopen a bare # that the original scanner already rejected.
+					local boundary, cursor = nil, 3
+					while true do
+						local closing = line:find("%]%][ \t]*#", cursor)
+						if not closing then break end
+						if boundary then boundary = nil; break end
+						boundary, cursor = closing, closing + 1
+					end
+					if boundary then
+						local recovered = line:sub(1, boundary + 1)
+						if KeyPath.header(recovered, true).segments then line = recovered end
+					end
+				end
 			end
 			-- Detect section headers
 			if line == "[_meta.sections]" then
