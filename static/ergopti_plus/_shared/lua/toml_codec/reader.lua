@@ -447,6 +447,7 @@ local function parse_lines(lines)
 	local first_line       = true
 	local semantic_ok      = true
 	local section_definitions = {}
+	local value_depth, value_quote = 0, nil
 
 	local function claim_section_definition(section, key)
 		local seen = section_definitions[section]
@@ -467,8 +468,18 @@ local function parse_lines(lines)
 			end
 			local line = raw_line:match("^%s*(.-)%s*$")
 
-			-- Skip blank lines and TOML comments
+			-- A table-looking physical line inside an assignment is value data.
+			-- Share the writer's lexical state instead of interpreting it as a header.
+			if value_depth > 0 or value_quote ~= nil then
+				value_depth, value_quote = RecordScanner.advance(raw_line, value_depth, value_quote)
+				goto continue
+			end
+			-- Skip blank lines and TOML comments outside an open value.
 			if not line or line == "" or line:sub(1, 1) == "#" then goto continue end
+			if line:sub(1, 1) ~= "[" then
+				local _, value = RecordScanner.split_assignment(line)
+				if value then value_depth, value_quote = RecordScanner.advance(value, 0, nil) end
+			end
 
 			-- Header comments are source-owned and are not part of a section name.
 			-- The scanner keeps a # inside a quoted semantic segment intact.
@@ -483,7 +494,9 @@ local function parse_lines(lines)
 			end
 
 			-- Per-section meta block: [_meta.sections.<name>]
-			local metadata_header = KeyPath.header(line)
+			local metadata_header = KeyPath.header(line, true)
+			-- A partial header must not replace a healthy source with an empty parse.
+			if line:sub(1, 1) == "[" and not metadata_header.segments then semantic_ok = false; return end
 			local metadata_parts = metadata_header and not metadata_header.array and metadata_header.segments
 			local meta_sec_name = metadata_parts and #metadata_parts == 3
 				and metadata_parts[1] == "_meta" and metadata_parts[2] == "sections" and metadata_parts[3]
@@ -640,7 +653,7 @@ local function parse_lines(lines)
 		end
 	end)
 
-	if not read_ok or not semantic_ok then
+	if not read_ok or not semantic_ok or value_depth > 0 or value_quote ~= nil then
 		return empty_document(), false
 	end
 

@@ -57,7 +57,9 @@ local LOG    = "adapters.toml_cache"
 --- contain a committed empty/partial result for an unchanged valid source.
 --- Version 5 invalidates snapshots produced before duplicate definitions were
 --- rejected transactionally by the shared reader.
-local CACHE_VERSION = 5
+--- Version 6 invalidates empty/partial snapshots from malformed source headers
+--- that the previous reader acknowledged instead of retaining a healthy source.
+local CACHE_VERSION = 6
 
 --- Chunk size used to stream the source file while building the content
 --- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
