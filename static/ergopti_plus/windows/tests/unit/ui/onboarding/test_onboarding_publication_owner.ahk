@@ -107,7 +107,10 @@ _OBP_Publication(Route, Mode) {
 	global _ConfigDir, _DefaultConfigDir, _OnboardingCatalogue
 	global _OnbWeb_SessionEpoch, _OnbWeb_ResetDone, _OnbWeb_Ready, _OnbWeb_Queue
 	global _OnbWeb_Controller, _OnbWeb_WebView, _OnbWeb_MsgSub
-	Saved := { Gui: _ob_gui, Locale: _ob_locale, AltGr: _OB_ALTGR_PASSTHROUGH,
+	; run_all does not include ui/onboarding/core.ahk, which owns these two
+	; globals: absent before the first onboarding test, as in the payload test.
+	Saved := { HasGui: IsSet(_ob_gui), Gui: IsSet(_ob_gui) ? _ob_gui : 0,
+		HasLocale: IsSet(_ob_locale), Locale: IsSet(_ob_locale) ? _ob_locale : 0, AltGr: _OB_ALTGR_PASSTHROUGH,
 		Config: ConfigurationFile, SubDirSet: IsSet(_AhkSubDir), SubDir: IsSet(_AhkSubDir) ? _AhkSubDir : "",
 		Dir: _ConfigDir, HasDefault: IsSet(_DefaultConfigDir), DefaultDir: IsSet(_DefaultConfigDir) ? _DefaultConfigDir : "",
 		Catalogue: _OnboardingCatalogue,
@@ -198,7 +201,8 @@ _OBP_Publication(Route, Mode) {
 			try Window.Destroy()
 		}
 		World.Windows := []
-		_ob_gui := Saved.Gui, _ob_locale := Saved.Locale, _OB_ALTGR_PASSTHROUGH := Saved.AltGr
+		_ob_gui := Saved.HasGui ? Saved.Gui : unset, _ob_locale := Saved.HasLocale ? Saved.Locale : unset
+		_OB_ALTGR_PASSTHROUGH := Saved.AltGr
 		ConfigurationFile := Saved.Config, _AhkSubDir := Saved.SubDirSet ? Saved.SubDir : unset
 		_ConfigDir := Saved.Dir, _DefaultConfigDir := Saved.HasDefault ? Saved.DefaultDir : unset
 		_OnboardingCatalogue := Saved.Catalogue

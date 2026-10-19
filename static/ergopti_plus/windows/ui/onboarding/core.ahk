@@ -1,12 +1,11 @@
 ﻿; ui/onboarding/core.ahk
 
 ; ==============================================================================
-; MODULE: Onboarding / State + Entry Points + i18n Preview
+; MODULE: Onboarding / State + Entry Points
 ; DESCRIPTION:
 ; Wizard state, the public entry points that launch the first-run wizard or
-; re-run it from the tray, the AltGr-neutralisation guard other modules' #HotIf
-; criteria read, and the translation helper that previews a locale without
-; switching the running script.
+; re-run it from the tray, and the AltGr-neutralisation guard other modules'
+; #HotIf criteria read. The locale preview helper lives in translate.ahk.
 ;
 ; Split out of the former infra/onboarding.ahk (the module split); see
 ; ui/onboarding/init.ahk for the module overview. Functions and globals are
@@ -116,37 +115,4 @@ Onboarding_ShowFromMenu(*) {
 	global _ob_locale := I18nGetLocale()
 	if !_Onboarding_TryWeb()
 		_Onboarding_ShowError("onboarding.error.open_failed")
-}
-
-
-
-
-
-; =======================================
-; =======================================
-; ======= 3/ i18n preview helpers =======
-; =======================================
-; =======================================
-
-; Resolve a translation key in a target locale WITHOUT touching the active
-; locale cache. Used while the user previews languages, so the window title and
-; error messages follow the language being previewed while the rest of the
-; running script keeps its current locale until the user confirms the choice.
-;
-; @param Code string Locale code to resolve under (e.g. "fr", "en").
-; @param Key  string Translation key to look up.
-; @returns string The translated value in Code, or the key itself on failure.
-_Onboarding_Translate(Code, Key) {
-	; Load the target locale into a throwaway local cache so we never touch the
-	; shared globals (_I18nLocale / _I18nCache / _I18nCacheLoaded). Swapping
-	; globals was the root cause of the rapid-switch stale-language bug: rapid
-	; ItemSelect events queued multiple swap/restore cycles, each one capturing
-	; the globals mid-flight from the previous swap, leaving the cache pointing
-	; at an arbitrary intermediate locale after the dust settled.
-	local LocalCache := Map(), Loaded := false
-	_I18nLoadInto(Code, &LocalCache, &Loaded)
-	if Loaded and LocalCache.Has(Key)
-		return LocalCache[Key]
-	; Fall back to the key name so the UI is never silently blank
-	return Key
 }

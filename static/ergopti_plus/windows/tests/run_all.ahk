@@ -884,6 +884,7 @@ _LogBootProgress("loading gestures modules")
 ; The answers contract, the commit and the WebView host are definitions-only
 ; until _Onboarding_TryWeb is called. Include them so the finish payload is
 ; followed to the candidate config.toml without the persistence/reload boundary.
+#Include ../ui/onboarding/translate.ahk
 #Include ../ui/onboarding/answers.ahk
 #Include ../ui/onboarding/finish.ahk
 #Include ../ui/onboarding/webview.ahk
