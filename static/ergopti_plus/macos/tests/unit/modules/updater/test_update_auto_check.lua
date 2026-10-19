@@ -485,6 +485,15 @@ helpers.describe("updater.auto_check (macOS): the manual check answers the updat
 		helpers.assert_eq(ctx.values[ctx.state_key].failures, 1)
 	end)
 
+	helpers.it("names an exhausted GitHub rate limit and its reset time", function()
+		local ctx = build({ now = T0, record = { seed = SEED }, responses = { { ok = false, status = 403,
+			headers = { ["X-RateLimit-Remaining"] = "0", ["x-ratelimit-reset"] = "86400" } } } })
+		local answers = check_now(ctx, "dev")
+		helpers.assert_eq(answers[1].reason_key, "updater.no_connection")
+		helpers.assert_contains(answers[1].detail, "rate limit is exhausted")
+		helpers.assert_contains(answers[1].detail, "1970-01-02 00:00:00 UTC")
+	end)
+
 	helpers.it("answers an unusable list with the parse reason", function()
 		local ctx = build({ now = T0, record = { seed = SEED },
 			responses = { { ok = true, status = 200, body = '[{"name":"no tag"}]', headers = {} } } })
