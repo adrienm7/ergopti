@@ -19,7 +19,7 @@ local function with_window(module_name, scenario)
 	rawset(_G, "lfs", nil)
 	local outcome = table.pack(xpcall(function()
 		return helpers.with_stub_scope({
-			"ui.layer_editor", "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths",
+			"ui.layer_editor", "ui.action_picker", "ui.webview_controller_pool", "ui.layout_manager", "ui.menu.menu_paths",
 			"infra.config_paths", "adapters.program_providers", "program_provider_picker", "modules.keymap.layout_registry",
 			"keymap.layer_editor", "keymap.layers", "platform.remap.nav_layer", "infra.keycodes", "adapters.file_system",
 			"infra.text_utils", "text_utils", "compat.utf8", "layouts.manager_bridge",
@@ -59,8 +59,8 @@ local function with_window(module_name, scenario)
 			}
 			local window = helpers.load_with_stubs(module_name, {
 				webview = { new = new_window, windowMasks = { titled = 1, closable = 2, resizable = 8 },
-					usercontent = { new = function()
-						local controller = {}
+					usercontent = { new = function(name)
+						local controller = { name = name }
 						function controller:setCallback(callback)
 							if callback == nil then
 								h.detach_calls = (h.detach_calls or 0) + 1
@@ -69,6 +69,7 @@ local function with_window(module_name, scenario)
 								if h.bridge_refusal == "false" then return false end
 								if h.bridge_refusal == "nil" then return nil end
 								if h.bridge_refusal == "true" then return true end
+								h.ack_detaches = (h.ack_detaches or 0) + 1
 							end
 						self.callback = callback
 						h.script_refs[self] = callback
@@ -262,6 +263,19 @@ local function close_callback_editor(h, mode)
 	helpers.assert_nil(next(h.retained), "window GC must settle independently of controller callbacks")
 end
 
+--- Verifies acknowledged retirement separately from a pooled successor binding.
+--- @param module_name string Real controller role.
+--- @param h table Native observations.
+--- @param controller table Prior native controller.
+--- @param before integer Acknowledgements before the healthy retry.
+local function assert_prior_callback_retired(module_name, h, controller, before)
+	if module_name == "ui.action_picker" then
+		helpers.assert_true((h.ack_detaches or 0) > before, "old callback requires exact native acknowledgement")
+		helpers.assert_eq(#h.bridges, 1, "a new picker lease reuses the same retained native UCC")
+		helpers.assert_type(h.script_refs[controller], "function", "the successor owns the rebound dispatcher")
+	else helpers.assert_nil(h.script_refs[controller]) end
+end
+
 helpers.describe("editor native message callbacks retire independently of windows", function()
 	for _, module_name in ipairs({ "ui.action_picker", "ui.layout_manager", "ui.menu.menu_paths" }) do
 		for _, mode in ipairs({ "native", "explicit" }) do
@@ -273,9 +287,10 @@ helpers.describe("editor native message callbacks retire independently of window
 					close_callback_editor(h, mode)
 					helpers.assert_nil(h.script_refs[controller], "native window GC does not unref UCC callbacks")
 					helpers.assert_true(h.show())
-					local successor = h.bridges[2]
+					local successor = module_name == "ui.action_picker" and h.bridges[1] or h.bridges[2]
 					helpers.assert_type(h.script_refs[successor], "function")
 					previous({ body = { action = "cancel" } })
+					previous({ name = controller.name, webView = h.windows[1], body = { action = "cancel" } })
 					helpers.assert_type(h.script_refs[successor], "function", "old callbacks cannot retire the successor")
 					h.close(); h.drain()
 					helpers.assert_nil(next(h.script_refs))
@@ -295,8 +310,9 @@ helpers.describe("editor native message callbacks retire independently of window
 						helpers.assert_eq(h.show(), false, "an unacknowledged bridge must block successor admission")
 						helpers.assert_eq(#h.windows, 1)
 						h.bridge_refusal = nil
+						local before_ack = h.ack_detaches or 0
 						helpers.assert_true(h.show())
-						helpers.assert_nil(h.script_refs[controller])
+						assert_prior_callback_retired(module_name, h, controller, before_ack)
 						helpers.assert_eq(#h.windows, 2)
 						h.close(); h.drain()
 						helpers.assert_nil(next(h.script_refs))
@@ -352,8 +368,9 @@ helpers.describe("editor bridge retirement without a native candidate", function
 					helpers.assert_eq(#h.windows, 0)
 					helpers.assert_eq(#h.bridges, 1, "retry must own the exact old bridge before allocating")
 					h.bridge_refusal = nil
+					local before_ack = h.ack_detaches or 0
 					helpers.assert_true(h.show())
-					helpers.assert_nil(h.script_refs[bridge])
+					assert_prior_callback_retired(module_name, h, bridge, before_ack)
 					h.close(); h.drain()
 					helpers.assert_nil(next(h.script_refs))
 				end)

@@ -27,6 +27,9 @@ local Logger     = require("infra.logger")
 local i18n       = require("infra.i18n")
 local Paths      = require("infra.paths")
 local Json       = require("json")
+local ControllerPool = require("ui.webview_controller_pool").new(function(name)
+	return hs.webview.usercontent.new(name)
+end, Logger)
 local ProgramProviderPicker = require("program_provider_picker")
 local PresentationPrepareOwner = rawget(ui_builder, "prepare_app_presentation")
 local PresentationContextPrepareOwner = rawget(ui_builder, "prepare_app_contextual_title")
@@ -91,8 +94,8 @@ local function close_session(session)
 	session.retired = true
 	local bridge = session.usercontent
 	if bridge then
-		local ok, result = pcall(function() return bridge:setCallback(nil) end)
-		if not ok or result ~= bridge then
+		local released, result = ControllerPool.release(session.controller_lease)
+		if not released then
 			pcall(Logger.error, LOG, "Action picker callback cleanup remains pending: %s.", tostring(result))
 			session.closing = false
 			return false
@@ -175,13 +178,17 @@ function M.open(opts, on_confirm)
 
 	if presentation_live and (not presentation_live() or _active_session ~= nil
 		or _session_serial ~= replacement_serial) then return false end
-	local ok_uc, uc = pcall(hs.webview.usercontent.new, "action_picker_bridge")
-	if not ok_uc or not uc then
-		Logger.error(LOG, "Error creating usercontent bridge.")
+	local controller_lease, uc = ControllerPool.reserve("action_picker")
+	if not controller_lease then
+		Logger.error(LOG, "Error creating usercontent bridge: %s.", tostring(uc))
 		return false
 	end
 	if presentation_live and (not presentation_live() or _active_session ~= nil
-		or _session_serial ~= replacement_serial) then return false end
+		or _session_serial ~= replacement_serial) then
+		local released, detail = ControllerPool.release(controller_lease)
+		if not released then Logger.error(LOG, "Action picker unpublished bridge cleanup remains pending: %s.", tostring(detail)) end
+		return false
+	end
 	_session_serial = _session_serial + 1
 	local session = {
 		epoch = _session_serial,
@@ -189,6 +196,7 @@ function M.open(opts, on_confirm)
 		settled = false,
 		settling = false,
 		usercontent = uc,
+		controller_lease = controller_lease,
 		webview = nil,
 		providers = { packet = { unavailable = true } },
 	}
@@ -251,7 +259,7 @@ function M.open(opts, on_confirm)
 		end
 	end
 
-	uc:setCallback(function(msg)
+	local bound, bind_error = ControllerPool.bind(controller_lease, function(msg)
 		if _active_session ~= session or session.retired or session.closing then return end
 		if type(msg) ~= "table" then return end
 		local body = msg.body
@@ -322,6 +330,11 @@ function M.open(opts, on_confirm)
 			close_session(session)
 		end
 	end)
+	if not bound then
+		Logger.error(LOG, "Action picker callback binding did not commit: %s.", tostring(bind_error))
+		close_session(session)
+		return false
+	end
 
 	local geo = ui_builder.get_app_geometry("action_picker")
 	if not geo then
@@ -392,6 +405,10 @@ function M.open(opts, on_confirm)
 	end
 	session.webview = webview
 	_webview = webview
+	if not ControllerPool.attach(controller_lease, webview) or not ControllerPool.commit(controller_lease) then
+		close_session(session)
+		return false
+	end
 	local automation_ok, automation = pcall(require, "adapters.apple_shortcuts_native")
 	ProgramProviderPicker.capture_automation(session.providers, automation_ok and automation or nil, function(packet)
 		if _active_session ~= session or session.closing or not session.webview then return end
