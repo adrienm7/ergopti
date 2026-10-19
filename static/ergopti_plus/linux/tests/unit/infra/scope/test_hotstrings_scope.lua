@@ -611,7 +611,7 @@ helpers.describe("hotstrings retained native release debt", function()
 		trigger_char = "§", preview_ai_enabled = true, dynamic = { date = { enabled = true } } }, other = { value = 1 } }
 	local expected_overrides = { autocorrection = { delay = 3, color = "#111111", names = { delay = 9 },
 		abbreviations = { delay = 9 }, technical_terms = { delay = 9 } }, rolls = { hc = { priority = 5 } },
-		foreign = { delay = 4, unknown_field = "kept" }, _global = { delay = 2 } }
+		foreign = { delay = 4, unknown_field = "kept" }, personal = { delay = 7 }, _global = { delay = 2 } }
 	local receipts = {
 		{ name = "nil", reply = function() return nil end },
 		{ name = "false", reply = function() return false end },
