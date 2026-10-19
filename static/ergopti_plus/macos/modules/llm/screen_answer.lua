@@ -159,6 +159,28 @@ local function is_current(generation, stage)
 	return false
 end
 
+--- Tells whether this screen producer still owns its exact answer surface.
+--- @param generation number The screen reading generation.
+--- @param engine table The prediction engine.
+--- @param session number The admitted answer revision.
+--- @param stage string The callback boundary.
+--- @return boolean current
+local function owns_session(generation, engine, session, stage)
+	return is_current(generation, stage) and engine.current_request_revision() == session
+end
+
+--- Closes only the current failed surface and publishes its failure receipt.
+--- @param generation number The screen reading generation.
+--- @param engine table The prediction engine.
+--- @param session number The admitted answer revision.
+local function close_failed_session(generation, engine, session)
+	if not owns_session(generation, engine, session, "failure") then return end
+	local revision = engine.close_answer_surface(session)
+	if revision ~= nil and owns_session(generation, engine, revision, "failure notice") then
+		show_notice("llm.vision.read_failed")
+	end
+end
+
 --- Drafts the answers one after the other on the AI menu's backend and shows
 --- each as it arrives.
 --- @param generation number The screen reading.
@@ -168,17 +190,23 @@ end
 --- @param answer_set table The answers to draft, in tooltip order.
 --- @param screen string The transcribed screen.
 local function draft_answers(generation, engine, session, config, answer_set, screen)
+	local function current()
+		return owns_session(generation, engine, session, "answer")
+	end
+	if not current() then return end
 	local answers = {}
 	local waiting_shown = false
 	local user_text = Vision.answer_user_text(screen)
 	local Profiles = require("modules.llm.profiles")
 	local language = Profiles.prompt_language()
+	if not current() then return end
 	local total = #answer_set
 
 	--- Shows the answers so far; false when the user closed the surface.
 	--- @param remaining number Answers still to come.
 	--- @return boolean shown
 	local function publish(remaining)
+		if not current() then return false end
 		waiting_shown = remaining > 0
 		if engine.show_answers(session, answers, #answers + remaining) then return true end
 		Logger.info(LOG, "Screen reading stopped: its answers were dismissed or replaced.")
@@ -188,10 +216,10 @@ local function draft_answers(generation, engine, session, config, answer_set, sc
 	local step
 	--- Ends the screen reading once every answer was asked for.
 	local function finish()
+		if not current() then return end
 		if #answers == 0 then
 			Logger.warn(LOG, "Screen reading failed: no answer could be drafted.")
-			engine.close_answer_surface(session)
-			show_notice("llm.vision.read_failed")
+			close_failed_session(generation, engine, session)
 			return
 		end
 		if waiting_shown and not publish(0) then return end
@@ -201,7 +229,7 @@ local function draft_answers(generation, engine, session, config, answer_set, sc
 	--- Asks for one answer, then the next.
 	--- @param index number Position in answer_set.
 	step = function(index)
-		if not is_current(generation, "answer") then return end
+		if not current() then return end
 		if index > total then
 			finish()
 			return
@@ -211,7 +239,7 @@ local function draft_answers(generation, engine, session, config, answer_set, sc
 		--- Moves on once this answer settled, exactly once.
 		--- @param text string|nil The answer, nil when skipped.
 		local function settle(text)
-			if settled or not is_current(generation, "answer") then return end
+			if settled or not current() then return end
 			settled = true
 			if text then
 				answers[#answers + 1] = text
@@ -223,6 +251,7 @@ local function draft_answers(generation, engine, session, config, answer_set, sc
 			Vision.fill_language(answer.prompt, language), user_text,
 			config.answer_max_tokens,
 			function(raw)
+				if not current() then return end
 				local text = Vision.extract(raw, config.answer_tag)
 				if not text then
 					Logger.warn(LOG, "Screen answer '%s' skipped: it holds no %s block.", answer.id, config.answer_tag)
@@ -230,11 +259,12 @@ local function draft_answers(generation, engine, session, config, answer_set, sc
 				settle(text)
 			end,
 			function(detail)
+				if not current() then return end
 				Logger.warn(LOG, "Screen answer '%s' skipped: the model gave no answer (%s).",
 					answer.id, tostring(detail))
 				settle(nil)
-			end)
-		if not sent then
+			end, current)
+		if not sent and current() then
 			Logger.warn(LOG, "Screen answer '%s' skipped: the request could not be sent.", answer.id)
 			settle(nil)
 		end
@@ -261,11 +291,16 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		show_notice("llm.vision.capture_failed")
 		return
 	end
-	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
-	if not engine then return end
+	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
+	if not engine or engine.admit_answer_request("Screen reading") ~= true then return end
+	if not is_current(generation, "capture admission") then return end
 	local session = engine.open_answer_surface("Screen reading")
 	if not session then
 		Logger.warn(LOG, "Screen reading stopped: the prediction tooltip could not be opened.")
+		return
+	end
+	if not owns_session(generation, engine, session, "loading surface") then
+		engine.close_answer_surface(session)
 		return
 	end
 	local body = Vision.build_request(backend.format, {
@@ -280,12 +315,12 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 	--- Ends a screen reading whose vision request failed.
 	--- @param reason string Why, for the log.
 	local function fail(reason)
+		if not owns_session(generation, engine, session, "failure") then return end
 		Logger.warn(LOG, "Screen reading failed: %s.", reason)
-		engine.close_answer_surface(session)
-		show_notice("llm.vision.read_failed")
+		close_failed_session(generation, engine, session)
 	end
 	local function on_text(text)
-		if not is_current(generation, "transcription") then return end
+		if not owns_session(generation, engine, session, "transcription") then return end
 		local screen = Vision.extract(text, config.screen_tag)
 		if not screen then
 			fail(string.format("the vision answer holds no %s block (%d char(s))", config.screen_tag, #text))
@@ -295,27 +330,47 @@ local function on_capture(generation, backend, model, config, answer_set, outcom
 		draft_answers(generation, engine, session, config, answer_set, screen)
 	end
 	local function on_fail(reason, detail)
-		if not is_current(generation, "transcription") then return end
+		if not is_current(generation, "transcription") or engine.current_request_revision() ~= session then return end
+		if reason == "cancelled" then
+			engine.close_answer_surface(session)
+			return
+		end
 		local Offer = require("modules.llm.local_model_offer")
 		if Offer.is_missing(reason, detail) then
 			-- Named, with its Download button, instead of the vague failure
 			Logger.warn(LOG, "Screen reading failed: the local server does not hold model %s.", detail.model)
-			engine.close_answer_surface(session)
+			if not is_current(generation, "model failure") or engine.current_request_revision() ~= session then return end
+			local consent_revision = engine.close_answer_surface(session)
+			if consent_revision == nil then return end
 			Offer.offer(detail.model, { current = function()
+				local script = package.loaded["modules.shortcuts.script_control"]
+				if script and type(script.is_paused) == "function" and script.is_paused() then return false end
 				return is_current(generation, "model consent") and engine.get_llm_enabled() == true
+					and engine.current_request_revision() == consent_revision
 			end })
 			return
 		end
 		fail("the vision model gave no answer (" .. tostring(reason) .. ")")
 	end
+	-- Capture and loading UI cross independent callback boundaries. Admission
+	-- and generation must still belong to this image at the private POST boundary.
+	local function may_dispatch()
+		if owns_session(generation, engine, session, "vision dispatch")
+			and engine.admit_answer_request("Screen reading") == true
+			and owns_session(generation, engine, session, "dispatch admission") then return true end
+		engine.close_answer_surface(session)
+		return false
+	end
 	if backend.kind == "local" then
 		local Ollama = dependency("modules.llm.api_ollama", "request_vision")
 		if not Ollama then return fail("the local backend is unavailable") end
-		Ollama.request_vision(body, on_text, on_fail)
+		if not may_dispatch() then return end
+		Ollama.request_vision(body, on_text, on_fail, may_dispatch)
 	else
 		local Remote = dependency("modules.llm.api_remote", "request_vision")
 		if not Remote then return fail("the remote backend is unavailable") end
-		Remote.request_vision(backend.provider, model, body, on_text, on_fail)
+		if not may_dispatch() then return end
+		Remote.request_vision(backend.provider, model, body, on_text, on_fail, may_dispatch)
 	end
 end
 

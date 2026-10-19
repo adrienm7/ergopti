@@ -293,7 +293,7 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			},
 			{
 				name = "loopback timer allocation failure",
-				options = { fail_on_do_after_call = 2 },
+				options = { fail_on_timer_new_call = 1 },
 				invoke = function(synthetic, tx)
 					return synthetic.emit_loopback_key_stroke({}, "f16", 0, tx)
 				end,

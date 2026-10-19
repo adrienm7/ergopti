@@ -346,13 +346,14 @@ local function ensure_webview(title)
 		end
 		local show_ok, candidate = xpcall(function()
 			local controller = hs.webview.usercontent.new("dl_bridge")
-			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
 			owner.controller = controller
+			controller:setCallback(function(msg) handle_bridge(owner, msg) end)
 			return ui_builder.show_webview({
 				frame             = frame,
 				title             = title or i18n.get("download_window.title"),
 				style_masks       = {"titled", "closable", "miniaturizable", "resizable", "nonactivating"},
 				allow_new_windows = false,
+				delete_on_close   = true,
 				usercontent       = controller,
 				assets_dir        = ASSETS_DIR,
 				on_navigation     = function(action)
@@ -369,11 +370,9 @@ local function ensure_webview(title)
 						if _is_hiding then return end
 						local abort, cancel = _on_abort, _on_cancel
 						_wv = nil
-						_owner = nil
-						_ready = false
-						_queued = PendingQueue.new()
-						M._total_files = nil
-						M._last_file_count = nil
+						owner.view = nil
+						-- The native window is already closing; settle only its controller.
+						M.hide()
 
 						-- Auto-abort download and reset menubar if the window is closed natively.
 						Logger.debug(LOG, "Native window closed (session=%d).", _session)
@@ -454,6 +453,7 @@ end
 --- Hides and destroys the progress window.
 --- @return boolean committed
 function M.hide()
+		if _is_hiding then return false end
 		_is_hiding = true
 		local owned = _wv
 		local owner = _owner
@@ -468,14 +468,26 @@ function M.hide()
 						return false
 				end
 				local ok, err = xpcall(function() owned:delete() end, debug.traceback)
-				_is_hiding = false
 				if not ok then
+						_is_hiding = false
 						Logger.error(LOG, "Download window close did not commit; exact WebView retained: %s.",
 							tostring(err))
 						return false
 				end
 		end
 		if _wv == owned then _wv = nil end
+		if owner then
+				owner.view = nil
+				if owner.controller then
+						local released, err = xpcall(function() owner.controller:setCallback(nil) end, debug.traceback)
+						if not released then
+								_is_hiding = false
+								Logger.error(LOG, "Download window controller release did not commit; exact controller retained: %s.", tostring(err))
+								return false
+						end
+						owner.controller = nil
+				end
+		end
 		if _owner == owner then _owner = nil end
 		_on_abort = nil
 		_on_cancel = nil

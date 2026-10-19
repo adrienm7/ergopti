@@ -634,6 +634,9 @@ helpers.describe("text composite owner: parent isolation", function()
 		helpers.assert_eq(
 			f.subject.has_pending_text_action("gestures"), true)
 
+		helpers.assert_eq(f.subject.pause_text_actions("gestures"), false,
+			"the exact queued copy remains owned until its cancellation callback")
+		f.drain_synthetic()
 		helpers.assert_eq(f.subject.pause_text_actions("gestures"), true)
 		helpers.assert_eq(gesture_timer.stop_calls, 1)
 		helpers.assert_eq(f.subject.resume_text_actions("gestures"), true)
@@ -661,7 +664,10 @@ helpers.describe("text composite owner: parent isolation", function()
 		helpers.assert_eq(
 			f.subject.has_pending_text_action("shortcut_bindings"), true)
 		helpers.assert_eq(
-			f.subject.pause_text_actions("shortcut_bindings"), true)
+			f.subject.pause_text_actions("shortcut_bindings"), false,
+			"the copy transaction must report terminal cancellation before release")
+		f.drain_synthetic()
+		helpers.assert_eq(f.subject.pause_text_actions("shortcut_bindings"), true)
 		helpers.assert_eq(owner_timer.stop_calls, 1)
 		helpers.assert_eq(
 			f.subject.resume_text_actions("shortcut_bindings"), true)

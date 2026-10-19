@@ -101,6 +101,7 @@ function M.open(options)
 		if callback_result == false then error("cleanup bridge callback was refused") end
 		local masks = assert(hs.webview.windowMasks, "native window styles are unavailable")
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame = frame, title = require("infra.i18n").get("dialog.unused_keys.title"),
 			style_masks = masks.titled + masks.closable + masks.resizable,
 			assets_dir = require("infra.paths").shared("ui/config_cleanup") .. "/",

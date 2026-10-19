@@ -11,16 +11,27 @@
 local helpers = require("tests.helpers")
 
 local function with_editor(module_name, callback)
-	local previous_hs = rawget(_G, "hs")
+	local previous_hs, previous_lfs = rawget(_G, "hs"), rawget(_G, "lfs")
+	rawset(_G, "lfs", nil)
 	local ok, err = xpcall(function()
 		helpers.with_fresh_modules({
 			module_name,
+			"ui.webview_controller_pool",
 			"ui.ui_builder",
 			"infra.logger",
 			"infra.paths",
 			"infra.i18n",
 			"hs",
 			"tests.stubs.hs",
+			"adapters.webview_result", "infra.fs_dir", "infra.text_utils", "platform.remap.lease_helper",
+			"program_providers", "adapters.task_environment", "compat.utf8", "diagnostics.runtime_log",
+			"adapters.apple_shortcuts", "adapters.shell_runner", "adapters.apple_shortcuts_native",
+			"infra.deferred_work", "infra.launcher_environment", "adapters.timer_scheduler", "app_dirs",
+			"lfs", "program_provider_picker", "diagnostics.operation_reporter", "infra.config_paths",
+			"infra.log_folders", "program_parameter", "text_utils", "adapters.program_providers",
+			"adapters.file_system", "json",
+			"infra.toml.codec", "toml_codec", "toml_codec.codec", "toml_codec.basic_string",
+			"toml_codec.bom", "toml_codec.key_path", "toml_codec.record_scanner",
 		}, function()
 			local state = {
 				bridges = {},
@@ -37,7 +48,7 @@ local function with_editor(module_name, callback)
 				local bridge = { name = name, callback = nil }
 				function bridge:setCallback(fn)
 					self.callback = fn
-					return true
+					return self
 				end
 				state.bridges[#state.bridges + 1] = bridge
 				return bridge
@@ -99,6 +110,7 @@ local function with_editor(module_name, callback)
 		end)
 	end, debug.traceback)
 	_G.hs = previous_hs
+	rawset(_G, "lfs", previous_lfs)
 	if not ok then error(err, 0) end
 end
 
@@ -112,6 +124,14 @@ local function latest_init_payload(state, hs_stub)
 	return payload
 end
 
+--- Preserves the native WKScriptMessage envelope, independently of page body.
+--- @param view table Exact emitting window.
+--- @param body table Page payload.
+--- @return table message Native-shaped message.
+local function native_message(view, body)
+	return { name = view.options.usercontent.name, webView = view, body = body }
+end
+
 helpers.describe("action picker: a second open supersedes the first context", function()
 	helpers.it("drops a late confirmation from A and invokes only callback B", function()
 		with_editor("ui.action_picker", function(picker, state)
@@ -120,28 +140,31 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				confirmed_a[#confirmed_a + 1] = id
 			end)
 			local bridge_a = state.bridges[1]
-			helpers.assert_type(bridge_a.callback, "function")
+			local queued_callback = bridge_a.callback
+			helpers.assert_type(queued_callback, "function")
 
 			picker.open({ title = "Target B", items = {} }, function(id)
 				confirmed_b[#confirmed_b + 1] = id
 			end)
-			local bridge_b = state.bridges[2]
-			helpers.assert_not_nil(bridge_b,
-				"the second target must own a fresh native bridge session")
+			local bridge_b = state.views[2].options.usercontent
+			helpers.assert_true(rawequal(bridge_a, bridge_b),
+				"a new exact picker session reuses its role's native controller")
+			helpers.assert_eq(#state.bridges, 1)
 			helpers.assert_eq(#state.views, 2,
 				"the second target must replace the first picker window")
 			helpers.assert_true(state.views[1].deleted,
 				"the superseded picker must be torn down before B is published")
 			state.views[1].options.on_close()
 
-			bridge_a.callback({ body = { action = "confirm", id = "stale-a" } })
+			queued_callback(native_message(state.views[1], { action = "confirm", id = "stale-a" }))
+			queued_callback({ body = { action = "confirm", id = "untagged" } })
 			helpers.assert_eq(#confirmed_a, 0,
 				"a queued message from the superseded bridge must not invoke callback A")
 			helpers.assert_eq(#confirmed_b, 0)
 			helpers.assert_true(not state.views[2].deleted,
 				"a stale A message must not close B's window")
 
-			bridge_b.callback({ body = { action = "confirm", id = "picked-b" } })
+			bridge_b.callback(native_message(state.views[2], { action = "confirm", id = "picked-b" }))
 			helpers.assert_eq(#confirmed_a, 0)
 			helpers.assert_eq(#confirmed_b, 1)
 			helpers.assert_eq(confirmed_b[1], "picked-b")
@@ -166,13 +189,13 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				return true
 			end)
 			local bridge = state.bridges[1]
-			bridge.callback({ body = { action = "ready" } })
+			bridge.callback(native_message(state.views[1], { action = "ready" }))
 			local payload = latest_init_payload(state, hs_stub)
 			helpers.assert_eq(payload.platform, "hs", "Command is the primary modifier of a captured shortcut")
 			helpers.assert_eq(payload.sendVocabulary.keys[1].id, "enter")
 			helpers.assert_eq(payload.parameterStrings.save, "Save")
 
-			bridge.callback({ body = { action = "confirm", id = "send_key", parameter = "enter" } })
+			bridge.callback(native_message(state.views[1], { action = "confirm", id = "send_key", parameter = "enter" }))
 			helpers.assert_eq(received and received.id, "send_key")
 			helpers.assert_eq(received and received.parameter, "enter",
 				"the collected value travels with the pick")
@@ -189,12 +212,12 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 			local bridge = state.bridges[1]
 			local view = state.views[1]
 
-			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			bridge.callback(native_message(view, { action = "confirm", id = "retry-me" }))
 			helpers.assert_eq(attempts, 1)
 			helpers.assert_eq(view.deleted, false,
 				"an explicit controller refusal must leave the current picker retryable")
 
-			bridge.callback({ body = { action = "confirm", id = "retry-me" } })
+			bridge.callback(native_message(view, { action = "confirm", id = "retry-me" }))
 			helpers.assert_eq(attempts, 2)
 			helpers.assert_true(view.deleted,
 				"the same picker must close after the retry commits")
@@ -213,7 +236,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 			local view = state.views[1]
 			state.delete_throws = true
 
-			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			bridge.callback(native_message(view, {action = "confirm", id = "accepted"}))
 			helpers.assert_eq(confirmations, 1,
 				"the controller must settle exactly once before the native refusal")
 			helpers.assert_eq(view.deleted, false,
@@ -224,7 +247,7 @@ helpers.describe("action picker: a second open supersedes the first context", fu
 				"a failed replacement must not allocate a second native picker")
 
 			state.delete_throws = false
-			bridge.callback({body = {action = "confirm", id = "accepted"}})
+			bridge.callback(native_message(view, {action = "confirm", id = "accepted"}))
 			helpers.assert_eq(confirmations, 1,
 				"retrying native closure must not invoke the accepted controller twice")
 			helpers.assert_true(view.deleted,
@@ -460,6 +483,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 			} })
 			helpers.assert_eq(state.deletes, 0,
 				"a stale cancel must not close the re-entrant context")
+			local queued_close = bridge.callback
 			bridge.callback({ body = {
 				action = "cancel",
 				edit_id = context_c.edit_id,
@@ -475,7 +499,7 @@ helpers.describe("prompt editor: messages are bound to an immutable context", fu
 			view_d.options.on_navigation("didFinishNavigation")
 			local context_d = latest_init_payload(state, hs_stub)
 			view.options.on_close()
-			bridge.callback({ body = {
+			queued_close({ body = {
 				action = "cancel",
 				edit_id = context_c.edit_id,
 				epoch = context_c.epoch,

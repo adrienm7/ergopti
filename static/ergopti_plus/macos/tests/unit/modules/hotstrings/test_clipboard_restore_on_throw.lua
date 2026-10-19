@@ -46,21 +46,47 @@ helpers.describe("clipboard: a write that throws must not keep the user's clipbo
 	end)
 
 	helpers.it("the sibling that was already fixed still restores", function()
-		local src = helpers.read_driver_source("local function schedule_restore()")
-		helpers.assert_true(type(src) == "string" and src ~= "",
-			"the text sender source must be readable or this asserts nothing")
-		local send_at = src:find("function M.send", 1, true)
-		local ownership_at = send_at and src:find("_paste_owns_clipboard = true", send_at, true)
-		local write_at = send_at and src:find("pcall(function() return Clipboard.write(text) end)", send_at, true)
-		local rejected_at = write_at and src:find("not ok_write or written ~= true", write_at, true)
-		local restore_at = rejected_at and src:find("restore_clipboard()", rejected_at, true)
-		local timer_at = restore_at and src:find("local restore_armed", restore_at, true)
-		helpers.assert_true(ownership_at ~= nil and write_at ~= nil and rejected_at ~= nil
-			and restore_at ~= nil and timer_at ~= nil,
-			"the text sender sibling must retain and restore around its native write")
-		helpers.assert_true(ownership_at < write_at and write_at < rejected_at
-			and rejected_at < restore_at and restore_at < timer_at,
-			"the text sender must restore a possibly mutated clipboard before publishing Cmd+V")
+		helpers.with_stub_scope({
+			"adapters.text_sender", "adapters.clipboard", "adapters.synthetic_input",
+			"adapters.timer_scheduler", "adapters.event_provenance", "adapters.storage",
+			"adapters.json_codec", "infra.logger", "infra.paths", "infra.timings",
+		}, function()
+			local f = require("tests.support.synthetic_input_fixture").make({ deliver_trigger = false })
+			local original = { ["public.utf8-plain-text"] = "USER CLIPBOARD", ["public.html"] = "<b>original</b>" }
+			local clipboard, writes, restores, notifications, count = original, 0, 0, 0, 0
+			f.hs_overrides.pasteboard = {
+				changeCount = function() return count end,
+				readAllData = function() return clipboard end,
+				setContents = function(text)
+					writes = writes + 1
+					count = count + 1
+					clipboard = { ["public.utf8-plain-text"] = text }
+					error("native write raised after changing the pasteboard")
+				end,
+				writeAllData = function(value)
+					restores = restores + 1
+					count = count + 1
+					clipboard = value
+					return true
+				end,
+				clearContents = function() count = count + 1; clipboard = {} end,
+			}
+			local synthetic = f.load()
+			local sender = require("adapters.text_sender")
+			helpers.assert_eq(sender.send("PRIVATE PAYLOAD", { mode = "clipboard" }, function()
+				notifications = notifications + 1
+			end), false)
+			helpers.assert_eq(writes, 1, "the real native write must mutate before throwing")
+			helpers.assert_eq(notifications, 1, "the refused request still notifies its caller inline")
+			helpers.assert_true(helpers.deep_equal(clipboard, original),
+				"all original pasteboard types must return before the failed send returns")
+			helpers.assert_eq(restores, 1, "the failed native write owns exactly one restoration")
+			helpers.assert_eq(#f.pump_deliveries, 0, "the refused payload must never reach native Cmd+V")
+			local stats = synthetic.stats()
+			helpers.assert_eq(stats.active_transactions, 0, "no producer may outlive the refused write")
+			helpers.assert_eq(stats.pending, 0, "no queued paste may dispatch after the refusal returns")
+			helpers.assert_eq(stats.records, 0, "no synthetic key record may remain armed")
+		end)
 	end)
 
 end)

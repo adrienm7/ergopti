@@ -18,7 +18,7 @@ local ACCESSIBILITY_URL = "x-apple.systempreferences:com.apple.preference.securi
 local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
 
 local MODULES = {
-	"ui.permission_dialog", "ui.ui_builder", "infra.i18n", "infra.accessibility_wait",
+	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.accessibility_wait",
 	"adapters.accessibility_permission", "adapters.shell_runner",
 }
 
@@ -128,7 +128,7 @@ end
 --- finds nothing, and every deferred focus retry is captured to be drained.
 --- @param body function Receives the harness.
 local function with_untrusted_factory(body)
-	local owned = { "ui.permission_dialog", "ui.ui_builder", "infra.deferred_work", "infra.i18n" }
+	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.i18n" }
 	helpers.with_stub_scope(owned, function()
 		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
 		package.loaded["infra.deferred_work"] = {
@@ -137,16 +137,27 @@ local function with_untrusted_factory(body)
 				return true
 			end,
 		}
-		local view = {}
+		local view = setmetatable({}, {})
 		for _, name in ipairs({ "windowTitle", "windowStyle", "shadow", "allowTextEntry", "allowGestures",
 			"windowCallback", "navigationCallback", "html" }) do
 			view[name] = function(self) return self end
+		end
+		function view:allowNewWindows(value)
+			if value == nil then return self.allow_new_windows ~= false end
+			assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+			self.allow_new_windows = value
+			return self
+		end
+		function view:deleteOnClose(value)
+			if value == nil then return self.delete_on_close == true end
+			self.delete_on_close = value
+			return self
 		end
 		function view.level(self, level) h.levels[#h.levels + 1] = level; return self end
 		function view.show(self) h.shows = h.shows + 1; return self end
 		function view.bringToFront(self, above_all) h.fronts[#h.fronts + 1] = above_all == true; return self end
 		function view.hswindow() return nil end
-		function view.delete(self) return self end
+		function view.delete(self) setmetatable(self, nil); return self end
 		local LEVELS = { floating = 3, screenSaver = 1000 }
 		h.floating = LEVELS.floating
 		helpers.load_with_stubs("ui.permission_dialog", {

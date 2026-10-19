@@ -339,6 +339,12 @@ syntax gate for entry files outside the normal require graph.
 A successful `pcall` only means no Lua exception occurred. Interpret each native
 API's actual return contract, including false/nil operational refusal.
 
+`hs.pasteboard.clearContents()` returns no Lua values in the pinned native
+binding. Normalize a successful call at its consumer boundary; requiring a
+boolean `true` rejects healthy clearing. `writeAllData()` still requires its
+actual boolean acknowledgement. Preserve both thrown errors and false/nil
+write refusals in tests and diagnostics.
+
 ### project-hs-json-native-test-conversions
 
 The shared pure-Lua JSON decoder is not an exact `hs.json` test double for
@@ -407,6 +413,12 @@ boundaries. Central lifecycle adapters own all of them.
 
 Publish a watcher or process only after activation commits. A teardown refusal
 leaves cleanup debt whose callbacks must already be inert.
+
+Darwin `ps` exposes the command path through `comm`; it is not the executable
+basename that Linux fixtures commonly supply. Use `ucomm` for existing Python
+name guards in MLX cleanup, and keep the independent argument and PID/PGID
+guards. Exercise the emitted shell with recorded signals, including paths
+with spaces and non-Python executables under a directory named `python`.
 
 ### project-hs-timer-commit-contract
 
@@ -1019,6 +1031,47 @@ metatable, including real code-zero errors with a domain. Model both nil and
 the native sentinel in callback fixtures. The pinned implementation is in
 [libwebview.m](https://github.com/Hammerspoon/hammerspoon/blob/1.1.1/extensions/webview/libwebview.m),
 `webview_evaluateJavaScript` and `NSError_toLua`.
+
+### project-hs-webview-close-rewraps-native-userdata
+
+In packaged Hammerspoon 1.1.1, `deleteOnClose(true)` can recurse from
+`windowWillClose` into `userdata_gc`: GC clears `udRef` before closing, and
+`HSWebViewWindow_toLua` wraps the same native window again. A guard against GC
+on the same consumed userdata does not prevent `C stack overflow`. Keep native
+automatic GC disabled and use the factory's `ui/webview_close_owner.lua` to
+retire user-closed windows outside their Cocoa notification. Check native
+consumption separately from business close callbacks. These failures can appear
+only in process `stderr` while `hs.console.getConsole()` is empty; qualify both
+native output streams as well as the console and exact process retirement.
+Disarming the parent does not disarm WebKit children: `allowNewWindows`
+defaults to true, while `createWebViewWithConfiguration` allocates a child
+with `deleteOnClose` true and copies the parent's `windowCallback`. An unowned
+child can therefore notify its parent's owner and enter recursive GC. Factory
+windows must commit `allowNewWindows(false)` before owner hooks or HTML;
+rejecting a child in `policyCallback` happens after its native allocation.
+
+The public `webview:delete()` wrapper normalizes an omitted delay to zero;
+for a visible window it still schedules a fade. Its close notification precedes
+native userdata consumption. Latch the exact request before calling delete and
+never repeat an uncertain request while its metatable remains. Observe retirement
+outside the notification, and release bridge callbacks only after userdata
+consumption and the exact observation timer's stop acknowledgement. A callback
+delivery alone does not prove that its timer retired.
+Do not require another closing notification after an accepted delete: the
+window may already be closed when native destruction runs. Start the owned
+observation from the accepted request and retain it if delivery precedes
+consumption, without issuing another delete. A failed native diagnostic must
+preserve the individual measured retirement facts instead of reporting only a
+timeout. Match exception classes as complete tokens so a startup source name
+such as `SentryCrashMonitor_NSException` is not mistaken for a thrown exception.
+
+WebView GC does not remove the shared user-content controller's script handlers
+or release its Lua callback reference. A successful `setCallback(nil)` detaches
+that callback; it does not prove controller userdata GC. Reusing a controller
+requires an exact session lease: revoke its receiver before detaching, retain
+failed detach as debt that blocks a successor, and check native `message.name`
+and `message.webView` before reading the body. A body field cannot establish
+which native window sent a message.
 
 ### project-hs-development-runtime-registers-stock-peers
 

@@ -38,6 +38,7 @@ local Paths      = require("infra.paths")
 local FileSystem = require("adapters.file_system")
 local JsonCodec  = require("adapters.json_codec")
 local WindowInfo = require("adapters.window_info")
+local SelectionPublication = require("modules.llm.selection_publication")
 
 local LOG = "llm.selection_translation"
 
@@ -176,8 +177,9 @@ end
 --- @param translation string The accepted translation.
 --- @param focus string The focused window identity when the selection was read.
 --- @param parent string|nil Stable action parent.
+--- @param continuation_current table Retained generation and destination publication receipt.
 --- @return boolean started True when the replacement is under way.
-local function replace_selection(selection, translation, focus, parent)
+local function replace_selection(selection, translation, focus, parent, continuation_current)
 	local current_focus = WindowInfo.focused_identity()
 	if current_focus == nil or current_focus ~= focus then
 		Logger.info(LOG, "Translation not typed: the focus moved to another window (%s → %s).",
@@ -191,26 +193,21 @@ local function replace_selection(selection, translation, focus, parent)
 			Logger.info(LOG, "Translation not typed: the selection changed since it was read.")
 			return
 		end
-		Logger.info(LOG, "Selection replaced by its translation (%d byte(s)).", #translation)
-	end)
+		Logger.info(LOG, "Translation replacement admitted (%d byte(s)).", #translation)
+	end, continuation_current)
 	if not started then
 		Logger.warn(LOG, "Translation not typed: another text action still owns the clipboard.")
 	end
 	return started == true
 end
 
---- Requests the translation once the selection was read.
+--- Requests the translation once the selection was read in its original window.
 --- @param generation number The translation.
 --- @param language string Native name of the target language.
 --- @param selection string The selected text.
 --- @param parent string|nil Stable action parent.
-local function request_translation(generation, language, selection, parent)
-	if not is_current(generation, "selection") then return end
-	local focus = WindowInfo.focused_identity()
-	if focus == nil then
-		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")
-		return
-	end
+local function request_translation(generation, language, selection, parent, focus, continuation_current)
+	if not is_current(generation, "selection") or not continuation_current.current() then return end
 	local engine = dependency("modules.llm.prediction_engine", "open_answer_surface")
 	if not engine then return end
 	local session = engine.open_answer_surface(LABEL)
@@ -219,6 +216,10 @@ local function request_translation(generation, language, selection, parent)
 		return
 	end
 	local config = M.config()
+	if not continuation_current.current() then
+		engine.close_answer_surface(session)
+		return
+	end
 
 	--- Ends a translation that produced nothing.
 	--- @param reason string Why, for the log.
@@ -235,7 +236,7 @@ local function request_translation(generation, language, selection, parent)
 			return
 		end
 		local shown = engine.show_answers(session, { translation }, 1, function(accepted)
-			return replace_selection(selection, accepted, focus, parent)
+			return replace_selection(selection, accepted, focus, parent, continuation_current)
 		end)
 		if not shown then
 			Logger.info(LOG, "Translation dropped: its tooltip was dismissed or replaced.")
@@ -245,10 +246,14 @@ local function request_translation(generation, language, selection, parent)
 	end
 	local function on_fail(detail)
 		if not is_current(generation, "answer") then return end
+		if detail == "cancelled" then
+			engine.close_answer_surface(session)
+			return
+		end
 		fail("the model gave no answer (" .. tostring(detail) .. ")")
 	end
 	local sent = engine.request_chat_answer(LABEL, Translate.system_prompt(config, language),
-		Translate.user_text(config, selection), config.max_tokens, on_raw, on_fail)
+		Translate.user_text(config, selection), config.max_tokens, on_raw, on_fail, continuation_current.current)
 	if not sent then
 		fail("the request could not be sent")
 		return
@@ -294,6 +299,11 @@ end
 function M.run(value, parent)
 	local engine = dependency("modules.llm.prediction_engine", "admit_answer_request")
 	if not engine or not engine.admit_answer_request(LABEL) then return false end
+	local focus = WindowInfo.focused_identity()
+	if focus == nil then
+		Logger.warn(LOG, "Translation refused: the focused window cannot be identified.")
+		return false
+	end
 	local config, names = M.config(), M.locale_names()
 	local target = Translate.parse(value, config, names)
 	if not target then
@@ -311,6 +321,12 @@ function M.run(value, parent)
 	local previous = _generation
 	_generation = previous + 1
 	local generation = _generation
+	local continuation_current = SelectionPublication.capture(focus, function() return generation == _generation end)
+	if not continuation_current then
+		if _generation == generation then _generation = previous end
+		Logger.info(LOG, "Translation refused: the text destination is not classified.")
+		return false
+	end
 	local started = Text.read_copied_selection(parent, function(selection)
 		if type(selection) ~= "string" or selection:match("^%s*$") then
 			if not is_current(generation, "selection") then return end
@@ -318,12 +334,12 @@ function M.run(value, parent)
 			show_notice("llm.translate.no_selection")
 			return
 		end
-		request_translation(generation, language, selection, parent)
+		request_translation(generation, language, selection, parent, focus, continuation_current)
 	end, function()
 		if not is_current(generation, "selection") then return end
 		Logger.info(LOG, "Translation refused: nothing is selected.")
 		show_notice("llm.translate.no_selection")
-	end)
+	end, continuation_current)
 	if not started then
 		-- Nothing was read: the translation in flight, if any, stays the current one
 		if _generation == generation then _generation = previous end

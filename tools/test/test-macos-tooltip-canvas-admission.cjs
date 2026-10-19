@@ -161,19 +161,29 @@ assert.ok(retain.includes('${{ runner.temp }}/tooltip-provisioning'));
 const root = path.resolve(__dirname, '..', '..');
 const calls = [];
 const silent = { log: () => {}, error: () => {} };
-const completed = { status: 0, stdout: '', stderr: 'Ran 48 tests in 0.01s\n\nOK\n' };
+const completed = { status: 0, stdout: '', stderr: 'Ran 54 tests in 0.01s\n\nOK\n' };
+const bindingCompleted = { ...completed, stderr: 'Ran 34 tests in 0.01s\n\nOK\n' };
+const physicalCompleted = { ...completed, stderr: 'Ran 23 tests in 0.01s\n\nOK\n' };
+const pickerCompleted = { ...completed, stderr: 'Ran 19 tests in 0.01s\n\nOK\n' };
 assert.equal(
 	run({
 		...silent,
 		env: { PYTHON: 'selected-python' },
 		spawn: (...args) => {
 			calls.push(args);
-			return completed;
+			return args[1][6] === 'macos_webview_binding_test.py'
+				? bindingCompleted
+				: args[1][6] === 'macos_physical_shortcuts_close_test.py'
+					? physicalCompleted
+					: args[1][6] === 'macos_action_picker_pool_test.py'
+						? pickerCompleted
+						: completed;
 		}
 	}),
 	0
 );
 assert.equal(calls[0][0], 'selected-python');
+assert.equal(calls.length, 4);
 assert.equal(calls[0][2].cwd, root);
 assert.deepEqual(calls[0][1], [
 	'-m',
@@ -185,6 +195,83 @@ assert.deepEqual(calls[0][1], [
 	'macos_tooltip_canvas_test.py',
 	'-v'
 ]);
+assert.equal(calls[1][0], 'selected-python');
+assert.equal(calls[1][2].cwd, root);
+assert.deepEqual(calls[1][1], [
+	'-m',
+	'unittest',
+	'discover',
+	'-s',
+	'tools/diagnostics',
+	'-p',
+	'macos_webview_binding_test.py',
+	'-v'
+]);
+assert.deepEqual(calls[2][1], [
+	'-m',
+	'unittest',
+	'discover',
+	'-s',
+	'tools/diagnostics',
+	'-p',
+	'macos_physical_shortcuts_close_test.py',
+	'-v'
+]);
+assert.deepEqual(calls[3][1], [
+	'-m',
+	'unittest',
+	'discover',
+	'-s',
+	'tools/diagnostics',
+	'-p',
+	'macos_action_picker_pool_test.py',
+	'-v'
+]);
+for (const receipt of [
+	{ ...pickerCompleted, status: 1 },
+	{ ...pickerCompleted, status: null },
+	{ ...pickerCompleted, error: new Error('ActionPicker Python unavailable') },
+	{ ...pickerCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
+	{ ...pickerCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK\n' },
+	{ ...pickerCompleted, stderr: 'Ran 19 tests in 0.01s\n\nOK (skipped=1)\n' }
+]) {
+	assert.equal(
+		run({
+			...silent,
+			spawn: (_python, args) =>
+				args[6] === 'macos_action_picker_pool_test.py'
+					? receipt
+					: args[6] === 'macos_webview_binding_test.py'
+						? bindingCompleted
+						: args[6] === 'macos_physical_shortcuts_close_test.py'
+							? physicalCompleted
+							: completed
+		}),
+		1
+	);
+}
+for (const receipt of [
+	{ ...physicalCompleted, status: 1 },
+	{ ...physicalCompleted, status: null },
+	{ ...physicalCompleted, error: new Error('Physical interpreter unavailable') },
+	{ ...physicalCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
+	{ ...physicalCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK\n' },
+	{ ...physicalCompleted, stderr: 'Ran 22 tests in 0.01s\n\nOK\n' },
+	{ ...physicalCompleted, stderr: 'Ran 23 tests in 0.01s\n\nOK (skipped=1)\n' }
+]) {
+	assert.equal(
+		run({
+			...silent,
+			spawn: (_python, args) =>
+				args[6] === 'macos_physical_shortcuts_close_test.py'
+					? receipt
+					: args[6] === 'macos_webview_binding_test.py'
+						? bindingCompleted
+						: completed
+		}),
+		1
+	);
+}
 for (const receipt of [
 	{ ...completed, status: 1 },
 	{ ...completed, status: null },
@@ -197,9 +284,37 @@ for (const receipt of [
 	{ ...completed, stderr: 'Ran 45 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 47 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 48 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...completed, stderr: 'Ran 48 tests in 0.01s\n\nOK\n' },
+	{ ...completed, stderr: 'Ran 53 tests in 0.01s\n\nOK\n' },
 	{ ...completed, stderr: 'Ran 38 tests in 0.01s\n\nOK (skipped=1)\n' }
 ])
 	assert.equal(run({ ...silent, spawn: () => receipt }), 1);
+
+for (const receipt of [
+	{ ...bindingCompleted, status: 1 },
+	{ ...bindingCompleted, status: null },
+	{ ...bindingCompleted, error: new Error('Binding interpreter unavailable') },
+	{ ...bindingCompleted, stderr: 'Ran 0 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 17 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 20 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 18 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 21 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 22 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 32 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK (skipped=1)\n' },
+	{ ...bindingCompleted, stderr: 'Ran 33 tests in 0.01s\n\nOK\n' },
+	{ ...bindingCompleted, stderr: 'Ran 34 tests in 0.01s\n\nOK (skipped=1)\n' }
+]) {
+	assert.equal(
+		run({
+			...silent,
+			spawn: (_python, args) => (args[6] === 'macos_webview_binding_test.py' ? receipt : completed)
+		}),
+		1
+	);
+}
 
 assert.equal(GATE_COMMANDS['macos-tooltip-canvas'].npm, 'test:macos-tooltip-canvas');
 for (const file of [
@@ -207,6 +322,17 @@ for (const file of [
 	'tools/diagnostics/macos_tooltip_canvas.lua',
 	'tools/diagnostics/macos_tooltip_canvas_observer.py',
 	'tools/diagnostics/macos_tooltip_canvas_test.py',
+	'tools/diagnostics/macos_webview_binding.lua',
+	'tools/diagnostics/macos_webview_binding.py',
+	'tools/diagnostics/macos_webview_binding_test.py',
+	'tools/diagnostics/macos_webview_raw_delete.lua',
+	'tools/diagnostics/macos_physical_shortcuts_close.lua',
+	'tools/diagnostics/macos_physical_shortcuts_close.py',
+	'tools/diagnostics/macos_physical_shortcuts_close_test.py',
+	'tools/diagnostics/macos_action_picker_pool.lua',
+	'tools/diagnostics/macos_action_picker_pool.py',
+	'tools/diagnostics/macos_action_picker_pool_observer.lua',
+	'tools/diagnostics/macos_action_picker_pool_test.py',
 	'tools/diagnostics/macos_owned_process.py',
 	'tools/test/run-macos-tooltip-canvas-tests.cjs'
 ]) {
@@ -219,6 +345,7 @@ for (const file of [
 		`${file}: wiring and independent admission must be selected`
 	);
 }
+assert(selectGates(['tools/diagnostics/macos_action_picker_pool_observer.lua']).has('hs'));
 assert(selectGates(['.github/workflows/ci-macos.yml']).has('js'));
 console.log(
 	'Mandatory macOS canvas job, inherited desktop evidence and pure Python registration admitted.'

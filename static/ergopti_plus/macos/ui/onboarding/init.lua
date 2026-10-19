@@ -1101,6 +1101,7 @@ function M.run(config_path)
 	_focus_owner = focus_owner
 	local show_ok, candidate = xpcall(function()
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame       = ui_builder.get_centered_frame(win_w, win_h),
 			title       = i18n.get(WINDOW_TITLE_KEY),
 			style_masks = style_masks,

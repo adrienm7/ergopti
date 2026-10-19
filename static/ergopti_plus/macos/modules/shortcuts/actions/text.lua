@@ -24,6 +24,9 @@ local Paths      = require("infra.paths")
 local Timings    = require("infra.timings")
 local SyntheticInput = require("adapters.synthetic_input")
 local TimerScheduler = require("adapters.timer_scheduler")
+local TextContinuation = require("modules.shortcuts.actions.text_continuation")
+local TextDispatch = require("modules.shortcuts.actions.text_dispatch")
+local TransformGrace = require("modules.shortcuts.actions.text_transform_grace")
 
 local LOG = "shortcuts.actions.text"
 
@@ -264,6 +267,10 @@ end
 --- @return any detail
 local function restore_text_clipboard(owner)
 	if owner.clipboard_owned ~= true then return true, nil end
+	if owner.kind == "transform" and (owner.synthetic_pending == true
+		or (owner.transform_restore_after or 0) > TimerScheduler.awake_time()) then
+		return false, "native transform paste grace is pending"
+	end
 	owner.mutations = owner.mutations + 1
 	local restore_ok, restore_result
 	if type(owner.clipboard_prior) == "table" and next(owner.clipboard_prior) ~= nil then
@@ -672,34 +679,20 @@ local _transform_generation = 0
 --- @param count integer Number of preceding characters to select.
 --- @param owner table Transform owner.
 --- @return boolean dispatched
-local function reselect_previous_text(count, owner)
+local function reselect_previous_text(count, owner, tx)
 	if type(count) ~= "number" or count < 1 then return true end
 	if not text_owner_authorized(owner) then return false end
-	local tx = nil
-	owner.mutations = owner.mutations + 1
-	local ok, err = xpcall(function()
-		tx = SyntheticInput.begin("shortcuts.text.reselect", "action")
-		local batch = SyntheticInput.begin_batch(tx)
-		for _ = 1, count do
-			assert(SyntheticInput.keyStroke(batch, {}, "left") == true,
-				"synthetic left reselection stroke was refused")
-		end
-		for _ = 1, count do
-			assert(SyntheticInput.keyStroke(batch, { "shift" }, "right") == true,
-				"synthetic right reselection stroke was refused")
-		end
-		assert(text_owner_authorized(owner),
-			"text admission was revoked during reselection build")
-		assert(SyntheticInput.dispatch(batch) == true,
-			"synthetic reselection batch could not be dispatched")
-		assert(SyntheticInput.seal(tx) == true,
-			"synthetic reselection transaction could not be sealed")
-	end, debug.traceback)
-	owner.mutations = owner.mutations - 1
-	if ok and text_owner_authorized(owner) then return true end
-	if tx then pcall(SyntheticInput.cancel, tx) end
-	Logger.error(LOG, "Text reselection could not be dispatched - %s.", tostring(err))
-	return false
+	local batch = SyntheticInput.begin_batch(tx)
+	for _ = 1, count do
+		assert(SyntheticInput.keyStroke(batch, {}, "left") == true,
+			"synthetic left reselection stroke was refused")
+	end
+	for _ = 1, count do
+		assert(SyntheticInput.keyStroke(batch, { "shift" }, "right") == true,
+			"synthetic right reselection stroke was refused")
+	end
+	assert(text_owner_authorized(owner), "text admission was revoked during reselection build")
+	return SyntheticInput.dispatch(batch) == true
 end
 
 --- The transform callback may return false to decline: nothing is pasted, the
@@ -709,8 +702,11 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_declined function|nil Runs after a decline released the clipboard.
 --- @param on_empty function|nil Runs after an empty selection released the clipboard.
+--- @param continuation_check function|table|nil Refuses delayed business work when it no longer returns true.
 --- @return boolean started
-local function do_transform(transform_func, parent, on_declined, on_empty)
+local function do_transform(transform_func, parent, on_declined, on_empty, continuation_check)
+	local continuation_current, continuation_cached = TextContinuation.new(continuation_check)
+	if not continuation_current() then return false end
 	local scope = text_scope(parent)
 	if scope.paused == true then return false end
 	if _transform_in_flight then
@@ -764,7 +760,14 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 	local restore_prior
 	local queue_restore_retry
 	local abort_transform
-	owner.on_timer_settled = function()
+	local continue_transform
+	owner.on_timer_settled = function(_, entry)
+		local was_grace = owner.transform_grace_entry == entry
+		if was_grace then owner.transform_grace_entry = nil end
+		if owner.business_open ~= true then
+			if was_grace or owner.transform_restore_after ~= nil then settle_text_owner(owner) end
+			return
+		end
 		if owner.cleanup_waiting == true and owner.cleanup_settling ~= true
 			and owner.cleanup_only == true and owns_clipboard
 			and scope.paused ~= true and scope.slots.transform == owner then
@@ -787,6 +790,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		return schedule_text_timer(owner, delay, "Text transform " .. label, function()
 			if not active or my_generation ~= _transform_generation then return end
 			if owner.cleanup_only == true and cleanup ~= true then return end
+			if cleanup ~= true and not continue_transform() then return end
 			local ok_callback, callback_error = xpcall(callback, debug.traceback)
 			if not ok_callback then
 				Logger.error(LOG, "Text transform %s callback failed: %s.",
@@ -855,13 +859,67 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		return false
 	end
 
+	-- Refusal ends business work, while clipboard retries keep their exact owner.
+	continue_transform = function()
+		if continuation_current() then return true end
+		local restored = restore_prior()
+		if restored then release() else queue_restore_retry() end
+		Logger.info(LOG, "Text transform stopped: its continuation is no longer current.")
+		return false
+	end
+
+	local function guarded_boundary(fn, ...)
+		if not continue_transform() then return false, "text continuation was revoked" end
+		local result = table.pack(call_text_boundary(owner, fn, ...))
+		if not continue_transform() then return false, "text continuation was revoked" end
+		return table.unpack(result, 1, result.n)
+	end
+
 	abort_transform = function(reason, detail)
-		if not active or my_generation ~= _transform_generation then return false end
+		if not active or my_generation ~= _transform_generation or owner.cleanup_only == true then return false end
 		local restored, restore_error = restore_prior()
 		if restored then release() else queue_restore_retry() end
 		Logger.error(LOG, "Text transform aborted at %s: %s (restore=%s).",
 			reason, tostring(detail), tostring(restore_error))
 		return false
+	end
+
+	local publication = {
+		current = function() return text_owner_authorized(owner) and continuation_current() end,
+		cached = function()
+			return text_owner_authorized(owner) and (continuation_cached == nil or continuation_cached())
+		end,
+	}
+	TransformGrace.install(owner, {
+		cancel = function(entry) return cancel_text_timer(owner, entry) end,
+		cancel_native = SyntheticInput.cancel,
+		now = TimerScheduler.awake_time,
+		schedule = function(delay, callback)
+			return schedule_text_timer(owner, delay, "Transform paste grace cleanup", callback, true)
+		end,
+		settle = function() return settle_text_owner(owner) end,
+	})
+	local function dispatch_stage(build, delay, label, next_stage, paste)
+		if not continue_transform() then return false end
+		local started, detail = TextDispatch.start(SyntheticInput, owner, publication, build, function(status, handed_off)
+			if paste and (status == "complete" or handed_off == true) then
+				owner.transform_restore_after = TimerScheduler.awake_time() + RESTORE_DELAY_SEC
+			end
+			if not active or my_generation ~= _transform_generation or not text_owner_authorized(owner) then
+				settle_text_owner(owner)
+				return
+			end
+			if not continue_transform() then return end
+			if status ~= "complete" then
+				abort_transform(label .. " dispatch", status)
+				return
+			end
+			local armed, timer_error = schedule_transform_timer(delay, label, next_stage)
+			if not armed then abort_transform(label .. " timer", timer_error) end
+		end, paste)
+		if not started then abort_transform(label .. " dispatch", detail) end
+		if not text_owner_authorized(owner) then settle_text_owner(owner) end
+		return started
 	end
 
 	local copy_stage
@@ -880,7 +938,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			Logger.info(LOG, "%s", message)
 			return true
 		end
-		local ok_selection, selection = call_text_boundary(owner, pasteboard.getContents)
+		local ok_selection, selection = guarded_boundary(pasteboard.getContents)
 		if not ok_selection or (selection ~= nil and type(selection) ~= "string") then
 			abort_transform("selection copy", selection)
 			return
@@ -897,7 +955,7 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			end
 			return
 		end
-		local ok_transform, transformed = call_text_boundary(owner, transform_func, selection)
+		local ok_transform, transformed = guarded_boundary(transform_func, selection)
 		if ok_transform and transformed == false then
 			if end_without_paste("Text transform declined by its action: nothing pasted.")
 				and type(on_declined) == "function" then
@@ -913,44 +971,27 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			return
 		end
 
-		local paste_stage
-		paste_stage = function()
-			local reselect_stage
-			reselect_stage = function()
-				local restore_armed, restore_timer_error = schedule_transform_timer(
-					RESTORE_DELAY_SEC, "clipboard restore", function()
-						local restored, restore_error = restore_prior()
-						if restored then
-							release()
-							Logger.done(LOG, "Text transformation completed.")
-						else
-							Logger.error(LOG, "Text transform clipboard restore refused: %s.",
-								tostring(restore_error))
-							queue_restore_retry()
-						end
-					end)
-				if not restore_armed then
-					abort_transform("restore timer", restore_timer_error)
-					return
-				end
-				local steps_ok, steps = pcall(cursor_steps, transformed)
-				local count = (steps_ok and steps > 0) and steps or #transformed
-				if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
-				if count > 0 and not reselect_previous_text(count, owner) then
-					abort_transform("text reselection", "synthetic dispatch refused")
-				end
+		local function restore_stage()
+			local restored, restore_error = restore_prior()
+			if restored then
+				release()
+				Logger.done(LOG, "Text transformation completed.")
+			else
+				Logger.error(LOG, "Text transform clipboard restore refused: %s.", tostring(restore_error))
+				queue_restore_retry()
 			end
-			local reselect_armed, reselect_timer_error = schedule_transform_timer(
-				RESELECT_DELAY_SEC, "reselection", reselect_stage)
-			if not reselect_armed then
-				abort_transform("reselection timer", reselect_timer_error)
-				return
-			end
-			local ok_paste, pasted = call_text_boundary(owner,
-				SyntheticInput.emit_key_stroke, { "cmd" }, "v", 0.02)
-			if not ok_paste or pasted ~= true then
-				abort_transform("paste shortcut", pasted)
-			end
+		end
+		local function reselect_stage()
+			local steps_ok, steps = pcall(cursor_steps, transformed)
+			local count = (steps_ok and steps > 0) and steps or #transformed
+			if count > MAX_RESELECT_CHARS then count = MAX_RESELECT_CHARS end
+			dispatch_stage(function(tx) return reselect_previous_text(count, owner, tx) end,
+				RESTORE_DELAY_SEC, "clipboard restore", restore_stage)
+		end
+		local function paste_stage()
+			dispatch_stage(function(tx)
+				return SyntheticInput.emit_key_stroke({ "cmd" }, "v", 0.02, tx)
+			end, RESELECT_DELAY_SEC, "reselection", reselect_stage, true)
 		end
 
 		local paste_armed, paste_timer_error = schedule_transform_timer(
@@ -959,8 +1000,8 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 			abort_transform("paste timer", paste_timer_error)
 			return
 		end
-		local ok_write, write_result = call_text_boundary(
-			owner, pasteboard.setContents, transformed)
+		local ok_write, write_result = guarded_boundary(
+			pasteboard.setContents, transformed)
 		if not ok_write or write_result ~= true then
 			abort_transform("clipboard write", write_result)
 		end
@@ -975,25 +1016,14 @@ local function do_transform(transform_func, parent, on_declined, on_empty)
 		Logger.error(LOG, "Text transform failsafe timer was refused: %s.", tostring(failsafe_error))
 		return false
 	end
-	local copy_armed, copy_timer_error = schedule_transform_timer(
-		COPY_SETTLE_SEC, "selection copy", copy_stage)
-	if not copy_armed then
-		abort_transform("copy timer", copy_timer_error)
-		return false
-	end
-
-	local ok_clear, clear_error = call_text_boundary(owner, pasteboard.clearContents)
+	local ok_clear, clear_error = guarded_boundary(pasteboard.clearContents)
 	if not ok_clear then
 		abort_transform("clipboard clear", clear_error)
 		return false
 	end
-	local ok_copy, copied = call_text_boundary(owner,
-		SyntheticInput.emit_key_stroke, { "cmd" }, "c", KEYSTROKE_NO_DELAY_US)
-	if not ok_copy or copied ~= true then
-		abort_transform("copy shortcut", copied)
-		return false
-	end
-	return true
+	return dispatch_stage(function(tx)
+		return SyntheticInput.emit_key_stroke({ "cmd" }, "c", KEYSTROKE_NO_DELAY_US, tx)
+	end, COPY_SETTLE_SEC, "selection copy", copy_stage)
 end
 
 
@@ -1639,8 +1669,9 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_selection function Receives the selected text.
 --- @param on_empty function|nil Runs when nothing is selected.
+--- @param continuation_check function|table|nil Optional receipt checked before delayed copy work.
 --- @return boolean started
-function M.read_copied_selection(parent, on_selection, on_empty)
+function M.read_copied_selection(parent, on_selection, on_empty, continuation_check)
 	if type(on_selection) ~= "function" then
 		error("read_copied_selection: on_selection must be a function")
 	end
@@ -1651,7 +1682,7 @@ function M.read_copied_selection(parent, on_selection, on_empty)
 	return do_transform(function(sel)
 		selection = sel
 		return false
-	end, parent, function() on_selection(selection) end, on_empty)
+	end, parent, function() on_selection(selection) end, on_empty, continuation_check)
 end
 
 --- Replaces the current selection with `text` and leaves `text` selected, like
@@ -1662,8 +1693,9 @@ end
 --- @param parent string|nil Stable action parent.
 --- @param on_checked function Receives true when the selection matched and the
 ---        paste follows, false once a changed selection was left alone.
+--- @param continuation_check function|table|nil Optional receipt checked before delayed copy, paste and reselection.
 --- @return boolean started
-function M.replace_copied_selection(expected, text, parent, on_checked)
+function M.replace_copied_selection(expected, text, parent, on_checked, continuation_check)
 	if type(expected) ~= "string" or expected == "" or type(text) ~= "string" or text == "" then
 		error("replace_copied_selection: expected and text must be non-empty strings")
 	end
@@ -1674,7 +1706,7 @@ function M.replace_copied_selection(expected, text, parent, on_checked)
 		if sel ~= expected then return false end
 		on_checked(true)
 		return text
-	end, parent, function() on_checked(false) end)
+	end, parent, function() on_checked(false) end, nil, continuation_check)
 end
 
 --- Selects the current word under the cursor (Alt+Right, then Alt+Shift+Left).

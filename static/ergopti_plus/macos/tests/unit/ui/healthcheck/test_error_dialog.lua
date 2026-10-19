@@ -36,7 +36,7 @@ local function load_dialog(controls)
 	local sharing_schema = require("healthcheck.snapshot").load_config(helpers.shared).schema
 	for _, name in ipairs({
 		"ui.error_dialog", "ui.healthcheck.core", "ui.healthcheck.report", "infra.logger", "infra.i18n",
-		"infra.locale", "ui.ui_builder", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
+		"infra.locale", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "adapters.timer_scheduler", "adapters.storage", "infra.manifest_reader",
 	}) do package.loaded[name] = nil end
 	package.loaded["tests.stubs.hs"] = nil
 	local hs_stub = require("tests.stubs.hs")
@@ -56,6 +56,11 @@ local function load_dialog(controls)
 	package.loaded["infra.locale"] = { all = function() return { ["common.error_title"] = "Error" } end }
 	package.loaded["adapters.timer_scheduler"] = {
 		after = function(delay, fn)
+			if delay == 0 then
+				context.close_cleanup = context.close_cleanup or {}
+				context.close_cleanup[#context.close_cleanup + 1] = fn
+				return { timer = {} }, true
+			end
 			context.timers[#context.timers + 1] = { delay = delay, fn = fn }
 			return { timer = {} }, true
 		end,
@@ -136,20 +141,37 @@ local function load_dialog(controls)
 		end
 	end
 
-	local webview = {}
+	local webview = setmetatable({}, {})
 	for _, method in ipairs({
 		"windowStyle", "windowTitle", "allowTextEntry", "allowNewWindows", "allowGestures", "level", "html",
 		"show", "shadow",
 	}) do webview[method] = function(self) return self end end
 	webview.windowTitle = function(self, title) context.title = title; return self end
+	-- The packaged methods have boolean getters, fluent setters and C defaults.
+	function webview:allowNewWindows(value)
+		if value == nil then return self.children ~= false end
+		self.children = value
+		return self
+	end
+	function webview:deleteOnClose(value)
+		if value == nil then return self.automatic_close == true end
+		self.automatic_close = value
+		return self
+	end
+	function webview:show() self.presented = true; return self end
 	webview.windowCallback = function(self, callback) context.window_callback = callback; return self end
 	webview.navigationCallback = function(self, callback) context.navigation_callback = callback; return self end
 	webview.evaluateJavaScript = function(self, script)
 		context.scripts[#context.scripts + 1] = script
 		return self
 	end
-	webview.delete = function() context.deleted = context.deleted + 1 end
-	hs_stub.webview.new = function() context.windows = (context.windows or 0) + 1; return webview end
+	webview.delete = function(self) context.deleted = context.deleted + 1; setmetatable(self, nil) end
+	hs_stub.webview.new = function()
+		if webview.presented or getmetatable(webview) == nil then
+			local fresh = {}; for key, value in pairs(webview) do if type(value) == "function" then fresh[key] = value end end
+			webview = setmetatable(fresh, {})
+		end
+		context.windows = (context.windows or 0) + 1; return webview end
 	hs_stub.webview.usercontent.new = function(name)
 		context.handler_name = name
 		return {

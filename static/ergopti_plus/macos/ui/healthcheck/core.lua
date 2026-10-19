@@ -33,6 +33,8 @@ local Snapshot = require("healthcheck.snapshot")
 local Cleanup = require("healthcheck.cleanup")
 local Actions  = require("healthcheck.actions")
 local TimerScheduler = require("adapters.timer_scheduler")
+local DeferredWork = require("infra.deferred_work")
+local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 
 local LOG = "healthcheck"
 
@@ -157,20 +159,29 @@ end
 --- @return boolean settled True only when the window and its runtime settled.
 local function close_owned_window(webview, reason)
 	if _window ~= webview then return true end
+	if _closing_window ~= nil then return false end
 	local session, generation = _session, _window_generation
+	local consumed = session and session.native_delete_metatable ~= nil and getmetatable(webview) == nil
+	if session and session.native_delete_pending and not consumed then return false end
 	local continuations = continuation_snapshot()
 	_focus_owner = nil
-	if type(webview.delete) ~= "function" then
-		Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
-		return false
-	end
-	_closing_window = webview
-	local ok, result = xpcall(function() return webview:delete() end, debug.traceback)
-	if _closing_window == webview then _closing_window = nil end
-	if not ok or result == false then
-		Logger.error(LOG, "Healthcheck %s did not commit; exact WebView retained: %s.",
-			reason, tostring(result))
-		return false
+	if not consumed then
+		local delete = webview.delete
+		if type(delete) ~= "function" then
+			Logger.error(LOG, "Healthcheck %s refused; owned WebView has no delete method.", reason)
+			return false
+		end
+		_closing_window = webview
+		session.native_delete_metatable = getmetatable(webview)
+		session.native_delete_pending = session.presentation_attempted == true
+		local ok, result = xpcall(function() return delete(webview) end, debug.traceback)
+		consumed = session.native_delete_metatable ~= nil and getmetatable(webview) == nil
+		if not consumed and (not ok or result == false) then
+			pcall(Logger.error, LOG, "Healthcheck %s did not commit; exact WebView retained: %s.", reason, tostring(result))
+			if _closing_window == webview then _closing_window = nil end
+			return false
+		end
+		if _closing_window == webview then _closing_window = nil end
 	end
 	if _window == webview then _window = nil end
 	if _window_generation == generation then _window_generation = generation + 1 end
@@ -519,6 +530,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.synthetic_input_loopback_owner",
+		contract = { "new" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.managed_ollama_pull",
 		contract = {
 			"handles", "prepare", "prepare_owned", "mark_start_attempted",
@@ -852,7 +868,7 @@ local function perform_action(session, action, documents)
 		local snapshot = session.snapshot
 		local revision, generation = snapshot.export_revision, session.generation
 		local function current()
-			return package.loaded["ui.healthcheck.core"] == M and _session == session and _window == session.webview and _closing_window ~= session.webview
+			return package.loaded["ui.healthcheck.core"] == M and _session == session and _window == session.webview and _closing_window ~= session.webview and not session.native_delete_pending
 				and session.action_epoch == epoch and session.snapshot == snapshot
 				and snapshot.export_revision == revision and session.generation == generation
 		end
@@ -875,7 +891,7 @@ end
 --- @param session table
 --- @param message table The usercontent message ({ body = … }).
 local function on_page_message(session, message)
-	if _session ~= session or _window ~= session.webview or _closing_window == session.webview then return end
+	if _session ~= session or _window ~= session.webview or _closing_window == session.webview or session.native_delete_pending then return end
 	local body = type(message) == "table" and message.body or nil
 	if body == "ready" then
 		Logger.info(LOG, "Diagnostics page ready.")
@@ -927,6 +943,7 @@ end
 --- @param opts table|nil { mode = "report"|nil, state = menu state|nil }
 --- @return boolean opened
 function M.show_window(opts)
+	if NativeClose.retry_cleanup() ~= true then return false end
 	_open_revision = _open_revision + 1
 	local revision = _open_revision
 	opts = type(opts) == "table" and opts or {}
@@ -1005,6 +1022,13 @@ function M.show_window(opts)
 		return false
 	end
 
+	local policy_ok, policy_error = xpcall(function()
+		NativeClose.disarm(wv)
+		assert(wv:allowNewWindows(false) == wv, "native child-window policy was not acknowledged")
+		assert(wv:allowNewWindows() == false, "native child windows remain enabled")
+	end, debug.traceback)
+	if not policy_ok then return abandon_open_window("The diagnostics native window policy was refused", policy_error) end
+
 	local ok_cb, cb_err = pcall(function()
 		controller:setCallback(function(message) on_page_message(session, message) end)
 	end)
@@ -1022,26 +1046,23 @@ function M.show_window(opts)
 	end
 	pcall(function() wv:windowTitle(title) end)
 	pcall(function() wv:allowTextEntry(true) end)
-	pcall(function() wv:allowNewWindows(false) end)
 	pcall(function() wv:allowGestures(false) end)
 
 	local ok_wcb, wcb_err = pcall(function()
-		wv:windowCallback(function(action)
+		NativeClose.bind(wv, function()
 			if generation ~= _window_generation or _window ~= wv then return end
 			if _closing_window == wv then return end
-			Logger.debug(LOG, "Window callback: action='%s'.", tostring(action))
-			if action == "closing" or action == "closed" then
-				local continuations = continuation_snapshot()
-				_window = nil
-				_window_generation = _window_generation + 1
-				retire_session(session)
-				if not stop_continuations(continuations) then
-					Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
-				end
+			local continuations = continuation_snapshot()
+			_window = nil
+			_window_generation = _window_generation + 1
+			retire_session(session)
+			if not stop_continuations(continuations) then
+				Logger.error(LOG, "Healthcheck close retained timer cleanup debt.")
 			end
+			Logger.debug(LOG, "Window closing callback received.")
 		end)
 	end)
-	if not ok_wcb then Logger.warn(LOG, "windowCallback() failed: %s.", tostring(wcb_err)) end
+	if not ok_wcb then return abandon_open_window("The diagnostics close owner was refused", wcb_err) end
 
 	local ok_ncb, ncb_err = pcall(function()
 		wv:navigationCallback(function(action)
@@ -1056,6 +1077,9 @@ function M.show_window(opts)
 		return abandon_open_window("wv:html() failed", h_result)
 	end
 
+	-- Before this boundary no native show can have created a fade owner.
+	-- Mark first: show itself may mutate and then raise.
+	session.presentation_attempted = true
 	local ok_sh, show_result = xpcall(function() return wv:show() end, debug.traceback)
 	if ok_sh ~= true or show_result == nil or show_result == false then
 		return abandon_open_window("wv:show() failed — window will not appear", show_result)

@@ -219,6 +219,12 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'e2e-hs',
+		'Qualify numeric logger boundary XCTest controls',
+		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' }}"
+	],
+	[
+		'.github/workflows/ci-macos.yml',
+		'e2e-hs',
 		'Qualify actual native PAC source ownership XCTest controls',
 		"${{ steps.stage-admission.outcome == 'success' && matrix.role == 'managed-ollama-native' && (!cancelled()) }}"
 	],

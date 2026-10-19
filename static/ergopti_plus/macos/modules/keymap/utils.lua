@@ -1398,7 +1398,8 @@ end
 --- Captures a classified destination without native calls on the input thread.
 --- @return table|nil destination Opaque retained native receipt.
 function M.capture_text_destination()
-	if M.is_secure_field() ~= false or _ignored_win_cache_value ~= false then return nil end
+	if _ignored_win_stopped or _ignored_win_cache_dirty
+		or _secure_field_cache_value ~= false or _ignored_win_cache_value ~= false then return nil end
 	return _text_destination
 end
 

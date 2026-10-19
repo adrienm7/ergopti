@@ -269,6 +269,7 @@ function M.open(current_info, save_callback)
 		local win_h = math.min(geo.height, math.floor((sf.h or 900) * 0.85))
 
 		return ui_builder.show_webview({
+			delete_on_close = true,
 			frame         = ui_builder.get_centered_frame(win_w, win_h),
 			title         = i18n.get("editor.personal_info.window_title"),
 			style_masks   = style_masks,

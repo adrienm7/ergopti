@@ -79,8 +79,17 @@ local function transformed_by(action_name, selected)
 		begin_batch = function(tx) return { tx = tx } end,
 		keyStroke = function() return true end,
 		dispatch = function() return true end,
-		seal = function() return true end,
-		cancel = function() return true end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		on_dispatched = function(tx, callback) tx.dispatched = callback end,
+		seal = function(tx)
+			if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+			if tx.callback then tx.callback(tx, "complete") end
+			return true
+		end,
+		cancel = function(tx)
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 	}
 	package.loaded["adapters.timer_scheduler"] = nil
 	package.loaded["modules.shortcuts.actions.text"] = nil
