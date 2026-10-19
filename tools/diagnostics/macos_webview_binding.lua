@@ -44,7 +44,7 @@ finish = function(failure)
 	local cleaned, cleanup_error = xpcall(cleanup, debug.traceback)
 	local console_ok, console_error = xpcall(console_check, debug.traceback)
 	local receipt = {
-		schema_version = 2, contract = "native.webview-binding", nonce = config.nonce,
+		schema_version = 3, contract = "native.webview-binding", nonce = config.nonce,
 		status = not failure and cleaned and console_ok and "ok" or "error",
 		error = failure, cleanup_error = not cleaned and tostring(cleanup_error) or nil,
 		console_error = not console_ok and tostring(console_error) or nil,
@@ -131,7 +131,7 @@ end
 local function message_identity(controller)
 	local ready, seen, evaluated, closes = {}, {}, {}, { a = 0, b = 0 }
 	local views = {}
-	local rebound_seen = false
+	local rebound_seen, post_a_gc_requested = false, false
 	for index, name in ipairs({ "a", "b" }) do
 		views[name] = view_for(controller, "Binding " .. name, 80 + (index - 1) * 280, function()
 			closes[name] = closes[name] + 1
@@ -182,8 +182,13 @@ local function message_identity(controller)
 						return
 					end
 					local body = assert(message.body)
-					assert(body.nonce == config.nonce and body.kind == "current-b", "foreign B message")
-					seen["current-b"] = { source_exact = true, admitted = true }
+					assert(body.nonce == config.nonce and (body.kind == "current-b"
+						or body.kind == "current-b-after-a-gc"), "foreign B message")
+					if body.kind == "current-b-after-a-gc" then
+						assert(post_a_gc_requested and getmetatable(a) == nil and closes.a == 1 and closes.b == 0,
+							"B post arrived before exact A consumption")
+					end
+					seen[body.kind] = { source_exact = true, admitted = true }
 				end)
 			end) == controller, "successor callback bind refused")
 			post(a, "stale-a")
@@ -199,15 +204,26 @@ local function message_identity(controller)
 				a:delete()
 				assert(getmetatable(a) == nil and closes.a == 1 and closes.b == 0 and b:isVisible(),
 					"A close callback affected the B owner")
-				assert(b:hide() == b, "B hide refused")
-				b:delete()
-				assert(getmetatable(b) == nil and closes.a == 1 and closes.b == 1,
-					"B close callback affected the A owner")
-				cleanup()
-				probe.features.message_identity = { initial_a_exact = true, current_b_exact = true,
-					rebound_b_callback = rebound_seen,
-					stale_a_rejected = true, current_b_accepted = true, a_close_preserved_b = true, a_closes = closes.a, b_closes = closes.b }
-				later(function() console_check(); finish() end)
+				-- Do not rebind/detach: exercise the exact B callback and UCC
+				-- which survived A's native userdata cleanup.
+				post_a_gc_requested = true
+				post(b, "current-b-after-a-gc")
+				await(function() return seen["current-b-after-a-gc"] and evaluated["current-b-after-a-gc"] end, function()
+					assert(getmetatable(a) == nil and closes.a == 1 and closes.b == 0 and b:isVisible(),
+						"post-GC B delivery changed exact window owners")
+					assert(b:hide() == b, "B hide refused")
+					b:delete()
+					assert(getmetatable(b) == nil and closes.a == 1 and closes.b == 1,
+						"B close callback affected the A owner")
+					cleanup()
+					probe.features.message_identity = { initial_a_exact = true, current_b_exact = true,
+						rebound_b_callback = rebound_seen,
+						b_after_a_gc_source_exact = seen["current-b-after-a-gc"].source_exact,
+						b_after_a_gc_accepted = seen["current-b-after-a-gc"].admitted,
+						b_after_a_gc_evaluated = evaluated["current-b-after-a-gc"],
+						stale_a_rejected = true, current_b_accepted = true, a_close_preserved_b = true, a_closes = closes.a, b_closes = closes.b }
+					later(function() console_check(); finish() end)
+				end)
 			end)
 		end)
 	end)
