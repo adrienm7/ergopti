@@ -1046,6 +1046,14 @@ outside the notification, and release bridge callbacks only after userdata
 consumption and the exact observation timer's stop acknowledgement. A callback
 delivery alone does not prove that its timer retired.
 
+WebView GC does not remove the shared user-content controller's script handlers
+or release its Lua callback reference. A successful `setCallback(nil)` detaches
+that callback; it does not prove controller userdata GC. Reusing a controller
+requires an exact session lease: revoke its receiver before detaching, retain
+failed detach as debt that blocks a successor, and check native `message.name`
+and `message.webView` before reading the body. A body field cannot establish
+which native window sent a message.
+
 ### project-hs-development-runtime-registers-stock-peers
 
 Launching custom Karabiner core/console paths does not isolate their IPC peers:
