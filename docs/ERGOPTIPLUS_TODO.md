@@ -3037,8 +3037,6 @@ These are software implementations; final hardware verification remains below.
       Mac reproduction. (5) The shortcut on the key left of "1" still targets
       the 105th ISO key (keycodes 10 and 50 are swapped on ISO Macs); needs
       the maintainer's keyboard type and the configured shortcut.
-- [ ] **GitHub issue #84 (Linux, open since September 12).** Shift does not
-      work on Arch (custom XKB type); waiting for the reporter's diagnostics.
 - [ ] **fix/\* merge of October 19 (dev 73bf713182, CI cancelled on request).**
       fix/windows, fix/macos and fix/linux merged into dev and fast-forwarded.
       fix/windows' head was red: two fixtures read the undefined `A_Pid`, the
