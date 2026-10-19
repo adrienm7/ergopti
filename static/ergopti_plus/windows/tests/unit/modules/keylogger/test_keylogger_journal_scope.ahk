@@ -84,6 +84,14 @@ _KJS_PreInitializationShutdown() {
 		Port["owner"].Rollback(Token, {}, 0, (*) => false)
 		Port["owner"].Release(Token)
 		AssertFalse(KL_FlushShutdownReady(Port), "uninitialized compensation debt is never bypassed")
+		; The shutdown log names the refusal; an in-progress flush is told apart.
+		Reason := "unset"
+		AssertFalse(KL_FlushShutdownReady(Port, , &Reason))
+		AssertEqual("uninitialized_owner_debt", Reason)
+		Keylogger._flush_in_progress := true
+		AssertFalse(KL_FlushShutdownReady(Port, , &Reason))
+		AssertEqual("flush_in_progress", Reason, "a busy flush is reported as such, not as debt")
+		Keylogger._flush_in_progress := false
 	} finally {
 		for Name, Value in Saved
 			Keylogger.%Name% := Value
