@@ -1040,7 +1040,19 @@ TrayTip(Text, Title := "", Options := 0) {
 }
 MsgBox(Text := "", Title := "", Options := "") {
 	TestMsgBoxCount(true)
-	return
+	Responder := TestMsgBoxResponder()
+	return IsObject(Responder) ? Responder(Text, Title, Options) : ""
+}
+
+; Lets one test answer the stubbed MsgBox in place of the user, for code that
+; acts on the reply. Always clear it (pass "") in the test's finally block.
+; @param {Func|String} Responder Called with (Text, Title, Options); "" clears.
+; @returns {Func|String} The responder in force.
+TestMsgBoxResponder(Responder?) {
+	static Current := ""
+	if IsSet(Responder)
+		Current := Responder
+	return Current
 }
 
 ; Counts the dialogs the MsgBox stub above absorbed, so a test can prove that an
