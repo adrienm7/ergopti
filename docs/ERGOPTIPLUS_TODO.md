@@ -3086,7 +3086,13 @@ These are software implementations; final hardware verification remains below.
       diagnostics on CI, find the root cause in the product and fix it. - HTTP wire: `native_http_wire_client_receiving.py`
       `RealNativeClientReceiving.test01RealHTTPXFullURLPACURLFallbackAndVerifiedPhysicalChildEOF`
       hit "Managed network request failed: deadline" in the package step
-      (run 39144577314), probably the same fallback. - Brew archive: the receipt now passes; the upgrade fails where
+      (run 39144577314), probably the same fallback. Run 39164864480 (dev,
+      October 18) repeats it: its `native_http_receiving` line shows 4
+      workers created, `session_wait` 4 but `session_done`, `returned` and
+      `first_frame` 3, one `selected_route` "unknown", one `exit_killed`:
+      one URLSession task never completes and the deadline kills its worker.
+      The Managed Ollama build job of that run failed in the native Go tests
+      with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade fails where
       Homebrew clones `homebrew/core` on the hosted runner. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
       hit a deadline, likely the same proxy fallback. - Shortcuts discovery, launch AppleEvents and the 27 owned-runtime XCTest
       methods: fixes are committed but never reached a fully green Build
