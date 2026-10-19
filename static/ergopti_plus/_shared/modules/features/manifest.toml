@@ -6661,9 +6661,12 @@ clear_exclude = ["gestures.enabled"]
 prefixes = ["layout", "category_enabled.layout", "script.alt_gr_is_kana_remap"]
 restore_exclude = []
 
+# A restore leaves the user's own hotstrings as they are: the personal sections
+# (hotstrings.personal on Windows, the "personal" group and the macOS editor's
+# "custom" group elsewhere) are not the shipped catalogue it recommends.
 [scopes.hotstrings]
 prefixes = ["hotstrings", "category_enabled.hotstrings", "category_enabled.autocorrection", "category_enabled.distances_reduction", "category_enabled.sfbs_reduction", "category_enabled.rolls", "category_enabled.magic_key"]
-restore_exclude = ["hotstrings.preview_ai_enabled"]
+restore_exclude = ["hotstrings.preview_ai_enabled", "hotstrings.personal", "hotstrings.groups.personal", "hotstrings.modules.personal", "hotstrings.groups.custom", "hotstrings.modules.custom"]
 dynamic_defaults = [{ prefix = "category_enabled", depth = 1, default = false, recommended = true }, { prefix = "hotstrings.groups", depth = 1, default = false, recommended = true }, { prefix = "hotstrings.modules", depth = 2, default = false, recommended = true }, { prefix = "hotstrings.personal", depth = 2, suffix = "enabled", default = false, recommended = false }, { prefix = "hotstrings.personal", depth = 2, suffix = "time_activation_seconds", default = 0, recommended = 0 }]
 
 [scopes.llm]

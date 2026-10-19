@@ -210,8 +210,9 @@ function M.new(options)
 				local sections = {}
 				for _, section in ipairs(entry.sections) do sections[#sections + 1] = section end
 				table.sort(sections)
+				local personal = options.is_personal(name) == true
 				groups[#groups + 1] = { id = name, override = segments, sections = sections,
-					bundled = Extensions.parse_category_key(name) == nil and options.is_personal(name) ~= true }
+					bundled = Extensions.parse_category_key(name) == nil and not personal, personal = personal }
 			end
 		end
 		table.sort(groups, function(left, right) return left.id < right.id end)

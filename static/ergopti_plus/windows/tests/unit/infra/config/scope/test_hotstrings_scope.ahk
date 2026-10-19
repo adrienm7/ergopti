@@ -45,7 +45,13 @@ _HotstringsScopeRoundTrip() {
 			Receipt := (Commands[Mode == "clear" ? "scope_clear" : "scope_restore"])()
 			AssertEqual(Receipt["status"], "pending")
 			Config := TOML_ParseFreshFile(Fixture.path)
-			Assert(!Config["hotstrings.personal.words"].Has("enabled"))
+			; A restore leaves the user's own sections as they are; a clear resets them.
+			if Mode == "clear"
+				Assert(!Config["hotstrings.personal.words"].Has("enabled"))
+			else {
+				AssertEqual(true, Config["hotstrings.personal.words"]["enabled"], "a restore keeps a personal section on")
+				AssertEqual(4, Config["hotstrings.personal.words"]["time_activation_seconds"])
+			}
 			AssertEqual(Config["hotstrings"]["preview_ai_enabled"], true)
 			AssertEqual(Config["private"]["credential"], "keep")
 			Overrides := TOML_ParseFreshFile(Fixture.overrides)
@@ -55,8 +61,12 @@ _HotstringsScopeRoundTrip() {
 			AssertEqual(Overrides["autocorrection"]["unknown"], "keep")
 			AssertEqual(Overrides["foreign"]["delay"], 9)
 			Personal := TOML_ParseFreshFile(Fixture.personal[1])
-			Assert(!Personal["_meta"].Has("delay"))
-			Assert(!Personal["_meta.sections.words"].Has("show_tooltip"))
+			if Mode == "clear" {
+				Assert(!Personal["_meta"].Has("delay"))
+				Assert(!Personal["_meta.sections.words"].Has("show_tooltip"))
+			} else
+				AssertEqual(FSReadUtf8Exact(Fixture.personal[1]), Fixture.personalSource,
+					"a restore leaves the personal file's tuning untouched")
 			AssertEqual(Personal["_meta"]["description"], "Keep corpus")
 			AssertContains(FSReadUtf8Exact(Fixture.personal[1]), '"abc" = "replacement"')
 			for Path in [Fixture.path, Fixture.overrides, Fixture.personal[1]]

@@ -45,7 +45,7 @@ local OVERRIDES = '[autocorrection]\ndelay = 3\ncolor = "#111111"\n\n'
 	.. '[autocorrection.names]\ndelay = 9\n\n'
 	.. '[autocorrection.abbreviations]\ndelay = 9\n\n'
 	.. '[autocorrection.technical_terms]\ndelay = 9\n\n'
-	.. '[rolls.hc]\npriority = 5\n\n[foreign]\ndelay = 4\nunknown_field = "kept"\n\n[_global]\ndelay = 2\n'
+	.. '[personal]\ndelay = 7\n\n[rolls.hc]\npriority = 5\n\n[foreign]\ndelay = 4\nunknown_field = "kept"\n\n[_global]\ndelay = 2\n'
 
 --- The catalogue the stub loader publishes: real category ids, corpus delays
 --- that differ from and agree with the manifest recommendations, and a
@@ -199,7 +199,12 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			helpers.assert_true(committed, tostring(detail))
 
 			local config = Codec.decode(read(c.config_path))
-			for id in pairs(CATEGORIES) do helpers.assert_eq(config.hotstrings.groups[id], true, id) end
+			for id in pairs(CATEGORIES) do
+				if id ~= "personal" then helpers.assert_eq(config.hotstrings.groups[id], true, id) end
+			end
+			-- The user's own hotstrings are not the catalogue a restore recommends.
+			helpers.assert_nil(config.hotstrings.groups.personal, "a restore leaves the personal category as stored")
+			helpers.assert_nil(config.hotstrings.modules.personal, "and its sections")
 			for _, family in ipairs(COMMON_FAMILIES) do
 				helpers.assert_eq(config.hotstrings.modules.autocorrection[family], true, family)
 			end
@@ -230,6 +235,7 @@ helpers.describe("hotstrings scope: restore recommended", function()
 			helpers.assert_eq(overrides.foreign.delay, 4, "an unknown category override survives")
 			helpers.assert_eq(overrides.foreign.unknown_field, "kept")
 			helpers.assert_nil((overrides.personal or {}).code, "user packs receive no recommendation")
+			helpers.assert_eq(overrides.personal.delay, 7, "a restore leaves the personal tuning untouched")
 
 			for _, family in ipairs(COMMON_FAMILIES) do
 				helpers.assert_eq(c.Config.resolve("autocorrection", family).delay, 0.5, family)

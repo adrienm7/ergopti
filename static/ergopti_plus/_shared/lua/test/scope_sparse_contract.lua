@@ -45,9 +45,13 @@ return function(helpers)
 			local owned = { "shortcuts.personal.sparse_probe", "hotstrings.personal.sparse_probe.enabled",
 				"hotstrings.personal.sparse_probe.time_activation_seconds", "hotstrings.groups.sparse_probe" }
 			local indexed = rows("global", "recommended", owned)
-			for i = 1, 3 do
-				helpers.assert_eq(indexed[owned[i]].delete, true, owned[i])
-				helpers.assert_eq(indexed[owned[i]].value, nil, owned[i])
+			helpers.assert_eq(indexed[owned[1]].delete, true, owned[1])
+			helpers.assert_eq(indexed[owned[1]].value, nil, owned[1])
+			-- A restore leaves the user's own hotstring sections as they are.
+			for i = 2, 3 do helpers.assert_eq(indexed[owned[i]], nil, owned[i]) end
+			for _, path in ipairs({ "hotstrings.groups.personal", "hotstrings.modules.personal.code",
+				"hotstrings.groups.custom", "hotstrings.modules.custom.code" }) do
+				helpers.assert_eq(rows("hotstrings", "recommended", { path })[path], nil, path)
 			end
 			helpers.assert_eq(indexed[owned[4]].value, true)
 			helpers.assert_eq(indexed[owned[4]].delete, nil)
