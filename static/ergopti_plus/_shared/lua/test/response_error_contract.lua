@@ -4,9 +4,10 @@
 --- MODULE: Shared Lua Provider Error Response Contract
 --- DESCRIPTION:
 --- Explicit expectations for Lua completion extraction with retained JSON error
---- fields. Linux registered provider tests and native public HTTP receipts consume
---- these independent values; foreign JSON adapters and classifiers require their
---- own native validation before adopting this contract. Existing universal parser
+--- fields. Linux registered provider tests, native public HTTP receipts and the
+--- macOS response classifier consume these independent values; other JSON
+--- adapters and classifiers require their own native validation before adopting
+--- this contract. Existing universal parser
 --- corpora and their first-part selection remain unchanged.
 --- ==============================================================================
 

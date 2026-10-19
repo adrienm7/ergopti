@@ -12,6 +12,7 @@ local M = {}
 
 local JsonCodec = require("adapters.json_codec")
 local Formats   = require("llm.remote_formats")
+local Json      = require("json")
 
 local function empty_usage()
 	return { prompt_tokens = 0, completion_tokens = 0, total_tokens = 0, est_cost_usd = 0.0 }
@@ -92,6 +93,19 @@ local function extract_text(format, root)
 	return ""
 end
 
+--- A top-level error envelope carries no completion, even beside a choices
+--- array: its text is the provider's decoy, never an answer (response_error_contract).
+--- hs.json drops a null member, so an "error": null envelope is confirmed on the
+--- shared lossless decoder, only when the body names the field at all.
+--- @param root table Root decoded by the native codec.
+--- @param body string Raw provider response body.
+--- @return boolean
+local function has_error_envelope(root, body)
+	if Formats.response_has_error(root) then return true end
+	if not body:find('"error"', 1, true) then return false end
+	return Formats.response_has_error(Json.decode_lossless(body))
+end
+
 --- Decode exactly once so completion and usage have one immutable owner.
 --- @param format string "openai" | "anthropic" | "gemini" | "backboard"
 --- @param body string Raw provider response body.
@@ -105,7 +119,7 @@ function M.classify(format, body)
 		return { text = "", usage = empty_usage(), valid_json = false }
 	end
 	return {
-		text = extract_text(format, root),
+		text = has_error_envelope(root, body) and "" or extract_text(format, root),
 		usage = extract_usage(format, root),
 		valid_json = true,
 	}
