@@ -16,6 +16,9 @@
  *    the build back onto the runner fails here, not in the catalogue.
  * 3. The catalogue warns on a name containing "linux": one name, everywhere
  *    the release, its notes and the website refer to it.
+ * 4. The catalogue's runner has GTK 3 and an XEmbed tray but no libayatana:
+ *    the image bundles the tray library without GTK, and the smoke replays the
+ *    catalogue's stalonetray check on a host without libayatana.
  * ==============================================================================
  */
 
@@ -127,7 +130,55 @@ const stager = read('tools/build/stage-linux-network-runtime.py');
 for (const library of ['libglib-2.0.so.0', 'libgio-2.0.so.0', 'libstdc++.so.6']) {
 	assert.ok(stager.includes(`"${library}"`), `${library} is left to the recipient`);
 }
+// v1.0.3 exited in the catalogue with "libayatana-appindicator3 is missing":
+// its runner has GTK 3 and an XEmbed tray but no libayatana. The image carries
+// the tray library and its non-GTK dependencies, never GTK itself.
+const trayList = stager.slice(
+	stager.indexOf('TRAY_LIBRARIES = frozenset('),
+	stager.indexOf('\n)\n', stager.indexOf('TRAY_LIBRARIES = frozenset('))
+);
+assert.ok(stager.includes('TRAY_ROOT = "libayatana-appindicator3.so.1"'));
+for (const library of [
+	'libayatana-indicator3.so.7',
+	'libayatana-ido3-0.4.so.0',
+	'libdbusmenu-glib.so.4',
+	'libdbusmenu-gtk3.so.4'
+]) {
+	assert.ok(trayList.includes(`"${library}"`), `${library} is bundled with the tray`);
+}
+assert.ok(
+	!/gtk-3|gdk-3|cairo|pango/.test(trayList.replace('dbusmenu-gtk3', '')),
+	"GTK stays the recipient's"
+);
+assert.match(
+	stager,
+	/for name, source in sorted\(tray_sources\(\)\.items\(\)\):\n\s+copy_unique\(source, prefix \/ "lib" \/ name, owners\)/
+);
 const container = read('tools/build/appimage-oldest-lts.sh');
+const containerBuildBody = container.slice(
+	container.indexOf('container_build() {'),
+	container.indexOf('container_smoke() {')
+);
+const containerSmokeBody = container.slice(
+	container.indexOf('container_smoke() {'),
+	container.indexOf('user_smoke() {')
+);
+assert.ok(
+	containerBuildBody.includes('libayatana-appindicator3-1'),
+	'the build host has the tray library'
+);
+assert.ok(
+	!/apt_install[^\n]*(\\\n[^\n]*)*libayatana/.test(containerSmokeBody),
+	'the smoke host lacks libayatana, as the catalogue does'
+);
+assert.ok(containerSmokeBody.includes('libgtk-3-0 stalonetray x11-utils'));
+assert.ok(
+	container.includes(
+		'env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a bash "$SELF" xembed-in-display "$appimage"'
+	),
+	"the catalogue's XEmbed tray check runs without a session bus"
+);
+assert.ok(container.includes("grep -E '^ +0x' | grep -v ' 1x1+'"), 'an icon docked in stalonetray');
 assert.ok(container.includes(`\nOLDEST_LTS_IMAGE="${Ceiling.OLDEST_LTS_IMAGE}"\n`));
 assert.ok(container.includes('\n\tbash tools/build/build-linux-appimage.sh\n'));
 assert.ok(container.includes('unshare --net -- runuser -u "$SMOKE_USER"'), 'launched offline');

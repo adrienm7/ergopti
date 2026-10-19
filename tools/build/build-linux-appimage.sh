@@ -19,8 +19,9 @@
 #      command is printed. Actual native staging requires Linux x86_64.
 #
 # LuaJIT, luv, curl, native GIO modules, schemas and their linked ELF closure
-# are bundled from trusted build-host packages. The recipient supplies glibc,
-# GLib, the C++ runtime and certificate trust, so the build host must be the
+# are bundled from trusted build-host packages, with libayatana-appindicator and
+# its non-GTK libraries for the tray. The recipient supplies glibc, GLib, GTK,
+# the C++ runtime and certificate trust, so the build host must be the
 # oldest supported Ubuntu LTS (ubuntu-22.04, glibc 2.35): built on a newer one,
 # the bundled luajit needed GLIBC_2.38 and the image died on Ubuntu 22.04 before
 # showing its tray. check-elf-glibc-ceiling.cjs refuses such a build below.

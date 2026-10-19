@@ -22,7 +22,9 @@
 #     Launches it in the conditions the catalogue sets with firejail: no
 #     arguments (a desktop launch), no network, a user outside the input group.
 #     Passes when a StatusNotifier host sees the tray icon and its menu and the
-#     app is still running afterwards. firejail itself cannot sandbox inside a
+#     app is still running afterwards, then when, with no session bus, the icon
+#     docks in stalonetray as in the catalogue. The host has GTK 3 but no
+#     libayatana, like the catalogue's runner: the image brings its own. firejail itself cannot sandbox inside a
 #     container (it takes Docker for a sandbox already in place and runs the
 #     image bare), so a network namespace of its own stands in for --net=none
 #     and the image mounts through FUSE as on a desktop.
@@ -48,7 +50,7 @@ apt_install() {
 container_build() {
 	apt_install bash ca-certificates curl binutils file gcc libc6-dev pkg-config python3 \
 		luajit lua-luv libssl-dev libglib2.0-dev libglib2.0-bin glib-networking \
-		dconf-gsettings-backend gsettings-desktop-schemas
+		dconf-gsettings-backend gsettings-desktop-schemas libayatana-appindicator3-1
 	# The runner's Node, mounted read-only: the release's own is too old for the
 	# build scripts, and Node itself ships nothing into the image.
 	export PATH="/opt/node/bin:$PATH"
@@ -77,8 +79,14 @@ container_build() {
 # Inside the container: the catalogue's launch
 # ----------------------------------------------------------------------
 container_smoke() {
+	# GTK 3 but no libayatana, as on the catalogue's runner: the image brings its
+	# own tray library. stalonetray and xwininfo replay the catalogue's tray check.
 	apt_install fuse3 xvfb xauth dbus iproute2 python3 python3-gi gir1.2-glib-2.0 \
-		libayatana-appindicator3-1
+		libgtk-3-0 stalonetray x11-utils
+	if ldconfig -p | grep -q 'libayatana-appindicator3\.so\.1 '; then
+		echo "ENVIRONMENT: the smoke host must not provide libayatana-appindicator3" >&2
+		return 2
+	fi
 	useradd --create-home "$SMOKE_USER"
 	cp /tmp/ergopti.AppImage "/home/$SMOKE_USER/ErgoptiPlus.AppImage"
 	chown "$SMOKE_USER:" "/home/$SMOKE_USER/ErgoptiPlus.AppImage"
@@ -134,6 +142,49 @@ user_smoke() {
 		return 1
 	fi
 	echo "[OK] Offline on $OLDEST_LTS_IMAGE, the AppImage shows its tray icon and stays up."
+
+	# The catalogue has no StatusNotifier host: it docks XEmbed icons into
+	# stalonetray, with no session bus. A fresh runtime directory keeps GLib
+	# from finding the bus above through $XDG_RUNTIME_DIR/bus.
+	export XDG_RUNTIME_DIR="$work/runtime-xembed"
+	mkdir -m 700 "$XDG_RUNTIME_DIR"
+	env -u DBUS_SESSION_BUS_ADDRESS xvfb-run -a bash "$SELF" xembed-in-display "$appimage"
+}
+
+# The catalogue's own tray check, run inside an X display without a session bus.
+xembed_smoke() {
+	local appimage="$1" tray_window="" icon="" app log
+	stalonetray --geometry 1x1+0+0 --icon-size 48 -bg white --window-type dock \
+		--decorations none --skip-taskbar > /dev/null 2>&1 &
+	for _ in $(seq 1 40); do
+		tray_window="$(xwininfo -name stalonetray 2>/dev/null | awk '/Window id:/ { print $4 }' || true)"
+		[ -n "$tray_window" ] && break
+		sleep 0.25
+	done
+	[ -n "$tray_window" ] || { echo "ENVIRONMENT: stalonetray never started" >&2; return 2; }
+	log="$(mktemp)"
+	"$appimage" > "$log" 2>&1 &
+	app=$!
+	# Docked icons are child windows of the tray; it always has a 1x1 one.
+	for _ in $(seq 1 30); do
+		sleep 1
+		kill -0 "$app" 2>/dev/null || break
+		icon="$(xwininfo -tree -id "$tray_window" 2>/dev/null | grep -E '^ +0x' | grep -v ' 1x1+' | tail -n 1 || true)"
+		[ -n "$icon" ] && break
+	done
+	echo "--- what the AppImage printed without a StatusNotifier host ---"
+	cat "$log"
+	if [ -z "$icon" ]; then
+		kill "$app" 2>/dev/null || true
+		echo "[ERR] No icon docked in stalonetray: the catalogue would fail this AppImage." >&2
+		return 1
+	fi
+	if ! kill -0 "$app" 2>/dev/null; then
+		echo "[ERR] The AppImage exited after docking its icon." >&2
+		return 1
+	fi
+	kill "$app" 2>/dev/null || true
+	echo "[OK] Without libayatana or a session bus, the icon docks in an XEmbed tray."
 }
 
 # ----------------------------------------------------------------------
@@ -163,6 +214,7 @@ case "${1:-}" in
 	container-build) container_build ;;
 	container-smoke) container_smoke ;;
 	smoke-as-user) user_smoke "$2" ;;
+	xembed-in-display) xembed_smoke "$2" ;;
 	*)
 		echo "Usage: $0 build | smoke <AppImage>" >&2
 		exit 2
