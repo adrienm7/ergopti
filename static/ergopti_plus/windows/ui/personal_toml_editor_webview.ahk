@@ -305,7 +305,7 @@ _HsEdWeb_ReportSaveFailure() {
 		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
 }
 
-_HsEdWeb_DeferredSaveCompleted(OpeningSource, CommitResult) {
+_HsEdWeb_DeferredSaveCompleted(OpeningSource, Added, CommitResult) {
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
 		return
 	global PERSONAL_TOML_COMMIT_FAILED
@@ -321,6 +321,7 @@ _HsEdWeb_DeferredSaveCompleted(OpeningSource, CommitResult) {
 	}
 	try LoggerSuccess("HsEditor",
 		"Deferred personal hotstrings saved and reloaded.")
+	_HsEdWeb_EnableAdded(Added)
 }
 
 _HsEdWeb_Save(Data) {
@@ -348,9 +349,11 @@ _HsEdWeb_Save(Data) {
 	)
 
 	try LoggerStart("HsEditor", "Saving personal hotstrings ({1} section(s))…", order.Length)
+	; Sections this save creates are switched on once it has committed.
+	Added := HS_PersonalSectionsAdded(ReadPersonalToml(true)["sections_order"], order)
 	global PERSONAL_TOML_COMMIT_FAILED, PERSONAL_TOML_COMMIT_DEFERRED
 	CommitResult := PersonalTomlCommitAndReload(WriteData,
-		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource), 0, OpeningSource)
+		0, 0, 0, 0, 0, 0, _HsEdWeb_DeferredSaveCompleted.Bind(OpeningSource, Added), 0, OpeningSource)
 	if (CommitResult == PERSONAL_TOML_COMMIT_FAILED) {
 		if A_IsSuspended
 			_HsEdWeb_ShowSaveFailure()
@@ -365,6 +368,26 @@ _HsEdWeb_Save(Data) {
 	if !_PersonalTomlOpeningSessionCurrent(OpeningSource)
 		return
 	try LoggerSuccess("HsEditor", "Personal hotstrings saved and reloaded.")
+	_HsEdWeb_EnableAdded(Added)
+}
+
+; A section the user has just created is meant to be used: enable it.
+_HsEdWeb_EnableAdded(Added) {
+	if !Added.Length
+		return true
+	Reason := "refused"
+	try {
+		if HS_EnableNewPersonalSections(Added) {
+			try LoggerSuccess("HsEditor", "{1} new personal section(s) enabled.", Added.Length)
+			return true
+		}
+	} catch as Err
+		Reason := Err.Message
+	try LoggerError("HsEditor", "The {1} new personal section(s) could not be enabled ({2}); enable them from the tray.",
+		Added.Length, Reason)
+	try NotifierSend(t("editor.hotstrings.err_write"),
+		Map("title", t("editor.hotstrings.save_error"), "level", "error"))
+	return false
 }
 
 ; Persists a single UI preference. The frontend uses its own key names

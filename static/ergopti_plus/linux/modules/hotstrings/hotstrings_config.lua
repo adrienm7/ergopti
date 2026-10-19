@@ -2138,6 +2138,35 @@ function M.toggle_section(category, section)
 	return committed
 end
 
+--- Switches on sections the user has just created in a category.
+---
+--- An undeclared section is neutral-off like every absent choice, so a category
+--- created in the editor never loaded and a bundled trigger kept firing over its
+--- hotstrings (issue #96). Creating it is the user's choice to use it. The
+--- category gate is lifted with them, as `set_all_sections` does when enabling.
+--- @param category string Category id (the personal file's stem).
+--- @param sections table Array of section names already in the reloaded category.
+--- @return boolean committed
+--- @return string|nil reason
+function M.enable_new_sections(category, sections)
+	local refusal = choice_refusal()
+	if refusal then return false, refusal end
+	if type(sections) ~= "table" or #sections == 0 or not _categories[category] then return false, "unknown" end
+	local known = {}
+	for _, name in ipairs(own_sections(category)) do known[name] = true end
+	local changes = { { group = category, enabled = true } }
+	for _, name in ipairs(sections) do
+		if not known[name] then
+			Logger.error(LOG, "New section '%s.%s' is not in the reloaded category.", tostring(category), tostring(name))
+			return false, "unknown"
+		end
+		changes[#changes + 1] = { group = category, section = name, enabled = true }
+	end
+	local committed, reason = commit_choices(changes, "New sections of '" .. tostring(category) .. "'")
+	if committed then notify_change() end
+	return committed, reason
+end
+
 --- Stages every section of the given categories in one candidate.
 --- Enabling lifts each category gate too: without it the row could set every
 --- section on and change nothing visible, because the gate above them was

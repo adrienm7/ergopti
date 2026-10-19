@@ -650,6 +650,19 @@ _NewSection(W, SectionDrop, LV, TriggerEdit, OutputEdit, ChkIsWord, ChkAutoExp, 
 	} finally Critical(PreviousCritical)
 	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
 		return false
+	; A section the user creates is meant to be used (issue #96). The section
+	; itself is already saved, so a failure here is reported, not unwound.
+	Reason := "refused"
+	try Enabled := HS_EnableNewPersonalSections([SecName])
+	catch as Err
+		Enabled := false, Reason := Err.Message
+	if !Enabled {
+		try LoggerError("PersonalEditor", "New section '{1}' could not be enabled ({2}); enable it from the tray.", SecName, Reason)
+		try NotifierSend(t("editor.hotstrings.err_write"),
+			Map("title", t("editor.hotstrings.save_error"), "level", "error"))
+	}
+	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
+		return false
 	_EditorPrefSet("default_section", SecName)
 	if !_PersonalEditorSectionActionCurrent(W, Source, Candidate, SecName)
 		return false
