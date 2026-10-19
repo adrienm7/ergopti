@@ -3053,12 +3053,11 @@ These are software implementations; final hardware verification remains below.
       network deadline, archive update controls; see the release item). The
       merged dev has not had a CI run yet. The `deploy-site.yml` changes only
       take effect once on main (workflow_run reads the default branch).
-      Known red on dev before that run: 3c4209e947 changed
-      tools/build/stage-linux-network-runtime.py without its pin in
-      tools/test/fixtures/validation-curl/PINS.json (`command_owner_sha256`,
-      now 708654f8…b824), so test-linux-managed-http-ci-registration and the
-      validation-curl setup refuse; the change only adds the AppImage tray
-      closure. Re-pin after the maintainer reviews it. A full local pass on
+      3c4209e947 changed tools/build/stage-linux-network-runtime.py without
+      its pin in tools/test/fixtures/validation-curl/PINS.json, so
+      test-linux-managed-http-ci-registration and the validation-curl setup
+      refused; re-pinned on the session branch after review (the change only
+      adds the AppImage tray closure). A full local pass on
       October 19 (Linux container) found no other repository failure: macOS
       and Linux Lua units green, Linux E2E green, the 445 JS gates green
       except that pin and failures of the container itself (root user, no
