@@ -184,4 +184,84 @@ return function(helpers)
 			helpers.assert_eq(Codec.decode(source), { ['x=y'] = { '[not=a.header]', { text = 'right=side' } }, neighbor = { keep = false } })
 		end)
 	end)
+
+	helpers.describe("shared hotstring reader header syntax", function()
+		local Reader = require("toml_codec.reader")
+		for _, header in ipairs({ "[probe", "[[probe", "[[probe]", "[probe]]",
+			"[]", "[probe..child]", '["open]', '["bad\\q"]', "[probe] trailing", "[[probe]] trailing" }) do
+			helpers.it("(toml-hotstring-header) rejects an incomplete or malformed header " .. header, function()
+				local document, committed = Reader.parse_text('[[before]]\n"b" = { output = "B" }\n' .. header .. "\n")
+				helpers.assert_eq(committed, false, "a malformed header cannot issue a successful source receipt")
+				helpers.assert_eq(next(document.sections), nil, "a refused source exposes no partial entries")
+				helpers.assert_eq(#document.source_entries, 0)
+			end)
+		end
+		for _, header in ipairs({ "[future.settings]", '[_meta.sections."group.name"]',
+			'[_meta.sections."group#name"] # retained comment', "[[future.settings]]", "[" .. string.rep("long", 512) .. "]" }) do
+			helpers.it("(toml-hotstring-header) preserves a complete unfamiliar header " .. header:sub(1, 70), function()
+				local document, committed = Reader.parse_text('[[before]]\n"b" = { output = "B" }\n'
+					.. header .. '\n[[after]]\n"a" = { output = "A" }\n')
+				helpers.assert_eq(committed, true, "valid unfamiliar tables retain the existing forward-compatible dialect")
+				helpers.assert_eq(document.sections.before.entries[1].output, "B")
+				helpers.assert_eq(document.sections.after.entries[1].output, "A")
+			end)
+		end
+		-- These are literal hotstring identities, not TOML key paths. In
+		-- particular [[]], [[.probe]] and [[probe]]] were wrongly classified
+		-- as malformed by the first header guard and must keep their old names.
+		for _, name in ipairs({ "", ".probe", "probe]", "dotted.Équipe", "Équipe d'été", 'quote"section',
+			"with spaces", "probe..child", 'hash"#section', "bracket]section", "bracket[section", '"bad\\q"' }) do
+			helpers.it("(toml-hotstring-header) preserves the historical literal name " .. name, function()
+				local document, committed = Reader.parse_text('[[' .. name .. ']]\n"entry" = { output = "kept" }\n')
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(document.sections[name].entries[1].output, "kept")
+				helpers.assert_eq(document.sections_order[1], name)
+				helpers.assert_eq(#document.source_entries, 1)
+			end)
+		end
+		for index, value in ipairs({ 'future_matrix = [\n [1, 2],\n]\n',
+			'future_matrix = [\n [1, { text = "[not a header" }],\n]\n',
+			'future_text = """\n[[not a header\n# """\n',
+			"future_text = '''\n[[not a header\n# '''\n" }) do
+			helpers.it("(toml-hotstring-header) preserves header-looking value continuation " .. index, function()
+				local document, committed = Reader.parse_text('[_meta]\n' .. value
+					.. '[[after]]\n"entry" = { output = "kept" }\n')
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(document.sections.after.entries[1].output, "kept")
+				helpers.assert_eq(#document.source_entries, 1)
+			end)
+		end
+		helpers.it("(toml-hotstring-header) keeps quoted metadata paths distinct from literal rule names", function()
+			local document, committed = Reader.parse_text('[_meta.sections."dotted.Équipe"]\ndelay = 0.2\n'
+				.. '[[dotted.Équipe]]\n"entry" = { output = "kept" }\n')
+			helpers.assert_eq(committed, true)
+			helpers.assert_eq(document.meta.sections["dotted.Équipe"].delay, 0.2)
+			helpers.assert_eq(document.sections["dotted.Équipe"].entries[1].output, "kept")
+		end)
+	end)
+
+	helpers.describe("shared hotstring reader logical-value completion", function()
+		local Reader = require("toml_codec.reader")
+		for index, vector in ipairs({
+			{ open = 'future_matrix = [\n', close = ']\n' },
+			{ open = 'future_matrix = [\n [1, 2],\n', close = ']\n' },
+			{ open = 'future_text = """\n[[not a header\n', close = '"""\n' },
+			{ open = "future_text = '''\n[[not a header\n", close = "'''\n" },
+		}) do
+			helpers.it("(toml-hotstring-value-eof) refuses an unfinished logical value " .. index, function()
+				local document, committed = Reader.parse_text('[[before]]\n"entry" = { output = "kept" }\n'
+					.. '[_meta]\n' .. vector.open)
+				helpers.assert_eq(committed, false, "an unfinished value cannot acknowledge a complete source")
+				helpers.assert_eq(next(document.sections), nil, "no earlier partial entries escape rejection")
+				helpers.assert_eq(#document.source_entries, 0)
+			end)
+			helpers.it("(toml-hotstring-value-eof) admits its completed logical-value neighbour " .. index, function()
+				local document, committed = Reader.parse_text('[_meta]\n' .. vector.open .. vector.close
+					.. '[[after]]\n"entry" = { output = "kept" }\n')
+				helpers.assert_eq(committed, true)
+				helpers.assert_eq(document.sections.after.entries[1].output, "kept")
+				helpers.assert_eq(#document.source_entries, 1)
+			end)
+		end
+	end)
 end

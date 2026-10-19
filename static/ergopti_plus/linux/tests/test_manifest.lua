@@ -408,6 +408,7 @@ return {
 	"tests.unit.modules.hotstrings.menu.test_category_submenu_extension_gates_one",
 	"tests.unit.modules.hotstrings.catalogue.test_bulk_scope",
 	"tests.unit.modules.hotstrings.catalogue.test_catalogue_last_known_good",
+	"tests.unit.modules.hotstrings.catalogue.test_catalogue_truncated_headers",
 	"tests.unit.modules.hotstrings.catalogue.test_common_autocorrection_reference",
 	"tests.unit.modules.hotstrings.engine.test_delay_resolver",
 	"tests.unit.modules.hotstrings.engine.test_device_finder_selection",
