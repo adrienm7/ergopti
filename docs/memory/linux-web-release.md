@@ -134,6 +134,17 @@ GitHub Pages deployment source can be branch-based or workflow-based. Verify the
 repository setting before changing CI; workflow files alone do not prove the
 active deployment mode.
 
+### project-deploy-site-runs-on-every-ci-completion
+
+`deploy-site.yml` listens to `workflow_run` completions of CI on main and dev,
+and GitHub labels every such run with the default branch (main) whatever the
+producer's branch. A failed or cancelled dev push therefore looked like a red
+"site deployment on main" at the admission step ("event must be a completed
+successful push"), while the real main deployment had succeeded. The receiver
+job now runs only for a manual dispatch or a successful push producer; the
+admission script still refuses anything else. Action: before debugging a red
+deploy, read the triggering CI run (`gh run list --workflow CI`), not the label.
+
 ### project-xkb-extensions-dir-is-the-clean-install-contract
 
 Since libxkbcommon 1.13 + xkeyboard-config 2.45, layout packages install under
