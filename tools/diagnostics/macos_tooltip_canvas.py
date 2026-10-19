@@ -21,6 +21,9 @@ import tempfile
 import time
 
 import macos_owned_process as owner
+from macos_webview_binding import qualify as qualify_webview_binding
+from macos_physical_shortcuts_close import qualify as qualify_physical_shortcuts_close
+from macos_action_picker_pool import qualify as qualify_action_picker_pool
 
 
 def require(condition, message):
@@ -328,6 +331,14 @@ def run(repo, app, output):
             "macos_tooltip_canvas.lua",
             "macos_tooltip_canvas.py",
             "macos_tooltip_canvas_observer.py",
+            "macos_webview_binding.py",
+            "macos_webview_binding.lua",
+            "macos_webview_raw_delete.lua",
+            "macos_physical_shortcuts_close.py",
+            "macos_physical_shortcuts_close.lua",
+            "macos_action_picker_pool.py",
+            "macos_action_picker_pool.lua",
+            "macos_action_picker_pool_observer.lua",
             "hs_native_bootstrap_probe.py",
             "hs_native_bootstrap.lua",
             "hs_script_scope_native.lua",
@@ -404,6 +415,36 @@ def run(repo, app, output):
         )
         report["native_script_scope"] = qualify_script_scope(
             copied_app, source_root, scratch, output, version, report, unchanged
+        )
+        report["native_webview_binding"] = qualify_webview_binding(
+            repo,
+            executable,
+            scratch,
+            output,
+            version,
+            unchanged,
+            owned_observation,
+            owner.NativeProcessGroups(),
+        )
+        report["native_physical_shortcuts_close"] = qualify_physical_shortcuts_close(
+            repo,
+            executable,
+            scratch,
+            output,
+            version,
+            unchanged,
+            owned_observation,
+            owner.NativeProcessGroups(),
+        )
+        report["native_action_picker_pool"] = qualify_action_picker_pool(
+            repo,
+            executable,
+            scratch,
+            output,
+            version,
+            unchanged,
+            owned_observation,
+            owner.NativeProcessGroups(),
         )
     except BaseException as error:
         report.update(status="error", error=str(error) or type(error).__name__)

@@ -64,8 +64,17 @@ local function load_fixture(options)
 		begin_batch = function() return {} end,
 		keyStroke = function() return true end,
 		dispatch = function() return true end,
-		seal = function() return true end,
-		cancel = function() return true end,
+		on_complete = function(tx, callback) tx.callback = callback end,
+		on_dispatched = function(tx, callback) tx.dispatched = callback end,
+		seal = function(tx)
+			if tx.dispatched then tx.dispatched(tx, nil, "dispatched") end
+			if tx.callback then tx.callback(tx, "complete") end
+			return true
+		end,
+		cancel = function(tx)
+			if tx.callback then tx.callback(tx, "cancelled") end
+			return true
+		end,
 	}
 	package.loaded["adapters.synthetic_input"] = synthetic
 	package.loaded["infra.logger"] = helpers.make_logger_stub()
@@ -145,10 +154,10 @@ helpers.describe("text actions: clipboard refusals fail closed", function()
 		helpers.assert_true(f.current() == f.original)
 	end)
 
-	helpers.it("transform refuses Cmd+C when its capture timer cannot be armed", function()
+	helpers.it("transform restores after capture timer refusal following completed Cmd+C", function()
 		local f = load_fixture({ timer_outcomes = { "success", "nil" } })
 		f.text.toggle_titlecase()
-		helpers.assert_eq(count_key(f.keys, "c"), 0)
+		helpers.assert_eq(count_key(f.keys, "c"), 1, "capture grace begins after native Cmd+C completion")
 		helpers.assert_eq(count_key(f.keys, "v"), 0)
 		helpers.assert_true(f.current() == f.original)
 	end)

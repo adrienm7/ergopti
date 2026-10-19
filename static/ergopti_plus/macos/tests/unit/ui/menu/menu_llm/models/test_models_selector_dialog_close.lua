@@ -32,7 +32,7 @@ local function with_fixture(callback, initial_state)
 			local bridge = {}
 			function bridge:setCallback(bridge_callback)
 				self.callback = bridge_callback
-				return true
+				return self
 			end
 			context.bridges[#context.bridges + 1] = bridge
 			return bridge

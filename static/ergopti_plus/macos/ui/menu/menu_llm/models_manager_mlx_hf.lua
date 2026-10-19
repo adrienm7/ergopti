@@ -51,6 +51,7 @@ function M.install(ctx)
 	local obj, deps, presets = ctx.obj, ctx.deps, ctx.presets
 	local active_flow = nil
 	local try_release_flow
+	local run_flow_callback
 	local pause_flow_ui_timers
 	local schedule_flow_ui_timer
 
@@ -69,6 +70,7 @@ function M.install(ctx)
 	--- @return boolean live
 	local function flow_has_live_work(flow)
 		return flow.timer_owner ~= nil
+			or flow.usercontent ~= nil
 			or flow.prompt_callback_expected == true
 			or flow.webview ~= nil
 			or flow.webview_installing == true
@@ -77,6 +79,25 @@ function M.install(ctx)
 			or (tonumber(flow.callback_depth) or 0) > 0
 			or (type(flow.ui_timer_owners) == "table"
 				and next(flow.ui_timer_owners) ~= nil)
+	end
+
+	--- Releases the exact native callback before retiring its flow authority.
+	--- @param flow table Exact auth-flow owner.
+	--- @return boolean released
+	local function release_flow_controller(flow)
+		local controller = flow.usercontent
+		if controller == nil then return true end
+		if flow.controller_releasing then return false end
+		flow.usercontent_retired = true
+		flow.controller_releasing = true
+		local ok, receipt = xpcall(function() return controller:setCallback(nil) end, debug.traceback)
+		flow.controller_releasing = false
+		if not ok or receipt ~= controller then
+			Logger.error(LOG, "HuggingFace script callback release refused: %s.", tostring(receipt))
+			return false
+		end
+		if flow.usercontent == controller then flow.usercontent = nil end
+		return true
 	end
 
 	--- Publishes one business terminal only after every exact child has settled.
@@ -103,6 +124,16 @@ function M.install(ctx)
 	--- @param flow table HuggingFace auth owner.
 	--- @return boolean settled
 	try_release_flow = function(flow)
+		if flow.webview == nil and flow.webview_installing ~= true then
+			if not release_flow_controller(flow) then return false end
+			if flow.webview_continuation_pending and flow.on_ui_timers_settled
+				and next(flow.ui_timer_owners) == nil
+				and (flow.callback_depth or 0) == 0 then
+				local callback = flow.on_ui_timers_settled
+				flow.on_ui_timers_settled = nil
+				run_flow_callback(flow, "HuggingFace script callback settlement", callback)
+			end
+		end
 		if flow_has_live_work(flow) then return false end
 		local terminal = flow.pending_terminal
 		if terminal ~= nil and flow.terminal_sent ~= true then
@@ -179,7 +210,7 @@ function M.install(ctx)
 				end
 			end
 		end
-		if flow.webview ~= nil then
+		if flow.webview ~= nil or flow.usercontent ~= nil then
 			local close_ok, closed = xpcall(function()
 				if type(flow.close_webview) ~= "function" then return false end
 				return flow.close_webview(nil, true)
@@ -238,6 +269,7 @@ function M.install(ctx)
 	--- @param passed table|nil `{ owner, lifecycle, is_authorized }`.
 	--- @return table|nil flow Exact auth-flow owner.
 	local function begin_flow(on_done, passed)
+		if active_flow ~= nil then try_release_flow(active_flow) end
 		if active_flow ~= nil then
 			Logger.error(LOG,
 				"HuggingFace login refused while a prior exact flow remains owned.")
@@ -329,7 +361,7 @@ function M.install(ctx)
 		return flow
 	end
 
-	local function run_flow_callback(flow, label, callback, ...)
+	run_flow_callback = function(flow, label, callback, ...)
 		flow.callback_depth = (flow.callback_depth or 0) + 1
 		local args = table.pack(...)
 		local ok, result = xpcall(function()
@@ -641,7 +673,8 @@ function M.install(ctx)
 
 		local function continue_after_webview()
 			if flow.webview_continuation_pending ~= true
-				or next(flow.ui_timer_owners) ~= nil then
+				or next(flow.ui_timer_owners) ~= nil
+				or not release_flow_controller(flow) then
 				return false
 			end
 			flow.webview_continuation_pending = false
@@ -711,10 +744,12 @@ function M.install(ctx)
 			end
 			local webview = flow.webview
 			if webview == nil then
-				return flow.webview_installing ~= true
+				if flow.webview_installing == true then return false end
+				return try_release_flow(flow)
 			end
 			if flow.webview_close_requested == true then return false end
 			flow.webview_close_requested = true
+			local native_metatable = getmetatable(webview)
 			local ok, accepted = xpcall(function()
 				if type(webview.delete) ~= "function" then
 					error("HuggingFace token webview has no delete method")
@@ -724,6 +759,13 @@ function M.install(ctx)
 			-- The close callback is stronger settlement evidence than a misleading
 			-- nil/false/throwing delete return from a mutating native implementation.
 			if flow.webview == nil then return true end
+			-- A failed factory can precede callback installation. Native GC strips
+			-- the userdata metatable even then; a nil return alone proves nothing.
+			if flow.webview == webview and native_metatable ~= nil
+				and getmetatable(webview) == nil then
+				after_webview_settled()
+				return true
+			end
 			if ok ~= true or accepted == false or accepted == nil then
 				flow.webview_close_requested = false
 				Logger.error(LOG,
@@ -744,6 +786,7 @@ function M.install(ctx)
 				"HuggingFace prompt bridge construction failure")
 			return false
 		end
+		flow.usercontent = ucc
 		if not flow_is_authorized(flow) then
 			flow.webview_installing = false
 			try_release_flow(flow)
@@ -752,6 +795,8 @@ function M.install(ctx)
 
 		local callback_ok, callback_result = xpcall(function()
 			return ucc:setCallback(function(msg)
+				if flow.usercontent_retired or flow.usercontent ~= ucc
+					or flow.webview_terminal_consumed then return end
 				local ok, result = run_flow_callback(flow,
 					"HuggingFace webview message", function()
 						if type(msg) ~= "table" or not flow_is_authorized(flow) then return end
@@ -830,6 +875,7 @@ function M.install(ctx)
 				title             = i18n.get("mlx.hf_login_title"),
 				style_masks       = { "titled", "closable", "nonactivating" },
 				allow_new_windows = false,
+				delete_on_close   = true,
 				usercontent       = ucc,
 				assets_dir        = TOKEN_ASSETS_DIR,
 				on_close          = on_webview_close,

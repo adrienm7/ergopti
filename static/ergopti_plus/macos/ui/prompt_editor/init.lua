@@ -103,40 +103,56 @@ local function message_matches(body, context)
 		and body.epoch == context.epoch
 end
 
---- Closes one exact native window session.
+--- Detaches the exact native callback before releasing its controller owner.
+--- @param window table Cleanup-only native session.
+--- @return boolean released Whether the native controller acknowledged itself.
+local function release_bridge(window)
+	local bridge = window.usercontent
+	if bridge == nil then return true end
+	local ok, result = pcall(function() return bridge:setCallback(nil) end)
+	if not ok or result ~= bridge then
+		Logger.error(LOG, "Prompt editor bridge release did not commit (window=%d): %s.",
+			window.epoch, tostring(result))
+		return false
+	end
+	window.usercontent = nil
+	if _usercontent == bridge then _usercontent = nil end
+	return true
+end
+
+--- Closes one exact native window session and retains refused bridge cleanup.
 --- @param window table Window identity.
---- @return boolean closed Whether the session was current.
+--- @return boolean closed Whether both native owners were released.
 local function close_window(window)
 	if _active_window ~= window or window.closing then return false end
 	window.rollback_pending = true
 	if window.opening then return false end
+	window.closing = true
 	local webview = window.webview
-	local context = _active_context
 	if webview then
-		if type(webview.delete) ~= "function" then
-			Logger.error(LOG, "Prompt editor close refused; owned WebView has no delete method.")
-			return false
+		local function consumed()
+			return window.webview_metatable ~= nil and getmetatable(webview) == nil
 		end
-		window.closing = true
-		local ok, err = xpcall(function() webview:delete() end, debug.traceback)
-		window.closing = false
-		if not ok then
-			-- Retain the exact retired session until an explicit native cleanup retry
-			_active_window = window
-			_active_context = context
-			_webview = webview
-			_usercontent = window.usercontent
-			Logger.error(LOG, "Prompt editor close did not commit; exact WebView retained: %s.",
-				tostring(err))
-			return false
+		if not consumed() then
+			local ok, err = xpcall(function() webview:delete() end, debug.traceback)
+			if not ok then
+				Logger.error(LOG, "Prompt editor native delete raised: %s.", tostring(err))
+				if not consumed() then window.closing = false; return false end
+			end
 		end
+		-- Accepted native fade belongs to this view. Bridge retries must never
+		-- call delete again after its deferred native GC has consumed the userdata.
+		window.webview = nil
+		if _webview == webview then _webview = nil end
 	end
+	if not release_bridge(window) then window.closing = false; return false end
 	if _active_window == window then
 		_active_window = nil
 		_active_context = nil
 		_webview = nil
 		_usercontent = nil
 	end
+	window.closing = false
 	Logger.info(LOG, "Prompt editor closed.")
 	return true
 end
@@ -235,7 +251,11 @@ function M.open(existing, on_save)
 		local active = _active_context
 		if not active or not message_matches(body, active) then return end
 		if window.rollback_pending or active.settled then
-			if body.action == "cancel" or body.action == "save" then close_window(window) end
+			-- A refused native delete leaves this exact page visible. Its queued
+			-- Save/Cancel may retry cleanup without persisting again; a retired
+			-- bridge whose window already closed owns no further actions.
+			if window.presented and window.webview ~= nil and not window.closing
+				and (body.action == "cancel" or body.action == "save") then close_window(window) end
 			return
 		end
 
@@ -287,6 +307,7 @@ function M.open(existing, on_save)
 		return false
 	end
 	local show_ok, webview = xpcall(ui_builder.show_webview, debug.traceback, {
+		delete_on_close = true,
 		frame         = frame,
 		title         = context.payload.title,
 		style_masks   = {"titled", "closable", "utility"},
@@ -300,16 +321,16 @@ function M.open(existing, on_save)
 		end,
 		on_close      = function()
 			if window.closing then return end
-			if window.opening then window.rollback_pending = true; return end
-			if _active_window == window then
-				_active_window = nil
-				_active_context = nil
-				_webview = nil
-				_usercontent = nil
-			end
+			window.rollback_pending = true
+			if _active_window ~= window then return end
+			local closed_view = window.webview
+			window.webview = nil
+			if _webview == closed_view then _webview = nil end
+			if not window.opening then close_window(window) end
 		end,
 		on_webview_created = function(candidate)
 			window.webview = candidate
+			window.webview_metatable = getmetatable(candidate)
 			if _active_window ~= window then return false end
 			_webview = candidate
 			return not window.rollback_pending
@@ -351,6 +372,7 @@ function M.open(existing, on_save)
 		return false
 	end
 	window.webview = webview
+	window.presented = true
 	_webview = webview
 	Logger.info(LOG, "Prompt editor opened successfully.")
 	return true

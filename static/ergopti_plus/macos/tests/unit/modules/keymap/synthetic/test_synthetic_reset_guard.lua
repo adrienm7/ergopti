@@ -3,7 +3,8 @@
 --- ==============================================================================
 --- MODULE: Explicit Synthetic Transaction Producer Coverage Guard
 --- DESCRIPTION:
---- Enumerates every production call to SyntheticInput.begin(). A new explicit
+--- Enumerates production calls to SyntheticInput.begin(), including the injected
+--- adapter in the common text dispatcher. A new explicit
 --- producer makes the inventory fail until its lifecycle is reviewed. Each known
 --- family is required to keep its construction scope and terminal seal/cancel
 --- paths, preventing a partially built transaction from leaking across actions.
@@ -60,8 +61,9 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 			'SyntheticInput.begin(source_variant or source_type or "replacement", "replacement", publication)',
 		external_replacement = 'SyntheticInput.begin("external_replacement", "replacement")',
 		keep_awake = 'SyntheticInput.begin("shortcuts.keep_awake", "replacement")',
-		text_reselect = 'SyntheticInput.begin("shortcuts.text.reselect", "action")',
+		text_transform = 'input.begin("shortcuts.text.transform", "action", publication)',
 		text_surround = 'SyntheticInput.begin("shortcuts.text.surround", "action")',
+		text_sender_paste = 'SyntheticInput.begin("text_sender.clipboard", "action", {',
 	}
 
 	helpers.it("enumerates the complete non-vacuous class", function()
@@ -69,9 +71,9 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 		local producer_names = {}
 		for name in pairs(producers) do producer_names[#producer_names + 1] = name end
 		table.sort(producer_names)
-		helpers.assert_eq(#producer_names, 6,
-			"the explicit producer inventory must name all six reviewed owners")
-		helpers.assert_eq(count_literal(all, "SyntheticInput.begin("), #producer_names,
+		helpers.assert_eq(#producer_names, 7,
+			"the explicit producer inventory must name all seven reviewed owners")
+		helpers.assert_eq(count_literal(all, "SyntheticInput.begin(") + count_literal(all, "input.begin("), #producer_names,
 			"a new explicit producer needs a lifecycle assertion in this inventory")
 		for _, name in ipairs(producer_names) do
 			local call = producers[name]
@@ -159,16 +161,40 @@ helpers.describe("SyntheticInput explicit producer inventory", function()
 			and seal_pos < release_pos)
 	end)
 
-	helpers.it("deferred text reselection owns dispatch through terminal cleanup", function()
-		local source = read_unit("local TRANSFORM_LOCK_TIMEOUT_SEC")
-		local begin_pos = source:find(producers.text_reselect, 1, true)
-		local batch_pos = source:find("SyntheticInput.begin_batch(tx)", begin_pos, true)
-		local dispatch_pos = source:find("SyntheticInput.dispatch(batch)", begin_pos, true)
-		local seal_pos = source:find("SyntheticInput.seal(tx)", begin_pos, true)
-		local cancel_pos = source:find("SyntheticInput.cancel, tx", begin_pos, true)
-		helpers.assert_true(begin_pos and batch_pos and dispatch_pos and seal_pos and cancel_pos,
-			"deferred action must retain batch, dispatch, seal, and rollback sites")
-		helpers.assert_true(begin_pos < batch_pos and batch_pos < dispatch_pos and dispatch_pos < seal_pos)
+	helpers.it("text transforms own dispatch through the shared terminal observer", function()
+		-- The real FIFO translation cases cover delayed copy, paste and reselection.
+		local source = read_unit("function M.start(input, owner, publication, build, completed, paste)")
+		local pending_pos = source:find("owner.synthetic_pending = true", 1, true)
+		local begin_pos = source:find(producers.text_transform, 1, true)
+		helpers.assert_not_nil(begin_pos)
+		local complete_pos = source:find("input.on_complete(tx", begin_pos, true)
+		local build_pos = source:find("assert(build(tx) == true", begin_pos, true)
+		local seal_pos = source:find("input.seal(tx)", begin_pos, true)
+		local cancel_pos = source:find("input.cancel, tx", begin_pos, true)
+		helpers.assert_true(pending_pos and complete_pos and build_pos and seal_pos and cancel_pos,
+			"text output must retain pending ownership, observe completion, build, seal and cancel")
+		helpers.assert_true(pending_pos < begin_pos and begin_pos < complete_pos and complete_pos < build_pos
+			and build_pos < seal_pos and seal_pos < cancel_pos,
+			"the exact pending owner and terminal observer must precede payload admission")
+	end)
+
+	helpers.it("text sender observes its exact paste producer before dispatch and terminal cleanup", function()
+		-- test_text_sender_paste_handoff drives this owner through the real FIFO timer,
+		-- including delayed handoff, cancellation, grace and exactly-once restore.
+		local source = read_unit("local _paste_transaction = nil")
+		local begin_pos = source:find(producers.text_sender_paste, 1, true)
+		helpers.assert_not_nil(begin_pos)
+		local dispatched_pos = source:find("SyntheticInput.on_dispatched(producer", begin_pos, true)
+		local completion_pos = source:find("SyntheticInput.on_complete(producer", begin_pos, true)
+		local emit_pos = source:find(
+			"SyntheticInput.emit_guarded_key_stroke, PASTE_MODIFIER, PASTE_KEY, producer", begin_pos, true)
+		local seal_pos = source:find("SyntheticInput.seal(producer)", begin_pos, true)
+		local cancel_pos = source:find("SyntheticInput.cancel, producer", begin_pos, true)
+		helpers.assert_true(dispatched_pos and completion_pos and emit_pos and seal_pos and cancel_pos,
+			"paste needs exact dispatch/completion observers, producer-bound emission, seal and cancellation")
+		helpers.assert_true(begin_pos < dispatched_pos and dispatched_pos < completion_pos
+			and completion_pos < emit_pos and emit_pos < seal_pos and seal_pos < cancel_pos,
+			"observers must own native handoff before emission or either terminal route")
 	end)
 
 	helpers.it("parenthesis surround retains one transaction through every terminal path", function()

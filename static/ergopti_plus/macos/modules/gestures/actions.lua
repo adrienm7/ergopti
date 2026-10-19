@@ -1655,7 +1655,9 @@ local function restore_search_clipboard(generation)
 	if type(saved) == "table" and next(saved) ~= nil then
 		ok_restore, restore_result = pcall(hs.pasteboard.writeAllData, saved)
 	else
+		-- The native clear primitive has no Lua success return.
 		ok_restore, restore_result = pcall(hs.pasteboard.clearContents)
+		if ok_restore then restore_result = true end
 	end
 	_search_mutation_depth = _search_mutation_depth - 1
 	if not ok_restore or restore_result ~= true then
@@ -1829,7 +1831,8 @@ sg("search_web", function(binding)
 	_search_mutation_depth = _search_mutation_depth + 1
 	local ok_clear, clear_error = pcall(hs.pasteboard.clearContents)
 	_search_mutation_depth = _search_mutation_depth - 1
-	if not ok_clear or clear_error ~= true then
+	-- clearContents returns no values; only a raised boundary refuses it.
+	if not ok_clear then
 		local restored, restore_error = restore_search_clipboard(my_generation)
 		if not restored then
 			_search_recovery_only = true

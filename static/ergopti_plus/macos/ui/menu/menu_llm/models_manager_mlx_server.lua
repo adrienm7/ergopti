@@ -879,8 +879,16 @@ function M.install(ctx)
 					settle_cancel("endpoint_reset_refused")
 					return false
 				end
+				local adoption_epoch = obj._server_transition_epoch
 				Logger.info(LOG, "Adopting MLX server from a previous session (already serving '%s' on :%d) — skipping cold restart.",
 					tostring(target_model), target_port)
+				if not current_or_cancel() then return false end
+				-- A diagnostic sink may have dispatched and even completed a newer
+				-- server. Preserve that transition before publishing this adoption.
+				if obj._server_transition_epoch ~= adoption_epoch then
+					settle_cancel("superseded")
+					return false
+				end
 				local adopted_owner = {
 					task = nil,
 					identity = target_identity,
@@ -1255,7 +1263,7 @@ function M.install(ctx)
 				-- Hammerspoon itself. Verify the process is still a python interpreter
 				-- running mlx_lm before issuing kill -9; otherwise we risk taking
 				-- down the menubar app on every model switch.
-				"OLD_COMM=$(ps -o comm= -p \"$OLD_PID\" 2>/dev/null | tr -d '[:space:]'); " ..
+				"OLD_COMM=$(ps -o ucomm= -p \"$OLD_PID\" 2>/dev/null | tr -d '[:space:]'); " ..
 				"OLD_ARGS=$(ps -o args= -p \"$OLD_PID\" 2>/dev/null); " ..
 				"if echo \"$OLD_COMM\" | grep -qi python && echo \"$OLD_ARGS\" | grep -q mlx_lm; then " ..
 				"echo \"[MLX] Killing previous server PID $OLD_PID (verified python+mlx_lm)…\"; " ..
@@ -1274,7 +1282,7 @@ function M.install(ctx)
 				-- the substring 'python… -m mlx_lm', so the regex hits it. Killing that PID
 				-- is suicide on the Hammerspoon-watched task. Using $2 (comm) instead skips
 				-- bash cleanly: only processes whose executable starts with python qualify.
-				"PGREP_PIDS=$(ps -axo pid=,comm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); " ..
+				"PGREP_PIDS=$(ps -axo pid=,ucomm=,args= | awk '$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}' || true); " ..
 				"if [ -n \"$PGREP_PIDS\" ]; then " ..
 				"echo \"[MLX] mlx_lm process(es) still alive (PIDs: $PGREP_PIDS) — killing…\"; " ..
 				"echo \"$PGREP_PIDS\" | xargs kill -9 2>/dev/null || true; " ..

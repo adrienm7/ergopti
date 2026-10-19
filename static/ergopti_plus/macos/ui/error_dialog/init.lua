@@ -42,6 +42,8 @@ local Policy         = require("diagnostics.error_policy")
 local ErrorReport    = require("diagnostics.error_report")
 local Redact         = require("diagnostics.redact")
 local TimerScheduler = require("adapters.timer_scheduler")
+local DeferredWork = require("infra.deferred_work")
+local NativeClose = require("ui.webview_close_owner").new(DeferredWork, Logger)
 local Storage        = require("adapters.storage")
 
 local LOG = "error_dialog"
@@ -175,7 +177,7 @@ end
 --- @param message table
 --- @return boolean submitted
 local function send(session, message)
-	if _session ~= session then return false end
+	if _session ~= session or session.closing then return false end
 	local ok_json, json = pcall(hs.json.encode, message)
 	if not ok_json or type(json) ~= "string" then
 		Logger.error(LOG, "An error window message could not be encoded: %s.", tostring(json))
@@ -222,12 +224,31 @@ end
 --- Closes the session's window.
 --- @param session table
 local function close(session)
-	if _session ~= session then return end
+	if _session ~= session then return false end
 	local webview = session.webview
-	retire(session)
-	local ok, err = pcall(function() webview:delete() end)
-	if not ok then Logger.error(LOG, "The error window could not be closed: %s.", tostring(err)) end
-	Logger.info(LOG, "Error window closed.")
+	if session.native_delete_pending then
+		if session.native_delete_metatable ~= nil and getmetatable(webview) == nil then retire(session); return true end
+		return false
+	end
+	if session.closing then return false end
+	local metadata = getmetatable(webview)
+	session.closing = true
+	cancel_action(session)
+	local delete = webview.delete
+	session.native_delete_pending, session.native_delete_metatable = session.presentation_attempted == true, metadata
+	local ok, result = xpcall(function() return delete(webview) end, debug.traceback)
+	local consumed = metadata ~= nil and getmetatable(webview) == nil
+	if consumed then retire(session); return true end
+	if not ok or result == false then
+		-- Keep the same session inert through logging, which can itself reenter.
+		pcall(Logger.error, LOG, "The error window could not be closed; exact owner retained: %s.", tostring(result))
+		if not session.native_delete_pending then session.closing = false end
+		return false
+	end
+	-- A visible public delete returns nil before its native fade completes.
+	-- Its closing notification owns retirement; never delete that window twice.
+	Logger.info(LOG, "Error window native close requested.")
+	return true
 end
 
 --- The page's first message: the error and its report, already redacted.
@@ -291,7 +312,7 @@ end
 --- @param session table
 --- @param message table The usercontent message ({ body = … }).
 local function on_page_message(session, message)
-	if _session ~= session then return end
+	if _session ~= session or session.closing then return end
 	local body = type(message) == "table" and message.body or nil
 	if body == "ready" then
 		send(session, init_message(session))
@@ -361,6 +382,10 @@ end
 --- @param record table { kind, module, message, time }
 --- @return boolean opened
 local function open_window(record)
+	if NativeClose.retry_cleanup() ~= true then return false end
+	if _session then
+		if close(_session) ~= true or _session ~= nil then return false end
+	end
 	Logger.start(LOG, "Opening the error window…")
 	local ok_report, fields = pcall(build_report, record)
 	if not ok_report then
@@ -408,6 +433,17 @@ local function open_window(record)
 	for key, value in pairs(fields) do session[key] = value end
 	_session = session
 
+	local policy_ok, policy_error = xpcall(function()
+		NativeClose.disarm(webview)
+		assert(webview:allowNewWindows(false) == webview, "native child-window policy was not acknowledged")
+		assert(webview:allowNewWindows() == false, "native child windows remain enabled")
+	end, debug.traceback)
+	if not policy_ok then
+		Logger.error(LOG, "The error window native policy was refused: %s.", tostring(policy_error))
+		close(session)
+		return false
+	end
+
 	local ok_cb, cb_err = pcall(function()
 		controller:setCallback(function(message) on_page_message(session, message) end)
 	end)
@@ -426,14 +462,15 @@ local function open_window(record)
 	local i18n = require("infra.i18n")
 	pcall(function() webview:windowTitle(ui_builder.window_title(i18n.get("common.error_title"))) end)
 	pcall(function() webview:allowTextEntry(true) end)
-	pcall(function() webview:allowNewWindows(false) end)
 	pcall(function() webview:allowGestures(false) end)
-	pcall(function()
-		webview:windowCallback(function(action)
-			if _session ~= session then return end
-			if action == "closing" or action == "closed" then retire(session) end
-		end)
+	local bound, bind_error = pcall(function()
+		NativeClose.bind(webview, function() retire(session) end)
 	end)
+	if not bound then
+		Logger.error(LOG, "The error window close owner was refused: %s.", tostring(bind_error))
+		close(session)
+		return false
+	end
 	pcall(function()
 		webview:navigationCallback(function(action)
 			if _session ~= session or action ~= "didFinishNavigation" then return end
@@ -452,6 +489,7 @@ local function open_window(record)
 		close(session)
 		return false
 	end
+	session.presentation_attempted = true
 	local ok_show, show_err = xpcall(function() return webview:show() end, debug.traceback)
 	if not ok_show or show_err == nil or show_err == false then
 		Logger.error(LOG, "The error window could not be shown: %s.", tostring(show_err))

@@ -27,12 +27,23 @@ local function recording_view(with_window)
 	function window:unminimize() return self end
 	function window:raise() calls.raises = calls.raises + 1; return self end
 	function window:focus() calls.focuses = calls.focuses + 1; return self end
-	local view = {}
+	local view = setmetatable({}, {})
 	for _, name in ipairs({
 		"windowTitle", "windowStyle", "shadow", "allowTextEntry", "allowGestures",
-		"allowNewWindows", "html", "windowCallback", "navigationCallback", "evaluateJavaScript",
+		"html", "windowCallback", "navigationCallback", "evaluateJavaScript",
 	}) do
 		view[name] = function(self) return self end
+	end
+	function view:allowNewWindows(value)
+		if value == nil then return self.allow_new_windows ~= false end
+		assert(type(value) == "boolean", "allowNewWindows expects a boolean")
+		self.allow_new_windows = value
+		return self
+	end
+	function view:deleteOnClose(value)
+		if value == nil then return self.delete_on_close == true end
+		self.delete_on_close = value
+		return self
 	end
 	function view:level(value)
 		calls.levels[#calls.levels + 1] = value
@@ -47,7 +58,7 @@ local function recording_view(with_window)
 		return self
 	end
 	function view:hswindow() return with_window and window or nil end
-	function view:delete() return self end
+	function view:delete() setmetatable(self, nil) end
 	return view, calls
 end
 
@@ -219,7 +230,13 @@ local function load_healthcheck(view)
 	_G.hs = hs_stub
 	package.loaded["hs"] = hs_stub
 	hs_stub.drawing.windowLevels = LEVELS
-	hs_stub.webview.new = function() return view end
+	hs_stub.webview.new = function()
+		if getmetatable(view) == nil then
+			local fresh = {}; for key, value in pairs(view) do if type(value) == "function" then fresh[key] = value end end
+			view = setmetatable(fresh, {})
+		end
+		return view
+	end
 	hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4, resizable = 8 }
 	hs_stub.screen.mainScreen = function()
 		return { frame = function() return { x = 0, y = 0, w = 1440, h = 900 } end }
@@ -301,7 +318,13 @@ local function load_error_dialog(view, app)
 	package.loaded["hs"] = hs_stub
 	hs_stub.drawing.windowLevels = LEVELS
 	hs_stub.focus = function() app.activations = app.activations + 1 end
-	hs_stub.webview.new = function() return view end
+	hs_stub.webview.new = function()
+		if getmetatable(view) == nil then
+			local fresh = {}; for key, value in pairs(view) do if type(value) == "function" then fresh[key] = value end end
+			view = setmetatable(fresh, {})
+		end
+		return view
+	end
 	hs_stub.webview.windowMasks = { titled = 1, closable = 2, miniaturizable = 4, resizable = 8 }
 	hs_stub.webview.usercontent.new = function()
 		return { setCallback = function(self) return self end }

@@ -79,7 +79,7 @@ helpers.describe("llm.boot_cleanup - asynchronous settlement", function()
 			helpers.assert_true(type(command) == "string", "cleanup must dispatch one shell script")
 			helpers.assert_contains(command, "-iTCP:4567",
 				"cleanup must use the port resolved by api_mlx")
-			helpers.assert_contains(command, "ps -axo pid=,comm=,args=",
+			helpers.assert_contains(command, "ps -axo pid=,ucomm=,args=",
 				"cleanup must enumerate executable identity instead of matching its shell argv")
 			helpers.assert_contains(command, "'$2 ~ /^[Pp]ython/ && /mlx_lm/ {print $1}'",
 				"only Python executables whose argv names mlx_lm may be selected")

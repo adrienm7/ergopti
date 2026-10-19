@@ -385,21 +385,25 @@ function M.store(path, parsed, source_identity)
 		os.time(),
 		table.concat(parts))
 
-	local ok = pcall(function()
+	local ok, failure = pcall(function()
 		local fh = io.open(snapshot_path(path), "w")
 		if not fh then error("open failed") end
-		-- Inner pcall ensures fh:close() always runs even when write() panics
-		-- (e.g. disk-full — without this the file descriptor leaks)
-		local write_ok, write_err = pcall(function() fh:write(body) end)
-		fh:close()
-		if not write_ok then error(write_err) end
+		-- Lua reports ordinary I/O failures as nil, not exceptions. Retire the
+		-- exact stream once even after a refused write; close consumes it before
+		-- reporting a late flush failure, so retrying close would use a dead file.
+		local write_ok, written, write_error = pcall(function() return fh:write(body) end)
+		local close_ok, closed, close_error = pcall(function() return fh:close() end)
+		if not write_ok then error(written, 0) end
+		if written ~= fh then error(write_error or "snapshot write receipt refused", 0) end
+		if not close_ok then error(closed, 0) end
+		if closed ~= true then error(close_error or "snapshot close receipt refused", 0) end
 	end)
 	if ok then
 		_writes = _writes + 1
 		Logger.debug(LOG, "Snapshot written for '%s' (%d bytes).", path, #body)
 		return true
 	else
-		Logger.warn(LOG, "Failed to write snapshot for '%s' — cache miss next boot.", path)
+		Logger.warn(LOG, "Failed to write snapshot for '%s' — cache miss next boot (%s).", path, tostring(failure))
 		return false
 	end
 end

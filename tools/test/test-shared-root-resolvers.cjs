@@ -42,6 +42,7 @@
 'use strict';
 
 const fs = require('fs');
+const assert = require('node:assert/strict');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
@@ -81,13 +82,16 @@ for (const bin of LUA_CANDIDATES) {
 // ==========================================
 // ==========================================
 
-/** Every non-vendor Lua file under the driver tree. */
-function walkLua(dir, acc = []) {
+/** Runtime Lua files; test fixtures and external dependencies do not ship as callers. */
+function walkLua(dir, acc = [], driversRoot = dir) {
 	if (!fs.existsSync(dir)) return acc;
 	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
 		const p = path.join(dir, e.name);
 		if (e.isDirectory()) {
-			if (e.name !== 'vendor' && e.name !== 'node_modules') walkLua(p, acc);
+			// Match driver test roots; a runtime folder merely named tests still ships.
+			const testTree = e.name === 'tests' && path.dirname(dir) === driversRoot;
+			if (!testTree && e.name !== 'vendor' && e.name !== 'node_modules')
+				walkLua(p, acc, driversRoot);
 		} else if (e.name.endsWith('.lua')) {
 			acc.push(p);
 		}
@@ -101,31 +105,101 @@ function walkLua(dir, acc = []) {
 // building the path one line earlier.
 const LITERAL_CALL = /\.(shared|shared_llm_path)\(\s*"([^"]*)"\s*\)/g;
 
-const targets = new Map(); // shared-relative path -> [call sites]
+/** Collect the requests from the exact runtime file walk, retaining their call sites. */
+function collectTargets(luaFiles, driversRoot) {
+	const targets = new Map();
+	for (const abs of luaFiles) {
+		const rel = path.relative(driversRoot, abs).split(path.sep).join('/');
+		// The shared tree holds no resolver calls of its own; skipping it keeps the
+		// target list to what the drivers ask for.
+		if (rel.startsWith('_shared/')) continue;
+		const lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/);
+		lines.forEach((line, i) => {
+			if (/^\s*--/.test(line)) return; // Prose cites paths it does not request
+			for (const m of line.matchAll(LITERAL_CALL)) {
+				const arg = m[2];
+				if (arg === '') continue; // Documented "nil/empty → the root itself"
+				const target = m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg;
+				if (!targets.has(target)) targets.set(target, []);
+				targets.get(target).push(`${rel}:${i + 1}`);
+			}
+		});
+	}
+	return targets;
+}
+
+/** Preserve actionable runtime failures for both missing and unresolved resources. */
+function missingTargetMessage(driver, target, resolved, targets) {
+	const sites = targets.get(target) || [];
+	const where =
+		sites.slice(0, 2).join(', ') + (sites.length > 2 ? `, +${sites.length - 2} more` : '');
+	if (!resolved || resolved === 'nil')
+		return `${driver}: Paths.shared("${target}") returned nil — requested at ${where}`;
+	if (!fs.existsSync(resolved))
+		return (
+			`${driver}: Paths.shared("${target}") resolves to "${resolved}", which does not ` +
+			`exist. Requested at ${where}. The read will fail silently at runtime.`
+		);
+	return null;
+}
+
+// Exercise the actual walk, collector and missing-resource guard on private files.
+// These fixtures are never passed to native resolvers or counted towards any floor.
+const collectionFixture = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-resolver-walk-'));
+try {
+	const sources = {
+		'macos/modules/runtime.lua': 'Paths.shared("runtime.txt")\nPaths.shared("missing-runtime.txt")',
+		'linux/modules/test_runtime.lua': 'Paths.shared_llm_path("fixture.json")',
+		'macos/tests/unit/fixture.lua': 'Paths.shared("test-only.txt")',
+		'macos/modules/tests/runtime.lua': 'Paths.shared("nested-runtime.txt")',
+		'linux/tests/fixture.lua': 'Paths.shared("linux-test-only.txt")',
+		'macos/vendor/fixture.lua': 'Paths.shared("vendor-only.txt")',
+		'macos/node_modules/fixture.lua': 'Paths.shared("dependency-only.txt")'
+	};
+	for (const [relative, contents] of Object.entries(sources)) {
+		const destination = path.join(collectionFixture, relative);
+		fs.mkdirSync(path.dirname(destination), { recursive: true });
+		fs.writeFileSync(destination, contents);
+	}
+	const walked = walkLua(collectionFixture);
+	assert.deepEqual(
+		walked.map((file) => path.relative(collectionFixture, file).split(path.sep).join('/')).sort(),
+		[
+			'linux/modules/test_runtime.lua',
+			'macos/modules/runtime.lua',
+			'macos/modules/tests/runtime.lua'
+		]
+	);
+	const requested = collectTargets(walked, collectionFixture);
+	assert.deepEqual([...requested.keys()].sort(), [
+		'missing-runtime.txt',
+		'modules/llm/fixture.json',
+		'nested-runtime.txt',
+		'runtime.txt'
+	]);
+	const present = path.join(collectionFixture, 'runtime.txt');
+	fs.writeFileSync(present, 'a real runtime resource');
+	assert.equal(missingTargetMessage('fixture', 'runtime.txt', present, requested), null);
+	const missing = missingTargetMessage(
+		'fixture',
+		'missing-runtime.txt',
+		path.join(collectionFixture, 'missing-runtime.txt'),
+		requested
+	);
+	assert.match(missing, /does not exist/);
+	assert.ok(missing.includes('macos/modules/runtime.lua:2'));
+	assert.match(missingTargetMessage('fixture', 'runtime.txt', null, requested), /returned nil/);
+} finally {
+	fs.rmSync(collectionFixture, { recursive: true, force: true });
+}
+
 const luaFiles = walkLua(DRIVERS);
+const targets = collectTargets(luaFiles, DRIVERS); // shared-relative path -> [call sites]
 
 if (luaFiles.length < 200) {
 	errors.push(
 		`walked only ${luaFiles.length} .lua file(s) — the scan is broken and would report nothing`
 	);
-}
-
-for (const abs of luaFiles) {
-	const rel = path.relative(DRIVERS, abs).split(path.sep).join('/');
-	// The shared tree holds no resolver calls of its own; skipping it keeps the
-	// target list to what the drivers ask for.
-	if (rel.startsWith('_shared/')) continue;
-	const lines = fs.readFileSync(abs, 'utf8').split(/\r?\n/);
-	lines.forEach((line, i) => {
-		if (/^\s*--/.test(line)) return; // Prose cites paths it does not request
-		for (const m of line.matchAll(LITERAL_CALL)) {
-			const arg = m[2];
-			if (arg === '') continue; // Documented "nil/empty → the root itself"
-			const target = m[1] === 'shared_llm_path' ? `modules/llm/${arg}` : arg;
-			if (!targets.has(target)) targets.set(target, []);
-			targets.get(target).push(`${rel}:${i + 1}`);
-		}
-	});
 }
 
 if (targets.size < MIN_TARGETS) {
@@ -292,19 +366,8 @@ if (!LUA) {
 		}
 
 		for (const { target, resolved } of res.paths) {
-			const sites = targets.get(target) || [];
-			const where =
-				sites.slice(0, 2).join(', ') + (sites.length > 2 ? `, +${sites.length - 2} more` : '');
-			if (!resolved || resolved === 'nil') {
-				errors.push(`${drv.name}: Paths.shared("${target}") returned nil — requested at ${where}`);
-				continue;
-			}
-			if (!fs.existsSync(resolved)) {
-				errors.push(
-					`${drv.name}: Paths.shared("${target}") resolves to "${resolved}", which does not ` +
-						`exist. Requested at ${where}. The read will fail silently at runtime.`
-				);
-			}
+			const failure = missingTargetMessage(drv.name, target, resolved, targets);
+			if (failure) errors.push(failure);
 		}
 	}
 

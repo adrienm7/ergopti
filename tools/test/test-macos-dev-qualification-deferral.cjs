@@ -102,12 +102,20 @@ const LOGGER_42_FILTER =
 	"--filter '(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)'";
 const LOGGER_42_BLOCK =
 	'          # Unchanged original logger29+directory13; neither SDK49 nor daily-log7 supplies this credit.\n          logger_transcript="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-xctest.log"\n          logger_source="$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-source.json"\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs begin "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source"\n          set +e\n          swift test --package-path static/ergopti_plus/macos/launcher \\\n            --scratch-path "$ERGOPTI_OLLAMA_BUILD_ROOT/swift" \\\n            --filter \'(^|[.])(LoggerDatagramWorkerTests|OwnedLogDirectoryTests)([/.]|$)\' 2>&1 | tee "$logger_transcript"\n          logger_statuses=("${PIPESTATUS[@]}")\n          set -e\n          test "${#logger_statuses[@]}" -eq 2\n          node tools/diagnostics/native_logger_regression_xctest_evidence.cjs judge "$logger_transcript" "${logger_statuses[0]}" "${logger_statuses[1]}" "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$logger_source" "$ERGOPTI_OLLAMA_BUILD_ROOT/logger-original-42-verdict.json"\n';
+const LOGGER_NUMERIC_COMMAND =
+	'          bash tools/diagnostics/run_logger_numeric_native.sh "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"\n';
+const LOGGER_NUMERIC_STEP = guardedStep(
+	'managed-ollama-native',
+	'      - name: Qualify numeric logger boundary XCTest controls\n        shell: bash\n        run: |\n' +
+		LOGGER_NUMERIC_COMMAND +
+		'        timeout-minutes: 5\n'
+);
 function admitNativeSdkSelector(mac) {
 	const jobs = [...mac.matchAll(/^  e2e-hs:\n[\s\S]*?(?=^  [A-Za-z][\w-]*:|(?![\s\S]))/gm)];
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
 	} catch {
 		return null;
 	}
@@ -118,6 +126,16 @@ function admitNativeSdkSelector(mac) {
 	];
 	if (steps.length !== 1) return null;
 	const step = steps[0][0];
+	const numeric = [
+		...jobs[0][0].matchAll(
+			/^      - name: Qualify numeric logger boundary XCTest controls\n[\s\S]*?(?=^      - |(?![\s\S]))/gm
+		)
+	];
+	if (numeric.length !== 1 || numeric[0][0] !== LOGGER_NUMERIC_STEP) return null;
+	const retained = jobs[0][0].indexOf(
+		'      - name: Retain independent native SDK XCTest diagnostics\n'
+	);
+	if (numeric[0].index <= steps[0].index || retained <= numeric[0].index) return null;
 	if (
 		step.split(DAEMON_LOG_BLOCK).length !== 2 ||
 		mac.split(DAEMON_LOG_FILTER).length !== 2 ||
@@ -202,7 +220,7 @@ function admitNativePacSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
 	} catch {
 		return null;
 	}
@@ -241,7 +259,7 @@ function admitNativeSourceSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
 	} catch {
 		return null;
 	}
@@ -450,7 +468,7 @@ function admitNativeNumberRowSelector(mac) {
 	if (jobs.length !== 1) return null;
 	// Every original role step retains its own admission after job-level gating moved.
 	try {
-		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 34) return null;
+		if (stageSource.selected(jobs[0][0], 'managed-ollama-native').length !== 35) return null;
 	} catch {
 		return null;
 	}
@@ -1638,6 +1656,13 @@ function run({ includeLeafControls = true } = {}) {
 	console.log(
 		'PASS: native logging exact-seven receipt controls=20 selector-controls=12; all native execution UNRUN.'
 	);
+
+	require('./fixtures/native-logger-numeric-qualification.cjs')({
+		workflow,
+		admitNativeSdkSelector,
+		LOGGER_NUMERIC_COMMAND,
+		LOGGER_NUMERIC_STEP
+	});
 
 	require('./fixtures/native-logger-regression-qualification.cjs')({
 		workflow,
