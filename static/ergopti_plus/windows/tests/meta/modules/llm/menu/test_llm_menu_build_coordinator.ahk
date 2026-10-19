@@ -333,6 +333,7 @@ BootProfile_Mark(Args*) => 0
 BootProfile_StageBegin(Args*) => 0
 BootProfile_StageEnd(Args*) => 0
 BootProfile_StageAbort(Args*) => 0
+ErrorNet_Describe(Err) => Err.Message
 _HS_InvalidateCaches() => 0
 MenuManifest_InvalidateCache() => 0
 LLM_Menu_BuildSavedOpts(Cache) => Map()
