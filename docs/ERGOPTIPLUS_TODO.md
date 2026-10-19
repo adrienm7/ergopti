@@ -2999,18 +2999,31 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
-- [ ] **GitHub issue #96 (Windows, v1.0.3, October 19).** A personal hotstring
-      `sru -> SRU` (priority P1) is still corrected to "sur" by the French
-      autocorrection; the screenshot shows "Hotstrings personnels (0)" with an
-      unchecked category "metiers (2)" and the main menu has lost a counter.
-      Find why the new personal category is not active (and whether priority
-      P1 must beat autocorrection when both are active), and restore the
-      counter.
-- [ ] **GitHub issue #95 (macOS, v1.0.3, October 19, maintainer's log
-      attached).** Four bugs: Karabiner lease errors in the log; "check for
-      updates" failed several times then worked; a running oMLX server is not
-      seen by the AI menu and adding it by hand fails; the shortcut on the key
-      left of "1" still targets the wrong key (the 105th ISO key).
+- [ ] **GitHub issue #96 (Windows, v1.0.3): fixed on dev, to release and
+      answer.** Cause: a category created in the editor took the neutral-off
+      default of an undeclared personal section, so "metiers" never loaded
+      ("Hotstrings personnels (0)" is the same cause, not a lost counter).
+      d31776170a enables the sections an editor save creates (Windows both
+      editors, Linux bridge; macOS already treats them as enabled). After the
+      next release, reply on the issue (the reporter must tick "metiers" once
+      on v1.0.3, or update). Open question for the maintainer: personal
+      sections have `recommended = false`, so « Restaurer les valeurs
+      conseillées » switches every personal category off.
+- [ ] **GitHub issue #95 (macOS, v1.0.3, maintainer's log attached).** - oMLX added by hand: fixed (c67d70f1fe, a pending key with the default
+      address left an empty address that won over the catalogue). - oMLX running but never seen before that: each sweep logs four
+      "Request timed out after 1500ms" (one per catalogue server) instead of
+      an instant refusal; check whether `localhost` resolves to ::1 first
+      while oMLX binds 127.0.0.1 only (then use 127.0.0.1 in
+      local_servers.json for all drivers), or whether oMLX answers 401
+      without a key. - "Check for updates" failed with HTTP 403 then worked: the unauthenticated
+      GitHub API limit (60/h per IP; the changelog window and the healthcheck
+      also call it). Send conditional requests (ETag, `If-None-Match`: a 304
+      does not count against the limit) and report a rate limit as such, on
+      the three drivers' update checks. - Karabiner lease: repeated "timeout waiting for READY", "watchdog exited
+      unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a Mac
+      reproduction (macos/platform/karabiner lease worker). - The shortcut on the key left of "1" still targets the 105th ISO key
+      (keycodes 10 and 50 are swapped on ISO Macs); needs the maintainer's
+      keyboard type and the configured shortcut.
 - [ ] **GitHub issue #84 (Linux, open since September 12).** Shift does not
       work on Arch (custom XKB type); waiting for the reporter's diagnostics.
 - [ ] **fix/\* merge of October 19 (dev 73bf713182, CI cancelled on request).**
