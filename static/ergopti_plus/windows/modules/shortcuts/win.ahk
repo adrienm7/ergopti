@@ -439,33 +439,23 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		; Open Regedit and navigate to RegPath.
 		; RegPath accepts both HKEY_LOCAL_MACHINE and HKLM formats.
-		RegJump(RegPath) {
-				; Normalize leading Computer\ prefix to French "Ordinateur\"
-				if SubStr(RegPath, 1, 9) == "Computer\" {
-						RegPath := "Ordinateur\" . SubStr(RegPath, 10)
-				}
+		RegJump(RegPath, CommitFn := _RegJumpCommit) {
+				return CommitFn.Call(_RegJumpNormalizePath(RegPath), Reg_WriteString, WMExists, WMKill, Run)
+		}
 
-				; Remove trailing backslash if present
-				RegPath := Trim(RegPath, "\")
-
-				; Extract root key (first component of path)
+		; Search accepts roots and optional machine labels without regard to case.
+		; Strip that label before finding the root, then expand only its own span.
+		_RegJumpNormalizePath(RegPath) {
+				RegPath := Trim(RegExReplace(RegPath, "i)^(?:Computer|Ordinateur)\\"), "\")
 				RootKey := StrSplit(RegPath, "\")[1]
-
-				; Convert short root key forms to long forms if necessary
-				if !InStr(RootKey, "HKEY_") {
-						KeyMap := Map(
-								"HKCR", "HKEY_CLASSES_ROOT",
-								"HKCU", "HKEY_CURRENT_USER",
-								"HKLM", "HKEY_LOCAL_MACHINE",
-								"HKU", "HKEY_USERS",
-								"HKCC", "HKEY_CURRENT_CONFIG"
-						)
-						if KeyMap.Has(RootKey) {
-								RegPath := StrReplace(RegPath, RootKey, KeyMap[RootKey], , , 1)
-						}
-				}
-
-				return _RegJumpCommit(RegPath, Reg_WriteString, WMExists, WMKill, Run)
+				KeyMap := Map(
+						"HKCR", "HKEY_CLASSES_ROOT",
+						"HKCU", "HKEY_CURRENT_USER",
+						"HKLM", "HKEY_LOCAL_MACHINE",
+						"HKU", "HKEY_USERS",
+						"HKCC", "HKEY_CURRENT_CONFIG"
+				)
+				return KeyMap.Get(StrUpper(RootKey), RootKey) . SubStr(RegPath, StrLen(RootKey) + 1)
 		}
 
 		_RegJumpCommit(RegPath, WriteFn, ExistsFn, KillFn, RunFn) {
@@ -498,6 +488,10 @@ if Features["shortcuts"]["search"]["enabled"] {
 
 		_GetPathCopyFlow(PathWithSlash, PathWithBackslash, WriteFn,
 				ScheduleFn, PromptFn, SleepFn, RenameFn) {
+				global _SelectionCaptureNextId
+				SelectionId := _SelectionCaptureNextId
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				if !WriteFn.Call(PathWithSlash) {
 						try LoggerWarn("shortcuts",
 								"GetPath could not copy the slash-form path; success UI was suppressed.")
@@ -505,24 +499,46 @@ if Features["shortcuts"]["search"]["enabled"] {
 				}
 				; One-shot timer (-50 ms): fires once only, so it auto-cancels even if the
 				; MsgBox is dismissed before the timer tick, preventing an infinite loop.
-				ScheduleFn.Call(RenameFn, -50)
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
+				ScheduleFn.Call(_GetPathRenameCurrent.Bind(SelectionId, RenameFn), -50)
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				; The shared locale strings use printf-style ``%s`` for cross-platform
 				; compatibility with the Hammerspoon driver. AHK v2's Format() expects
 				; ``{1}``-style placeholders and would leave ``%s`` verbatim, so the
 				; substitution is done with StrReplace here.
 				Result := PromptFn.Call(StrReplace(t("dialog.path_copy.msg_with_question"), "%s", PathWithSlash),
 						t("dialog.path_copy.title"), "YesNo")
+				; MsgBox pumps hotkeys: a pause or newer selection revokes this response.
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
 				if (Result == "No") {
 						if !WriteFn.Call(PathWithBackslash) {
 								try LoggerWarn("shortcuts",
 										"GetPath could not copy the backslash-form path; success UI was suppressed.")
 								return false
 						}
+						if !_GetPathCopyCurrent(SelectionId)
+								return false
 						SleepFn.Call(200)
+						if !_GetPathCopyCurrent(SelectionId)
+								return false
 						PromptFn.Call(StrReplace(t("dialog.path_copy.msg_simple"), "%s", PathWithBackslash))
 				}
 				return true
 		}
+		_GetPathCopyCurrent(SelectionId) {
+				global _SelectionCaptureNextId
+				return !A_IsSuspended && _SelectionCaptureNextId == SelectionId
+		}
+
+		_GetPathRenameCurrent(SelectionId, RenameFn) {
+				if !_GetPathCopyCurrent(SelectionId)
+						return false
+				return RenameFn.Call()
+		}
+
 		ChangeButtonNames() {
 				return _ChangeButtonNamesWith(WMExists, WMActivate, ControlSetText)
 		}
@@ -619,23 +635,21 @@ if Features["shortcuts"]["open_downloads"] {
 		AddShortcut("#", "d", OpenDownloads)
 
 		OpenDownloads(*) {
-				; Resolve the real Downloads folder via SHGetKnownFolderPath --
-				; locale-independent and respects user-relocated folders. Falls back
-				; to %USERPROFILE%\Downloads if the API call fails.
-				DownloadsPath := GetKnownFolderDownloads()
-				if (DownloadsPath == "") {
-						DownloadsPath := EnvGet("USERPROFILE") "\Downloads"
-				}
-
-				; This keyboard hotkey must never enumerate Shell.Application or wait
-				; for Explorer: either COM boundary can block all remapping for seconds.
-				; Explorer opens/reuses the resolved known path asynchronously itself.
 				try {
-						Run('explorer.exe "' DownloadsPath '"')
+						return _OpenDownloadsWith(GetKnownFolderDownloads, Run)
 				} catch as Err {
-						LoggerError("Shortcuts", "OpenDownloads failed for '{1}': {2}", DownloadsPath, Err.Message)
+						LoggerError("Shortcuts", "OpenDownloads failed: {1}", Err.Message)
 						try TrayTip("Could not open Downloads.", "ErgoptiPlus", "Iconx Mute")
+						return false
 				}
+		}
+
+		; Explorer opens the current Shell-known path asynchronously, including a
+		; folder redirected by the user or by company policy.
+		_OpenDownloadsWith(ResolveFn, LaunchFn) {
+				DownloadsPath := ResolveFn.Call()
+				LaunchFn.Call('explorer.exe "' DownloadsPath '"')
+				return true
 		}
 
 		; Converts a file:// URL (as returned by IE/Explorer LocationURL) to a
@@ -651,24 +665,27 @@ if Features["shortcuts"]["open_downloads"] {
 				return Path
 		}
 
-		; Returns the absolute path of the Downloads folder.
-		; Tries several localised and English candidate names under %USERPROFILE%
-		; and returns the first one that actually exists on disk.
-		GetKnownFolderDownloads() {
-				Profile := EnvGet("USERPROFILE")
-				Candidates := [
-						Profile "\Téléchargements",
-						Profile "\Downloads",
-						Profile "\Descargas",
-						Profile "\Transferências",
-						Profile "\Загрузки",
-				]
-				for _, Path in Candidates {
-						if DirExist(Path) {
-								return Path
-						}
+		; The Downloads known-folder id is stable across display languages and
+		; profile relocation. The Shell owns both its path and the allocated string.
+		GetKnownFolderDownloads(CallFn := DllCall) {
+				FolderId := Buffer(16, 0)
+				NumPut("UInt", 0x374DE290, "UShort", 0x123F, "UShort", 0x4565,
+						"UInt", 0xC4396491, "UInt", 0x7B465E92, FolderId)
+				PathSlot := Buffer(A_PtrSize, 0)
+				; Resolve the configured path even if its directory is temporarily offline.
+				Result := CallFn.Call("shell32\SHGetKnownFolderPath", "Ptr", FolderId,
+						"UInt", 0x4000, "Ptr", 0, "Ptr", PathSlot, "Int")
+				PathPtr := NumGet(PathSlot, 0, "Ptr")
+				try {
+						if Result < 0
+								throw Error(Format("Downloads known-folder lookup failed (HRESULT 0x{:08X}).", Result & 0xFFFFFFFF))
+						if !PathPtr
+								throw Error("Downloads known-folder lookup returned no path.")
+						return StrGet(PathPtr, "UTF-16")
+				} finally {
+						if PathPtr
+								CallFn.Call("ole32\CoTaskMemFree", "Ptr", PathPtr)
 				}
-				return ""
 		}
 
 		; UriDecode is defined in infra/text_utils.ahk and visible globally.

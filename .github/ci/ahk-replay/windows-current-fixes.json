@@ -1,0 +1,149 @@
+{
+	"expected_count": 173,
+	"filters": [
+		{
+			"contains": "klr-trusted-frame-capture",
+			"expected_count": 8
+		},
+		{
+			"contains": "klr-trusted-frame-tail",
+			"expected_count": 3
+		},
+		{
+			"contains": "klr-trusted-frame-lexer",
+			"expected_count": 9
+		},
+		{
+			"contains": "klr-trusted-frame-resume",
+			"expected_count": 2
+		},
+		{
+			"contains": "klr-trusted-frame-source",
+			"expected_count": 4
+		},
+		{
+			"contains": "klr-trusted-frame-comments",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-trusted-frame-cost",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-trusted-frame-bound",
+			"expected_count": 2
+		},
+		{
+			"contains": "klr-trusted-frame-format",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-trusted-frame-progress",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-newest-first-rebuild",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-newest-first-collision",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-newest-first-torn-tail",
+			"expected_count": 1
+		},
+		{
+			"contains": "klr-rebuild-resume",
+			"expected_count": 2
+		},
+		{
+			"contains": "metrics-seed-projection-format",
+			"expected_count": 3
+		},
+		{
+			"contains": "meta: windows/ OS-call purity ratchet — modules + lib",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta: windows/ OS-call purity ratchet — ui",
+			"expected_count": 1
+		},
+		{
+			"contains": "logger-semantic-level",
+			"expected_count": 3
+		},
+		{
+			"contains": "editor-semantic-preference",
+			"expected_count": 3
+		},
+		{
+			"contains": "ollama-stream-utf8-admission",
+			"expected_count": 26
+		},
+		{
+			"contains": "sqlite-text-byte-length",
+			"expected_count": 2
+		},
+		{
+			"contains": "filesystem-buffer-move",
+			"expected_count": 3
+		},
+		{
+			"contains": "toml-literal-line-boundary",
+			"expected_count": 5
+		},
+		{
+			"contains": "metrics-toml-grammar",
+			"expected_count": 1
+		},
+		{
+			"contains": "metrics-semantic-source",
+			"expected_count": 6
+		},
+		{
+			"contains": "plain-paste-owner-refusal",
+			"expected_count": 16
+		},
+		{
+			"contains": "webview-build-close-ownership",
+			"expected_count": 7
+		},
+		{
+			"contains": "Semantic media history: compatible warm cache private upgrade",
+			"expected_count": 1
+		},
+		{
+			"contains": "Semantic media history: upgraded image persists for future worker",
+			"expected_count": 1
+		},
+		{
+			"contains": "personal-semantic-activation",
+			"expected_count": 9
+		},
+		{
+			"contains": "onboarding-semantic-current-values",
+			"expected_count": 10
+		},
+		{
+			"contains": "catalogue-paste-admission",
+			"expected_count": 11
+		},
+		{
+			"contains": "catalogue-paste-timer-window",
+			"expected_count": 2
+		},
+		{
+			"contains": "klr-segmented-clock",
+			"expected_count": 14
+		},
+		{
+			"contains": "klr-segmented-native64",
+			"expected_count": 6
+		},
+		{
+			"contains": "klr-executed-round-ownership",
+			"expected_count": 5
+		}
+	]
+}

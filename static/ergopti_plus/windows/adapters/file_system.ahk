@@ -825,6 +825,14 @@ FSHandleSnapshot(FileHandle) {
 	}
 }
 
+; Move an exact file-read byte span, including overlapping carry buffers.
+; @param Destination {Buffer|Integer} A writable span of at least ByteCount bytes.
+; @param Source {Buffer|Integer} A readable span of at least ByteCount bytes.
+; @param ByteCount {Integer} The number of bytes to move without text decoding.
+FSBufferMove(Destination, Source, ByteCount) {
+	DllCall("ntdll\RtlMoveMemory", "Ptr", Destination, "Ptr", Source, "UPtr", ByteCount)
+}
+
 ; Reads an exact byte range together with the identity of the handle it came
 ; from, so a caller can prove the bytes belong to the file it expects. NUL bytes
 ; (an interrupted append's hole) are optionally blanked to spaces: UTF-8

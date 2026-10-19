@@ -20,14 +20,14 @@ _KLRNF_ThreeDayLedger() {
 }
 
 ; Run one worker build with the given rebuild seams, restoring them after.
-_KLRNF_Build(Segmented, Observer := 0, StopAfterRounds := 0) {
+_KLRNF_Build(Segmented, Observer := 0, StopAfterRounds := 0, ChunkBytes := 700) {
 	Saved := [KLRRebuild.min_ledger_bytes, KLRRebuild.chunk_bytes,
 		KLRRebuild.round_interval_ms, KLRRebuild.observer,
 		KLRRebuild.checkpoint_interval_ms, KLRRebuild.stop_after_rounds]
 	try {
 		KLRRebuild.min_ledger_bytes := Segmented ? 0 : 0x7FFFFFFF
 		; One fixture batch per read, a rollup round and a checkpoint after each.
-		KLRRebuild.chunk_bytes := 700
+		KLRRebuild.chunk_bytes := ChunkBytes
 		KLRRebuild.round_interval_ms := 0
 		KLRRebuild.checkpoint_interval_ms := 0
 		KLRRebuild.stop_after_rounds := StopAfterRounds
@@ -347,3 +347,7 @@ for _KLRNF64Kind in ["round", "checkpoint"] {
 			_KLRDC_CheckTeardown.Bind(_KLRNF_ClockScenario.Bind(_KLRNF64Kind,
 				0x100000000 + 100000, 0x100000000 + _KLRNF64Threshold + _KLRNF64Offset)))
 }
+
+#Include test_klr_trusted_frames.ahk
+
+#Include test_klr_executed_rounds.ahk

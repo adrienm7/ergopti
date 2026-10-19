@@ -162,7 +162,7 @@ _TSCT_RestoreGuardedByGeneration() {
 	Assert(InStr(WriteBody, "_TEXT_CLIPBOARD_GENERATION += 1") > 0,
 		"_TextSendClipboard must bump the generation counter so each injection claims a unique slot")
 
-	RestoreBody := _TSCT_FuncBodyStripped(Src, "_TextSendRestoreClipboard(Saved, Generation, OwnedSequence) {")
+	RestoreBody := _TSCT_FuncBodyStripped(Src, "_TextSendRestoreClipboard(Saved, Generation, OwnedSequence, RestoreFn := 0, SequenceFn := 0) {")
 	Assert(RestoreBody != "", "_TextSendRestoreClipboard guard helper must exist")
 	Assert(InStr(RestoreBody, "_TEXT_CLIPBOARD_GENERATION") > 0,
 		"_TextSendRestoreClipboard must compare the captured generation against the current counter")

@@ -23,14 +23,10 @@
 ; functions that take the values as parameters, which makes each closure's
 ; binding its own by construction, and the test below pins that construction.
 ;
-; WHERE THIS STOPS, DELIBERATELY:
-; It does not invoke a handler and observe the keystroke. AHK v2 resolves
-; function names at compile time, so intercepting TextPressKey would mean adding
-; a recorder seam to adapters/text_sender.ahk — a production change for
-; testability that nothing else in this suite currently needs. Registration
-; completeness and the binding construction are what is checked here; the
-; catalogue-to-generated-file agreement is covered by the no-drift gate, which
-; regenerates and diffs.
+; Registration completeness and loop binding are checked below. The paste
+; admission sibling also invokes the real dispatch routes through the existing
+; low-level SendInput port; no catalogue handler is replaced. The no-drift gate
+; separately regenerates and compares the catalogue's generated emit data.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -166,3 +162,6 @@ _GEA_NoHandWrittenDuplicates() {
 		. "single source, so the hand-written copy must go.")
 }
 Test("gesture emit: no action is both generated and hand-written", _GEA_NoHandWrittenDuplicates)
+
+
+#Include test_gesture_paste_admission.ahk

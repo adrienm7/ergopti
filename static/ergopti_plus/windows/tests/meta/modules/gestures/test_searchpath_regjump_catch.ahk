@@ -48,8 +48,9 @@ Test("shortcuts: SearchPath's RegeditPath branch wraps RegJump in try/catch (sea
 _SPRJC_RegJumpUsesReceiptCheckedCommit() {
 	Body := _DriverFuncBody("RegJump")
 	Assert(Body != "", "RegJump must exist in the Windows shortcuts module")
-	Assert(InStr(Body, "_RegJumpCommit(") > 0,
-		"RegJump must delegate its desktop effects to the receipt-checked commit boundary")
+	Assert(InStr(Body, "CommitFn := _RegJumpCommit") > 0
+		and InStr(Body, "CommitFn.Call(_RegJumpNormalizePath(RegPath), Reg_WriteString, WMExists, WMKill, Run)") > 0,
+		"RegJump must normalize its target and default to the receipt-checked native commit boundary")
 
 	CommitBody := _DriverFuncBody("_RegJumpCommit")
 	Assert(CommitBody != "", "the RegJump commit boundary must be defined")

@@ -519,3 +519,97 @@ _TSCT_FocusedControlClass() {
 
 Test("TextSender: clipboard diagnostics resolve a focused HWND to its actual class (clipboard-diagnostic-transitions)",
 	_TSCT_FocusedControlClass)
+
+_TSRO_Sequence(State) {
+	State["reads"] += 1
+	if State["throw"]
+		throw Error("injected unavailable clipboard sequence")
+	return State["sequence"]
+}
+
+_TSRO_Restore(State, Saved) {
+	State["restores"] += 1
+	State["restored"] := Saved
+	AssertTrue(CBClipboardOwner.restore_debt is Map)
+	AssertEqual(1, CBClipboardOwner.active.Count,
+		"the exact FIFO owner must survive the fallible assignment")
+	return true
+}
+
+_TSRO_ClipboardRestoreObservation(Mode) {
+	global _TEXT_CLIPBOARD_GENERATION, _TEXT_CLIPBOARD_OWNER_TOKEN
+	global _TEXT_CLIPBOARD_BUSY, _TEXT_CLIPBOARD_QUEUE
+	AssertEqual(0, CBClipboardOwner.active.Count, "fixture refuses a live clipboard owner")
+	AssertFalse(CBClipboardOwner.restore_debt)
+	AssertEqual(0, _TEXT_CLIPBOARD_OWNER_TOKEN)
+	AssertFalse(_TEXT_CLIPBOARD_BUSY)
+	AssertEqual(0, _TEXT_CLIPBOARD_QUEUE.Length)
+	PreviousCritical := Critical("On")
+	PreviousGeneration := _TEXT_CLIPBOARD_GENERATION
+	PreviousOwnerGeneration := CBClipboardOwner.generation
+	PreviousSettle := CBClipboardOwner.settle_hook
+	Token := 0
+	Snapshot := Map("opaque formats", "owned user snapshot")
+	State := Map("reads", 0, "restores", 0, "restored", 0,
+		"sequence", InStr(Mode, "unavailable") == 1 ? 0 : Mode == "foreign" ? 43 : 42,
+		"throw", Mode == "throw")
+	try {
+		CBClipboardOwner.settle_hook := 0
+		Token := CB_TryBeginOwnedTransaction("text_sender", true)
+		AssertTrue(Token > 0)
+		_TEXT_CLIPBOARD_OWNER_TOKEN := Token
+		_TEXT_CLIPBOARD_BUSY := true
+		_TEXT_CLIPBOARD_GENERATION += 1
+		Generation := _TEXT_CLIPBOARD_GENERATION - (Mode == "stale" ? 1 : 0)
+		_TextSendRestoreClipboard(Snapshot, Generation, 42,
+			_TSRO_Restore.Bind(State), _TSRO_Sequence.Bind(State))
+		if InStr(Mode, "unavailable") == 1 or Mode == "throw" {
+			Debt := CBClipboardOwner.restore_debt
+			AssertTrue(Debt is Map, "unavailable observations must retain restoration debt")
+			AssertTrue(Debt["saved"] == Snapshot, "the opaque all-format snapshot must remain owned")
+			AssertEqual(Token, Debt["owner_token"])
+			AssertEqual(0, State["restores"], "unavailability cannot authorize an assignment")
+			_TextSenderFinishClipboard()
+			SetTimer(_TextSenderFinishClipboard, 0)
+			AssertTrue(_TEXT_CLIPBOARD_BUSY, "FIFO completion cannot discard a pending snapshot")
+			AssertEqual(Token, _TEXT_CLIPBOARD_OWNER_TOKEN)
+			AssertTrue(CBClipboardOwner.active.Has(Token))
+			State["throw"] := false
+			State["sequence"] := Mode == "unavailable-foreign" ? 43 : 42
+			AssertTrue(CB_RetryRestoreDebt())
+		} else if Mode == "stale" {
+			AssertEqual(0, State["reads"], "a stale generation cannot inspect or restore a newer request")
+			AssertFalse(CBClipboardOwner.restore_debt)
+			AssertTrue(CBClipboardOwner.active.Has(Token), "stale cleanup cannot release the successor")
+		}
+		ExpectedRestores := Mode == "foreign" or Mode == "unavailable-foreign" or Mode == "stale" ? 0 : 1
+		AssertEqual(ExpectedRestores, State["restores"])
+		if ExpectedRestores
+			AssertTrue(State["restored"] == Snapshot, "only the original opaque snapshot can be restored")
+		AssertFalse(CBClipboardOwner.restore_debt)
+		AssertTrue(CBClipboardOwner.active.Has(Token), "the FIFO retains its lease until its own completion")
+		_TextSenderFinishClipboard()
+		AssertFalse(_TEXT_CLIPBOARD_BUSY)
+		AssertEqual(0, _TEXT_CLIPBOARD_OWNER_TOKEN)
+		AssertEqual(0, CBClipboardOwner.active.Count)
+	} finally {
+		SetTimer(_TextSenderFinishClipboard, 0)
+		SetTimer(CB_RetryRestoreDebt, 0)
+		if (CBClipboardOwner.restore_debt is Map)
+				and CBClipboardOwner.restore_debt["owner_token"] == Token
+			CBClipboardOwner.restore_debt := 0
+		if Token
+			CB_EndOwnedTransaction(Token)
+		CBClipboardOwner.settle_hook := PreviousSettle
+		CBClipboardOwner.generation := PreviousOwnerGeneration
+		_TEXT_CLIPBOARD_GENERATION := PreviousGeneration
+		_TEXT_CLIPBOARD_OWNER_TOKEN := 0
+		_TEXT_CLIPBOARD_BUSY := false
+		Critical(PreviousCritical)
+	}
+}
+
+for Mode in ["matching", "foreign", "unavailable", "unavailable-foreign", "throw", "stale"] {
+	Test("TextSender: restore handles " . Mode . " clipboard sequence (text-sender-restore-unavailable)",
+		_TSRO_ClipboardRestoreObservation.Bind(Mode))
+}

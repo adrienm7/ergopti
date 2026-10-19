@@ -75,6 +75,55 @@ _SQLRD_TypedReads(Db) {
 Test("SQLite reads: native types survive repeated dispatch (sqlite-read-dispatch)",
 	() => _SQLRD_WithDatabase(_SQLRD_TypedReads))
 
+; Generate NUL inside SQLite, so the fixture never passes a truncated SQL input.
+_SQLRD_LengthfulSql() {
+	return "SELECT char(0) AS leading, 'before'||char(0)||'after' AS middle,"
+		. " 'suffix'||char(0) AS trailing, 'é'||char(0)||'界😀' AS unicode_value,"
+		. " CAST(X'41004200' AS TEXT) AS raw_value, '' AS empty, '0' AS zero"
+}
+
+_SQLRD_AssertTextUnits(Expected, Actual) {
+	AssertEqual("String", Type(Actual), "SQLite text keeps its string type")
+	AssertEqual(StrLen(Expected), StrLen(Actual), "the complete UTF-16 length must survive")
+	Loop StrLen(Expected)
+		AssertEqual(NumGet(StrPtr(Expected), (A_Index - 1) * 2, "UShort"),
+			NumGet(StrPtr(Actual), (A_Index - 1) * 2, "UShort"),
+			"every code unit after an embedded NUL must remain intact")
+}
+
+_SQLRD_AssertLengthfulRow(Row) {
+	AssertEqual(7, Row.Count)
+	_SQLRD_AssertTextUnits(Chr(0), Row["leading"])
+	_SQLRD_AssertTextUnits("before" . Chr(0) . "after", Row["middle"])
+	_SQLRD_AssertTextUnits("suffix" . Chr(0), Row["trailing"])
+	_SQLRD_AssertTextUnits("é" . Chr(0) . "界😀", Row["unicode_value"])
+	_SQLRD_AssertTextUnits("A" . Chr(0) . "B" . Chr(0), Row["raw_value"])
+	_SQLRD_AssertTextUnits("", Row["empty"])
+	_SQLRD_AssertTextUnits("0", Row["zero"])
+	return true
+}
+
+_SQLRD_LengthfulReads(Db, Stream) {
+	Sql := _SQLRD_LengthfulSql() . " UNION ALL " . _SQLRD_LengthfulSql()
+	if Stream {
+		AssertEqual(2, SQLite_EachRow(Db, Sql, _SQLRD_AssertLengthfulRow, 1),
+			"both streamed rows must reach the independent code-unit oracle")
+	} else {
+		Rows := SQLite_Query(Db, Sql, 1)
+		AssertEqual(2, Rows.Length)
+		for Row in Rows
+			_SQLRD_AssertLengthfulRow(Row)
+	}
+	_SQLRD_AssertNoStatements(Db)
+	_SQLRD_AssertTypedRow(SQLite_Query(Db, _SQLRD_TypedSql())[1])
+	_SQLRD_AssertNoStatements(Db)
+}
+
+Test("SQLite reads: query retains text bytes after NUL (sqlite-text-byte-length)",
+	() => _SQLRD_WithDatabase(_SQLRD_LengthfulReads.Bind(, false)))
+Test("SQLite reads: streaming retains text bytes after NUL (sqlite-text-byte-length)",
+	() => _SQLRD_WithDatabase(_SQLRD_LengthfulReads.Bind(, true)))
+
 _SQLRD_NestedConsumer(Db, Seen, Row) {
 	Rows := SQLite_Query(Db, _SQLRD_TypedSql(), 1)
 	AssertEqual(1, Rows.Length)

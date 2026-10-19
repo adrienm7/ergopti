@@ -256,3 +256,94 @@ _PVSE_TooltipOwnerRejectsSurfaceAndRequestAba() {
 Test("prefix finalizer: exact tooltip owner rejects ABA replacements "
 	. "(prefix-finalizer-tooltip-owner-aba)",
 	_PVSE_TooltipOwnerRejectsSurfaceAndRequestAba)
+
+; An old empty lookup can yield just as a populated lookup can. Drive both
+; real empty branches, retaining the actual pending request and metric owner.
+_PEHR_Transition(State) {
+	global _PrefixInputContextGeneration, _PrefixDeferredGeneration, _KLLastShownSuggestion
+	global _TooltipPendingRequest
+	State["transitions"] += 1
+	switch State["transition"] {
+		case "content": _PrefixSetBuffer("later")
+		case "context": _PrefixInputContextGeneration += 1
+		case "surface":
+			AssertTrue(TooltipShow([{ Text: "replacement", DurationSec: 1 }], 0, false))
+		case "pause": Suspend(true)
+		case "lifecycle": _PrefixDeferredGeneration += 1
+		case "none": return
+		default: throw Error("Unknown empty-lookup fixture transition.")
+	}
+	_KLLastShownSuggestion := State["replacement"]
+	State["request"] := _TooltipPendingRequest
+}
+
+_PEHR_Collect(State, ContentGeneration, InputContextGeneration) {
+	if State["branch"] == "candidates" {
+		_PEHR_Transition(State)
+		return []
+	}
+	return [{ Category: "fixture", Section: "filtered" }]
+}
+
+_PEHR_Resolve(State, Category, Section) {
+	AssertEqual("fixture", Category)
+	AssertEqual("filtered", Section)
+	_PEHR_Transition(State)
+	return { ShowTooltip: false }
+}
+
+_PEHR_EmptyLookup(Branch, Transition) {
+	global _PrefixBuffer, _PrefixContentGeneration, _PrefixInputContextGeneration, _PrefixDeferredGeneration
+	global _KLLastShownSuggestion, _PrefixVisibleFireDecisions
+	global _TooltipPendingRequest, _TooltipActiveSurface
+	global _TooltipGeneration, _TooltipRequestSerial
+	AssertFalse(IsObject(_TooltipPendingRequest), "fixture refuses a pending tooltip owned by another test")
+	AssertFalse(IsObject(_TooltipActiveSurface), "fixture refuses an active tooltip owned by another test")
+	Saved := { Buffer: _PrefixBuffer, Content: _PrefixContentGeneration,
+		Context: _PrefixInputContextGeneration, Lifecycle: _PrefixDeferredGeneration,
+		Suggestion: _KLLastShownSuggestion, Decisions: _PrefixVisibleFireDecisions,
+		TooltipGeneration: _TooltipGeneration, RequestSerial: _TooltipRequestSerial,
+		Suspended: A_IsSuspended }
+	PreviousCritical := Critical("On")
+	State := Map("branch", Branch, "transition", Transition, "transitions", 0,
+		"replacement", { Trigger: "fresh", Output: "new answer", Category: "personal", IsPrivate: true },
+		"request", 0)
+	try {
+		Suspend(false)
+		_PrefixSetBuffer("before")
+		AssertTrue(TooltipShow([{ Text: "before", DurationSec: 1 }], 0, false))
+		_KLLastShownSuggestion := { Trigger: "before", Output: "old answer", Category: "personal", IsPrivate: true }
+		State["request"] := _TooltipPendingRequest
+		_LookupAndRender(_PEHR_Collect.Bind(State), _PEHR_Resolve.Bind(State))
+		AssertEqual(1, State["transitions"], "the actual empty branch must reach its interruptible boundary")
+		if Transition == "none" {
+			AssertFalse(IsObject(_TooltipPendingRequest), "a current empty answer still retires its own pending pixels")
+			AssertFalse(IsObject(_KLLastShownSuggestion), "a current empty answer still dismisses its metric")
+		} else {
+			AssertTrue(_TooltipPendingRequest == State["request"],
+				"an empty answer which lost ownership must not cancel the pending request")
+			AssertTrue(_KLLastShownSuggestion == State["replacement"],
+				"an empty answer which lost ownership must not dismiss the newer suggestion")
+		}
+	} finally {
+		Suspend(false)
+		TooltipHide("EmptyLookupFixture", true)
+		_PrefixBuffer := Saved.Buffer
+		_PrefixContentGeneration := Saved.Content
+		_PrefixInputContextGeneration := Saved.Context
+		_PrefixDeferredGeneration := Saved.Lifecycle
+		_KLLastShownSuggestion := Saved.Suggestion
+		_PrefixVisibleFireDecisions := Saved.Decisions
+		_TooltipGeneration := Saved.TooltipGeneration
+		_TooltipRequestSerial := Saved.RequestSerial
+		Suspend(Saved.Suspended)
+		Critical(PreviousCritical)
+	}
+}
+
+for _PEHR_Branch in ["candidates", "items"] {
+	for _PEHR_TransitionName in ["content", "context", "surface", "pause", "lifecycle", "none"]
+		Test("prefix preview: empty " . _PEHR_Branch . " lookup after " . _PEHR_TransitionName
+			. " keeps exact ownership (prefix-empty-render-owner)",
+			_PEHR_EmptyLookup.Bind(_PEHR_Branch, _PEHR_TransitionName))
+}

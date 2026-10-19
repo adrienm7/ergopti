@@ -625,3 +625,92 @@ TestLT_AltGrNumberRowRegistrationNoErgoptiBase() {
 }
 Test("ALTGR_NUMBER_ROW registration: HotIf does not require ergopti_base",
 	TestLT_AltGrNumberRowRegistrationNoErgoptiBase)
+
+; layout.ahk installs hotkeys and cannot join the headless include graph.
+; Execute its unchanged definitions in an owned native child, with passive
+; selection/send ports and the real ring writer, to observe the emitted suffix.
+_WHR_Literal(Text) {
+	return Chr(34) . StrReplace(StrReplace(Text, Chr(96), Chr(96) . Chr(96)),
+		Chr(34), Chr(96) . Chr(34)) . Chr(34)
+}
+
+_WHR_Script() {
+	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n"
+	Code .= '#Include ' . _DriverDir . '\infra\text_utils.ahk' . "`n"
+	for Name in ["WrapTextIfSelected", "UpdateLastSentCharacter", "_LSCPush", "_LSCResetFrom", "GetLastSentCharacterAt"] {
+		Definition := _DriverFuncBody(Name)
+		Assert(Definition != "", "the native wrap fixture needs the real production definition: " . Name)
+		Code .= Definition . "`n"
+	}
+	Code .= 'global Features := Map("shortcuts", Map("wrap_text_if_selected", true))' . "`n"
+	Code .= 'global _LSC_CAP := 16, _LSC_RING := [], _LSC_CURSOR := 0, _LSC_LEN := 0' . "`n"
+	Code .= 'global _WH_Output := "", _WH_Stamped := "", _WH_SendOk := true' . "`n"
+	Code .= 'WrapSymbols_IsEnabled(*) => true`nGetUIASelection() => "selected"`n'
+	Code .= 'AppState_TouchLastSentKey(Text) {`nglobal _WH_Stamped`n_WH_Stamped := Text`n}' . "`n"
+	Code .= 'SendInstant(Text) {`nglobal _WH_Output, _WH_SendOk`nif !_WH_SendOk`nreturn false`n_WH_Output := Text`nreturn true`n}' . "`n"
+	Code .= 'SendNewResult(Text) {`nglobal _WH_Output`n_WH_Output := Text`nUpdateLastSentCharacter(Text)`n}' . "`n"
+	Rows := [["(", "(", ")", ")", true], [")", "(", ")", ")", true],
+		["[", "[", "]", "]", true], ["*", "*", "*", "*", true],
+		[Chr(0xAB) . Chr(0xA0), Chr(0xAB) . Chr(0xA0), Chr(0xA0) . Chr(0xBB), Chr(0xBB), true],
+		["[", "[", "]" . Chr(0x1F642), Chr(0x1F642), true], ["(", "(", ")", "(", false]]
+	for Row in Rows {
+		ExpectedText := Row[5] ? Row[2] . "selected" . Row[3] : Row[1]
+		Code .= '_LSCResetFrom([])`n_WH_Output := ""`n_WH_Stamped := ""`n_WH_SendOk := ' . (Row[5] ? "true" : "false") . "`n"
+		Code .= "WrapTextIfSelected(" . _WHR_Literal(Row[1]) . ", " . _WHR_Literal(Row[2]) . ", " . _WHR_Literal(Row[3]) . ")`n"
+		Code .= "if _WH_Output !== " . _WHR_Literal(ExpectedText) . '`nthrow Error("wrap output mismatch at case ' . A_Index . '")`n'
+		Code .= "if GetLastSentCharacterAt(-1) !== " . _WHR_Literal(Row[4]) . '`nthrow Error("wrap history mismatch at case ' . A_Index . '")`n'
+		Code .= "if _WH_Stamped !== " . _WHR_Literal(Row[4]) . '`nthrow Error("wrap timestamp mismatch at case ' . A_Index . '")`n'
+		Code .= 'if _LSC_LEN != 1`nthrow Error("one wrap must record exactly one final character")`n'
+	}
+	Code .= 'FileAppend("wrap-history-ok", "*")`nExitApp(0)`n'
+	return Code
+}
+
+_WHR_Completed(State, Code, Output, ErrorText) {
+	State.Code := Code
+	State.Output := Output
+	State.ErrorText := ErrorText
+	State.Calls += 1
+}
+
+_WHR_ActualWrappingHistory() {
+	Script := A_Temp . "\ergopti_wrap_history_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".ahk"
+	AssertFalse(FileExist(Script), "the fixture owns a fresh native script path")
+	AssertTrue(FSWriteCreateDurable(Script, Chr(0xFEFF) . _WHR_Script()) != 0)
+	State := { Code: -1, Output: "", ErrorText: "", Calls: 0 }
+	Handle := 0
+	Primary := 0
+	try {
+		Handle := ShellRunner_SpawnTreeOwned(A_AhkPath, ["/ErrorStdOut", Script], _WHR_Completed.Bind(State))
+		AssertTrue(Handle.start(), "the real wrapping definitions must start in their native fixture")
+		Started := A_TickCount
+		while State.Calls == 0 && TickElapsed(Started) < 5000 {
+			_SR_TreePoll()
+			Sleep(10)
+		}
+		AssertEqual(1, State.Calls, "the owned native fixture must settle exactly once")
+		AssertEqual(0, State.Code, "the real wrapper must preserve its visible suffix in ring and timestamps: " . State.Output)
+		AssertEqual("wrap-history-ok", State.Output)
+		AssertEqual("", State.ErrorText)
+	} catch as Err {
+		Primary := Err
+	}
+	Retired := false
+	try Retired := !IsObject(Handle) || ((Result := Handle.terminate()) is Integer && Result == 1)
+	catch as Err {
+		if !IsObject(Primary)
+			Primary := Err
+	}
+	if Retired {
+		try FileDelete(Script)
+		catch as Err {
+			if !IsObject(Primary)
+				Primary := Err
+		}
+	}
+	if IsObject(Primary)
+		throw Primary
+	AssertTrue(Retired, "retain the fixture script until its exact native tree retires")
+}
+Test("keymap: actual selection wrapping records its final Unicode character (wrap-visible-suffix)",
+	_WHR_ActualWrappingHistory)

@@ -245,3 +245,53 @@ _TPR_CancelRetiresOnlyItsExactRequest() {
 }
 Test("tooltip first position: cancel retires only its exact pending tuple (tooltip-position-refinement)",
 	_TPR_CancelRetiresOnlyItsExactRequest)
+
+; The one-shot scheduler is not the only owner of a bound callback. Replacing
+; the global position owner must also reclaim its surface and preview request.
+_TPR_LifetimeState() {
+	return { InputGeneration: 0, Context: Map() }
+}
+
+class _TPR_LifetimeOwner extends TooltipPositionRefinement {
+	__New(Receipt) {
+		this.Receipt := Receipt
+		super.__New({}, [], 1, _TPR_LifetimeState, SetTimer,
+			(*) => false, (*) => false, (*) => false, (*) => false,
+			(*) => 0, (*) => 0, (*) => true)
+	}
+	__Delete() {
+		this.Receipt["released"] += 1
+	}
+}
+
+class _TPR_LifetimePreview extends TooltipPreviewPositionRequest {
+	__New(Receipt, Request, DefaultState := false) {
+		this.Receipt := Receipt
+		super.__New(Request, DefaultState ? 0 : _TPR_LifetimeState, SetTimer,
+			(*) => false, (*) => false, (*) => 0, (*) => true)
+	}
+	__Delete() {
+		this.Receipt["released"] += 1
+	}
+}
+
+_TPR_CancelReleasesOwner(IsPreview, DefaultState := false) {
+	Receipt := Map("released", 0)
+	Request := { Serial: 1, Items: [], Position: { Done: false, Anchor: 0 },
+		TimerFn: (*) => false }
+	Owner := IsPreview ? _TPR_LifetimePreview(Receipt, Request, DefaultState) : _TPR_LifetimeOwner(Receipt)
+	SetTimer(Owner.TimerFn, -60000)
+	Owner.Cancel(false)
+	AssertTrue(Owner.Stopped)
+	AssertFalse(Owner.Cancel(false), "a repeated cancellation must remain inert")
+	if IsPreview
+		AssertTrue(Request.Position.Done, "cancellation keeps the preview retirement contract")
+	Owner := 0
+	AssertEqual(1, Receipt["released"], "a stopped position owner must release its self-bound callbacks")
+}
+Test("tooltip position: cancel releases its timer's owner (tooltip-position-owner-release)",
+	_TPR_CancelReleasesOwner.Bind(false))
+Test("tooltip position: cancel releases the preview cache callback (tooltip-position-owner-release)",
+	_TPR_CancelReleasesOwner.Bind(true))
+Test("tooltip position: default state closure releases its preview owner (tooltip-position-owner-release)",
+	_TPR_CancelReleasesOwner.Bind(true, true))

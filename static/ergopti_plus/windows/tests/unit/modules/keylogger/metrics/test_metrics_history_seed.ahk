@@ -275,3 +275,72 @@ _MHS_TailRereadRequiresConsumedSnapshot() {
 }
 Test("metrics history seed: tail reread requires consumed modification receipt (metrics-seed-rewrite)",
 	_KLRDC_CheckTeardown.Bind(_MHS_TailRereadRequiresConsumedSnapshot))
+
+
+_MHS_ProjectionFormatReceipt() {
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Day := "2026-01-02"
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, Day . " 10:00:00.000", Day, "code.exe", ["a"]))
+		_KLRDC_BuildAsWorker()
+		Seed := KLPF_CaptureHistorySeed(_KLRDC_Root(), Day)
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Seed, Seed), "the current projection format must admit unchanged history")
+		Legacy := Seed.Clone()
+		if Legacy.Has("projection_format")
+			Legacy.Delete("projection_format")
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Legacy, Legacy), "matching legacy receipts cannot certify the current projection semantics")
+		for Value in [0, Integer(KLR_CACHE_FORMAT_VERSION), "", "obsolete", Map()] {
+			Invalid := Seed.Clone()
+			Invalid["projection_format"] := Value
+			AssertFalse(KLPF_HistorySeedAllowsDelta(Invalid, Invalid), "matching invalid formats must fail closed")
+		}
+	} finally _KLRDC_Cleanup()
+}
+Test("metrics history seed: projection format is required and typed (metrics-seed-projection-format)",
+	_KLRDC_CheckTeardown.Bind(_MHS_ProjectionFormatReceipt))
+
+_MHS_ProducerDeclinesChangedProjectionFormat(Mode) {
+	global Features, KLPF_LAST_JSON, KLPF_MANIFEST_CACHE, KLR_CACHE_FORMAT_VERSION
+	SavedFeatures := Features
+	HadJson := IsSet(KLPF_LAST_JSON)
+	SavedJson := HadJson ? KLPF_LAST_JSON : 0
+	HadManifest := IsSet(KLPF_MANIFEST_CACHE)
+	SavedManifest := HadManifest ? KLPF_MANIFEST_CACHE : 0
+	SavedFormat := KLR_CACHE_FORMAT_VERSION
+	_KLRDC_EnsureSharedDir()
+	_KLRDC_Reset()
+	try {
+		Features := Map("layout", Map("ergopti_base", false))
+		KLPF_LAST_JSON := Map()
+		KLPF_MANIFEST_CACHE := unset
+		Day := FormatTime(A_Now, "yyyy-MM-dd")
+		OldDay := KLR_PrevDay(Day)
+		_KLRDC_WriteLedger(_KLRDC_Header()
+			. _KLRDC_TypingBatch(1, OldDay . " 10:00:00.000", OldDay, "fixture.exe", ["a", "b"]))
+		_KLRDC_BuildAsWorker()
+		Root := _KLRDC_Root()
+		Seed := KLPF_CaptureHistorySeed(Root, Day)
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Seed, Seed))
+		KLR_CACHE_FORMAT_VERSION := SavedFormat . "-next"
+		_KLRDC_BuildAsWorker()
+		Current := KLPF_CaptureHistorySeed(Root, Day)
+		AssertTrue(KLPF_HistorySeedAllowsDelta(Current, Current), "the upgraded producer must certify its own history")
+		AssertFalse(KLPF_HistorySeedAllowsDelta(Seed, Current), "a projection upgrade must invalidate the delivered historical slice")
+		Path := Root . "declined-projection.json"
+		AssertTrue(FSWriteDurable(Path, '{"previous":"complete"}'))
+		AssertEqual("full_required", KLPF_BuildAndWriteToPath("typing", Root, Path,
+			Root . "probe.log", Mode, Seed), "unchanged ledger bytes cannot make old projection semantics current")
+		AssertEqual('{"previous":"complete"}', FileRead(Path, "UTF-8"), "refused deltas must preserve the last complete destination")
+	} finally {
+		Features := SavedFeatures
+		KLPF_LAST_JSON := HadJson ? SavedJson : unset
+		KLPF_MANIFEST_CACHE := HadManifest ? SavedManifest : unset
+		KLR_CACHE_FORMAT_VERSION := SavedFormat
+		_KLRDC_Cleanup()
+	}
+}
+for Mode in ["live", "manifest"]
+	Test("metrics history seed: changed projection declines " . Mode . " (metrics-seed-projection-format)",
+		_KLRDC_CheckTeardown.Bind(_MHS_ProducerDeclinesChangedProjectionFormat.Bind(Mode)))

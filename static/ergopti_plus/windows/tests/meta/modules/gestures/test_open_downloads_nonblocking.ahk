@@ -13,12 +13,18 @@
 _ODNB_KeyboardPathHasNoExplorerWait() {
 	Body := _DriverFuncBody("OpenDownloads")
 	Assert(Body != "", "OpenDownloads must exist in modules/shortcuts/win.ahk")
-	Assert(!InStr(Body, 'ComObject("Shell.Application")'),
+	LaunchBody := _DriverFuncBody("_OpenDownloadsWith")
+	Assert(LaunchBody != "", "the resolved-folder launcher must exist")
+	Assert(InStr(Body, "_OpenDownloadsWith(GetKnownFolderDownloads, Run)") > 0,
+		"the hotkey must use the real known-folder resolver and native shell launcher")
+	Combined := Body . LaunchBody
+	Assert(!InStr(Combined, 'ComObject("Shell.Application")'),
 		"OpenDownloads must not enumerate Shell.Application COM on the keyboard hotkey thread")
-	Assert(!InStr(Body, "WinWait("),
+	Assert(!InStr(Combined, "WinWait("),
 		"OpenDownloads must not synchronously wait for Explorer from the keyboard hotkey thread")
-	Assert(InStr(Body, "Run('explorer.exe") > 0,
-		"OpenDownloads must still launch the resolved Downloads folder through Explorer")
+	Assert(InStr(LaunchBody, "DownloadsPath := ResolveFn.Call()") > 0
+		and InStr(LaunchBody, "LaunchFn.Call('explorer.exe") > 0,
+		"the hotkey's launcher must resolve Downloads and open that exact folder through Explorer")
 	CatchPos := InStr(Body, "} catch as Err")
 	Assert(CatchPos > 0 and InStr(SubStr(Body, CatchPos, 300), "LoggerError") > 0,
 		"OpenDownloads must contain shell-launch failures with LoggerError instead of throwing from the hotkey")

@@ -1,0 +1,49 @@
+{
+	"expected_count": 167,
+	"filters": [
+		{
+			"contains": "key-combination-semantic-scope",
+			"expected_count": 6
+		},
+		{
+			"contains": "onboarding-publication-owner",
+			"expected_count": 24
+		},
+		{
+			"contains": "selection-admitted-sequence",
+			"expected_count": 32
+		},
+		{
+			"contains": "selection-startup-revocation",
+			"expected_count": 17
+		},
+		{
+			"contains": "selection-restore-revalidation",
+			"expected_count": 16
+		},
+		{
+			"contains": "selection-timer-release",
+			"expected_count": 3
+		},
+		{
+			"contains": "selection-startup-owner-settlement",
+			"expected_count": 2
+		},
+		{
+			"contains": "tap-hold-semantic-consumers",
+			"expected_count": 14
+		},
+		{
+			"contains": "personal-native-modal-owner",
+			"expected_count": 28
+		},
+		{
+			"contains": "region-startup-",
+			"expected_count": 19
+		},
+		{
+			"contains": "program-picker-modal-owner",
+			"expected_count": 6
+		}
+	]
+}

@@ -402,3 +402,31 @@ _KLF_FreshHint() {
 }
 Test("keylogger observer hints: a newly admitted identity survives unchanged (todo49-observer-hints)",
 	_KLF_WithState.Bind(_KLF_FreshHint))
+
+
+_KLF_BackspaceUnicodeScalar() {
+	Ergonomic := []
+	Record := _KLF_RecordErgo.Bind(Ergonomic)
+	Emoji := Chr(0x1F642)
+	KL_Hook_OnChar(0, "é", _KLF_Allow, 1000, Record)
+	KL_Hook_OnChar(0, Emoji, _KLF_Allow, 1100, Record)
+	AssertEqual("é" . Emoji, Keylogger.buffer_text, "the observed supplementary character must reach the buffer intact")
+	KL_Hook_OnKeyDown(0, 0x08, 0x0E, _KLF_Allow, 1200, _KLF_NoShortcut, Record)
+	AssertEqual("é", Keylogger.buffer_text,
+		"one Backspace must remove the complete supplementary scalar without leaving a high surrogate")
+	Decoded := KL_JsonDecode(KL_JsonEncode(Map("text", Keylogger.buffer_text, "events", Keylogger.buffer_events)))
+	AssertEqual("é", Decoded["text"], "the durable typing payload must contain the same corrected text")
+	AssertEqual(Emoji, Decoded["events"][2][1], "the original input event remains intact for replay")
+	AssertEqual("[BS]", Decoded["events"][3][1], "deletion remains a single replayable input event")
+	KL_Hook_OnKeyDown(0, 0x08, 0x0E, _KLF_Allow, 1300, _KLF_NoShortcut, Record)
+	AssertEqual("", Keylogger.buffer_text, "BMP deletion must keep removing exactly one character")
+	KL_Hook_OnKeyDown(0, 0x08, 0x0E, _KLF_Allow, 1400, _KLF_NoShortcut, Record)
+	AssertEqual("", Keylogger.buffer_text, "an empty buffer must remain empty")
+	KL_Hook_OnChar(0, Emoji, _KLF_Allow, 1500, Record)
+	KL_Hook_OnKeyDown(0, 0x08, 0x0E, _KLF_Allow, 1600, _KLF_NoShortcut, Record)
+	AssertEqual("", Keylogger.buffer_text, "an emoji at the start of the buffer must disappear completely")
+	AssertEqual(7, Keylogger.buffer_events.Length, "Unicode correction cannot lose or duplicate observed events")
+	AssertFalse(KL_Hook_HasPendingInput(), "Unicode correction must release the arrival owner")
+}
+Test("keylogger input: Backspace preserves complete Unicode scalars (keylogger-backspace-unicode)",
+	_KLF_WithState.Bind(_KLF_BackspaceUnicodeScalar))

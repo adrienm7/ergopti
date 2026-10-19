@@ -7,11 +7,11 @@
 ; launch alone is injected. Generic provenance-only loader assertions stay intact.
 ; ==============================================================================
 
-_PFC_Fixture(FixtureRootSpelling := "temp") {
+_PFC_Fixture(FixtureRootSpelling := "temp", InitialSource := unset) {
 	global ScriptInformation, ConfigurationFile, _HotstringRegistrar, CategoryEnabled
 	if FixtureRootSpelling != "temp" && FixtureRootSpelling != "long" && FixtureRootSpelling != "dot"
 		throw ValueError("Unknown fixture native root spelling")
-	Fixture := _ScopeOwnerFixture()
+	Fixture := IsSet(InitialSource) ? _ScopeOwnerFixture(InitialSource) : _ScopeOwnerFixture()
 	Fixture.savedInfo := ScriptInformation, Fixture.savedConfig := ConfigurationFile
 	Fixture.savedOwners := PersonalFileControls.owners, Fixture.savedInventory := PersonalFileControls.inventory
 	Fixture.savedRegistrar := _HotstringRegistrar, Fixture.savedGate := CategoryEnabled["Hotstrings"]
@@ -32,10 +32,12 @@ _PFC_Fixture(FixtureRootSpelling := "temp") {
 		. '[_meta]`ndelay = 0.25`npriority = 61`ncolor = "123456"`nunknown = "keep"`n'
 		. '[_meta.sections.live]`ndelay = 0.5`npriority = 67`nshow_tooltip = false`n'
 	Assert(FSWriteDurable(Fixture.file, Fixture.content))
-	Fixture.source := '[category_enabled]`nhotstrings = true`n[private]`ncredential = "keep"`n'
-		. '[hotstrings.modules.' . TOML_RenderKey(Fixture.descriptor["id"]) . ']`nquiet = false`n'
-	Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
-	Assert(FSWriteDurable(Fixture.path, Fixture.source))
+	if !IsSet(InitialSource) {
+		Fixture.source := '[category_enabled]`nhotstrings = true`n[private]`ncredential = "keep"`n'
+			. '[hotstrings.modules.' . TOML_RenderKey(Fixture.descriptor["id"]) . ']`nquiet = false`n'
+		Fixture.source := _CMJFixtureCurrentSource(Fixture.source)
+		Assert(FSWriteDurable(Fixture.path, Fixture.source))
+	}
 	AssertTrue(ConfigSchemaCanPrepareWrite(Fixture.path), "the actual dynamic personal-file configuration remains admitted by its genuine native boot owner")
 	ScriptInformation := Fixture.savedInfo.Clone()
 	ScriptInformation["PersonalHotstringsDir"] := Fixture.root
@@ -241,7 +243,7 @@ _PFC_FreshReceiptRefusesCachedAmbiguityAndUnreadability() {
 		Record := PersonalFileControls.Scan()[1]
 		Assert(FSWriteDurable(Fixture.file, Ambiguous))
 		Refused := false
-		try PersonalFileAdoptedOwner(Record, TOML_ParseFreshFileTyped(Fixture.path))
+		try PersonalFileAdoptedOwner(Record, ConfigTomlDecodeSnapshot(FSReadUtf8Exact(Fixture.path)).Document)
 		catch
 			Refused := true
 		Assert(Refused, "constructor refuses an edit after the exact admitted discovery receipt")
@@ -689,3 +691,63 @@ _PFC_FileRowRendersWithoutReparsing() {
 }
 Test("personal-file-metadata: a file row renders from the admitted parse (perf-personal-metadata-2026-10-17)",
 	_PFC_FileRowRendersWithoutReparsing)
+
+; Boot migration and the semantic cache leave current-schema source untouched.
+; The fresh adopted owner must read the same authored choices when registering.
+_PFC_SemanticActivation(Shape, Mode) {
+	global HSE_RegistryByGroup, _ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache
+	Id := PersonalFileDescribe(["a__b.toml"])["id"], Key := TOML_RenderKey(Id)
+	FileEnabled := Mode != "file-off", SectionEnabled := Mode == "all-on"
+	FileLiteral := FileEnabled ? "true" : "false"
+	SectionLiteral := SectionEnabled ? "true" : "false"
+	switch Shape {
+		case "dotted": Source := "hotstrings.groups." . Key . " = " . FileLiteral
+			. "`nhotstrings.modules." . Key . ".quiet = " . SectionLiteral . "`n"
+		case "inline": Source := "hotstrings = { groups = { " . Key . " = " . FileLiteral
+			. " }, modules = { " . Key . " = { quiet = " . SectionLiteral . " } } }`n"
+		case "quoted": Source := '["hotstrings"."groups"]`n' . Key . " = " . FileLiteral
+			. '`n["hotstrings"."modules".' . Key . ']`nquiet = ' . SectionLiteral . "`n"
+		default: throw ValueError("Unknown personal activation source shape")
+	}
+	Source .= '[category_enabled]`nhotstrings = true`n[future]`ntext = "001" # exact foreign data`n'
+	; The scope fixture boots this exact image once. Replacing a READY image
+	; and calling boot again violates the native source-construction contract.
+	Fixture := _PFC_Fixture("temp", Source)
+	Source := Fixture.source
+	try {
+		AssertEqual(Id, Fixture.descriptor["id"], "the authored choices target the actually discovered file")
+		Cache := ParseConfigTomlFile(Fixture.path)
+		AssertTrue(Cache["future"]["text"] is String)
+		AssertEqual("001", Cache["future"]["text"])
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Source), "boot does not canonicalize aliases before registration")
+
+		HSE_RegistryClear()
+		PersonalFileControls.Register()
+		Owner := PersonalFileControls.owners[Id]
+		AssertTrue(Owner.groups[Id] is TOML_Bool, "the actual adopted gate retains TOML Boolean intent")
+		AssertEqual(FileEnabled, Owner.groups[Id].Value)
+		AssertTrue(Owner.sections["quiet"] is TOML_Bool)
+		AssertEqual(SectionEnabled, Owner.sections["quiet"].Value)
+		Expected := FileEnabled ? (SectionEnabled ? 2 : 1) : 0
+		AssertEqual(Expected, HSE_RegistryByGroup.Count, "actual registration honors file and independent section choices")
+		AssertEqual(Expected, PersonalFileControls.ActiveCount())
+		AssertEqual(FileEnabled, HSE_RegistryByGroup.Has(Id . ".live"))
+		AssertEqual(FileEnabled && SectionEnabled, HSE_RegistryByGroup.Has(Id . ".quiet"))
+		Index := Map(), TriggerSet := Map()
+		PersonalFileControls.BuildPreview(Index, TriggerSet)
+		AssertEqual(Expected, TriggerSet.Count, "preview cannot expose a disabled mapping")
+		AssertEqual(FileEnabled, TriggerSet.Has("abcd"))
+		AssertEqual(FileEnabled && SectionEnabled, TriggerSet.Has("qwer"))
+		AssertTrue(FSUtf8ExactMatches(Fixture.path, Source), "adoption and registration never rewrite settings or foreign data")
+	} finally {
+		for Store in [_ConfigTomlSnapshots, _ParseTomlCache, _TomlFileCache] {
+			if Store.Has(Fixture.path)
+				Store.Delete(Fixture.path)
+		}
+		_PFC_Cleanup(Fixture)
+	}
+}
+for _PFC_SemanticShape in ["dotted", "inline", "quoted"]
+	for _PFC_SemanticMode in ["file-off", "section-off", "all-on"]
+		Test("personal-file-controls: " . _PFC_SemanticShape . " " . _PFC_SemanticMode . " reaches registration and preview (personal-semantic-activation)",
+			_PFC_SemanticActivation.Bind(_PFC_SemanticShape, _PFC_SemanticMode))

@@ -563,8 +563,7 @@ _KL_Hook_CommitInput(Intent) {
 		else {
 			switch Intent.vk {
 				case 0x08:
-					if StrLen(Keylogger.buffer_text) > 0
-						Keylogger.buffer_text := SubStr(Keylogger.buffer_text, 1, StrLen(Keylogger.buffer_text) - 1)
+					Keylogger.buffer_text := KLW_PopLast(Keylogger.buffer_text)
 				case 0x0D: Keylogger.buffer_text .= Chr(10)
 				case 0x09: Keylogger.buffer_text .= Chr(9)
 			}

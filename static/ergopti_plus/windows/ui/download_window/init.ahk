@@ -385,13 +385,19 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 		} finally {
 			Critical(PreviousCritical)
 		}
-		if IsObject(Work) && Work.HasOwnProp("ack_timer") {
-			try this.TimerFn.Call(Work.ack_timer, 0)
-			catch Any as Err {
-				; Private ownership is already invalidated, so a queued callback is inert.
-				LoggerWarn("ManagedDownload", "The rendering deadline could not be cancelled physically (error_type={1}).", Type(Err))
-				return false
-			}
+		return this._ReleaseRenderAcknowledgement(Work)
+	}
+
+	; Detach the self-capturing callback before physical cancellation can reenter.
+	_ReleaseRenderAcknowledgement(Work) {
+		if !IsObject(Work) || !Work.HasOwnProp("ack_timer")
+			return true
+		Timer := Work.ack_timer
+		Work.DeleteProp("ack_timer")
+		try this.TimerFn.Call(Timer, 0)
+		catch Any as Err {
+			LoggerWarn("ManagedDownload", "The rendering deadline could not be cancelled physically (error_type={1}).", Type(Err))
+			return false
 		}
 		return true
 	}
@@ -487,11 +493,7 @@ class ManagedDownloadFailureWindow extends WebViewHost {
 	_FinishClose(Detached) {
 		if HasMethod(Detached.closed_fn, "Call")
 			Detached.closed_fn.Call()
-		if IsObject(Detached.work) && Detached.work.HasOwnProp("ack_timer") {
-			try this.TimerFn.Call(Detached.work.ack_timer, 0)
-			catch Any as Err
-				LoggerWarn("ManagedDownload", "The rendering deadline could not be cancelled physically (error_type={1}).", Type(Err))
-		}
+		this._ReleaseRenderAcknowledgement(Detached.work)
 		if Detached.building {
 			if Detached.gui
 				try Detached.gui.Hide()

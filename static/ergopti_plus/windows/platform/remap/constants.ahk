@@ -1323,6 +1323,10 @@ _TapHoldInvokeConfiguredAction(KeyId) {
 	; or a shortcut slot fires it while its own carrier modifier is down.
 	Action := GESTURE_ACTIONS[ActionId]
 	if Action.HasOwnProp("Key") {
+		; Keep key metadata and the tap's Blind/provenance path, while sharing
+		; the catalogue paste's admission before any temporary payload is read.
+		if ActionId == "paste"
+			return _GestureWithPasteAdmission(TapHoldEmitKeyTap.Bind(Action.Key, Action.Mods))
 		TapHoldEmitKeyTap(Action.Key, Action.Mods)
 		return
 	}
