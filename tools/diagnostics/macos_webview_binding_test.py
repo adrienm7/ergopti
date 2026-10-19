@@ -19,7 +19,7 @@ def healthy():
     """Model a receipt only to exercise strict supervisor refusals on mutated facts."""
     return {
         "status": "ok",
-        "schema_version": 2,
+        "schema_version": 3,
         "contract": "native.webview-binding",
         "nonce": "owned-nonce",
         "pid": 711,
@@ -52,6 +52,9 @@ def healthy():
             },
             "message_identity": {
                 "rebound_b_callback": True,
+                "b_after_a_gc_source_exact": True,
+                "b_after_a_gc_accepted": True,
+                "b_after_a_gc_evaluated": True,
                 "initial_a_exact": True,
                 "current_b_exact": True,
                 "stale_a_rejected": True,
@@ -141,11 +144,18 @@ class BindingSupervisorControls(unittest.TestCase):
                             self.observe()
 
     def test_integer_one_cannot_replace_a_measured_boolean(self):
-        result = healthy()
-        result["cleanup"]["console_checked"] = 1
-        self.publish(result)
-        with self.assertRaisesRegex(ValueError, "schema"):
-            self.observe()
+        for section, field in (
+            ("cleanup", "console_checked"),
+            ("message_identity", "b_after_a_gc_source_exact"),
+            ("message_identity", "b_after_a_gc_accepted"),
+            ("message_identity", "b_after_a_gc_evaluated"),
+        ):
+            result = healthy()
+            fields = result["cleanup"] if section == "cleanup" else result["features"][section]
+            fields[field] = 1
+            self.publish(result)
+            with self.subTest(field=field), self.assertRaisesRegex(ValueError, "schema"):
+                self.observe()
 
     def test_unknown_fake_or_skip_flags_and_gc_claim_are_rejected(self):
         for field, value in (("fake", True), ("skip", True), ("ucc_userdata_gc", "qualified")):
@@ -371,7 +381,7 @@ class BindingSupervisorControls(unittest.TestCase):
         prefix, suffix = expressions[0]
         node = shutil.which("node")
         self.assertIsNotNone(node, "canonical Node interpreter is mandatory")
-        for kind in ("initial-a", "stale-a", "current-b"):
+        for kind in ("initial-a", "stale-a", "current-b", "current-b-after-a-gc"):
             payload = {"nonce": 'owned-"nonce\\value-✨', "kind": kind}
             script = prefix + json.dumps(payload) + suffix
             with self.subTest(kind=kind):

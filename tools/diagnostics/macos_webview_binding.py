@@ -85,7 +85,7 @@ def validate(result, pid, version, nonce, source_revision):
         "Native binding window identities differ",
     )
     expected = {
-        "schema_version": 2,
+        "schema_version": 3,
         "contract": "native.webview-binding",
         "nonce": nonce,
         "pid": pid,
@@ -118,6 +118,9 @@ def validate(result, pid, version, nonce, source_revision):
             },
             "message_identity": {
                 "rebound_b_callback": True,
+                "b_after_a_gc_source_exact": True,
+                "b_after_a_gc_accepted": True,
+                "b_after_a_gc_evaluated": True,
                 "initial_a_exact": True,
                 "current_b_exact": True,
                 "stale_a_rejected": True,
