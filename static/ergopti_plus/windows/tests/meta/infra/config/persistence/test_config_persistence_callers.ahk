@@ -110,7 +110,7 @@ _CPC_IndentWriterReturnsItsNativeStatus() {
 			continue
 		Calls += 1
 		Assert(_CPC_LineConsumesResult(Lines, Index), "the indentation writer must return its native ACK")
-		Assert(InStr(Line, "WriterFn.Call(Path, Owned)") > 0,
+		Assert(InStr(Line, "WriterFn.Call(Path, Owned, Content, 1)") > 0,
 			"the injected and production writers must share the same owned leaf and result boundary")
 		Discarded := Lines.Clone()
 		Discarded[Index] := StrReplace(Line, "return ", "")
@@ -797,3 +797,5 @@ _CPC_NativeTernaryRequiresTestedStatus() {
 	AssertEqual(2, Calls, "the two actual guarded and default native dispatch branches remain enrolled")
 }
 Test("AHK-15-persistence: adjacent native ternary branches retain tested result ownership", _CPC_NativeTernaryRequiresTestedStatus)
+
+#Include test_config_indent_source_witness.ahk

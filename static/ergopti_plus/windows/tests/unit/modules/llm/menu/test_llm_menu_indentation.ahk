@@ -109,11 +109,11 @@ _LMT_IndentChild(Built) {
 	throw Error("The actual native indentation submenu is absent.")
 }
 
-_LMT_IndentWriteMode(Mode, Seen, Path, Updates) {
-	return _LMT_IndentWriteObserved(Path, Updates, Mode, Seen)
+_LMT_IndentWriteMode(Mode, Seen, Path, Updates, Content := unset, Presence := unset) {
+	return _LMT_IndentWriteObserved(Path, Updates, Mode, Seen, Content?, Presence?)
 }
 
-_LMT_IndentWriteObserved(Path, Updates, Mode, Seen) {
+_LMT_IndentWriteObserved(Path, Updates, Mode, Seen, Content := unset, Presence := unset) {
 	Seen["calls"] += 1
 	Seen["updates"] := LLM_Menu_DeepClone(Updates)
 	if Mode == "throw"
@@ -126,7 +126,7 @@ _LMT_IndentWriteObserved(Path, Updates, Mode, Seen) {
 		return 2
 	if Mode == "truthy string"
 		return "ack"
-	return TOML_ConfigBatchWrite(Path, Updates)
+	return TOML_ConfigBatchWrite(Path, Updates, [], 0, Content?, Presence?)
 }
 
 ; Uses the actual Win32 menu, native dispatcher, configuration lease and strict
@@ -254,7 +254,7 @@ _LMT_IndentRetainedOwners() {
 				FileDelete(Path)
 			FileAppend(Initial, Path, "UTF-8-RAW")
 			Seen := Map("calls", 0)
-			Writer := (Target, Updates) => _LMT_IndentWriteObserved(Target, Updates, "ack", Seen)
+			Writer := _LMT_IndentWriteMode.Bind("ack", Seen)
 			Command := (Value, Expected) => _LMT_IndentCommit(Value, Expected, Writer)
 			Built := LLM_Menu_BuildDisplayMenu(_LMT_InfoBarToggle, _LMT_ShowAllToggle, (*) => false, Command)
 			try {
@@ -355,3 +355,5 @@ _LMT_IndentObservationIsClosed() {
 	AssertFalse(InStr(Summary, "unknown_future_stage"))
 }
 Test("LLM display: indentation owner diagnostics retain only closed stage facts", _LMT_IndentObservationIsClosed)
+
+#Include test_llm_menu_indentation_source_owner.ahk

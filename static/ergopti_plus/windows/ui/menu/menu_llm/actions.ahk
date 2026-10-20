@@ -535,7 +535,10 @@ _LLM_Menu_IndentWrite(Expected, Path, Updates, WriterFn := 0) {
 		return false
 	; This choice owns one presentation leaf, so unrelated external settings
 	; remain byte-owned by their existing source instead of the RAM full collector.
-	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned) : TOML_ConfigBatchWrite(Path, Owned)
+	Content := FSReadUtf8Exact(Path)
+	if !(Content is String) || !_LLM_Menu_EnableSourceMatches(Expected["source"], _LLM_Menu_EnableReadSource())
+		return false
+	return HasMethod(WriterFn, "Call") ? WriterFn.Call(Path, Owned, Content, 1) : TOML_ConfigBatchWrite(Path, Owned, [], 0, Content, 1)
 }
 
 
