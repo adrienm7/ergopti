@@ -720,7 +720,9 @@ SC00B:: _NumberRowSymbolsFirstSend(0x0B, false)
 ; effective layout's levels. The tap keys' hotkeys, created earlier, keep an
 ; assigned edge key. A Kana AltGr is no modifier to AutoHotkey, so under it these
 ; hotkeys would replace the layout's AltGr level: they stand down there.
-#HotIf NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()
+; This static criterion can run during Bundle_Init, before the edge owner's
+; globals exist. The ordering's admission stays native until its sources publish.
+#HotIf NumberRowEffectiveMode() != "native" && NumberRowEdgesEffective() && !TapHoldKanaAltGrHeld()
 SC029:: _NumberRowEdgeSend(0x29, false)
 +SC029:: _NumberRowEdgeSend(0x29, true)
 SC00C:: _NumberRowEdgeSend(0x0C, false)
