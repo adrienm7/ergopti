@@ -31,6 +31,20 @@ local function quoted_kinds(body, declared)
 	return named
 end
 
+helpers.describe("a hotstring replacement reports its typed output to CapsWord", function()
+	-- Its key events are returned from the keymap's own eventtap callback and
+	-- need not cross the CapsWord watcher's tap: the expander reports the
+	-- committed text, after every rollback point, so a refused one is never seen.
+	helpers.it("the expander reports the committed replacement text", function()
+		local src = strip_comments(helpers.read_driver_source("CapsWordOutput.report(logical_text)"))
+		local report = src:find("CapsWordOutput.report(logical_text)", 1, true)
+		local commit = src:find("TerminatorReplay.commit_prepared(replay_owner)", 1, true)
+		helpers.assert_true(report ~= nil, "the expander must report its replacement text")
+		helpers.assert_true(commit ~= nil and commit < report,
+			"the report must follow the replacement commit, after every rollback")
+	end)
+end)
+
 helpers.describe("CapsWord auto-off lists live in the manifest and the catalogue", function()
 	helpers.it("the watcher maps exactly the declared macOS pointer kinds", function()
 		local Owner = require("infra.capsword_auto_off")

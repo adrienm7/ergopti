@@ -43,6 +43,7 @@ local Registrar      = require("adapters.hotkey_registrar")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
 local CapsWordAutoOff = require("infra.capsword_auto_off")
+local CapsWordOutput = require("infra.capsword_output")
 local AutoOffPolicy  = require("caps_word.auto_off")
 -- Layout observation does not own keyboard-control resources. Acquire this
 -- dependency only when the CapsWord generation starts its gesture watcher.
@@ -498,6 +499,8 @@ end
 local function handle_capsword_event(watcher_gen, event, types)
 	if event:getType() == types.keyDown then
 		-- Every keystroke reaches this tap; only an active CapsWord costs anything.
+		-- The characters are the typed output: the layout's, Karabiner's remap,
+		-- a completed dead key, a French spaced-punctuation carrier.
 		if not KeVariables.capsword_known_active() then return end
 		_capsword_last_activity_ns = TimerScheduler.now_ns()
 		local text = event:getCharacters()
@@ -509,6 +512,18 @@ local function handle_capsword_event(watcher_gen, event, types)
 	local kind = capsword_pointer_kind(event, types)
 	if AutoOffPolicy.ends_on_pointer(CapsWordAutoOff.policy(), kind) then
 		deactivate_capsword(watcher_gen, "pointer " .. kind)
+	end
+end
+
+--- Ends CapsWord on a delimiter in text the driver itself typed (a hotstring
+--- expansion, a replayed delimiter): its key events may never cross this tap.
+--- @param watcher_gen number Watcher lifecycle generation.
+--- @param text string Driver output.
+local function handle_capsword_output(watcher_gen, text)
+	if watcher_gen ~= _capsword_watcher_gen or not KeVariables.capsword_known_active() then return end
+	_capsword_last_activity_ns = TimerScheduler.now_ns()
+	if AutoOffPolicy.ends_on_text(CapsWordAutoOff.policy(), text) then
+		deactivate_capsword(watcher_gen, "delimiter in driver output", true)
 	end
 end
 
@@ -650,6 +665,9 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		return nil
 	end
 	_capsword_listener_owned = true
+	CapsWordOutput.set_observer(function(text)
+		return handle_capsword_output(watcher_gen, text)
+	end)
 	return watcher
 end
 
@@ -669,6 +687,7 @@ function M.stop_gesture_watcher(watcher)
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
 	_capsword_check_pending = false
 	_capsword_last_check_ns = 0
+	CapsWordOutput.set_observer(nil)
 	local all_stopped = true
 	if _capsword_listener_owned then
 		local removed, remove_err = pcall(ControlSentinels.set_listener, "karabiner.capsword", nil)
