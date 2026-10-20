@@ -526,16 +526,29 @@ _LLM_Deps_PublishFailure(msg, on_failed?, captured_epoch := 0, PriorityFn := 0) 
 	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
 		return false
 	LoggerError("LLM", "Deps failure: " msg)
-	_LLM_Deps_State          := "failed"
-	_LLM_Deps_FailureMessage := msg
-	_LLM_Deps_Checking       := false
+	; Logging can yield to real cancellation. Only the captured epoch may
+	; atomically publish the three dependency-state fields; no I/O runs here.
+	PreviousCritical := Critical("On")
+	try {
+		if captured_epoch && captured_epoch != _LLM_Deps_Epoch
+			return false
+		_LLM_Deps_State          := "failed"
+		_LLM_Deps_FailureMessage := msg
+		_LLM_Deps_Checking       := false
+	} finally Critical(PreviousCritical)
 	; AHK-30: restore the driver baseline priority — the install ran with AHK
 	; boosted to High. Mirror of the same restore in LLM_Deps_Cancel. MUST use
 	; the shared constant, not a hardcoded "Normal" literal
 	; (driver-baseline-priority-reverted-to-normal).
 	if !HasMethod(PriorityFn, "Call")
 		PriorityFn := ProcessSetPriority
+	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
+		return false
 	try PriorityFn.Call(DRIVER_BASELINE_PRIORITY_CLASS)
+	; The priority port is a callout too; a cancellation there must not
+	; deliver the old business callback into the new dependency epoch.
+	if captured_epoch && captured_epoch != _LLM_Deps_Epoch
+		return false
 	if IsSet(on_failed)
 		on_failed(msg)
 	return true
