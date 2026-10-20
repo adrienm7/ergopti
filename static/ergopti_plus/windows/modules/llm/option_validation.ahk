@@ -23,6 +23,13 @@ global LLM_PROFILE_BUILTIN_ORDER := [
 	"tone_familiar", "tone_neutral", "tone_formal", "tone_very_formal",
 	"translate_en", "translate_ja"
 ]
+; Profile-power thresholds used by LLM_RecommendProfileForModel — kept here
+; as named constants so the policy is the same as the HS reference (see
+; ui/menu/menu_llm/init.lua MODEL_ADVANCED_PARAMS_THRESHOLD_B and
+; MODEL_BATCH_PARAMS_THRESHOLD_B).
+global LLM_PROFILE_ADVANCED_PARAMS_B := 2.0   ; ≥ 2B → advanced
+global LLM_PROFILE_BATCH_PARAMS_B    := 4.0   ; ≥ 4B → batch_advanced
+
 ; The built-in translations of the current sentence, run by live mode
 ; (llm_live_prompt_toggle) or their llm_predict presets rather than as the
 ; active profile: like the tone ladder, they take no Ctrl+<n> profile hotkey.

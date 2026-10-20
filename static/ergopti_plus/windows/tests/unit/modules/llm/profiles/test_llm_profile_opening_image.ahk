@@ -199,3 +199,32 @@ for _PFI_Mode in ["edit-current", "edit-external", "edit-cancel", "edit-late-wri
 		"create-current", "create-external", "create-cancel", "delete-current", "delete-external", "delete-cancel",
 		"chooser-edit-external", "use-current", "use-external", "web-current", "web-external", "web-late-write", "web-successor", "web-no-source"]
 	Test("LLM profile opening image: " . _PFI_Mode . " (llm-profile-opening-image)", _PFI_Run.Bind(_PFI_Mode))
+
+_PFI_ColdProfilePolicy() {
+	global LLM_PROFILE_ADVANCED_PARAMS_B, LLM_PROFILE_BATCH_PARAMS_B
+	global _LLM_PresetsCache, _LLM_IndexCache
+	AssertTrue(IsSet(LLM_PROFILE_ADVANCED_PARAMS_B) && IsSet(LLM_PROFILE_BATCH_PARAMS_B),
+		"The definitions-only profile policy must initialize both thresholds without menu startup.")
+	AssertTrue(LLM_PROFILE_ADVANCED_PARAMS_B is Float && LLM_PROFILE_BATCH_PARAMS_B is Float)
+	AssertEqual(2.0, LLM_PROFILE_ADVANCED_PARAMS_B)
+	AssertEqual(4.0, LLM_PROFILE_BATCH_PARAMS_B)
+	HadPresets := IsSet(_LLM_PresetsCache)
+	Presets := HadPresets ? _LLM_PresetsCache : 0
+	HadIndex := IsSet(_LLM_IndexCache)
+	Index := HadIndex ? _LLM_IndexCache : 0
+	try {
+		Model := "__ergopti_profile_policy_composition_unknown__"
+		Models := LLM_GetModelIndex()
+		AssertTrue(Models is Map && !Models.Has(Model), "The real catalogue must admit the unknown-model policy branch.")
+		Info := LLM_GetModelInfo(Model)
+		AssertEqual("chat", Info["type"])
+		AssertEqual(0.0, Info["params_b"])
+		AssertEqual("basic", LLM_RecommendProfileForModel(Model),
+			"A real nonempty model recommendation must consume the policy before menu startup.")
+	} finally {
+		_LLM_PresetsCache := HadPresets ? Presets : unset
+		_LLM_IndexCache := HadIndex ? Index : unset
+	}
+}
+Test("LLM profile policy: cold recommendation is composed before menu startup (llm-profile-policy-composition)",
+	_PFI_ColdProfilePolicy)
