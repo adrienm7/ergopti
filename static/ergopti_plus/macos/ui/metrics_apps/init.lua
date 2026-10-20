@@ -937,7 +937,12 @@ local function load_and_inject(generation, webview)
 		manifest = M._manifest_cache
 	else
 		Logger.trace(LOG, "Manifest cache miss (rev %d) — querying SQLite…", rev)
-		manifest = sqlite_reader.read_manifest(sqlite_path)
+		local complete
+		manifest, complete = sqlite_reader.read_manifest(sqlite_path)
+		if complete ~= true then
+			Logger.warn(LOG, "Apps dashboard refresh refused because the SQLite projection is incomplete.")
+			return false
+		end
 		M._manifest_cache = manifest
 		M._manifest_rev   = rev
 		Logger.done(LOG, "Manifest cached (rev %d).", rev)
