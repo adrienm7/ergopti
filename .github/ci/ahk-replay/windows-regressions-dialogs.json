@@ -1,0 +1,21 @@
+{
+	"expected_count": 30,
+	"filters": [
+		{
+			"contains": "number-row-edges-boot-admission",
+			"expected_count": 8
+		},
+		{
+			"contains": "layout-row-chosen-magic-scope",
+			"expected_count": 4
+		},
+		{
+			"contains": "llm-delete-confirmation-owner",
+			"expected_count": 10
+		},
+		{
+			"contains": "llm-api-remove-confirmation-source",
+			"expected_count": 8
+		}
+	]
+}
