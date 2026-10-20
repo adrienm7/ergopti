@@ -286,15 +286,20 @@ end
 
 --- Presses a combo on the daemon's uinput device.
 --- @param combo string
+--- @param publication table|nil Retained full-phase and cached-key admission.
 --- @return boolean True when every event was written.
 --- @return table Typed outcome; only an issued unavailable receipt permits fallback.
-function M.press(combo)
+function M.press(combo, publication)
+	if publication ~= nil then
+		local ok, allowed = pcall(publication.current)
+		if not ok or allowed ~= true then return false, outcome("refused") end
+	end
 	local parsed, unknown = M.parse(combo)
 	if not parsed then
 		Logger.error(LOG, "Cannot emit '%s': %s.", tostring(combo), tostring(unknown))
 		return false, outcome("refused")
 	end
-	return M.press_codes(parsed.mods, parsed.keys, combo)
+	return M.press_codes(parsed.mods, parsed.keys, combo, publication)
 end
 
 --- Presses evdev codes on the daemon's uinput device: the modifiers held, the
@@ -312,9 +317,16 @@ end
 --- @param mods table Array of modifier evdev codes, pressed in order.
 --- @param keys table Non-empty array of key evdev codes.
 --- @param label string|nil What to call the chord in the log.
+--- @param publication table|nil Retained full-phase and cached-key admission.
 --- @return boolean True when every event was written.
 --- @return table Typed outcome retaining unavailable/native-refusal distinction.
-function M.press_codes(mods, keys, label)
+function M.press_codes(mods, keys, label, publication)
+	local function admitted(cached)
+		if publication == nil then return true end
+		local ok, allowed = pcall(cached and publication.cached or publication.current)
+		return ok and allowed == true
+	end
+	if not admitted(false) then return false, outcome("refused") end
 	if type(mods) ~= "table" or type(keys) ~= "table" or #keys == 0 then
 		Logger.error(LOG, "press_codes() needs a modifier list and at least one key.")
 		return false, outcome("refused")
@@ -341,6 +353,7 @@ function M.press_codes(mods, keys, label)
 	if broker and not reservation then return false, outcome("refused") end
 	local held, suspended = {}, {}
 	local function emit(code, value)
+		if value == PRESS and not admitted(true) then return false end
 		if value == PRESS and not reservation then held[#held + 1] = code end
 		local ok, result = pcall(reservation and reservation.emit or Writer.emit, code, value)
 		if not ok or result ~= true then return false end
@@ -417,6 +430,7 @@ function M.press_codes(mods, keys, label)
 		local borrowed = reservation and reservation.borrow(code) or (not broker and already_down[code])
 		if not borrowed then owned_mods[#owned_mods + 1] = code end
 	end
+	if not admitted(false) then return failed() end
 	for _, code in ipairs(owned_mods) do
 		if not emit(code, PRESS) then return failed() end
 	end

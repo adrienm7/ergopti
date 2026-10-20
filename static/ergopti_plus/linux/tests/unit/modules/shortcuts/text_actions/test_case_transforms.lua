@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local TextOwnerFixture = require("tests.support.text_owner_fixture")
 
 local function with_manager(selected, body)
 	local names = {
@@ -39,7 +40,11 @@ local function with_manager(selected, body)
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
-		body(require(names.manager), state)
+		TextOwnerFixture.with(function(guard)
+			local manager = require(names.manager)
+			manager.init({ persist = false, capture_text_owner = guard.capture_text_owner })
+			body(manager, state, guard.capture_text_owner)
+		end)
 	end)
 	for key, name in pairs(names) do package.loaded[name] = previous[key] end
 	helpers.assert_true(ok, "shortcut case probe must not throw: " .. tostring(err))
@@ -80,10 +85,10 @@ end)
 --- Native selection/clipboard ports remain the case fixture's boundaries.
 --- @param body function
 local function with_caps_word_menu(body)
-	with_manager("unused", function(manager)
+	with_manager("unused", function(manager, _, capture_text_owner)
 		require("test.config_unused_keys_contract").sandbox.with_config(
 			'[shortcuts]\nenabled = false\n[foreign]\nvalue = "keep"\n', function(path)
-				manager.init({ persist = true, config_path = path })
+				manager.init({ persist = true, config_path = path, capture_text_owner = capture_text_owner })
 				local changed = { count = 0 }
 				local builder = helpers.load_module("ui.menu.menu_builder")
 				local function row()

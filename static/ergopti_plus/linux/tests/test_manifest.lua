@@ -569,6 +569,7 @@ return {
 	"tests.unit.modules.gestures.programs.test_program_lifecycle",
 	"tests.unit.modules.gestures.programs.test_program_literal_native",
 	"tests.unit.modules.shortcuts.text_actions.test_text_actions_route_through_handlers",
+	"tests.unit.modules.shortcuts.text_actions.test_selection_action_destination",
 	"tests.unit.modules.gestures.config.test_gesture_enable_transaction",
 	"tests.unit.modules.gestures.engine.test_gesture_pump_chain",
 	"tests.unit.modules.gestures.engine.test_gesture_close_ack",
