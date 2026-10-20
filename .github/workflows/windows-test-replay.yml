@@ -160,48 +160,74 @@ jobs:
           $evidence = Join-Path $env:RUNNER_TEMP 'windows-full-entry-evidence'
           New-Item -ItemType Directory -Force -Path $evidence | Out-Null
           $runner = Join-Path $env:GITHUB_WORKSPACE 'static/ergopti_plus/windows/tests/e2e/run_e2e.ahk'
+          $plan = Join-Path $evidence 'e2e.plan.tsv'
+          $discoveryTap = Join-Path $evidence 'e2e-discovery.tap.txt'
+          $discoveryManifest = Join-Path $evidence 'e2e.discovery.json'
           $tap = Join-Path $evidence 'e2e.tap.txt'
-          $env:ERGOPTI_AHK_RESULTS_FILE = $tap
-          $stdout = Join-Path $evidence 'e2e.stdout.log'
-          $stderr = Join-Path $evidence 'e2e.stderr.log'
           $manifest = Join-Path $evidence 'e2e.manifest.json'
-          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'hotstrings-pure-and-native-edit'; status = 'failed'; native_exit_code = $null; pid = $null; expected_count = $null; started_at = [DateTime]::UtcNow.ToString('o'); ended_at = $null; full_suite_qualified = $false }
+          $receipt = [ordered]@{ source_sha = $env:GITHUB_SHA; scope = 'hotstrings-pure-and-native-edit'; status = 'failed'; native_exit_code = $null; pid = $null; expected_count = $null; started_at = [DateTime]::UtcNow.ToString('o'); ended_at = $null; full_suite_qualified = $false; phases = @() }
           $proc = $null
           try {
+              if ((git rev-parse HEAD).Trim() -cne $env:GITHUB_SHA) { throw 'The E2E source differs from the workflow source.' }
+              $runnerHash = (Get-FileHash -LiteralPath $runner -Algorithm SHA256).Hash
+              $receipt.runner_sha256 = $runnerHash
+              Remove-Item -LiteralPath $plan, $tap, $discoveryTap, $manifest, $discoveryManifest -Force -ErrorAction SilentlyContinue
+              foreach ($file in @($plan, $tap, $discoveryTap, $manifest, $discoveryManifest)) { if (Test-Path -LiteralPath $file) { throw 'A prior E2E artifact could not be retired.' } }
+              node tools/test/test-ahk-runner-arguments.cjs
+              if ($LASTEXITCODE -ne 0) { throw 'The native runner argument controls failed.' }
               . ./tools/ci/ahk-tap-follower.ps1
-              $follower = New-AhkTapFollower -Path $tap
-              $proc = Start-Process -FilePath $env:ERGOPTI_REPLAY_AHK -ArgumentList "/ErrorStdOut `"$runner`"" -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
-              $null = $proc.Handle
-              $receipt.pid = $proc.Id
-              $clock = [Diagnostics.Stopwatch]::StartNew()
-              while (-not $proc.HasExited) {
-                  if ($clock.ElapsedMilliseconds -gt 180000) { $proc.Kill(); $proc.WaitForExit(); throw 'The native E2E process exceeded its deadline.' }
-                  $follower.Poll() | ForEach-Object { Write-Host $_ }
-                  Start-Sleep -Milliseconds 100
+              foreach ($phase in @('discovery', 'execution')) {
+                  if ((git rev-parse HEAD).Trim() -cne $env:GITHUB_SHA -or (Get-FileHash -LiteralPath $runner -Algorithm SHA256).Hash -cne $runnerHash) { throw 'The native E2E runner changed after admission.' }
+                  $phaseTap = if ($phase -ceq 'discovery') { $discoveryTap } else { $tap }
+                  if (Test-Path -LiteralPath $phaseTap) { throw 'The native E2E receipt path is not fresh.' }
+                  if ($phase -ceq 'discovery' -and (Test-Path -LiteralPath $plan)) { throw 'The native E2E plan path is not fresh.' }
+                  $env:ERGOPTI_AHK_RESULTS_FILE = $phaseTap
+                  $prefix = if ($phase -ceq 'discovery') { 'e2e-discovery' } else { 'e2e' }
+                  $stdout = Join-Path $evidence "$prefix.stdout.log"
+                  $stderr = Join-Path $evidence "$prefix.stderr.log"
+                  $arguments = "/ErrorStdOut `"$runner`""
+                  if ($phase -ceq 'discovery') { $arguments += " --dry-run `"--dump-plan=$plan`"" }
+                  $phaseReceipt = [ordered]@{ phase = $phase; native_exit_code = $null; pid = $null; started_at = [DateTime]::UtcNow.ToString('o'); ended_at = $null }
+                  $receipt.phases += $phaseReceipt
+                  try {
+                      $follower = New-AhkTapFollower -Path $phaseTap
+                      $proc = Start-Process -FilePath $env:ERGOPTI_REPLAY_AHK -ArgumentList $arguments -NoNewWindow -PassThru -RedirectStandardOutput $stdout -RedirectStandardError $stderr
+                      $null = $proc.Handle
+                      $phaseReceipt.pid = $proc.Id
+                      $clock = [Diagnostics.Stopwatch]::StartNew()
+                      while (-not $proc.HasExited) {
+                          if ($clock.ElapsedMilliseconds -gt 180000) { $proc.Kill(); $proc.WaitForExit(); throw 'The native E2E process exceeded its deadline.' }
+                          $follower.Poll() | ForEach-Object { Write-Host $_ }
+                          Start-Sleep -Milliseconds 100
+                      }
+                      $proc.WaitForExit()
+                      $phaseReceipt.native_exit_code = $proc.ExitCode
+                      $follower.Finish() | ForEach-Object { Write-Host $_ }
+                      Get-Content -LiteralPath $stdout | ForEach-Object { Write-Host $_ }
+                      Get-Content -LiteralPath $stderr | ForEach-Object { Write-Host $_ }
+                      if ($null -eq $phaseReceipt.native_exit_code -or $phaseReceipt.native_exit_code -ne 0) { throw 'The native E2E process failed.' }
+                  } finally {
+                      if ($null -ne $proc) { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() }; $proc.Dispose(); $proc = $null }
+                      $phaseReceipt.ended_at = [DateTime]::UtcNow.ToString('o')
+                  }
+                  if ($phase -ceq 'discovery') {
+                      node tools/test/validate-ahk-e2e-manifest.cjs --plan $plan --discovery $discoveryTap --json $discoveryManifest
+                      if ($LASTEXITCODE -ne 0) { throw 'The fresh native E2E plan is incomplete.' }
+                      $receipt.expected_count = (Get-Content -Raw -LiteralPath $discoveryManifest | ConvertFrom-Json).expected_count
+                      $receipt.plan_sha256 = (Get-FileHash -LiteralPath $plan -Algorithm SHA256).Hash
+                  } else {
+                      $receipt.pid = $phaseReceipt.pid
+                      $receipt.native_exit_code = $phaseReceipt.native_exit_code
+                      if ((Get-FileHash -LiteralPath $plan -Algorithm SHA256).Hash -cne $receipt.plan_sha256) { throw 'The native discovery plan changed during execution.' }
+                      node tools/test/validate-ahk-e2e-manifest.cjs --input $tap --plan $plan --discovery $discoveryTap --json $manifest
+                      if ($LASTEXITCODE -ne 0) { throw 'The native E2E execution differs from its fresh discovery plan.' }
+                  }
               }
-              $proc.WaitForExit()
-              $receipt.native_exit_code = $proc.ExitCode
-              $follower.Finish() | ForEach-Object { Write-Host $_ }
-              Get-Content -LiteralPath $stdout | ForEach-Object { Write-Host $_ }
-              Get-Content -LiteralPath $stderr | ForEach-Object { Write-Host $_ }
-              if ($null -eq $receipt.native_exit_code -or $receipt.native_exit_code -ne 0) { throw 'The native E2E process failed.' }
-              node tools/test/validate-ahk-e2e-manifest.cjs --input $tap
-              if ($LASTEXITCODE -ne 0) { throw 'The mandatory pure and native Edit corpus is incomplete.' }
-              node tools/test/validate-ahk-suite-manifest.cjs --input $tap --json $manifest
-              if ($LASTEXITCODE -ne 0) { throw 'The native E2E execution manifest is incomplete.' }
-              $observed = Get-Content -Raw -LiteralPath $manifest | ConvertFrom-Json
-              $corpus = Get-Content -Raw -LiteralPath 'static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json' | ConvertFrom-Json
-              $receipt.expected_count = 2 * $corpus.vectors.Count + 2
-              if ($observed.executed_count -ne $receipt.expected_count -or $observed.timed_count -ne $receipt.expected_count -or $observed.failed -ne 0) { throw 'The complete E2E corpus and Unicode controls did not all execute.' }
-              foreach ($tier in @('pure', 'native-edit')) {
-                  $name = "e2e[$tier] supplementary trigger and completion preserve native edits (unicode-erase)"
-                  if (@($observed.executed | Where-Object { $_.name -ceq $name -and $_.status -ceq 'ok' }).Count -ne 1) { throw 'The native E2E Unicode control is missing.' }
-              }
+              if ((git rev-parse HEAD).Trim() -cne $env:GITHUB_SHA -or (Get-FileHash -LiteralPath $runner -Algorithm SHA256).Hash -cne $runnerHash) { throw 'The native E2E source changed during execution.' }
               $receipt.status = 'passed'
           } finally {
-              if ($null -ne $proc) { if (-not $proc.HasExited) { $proc.Kill(); $proc.WaitForExit() }; $proc.Dispose() }
               $receipt.ended_at = [DateTime]::UtcNow.ToString('o')
-              $receipt | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
+              $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $evidence 'e2e.receipt.json') -Encoding utf8
           }
 
       - name: Replay every case alone and the selection in reverse
