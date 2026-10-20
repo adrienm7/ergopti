@@ -480,6 +480,23 @@ helpers.describe("Local OpenAI-compatible servers: AI menu (local-openai-backend
 		end)
 	end)
 
+	helpers.it("starts the stale sweep only after the menu build returns (issue #95)", function()
+		with_panel(function(Panel, _, _, world, ctx)
+			world.hold_deferred = true
+			Panel.rows(ctx)
+			Panel.rows(ctx)
+			helpers.assert_eq(#world.probes, 0,
+				"no probe deadline may start while the menu build holds the run loop")
+			helpers.assert_eq(#world.deferred, 1, "repeated builds queue one sweep")
+			helpers.assert_eq(world.deferred[1].delay, 0)
+			world.deferred[1].callback()
+			helpers.assert_eq(#world.probes, 4, "the sweep probes every server once the build returned")
+			answer_sweep(world, { omlx = models_answer({ "Qwen3-8B-4bit" }) })
+			helpers.assert_true(row_starting(Panel.rows(ctx), "oMLX 🖥️") ~= nil)
+			helpers.assert_eq(#world.deferred, 1, "fresh verdicts queue no new sweep")
+		end)
+	end)
+
 	helpers.it("asks for the key a server wants and probes it with the key (local-openai-backends)", function()
 		with_panel(function(Panel, api, LocalServers, world, ctx)
 			Panel.rows(ctx)

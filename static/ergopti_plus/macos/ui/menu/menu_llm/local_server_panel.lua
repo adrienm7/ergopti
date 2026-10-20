@@ -12,7 +12,10 @@
 --- FEATURES & RATIONALE:
 --- 1. Listed only when it answers: the menu shows the last sweep's verdicts
 ---    and asks for a new sweep, asynchronously, when they are stale; the menu
----    is redrawn only when a verdict changed.
+---    is redrawn only when a verdict changed. That sweep starts after the menu
+---    build returns: its probes answer on the main run loop, which the build
+---    holds for about a second, so a probe dispatched from inside it spent its
+---    1.5 s deadline waiting and every server read as silent (issue #95).
 --- 2. Choosing a model is choosing the backend: the server's API entry is
 ---    stored (api_panel.apply_local_server), then the API backend is selected
 ---    if it was not, so predictions go to the server at once.
@@ -24,6 +27,7 @@
 local M = {}
 
 local Logger        = require("infra.logger")
+local DeferredWork  = require("infra.deferred_work")
 local i18n          = require("infra.i18n")
 local dialog        = require("infra.dialog_util")
 local notifications = require("infra.notifications")
@@ -37,6 +41,8 @@ local LOG = "menu_llm.local_servers"
 local _ctx = nil
 -- The AI agent menu's context: a missing model of a System is fixed through it
 local _agent_ctx = nil
+-- True while a stale-verdict sweep waits for the menu build to return
+local _rescan_deferred = false
 
 
 
@@ -366,7 +372,14 @@ function M.rows(ctx)
 	servers().set_failure_handler(on_failure)
 	-- Source provenance is refreshed before cache age can grant a model view.
 	api_remote.refresh_local_server_views()
-	if admitted(ctx) and servers().is_stale() then M.rescan(ctx) end
+	if admitted(ctx) and servers().is_stale() and not _rescan_deferred then
+		_rescan_deferred = true
+		local scheduled = DeferredWork.after(0, function()
+			_rescan_deferred = false
+			M.rescan(_ctx)
+		end, "menu_llm.local_servers.rescan")
+		if not scheduled then _rescan_deferred = false end
+	end
 	local data = servers()
 	local receipts = {}
 	for _, id in ipairs(data.view_order()) do receipts[id] = capture_view(id) end
