@@ -151,6 +151,7 @@ function M.run(options)
 	env.script_actions = { is_paused = function() return false end }
 	env.secure_focus_guard = { has_context_operation = function() return false end, blocks_text = function() return false end }
 	env.engine = { reset = function() observed.automation = observed.automation + 1 end }
+	env.perform_reload = function() return true end
 	env.DiagnosticSnapshot = { prepare = function()
 		record("diagnostics.prepare"); native_callback("diagnostics.prepare")
 		observed.snapshot_prepared_under_grab = observed.grabbed
@@ -181,6 +182,14 @@ function M.run(options)
 				record("signals.stop"); observed.signal_stops = observed.signal_stops + 1
 				observed.signals_active = false; return true
 			end }
+		elseif name == "infra.driver_control" then
+			-- The local reload control starts once the daemon is ready.
+			return { start = function(control_options)
+				observed.driver_control = control_options
+				return { handle = function() return false end, stop = function() return true end }
+			end }
+		elseif name == "luv" then
+			return { os_getpid = function() return 4242 end }
 		elseif name == "infra.input_access" then
 			return { report = function() observed.access_reported = true; return 1 end }
 		elseif name == "infra.i18n" then
