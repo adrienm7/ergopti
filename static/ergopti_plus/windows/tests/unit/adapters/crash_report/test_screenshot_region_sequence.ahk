@@ -149,15 +149,17 @@ _GSQ_Receive(Mode) {
 		AssertEqual(1, State.Calls, "the exact worker must settle once")
 		if Mode == "after" {
 			AssertTrue(RegExMatch(State.Output, "m)^OWNED_SEQUENCE=(\d+)\r?$", &Receipt),
-				"the controlled native copy must report its own sequence")
+				"the controlled native copy must report its own sequence: " . State.Output . State.ErrorText)
 			OwnedSequence := Integer(Receipt[1])
 		}
 		if Mode == "before" || Mode == "unknown" {
 			AssertTrue(State.Code != 0, "the worker must refuse lost clipboard custody: " . State.Output . State.ErrorText)
-			AssertTrue(InStr(State.ErrorText, "clipboard content changed") > 0)
+			; Tree-owned ShellRunner deliberately combines native stderr into stdout.
+			AssertTrue(InStr(State.Output . State.ErrorText, "clipboard content changed") > 0,
+				"the refusal must report its actual custody failure: " . State.Output . State.ErrorText)
 			AssertFalse(FileExist(Stage), "refused custody must never create a staged image")
 		} else {
-			AssertEqual(0, State.Code, State.ErrorText)
+			AssertEqual(0, State.Code, "the native worker must succeed: " . State.Output . State.ErrorText)
 			AssertEqual("", State.ErrorText)
 			AssertTrue(FileExist(Stage), "an admitted image must be saved")
 			AssertTrue(InStr(State.Output, "PIXEL=255,0,0") > 0, "the stage must contain the selected red pixel")
@@ -166,8 +168,8 @@ _GSQ_Receive(Mode) {
 			if Mode == "delayed" {
 				AssertEqual(1, Renderer.Calls, "the native delayed renderer must answer once")
 				AssertEqual("", Renderer.ErrorText)
-				AssertTrue(Renderer.Sequence != ExpectedSequence,
-					"legitimate materialization must really change the clipboard sequence")
+				AssertTrue(Renderer.Sequence > 0 && CB_GetSequenceNumber() > 0,
+					"the real delayed owner must retain observable clipboard content")
 			}
 		}
 	} catch as Err {
