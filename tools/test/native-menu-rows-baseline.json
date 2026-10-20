@@ -21,7 +21,7 @@
 		"sites": []
 	},
 	"linux": {
-		"count": 1,
-		"sites": ["linux/ui/menu/menu_builder.lua:2412 static"]
+		"count": 0,
+		"sites": []
 	}
 }

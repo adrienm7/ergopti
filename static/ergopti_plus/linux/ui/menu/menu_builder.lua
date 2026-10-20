@@ -2458,11 +2458,20 @@ local function _build_llm(ctx)
 					Logger.error(LOG, "No numeric prompt; debounce can only take a preset.")
 					return
 				end
+				-- The prompt is headed by the declared caption of the group that opens it.
+				local title_key
+				for _, entry in ipairs(ManifestMenu.get_array("llm_menu")) do
+					if entry.id == "llm_trigger" then title_key = entry.i18n end
+				end
+				if type(title_key) ~= "string" or title_key == "" then
+					Logger.error(LOG, "The AI trigger group declares no caption; debounce prompt refused.")
+					return
+				end
 				local value, save = numeric_setting_request(ctx, TriggerSettings, "modules.llm.trigger_settings",
 					"debounce_ms", "llm.trigger.debounce_ms")
 				if not save then return false end
 				Prompt.ask({
-					title = i18n_safe("menu.llm.trigger_menu_title"),
+					title = i18n_safe(title_key),
 					hint = string.format("%d – %d ms", bounds.min, bounds.max),
 					value = value,
 					min = bounds.min,
