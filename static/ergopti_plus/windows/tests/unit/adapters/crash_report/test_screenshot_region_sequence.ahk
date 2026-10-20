@@ -38,9 +38,9 @@ _GSQ_ReplaceOnce(Text, Needle, Replacement) {
 	return Result
 }
 
-; The immediate image must exercise the DIB section produced by the real
-; clipboard adapter, which the cross-process GDI+ reader used to reject.
-_GSQ_RequireDibSection() {
+; The real publisher must share a DDB usable by another process. A DIB section
+; remains process-local even when its handle reaches CF_BITMAP.
+_GSQ_RequireDeviceBitmap() {
 	AssertTrue(DllCall("OpenClipboard", "Ptr", A_ScriptHwnd, "Int"))
 	try {
 		Bitmap := DllCall("GetClipboardData", "UInt", 2, "Ptr")
@@ -48,8 +48,8 @@ _GSQ_RequireDibSection() {
 		Info := Buffer(A_PtrSize == 8 ? 32 : 24, 0)
 		AssertEqual(Info.Size, DllCall("Gdi32\GetObjectW", "Ptr", Bitmap,
 			"Int", Info.Size, "Ptr", Info, "Int"), "the native BITMAP must be observable")
-		AssertTrue(NumGet(Info, A_PtrSize == 8 ? 24 : 20, "Ptr") != 0,
-			"the immediate source must be a DIB section, not only the passing delayed DDB control")
+		AssertEqual(0, NumGet(Info, A_PtrSize == 8 ? 24 : 20, "Ptr"),
+			"the immediate source must be a shareable DDB for the actual external pixel reader")
 	} finally AssertTrue(DllCall("CloseClipboard", "Int"))
 }
 
@@ -152,7 +152,7 @@ _GSQ_Receive(Mode) {
 			OwnedSequence := CB_GetSequenceNumber()
 		} else {
 			AssertTrue(CB_WriteBitmapFile(RedPath), "the selected red bitmap must reach the native clipboard")
-			_GSQ_RequireDibSection()
+			_GSQ_RequireDeviceBitmap()
 			OwnedSequence := CB_GetSequenceNumber()
 		}
 		AssertTrue(OwnedSequence > 0)

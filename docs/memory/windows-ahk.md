@@ -414,14 +414,21 @@ HBITMAP. Serialize the detached copy after releasing the lock so later user
 copies remain independent. The native region custody fixture includes an actual
 hidden-window delayed renderer, a second-process lock probe and a pixel oracle.
 
-`CF_BITMAP` can be a DIB section which GDI+ `Image.FromHbitmap` rejects with a
-generic error when another process reads it. While still holding the admitted
-clipboard lock, use
+Publish `CF_BITMAP` as a device-dependent bitmap (DDB).
+[CreateDIBSection](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/nf-wingdi-createdibsection)
+explicitly states: “You cannot paste a DIB section from one application into
+another application.” `CB_WriteBitmapFile` must load with `LR_LOADFROMFILE`
+alone; adding `LR_CREATEDIBSECTION` produces a process-local bitmap that the
+external screenshot worker cannot read or copy. The native fixture checks that
+the real publisher's `BITMAP.bmBits` is null, then verifies the red pixel through
+the actual second-process worker. Retain the delayed-rendered DDB control.
+
+While holding the admitted clipboard lock, use
 [CopyImage](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-copyimage)
-with `IMAGE_BITMAP`, zero dimensions and zero flags to create a new local DDB.
-Keep `LR_COPYRETURNORG`, `LR_COPYDELETEORG` and `LR_CREATEDIBSECTION` absent;
-delete only that private handle after making the managed copy. Test both a real
-immediate DIB section and a real delayed-rendered DDB.
+with `IMAGE_BITMAP`, zero dimensions and zero flags to detach the valid shared
+bitmap into a private DDB. Keep `LR_COPYRETURNORG`, `LR_COPYDELETEORG` and
+`LR_CREATEDIBSECTION` absent; delete only that private handle after making the
+managed copy.
 
 ### project-ahk-sendinput-falls-back-to-sendevent
 
