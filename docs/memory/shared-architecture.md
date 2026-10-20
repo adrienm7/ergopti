@@ -568,7 +568,9 @@ counted by `npm run test:native-menu-rows` against a non-increasing baseline.
 The scanner ignores dynamically supplied rows, so regenerate the baseline with
 its owning generator and never lower it by hand; counts quoted in notes drift
 with scanner variants. Reload, Quit and the top-level captions come from
-canonical native-platform variants.
+canonical native-platform variants. On Windows a `dynamic` handler returns its
+row data and `MenuRenderer_Build` draws it at the entry (a non-Array answer
+refuses the build); only `action` handlers still draw into the menu they get.
 
 ### project-github-release-api-rate-limit
 

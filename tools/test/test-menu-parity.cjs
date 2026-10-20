@@ -2775,7 +2775,7 @@ const {
 	assert.equal(
 		credits(),
 		true,
-		'the real receiver, completed child and returned parent reach native AppendRows'
+		'the real receiver, completed child and returned parent go back to MenuRenderer_Build'
 	);
 	for (const [definition, proof, section, extension] of [
 		[[], selected, key, '.ahk'],
@@ -2810,8 +2810,8 @@ const {
 	const build = 'model_menu := LLM_Menu_BuildModelMenu()';
 	const handoff =
 		'ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)';
-	const append =
-		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows)';
+	// The emitter returns the rows; MenuRenderer_Build draws them at the entry.
+	const consume = 'return ModelRows';
 	const helper =
 		'_LLM_Menu_ModelParentRows(Receive, NativeChild, HealthPrefix, ModelCaption, Disabled) {';
 	const controls = [
@@ -2874,17 +2874,14 @@ const {
 			'ModelRows := Foreign(ReceiveModel, model_menu, health_dot, model_shown, disabled)',
 			'actual helper disconnected'
 		],
-		[append, append.replace('ModelRows)', '[])'), 'returned rows discarded'],
-		[append, append.replace('TargetMenu', 'ForeignMenu'), 'foreign native target'],
+		[consume, 'return []', 'returned rows discarded'],
+		[consume, 'return ForeignRows', 'foreign rows returned'],
+		['ModelRows := ModelRows.Clone()', 'ModelRows := Foreign.Clone()', 'foreign array extended'],
+		['ModelRows.Push(Row)', 'ModelRows.Push(Foreign)', 'foreign row appended'],
 		[
-			append,
-			append.replace('TargetMenu', '_LLM_Menu_Handle'),
-			'published handle replaces the captured target'
-		],
-		[
-			append,
-			'TargetMenu := Foreign\n\t\t\t' + append,
-			'explicit target rebound before native publication'
+			'InfoRows := MenuRenderer_TemplateRows("llm_thinking_info"',
+			'InfoRows := MenuRenderer_TemplateRows("foreign_info"',
+			'appended rows lose their declared template'
 		],
 		['if !(TargetMenu is Menu)', 'if false', 'native target type admission withdrawn'],
 		[
@@ -2892,11 +2889,10 @@ const {
 			'_LLM_Menu_EmitRow(id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {',
 			'explicit native target parameter withdrawn'
 		],
-		[append, append.replace('"llm_model_parent_ahk"', '"foreign_parent"'), 'foreign native frame'],
-		[append, 'ModelRows := []\n\t\t\t' + append, 'returned row array replaced'],
-		[append, 'ModelRows[1] := Foreign\n\t\t\t' + append, 'actual returned parent replaced'],
-		[append, 'return\n\t\t\t' + append, 'unreachable publication'],
-		[append, 'if false {\n' + append + '\n}', 'dead nested publication'],
+		[consume, 'ModelRows := []\n\t\t' + consume, 'returned row array replaced'],
+		[consume, 'ModelRows[1] := Foreign\n\t\t' + consume, 'actual returned parent replaced'],
+		[consume, 'return\n\t\t' + consume, 'unreachable publication'],
+		[consume, 'if false {\n' + consume + '\n}', 'dead nested publication'],
 		['if !_MR_DeclaredParentCallable(Receive)', 'if false', 'canonical callable guard withdrawn'],
 		['(*) => HealthPrefix', '(*) => Foreign()', 'health getter is no longer a scalar read'],
 		['(*) => ModelCaption', '(*) => (Receive := Foreign)', 'constructor callback changes receiver'],

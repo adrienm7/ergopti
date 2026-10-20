@@ -382,8 +382,9 @@ _LBMS_ActualWarningAnchor() {
 	try {
 		WarningRows := [Map("label", t("menu.llm.warning_install_ollama"),
 			"action", _LLM_Menu_OnWarningInstallClick)]
-		_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false,
-			WarningRows, Destination, "LLM")
+		; The captured emitter returns its rows; MenuRenderer_Build draws them.
+		MenuRenderer_AppendRows(Destination, "llm_menu", "llm_backend", _LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle,
+			"llm_backend", false, false, false, WarningRows, Destination, "LLM"))
 		Labels := _LBMS_Labels(Destination)
 		AssertEqual(t("menu.llm.warning_install_ollama"), Labels[1],
 			"the retained native warning precedes its actual backend anchor")
@@ -556,7 +557,8 @@ _WBF_ActualBackendRoute(Root) {
 				Target := Menu(), _LLM_Menu_Handle := Target
 				Warnings := Present ? MenuRenderer_TemplateRows("llm_install_warning_frame", Map("llm_install_warning", _LLM_Menu_OnWarningInstallClick), Map(), Map()) : []
 				try {
-					_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM")
+					MenuRenderer_AppendRows(Target, "llm_menu", "llm_backend",
+						_LLM_Menu_EmitCapturedRow(_LLM_Menu_Handle, "llm_backend", false, false, false, Warnings, Target, "LLM"))
 					Labels := _LBMS_Labels(Target)
 					AssertEqual(Present ? 2 : 1, Labels.Length)
 					AssertEqual(Expected, Labels[Labels.Length], "actual selected original catalogue datum reaches the declared parent")

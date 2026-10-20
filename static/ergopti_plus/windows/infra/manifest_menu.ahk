@@ -165,8 +165,11 @@ _MR_Get(Obj, Key, Default := "") {
 ;
 ; ``ManifestKey``   — key in ``menu_manifest.json`` (e.g. "shortcuts_menu")
 ; ``CategoryName``  — v1 PascalCase master-gate category (e.g. "Shortcuts")
-; ``DynamicHandlers`` — Map of id → Func to call for ``type:"dynamic"`` entries.
-;   Each handler receives ``(Menu, CategoryName)`` and populates the menu in place.
+; ``DynamicHandlers`` — Map of id → Func to call for ``type:"dynamic"`` and
+;   ``type:"action"`` entries, which receive ``(Menu, CategoryName)``. A
+;   ``dynamic`` handler RETURNS its row DATA (an Array, possibly empty) and this
+;   renderer draws it at the entry's place, so no driver code places a row; an
+;   ``action`` handler still populates the menu in place.
 ; ``GroupBuilders`` — Map of group_id → Func to call for ``type:"group"`` entries.
 ;   Each builder receives no arguments and returns a Menu object (or ``false``
 ;   to skip the entry entirely).
@@ -361,7 +364,10 @@ MenuRenderer_Build(ManifestKey, CategoryName, DynamicHandlers, GroupBuilders := 
 		} else if ItemType == "dynamic" {
 			Id := _MR_Get(Item, "id")
 			if (Id != "" and DynamicHandlers is Map and DynamicHandlers.Has(Id)) {
-				(DynamicHandlers[Id])(Result, CategoryName)
+				Rows := (DynamicHandlers[Id])(Result, CategoryName)
+				if !(Rows is Array)
+					throw Error("Dynamic item '" . Id . "' in '" . ManifestKey . "' returned no row data.")
+				_MR_RenderRows(Result, Rows, Id, 1)
 				ItemCount++
 			} else {
 				try LoggerWarn("MenuRenderer", "No handler for dynamic item '{1}' in '{2}' — skipped.", Id, ManifestKey)
