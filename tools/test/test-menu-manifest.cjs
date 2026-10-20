@@ -11604,8 +11604,8 @@ console.log(
 	};
 	const handoff =
 		'ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)';
-	const consumer =
-		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)';
+	// The emitter returns the admitted frame; MenuRenderer_Build draws it.
+	const consumer = 'return ProfileRows';
 	assert(contains(source, 'ProfileMenu := LLM_Menu_BuildProfileMenu()'));
 	assert(
 		contains(source, handoff),
@@ -11959,7 +11959,8 @@ console.log(
 		'BackendCaption := _LLM_Menu_BackendRowLabel()',
 		'BackendMenu := LLM_Menu_BuildBackendMenu()',
 		'BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)',
-		'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)'
+		// The emitter returns the admitted frame; MenuRenderer_Build draws it.
+		'return BackendRows'
 	]) {
 		assert(
 			contains(source, statement),

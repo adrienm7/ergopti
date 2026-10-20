@@ -329,7 +329,7 @@ function publishesMenuTemplate(source, extension, section) {
 	return menuTemplatePublicationReader(source, extension)(section);
 }
 
-/** Follows the real model receiver into its returned parent and native consumer. */
+/** Follows the real model receiver into its returned parent and the rows the case returns. */
 function retainedModelGroupPublication(source, section, definition, proof, executable) {
 	const row = {
 		type: 'group',
@@ -397,6 +397,7 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 		const callableNames = new Set([
 			'menurenderer_groupreceiver',
 			'menurenderer_appendrows',
+			'menurenderer_templaterows',
 			'_mr_declaredparentcallable',
 			'_llm_menu_emitrow',
 			'_llm_menu_modelparentrows',
@@ -684,12 +685,72 @@ function retainedModelGroupPublication(source, section, definition, proof, execu
 				', disabled)'
 		);
 		stage.line();
-		stage.take(
-			'MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ' +
-				returnedRows +
-				')'
-		);
 		stage.take('} catch as Err {');
+		// The case hands its rows back to MenuRenderer_Build, which draws them. The
+		// one return is the case's last statement, at case level, and the returned
+		// array is the handed-off one, extended only by the declared thinking info.
+		const caseTokens = emit.body.slice(selected, end);
+		let caseDepth = 0;
+		const caseLevels = caseTokens.map((t) => {
+			if (symbol(t, '}')) caseDepth--;
+			const level = caseDepth;
+			if (symbol(t, '{')) caseDepth++;
+			return level;
+		});
+		const last = caseTokens.length - 1;
+		if (
+			!identifier(caseTokens[last], returnedRows) ||
+			!identifier(caseTokens[last - 1], 'return') ||
+			caseLevels[last - 1] !== 0 ||
+			source
+				.slice(
+					source.lastIndexOf('\n', caseTokens[last - 1].start - 1) + 1,
+					caseTokens[last - 1].start
+				)
+				.trim() ||
+			caseTokens.filter((t) => identifier(t, 'return')).length !== 1
+		)
+			return false;
+		let handoffSeen = false;
+		for (let i = 0; i < last; i++) {
+			if (!identifier(caseTokens[i], returnedRows) || symbol(caseTokens[i - 1], '.')) continue;
+			const next = caseTokens[i + 1];
+			if (symbol(next, ':=')) {
+				// The first assignment is the stage-verified handoff above.
+				if (!handoffSeen) {
+					handoffSeen = true;
+					continue;
+				}
+				const clone = scriptTokens(returnedRows + ' := ' + returnedRows + '.Clone()', '.ahk');
+				if (!clone.every((t, k) => sameToken(caseTokens[i + k], t))) return false;
+				i += clone.length - 1;
+				continue;
+			}
+			if (symbol(next, '.')) {
+				// for Row in InfoRows / ModelRows.Push(Row), InfoRows from the declared template.
+				if (!identifier(caseTokens[i + 2], 'Push') || !symbol(caseTokens[i + 3], '(')) return false;
+				const pushed = caseTokens[i + 4];
+				const loop = caseTokens.slice(i - 4, i);
+				if (
+					!identifier(pushed) ||
+					!symbol(caseTokens[i + 5], ')') ||
+					!identifier(loop[0], 'for') ||
+					!identifier(loop[1], pushed.value) ||
+					!identifier(loop[2], 'in') ||
+					!identifier(loop[3])
+				)
+					return false;
+				const declared = scriptTokens(
+					loop[3].value + ' := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())',
+					'.ahk'
+				);
+				if (!caseTokens.some((_, at) => declared.every((t, k) => sameToken(caseTokens[at + k], t))))
+					return false;
+				i += 5;
+				continue;
+			}
+			if (!symbol(next, ',') && !symbol(next, ')')) return false;
+		}
 		const localNames = new Set([getters, parent, ...stageNames].map((n) => n.toLowerCase()));
 		for (let i = 0; i < tokens.length; i++) {
 			if (levels[i] !== 0 || !identifier(tokens[i])) continue;

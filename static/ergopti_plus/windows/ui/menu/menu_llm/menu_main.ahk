@@ -224,10 +224,11 @@ _LLM_Menu_StateGetters() {
 }
 
 ; Binding captures each row before the native renderer invokes it, avoiding loop closures.
+; The rows go back to the renderer, which draws them at the declared entry.
 _LLM_Menu_EmitCapturedRow(Owner, Id, Disabled, Operational, HealthDot, WarningRows, TargetMenu, CategoryName) {
 	if !(Owner is Menu) || !(TargetMenu is Menu) || TargetMenu != Owner
 		throw Error("An LLM row cannot leave its detached native menu owner.")
-	_LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
+	return _LLM_Menu_EmitRow(TargetMenu, Id, Disabled, Operational, HealthDot, WarningRows)
 }
 
 ; Child builders retain genuine native Menu identities; the manifest owns the parents.
@@ -432,19 +433,21 @@ _LLM_MenuLayout_Fallback() {
 }
 
 /**
- * Emits one `dynamic` settings row by its shared-spec id. The declared `group`
+ * Returns the row DATA of one `dynamic` settings row by its shared-spec id; the
+ * renderer draws it into TargetMenu at the declared entry. The declared `group`
  * rows never come here: the renderer draws them from _LLM_Menu_GroupBuilders.
  * The spec (_LLM_MenuLayout_Rows) owns the ORDER and the `disabled` flag; this
  * dispatch owns the platform-native label formatting and submenu construction
  * (which read Win32/tray state and so cannot live in shared data). Conditional native-only rows that have no shared
  * entry — the thinking-model info row and the separator after the profile row —
- * are emitted here at their anchor row to preserve menu order.
+ * are returned here with their anchor row to preserve menu order.
  * @param {String}  id                  Row id from the manifest's llm_menu.
  * @param {Boolean} disabled            Greying flag already resolved from the spec policy.
  * @param {Boolean} llm_is_operational  Enabled AND deps ready — gates the health dot.
  * @param {Boolean} has_health_dot      The row's declared health_dot flag. Which row
  *                                      carries the dot is the manifest's call, not this
  *                                      file's, so macOS cannot end up dotting another row.
+ * @returns {Array} Row data for MenuRenderer_Build; empty for an unknown id.
  */
 _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot := false, CapturedWarningRows := unset) {
 	global _LLM_Menu
@@ -473,12 +476,12 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			BackendRows := _LLM_Menu_BackendParentRows(BackendMenu, BackendCaption, disabled, WarningRows)
 			if !(BackendRows is Array)
 				throw Error("Declared backend parent frame was withdrawn.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_backend_parent_frame_ahk", BackendRows)
 		} catch as Err {
 			BackendMenu.Delete()
 			MenuDispatcher_PruneMenu(BackendMenu)
 			throw Err
 		}
+		return BackendRows
 	case "llm_model":
 		; Build the submenu, fire the async probes (backend health + installed-tags
 		; list), then prefix the label with the cached backend-health dot (🟢
@@ -510,7 +513,6 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			; thinking-model row below must agree with the same text.
 			model_shown := _LLM_Menu_ModelDisplayText()
 			ModelRows := _LLM_Menu_ModelParentRows(ReceiveModel, model_menu, health_dot, model_shown, disabled)
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_model_parent_ahk", ModelRows)
 		} catch as Err {
 			try _LLM_Menu_ReleaseModelMenu(model_menu)
 			catch as CleanupError
@@ -522,8 +524,11 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			InfoRows := MenuRenderer_TemplateRows("llm_thinking_info", Map(), Map(), Map())
 			if !(InfoRows is Array)
 				throw Error("Declared thinking-model information was refused.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_thinking_info", InfoRows)
+			ModelRows := ModelRows.Clone()
+			for Row in InfoRows
+				ModelRows.Push(Row)
 		}
+		return ModelRows
 	case "llm_profile":
 		; Admit the actual boundary and whole frame before building the native child.
 		BoundaryRows := MenuRenderer_TemplateRows("llm_after_profile_boundary", Map(), Map(), Map())
@@ -549,14 +554,15 @@ _LLM_Menu_EmitRow(TargetMenu, id, disabled, llm_is_operational, has_health_dot :
 			ProfileRows := _LLM_Menu_ProfileParentRows(ProfileMenu, ProfileCaption, disabled)
 			if !(ProfileRows is Array) || ProfileRows.Length != 2
 				throw Error("Declared profile parent frame was withdrawn.")
-			MenuRenderer_AppendRows(TargetMenu, "llm_menu", "llm_profile_parent_frame_ahk", ProfileRows)
 		} catch as Err {
 			ProfileMenu.Delete()
 			MenuDispatcher_PruneMenu(ProfileMenu)
 			throw Err
 		}
+		return ProfileRows
 	default:
 		try LoggerWarn("LLM", "_LLM_Menu_EmitRow: unknown row id '{1}' in the shared menu manifest — skipped.", id)
+		return []
 	}
 }
 
