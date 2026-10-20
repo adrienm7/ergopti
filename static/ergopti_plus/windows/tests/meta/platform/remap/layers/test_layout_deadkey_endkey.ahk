@@ -14,8 +14,8 @@
 ; would disappear: the character was produced but the structural editing action
 ; (newline, delete, erase) was swallowed.
 ;
-; The fix checks ih.EndReason = "EndKey" after the hook returns and re-sends the
-; consumed key via Send("{" . ih.EndKey . "}"). This test is a companion to
+; The scalar reader distinguishes named controls from literal EndKey text.
+; Only a named control is re-sent through the key-send port. This test is a companion to
 ; test_deadkey_suspend_guard.ahk, which covers the A_IsSuspended guard; this
 ; file specifically pins the EndKey re-send.
 ; ==============================================================================
@@ -51,14 +51,14 @@ _LDEK_DeadKeyResendEndKey() {
 	Body := _DriverFuncBody("DeadKey")
 	Assert(Body != "", "DeadKey(Mapping) must exist in modules/keymap/layout.ahk")
 
-	; Must check EndReason so the re-send only fires when an EndKey terminated the hook
-	Assert(InStr(Body, "ih.EndReason") > 0 and InStr(Body, Chr(34) . "EndKey" . Chr(34)) > 0,
-		"DeadKey must check ih.EndReason = " . Chr(34) . "EndKey" . Chr(34) . " before re-sending (deadkey-endkey-consumed)")
-
-	; Must re-send the consumed EndKey via Send("{" endkey "}")
-	Assert(InStr(Body, "Send(" . Chr(34) . "{" . Chr(34) . " . ih.EndKey . " . Chr(34) . "}" . Chr(34) . ")") > 0
-		or RegExMatch(Body, "Send\(\{.*ih\.EndKey") > 0
-		or InStr(Body, "ih.EndKey") > 0,
-		"DeadKey must re-send ih.EndKey so Enter/BackSpace/Delete are not silently swallowed after a dead-key sequence (deadkey-endkey-consumed)")
+	; Every scalar now ends with EndKey too. Replay only the canonical
+	; reader's explicit named-control result, never a literal scalar unit.
+	Read := InStr(Body, 'Capture := _SIHO_ReadScalar(ih, NamedKeys)', true)
+	Guard := InStr(Body, 'if Capture.Kind == "control"', true)
+	SendPos := InStr(Body, 'Send("{" . Capture.Name . "}")', true)
+	Assert(Read > 0 && Guard > Read && SendPos > Guard,
+		"DeadKey must replay only its decoded named control after successful settlement")
+	Assert(InStr(Body, 'Send("{" . ih.EndKey . "}")', true) == 0,
+		"raw literal EndKey scalars must not be interpreted as a second control-key send")
 }
 Test("layout: DeadKey re-sends ih.EndKey after InputHook so EndKeys are not swallowed (deadkey-endkey-consumed)", _LDEK_DeadKeyResendEndKey)

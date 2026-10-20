@@ -6,7 +6,7 @@
 ; Receives native input through the genuine one-shot and dead-key owners,
 ; or an explicitly selected EndChars prototype. Application emitters are
 ; observers, and a native safety hook consumes the abandoned tail. This does
-; not qualify application receiving, a production fix or a native FIFO.
+; not qualify application receiving or a native FIFO.
 ; ==============================================================================
 
 if A_Args.Length != 3 || A_Args[1] != "--allow-explicit-user32-sendinput" {
@@ -20,7 +20,13 @@ if A_AhkVersion != "2.0.26" || A_PtrSize != 8 {
 _UNC_Allowed := Map("one-shot-a", true, "one-shot-AB", true, "one-shot-surrogate", true,
 	"dead-key-a", true, "dead-key-AB", true, "dead-key-surrogate", true,
 	"prototype-a", true, "prototype-AB", true, "prototype-surrogate", true, "prototype-open-brace", true,
-	"prototype-close-brace", true, "prototype-punctuation", true, "prototype-enter", true)
+	"prototype-close-brace", true, "prototype-punctuation", true, "prototype-enter", true,
+	"one-shot-punctuation", true, "one-shot-open-brace", true, "one-shot-close-brace", true,
+	"one-shot-enter", true, "one-shot-pair-B", true, "one-shot-magic-astral", true,
+	"one-shot-disabled-surrogate", true, "one-shot-disabled-magic-astral", true,
+	"dead-key-punctuation", true, "dead-key-open-brace", true, "dead-key-close-brace", true,
+	"dead-key-enter", true, "dead-key-pair-B", true,
+	"one-shot-backspace", true, "one-shot-delete", true, "dead-key-backspace", true, "dead-key-delete", true)
 if !_UNC_Allowed.Has(A_Args[2]) {
 	FileAppend("REFUSED: unknown native Unicode capture case.`n", "**")
 	ExitApp(2)
@@ -28,7 +34,7 @@ if !_UNC_Allowed.Has(A_Args[2]) {
 
 ; Reuses the existing explicit INPUT40 fixture's packet ABI, sender and owned
 ; Edit admission. All application emitters are observers. The older safety hook
-; consumes the tail which L1 stops owning, so no injected text reaches any app.
+; consumes the tail which the scalar capture stops owning, so no injected text reaches any app.
 ; These two test-local hooks have exact finally/exit owners, outside the product
 ; registry whose exclusive one-shot/dead-key admission is under test.
 global _SharedDir := A_Args[3], _TapHoldOneShotCache := 0
@@ -36,8 +42,8 @@ global ScriptInformation := Map("MagicKey", Chr(0x2605))
 global OneShotShiftEnabled := false, InDeadKeySequence := false
 global _UNC := { Case: A_Args[2], Gui: 0, Edit: 0, Hwnd: 0, EditHwnd: 0, Thread: 0,
 	Pid: DllCall("GetCurrentProcessId", "UInt"), Guard: 0, Observer: 0, Target: 0, Token: 0,
-	Units: [], Observed: [], Tail: [], Emits: [], Ups: 0, UpVk: 0xE7, Calls: 0, Inserted: -1,
-	PrototypeBuilds: 0, PrototypeInjectedAt: 0,
+	Units: [], ExpectedObserved: 0, Observed: [], Tail: [], Emits: [], Controls: [], Ups: 0, UpVk: 0xE7, Calls: 0, Inserted: -1,
+	PrototypeInjectedAt: 0,
 	Debt: false, Injected: false, Cancelled: false, Error: 0, Logs: 0, Activations: 0, ArmedAt: 0 }
 OnExit(_UNC_Exit)
 
@@ -84,8 +90,14 @@ SendNewResult(Text, *) {
 	_UNC.Emits.Push(_UNC_Units(Text))
 }
 
-Send(*) {
-	throw Error("No control-key emit belongs to this native Unicode capture vector.")
+Send(Keys) {
+	global _UNC
+	_UNC.Controls.Push(Keys)
+}
+
+LoggerWarn(*) {
+	global _UNC
+	_UNC.Logs += 1
 }
 
 _UNC_Identity(Hwnd) {
@@ -183,6 +195,8 @@ _UNC_Inject() {
 			_UNC_Admit()
 			if InStr(_UNC.Case, "prototype-") == 1
 				_UNC.PrototypeInjectedAt := _UNC_Qpc()
+			if InStr(_UNC.Case, "one-shot-disabled-") == 1
+				OneShotShiftFix()
 			_UNC.Debt := true, _UNC.Injected := true, _UNC.Calls += 1
 			_UNC.Inserted := _LLM_TerminalOutputSendInputNative(_UNC.Units.Length * 2, Packets, 40)
 			_UNC_Require(_UNC.Inserted == _UNC.Units.Length * 2, "The native primitive refused part of the exact INPUT40 vector.")
@@ -198,9 +212,10 @@ _UNC_Inject() {
 _UNC_Drain() {
 	global _UNC
 	Started := DllCall("GetTickCount64", "UInt64")
+	Expected := _UNC.ExpectedObserved is Array ? _UNC.ExpectedObserved : _UNC.Units
 	while DllCall("GetTickCount64", "UInt64") - Started < 5000 {
 		if _UNC.Inserted == _UNC.Units.Length * 2 && _UNC.Ups == _UNC.Units.Length
-				&& _UNC_Same(_UNC.Observed, _UNC.Units) {
+				&& _UNC_Same(_UNC.Observed, Expected) {
 			_UNC.Debt := false
 			return
 		}
@@ -274,37 +289,8 @@ _UNC_OpenCapture() {
 	_UNC_Require(SIHO_Count() == 0, "Only the actual product hook joins the product's exclusive registry.")
 }
 
-; Test-only candidate. These helpers are not a production capture policy.
-; Keep one bounded builder here so an accepted implementation can move it.
-_UNC_PrototypeEndKeys() {
-	global _UNC
-	static Cached := 0
-	if Cached is String
-		return Cached
-	; Nonzero UTF-16 units except the 1024 highs. Each literal brace adds
-	; two escaping units for the actual native EndKeys parser.
-	Units := 0xFFFF - 0x400 + 4
-	Bytes := Buffer((Units + 1) * 2, 0)
-	Offset := 0
-	loop 0xFFFF {
-		Unit := A_Index
-		if Unit >= 0xD800 && Unit <= 0xDBFF
-			continue
-		if Unit == 0x7B || Unit == 0x7D {
-			NumPut("UShort", 0x7B, "UShort", Unit, "UShort", 0x7D, Bytes, Offset)
-			Offset += 6
-		} else {
-			NumPut("UShort", Unit, Bytes, Offset)
-			Offset += 2
-		}
-	}
-	_UNC_Require(Offset == Units * 2, "The candidate UTF-16 table must fill its exact bounded buffer.")
-	Cached := StrGet(Bytes, Units, "UTF-16")
-	_UNC_Require(StrLen(Cached) == Units, "Native UTF-16 string creation must preserve every table unit.")
-	_UNC.PrototypeBuilds += 1
-	return Cached
-}
-
+; Construction/decoding now come from the canonical production helper.
+; The independent set census and expected scalar vectors remain test-owned.
 ; Independently census the complete literal set outside the construction timing.
 _UNC_PrototypeCheckEndKeys(Text) {
 	Seen := Buffer(0x10000, 0)
@@ -353,7 +339,7 @@ _UNC_PrototypeMeasure() {
 	_UNC_Require(DllCall("QueryPerformanceFrequency", "Int64*", &Frequency, "Int") != 0 && Frequency > 0,
 		"The native performance frequency must be received.")
 	Start := _UNC_Qpc()
-	EndKeys := _UNC_PrototypeEndKeys()
+	EndKeys := _SIHO_ScalarEndKeys()
 	BuildTicks := _UNC_Qpc() - Start
 	Start := _UNC_Qpc()
 	_UNC_PrototypeCheckEndKeys(EndKeys)
@@ -364,7 +350,7 @@ _UNC_PrototypeMeasure() {
 		Start := _UNC_Qpc()
 		ClockTicks.Push(_UNC_Qpc() - Start)
 		Start := _UNC_Qpc()
-		Cached := _UNC_PrototypeEndKeys()
+		Cached := _SIHO_ScalarEndKeys()
 		CacheTicks.Push(_UNC_Qpc() - Start)
 		_UNC_Require(Cached == EndKeys, "A cache hit must return the same complete immutable table.")
 		; This small reference is not claimed as an entire production owner.
@@ -378,11 +364,11 @@ _UNC_PrototypeMeasure() {
 		Probe := 0
 		CandidateTicks.Push(_UNC_Qpc() - Start)
 	}
-	_UNC_Require(_UNC.PrototypeBuilds == 1 && CacheTicks.Length == Samples
+	_UNC_Require(CacheTicks.Length == Samples
 		&& ReferenceTicks.Length == Samples && CandidateTicks.Length == Samples,
 		"Native per-hook allocation must not be disguised as a shared cached hook.")
 	FileAppend("MEASURE case=" . _UNC.Case . " runtime=" . A_AhkVersion . " qpf=" . Frequency . " samples=" . Samples
-		. " build_ticks=" . BuildTicks . " validation_ticks=" . ValidationTicks . " builds=" . _UNC.PrototypeBuilds
+		. " build_ticks=" . BuildTicks . " validation_ticks=" . ValidationTicks . " first_call_in_fresh_child=true cache_calls=" . Samples
 		. " literal_units=" . StrLen(EndKeys) . " literal_bytes=" . ((StrLen(EndKeys) + 1) * 2)
 		. " native_endchars_capacity_bytes=" . ((0xFFFF - 0x400 + 1) * 2)
 		. " source_derived_capacity=true constructor_endkeys_units=" . StrLen(EndKeys . "{Enter}") . " constructor_named_key=Enter"
@@ -390,21 +376,6 @@ _UNC_PrototypeMeasure() {
 		. " reference_ctor_ticks=" . _UNC_Csv(ReferenceTicks) . " candidate_ctor_ticks=" . _UNC_Csv(CandidateTicks)
 		. " constructor_order=reference_then_candidate includes_destruction=true hook_pooling=false`n", "*")
 	return Frequency
-}
-
-_UNC_PrototypeScalar(Hook) {
-	Input := _UNC_Units(Hook.Input), EndKey := Hook.EndKey
-	_UNC_Require(Hook.EndReason == "EndKey", "The candidate must end synchronously on its native EndKey.")
-	if StrLen(EndKey) != 1 {
-		_UNC_Require(Input.Length == 0 && EndKey == "Enter", "A named control must stay separate from literal text.")
-		return { Kind: "control", Text: "", Name: EndKey }
-	}
-	Unit := NumGet(StrPtr(EndKey), 0, "UShort")
-	if Input.Length == 0 && !(Unit >= 0xD800 && Unit <= 0xDFFF)
-		return { Kind: "text", Text: EndKey, Name: "" }
-	_UNC_Require(Input.Length == 1 && Input[1] >= 0xD800 && Input[1] <= 0xDBFF
-		&& Unit >= 0xDC00 && Unit <= 0xDFFF, "Only a complete high/low pair is a supplementary scalar.")
-	return { Kind: "text", Text: Hook.Input . EndKey, Name: "" }
 }
 
 _UNC_RunPrototype() {
@@ -434,7 +405,7 @@ _UNC_RunPrototype() {
 	}
 	Frequency := _UNC_PrototypeMeasure()
 	_UNC_OpenCapture()
-	Hook := InputHook("L2 E C T2", _UNC_PrototypeEndKeys() . "{Enter}")
+	Hook := InputHook("L2 E C T2", _SIHO_ScalarEndKeys() . "{Enter}")
 	_UNC_Require(Hook.CaseSensitive && Hook.MinSendLevel == 0,
 		"The real candidate hook must apply C and retain the default input admission.")
 	Token := SIHO_StartOwned(Hook, "scalar-prototype", true)
@@ -455,7 +426,7 @@ _UNC_RunPrototype() {
 	_UNC_Admit()
 	_UNC_Require(Settled && SIHO_Count() == 0 && !_SIHO_Owners.Has(Token) && !Hook.InProgress,
 		"The candidate must retire the exact completed owner before decoding.")
-	Result := _UNC_PrototypeScalar(Hook)
+	Result := _SIHO_ReadScalar(Hook, "{Enter}")
 	Scalar := _UNC_Units(Result.Text)
 	FileAppend("RECEIPT source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case
 		. " packet_kind=" . (_UNC.UpVk == 0xE7 ? "unicode" : "virtual_key") . " vk=" . Format("{:04X}", _UNC.UpVk)
@@ -473,10 +444,60 @@ _UNC_RunPrototype() {
 }
 
 _UNC_Run() {
-	global _UNC
+	global _UNC, ScriptInformation
 	OneShot := InStr(_UNC.Case, "one-shot-") == 1
 	Kind := SubStr(_UNC.Case, 10)
-	_UNC.Units := Kind == "a" ? [0x61] : (Kind == "AB" ? [0x41, 0x42] : [0xD83D, 0xDE00])
+	ExpectedTail := [], ExpectedControls := [], ExpectedActivations := 0
+	switch Kind {
+		case "a":
+			_UNC.Units := [0x61], ExpectedTarget := [0x61]
+		case "AB":
+			_UNC.Units := [0x41, 0x42], ExpectedTarget := [0x41], ExpectedTail := [0x42]
+		case "surrogate", "disabled-surrogate", "magic-astral", "disabled-magic-astral":
+			_UNC.Units := [0xD83D, 0xDE00], ExpectedTarget := [0xD83D, 0xDE00]
+		case "pair-B":
+			_UNC.Units := [0xD83D, 0xDE00, 0x42], ExpectedTarget := [0xD83D, 0xDE00], ExpectedTail := [0x42]
+		case "punctuation":
+			_UNC.Units := [0x2E], ExpectedTarget := [0x2E]
+		case "open-brace":
+			_UNC.Units := [0x7B], ExpectedTarget := [0x7B]
+		case "close-brace":
+			_UNC.Units := [0x7D], ExpectedTarget := [0x7D]
+		case "enter":
+			_UNC.Units := [0x0A], _UNC.UpVk := 0x0D, ExpectedTarget := []
+		case "backspace", "delete":
+			; Backspace removes its translated backspace before OnChar;
+			; Delete produces no text. Exact native Up still drains each batch.
+			_UNC.Units := [0], _UNC.ExpectedObserved := [], ExpectedTarget := []
+			_UNC.UpVk := Kind == "backspace" ? 0x08 : 0x2E
+		default:
+			throw Error("Unknown actual-owner scalar capture vector.")
+	}
+	NamedControl := Kind == "enter" ? "Enter" : (Kind == "backspace" ? "Backspace" : (Kind == "delete" ? "Delete" : ""))
+	if InStr(Kind, "magic-astral")
+		ScriptInformation["MagicKey"] := Chr(0x1F600)
+	if OneShot {
+		if NamedControl != "" {
+			if Kind == "enter"
+				ExpectedEmits := [[0x7B, 0x45, 0x6E, 0x74, 0x65, 0x72, 0x7D]]
+			else if Kind == "backspace"
+				ExpectedEmits := [[0x7B, 0x42, 0x61, 0x63, 0x6B, 0x73, 0x70, 0x61, 0x63, 0x65, 0x7D]]
+			else
+				ExpectedEmits := [[0x7B, 0x44, 0x65, 0x6C, 0x65, 0x74, 0x65, 0x7D]]
+		}
+		else if Kind == "punctuation"
+			ExpectedEmits := [[0x20, 0x3A]], ExpectedActivations := 1
+		else if Kind == "magic-astral"
+			ExpectedEmits := [[0x4A]], ExpectedActivations := 1
+		else if Kind == "a"
+			ExpectedEmits := [[0x41]]
+		else
+			ExpectedEmits := [ExpectedTarget]
+	} else {
+		ExpectedEmits := Kind == "a" ? [[0xE4]] : [[0xA8], ExpectedTarget]
+		if NamedControl != ""
+			ExpectedControls := ["{" . NamedControl . "}"]
+	}
 	_UNC_Require(_TapHoldOneShotTable()["results"].Count > 0 && _UNC.Logs == 0,
 		"The canonical shared JSON must load without fallback before capture.")
 	_UNC_OpenCapture()
@@ -489,8 +510,6 @@ _UNC_Run() {
 		else
 			DeadKey(Map("a", Chr(0x00E4), " ", Chr(0x00A8)))
 	} catch as Err {
-		; A failure after native capture must not hide the captured code units
-		; or bypass draining the inserted batch under the still-owned guard.
 		CaptureError := Err
 	} finally SetTimer(_UNC_Inject, 0)
 	_UNC_Require(_UNC.Injected && _UNC.Calls == 1, "The real native capture must receive exactly one native packet batch.")
@@ -503,13 +522,13 @@ _UNC_Run() {
 	if IsObject(_UNC.Error)
 		throw _UNC.Error
 	_UNC_Admit()
-	TargetUnits := _UNC_Units(_UNC.Target.Input)
-	ExpectedTarget := Kind == "a" ? [0x61] : (Kind == "AB" ? [0x41] : [0xD83D, 0xDE00])
-	ExpectedTail := Kind == "AB" ? [0x42] : []
-	ExpectedEmits := OneShot ? [Kind == "surrogate" ? [0xD83D, 0xDE00] : [0x41]]
-		: (Kind == "a" ? [[0xE4]] : [[0xA8], ExpectedTarget])
+	; This oracle observes raw native fields independently of the production
+	; reader. The separately declared goldens and actual emissions qualify it.
+	InputUnits := _UNC_Units(_UNC.Target.Input), EndUnits := _UNC_Units(_UNC.Target.EndKey)
+	TargetUnits := _UNC_Units(_UNC.Target.Input . (NamedControl != "" ? "" : _UNC.Target.EndKey))
 	FileAppend("RECEIPT source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case
 		. " input=" . _UNC_Hex(_UNC.Units) . " observed=" . _UNC_Hex(_UNC.Observed)
+		. " input_buffer=" . _UNC_Hex(InputUnits) . " end_key=" . _UNC_Hex(EndUnits)
 		. " target=" . _UNC_Hex(TargetUnits) . " end_reason=" . _UNC.Target.EndReason . " tail=" . _UNC_Hex(_UNC.Tail)
 		. " ups=" . _UNC.Ups . " native_calls=" . _UNC.Calls . " inserted=" . _UNC.Inserted
 		. " scope=native_capture_and_observed_emission application_receiving=false`n", "*")
@@ -517,16 +536,21 @@ _UNC_Run() {
 		FileAppend("EMIT " . Index . " utf16=" . _UNC_Hex(Units) . "`n", "*")
 	if IsObject(CaptureError)
 		throw CaptureError
-	_UNC_Require(_UNC.Target.EndReason != "" && _UNC.Target.EndReason != "Timeout" && !_UNC.Target.InProgress
+	_UNC_Require(_UNC.Target.EndReason == "EndKey" && !_UNC.Target.InProgress
 		&& SIHO_Count() == 0 && !_SIHO_Owners.Has(_UNC.Token),
 		"The real product owner must settle capture and retire its exact native token without timeout.")
+	if NamedControl != ""
+		_UNC_Require(_UNC.Target.EndKey == NamedControl && InputUnits.Length == 0, "A named control must stay outside literal scalar text.")
 	_UNC_Require(_UNC_Same(TargetUnits, ExpectedTarget), "The native capture lost or over-consumed a UTF-16 unit.")
-	_UNC_Require(_UNC_Same(_UNC.Tail, ExpectedTail), "Only a second independent BMP character may escape to the safety guard.")
+	_UNC_Require(_UNC_Same(_UNC.Tail, ExpectedTail), "Only the next independent BMP character may escape to the safety guard.")
 	_UNC_Require(_UNC.Emits.Length == ExpectedEmits.Length, "The genuine owner emitted the wrong number of observed results.")
 	for Index, Units in ExpectedEmits
 		_UNC_Require(_UNC_Same(_UNC.Emits[Index], Units), "The genuine owner emitted an incomplete or incorrect Unicode result.")
-	_UNC_Require(_UNC.Logs == 0 && _UNC.Activations == 0 && _UNC.Edit.Value == "",
-		"No hidden error, special-key branch or application text may qualify this capture.")
+	_UNC_Require(_UNC.Controls.Length == ExpectedControls.Length, "Only a genuine named control may invoke the key-send port.")
+	for Index, Keys in ExpectedControls
+		_UNC_Require(_UNC.Controls[Index] == Keys, "A named control must be replayed exactly once.")
+	_UNC_Require(_UNC.Logs == 0 && _UNC.Activations == ExpectedActivations && _UNC.Edit.Value == "",
+		"No hidden error or application text may qualify this capture, and only genuine special results activate hotstrings.")
 }
 
 FileAppend("BEGIN source_scope=parent_execution_manifest runtime=" . A_AhkVersion . " pid=" . _UNC.Pid . " case=" . _UNC.Case . "`n", "*")

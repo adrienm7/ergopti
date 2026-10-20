@@ -8,7 +8,7 @@ _SICS_ChildSource() {
 		AssertTrue(Owner != "", "the real capture dependency must have one owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
+	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the genuine capture function must exist: " . Name)
 		if Name == "DeadKey" || Name == "OneShotShift" {
@@ -102,7 +102,7 @@ _SICU_ChildSource() {
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative"] {
+	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the native capture function requires its genuine body: " . Name)
 		Code .= Definition . "`n"
@@ -135,18 +135,16 @@ _SICU_Case(Owner, Mode) {
 			Sleep(10)
 		}
 		AssertEqual(1, State.Calls, "the native child must settle once: " . State.ErrorText . State.Output)
-		if Owner == "prototype" {
-			; Keep actual measurements even on success, not only in a red assertion.
-			for Line in StrSplit(State.Output, "`n", "`r")
-				if InStr(Line, "MEASURE ") == 1 || InStr(Line, "RECEIPT ") == 1
-					_TestPrint("# endchars-prototype " . Line)
-		}
+		; Keep raw receipts on success too, including actual-owner completion.
+		for Line in StrSplit(State.Output, "`n", "`r")
+			if InStr(Line, "MEASURE ") == 1 || InStr(Line, "RECEIPT ") == 1
+				_TestPrint("# " . (Owner == "prototype" ? "endchars-prototype" : "scalar-capture") . " " . Line)
 		AssertEqual(0, State.Code, "native capture refused or failed: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "native parse/runtime errors must not be hidden: " . State.Output)
 		if Owner == "prototype" {
 			Series := "\d+(?:,\d+){7}"
 			Measure := "m)^MEASURE case=" . CaseName . " runtime=2\.0\.26 qpf=[1-9]\d* samples=8"
-				. " build_ticks=\d+ validation_ticks=\d+ builds=1 literal_units=64515 literal_bytes=129032 native_endchars_capacity_bytes=129024"
+				. " build_ticks=\d+ validation_ticks=\d+ first_call_in_fresh_child=true cache_calls=8 literal_units=64515 literal_bytes=129032 native_endchars_capacity_bytes=129024"
 				. " source_derived_capacity=true constructor_endkeys_units=64522 constructor_named_key=Enter clock_ticks=" . Series . " cache_ticks=" . Series
 				. " reference_ctor_ticks=" . Series . " candidate_ctor_ticks=" . Series
 				. " constructor_order=reference_then_candidate includes_destruction=true hook_pooling=false\r?$"
@@ -206,3 +204,122 @@ for _SICU_Owner in ["one-shot", "dead-key"]
 for _SICU_PrototypeMode in ["a", "AB", "surrogate", "open-brace", "close-brace", "punctuation", "enter"]
 	Test("native EndChars prototype: " . _SICU_PrototypeMode . " keeps one scalar and reports cost (inputhook-endchars-prototype)",
 		_SICU_Case.Bind("prototype", _SICU_PrototypeMode))
+
+for _SICU_NewOwner in ["one-shot", "dead-key"]
+	for _SICU_NewMode in ["punctuation", "open-brace", "close-brace", "enter", "backspace", "delete", "pair-B"]
+		Test("scalar dispatch: " . _SICU_NewOwner . " " . _SICU_NewMode . " keeps text and controls distinct (inputhook-scalar-dispatch)",
+			_SICU_Case.Bind(_SICU_NewOwner, _SICU_NewMode))
+for _SICU_OneShotMode in ["magic-astral", "disabled-surrogate", "disabled-magic-astral"]
+	Test("scalar dispatch: one-shot " . _SICU_OneShotMode . " preserves the complete scalar (inputhook-scalar-dispatch)",
+		_SICU_Case.Bind("one-shot", _SICU_OneShotMode))
+
+_SICS_RawUnits(Units*) {
+	Bytes := Buffer((Units.Length + 1) * 2, 0)
+	for Index, Unit in Units
+		NumPut("UShort", Unit, Bytes, (Index - 1) * 2)
+	return StrGet(Bytes, Units.Length, "UTF-16")
+}
+
+_SICS_DecodeCase(Name) {
+	High := _SICS_RawUnits(0xD83D), Low := _SICS_RawUnits(0xDE00)
+	Hook := { Input: "", EndKey: "", EndReason: "EndKey" }
+	Kind := "invalid", Text := "", Control := "", Reason := "incomplete-scalar"
+	switch Name {
+		case "BMP":
+			Hook.EndKey := "a", Kind := "text", Text := "a", Reason := ""
+		case "punctuation":
+			Hook.EndKey := ".", Kind := "text", Text := ".", Reason := ""
+		case "open-brace":
+			Hook.EndKey := "{", Kind := "text", Text := "{", Reason := ""
+		case "close-brace":
+			Hook.EndKey := "}", Kind := "text", Text := "}", Reason := ""
+		case "supplementary":
+			Hook.Input := High, Hook.EndKey := Low, Kind := "text", Text := Chr(0x1F600), Reason := ""
+		case "named-enter":
+			Hook.EndKey := "Enter", Kind := "control", Control := "Enter", Reason := ""
+		case "native-backspace-alias":
+			Hook.EndKey := "Backspace", Kind := "control", Control := "Backspace", Reason := ""
+		case "native-insert":
+			Hook.EndKey := "Insert", Kind := "control", Control := "Insert", Reason := ""
+		case "native-numlock-alias":
+			Hook.EndKey := "NumLock", Kind := "control", Control := "NumLock", Reason := ""
+		case "named-delete":
+			Hook.EndKey := "Delete", Kind := "control", Control := "Delete", Reason := ""
+		case "named-after-high":
+			Hook.Input := High, Hook.EndKey := "BackSpace", Kind := "control", Control := "BackSpace", Reason := "incomplete-control-prefix"
+		case "unknown-control":
+			Hook.EndKey := "Escape", Reason := "unknown-end-key"
+		case "joined-controls":
+			Hook.EndKey := "Enter}{Delete", Reason := "unknown-end-key"
+		case "empty-timeout":
+			Hook.EndReason := "Timeout", Kind := "timeout", Reason := ""
+		case "high-timeout":
+			Hook.Input := High, Hook.EndReason := "Timeout", Kind := "timeout", Reason := "incomplete-timeout"
+		case "low-alone":
+			Hook.EndKey := Low
+		case "high-alone":
+			Hook.EndKey := High
+		case "high-high":
+			Hook.Input := High, Hook.EndKey := High
+		case "high-BMP":
+			Hook.Input := High, Hook.EndKey := "a"
+		case "BMP-low":
+			Hook.Input := "a", Hook.EndKey := Low
+		case "long-prefix":
+			Hook.Input := "ab", Hook.EndKey := "c"
+		case "max-is-not-completion":
+			Hook.Input := Chr(0x1F600), Hook.EndReason := "Max", Reason := "unexpected-end-reason"
+		case "stopped-is-not-completion":
+			Hook.Input := "a", Hook.EndReason := "Stopped", Reason := "unexpected-end-reason"
+		case "empty-end-key":
+			Hook.EndKey := ""
+		default:
+			throw Error("Unknown scalar decoder vector.")
+	}
+	Result := _SIHO_ReadScalar(Hook, "{BackSpace}{Enter}{Delete}{Numlock}{Insert}")
+	AssertEqual(Kind, Result.Kind, "completion kind must follow the independent vector")
+	AssertEqual(Text, Result.Text, "only a complete scalar may enter text dispatch")
+	AssertEqual(Control, Result.Name, "controls stay named and allowlisted")
+	AssertEqual(Reason, Result.Reason, "partial/invalid text must remain visible without logging raw surrogate data")
+}
+
+for _SICS_DecodeName in ["BMP", "punctuation", "open-brace", "close-brace", "supplementary", "named-enter", "named-after-high",
+	"native-backspace-alias", "native-insert", "native-numlock-alias", "named-delete", "unknown-control", "joined-controls", "empty-timeout", "high-timeout", "low-alone", "high-alone", "high-high", "high-BMP", "BMP-low",
+	"long-prefix", "max-is-not-completion", "stopped-is-not-completion", "empty-end-key"]
+	Test("scalar completion: " . _SICS_DecodeName . " validates units and named controls (inputhook-scalar-reader)",
+		_SICS_DecodeCase.Bind(_SICS_DecodeName))
+
+_SICS_PrewarmBeforeConfiguredAdmission() {
+	global _DriverDir
+	BootOwner := "", Entry := "", BootOwners := 0, EntryOwners := 0
+	Loop Files, _DriverDir . "\*.ahk", "FR" {
+		if !_DriverIsProductionSource(A_LoopFileFullPath)
+			continue
+		Source := FileRead(A_LoopFileFullPath, "UTF-8")
+		Code := _DriverMaskNonCode(&Source)
+		if RegExMatch(Code, "m)^TapHoldsLoadTimings\(\)\s*\n_SIHO_ScalarEndKeys\(\)\s*\nLLMApiLoadTimings\(\)") {
+			BootOwner := A_LoopFileFullPath
+			BootOwners += 1
+		}
+		if RegExMatch(Code, "m)^global TapHold := LoadTapHoldToml\(") {
+			Entry := _StripFullLineComments(Source)
+			EntryOwners += 1
+		}
+	}
+	AssertEqual(1, BootOwners, "one actual shared-timings boot owner must warm the scalar cache")
+	AssertEqual(1, EntryOwners, "the configured tap-hold admission must have one entry owner")
+	RelativeOwner := StrReplace(SubStr(BootOwner, StrLen(_DriverDir) + 2), "\", "/")
+	Boot := InStr(Entry, "#Include " . RelativeOwner, true)
+	Admission := InStr(Entry, "global TapHold := LoadTapHoldToml(", true)
+	AssertTrue(Boot > 0 && Admission > Boot, "the actual boot owner must run before configured static tap-hold criteria become eligible")
+}
+Test("scalar startup: existing boot warms the table before configured capture admission (inputhook-scalar-prewarm)",
+	_SICS_PrewarmBeforeConfiguredAdmission)
+
+for _SICS_InvalidOwner in ["one-shot", "dead-key"]
+	for _SICS_InvalidMode in ["invalid-low", "invalid-high-BMP", "partial-timeout", "control-after-high"]
+		Test("scalar refusal: " . _SICS_InvalidOwner . " " . _SICS_InvalidMode . " never emits partial text (inputhook-scalar-rejection)",
+			_SICS_Case.Bind(_SICS_InvalidOwner, _SICS_InvalidMode))
+
+Test("scalar control: dead-key uses native canonical Insert spelling (inputhook-scalar-rejection)",
+	_SICS_Case.Bind("dead-key", "named-insert"))
