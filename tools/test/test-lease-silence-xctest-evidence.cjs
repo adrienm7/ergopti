@@ -11,13 +11,13 @@ const lines = [
 	"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-11 00:00:00.000.",
 	"Test Suite 'KarabinerLeaseWorkerTests' started at 2026-10-11 00:00:00.000.",
 	`Test Case '${name}' started.`,
-	`Test Case '${name}' passed (6.752 seconds).`,
-	"Test Suite 'KarabinerLeaseWorkerTests' passed at 2026-10-11 00:00:06.752.",
-	' Executed 1 test, with 0 failures (0 unexpected) in 6.752 (6.752) seconds',
-	"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-11 00:00:06.752.",
-	' Executed 1 test, with 0 failures (0 unexpected) in 6.752 (6.752) seconds',
-	"Test Suite 'Selected tests' passed at 2026-10-11 00:00:06.752.",
-	' Executed 1 test, with 0 failures (0 unexpected) in 6.752 (6.752) seconds'
+	`Test Case '${name}' passed (17.752 seconds).`,
+	"Test Suite 'KarabinerLeaseWorkerTests' passed at 2026-10-11 00:00:17.752.",
+	' Executed 1 test, with 0 failures (0 unexpected) in 17.752 (17.752) seconds',
+	"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-11 00:00:17.752.",
+	' Executed 1 test, with 0 failures (0 unexpected) in 17.752 (17.752) seconds',
+	"Test Suite 'Selected tests' passed at 2026-10-11 00:00:17.752.",
+	' Executed 1 test, with 0 failures (0 unexpected) in 17.752 (17.752) seconds'
 ];
 const good = lines.join('\n') + '\n';
 let passed = 0;
@@ -51,11 +51,11 @@ refused(
 );
 refused(
 	'skipped method cannot qualify',
-	good.replace('passed (6.752 seconds).', 'skipped (6.752 seconds).')
+	good.replace('passed (17.752 seconds).', 'skipped (17.752 seconds).')
 );
 refused(
 	'failed method cannot qualify',
-	good.replace('passed (6.752 seconds).', 'failed (6.752 seconds).')
+	good.replace('passed (17.752 seconds).', 'failed (17.752 seconds).')
 );
 refused('missing start cannot qualify', lines.filter((_, i) => i !== 3).join('\n'));
 refused('missing terminal cannot qualify', lines.filter((_, i) => i !== 4).join('\n'));
@@ -91,8 +91,12 @@ refused(
 );
 refused('native compile error cannot qualify', good + 'error: native compilation refused\n');
 refused(
+	'the pre-host-stall 6.75-second silence cannot qualify the current native budget',
+	good.replace('passed (17.752', 'passed (6.752')
+);
+refused(
 	'too-short fixture duration cannot qualify the unchanged native deadline',
-	good.replace('passed (6.752', 'passed (1.000')
+	good.replace('passed (17.752', 'passed (1.000')
 );
 refused('nonzero Swift status cannot qualify', good, '1', '0');
 refused('signaled Swift status cannot qualify', good, '137', '0');
@@ -154,13 +158,13 @@ passed += (() => {
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' started at 2026-10-11.",
 		"Test Suite 'KarabinerLeaseWorkerTests' started at 2026-10-11.",
 		`Test Case '${n}' started.`,
-		`Test Case '${n}' passed (6.752 seconds).`,
+		`Test Case '${n}' passed (17.752 seconds).`,
 		"Test Suite 'KarabinerLeaseWorkerTests' passed at 2026-10-11.",
-		' Executed 1 test, with 0 failures (0 unexpected) in 6.752 seconds',
+		' Executed 1 test, with 0 failures (0 unexpected) in 17.752 seconds',
 		"Test Suite 'ErgoptiPlusPackageTests.xctest' passed at 2026-10-11.",
-		' Executed 1 test, with 0 failures (0 unexpected) in 6.752 seconds',
+		' Executed 1 test, with 0 failures (0 unexpected) in 17.752 seconds',
 		"Test Suite 'Selected tests' passed at 2026-10-11.",
-		' Executed 1 test, with 0 failures (0 unexpected) in 6.752 seconds'
+		' Executed 1 test, with 0 failures (0 unexpected) in 17.752 seconds'
 	].join('\n');
 	check('only all three original statuses zero admits', () => {
 		const r = judge.evaluateDirect(t, 0, 0, 0);
@@ -183,5 +187,23 @@ passed += (() => {
 check('a second LF cannot qualify a direct-child status', () => {
 	const judge = require('../diagnostics/lease_silence_xctest_evidence.cjs');
 	assert.throws(() => judge.parseChildStatus('0\n\n'));
+});
+// The native cell refuses at "begin" when the frozen method or role hash
+// drifts; check it here, where any OS sees it before a Mac runner does.
+check('the frozen native method and role hashes match the checked-in Swift', () => {
+	const fs = require('node:fs');
+	const path = require('node:path');
+	const judge = require('../diagnostics/lease_silence_xctest_evidence.cjs');
+	const launcher = path.join(__dirname, '../../static/ergopti_plus/macos/launcher');
+	const test = fs.readFileSync(
+		path.join(launcher, 'Tests/ErgoptiPlusTests/RemapLeaseWorkerTests.swift'),
+		'utf8'
+	);
+	const worker = fs.readFileSync(
+		path.join(launcher, 'Sources/ErgoptiPlus/RemapLeaseWorker.swift'),
+		'utf8'
+	);
+	judge.validateNativeSources(test, worker);
+	assert.throws(() => judge.validateNativeSources(test.replace('silenceBudget', 'budget'), worker));
 });
 console.log(`RESULT passed=${passed} failed=0 native_executed=0`);
