@@ -2006,6 +2006,9 @@ _LogBootProgress("keylogger modules + tests included")
 ; The diagnostics window's sources are headless-safe: function definitions and
 ; their globals only, no top-level side effects.
 #Include ../ui/healthcheck/core.ahk
+; The local reload control rides the Diagnostics endpoint owner above.
+#Include ../infra/driver_control.ahk
+#Include unit/infra/control/test_driver_control.ahk
 #Include ../ui/healthcheck/collection.ahk
 #Include unit/ui/webview/test_ui_warm_hosts.ahk
 #Include ../ui/healthcheck/helpers.ahk

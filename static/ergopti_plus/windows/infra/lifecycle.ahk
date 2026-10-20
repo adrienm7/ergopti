@@ -1316,6 +1316,9 @@ Ergopti_OnShutdown(reason, code) {
 		try CrashReportWorker_StopAll()
 		try HookDispatcher.Stop()
 		try KLWV_CloseAll()
+		try DriverControl_Stop()
+		catch as Err
+			try LoggerError("Lifecycle", "Local reload control teardown failed: {1}.", Err.Message)
 		try HealthCheck_StopWindowControl()
 		catch as Err
 			try LoggerError("Lifecycle", "Diagnostics window control teardown failed: {1}.", Err.Message)

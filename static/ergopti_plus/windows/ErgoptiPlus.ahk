@@ -487,6 +487,7 @@ BootProfile_Stamp("Hotstring and TOML state initialised")
 #Include infra/start_at_login.ahk
 #Include ui/changelog/init.ahk
 #Include ui/healthcheck/init.ahk
+#Include infra/driver_control.ahk
 #Include ui/error_dialog/init.ahk
 #Include ui/update_check/init.ahk
 #Include modules/diagnostics/crash_reporter.ahk
@@ -1445,6 +1446,11 @@ if _LLM_Menu_RuntimeActivated
 _MenuPopulationPublished.Start()
 _DriverBootPhase := "ready"
 HealthCheck_StartWindowControl()
+; The local reload command is optional: a control that cannot start is
+; reported and the ready driver keeps running without it.
+try DriverControl_Start()
+catch as _DriverControlErr
+	LoggerError("ErgoptiPlus", "Local reload control unavailable: {1}.", _DriverControlErr.Message)
 LoggerSuccess("ErgoptiPlus", "Driver fully initialised — ready.")
 ; Release retained lifecycle commands only after real input readiness.
 _TrayStartupCommands.NotifyReady()
