@@ -713,6 +713,12 @@ _DigitRowSwapSend(Sc, ForegroundFn := 0, *) {
 		_KLE_Emit(Format("SC{:03X}", Sc), false, false)
 		return
 	}
+	if Resolution["source"] == "builtin" && Resolution["descriptor"]["Kind"] != "text" {
+		; The shipped Ergopti rows type text; a dead key here has no emitter.
+		try LoggerError("Layout", "Shift+SC{1:03X}: the built-in row's unshifted level is not text ({2}); nothing typed.",
+			Sc, Resolution["descriptor"]["Kind"])
+		return
+	}
 	; Native symbols retain the established Unicode path and emission timing.
 	_DigitShiftSend(Resolution["descriptor"]["Text"])
 }

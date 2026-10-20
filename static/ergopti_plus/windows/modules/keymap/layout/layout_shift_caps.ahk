@@ -327,18 +327,59 @@ _DigitRowSwapResolution(Sc, Hkl, Caps := unset) {
 	if !IsSet(Caps)
 		Caps := GetKeyState("CapsLock", "T")
 	Levels := KeylayoutEmulation_NumberRowLevels(Sc, Caps)
+	Source := "emulated"
+	if !(Levels is Map) {
+		Levels := _DigitRowBuiltinLevels(Sc, Caps)
+		Source := "builtin"
+	}
 	if Levels is Map {
 		Plain := Levels["plain"]
 		Shift := Levels["shift"]
 		Digit := Mod(Sc - 1, 10) . ""
 		Swap := !(Plain["Kind"] == "text" && StrCompare(Plain["Text"], Digit, true) == 0)
 			&& Shift["Kind"] == "text" && StrCompare(Shift["Text"], Digit, true) == 0
-		return Map("swap", Swap, "source", "emulated", "descriptor", Plain)
+		return Map("swap", Swap, "source", Source, "descriptor", Plain)
 	}
 	Profile := _DigitRowProfile(Hkl)
 	Text := Profile["symbols"].Get(Sc, "")
 	return Map("swap", Profile["shifted"] && Text != "", "source", "native",
 		"descriptor", Map("Kind", "text", "Text", Text, "State", "", "Action", ""))
+}
+
+; The built-in Ergopti emulation's own levels of one row key, in the registry
+; descriptor shape, while that emulation owns the row's Shift level
+; (RegisterShiftLayer); 0 otherwise. The layout manager and the wizard select
+; Ergopti and Ergopti+ this way, so resolving the row on the native layout
+; instead swapped AZERTY's symbols onto Shift (digit-row-builtin-ergopti-shift).
+; @param Sc {Integer} Physical scan code in the 1-0 row.
+; @param Caps {Boolean} CapsLock state: its unshifted level is the CapsLock layer.
+; @return {Map|Integer} "plain" and "shift" descriptors, or 0.
+_DigitRowBuiltinLevels(Sc, Caps) {
+	global Features, ERGOPTI_SPEC
+	if !IsSet(Features) || !(Features is Map) || !Features.Has("layout") || !(Features["layout"] is Map)
+			|| Features["layout"].Get("ergopti_base", false) != true
+			|| !IsSet(ERGOPTI_SPEC) || !IsObject(ERGOPTI_SPEC)
+		return 0
+	Name := Format("SC{:03X}", Sc)
+	Levels := ERGOPTI_SPEC["levels"]
+	PlainTable := Caps ? Levels["caps"] : ERGOPTI_SPEC["number_row_base"]
+	if !PlainTable.Has(Name) || !Levels["shift"].Has(Name)
+		return 0
+	return Map("plain", _DigitRowBuiltinDescriptor(PlainTable[Name]),
+		"shift", _DigitRowBuiltinDescriptor(Levels["shift"][Name]))
+}
+
+; A built-in Ergopti descriptor (_ErgoptiDescribe) in the registry shape.
+_DigitRowBuiltinDescriptor(Descriptor) {
+	global ERGOPTI_SPEC
+	if Descriptor.Has("dead") {
+		Name := Descriptor["dead"]
+		return Map("Kind", "dead", "Text", ERGOPTI_SPEC["terminators"][Name], "State", Name, "Action", Name)
+	}
+	for Field in ["text", "word", "wrap"]
+		if Descriptor.Has(Field)
+			return Map("Kind", "text", "Text", Descriptor[Field], "State", "", "Action", "")
+	return Map("Kind", "none", "Text", "", "State", "", "Action", "")
 }
 
 ; Whether any effective row key needs the direct-digit override to swap levels.
