@@ -8559,7 +8559,7 @@ function languageParentSource(source, driver) {
 		true,
 		'complete genuine original folder owner plus only two caption edits'
 	);
-	const marker = '_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {';
+	const marker = '_HS_RenderTree(Tree, Rows, OwnedMenus := unset) {';
 	const begin = source.indexOf(marker),
 		end = source.indexOf('\n; Release only returned native menus', begin);
 	assert(begin >= 0 && end > begin, 'nonempty actual complete folder native owner exists');
