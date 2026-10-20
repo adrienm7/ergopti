@@ -296,10 +296,10 @@ _LayoutRowPassthroughCriterion(Sc, *) {
 		&& Features["hotstrings"]["magic_key"]["replace"]["enabled"])
 }
 
-; LAYOUT_ROW_SEND_LEVEL is above every input level of the driver's hotkeys
-; (I2, I3), so the key sent on is ignored by all of them and typed by the OS
-; layout with the modifiers held ({Blind}); the hotstring input still sees it.
-global LAYOUT_ROW_SEND_LEVEL := 10
+; Hook hotkeys ignore synthetic events at or below their input level. Match
+; the ordinary remaps' level: I2/I3 must leave the already-forwarded key to
+; the OS, while the I1 input observers still see it with its held modifiers.
+global LAYOUT_ROW_SEND_LEVEL := 2
 
 _LayoutRowPassthrough(Sc, *) {
 	global LAYOUT_ROW_SEND_LEVEL
