@@ -1,5 +1,5 @@
 {
-	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder.",
+	"_comment": "The diagnostics window's snapshot, version 2, produced by the three drivers and rendered and exported by the shared page (_shared/ui/healthcheck/model.js). A snapshot is { schema_version, driver, generated_at (UTC, ISO 8601), detailed, sections: { <section id>: { <field id>: value } or { items: [ ... ] } }, probes: { <probe id>: { state, ms, detail } } }. Sections render in this order; a section or a field whose `platforms` omits the driver is neither collected nor shown there. Labels come from the locales: healthcheck.section.<id>, healthcheck.field.<id>, healthcheck.column.<section>.<column>. Field types: text, path (the page offers Open; the host opens it by field id only, never by a path the page sends), count, bytes, seconds, ms, percent (0 to 100, of the whole machine's processor capacity), bool (true, or 1 from the AHK writer), list, log (an H3 and a block), enum (translated through enum_key + value). A field with `probe` is filled by that asynchronous probe and reads as pending until the probe answers; `probe` is a probe id, or a map from driver to probe id when only some drivers need one; show_ms appends the probe's duration. The cpu_load probe takes two samples sample_ms apart, on a timer. An items section with `probe` lists what phase A read and says its list is incomplete until that probe answers with the whole list (macOS reads its Bluetooth devices with system_profiler). A field marked opt_in, and an items column in opt_in_columns, is collected and shown only when the user ticks 'Include details'. Phase A, the synchronous collection, must stay under phase_a_budget_ms and may only read memory, cached values and small files: every subprocess, network request or slow system query is a probe bounded by its timeout_ms. `permissions` lists, per driver, the permission ids the host reports, the system settings page it opens for one (by id) and whether a fix hint (healthcheck.permission_fix.<id>) exists. `report` bounds the Markdown file the page asks the host to save under the logs folder. `configuration.files` lists, per driver, the configuration files in the order they apply (the section configuration_files reports each as ok, missing, unreadable or invalid), and the section configuration holds the manifest-declared settings of config.toml as { setting, type, value } rows: booleans, numbers and manifest enum values exactly, any other string only its length and any list only its item count (the setting_row sharing rule drops a row whose value is outside the grammar of its type).",
 	"schema_version": 2,
 	"diagnostic_checks": {
 		"items": [
@@ -104,6 +104,17 @@
 				"fix": true
 			}
 		}
+	},
+	"configuration": {
+		"files": {
+			"windows": ["defaults", "config", "layers", "tap_hold"],
+			"macos": ["defaults", "config", "layers"],
+			"linux": ["defaults", "config", "layers", "tap_hold"]
+		},
+		"file_names": { "config": "config.toml", "layers": "layers.toml", "tap_hold": "tap_hold.toml" },
+		"states": ["ok", "missing", "unreadable", "invalid"],
+		"types": ["boolean", "number", "enum", "text", "list"],
+		"max_rows": 800
 	},
 	"feature_labels": {
 		"hotstrings": "menu.hotstrings.title",
@@ -361,6 +372,16 @@
 			"id": "features",
 			"kind": "items",
 			"columns": ["id", "enabled"]
+		},
+		{
+			"id": "configuration_files",
+			"kind": "items",
+			"columns": ["id", "state"]
+		},
+		{
+			"id": "configuration",
+			"kind": "items",
+			"columns": ["setting", "type", "value"]
 		},
 		{
 			"id": "unavailable",
@@ -733,6 +754,39 @@
 								"channel": {
 									"kind": "enum",
 									"values": ["dev", "main", "stable", "beta", "unknown"]
+								}
+							}
+						},
+						"configuration_files": {
+							"kind": "object",
+							"fields": {
+								"items": {
+									"kind": "array",
+									"max_items": 8,
+									"item": {
+										"kind": "object",
+										"fields": {
+											"id": {
+												"kind": "enum",
+												"values": ["defaults", "config", "layers", "tap_hold"]
+											},
+											"state": {
+												"kind": "enum",
+												"values": ["ok", "missing", "unreadable", "invalid"],
+												"default": "unreadable"
+											}
+										}
+									}
+								}
+							}
+						},
+						"configuration": {
+							"kind": "object",
+							"fields": {
+								"items": {
+									"kind": "array",
+									"max_items": 800,
+									"item": { "kind": "setting_row" }
 								}
 							}
 						},
