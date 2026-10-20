@@ -3099,9 +3099,14 @@ These are software implementations; final hardware verification remains below.
       never completes (`session_done` 3 of 4). Next: on a Mac, check whether
       CFNetwork retries DIRECT after the refused proxy and blocks resolving
       the fixture's `.test` origin instead of completing with ECONNREFUSED.
-      91c0638b separately moved the wire fixture's TLS handshake out of its
-      accept loop (a stalled tunnel held back every later origin connection
-      for 10 s); that hardening is not this failure's cause.
+      91c0638b moved the wire fixture's TLS handshake out of its accept loop
+      (a stalled tunnel held back every later origin connection for 10 s).
+      On the first run that carries it (dev 39342738010) test01 passes on
+      both architectures: 5 workers created, every `first_frame` reached, so
+      the refused-proxy failover now completes. Confirm on one more run, then
+      drop `macos-native-http` and `macos-native-pac` from the v1.0.3
+      profile. That run's Intel model receiving still exits 1 silently;
+      cca8eb94 prints its closed failure fields from the next run on.
       `native_pac_source_fixture.py` has the same accept-loop handshake (2 s).
       The Managed Ollama build job of that run failed in the native Go tests
       with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade fails where
