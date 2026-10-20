@@ -24,6 +24,8 @@
 
 #Requires AutoHotkey v2.0
 
+#Include test_healthcheck_report_durable_route.ahk
+
 
 
 

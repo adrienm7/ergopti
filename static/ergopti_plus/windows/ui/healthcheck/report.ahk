@@ -351,14 +351,18 @@ global HC_FOLDER_IDS := Map("config_dir", true, "logs_dir", true, "crash_dir", t
 ; ===============================
 
 ; Saves the report in Dir, creating the folder when it is missing.
+; @param WriterFn {Func|Integer} Optional durable native writer for fault coverage.
 ; @returns {String} The saved file's path.
 ; @throws {Error} When the folder or the file cannot be written.
-_HCReport_Save(Dir, Name, Text) {
+_HCReport_Save(Dir, Name, Text, WriterFn := 0) {
 	DirCreate(Dir)
 	Path := Dir . "\" . Name
-	File := FileOpen(Path, "w", "UTF-8-RAW")
-	try File.Write(Text)
-	finally File.Close()
+	if !(WriterFn is Integer && WriterFn == 0) && !HasMethod(WriterFn, "Call")
+		throw TypeError("The diagnostics attachment writer must be callable or zero.")
+	ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable
+	Written := ResolvedWriter.Call(Path, Text)
+	if !(Written is Integer) || Written != 1
+		throw Error("The complete diagnostics attachment could not be written.")
 	return Path
 }
 
