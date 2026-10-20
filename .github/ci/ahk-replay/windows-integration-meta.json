@@ -1,0 +1,61 @@
+{
+	"expected_count": 14,
+	"filters": [
+		{
+			"contains": "meta: windows/ platform-API family ratchet — modules + lib",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta: windows/ platform-API family ratchet — ui",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta: windows/ platform-API family ratchet — entry point",
+			"expected_count": 1
+		},
+		{
+			"contains": "OS-purity family census: domain helper suffixes are not native APIs",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta hotif-globals-boot-safe: the pre-pump block still seeds what it promises",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta hotif-globals-boot-safe: every parse-time #HotIf helper is boot-safe",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta hotif-globals-boot-safe: function scan stops at the real closing brace",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta hotif-globals-boot-safe: call scan follows executable free functions only",
+			"expected_count": 1
+		},
+		{
+			"contains": "AHK-15-persistence: every TOML writer and transaction gateway consumes its boolean",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta fix-tapholds-menu-raw-add: the two buttons are declared commands",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta fix-tapholds-menu-raw-add: the per-key provider returns data, not a menu",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta fix-tapholds-menu-raw-add: the hold picker returns data, not a menu",
+			"expected_count": 1
+		},
+		{
+			"contains": "meta fix-tapholds-menu-raw-add: executable bindings use complete global and local identifiers",
+			"expected_count": 1
+		},
+		{
+			"contains": "OS purity inputs: JSDoc is excluded while native code and names remain counted (os-purity-block-comments)",
+			"expected_count": 1
+		}
+	]
+}
