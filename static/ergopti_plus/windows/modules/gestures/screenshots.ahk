@@ -13,8 +13,8 @@
 ;    paths share one cancellable ShellRunner lifecycle.
 ; 2. Side-effect fencing - a worker which survives suspend, timeout, supersession,
 ;    or shutdown can finish only a private stage and cannot touch user state.
-; 3. Exact ownership - terminal callbacks, process termination, and stage cleanup
-;    are each claimed once even when cancellation and completion are re-entrant.
+; 3. Exact ownership - terminal callbacks and process termination are claimed
+;    once; staging cleanup retains its native identity until deletion is acknowledged.
 ; ==============================================================================
 
 #Requires AutoHotkey v2.0
@@ -123,15 +123,21 @@ _GestureScreenshotDefaultPublishClipboard(Stage, AdmissionFn := 0) {
 	return Map("published", Published, "sequence", MutationSequence)
 }
 
-_GestureScreenshotDefaultDeleteFile(Path) {
-	try {
-		if FileExist(Path)
-			FileDelete(Path)
-		return FileExist(Path) = ""
-	} catch as Err {
-		LoggerError("gestures", "Screenshot staging cleanup failed for '{1}': {2}.", Path, Err.Message)
+_GestureScreenshotDefaultDeleteFile(Path, Snapshot) {
+	; Absence captured before delivery owns nothing created by a later callback.
+	if Snapshot is Map && Snapshot.Get("absent", false)
+		return true
+	if !(Snapshot is Map) || !Snapshot.Get("ok", false)
 		return false
-	}
+	if !FSStrictExists(Path)
+		return true
+	Observed := _GestureScreenshotFileSnapshot(Path)
+	if !(Observed is Map) || !Observed.Get("ok", false)
+		return false
+	for Key in ["volume", "index_high", "index_low", "size", "write_high", "write_low"]
+		if Snapshot[Key] != Observed[Key]
+			return true
+	return FSDeleteVerified(Path, _GestureScreenshotSnapshotMatches.Bind(Snapshot))
 }
 
 _GestureScreenshotDefaultClipboardSequence() {
@@ -169,22 +175,86 @@ _GestureScreenshotPublishClipboard(Stage, AdmissionFn) {
 	return Fn.Call(Stage, AdmissionFn)
 }
 
+_GestureScreenshotCaptureStage(Job) {
+	PreviousCritical := Critical("On")
+	try {
+		if Job.Get("stage_captured", false)
+			return
+		Job["stage_captured"] := true
+		Job["stage_snapshot"] := 0
+	} finally Critical(PreviousCritical)
+	; Never re-adopt a path after a callback, failed probe, or cleanup retry.
+	if IsObject(GestureScreenshotWorkerState.cleanup_stage_fn)
+		return
+	try Job["stage_snapshot"] := FSStrictExists(Job["stage"])
+		? _GestureScreenshotFileSnapshot(Job["stage"]) : Map("absent", true)
+}
+
 _GestureScreenshotCleanupStage(Job) {
 	PreviousCritical := Critical("On")
 	try {
-		if Job.Get("cleanup_claimed", false)
+		if !GestureScreenshotWorkerState.jobs.Has(Job["id"])
+				|| GestureScreenshotWorkerState.jobs[Job["id"]] != Job
+				|| !Job.Get("quiescent", false) || Job.Get("delivery_active", false)
+				|| Job.Get("cleanup_claimed", false)
 			return false
 		Job["cleanup_claimed"] := true
+		Job["cleanup_attempts"] := Job.Get("cleanup_attempts", 0) + 1
+	} finally Critical(PreviousCritical)
+	Acknowledged := false
+	try {
+		_GestureScreenshotCaptureStage(Job)
+		Fn := GestureScreenshotWorkerState.cleanup_stage_fn
+		Result := IsObject(Fn) ? Fn.Call(Job["stage"])
+			: _GestureScreenshotDefaultDeleteFile(Job["stage"], Job["stage_snapshot"])
+		Acknowledged := Result is Integer && Result == 1
+	} catch as Err {
+		; The retained job, not a new pathname sample, owns the next attempt.
+		Job["cleanup_error"] := Err.Message
 	} finally {
-		Critical(PreviousCritical)
+		PreviousCritical := Critical("On")
+		try {
+			Job["cleanup_claimed"] := false
+			if Acknowledged && GestureScreenshotWorkerState.jobs.Has(Job["id"])
+					&& GestureScreenshotWorkerState.jobs[Job["id"]] == Job {
+				Job["cleanup_done"] := true
+				GestureScreenshotWorkerState.jobs.Delete(Job["id"])
+			}
+		} finally Critical(PreviousCritical)
+		_GestureScreenshotScheduleCleanup()
 	}
-	Fn := IsObject(GestureScreenshotWorkerState.cleanup_stage_fn)
-		? GestureScreenshotWorkerState.cleanup_stage_fn : _GestureScreenshotDefaultDeleteFile
-	try return Fn.Call(Job["stage"])
-	catch as Err {
-		LoggerError("gestures", "Screenshot staging cleanup threw for '{1}': {2}.", Job["stage"], Err.Message)
-		return false
-	}
+	if !Acknowledged && (Job["cleanup_attempts"] == 1 || Mod(Job["cleanup_attempts"], 20) == 0)
+		LoggerError("gestures", "Screenshot staging cleanup remains pending for '{1}' after attempt {2}: {3}.",
+			Job["stage"], Job["cleanup_attempts"], Job.Get("cleanup_error", "native deletion was not acknowledged"))
+	return Acknowledged
+}
+
+_GestureScreenshotScheduleCleanup() {
+	global GESTURE_REGION_CAPTURE_POLL_MS
+	PreviousCritical := Critical("On")
+	try {
+		Pending := false
+		for _, Job in GestureScreenshotWorkerState.jobs
+			if Job.Get("quiescent", false) && !Job.Get("delivery_active", false)
+					&& !Job.Get("cleanup_shutdown", false) {
+				Pending := true
+				break
+			}
+		if Pending
+			TimerArmOneShotMs(_GestureScreenshotRetryCleanup, GESTURE_REGION_CAPTURE_POLL_MS)
+		else
+			TimerSetCallback(_GestureScreenshotRetryCleanup, 0)
+	} finally Critical(PreviousCritical)
+}
+
+_GestureScreenshotRetryCleanup() {
+	PreviousCritical := Critical("On")
+	try Snapshot := GestureScreenshotWorkerState.jobs.Clone()
+	finally Critical(PreviousCritical)
+	for _, Job in Snapshot
+		if Job.Get("quiescent", false) && !Job.Get("cleanup_shutdown", false)
+			_GestureScreenshotCleanupStage(Job)
+	_GestureScreenshotScheduleCleanup()
 }
 
 _GestureScreenshotRollbackFile(Destination, Snapshot) {
@@ -274,6 +344,8 @@ _GestureScreenshotCreateWorker(Kind, OwnerEpoch, Stage, Args, OwnerDone) {
 		"handle", Handle,
 		"on_done", OwnerDone,
 		"worker_done", false,
+		"start_attempted", false,
+		"quiescent", false,
 		"cancel_requested", false,
 		"terminate_requested", false,
 		"cleanup_claimed", false)
@@ -291,6 +363,7 @@ _GestureScreenshotStartWorker(WorkerId) {
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
 		if Job["cancel_requested"]
 			return false
+		Job["start_attempted"] := true
 	} finally {
 		Critical(PreviousCritical)
 	}
@@ -300,9 +373,9 @@ _GestureScreenshotStartWorker(WorkerId) {
 		return false
 	}
 	; A test seam or a very short process may complete synchronously from start().
-	; The vanished registry entry proves that terminal already won ownership.
+	; A terminal remains successful even while its private file cleanup is pending.
 	PreviousCritical := Critical("On")
-	try return !GestureScreenshotWorkerState.jobs.Has(WorkerId) ? true : (Started ? true : false)
+	try return Job["worker_done"] || !GestureScreenshotWorkerState.jobs.Has(WorkerId) || Started ? true : false
 	finally Critical(PreviousCritical)
 }
 
@@ -312,11 +385,15 @@ _GestureScreenshotDiscardUnstartedWorker(WorkerId) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return false
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
-		GestureScreenshotWorkerState.jobs.Delete(WorkerId)
-	} finally {
-		Critical(PreviousCritical)
-	}
-	_GestureScreenshotCleanupStage(Job)
+		Job["cancel_requested"] := true
+		Job["on_done"] := 0
+		if !Job["start_attempted"]
+			Job["quiescent"] := true
+	} finally Critical(PreviousCritical)
+	if !Job["quiescent"]
+		GestureScreenshotCancelWorker(WorkerId, "start failed")
+	if Job["quiescent"]
+		_GestureScreenshotCleanupStage(Job)
 	return true
 }
 
@@ -326,39 +403,38 @@ GestureScreenshotCancelWorker(WorkerId, Reason) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return false
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
-		if Job["cancel_requested"]
-			return false
+		if Reason == "shutdown"
+			Job["cleanup_shutdown"] := true
 		Job["cancel_requested"] := true
 		Job["cancel_reason"] := Reason
-		if Job["worker_done"]
-			return true
-		; Claim before calling the handle: a fake or future handle may report done
-		; synchronously while it processes the termination request.
-		Job["terminate_requested"] := true
+		; A terminal or an earlier exact termination receipt already proves quiet.
+		Request := !Job["quiescent"] && !Job["terminate_requested"]
+		if Request
+			Job["terminate_requested"] := true
 		Handle := Job["handle"]
-	} finally {
-		Critical(PreviousCritical)
-	}
+	} finally Critical(PreviousCritical)
 	Requested := false
-	try Requested := Handle.requestTerminate()
-	catch as Err
-		LoggerError("gestures", "Screenshot worker termination threw ({1}, {2}): {3}.", Job["kind"], Reason, Err.Message)
-	if !Requested {
-		PreviousCritical := Critical("On")
-		try {
-			if GestureScreenshotWorkerState.jobs.Has(WorkerId)
-				GestureScreenshotWorkerState.jobs[WorkerId]["termination_failed"] := true
-		} finally {
-			Critical(PreviousCritical)
+	if Request {
+		try Requested := Handle.requestTerminate()
+		catch as Err
+			LoggerError("gestures", "Screenshot worker termination threw ({1}, {2}): {3}.", Job["kind"], Reason, Err.Message)
+		if Requested is Integer && Requested == 1
+			Job["quiescent"] := true
+		else {
+			Job["termination_failed"] := true
+			LoggerError("gestures", "Screenshot worker termination request failed ({1}, {2}); publication remains fenced.", Job["kind"], Reason)
 		}
-		LoggerError("gestures", "Screenshot worker termination request failed ({1}, {2}); publication remains fenced.", Job["kind"], Reason)
 	}
-	; On shutdown no AHK completion callback can run. Delete an already-written
-	; stage now; a worker still inside Save performs the matching parent-death
-	; cleanup in its final PowerShell statement.
-	if Reason == "shutdown"
+	; Normal termination retains its completion callback. Shutdown has no such
+	; guarantee: attempt once only after a strict native quiescence receipt.
+	if Job["worker_done"] || (Reason == "shutdown" && Job["quiescent"])
 		_GestureScreenshotCleanupStage(Job)
-	return Requested
+	if Reason == "shutdown" {
+		_GestureScreenshotScheduleCleanup()
+		if GestureScreenshotWorkerState.jobs.Has(WorkerId)
+			LoggerError("gestures", "Screenshot staging debt remains at shutdown for '{1}'; forced exit or a native blocker can prevent cleanup.", Job["stage"])
+	}
+	return Job["quiescent"]
 }
 
 GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
@@ -367,26 +443,29 @@ GestureScreenshotWorkerDone(WorkerId, ExitCode, Stdout, Stderr) {
 		if !GestureScreenshotWorkerState.jobs.Has(WorkerId)
 			return
 		Job := GestureScreenshotWorkerState.jobs[WorkerId]
+		FirstTerminal := !Job["worker_done"]
 		Job["worker_done"] := true
-		Canceled := Job["cancel_requested"]
-	} finally {
-		Critical(PreviousCritical)
+		Job["quiescent"] := true
+		if FirstTerminal {
+			Job["delivery_active"] := true
+			Completion := Job["on_done"]
+			Job["on_done"] := 0
+		}
+	} finally Critical(PreviousCritical)
+	if !FirstTerminal {
+		_GestureScreenshotCleanupStage(Job)
+		return
 	}
 	try {
-		if !Canceled {
-			try Job["on_done"].Call(WorkerId, Job, ExitCode, Stdout, Stderr)
+		_GestureScreenshotCaptureStage(Job)
+		if !Job["cancel_requested"] && IsObject(Completion) {
+			try Completion.Call(WorkerId, Job, ExitCode, Stdout, Stderr)
 			catch as Err
 				LoggerError("gestures", "Screenshot owner completion failed ({1}): {2}.", Job["kind"], Err.Message)
 		}
 	} finally {
+		Job["delivery_active"] := false
 		_GestureScreenshotCleanupStage(Job)
-		PreviousCritical := Critical("On")
-		try {
-			if GestureScreenshotWorkerState.jobs.Has(WorkerId)
-				GestureScreenshotWorkerState.jobs.Delete(WorkerId)
-		} finally {
-			Critical(PreviousCritical)
-		}
 	}
 }
 

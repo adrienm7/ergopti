@@ -1,0 +1,8 @@
+{
+	"expected_count": 34,
+	"filters": [
+		{ "contains": "screenshot-stage-cleanup-debt", "expected_count": 10 },
+		{ "contains": "screenshot-file-publication-custody", "expected_count": 14 },
+		{ "contains": "screenshot-worker-ownership:", "expected_count": 10 }
+	]
+}

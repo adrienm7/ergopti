@@ -781,3 +781,5 @@ Test("screenshot-worker-ownership: every entry point and lifecycle boundary shar
 #Include test_screenshot_file_publication.ahk
 
 #Include test_screenshot_clipboard_publication.ahk
+
+#Include test_screenshot_stage_cleanup.ahk
