@@ -118,8 +118,8 @@ _GestureScreenshotDefaultRollbackFile(Destination, Snapshot) {
 	return FSDeleteVerified(Destination, _GestureScreenshotSnapshotMatches.Bind(Snapshot))
 }
 
-_GestureScreenshotDefaultPublishClipboard(Stage) {
-	Published := CB_WriteBitmapFile(Stage, &MutationSequence)
+_GestureScreenshotDefaultPublishClipboard(Stage, AdmissionFn := 0) {
+	Published := CB_WriteBitmapFile(Stage, &MutationSequence, AdmissionFn)
 	return Map("published", Published, "sequence", MutationSequence)
 }
 
@@ -163,10 +163,10 @@ _GestureScreenshotPublishFile(Stage, Destination) {
 	return Fn.Call(Stage, Destination)
 }
 
-_GestureScreenshotPublishClipboard(Stage) {
+_GestureScreenshotPublishClipboard(Stage, AdmissionFn) {
 	Fn := IsObject(GestureScreenshotWorkerState.publish_clipboard_fn)
 		? GestureScreenshotWorkerState.publish_clipboard_fn : _GestureScreenshotDefaultPublishClipboard
-	return Fn.Call(Stage)
+	return Fn.Call(Stage, AdmissionFn)
 }
 
 _GestureScreenshotCleanupStage(Job) {
@@ -561,6 +561,14 @@ GestureDirectCapturePoll(Epoch) {
 	SetTimer(GestureDirectCapturePoll.Bind(Epoch), -GESTURE_REGION_CAPTURE_POLL_MS)
 }
 
+; Called only by the native bitmap publisher inside its short Critical claim.
+; Retain the exact completed job even after its worker registry slot is retired.
+_GestureDirectClipboardAdmission(State, Epoch, WorkerId, Job) {
+	return !A_IsSuspended && !Job["cancel_requested"]
+		&& _GestureDirectCaptureState(Epoch, WorkerId) == State
+		&& !TickExpired(State["started_tick"], State["timeout_ms"])
+}
+
 GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 	State := _GestureDirectCaptureState(Epoch, WorkerId)
 	if !IsObject(State) || Job["cancel_requested"]
@@ -604,7 +612,8 @@ GestureDirectCaptureWorkerDone(Epoch, WorkerId, Job, ExitCode, Stdout, Stderr) {
 				"clipboard snapshot failed before publication")
 			return
 		}
-		Publication := _GestureScreenshotPublishClipboard(Job["stage"])
+		AdmissionFn := _GestureDirectClipboardAdmission.Bind(State, Epoch, WorkerId, Job)
+		Publication := _GestureScreenshotPublishClipboard(Job["stage"], AdmissionFn)
 		Published := Publication["published"]
 		PublishedSequence := Publication["sequence"]
 		ClipboardChanged := PublishedSequence > 0

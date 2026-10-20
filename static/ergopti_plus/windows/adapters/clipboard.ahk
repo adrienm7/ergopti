@@ -567,59 +567,70 @@ CB_HasImage() {
 ; CloseClipboard materializes synthesized DIB formats, so the optional receipt
 ; authenticates the exact publication under a new read lock after that close.
 ; A sequence sampled after return cannot establish ownership.
-CB_WriteBitmapFile(Path, &MutationSequence := 0) {
+CB_WriteBitmapFile(Path, &MutationSequence := 0, AdmissionFn := 0) {
 	MutationSequence := 0
 	if !_CB_ResolveRestoreDebtBeforeMutation()
 		return false
-	static IMAGE_BITMAP := 0
-	static CF_BITMAP := 2
-	static LR_LOADFROMFILE := 0x10
-	MutationId := 0
 	BitmapHandle := 0
-	TransferredBitmap := 0
-	ClipboardOpened := false
-	ClipboardMutated := false
 	try {
-		; CF_BITMAP needs a DDB: a process-local DIB section cannot be pasted by another process.
+		if !(AdmissionFn is Integer && AdmissionFn == 0) && !HasMethod(AdmissionFn, "Call")
+			throw TypeError("Bitmap admission must be a callable or Integer0.")
+		; Load before final admission and keep file I/O outside the short claim.
+		; CF_BITMAP needs a DDB usable by another process, without LR_CREATEDIBSECTION.
 		BitmapHandle := DllCall("User32\LoadImageW", "Ptr", 0, "Str", Path,
-			"UInt", IMAGE_BITMAP, "Int", 0, "Int", 0,
-			"UInt", LR_LOADFROMFILE, "Ptr")
+			"UInt", 0, "Int", 0, "Int", 0, "UInt", 0x10, "Ptr")
 		if !BitmapHandle
 			throw Error("LoadImageW could not load the staged bitmap")
+		return _CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn)
+	} catch as Err {
+		if BitmapHandle {
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+			BitmapHandle := 0
+		}
+		; The native helper has closed its lock and restored Critical before logging.
+		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
+		return false
+	} finally {
+		if BitmapHandle
+			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+	}
+}
+
+; Admission is a pure, zero-argument predicate. Only Integer1 authorizes the
+; mutation; its callback cannot yield to UI or perform clipboard/file I/O.
+; The caller still owns the loaded bitmap until SetClipboardData transfers it.
+_CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn) {
+	PreviousCritical := Critical("On")
+	ClipboardOpened := false, ClipboardMutated := false
+	MutationId := 0, TransferredBitmap := 0
+	try {
 		ClipboardOpened := DllCall("User32\OpenClipboard", "Ptr", A_ScriptHwnd, "Int") != 0
 		if !ClipboardOpened
 			throw Error("OpenClipboard failed")
-		; No clipboard notification can be ours until the file is loaded and the
-		; clipboard lock is held. Reserving earlier could consume an unrelated user
-		; copy while LoadImageW or OpenClipboard was still in progress.
+		if HasMethod(AdmissionFn, "Call") {
+			Admitted := AdmissionFn.Call()
+			if !(Admitted is Integer && Admitted == 1)
+				return false
+		}
+		; Reserve only after the loaded bitmap, native lock and caller admission
+		; are current. Refusal must never consume a foreign clipboard notification.
 		MutationId := _CB_BeginOwnedMutation()
 		if !DllCall("User32\EmptyClipboard", "Int")
 			throw Error("EmptyClipboard failed")
 		ClipboardMutated := true
-		TransferredBitmap := DllCall("User32\SetClipboardData", "UInt", CF_BITMAP, "Ptr", BitmapHandle, "Ptr")
+		TransferredBitmap := DllCall("User32\SetClipboardData", "UInt", 2, "Ptr", BitmapHandle, "Ptr")
 		if !TransferredBitmap
 			throw Error("SetClipboardData(CF_BITMAP) failed")
 		BitmapHandle := 0
 		return true
 	} catch as Err {
-		; EmptyClipboard itself emits the owned notification. Cancel the reservation
-		; only when the clipboard never changed, otherwise the observer must consume it.
 		if MutationId && !ClipboardMutated
 			_CB_CancelOwnedMutation(MutationId)
-		; Release the global clipboard lock before file-backed logging can yield.
-		if ClipboardOpened
-			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
-		if BitmapHandle {
-			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
-			BitmapHandle := 0
-		}
-		try LoggerError("Clipboard", "CB_WriteBitmapFile failed for '{1}': {2}.", Path, Err.Message)
-		return false
+		throw Err
 	} finally {
 		if ClipboardOpened
 			MutationSequence := _CB_CloseBitmapPublication(&ClipboardOpened, ClipboardMutated, TransferredBitmap)
-		if BitmapHandle
-			try DllCall("Gdi32\DeleteObject", "Ptr", BitmapHandle)
+		Critical(PreviousCritical)
 	}
 }
 

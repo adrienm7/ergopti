@@ -84,23 +84,33 @@ _GSWO_FakePublishFilePartialFailure(Stage, Destination) {
 	return Map("published", false, "snapshot", Map("fake_owned_path", Destination))
 }
 
-_GSWO_FakePublishClipboard(Stage) {
+_GSWO_FakePublishClipboard(Stage, AdmissionFn := 0) {
 	global _GSWO_ExistingFiles, _GSWO_ClipboardPublishes
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
 		return Map("published", false, "sequence", 0)
+	if HasMethod(AdmissionFn, "Call") {
+		Admitted := AdmissionFn.Call()
+		if !(Admitted is Integer && Admitted == 1)
+			return Map("published", false, "sequence", 0)
+	}
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := true
 	return Map("published", true, "sequence", _GSWO_ClipboardSequence)
 }
 
-_GSWO_FakePublishClipboardPartialFailure(Stage) {
+_GSWO_FakePublishClipboardPartialFailure(Stage, AdmissionFn := 0) {
 	global _GSWO_ExistingFiles, _GSWO_ClipboardPublishes
 	global _GSWO_ClipboardSequence, _GSWO_ClipboardHasImage
 	_GSWO_ClipboardPublishes += 1
 	if !_GSWO_ExistingFiles.Get(Stage, false)
 		return Map("published", false, "sequence", 0)
+	if HasMethod(AdmissionFn, "Call") {
+		Admitted := AdmissionFn.Call()
+		if !(Admitted is Integer && Admitted == 1)
+			return Map("published", false, "sequence", 0)
+	}
 	; Models EmptyClipboard succeeding before SetClipboardData fails.
 	_GSWO_ClipboardSequence += 1
 	_GSWO_ClipboardHasImage := false
@@ -608,6 +618,7 @@ _GSWO_AllEntryPointsShareOwnership() {
 	DirectScript := _DriverFuncBody("_GestureScreenshotDirectScript")
 	RegionScript := _DriverFuncBody("_GestureScreenshotRegionSaveScript")
 	ClipboardPublish := _DriverFuncBody("CB_WriteBitmapFile")
+	LoadedPublish := _DriverFuncBody("_CB_PublishLoadedBitmap")
 	DefaultClipboardPublish := _DriverFuncBody("_GestureScreenshotDefaultPublishClipboard")
 	SuspendBody := _DriverFuncBody("Ergopti_OnSuspendEnter")
 	ShutdownBody := _DriverFuncBody("Ergopti_OnShutdown")
@@ -625,6 +636,7 @@ _GSWO_AllEntryPointsShareOwnership() {
 		"direct script", DirectScript,
 		"region script", RegionScript,
 		"clipboard publish", ClipboardPublish,
+		"loaded bitmap publication", LoadedPublish,
 		"default clipboard publish", DefaultClipboardPublish,
 		"suspend", SuspendBody,
 		"shutdown", ShutdownBody,
@@ -689,15 +701,16 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Assert(InStr(DirectScript, "Clipboard]::SetImage") = 0
 		&& InStr(DirectScript, "Stage") > 0 && InStr(DirectScript, '"Bmp"') > 0,
 		"direct workers may write only a private stage, never the clipboard")
-	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage, &MutationSequence)") > 0
+	Assert(InStr(DefaultClipboardPublish, "CB_WriteBitmapFile(Stage, &MutationSequence, AdmissionFn)") > 0
 		&& InStr(ClipboardPublish, "LoadImageW") > 0
-		&& InStr(ClipboardPublish, "SetClipboardData") > 0
-		&& InStr(ClipboardPublish, "_CB_BeginOwnedMutation") > 0,
+		&& InStr(ClipboardPublish, "_CB_PublishLoadedBitmap(&BitmapHandle, &MutationSequence, AdmissionFn)") > 0
+		&& InStr(LoadedPublish, "SetClipboardData") > 0
+		&& InStr(LoadedPublish, "_CB_BeginOwnedMutation") > 0,
 		"only the current AHK owner may publish a staged bitmap through clipboard provenance")
-	Assert(InStr(ClipboardPublish, "OpenClipboard")
-		< InStr(ClipboardPublish, "_CB_BeginOwnedMutation")
-		&& InStr(ClipboardPublish, "_CB_BeginOwnedMutation")
-		< InStr(ClipboardPublish, "EmptyClipboard"),
+	Assert(InStr(LoadedPublish, "OpenClipboard")
+		< InStr(LoadedPublish, "AdmissionFn.Call()")
+		&& InStr(LoadedPublish, "AdmissionFn.Call()") < InStr(LoadedPublish, "_CB_BeginOwnedMutation")
+		&& InStr(LoadedPublish, "_CB_BeginOwnedMutation") < InStr(LoadedPublish, "EmptyClipboard"),
 		"clipboard provenance must be reserved only after the file load and lock, immediately before mutation")
 	Assert(InStr(RegionScript, "Stage") > 0 && InStr(RegionScript, 'State["path"]') = 0,
 		"region-save workers may write only their private stage, never the final path")

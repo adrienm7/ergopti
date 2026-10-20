@@ -4,8 +4,8 @@
 ; wrapper performs a genuine foreign copy at the unlocked return boundary;
 ; neither clipboard sequences nor restoration results are mocked.
 
-_GSCP_Publish(Record, Stage) {
-	Receipt := _GestureScreenshotDefaultPublishClipboard(Stage)
+_GSCP_Publish(Record, Stage, Args*) {
+	Receipt := _GestureScreenshotDefaultPublishClipboard(Stage, Args*)
 	Record["receipt"] := Receipt
 	Record["sequence_after_publish"] := CB_GetSequenceNumber()
 	Record["clipboard_owner"] := DllCall("User32\GetClipboardOwner", "Ptr")
@@ -23,7 +23,7 @@ _GSCP_Publish(Record, Stage) {
 	return Receipt
 }
 
-_GSCP_Case(Mode) {
+_GSCP_Case(Mode, Configure := 0) {
 	global _GestureDirectCaptures, _GSWO_Terminals
 	PreviousCritical := Critical("On"), WasSuspended := A_IsSuspended
 	Old := _GSWO_Install()
@@ -63,6 +63,9 @@ _GSCP_Case(Mode) {
 		_GestureDirectCaptures[1] := Map("worker_id", 1, "mode", "clipboard", "path", "",
 			"started_tick", A_TickCount, "timeout_ms", 60000, "callback", _GSWO_RecordTerminal)
 		Job := Map("stage", Stage, "cancel_requested", false)
+		Record["job"] := Job
+		if HasMethod(Configure, "Call")
+			Configure.Call(Record)
 		GestureDirectCaptureWorkerDone(1, 1, Job, 0, "", "")
 		Receipt := Record.Get("receipt", Map())
 		Diagnostic := " / mode=" . Mode . " receipt=" . Receipt.Get("sequence", 0)
@@ -88,6 +91,7 @@ _GSCP_Case(Mode) {
 	} catch as Err {
 		Primary := Err
 	} finally {
+		Critical("On")
 		try {
 			if _GestureDirectCaptures.Has(1)
 				GestureDirectCaptureFinish(1, false, "clipboard publication fixture cleanup")
@@ -176,3 +180,5 @@ _GSCP_Case(Mode) {
 for _GSCP_Mode in ["foreign-cancel", "foreign-failure", "foreign-image", "owned-cancel", "owned-failure", "owned-success"]
 	Test("screenshot clipboard publication: " . _GSCP_Mode . " retains exact mutation custody (screenshot-clipboard-publication-custody)",
 		_GSCP_Case.Bind(_GSCP_Mode))
+
+#Include test_screenshot_clipboard_admission.ahk
