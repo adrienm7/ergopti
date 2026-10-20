@@ -58,7 +58,8 @@ OnboardingCatalogue() {
 ; Indexes the paths the wizard may write on Windows.
 ; @param Text string The catalogue JSON.
 ; @returns {Map} "pages" (Array) and "entries" (Map path -> entry Map with
-;   "kind" switch|choice|tap_hold_key|character, "default", and "value" or
+;   "kind" switch|choice|control|tap_hold_key|character, "default", and "value",
+;   "values" (a control) or
 ;   "max_characters"; a tap_hold_key entry also names its "key" and the
 ;   "customised" value a configured key of the user's reads as).
 OnboardingCatalogueIndex(Text) {
@@ -83,8 +84,41 @@ OnboardingCatalogueIndex(Text) {
 		if Page.Has("magic_key")
 			_OnboardingClaim(Entries, Page["magic_key"], "character")
 		_OnboardingClaimGroups(Entries, Page.Get("groups", []))
+		for Control in Page.Get("controls", [])
+			_OnboardingClaimControl(Entries, Control)
 	}
 	return Map("pages", Platform["pages"], "entries", Entries)
+}
+
+; Claims the paths of one persistent control: each takes any value one of its
+; choices writes there. A control this driver lacks claims nothing, so the
+; whole batch is refused if the page ever writes one of its paths.
+; @param Entries Map Index being built.
+; @param Control Map Catalogue control.
+_OnboardingClaimControl(Entries, Control) {
+	if !(Control is Map) || !(Control.Get("choices", "") is Array) || Control["choices"].Length < 2
+		throw ValueError("the onboarding catalogue has a malformed control")
+	if !Control.Get("available", false)
+		return
+	Values := Map()
+	Defaults := Map()
+	for Choice in Control["choices"] {
+		if !(Choice is Map) || !(Choice.Get("writes", "") is Array) || Choice["writes"].Length == 0
+			throw ValueError("the onboarding catalogue has a control choice without writes")
+		for Write in Choice["writes"] {
+			Path := (Write is Map) ? Write.Get("path", "") : ""
+			if !(Path is String) || Path == ""
+				throw ValueError("the onboarding catalogue has an unnamed control write")
+			if !Values.Has(Path)
+				Values[Path] := [], Defaults[Path] := Write["default"]
+			Values[Path].Push(Write["value"])
+		}
+	}
+	for Path, Allowed in Values {
+		if Entries.Has(Path)
+			throw ValueError("the onboarding catalogue writes " . Path . " twice")
+		Entries[Path] := Map("kind", "control", "default", Defaults[Path], "values", Allowed)
+	}
 }
 
 ; Claims every file gate and item of a checklist tree.
@@ -215,6 +249,12 @@ _OnboardingAnswerRefusal(Entry, Value) {
 	Kind := Entry["kind"]
 	if (Kind == "switch")
 		return _OnboardingIsBoolean(Value) ? "" : "a category switch takes true or false"
+	if (Kind == "control") {
+		for Allowed in Entry["values"]
+			if _OnboardingSameAnswer(Value, Allowed)
+				return ""
+		return "a control takes one of the values its choices write"
+	}
 	if (Kind == "choice" || Kind == "tap_hold_key") {
 		if _OnboardingSameAnswer(Value, Entry["value"]) || _OnboardingSameAnswer(Value, Entry["default"])
 			return ""

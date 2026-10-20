@@ -2435,6 +2435,187 @@ console.log(
 	);
 })();
 
+// ======================================
+// ======= 11/ Keyboard layout controls =
+// ======================================
+
+/**
+ * The persistent control groups of the shown page, by control id.
+ * @param {object} page
+ * @returns {Map<string, object>}
+ */
+function controlGroups(page) {
+	const groups = new Map();
+	for (const group of page.el('page-controls').children) groups.set(group.dataset.control, group);
+	return groups;
+}
+
+/**
+ * The radio inputs of a choice control, by value.
+ * @param {object} group
+ * @returns {Map<string, object>}
+ */
+function controlRadios(group) {
+	const radios = new Map();
+	for (const row of group.children.filter((child) => child.classList.contains('radio-card')))
+		radios.set(row.children[0].value, row.children[0]);
+	return radios;
+}
+
+/** Picks a radio of a choice control. */
+function pick(page, id, value) {
+	const radio = controlRadios(controlGroups(page).get(id)).get(value);
+	radio.checked = true;
+	radio.dispatch('change');
+}
+
+// The layout step offers the emulated layout, the number-row emulation (base
+// and Shift levels) and the ordering as controls of their own, declared once
+// for every driver. A new installation emulates nothing and reorders nothing;
+// a control changes only what the user changes, posts nothing to the host and
+// keeps its value across Yes/No and a language preview (neutral-layout-wizard).
+(function theLayoutStepOffersPersistentNeutralControls() {
+	const page = openWizard({ platform: 'windows' });
+	page.platform = 'windows';
+	goToPage(page, 'keyboard_layout');
+	const layout = pageOf(page, 'keyboard_layout');
+	assert.deepEqual(
+		layout.controls.map((control) => control.id),
+		['emulated_layout', 'alt_gr_emulation', 'number_row_emulation', 'number_row_order']
+	);
+	for (const path of [
+		'layout.ergopti_base',
+		'layout.ergopti_variant',
+		'layout.ergopti_alt_gr',
+		'layout.direct_access_digits'
+	])
+		assert.ok(
+			!layout.groups.some((group) => (group.items || []).some((item) => item.path === path)),
+			path + ' is a control, never a checklist item a Yes would prefill'
+		);
+	let groups = controlGroups(page);
+	assert.equal(page.el('page-controls').classList.contains('hidden'), false);
+	assert.equal(
+		controlRadios(groups.get('emulated_layout')).get('none').checked,
+		true,
+		'no emulation'
+	);
+	assert.equal(
+		controlRadios(groups.get('number_row_order')).get('native').checked,
+		true,
+		'native order'
+	);
+	const numberRow = groups.get('number_row_emulation').children[0].children[0];
+	assert.equal(numberRow.checked, true, 'the number row is emulated with the layout, as shipped');
+	assert.equal(numberRow.disabled, true, 'the controls follow the question, which starts at No');
+	answer(page, true);
+	groups = controlGroups(page);
+	assert.equal(controlRadios(groups.get('emulated_layout')).get('ergopti').disabled, false);
+	page.messages.splice(0);
+	pick(page, 'emulated_layout', 'ergopti_plus');
+	pick(page, 'number_row_order', 'digits');
+	const box = controlGroups(page).get('number_row_emulation').children[0].children[0];
+	box.checked = false;
+	box.dispatch('change');
+	assert.deepEqual(page.messages, [], 'a control changes the page alone: nothing reloads');
+	assert.equal(page.el('page-title').textContent, locale('en')['menu.layout.title']);
+	page.window.applyStrings({ locale: 'en', strings: locale('en') });
+	answer(page, false);
+	answer(page, true);
+	groups = controlGroups(page);
+	assert.equal(controlRadios(groups.get('emulated_layout')).get('ergopti_plus').checked, true);
+	assert.equal(controlRadios(groups.get('number_row_order')).get('digits').checked, true);
+	assert.equal(groups.get('number_row_emulation').children[0].children[0].checked, false);
+	const operations = finish(page).answers.operations;
+	const written = new Map(operations.map((operation) => [operation.path, operation.value]));
+	assert.equal(written.get('category_enabled.layout'), true);
+	assert.equal(written.get('layout.ergopti_base'), true);
+	assert.equal(written.get('layout.ergopti_variant'), 'ergopti_plus');
+	assert.equal(written.get('layout.direct_access_digits'), 'digits');
+	assert.equal(written.get('layout.emulate_number_row'), false);
+	assert.equal(
+		written.has('layout.emulated_layout'),
+		false,
+		'a value already in force is not rewritten'
+	);
+
+	// A first run answered Yes with the controls untouched writes the switch alone.
+	const fresh = openWizard({ platform: 'windows' });
+	fresh.platform = 'windows';
+	goToPage(fresh, 'keyboard_layout');
+	answer(fresh, true);
+	const neutral = finish(fresh).answers.operations.filter((operation) =>
+		operation.path.startsWith('layout.')
+	);
+	assert.deepEqual(neutral, [], 'a new installation emulates nothing and reorders nothing');
+})();
+
+// A re-run keeps what the layout manager chose: a registry layout matches no
+// built-in choice, so the control shows none selected and writes nothing until
+// the user picks one (neutral-layout-wizard).
+(function aRerunKeepsTheRegistryLayout() {
+	const page = openWizard({
+		platform: 'windows',
+		current: {
+			'category_enabled.layout': true,
+			'layout.ergopti_base': true,
+			'layout.emulated_layout': 'ergol',
+			'layout.direct_access_digits': 'symbols'
+		}
+	});
+	page.platform = 'windows';
+	goToPage(page, 'keyboard_layout');
+	const radios = controlRadios(controlGroups(page).get('emulated_layout'));
+	assert.ok(
+		[...radios.values()].every((radio) => !radio.checked),
+		'no built-in choice claims Ergo-L'
+	);
+	assert.equal(
+		controlRadios(controlGroups(page).get('number_row_order')).get('symbols').checked,
+		true
+	);
+	const written = finish(page).answers.operations.map((operation) => operation.path);
+	for (const path of [
+		'layout.emulated_layout',
+		'layout.ergopti_base',
+		'layout.direct_access_digits'
+	])
+		assert.ok(!written.includes(path), path + ' stays as configured');
+})();
+
+// macOS and Linux emulate no layout and keep the native number row: the same
+// controls are drawn greyed with why, and their hosts accept none of their paths.
+(function theOtherDriversShowWhyTheyLackTheControls() {
+	for (const platform of ['macos', 'linux']) {
+		const page = openWizard({ platform });
+		page.platform = platform;
+		goToPage(page, 'keyboard_layout');
+		const layout = pageOf(page, 'keyboard_layout');
+		assert.ok(
+			layout.controls.every((control) => !control.available),
+			platform + ': no control applies'
+		);
+		const groups = controlGroups(page);
+		assert.equal(groups.size, 4, platform + ': the four controls are drawn');
+		for (const control of layout.controls) {
+			const group = groups.get(control.id);
+			const reason = group.children[group.children.length - 1];
+			assert.equal(
+				reason.textContent,
+				locale('en')[control.reason_key],
+				platform + ': ' + control.id + ' says why'
+			);
+		}
+		assert.ok(
+			!cataloguePaths(platform).has('layout.direct_access_digits'),
+			platform + ': the host accepts no ordering answer'
+		);
+	}
+})();
+
 console.log(
 	'Onboarding folder edits: delayed locale delivery, raw input, source admission and Finish passed.'
+);
+console.log(
+	'Keyboard layout controls: neutral first run, persistent values, re-run and capability reasons passed.'
 );
