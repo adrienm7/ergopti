@@ -26,6 +26,11 @@ answer once, then delete the answered lines.
    your word.
 8. **Windows `config.toml` blank lines.** All three drivers and templates now use the 5/3 style. Anything
    else to align? Default: done.
+9. **Merge commits on `dev`.** The `commit-and-push` skill says `dev` and `main` stay perfectly linear,
+   yet the TODO's own practice merges `fix/*` into dev with `--no-ff`, and Codex agents pushing to dev
+   with your credentials (about 50 commits on October 20 evening) were integrated by the merge commit
+   330cbe4c04. Keep dev linear (rebase, fast-forward only) or accept merge commits and correct the
+   skill? Default: merge commits tolerated.
 
 ## Answered
 
