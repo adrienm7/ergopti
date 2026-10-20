@@ -19,7 +19,9 @@ _ArtifactCurlFactoryControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("CURL_ATTEMPT_MODEL_CONTROLS:29", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
@@ -505,7 +507,9 @@ _ArtifactNtlmTunnelCopyControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("ARTIFACT_RELAY_TCP_CONTROLS:4", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
@@ -532,7 +536,9 @@ _ArtifactNtlmFullDuplexRetirementControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("ARTIFACT_TUNNEL_RETIREMENT_CONTROLS:6", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
@@ -624,7 +630,9 @@ _ArtifactOwnedCloseProgressControls() {
 			Sleep(10)
 		}
 		AssertEqual(1, Observed.Length)
-		AssertEqual(0, Observed[1]["exit"])
+		; The fixture names its failing control on stdout/stderr; carry it into
+		; the job log instead of a bare exit status.
+		AssertEqual(0, Observed[1]["exit"], "fixture output: " . Observed[1]["stdout"] . " | " . Observed[1]["stderr"])
 		AssertEqual("OWNED_CLOSE_PROGRESS_CONTROLLED_PORTS:11", Trim(Observed[1]["stdout"], "`r`n "))
 		AssertEqual("", Observed[1]["stderr"])
 	} finally {
