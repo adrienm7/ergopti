@@ -566,7 +566,12 @@ MenuCommandRun(Callback, Args, Attempt := 0, BusyFn := 0, ArmFn := 0, Registrati
 		Registration := _MenuCommandRegistrationSnapshot(Registration)
 		; A command held for a pending reload is identified by its row, not its
 		; registration, so a tray rebuild meanwhile does not drop it.
-		Held := HeldKey ? MenuReloadReplay_Hold(HeldKey, Registration) : 0
+		RefusedPath := 0
+		Held := HeldKey ? MenuReloadReplay_Hold(HeldKey, Registration, &RefusedPath) : 0
+		; A detached rebuild may keep the old Menu alive through Args. Its token
+		; still exists, but only the retained path can identify the current action.
+		if RefusedPath is Array
+				return MenuReloadReplay_Run(RefusedPath)
 		if !Held && !_MenuCommandRegistrationCurrent(Registration) {
 				try LoggerWarn("MenuDispatcher", "Menu command refused because its native registration was retired.")
 				return false

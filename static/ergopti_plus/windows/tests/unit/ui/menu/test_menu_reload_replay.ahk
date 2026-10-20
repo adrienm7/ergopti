@@ -243,6 +243,120 @@ Test("menu reload replay: a refused reload runs the held command in place",
 	(*) => _MRR_Run(_MRR_RefusedReloadBody))
 
 
+; A detached rebuild keeps the old child alive through the retry's native Args.
+; Its token may remain valid, but it no longer owns the command the current tray
+; offers. A refused reload must resolve the held row instead of invoking it.
+_MRRF_Build(Fixture, Who, Canonical) {
+	global _MenuDispatchCallbacks, _MenuDispatchTokens
+	if !Canonical {
+		Tray := _MRR_BuildTray(Fixture, Who)
+		Tray.Position := 2
+		return Tray
+	}
+	Sub := Menu(), Root := Menu()
+	Row := MenuRenderer_CommandRow("script_control_group", "scope_restore",
+		Map("scope_restore", _MRR_Command.Bind(Fixture.Runs, Who)))
+	AssertTrue(Row is Map, "the canonical branch uses a real declared action")
+	Row["label"] := "Toggle"
+	AssertEqual(1, MenuRenderer_AppendRows(Sub, "refused reload fixture", "restore", [Row]))
+	Root.Add("Features", Sub), Fixture.Menus.Push(Sub, Root)
+	Id := _MenuItemIdAtPosition(Sub, 0)
+	return {Root: Root, Sub: Sub, Command: _MenuDispatchCallbacks[Id], Position: 1,
+		Identity: {ItemId: Id, Token: _MenuDispatchTokens[Id]}}
+}
+
+_MRRF_Hold(Fixture, Tray, Canonical) {
+	global _MenuReloadReplayRoot
+	_MenuReloadReplayRoot := Tray.Root
+	Path := MenuReloadReplay_PathOf(Tray.Identity.ItemId)
+	AssertEqual(Canonical, Path.HasOwnProp("ReplayIdentity"))
+	_MRR_ReloadPending()
+	Before := Fixture.Runs.Length
+	AssertEqual("", MenuCommandRun(Tray.Command, ["Toggle", Tray.Position, Tray.Sub],
+		0, () => false, _MRR_Arm.Bind(Fixture), Tray.Identity))
+	AssertEqual(Before, Fixture.Runs.Length, "no configuration command runs while its reload owns the barrier")
+	AssertEqual(1, MenuReloadReplay_HeldCount())
+	AssertEqual(1, Fixture.Armed.Length)
+	return Path
+}
+
+_MRRF_Refused(Canonical, Mode, Fixture) {
+	global _MenuReloadReplayRoot
+	Old := _MRRF_Build(Fixture, "obsolete", Canonical)
+	HeldPath := _MRRF_Hold(Fixture, Old, Canonical)
+	Current := _MRRF_Build(Fixture, "current", Canonical)
+	_MenuReloadReplayRoot := Current.Root
+	switch Mode {
+		case "missing": Current.Sub.Delete("Toggle")
+		case "disabled-leaf": Current.Sub.Disable("Toggle")
+		case "disabled-parent": Current.Root.Disable("Features")
+		case "moved-context": Current.Root.Rename("Features", "Other context")
+		case "other-action":
+			Row := MenuRenderer_CommandRow("script_control_group", "scope_clear",
+				Map("scope_clear", _MRR_Command.Bind(Fixture.Runs, "wrong action")))
+			AssertTrue(Row is Map)
+			Row["label"] := "Toggle"
+			AssertEqual(1, MenuRenderer_AppendRows(Current.Sub, "refused reload fixture", "clear", [Row]))
+			AssertFalse(_MenuReloadReplayIdentityOf(_MenuItemIdAtPosition(Current.Sub, 0)) == HeldPath.ReplayIdentity,
+				"the current caption names a different real declared action")
+		case "ambiguous":
+			Identity := Canonical ? HeldPath.ReplayIdentity : ""
+			AssertEqual(1, RegisterMenuItemInsert(Current.Sub, "1&", "Toggle",
+				_MRR_Command.Bind(Fixture.Runs, "ambiguous twin"), Identity))
+			Matches := 0
+			loop _MenuReloadReplayCount(Current.Sub.Handle)
+				if _MenuReloadReplayLabel(Current.Sub.Handle, A_Index - 1) == "Toggle"
+					Matches += 1
+			AssertEqual(2, Matches, "the actual native menu contains two equal captions")
+			AssertTrue(_MenuItemIdAtPosition(Current.Sub, 0) != _MenuItemIdAtPosition(Current.Sub, Current.Position),
+				"the duplicate rows have different real tracked command IDs")
+	}
+	MenuDispatcher_PruneMenu(Current.Sub)
+	AssertTrue(_MenuCommandRegistrationCurrent(Old.Identity),
+		"the retained native Menu is still alive, so the obsolete callback could run before this fix")
+	_MRR_ReloadEnded()
+	_MRR_RunArmed(Fixture)
+	AssertEqual(0, MenuReloadReplay_HeldCount(), "a refused reload releases the exact held intent once")
+	AssertEqual(0, Fixture.Armed.Length)
+	AssertEqual(Mode == "replaced" ? 1 : 0, Fixture.Runs.Length,
+		"only a unique enabled current row may execute; no obsolete callback may run")
+	if Mode == "replaced" {
+		AssertEqual("current", Fixture.Runs[1].Who)
+		AssertEqual("Toggle", Fixture.Runs[1].Name)
+		AssertEqual(Current.Position, Fixture.Runs[1].Position)
+		AssertEqual(Current.Sub.Handle, Fixture.Runs[1].Handle, "dispatch receives the actual current native arguments")
+		; Also cover a real explicit retirement, without deleting dictionary entries
+		; or relying on native ID reuse. The next held Menu truly loses its rows.
+		_MRRF_Hold(Fixture, Current, Canonical)
+		Next := _MRRF_Build(Fixture, "next", Canonical)
+		_MenuReloadReplayRoot := Next.Root
+		Current.Sub.Delete()
+		MenuDispatcher_PruneMenu(Current.Sub)
+		AssertFalse(_MenuCommandRegistrationCurrent(Current.Identity), "actual native deletion retires this registration")
+		_MRR_ReloadEnded()
+		_MRR_RunArmed(Fixture)
+		AssertEqual(2, Fixture.Runs.Length)
+		AssertEqual("next", Fixture.Runs[2].Who, "a retired predecessor also resolves through the current tray")
+		AssertEqual(Next.Sub.Handle, Fixture.Runs[2].Handle)
+		AssertEqual(0, MenuReloadReplay_HeldCount())
+		AssertEqual(0, Fixture.Armed.Length)
+	}
+	AssertTrue(MenuReloadReplay_Publish(Fixture.File))
+	AssertFalse(FileExist(Fixture.File) != "", "a resolved or refused command cannot leak into a later reload")
+}
+
+for _MRRF_Canonical in [false, true]
+	for _MRRF_Mode in ["replaced", "missing", "disabled-leaf", "disabled-parent", "ambiguous"]
+		Test("menu reload refusal: " . (_MRRF_Canonical ? "canonical" : "labels") . " " . _MRRF_Mode
+			. " resolves the retained current row (menu-refused-reload-rebuild)",
+			_MRR_Run.Bind(_MRRF_Refused.Bind(_MRRF_Canonical, _MRRF_Mode)))
+
+Test("menu reload refusal: a changed declared action cannot reuse the retained caption (menu-refused-reload-rebuild)",
+	_MRR_Run.Bind(_MRRF_Refused.Bind(true, "other-action")))
+Test("menu reload refusal: a moved declared context cannot adopt the held action (menu-refused-reload-rebuild)",
+	_MRR_Run.Bind(_MRRF_Refused.Bind(true, "moved-context")))
+
+
 
 
 

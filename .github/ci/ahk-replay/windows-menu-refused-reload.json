@@ -1,0 +1,4 @@
+{
+	"expected_count": 12,
+	"filters": [{ "contains": "menu-refused-reload-rebuild", "expected_count": 12 }]
+}

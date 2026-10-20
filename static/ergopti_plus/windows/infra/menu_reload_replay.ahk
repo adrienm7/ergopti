@@ -45,12 +45,14 @@ global _MenuReloadReplayRoot := 0
  * Decides whether a menu command waits for the pending reload's successor.
  * @param {Integer} HeldKey The key a previous look returned, 0 for a new command.
  * @param {Object|Integer} Registration The command's native item identity, or 0.
+ * @param {Array|Integer} RefusedPath The retained path after a refused reload, or 0.
  * @returns {Integer} 0 to run the command here, a positive key to look again
  *     later, -1 when the command was already handed to the successor.
  */
-MenuReloadReplay_Hold(HeldKey, Registration) {
+MenuReloadReplay_Hold(HeldKey, Registration, &RefusedPath := unset) {
 	global _MenuReloadReplayHeld, _MenuReloadReplayNextKey, _MenuReloadReplayPublished
 	global MENU_STARTUP_MAX_PENDING
+	RefusedPath := 0
 	if !(HeldKey is Integer) || HeldKey < 0
 		throw TypeError("A held menu command key must be a nonnegative integer.")
 	Active := ReloadTerminalHandoffActive()
@@ -64,7 +66,8 @@ MenuReloadReplay_Hold(HeldKey, Registration) {
 			return HeldKey
 		Path := _MenuReloadReplayHeld[HeldKey]
 		_MenuReloadReplayHeld.Delete(HeldKey)
-		try LoggerInfo("MenuDispatcher", "The reload ended without a successor; the held menu command '{1}' runs here.",
+		RefusedPath := Path
+		try LoggerInfo("MenuDispatcher", "The reload ended without a successor; the held menu command '{1}' resolves against the current tray.",
 			MenuReloadReplay_Describe(Path))
 		return 0
 	}
@@ -306,6 +309,11 @@ _MenuReloadReplayResolveLabels(Path) {
 		Loop _MenuReloadReplayCount(Handle) {
 			Position := A_Index - 1
 			if _MenuReloadReplayLabel(Handle, Position) != Wanted
+				continue
+			Flags := DllCall("GetMenuState", "Ptr", Handle, "UInt", Position, "UInt", 0x400, "UInt")
+			if Flags == 0xFFFFFFFF
+				throw OSError(A_LastError, A_ThisFunc, "The replay row's current state could not be read.")
+			if Flags & 0x3
 				continue
 			Sub := TrayMenuSubmenuHandle(Handle, Position)
 			if Last ? !Sub : Sub {
