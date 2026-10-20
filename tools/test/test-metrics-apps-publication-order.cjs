@@ -15,23 +15,13 @@ const path = require('node:path');
 const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 
-const source = fs.readFileSync(
-	path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/metrics_apps/script.js'),
-	'utf8'
-);
+const { loadMetricsAppsPage } = require('./support/metrics-apps-page.cjs');
+const cases = [];
 let passed = 0;
 let failed = 0;
 
 function fixture() {
-	const context = vm.createContext({ window: {}, document: { addEventListener() {} }, console });
-	vm.runInContext(
-		fs.readFileSync(
-			path.resolve(__dirname, '../../static/ergopti_plus/_shared/ui/host_bridge.js'),
-			'utf8'
-		),
-		context
-	);
-	vm.runInContext(source, context);
+	const { context } = loadMetricsAppsPage();
 	vm.runInContext('initDashboard = function() {}; renderDashboard = function() {};', context);
 	return {
 		context,
@@ -45,6 +35,10 @@ function fixture() {
 }
 
 function test(name, callback) {
+	cases.push({ name, callback });
+}
+
+function run({ name, callback }) {
 	try {
 		callback();
 		passed++;
@@ -297,6 +291,165 @@ end)
 	assert.equal(vm.runInContext(older, reordered.context), false);
 	assert.deepEqual(reordered.state()[0], { '2026-01-01': { Editor: { app_time_ms: 20 } } });
 });
+
+test('loaded HTML admits the exact Lua readiness query and paints normal native publications', () => {
+	const f = loadMetricsAppsPage();
+	assert.equal(
+		f.scripts.length,
+		11,
+		'all ten external scripts and the actual inline script execute'
+	);
+	assert.equal(f.scripts.includes('script.js'), false, 'the legacy dashboard is not loaded');
+	const lua = fs.readFileSync(
+		path.resolve(__dirname, '../../static/ergopti_plus/macos/ui/metrics_apps/init.lua'),
+		'utf8'
+	);
+	const query =
+		/return submit_javascript\(generation, webview, "(typeof window\.[A-Za-z_$][A-Za-z0-9_$]*)"/.exec(
+			lua
+		);
+	assert.ok(query, 'readiness is extracted from the actual native controller');
+	assert.ok(
+		lua.includes('if kind == "function" then'),
+		'the native controller requires a function'
+	);
+	assert.equal(vm.runInContext(query[1], f.context), 'function');
+	assert.equal(typeof f.context.publishMetricsAppsCategories, 'function');
+	const manifest = {
+		'2026-10-01': { Editor: { app_time_ms: 60000, chars: 10, category: 'Productivity' } }
+	};
+	assert.equal(f.context.publishMetricsAppsData(manifest, {}, {}, revision(1, 1)), true);
+	const body = f.elements.get('apps-tbody');
+	assert.equal(body.children.length, 1, 'the actual renderer paints the accepted application');
+	assert.match(body.children[0].children[0].innerHTML, /Editor/);
+	assert.equal(body.children[0].children[2].textContent, '1m');
+	assert.equal(
+		f.context.publishMetricsAppsCategories({ Editor: { type: 'Productivity', score: 2 } }, 2),
+		true
+	);
+	assert.equal(f.context.getAppCategory('Editor').score, 2);
+	assert.equal(f.diagnostics.filter(({ level }) => level === 'error').length, 0);
+});
+
+test('loaded native publications invalidate projections without changing selected filters', () => {
+	const f = fixture();
+	const manifest = {
+		'2026-10-01': { Editor: { app_time_ms: 1000, chars: 10, category: 'Utilities' } }
+	};
+	f.bootstrap(manifest, {}, {}, revision(1, 1));
+	vm.runInContext(
+		"currentPeriod='all';currentCategoryFilter=new Set([getAppCategory('Editor', 'Utilities').type]);",
+		f.context
+	);
+	const selected = vm.runInContext('JSON.stringify([...currentCategoryFilter])', f.context);
+	const first = f.context.getAggregatedData();
+	f.categories({ Editor: { type: 'Utilities', score: 1 } }, 2);
+	const edited = f.context.getAggregatedData();
+	assert.notStrictEqual(edited, first);
+	assert.equal(edited.rich.prod_split.positive_ms, 1000);
+	assert.equal(f.context.getAppCategory('Editor').score, 1);
+	assert.equal(vm.runInContext('JSON.stringify([...currentCategoryFilter])', f.context), selected);
+	f.bootstrap(
+		{ '2026-10-01': { Editor: { app_time_ms: 2000, chars: 20 } } },
+		{},
+		{},
+		revision(2, 1)
+	);
+	const updated = f.context.getAggregatedData();
+	assert.notStrictEqual(updated, edited);
+	assert.equal(updated.apps.Editor.chars, 20);
+	assert.equal(f.context.getAppCategory('Editor').score, 1);
+});
+
+for (const host of ['windows', 'linux']) {
+	test(`actual ${host} HTML transport retains untagged replacement behavior`, () => {
+		const f = loadMetricsAppsPage(host);
+		const first = { '2026-10-01': { Editor: { app_time_ms: 60000, chars: 10 } } };
+		const second = { '2026-10-01': { Browser: { app_time_ms: 120000, chars: 20 } } };
+		const send = (manifest, categories) => {
+			const payload = { metrics_manifest: manifest, user_categories: categories, app_icons: {} };
+			if (host === 'windows') {
+				const listener = f.messageListeners.find(({ name }) => name === 'message');
+				assert.ok(listener, 'actual inline WebView2 message handler is installed');
+				listener.callback({ data: { type: 'prefetch', blob: payload } });
+			} else {
+				assert.equal(typeof f.context.__hostBridgeResponse, 'function');
+				f.context.__hostBridgeResponse(
+					'metrics_apps_bridge',
+					false,
+					encodeURIComponent(JSON.stringify(payload))
+				);
+			}
+		};
+		send(first, { Editor: { type: 'Productivity', score: 1 } });
+		send(second, { Browser: { type: 'Utilities', score: 2 } });
+		assert.equal(f.context.getAppCategory('Browser').score, 2);
+		assert.equal(
+			f.elements
+				.get('apps-tbody')
+				.children.some((row) => /Browser/.test(row.children[0].innerHTML)),
+			true
+		);
+		assert.equal(f.diagnostics.filter(({ level }) => level === 'error').length, 0);
+	});
+}
+
+test('defensive order control exposes native publishers only after the final external script', () => {
+	const phases = [];
+	const page = loadMetricsAppsPage('macos', (name, context) => {
+		phases.push({
+			name,
+			data: typeof context.publishMetricsAppsData,
+			categories: typeof context.publishMetricsAppsCategories,
+			ownsData: Object.prototype.hasOwnProperty.call(context, 'publishMetricsAppsData'),
+			ownsCategories: Object.prototype.hasOwnProperty.call(context, 'publishMetricsAppsCategories'),
+			privateStateExposed: Object.prototype.hasOwnProperty.call(context, 'metricsAppsPublications'),
+			dependencies: [
+				context.initDashboard,
+				context.renderDashboard,
+				context.renderHourWeekdayHeatmap,
+				context.openAppDrilldown
+			].every((value) => typeof value === 'function')
+		});
+	});
+	const external = phases.filter(({ name }) => name !== '#inline');
+	assert.equal(external.length, 10);
+	assert.equal(external[external.length - 1].name, 'modal.js');
+	for (const phase of external.slice(0, -1)) {
+		assert.equal(
+			phase.ownsData,
+			false,
+			`data readiness must not precede dependencies: ${phase.name}`
+		);
+		assert.equal(
+			phase.ownsCategories,
+			false,
+			`category readiness must not precede dependencies: ${phase.name}`
+		);
+	}
+	for (const phase of phases) assert.equal(phase.privateStateExposed, false);
+	for (const phase of phases.slice(phases.findIndex(({ name }) => name === 'modal.js'))) {
+		assert.equal(phase.data, 'function');
+		assert.equal(phase.categories, 'function');
+		assert.equal(phase.dependencies, true);
+	}
+	assert.equal(page.scripts.includes('script.js'), false);
+});
+
+const only = process.argv.find((value) => value.startsWith('--only='))?.slice(7);
+const indexArg = process.argv.find((value) => value.startsWith('--case-index='));
+const caseIndex = indexArg === undefined ? null : Number(indexArg.slice(13));
+assert.ok(
+	caseIndex === null || (Number.isSafeInteger(caseIndex) && caseIndex >= 0),
+	'valid case index'
+);
+const selected = cases.filter(
+	({ name }, index) =>
+		(only === undefined || name === only) && (caseIndex === null || index === caseIndex)
+);
+assert.ok(selected.length > 0, 'the selected test must exist');
+if (process.argv.includes('--reverse')) selected.reverse();
+for (const entry of selected) run(entry);
 
 console.log(`metrics publication ordering: ${passed} passed, ${failed} failed`);
 process.exitCode = failed ? 1 : 0;

@@ -3,6 +3,57 @@
 // ===================================
 // ===================================
 
+// These watermarks belong to this document, not to the native submission queue.
+let appliedManifestRevision = -1;
+let appliedCategoriesRevision = -1;
+
+/** Refuses invalid revisions before any component is mutated. */
+function validatePublicationRevision(revision) {
+	if (!Number.isSafeInteger(revision) || revision < 0) {
+		throw new TypeError('Metrics publication requires a nonnegative safe integer revision');
+	}
+}
+
+const metricsAppsPublications = {
+	/** Publishes a native category edit without admitting a reordered older edit. */
+	categories(newCategories, revision) {
+		validatePublicationRevision(revision);
+		if (revision <= appliedCategoriesRevision) return false;
+		userCategories = newCategories || {};
+		appliedCategoriesRevision = revision;
+		invalidateAggregationCache();
+		renderDashboard();
+		return true;
+	},
+
+	/** Publishes independently versioned native data and categories in this document. */
+	data(newManifest, newCategories, newIcons, revisions) {
+		if (!revisions || typeof revisions !== 'object' || Array.isArray(revisions)) {
+			throw new TypeError('Metrics publication requires component revisions');
+		}
+		validatePublicationRevision(revisions.manifest_revision);
+		validatePublicationRevision(revisions.categories_revision);
+		let changed = false;
+		if (revisions.manifest_revision > appliedManifestRevision) {
+			manifestData = newManifest || {};
+			appIcons = newIcons || {};
+			appliedManifestRevision = revisions.manifest_revision;
+			changed = true;
+		}
+		if (revisions.categories_revision > appliedCategoriesRevision) {
+			userCategories = newCategories || {};
+			appliedCategoriesRevision = revisions.categories_revision;
+			changed = true;
+		}
+		// Applied watermarks remain authoritative even if drawing subsequently throws.
+		if (changed) {
+			invalidateAggregationCache();
+			initDashboard();
+		}
+		return changed;
+	}
+};
+
 window.updateUserCategories = function (newCategories) {
 	userCategories = newCategories || {};
 	invalidateAggregationCache();
