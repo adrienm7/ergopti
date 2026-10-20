@@ -23,7 +23,7 @@ const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-login-startup-'))
 const posix = (value) =>
 	value.replaceAll('\\', '/').replace(/^([A-Za-z]):/, (_, drive) => `/${drive.toLowerCase()}`);
 try {
-	const installed = path.join(sandbox, 'a space', 'lib/ergopti/linux/install');
+	const installed = path.join(sandbox, "a space d'été Ω", 'lib/ergopti/linux/install');
 	const stubs = path.join(sandbox, 'stubs');
 	const config = path.join(sandbox, 'config');
 	const calls = path.join(sandbox, 'calls');
@@ -46,7 +46,21 @@ try {
 	}
 	fs.writeFileSync(
 		path.join(stubs, 'systemctl'),
-		'#!/bin/bash\nprintf "%s\\n" "$*" >> "$CALL_LOG"\nif [ "$2" = is-enabled ]; then exit 1; fi\nif [ "$4" = list-unit-files ]; then [ "${NO_UNIT:-0}" = 1 ] || echo "ergopti-hotstrings.service disabled enabled"; exit 0; fi\n[ "${NO_UNIT:-0}" != 1 ] && [ "${REFUSE:-0}" != 1 ]\n',
+		[
+			'#!/bin/bash',
+			'printf "%s\\n" "$*" >> "$CALL_LOG"',
+			'if [ "$2" = is-enabled ]; then exit 1; fi',
+			'if [ "$4" = list-unit-files ]; then',
+			'  [ "${QUERY_REFUSE:-0}" != 1 ] || exit 23',
+			'  if [ "${NO_UNIT:-0}" = 1 ]; then',
+			'    [ "$#" -eq 4 ] || exit 1',
+			'    printf "%s\\n" "fooergopti-hotstrings.service disabled enabled" "ergopti-hotstrings.service.other disabled enabled"',
+			'  else echo "ergopti-hotstrings.service disabled enabled"; fi',
+			'  exit 0',
+			'fi',
+			'[ "${NO_UNIT:-0}" != 1 ] && [ "${REFUSE:-0}" != 1 ]',
+			''
+		].join('\n'),
 		{ mode: 0o755 }
 	);
 	const env = {
@@ -95,12 +109,27 @@ try {
 		disabled,
 		'failed service mutation cannot publish a false enabled state'
 	);
+	assert.notEqual(run('enable', { QUERY_REFUSE: '1' }).status, 0);
+	assert.equal(
+		fs.readFileSync(desktop, 'utf8'),
+		disabled,
+		'a failed metadata query cannot publish a false enabled state'
+	);
+	const beforeMissing = fs.readFileSync(calls, 'utf8').length;
 	assert.equal(
 		run('enable', { NO_UNIT: '1' }).status,
 		0,
 		'an installation without a service can use XDG startup'
 	);
 	assert.equal(run('status').stdout.trim(), 'enabled');
+	assert.doesNotMatch(
+		fs.readFileSync(calls, 'utf8').slice(beforeMissing),
+		/--no-reload disable/,
+		'nearby unit names cannot grant authority to disable the exact service'
+	);
+	assert.equal(run('disable', { NO_UNIT: '1' }).status, 0);
+	assert.equal(run('status').stdout.trim(), 'disabled');
+	assert.match(fs.readFileSync(desktop, 'utf8'), /^Hidden=true$/m);
 	fs.writeFileSync(desktop, '[Desktop Entry]\nExec=/other/program\n');
 	assert.equal(
 		run('status').stdout.trim(),
