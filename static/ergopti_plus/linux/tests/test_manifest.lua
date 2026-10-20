@@ -162,6 +162,7 @@ return {
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_device_watchdog_managed_source_cohort",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_remap_departure",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_remap_multisource",
+	"tests.unit.adapters.keyboard_hook.test_key_combination_multidevice_passthrough",
 	"tests.unit.adapters.synthetic_input.test_modifier_broker_consumers",
 	"tests.unit.adapters.synthetic_input.test_modifier_broker_reentrant",
 	"tests.unit.adapters.keyboard_hook.test_keyboard_hook_safety",
