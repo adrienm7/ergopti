@@ -4302,6 +4302,9 @@ checked_when = ["llm_enabled"]
 # The row used to vanish in those states, leaving the IA submenu without a switch.
 disabled_when = ["llm_toggle_ready"]
 disabled_reason_key = "menu.llm.save_unavailable"
+# A configuration saved by a newer version is read-only for the session: the
+# row names that cause, since resuming or Diagnostics cannot lift it.
+disabled_reasons = [{ when = "config_newer_schema", reason_key = "menu.read_only.newer_schema" }]
 category = "LLM"
 
 # The restore alone: the maintainer retired the AI menu's « Tout effacer » on
@@ -4311,6 +4314,11 @@ category = "LLM"
 type = "command"
 id = "scope_restore"
 i18n = "common.restore_recommended"
+# The restore writes the AI section: greyed, like the switch, whenever the
+# configuration cannot be saved, and with the same newer-configuration cause.
+disabled_when = ["llm_scope_ready"]
+disabled_reason_key = "menu.llm.save_unavailable"
+disabled_reasons = [{ when = "config_newer_schema", reason_key = "menu.read_only.newer_schema" }]
 
 [[menu.llm_menu]]
 type = "---"

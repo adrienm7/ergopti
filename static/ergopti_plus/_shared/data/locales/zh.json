@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%s已选模型：%s",
 	"config.read_only.newer_schema": "此配置由较新版本的 ErgoptiPlus 保存。您的设置已保留，未作更改。请先更新并重新加载 ErgoptiPlus，再修改设置。",
 	"menu.llm.save_unavailable": "不可用: 如果 ErgoptiPlus 已暂停，请恢复运行；或打开诊断，查看无法保存设置的原因。",
+	"menu.read_only.newer_schema": "由较新版本保存：请先更新 ErgoptiPlus 并重新加载，再修改设置。",
 	"healthcheck.collection.start": "收集 Windows 诊断",
 	"healthcheck.collection.guided": "键盘和屏幕引导步骤",
 	"healthcheck.collection.skip": "跳过实体检查步骤",

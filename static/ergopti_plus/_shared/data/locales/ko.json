@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%s선택된 모델: %s",
 	"config.read_only.newer_schema": "이 구성은 더 최신 버전의 ErgoptiPlus에서 저장되었습니다. 설정은 그대로 보존되었습니다. 설정을 변경하기 전에 ErgoptiPlus를 업데이트하고 다시 불러오세요.",
 	"menu.llm.save_unavailable": "사용할 수 없음: ErgoptiPlus가 일시 중지되어 있다면 재개하거나, 진단을 열어 설정을 저장할 수 없는 이유를 확인하세요.",
+	"menu.read_only.newer_schema": "최신 버전에서 저장됨: 설정을 변경하기 전에 ErgoptiPlus를 업데이트한 다음 다시 불러오세요.",
 	"healthcheck.collection.start": "Windows 진단 수집",
 	"healthcheck.collection.guided": "키보드 및 화면 확인 단계",
 	"healthcheck.collection.skip": "물리적 확인 건너뛰기",

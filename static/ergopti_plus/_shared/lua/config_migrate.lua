@@ -185,6 +185,10 @@ end
 -- module cannot grant readiness. The normal loader constructs one journal;
 -- arbitrary replacement searchers/debug mutation are outside this boundary.
 local destinations = {}
+-- The boot status that first made a destination read-only ("newer", "invalid",
+-- "unsupported", "failed"): the menus name a newer file's cause on the rows
+-- it greys. Refusals last for the session, so the first cause stays the cause.
+local read_only_statuses = {}
 local validated_registries = setmetatable({}, { __mode = "k" })
 local admission_factory
 
@@ -1235,6 +1239,16 @@ function M.read_only_reason(path)
 	return writer().write_refusal(path)
 end
 
+--- The boot migration status that made path read-only this session, the
+--- counterpart of the Windows ConfigSchemaReadOnlyStatus.
+--- @param path string
+--- @return string|nil status "newer", "invalid", "unsupported" or "failed";
+---   nil while path is writable or was refused by another owner.
+function M.read_only_status(path)
+	if type(path) ~= "string" or path == "" or writer().write_refusal(path) == nil then return nil end
+	return read_only_statuses[(destination_key(path))]
+end
+
 -- The locale key of the notice a newer file earns, shared with the Windows
 -- driver's refused-save notification (config_io.ahk).
 M.NEWER_SCHEMA_NOTICE_KEY = "config.read_only.newer_schema"
@@ -1306,6 +1320,7 @@ function M.run(opts)
 		result.status = status
 		result.detail = detail
 		result.read_only = true
+		if read_only_statuses[key] == nil then read_only_statuses[key] = status end
 		writer().refuse_writes(path, detail)
 		log.error(LOG, "Config migration of '%s' refused (%s): %s. The file is left untouched and "
 			.. "this session will not write it.", path, status, tostring(detail))

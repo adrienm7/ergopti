@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sמודל נבחר: %s",
 	"config.read_only.newer_schema": "התצורה הזו נשמרה בגרסה חדשה יותר של ErgoptiPlus. ההגדרות שלך נשמרו ללא שינוי. יש לעדכן את ErgoptiPlus ולטעון אותו מחדש לפני שינוי ההגדרות.",
 	"menu.llm.save_unavailable": "לא זמין: יש להמשיך את פעולת ErgoptiPlus אם היא מושהית, או לפתוח את האבחון כדי לבדוק מדוע אי אפשר לשמור הגדרות.",
+	"menu.read_only.newer_schema": "נשמר בגרסה חדשה יותר: יש לעדכן את ErgoptiPlus ולטעון אותו מחדש לפני שינוי ההגדרות.",
 	"healthcheck.collection.start": "איסוף אבחון Windows",
 	"healthcheck.collection.guided": "שלבים מודרכים למקלדת ולמסך",
 	"healthcheck.collection.skip": "דילוג על שלבים פיזיים",

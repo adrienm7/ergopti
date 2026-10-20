@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sВыбранная модель: %s",
 	"config.read_only.newer_schema": "Эта конфигурация сохранена более новой версией ErgoptiPlus. Ваши настройки сохранены без изменений. Перед изменением настроек обновите ErgoptiPlus и перезагрузите его.",
 	"menu.llm.save_unavailable": "Недоступно: возобновите работу ErgoptiPlus, если она приостановлена, или откройте диагностику, чтобы узнать, почему настройки не сохраняются.",
+	"menu.read_only.newer_schema": "Сохранено более новой версией: обновите ErgoptiPlus и перезагрузите его, прежде чем менять настройки.",
 	"healthcheck.collection.start": "Собрать диагностику Windows",
 	"healthcheck.collection.guided": "Проверки клавиатуры и экрана",
 	"healthcheck.collection.skip": "Пропустить физические проверки",

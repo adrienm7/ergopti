@@ -20,9 +20,7 @@
 ; loses. NotifyFn is injectable so behavioural tests can count the signal
 ; without displaying a real TrayTip.
 ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchanged := true) {
-	global ConfigurationFile
-	NewerSchema := IsSet(ConfigurationFile) && (ConfigurationFile is String)
-		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
+	NewerSchema := ConfigNewerSchemaReadOnly()
 	if NewerSchema
 		Detail := "the startup configuration uses a newer schema; update ErgoptiPlus and reload before changing settings"
 	if (Detail != "") {
@@ -49,6 +47,15 @@ ConfigReportPersistenceFailure(Context, NotifyFn := 0, Detail := "", StateUnchan
 		try LoggerError("Config", "Could not present the persistence failure notification: {1}.", Err.Message)
 	}
 	return false
+}
+
+; True when the startup configuration was saved by a newer schema: the boot
+; migration preserved it and every write is refused for the session. The
+; refused-save notice and the menus' greyed persistence rows name this cause.
+ConfigNewerSchemaReadOnly() {
+	global ConfigurationFile
+	return IsSet(ConfigurationFile) && (ConfigurationFile is String)
+		&& ConfigSchemaReadOnlyStatus(ConfigurationFile) == "newer"
 }
 
 ; SaveFullConfig has three explicit outcomes. Callers must compare against the

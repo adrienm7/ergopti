@@ -149,7 +149,7 @@ _LMDG_ToggleRoute(Build, Render, Getters) {
 		'm)^[ \t]*(MenuRenderer_Build)\("llm_menu", "LLM", DynamicHandlers, _LLM_Menu_GroupBuilders\(\),[ \t]*\n[ \t]*"", Commands, StateGetters, StagedHandle, GroupDisabled\)', 2)
 	; The factored getter must retain both pause and genuine full-state admission.
 	Ready := _LMDG_Statement(Getters,
-		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\)\)[ \t]*$', 1)
+		'm)^[ \t]*(return) Map\("llm_enabled", \(\) => _LLM_Menu\["enabled"\],[ \t]*\n[ \t]*"llm_toggle_ready", \(\) => !A_IsSuspended && ConfigFullStateCanPersist\(\),[ \t]*$', 1)
 	if !(Command && Reader && Ready && Publish && Command < Reader && Reader < Publish)
 		return false
 	Stage := _LMDG_Statement(Build, 'm)^[ \t]*(try) \{[ \t]*$', 1)

@@ -94,6 +94,40 @@ helpers.describe("IA submenu on/off row", function()
 				"row " .. index .. " of the AI submenu is a clear row")
 		end
 	end)
+
+	-- A configuration saved by a newer version is read-only for the session:
+	-- the switch and the restore named only the generic "resume or open
+	-- Diagnostics" cause, which neither action can lift, and a restore row kept
+	-- from an earlier build still ran its scope transaction.
+	helpers.it("names a newer configuration on its greyed persistence rows and refuses their retained commands", function()
+		with_activation("ollama", { true }, nil, function(_action, _state, calls)
+			local read_only, scoped = false, 0
+			package.loaded["config_migrate"] = {
+				read_only_reason = function() return read_only and "newer schema" or nil end,
+				read_only_status = function() return read_only and "newer" or nil end,
+			}
+			calls.root_deps.apply_preference_scope = function()
+				scoped = scoped + 1
+				return true
+			end
+			calls.handler.build_item()
+			local retained = calls.render_ctx
+			read_only = true
+			helpers.assert_eq(retained.commands.scope_restore(), false, "a retained restore rechecks the configuration")
+			helpers.assert_eq(retained.commands.llm_toggle(), false, "a retained switch rechecks the configuration")
+			helpers.assert_eq(scoped, 0, "no scope transaction runs on a read-only configuration")
+			helpers.assert_eq(calls.saves, 0, "no preference save runs on a read-only configuration")
+
+			calls.handler.build_item()
+			local rows = render(calls.render_ctx)
+			for index, label in ipairs({ "menu.llm.enable", "common.restore_recommended" }) do
+				helpers.assert_eq(rows[index] and rows[index].title, label .. " — menu.read_only.newer_schema",
+					label .. " names the newer configuration as its cause")
+				helpers.assert_eq(rows[index].disabled, true, label .. " is greyed")
+				helpers.assert_nil(rows[index].fn, label .. " has nothing to run")
+			end
+		end)
+	end)
 end)
 
 

@@ -3378,6 +3378,7 @@
 	"menu.llm.model_parent_with_health": "%sValgt modell: %s",
 	"config.read_only.newer_schema": "Denne konfigurasjonen ble lagret med en nyere versjon av ErgoptiPlus. Innstillingene dine er bevart. Oppdater ErgoptiPlus og last det inn på nytt før du endrer innstillinger.",
 	"menu.llm.save_unavailable": "Utilgjengelig: gjenoppta ErgoptiPlus hvis det er satt på pause, eller åpne Diagnostikk for å se hvorfor innstillingene ikke kan lagres.",
+	"menu.read_only.newer_schema": "Lagret av en nyere versjon: oppdater ErgoptiPlus, og last det inn på nytt før du endrer innstillinger.",
 	"healthcheck.collection.start": "Samle Windows-diagnostikk",
 	"healthcheck.collection.guided": "Veiledede trinn med tastatur og skjerm",
 	"healthcheck.collection.skip": "Hopp over fysiske trinn",
