@@ -1,5 +1,5 @@
 {
-	"expected_count": 68,
+	"expected_count": 141,
 	"filters": [
 		{
 			"contains": "llm-deferred-hotkeys-enable-owner",
@@ -32,6 +32,38 @@
 		{
 			"contains": "ctrl-alt-numpad-row-scope",
 			"expected_count": 6
+		},
+		{
+			"contains": "number-row-edges-boot-admission",
+			"expected_count": 8
+		},
+		{
+			"contains": "layout-row-chosen-magic-scope",
+			"expected_count": 4
+		},
+		{
+			"contains": "llm-delete-confirmation-owner",
+			"expected_count": 10
+		},
+		{
+			"contains": "llm-api-remove-confirmation-source",
+			"expected_count": 8
+		},
+		{
+			"contains": "groups247-native-dispatch",
+			"expected_count": 9
+		},
+		{
+			"contains": "builtin-number-row-magic-owner",
+			"expected_count": 16
+		},
+		{
+			"contains": "healthcheck-config-encoding",
+			"expected_count": 8
+		},
+		{
+			"contains": "llm-api-post-save-validation-owner",
+			"expected_count": 10
 		}
 	]
 }
