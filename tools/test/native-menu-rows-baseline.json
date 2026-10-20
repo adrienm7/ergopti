@@ -1,20 +1,19 @@
 {
 	"_comment": "Native menu rows still built in driver code (tools/test/test-native-menu-rows.cjs). Lower with --update-baseline as rows move to the shared manifest; never raise.",
 	"windows": {
-		"count": 16,
+		"count": 15,
 		"sites": [
-			"windows/ui/menu/menu_hotstrings.ahk:945 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1109 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1294 append",
-			"windows/ui/menu/menu_hotstrings.ahk:1316 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:416 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:453 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:465 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:492 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:499 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:503 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:507 append",
-			"windows/ui/menu/menu_llm/menu_main.ahk:511 append",
+			"windows/ui/menu/menu_hotstrings.ahk:949 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1113 append",
+			"windows/ui/menu/menu_hotstrings.ahk:1305 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:473 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:510 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:522 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:549 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:556 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:560 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:564 append",
+			"windows/ui/menu/menu_llm/menu_main.ahk:568 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:259 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:291 append",
 			"windows/ui/menu/menu_llm/menu_models.ahk:297 append",
@@ -24,12 +23,12 @@
 	"macos": {
 		"count": 2,
 		"sites": [
-			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:830 static",
+			"macos/ui/menu/menu_llm/models_manager_mlx_hf.lua:875 static",
 			"macos/ui/menu/menu_llm/profiles_manager.lua:1068 static"
 		]
 	},
 	"linux": {
 		"count": 1,
-		"sites": ["linux/ui/menu/menu_builder.lua:2376 static"]
+		"sites": ["linux/ui/menu/menu_builder.lua:2412 static"]
 	}
 }

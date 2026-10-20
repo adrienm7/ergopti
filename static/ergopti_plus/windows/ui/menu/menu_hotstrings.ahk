@@ -1030,7 +1030,7 @@ _HS_PersonalRows(Options := unset) {
 		RootNode := TreeCopy[""]
 		TreeCopy.Delete("")
 	}
-	if _HS_RenderTree(TreeCopy, "", Rows, OwnedMenus) != true
+	if _HS_RenderTree(TreeCopy, Rows, OwnedMenus) != true
 		return []
 	if (RootNode != false) {
 		FileNodeList := RootNode["tomls"]
@@ -1223,10 +1223,9 @@ _HS_NodeTotal(Node) {
 
 ; Render recursive ext tree (nested folder structure).
 ;
-; ``Rows`` is how the TOP level is called since 2026-08-07: the personal block is
-; a `list` provider, which is handed no menu, so its folders have to come back as
-; row data. The nested levels still take a ParentMenu, because a folder's
-; children genuinely hang off the folder's own Menu. Passing `M` here — the name
+; Every level returns its folders as row data in ``Rows``: the personal block is
+; a `list` provider, which is handed no menu, and each folder hands its
+; subfolders to the declared frame of its own Menu. Passing `M` here — the name
 ; a dynamic handler's menu parameter used to have — is what made the provider
 ; throw and took the entire tray menu down with it.
 ;
@@ -1237,7 +1236,9 @@ _HS_NodeTotal(Node) {
 ; inside one array, and this walk starts a fresh render at each level. So the walk
 ; keeps its own recursion, which is what a filesystem needs, and the renderer
 ; still draws every row, which is what one menu needs.
-_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
+_HS_RenderTree(Tree, Rows, OwnedMenus := unset) {
+	if !(Rows is Array)
+		throw TypeError("A personal folder level returns its rows to the level above it.")
 	LocalOwner := !IsSet(OwnedMenus), HandedOff := false
 	if LocalOwner
 		OwnedMenus := []
@@ -1260,9 +1261,8 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 			}
 		}
 	}
-	; The folder rows of THIS level. They go back to the caller when it asked for
-	; data (the top level, which is a list provider) and are rendered into the
-	; parent's menu otherwise (every level below it).
+	; The folder rows of THIS level go back to the caller as data: the top level
+	; is a list provider, and each folder hands its subfolders to its own frame.
 	FolderRows := []
 	for _, FolderName in FolderNames {
 		Node := Tree[FolderName]
@@ -1287,7 +1287,7 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 			}
 		}
 		SubfolderRows := []
-		if Node["subfolders"].Count > 0 && _HS_RenderTree(Node["subfolders"], "", SubfolderRows, OwnedMenus) != true
+		if Node["subfolders"].Count > 0 && _HS_RenderTree(Node["subfolders"], SubfolderRows, OwnedMenus) != true
 			return false
 		FileRows := []
 		for _, TF in FileNodeList {
@@ -1321,11 +1321,8 @@ _HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {
 	Rendered := MenuRenderer_TemplateRows("hotstring_personal_directory_frame", Map(), Getters, Providers)
 	if !(Rendered is Array)
 		return false
-	if Rows is Array {
-		for Row in Rendered
-			Rows.Push(Row)
-	} else if MenuRenderer_AppendTemplate(ParentMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted
-		return false
+	for Row in Rendered
+		Rows.Push(Row)
 	HandedOff := true
 	return true
 	} catch as ErrorInfo {

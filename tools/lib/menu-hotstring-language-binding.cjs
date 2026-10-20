@@ -2736,7 +2736,11 @@ function personalFileCaptionPublication(source) {
 }
 module.exports.personalFileCaptionPublication = personalFileCaptionPublication;
 
-/** Finite folder contract: complete original owner plus two unique presentation edits. */
+/**
+ * Finite folder contract: complete original owner plus two unique presentation
+ * edits and the retirement of its caller-less parent-menu mode, whose native
+ * append no production level reached.
+ */
 function personalFolderCaptionPublication(source) {
 	try {
 		const donor =
@@ -2749,6 +2753,22 @@ function personalFolderCaptionPublication(source) {
 			[
 				'\t\tFolderLabel := FolderName . (FolderTotal > 0 ? " (" . FmtCount(FolderTotal) . ")" : "")\n\t\tFolderRows.Push(Map("label", FolderLabel, "submenu", FolderMenu))',
 				'\t\t; Preserve positive count coercion before the original outer name coercion.\n\t\tFolderRow := (FolderPositive := FolderTotal > 0,\n\t\t\tFolderCount := FolderPositive ? FmtCount(FolderTotal) . "" : "",\n\t\t\tFolderNameReceipt := FolderName . "",\n\t\t\tCaptionOwner := CaptionPolicy["parent"],\n\t\t\tCaptionOwner != MenuRenderer_PersonalFolderParentRow || Object.Prototype.HasOwnProp.Call(CaptionOwner, "Call")\n\t\t\t\t? false : CaptionOwner.Call(CaptionPolicy, FolderPositive, FolderNameReceipt, FolderCount, FolderMenu))\n\t\tif !(FolderRow is Map)\n\t\t\treturn false\n\t\tFolderRows.Push(FolderRow)'
+			],
+			[
+				'\n\tLocalOwner := !IsSet(OwnedMenus)',
+				'\n\tif !(Rows is Array)\n\t\tthrow TypeError("A personal folder level returns its rows to the level above it.")\n\tLocalOwner := !IsSet(OwnedMenus)'
+			],
+			[
+				"\t; The folder rows of THIS level. They go back to the caller when it asked for\n\t; data (the top level, which is a list provider) and are rendered into the\n\t; parent's menu otherwise (every level below it).\n",
+				'\t; The folder rows of THIS level go back to the caller as data: the top level\n\t; is a list provider, and each folder hands its subfolders to its own frame.\n'
+			],
+			[
+				'_HS_RenderTree(Node["subfolders"], "", SubfolderRows, OwnedMenus)',
+				'_HS_RenderTree(Node["subfolders"], SubfolderRows, OwnedMenus)'
+			],
+			[
+				'\tif Rows is Array {\n\t\tfor Row in Rendered\n\t\t\tRows.Push(Row)\n\t} else if MenuRenderer_AppendTemplate(ParentMenu, "hotstring_personal_directory_frame", Map(), Getters, Providers, &WholeTreeAdmitted) != FolderRows.Length || !WholeTreeAdmitted\n\t\treturn false\n',
+				'\tfor Row in Rendered\n\t\tRows.Push(Row)\n'
 			]
 		];
 		let expected = donor;
@@ -2756,13 +2776,7 @@ function personalFolderCaptionPublication(source) {
 			if (expected.split(before).length !== 2) return false;
 			expected = expected.replace(before, after);
 		}
-		return (
-			owner(
-				source,
-				'_HS_RenderTree(Tree, ParentMenu, Rows := "", OwnedMenus := unset) {',
-				'.ahk'
-			) === expected
-		);
+		return owner(source, '_HS_RenderTree(Tree, Rows, OwnedMenus := unset) {', '.ahk') === expected;
 	} catch {
 		return false;
 	}
