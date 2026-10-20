@@ -100,9 +100,7 @@ class PACSourcePeerTests(unittest.TestCase):
 
     def test_stalled_handshake_never_delays_the_next_tls_request(self):
         context = ssl.create_default_context(cafile=str(self.fixture.root / "ca.pem"))
-        stalled = socket.create_connection(
-            ("127.0.0.1", self.fixture.https.server_port), timeout=3
-        )
+        stalled = socket.create_connection(("127.0.0.1", self.fixture.https.server_port), timeout=3)
         self.addCleanup(stalled.close)
         started = time.monotonic()
         body = self.request("utf8", tls=True, context=context).read()
