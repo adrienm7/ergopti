@@ -80,6 +80,12 @@ _LLM_Menu_OnWarningInstallClick(ItemName := "", ItemPos := 0, MenuObj := 0) {
 	; global, throws inside a hotkey thread while _DriverBootPhase is still
 	; "starting", and the error net treats that as a fatal boot fault: pressing a
 	; debug rescue hotkey killed the boot it was meant to rescue.
+	; With the AI off there is nothing to rescue: the hotkey must not probe or
+	; install Ollama behind a disabled feature (issue #97).
+	if !LLM_Menu_AiEnabled() {
+		try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I ignored: the AI is off.")
+		return
+	}
 	try LoggerInfo("LLM", "Debug hotkey Ctrl+Alt+Shift+I — direct install trigger.")
 	try TrayTip(t("llm.deps.tray_title"), t("llm.deps.install_launching_hotkey"), 0x1)
 	try LLM_Menu_BootstrapOllama(true)
@@ -126,6 +132,8 @@ _LLM_Menu_ApplyToggleCommitted(Candidate, ShowUi := true) {
 		; barrier releases, so it cannot start a nested persistence transaction.
 		SetTimer(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 		LLM_Menu_ScheduleBackendLifecycle(ShowUi)
+		; A boot with the AI off left its hotkeys inactive until now.
+		LLM_Menu_ScheduleHotkeysAwaitingEnable()
 	} else {
 		SetTimer(_LLM_Menu_FireHealthProbe, 0)
 		LLM_Menu_BackendLifecycleInvalidate(true)
@@ -420,6 +428,9 @@ _LLM_Menu_FireInstalledTagsProbe(NowTick := unset, DispatchFn := unset) {
 		return
 	if (_LLM_Menu["backend"] != "ollama")
 		return
+	; No AI request of any kind runs while the AI is off (issue #97).
+	if !_LLM_Menu.Get("enabled", false)
+		return
 	; The install dots only mean something once Ollama is confirmed reachable —
 	; mirrors the menu's own deps_ready gate on the per-row probe. When the daemon
 	; is down the async request would just time out with nothing to paint.
@@ -628,6 +639,9 @@ LLM_Menu_EnsureModelReady() {
 	if IsSet(_DriverInputInitPending) && _DriverInputInitPending
 		return true
 	if (_LLM_Menu["backend"] != "ollama")
+		return true
+	; With the AI off there is no model to ready: no probe, no correction (issue #97).
+	if !_LLM_Menu.Get("enabled", false)
 		return true
 	; Never run the blocking installed-models probe (GET /api/tags, up to a 5 s
 	; WinHTTP timeout) unless the Ollama daemon is confirmed reachable. At boot

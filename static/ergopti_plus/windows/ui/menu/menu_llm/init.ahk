@@ -53,6 +53,16 @@ LLM_Menu_HealthSnapshot() {
 	}
 }
 
+/**
+ * Whether the user has switched the AI feature on. Every background AI path
+ * (probes, discovery, hotkeys) is inert while it is off (issue #97).
+ * @returns {Boolean} True only when the published menu state is enabled.
+ */
+LLM_Menu_AiEnabled() {
+	global _LLM_Menu
+	return IsSet(_LLM_Menu) && (_LLM_Menu is Map) && _LLM_Menu.Get("enabled", false) ? true : false
+}
+
 _LLM_Menu_RestoreSavedOptsOnce(saved_opts) {
 	global _LLM_Menu, _LLM_Menu_Loaded
 	if _LLM_Menu_Loaded
@@ -147,6 +157,8 @@ _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
 ; many times that resume may try it, how far apart.
 global _LLM_Menu_FirstRestoreHotkeysDeferred := false
 global _LLM_Menu_RuntimeActivated := false
+; Whether a boot with the AI off left its hotkeys inactive until the switch-on.
+global _LLM_Menu_HotkeysAwaitEnable := false
 global LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS := 3
 global LLM_MENU_DEFERRED_HOTKEY_RETRY_MS := 500
 
@@ -287,7 +299,7 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 
 	; Auto-correct legacy raw-tag configs (e.g. qwen2.5:3b) before the first
 	; bootstrap / bridge start so predictions do not silently fail.
-	if (_LLM_Menu["backend"] == "ollama")
+	if (_LLM_Menu["backend"] == "ollama") && LLM_Menu_AiEnabled()
 		LLM_Menu_EnsureModelReady()
 
 	; Restore persisted remote API entries (lives in api_entries.json next to
@@ -356,37 +368,73 @@ LLM_Menu_Init(saved_opts := Map(), ActivateRuntime := true) {
 LLM_Menu_ActivateRuntime(ActivateHotkeysFn := 0, ScheduleBackendFn := 0, HealthTimerFn := 0,
 		Attempt := 1) {
 	global _LLM_Menu, _LLM_Menu_Loaded, _LLM_Menu_RuntimeActivated
-	global LLM_HEALTH_PROBE_INTERVAL_MS
+	global _LLM_Menu_HotkeysAwaitEnable, LLM_HEALTH_PROBE_INTERVAL_MS
 	global _MenuStartupCommands, _DriverReady
 	if !_LLM_Menu_Loaded
 		throw Error("AI runtime activation requires restored menu state")
 	if _LLM_Menu_RuntimeActivated
 		return false
-	Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
-	try Activate.Call(true)
-	catch TrayRootRetryPendingError as Err {
-		if Attempt >= LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS
-			throw Error("AI runtime activation exhausted its bounded retries: " . Err.Message)
-		SetTimer(LLM_Menu_ActivateRuntime.Bind(ActivateHotkeysFn, ScheduleBackendFn,
-			HealthTimerFn, Attempt + 1), -LLM_MENU_DEFERRED_HOTKEY_RETRY_MS)
-		try LoggerWarn("LLM", "AI runtime activation retained for bounded retry {1}: {2}.",
-			Attempt + 1, Err.Message)
-		return false
-	}
+	; With the AI off nothing of it runs: its hotkeys wait for the switch-on, and
+	; no health timer or probe starts. A boot with the AI off used to bind them
+	; anyway, and a refused native navigation plan aborted the boot (issue #97).
+	Enabled := LLM_Menu_AiEnabled()
+	if Enabled {
+		Activate := HasMethod(ActivateHotkeysFn, "Call") ? ActivateHotkeysFn : _LLM_Menu_RequireFirstRestoreHotkeys
+		try Activate.Call(true)
+		catch TrayRootRetryPendingError as Err {
+			if Attempt >= LLM_MENU_DEFERRED_HOTKEY_ATTEMPTS
+				throw Error("AI runtime activation exhausted its bounded retries: " . Err.Message)
+			SetTimer(LLM_Menu_ActivateRuntime.Bind(ActivateHotkeysFn, ScheduleBackendFn,
+				HealthTimerFn, Attempt + 1), -LLM_MENU_DEFERRED_HOTKEY_RETRY_MS)
+			try LoggerWarn("LLM", "AI runtime activation retained for bounded retry {1}: {2}.",
+				Attempt + 1, Err.Message)
+			return false
+		}
+	} else
+		_LLM_Menu_HotkeysAwaitEnable := true
 	ScheduleBackend := HasMethod(ScheduleBackendFn, "Call") ? ScheduleBackendFn : LLM_Menu_ScheduleBackendLifecycle
 	if _LLM_Menu_ShouldScheduleInitialBackendLifecycle(true, _LLM_Menu)
 		ScheduleBackend.Call(false)
 	HealthTimer := HasMethod(HealthTimerFn, "Call") ? HealthTimerFn : SetTimer
-	HealthTimer.Call(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
+	if Enabled
+		HealthTimer.Call(_LLM_Menu_FireHealthProbe, LLM_HEALTH_PROBE_INTERVAL_MS)
 	_LLM_Menu_RuntimeActivated := true
 	LLM_Menu_LocalServersInit()
 	if Attempt > 1 && IsSet(_DriverReady) && _DriverReady
 			&& IsSet(_MenuStartupCommands) && _MenuStartupCommands is MenuStartupCommands
 		_MenuStartupCommands.NotifyReady()
-	if !HasMethod(HealthTimerFn, "Call") {
+	if Enabled && !HasMethod(HealthTimerFn, "Call") {
 		_LLM_Menu_FireHealthProbe(true)
 		_LLM_Menu_FireInstalledTagsProbe()
 	}
-	try LoggerInfo("LLM", "Restored AI menu state activated after input registration.")
+	if Enabled {
+		try LoggerInfo("LLM", "Restored AI menu state activated after input registration.")
+	} else {
+		try LoggerInfo("LLM", "Restored AI menu state activated with the AI off: its hotkeys and probes wait for the switch-on.")
+	}
+	return true
+}
+
+/**
+ * Hands the AI hotkeys that a boot with the AI off left inactive to the
+ * deferred activation, once the user switches the AI on. That activation
+ * retries a refusal a bounded number of times, then reports it.
+ * @param {Func} ScheduleFn - Test seam taking the callback and its period.
+ * @param {Func} ActivateFn - Test seam of the hotkey activation.
+ * @returns {Boolean} True when an activation was scheduled.
+ */
+LLM_Menu_ScheduleHotkeysAwaitingEnable(ScheduleFn := 0, ActivateFn := 0) {
+	global _LLM_Menu_HotkeysAwaitEnable, _LLM_Menu_FirstRestoreHotkeysDeferred
+	if !_LLM_Menu_HotkeysAwaitEnable || !LLM_Menu_AiEnabled()
+		return false
+	_LLM_Menu_HotkeysAwaitEnable := false
+	_LLM_Menu_FirstRestoreHotkeysDeferred := true
+	try LoggerInfo("LLM", "AI switched on: activating the AI hotkeys left inactive at startup.")
+	; Out of the committing transaction: binding never runs under its barrier.
+	Activate := LLM_Menu_ActivateDeferredHotkeys.Bind(ActivateFn, 1, ScheduleFn)
+	if HasMethod(ScheduleFn, "Call")
+		ScheduleFn.Call(Activate, -1)
+	else
+		SetTimer(Activate, -1)
 	return true
 }
