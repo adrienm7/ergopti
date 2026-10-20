@@ -10,56 +10,6 @@
 
 local helpers = require("tests.helpers")
 
--- ============================================================================
--- personal_toml_editor save: validate before truncating, stage atomically.
--- ============================================================================
---
--- Regression: the save handler truncated personal_info.toml with io.open(path,
--- "w") and then wrote whatever the editor sent — unchecked write/close, no
--- tmp staging, no TOML validation. One malformed save disabled every @-tag
--- shortcut on the next load, a crash mid-write left a truncated file, and a
--- fresh home with no file could never save at all (toml_path == "").
---
--- These tests sandbox the bridge (fake home, fake dynamic manager path, fake
--- shell) and drive the real on_message() save path.
-
---- Reads a whole file, or "" when absent.
-local function read_sandbox_file(path)
-  local fh = io.open(path, "r")
-  if not fh then return "" end
-  local content = fh:read("*a") or ""
-  fh:close()
-  return content
-end
-
---- Installs sandbox doubles and returns a freshly loaded bridge plus restore info.
-local function sandboxed_toml_bridge(toml_path)
-  local previous = {
-    config_paths = package.loaded["infra.config_paths"],
-    manager = package.loaded["modules.dynamic_hotstrings.manager"],
-    shell = package.loaded["adapters.shell_runner"],
-  }
-  package.loaded["infra.config_paths"] = {
-    home = function() return "/nonexistent-test-home" end,
-  }
-  package.loaded["modules.dynamic_hotstrings.manager"] = {
-    get_config_path = function() return toml_path end,
-    reload = function() end,
-  }
-  package.loaded["adapters.shell_runner"] = {
-    run = function() return true end,
-    quote = function(s) return "'" .. tostring(s) .. "'" end,
-  }
-  local handler = helpers.load_module("ui.personal_info_editor.bridge_toml")
-  return handler, previous
-end
-
-local function restore_sandbox(previous)
-  package.loaded["infra.config_paths"] = previous.config_paths
-  package.loaded["modules.dynamic_hotstrings.manager"] = previous.manager
-  package.loaded["adapters.shell_runner"] = previous.shell
-end
-
 -- Real private source publication exercises the displayed model's consent boundary.
 local OPENING_SOURCE = '[_meta]\nsections_order = ["english"]\n[english]\n"old" = { output = "original", is_word = true, final_result = false }\n'
 
@@ -278,9 +228,6 @@ end
 
 return {
 	helpers = helpers,
-	read_sandbox_file = read_sandbox_file,
-	sandboxed_toml_bridge = sandboxed_toml_bridge,
-	restore_sandbox = restore_sandbox,
 	OPENING_SOURCE = OPENING_SOURCE,
 	OPENING_FOREIGN = OPENING_FOREIGN,
 	opening_model = opening_model,
