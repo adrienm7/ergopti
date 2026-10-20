@@ -133,6 +133,21 @@ and PUC Lua's exit tuple explicitly. Publish successful scenario results only
 after native cleanup; an intentionally fatal output refusal needs its exact
 nonzero exit and a separate failure receipt, never a healthy cleanup claim.
 
+### project-refused-port-fixture-is-an-unheld-port
+
+A bound socket that never listens refuses a connection on Linux, but XNU's
+`tcp_input` silently drops a SYN matching a TCPS_CLOSED socket, so on macOS
+the client waits until its deadline instead of getting ECONNREFUSED. A fixture
+that needs a refused endpoint reserves a port and closes it before use (a RST on
+every OS), and its portable control proves no socket holds the port.
+
+### project-python-format-uses-the-pinned-ruff
+
+`format:check` runs ruff at the version pinned in CI (0.15.8), whose line
+wrapping differs from newer releases. Format Python with that exact version
+before committing; a newer local ruff can accept a file the CI check refuses,
+and that refusal blocks every lane.
+
 ### project-plans-are-proportional
 
 Small isolated edits do not need a persistent plan. Use a short checklist for a
