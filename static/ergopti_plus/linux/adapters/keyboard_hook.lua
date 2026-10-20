@@ -4144,7 +4144,7 @@ function M.while_released(fn, opts)
 		observe("refused", { ok = false, reason = "reconciliation_pending" })
 		return nil, "source reconciliation is already pending"
 	end
-	if not _running or not _intercept then
+	if not _running then
 		if _remapper and _remapper.has_combinations then
 			if _release_remapped() ~= true or _remapper:activate() ~= true then
 				observe("refused", { ok = false, reason = "release_failed" })
@@ -4162,25 +4162,28 @@ function M.while_released(fn, opts)
 	-- Ungrabbed, the keyboard reaches the desktop unseen: a CapsLock pressed
 	-- in the dialog could not be told apart from the session's, so it ends.
 	_locks.end_word(true, "keyboard handed to a dialog")
-	local modal_tx = original_reader_load and _input_source_owners and _capture_session and _begin_source_transaction() or nil
+	local modal_tx = _intercept and original_reader_load and _input_source_owners and _capture_session
+		and _begin_source_transaction() or nil
 	local function stop_modal(reason)
 		if modal_tx then
 			_retire_source_transaction(modal_tx, reason)
 			if _source_reconciliation == modal_tx then _source_reconciliation = nil end
 		else M.emergency_stop(reason) end
 	end
-	local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
-	if not release_call or not released then
-		stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
-		observe("refused", { ok = false, reason = "release_failed" })
-		return nil, "virtual key retirement refused"
-	end
-	for _, path in ipairs(paths) do
-		local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
-		if not called or acknowledged ~= true then
-			stop_modal("could not release the keyboard before a dialog: " .. path)
-			observe("refused", { ok = false, reason = "ungrab_failed" })
-			return nil, "keyboard release refused"
+	if _intercept then
+		local release_call, released, release_err = pcall(_release_forwarded_sources, paths)
+		if not release_call or not released then
+			stop_modal("could not release virtual keys before a dialog: " .. tostring(release_err or "release refused"))
+			observe("refused", { ok = false, reason = "release_failed" })
+			return nil, "virtual key retirement refused"
+		end
+		for _, path in ipairs(paths) do
+			local called, acknowledged = pcall(EvdevReader.ungrab, keyboard_slot(path))
+			if not called or acknowledged ~= true then
+				stop_modal("could not release the keyboard before a dialog: " .. path)
+				observe("refused", { ok = false, reason = "ungrab_failed" })
+				return nil, "keyboard release refused"
+			end
 		end
 	end
 	Logger.debug(LOG, "Keyboard released to the desktop for a dialog.")
@@ -4208,8 +4211,11 @@ function M.while_released(fn, opts)
 			local slot = keyboard_slot(path)
 			repeat local drained = EvdevReader.drain(function() end, slot) until not drained or drained == 0
 			_pending_events[slot] = nil
-			if EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
+			if _intercept and EvdevReader.grab(slot) ~= true then return false, "regrab_failed" end
 		end
+		-- Observe mode receives the same queued evdev input while the blocking
+		-- dialog owns the desktop. Discard it and resynchronise without grabbing
+		-- or creating the native transaction reserved for intercepted sources.
 		if not _source_recovery.run(paths, true, modal_tx) then return false, "resynchronisation_failed" end
 		return true
 	end)
