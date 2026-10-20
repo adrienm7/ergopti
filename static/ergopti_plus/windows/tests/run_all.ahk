@@ -292,6 +292,7 @@ global _DefaultLogsDir := _LogsDir
 #Include ../modules/keymap/layout/layout_ergopti.ahk
 #Include ../modules/keymap/layout/accented_shortcuts.ahk
 #Include ../../_shared/modules/features/number_row_policy.ahk
+#Include ../../_shared/modules/features/caps_word_auto_off_policy.ahk
 #Include ../modules/keymap/layout/layout_shift_caps.ahk
 ; Registry layout emulation: definitions only (the hotkeys are registered by
 ; KeylayoutEmulation_Register, which the tests call with injected registrars).
@@ -377,6 +378,9 @@ SFD_ConfigureUiaWorker(
 ; runner; keyboard_hook.ahk registers/unregisters its subscribers through it.
 ; Exercised by test_hook_dispatcher.ahk (BoundFunc identity + bind-once contract).
 #Include ../infra/hook_dispatcher.ahk
+; CapsWord auto-off listeners: definitions only (capsword.ahk, with its
+; hotkeys, stays out of the runner; the stubs stand in for DisableCapsWord).
+#Include ../modules/shortcuts/capsword_auto_off.ahk
 #Include ../adapters/keyboard_hook.ahk
 #Include ../ui/editors.ahk
 
@@ -576,6 +580,8 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/prefix/test_prefix_finalizer_generation.ahk
 #Include unit/modules/hotstrings/engine/test_synthetic_sends_declare_buffer_effect.ahk
 #Include unit/platform/remap/keys/test_capsword_taphold_unlatch.ahk
+#Include unit/modules/shortcuts/test_caps_word_auto_off_policy.ahk
+#Include unit/modules/shortcuts/test_capsword_auto_off.ahk
 #Include meta/platform/remap/tap_hold/test_tap_hold_suspend_boundary.ahk
 #Include unit/test_updater.ahk
 #Include unit/modules/updater/test_updater_release_fetch.ahk
@@ -1760,6 +1766,7 @@ _LogBootProgress("keylogger modules + tests included")
 #Include meta/modules/llm/servers/test_deps_check_epoch_guard.ahk
 #Include meta/modules/updater/test_updater_rebuild_resets_dispatcher.ahk
 #Include meta/platform/remap/keys/test_capsword_reset_on_suspend.ahk
+#Include meta/modules/shortcuts/test_capsword_auto_off_single_source.ahk
 #Include meta/platform/remap/keys/test_capsword_space_release_timeout.ahk
 #Include meta/modules/gestures/test_gesture_toggle_ui_errors_logged.ahk
 #Include meta/ui/wpm/test_wpm_mousewatch_suspend_guard.ahk

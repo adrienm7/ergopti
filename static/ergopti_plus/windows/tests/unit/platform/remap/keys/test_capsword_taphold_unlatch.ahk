@@ -39,12 +39,29 @@
 ; Drive one dispatch with CapsWord active and report whether it survived.
 ; TapHoldDispatchTap consults the activity/suspend guards first, so the fixture
 ; sets up a key with a real configured duration.
-_CTU_DispatchWith(KeyId) {
+; CapsWord is armed as ToggleCapsWord arms it, with the given checked
+; delimiters (the manifest defaults unless named): the dispatcher asks the
+; auto-off settings whether the tap's key ends it.
+_CTU_DispatchWith(KeyId, Terminators := unset) {
 	global CapsWordEnabled, TapHold
-	CapsWordEnabled := true
+	_CWAO_ArmWith(IsSet(Terminators) ? Terminators : ManifestDefaultFor("shortcuts.caps_word.terminators"))
 	Ran := false
-	TapHoldDispatchTap(KeyId, (*) => (Ran := true))
-	return { Ran: Ran, StillLatched: CapsWordEnabled }
+	try {
+		TapHoldDispatchTap(KeyId, (*) => (Ran := true))
+		StillLatched := CapsWordEnabled
+	} finally _CWAO_Reset()
+	return { Ran: Ran, StillLatched: StillLatched }
+}
+
+; Unchecked, Space no longer ends CapsWord from its tap either; a checked Tab
+; tap-hold does, which the old fixed Space/Enter list never allowed.
+_CTU_TapFollowsTheCheckedDelimiters() {
+	R := _CTU_DispatchWith("space", ["enter"])
+	Assert(R.Ran, "the tap must still run")
+	Assert(R.StillLatched, "a tap-hold Space must keep CapsWord while the space delimiter is unchecked")
+	R := _CTU_DispatchWith("tab")
+	Assert(R.Ran, "the tap must still run")
+	Assert(!R.StillLatched, "a tap-hold Tab must end CapsWord with the default delimiters")
 }
 
 ; The reported bug, reduced: the space that should have ended CapsWord.
@@ -121,6 +138,8 @@ Test("capsword-taphold-unlatch: a tap-hold Enter ends CapsWord",
 	_CTU_EnterTapUnlatchesCapsWord)
 Test("capsword-taphold-unlatch: a non-terminator tap leaves CapsWord latched",
 	_CTU_NonTerminatorTapKeepsCapsWord)
+Test("capsword-taphold-unlatch: a tap follows the checked CapsWord delimiters",
+	_CTU_TapFollowsTheCheckedDelimiters)
 Test("capsword-taphold-unlatch: tap_holds is still included after shortcuts",
 	_CTU_TapHoldsAreIncludedAfterShortcuts)
 Test("capsword-taphold-unlatch: capsword keeps its own unlatch hotkeys",
