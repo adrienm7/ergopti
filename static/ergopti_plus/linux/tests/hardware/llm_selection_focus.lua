@@ -165,6 +165,15 @@ for command in io.lines() do
 		result.selection_ms = Clock.now_ms() - started
 	elseif command == "offer" or command == "finish" then
 		assert(callback, "the controlled provider must have an actual pending request")
+		-- A real provider answers long after a focus change; replying within
+		-- milliseconds raced the resident watcher's new verdict, so the same
+		-- field read as "unknown" and its output was refused (dev CI of
+		-- October 20). A password settles to "secure" and stays refused.
+		local settle_deadline = Clock.now_ms() + 2000
+		while Detector.getVerdict() == "unknown" and Clock.now_ms() < settle_deadline do
+			uv.run("nowait"); Guard.refresh(true); uv.sleep(1)
+		end
+		result.verdict_before_reply = Detector.getVerdict()
 		local text = mode == "tone" and "REWRITE: Merci pour votre aide."
 			or mode == "translation" and "TRANSLATION: Thank you for your help."
 			or " que tout le monde aille bien"
