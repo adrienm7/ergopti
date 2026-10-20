@@ -37,6 +37,9 @@ MagicKeyEditor(*) {
 				if !_MagicKeyEditorStopOwned(_MagicKeyEditorInputHook)
 						return
 		}
+		; Prepare the cached scalar membership before any dialog is visible.
+		; I keeps its existing MinSendLevel=1 admission for non-AHK input.
+		ScalarEndKeys := _SIHO_ScalarEndKeys() . "{Escape}"
 		_InheritedCritical := A_IsCritical
 		GuiToShow := 0, IH := 0
 		try {
@@ -45,7 +48,7 @@ MagicKeyEditor(*) {
 				GuiToShow.Add("Text", "w300", t("button.cancel") . " → Echap")
 				; Construct while hidden: native Close otherwise hides an unowned Gui
 				; before the later factory returns and starts an invisible capture.
-				IH := InputHook("L1 I", "{Escape}")
+				IH := InputHook("L2 E C I", ScalarEndKeys)
 				GuiToShow.OnEvent("Close", _MagicKeyEditorClose.Bind(IH))
 				Critical("On")
 				try {
@@ -84,12 +87,15 @@ MagicKeyEditor(*) {
 		}
 
 		; Close or a complete pause/resume may retire this exact owner while a
-		; completed native hook still retains its Max reason and input. Only the
+		; completed native hook still retains its reason and captured units. Only the
 		; terminal path which actually retires that owner may persist its result.
 		if !CaptureSettled || A_IsSuspended
 				return
-		if (IH.EndReason = "Max" && IH.Input != "")
-				ModifyMagicKey(0, IH.Input)
+		Capture := _SIHO_ReadScalar(IH, "{Escape}")
+		if Capture.Reason != ""
+				LoggerWarn("Editors", "Discarded invalid Magic Key scalar capture ({1}).", Capture.Reason)
+		if Capture.Kind == "text"
+				ModifyMagicKey(0, Capture.Text)
 }
 
 _MagicKeyEditorClose(IH, GuiToClose, *) {

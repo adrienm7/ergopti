@@ -102,7 +102,8 @@ _SICU_ChildSource() {
 		AssertTrue(Owner != "", "the native capture dependency requires its real owner: " . Symbol)
 		Code .= "#Include " . Owner . "`n"
 	}
-	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative"] {
+	for Name in ["DeadKey", "OneShotShift", "OneShotShiftFix", "_TapHoldOneShotTable", "TapHoldOneShotResult", "TapHoldOneShotEndKeys", "_LLM_TerminalOutputSendInputNative",
+		"MagicKeyEditor", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the native capture function requires its genuine body: " . Name)
 		Code .= Definition . "`n"
@@ -323,3 +324,7 @@ for _SICS_InvalidOwner in ["one-shot", "dead-key"]
 
 Test("scalar control: dead-key uses native canonical Insert spelling (inputhook-scalar-rejection)",
 	_SICS_Case.Bind("dead-key", "named-insert"))
+
+for _SICU_EditorMode in ["a", "AB", "surrogate", "open-brace", "close-brace", "punctuation"]
+	Test("Magic Key native scalar: " . _SICU_EditorMode . " captures through the genuine I1 editor (magic-key-native-scalar)",
+		_SICU_Case.Bind("magic-editor", _SICU_EditorMode))

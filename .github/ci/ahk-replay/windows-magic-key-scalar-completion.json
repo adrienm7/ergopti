@@ -1,0 +1,29 @@
+{
+	"expected_count": 30,
+	"filters": [
+		{
+			"contains": "magic-key-capture-settlement",
+			"expected_count": 14
+		},
+		{
+			"contains": "magic-key-editor-startup-close",
+			"expected_count": 4
+		},
+		{
+			"contains": "magic-key-native-scalar",
+			"expected_count": 6
+		},
+		{
+			"contains": "magic-key-scalar-settlement",
+			"expected_count": 4
+		},
+		{
+			"contains": "ui: Magic Key capture persists a complete scalar and stops on dialog close",
+			"expected_count": 1
+		},
+		{
+			"contains": "ui: Magic Key retains a refused suppressive hook for retry (AHK-170)",
+			"expected_count": 1
+		}
+	]
+}

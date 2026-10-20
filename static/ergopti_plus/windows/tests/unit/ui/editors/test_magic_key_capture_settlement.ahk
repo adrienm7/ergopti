@@ -6,7 +6,7 @@
 _MESC_ChildSource() {
 	global _DriverDir
 	Code := "#Requires AutoHotkey v2.0`n#SingleInstance Off`n#NoTrayIcon`n#Warn All, StdOut`n#Warn VarUnset, Off`n"
-	for Name in ["MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
+	for Name in ["_SIHO_ScalarEndKeys", "_SIHO_ReadScalar", "MagicKeyEditor", "MagicKeySourceCapture", "_MagicKeyEditorClose", "_MagicKeyEditorStopOwned",
 		"_MagicKeySourceCapturePoll", "_MagicKeySourcePressedScan", "_MagicKeySourceCaptureKeyDown"] {
 		Definition := _DriverFuncBody(Name)
 		AssertTrue(Definition != "", "the editor fixture requires its genuine owner: " . Name)
@@ -99,3 +99,7 @@ for _MESC_Editor in ["character", "source"]
 	for _MESC_Mode in ["live", "cancel", "completed-close", "completed-paused-resumed", "completed-close-successor", "stop-refusal", "stop-reentrant"]
 		Test("Magic Key capture settlement: " . _MESC_Editor . " " . _MESC_Mode . " (magic-key-capture-settlement)",
 			_MESC_Case.Bind(_MESC_Editor, _MESC_Mode))
+
+for _MESC_ScalarMode in ["scalar-pair", "invalid-high-BMP", "invalid-low", "invalid-max"]
+	Test("Magic Key scalar settlement: " . _MESC_ScalarMode . " never persists partial units (magic-key-scalar-settlement)",
+		_MESC_Case.Bind("character", _MESC_ScalarMode))
