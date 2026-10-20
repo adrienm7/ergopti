@@ -28,6 +28,16 @@ assert.doesNotMatch(
 );
 assert.match(admission, /A_Args/, 'the probe must execute the real native argument parser');
 
+const e2eEntry = fs.readFileSync(
+	path.join(root, 'static/ergopti_plus/windows/tests/e2e/run_e2e.ahk'),
+	'utf8'
+);
+const e2eBoundary = /^#Include \.\.\/test_framework\.ahk\s*$/m.exec(e2eEntry);
+assert.ok(e2eBoundary, 'the E2E probe must stop before framework initialization');
+const e2eAdmission = e2eEntry.slice(0, e2eBoundary.index);
+assert.doesNotMatch(e2eAdmission, /^\s*#Include/im);
+assert.match(e2eAdmission, /A_Args/);
+
 require('./support/ahk-registration-ownership.cjs');
 
 if (process.platform !== 'win32') {
@@ -35,9 +45,10 @@ if (process.platform !== 'win32') {
 	process.exit(0);
 }
 const ahk = [
+	process.env.ERGOPTI_REPLAY_AHK,
 	'C:/Program Files/AutoHotkey/v2/AutoHotkey64.exe',
 	'C:/Program Files/AutoHotkey/v2/AutoHotkey32.exe'
-].find((file) => fs.existsSync(file));
+].find((file) => file && fs.existsSync(file));
 if (!ahk) {
 	console.log('[SKIP] native AHK runner arguments require AutoHotkey v2');
 	process.exit(0);
@@ -99,6 +110,40 @@ try {
 		assert.match(result.out + result.err, /Invalid test runner arguments/);
 	}
 	console.log('AHK runner rejects malformed arguments before test admission: ok');
+	fs.writeFileSync(
+		probe,
+		e2eAdmission.replace(/\r\n?/g, '\n') +
+			'FileAppend("ADMITTED:" . _AHK_DRY_RUN . ":" . _AHK_DUMP_PLAN . "`n", "*")\nExitApp(0)\n',
+		'utf8'
+	);
+	for (const [args, expected] of [
+		[[], 'ADMITTED:0:'],
+		[['--dry-run'], 'ADMITTED:1:'],
+		[['--dump-plan=plan.tsv'], 'ADMITTED:0:plan.tsv'],
+		[['--dry-run', '--dump-plan=plan.tsv'], 'ADMITTED:1:plan.tsv'],
+		[['--dump-plan=plan.tsv', '--dry-run'], 'ADMITTED:1:plan.tsv']
+	]) {
+		const result = invoke(args);
+		assert.equal(result.status, 0, JSON.stringify({ args, result }));
+		assert.equal(result.out.trim(), expected);
+		assert.equal(result.err, '');
+	}
+	for (const args of [
+		['--dump-plan'],
+		['--dump-plan='],
+		['--dump-plan=   '],
+		['--dryrun'],
+		['--only=slug'],
+		['stray'],
+		['--dry-run', '--dry-run'],
+		['--dump-plan=a', '--dump-plan=b']
+	]) {
+		const result = invoke(args);
+		assert.equal(result.status, 2, JSON.stringify({ args, result }));
+		assert.doesNotMatch(result.out, /ADMITTED:/);
+		assert.match(result.out + result.err, /Invalid E2E runner arguments/);
+	}
+	console.log('AHK E2E runner discovery argument controls: ok');
 } finally {
 	fs.rmSync(dir, { recursive: true, force: true });
 }

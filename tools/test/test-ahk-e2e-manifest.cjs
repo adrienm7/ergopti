@@ -15,7 +15,11 @@ const vm = require('node:vm');
 const { createRequire } = require('node:module');
 const { spawnSync } = require('node:child_process');
 const pipeline = require('./ci-pipeline.cjs');
-const { validateAhkE2eManifest } = require('./validate-ahk-e2e-manifest.cjs');
+const {
+	validateAhkE2eManifest,
+	validateAhkE2eDiscovery,
+	validateAhkE2ePlanExecution
+} = require('./validate-ahk-e2e-manifest.cjs');
 const corpus = require('../../static/ergopti_plus/_shared/tests/corpus/hotstrings/vectors.json');
 
 /** Produces internally consistent observations even for incomplete corpus coverage. */
@@ -156,4 +160,139 @@ for (const [from, to] of [
 
 console.log(
 	'AHK E2E admission rejects missing, duplicate, failed and empty native corpus observations.'
+);
+
+// A complete old corpus must not qualify a larger freshly discovered runner.
+const unicode = ['pure', 'native-edit'].map((tier) => ({
+	name: `e2e[${tier}] supplementary trigger and completion preserve native edits (unicode-erase)`,
+	status: 'ok'
+}));
+const oldMinimum = [...complete, ...unicode];
+const fresh = [
+	...oldMinimum,
+	...Array.from({ length: 7 }, (_, index) => ({
+		name: `additional native regression ${index}`,
+		status: 'ok'
+	}))
+];
+const planOf = (entries) =>
+	entries.map((entry) => `e2e\ttests/e2e/actual.ahk\t${entry.name}`).join('\n') + '\n';
+const discoveryOf = (entries) => `1..${entries.length}\n# dry-run - skipping execution.\n`;
+const timed = (entries) =>
+	transcript(entries).replace(
+		/^(ok|not ok) (\d+) - (.+)$/gm,
+		(line, status, ordinal) => `${line}\n# duration_ms ${ordinal} 0.125`
+	);
+const discovery = validateAhkE2eDiscovery(planOf(fresh), discoveryOf(fresh));
+assert.equal(discovery.complete, true, discovery.errors.join('\n'));
+assert.equal(discovery.expected_count, fresh.length);
+assert.equal(validateAhkE2eManifest(timed(oldMinimum)).complete, true);
+assert.equal(validateAhkE2ePlanExecution(timed(oldMinimum), discovery).complete, false);
+assert.equal(validateAhkE2ePlanExecution(timed(fresh), discovery).complete, true);
+for (const [plan, tap] of [
+	['', discoveryOf(fresh)],
+	['malformed', discoveryOf(fresh)],
+	[planOf([...fresh, fresh[0]]), discoveryOf([...fresh, fresh[0]])],
+	[planOf(complete), discoveryOf(complete)],
+	[planOf(fresh), discoveryOf(oldMinimum)],
+	[planOf(fresh), discoveryOf(fresh).replace('# dry-run - skipping execution.', '')],
+	[planOf(fresh), discoveryOf(fresh) + 'ok 1 - forged\n'],
+	[planOf(fresh), discoveryOf(fresh) + '# DEFERRED qualification\n'],
+	[planOf(fresh), discoveryOf(fresh) + '# skip: French layout unavailable\n'],
+	[planOf(fresh), discoveryOf(fresh) + '# DeFeRrEd qualification\n'],
+	[planOf(fresh), discoveryOf(fresh) + '# excluded (requires --interactive): x\n']
+])
+	assert.equal(validateAhkE2eDiscovery(plan, tap).complete, false);
+for (const source of [
+	timed([...fresh].reverse()),
+	timed(fresh.slice(0, -1)),
+	timed(
+		fresh.map((entry, index) =>
+			index === fresh.length - 1 ? { ...entry, name: 'substitute' } : entry
+		)
+	),
+	transcript(fresh),
+	timed(fresh).replace('# duration_ms 1 0.125\n', ''),
+	timed(fresh).replace(/^ok 1 /m, 'not ok 1 '),
+	timed(fresh) + '# SKIP x\n',
+	timed(fresh) + '# skip: French layout unavailable\n',
+	timed(fresh) + '# SkIp: unavailable\n',
+	timed(fresh) + '# dry-run - skipping execution.\n'
+])
+	assert.equal(validateAhkE2ePlanExecution(source, discovery).complete, false);
+const chunks = [
+	...timed(fresh).matchAll(/RUNNING [^\n]+\n(?:not )?ok [^\n]+\n# duration_ms [^\n]+\n/g)
+].map((match) => match[0]);
+const physicallyReversed = `1..${fresh.length}\n${chunks.reverse().join('')}# ${fresh.length} passed, 0 failed.\n`;
+assert.equal(validateAhkE2eManifest(physicallyReversed).complete, true);
+assert.equal(validateAhkE2ePlanExecution(physicallyReversed, discovery).complete, false);
+assert.equal(
+	validateAhkE2ePlanExecution(timed(fresh).replaceAll('\n', '\r\n'), discovery).complete,
+	true
+);
+const future = [...fresh, { name: 'future independent native case', status: 'ok' }];
+assert.equal(
+	validateAhkE2ePlanExecution(
+		timed(future),
+		validateAhkE2eDiscovery(planOf(future), discoveryOf(future))
+	).complete,
+	true
+);
+const cliRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti-e2e-discovery-'));
+try {
+	const files = Object.fromEntries(
+		['plan', 'discovery', 'input', 'json'].map((key) => [key, path.join(cliRoot, key)])
+	);
+	fs.writeFileSync(files.plan, planOf(fresh));
+	fs.writeFileSync(files.discovery, discoveryOf(fresh));
+	fs.writeFileSync(files.input, timed(fresh));
+	const invoke = (args) =>
+		spawnSync(process.execPath, [path.join(__dirname, 'validate-ahk-e2e-manifest.cjs'), ...args], {
+			encoding: 'utf8',
+			timeout: 5000,
+			windowsHide: true
+		});
+	const base = ['--plan', files.plan, '--discovery', files.discovery, '--json', files.json];
+	for (const args of [base, ['--input', files.input, ...base]]) {
+		const result = invoke(args);
+		assert.ifError(result.error);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(JSON.parse(fs.readFileSync(files.json)).expected_count, fresh.length);
+	}
+	fs.writeFileSync(files.input, timed(oldMinimum));
+	assert.equal(invoke(['--input', files.input, ...base]).status, 1);
+	assert.equal(JSON.parse(fs.readFileSync(files.json)).complete, false);
+	for (const args of [
+		[],
+		['--plan', files.plan],
+		['--discovery', files.discovery],
+		['--unknown', files.input],
+		['--input'],
+		['--input', files.input, '--input', files.input]
+	])
+		assert.equal(invoke(args).status, 1);
+} finally {
+	fs.rmSync(cliRoot, { recursive: true, force: true });
+}
+const replaySource = fs.readFileSync(
+	path.join(__dirname, '../../.github/workflows/windows-test-replay.yml'),
+	'utf8'
+);
+const replayStep = pipeline.step(replaySource, 'Run the complete native Windows E2E corpus');
+assert.equal(pipeline.stepField(replayStep, 'timeout-minutes'), '5');
+const replayScript = pipeline.runOf(replayStep).join('\n');
+assert.match(replayScript, /foreach \(\$phase in @\('discovery', 'execution'\)\)/);
+assert.match(replayScript, /--dry-run .*--dump-plan=\$plan/);
+assert.match(replayScript, /Remove-Item -LiteralPath \$plan, \$tap, \$discoveryTap/);
+assert.match(replayScript, /Test-Path -LiteralPath \$phaseTap/);
+assert.match(replayScript, /Test-Path -LiteralPath \$plan/);
+assert.match(replayScript, /A prior E2E artifact could not be retired/);
+assert.match(
+	replayScript,
+	/--input \$tap --plan \$plan --discovery \$discoveryTap --json \$manifest/
+);
+assert.match(replayScript, /ElapsedMilliseconds -gt 180000/);
+assert.doesNotMatch(replayScript, /2 \* \$corpus|expected_count = 77|continue-on-error/);
+console.log(
+	'Fresh native E2E discovery requires every exact ordered result and timing, beyond the mandatory corpus.'
 );

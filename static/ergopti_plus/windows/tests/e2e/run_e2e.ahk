@@ -36,7 +36,28 @@
 SetWorkingDir(A_ScriptDir)
 #Warn All, StdOut
 #Warn VarUnset, Off
+; Reject malformed discovery options before loading any test or input seam.
+_RejectE2eArguments(Message) {
+	FileAppend("Invalid E2E runner arguments: " . Message . "`n", "**")
+	ExitApp(2)
+}
+
 global _AHK_DRY_RUN := false
+global _AHK_DUMP_PLAN := ""
+for _E2eArg in A_Args {
+	if _E2eArg == "--dry-run" {
+		if _AHK_DRY_RUN
+			_RejectE2eArguments("duplicate --dry-run")
+		_AHK_DRY_RUN := true
+	} else if SubStr(_E2eArg, 1, 12) == "--dump-plan=" {
+		if _AHK_DUMP_PLAN != ""
+			_RejectE2eArguments("duplicate --dump-plan")
+		_AHK_DUMP_PLAN := SubStr(_E2eArg, 13)
+		if Trim(_AHK_DUMP_PLAN) == ""
+			_RejectE2eArguments("--dump-plan needs a nonempty path")
+	} else
+		_RejectE2eArguments("unknown option: " . _E2eArg)
+}
 
 ; Load the test framework first so Assert / Test / RunTests are available.
 #Include ../test_framework.ahk
