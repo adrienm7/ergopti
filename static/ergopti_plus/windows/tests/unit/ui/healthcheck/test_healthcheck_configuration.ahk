@@ -172,33 +172,27 @@ _HCCfgT_InvalidAndMissingConfig() {
 Test("diagnostics configuration: invalid and missing inputs are explicit (healthcheck-configuration-states)",
 	_HCCfgT_InvalidAndMissingConfig)
 
-; The configuration is a probe, never phase A. The fixture is a slow reader: the
-; driver's own config.toml made long enough that collecting it costs many
-; times the phase A budget. Phase A, measured by the snapshot itself, must stay
-; far below that cost, with the sections empty and the probe pending (a
-; regression that collects it synchronously again pays the whole read).
+; The configuration is a probe, never phase A. The oracle is the snapshot itself:
+; the fixture is a real config.toml that, collected directly, yields file rows
+; and settings; phase A must publish both sections empty with the probe pending.
+; A regression that collects it synchronously again fills the sections, which
+; fails here without any wall-clock measurement (a timing ratio is noise on a
+; shared runner).
 _HCCfgT_PhaseANeverReads() {
 	global _ConfigDir, _AhkSubDir
 	SavedDir := _ConfigDir, SavedSub := _AhkSubDir
 	Schema := HealthCheck_Config()["schema"]
-	Budget := Schema["phase_a_budget_ms"]
 	Root := A_Temp . "\cfgdiag_phase_a_" . A_TickCount . "_" . Random(1000, 9999)
 	DirCreate(Root . "\autohotkey")
-	Text := ""
-	loop 1000
-		Text .= "[s" . A_Index . "]`nk = " . Chr(34) . "x" . Chr(34) . "`n"
+	Text := "[script]`nlog_level = " . Chr(34) . "DEBUG" . Chr(34) . "`n"
 	FileAppend(Text, Root . "\autohotkey\config.toml", "UTF-8")
 	try {
 		_ConfigDir := Root . "\", _AhkSubDir := "autohotkey\"
-		Started := _HealthCheck_NowMs()
 		Collected := HealthCheck_CollectConfiguration(Schema)
-		ReadMs := _HealthCheck_NowMs() - Started
-		AssertEqual("ok", Collected["files"]["items"][2]["state"], "the slow fixture is the config.toml read")
-		AssertTrue(ReadMs > 20 * Budget, "the fixture must cost many phase A budgets to read, not " . ReadMs . " ms")
+		AssertEqual("ok", Collected["files"]["items"][2]["state"], "the fixture is the config.toml read")
+		AssertTrue(Collected["files"]["items"].Length > 0, "the fixture collects file rows when read directly")
+		AssertTrue(Collected["settings"]["items"].Length > 0, "the fixture collects settings when read directly")
 		Snapshot := HealthCheck_Run()
-		PhaseA := Snapshot["sections"]["developer"]["phase_a_ms"]
-		AssertTrue(PhaseA < ReadMs / 2,
-			"phase A took " . PhaseA . " ms against a " . Round(ReadMs) . " ms read: the configuration was read synchronously")
 		AssertEqual(0, Snapshot["sections"]["configuration"]["items"].Length)
 		AssertEqual(0, Snapshot["sections"]["configuration_files"]["items"].Length)
 		AssertEqual("pending", Snapshot["probes"]["configuration"]["state"])
