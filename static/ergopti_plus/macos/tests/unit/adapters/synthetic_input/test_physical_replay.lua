@@ -331,6 +331,39 @@ helpers.describe("synthetic input: ambient transactions and loopback", function(
 			"terminal failure must open the process-wide drain exactly once")
 	end)
 
+	helpers.it("reports a consumed physical key whose replay never posts (keystroke-integrity)", function()
+		-- The original was consumed at the fence: a replay that fails before its
+		-- post is a typed key the user never sees, and must be named as such.
+		local Integrity = require("infra.keystroke_integrity")
+		Integrity.reset()
+		local fixture = make_fixture({ key_post_always_throws = true })
+		local synthetic = fixture.load()
+		synthetic.enter_callback()
+		local tx = synthetic.begin("unit.integrity-paced", "replacement")
+		synthetic.with_transaction(tx, function()
+			synthetic.emit_key_stroke({}, "delete", 0)
+			synthetic.emit_key_strokes("X")
+		end)
+		local owner = synthetic.prepare_collected_paced(tx, 1, 12000, { id = "terminal-app" })
+		helpers.assert_not_nil(owner)
+		helpers.assert_true(synthetic.seal(tx))
+		helpers.assert_true(synthetic.authorize_collected_paced(owner))
+		helpers.assert_true(synthetic.commit_collected_paced(owner))
+		synthetic.leave_callback(true)
+		local fence = synthetic.claim_physical_fence(fixture.external_event(nil, 42))
+		helpers.assert_not_nil(fence)
+		helpers.assert_true(fence.consume_original)
+		helpers.assert_true(Integrity.summary():find("replay_queued=1", 1, true) ~= nil)
+		for _ = 1, 40 do
+			if synthetic.stats().pending == 0 or #fixture.timers == 0 then break end
+			fixture.fire_next_timer()
+		end
+		helpers.assert_eq(synthetic.stats().pending, 0, "the refused replay must settle")
+		helpers.assert_eq(Integrity.drop_count(), 1,
+			"a consumed key whose replay never posted must be reported as swallowed")
+		Integrity.reset()
+	end)
+
 	helpers.it("fences a physical mouse event globally and replays it once to provenance consumers", function()
 		local fixture = make_fixture()
 		local synthetic, provenance = fixture.load()
