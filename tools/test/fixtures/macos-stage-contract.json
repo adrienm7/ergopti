@@ -33,10 +33,15 @@
 					"name": "Install Lua 5.4 + luarocks"
 				},
 				{
-					"name": "Install luacheck + luafilesystem"
+					"name": "Install luafilesystem"
 				},
 				{
-					"name": "Run luacheck (non-blocking)"
+					"name": "Install luacheck",
+					"if": "matrix.lot == 'other'"
+				},
+				{
+					"name": "Run luacheck (non-blocking)",
+					"if": "matrix.lot == 'other'"
 				},
 				{
 					"name": "Run unit + meta tests",
