@@ -73,15 +73,16 @@ DeadKey(Mapping) {
 			try {
 				ih.Wait()
 			} finally {
-				SIHO_StopOwned(OwnerToken, ih)
+				CaptureSettled := SIHO_StopOwned(OwnerToken, ih)
 			}
 		} finally {
 			Critical(_AtCrit)
 		}
 		; A live InputHook bypasses native Suspend, so a pause can land DURING Wait().
 		; If the driver was paused mid-sequence, emit nothing — « pause = tout eteint »
-		; (deadkey-inputhook-post-wait-suspend-leak). The finally still resets the flag.
-		if A_IsSuspended
+		; (deadkey-inputhook-post-wait-suspend-leak). The exact owner acknowledgement
+		; also rejects a pause which resumed before this older Wait unwound.
+		if !CaptureSettled || A_IsSuspended
 			return
 		if (ih.EndReason = "Timeout") {
 			if Mapping.Has(" ")
