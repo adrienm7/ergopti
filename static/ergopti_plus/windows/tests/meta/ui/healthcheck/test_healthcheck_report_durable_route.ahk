@@ -11,9 +11,17 @@
 
 _HCRDM_Durable(Body) {
 	Resolve := InStr(Body, 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable')
+	if !Resolve
+		return false
 	Write := InStr(Body, 'Written := ResolvedWriter.Call(Path, Text)', true, Resolve)
+	if !Write
+		return false
 	Guard := InStr(Body, 'if !(Written is Integer) || Written != 1', true, Write)
+	if !Guard
+		return false
 	Refuse := InStr(Body, 'throw Error("The complete diagnostics attachment could not be written.")', true, Guard)
+	if !Refuse
+		return false
 	ReturnAt := InStr(Body, 'return Path', true, Refuse)
 	return Resolve > 0 && Write > Resolve && Guard > Write && Refuse > Guard && ReturnAt > Refuse
 }
@@ -32,6 +40,9 @@ _HCRDM_ActualRoute() {
 	AssertTrue(AttachAt > 0 && InStr(Report, 'Effects["open_url"].Call(Url)') > AttachAt,
 		"the real report route opens its browser after attachment completion")
 	AssertTrue(_HCRDM_Durable(Body), "the actual attachment default requires complete UTF-8 bytes and flush")
+	AssertFalse(_HCRDM_Durable(""), "a missing writer is refused without an invalid search offset")
+	AssertFalse(_HCRDM_Durable('ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable'),
+		"a truncated route is refused before its dependent search")
 	for Mutation in [
 		['ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWriteDurable', 'ResolvedWriter := HasMethod(WriterFn, "Call") ? WriterFn : FSWrite'],
 		['Written := ResolvedWriter.Call(Path, Text)', 'Ignored := ResolvedWriter.Call(Path, Text)'],
