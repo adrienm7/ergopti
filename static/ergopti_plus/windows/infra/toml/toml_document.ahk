@@ -543,7 +543,7 @@ _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
 	}
 	Content := "", Seen := Map(), Current := ""
 	Append(Text) {
-		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+		if Content != "" && !TOML_EndsWithLineBreak(Content)
 			Content .= "`n"
 		Content .= Text
 	}
@@ -590,6 +590,18 @@ _TOML_RetainForeignRecords(Source, Candidate, Updates, Prefixes) {
 		Flush(Section)
 	}
 	return Chr(0xFEFF) . Content
+}
+
+/**
+ * Tells whether a growing source buffer already ends its last physical line.
+ * An end-anchored regex rescans the whole buffer on every append, which made
+ * rendering a long config quadratic; this reads only the final character.
+ * @param {String} Text Source image assembled so far.
+ * @returns {Boolean} True when the final character is CR or LF.
+ */
+TOML_EndsWithLineBreak(Text) {
+	Last := SubStr(Text, -1)
+	return Last == "`n" || Last == "`r"
 }
 
 
@@ -819,7 +831,8 @@ _TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped,
  * @param {String} Source Exact source image captured by the existing I/O owner.
  * @param {Array} Updates Section paths and literal leaf keys, never flat aliases.
  * @param {Array} Prefixes Explicitly replaced semantic namespaces.
- * @returns {Map} Qualified complete content and unchanged-source acknowledgement.
+ * @returns {Map} Qualified complete content, unchanged-source acknowledgement,
+ *   and the number of source parses spent admitting new section headers.
  */
 TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	Document := TOML_ParseDocument(Source, &Records, &Physical)
@@ -848,7 +861,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	_TOML_ConfigPruneDeletedAncestors(Expected, Deleted, Records, Physical, Dropped, Owned)
 	if TOML_SameValue(Document, Expected)
-		return Map("content", Source, "preserve_source", true)
+		return Map("content", Source, "preserve_source", true, "header_admission_parses", 0)
 
 	; Find the deepest surviving explicit table for each newly introduced leaf.
 	; Appending a root dotted row after a header would silently change its owner.
@@ -868,7 +881,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 			if _TOML_ConfigPathDropped(Records[RecordIndex].Path, Dropped)
 				continue
 		}
-		if HeaderSource != "" && !RegExMatch(HeaderSource, "[\r\n]$")
+		if HeaderSource != "" && !TOML_EndsWithLineBreak(HeaderSource)
 			HeaderSource .= "`n"
 		HeaderSource .= PhysicalRecord.Text
 	}
@@ -908,17 +921,20 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	; One parse admits every header at once: parsing only adds declarations, so
 	; headers legal together are each legal alone. A refusal falls back to one
 	; parse per header, which a bulk change of 20 new sections paid every time.
+	AdmissionParses := 0
 	if HeaderAdmission.Count {
 		Batch := ""
 		for Identity in HeaderAdmission
 			Batch .= "`n[" . Identity . "]`n"
 		try {
+			AdmissionParses += 1
 			TOML_ParseDocument(HeaderSource . Batch)
 			for Identity in HeaderAdmission
 				HeaderAdmission[Identity] := true
 		} catch ValueError {
 			for Identity in HeaderAdmission {
 				try {
+					AdmissionParses += 1
 					TOML_ParseDocument(HeaderSource . "`n[" . Identity . "]`n")
 					HeaderAdmission[Identity] := true
 				} catch ValueError {
@@ -954,7 +970,7 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	}
 	Content := "", Current := "", RecordIndex := 0
 	Append(Text) {
-		if Content != "" && !RegExMatch(Content, "[\r\n]$")
+		if Content != "" && !TOML_EndsWithLineBreak(Content)
 			Content .= "`n"
 		Content .= Text
 	}
@@ -1012,7 +1028,8 @@ TOML_BuildConfigDocumentCandidate(Source, Updates, Prefixes) {
 	Candidate := Chr(0xFEFF) . Content
 	if !TOML_SameValue(TOML_ParseDocument(Candidate), Expected)
 		throw ValueError("The physical configuration candidate differs from its requested semantic model")
-	return Map("content", Candidate, "preserve_source", false)
+	return Map("content", Candidate, "preserve_source", false,
+		"header_admission_parses", AdmissionParses)
 }
 
 ; Foreign table arrays cannot lend their collapsed flat row to the writer.
