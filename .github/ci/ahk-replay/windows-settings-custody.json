@@ -1,5 +1,5 @@
 {
-	"expected_count": 32,
+	"expected_count": 33,
 	"filters": [
 		{
 			"contains": "llm-profile-opening-image",
@@ -15,6 +15,10 @@
 		},
 		{
 			"contains": "llm-indent-source-witness",
+			"expected_count": 1
+		},
+		{
+			"contains": "llm-profile-policy-composition",
 			"expected_count": 1
 		}
 	]

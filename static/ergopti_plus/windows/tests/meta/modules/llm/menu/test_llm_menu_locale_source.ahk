@@ -24,10 +24,14 @@ _AHK021_MenuHasExactlyOneLocaleSource() {
 	AssertFalse(InStr(Restore, '"language"') > 0,
 		"boot restore must not recreate a second language source")
 	MenuStart := InStr(Source, "global _LLM_Menu := Map(")
-	MenuEnd := InStr(Source, "global LLM_PROFILE_ADVANCED_PARAMS_B",, MenuStart)
-	Assert(MenuStart > 0 && MenuEnd > MenuStart,
-		"the source guard must isolate the LLM menu default graph")
-	MenuDefaults := SubStr(Source, MenuStart, MenuEnd - MenuStart)
+	Assert(MenuStart > 0, "the source guard must find the actual LLM menu defaults")
+	; Each file stays contiguous in the source graph; the unindented closing
+	; delimiter bounds this Map independently of later policy declarations.
+	MenuEnd := RegExMatch(Source, "m)^\)",, MenuStart)
+	Assert(MenuEnd > MenuStart,
+		"the source guard must isolate the complete LLM menu default graph")
+	MenuDefaults := SubStr(Source, MenuStart, MenuEnd - MenuStart + 1)
+	Assert(MenuDefaults != "", "the isolated default graph must not be empty")
 	Assert(RegExMatch(MenuDefaults, 'i)"language"\s*,') == 0,
 		"the LLM menu default graph must not seed a second locale owner")
 	PromptStart := InStr(Fire, "system_prompt := LLM_ResolveSystemPrompt(")
