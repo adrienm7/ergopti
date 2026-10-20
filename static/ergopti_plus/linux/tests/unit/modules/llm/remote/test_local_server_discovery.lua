@@ -112,11 +112,38 @@ helpers.describe("Linux local server discovery ownership", function()
 			helpers.assert_nil(entries.active())
 		end)
 	end)
-	helpers.it("models rows are usable with master OFF and expose JSON ACK/backend refusal separately", function()
+	-- ai-disabled-no-discovery-2026-10-20 (issue #97): every Models menu build
+	-- swept the four catalogue servers even with the AI switched off.
+	helpers.it("probes no server and keeps the rows inert while the AI is off (issue #97)", function()
+		isolated(function(servers,entries,calls)
+			local enabled=false
+			local llm={get_backend=function() return "ollama" end,get_current_model=function() return "ollama-model" end,
+				can_configure_local_servers=function() return true end,is_enabled=function() return enabled end,
+				set_backend=function() error("an inert row cannot select a backend") end}
+			local dialogs={prompt=function() error("an inert row cannot prompt") end,error=function() end}
+			local context={is_paused=function() return false end}
+			local BackendRows=require("ui.menu.llm_backend_rows")
+			local function build() return BackendRows.rows(llm,dialogs,function() end,function() return {} end,context) end
+			local rows=build()
+			helpers.assert_eq(#calls,0,"no local server is probed while the AI is off")
+			local rescan=find(rows,require("infra.i18n").get("menu.llm.local_servers.rescan"))
+			helpers.assert_true(rescan~=nil and rescan.action==nil and rescan.disabled==true,
+				"the rescan row is inert while the AI is off")
+			local address=find(rows,require("infra.i18n").get("menu.llm.local_servers.other_address"))
+			helpers.assert_true(address~=nil)
+			for _,item in ipairs(address.items or {}) do
+				helpers.assert_nil(item.action,"another address cannot be typed while the AI is off")
+			end
+			enabled=true
+			build()
+			helpers.assert_eq(#calls,4,"switching the AI on sweeps every catalogue server")
+		end)
+	end)
+	helpers.it("models rows are usable with the AI on and expose JSON ACK/backend refusal separately", function()
 		isolated(function(servers,entries,calls)
 			local allowed, backend, setters, changes=true,"ollama",0,0
 			local llm={get_backend=function() return backend end,get_current_model=function() return "ollama-model" end,
-				can_configure_local_servers=function() return allowed end,
+				can_configure_local_servers=function() return allowed end,is_enabled=function() return true end,
 				set_backend=function() setters=setters+1;allowed=false;return false end}
 			local dialogs={prompt=function() return nil end,error=function() end}
 			local context={is_paused=function() return false end}
@@ -140,7 +167,7 @@ helpers.describe("Linux local server discovery ownership", function()
 	helpers.it("a scope acquired during a blocking address prompt refuses publication and any backend setter", function()
 		isolated(function(servers,entries,calls)
 			local allowed,setters=true,0
-			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return allowed end,
+			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return allowed end,is_enabled=function() return true end,
 				set_backend=function() setters=setters+1;return true end}
 			local dialogs={prompt=function() allowed=false;return "http://localhost:9876/v1" end,error=function() end}
 			local Rows=require("ui.menu.local_server_rows")
@@ -162,7 +189,7 @@ helpers.describe("local selection terminal acknowledgement", function()
 	helpers.it("a scope acquired after JSON ACK leaves a saved model without acquiring the backend setter", function()
 		isolated(function(servers,entries,calls,path)
 			local allowed,setters=true,0
-			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return allowed end,
+			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return allowed end,is_enabled=function() return true end,
 				set_backend=function() setters=setters+1;return true end}
 			local Rows=require("ui.menu.local_server_rows")
 			local function build() return Rows.rows(llm,{prompt=function() return nil end,error=function() end},function() end,
@@ -362,7 +389,7 @@ helpers.describe("Configured native menu publication (local-configured-view)", f
 				local entry=assert(entries.add({provider=provider,label="Personal",model="before",token="",
 					base_url="http://127.0.0.1:54321/v1"}))
 				local backend,writes="ollama",0
-				local llm={get_backend=function() return backend end,can_configure_local_servers=function() return true end,
+				local llm={get_backend=function() return backend end,can_configure_local_servers=function() return true end,is_enabled=function() return true end,
 					set_backend=function(value,admit) if not admit() then return false end;backend=value;writes=writes+1;return true end}
 				local Rows=require("ui.menu.local_server_rows")
 				local context={is_paused=function() return false end}
@@ -424,7 +451,7 @@ helpers.describe("Native discovery infrastructure receipts (local-probe-unavaila
 				helpers.assert_eq(servers.result("omlx").status,"unavailable")
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
-					can_configure_local_servers=function() return true end}, {},function() end,{is_paused=function() return false end})
+					can_configure_local_servers=function() return true end,is_enabled=function() return true end}, {},function() end,{is_paused=function() return false end})
 				local failed=find(rows,require("infra.i18n").get("healthcheck.status.failed"))
 				helpers.assert_true(failed and failed.disabled,"actual menu exposes infrastructure failure")
 				helpers.assert_eq(#rows,5,"one failure row replaces the no-server summary")
@@ -503,7 +530,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 			local entry=assert(entries.add({provider="openai_compat",label="Personal",model="before",token="",
 				base_url="http://127.0.0.1:54321/v1"}))
 			local setters=0
-			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end,
+			local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end,is_enabled=function() return true end,
 				set_backend=function() setters=setters+1;return true end}
 			local Rows=require("ui.menu.local_server_rows")
 			local function build() return Rows.rows(llm,{},function() end,{is_paused=function() return false end}) end
@@ -539,7 +566,7 @@ helpers.describe("Native empty models presentation (local-empty-models)",functio
 				for _,id in ipairs(servers.order()) do helpers.assert_eq(servers.result(id).status,"down") end
 				helpers.assert_eq(#servers.detected(),0)
 				local rows=require("ui.menu.local_server_rows").rows({get_backend=function() return "ollama" end,
-					can_configure_local_servers=function() return true end},{},function() end,{is_paused=function() return false end})
+					can_configure_local_servers=function() return true end,is_enabled=function() return true end},{},function() end,{is_paused=function() return false end})
 				helpers.assert_nil(find(rows,require("infra.i18n").get("healthcheck.status.failed")))
 			end)
 		end)
@@ -554,7 +581,7 @@ helpers.describe("Private discovery cache origin (local-cache-identity)",functio
 					base_url="http://127.0.0.1:54321/v1"}))
 				local id="configured:"..entry.id
 				local Rows=require("ui.menu.local_server_rows")
-				local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end}
+				local llm={get_backend=function() return "ollama" end,can_configure_local_servers=function() return true end,is_enabled=function() return true end}
 				local function build() return Rows.rows(llm,{},function() end,{is_paused=function() return false end}) end
 				build()
 				for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
@@ -595,7 +622,7 @@ helpers.describe("Same-ID native cache retirement (local-cache-identity)",functi
 			local id="configured:"..entry.id
 			local Rows=require("ui.menu.local_server_rows")
 			local function build() return Rows.rows({get_backend=function() return "ollama" end,
-				can_configure_local_servers=function() return true end},{},function() end,{is_paused=function() return false end}) end
+				can_configure_local_servers=function() return true end,is_enabled=function() return true end},{},function() end,{is_paused=function() return false end}) end
 			build()
 			for index=1,4 do calls[index].finish({ok=false,status=0,body=""}) end
 			calls[5].finish(models("old-model"))
