@@ -45,14 +45,14 @@ end
 
 test("canonical Linux asset comes from packaged catalogue", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
-	expect(asset.version == "0.24.0" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
-	expect(asset.bytes == 1198635318 and asset.sha256 == "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb", "independent pinned byte/hash receipts")
+	expect(asset.version == "0.40.4" and asset.key == "linux-amd64", "frozen authoritative version and architecture")
+	expect(asset.bytes == 1436408810 and asset.sha256 == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a", "independent pinned byte/hash receipts")
 end)
 
 test("version asset and complete digest form immutable directory name", function()
 	local asset = assert(Policy.asset(release(), "linux", "x86_64"))
 	local plan = assert(Policy.posix_plan({ HOME = "/home/test" }, AppDirs, asset))
-	expect(plan.directory == "/home/test/.local/share/ergopti_plus/runtimes/ollama/0.24.0-linux-amd64-15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb/ollama", "independent complete immutable name")
+	expect(plan.directory == "/home/test/.local/share/ergopti_plus/runtimes/ollama/0.40.4-linux-amd64-15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a/ollama", "independent complete immutable name")
 	expect(plan.executable == plan.directory .. "/bin/ollama" and plan.libraries == plan.directory .. "/lib/ollama", "whole archive layout")
 end)
 
@@ -82,7 +82,7 @@ test("release snapshot does not follow original catalogue mutation", function()
 	local catalogue = release()
 	local asset = assert(Policy.asset(catalogue, "linux", "x86_64"))
 	catalogue.version = "99.0.0" catalogue.assets["linux-amd64"].sha256 = string.rep("b", 64)
-	expect(asset.version == "0.24.0" and asset.sha256 == "15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb", "admitted canonical scalars frozen")
+	expect(asset.version == "0.40.4" and asset.sha256 == "15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a", "admitted canonical scalars frozen")
 end)
 
 test("construction is read-only and plan getters cannot rewrite owner", function()

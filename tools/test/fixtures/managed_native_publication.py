@@ -13,18 +13,20 @@ import subprocess
 import tarfile
 import zipfile
 
-SOURCE_COMMIT = "c28ddc0a7b273cd286b680a6db0bef0c17bc0ec0"
+SOURCE_COMMIT = "45e6011815c74acde6a346512856b69dd79dd22b"
 SOURCE_FILES = (
     "tools/build/build-macos-managed-ollama.py",
     "static/ergopti_plus/_shared/go/native_http/transport.go",
     "static/ergopti_plus/_shared/go/native_http/worker_darwin.go",
     "static/ergopti_plus/_shared/go/native_http/worker_other.go",
     "static/ergopti_plus/_shared/go/native_http/admission.go",
+    "static/ergopti_plus/_shared/go/native_http/address_policy.go",
     "static/ergopti_plus/_shared/go/native_http/network_bootstrap.go",
     "static/ergopti_plus/_shared/go/native_http/network_bootstrap_posix.go",
     "static/ergopti_plus/_shared/go/native_http/network_bootstrap_unsupported.go",
     "static/ergopti_plus/_shared/go/native_http/transport_test.go",
     "static/ergopti_plus/_shared/go/native_http/admission_test.go",
+    "static/ergopti_plus/_shared/go/native_http/address_policy_test.go",
     "static/ergopti_plus/_shared/go/native_http/network_bootstrap_test.go",
     "static/ergopti_plus/_shared/go/native_http/network_bootstrap_darwin_test.go",
     "static/ergopti_plus/_shared/modules/llm/managed_ollama_bootstrap.json",
@@ -37,7 +39,7 @@ SOURCE_FILES = (
     "static/ergopti_plus/_shared/go/native_http/listener_event_test.go",
     "static/ergopti_plus/_shared/go/native_http/failure_stage_test.go",
 )
-VERSION = "0.24.0"
+VERSION = "0.40.4"
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
 REPOSITORY = "adrienm7/ergopti"
 CATALOGUE = "managed_ollama_release.json"

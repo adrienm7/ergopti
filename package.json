@@ -93,6 +93,7 @@
 		"test:lua-fixtures-out-of-repo": "node ./tools/test/test-lua-fixtures-stay-out-of-the-repo.cjs",
 		"test:temperature-single-source": "node ./tools/test/test-temperature-single-source.cjs",
 		"test:ollama-port-single-source": "node ./tools/test/test-ollama-port-single-source.cjs",
+		"test:ollama-release-pin-parity": "node ./tools/test/test-ollama-release-pin-parity.cjs",
 		"test:linux-llm-defaults-single-source": "node ./tools/test/test-linux-llm-defaults-single-source.cjs",
 		"test:i18n-fallback-path": "node ./tools/test/test-i18n-fallback-path.cjs",
 		"test:i18n-cascade": "node ./tools/test/test-webview-i18n-cascade.cjs",

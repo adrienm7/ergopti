@@ -72,6 +72,14 @@ REQUIRED = [
     "TestManagedRedirectKeepsOriginalVeto",
     "TestManagedRedirectReturnToOriginDoesNotRestoreHeaderOrJarSecrets",
 ]
+# Literal identities of the destination policy that replaces Ollama 0.40.4's
+# checked dialer on native routes; neither frozen receipt can qualify them.
+ADDRESS_POLICY_IDENTITIES = [
+    "TestDestinationPolicyIndependentUpstreamVectors",
+    "TestDestinationPolicyRefusesNonPublicBeforeNativeWorker",
+    "TestDestinationPolicyExplicitProxyHopBypassesCheckedDialer",
+    "TestWrapCheckedKeepsOriginalCheckedDialerWithoutCapability",
+]
 FROZEN = ROOT / "tools/test/fixtures/managed-ollama-go/linux-44.jsonl"
 PACKAGE = "ergopti/nativehttp"
 
@@ -116,10 +124,11 @@ class NativeGoEvidenceTests(unittest.TestCase):
         self.assertEqual(
             identities["original_source_commit"], "e94153e87b698b24de86133239319bde4be12a90"
         )
-        subjects = identities["identities"]
+        original = identities["identities"]
         added = identities["required_failure_stage_subtests"]
-        self.assertEqual(len(subjects), 74)
-        self.assertEqual(len(set(subjects)), 74)
+        self.assertEqual(len(original), 74)
+        self.assertEqual(len(set(original)), 74)
+        subjects = original + ADDRESS_POLICY_IDENTITIES
         self.assertEqual(len(added), 17)
         self.assertEqual(len(set(added)), 17)
         events = [{"Action": "start", "Package": PACKAGE}]
@@ -134,10 +143,10 @@ class NativeGoEvidenceTests(unittest.TestCase):
             self.fail("The frozen original failure-stage subtests must be explicitly enrolled")
         self.assertEqual(POLICY["required_passes"], subjects)
         self.assertEqual(
-            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (74, 39, 35)
+            (fact["passed"], fact["top_level_passed"], fact["subtests_passed"]), (78, 43, 35)
         )
         self.assertEqual((fact["failed"], fact["skipped"], fact["package_completed"]), (0, 0, True))
-        for name in added:
+        for name in added + ADDRESS_POLICY_IDENTITIES:
             for mutation in (
                 "missing",
                 "fail",
@@ -186,6 +195,22 @@ class NativeGoEvidenceTests(unittest.TestCase):
         }
         self.assertTrue(observed.isdisjoint(required))
         for name in required:
+            with self.subTest(identity=name):
+                with self.assertRaises(ValueError):
+                    self.receive(required=REQUIRED + [name])
+
+    def testFrozenLinux44CannotQualifyAddedDestinationPolicyIdentities(self):
+        self.assertEqual(
+            [name for name in POLICY["required_passes"] if name in ADDRESS_POLICY_IDENTITIES],
+            ADDRESS_POLICY_IDENTITIES,
+        )
+        observed = {
+            event["Test"]
+            for event in self.events
+            if event.get("Action") == "pass" and "Test" in event
+        }
+        self.assertTrue(observed.isdisjoint(ADDRESS_POLICY_IDENTITIES))
+        for name in ADDRESS_POLICY_IDENTITIES:
             with self.subTest(identity=name):
                 with self.assertRaises(ValueError):
                     self.receive(required=REQUIRED + [name])

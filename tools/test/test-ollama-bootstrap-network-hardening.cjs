@@ -404,7 +404,7 @@ test(
 );
 test(
 	'only the on-demand install sources the pinned Ollama release; the app build no longer bundles it',
-	releaseSource.includes('OLLAMA_RELEASE_VERSION="0.24.0"') &&
+	releaseSource.includes('OLLAMA_RELEASE_VERSION="0.40.4"') &&
 		releaseSource.includes('OLLAMA_DARWIN_TGZ_SHA256=') &&
 		releaseSource.includes('OLLAMA_DARWIN_TGZ_BYTES=') &&
 		ollamaSource.includes('ollama-release.sh') &&
@@ -420,38 +420,39 @@ test(
 	!ollamaSource.includes('| sh') && !/\bbrew\s+install\b/.test(ollamaSource)
 );
 
-// These literal expectations were transcribed from the saved frozen v0.24.0 API
-// receipt, SHA-256 17c470fdb0e77215d38f80bb95a512d5005f24d520043b3b273744a083e1f2d4.
-// Upstream reported immutable:false; the saved digest alone admits archive bytes.
+// These literal expectations were transcribed from the GitHub release API asset
+// digests and sizes for v0.40.4, cross-checked against that release's
+// sha256sum.txt (SHA-256 216d306cbce4a048ccbb61d808394696e17e23913bff3663c61c7167c15731e9).
+// Upstream releases are mutable; the pinned digest alone admits archive bytes.
 // They must not be generated from the new catalogue or projection implementation.
 const EXPECTED_RELEASE = {
 	schema_version: 1,
-	version: '0.24.0',
+	version: '0.40.4',
 	assets: {
 		'macos-universal': {
 			filename: 'ollama-darwin.tgz',
-			sha256: 'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
-			bytes: 133395504
+			sha256: 'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
+			bytes: 167884528
 		},
 		'linux-amd64': {
 			filename: 'ollama-linux-amd64.tar.zst',
-			sha256: '15c5f8d66ba06e0d3b4719df8868612dbd66e14e82760929bb3552e1657cdcdb',
-			bytes: 1198635318
+			sha256: '15f31e9576d15a481e099b4145dba6e9f8c1f295927d6b8895300ae30ed3740a',
+			bytes: 1436408810
 		},
 		'linux-arm64': {
 			filename: 'ollama-linux-arm64.tar.zst',
-			sha256: '6e9a3ce5f64e93312902e39c420ec336255f078a368ca25e99b339d08a6dfa4b',
-			bytes: 1323731537
+			sha256: '1a314ac530d2c23bf6d2aaaf4a4aba8cc0b2a4ee8bc8fae3f3aa88bff7f7177b',
+			bytes: 1555988008
 		},
 		'windows-amd64': {
 			filename: 'ollama-windows-amd64.zip',
-			sha256: '40c523d3eeba6f4647c5ca58fe47f15b8dee79f7675ebf573458890064f424c7',
-			bytes: 2069313829
+			sha256: '7485a1172f8527db4342a63521b9342fc466185ff0855da378cc864ecf6354cf',
+			bytes: 1469916992
 		},
 		'windows-arm64': {
 			filename: 'ollama-windows-arm64.zip',
-			sha256: 'f248475a81a7dcd841a32e1f6c06c83310c893c49c4bdf7da8c10f3eef27231a',
-			bytes: 24673830
+			sha256: '1fe50fb62ddcfc5fe102322e4a35043ccbf4e821adfa4ef41eee21af0aa158a7',
+			bytes: 210017261
 		}
 	}
 };
@@ -469,9 +470,9 @@ const EXPECTED_MACOS_RELEASE = `#!/bin/bash
 # tag; the size only drives the download progress bar, the digest gates use.
 # ============================================================================
 
-OLLAMA_RELEASE_VERSION="0.24.0"
-OLLAMA_DARWIN_TGZ_SHA256="e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38"
-OLLAMA_DARWIN_TGZ_BYTES="133395504"
+OLLAMA_RELEASE_VERSION="0.40.4"
+OLLAMA_DARWIN_TGZ_SHA256="a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58"
+OLLAMA_DARWIN_TGZ_BYTES="167884528"
 `;
 
 const cataloguePath = path.join(ROOT, sharedRel('modules', 'llm', 'ollama_release.json'));
@@ -562,7 +563,7 @@ for (const [name, mutate] of [
 	[
 		'prerelease version',
 		(data) => {
-			data.version = '0.24.0-rc.1';
+			data.version = '0.40.4-rc.1';
 		}
 	],
 	[
@@ -574,13 +575,13 @@ for (const [name, mutate] of [
 	[
 		'line-ending version',
 		(data) => {
-			data.version = '0.24.0\n';
+			data.version = '0.40.4\n';
 		}
 	],
 	[
 		'shell-bearing version',
 		(data) => {
-			data.version = '0.24.0"; exit 0';
+			data.version = '0.40.4"; exit 0';
 		}
 	],
 	[
@@ -685,7 +686,7 @@ for (const id of Object.keys(EXPECTED_RELEASE.assets)) {
 	test(
 		`the ${id} download URL retains the official release origin and basename`,
 		releaseGenerator.assetUrl(EXPECTED_RELEASE, id) ===
-			`https://github.com/ollama/ollama/releases/download/v0.24.0/${EXPECTED_RELEASE.assets[id].filename}`
+			`https://github.com/ollama/ollama/releases/download/v0.40.4/${EXPECTED_RELEASE.assets[id].filename}`
 	);
 }
 
@@ -772,19 +773,19 @@ try {
 	// This deliberately changed source has independent literal output expectations;
 	// --check must refuse the predecessor, and generation must project every change.
 	const changed = structuredClone(EXPECTED_RELEASE);
-	changed.version = '0.24.1';
+	changed.version = '0.40.5';
 	changed.assets['macos-universal'].sha256 =
 		'0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
-	changed.assets['macos-universal'].bytes = 133395505;
+	changed.assets['macos-universal'].bytes = 167884529;
 	const expectedChanged = EXPECTED_MACOS_RELEASE.replace(
-		'OLLAMA_RELEASE_VERSION="0.24.0"',
-		'OLLAMA_RELEASE_VERSION="0.24.1"'
+		'OLLAMA_RELEASE_VERSION="0.40.4"',
+		'OLLAMA_RELEASE_VERSION="0.40.5"'
 	)
 		.replace(
-			'e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38',
+			'a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58',
 			changed.assets['macos-universal'].sha256
 		)
-		.replace('OLLAMA_DARWIN_TGZ_BYTES="133395504"', 'OLLAMA_DARWIN_TGZ_BYTES="133395505"');
+		.replace('OLLAMA_DARWIN_TGZ_BYTES="167884528"', 'OLLAMA_DARWIN_TGZ_BYTES="167884529"');
 	fs.writeFileSync(source, JSON.stringify(changed) + '\n');
 	fs.writeFileSync(output, EXPECTED_MACOS_RELEASE);
 	const cliChanged = spawnSync(process.execPath, [generatorCli, '--check'], {

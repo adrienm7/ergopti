@@ -69,16 +69,13 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
             "\tif req.Method == http.MethodGet || req.Method == http.MethodHead {\n"
             "\t\tc.Transport = nativehttp.Wrap(c.Transport)\n\t}\n\treturn nativehttp.Do(c, req)\n",
         ),
-        "server/internal/client/ollama/registry.go": (
-            "\tres, err := c.Do(r)\n",
-            "\tif r.Method == http.MethodGet || r.Method == http.MethodHead {\n"
-            "\t\tcc := *c\n\t\tcc.Transport = nativehttp.Wrap(c.Transport)\n\t\tc = &cc\n"
-            "\t}\n\tres, err := nativehttp.Do(c, r)\n",
-        ),
-        "x/transfer/download.go": (
-            "\td := &downloader{\n\t\tclient:       cmp.Or(opts.Client, defaultClient),\n",
-            "\tclient := *cmp.Or(opts.Client, defaultClient)\n"
-            "\tclient.Transport = nativehttp.Wrap(client.Transport)\n"
+        # The transfer client's checked dialer refuses non-public addresses;
+        # the native worker never reaches it, so WrapChecked repeats that check.
+        "transfer/download.go": (
+            "\td := &downloader{\n"
+            "\t\tclient:       cmp.Or(opts.Client, checkedClient(opts.BaseURL, opts.AllowPrivateHosts)),\n",
+            "\tclient := *cmp.Or(opts.Client, checkedClient(opts.BaseURL, opts.AllowPrivateHosts))\n"
+            "\tclient.Transport = nativehttp.WrapChecked(client.Transport, opts.BaseURL, opts.AllowPrivateHosts)\n"
             "\td := &downloader{\n\t\tclient:       &client,\n",
         ),
         "server/routes.go": (
@@ -102,21 +99,26 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
         text = (source / relative).read_text(encoding="utf-8")
         text = replace_once(text, "import (\n", "import (\n" + IMPORT)
         text = replace_once(text, old, new)
-        if relative == "x/transfer/download.go":
+        if relative == "transfer/download.go":
             if text.count("d.client.Do(req)") != 2:
                 raise ValueError("The reviewed upstream download request seams changed")
             text = text.replace("d.client.Do(req)", "nativehttp.Do(d.client, req)")
         if relative == "server/download.go":
-            # Upstream fetches each blob part with http.DefaultClient from the
-            # direct URL the registry named. Unwrapped, those requests ignored
-            # PAC, proxies and enterprise anchors and resolved the registry
-            # host directly, so a pull behind a PAC-only proxy failed there.
+            # Upstream fetches each blob part through its checked redirect
+            # client from the direct URL the registry named. Unwrapped, those
+            # requests ignored PAC, proxies and enterprise anchors, so a pull
+            # behind a PAC-only proxy failed there. Redirect targets get no
+            # registry exemption, as upstream NewRedirectClient decides.
             text = replace_once(
                 text,
-                "\t\tresp, err := http.DefaultClient.Do(req)\n",
-                "\t\tchunkClient := *http.DefaultClient\n"
-                "\t\tchunkClient.Transport = nativehttp.Wrap(chunkClient.Transport)\n"
-                "\t\tresp, err := nativehttp.Do(&chunkClient, req)\n",
+                "\tclient := transfer.NewRedirectClient(requestURL.String(), opts.Insecure)\n",
+                "\tclient := transfer.NewRedirectClient(requestURL.String(), opts.Insecure)\n"
+                '\tclient.Transport = nativehttp.WrapChecked(client.Transport, "", opts.Insecure)\n',
+            )
+            text = replace_once(
+                text,
+                "\t\tresp, err := client.Do(req)\n",
+                "\t\tresp, err := nativehttp.Do(client, req)\n",
             )
         if relative == "server/routes.go":
             text = replace_once(
@@ -138,8 +140,13 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
 		ctx, cancel := context.WithCancel(c.Request.Context())
 		defer cancel()
 
-		if err := PullModel(ctx, name.DisplayShortest(), regOpts, fn); err != nil {
+		if err := PullModel(ctx, name.DisplayShortest(), runner, regOpts, fn); err != nil {
 			ch <- gin.H{"error": err.Error()}
+			return
+		}
+
+		if s.modelCaches != nil && s.modelCaches.show != nil {
+			s.modelCaches.show.invalidateLocal(name)
 		}
 	}()
 """
@@ -161,11 +168,16 @@ def apply_hooks(source: Path, repository: Path) -> dict[str, str]:
 			Insecure: req.Insecure,
 		}
 
-		if err := PullModel(ctx, name.DisplayShortest(), regOpts, fn); err != nil {
+		if err := PullModel(ctx, name.DisplayShortest(), runner, regOpts, fn); err != nil {
 			select {
 			case ch <- gin.H{"error": err.Error()}:
 			case <-ctx.Done():
 			}
+			return
+		}
+
+		if s.modelCaches != nil && s.modelCaches.show != nil {
+			s.modelCaches.show.invalidateLocal(name)
 		}
 	}()
 """

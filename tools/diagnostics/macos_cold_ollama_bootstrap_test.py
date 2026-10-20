@@ -454,7 +454,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                 return subprocess.CompletedProcess(
                     arguments,
                     0,
-                    stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                    stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
                     stderr="",
                 )
 
@@ -474,7 +474,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
                     "command_closed": True,
                     "lease_closed": True,
                     "route_worker_retired": True,
-                    "client_version": "0.24.0",
+                    "client_version": "0.40.4",
                 },
             )
             self.assert_owner_retired(observed["address"])
@@ -500,7 +500,7 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
             return subprocess.CompletedProcess(
                 arguments,
                 0,
-                stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                stdout="Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
                 stderr="",
             )
 
@@ -514,12 +514,12 @@ class OfficialClientVersionProbeTests(unittest.TestCase):
         self,
     ):
         for text in (
-            "ollama version is 0.24.0\n",
-            "unexpected startup output\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
-            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.1\n",
-            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0-foreign\n",
-            "Warning: client version is 0.24.0\n",
-            "ollama version is 0.24.0\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+            "ollama version is 0.40.4\n",
+            "unexpected startup output\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.5\n",
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4-foreign\n",
+            "Warning: client version is 0.40.4\n",
+            "ollama version is 0.40.4\nWarning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
         ):
             observed = {}
             with self.subTest(text=text):
@@ -701,7 +701,7 @@ class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
 
     def test_timeout_keeps_primary_exception_and_only_fingerprints_captured_prefix(self):
         diagnostics = {}
-        expected = b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n"
+        expected = b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n"
         refusal = subprocess.TimeoutExpired(["/owned/ollama"], 30, output=expected, stderr=b"")
         with mock.patch.object(cold.subprocess, "run", side_effect=refusal):
             with self.assertRaises(subprocess.TimeoutExpired) as observed:
@@ -730,9 +730,9 @@ class OfficialVersionTimeoutDiscriminatorTests(unittest.TestCase):
 
     def test_unclosed_or_foreign_version_lines_cannot_credit_completed_version_output(self):
         for payload in (
-            b"Warning: client version is 0.24.0\n",
-            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.1\n",
-            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0",
+            b"Warning: client version is 0.40.4\n",
+            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.5\n",
+            b"Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4",
         ):
             with self.subTest(output=payload):
                 refusal = subprocess.TimeoutExpired(
@@ -749,7 +749,7 @@ class OwnedVersionErrorRouteTests(unittest.TestCase):
         result = subprocess.CompletedProcess(
             [],
             0,
-            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+            "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
             "",
         )
         diagnostics = {}
@@ -795,7 +795,7 @@ class OwnedVersionErrorRouteTests(unittest.TestCase):
             return subprocess.CompletedProcess(
                 arguments,
                 0,
-                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
                 "",
             )
 
@@ -957,7 +957,7 @@ class OwnedVersionErrorRouteTests(unittest.TestCase):
             return subprocess.CompletedProcess(
                 arguments,
                 0,
-                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.24.0\n",
+                "Warning: could not connect to a running Ollama instance\nWarning: client version is 0.40.4\n",
                 "",
             )
 

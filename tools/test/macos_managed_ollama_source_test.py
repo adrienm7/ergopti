@@ -14,17 +14,25 @@ REPOSITORY = Path(__file__).resolve().parents[2]
 UPSTREAM = None
 # These vectors were frozen from the reviewed upstream commit, before applying
 # any product hook. They must not be regenerated from patched candidate files.
+# Ollama v0.40.4 is commit 45e6011815c74acde6a346512856b69dd79dd22b.
 FROZEN = {
-    "server/download.go": "14ffbdd4c503e7c0fb314e221d6f430a90ad745e910fa601e6b543e4c6a00699",
-    "server/routes.go": "2621eef9e33b370d97a460eef80466654e4319ffea5ec0b94b3dbd79d5effd5e",
-    "server/images.go": "517e83b75fa014fc3a3a9d23c316f71e10228e8d2f0c92323c627eb45e8d3887",
-    "server/internal/client/ollama/registry.go": "6063de52240e9857334f8af210f71a3073b0b2bb8fac35c8df8b97494edf91c0",
-    "x/transfer/download.go": "4cc3da8d3cbeac187eea3bd89dcc10a191fc3d8de53a7c5c5074ba30243be21a",
-    "go.mod": "a6b997b339c1de4fcdaaa2e3266d3494863e391e429496973b7da5f05aa898db",
-    "go.sum": "27f221ed12b312246074ac797952d26151b1b10f0e2731e3a42445665b950568",
+    "server/download.go": "d9299dd65146ba3dd5f4a5c7efe012795c763dcaa04ee6915086a2ac68665f0b",
+    "server/routes.go": "23b3202e270e8f3dba0c716c128529432db02e8b1e40e6d73c94345abf6cfde4",
+    "server/images.go": "41903a5408026cf30b4c07ce84c9365c8fa504d523e946d644131d095b22220f",
+    "transfer/download.go": "1eb5c3782d9b19b68bffa047d53ff96533ba8f9b94f6f6499c2ac1d6a97547b8",
+    "transfer/redirect.go": "fe3ed501f8cc2779c681dbe24ca9efb4e2f3db7fed46c94f87aa0d873fe71fc4",
+    "go.mod": "c8330ba5f762c4bded1401cc8ecadbe85ebe8e5d159fd81da122da986b26cda5",
+    "go.sum": "d9a0e2f1149951068ff200abac695a8fc6d6711b7cbf59c5aefb5e0a0340caae",
     "auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
-    "cmd/cmd.go": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627",
+    "cmd/cmd.go": "749cd910c303a7b7189e8a6c309dafd8d0aa55afe87620db3bac36410eaff56c",
 }
+# Seams that Ollama 0.24.0 had and 0.40.4 removed; a producer that still names
+# one of them was not ported to the pinned source layout.
+RETIRED_SEAMS = (
+    "server/internal/client/ollama/registry.go",
+    "x/transfer/download.go",
+    "http.DefaultClient.Do(req)",
+)
 SPEC = importlib.util.spec_from_file_location(
     "producer", REPOSITORY / "tools/build/build-macos-managed-ollama.py"
 )
@@ -52,16 +60,25 @@ class Hooks(unittest.TestCase):
             images.index("nativehttp.Wrap(c.Transport)"),
         )
         self.assertLess(
-            images.index("CheckRedirect: regOpts.CheckRedirect"),
+            images.index("checkRedirect = regOpts.CheckRedirect"),
             images.index("nativehttp.Wrap(c.Transport)"),
         )
         self.assertIn("req.Method == http.MethodGet || req.Method == http.MethodHead", images)
-        registry = (self.candidate / "server/internal/client/ollama/registry.go").read_text()
-        self.assertIn("cc := *c\n\t\tcc.Transport = nativehttp.Wrap(c.Transport)", registry)
-        transfer = (self.candidate / "x/transfer/download.go").read_text()
-        self.assertIn("client := *cmp.Or(opts.Client, defaultClient)", transfer)
+        transfer = (self.candidate / "transfer/download.go").read_text()
+        # The checked transfer client stays the base; only its route is wrapped,
+        # and the wrapper receives the same registry exemption and --insecure bit.
+        self.assertIn(
+            "client := *cmp.Or(opts.Client, checkedClient(opts.BaseURL, opts.AllowPrivateHosts))",
+            transfer,
+        )
+        self.assertIn(
+            "nativehttp.WrapChecked(client.Transport, opts.BaseURL, opts.AllowPrivateHosts)",
+            transfer,
+        )
         self.assertIn("client:       &client", transfer)
-        for relative in ("auth/auth.go", "go.mod", "go.sum"):
+        self.assertEqual(transfer.count("nativehttp.Do(d.client, req)"), 2)
+        self.assertNotIn("d.client.Do(req)", transfer)
+        for relative in ("auth/auth.go", "go.mod", "go.sum", "transfer/redirect.go"):
             self.assertEqual(
                 (self.candidate / relative).read_bytes(), (UPSTREAM / relative).read_bytes()
             )
@@ -75,17 +92,33 @@ class Hooks(unittest.TestCase):
         self.assertIn('r.GET("/api/status", s.StatusHandler)', routes)
         self.assertIn("defer finishNativePull()", routes)
         self.assertIn("case <-ctx.Done():", routes)
+        self.assertIn("PullModel(ctx, name.DisplayShortest(), runner, regOpts, fn)", routes)
+        self.assertIn("s.modelCaches.show.invalidateLocal(name)", routes)
         download = (self.candidate / "server/download.go").read_text()
         self.assertIn("retireNativeDownload := nativehttp.TrackBackgroundDownload()", download)
         self.assertIn("defer retireNativeDownload()", download)
         # Blob parts come from the registry-named direct URL; an unwrapped
-        # DefaultClient bypassed PAC, proxies and anchors (hosted pull failure).
-        self.assertNotIn("http.DefaultClient.Do(req)", download)
-        self.assertIn("chunkClient.Transport = nativehttp.Wrap(chunkClient.Transport)", download)
-        self.assertIn("resp, err := nativehttp.Do(&chunkClient, req)", download)
+        # client bypassed PAC, proxies and anchors (hosted pull failure), and
+        # redirect targets keep upstream's non-public address refusal.
+        self.assertIn(
+            'client.Transport = nativehttp.WrapChecked(client.Transport, "", opts.Insecure)',
+            download,
+        )
+        self.assertIn("resp, err := nativehttp.Do(client, req)", download)
+        self.assertNotIn("resp, err := client.Do(req)", download)
+
+    def test_producer_names_no_retired_upstream_seam(self):
+        producer = (REPOSITORY / "tools/build/build-macos-managed-ollama.py").read_text()
+        contract = PRODUCER.runtime_contract(REPOSITORY)
+        for seam in RETIRED_SEAMS:
+            self.assertNotIn(seam, producer)
+            self.assertNotIn(seam, contract["upstream_preimages"])
+            self.assertNotIn(seam, contract["request_hook_paths"])
+        self.assertEqual(contract["upstream_preimages"], FROZEN)
+        self.assertEqual(contract["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
 
     def test_changed_preimages_refuse_before_any_source_edit(self):
-        path = self.candidate / "x/transfer/download.go"
+        path = self.candidate / "transfer/download.go"
         path.write_bytes(path.read_bytes() + b"\n// Independent unexpected upstream edit.\n")
         before = {relative: (self.candidate / relative).read_bytes() for relative in FROZEN}
         with self.assertRaisesRegex(ValueError, "preimage changed"):
@@ -105,10 +138,16 @@ class Hooks(unittest.TestCase):
     def test_all_owned_bridge_sources_join_actual_upstream_module(self):
         PRODUCER.apply_hooks(self.candidate, REPOSITORY)
         package = self.candidate / "internal/ergoptinativehttp"
+        contract = PRODUCER.runtime_contract(REPOSITORY)
         self.assertEqual(
             sorted(path.name for path in package.iterdir()),
-            ["admission.go", "transport.go", "worker_darwin.go", "worker_other.go"],
+            sorted(
+                Path(name).name
+                for name in contract["source_fingerprint_paths"]
+                if Path(name).suffix in (".go", ".json")
+            ),
         )
+        self.assertIn("address_policy.go", {path.name for path in package.iterdir()})
         for path in package.iterdir():
             self.assertEqual(
                 path.read_bytes(),

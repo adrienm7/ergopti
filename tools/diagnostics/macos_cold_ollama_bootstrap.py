@@ -38,9 +38,9 @@ SOURCE_PATHS = (
     "_shared/modules/llm/ollama_release.json",
 )
 # Independent receiving pins: do not derive these from the new installer.
-OFFICIAL_VERSION = "0.24.0"
-OFFICIAL_SHA256 = "e6d5e8b4bc0cb2a35ff7901c58d81ca2170403a819c4726f58798155fa682e38"
-OFFICIAL_BYTES = 133395504
+OFFICIAL_VERSION = "0.40.4"
+OFFICIAL_SHA256 = "a4ceae4b2aaf18df37ebcbfb56ba3a37a87838631112d66c2be07268693c8d58"
+OFFICIAL_BYTES = 167884528
 
 
 def isolated_runtime_paths(environment):

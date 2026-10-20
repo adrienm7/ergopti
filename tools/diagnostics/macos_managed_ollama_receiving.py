@@ -1095,7 +1095,7 @@ class Receiver:
                 with opener.open(
                     f"http://127.0.0.1:{self.port}/api/version", timeout=1
                 ) as response:
-                    require(json.load(response)["version"] == "0.24.0", "actual_daemon_version")
+                    require(json.load(response)["version"] == "0.40.4", "actual_daemon_version")
                     with patch.dict(os.environ, self.api_environment, clear=True):
                         self.owner()
                     self.verify_alias_source(deadline)

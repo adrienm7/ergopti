@@ -32,15 +32,15 @@ CATALOGUE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CATALOGUE)
 CAPABILITY = "ERGOPTI_OLLAMA_NATIVE_HTTP_V1"
 REVIEWED_PREIMAGES = {
-    "cmd/cmd.go": "e6ac73dca45ec039b45c640f2b29dca5a31561e6df514c10e37fe0281bedf627",
-    "server/images.go": "517e83b75fa014fc3a3a9d23c316f71e10228e8d2f0c92323c627eb45e8d3887",
-    "server/internal/client/ollama/registry.go": "6063de52240e9857334f8af210f71a3073b0b2bb8fac35c8df8b97494edf91c0",
-    "x/transfer/download.go": "4cc3da8d3cbeac187eea3bd89dcc10a191fc3d8de53a7c5c5074ba30243be21a",
-    "go.mod": "a6b997b339c1de4fcdaaa2e3266d3494863e391e429496973b7da5f05aa898db",
-    "go.sum": "27f221ed12b312246074ac797952d26151b1b10f0e2731e3a42445665b950568",
+    "cmd/cmd.go": "749cd910c303a7b7189e8a6c309dafd8d0aa55afe87620db3bac36410eaff56c",
+    "server/images.go": "41903a5408026cf30b4c07ce84c9365c8fa504d523e946d644131d095b22220f",
+    "transfer/download.go": "1eb5c3782d9b19b68bffa047d53ff96533ba8f9b94f6f6499c2ac1d6a97547b8",
+    "transfer/redirect.go": "fe3ed501f8cc2779c681dbe24ca9efb4e2f3db7fed46c94f87aa0d873fe71fc4",
+    "go.mod": "c8330ba5f762c4bded1401cc8ecadbe85ebe8e5d159fd81da122da986b26cda5",
+    "go.sum": "d9a0e2f1149951068ff200abac695a8fc6d6711b7cbf59c5aefb5e0a0340caae",
     "auth/auth.go": "ac4c269cb812edc01e2386fce0a7753871851edf76ec46ad26329016dc6f7841",
-    "server/routes.go": "2621eef9e33b370d97a460eef80466654e4319ffea5ec0b94b3dbd79d5effd5e",
-    "server/download.go": "14ffbdd4c503e7c0fb314e221d6f430a90ad745e910fa601e6b543e4c6a00699",
+    "server/routes.go": "23b3202e270e8f3dba0c716c128529432db02e8b1e40e6d73c94345abf6cfde4",
+    "server/download.go": "d9299dd65146ba3dd5f4a5c7efe012795c763dcaa04ee6915086a2ac68665f0b",
 }
 # These vectors are literal independent protocol inputs, not native binaries.
 ARM64_HEADER = bytes.fromhex("cffaedfe0c000001000000000200000000000000000000000000000000000000")
@@ -96,8 +96,7 @@ class PortableCatalogue(unittest.TestCase):
         }
         self.hooks = {
             "server/images.go": "1" * 64,
-            "server/internal/client/ollama/registry.go": "2" * 64,
-            "x/transfer/download.go": "3" * 64,
+            "transfer/download.go": "3" * 64,
             "server/routes.go": "4" * 64,
             "server/download.go": "5" * 64,
         }
@@ -106,9 +105,9 @@ class PortableCatalogue(unittest.TestCase):
         ).strip()
         self.receipt = {
             "schema_version": 1,
-            "version": "0.24.0",
+            "version": "0.40.4",
             "capability": CAPABILITY,
-            "source_commit": "c28ddc0a7b273cd286b680a6db0bef0c17bc0ec0",
+            "source_commit": "45e6011815c74acde6a346512856b69dd79dd22b",
             "go_version": "go1.26.8",
             "architecture": "arm64",
             "platform": "darwin",
@@ -167,8 +166,8 @@ class PortableCatalogue(unittest.TestCase):
         self.receipt["bytes"] = self.asset.stat().st_size
 
     def test_source_contract_has_reviewed_pins_and_no_future_asset_identity(self):
-        self.assertEqual(self.contract["version"], "0.24.0")
-        self.assertEqual(self.contract["source_commit"], "c28ddc0a7b273cd286b680a6db0bef0c17bc0ec0")
+        self.assertEqual(self.contract["version"], "0.40.4")
+        self.assertEqual(self.contract["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
         self.assertEqual(self.contract["go_version"], "go1.26.8")
         self.assertEqual(self.contract["native_http_capability"], 1)
         self.assertEqual(self.contract["upstream_preimages"], REVIEWED_PREIMAGES)
@@ -585,8 +584,8 @@ class NativeCatalogue(unittest.TestCase):
         data = json.loads(output.read_text())
         receipt = json.loads(NATIVE.producer_receipt.read_text())
         asset = data["assets"]["macos-" + receipt["architecture"]]
-        self.assertEqual(data["version"], "0.24.0")
-        self.assertEqual(data["source_commit"], "c28ddc0a7b273cd286b680a6db0bef0c17bc0ec0")
+        self.assertEqual(data["version"], "0.40.4")
+        self.assertEqual(data["source_commit"], "45e6011815c74acde6a346512856b69dd79dd22b")
         self.assertEqual(asset["sha256"], sha_bytes(NATIVE.archive.read_bytes()))
         self.assertEqual(asset["bytes"], NATIVE.archive.stat().st_size)
         self.assertEqual(asset["binary_sha256"], receipt["binary_sha256"])
