@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Tecla à esquerda do 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Primeira tecla à direita do 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Segunda tecla à direita do 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "substitui a tecla mágica física",
 	"menu.shortcuts.tap_keys.unassigned": "comportamento normal",
 	"menu.shortcuts.script_shortcuts": "Atalhos de gerenciamento de script",
 	"menu.shortcuts.script_shortcuts_enable": "Ativar os atalhos de gerenciamento de script",

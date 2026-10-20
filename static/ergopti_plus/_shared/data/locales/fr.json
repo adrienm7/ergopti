@@ -1674,6 +1674,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Touche à gauche du 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "1re touche à droite du 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "2e touche à droite du 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "remplace la touche magique physique",
 	"menu.shortcuts.tap_keys.unassigned": "comportement normal",
 	"menu.shortcuts.script_shortcuts": "Raccourcis de gestion du script",
 	"menu.shortcuts.script_shortcuts_enable": "Activer les raccourcis de gestion du script",

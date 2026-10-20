@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "1 के बाईं ओर की कुंजी",
 	"menu.shortcuts.tap_keys.number_row_right_1": "0 के दाईं ओर की पहली कुंजी",
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 के दाईं ओर की दूसरी कुंजी",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "भौतिक जादुई कुंजी की जगह लेता है",
 	"menu.shortcuts.tap_keys.unassigned": "सामान्य व्यवहार",
 	"menu.shortcuts.script_shortcuts": "स्क्रिप्ट प्रबंधन शॉर्टकट",
 	"menu.shortcuts.script_shortcuts_enable": "स्क्रिप्ट प्रबंधन शॉर्टकट सक्षम करें",

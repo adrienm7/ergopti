@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Klawisz na lewo od 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Pierwszy klawisz na prawo od 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Drugi klawisz na prawo od 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "zastępuje fizyczny klawisz magiczny",
 	"menu.shortcuts.tap_keys.unassigned": "zwykłe działanie",
 	"menu.shortcuts.script_shortcuts": "Skróty zarządzania skryptem",
 	"menu.shortcuts.script_shortcuts_enable": "Włącz skróty zarządzania skryptem",

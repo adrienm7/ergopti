@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "1’in solundaki tuş",
 	"menu.shortcuts.tap_keys.number_row_right_1": "0’ın sağındaki ilk tuş",
 	"menu.shortcuts.tap_keys.number_row_right_2": "0’ın sağındaki ikinci tuş",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "fiziksel sihirli tuşun yerini alır",
 	"menu.shortcuts.tap_keys.unassigned": "normal davranış",
 	"menu.shortcuts.script_shortcuts": "Betik yönetim kısayolları",
 	"menu.shortcuts.script_shortcuts_enable": "Betik yönetim kısayollarını etkinleştir",

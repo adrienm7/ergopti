@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Tasten til venstre for 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Første tast til højre for 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Anden tast til højre for 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "erstatter den fysiske magiske tast",
 	"menu.shortcuts.tap_keys.unassigned": "normal funktion",
 	"menu.shortcuts.script_shortcuts": "Script-administrationsgenveje",
 	"menu.shortcuts.script_shortcuts_enable": "Aktivér script-administrationsgenveje",

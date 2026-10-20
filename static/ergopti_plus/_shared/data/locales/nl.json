@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Toets links van 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Eerste toets rechts van 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Tweede toets rechts van 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "vervangt de fysieke magische toets",
 	"menu.shortcuts.tap_keys.unassigned": "normaal gedrag",
 	"menu.shortcuts.script_shortcuts": "Scriptbeheer-sneltoetsen",
 	"menu.shortcuts.script_shortcuts_enable": "Scriptbeheer-sneltoetsen inschakelen",

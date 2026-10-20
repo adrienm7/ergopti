@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Tangenten till vänster om 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Första tangenten till höger om 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Andra tangenten till höger om 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "ersätter den fysiska magiska tangenten",
 	"menu.shortcuts.tap_keys.unassigned": "normalt beteende",
 	"menu.shortcuts.script_shortcuts": "Genvägar för skripthantering",
 	"menu.shortcuts.script_shortcuts_enable": "Aktivera genvägar för skripthantering",

@@ -1674,6 +1674,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Key left of 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "First key right of 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Second key right of 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "replaces the physical magic key",
 	"menu.shortcuts.tap_keys.unassigned": "normal behaviour",
 	"menu.shortcuts.script_shortcuts": "Script management shortcuts",
 	"menu.shortcuts.script_shortcuts_enable": "Enable script management shortcuts",

@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Taste links von 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Erste Taste rechts von 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Zweite Taste rechts von 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "ersetzt die physische magische Taste",
 	"menu.shortcuts.tap_keys.unassigned": "normales Verhalten",
 	"menu.shortcuts.script_shortcuts": "Skript-Verwaltungskürzel",
 	"menu.shortcuts.script_shortcuts_enable": "Skript-Verwaltungskürzel aktivieren",

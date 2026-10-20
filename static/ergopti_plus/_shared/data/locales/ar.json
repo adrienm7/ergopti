@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "المفتاح على يسار 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "المفتاح الأول على يمين 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "المفتاح الثاني على يمين 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "يحل محل المفتاح الفعلي للمفتاح السحري",
 	"menu.shortcuts.tap_keys.unassigned": "السلوك العادي",
 	"menu.shortcuts.script_shortcuts": "اختصارات إدارة النص البرمجي",
 	"menu.shortcuts.script_shortcuts_enable": "تفعيل اختصارات إدارة النص البرمجي",
