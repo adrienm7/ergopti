@@ -3358,7 +3358,11 @@ function M.merge_and_deploy_config(
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
 	end
-	if merge_changed == false then
+	-- A skip leaves the file as it is on disk, so that file must still be the
+	-- one the merge read: confirmed by its exact bytes before reporting success.
+	-- One INFO line per decision: each publication makes Karabiner reload every
+	-- rule, so the log must show how often that happens and why.
+	local function skip_identical(why)
 		local read_ok, current, current_status, current_detail = pcall(
 			FileSystem.read_with_status,
 			karabiner_out
@@ -3377,11 +3381,11 @@ function M.merge_and_deploy_config(
 			Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 			return false, detail, 0
 		end
-		-- One INFO line per decision: each publication makes Karabiner reload
-		-- every rule, so the log must show how often that happens and why.
-		Logger.info(LOG,
-			"Karabiner deploy decision: skipped-identical (the managed rules on disk already match; no reload).")
+		Logger.info(LOG, "Karabiner deploy decision: skipped-identical (%s; no reload).", why)
 		return true, "unchanged", 0
+	end
+	if merge_changed == false then
+		return skip_identical("the managed rules on disk already match")
 	end
 
 	local encode_ok, content = pcall(hs.json.encode, merged, true)
@@ -3389,6 +3393,11 @@ function M.merge_and_deploy_config(
 		local detail = "JSON encode failed: " .. tostring(content)
 		Logger.error(LOG, "Karabiner deploy aborted — %s.", detail)
 		return false, detail, 1
+	end
+	-- The bytes read for the merge are the deployed file: identical output is
+	-- no publication, whatever the semantic verdict said.
+	if source_snapshot.status == "ok" and content == source_snapshot.content then
+		return skip_identical("the encoded file equals the bytes on disk")
 	end
 
 	local call_ok, deployed, deploy_detail = pcall(
