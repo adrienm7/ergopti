@@ -43,6 +43,23 @@ Breaking change: `feat!:` plus an explanation in the body.
 - **One commit per fix.** Do not batch unrelated fixes; each must be revertable alone.
 - The body is for motivation and root cause — the diff already shows the what.
 
+## Forcing the next stable version
+
+A push to `main` numbers its tag from the subjects since the last stable tag:
+`feat` bumps the minor, `!:` or `BREAKING:` the major, anything else the patch.
+When the maintainer asks for a specific version, add this line on its own in
+a commit message after the last stable tag (the newest such commit wins):
+
+```
+Release-As: 1.0.4
+```
+
+`git commit --trailer 'Release-As: 1.0.4'` writes it. The value must be
+MAJOR.MINOR.PATCH (no `v`, no leading zeros), strictly greater than the last
+stable tag and not an existing tag; otherwise the plan fails instead of
+publishing the computed number. `dev` ignores it with a notice. Never begin a
+line with `Release-As:` in an explanatory message: it would become a request.
+
 ## Never credit a tool
 
 **No `Co-Authored-By` trailers. Ever.** Not Claude, not Copilot, not
