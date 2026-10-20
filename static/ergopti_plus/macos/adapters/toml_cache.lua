@@ -17,9 +17,9 @@
 ---    reader stays pure. The reader sees only an injected load/store hook.
 --- 2. Robust invalidation: a snapshot is written only when the source identity
 ---    captured before parsing still matches at store time, then served only when
----    the source file's modification time, size, AND content fingerprint match
+---    the source file's modification time, size, AND exact source bytes match
 ---    that identity and the embedded schema version matches.
----    The fingerprint guards against HFS+ 1-second mtime resolution where an
+---    Exact byte equality guards against coarse timestamps and restores where an
 ---    edit + reload within the same wall-clock second would otherwise return a
 ---    stale snapshot when the file size happened to stay the same. Any mismatch
 ---    (or a missing / corrupt snapshot) is a silent miss that falls back to a
@@ -59,15 +59,12 @@ local LOG    = "adapters.toml_cache"
 --- rejected transactionally by the shared reader.
 --- Version 6 invalidates empty/partial snapshots from malformed source headers
 --- that the previous reader acknowledged instead of retaining a healthy source.
-local CACHE_VERSION = 6
+--- Version 7 requires the exact source bytes instead of a colliding 32-bit hash.
+local CACHE_VERSION = 7
 
---- Chunk size used to stream the source file while building the content
---- fingerprint. The WHOLE file is hashed, one chunk at a time; this constant is
---- only the read granularity, not a prefix window. It used to be a 512-byte
---- prefix, which on a manifest-shaped file covered the `[_meta]` header and not
---- one entry — so a same-second edit to any actual value was invisible and the
---- stale cache was served. The read happens only when mtime+size already match.
-local FINGERPRINT_CHUNK_BYTES = 64 * 1024
+--- Read granularity for collecting complete source bytes. Equality is byte-exact;
+--- neither timestamps nor a fixed-width digest can certify the parsed document.
+local SOURCE_CHUNK_BYTES = 64 * 1024
 
 --- djb2 hash seed and modulus (32-bit) used to derive a collision-resistant
 --- snapshot filename from the full source path.
@@ -79,6 +76,9 @@ local DJB2_MODULUS = 4294967296  -- 2^32
 --- returns a miss and every store() is a no-op, so the parser behaves exactly as
 --- it did before the cache existed.
 local _cache_dir = nil
+
+-- Tokens keep source receipts private without retaining terminal parse sessions.
+local _source_tokens = setmetatable({}, { __mode = "k" })
 
 --- Lightweight hit/miss counters, surfaced via M.stats() for diagnostics.
 local _hits   = 0
@@ -160,61 +160,45 @@ local function source_attr(path)
 	return { mtime = a.modification, size = a.size }
 end
 
---- Computes a 32-bit FNV-1a-like fingerprint over the complete source file.
---- Called only when content identity is required, so the extra io.open stays off
---- unambiguous cache hits.
+--- Reads complete source bytes, admitting only a clean EOF and a true close ACK.
 --- @param path string Absolute source path.
---- @return number|nil 32-bit non-negative integer, or nil if the file cannot be read.
-local function content_fingerprint(path)
+--- @return string|nil source Exact bytes, or nil when reading or retirement failed.
+local function read_source_bytes(path)
 	local ok, result = pcall(function()
 		local f = io.open(path, "rb")
 		if not f then return nil end
-		-- The WHOLE file, read in chunks. A prefix window is not evidence about the
-		-- part of the file it does not cover: at 512 bytes it stopped inside the
-		-- [_meta] preamble of every hotstring TOML in this repo, so an equal-length
-		-- same-second edit to any actual entry hashed identically and stale data was
-		-- served for the rest of the session.
-		--
-		-- Reading it all is affordable because this function is now only reached on
-		-- the AMBIGUOUS branch — a snapshot written in the same integer second as the
-		-- source mtime. Every other hit skips it entirely, which makes this a net
-		-- saving rather than a cost.
-		--
-		-- Inner pcall ensures f:close() always runs on unexpected read errors.
-		local h = 2166136261
-		local read_ok = pcall(function()
+		local chunks = {}
+		local read_ok, read_complete = pcall(function()
 			while true do
-				local chunk = f:read(FINGERPRINT_CHUNK_BYTES)
-				if not chunk or #chunk == 0 then break end
-				-- FNV-1a-like: XOR then multiply, kept in 32-bit range
-				for i = 1, #chunk do
-					h = ((h ~ chunk:byte(i)) * 16777619) & 0xFFFFFFFF
-				end
+				local chunk, read_error = f:read(SOURCE_CHUNK_BYTES)
+				if chunk == nil then return read_error == nil end
+				if #chunk == 0 then return true end
+				chunks[#chunks + 1] = chunk
 			end
 		end)
-		f:close()
-		if not read_ok then return nil end
-		return h
+		local close_ok, closed = pcall(f.close, f)
+		if not read_ok or read_complete ~= true or not close_ok or closed ~= true then return nil end
+		return table.concat(chunks)
 	end)
 	if not ok then return nil end
 	return result
 end
 
---- Captures one stable source identity around a complete content fingerprint.
+--- Captures one stable source identity around complete exact source bytes.
 --- @param path string Absolute source path.
 --- @return table|nil identity Opaque parse-to-store identity, or nil on failure.
 local function capture_source_identity(path)
 	local before = source_attr(path)
 	if not before then return nil end
-	local fp = content_fingerprint(path)
-	if not fp then return nil end
+	local source = read_source_bytes(path)
+	if source == nil then return nil end
 	local after = source_attr(path)
 	if not after
 		or before.mtime ~= after.mtime
 		or before.size ~= after.size then
 		return nil
 	end
-	return { path = path, mtime = after.mtime, size = after.size, fp = fp }
+	return { path = path, mtime = after.mtime, size = after.size, source = source }
 end
 
 --- Compares two complete source identities.
@@ -227,11 +211,11 @@ local function same_source_identity(left, right)
 		and type(left.path) == "string"
 		and type(left.mtime) == "number"
 		and type(left.size) == "number"
-		and type(left.fp) == "number"
+		and type(left.source) == "string"
 		and left.path == right.path
 		and left.mtime == right.mtime
 		and left.size == right.size
-		and left.fp == right.fp
+		and left.source == right.source
 end
 
 --- 32-bit djb2 hash of a string, used to disambiguate snapshot filenames.
@@ -319,29 +303,18 @@ function M.load(path)
 	if snap.ver ~= CACHE_VERSION
 		or snap.mtime ~= attr.mtime
 		or snap.size ~= attr.size
-		or type(snap.data) ~= "table" then
+		or type(snap.data) ~= "table"
+		or type(snap.source) ~= "string" then
 		_misses = _misses + 1
 		return nil
 	end
 
-	-- mtime and size match. On HFS+ the mtime resolution is 1 second, so a
-	-- same-second edit at an unchanged size would pass the checks above and serve
-	-- stale data. But that window only exists when the snapshot was written IN that
-	-- same second: if it was written strictly later, any subsequent edit necessarily
-	-- moves mtime past `snap.mtime`, and the check above has already caught it.
-	--
-	-- So the common case needs no content read at all — this takes an io.open plus a
-	-- full read off every cache hit. A snapshot with no `wrote_at` predates the field
-	-- and is treated as ambiguous, which is the safe direction.
-	if type(snap.wrote_at) == "number" and snap.wrote_at > math.floor(snap.mtime) then
-		_hits = _hits + 1
-		Logger.debug(LOG, "Snapshot hit for '%s' (unambiguous write, no content read).", path)
-		return snap.data
-	end
+	-- Restores and synchronization can preserve mtime and size even when bytes
+	-- change. The snapshot's write time cannot authorize a content-free hit.
 
-	local fp = content_fingerprint(path)
-	if fp ~= snap.fp then
-		Logger.debug(LOG, "Fingerprint mismatch for '%s' — invalidating stale snapshot.", path)
+	local source = read_source_bytes(path)
+	if source == nil or source ~= snap.source then
+		Logger.debug(LOG, "Source bytes changed for '%s' — invalidating stale snapshot.", path)
 		_misses = _misses + 1
 		return nil
 	end
@@ -357,7 +330,22 @@ end
 --- @return table|nil identity Opaque source identity, or nil when unavailable.
 function M.capture_source(path)
 	if not _cache_dir or type(path) ~= "string" then return nil end
-	return capture_source_identity(path)
+	local identity = capture_source_identity(path)
+	if not identity then return nil end
+	local token = {}
+	_source_tokens[token] = identity
+	return token
+end
+
+--- Returns the exact bytes already read and closed for one issued source token.
+--- @param path string Absolute TOML source path.
+--- @param token table Opaque identity returned by capture_source().
+--- @return string|nil source Captured bytes, or nil for a foreign token or path.
+function M.read_snapshot(path, token)
+	if not _cache_dir or type(path) ~= "string" or type(token) ~= "table" then return nil end
+	local identity = _source_tokens[token]
+	if not identity or identity.path ~= path then return nil end
+	return identity.source
 end
 
 --- Writes (or refreshes) the snapshot for a freshly parsed source file.
@@ -368,8 +356,9 @@ end
 function M.store(path, parsed, source_identity)
 	if not _cache_dir or type(path) ~= "string" or type(parsed) ~= "table" then return false end
 
+	local expected = type(source_identity) == "table" and _source_tokens[source_identity] or nil
 	local current_identity = capture_source_identity(path)
-	if not same_source_identity(source_identity, current_identity) then
+	if not same_source_identity(expected, current_identity) then
 		Logger.warn(LOG, "Source changed while '%s' was parsed — stale snapshot refused.", path)
 		return false
 	end
@@ -377,12 +366,11 @@ function M.store(path, parsed, source_identity)
 	local parts = {}
 	serialize(parsed, parts)
 	local body = string.format(
-		"return {ver=%d,mtime=%.17g,size=%.17g,fp=%d,wrote_at=%d,data=%s}\n",
+		"return {ver=%d,mtime=%.17g,size=%.17g,source=%q,data=%s}\n",
 		CACHE_VERSION,
-		source_identity.mtime,
-		source_identity.size,
-		source_identity.fp,
-		os.time(),
+		expected.mtime,
+		expected.size,
+		expected.source,
 		table.concat(parts))
 
 	local ok, failure = pcall(function()
