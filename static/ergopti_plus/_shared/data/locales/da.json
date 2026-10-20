@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Starter Ollama-installation…",
 	"llm.deps.install_launching_hotkey": "Ollama-installation (udløst af genvej)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "AI-tastaturgenvejene kunne ikke aktiveres. AI virker stadig uden dem: slå den fra og til igen, eller genstart Ergopti+, for at prøve igen.",
 	"llm.generating": "⏳ Genererer…",
 	"llm.manual_prediction.backend_not_ready": "AI-modellen er ikke klar endnu: intet forslag genereret.",
 	"llm.manual_prediction.disabled": "AI-forslag er slået fra: slå dem til i menuen Kunstig intelligens.",

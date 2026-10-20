@@ -510,7 +510,24 @@ _LLM_Menu_RestoreNavBindingPlan(OldPlan, CandidatePlan, HotkeyFn) {
 	return Restored
 }
 
-_LLM_Menu_LogNavBindingFailure(Message, LogFn := 0) {
+; The last refusal of a navigation binding and what caused it. "external" is a
+; refusal by the system (the native owner, a keyboard layout lookup, a Hotkey
+; call); "invalid" is a plan the driver itself built wrong, a programming error.
+global _LLM_Menu_NavLastRefusal := 0
+global LLM_NAV_REFUSAL_EXTERNAL := "external"
+global LLM_NAV_REFUSAL_INVALID := "invalid"
+
+/**
+ * Records why a navigation binding was refused, then logs it.
+ * @param {String} Message The cause, in the log's words.
+ * @param {Func} LogFn Test seam, or a collector that keeps the line unlogged.
+ * @param {String} Kind LLM_NAV_REFUSAL_EXTERNAL or LLM_NAV_REFUSAL_INVALID.
+ */
+_LLM_Menu_LogNavBindingFailure(Message, LogFn := 0, Kind := "") {
+	global _LLM_Menu_NavLastRefusal, LLM_NAV_REFUSAL_EXTERNAL, LLM_NAV_REFUSAL_INVALID
+	if !(Kind == LLM_NAV_REFUSAL_EXTERNAL || Kind == LLM_NAV_REFUSAL_INVALID)
+		throw ValueError("A navigation binding refusal must name its cause.", -1, Kind)
+	_LLM_Menu_NavLastRefusal := Map("kind", Kind, "detail", Message)
 	if HasMethod(LogFn, "Call") {
 		try LogFn.Call(Message)
 		return
@@ -522,6 +539,7 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 		LogFn := 0, ResetFn := 0, KeyResolverFn := 0,
 		NativeOwnerPort := 0) {
 	global _LLM_Menu, _LLM_Menu_NavSlotPlans, _LLM_Menu_NavActiveSlot
+	global LLM_NAV_REFUSAL_EXTERNAL, LLM_NAV_REFUSAL_INVALID
 	InheritedCritical := A_IsCritical
 	if InheritedCritical {
 		Critical("Off")
@@ -535,7 +553,7 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 	if !(Built is Map) {
 		_LLM_Menu_LogNavBindingFailure(
 			"Navigation hotkeys rejected: invalid modifier configuration.",
-			LogFn)
+			LogFn, LLM_NAV_REFUSAL_INVALID)
 		return false
 	}
 	CandidatePlan := Built["plan"]
@@ -549,18 +567,20 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 				_LLM_Menu_NavDigitRowKey.Bind(LayoutResolver)) {
 		_LLM_Menu_LogNavBindingFailure(
 			"Navigation hotkeys rejected: physical ownership could not be resolved.",
-			LogFn)
+			LogFn, LLM_NAV_REFUSAL_EXTERNAL)
 		return false
 	}
 	if !_LLM_Menu_NavPlanIsValid(CandidatePlan, ResolvedMenu) {
 		_LLM_Menu_LogNavBindingFailure(
-			"Navigation hotkeys rejected: invalid candidate owner.", LogFn)
+			"Navigation hotkeys rejected: invalid candidate owner.", LogFn,
+			LLM_NAV_REFUSAL_INVALID)
 		return false
 	}
 	if !(_LLM_Menu_NavActiveSlot == 0 || _LLM_Menu_NavActiveSlot == 1
 			|| _LLM_Menu_NavActiveSlot == 2) {
 		_LLM_Menu_LogNavBindingFailure(
-			"Navigation hotkeys rejected: invalid active slot.", LogFn)
+			"Navigation hotkeys rejected: invalid active slot.", LogFn,
+			LLM_NAV_REFUSAL_INVALID)
 		return false
 	}
 	CandidateSlot := _LLM_Menu_NavActiveSlot == 1 ? 2 : 1
@@ -578,7 +598,8 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 			NativeOwnerPort)
 		if !(NativeGeneration is Integer) || NativeGeneration <= 0 {
 			_LLM_Menu_LogNavBindingFailure(
-				"Navigation event owner rejected the candidate plan.", LogFn)
+				"Navigation event owner rejected the candidate plan.", LogFn,
+				LLM_NAV_REFUSAL_EXTERNAL)
 			return false
 		}
 		PreviousCritical := Critical("On")
@@ -656,11 +677,11 @@ _LLM_Menu_PrepareNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 		}
 	} finally Critical(PreviousCritical)
 	if IsObject(ResetFailure) {
-		_LLM_Menu_LogNavBindingFailure(FailureDetail, LogFn)
+		_LLM_Menu_LogNavBindingFailure(FailureDetail, LogFn, LLM_NAV_REFUSAL_EXTERNAL)
 		throw ResetFailure
 	}
 	if !Succeeded {
-		_LLM_Menu_LogNavBindingFailure(FailureDetail, LogFn)
+		_LLM_Menu_LogNavBindingFailure(FailureDetail, LogFn, LLM_NAV_REFUSAL_EXTERNAL)
 		return false
 	}
 	return Owner
@@ -710,22 +731,31 @@ LLM_Menu_BindNavHotkeys(MenuState := 0, HotkeyFn := 0, HotIfFn := 0,
 	if !(Owner is Map)
 		return false
 	global _LLM_Menu_NavHotkeysBound, _LLM_Menu_NavActiveSlot
-	global _LLM_Menu
+	global _LLM_Menu, LLM_NAV_REFUSAL_EXTERNAL, LLM_NAV_REFUSAL_INVALID
 	ResolvedMenu := MenuState is Map ? MenuState : _LLM_Menu
+	Refusal := ""
 	PreviousCritical := Critical("On")
 	try {
 		if !_LLM_Menu_NavPlanIsValid(Owner["plan"], ResolvedMenu)
-			return false
-		if Owner.Get("native_owner", false) {
+			Refusal := LLM_NAV_REFUSAL_INVALID
+		else if Owner.Get("native_owner", false) {
 			Generation := Owner.Get("native_generation", 0)
 			if !(Generation is Integer) || Generation <= 0
-					|| !LLM_NavEventOwner_CommitPlan(Generation)
-				return false
+				Refusal := LLM_NAV_REFUSAL_INVALID
+			else if !LLM_NavEventOwner_CommitPlan(Generation)
+				Refusal := LLM_NAV_REFUSAL_EXTERNAL
 		}
-		_LLM_Menu_NavHotkeysBound := Owner["plan"]
-		_LLM_Menu_NavActiveSlot := Owner["slot"]
-		return true
+		if Refusal == "" {
+			_LLM_Menu_NavHotkeysBound := Owner["plan"]
+			_LLM_Menu_NavActiveSlot := Owner["slot"]
+		}
 	} finally Critical(PreviousCritical)
+	if Refusal == ""
+		return true
+	_LLM_Menu_LogNavBindingFailure(Refusal == LLM_NAV_REFUSAL_INVALID
+		? "Navigation hotkeys rejected: the prepared plan no longer matches its owner."
+		: "Navigation event owner refused to commit the prepared plan.", LogFn, Refusal)
+	return false
 }
 
 _LLM_Menu_MakeNavJump(idx) {

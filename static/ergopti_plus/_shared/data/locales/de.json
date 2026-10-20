@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Ollama-Installation wird gestartet…",
 	"llm.deps.install_launching_hotkey": "Ollama-Installation (per Tastenkombination ausgelöst)…",
 	"llm.deps.tray_title": "Ergopti — KI",
+	"llm.hotkeys_unavailable": "Die KI-Tastenkürzel konnten nicht aktiviert werden. Die KI funktioniert auch ohne sie: Schalte sie aus und wieder ein oder starte Ergopti+ neu, um es erneut zu versuchen.",
 	"llm.generating": "⏳ Generierung läuft…",
 	"llm.manual_prediction.backend_not_ready": "Das KI-Modell ist noch nicht bereit: kein Vorschlag erzeugt.",
 	"llm.manual_prediction.disabled": "KI-Vorschläge sind ausgeschaltet: Schalten Sie sie im Menü Künstliche Intelligenz ein.",

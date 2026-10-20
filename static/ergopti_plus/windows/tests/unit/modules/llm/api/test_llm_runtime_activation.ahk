@@ -161,6 +161,71 @@ _LRA_DisabledProbes() {
 Test("AI runtime: probes and model corrections stay silent while the AI is off (ai-disabled-runtime-inert-2026-10-20)",
 	_LRA_DisabledProbes)
 
+; ai-hotkeys-refusal-degrades-2026-10-20 (issue #97): with the AI on, a native
+; owner that refused the navigation plan threw out of the top-level boot. A
+; refusal by the system now leaves the driver running without these hotkeys;
+; a plan the driver built wrong stays a programming error.
+_LRA_RefusalCase(Kind) {
+	global _LLM_Menu_HotkeysAwaitEnable, _LLM_Menu_NavLastRefusal
+	global LLM_NAV_REFUSAL_EXTERNAL, LLM_NAV_REFUSAL_INVALID
+	SavedAwait := IsSet(_LLM_Menu_HotkeysAwaitEnable) ? _LLM_Menu_HotkeysAwaitEnable : false
+	Notices := []
+	try {
+		_LLM_Menu_HotkeysAwaitEnable := false
+		Profile := () => 1
+		Nav := Kind == "none" ? () => false
+			: () => _LLM_Menu_LogNavBindingFailure("Independent " . Kind . " refusal.", (*) => 0,
+				Kind == "external" ? LLM_NAV_REFUSAL_EXTERNAL : LLM_NAV_REFUSAL_INVALID)
+		Notify := (Title, Body) => Notices.Push([Title, Body])
+		Thrown := 0
+		try Result := _LLM_Menu_RequireFirstRestoreHotkeys(true, Profile, Nav, false, Notify)
+		catch as Err
+			Thrown := Err
+		if Kind == "external" {
+			AssertFalse(Thrown is Error, "a refusal by the system must not abort the boot")
+			AssertTrue(Result)
+			AssertEqual(1, Notices.Length, "the user is told once that the AI hotkeys are unavailable")
+			AssertEqual(t("llm.hotkeys_unavailable"), Notices[1][2])
+			AssertTrue(Notices[1][2] != "llm.hotkeys_unavailable", "the notice is localized")
+			AssertTrue(_LLM_Menu_HotkeysAwaitEnable, "switching the AI off and on retries the hotkeys")
+		} else {
+			AssertTrue(Thrown is Error, "an invalid plan or an unexplained refusal stays fail-fast")
+			AssertTrue(InStr(Thrown.Message, "initial LLM hotkey surface is incomplete") == 1)
+			AssertEqual(0, Notices.Length)
+			AssertFalse(_LLM_Menu_HotkeysAwaitEnable)
+		}
+	} finally {
+		_LLM_Menu_HotkeysAwaitEnable := SavedAwait
+		_LLM_Menu_NavLastRefusal := 0
+	}
+}
+Test("AI runtime: a refused AI hotkey binding degrades instead of aborting the boot (ai-hotkeys-refusal-degrades-2026-10-20)",
+	_LRA_RefusalCase.Bind("external"))
+Test("AI runtime: an invalid AI hotkey plan stays fail-fast (ai-hotkeys-refusal-degrades-2026-10-20)",
+	_LRA_RefusalCase.Bind("invalid"))
+Test("AI runtime: an AI hotkey refusal without a cause stays fail-fast (ai-hotkeys-refusal-degrades-2026-10-20)",
+	_LRA_RefusalCase.Bind("none"))
+
+; The production binder names each refusal: a layout the snapshot cannot
+; resolve is the system's, malformed modifiers are the driver's.
+_LRA_RefusalKinds() {
+	global _LLM_Menu_NavLastRefusal, LLM_NAV_REFUSAL_EXTERNAL, LLM_NAV_REFUSAL_INVALID
+	try {
+		_LLM_Menu_NavLastRefusal := 0
+		AssertFalse(_LLM_Menu_PrepareNavHotkeys(Map("nav_modifiers", 7), 0, 0, (*) => 0))
+		AssertTrue(_LLM_Menu_NavLastRefusal is Map)
+		AssertEqual(LLM_NAV_REFUSAL_INVALID, _LLM_Menu_NavLastRefusal["kind"])
+		_LLM_Menu_NavLastRefusal := 0
+		AssertFalse(_LLM_Menu_PrepareNavHotkeys(Map("nav_modifiers", "alt", "val_modifiers", "alt"),
+			0, 0, (*) => 0, 0, (*) => ""))
+		AssertTrue(_LLM_Menu_NavLastRefusal is Map)
+		AssertEqual(LLM_NAV_REFUSAL_EXTERNAL, _LLM_Menu_NavLastRefusal["kind"])
+		AssertThrows(() => _LLM_Menu_LogNavBindingFailure("Unnamed cause.", (*) => 0))
+	} finally _LLM_Menu_NavLastRefusal := 0
+}
+Test("AI runtime: every navigation refusal names a system or a programming cause (ai-hotkeys-refusal-degrades-2026-10-20)",
+	_LRA_RefusalKinds)
+
 _LRA_EarlyProbes() {
 	global _DriverInputInitPending, _LLM_Menu
 	SavedPending := IsSet(_DriverInputInitPending) ? _DriverInputInitPending : false

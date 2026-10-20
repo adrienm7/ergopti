@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Ollama のインストールを開始しています…",
 	"llm.deps.install_launching_hotkey": "Ollama のインストール（ショートカットにより開始）…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "AI のキーボードショートカットを有効にできませんでした。AI はショートカットなしでも動作します。もう一度試すには、AI をオフにしてから再度オンにするか、Ergopti+ を再起動してください。",
 	"llm.generating": "⏳ 生成中…",
 	"llm.manual_prediction.backend_not_ready": "AI モデルはまだ準備ができていません：提案は生成されませんでした。",
 	"llm.manual_prediction.disabled": "AI の提案はオフです：人工知能メニューでオンにしてください。",

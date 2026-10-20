@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "بدء تثبيت Ollama…",
 	"llm.deps.install_launching_hotkey": "تثبيت Ollama (تم تشغيله بواسطة اختصار)…",
 	"llm.deps.tray_title": "Ergopti — الذكاء الاصطناعي",
+	"llm.hotkeys_unavailable": "تعذّر تفعيل اختصارات لوحة المفاتيح الخاصة بالذكاء الاصطناعي. يظل الذكاء الاصطناعي يعمل بدونها: أوقفه ثم شغّله من جديد، أو أعد تشغيل Ergopti+، للمحاولة مرة أخرى.",
 	"llm.generating": "⏳ جاري التوليد…",
 	"llm.manual_prediction.backend_not_ready": "نموذج الذكاء الاصطناعي غير جاهز بعد: لم يتم إنشاء أي اقتراح.",
 	"llm.manual_prediction.disabled": "اقتراحات الذكاء الاصطناعي معطّلة: فعّلها من قائمة الذكاء الاصطناعي.",

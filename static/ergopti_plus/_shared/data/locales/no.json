@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Starter Ollama-installasjon…",
 	"llm.deps.install_launching_hotkey": "Ollama-installasjon (utløst av snarvei)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "KI-hurtigtastene kunne ikke aktiveres. KI fungerer fortsatt uten dem: slå den av og på igjen, eller start Ergopti+ på nytt, for å prøve igjen.",
 	"llm.generating": "⏳ Genererer…",
 	"llm.manual_prediction.backend_not_ready": "AI-modellen er ikke klar ennå: ingen forslag generert.",
 	"llm.manual_prediction.disabled": "AI-forslag er slått av: slå dem på i menyen Kunstig intelligens.",

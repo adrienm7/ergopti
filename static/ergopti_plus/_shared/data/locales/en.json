@@ -919,6 +919,7 @@
 	"llm.deps.install_launching": "Launching Ollama installation…",
 	"llm.deps.install_launching_hotkey": "Ollama installation (triggered by shortcut)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "The AI keyboard shortcuts could not be enabled. The AI still works without them: switch it off and on again, or restart Ergopti+, to try again.",
 	"llm.generating": "⏳ Generating…",
 	"llm.manual_prediction.backend_not_ready": "The AI model is not ready yet: no suggestion generated.",
 	"llm.manual_prediction.disabled": "AI suggestions are off: turn them on in the Artificial Intelligence menu.",

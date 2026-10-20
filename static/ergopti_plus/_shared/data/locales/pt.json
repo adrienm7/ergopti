@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Iniciando a instalação do Ollama…",
 	"llm.deps.install_launching_hotkey": "Instalação do Ollama (acionada por atalho)…",
 	"llm.deps.tray_title": "Ergopti — IA",
+	"llm.hotkeys_unavailable": "Não foi possível ativar os atalhos de teclado da IA. A IA continua funcionando sem eles: desative-a e ative-a novamente, ou reinicie o Ergopti+, para tentar novamente.",
 	"llm.generating": "⏳ A gerar…",
 	"llm.manual_prediction.backend_not_ready": "O modelo de IA ainda não está pronto: nenhuma sugestão gerada.",
 	"llm.manual_prediction.disabled": "As sugestões de IA estão desativadas: ative-as no menu Inteligência Artificial.",

@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Ollama kurulumu başlatılıyor…",
 	"llm.deps.install_launching_hotkey": "Ollama kurulumu (kısayolla tetiklendi)…",
 	"llm.deps.tray_title": "Ergopti — Yapay Zeka",
+	"llm.hotkeys_unavailable": "Yapay zeka klavye kısayolları etkinleştirilemedi. Yapay zeka onlar olmadan da çalışır: yeniden denemek için kapatıp tekrar açın veya Ergopti+'yı yeniden başlatın.",
 	"llm.generating": "⏳ Oluşturuluyor…",
 	"llm.manual_prediction.backend_not_ready": "Yapay zeka modeli henüz hazır değil: öneri oluşturulmadı.",
 	"llm.manual_prediction.disabled": "Yapay zeka önerileri kapalı: Yapay Zeka menüsünden açın.",

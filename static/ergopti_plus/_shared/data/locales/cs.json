@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Spouštění instalace Ollama…",
 	"llm.deps.install_launching_hotkey": "Instalace Ollama (spuštěna zkratkou)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "Klávesové zkratky AI se nepodařilo zapnout. AI funguje i bez nich: vypněte ji a znovu zapněte, nebo restartujte Ergopti+, a zkuste to znovu.",
 	"llm.generating": "⏳ Generuji…",
 	"llm.manual_prediction.backend_not_ready": "Model AI ještě není připraven: žádný návrh nebyl vytvořen.",
 	"llm.manual_prediction.disabled": "Návrhy AI jsou vypnuté: zapněte je v nabídce Umělá inteligence.",

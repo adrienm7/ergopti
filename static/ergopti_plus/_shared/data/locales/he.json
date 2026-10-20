@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "מתחיל התקנת Ollama…",
 	"llm.deps.install_launching_hotkey": "התקנת Ollama (הופעלה על ידי קיצור דרך)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "לא ניתן היה להפעיל את קיצורי המקלדת של הבינה המלאכותית. הבינה המלאכותית ממשיכה לעבוד גם בלעדיהם: יש לכבות אותה ולהפעיל אותה שוב, או להפעיל מחדש את Ergopti+, כדי לנסות שוב.",
 	"llm.generating": "⏳ מייצר…",
 	"llm.manual_prediction.backend_not_ready": "מודל הבינה המלאכותית עדיין לא מוכן: לא נוצרה הצעה.",
 	"llm.manual_prediction.disabled": "הצעות הבינה המלאכותית כבויות: הפעילו אותן בתפריט בינה מלאכותית.",
