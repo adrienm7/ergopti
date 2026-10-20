@@ -1347,12 +1347,17 @@ operators); running the macOS tests under LuaJIT fails for reasons unrelated to
 the code under test. The Mac version shown to users comes from the outer
 launcher plist; the shared build stamp names the commit.
 
-### project-karabiner-off-is-the-lease-workaround
+### project-karabiner-lease-exit-73-names-its-cause
 
-Configuration > Ergopti uses Karabiner > Off is the supported workaround while
-Karabiner lease failures (exit 73, READY or PONG timeouts on Apple silicon) are
-unexplained; it preserves the user's personal Karabiner rules. Do not infer
-guardian retirement from a signal, a missing handle or a hidden dialog.
+Exit 73 is any supervision loss of the lease worker (inner silence fence,
+private command deadline, guardian loss, socket error). Since 8d66fca660 the
+worker writes its cause to stderr, which the lease controller logs as
+`lease worker: lease lost …`, and reports every private round trip of 1 s or
+more. The worker, guardian and Lua deadlines are pinned against each other by
+`tests/meta/architecture/test_native_lease_budget_parity.lua`: change one only
+with the others. Configuration > Ergopti uses Karabiner > Off stays the
+workaround that preserves personal Karabiner rules. Do not infer guardian
+retirement from a signal, a missing handle or a hidden dialog.
 
 ### project-macos-writer-lease-is-advisory
 
