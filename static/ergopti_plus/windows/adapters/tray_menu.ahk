@@ -132,6 +132,18 @@ TrayMenuHandleItemCount(Handle) {
 	return DllCall("GetMenuItemCount", "ptr", Handle, "int")
 }
 
+/**
+ * Reads the native state flags at a captured menu's zero-based row position.
+ * This Windows-only helper is outside the cross-driver TrayMenu port contract.
+ * Callers retain the failure sentinel so they can refuse their owning operation.
+ * @param {Integer} Handle Captured HMENU, without reacquiring Menu.Handle.
+ * @param {Integer} Position Zero-based row position.
+ * @returns {Integer} Native state flags, or 0xFFFFFFFF when the row cannot be read.
+ */
+TrayMenuHandleItemState(Handle, Position) {
+	return DllCall("GetMenuState", "ptr", Handle, "uint", Position, "uint", 0x400, "uint")
+}
+
 ; Reads a child from the same captured native parent during owned-tree cleanup.
 ; @param Handle {Integer} Captured parent HMENU.
 ; @param Position {Integer} Zero-based row position.
