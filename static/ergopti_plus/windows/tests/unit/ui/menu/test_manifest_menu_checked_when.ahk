@@ -540,3 +540,47 @@ _MMC_ReasonedToggleData() {
 	} finally Root.Delete(Key)
 }
 Test("reasoned-toggle: actual Windows row data removes disabled delivery and preserves enabled identity", _MMC_ReasonedToggleData)
+
+
+; Replays the shared corpus the macOS and Linux renderers replay: a greyed row
+; names the first disabled_reasons cause whose getter answers true.
+_MMC_DisabledReasonsCorpus() {
+	global _SharedDir
+	Corpus := JsonParse(FSReadUtf8Exact(_SharedDir . "\tests\corpus\menus\disabled_reasons.json"))
+	Root := _MR_GetManifestRoot(), Key := "__disabled_reasons_corpus_fixture"
+	AssertFalse(Root.Has(Key), "the fixture requires an unoccupied declaration")
+	Root[Key] := Corpus["rows"]
+	Calls := 0
+	Action(*) => Calls += 1
+	Commands := Map("power", Action, "restore", Action)
+	try {
+		for Vec in Corpus["cases"] {
+			Ready := Vec["ready"], Newer := Vec["newer"]
+			Getters := Map("ready", ((Value, *) => Value).Bind(Ready))
+			if Newer != "absent"
+				Getters["newer"] := ((Value, *) => Value).Bind(Newer)
+			for Item in Corpus["rows"] {
+				Row := Item["type"] == "toggle"
+					? _MR_ToggleRowData(Item, Key, Commands, Getters)
+					: _MR_CommandRowData(Item, Key, Commands, Getters)
+				Where := Vec["name"] . " / " . Item["id"]
+				if Vec["reason"] == "refused" {
+					AssertFalse(Row, Where . ": a cause without a getter refuses the row")
+					continue
+				}
+				Assert(Row is Map, Where)
+				AssertEqual(t(Item["i18n"]), Row["label"], Where)
+				if Vec["reason"] == "none" {
+					Assert(Row.Has("action") && Row["action"] == Action, Where . ": a ready row runs")
+					AssertFalse(Row.Has("disabled_reason_key"), Where)
+				} else {
+					AssertEqual(Vec["reason"], Row["disabled_reason_key"], Where)
+					AssertTrue(Row["disabled"], Where)
+					AssertFalse(Row.Has("action"), Where . ": a greyed row has nothing to run")
+				}
+			}
+		}
+		AssertEqual(0, Calls)
+	} finally Root.Delete(Key)
+}
+Test("disabled reasons: the shared corpus names a newer configuration on greyed rows", _MMC_DisabledReasonsCorpus)

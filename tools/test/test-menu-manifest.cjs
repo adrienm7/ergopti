@@ -14273,6 +14273,35 @@ console.log(
 			'malformed reasoned toggle must refuse'
 		);
 	}
+	// A refined reason names the cause of the same greying (a newer configuration).
+	const refined = {
+		...row,
+		disabled_reasons: [{ when: 'newer', reason_key: 'contract.newer' }]
+	};
+	assert.doesNotThrow(() => validateMenuAvailability({ frame: [refined] }));
+	assert.doesNotThrow(() =>
+		validateMenuAvailability({ frame: [{ ...refined, type: 'command', category: undefined }] })
+	);
+	for (const change of [
+		{ disabled_reasons: [] },
+		{ disabled_reasons: {} },
+		{ disabled_reasons: [{ when: '', reason_key: 'contract.newer' }] },
+		{ disabled_reasons: [{ when: 'newer', reason_key: '' }] },
+		{ disabled_reasons: [{ when: 'newer' }] },
+		{ disabled_reasons: [{ when: 'newer', reason_key: 'contract.newer', extra: 1 }] },
+		{ disabled_reasons: ['newer'] },
+		{ disabled_reason_key: undefined },
+		{ type: 'check' }
+	]) {
+		assert.throws(
+			() => validateMenuAvailability({ frame: [{ ...refined, ...change }] }),
+			/disabled_reasons|disabled_reason_key/,
+			'a malformed refined reason must refuse'
+		);
+	}
+	console.log(
+		'[OK] refined disabled reasons: exact { when, reason_key } entries on reasoned rows.'
+	);
 }
 
 // Coordinate indexing preserves the original UTF-16/LF interpretation without rereading source prefixes.

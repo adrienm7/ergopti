@@ -1,0 +1,43 @@
+{
+	"_comment": "A greyed row names the first disabled_reasons cause whose getter answers true, else its disabled_reason_key; a cause with no getter refuses the row. Replayed by the Windows, macOS and Linux renderers.",
+	"rows": [
+		{
+			"type": "toggle",
+			"id": "power",
+			"category": "LLM",
+			"i18n": "menu.llm.enable",
+			"disabled_when": ["ready"],
+			"disabled_reason_key": "menu.llm.save_unavailable",
+			"disabled_reasons": [{ "when": "newer", "reason_key": "menu.read_only.newer_schema" }]
+		},
+		{
+			"type": "command",
+			"id": "restore",
+			"i18n": "common.restore_recommended",
+			"disabled_when": ["ready"],
+			"disabled_reason_key": "menu.llm.save_unavailable",
+			"disabled_reasons": [{ "when": "newer", "reason_key": "menu.read_only.newer_schema" }]
+		}
+	],
+	"cases": [
+		{ "name": "a writable configuration", "ready": true, "newer": false, "reason": "none" },
+		{
+			"name": "a refused save",
+			"ready": false,
+			"newer": false,
+			"reason": "menu.llm.save_unavailable"
+		},
+		{
+			"name": "a configuration saved by a newer version",
+			"ready": false,
+			"newer": true,
+			"reason": "menu.read_only.newer_schema"
+		},
+		{
+			"name": "a cause the driver gives no getter",
+			"ready": false,
+			"newer": "absent",
+			"reason": "refused"
+		}
+	]
+}

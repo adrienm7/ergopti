@@ -1391,6 +1391,8 @@ end)
 
 require("test.menu_command_literal_prefix_contract").register(helpers, "linux")
 
+require("test.menu_disabled_reasons_contract").register(helpers, "linux")
+
 helpers.describe("Complete-menu gesture status fixture owns its native cohort", function()
 	helpers.it("rebuilds the native producer against current locale and manifest despite a stale loaded producer", function()
 		local previous = rawget(package.loaded, "ui.gesture_conflicts")
