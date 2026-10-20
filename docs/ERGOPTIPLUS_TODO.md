@@ -2,7 +2,7 @@
 
 # ErgoptiPlus continuation checklist
 
-Updated: 2026-10-20 (evening). Latest stable:
+Updated: 2026-10-21. Latest stable:
 [v1.0.3](https://github.com/adrienm7/ergopti/releases/tag/v1.0.3) (tagged 2026-10-18, with deferred
 macOS native scopes, see [below](#next-release-with-nothing-deferred)). Open work only: a finished
 item is removed, its lessons go to [docs/memory](memory/README.md), and the history stays in Git
@@ -18,17 +18,31 @@ tests, containers and software-supplied events are never physical evidence. The 
 Windows PC (physical tests on request) and a work Mac (reproduce on CI first, then at most one short
 command); there is no Linux machine.
 
-## Tonight (October 20)
+## State on October 21
 
-- dev is pushed at a49445bdee. Other agents (Codex) fix bugs on `fix/windows`, `fix/macos` and
-  `fix/linux`, branched from that commit, each fix with a non-regression test; integrate them as
-  described under [Integration](#integration-items-16-38).
-- The CI errors of dev are owned by the coordinator. The Windows CI step fixes (shared serve
-  environment for the runtime model, refused file-port receiver stderr, Mac Ollama fixture registry)
-  are in dev; dev's CI run on a49445bdee decides whether they hold.
-- Not started or stopped mid-way, still open below: AI 112, 124, 143; Windows 115, TOML fuzz
-  semantics, item 30 Linux magic-key override; hotstrings 102, 129 and the priority-100 uppercase
-  report; config-menus 141, 142, 54/81.
+- origin/dev is at 330cbe4c04; CI run 39509331307 decides whether the night's Windows CI fixes hold:
+  a20c879b2e, 5204933fbb, d24ac409cd, the artifact relay that ends its request copy on a disposed
+  client (440bdd1297), the quadratic TOML render and the deterministic batch admission test
+  (fd031f8613), the updater source sealer working on Windows (3e1dbf303b) and the phase A test
+  without a clock (8b9508fed9). The CI errors of dev stay owned by the coordinator.
+- **Codex agents push directly to dev** with the maintainer's credentials: about 50 commits on the
+  evening of October 20 (`test(windows)` / `fix(windows)` replay, clipboard and diagnostics work, and
+  some Linux and macOS fixes). The merge commit 330cbe4c04 integrated them with the local October 20
+  work. Fetch and read `git log origin/dev` before any integration: a local branch can be behind
+  without anyone having pushed it from here. The `commit-and-push` skill says dev and main stay
+  linear, while [Integration](#integration-items-16-38) merges `fix/*` with `--no-ff`: see question
+  9 in [questions for the maintainer](questions-for-maintainer.md) (default: merge commits
+  tolerated).
+- Landed overnight, software side closed, residual checks kept at their items: 112 prediction chord
+  insert and the shared muted shortcut column (af5cb11b84, a9e1f997c1); 124 Live selector retired,
+  guarded by its id on every driver (ce9791f68e); 143 AI toggle reusing its child (0c5006c863,
+  9fac7fcb66); 141 greyed AI persistence rows (449ccd4fd3, 9f6ec6b9a5, 2e8a9fb02a); 142 local reload
+  command on the three OS (9c30266410, 9ad640d327, 0ada3403db); 102 Windows adoption gate
+  (ae040558d8); 129 Linux reset sites (8302ea9269); the priority-100 uppercase report (cf29c35e5f);
+  115 JS suite on a Windows host (f2aebecb94, d66010e82c); TOML fuzz semantic oracles with a mutation
+  check (b60ce76756, item removed); item 30 Linux magic key against a tap action (407db5fd50); `.rpm`
+  asset renamed `ErgoptiPlus-linux-x86_64.rpm` (1b4b8250f9); Windows unit shards in 14 named test
+  categories (0418ac3ea8) and macOS jobs named by macOS version (3e0dd21f98).
 
 ## Priority 0: Windows
 
@@ -72,10 +86,11 @@ then.
 - [ ] **114. Prediction-key (1-5) and AltGr+Enter stalls.** [PHYS-W] Cause unconfirmed. Observe the
       resident process while it stalls; collect the Notepad stale-admission diagnostics before
       changing tooltips or hooks.
-- [ ] **143. AI enable/disable latency behind an incomplete startup.** [CODE] Not started. Pass the
-      exact caller-owned child through the root builder map so the queue settles without a second
-      child construction; reduce startup cost (Rescan, schema checks). [PHYS-W] Re-measure the real
-      click.
+- [ ] **143. AI enable/disable latency behind an incomplete startup.** [PHYS-W] The toggle lends its
+      built child to the root queue instead of a second construction (0c5006c863) and an AI source
+      check pays one full admission (9fac7fcb66): a toggle behind an unfinished startup went from
+      about 5.4 s to 3.05 s on the startup smoke. Re-measure the real click on the PC; reduce the
+      remaining startup cost (Rescan, schema checks) only from that measurement.
 - [ ] **49. Keyboard-hook order.** [PHYS-W] [CODE] AutoHotkey removes and reinstalls its low-level
       hook around SendInput, so hook order is undefined. Record the real order before and after a
       SendInput rehook; audit terminal capture against KLE, dead-key, digit, profile, tap-hold,
@@ -98,10 +113,11 @@ then.
 - [ ] **Full Windows AHK suite.** [CI] It has never completed green locally (watchdog
       `_SUITE_MAX_TIMEOUT_MS`, 120 min; about 90 min single-threaded). Run it sharded on the PC;
       never raise the watchdog to make a run finish.
-- [ ] **115. Portable JS suite on the Windows host.** [CODE] Not started. Fix the host-bound fixtures
-      (Linux installer sandbox, drive-letter path given to a POSIX constructor, backslash
-      `LUA_CPATH`, Sparkle POSIX mode, symlink privilege error 1314), so a local run equals the
-      hosted one.
+- [ ] **115. Portable JS suite on the Windows host.** [CODE] Host-bound cases (Linux installer
+      sandbox, POSIX paths, Sparkle POSIX mode, symlink privilege 1314) now report "not executed" on
+      a local Windows host (f2aebecb94) and the Node checks start without a shell (d66010e82c). The
+      remaining local reds come from the host, not the code: Node 22.16 against the pinned 22.22.2,
+      and no `pwsh`. Install both, rerun, and fix only a red that survives.
 - [ ] **Native Windows TLS fixture.** [CI] Seven managed-network `native_tls` cases fail since
       hosted Git 2.56 moved the SDK from mingw64 to ucrt64; the trust install stays at `before_add`
       with no root-removal or service closure ack. Cause not proved.
@@ -119,8 +135,6 @@ then.
 - [ ] **132. SignPath Foundation signing.** [CODE] Apply, integrate Windows signing, then delete
       `.github/ci/stable_windows_signing_exception.json`. Unsigned stable Windows releases are
       authorised until then.
-- [ ] **Windows AHK TOML fuzz.** [CODE] Not started. The fuzz callbacks check only the absence of
-      unhandled errors, not the expected parse semantics.
 
 ### Physical Windows tests the maintainer can run
 
@@ -167,6 +181,11 @@ for anything that writes configuration.
     LAlt then CapsLock trigger end CapsWord as configured.
 13. **AI off (#97)**: with the AI off, no local server sweep, no AI hotkeys registered, and a
     refused AI hotkey leaves the driver running.
+14. **Prediction chord (item 112)**: in Notepad, each slot's modifier+digit chord inserts that
+    prediction (and its correction form), and the shortcut column is right-aligned and muted.
+15. **Local reload command (item 142)**: against the installed driver, run
+    `tools/control/request_driver_reload.ps1` idle, paused and during a reload (expect "busy"); one
+    driver afterwards, never a forced end.
 
 ## Integration (items 16, 38)
 
@@ -221,8 +240,11 @@ for anything that writes configuration.
       artifact curl relay) and macOS Go `TestIdleDeadlinePhysicallyRetiresPeer` (ad03a898).
 - [ ] **Integrate the fix branches.** Merge `fix/windows`, `fix/macos`, `fix/linux` into dev with
       `--no-ff`, validate, push dev only with authorisation, then fast-forward each `fix/*` only
-      when it is an ancestor of dev. After a merge touching `run_all.ahk`, `test_framework.ahk` or a
-      sealed source, reseal `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json`.
+      when it is an ancestor of dev. Codex agents now also push straight to dev (see
+      [State](#state-on-october-21)): fetch first and merge origin/dev rather than overwrite it.
+      Whether dev tolerates merge commits is question 9 for the maintainer. After a merge touching
+      `run_all.ahk`, `test_framework.ahk` or a sealed source, reseal
+      `tools/ci/windows-updater-original-diagnostic-cohort-inputs.json`.
 - [ ] **Menu clicks during a reload on macOS and Linux.** [CODE] Windows holds a click that lands
       while a reload is pending and replays it in the successor (85a926ba27). Check the Lua drivers
       for the same pending-reload window and give them the same contract if it exists.
@@ -245,9 +267,9 @@ for anything that writes configuration.
       `hs274-native.yml`, `hs274-producer-build.yml`, `hs274-shutdown.yml`, `hs274-transport.yml`,
       `shortcuts-cold-cli-diagnostic.yml`, `windows-test-replay.yml`,
       `metrics-reader-bench.yml`, `macos-keyboard-geometry.yml`, `macos-release-launch.yml`,
-      `linux-layout.yml`, `bench.yml`; keep `deploy-site.yml`. Windows unit shards are grouped by
-      test type with explicit names (a new test file with no category fails a gate), not by
-      duration.
+      `linux-layout.yml`, `bench.yml`; keep `deploy-site.yml`. Already done: the Windows unit shards
+      run by 14 named test categories (0418ac3ea8) and every macOS cell is named by its macOS
+      version (3e0dd21f98).
 - [ ] **16/38. Final acceptance.** [CI] One complete non-release three-OS checkpoint on the final
       source (units, E2E, packaging, installation, launch) with exact receipts, then the physical
       tests. Mac checks (38): no "Lease-bound input startup failed" or spurious "Layout poll
@@ -266,8 +288,9 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
   `test01` (HTTP wire) before dropping `macos-native-http` and `macos-native-pac`.
 - Brew archive acceptance: green once (empty core tap, 3d298e30).
 - Managed model receiving: green twice on both architectures before Ollama 0.40.4; the receiver now
-  reads its manifests-v2 store and the fixture registry is served from a public test address, so
-  re-qualify on the new pin.
+  reads its manifests-v2 store and the fixture registry is served from a public test address. The
+  red create stage on 0.40.4 came from its shared-blob-store probe and is fixed with
+  `OLLAMA_CREATE_REMOTE=1` (460b96dd1f): re-qualify on the new pin on macOS CI.
 - Shortcuts discovery, launch AppleEvents, owned-runtime XCTest (ACL fix 0b7428c8): validate through
   a release-like run with Build and Install-and-launch green.
 
@@ -293,14 +316,14 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
 - [ ] **42. config.toml batch writer follow-ups.** [CODE] Ancestor admission and external
       symlink-target replacement for the explicit `--config FILE.toml` watcher; Windows full-save
       comment preservation and scalar/array table-array boundaries need native qualification.
-- [ ] **54/81. Every menu row declared in the shared manifest.** [CODE] Not resumed. Drive the
-      native-menu-row census to zero, one commit per menu with the baseline lowered
-      (`npm run test:native-menu-rows`; regenerate before trusting any count). Convert Windows
-      dynamic `register/append/add` rows to check/command; a declared child template for `list`
-      parents (Tap-Hold, gesture slot, hotstring file, AI profile); provider separators; tray root
-      bootstrap; four Windows Personal constructors. Next: Hotstrings, AI menus, Linux
-      `menu_builder.lua`. [PHYS-W/M/L] Installed menus: captions, unavailable reasons, child
-      commands, state after restart.
+- [ ] **54/81. Every menu row declared in the shared manifest.** [CODE] The native-menu-row census
+      is down to Windows 3, macOS 0, Linux 0 (a0eee67936 to f29d2f815c: personal folder levels, AI
+      dynamic rows and the AI model picker return row data to the renderer;
+      `npm run test:native-menu-rows`, regenerate before trusting any count). The last three rows
+      are in `menu_hotstrings.ahk` and need a renderer design first: the renderer must own the child
+      menus it hands back to repaint commands, so a repaint cannot act on a child it no longer
+      publishes. Then lower the baseline to zero. [PHYS-W/M/L] Installed menus: captions,
+      unavailable reasons, child commands, state after restart.
 - [ ] **116. Guided third-party validation report.** [CODE] Isolated timer/Karabiner/Shortcuts/Brew
       checks and package provenance; [PHYS-M] the installed page.
 - [ ] **121. AI Agent submenu unavailable on every OS.** [CI] Composed-menu qualification.
@@ -315,19 +338,26 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       not a day); [PHYS-W/M] installed copy, write, reveal and browser; GitHub field editability.
 - [ ] **139. Remove personal identities from logs.** [CODE] Free-form text is not proven safe;
       historical logs unchanged; GitHub attachment URL revocation unestablished.
-- [ ] **141. Newer configuration schemas read-only on every driver.** [CODE] The three drivers show
-      `config.read_only.newer_schema` (58ef8cfcdd). Still open: grey the AI persistence actions with
-      that reason and recheck retained callbacks.
-- [ ] **142. Local driver control command for reload.** [CODE] Not started. Route through the
-      lifecycle owner (pause, transactions, cleanup, successor identity); report requested, refused
-      and completed separately; never start a duplicate driver or force termination; all three OS.
+- [ ] **141. Newer configuration schemas read-only on every driver.** [CODE] A greyed row can name
+      the cause that greys it (449ccd4fd3, contract pinned by 2e8a9fb02a), and the AI switch and
+      "restore recommended" rows now name a newer configuration (9f6ec6b9a5). Still open: the AI
+      submenus (servers, API entries, profiles) are refused only by the normal save path; give their
+      persistence rows the same greyed cause and recheck the retained callbacks.
+- [ ] **142. Local driver control command for reload.** [PHYS-W/M/L] Windows, Linux and macOS
+      reload on an authenticated local command through their reload owner, with requested, refused
+      and completed outcomes (9c30266410, 9ad640d327, 0ada3403db; declaration in
+      `_shared/modules/control/driver_control.json`). Never tried against an installed driver
+      (Windows check 15 above). Known gaps: Windows refuses with "busy" while a reload is pending
+      rather than queueing; Linux reloads the hotstrings in process instead of a successor; [CODE]
+      the Windows client does not check the driver executable's hash before trusting the session.
 
 ## hotstrings (items 34, 37, 102, 104, 105)
 
-- [ ] **Priority-100 entry cannot output uppercase (Discord tester).** [CODE] A hotstring whose
-      priority is 100 reportedly never types its uppercase form. Get the entry and the OS from the
-      tester, reproduce it in the shared corpus, then fix with a causal regression on the three
-      drivers.
+- [ ] **Priority-100 entry cannot output uppercase (Discord tester).** [PHYS-W] Fixed on Windows
+      (cf29c35e5f): a case-insensitive entry registered a lowercased replacement, so its own
+      capitals were lost whatever the priority; three shared corpus vectors replay it on the three
+      drivers. Confirm with the tester on the next dev build. Tell him meanwhile: on 1.0.3, tick
+      « Case sensitive » on the entry to keep its capitals.
 - [ ] **34. Recommended delays and handwritten `[[hotstrings.terminators]]`.** [PHYS-W] Menu, save
       and restart acceptance
       ([checklist](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo34-delays-and-handwritten-delimiters)).
@@ -336,24 +366,28 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       ([checklist](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo37-shipped-ergopti-sections)),
       including build/install/upgrade/uninstall with both extension TOML files. [CI] macOS packaging
       and installation.
-- [ ] **102. Two commands per Hotstrings category submenu.** [CODE] Not resumed. Windows additional
-      personal-file persistence ownership and a personal-file identity gate shared by the live
-      engine and previews; [CI] Windows native cases, Fedora/Alpine ShellRunner fixtures; [PHYS-W]
+- [ ] **102. Two commands per Hotstrings category submenu.** [CODE] Windows now loads only adopted
+      personal files: `PersonalFileControls.ActiveOwner` is the one identity gate of the live
+      registration, the preview index and the menu total (ae040558d8). Still open: a refused file's
+      row caption shows its raw entry count, as if it were active. [CI] Windows native cases,
+      Fedora/Alpine ShellRunner fixtures; [PHYS-W]
       ([checklist](handovers/2026-10-04-parallel-containers/GROUP2-WINDOWS-TODO.md#todo102-personal-files-and-source-controls)).
 - [ ] **104. Common autocorrection sections.** [CI] Native Windows/macOS, per-section E2E, package;
       the independent 140-rule corpus is never regenerated from production.
-- [ ] **105. Programmable dynamic hotstrings.** [CI] The Windows worker probe never ran natively;
-      macOS/Windows execution, E2E, package.
+- [ ] **105. Programmable dynamic hotstrings.** [CI] The Windows worker probe passed 24/24 natively;
+      still open: macOS execution, E2E, package.
 - [ ] **129. Built-in dynamic hotstrings only at word starts** (`update` must not propose `date`).
-      [CODE] Not resumed. Composed release gate; review the six Linux unknown-context reset sites;
+      Linux leaves the word start unknown after its six text-context resets (8302ea9269). [CI] The
+      E2E scenario needs a Linux runner, and the composed release gate is the CI run itself;
       [PHYS-W/M/L] real typing.
 
 ## actions (items 63, 71, 73, 91, 93, 96-98, 106-109, 111)
 
 - [ ] **Number row: remaining checks.** The ordering is offered only where it reorders the effective
       row (digits first on AZERTY-like rows, symbols first on QWERTY-like rows, neither on Ergopti
-      or mixed rows), the three edge keys can be reordered too, the layout emulation switches off
-      row by row, and the built-in Ergopti row resolves from its own levels; layout emulation and
+      or mixed rows), scopes are per row, the three edge keys have their own checkbox, the wizard
+      has the step (c9479f2e6a, a2d4adb113, 7977d3dc74), the layout emulation switches off row by
+      row, and the built-in Ergopti row resolves from its own levels; layout emulation and
       its row switches are Windows-only and greyed with their reason elsewhere. [PHYS-W] Real
       typing on the maintainer's layouts (checklist item 3). [CODE] Emulating the number row's base
       and Shift levels independently is not implemented as such (a row is emulated or native):
@@ -395,9 +429,11 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
 
 ## ai (items 46, 47, 48, 88)
 
-- [ ] **Ollama 0.40.4: compile and qualify.** [CI] Every driver pins 0.40.4 with the checked dialer
-      and native HTTP hooks ported, and every managed server runs with `OLLAMA_NO_CLOUD`; the Go
-      side has not been compiled anywhere yet (the source test applies the hooks without Go).
+- [ ] **Ollama 0.40.4: compile and qualify.** [CI] Every driver pins 0.40.4 (662ed3714b) with the
+      checked dialer and native HTTP hooks ported, and every managed server runs with
+      `OLLAMA_NO_CLOUD=1` (b06c421923). The Mac receiving create stage runs its client with
+      `OLLAMA_CREATE_REMOTE=1` (460b96dd1f), pending a green macOS CI. The Go side has not been
+      compiled anywhere yet (the source test applies the hooks without Go).
       Product decision for the maintainer, needs a Go toolchain: whether a download host that does
       not resolve is left to the proxy or the native worker, which reverses an assertion in
       `address_policy_test.go`.
@@ -407,17 +443,16 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       (it rejects the default `localhost` URL). [CODE] 17 baseline FFI failures in the Lua 5.4
       authenticated private-file fixture.
 - [ ] **88. Prediction tooltip appearance.** [PHYS] Typography on the three OS.
-- [ ] **112. Accept a prediction with its modifier+digit shortcut.** [CODE] Not started (it only
-      highlights): insert through the acceptance owner and show the shortcut in a right-aligned
-      muted column, same design on the three OS.
+- [ ] **112. Accept a prediction with its modifier+digit shortcut.** [PHYS] Windows inserts the
+      prediction a validation chord names (af5cb11b84) and the three OS show each prediction's chord
+      in one shared right-aligned muted column (a9e1f997c1). Check the insert and the correction
+      form in Notepad (Windows check 14) and the column's look on the three OS.
 - [ ] **113. Promo-video i18n and performance.** [CODE] Sales-page placeholder rows
       (`_modifier_chords_placeholder`); regenerate GIFs
       (`npm run gifs -- personal-hotstrings screen-time ai-predictions`) without touching the video
       agent's uncommitted work; cache PAC resolution only after measuring.
 - [ ] **120. Provider and model selection before enabling AI.** [PHYS-M] Installed menu; broad
       Ollama process termination on macOS stays debt.
-- [ ] **124. Remove the Live mode submenu.** [CODE] Not started. Migrate the older source-scanning
-      guards.
 - [ ] **137. Publish the selected provider before model loading (macOS).** [CI] Hosted
       qualification.
 - [ ] **Configured local servers (issue 94 follow-up).** [PHYS-M] Native acceptance of configured
@@ -444,8 +479,9 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       missing handle or a hidden dialog.
 - [ ] **24. Tap-hold outage guide.** [PHYS-M] Login Items approval and retirement on a real Mac.
 - [ ] **30. Physical magic key on the three OS.** [PHYS] Windows capture under emulation, macOS ISO
-      and ANSI (Backquote and IntlBackslash), Linux grab, injection and hotplug. [CODE] Not started:
-      on Linux, choosing Backquote/Minus/Equal silently overrides a tap-key action.
+      and ANSI (Backquote and IntlBackslash), Linux grab, injection and hotplug. Linux now says when
+      a tap action takes the physical magic key instead of overriding it silently (407db5fd50);
+      [CI] its Linux tests have not run yet.
 - [ ] **31. HS-274 exact physical key accounting with an owned Karabiner runtime.** [CODE] Work
       packages WP3-WP10 (production consumer, headless producer v2, reproducible runtime, launchd
       ownership, owned configuration, native and real-Mac acceptance, enable and retire); media keys
@@ -470,7 +506,9 @@ none left the next tag publishes with no profile (tested). Items 128 and 133 clo
       job: Sparkle install/refusal/retry/relaunch, both Brew positives, full-policy denial, all Brew
       archive scenarios. The Brew deny-removal AppleEvent positive has no supported consent path on
       hosted runners [PHYS-M]. Linux side: Flatpak/AppImage full-format installation and
-      PAC/session/TLS delivery; the `.rpm` now builds for x86_64.
+      PAC/session/TLS delivery; the `.rpm` builds for x86_64 as `ErgoptiPlus-linux-x86_64.rpm`
+      (1b4b8250f9). The AppImage name must never contain "linux" (the catalog refuses it;
+      `test-linux-appimage-portability.cjs` pins it), so it stays `ErgoptiPlus-x86_64.AppImage`.
 - [ ] **62. Downloads on managed company networks.** [CODE] macOS full request-URL PAC/WPAD, ordered
       fallback and redirects for uv, HTTPX/HF/Xet and outgoing Ollama Go (keep the
       verified-unsupported-route refusal); diagnose `-1202`/SSL-9813 after a successful trust add
