@@ -1,0 +1,13 @@
+{
+	"expected_count": 24,
+	"filters": [
+		{
+			"contains": "builtin-number-row-magic-owner",
+			"expected_count": 16
+		},
+		{
+			"contains": "healthcheck-config-encoding",
+			"expected_count": 8
+		}
+	]
+}
