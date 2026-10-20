@@ -233,7 +233,9 @@ class LLM_LocalServerPanel {
 				this.PreparedOwner := 0
 				this.PreparedRecord := 0
 			} finally Critical(ClaimCritical)
-			if !A_IsSuspended && !this.Writing && !this.Native.Closed
+			; With the AI off the rows stay inert: no source capture and no
+			; discovery sweep may start behind a disabled feature (issue #97).
+			if !A_IsSuspended && !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
 				this._QueuePreparation()
 			return this.LastSnapshot is Map ? this._Render(this.LastSnapshot, true, 0) : this._UnavailableRows()
 		} catch as Err {
@@ -699,6 +701,7 @@ class LLM_LocalServerPanel {
 			global _LifecycleLatestTransition, _LLM_Menu_ApiPrivateAuthorityGeneration
 			State := _LLM_Menu_ApiPrivateLifecycleState()
 			if A_IsSuspended || this.Writing || this.Native.Closed || State["attempt"] != 0
+					|| !LLM_Menu_AiEnabled()
 				return false
 			Record := Map("kind", "discovery", "source", Source, "generation", this.Generation,
 				"epoch", State["generation"], "intent", ++this.DiscoveryGeneration,
@@ -718,7 +721,7 @@ class LLM_LocalServerPanel {
 		State := _LLM_Menu_ApiPrivateLifecycleState()
 		return this.Discovery is Map && this.Discovery == Record
 			&& this.RepairRecords.Get(ObjPtr(Record), 0) == Record
-			&& !A_IsSuspended && !this.Writing && !this.Native.Closed
+			&& !A_IsSuspended && !this.Writing && !this.Native.Closed && LLM_Menu_AiEnabled()
 			&& Record["generation"] == this.Generation && Record["epoch"] == State["generation"]
 			&& Record["intent"] == this.DiscoveryGeneration && State["attempt"] == 0
 			&& Record["transition"] == _LifecycleLatestTransition
