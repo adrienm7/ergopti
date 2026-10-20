@@ -1450,7 +1450,6 @@ class NativeServerRetirementTests(unittest.TestCase):
             worker.join()
         for server in self.fixture.servers:
             server.server_close()
-        self.fixture.refused.close()
         import shutil
 
         shutil.rmtree(self.fixture.root)
@@ -2073,8 +2072,6 @@ class NativeCommandGuardTests(unittest.TestCase):
             # This does not pay the modeled native ACK debt or clear its record.
             if self.root.exists():
                 self.fixture._retire_servers()
-                if hasattr(self.fixture, "refused"):
-                    self.fixture.refused.close()
                 shutil.rmtree(self.root)
             NATIVE_GUARD_CLEANUP.append(
                 {

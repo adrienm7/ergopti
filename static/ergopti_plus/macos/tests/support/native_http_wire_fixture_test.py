@@ -116,6 +116,16 @@ class RealPeerControls(unittest.TestCase):
             ],
         )
 
+    def testRefusedProxyPortIsHeldByNoSocket(self):
+        # XNU drops a SYN to a bound non-listening socket without a RST, so
+        # the refused route must be a port no socket holds: this bind fails
+        # with EADDRINUSE while the fixture still owns one.
+        probe = socket.socket()
+        try:
+            probe.bind(("127.0.0.1", self.fixture.ports["refused"]))
+        finally:
+            probe.close()
+
     def testBoundRefusalAndActual407DoNotDeliverOriginBytes(self):
         with self.assertRaises(ConnectionRefusedError):
             socket.create_connection(("127.0.0.1", self.fixture.ports["refused"]), timeout=3)

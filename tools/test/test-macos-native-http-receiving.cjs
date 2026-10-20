@@ -52,7 +52,7 @@ const portableOwners = [['tools/test/macos_managed_http_test_deps_test.py', 3]];
 if (process.platform !== 'win32') {
 	portableOwners.push([
 		'static/ergopti_plus/macos/tests/support/native_http_wire_fixture_test.py',
-		4
+		5
 	]);
 }
 for (const [script, expected] of portableOwners) {

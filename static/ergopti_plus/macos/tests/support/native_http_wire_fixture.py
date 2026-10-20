@@ -773,11 +773,19 @@ class WireFixture:
         socks.receiving_kind = "socks"
         self.servers.append(socks)
         self.ports["socks"] = socks.server_address[1]
-        # An owned bound non-listening socket proves ECONNREFUSED while keeping
-        # its port unavailable to an unrelated process throughout the test.
-        self.refused = socket.socket()
-        self.refused.bind(("127.0.0.1", 0))
-        self.ports["refused"] = self.refused.getsockname()[1]
+        # The refused proxy is a port nothing holds. A bound non-listening
+        # socket refuses on Linux, but XNU silently drops a SYN that matches a
+        # TCPS_CLOSED socket (tcp_input: "goto drop", no RST), so CFNetwork
+        # waited on that proxy until the deadline killed the worker (test01's
+        # "default_refused_with_successor" route). A port with no socket gets
+        # a RST on every OS; the kernel just released it, and a reuse by an
+        # unrelated process fails the case instead of passing it.
+        reservation = socket.socket()
+        try:
+            reservation.bind(("127.0.0.1", 0))
+            self.ports["refused"] = reservation.getsockname()[1]
+        finally:
+            reservation.close()
         self.pac = (
             "function FindProxyForURL(url, host) { "
             + "".join(
@@ -955,8 +963,6 @@ class WireFixture:
             except OSError:
                 pass
             connection.close()
-        if hasattr(self, "refused"):
-            self.refused.close()
         if getattr(self, "command_group_debt", ()):
             failures.append("child")
         if failures:
