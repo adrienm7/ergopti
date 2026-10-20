@@ -155,6 +155,8 @@ helpers.describe("keyboard_hook.while_released: native refusal never blocks a gr
 		package.loaded["modules.hotstrings.device_finder"] = {
 			find_devices = function() return paths, {} end,
 			is_key_device = function() return true end,
+			-- Controlled keyboard sources have no REL/ABS axes.
+			is_interceptable_key_device = function() return true end,
 		}
 		package.loaded["adapters.xkb_capture"] = {
 			is_ready = function() return true end, reset_state = function() return true end,

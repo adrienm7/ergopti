@@ -144,6 +144,8 @@ helpers.describe("keyboard hook: acknowledged consumed repeats", function()
 			})
 			package.loaded[names[3]] = {
 				is_key_device = function() return true end,
+				-- Controlled keyboard sources have no REL/ABS axes.
+				is_interceptable_key_device = function() return true end,
 				physical_sources = function(paths)
 					observed.origins = observed.origins + 1
 					return { { path = paths[1], sysfs = "/fixture/native-keyboard",
@@ -300,6 +302,8 @@ helpers.describe("keyboard hook: recovery repeat ownership", function()
 			package.loaded[names[3]] = {
 				find_devices = function() return source_set, {} end,
 				is_key_device = function() return true end,
+				-- Controlled keyboard sources have no REL/ABS axes.
+				is_interceptable_key_device = function() return true end,
 				physical_sources = function(current)
 					observed.origins = observed.origins + 1
 					local sources = {}

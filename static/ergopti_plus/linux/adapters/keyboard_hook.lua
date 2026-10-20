@@ -3584,17 +3584,21 @@ function M.check_device()
 			-- mouse or another non-keyboard node. start() refuses those, so the
 			-- watchdog must not adopt one behind its back and grab it as a keyboard.
 			local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
-			if ok_finder and type(Finder.is_key_device) == "function" then
-				local is_key, key_why = Finder.is_key_device(_pinned_device)
-				if not is_key then
-					_pinned_missing = true
-					if not _reported_missing then
-						Logger.warn(LOG, "Pinned input device %s no longer produces key events (%s) — waiting for that exact path.",
-							_pinned_device, tostring(key_why))
-						_reported_missing = true
-					end
-					tx.waiting = true; return true
+			local validate = ok_finder and Finder.is_key_device
+			if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
+			if type(validate) ~= "function" then
+				Logger.error(LOG, "Pinned input capability validation is unavailable — refusing capture.")
+				return false
+			end
+			local is_key, key_why = validate(_pinned_device)
+			if not is_key then
+				_pinned_missing = true
+				if not _reported_missing then
+					Logger.warn(LOG, "Pinned input device %s cannot be captured in the current mode (%s) — waiting for that exact path.",
+						_pinned_device, tostring(key_why))
+					_reported_missing = true
 				end
+				tx.waiting = true; return true
 			end
 			keyboards = { _pinned_device }
 		else
@@ -3929,14 +3933,16 @@ function M.start(opts)
 	-- /proc, and a runtime without it must fail HERE with a reason rather than at
 	-- the first keystroke that never comes.
 	local ok_finder, Finder = pcall(require, "modules.hotstrings.device_finder")
-	if not ok_finder or type(Finder.is_key_device) ~= "function" then
+	local validate = ok_finder and Finder.is_key_device
+	if ok_finder and _intercept then validate = Finder.is_interceptable_key_device end
+	if type(validate) ~= "function" then
 		Logger.error(LOG, "start(): device_finder unavailable — cannot verify the keyboard source set.")
 		return
 	end
 	for _, target in ipairs(targets) do
-		local is_key, key_why = Finder.is_key_device(target)
+		local is_key, key_why = validate(target)
 		if not is_key then
-			Logger.error(LOG, "start(): %s cannot produce key events — %s.", target, tostring(key_why))
+			Logger.error(LOG, "start(): %s cannot be captured in the current mode — %s.", target, tostring(key_why))
 			return
 		end
 	end
