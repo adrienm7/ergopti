@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Запуск встановлення Ollama…",
 	"llm.deps.install_launching_hotkey": "Встановлення Ollama (запущено сполученням клавіш)…",
 	"llm.deps.tray_title": "Ergopti — ШІ",
+	"llm.hotkeys_unavailable": "Не вдалося ввімкнути клавіатурні скорочення ШІ. ШІ працює і без них: вимкніть і знову ввімкніть його або перезапустіть Ergopti+, щоб спробувати ще раз.",
 	"llm.generating": "⏳ Генерація…",
 	"llm.manual_prediction.backend_not_ready": "Модель ШІ ще не готова: пропозицію не створено.",
 	"llm.manual_prediction.disabled": "Пропозиції ШІ вимкнено: увімкніть їх у меню «Штучний інтелект».",

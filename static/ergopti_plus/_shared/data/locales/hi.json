@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Ollama इंस्टॉलेशन शुरू हो रहा है…",
 	"llm.deps.install_launching_hotkey": "Ollama इंस्टॉलेशन (शॉर्टकट द्वारा ट्रिगर किया गया)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "AI के कीबोर्ड शॉर्टकट चालू नहीं किए जा सके। AI उनके बिना भी काम करता है: दोबारा कोशिश करने के लिए इसे बंद करके फिर चालू करें, या Ergopti+ को फिर से शुरू करें।",
 	"llm.generating": "⏳ जनरेट हो रहा है…",
 	"llm.manual_prediction.backend_not_ready": "AI मॉडल अभी तैयार नहीं है: कोई सुझाव नहीं बनाया गया।",
 	"llm.manual_prediction.disabled": "AI सुझाव बंद हैं: उन्हें कृत्रिम बुद्धिमत्ता मेनू में चालू करें।",

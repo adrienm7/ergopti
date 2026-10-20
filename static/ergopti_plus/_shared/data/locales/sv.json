@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Startar Ollama-installation…",
 	"llm.deps.install_launching_hotkey": "Ollama-installation (startad via kortkommando)…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "AI-kortkommandona kunde inte aktiveras. AI fungerar ändå utan dem: stäng av och slå på den igen, eller starta om Ergopti+, för att försöka igen.",
 	"llm.generating": "⏳ Genererar…",
 	"llm.manual_prediction.backend_not_ready": "AI-modellen är inte redo än: inget förslag skapades.",
 	"llm.manual_prediction.disabled": "AI-förslag är avstängda: slå på dem i menyn Artificiell intelligens.",

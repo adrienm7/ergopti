@@ -177,21 +177,59 @@ global LLM_MENU_DEFERRED_HOTKEY_RETRY_MS := 500
  * @throws {Error} When an active driver could not activate them.
  */
 _LLM_Menu_RequireFirstRestoreHotkeys(FirstRestore, ProfileFn := 0,
-		NavFn := 0, IsPaused := unset) {
-	global _LLM_Menu_FirstRestoreHotkeysDeferred
+		NavFn := 0, IsPaused := unset, NotifyFn := 0) {
+	global _LLM_Menu_FirstRestoreHotkeysDeferred, _LLM_Menu_NavLastRefusal
+	global LLM_NAV_REFUSAL_EXTERNAL
 	if FirstRestore && (IsSet(IsPaused) ? IsPaused : A_IsSuspended) {
 		_LLM_Menu_FirstRestoreHotkeysDeferred := true
 		try LoggerInfo("LLM", "AI hotkeys deferred to the resume: the driver is paused.")
 		return true
 	}
+	; The refusal is reported once below, with its cause, so the production
+	; binder collects its line instead of logging it a second time.
+	_LLM_Menu_NavLastRefusal := 0
+	if !HasMethod(NavFn, "Call")
+		NavFn := LLM_Menu_BindNavHotkeys.Bind(0, 0, 0, (*) => 0)
 	if _LLM_Menu_ActivateFirstRestoreHotkeys(FirstRestore, ProfileFn, NavFn)
 		return true
 	if _LLM_Menu_ProfileHotkeyRetryPending()
 		throw TrayRootRetryPendingError(
 			"initial LLM profile hotkeys are pending a bounded retry")
-	LoggerError("LLM",
-		"Initial LLM hotkey activation remained incomplete; retaining the tray build for retry.")
-	throw Error("initial LLM hotkey surface is incomplete")
+	Refusal := _LLM_Menu_NavLastRefusal
+	Detail := Refusal is Map ? Refusal["detail"] : "the activation reported no cause"
+	; A refusal by the system (the native owner, the keyboard layout) leaves
+	; the driver running without these hotkeys. Aborting here aborted the whole
+	; boot (issue #97). A plan the driver built wrong stays a programming error.
+	if Refusal is Map && Refusal["kind"] == LLM_NAV_REFUSAL_EXTERNAL
+		return _LLM_Menu_DegradeFirstRestoreHotkeys(Detail, NotifyFn)
+	LoggerError("LLM", "Initial AI hotkey activation built an invalid plan: {1}", Detail)
+	throw Error("initial LLM hotkey surface is incomplete: " . Detail)
+}
+
+/**
+ * Leaves the driver running without the AI hotkeys the system refused: one
+ * ERROR with the cause and one notification. Switching the AI off and on again
+ * retries them; a restart does too.
+ * @param {String} Detail The refusal's cause.
+ * @param {Func} NotifyFn Test seam taking the title and the body.
+ * @returns {Boolean} True: the activation is settled, without the hotkeys.
+ */
+_LLM_Menu_DegradeFirstRestoreHotkeys(Detail, NotifyFn := 0) {
+	global _LLM_Menu_HotkeysAwaitEnable
+	_LLM_Menu_HotkeysAwaitEnable := true
+	LoggerError("LLM", "AI hotkeys are unavailable because the system refused them: {1} "
+		. "The AI keeps running without them until it is switched off and on again or the driver restarts.",
+		Detail)
+	Title := t("llm.deps.tray_title"), Body := t("llm.hotkeys_unavailable")
+	try {
+		if HasMethod(NotifyFn, "Call")
+			NotifyFn.Call(Title, Body)
+		else
+			TrayTip(Body, Title, "Icon!")
+	} catch as Err {
+		LoggerWarn("LLM", "The AI hotkeys notification could not be shown: {1}", Err.Message)
+	}
+	return true
 }
 
 /**

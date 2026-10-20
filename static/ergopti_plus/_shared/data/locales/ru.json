@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "Запуск установки Ollama…",
 	"llm.deps.install_launching_hotkey": "Установка Ollama (запущена сочетанием клавиш)…",
 	"llm.deps.tray_title": "Ergopti — ИИ",
+	"llm.hotkeys_unavailable": "Не удалось включить сочетания клавиш ИИ. ИИ работает и без них: выключите и снова включите его или перезапустите Ergopti+, чтобы попробовать ещё раз.",
 	"llm.generating": "⏳ Генерация…",
 	"llm.manual_prediction.backend_not_ready": "Модель ИИ ещё не готова: предложение не создано.",
 	"llm.manual_prediction.disabled": "Предложения ИИ отключены: включите их в меню «Искусственный интеллект».",

@@ -924,6 +924,7 @@
 	"llm.deps.install_launching": "正在启动 Ollama 安装…",
 	"llm.deps.install_launching_hotkey": "Ollama 安装（由快捷键触发）…",
 	"llm.deps.tray_title": "Ergopti — AI",
+	"llm.hotkeys_unavailable": "无法启用 AI 键盘快捷键。没有它们 AI 仍可使用：关闭后重新开启 AI，或重启 Ergopti+，即可重试。",
 	"llm.generating": "⏳ 生成中…",
 	"llm.manual_prediction.backend_not_ready": "AI 模型尚未就绪：未生成建议。",
 	"llm.manual_prediction.disabled": "AI 建议已关闭：请在人工智能菜单中开启。",
