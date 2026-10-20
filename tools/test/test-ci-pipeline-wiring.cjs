@@ -4002,7 +4002,8 @@ const componentBody = pipeline.step(
 for (const command of [
 	'test-managed-ollama-protocol.cjs" --windows-file-port',
 	'tests/unit/modules/llm/servers/test_ollama_install_files.ps1"',
-	'if ($modelsExit -ne 0)',
+	// The throw, not the stderr print that shares its condition.
+	'if ($modelsExit -ne 0) { throw',
 	'if ($nativeExit -ne 0 -or $stderr.Length -ne 0 -or'
 ])
 	mustCatch(
