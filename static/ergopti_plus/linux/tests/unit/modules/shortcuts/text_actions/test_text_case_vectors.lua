@@ -74,10 +74,14 @@ local function transformed_by(action_name, selected)
 	package.loaded[names.manager] = nil
 
 	local ok, err = pcall(function()
-		local handlers = require(names.manager).action_handlers()
-		helpers.assert_eq(type(handlers[action_name]), "function",
-			"the shortcuts manager must hand the executor a handler for " .. action_name)
-		helpers.assert_true(handlers[action_name]() == true, action_name .. " must succeed")
+		require("tests.support.text_owner_fixture").with(function(guard)
+			local manager = require(names.manager)
+			manager.init({ persist = false, capture_text_owner = guard.capture_text_owner })
+			local handlers = manager.action_handlers()
+			helpers.assert_eq(type(handlers[action_name]), "function",
+				"the shortcuts manager must hand the executor a handler for " .. action_name)
+			helpers.assert_true(handlers[action_name]() == true, action_name .. " must succeed")
+		end)
 	end)
 	for key, name in pairs(names) do package.loaded[name] = previous[key] end
 	helpers.assert_true(ok, tostring(err))

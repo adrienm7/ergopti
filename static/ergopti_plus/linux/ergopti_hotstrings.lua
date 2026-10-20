@@ -2388,7 +2388,7 @@ local function main()
 	if not privacy_owners.startup_checkpoint() then return end
 	-- 8.10d) Initialise the shortcuts manager (wrap symbols, CapsWord, text transforms).
 	if shortcuts then
-		shortcuts.init({ persist = true })
+		shortcuts.init({ persist = true, capture_text_owner = secure_focus_guard.capture_text_owner })
 		Logger.info(LOG, "Shortcuts manager initialised.")
 	end
 

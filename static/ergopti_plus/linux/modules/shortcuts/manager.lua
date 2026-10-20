@@ -50,6 +50,7 @@ local CapsWordPolicy = require("caps_word.auto_off")
 local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
+local _capture_text_owner = nil
 local ENABLED_PATH = "shortcuts.enabled"
 
 -- The send_text / send_key / send_shortcut vocabulary, read on first use.
@@ -75,6 +76,23 @@ local collision_read = TomlWriter and TomlWriter.read_classified
 local collision_decode, collision_shared = TomlCodec.decode, Paths.shared
 local collision_single_character = TextCase.is_single_character
 local collision_generation, collision_initialized = 0, false
+
+--- Retains the original native field before metrics or clipboard I/O can yield.
+--- @return table|nil publication
+local function capture_text_destination()
+	if type(_capture_text_owner) ~= "function" or _configuration_owner ~= nil then return nil end
+	local generation = collision_generation
+	local ok, destination = pcall(_capture_text_owner)
+	if not ok or type(destination) ~= "table" or getmetatable(destination) ~= nil
+		or type(destination.current) ~= "function" or type(destination.cached) ~= "function" then return nil end
+	local function check(cached)
+		if generation ~= collision_generation or _configuration_owner ~= nil then return false end
+		local checked, allowed = pcall(cached and destination.cached or destination.current)
+		return checked and allowed == true and generation == collision_generation and _configuration_owner == nil
+	end
+	if not check(false) then return nil end
+	return { current = function() return check(false) end, cached = function() return check(true) end }
+end
 local wrap_source
 local collision_json, collision_json_decode
 local collision_factory
@@ -341,15 +359,21 @@ end
 --- @param right string Closing symbol.
 function M.wrap_selection(left, right)
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "Selection wrapping refused: no retained text destination."); return false end
 	record("wrap_selection")
 	if type(left) ~= "string" or type(right) ~= "string" then return false end
 	local ok, reason = Clipboard.transform_selection(function(selected)
 		return left .. selected .. right
-	end, ComboEmitter.press, EventLoop.sleep_ms)
+	end, ComboEmitter.press, EventLoop.sleep_ms, publication)
 	if ok then return true end
 	if reason == "no_selection" then
-		local result = Injector.inject(0, left .. right, false)
+		local result = Injector.inject(0, left .. right, false, nil, publication)
 		return type(result) == "table" and result.ok == true
+	end
+	if reason == "destination_changed" then
+		Logger.warn(LOG, "Selection wrapping stopped: its original text destination was retired.")
+		return false
 	end
 	Logger.error(LOG, "Selection wrapping failed: %s.", tostring(reason))
 	return false
@@ -551,10 +575,12 @@ end
 
 local function transform_selection(action, transform)
 	if _configuration_owner ~= nil then return false end
+	local publication = capture_text_destination()
+	if not publication then Logger.warn(LOG, "%s refused: no retained text destination.", action); return false end
 	record(action)
 	-- Metric delivery can reserve configuration before clipboard ownership begins.
 	if _configuration_owner ~= nil then return false end
-	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms)
+	local ok, reason = Clipboard.transform_selection(transform, ComboEmitter.press, EventLoop.sleep_ms, publication)
 	if not ok then Logger.warn(LOG, "%s failed: %s.", action, tostring(reason)) end
 	return ok
 end
@@ -822,13 +848,17 @@ function M.mark_config_reads(config, mark)
 end
 
 --- Initialises the shortcuts module.
---- @param opts table|nil { enabled?, persist?, config_path? }
+--- @param opts table|nil { enabled?, persist?, config_path?, capture_text_owner? }
 function M.init(opts)
 	if _configuration_owner ~= nil then return false end
 	opts = type(opts) == "table" and opts or {}
 	if opts.enabled ~= nil and type(opts.enabled) ~= "boolean" then
 		error("shortcuts enabled override must be a boolean")
 	end
+	if opts.capture_text_owner ~= nil and type(opts.capture_text_owner) ~= "function" then
+		error("shortcuts text destination capture must be a function")
+	end
+	_capture_text_owner = opts.capture_text_owner
 	-- A clean slate: a session still running unlocks its CapsLock first.
 	end_caps_word("shortcuts re-initialised")
 	_caps_word_policy, _caps_word_last_ms = nil, nil

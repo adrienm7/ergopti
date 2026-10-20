@@ -452,15 +452,22 @@ end
 --- @param b table The session's clipboard backend.
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
+--- @param publication table|nil Original destination retained across copy boundaries.
 --- @return boolean ok
 --- @return string selected_or_reason The selection, or why there is none.
-local function copy_selection(b, emit_combo, sleep_ms)
+local function copy_selection(b, emit_combo, sleep_ms, publication)
+	local function current() return publication == nil or admitted(publication.current) end
+	if not current() then return false, "destination_changed" end
 	local sentinel = "__ERGOPTI_SELECTION_PROBE_" .. tostring({}) .. "__"
 	if not write_backend_checked(b, sentinel) then return false, "clipboard_probe_write_failed" end
-	local copy_ok, copied = pcall(emit_combo, "ctrl+c")
+	if not current() then return false, "destination_changed" end
+	local copy_ok, copied = pcall(emit_combo, "ctrl+c", publication)
 	if not copy_ok or copied ~= true then return false, "copy_chord_failed" end
+	if not current() then return false, "destination_changed" end
 	if not wait_checked(sleep_ms, COPY_SETTLE_MS) then return false, "copy_settle_failed" end
+	if not current() then return false, "destination_changed" end
 	local selection_ok, selected, selection_error = read_backend_checked(b)
+	if not current() then return false, "destination_changed" end
 	if not selection_ok then return false, selection_error or "selection_read_failed" end
 	if selected == sentinel then return false, "no_selection" end
 	return true, selected
@@ -540,12 +547,16 @@ end
 --- @param transform function selected_text -> replacement_text
 --- @param emit_combo function combo -> boolean
 --- @param sleep_ms function Blocking millisecond wait.
+--- @param publication table|nil Original destination admission, retained through cleanup.
 --- @return boolean ok
 --- @return string|nil reason
-function M.transform_selection(transform, emit_combo, sleep_ms)
+function M.transform_selection(transform, emit_combo, sleep_ms, publication)
 	if type(transform) ~= "function" then return false, "invalid_dependencies" end
+	local function current() return publication == nil or admitted(publication.current) end
+	if not current() then return false, "destination_changed" end
 	local b, why = selection_backend(emit_combo, sleep_ms)
 	if not b then return false, why end
+	if not current() then return false, "destination_changed" end
 
 	local snapshot_ok, saved, snapshot_error = read_backend_checked(b)
 	if not snapshot_ok then return false, snapshot_error or "clipboard_snapshot_failed" end
@@ -557,25 +568,31 @@ function M.transform_selection(transform, emit_combo, sleep_ms)
 		if not restore() then return false, "clipboard_restore_failed" end
 		return false, reason
 	end
-	local copied, selected = copy_selection(b, emit_combo, sleep_ms)
+	if not current() then return fail("destination_changed") end
+	local copied, selected = copy_selection(b, emit_combo, sleep_ms, publication)
 	if not copied then return fail(selected) end
 
 	local transformed_ok, replacement = pcall(transform, selected)
 	if not transformed_ok or type(replacement) ~= "string" then
 		return fail("selection_transform_failed")
 	end
+	if not current() then return fail("destination_changed") end
 	if not write_backend_checked(b, replacement) then
 		return fail("replacement_write_failed")
 	end
+	if not current() then return fail("destination_changed") end
 
 	local paste_ok, pasted = pcall(function()
 		if not wait_checked(sleep_ms, SETTLE_MS) then return false end
-		if emit_combo("ctrl+v") ~= true then return false end
+		if not current() then return false end
+		if emit_combo("ctrl+v", publication) ~= true then return false end
+		if not current() then return false end
 		if not wait_checked(sleep_ms, RESTORE_DELAY_MS) then return false end
 		return true
 	end)
 	local restored = restore()
 	if not restored then return false, "clipboard_restore_failed" end
+	if not current() then return false, "destination_changed" end
 	if not paste_ok or pasted ~= true then return false, "paste_chord_failed" end
 	Logger.debug(LOG, "Replaced a %d-byte selection via %s.", #selected, b.name)
 	return true
