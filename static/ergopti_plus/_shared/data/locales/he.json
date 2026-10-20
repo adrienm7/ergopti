@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "המקש משמאל ל־1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "המקש הראשון מימין ל־0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "המקש השני מימין ל־0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "מחליף את מקש הקסם הפיזי",
 	"menu.shortcuts.tap_keys.unassigned": "התנהגות רגילה",
 	"menu.shortcuts.script_shortcuts": "קיצורי ניהול סקריפט",
 	"menu.shortcuts.script_shortcuts_enable": "הפעל קיצורי ניהול סקריפט",

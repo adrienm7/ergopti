@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "1 の左のキー",
 	"menu.shortcuts.tap_keys.number_row_right_1": "0 の右の 1 つ目のキー",
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 の右の 2 つ目のキー",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "物理マジックキーを置き換えます",
 	"menu.shortcuts.tap_keys.unassigned": "通常の動作",
 	"menu.shortcuts.script_shortcuts": "スクリプト管理ショートカット",
 	"menu.shortcuts.script_shortcuts_enable": "スクリプト管理ショートカットを有効にする",

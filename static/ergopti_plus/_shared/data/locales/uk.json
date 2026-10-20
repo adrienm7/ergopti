@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Клавіша ліворуч від 1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Перша клавіша праворуч від 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Друга клавіша праворуч від 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "замінює фізичну чарівну клавішу",
 	"menu.shortcuts.tap_keys.unassigned": "звичайна поведінка",
 	"menu.shortcuts.script_shortcuts": "Скорочення для керування скриптом",
 	"menu.shortcuts.script_shortcuts_enable": "Увімкнути скорочення для керування скриптом",

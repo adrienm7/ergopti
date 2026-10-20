@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "1 左边的键",
 	"menu.shortcuts.tap_keys.number_row_right_1": "0 右边的第一个键",
 	"menu.shortcuts.tap_keys.number_row_right_2": "0 右边的第二个键",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "取代物理魔法键",
 	"menu.shortcuts.tap_keys.unassigned": "正常行为",
 	"menu.shortcuts.script_shortcuts": "脚本管理快捷键",
 	"menu.shortcuts.script_shortcuts_enable": "启用脚本管理快捷键",

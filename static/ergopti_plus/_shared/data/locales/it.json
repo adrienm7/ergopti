@@ -1645,6 +1645,7 @@
 	"menu.shortcuts.tap_keys.number_row_left": "Tasto a sinistra dell’1",
 	"menu.shortcuts.tap_keys.number_row_right_1": "Primo tasto a destra dello 0",
 	"menu.shortcuts.tap_keys.number_row_right_2": "Secondo tasto a destra dello 0",
+	"menu.shortcuts.tap_keys.overrides_magic_key_source": "sostituisce il tasto magico fisico",
 	"menu.shortcuts.tap_keys.unassigned": "comportamento normale",
 	"menu.shortcuts.script_shortcuts": "Scorciatoie gestione script",
 	"menu.shortcuts.script_shortcuts_enable": "Abilita le scorciatoie di gestione dello script",
