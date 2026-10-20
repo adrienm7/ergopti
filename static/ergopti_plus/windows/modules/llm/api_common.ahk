@@ -465,9 +465,9 @@ LLM_ApiCommon_LogSummary(mode, requested, stats, kept_count) {
  * Critical, because the poll ticks read them; killing the transport is OS work
  * and has no business being there.
  *
- * A negative SetTimer period runs the callback on a NEW thread once the current
+ * A one-shot (negative period) timer runs the callback on a NEW thread once the current
  * one finishes, i.e. after Critical has been restored. This is the same
- * mechanism the spawn side already uses to keep Run() off the keystroke path.
+ * mechanism the spawn side already uses to keep process launches off the keystroke path.
  *
  * Kills MUST be a snapshot taken under Critical, never a live Map: the entries
  * it refers to are mutated and deleted by the poll ticks that run in between.

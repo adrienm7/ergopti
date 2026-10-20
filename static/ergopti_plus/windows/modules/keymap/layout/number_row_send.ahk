@@ -44,7 +44,7 @@ NumberRowSendEvent(Keys) {
 ; layout. A registry layout types it through its own action machine.
 _NumberRowEdgeSend(Sc, Shift, *) {
 	Hkl := NumberRowForegroundLayout()
-	Caps := GetKeyState("CapsLock", "T")
+	Caps := KS_CapsLockToggleState()
 	Text := NumberRowEdgeText(Sc, Shift, Hkl, Caps)
 	if Text == "" {
 		try LoggerWarn("Layout", "SC{1:03X}: the edge keys are no longer reordered on the layout of the press; nothing typed.", Sc)
@@ -59,7 +59,7 @@ _NumberRowEdgeSend(Sc, Shift, *) {
 
 ; « Symbols first » on a row no registry layout owns.
 _NumberRowSymbolsFirstSend(Sc, Shift, *) {
-	Text := NumberRowSymbolsFirstText(Sc, Shift, NumberRowForegroundLayout(), GetKeyState("CapsLock", "T"))
+	Text := NumberRowSymbolsFirstText(Sc, Shift, NumberRowForegroundLayout(), KS_CapsLockToggleState())
 	if Text == "" {
 		try LoggerWarn("Layout", "SC{1:03X}: symbols first no longer applies on the layout of the press; nothing typed.", Sc)
 		return
