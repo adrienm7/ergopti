@@ -3031,10 +3031,12 @@ These are software implementations; final hardware verification remains below.
       (many in that log) spends a call. macOS now reports a 403/429 with
       `X-RateLimit-Remaining: 0` as an exhausted rate limit with its UTC reset
       time (auto_check.lua, unit case), and keeps the list ETag with a reduced
-      copy across restarts (`check_state.list_storage_key`, 1d341534). Still
-      to do: Linux keeps the ETag in ~/.cache but its curl
-      adapter exposes no response headers for the reset time; Windows keeps
-      both in memory only (`_UpdaterFetchCache`).
+      copy across restarts (`check_state.list_storage_key`, 1d341534). Linux
+      and Windows now name an exhausted limit with its UTC reset too, from
+      one shared sentence (`_shared/lua/updater/rate_limit.lua`; the Linux
+      curl adapter reads the final header frame it already captures, Windows
+      reads both headers). Still to do: Windows keeps the list ETag in memory
+      only (`_UpdaterFetchCache`), so each restart spends a full request.
       (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
       exited unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a
       Mac reproduction. (5) The shortcut on the key left of "1" still targets
