@@ -581,8 +581,13 @@ for (const [before, after] of [
 // One stand-in for both conditions: each full renderer draws the row its
 // disabled_when greys through the same native stand-in as an unavailable row.
 const STAND_IN = {
+	// The stand-in carries the resolved cause: the first disabled_reasons entry
+	// whose getter answers true, otherwise the row's own disabled_reason_key.
 	'renderer.lua': (text) =>
-		/greyed_stand_in\(manifest_key,\s*\{[^}]*reason_key = item\.disabled_reason_key/.test(text),
+		/local reason = item\.disabled_reason_key\n/.test(text) &&
+		/local reason_key = disabled_reason\(manifest_key, item, getters\)\n\s*if reason_key == nil then return nil end\n\s*local stand_in = greyed_stand_in\(manifest_key,\s*\{[^}]*reason_key = reason_key/.test(
+			text
+		),
 	'manifest_menu.ahk': ahkDisabledReasonStandIn
 };
 for (const file of RENDERERS) {
