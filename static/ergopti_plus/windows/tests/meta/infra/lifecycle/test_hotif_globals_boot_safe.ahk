@@ -50,10 +50,15 @@ global _HGBS_HOTIF_PARENTS := Map()
 
 ; The entry source above Bundle_Init(). Everything a parse-time #HotIf can
 ; reach during the first pump must be established in here.
-_HGBS_PrePumpSource() {
+_HGBS_EntrySource() {
 	SplitPath(A_ScriptDir, , &WindowsDir)
 	Src := ""
 	try Src := FileRead(WindowsDir . "\ErgoptiPlus.ahk")
+	return Src
+}
+
+_HGBS_PrePumpSource() {
+	Src := _HGBS_EntrySource()
 	if (Src == "")
 		return ""
 	Code := _StripFullLineComments(Src)
@@ -82,13 +87,50 @@ _HGBS_SeedsSurviveInThePrePumpBlock() {
 ; ==============================================================
 ; ==============================================================
 
+; A leading AND guard prevents every later operand from running while Features
+; is absent. Admit that cold path only against its actual, unique publication
+; after the pump and both dependencies; no function-name exemption is involved.
+_HGBS_FeaturesPublishAfterDependencies(Entry, Driver) {
+	Entry := _HGBS_CodeOnly(Entry)
+	Driver := _HGBS_CodeOnly(Driver)
+	Publication := "im)^global\s+Features\s*:=\s*ManifestBuildFeaturesMap\(\)\s*$"
+	PublishPos := RegExMatch(Entry, Publication)
+	if !PublishPos
+		return false
+	for Source in [Entry, Driver] {
+		Count := 0
+		for Line in StrSplit(Source, "`n", "`r")
+			if RegExMatch(Line, "i)^\s*global\s+Features\s*:=")
+				Count++
+		if Count != 1
+			return false
+	}
+	Pump := RegExMatch(Entry, "m)^Bundle_Init\(\)\s*$")
+	Json := RegExMatch(Entry, "im)^#Include\s+infra/json\.ahk\s*$")
+	Policy := RegExMatch(Entry, "im)^#Include\s+\.\./_shared/modules/features/layout_rows_policy\.ahk\s*$")
+	return Pump > 0 && Json > Pump && Policy > Json && PublishPos > Policy
+}
+
+_HGBS_ColdFeaturesDirective(Text, ProvenAbsent) {
+	if !ProvenAbsent
+		return false
+	; OR/ternary/assignment/comma can bypass the leading guard. Stay conservative
+	; rather than pretending this bounded recognizer is an expression parser.
+	if RegExMatch(Text, "i)\bor\b|\|\||\?|:=|,")
+		return false
+	return RegExMatch(Text, "i)^\s*IsSet\s*\(\s*Features\s*\)\s*(?:&&|and\b)") > 0
+}
+
 ; Names of the driver functions called from a parse-time #HotIf directive.
 ; Multi-line directives are covered: `#HotIf (` continues until the closing
 ; paren, and a scanner that only reads the directive's first line is blind to
 ; everything after it — that blindness is itself a recorded finding.
-_HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty) {
+_HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty, Entry := unset, Driver := unset) {
 	global _HGBS_HOTIF_PARENTS
 	Src := IsSet(Source) ? Source : _DriverSourceNoComments()
+	EntrySource := IsSet(Entry) ? Entry : (IsSet(Source) ? "" : _HGBS_EntrySource())
+	DriverSource := IsSet(Driver) ? Driver : _DriverSourceNoComments()
+	FeaturesAbsent := _HGBS_FeaturesPublishAfterDependencies(EntrySource, DriverSource)
 	; Only executable parentheses delimit directives; quoted examples are data.
 	Src := _DriverMaskNonCode(&Src)
 	Names := Map()
@@ -98,12 +140,14 @@ _HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty) {
 	Lines := StrSplit(Src, "`n", "`r")
 	InDirective := false
 	Depth := 0
+	Directive := ""
 	for Line in Lines {
 		Text := ""
 		if RegExMatch(Line, "i)^\s*#HotIf\s*(.*)$", &M) {
 			Text := M[1]
 			; A directive that opens more parens than it closes continues below.
 			Depth := 0
+			Directive := ""
 			InDirective := true
 		} else if (InDirective) {
 			Text := Line
@@ -112,10 +156,14 @@ _HGBS_HotIfFunctions(Source := unset, ReadBody := _DriverFuncBodyOrEmpty) {
 		}
 		Depth += StrLen(Text) - StrLen(StrReplace(Text, "("))
 		Depth -= StrLen(Text) - StrLen(StrReplace(Text, ")"))
-		if (Depth <= 0)
-			InDirective := false
+		Directive .= Text . "`n"
+		if (Depth > 0)
+			continue
+		InDirective := false
+		if _HGBS_ColdFeaturesDirective(Directive, FeaturesAbsent)
+			continue
 
-		for Fn in _HGBS_CalleesIn(Text) {
+		for Fn in _HGBS_CalleesIn(Directive) {
 			Names[Fn] := true
 			if !Parents.Has(Fn)
 				Parents[Fn] := "#HotIf"
@@ -253,6 +301,7 @@ _HGBS_UnguardedGlobalsOf(Body) {
 ; only if that global is seeded before the first pump, or if it checks IsSet.
 _HGBS_EveryHotIfHelperIsBootSafe() {
 	global _HGBS_PRE_PUMP_SEEDED
+	_HGBS_ColdFeaturesGuardControls()
 	Fns := _HGBS_HotIfFunctions()
 
 	Count := 0
@@ -278,6 +327,49 @@ _HGBS_EveryHotIfHelperIsBootSafe() {
 				. " and reads the global '" . Name . "' without an IsSet guard, while that global is not seeded in the pre-pump block. A key pressed during Bundle_Init's extraction evaluates that #HotIf before the assignment runs, raises UnsetError inside the evaluator, and kills the boot. Either IsSet-guard the read or seed the global above Bundle_Init()")
 		}
 	}
+}
+
+_HGBS_ColdFeaturesGuardControls() {
+	Entry := _HGBS_EntrySource()
+	Driver := _DriverSourceNoComments()
+	Assert(Entry != "" && Driver != "", "cold-path proof requires the actual entry and whole driver")
+	Assert(_HGBS_FeaturesPublishAfterDependencies(Entry, Driver),
+		"the unique Features publication follows Bundle and the JSON/policy owners")
+	Directives := []
+	for Line in StrSplit(Driver, "`n", "`r")
+		if RegExMatch(Line, "^#HotIf\s+.*LayoutRowIsEmulatedHotkey\(")
+			Directives.Push(Line)
+	AssertEqual(3, Directives.Length, "all three actual control/zoom contexts must participate")
+	for Directive in Directives {
+		Cold := _HGBS_HotIfFunctions(Directive, _DriverFuncBodyOrEmpty, Entry, Driver)
+		AssertFalse(Cold.Has("LayoutRowIsEmulatedHotkey"), "the real AND prefix short-circuits before row lookup")
+		Multiline := StrReplace(Directive, "IsSet(Features) and ", "IsSet(Features) and (`n") . "`n)"
+		Cold := _HGBS_HotIfFunctions(Multiline, _DriverFuncBodyOrEmpty, Entry, Driver)
+		AssertFalse(Cold.Has("LayoutRowIsEmulatedHotkey"), "the entire multiline AND expression must preserve dominance")
+		for Mutant in [StrReplace(Directive, "IsSet(Features) and ", ""),
+			StrReplace(Directive, "IsSet(Features) and ", "IsSet(Features) or "),
+			StrReplace(Directive, "IsSet(Features) and ", "IsSet(OtherState) and "),
+			StrReplace(Directive, "IsSet(Features) and ", "BeforeGuard() and IsSet(Features) and "),
+			Directive . ", JsonParse(Probe)", Directive . " or (`nJsonParse(Probe)`n)"] {
+			Assert(StrCompare(Directive, Mutant, true) != 0, "each guard mutant must alter the actual directive")
+			Reachable := _HGBS_HotIfFunctions(Mutant, _DriverFuncBodyOrEmpty, Entry, Driver)
+			Assert(Reachable.Has("LayoutRowIsEmulatedHotkey") && Reachable.Has("JsonParse"),
+				"an absent, foreign, reversed or OR guard must restore the real transitive JSON path")
+		}
+	}
+	Publication := "global Features := ManifestBuildFeaturesMap()"
+	for Mutant in [StrReplace(Entry, Publication, ""),
+		Publication . "`n" . StrReplace(Entry, Publication, ""), Entry . "`n" . Publication,
+		StrReplace(Entry, "#Include infra/json.ahk", ""),
+		StrReplace(Entry, "#Include ../_shared/modules/features/layout_rows_policy.ahk", "")] {
+		Assert(StrCompare(Entry, Mutant, true) != 0, "each owner mutant must alter the actual entry")
+		AssertFalse(_HGBS_FeaturesPublishAfterDependencies(Mutant, Mutant),
+			"missing, early, duplicate or dependency-free publication cannot justify cold pruning")
+		Reachable := _HGBS_HotIfFunctions(Directives[1], _DriverFuncBodyOrEmpty, Mutant, Mutant)
+		Assert(Reachable.Has("JsonParse"), "unproven initialization must retain the actual cold call graph")
+	}
+	AssertFalse(_HGBS_FeaturesPublishAfterDependencies(Entry, Driver . "`nglobal Features := Map()"),
+		"a publication in another driver file must also invalidate absence")
 }
 
 _HGBS_FunctionScannerIgnoresLiteralBraces() {
