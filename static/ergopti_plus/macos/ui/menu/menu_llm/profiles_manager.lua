@@ -1065,7 +1065,7 @@ local function build_profile_menu(
 				["llm_profile_shortcut"] = function()
 						if not settle_profile_mutation_recovery(deps) then return false end
 						return shortcut_ui.prompt_shortcut({
-							title = i18n.get("menu.profiles.shortcut_title"),
+							native_presentation_id = "profile_shortcut_dialog",
 							message = i18n.get("menu.profiles.shortcut_prompt"),
 							current_shortcut = type(state.llm_profile_shortcuts) == "table" and state.llm_profile_shortcuts[pid] or nil,
 							default_mods = {"ctrl"},

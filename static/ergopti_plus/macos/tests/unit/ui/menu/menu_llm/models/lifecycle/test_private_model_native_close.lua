@@ -24,7 +24,7 @@ local function with_dialog(kind, scenario)
 		"ui.ui_builder", "ui.webview_close_owner", "adapters.timer_scheduler", "adapters.task_lifecycle", "infra.deferred_work",
 		"infra.log_folders", "locale.core", "json", "adapters.json_codec", "diagnostics.redact",
 		"window_titles", "webview.presentation", "infra.launcher_environment", "adapters.log_transport",
-		"app_dirs", "infra.logger", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
+		"app_dirs", "infra.logger", "infra.i18n", "infra.locale", "_generated.logger_sub_files", "webview.i18n_seed",
 		"infra.notifications", "infra.dialog_util", "tests.support.native_webview_close_fixture",
 	}, function()
 		local h = { windows = {}, retained = {}, deferred = {}, bridges = {}, script_refs = {}, timers = {}, terminals = {},
@@ -90,6 +90,19 @@ local function with_dialog(kind, scenario)
 			end },
 		})
 		if kind == "hf" then
+			-- The HF window takes its caption from the shared token_prompt/hf_login
+			-- presentation, which refuses an untranslated key: rebind the factory and
+			-- the flow to an i18n facade that translates that one key.
+			local translating = {}
+			for name, value in pairs(package.loaded["infra.i18n"]) do translating[name] = value end
+			local echo = translating.get
+			translating.get = function(key)
+				if key == "mlx.hf_login_title" then return "HF fixture caption" end
+				return echo(key)
+			end
+			package.loaded["infra.i18n"] = translating
+			package.loaded["ui.ui_builder"], package.loaded[module_name] = nil, nil
+			subject = require(module_name)
 			local manager = {}
 			h.manager = manager
 			subject.install({ obj = manager, deps = { active_tasks = {} }, presets = {} })
