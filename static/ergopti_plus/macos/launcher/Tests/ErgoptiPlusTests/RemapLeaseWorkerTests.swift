@@ -3927,6 +3927,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			initialMode: kLeaseModeActive,
 			heartbeatSeconds: kDefaultHeartbeatSeconds
 		)
+		var diagnostics: [String] = []
 		let runtime = KarabinerLeaseOuterRuntime(
 			identity: identity,
 			detached: false,
@@ -3934,7 +3935,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			guardianRegistration: guardian,
 			recoveryExecutor: recovery,
 			parentInputDescriptor: parentPipe[0],
-			parentOutputDescriptor: outputDescriptor
+			parentOutputDescriptor: outputDescriptor,
+			diagnostic: { diagnostics.append($0) }
 		)
 		let silenceBudget = kDefaultHeartbeatSeconds + kLeaseInnerSilenceSlackSeconds
 		let started = ProcessInfo.processInfo.systemUptime
@@ -3946,6 +3948,14 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			"the actual inner must exhaust its five-second pulse plus the production silence slack")
 		XCTAssertLessThan(elapsed, silenceBudget + 5.25,
 			"the exact native silence and replacement fence must finish within the test bound")
+		let losses = diagnostics.filter { $0.hasPrefix("lease lost") }
+		XCTAssertEqual(losses.count, 1, "one lease loss is reported exactly once: \(diagnostics)")
+		XCTAssertTrue(
+			losses.first?.hasPrefix("lease lost (exit 73)") == true
+				&& losses.first?.contains("closed its socket without FENCED") == true
+				&& losses.first?.contains("ACTIVATE 1") == true,
+			"exit 73 must name the inner's silence fence, not stay blank: \(diagnostics)"
+		)
 		XCTAssertEqual(try String(contentsOf: output, encoding: .utf8), "READY\n",
 			"no STOP or PING was sent; outer failure must not invent a terminal public acknowledgement")
 		let statuses = try String(contentsOf: innerExitMarker, encoding: .utf8)
@@ -5448,6 +5458,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		var clockReads = 0
 		var stagedChildPID: pid_t?
 		var groupStopStatus: Int32?
+		var diagnostics: [String] = []
 		let runtime = KarabinerLeaseOuterRuntime(
 			identity: identity,
 			detached: false,
@@ -5470,7 +5481,8 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 					}
 				}
 				return kPrivateCommandAckTimeoutSeconds + 0.25
-			}
+			},
+			diagnostic: { diagnostics.append($0) }
 		)
 
 		let result = runtime.run()
@@ -5478,6 +5490,14 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 
 		XCTAssertEqual(result, LeaseWorkerExit.innerFailed.rawValue)
 		XCTAssertEqual(groupStopStatus, 0)
+		let losses = diagnostics.filter { $0.hasPrefix("lease lost") }
+		XCTAssertEqual(losses.count, 1, "one lease loss is reported exactly once: \(diagnostics)")
+		XCTAssertTrue(
+			losses.first?.contains("private command deadline expired") == true
+				&& losses.first?.contains("ACTIVATE 1") == true
+				&& losses.first?.contains("unanswered") == true,
+			"exit 73 must name the expired command, not stay blank: \(diagnostics)"
+		)
 		XCTAssertTrue(waitUntilGone(childPID, timeout: 2))
 		XCTAssertTrue(FileManager.default.fileExists(atPath: replacementFenceFile.path))
 		XCTAssertFalse(
