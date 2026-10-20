@@ -878,6 +878,14 @@ local function teardown_all_resources(termination_kind, on_teardown_ready)
 		end
 	end
 	steps[#steps + 1] = {
+		name = "driver-control",
+		run = function()
+			local module = package.loaded["infra.driver_control"]
+			if module == nil then return true end
+			return module.stop()
+		end,
+	}
+	steps[#steps + 1] = {
 		name = "menu-watchers",
 		run = function()
 			local module = package.loaded["ui.menu"]
@@ -2151,6 +2159,15 @@ Logger.info(LOG, "════════════════════�
 Logger.info(LOG, "✅ Hammerspoon boot SUCCESSFUL.")
 Logger.info(LOG, "════════════════════════════════════════════════════════════")
 Storage.set(HS_BOOT_READY_SETTING_KEY, true)
+-- The local reload command, once boot is complete: a reload it requested is
+-- completed here by this reloaded state. Optional, so a control that cannot
+-- start is logged and the driver runs on.
+require("infra.driver_control").start({
+	pid = assert(tonumber(hs.processInfo.processID), "hs.processInfo.processID is unavailable"),
+	request_reload = function(reason, on_aborted)
+		return TerminationCoordinator.request_reload_owned(reason, on_aborted)
+	end,
+})
 -- Trigger the first Karabiner deploy HERE, after init.lua fully completes.
 -- hs.timer callbacks scheduled during module init do not fire reliably;
 -- calling regenerate() from this top-level context guarantees the event loop
