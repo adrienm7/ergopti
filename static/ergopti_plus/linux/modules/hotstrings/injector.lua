@@ -89,6 +89,17 @@ local _output_observer = nil
 --- means the daemon cannot put a key back, cannot erase a trigger and cannot
 --- type a replacement, which is why the daemon refuses to grab without it.
 local _uinput = nil
+local _clipboard_cleanup = nil
+
+--- Retires the original clipboard owner independently of output admission.
+--- @return boolean acknowledged Saved bytes were physically restored.
+local function retire_clipboard()
+	local close = _clipboard_cleanup
+	if not close then return true end
+	local checked, closed = pcall(close)
+	if checked and closed == true and _clipboard_cleanup == close then _clipboard_cleanup = nil end
+	return _clipboard_cleanup == nil
+end
 
 --- Exact layout-level modifier keycodes the user is physically holding.
 --- @return table Ordered evdev keycodes.
@@ -301,6 +312,10 @@ end
 --- @param prepared table|nil Admitted ordinary replacement route; nil for other text phases.
 --- @return boolean True when the whole payload was delivered.
 local function send_text(tx, text, is_private, prepared)
+	if prepared and prepared.clipboard_paste then
+		if not prepared.clipboard_paste(tx.channel()) then error("prepared clipboard paste refused", 0) end
+		return true
+	end
 	if not prepared or prepared.native then
 		if send_text_native(tx, text, prepared) then return true end
 		if prepared then error("prepared native replacement is no longer available", 0) end
@@ -409,6 +424,7 @@ local function capture_replacement_owner()
 	local broker, binding = broker_for_channel(channel)
 	return { channel = channel, open = channel and channel.is_open, emit = channel and channel.emit,
 		ready = KeyboardLayout.is_ready, available = Clipboard.is_available, paste = Clipboard.paste_text,
+		stage = Clipboard.new_paste_stage, paste_key = Clipboard.paste_keycode, shortcut = KeyboardLayout.shortcut_keycode,
 		broker = broker, binding = binding, output_current = broker and broker.output_current }
 end
 
@@ -423,7 +439,9 @@ local function prepare_replacement(text, publication, owner)
 	local channel, open, emit, ready = owner.channel, owner.open, owner.emit, owner.ready
 	local available, paste = owner.available, owner.paste
 	local broker, binding, output_current = owner.broker, owner.binding, owner.output_current
+	local stage_factory, paste_key, shortcut = owner.stage, owner.paste_key, owner.shortcut
 	local prepared = { channel = channel }
+	local clip, clip_prepare, clip_paste, clip_close, owned_close, clip_closed, admission_error
 	local function seal()
 		local current_broker, current_binding = broker_for_channel(channel)
 		if _uinput ~= channel or not channel or channel.is_open ~= open or channel.emit ~= emit
@@ -437,6 +455,11 @@ local function prepare_replacement(text, publication, owner)
 		end
 		if prepared.native == false and (Clipboard.is_available ~= available or Clipboard.paste_text ~= paste) then
 			error("clipboard preparation is no longer current", 0)
+		end
+		if clip and (Clipboard.new_paste_stage ~= stage_factory or Clipboard.paste_keycode ~= paste_key
+			or KeyboardLayout.shortcut_keycode ~= shortcut or clip.prepare ~= clip_prepare
+			or clip.paste ~= clip_paste or clip.close ~= clip_close) then
+			error("clipboard stage is no longer current", 0)
 		end
 	end
 	prepared.seal = seal
@@ -489,6 +512,48 @@ local function prepare_replacement(text, publication, owner)
 			seal()
 			if not checked or current ~= true then error("replacement output owner is no longer current", 0) end
 		end
+	end
+	--- Prepares only the ordinary single-payload route before destructive keys.
+	function prepared.prepare_clipboard()
+		if prepared.native then return true end
+		if clip or _clipboard_cleanup then error("clipboard preparation already owned", 0) end
+		prepared.current()
+		if type(stage_factory) ~= "function" or type(paste_key) ~= "function" then
+			error("clipboard preparation unavailable", 0)
+		end
+		local key = paste_key()
+		prepared.current()
+		local function admission()
+			local checked, why = pcall(prepared.source_current)
+			if not checked then admission_error = why end
+			return checked
+		end
+		clip = stage_factory(text, sleep_ms, key, admission)
+		clip_prepare, clip_paste, clip_close = clip.prepare, clip.paste, clip.close
+		assert(type(clip_prepare) == "function" and type(clip_paste) == "function" and type(clip_close) == "function",
+			"invalid clipboard stage")
+		owned_close = function()
+			if clip_close() ~= true then return false end
+			clip_closed = true
+			return true
+		end
+		_clipboard_cleanup = owned_close
+		seal()
+		if clip_prepare() ~= true then error(admission_error or "clipboard preparation failed", 0) end
+		prepared.current()
+		prepared.clipboard_paste = function(output)
+			prepared.source_current()
+			local pasted = clip_paste(output)
+			if admission_error then error(admission_error, 0) end
+			prepared.source_current()
+			return pasted == true
+		end
+		return true
+	end
+	--- Cleanup uses the captured owner even after its public APIs are replaced.
+	function prepared.close_clipboard()
+		if not clip or clip_closed then return true end
+		return _clipboard_cleanup == owned_close and retire_clipboard()
 	end
 	return prepared
 end
@@ -728,7 +793,8 @@ end
 --- Closes the non-forking channel, if one is open.
 --- @return boolean acknowledged True when absent or strictly retired; false retains cleanup debt.
 function M.close_fast_channel()
-	if not _uinput then return true end
+	local clipboard_closed = retire_clipboard()
+	if not _uinput then return clipboard_closed end
 	local Broker = require("adapters.modifier_broker")
 	if Broker.for_channel(_uinput) then
 		local acknowledged = _uinput.close() == true
@@ -741,7 +807,7 @@ function M.close_fast_channel()
 	else _uinput.close() end
 	_uinput = nil
 	Logger.done(LOG, "Non-forking uinput channel closed.")
-	return true
+	return clipboard_closed
 end
 
 --- Test seam: injects (or clears) the uinput channel without touching /dev.
@@ -810,14 +876,26 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 	else
 		Logger.trace(LOG, "inject(): bc=%d text='%s'…", backspace_count, replacement_text)
 	end
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
+	end
 	local checked, prepared = pcall(prepare_replacement, replacement_text, publication)
 	if not checked then
 		if is_private then Logger.error(LOG, "Cannot prepare a private replacement before erasure: %s.", tostring(prepared))
 		else Logger.error(LOG, "Cannot deliver '%s' before erasing its trigger: %s.", replacement_text, tostring(prepared)) end
 		return { ok = false, error = tostring(prepared), failed_phase = "replacement preflight", cleanup_ok = true }
 	end
+	local ready, preparation_error = pcall(prepared.prepare_clipboard)
+	if not ready then
+		local closed = prepared.close_clipboard()
+		local failure = { ok = false, error = closed and tostring(preparation_error) or "clipboard restoration failed",
+			failed_phase = "replacement preflight", cleanup_ok = closed }
+		if not closed then failure.native_cleanup_ok = true end
+		if not closed then stop_after_failure(failure, "inject()") end
+		return failure
+	end
 
-	local result = run_transaction("inject()", function(tx)
+	local ran, result = pcall(run_transaction, "inject()", function(tx)
 		-- Phase 1: erase the trigger (and terminator if consumed).
 		if backspace_count > 0 then
 			send_backspaces(tx, backspace_count)
@@ -836,6 +914,16 @@ function M.inject(backspace_count, replacement_text, is_private, replay_terminat
 			send_terminator(tx, replay_terminator)
 		end
 	end, publication, prepared)
+	local clipboard_closed = prepared.close_clipboard()
+	if not ran then
+		result = { ok = false, error = "output transaction raised before its cleanup receipt", failed_phase = "output transaction",
+			cleanup_ok = false, native_cleanup_ok = false }
+	end
+	if not clipboard_closed then
+		result.native_cleanup_ok = result.cleanup_ok
+		result.ok, result.cleanup_ok, result.error, result.failed_phase = false, false, "clipboard restoration failed", "clipboard restoration"
+	end
+	if not ran or not clipboard_closed then stop_after_failure(result, "inject()") end
 
 	if result.ok then
 		Logger.done(LOG, "inject(): done (bc=%d).", backspace_count)
@@ -916,6 +1004,9 @@ function M.inject_fields(backspace_count, values, is_private)
 	-- two-phase timing and the clipboard fallback.
 	if #values == 1 then
 		return M.inject(backspace_count, values[1], is_private)
+	end
+	if not retire_clipboard() then
+		return { ok = false, error = "clipboard restoration failed", failed_phase = "replacement preflight", cleanup_ok = false }
 	end
 
 	local owner = capture_replacement_owner()

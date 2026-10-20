@@ -25,6 +25,7 @@ local function injection(boundary, body)
 		logger.set_error_observer(function(_, template) errors[#errors + 1] = template end)
 		package.loaded["logger.shim"] = logger
 		local transitioned = false
+		local restoration_recovered = false
 		local function transition(point)
 			if (boundary == point or point == "write" and (boundary == "restore-false" or boundary == "restore-throw")
 				or point == "ctrl-down" and boundary == "cleanup-refusal") and not transitioned then
@@ -48,8 +49,8 @@ local function injection(boundary, body)
 				for _, item in ipairs(commands) do
 					if item.command == command then
 						writes[#writes + 1] = item.text
-						if item.text == "SAVED" and boundary == "restore-false" then return false end
-						if item.text == "SAVED" and boundary == "restore-throw" then error("controlled restore transport failure") end
+						if item.text == "SAVED" and boundary == "restore-false" and not restoration_recovered then return false end
+						if item.text == "SAVED" and boundary == "restore-throw" and not restoration_recovered then error("controlled restore transport failure") end
 						if item.text == "☃" then transition("write") end
 						return true
 					end
@@ -108,7 +109,12 @@ local function injection(boundary, body)
 				helpers.assert_eq(errors, {}, "a healthy destination refusal never opens the ERROR observer")
 			end
 		end)
-		if injector then injector._set_uinput(nil); injector._set_nanosleep_for_test(nil) end
+		if injector then
+			restoration_recovered = true
+			injector._set_uinput(nil)
+			assert(injector.close_fast_channel(), "the original fake restoration owner must close after recovery")
+			injector._set_nanosleep_for_test(nil)
+		end
 		for _, name in ipairs(names) do package.loaded[name] = saved[name] end
 		if not ok then error(detail, 0) end
 	end)
@@ -160,9 +166,10 @@ helpers.describe("ordinary clipboard destination admission", function()
 				helpers.assert_true(transitioned, "the destination expires after staging")
 				helpers.assert_eq(result.ok, false)
 				helpers.assert_eq(result.error, "clipboard restoration failed")
-				helpers.assert_eq(result.cleanup_ok, true, "native key cleanup alone remains acknowledged")
-				helpers.assert_eq(table.concat(rows, " "), "14:1 14:0 14:1 14:0 14:1 14:0")
-				helpers.assert_eq(writes, { "☃", "SAVED" }, "restoration was attempted but not acknowledged")
+				helpers.assert_eq(result.native_cleanup_ok, true, "no native key cleanup is outstanding")
+				helpers.assert_eq(result.cleanup_ok, false, "clipboard restoration remains unacknowledged")
+				helpers.assert_eq(rows, {}, "a preparation refusal must preserve the original trigger")
+				helpers.assert_eq(writes, { "☃", "SAVED", "SAVED" }, "both preparation unwind and final cleanup retain the refused owner")
 				helpers.assert_eq(stopped, 1, "a real clipboard restoration failure is never downgraded to a focus refusal")
 			end)
 		end)
@@ -173,12 +180,12 @@ helpers.describe("ordinary clipboard destination admission", function()
 				helpers.assert_true(transitioned, "the actual requested blocking boundary must run")
 				helpers.assert_eq(result.ok, false)
 				helpers.assert_eq(result.cleanup_ok, true)
-				local expected = point == "before-erase" and "" or "14:1 14:0 14:1 14:0 14:1 14:0"
+				local expected = (point == "postpaste" or point == "ctrl-down") and "14:1 14:0 14:1 14:0 14:1 14:0" or ""
 				if point == "postpaste" then expected = expected .. " 29:1 47:1 47:0 29:0" end
 				if point == "ctrl-down" then expected = expected .. " 29:1 29:0" end
 				helpers.assert_eq(table.concat(rows, " "), expected,
 					"a changed destination gets no new paste DOWN; already delivered text is not rolled back")
-				helpers.assert_eq(writes, (point == "before-erase" or point == "read") and {} or { "☃", "SAVED" })
+				helpers.assert_eq(writes, (point == "before-erase" or point == "read" or point == "lookup") and {} or { "☃", "SAVED" })
 				helpers.assert_eq(stopped, 0, "destination refusal never emergency-stops a healthy keyboard")
 			end)
 		end)
