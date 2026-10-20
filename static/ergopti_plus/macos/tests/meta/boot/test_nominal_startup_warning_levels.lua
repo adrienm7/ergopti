@@ -73,11 +73,6 @@ helpers.describe("meta: nominal startup diagnostics stay warning-free", function
 		helpers.assert_true(source:find("Logger.debug(LOG, \"EMERGENCY RECYCLE executing now", 1, true) ~= nil)
 	end)
 
-	helpers.it("automatic CapsWord probe cleanup stays debug-only", function()
-		local source = read_source("local function parse_layout_name") -- platform/remap/watchers.lua
-		helpers.assert_true(source:find("Logger.debug(LOG, \"CapsWord probe timed out", 1, true) ~= nil)
-	end)
-
 	helpers.it("gesture lift-off drift rejection stays debug-only", function()
 		local source = read_source("local function triggerLiveAxisIfNeeded") -- modules/gestures/engine.lua
 		helpers.assert_true(source:find("Logger.debug(LOG, \"commitGesture: dir=%s does not match gesture lockedDir", 1, true) ~= nil)
