@@ -171,13 +171,13 @@
 				},
 				{
 					"name": "Receive selected-release shell corpus and native guardian cancellation",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"shell": "bash"
 				},
 				{
 					"name": "Retain selected-release native ownership receiving",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Admit the canonical native toolchain and public inputs",
@@ -187,14 +187,14 @@
 				},
 				{
 					"name": "Build the actual launcher native transport roles",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native launcher compiler diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Prepare locked native HTTP receiving clients",
@@ -203,101 +203,101 @@
 				},
 				{
 					"name": "Receive actual private-session and numeric TLS peer controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 5,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain actual private-session and numeric TLS peer diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Qualify actual SDK accepted-owner and deadline XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Qualify numeric logger boundary XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 5,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native SDK XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}"
 				},
 				{
 					"name": "Qualify actual selected number-row Carbon XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain selected number-row Carbon XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}"
 				},
 				{
 					"name": "Qualify native input-source and launcher XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 20,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain native input-source and launcher XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}"
 				},
 				{
 					"name": "Qualify actual native PAC source ownership XCTest controls",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Qualify actual native PAC and WPAD XCTest controls",
 					"id": "managed-ollama-pac-receiving",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}",
 					"timeout-minutes": 10,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native PAC XCTest diagnostics",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}"
 				},
 				{
 					"name": "Receive actual independent managed HTTP native clients",
 					"id": "native_http_clock",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 5,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native HTTP clock receiving",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true' && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Qualify actual explicit curl stream ownership",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Receive and admit the clean native source asset from its build cell",
 					"id": "ollama-native-build",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 50,
 					"shell": "bash"
 				},
 				{
 					"name": "Receive actual native model create, pull, inference and retirement",
 					"id": "managed-ollama-model-receiving",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success' && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"shell": "bash"
 				},
 				{
@@ -309,12 +309,12 @@
 				{
 					"name": "Upload qualified native inputs for the application catalogue",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Upload the actual managed native release asset",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Retain actual native producer, catalogue and receiving evidence",
@@ -328,25 +328,25 @@
 				},
 				{
 					"name": "Observe installed Shortcuts Events metadata without launch",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain installed Shortcuts Events metadata diagnostic",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"name": "Observe independent native Apple Shortcuts SDK preflight and discovery",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}",
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}",
 					"timeout-minutes": 2,
 					"shell": "bash"
 				},
 				{
 					"name": "Retain independent native Apple Shortcuts SDK observation",
 					"uses": "actions/upload-artifact@v4",
-					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}"
+					"if": "${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}"
 				},
 				{
 					"uses": "actions/setup-node@v4",

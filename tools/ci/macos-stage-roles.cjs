@@ -112,12 +112,16 @@ function plan(stage, context) {
 	// Each managed-ollama-build cell runs the clean native source build of the
 	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
 	// travel through tools/ci/managed-ollama-handoff.cjs.
+	// The Intel managed-ollama-native role runs as two cells: its XCTest cohorts
+	// ("xctest") beside the runtime receiving ("runtime"), which waits for the
+	// clean build anyway. Apple silicon keeps one cell that runs both.
 	if (stage === 'e2e') {
 		const rows = [
 			cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),
 			cell('tooltip-canvas', 'macos-15', 'arm64', 10),
 			cell('managed-ollama-native', 'macos-15', 'arm64', 60),
-			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60),
+			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60, 'runtime'),
+			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 45, 'xctest'),
 			cell('managed-ollama-build', 'macos-15', 'arm64', 60),
 			cell('managed-ollama-build', 'macos-15-intel', 'amd64', 60)
 		];
@@ -163,6 +167,15 @@ function roleLot(stage, role, architecture, scenario) {
 	if (stage === 'testbuild' && role === 'launch') {
 		assert.match(scenario, /^[a-z][a-z0-9_]*$/);
 		return 'Installed app: ' + scenario.replace(/_/g, ' ') + ' (' + native() + ')';
+	}
+	if (
+		stage === 'e2e' &&
+		role === 'managed-ollama-native' &&
+		['runtime', 'xctest'].includes(scenario)
+	) {
+		assert.equal(architecture, 'amd64', 'Only the Intel managed native role is split');
+		// The runtime cell keeps the name the build handoff and Build wait for.
+		return scenario === 'runtime' ? 'Managed Ollama (Intel)' : 'Native XCTest (Intel)';
 	}
 	assert.equal(scenario, '', 'Unexpected scenario for this human lot');
 	switch (stage + '/' + role) {

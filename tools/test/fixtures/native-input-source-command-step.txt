@@ -1,5 +1,5 @@
       - name: Qualify native input-source and launcher XCTest controls
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && matrix.scenario != 'runtime' }}
         shell: bash
         run: |
           set -euo pipefail

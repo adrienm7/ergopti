@@ -102,12 +102,23 @@ function macRoleBody(body, role, expectedCount) {
 	const expected =
 		role === 'cold-bootstrap-native'
 			? [['macos-15', 'arm64', 90]]
-			: [
-					['macos-15', 'arm64', 60],
-					['macos-15-intel', 'amd64', 60]
-				];
+			: role === 'managed-ollama-native'
+				? [
+						['macos-15', 'arm64', '', 60],
+						// Intel runs its XCTest cohorts beside the runtime receiving.
+						['macos-15-intel', 'amd64', 'runtime', 60],
+						['macos-15-intel', 'amd64', 'xctest', 45]
+					]
+				: [
+						['macos-15', 'arm64', '', 60],
+						['macos-15-intel', 'amd64', '', 60]
+					];
 	assert.deepEqual(
-		rows.map((row) => [row.runner, row.architecture, row.timeout_minutes]),
+		rows.map((row) =>
+			role === 'cold-bootstrap-native'
+				? [row.runner, row.architecture, row.timeout_minutes]
+				: [row.runner, row.architecture, row.scenario, row.timeout_minutes]
+		),
 		expected
 	);
 	const steps = Mac.selected(body, role);
@@ -924,7 +935,7 @@ function checkManagedOllamaNative(body) {
 	assert.equal(pipeline.stepField(admission, 'id'), 'ollama-native-build');
 	assert.equal(
 		pipeline.stepField(admission, 'if'),
-		Mac.condition('managed-ollama-native', '${{ !cancelled() }}')
+		Mac.condition('managed-ollama-native', "${{ !cancelled() && matrix.scenario != 'xctest' }}")
 	);
 	assert.match(
 		admission,
@@ -957,7 +968,10 @@ function checkManagedOllamaNative(body) {
 	assert.match(listener, /ManagedNetworkBootstrapTests/);
 	assert.match(listener, /Executed 49 tests, with 0 failures/);
 	assert.equal(pipeline.stepField(listener, 'continue-on-error'), null);
-	assert.equal(pipeline.stepField(listener, 'if'), Mac.condition('managed-ollama-native'));
+	assert.equal(
+		pipeline.stepField(listener, 'if'),
+		Mac.condition('managed-ollama-native', "${{ matrix.scenario != 'runtime' }}")
+	);
 	const receive = pipeline.step(
 		role,
 		'Receive actual native model create, pull, inference and retirement'
@@ -973,7 +987,7 @@ function checkManagedOllamaNative(body) {
 		pipeline.stepField(receive, 'if'),
 		Mac.condition(
 			'managed-ollama-native',
-			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' }}"
+			"${{ !cancelled() && steps.ollama-native-build.outcome == 'success' && matrix.scenario != 'xctest' }}"
 		)
 	);
 	assert.doesNotMatch(role, /gh release|softprops\/action-gh-release|createRelease|--cross/);
@@ -2557,14 +2571,15 @@ console.log(
 	assert.ok(body.indexOf(compile) < body.indexOf(listener));
 	assert.ok(body.indexOf(listener) < body.indexOf(producer));
 	assert.match(listener, /tests\? skipped/);
-	for (const name of [
-		'Retain independent native launcher compiler diagnostics',
-		'Retain independent native SDK XCTest diagnostics'
+	// The launcher build stays with the Intel runtime cell, the SDK cohort with its XCTest cell.
+	for (const [name, skipped] of [
+		['Retain independent native launcher compiler diagnostics', 'xctest'],
+		['Retain independent native SDK XCTest diagnostics', 'runtime']
 	]) {
 		const upload = pipeline.step(body, name);
 		assert.equal(
 			pipeline.stepField(upload, 'if'),
-			Mac.condition('managed-ollama-native', 'always()')
+			Mac.condition('managed-ollama-native', `\${{ always() && matrix.scenario != '${skipped}' }}`)
 		);
 		assert.ok(body.indexOf(upload) < body.indexOf(producer));
 	}

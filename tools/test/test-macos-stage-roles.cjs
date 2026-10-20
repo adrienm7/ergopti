@@ -113,23 +113,130 @@ check('exact five visible jobs with only their declared predecessor edges', () =
 });
 check('push E2E includes every mandatory role and both managed architectures', () => {
 	assert.deepEqual(
-		roles.plan('e2e', context).map((cell) => [cell.role, cell.runner, cell.timeout_minutes]),
+		roles
+			.plan('e2e', context)
+			.map((cell) => [cell.role, cell.runner, cell.scenario, cell.timeout_minutes]),
 		[
-			['e2e-hs', 'ubuntu-latest', 360],
-			['tooltip-canvas', 'macos-15', 10],
-			['managed-ollama-native', 'macos-15', 60],
-			['managed-ollama-native', 'macos-15-intel', 60],
-			['managed-ollama-build', 'macos-15', 60],
-			['managed-ollama-build', 'macos-15-intel', 60]
+			['e2e-hs', 'ubuntu-latest', '', 360],
+			['tooltip-canvas', 'macos-15', '', 10],
+			['managed-ollama-native', 'macos-15', '', 60],
+			// Intel runs its XCTest cohorts beside the runtime receiving.
+			['managed-ollama-native', 'macos-15-intel', 'runtime', 60],
+			['managed-ollama-native', 'macos-15-intel', 'xctest', 45],
+			['managed-ollama-build', 'macos-15', '', 60],
+			['managed-ollama-build', 'macos-15-intel', '', 60]
 		]
 	);
+	assert.deepEqual(roles.displayPlan('e2e', context).matrix.lot.slice(2, 5), [
+		'Managed Ollama (Apple silicon)',
+		'Managed Ollama (Intel)',
+		'Native XCTest (Intel)'
+	]);
+	for (const [architecture, scenario] of [
+		['arm64', 'runtime'],
+		['arm64', 'xctest'],
+		['amd64', 'other']
+	])
+		assert.throws(() => roles.roleLot('e2e', 'managed-ollama-native', architecture, scenario));
+});
+/** The managed native steps one cell of each scenario actually runs. */
+function managedNativeSteps(workflow) {
+	const steps = workflow.jobs['e2e-hs'].steps.filter((step) =>
+		(step.if ?? '').includes("env.MACOS_STAGE_ROLE == 'managed-ollama-native'")
+	);
+	const runs = (step, scenario) =>
+		!(step.if ?? '').includes("env.MACOS_STAGE_SCENARIO != '" + scenario + "'");
+	return { steps, runs };
+}
+function checkManagedNativeSplit(workflow) {
+	const { steps, runs } = managedNativeSteps(workflow);
+	assert.ok(steps.length > 30, 'the managed native role keeps its steps');
+	const scenarios = roles
+		.plan('e2e', context)
+		.filter((cell) => cell.role === 'managed-ollama-native')
+		.map((cell) => cell.scenario);
+	assert.deepEqual(scenarios, ['', 'runtime', 'xctest']);
+	const xctest = steps.filter((step) =>
+		/\bswift test\b|run_logger_numeric_native\.sh/.test(step.run ?? '')
+	);
+	assert.ok(xctest.length >= 6, 'every XCTest cohort is found');
+	for (const step of steps) {
+		// Apple silicon has no scenario and runs every step of the role.
+		assert.ok(runs(step, ''), step.name + ' must run in the Apple-silicon cell');
+		assert.ok(runs(step, 'runtime') || runs(step, 'xctest'), step.name + ' must run on Intel');
+	}
+	for (const step of xctest) {
+		assert.ok(!runs(step, 'runtime'), step.name + ' must leave the Intel runtime cell');
+		assert.ok(runs(step, 'xctest'), step.name + ' must run in the Intel XCTest cell');
+	}
+	for (const name of [
+		'Build the actual launcher native transport roles',
+		'Receive and admit the clean native source asset from its build cell',
+		'Receive actual native model create, pull, inference and retirement',
+		'Receive actual independent managed HTTP native clients',
+		'Upload qualified native inputs for the application catalogue',
+		'Upload the actual managed native release asset'
+	]) {
+		const step = steps.find((candidate) => candidate.name === name);
+		assert.ok(step && runs(step, 'runtime') && !runs(step, 'xctest'), name + ' is runtime only');
+	}
+	// Two Intel cells must never upload one artifact name.
+	for (const step of steps.filter(
+		(candidate) =>
+			/actions\/upload-artifact/.test(candidate.uses ?? '') &&
+			runs(candidate, 'runtime') &&
+			runs(candidate, 'xctest')
+	))
+		assert.match(step.with.name, /env\.MACOS_STAGE_SCENARIO/, step.name + ' names its scenario');
+}
+check('the Intel managed native role splits XCTest from runtime without dropping a step', () => {
+	const workflow = YAML.parse(
+		fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
+	);
+	checkManagedNativeSplit(workflow);
+	const sdk = 'Qualify actual SDK accepted-owner and deadline XCTest controls';
+	const model = 'Receive actual native model create, pull, inference and retirement';
+	const upload = 'Retain actual native producer, catalogue and receiving evidence';
+	for (const [label, mutate] of [
+		[
+			'an XCTest cohort back in the runtime cell',
+			(step) =>
+				step.name === sdk &&
+				(step.if = step.if.replace(" && (env.MACOS_STAGE_SCENARIO != 'runtime')", ''))
+		],
+		[
+			'model receiving in the XCTest cell',
+			(step) =>
+				step.name === model &&
+				(step.if = step.if.replace(" && env.MACOS_STAGE_SCENARIO != 'xctest'", ''))
+		],
+		[
+			'a step skipped on Apple silicon',
+			(step) => step.name === sdk && (step.if = step.if.replace("'runtime'", "''"))
+		],
+		[
+			'one artifact name for both Intel cells',
+			(step) =>
+				step.name === upload &&
+				(step.with.name = step.with.name.replace(
+					"${{ env.MACOS_STAGE_SCENARIO && format('-{0}', env.MACOS_STAGE_SCENARIO) || '' }}",
+					''
+				))
+		]
+	]) {
+		const mutated = structuredClone(workflow);
+		const before = JSON.stringify(mutated);
+		mutated.jobs['e2e-hs'].steps.forEach(mutate);
+		assert.notEqual(JSON.stringify(mutated), before, label + ' must change the workflow');
+		assert.throws(() => checkManagedNativeSplit(mutated), undefined, label);
+	}
 });
 check('manual nonrelease retains Item36 and both lease cells', () => {
 	const ctx = { ...context, event_name: 'workflow_dispatch' };
 	assert.deepEqual(
 		roles
 			.plan('e2e', ctx)
-			.slice(6)
+			.slice(7)
 			.map((cell) => [cell.role, cell.runner, cell.timeout_minutes]),
 		[
 			['item36-native', 'macos-latest', 25],
@@ -137,11 +244,11 @@ check('manual nonrelease retains Item36 and both lease cells', () => {
 			['lease-silence-native', 'macos-15-intel', 20]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[1].cells.length, 9);
+	assert.equal(complete(ctx).proof.chain[1].cells.length, 10);
 });
 check('release launch preserves both arches and every canonical supplied scenario', () => {
 	const ctx = { ...context, release: true, event_name: 'workflow_dispatch' };
-	assert.equal(roles.plan('e2e', ctx).length, 6);
+	assert.equal(roles.plan('e2e', ctx).length, 7);
 	assert.deepEqual(
 		roles
 			.plan('testbuild', ctx)
@@ -376,8 +483,9 @@ check('existing scope owner admits every retained Mac command after address relo
 	assert.ok(projected.length > 0 && projected !== source);
 });
 
-// One more than the single-cell Unit: a duplicate Unit row now replaces a mandatory group.
-assert.equal(controls, 85, 'all original stage and receipt controls remain present');
+// One more than the single-cell Unit: a duplicate Unit row now replaces a mandatory group;
+// one more for the Intel managed native split.
+assert.equal(controls, 86, 'all original stage and receipt controls remain present');
 check('Unit lots are the module groups, each one complete stubbed cell', () => {
 	const groups = roles.unitGroups();
 	// Deliberately narrow: these are the macOS shard GROUP names, not source trees
@@ -417,6 +525,7 @@ check('E2E human lots retain native architectures and scoped manual roles', () =
 		'Tooltip canvas (Apple silicon)',
 		'Managed Ollama (Apple silicon)',
 		'Managed Ollama (Intel)',
+		'Native XCTest (Intel)',
 		'Managed Ollama build (Apple silicon)',
 		'Managed Ollama build (Intel)'
 	];
@@ -711,7 +820,7 @@ check('recording refuses another valid cell under the selected human lot', () =>
 		/Selected human lot and receipt cell differ/
 	);
 });
-assert.equal(controls, 139, 'original controls and human lot transport controls all execute');
+assert.equal(controls, 140, 'original controls and human lot transport controls all execute');
 check('role labels retain the independent authored human names without runtime metadata', () => {
 	for (const [stage, role, architecture, scenario, expected] of [
 		['unit', 'lua-unit-meta', 'stubbed', 'meta', 'meta'],
@@ -777,7 +886,7 @@ check('full-cell human labels still reject incomplete cells and foreign fields',
 		/Closed stage receipt fields required/
 	);
 });
-assert.equal(controls, 142, 'all original, human lot transport and role-label controls execute');
+assert.equal(controls, 143, 'all original, human lot transport and role-label controls execute');
 /** Admit the Unit group matrix while preserving its complete receipt-producing source chain. */
 function assertLiteralUnit(source) {
 	const job = YAML.parse(source, { uniqueKeys: true }).jobs['test-hs'];
@@ -1103,7 +1212,7 @@ check('literal Unit lot produces the unchanged complete role and receipt', () =>
 			)
 		);
 });
-assert.equal(controls, 167, 'all prior 142 controls and 25 Unit matrix controls execute');
+assert.equal(controls, 168, 'all prior 143 controls and 25 Unit matrix controls execute');
 
 /** The native composition validator needs the approved commit's complete HEAD ancestry. */
 function assertManagedNativeHistory(workflow) {
@@ -1153,8 +1262,8 @@ for (const [name, mutate] of [
 	});
 assert.equal(
 	controls,
-	174,
-	'all prior 167 controls and seven managed native history controls execute'
+	175,
+	'all prior 168 controls and seven managed native history controls execute'
 );
 
 // The stage graph: Build admits Unit beside E2E, and the test build joins both.
@@ -1324,6 +1433,6 @@ check('a Build older than its Unit predecessor is a backward lineage', () => {
 		/Backward predecessor attempt lineage/
 	);
 });
-assert.equal(controls, 188, 'all prior 174 controls and fourteen stage graph controls execute');
+assert.equal(controls, 189, 'all prior 175 controls and fourteen stage graph controls execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

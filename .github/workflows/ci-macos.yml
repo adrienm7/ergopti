@@ -333,6 +333,13 @@ jobs:
       # SwiftPM tree the cache restores: the app build below still resolves and
       # compiles its launcher in a clean .build, as it did on a runner of its own,
       # never in a tree restored from an earlier run.
+      #
+      # On Intel the role runs as two cells. Its XCTest cohorts took about nine
+      # minutes ahead of the model receiving, which waits for the parallel clean
+      # build anyway, so they run beside it: the "xctest" cell skips every step
+      # marked != 'xctest' and the "runtime" cell every step marked
+      # != 'runtime'. The Apple-silicon cell has no scenario and runs both.
+      # Steps that run in both Intel cells name their uploads by scenario.
       # Retained original role: managed-ollama-native
       - uses: actions/checkout@v4
         with:
@@ -377,7 +384,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -392,7 +399,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           name: selected-release-native-ownership-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -458,7 +465,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -478,7 +485,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -510,7 +517,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -553,7 +560,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -573,7 +580,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -636,7 +643,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'runtime') }}
         shell: bash
         run: |
           bash tools/diagnostics/run_logger_numeric_native.sh "$GITHUB_SHA" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE" "$ERGOPTI_OLLAMA_BUILD_ROOT"
@@ -649,7 +656,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -675,7 +682,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -752,7 +759,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         uses: actions/upload-artifact@v4
         with:
           name: number-row-carbon-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -776,7 +783,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -861,7 +868,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         uses: actions/upload-artifact@v4
         with:
           name: native-input-source-launcher-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -876,7 +883,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -903,7 +910,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         id: managed-ollama-pac-receiving
         shell: bash
         run: |
@@ -952,7 +959,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && env.MACOS_STAGE_SCENARIO != 'runtime') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -973,7 +980,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         id: native_http_clock
         shell: bash
         run: |
@@ -1032,7 +1039,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && steps.native_http_clock.outputs.clock_expected == 'true' && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           name: native-http-clock-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1046,7 +1053,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1064,7 +1071,7 @@ jobs:
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
           GITHUB_TOKEN: ${{ github.token }}
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         id: ollama-native-build
         shell: bash
         run: |
@@ -1079,7 +1086,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && steps.ollama-native-build.outcome == 'success' && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         id: managed-ollama-model-receiving
         shell: bash
         run: |
@@ -1130,7 +1137,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -1148,7 +1155,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           overwrite: true
@@ -1168,7 +1175,7 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          name: managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE }}${{ env.MACOS_STAGE_SCENARIO && format('-{0}', env.MACOS_STAGE_SCENARIO) || '' }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
           if-no-files-found: error
           retention-days: ${{ inputs.release && 7 || 1 }}
           path: |
@@ -1199,7 +1206,7 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always()) }}
         uses: actions/upload-artifact@v4
         with:
-          name: assets-qualification-managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}
+          name: assets-qualification-managed-ollama-native-${{ env.MACOS_STAGE_ARCHITECTURE || 'stubbed' }}${{ env.MACOS_STAGE_SCENARIO && format('-{0}', env.MACOS_STAGE_SCENARIO) || '' }}
           path: ${{ runner.temp }}/stable-macos-*.json
           if-no-files-found: warn
 
@@ -1213,7 +1220,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled()) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (github.event_name == 'workflow_dispatch' && !inputs.release && !cancelled() && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1276,7 +1283,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           name: shortcuts-installed-target-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -1292,7 +1299,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (!cancelled() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1310,7 +1317,7 @@ jobs:
           ERGOPTI_RELEASE_VERSION: '${{ inputs.version }}'
           ERGOPTI_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_OLLAMA_EXPECTED_ARCHITECTURE: '${{ env.MACOS_STAGE_ARCHITECTURE }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release) }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'managed-ollama-native' && (always() && github.event_name == 'workflow_dispatch' && !inputs.release && env.MACOS_STAGE_SCENARIO != 'xctest') }}
         uses: actions/upload-artifact@v4
         with:
           name: native-apple-shortcuts-independent-${{ env.MACOS_STAGE_ARCHITECTURE }}-${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
