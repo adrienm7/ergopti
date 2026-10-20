@@ -79,6 +79,10 @@ $script:ManifestSha256 = 'a' * 64
 $script:Port = 23456
 $script:StartedTick = 1000
 $script:DeadlineMs = 9000
+# The real shared declaration, so a launcher that drops its serve environment
+# fails this model exactly as the production owner would.
+$script:ServeEnvironmentPath = [IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $Source) '..\..\..\_shared\modules\llm\managed_ollama_environment.json'))
+$script:ServeEnvironmentSha256 = (Get-FileHash -LiteralPath $script:ServeEnvironmentPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $script:Collision = $false
 $script:Foreign = $false
 $script:Spawns = 0
@@ -134,6 +138,7 @@ $cases = @(
 		Must ($script:Spawns -eq 1 -and $script:HttpCalls -eq 1) 'Actual entry must hit one owned spawn and one admitted HTTP request.'
 		Must ($script:LastStart.FileName -ceq (Join-Path $script:PublishedPath 'ollama.exe')) 'Exact validated executable must be passed.'
 		Must ($script:LastStart.EnvironmentVariables['OLLAMA_MODELS'] -ceq (Join-Path $script:ManagedRoot 'models')) 'Models directory must be the same admitted root child.'
+		Must ($script:LastStart.EnvironmentVariables['OLLAMA_NO_CLOUD'] -ceq '1') 'The owned server must start with the shared serve environment.'
 		$receipt = $global:CapturedReadyText | ConvertFrom-Json
 		Must ($receipt.launcher_pid -eq $PID -and $receipt.child_pid -eq 5002 -and $receipt.manifest_sha256 -ceq $script:ManifestSha256) 'Fresh receipt must bind current launcher, retained child and exact manifest.'
 		Must ($receipt.child_created_filetime -eq 133700000000000000L) 'Receipt must retain exact child creation identity from its held HANDLE.'
