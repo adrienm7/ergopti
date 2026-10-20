@@ -209,6 +209,45 @@ _PFC_CollidingLegacyNamesAndPhysicalAliases() {
 }
 Test("personal-file-controls: flattened names retain distinct package owners and real primary aliases refuse", _PFC_CollidingLegacyNamesAndPhysicalAliases)
 
+; A source the adoption refuses (here a hard-link alias of the primary file) is
+; unavailable to the live engine and the preview alike, as on macOS and Linux.
+; Windows loaded it as a whole-file pack: the primary's mappings fired a second
+; time through the alias, and disabling the personal category left them active.
+_PFC_UnadmittedSourceNeverRegisters() {
+	global HSE_RegistryByGroup
+	Fixture := _PFC_Fixture()
+	Primary := Fixture.root . "\personal_hotstrings.toml"
+	Alias := Fixture.root . "\alias.toml"
+	try {
+		Assert(FSWriteDurable(Primary, '[[primary]]`n"prmy" = "owned elsewhere"`n'))
+		AssertEqual(1, DllCall("CreateHardLinkW", "wstr", Alias, "wstr", Primary, "ptr", 0),
+			"the native physical alias fixture requires a real NTFS hard link")
+		HSE_RegistryClear()
+		PersonalFileControls.Register()
+		Refused := 0
+		for Record in PersonalFileControls.inventory {
+			if Record["path"] == Alias {
+				Refused := Record
+				AssertFalse(Record["admitted"], "the primary alias is refused by the shared adoption policy")
+			}
+		}
+		Assert(Refused is Map, "the alias is discovered")
+		for Group, Specs in HSE_RegistryByGroup {
+			for Spec in Specs
+				AssertFalse(Spec.Trigger = "prmy", "the alias registers none of the primary's mappings (group " . Group . ")")
+		}
+		AssertTrue(HSE_RegistryByGroup.Has(Fixture.descriptor["id"] . ".live"), "the adopted source still registers")
+		Index := Map(), TriggerSet := Map()
+		PersonalFileControls.BuildPreview(Index, TriggerSet)
+		AssertFalse(TriggerSet.Has("prmy"), "the preview offers nothing from the refused alias")
+		Assert(TriggerSet.Has("abcd"), "the adopted source still previews")
+		AssertEqual(PersonalFileControls.ForPath(Fixture.file).ActiveCount(), PersonalFileControls.ActiveCount(),
+			"the menu counts only the adopted source")
+	} finally _PFC_Cleanup(Fixture)
+}
+Test("personal-file-controls: a refused source reaches neither the engine nor the preview (personal-identity-gate)",
+	_PFC_UnadmittedSourceNeverRegisters)
+
 _PFC_NeutralProjectionIsNotAdmission() {
 	Group := 'hotstrings.groups."personal-file:632e746f6d6c"'
 	Section := 'hotstrings.modules."personal-file:632e746f6d6c"."é.foo"'
