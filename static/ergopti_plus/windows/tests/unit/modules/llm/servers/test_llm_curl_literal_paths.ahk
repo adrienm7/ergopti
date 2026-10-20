@@ -179,6 +179,7 @@ _CLP_DuplicateNativeHandle(Handle) {
 _CLP_RecordJob(Witness, State, Native) {
 	AssertEqual(0, Witness["job"], "one native creation owns one exact Job")
 	Witness["job"] := _CLP_DuplicateNativeHandle(Native["JobHandle"])
+	Witness["root"] := _CLP_DuplicateNativeHandle(Native["ProcessHandle"])
 }
 
 _CLP_JobFactory(Witness, Application, Command, Environment, Directory, Done, Chunk?, BeforeAdopt?,
@@ -197,6 +198,43 @@ _CLP_JobProcessCount(Job) {
 	AssertTrue(DllCall("Kernel32\QueryInformationJobObject", "Ptr", Job, "Int", 1,
 		"Ptr", Info, "UInt", Info.Size, "Ptr", 0, "Int"), "the independent native Job accounting query must succeed")
 	return NumGet(Info, 40, "UInt")
+}
+
+_CLP_JobProcessIds(Job) {
+	Info := Buffer(8 + 64 * A_PtrSize, 0)
+	AssertTrue(DllCall("Kernel32\QueryInformationJobObject", "Ptr", Job, "Int", 3,
+		"Ptr", Info, "UInt", Info.Size, "Ptr", 0, "Int"), "the complete bounded native Job PID census must succeed")
+	Assigned := NumGet(Info, 0, "UInt"), Count := NumGet(Info, 4, "UInt")
+	AssertTrue(Count <= 64)
+	AssertEqual(Assigned, Count, "the native census must include every assigned process")
+	Ids := Map()
+	loop Count {
+		Pid := NumGet(Info, 8 + (A_Index - 1) * A_PtrSize, "UPtr")
+		AssertTrue(Pid > 0 && !Ids.Has(Pid), "the complete Job census contains distinct positive identities")
+		Ids[Pid] := true
+	}
+	return Ids
+}
+
+_CLP_RecordJobImages(Job, Ids) {
+	for Pid in Ids {
+		Handle := DllCall("Kernel32\OpenProcess", "UInt", 0x1000, "Int", false, "UInt", Pid, "Ptr")
+		if !Handle {
+			_TestAppendProgress("# curl-owned-job pid=" . Pid . " image_observation_error=" . A_LastError)
+			continue
+		}
+		try {
+			Member := -1
+			AssertTrue(DllCall("Kernel32\IsProcessInJob", "Ptr", Handle, "Ptr", Job, "Int*", &Member, "Int"))
+			Name := Buffer(32768 * 2, 0), Length := 32768
+			if DllCall("Kernel32\QueryFullProcessImageNameW", "Ptr", Handle, "UInt", 0,
+					"Ptr", Name, "UInt*", &Length, "Int")
+				_TestAppendProgress("# curl-owned-job pid=" . Pid . " current_member=" . Member
+					. " image=" . JsonStringLiteral(StrGet(Name, Length, "UTF-16")))
+			else
+				_TestAppendProgress("# curl-owned-job pid=" . Pid . " image_observation_error=" . A_LastError)
+		} finally DllCall("Kernel32\CloseHandle", "Ptr", Handle)
+	}
 }
 
 /** Opens a private loopback peer which accepts HTTP but sends no response. */
@@ -236,7 +274,7 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 	DirCreate(Root)
 	Owner := 0, Child := 0, Peer := -1, Listener := 0
 	ControlOwner := 0, ControlWitness := 0, ControlListener := 0
-	Witness := Map("job", 0)
+	Witness := Map("job", 0, "root", 0)
 	try {
 		Listener := _CLP_OpenSilentListener()
 		CurlCommand := _Q(A_WinDir . "\System32\curl.exe")
@@ -262,7 +300,21 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 		AssertEqual(0x102, DllCall("Kernel32\WaitForSingleObject", "Ptr", Child, "UInt", 0, "UInt"),
 			"the retained curl transfer must still await HTTP before cancellation")
 		if WithJobWitness {
-			AssertEqual(2, _CLP_JobProcessCount(Witness["job"]), "the private Job must include both cmd and its curl child")
+			Ids := _CLP_JobProcessIds(Witness["job"])
+			RootId := DllCall("Kernel32\GetProcessId", "Ptr", Witness["root"], "UInt")
+			CurlId := DllCall("Kernel32\GetProcessId", "Ptr", Child, "UInt")
+			AssertEqual(Pid, RootId, "the census observes the exact wrapper retained before resume")
+			AssertTrue(CurlId > 0 && CurlId != RootId && Ids.Has(RootId) && Ids.Has(CurlId),
+				"the complete Job census must contain the distinct exact wrapper and curl identities")
+			for Handle in [Witness["root"], Child] {
+				Member := -1
+				AssertTrue(DllCall("Kernel32\IsProcessInJob", "Ptr", Handle, "Ptr", Witness["job"], "Int*", &Member, "Int"))
+				AssertEqual(1, Member, "both retained exact process objects must belong to the request Job")
+			}
+			Active := _CLP_JobProcessCount(Witness["job"])
+			AssertTrue(Active >= 2, "the Job must account for the blocked wrapper and curl, including any native auxiliary processes")
+			_TestAppendProgress("# curl-owned-job active=" . Active . " census=" . Ids.Count)
+			_CLP_RecordJobImages(Witness["job"], Ids)
 			ControlListener := _CLP_OpenSilentListener()
 			ControlCommand := _Q(A_WinDir . "\System32\curl.exe")
 				. " --disable --silent --globoff --noproxy * --max-time 20 --proto =http "
@@ -282,6 +334,12 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 		; Do not keep a process reference while waiting for final Job accounting.
 		AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Child, "Int"))
 		Child := 0
+		if Witness["root"] {
+			AssertEqual(0, DllCall("Kernel32\WaitForSingleObject", "Ptr", Witness["root"], "UInt", 1000, "UInt"),
+				"the termination request must also retire the exact retained wrapper")
+			AssertTrue(DllCall("Kernel32\CloseHandle", "Ptr", Witness["root"], "Int"))
+			Witness["root"] := 0
+		}
 		Started := DllCall("Kernel32\GetTickCount64", "UInt64")
 		while !Retired && DllCall("Kernel32\GetTickCount64", "UInt64") - Started < 5000 {
 			Sleep(10)
@@ -309,8 +367,11 @@ _CLP_CancelWrappedTransferRetiresRealCurl(WithJobWitness := false) {
 			try _CLP_DrainChild(ControlWitness)
 			finally {
 				try {
-					_CLP_RetireOwner(Owner)
-					_CLP_RetireOwner(ControlOwner)
+					try _CLP_DrainChild(Witness["root"])
+					finally {
+						try _CLP_RetireOwner(Owner)
+						finally _CLP_RetireOwner(ControlOwner)
+					}
 				} finally {
 					if Witness["job"]
 						DllCall("Kernel32\CloseHandle", "Ptr", Witness["job"])
