@@ -7,6 +7,16 @@
 class _OFEP_Fixture {
 	__New(Mode) {
 		this.Mode := Mode
+		; The headless include graph omits the entry's process-priority seed.
+		; Resolve its one canonical declaration before entering the state claim.
+		Driver := _DriverSourceConcat()
+		ActiveDriver := _DriverMaskBlockComments(&Driver)
+		Pattern := 'm)^global DRIVER_BASELINE_PRIORITY_CLASS := "([^"`r`n]+)"$'
+		Assert(RegExMatch(ActiveDriver, Pattern, &Baseline) > 0,
+			"the fixture requires the real entry's process-priority declaration")
+		Assert(!RegExMatch(ActiveDriver, Pattern, , Baseline.Pos + Baseline.Len),
+			"only the unique production declaration may seed fixture priority")
+		this.Baseline := Baseline[1]
 		this.Prepared := false
 		this.TimerFn := 0
 		this.SinkFn := 0
@@ -21,6 +31,7 @@ class _OFEP_Fixture {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
 		global _LLM_Deps_InstallerOwner, _LLM_ManagedBootstrap, _LLM_Deps_PollTimer
 		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, LOGGER_SUB_FILES, _LOGGER_SUB_PENDING, _LOGGER_SUB_PATHS
+		global DRIVER_BASELINE_PRIORITY_CLASS
 		AssertFalse(IsObject(_LLM_Deps_InstallerOwner), "the fixture cannot cancel a foreign installer owner")
 		AssertFalse(IsObject(_LLM_ManagedBootstrap), "the fixture cannot cancel a foreign managed bootstrap")
 		AssertTrue(!IsSet(_LLM_Deps_PollTimer) || !_LLM_Deps_PollTimer, "the fixture cannot stop another poll timer")
@@ -32,12 +43,16 @@ class _OFEP_Fixture {
 		this.Saved := Map("state", _LLM_Deps_State, "checking", _LLM_Deps_Checking, "epoch", _LLM_Deps_Epoch,
 			"message_present", IsSet(_LLM_Deps_FailureMessage), "poll_present", IsSet(_LLM_Deps_PollTimer),
 			"sink", _LOGGER_TEST_SINK, "repeat", _LOGGER_REPEAT_ENABLED,
+			"baseline_present", IsSet(DRIVER_BASELINE_PRIORITY_CLASS),
 			"installer", _LLM_Deps_InstallerOwner, "managed", _LLM_ManagedBootstrap)
+		if this.Saved["baseline_present"]
+			this.Saved["baseline"] := DRIVER_BASELINE_PRIORITY_CLASS
 		if this.Saved["message_present"]
 			this.Saved["message"] := _LLM_Deps_FailureMessage
 		if this.Saved["poll_present"]
 			this.Saved["poll"] := _LLM_Deps_PollTimer
 		this.Prepared := true
+		DRIVER_BASELINE_PRIORITY_CLASS := this.Baseline
 		_ResetLogger()
 		LOGGER_SUB_FILES := Map(), _LOGGER_SUB_PENDING := Map(), _LOGGER_SUB_PATHS := Map()
 		_LOGGER_REPEAT_ENABLED := false
@@ -97,6 +112,7 @@ class _OFEP_Fixture {
 		this.PriorityEpoch := _LLM_Deps_Epoch
 		try {
 			AssertFalse(A_IsCritical, "the priority port must remain outside the state claim")
+			AssertEqual(this.Baseline, Priority, "the real publication must pass its canonical baseline to the observer")
 			ProcessSetPriority(Priority)
 			if this.Mode == "priority"
 				this.WaitForCancellation("failed")
@@ -115,7 +131,7 @@ class _OFEP_Fixture {
 	}
 	Close() {
 		global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch, _LLM_Deps_PollTimer
-		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED
+		global _LOGGER_TEST_SINK, _LOGGER_REPEAT_ENABLED, DRIVER_BASELINE_PRIORITY_CLASS
 		if HasMethod(this.TimerFn, "Call")
 			SetTimer(this.TimerFn, 0)
 		if !this.Prepared
@@ -136,10 +152,19 @@ class _OFEP_Fixture {
 			else
 				_LLM_Deps_PollTimer := unset
 		} finally {
+			if this.Saved["baseline_present"]
+				DRIVER_BASELINE_PRIORITY_CLASS := this.Saved["baseline"]
+			else
+				DRIVER_BASELINE_PRIORITY_CLASS := unset
 			Restored := DllCall("SetPriorityClass", "Ptr", DllCall("GetCurrentProcess", "Ptr"), "UInt", this.Priority, "Int")
 			this.TimerFn := 0
 			this.SinkFn := 0
 			AssertTrue(Restored, "the fixture must restore its original native priority")
+			AssertEqual(this.Saved["baseline_present"], IsSet(DRIVER_BASELINE_PRIORITY_CLASS),
+				"the fixture must preserve the entry seed's assigned or unset lifetime")
+			if this.Saved["baseline_present"]
+				AssertEqual(this.Saved["baseline"], DRIVER_BASELINE_PRIORITY_CLASS,
+					"the fixture must restore the exact previous priority declaration")
 		}
 	}
 }
@@ -147,8 +172,8 @@ class _OFEP_Fixture {
 _OFEP_Case(Mode) {
 	global _LLM_Deps_State, _LLM_Deps_FailureMessage, _LLM_Deps_Checking, _LLM_Deps_Epoch
 	global _LLM_Deps_InstallerOwner, _LLM_ManagedBootstrap
-	PreviousCritical := Critical("On")
 	F := _OFEP_Fixture(Mode)
+	PreviousCritical := Critical("On")
 	try {
 		F.Setup()
 		Captured := Mode == "stale" ? F.Epoch - 1 : Mode == "legacy" ? 0 : F.Epoch
