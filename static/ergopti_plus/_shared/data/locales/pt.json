@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Este coletor Windows não está disponível no macOS e Linux.",
 	"healthcheck.collection.guide": "Digite o texto de teste abaixo. Mantenha e solte Ctrl e depois Shift separadamente, com o campo de texto ativo.",
 	"healthcheck.collection.visual": "Consigo ler claramente o texto de teste.",
-	"healthcheck.collection.failed": "A coleta falhou. Verifique a pasta local para operações incompletas."
+	"healthcheck.collection.failed": "A coleta falhou. Verifique a pasta local para operações incompletas.",
+	"menu.caps_word.auto_off": "CapsWord: desativação automática",
+	"menu.caps_word.idle_timeout": "Desativar após uma pausa",
+	"menu.caps_word.idle_timeout_never": "Nunca (infinito)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Desativar com estes delimitadores",
+	"menu.caps_word.pointer_header": "Desativar ao usar o ponteiro",
+	"menu.caps_word.pointer.gesture": "Gesto ou toque no trackpad",
+	"menu.caps_word.pointer.pointer_motion": "Movimento do ponteiro ou rolagem",
+	"menu.caps_word.pointer.left_click": "Clique esquerdo",
+	"menu.caps_word.pointer.right_click": "Clique direito",
+	"menu.caps_word.pointer.middle_click": "Clique do meio",
+	"menu.caps_word.pointer.other_buttons": "Outros botões do rato",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Não no Windows: o sistema guarda os gestos do touchpad para si e não transmite nenhum toque ao Ergopti. A rolagem com dois dedos continua a contar como rolagem."
 }

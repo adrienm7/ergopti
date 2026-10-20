@@ -12,6 +12,30 @@
 		"evidence": []
 	},
 	"evidence_groups": {
+		"caps_word_auto_off": {
+			"members": [
+				"shortcuts.caps_word.idle_timeout_seconds",
+				"shortcuts.caps_word.terminators",
+				"shortcuts.caps_word.pointer.gesture",
+				"shortcuts.caps_word.pointer.pointer_motion",
+				"shortcuts.caps_word.pointer.left_click",
+				"shortcuts.caps_word.pointer.right_click",
+				"shortcuts.caps_word.pointer.middle_click",
+				"shortcuts.caps_word.pointer.other_buttons"
+			],
+			"registered": "no",
+			"production_caller": "no",
+			"persisted": "no",
+			"applied": "no",
+			"hardware_proven": "no",
+			"proof_tier": "unit",
+			"intentional": false,
+			"evidence": [
+				"static/ergopti_plus/_shared/lua/caps_word/auto_off.lua",
+				"static/ergopti_plus/_shared/lua/test/caps_word_auto_off_contract.lua",
+				"static/ergopti_plus/_shared/tests/corpus/caps_word/auto_off_vectors.json"
+			]
+		},
 		"agent_settings": {
 			"members": [
 				"llm.agent_system1",

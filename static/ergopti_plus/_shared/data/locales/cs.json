@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Tento kolektor Windows není dostupný na macOS a Linuxu.",
 	"healthcheck.collection.guide": "Napište níže uvedený zkušební text. V aktivním textovém poli zvlášť podržte a uvolněte Ctrl a potom Shift.",
 	"healthcheck.collection.visual": "Zkušební text mohu jasně přečíst.",
-	"healthcheck.collection.failed": "Shromažďování selhalo. Zkontrolujte nedokončené operace v místní složce."
+	"healthcheck.collection.failed": "Shromažďování selhalo. Zkontrolujte nedokončené operace v místní složce.",
+	"menu.caps_word.auto_off": "CapsWord: automatické vypnutí",
+	"menu.caps_word.idle_timeout": "Vypnout po pauze",
+	"menu.caps_word.idle_timeout_never": "Nikdy (bez omezení)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Vypnout u těchto oddělovačů",
+	"menu.caps_word.pointer_header": "Vypnout při použití ukazatele",
+	"menu.caps_word.pointer.gesture": "Gesto nebo dotyk na touchpadu",
+	"menu.caps_word.pointer.pointer_motion": "Pohyb ukazatele nebo posouvání",
+	"menu.caps_word.pointer.left_click": "Levé kliknutí",
+	"menu.caps_word.pointer.right_click": "Pravé kliknutí",
+	"menu.caps_word.pointer.middle_click": "Prostřední kliknutí",
+	"menu.caps_word.pointer.other_buttons": "Ostatní tlačítka myši",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Ne na Windows: systém si gesta touchpadu ponechává a Ergopti nepředává žádný dotyk. Posouvání dvěma prsty se stále počítá jako posouvání."
 }

@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Questo raccoglitore Windows non è disponibile su macOS e Linux.",
 	"healthcheck.collection.guide": "Digita il testo di prova qui sotto. Tieni premuto e rilascia Ctrl, poi Shift, separatamente, con il campo di testo attivo.",
 	"healthcheck.collection.visual": "Riesco a leggere chiaramente il testo di prova.",
-	"healthcheck.collection.failed": "La raccolta è fallita. Controlla la cartella locale per le operazioni incomplete."
+	"healthcheck.collection.failed": "La raccolta è fallita. Controlla la cartella locale per le operazioni incomplete.",
+	"menu.caps_word.auto_off": "CapsWord: disattivazione automatica",
+	"menu.caps_word.idle_timeout": "Disattiva dopo una pausa",
+	"menu.caps_word.idle_timeout_never": "Mai (infinito)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Disattiva con questi delimitatori",
+	"menu.caps_word.pointer_header": "Disattiva quando si usa il puntatore",
+	"menu.caps_word.pointer.gesture": "Gesto o tocco sul trackpad",
+	"menu.caps_word.pointer.pointer_motion": "Movimento del puntatore o scorrimento",
+	"menu.caps_word.pointer.left_click": "Clic sinistro",
+	"menu.caps_word.pointer.right_click": "Clic destro",
+	"menu.caps_word.pointer.middle_click": "Clic centrale",
+	"menu.caps_word.pointer.other_buttons": "Altri pulsanti del mouse",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Non su Windows: il sistema tiene per sé i gesti del touchpad e non trasmette alcun tocco a Ergopti. Lo scorrimento a due dita conta comunque come scorrimento."
 }

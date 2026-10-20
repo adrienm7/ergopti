@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "אוסף האבחון של Windows אינו זמין ב-macOS וב-Linux.",
 	"healthcheck.collection.guide": "הקלידו את טקסט הבדיקה שלהלן. החזיקו ושחררו Ctrl, ואז Shift, בנפרד, כששדה הטקסט פעיל.",
 	"healthcheck.collection.visual": "אני יכול לקרוא בבירור את טקסט הבדיקה.",
-	"healthcheck.collection.failed": "האיסוף נכשל. בדקו בתיקייה המקומית אילו פעולות לא הושלמו."
+	"healthcheck.collection.failed": "האיסוף נכשל. בדקו בתיקייה המקומית אילו פעולות לא הושלמו.",
+	"menu.caps_word.auto_off": "CapsWord: כיבוי אוטומטי",
+	"menu.caps_word.idle_timeout": "כיבוי אחרי הפסקה",
+	"menu.caps_word.idle_timeout_never": "אף פעם (ללא הגבלה)",
+	"menu.caps_word.idle_timeout_unit": "ש׳",
+	"menu.caps_word.terminators_header": "כיבוי בתווים מפרידים אלה",
+	"menu.caps_word.pointer_header": "כיבוי בעת שימוש בסמן",
+	"menu.caps_word.pointer.gesture": "מחווה או נגיעה במשטח המגע",
+	"menu.caps_word.pointer.pointer_motion": "תזוזת הסמן או גלילה",
+	"menu.caps_word.pointer.left_click": "לחיצה שמאלית",
+	"menu.caps_word.pointer.right_click": "לחיצה ימנית",
+	"menu.caps_word.pointer.middle_click": "לחיצה אמצעית",
+	"menu.caps_word.pointer.other_buttons": "לחצני עכבר אחרים",
+	"platform_reason.caps_word_gestures_stay_with_windows": "לא ב-Windows: המערכת שומרת לעצמה את מחוות משטח המגע ואינה מעבירה שום נגיעה ל-Ergopti. גלילה בשתי אצבעות עדיין נחשבת לגלילה."
 }

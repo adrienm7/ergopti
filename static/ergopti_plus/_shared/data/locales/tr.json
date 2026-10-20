@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Bu Windows toplayıcısı macOS ve Linux üzerinde kullanılamaz.",
 	"healthcheck.collection.guide": "Aşağıdaki test metnini yazın. Metin alanı odaktayken önce Ctrl, sonra Shift tuşunu ayrı ayrı basılı tutup bırakın.",
 	"healthcheck.collection.visual": "Test metnini net olarak okuyabiliyorum.",
-	"healthcheck.collection.failed": "Toplama başarısız oldu. Tamamlanmamış işlemler için yerel klasörü inceleyin."
+	"healthcheck.collection.failed": "Toplama başarısız oldu. Tamamlanmamış işlemler için yerel klasörü inceleyin.",
+	"menu.caps_word.auto_off": "CapsWord: otomatik kapanma",
+	"menu.caps_word.idle_timeout": "Duraklamadan sonra kapat",
+	"menu.caps_word.idle_timeout_never": "Asla (sınırsız)",
+	"menu.caps_word.idle_timeout_unit": "sn",
+	"menu.caps_word.terminators_header": "Bu ayırıcılarda kapat",
+	"menu.caps_word.pointer_header": "İşaretçi kullanılınca kapat",
+	"menu.caps_word.pointer.gesture": "İzleme dörtgeninde hareket veya dokunma",
+	"menu.caps_word.pointer.pointer_motion": "İşaretçi hareketi veya kaydırma",
+	"menu.caps_word.pointer.left_click": "Sol tık",
+	"menu.caps_word.pointer.right_click": "Sağ tık",
+	"menu.caps_word.pointer.middle_click": "Orta tık",
+	"menu.caps_word.pointer.other_buttons": "Diğer fare düğmeleri",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Windows'ta yok: sistem dokunmatik yüzey hareketlerini kendine saklar ve Ergopti'ye hiçbir dokunuş iletmez. İki parmakla kaydırma yine kaydırma sayılır."
 }

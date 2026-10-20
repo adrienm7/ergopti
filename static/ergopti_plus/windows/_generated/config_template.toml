@@ -601,6 +601,21 @@ number_row_right_2 = "none"
 
 
 
+[shortcuts.caps_word]
+idle_timeout_seconds = 0
+terminators = ["space", "tab", "enter"]
+
+
+
+[shortcuts.caps_word.pointer]
+pointer_motion = true
+left_click = true
+right_click = true
+middle_click = true
+other_buttons = true
+
+
+
 
 
 [gestures]

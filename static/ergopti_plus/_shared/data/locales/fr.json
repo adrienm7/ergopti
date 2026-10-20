@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Ce collecteur Windows est indisponible sur macOS et Linux.",
 	"healthcheck.collection.guide": "Tapez le texte synthétique ci-dessous. Maintenez puis relâchez Ctrl, puis Shift, séparément, avec le champ de texte actif.",
 	"healthcheck.collection.visual": "Je peux lire clairement le texte synthétique.",
-	"healthcheck.collection.failed": "La collecte a échoué. Consultez le dossier local pour les opérations inachevées."
+	"healthcheck.collection.failed": "La collecte a échoué. Consultez le dossier local pour les opérations inachevées.",
+	"menu.caps_word.auto_off": "CapsWord : désactivation automatique",
+	"menu.caps_word.idle_timeout": "Désactiver après une pause",
+	"menu.caps_word.idle_timeout_never": "Jamais (infini)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Désactiver sur ces délimiteurs",
+	"menu.caps_word.pointer_header": "Désactiver à l'utilisation du pointeur",
+	"menu.caps_word.pointer.gesture": "Geste ou contact sur le pavé tactile",
+	"menu.caps_word.pointer.pointer_motion": "Déplacement du pointeur ou défilement",
+	"menu.caps_word.pointer.left_click": "Clic gauche",
+	"menu.caps_word.pointer.right_click": "Clic droit",
+	"menu.caps_word.pointer.middle_click": "Clic du milieu",
+	"menu.caps_word.pointer.other_buttons": "Autres boutons de la souris",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Pas sous Windows : le système garde les gestes du pavé tactile pour lui et ne transmet aucun contact à Ergopti. Le défilement à deux doigts compte toujours comme un défilement."
 }

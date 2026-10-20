@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "此 Windows 收集器无法在 macOS 和 Linux 上使用。",
 	"healthcheck.collection.guide": "输入下方测试文本。保持文本框处于焦点，先按住并松开 Ctrl，再单独按住并松开 Shift。",
 	"healthcheck.collection.visual": "我能清楚地阅读测试文本。",
-	"healthcheck.collection.failed": "收集失败。请查看本地文件夹中的未完成操作。"
+	"healthcheck.collection.failed": "收集失败。请查看本地文件夹中的未完成操作。",
+	"menu.caps_word.auto_off": "CapsWord：自动关闭",
+	"menu.caps_word.idle_timeout": "停顿后关闭",
+	"menu.caps_word.idle_timeout_never": "从不（无限）",
+	"menu.caps_word.idle_timeout_unit": "秒",
+	"menu.caps_word.terminators_header": "遇到这些分隔符时关闭",
+	"menu.caps_word.pointer_header": "使用指针时关闭",
+	"menu.caps_word.pointer.gesture": "触控板手势或触摸",
+	"menu.caps_word.pointer.pointer_motion": "移动指针或滚动",
+	"menu.caps_word.pointer.left_click": "左键单击",
+	"menu.caps_word.pointer.right_click": "右键单击",
+	"menu.caps_word.pointer.middle_click": "中键单击",
+	"menu.caps_word.pointer.other_buttons": "其他鼠标按键",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Windows 上没有：系统自行处理触控板手势，不会把任何触摸传给 Ergopti。双指滚动仍算作滚动。"
 }

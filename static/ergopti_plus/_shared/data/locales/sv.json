@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Den här Windows-insamlaren är inte tillgänglig på macOS och Linux.",
 	"healthcheck.collection.guide": "Skriv testtexten nedan. Håll och släpp Ctrl och sedan Shift var för sig med textfältet aktivt.",
 	"healthcheck.collection.visual": "Jag kan tydligt läsa testtexten.",
-	"healthcheck.collection.failed": "Insamlingen misslyckades. Kontrollera den lokala mappen för ofullständiga åtgärder."
+	"healthcheck.collection.failed": "Insamlingen misslyckades. Kontrollera den lokala mappen för ofullständiga åtgärder.",
+	"menu.caps_word.auto_off": "CapsWord: automatisk avaktivering",
+	"menu.caps_word.idle_timeout": "Avaktivera efter en paus",
+	"menu.caps_word.idle_timeout_never": "Aldrig (oändligt)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Avaktivera vid dessa avgränsare",
+	"menu.caps_word.pointer_header": "Avaktivera när pekaren används",
+	"menu.caps_word.pointer.gesture": "Gest eller beröring på styrplattan",
+	"menu.caps_word.pointer.pointer_motion": "Pekarrörelse eller rullning",
+	"menu.caps_word.pointer.left_click": "Vänsterklick",
+	"menu.caps_word.pointer.right_click": "Högerklick",
+	"menu.caps_word.pointer.middle_click": "Mittenklick",
+	"menu.caps_word.pointer.other_buttons": "Andra musknappar",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Inte på Windows: systemet behåller styrplattans gester själv och skickar ingen beröring vidare till Ergopti. Rullning med två fingrar räknas fortfarande som rullning."
 }

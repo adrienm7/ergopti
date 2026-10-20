@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "यह Windows संग्राहक macOS और Linux पर उपलब्ध नहीं है।",
 	"healthcheck.collection.guide": "नीचे दिया परीक्षण पाठ टाइप करें। पाठ फ़ील्ड सक्रिय रखते हुए पहले Ctrl और फिर Shift को अलग-अलग दबाकर छोड़ें।",
 	"healthcheck.collection.visual": "मैं परीक्षण पाठ स्पष्ट रूप से पढ़ सकता हूँ।",
-	"healthcheck.collection.failed": "संग्रह विफल हुआ। अधूरे कार्यों के लिए स्थानीय फ़ोल्डर देखें।"
+	"healthcheck.collection.failed": "संग्रह विफल हुआ। अधूरे कार्यों के लिए स्थानीय फ़ोल्डर देखें।",
+	"menu.caps_word.auto_off": "CapsWord: स्वचालित बंद होना",
+	"menu.caps_word.idle_timeout": "विराम के बाद बंद करें",
+	"menu.caps_word.idle_timeout_never": "कभी नहीं (असीमित)",
+	"menu.caps_word.idle_timeout_unit": "से.",
+	"menu.caps_word.terminators_header": "इन विभाजकों पर बंद करें",
+	"menu.caps_word.pointer_header": "पॉइंटर के उपयोग पर बंद करें",
+	"menu.caps_word.pointer.gesture": "ट्रैकपैड जेस्चर या स्पर्श",
+	"menu.caps_word.pointer.pointer_motion": "पॉइंटर की हलचल या स्क्रॉलिंग",
+	"menu.caps_word.pointer.left_click": "बायाँ क्लिक",
+	"menu.caps_word.pointer.right_click": "दायाँ क्लिक",
+	"menu.caps_word.pointer.middle_click": "मध्य क्लिक",
+	"menu.caps_word.pointer.other_buttons": "माउस के अन्य बटन",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Windows पर नहीं: सिस्टम टचपैड जेस्चर अपने पास रखता है और Ergopti को कोई स्पर्श नहीं भेजता। दो उँगलियों से स्क्रॉल करना फिर भी स्क्रॉलिंग गिना जाता है।"
 }

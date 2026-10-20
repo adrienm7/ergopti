@@ -3371,5 +3371,18 @@
 	"healthcheck.collection.unavailable": "Ten kolektor Windows jest niedostępny na macOS i Linuksie.",
 	"healthcheck.collection.guide": "Wpisz poniższy tekst testowy. W aktywnym polu tekstowym osobno przytrzymaj i zwolnij Ctrl, a potem Shift.",
 	"healthcheck.collection.visual": "Mogę wyraźnie odczytać tekst testowy.",
-	"healthcheck.collection.failed": "Zbieranie nie powiodło się. Sprawdź niedokończone operacje w lokalnym folderze."
+	"healthcheck.collection.failed": "Zbieranie nie powiodło się. Sprawdź niedokończone operacje w lokalnym folderze.",
+	"menu.caps_word.auto_off": "CapsWord: automatyczne wyłączanie",
+	"menu.caps_word.idle_timeout": "Wyłącz po przerwie",
+	"menu.caps_word.idle_timeout_never": "Nigdy (bez limitu)",
+	"menu.caps_word.idle_timeout_unit": "s",
+	"menu.caps_word.terminators_header": "Wyłącz przy tych separatorach",
+	"menu.caps_word.pointer_header": "Wyłącz przy użyciu wskaźnika",
+	"menu.caps_word.pointer.gesture": "Gest lub dotknięcie gładzika",
+	"menu.caps_word.pointer.pointer_motion": "Ruch wskaźnika lub przewijanie",
+	"menu.caps_word.pointer.left_click": "Lewy przycisk",
+	"menu.caps_word.pointer.right_click": "Prawy przycisk",
+	"menu.caps_word.pointer.middle_click": "Środkowy przycisk",
+	"menu.caps_word.pointer.other_buttons": "Inne przyciski myszy",
+	"platform_reason.caps_word_gestures_stay_with_windows": "Nie w Windows: system zatrzymuje gesty gładzika dla siebie i nie przekazuje Ergopti żadnego dotknięcia. Przewijanie dwoma palcami nadal liczy się jako przewijanie."
 }
