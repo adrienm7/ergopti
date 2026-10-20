@@ -243,6 +243,29 @@ Test("menu reload replay: a refused reload runs the held command in place",
 	(*) => _MRR_Run(_MRR_RefusedReloadBody))
 
 
+; Declared provider actions take no arguments. Observe the actual native delivery
+; at the rendered row, then let the real provider wrapper call that domain action.
+_MRRF_ProviderDelivery(Receipt, Delivery, Args*) {
+	PreviousArgs := Receipt.Args
+	Receipt.Args := Args
+	try return Delivery.Call(Args*)
+	finally Receipt.Args := PreviousArgs
+}
+
+_MRRF_ProviderAction(Runs, Who, Receipt) {
+	AssertTrue(Receipt.Args is Array, "the real native row must observe its arguments before the zero-argument provider action")
+	return _MRR_Command(Runs, Who, Receipt.Args*)
+}
+
+_MRRF_ProviderRow(Fixture, Who, CommandId) {
+	Receipt := {Args: 0}
+	Row := MenuRenderer_CommandRow("script_control_group", CommandId,
+		Map(CommandId, _MRRF_ProviderAction.Bind(Fixture.Runs, Who, Receipt)))
+	AssertTrue(Row is Map, "the canonical branch uses a real declared action")
+	Row["action"] := _MRRF_ProviderDelivery.Bind(Receipt, Row["action"])
+	return Row
+}
+
 ; A detached rebuild keeps the old child alive through the retry's native Args.
 ; Its token may remain valid, but it no longer owns the command the current tray
 ; offers. A refused reload must resolve the held row instead of invoking it.
@@ -254,9 +277,7 @@ _MRRF_Build(Fixture, Who, Canonical) {
 		return Tray
 	}
 	Sub := Menu(), Root := Menu()
-	Row := MenuRenderer_CommandRow("script_control_group", "scope_restore",
-		Map("scope_restore", _MRR_Command.Bind(Fixture.Runs, Who)))
-	AssertTrue(Row is Map, "the canonical branch uses a real declared action")
+	Row := _MRRF_ProviderRow(Fixture, Who, "scope_restore")
 	Row["label"] := "Toggle"
 	AssertEqual(1, MenuRenderer_AppendRows(Sub, "refused reload fixture", "restore", [Row]))
 	Root.Add("Features", Sub), Fixture.Menus.Push(Sub, Root)
@@ -292,9 +313,7 @@ _MRRF_Refused(Canonical, Mode, Fixture) {
 		case "disabled-parent": Current.Root.Disable("Features")
 		case "moved-context": Current.Root.Rename("Features", "Other context")
 		case "other-action":
-			Row := MenuRenderer_CommandRow("script_control_group", "scope_clear",
-				Map("scope_clear", _MRR_Command.Bind(Fixture.Runs, "wrong action")))
-			AssertTrue(Row is Map)
+			Row := _MRRF_ProviderRow(Fixture, "wrong action", "scope_clear")
 			Row["label"] := "Toggle"
 			AssertEqual(1, MenuRenderer_AppendRows(Current.Sub, "refused reload fixture", "clear", [Row]))
 			AssertFalse(_MenuReloadReplayIdentityOf(_MenuItemIdAtPosition(Current.Sub, 0)) == HeldPath.ReplayIdentity,
