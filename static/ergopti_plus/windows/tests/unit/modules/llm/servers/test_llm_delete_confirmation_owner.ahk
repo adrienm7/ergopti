@@ -75,10 +75,12 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 	global _LLM_AuxGeneration, _LLM_AuxOwnerCounter, _LLM_AuxOwners
 	global _LLM_AuxCleanupDebt, _LLM_AuxCleanupDebtCounter
 	global _LLM_Menu_DeleteReconcilePending
+	HadPending := IsSet(_LLM_Menu_DeleteReconcilePending)
+	SavedPending := HadPending ? _LLM_Menu_DeleteReconcilePending : unset
 	Saved := { Menu: _LLM_Menu, Origin: LLM_OLLAMA_BASE_URL, Managed: _LLM_ManagedBootstrap,
 		Generation: _LLM_AuxGeneration, Counter: _LLM_AuxOwnerCounter, Owners: _LLM_AuxOwners,
 		Debt: _LLM_AuxCleanupDebt, DebtCounter: _LLM_AuxCleanupDebtCounter,
-		Pending: _LLM_Menu_DeleteReconcilePending, Suspended: A_IsSuspended }
+		Suspended: A_IsSuspended }
 	PreviousCritical := Critical("On")
 	Dir := _LTATO_UniqueDir("delete_confirmation")
 	State := { Mode: Mode, Tag: "private-confirmed-model:latest", ConfirmCalls: 0,
@@ -141,10 +143,15 @@ _LDCO_ConfirmationRetainsOwner(Mode) {
 		_LLM_AuxOwners := Saved.Owners
 		_LLM_AuxCleanupDebt := Saved.Debt
 		_LLM_AuxCleanupDebtCounter := Saved.DebtCounter
-		_LLM_Menu_DeleteReconcilePending := Saved.Pending
+		_LLM_Menu_DeleteReconcilePending := HadPending ? SavedPending : unset
 		Suspend(Saved.Suspended)
 		Critical(PreviousCritical)
 	}
+	AssertEqual(HadPending, IsSet(_LLM_Menu_DeleteReconcilePending),
+		"The fixture must preserve whether production initialized reconciliation state.")
+	if HadPending
+		AssertTrue(_LLM_Menu_DeleteReconcilePending == SavedPending,
+			"The fixture must restore the exact pre-existing reconciliation owner.")
 }
 for _LDCO_Mode in ["yes", "disabled", "no", "pause", "retired", "backend", "endpoint", "payload-endpoint", "poll-endpoint", "confirm-error"]
 	Test("Ollama delete confirmation: " . _LDCO_Mode . " (llm-delete-confirmation-owner)",
