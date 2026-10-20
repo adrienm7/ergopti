@@ -58,4 +58,63 @@ assert.throws(() =>
 	)
 );
 
-console.log(`AHK module matrix: OK (${groups.length} groups)`);
+// ─────────────────────────────────────────────────
+// Every registering test file belongs to exactly one declared category
+// ─────────────────────────────────────────────────
+const entries = [...table[1].matchAll(/^\t\["([a-z][a-z0-9-]*)", "((?:[^"\\]|\\.)*)"\],?$/gm)].map(
+	(match) => ({ name: match[1], pattern: match[2] })
+);
+assert.deepEqual(
+	entries.map((entry) => entry.name),
+	groups,
+	'every category is one literal name and pattern'
+);
+assert.ok(
+	entries.every((entry) => entry.pattern !== ''),
+	'no category is a catch-all: an undeclared file must fail, not land in a default'
+);
+const matchers = entries.map((entry) => ({ name: entry.name, regex: new RegExp(entry.pattern) }));
+/** The category _TestModuleOf picks for a file relative to tests/, or null. */
+function categoryOf(relative) {
+	const found = matchers.find((entry) => entry.regex.test(relative.toLowerCase()));
+	return found ? found.name : null;
+}
+const TESTS = path.join(ROOT, 'static/ergopti_plus/windows/tests');
+const registering = [];
+for (const top of ['unit', 'meta'])
+	(function walk(directory) {
+		for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+			const file = path.join(directory, entry.name);
+			if (entry.isDirectory()) walk(file);
+			else if (entry.name.endsWith('.ahk') && /^\s*Test\(/m.test(fs.readFileSync(file, 'utf8')))
+				registering.push(path.relative(TESTS, file).replace(/\\/g, '/'));
+		}
+	})(path.join(TESTS, top));
+assert.ok(registering.length > 1000, 'the category scan found the registering test files');
+const undeclared = registering.filter((relative) => categoryOf(relative) === null);
+assert.deepEqual(undeclared, [], 'every registering test file belongs to a declared category');
+const sizes = new Map(groups.map((name) => [name, 0]));
+for (const relative of registering)
+	sizes.set(categoryOf(relative), sizes.get(categoryOf(relative)) + 1);
+for (const [name, size] of sizes)
+	assert.ok(size > 0, `category ${name} holds at least one test file`);
+assert.equal(categoryOf('unit/new_area/test_x.ahk'), null, 'a new undeclared folder is refused');
+assert.equal(categoryOf('run_all.ahk'), null, 'the runner itself declares no tests');
+
+// The workflow documents each category in one line beside the matrix.
+const documented = [...body.matchAll(/^ {4}# {3}([a-z][a-z0-9-]*): \S/gm)].map((match) => match[1]);
+assert.deepEqual(documented, groups, 'the Windows unit job documents every category, in order');
+assert.throws(() =>
+	assert.deepEqual(
+		[
+			...body
+				.replace(new RegExp(`^ {4}# {3}${lastGroup}: .*\\n`, 'm'), '')
+				.matchAll(/^ {4}# {3}([a-z][a-z0-9-]*): \S/gm)
+		].map((match) => match[1]),
+		groups
+	)
+);
+
+console.log(
+	`AHK module matrix: OK (${groups.length} categories, ${registering.length} registering files, none undeclared)`
+);

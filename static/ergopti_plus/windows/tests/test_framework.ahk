@@ -588,44 +588,58 @@ Test(Name, Callback, Interactive := false) {
 
 ; Keep excluded cases outside the execution plan, with explicit diagnostics;
 ; they must never contribute a fabricated successful result to the TAP footer.
-; Module groups for CI: each runner executes one group with --module=<name>.
-; A test belongs to the first group whose pattern matches its registering file
-; (relative to tests/, lower case); "core" takes everything else, so the groups
-; partition the suite and a module's tests keep their relative order. Groups
-; name the domain folders of unit/ (which mirror the driver tree); the
-; heaviest folders are split by file so no group dominates the CI wall time.
-; The split follows measured per-file suite times (the execution manifests'
-; duration_ms), so a light group also carries a heavy file from elsewhere:
-; meta takes the scope cohort, gestures and keylogger, llm-terminal the
-; server panel. Re-measure before moving a file between groups.
+; Test categories for CI: each Windows unit runner executes one category with
+; --module=<name>, so a red job names the kind of test that broke. A test
+; belongs to the first category whose pattern matches its registering file
+; (relative to tests/, lower case); categories follow the domain folders of
+; unit/ (which mirror the driver tree). There is no catch-all: a file that no
+; category declares fails every --module run and the partition test, so a new
+; folder must join or add a category. A category is split only when one runner
+; would be far too long, and then by sub-domain with a name that says it.
 ; unit/test_updater.ahk, unit/updater/ and unit/test_config_scope_manifest.ahk
 ; keep their flat paths because the sealed updater source roster names them.
 global TEST_MODULE_GROUPS := [
-	["meta", "^meta/|^unit/modules/llm/servers/test_local_server_scope_cohort|^unit/modules/(gestures|keylogger)/"],
-	["llm-servers-a", "^unit/modules/llm/servers/test_local_server_(panel_view_preparation|panel_discovery|source_operations|receipt_entry)"],
-	["llm-terminal", "^unit/modules/llm/nav_event_owner/|^unit/modules/llm/servers/test_local_server_panel\.ahk$"],
-	["llm-servers-b", "^unit/modules/llm/servers/"],
+	; Source-scanning meta tests of the whole driver.
+	["meta", "^meta/"],
+	; Local LLM server panel (view preparation, discovery, panel actions).
+	["llm-server-panel", "^unit/modules/llm/servers/test_local_server_panel"],
+	; Every other local and managed LLM server test: sharing, publication, Ollama.
+	["llm-servers", "^unit/modules/llm/servers/"],
+	; LLM terminal navigation owner.
+	["llm-terminal", "^unit/modules/llm/nav_event_owner/"],
+	; The rest of the LLM module: prediction, menus, API clients.
 	["llm", "^unit/modules/llm/"],
+	; Configuration version transitions.
 	["config-transition", "^unit/infra/config/transition/"],
-	["config-scope-a", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
-	["config-scope-b", "^unit/infra/config/scope/"],
-	["config", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
-	["hotstrings", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
-	["keymap", "^unit/(platform/remap|modules/keymap)/"],
-	["core", ""]
+	; Whole-configuration scope: global scope, recommended restore, scope manifest, menus.
+	["config-scope-global", "^unit/infra/config/scope/test_(global_config_scope|restore_recommended_no_confirm|config_scope_menus|config_scope_shortcuts)\.ahk$|^unit/test_config_scope_manifest\.ahk$"],
+	; Per-feature configuration scope: hotstrings, tap-hold, personal files.
+	["config-scope-features", "^unit/infra/config/scope/"],
+	; Configuration storage, TOML and the updater.
+	["config-updater", "^unit/infra/(config|toml)/|^unit/modules/updater/|^unit/updater/|^unit/test_updater\.ahk$"],
+	; Hotstrings, dynamic hotstrings and shortcuts.
+	["hotstrings-shortcuts", "^unit/modules/(hotstrings|dynamic_hotstrings|shortcuts)/"],
+	; Keyboard remapping, layouts and gestures.
+	["keymap-gestures", "^unit/(platform/remap|modules/(keymap|gestures))/"],
+	; Keylogger capture, storage and metrics.
+	["keylogger", "^unit/modules/keylogger/"],
+	; User interface: menus, windows, onboarding, tooltips, healthcheck.
+	["ui", "^unit/ui/"],
+	; Adapters, platform services, shared infrastructure and the test runner.
+	["core", "^unit/(adapters|platform|infra|suite)/"]
 ]
 
-; The module group of a registering test file.
+; The test category of a registering test file; a file no category declares is refused.
 _TestModuleOf(File) {
 	global TEST_MODULE_GROUPS
 	Relative := StrLower(StrReplace(File, "\", "/"))
 	if Position := InStr(Relative, "/windows/tests/")
 		Relative := SubStr(Relative, Position + StrLen("/windows/tests/"))
 	for Group in TEST_MODULE_GROUPS {
-		if Group[2] == "" || RegExMatch(Relative, Group[2])
+		if RegExMatch(Relative, Group[2])
 			return Group[1]
 	}
-	throw Error("The module groups must end with a catch-all.")
+	throw Error("No test category declares " . Relative . "; add it to TEST_MODULE_GROUPS.")
 }
 
 ; Runs the selection backwards when Reverse is set. A test that silently

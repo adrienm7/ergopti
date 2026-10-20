@@ -63,25 +63,44 @@ jobs:
     name: 'Unit tests'
     runs-on: windows-latest
     # The canonical AHK suite is single-threaded and took over 90 minutes on one
-    # runner. Each runner executes one product module group (run_all.ahk
-    # --module, TEST_MODULE_GROUPS in tests/test_framework.ahk); the groups
-    # partition the suite, and the heaviest modules are split by file.
+    # runner. Each runner executes one named test category (run_all.ahk
+    # --module, TEST_MODULE_GROUPS in tests/test_framework.ahk), so a red job
+    # says what kind of test broke. Categories follow the driver's domain
+    # folders, a test belongs to the first one that declares its file, and there
+    # is no catch-all: an undeclared file fails the run. A category is split
+    # only when one runner would be far too long, by sub-domain:
+    #   meta: source-scanning meta tests of the whole driver
+    #   llm-server-panel: local LLM server panel
+    #   llm-servers: other local and managed LLM servers (sharing, Ollama)
+    #   llm-terminal: LLM terminal navigation owner
+    #   llm: the rest of the LLM module (prediction, menus, API clients)
+    #   config-transition: configuration version transitions
+    #   config-scope-global: whole-configuration scope and its manifest
+    #   config-scope-features: per-feature scope (hotstrings, tap-hold, files)
+    #   config-updater: configuration storage, TOML and the updater
+    #   hotstrings-shortcuts: hotstrings, dynamic hotstrings and shortcuts
+    #   keymap-gestures: keyboard remapping, layouts and gestures
+    #   keylogger: keylogger capture, storage and metrics
+    #   ui: menus, windows, onboarding, tooltips and healthcheck
+    #   core: adapters, platform services, shared infrastructure and the runner
     strategy:
       fail-fast: false
       matrix:
         module:
           [
             meta,
-            llm-servers-a,
+            llm-server-panel,
+            llm-servers,
             llm-terminal,
-            llm-servers-b,
             llm,
             config-transition,
-            config-scope-a,
-            config-scope-b,
-            config,
-            hotstrings,
-            keymap,
+            config-scope-global,
+            config-scope-features,
+            config-updater,
+            hotstrings-shortcuts,
+            keymap-gestures,
+            keylogger,
+            ui,
             core
           ]
 
@@ -548,7 +567,7 @@ jobs:
       # JS suite runs on Linux, where this smoke can only skip, so it runs here.
       - name: Run the full-driver startup smoke
         # Whole-driver gates, not module tests: one module runner owns them.
-        if: matrix.module == 'hotstrings'
+        if: matrix.module == 'hotstrings-shortcuts'
         shell: pwsh
         timeout-minutes: 20
         run: |
@@ -561,7 +580,7 @@ jobs:
 
       - name: Test fresh Git clone bootstrap and warm startup
         # Whole-driver gates, not module tests: one module runner owns them.
-        if: matrix.module == 'hotstrings'
+        if: matrix.module == 'hotstrings-shortcuts'
         shell: pwsh
         timeout-minutes: 24
         run: |
