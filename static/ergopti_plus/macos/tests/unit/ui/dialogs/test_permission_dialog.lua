@@ -18,7 +18,7 @@ local ACCESSIBILITY_URL = "x-apple.systempreferences:com.apple.preference.securi
 local BUNDLE_PATH = "/Applications/ErgoptiPlus.app/Contents/Frameworks/Hammerspoon.app"
 
 local MODULES = {
-	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "infra.i18n", "infra.accessibility_wait",
+	"ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.i18n", "infra.accessibility_wait",
 	"adapters.accessibility_permission", "adapters.shell_runner",
 }
 
@@ -109,7 +109,9 @@ local function with_dialog(body)
 		h.dialog = require("ui.permission_dialog")
 		h.permission = require("adapters.accessibility_permission")
 		--- Posts one button action as the page does.
-		function h.click(action) h.post({ body = { action = action } }) end
+		function h.click(action)
+			h.post({ name = h.bridge_name, webView = h.windows[#h.windows], body = { action = action } })
+		end
 		--- Counts the windows still open.
 		function h.open_count()
 			local count = 0
@@ -128,7 +130,7 @@ end
 --- finds nothing, and every deferred focus retry is captured to be drained.
 --- @param body function Receives the harness.
 local function with_untrusted_factory(body)
-	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "infra.deferred_work", "infra.i18n" }
+	local owned = { "ui.permission_dialog", "ui.ui_builder", "ui.webview_close_owner", "ui.webview_controller_pool", "infra.deferred_work", "infra.i18n" }
 	helpers.with_stub_scope(owned, function()
 		local h = { deferred = {}, activations = 0, levels = {}, fronts = {}, shows = 0 }
 		package.loaded["infra.deferred_work"] = {

@@ -14,7 +14,7 @@ local helpers = require("tests.helpers")
 --- Runs a real dialog over native-shaped controller and window boundaries.
 --- @param body function Receives the harness.
 local function with_dialog(body)
-	helpers.with_stub_scope({ "ui.permission_dialog", "ui.ui_builder" }, function()
+	helpers.with_stub_scope({ "ui.permission_dialog", "ui.ui_builder", "ui.webview_controller_pool" }, function()
 		local h = { controllers = {}, windows = {}, references = {}, releases = 0, settings = 0 }
 		package.loaded["ui.ui_builder"] = {
 			get_app_geometry = function() return { width = 560, height = 400 } end,
@@ -136,16 +136,17 @@ helpers.describe("permission dialog controller cleanup", function()
 		end)
 	end)
 
-	helpers.it("releases the old controller before notifying an owner that opens a successor", function()
+	helpers.it("releases the old callback before notifying an owner that opens a successor", function()
 		with_dialog(function(h)
 			local successor
 			helpers.assert_true(h.show(function()
 				helpers.assert_nil(h.references[h.controllers[1]])
 				helpers.assert_true(h.show())
-				successor = h.controllers[2]
+				successor = h.controllers[1]
 			end))
 			helpers.assert_true(h.dialog.close())
 			helpers.assert_true(successor ~= nil)
+			helpers.assert_eq(#h.controllers, 1, "the successor reuses the retained native controller")
 			helpers.assert_true(h.references[successor] ~= nil)
 			helpers.assert_true(h.dialog.is_open())
 			helpers.assert_true(h.dialog.close())
