@@ -70,11 +70,10 @@ _UIWH_DiagnosticsRetention() {
 	global _HC_Gui, _HC_Controller, _HC_WebView, _HC_MsgSub, _HC_Session
 	global _HC_WindowEpoch, _HC_ResetDone, _HC_ReuseKey, _HC_ProbeRun
 	global _HC_Opening, _HC_CloseDuringOpen
-	global _HC_RequestSerial, _HC_PendingSerial, _HC_PendingMode
+	global _HC_RequestSerial, _HC_PendingSerial, _HC_PendingOpen
 	SavedSerial := _HC_RequestSerial
 	SavedPendingSerial := _HC_PendingSerial
-	HadPending := IsSet(_HC_PendingMode)
-	SavedPending := HadPending ? _HC_PendingMode : ""
+	SavedPending := _HC_PendingOpen
 	Saved := Map("gui", IsSet(_HC_Gui) ? _HC_Gui : 0,
 		"controller", IsSet(_HC_Controller) ? _HC_Controller : 0,
 		"webview", IsSet(_HC_WebView) ? _HC_WebView : 0,
@@ -94,14 +93,14 @@ _UIWH_DiagnosticsRetention() {
 		AssertEqual(51, _HC_WindowEpoch, "a stale GUI cannot retire the live singleton")
 		_HC_Opening := true
 		_HC_CloseDuringOpen := false
-		_HC_PendingMode := "report"
+		_HC_PendingOpen := true
 		_HC_PendingSerial := _HC_RequestSerial
 		QueuedSerial := _HC_RequestSerial
 		AssertEqual(1, _HealthCheck_CloseGui(G))
 		AssertTrue(_HC_CloseDuringOpen, "closing during native creation retains the user's intent")
-		AssertFalse(IsSet(_HC_PendingMode), "a user close cancels an earlier queued open")
-		_HC_ResumePending("report", QueuedSerial)
-		AssertFalse(IsSet(_HC_PendingMode), "an already scheduled stale open cannot reopen the window")
+		AssertFalse(_HC_PendingOpen, "a user close cancels an earlier queued open")
+		_HC_ResumePending(QueuedSerial)
+		AssertFalse(_HC_PendingOpen, "an already scheduled stale open cannot reopen the window")
 		_HC_Opening := false
 		AssertTrue(_HC_WindowEpoch > 51)
 		AssertEqual(0, _HC_Session)
@@ -130,7 +129,7 @@ _UIWH_DiagnosticsRetention() {
 		_HC_ResetDone := Saved["reset"], _HC_ReuseKey := Saved["key"], _HC_ProbeRun := Saved["probes"]
 		_HC_Opening := Saved["opening"], _HC_CloseDuringOpen := Saved["close_request"]
 		_HC_RequestSerial := SavedSerial, _HC_PendingSerial := SavedPendingSerial
-		_HC_PendingMode := HadPending ? SavedPending : unset
+		_HC_PendingOpen := SavedPending
 	}
 }
 Test("diagnostics: retained singleton cancels probes and releases on shutdown (ui-warm-reopen)",
@@ -149,29 +148,31 @@ _UIWH_DocumentFence() {
 Test("metrics: native scripts and envelopes own their document (ui-warm-reopen)", _UIWH_DocumentFence)
 
 _UIWH_OpeningDuringRetirement() {
-	global _HC_Retiring, _HC_PendingMode, _HC_RequestSerial, _HC_PendingSerial
+	global _HC_Retiring, _HC_PendingOpen, _HC_RequestSerial, _HC_PendingSerial
 	SavedSerial := _HC_RequestSerial
 	SavedPendingSerial := _HC_PendingSerial
 	SavedRetiring := KLWV.retiring
 	SavedHcRetiring := _HC_Retiring
-	HadPending := IsSet(_HC_PendingMode)
-	SavedPending := HadPending ? _HC_PendingMode : ""
+	SavedPending := _HC_PendingOpen
 	Pending := Map()
 	try {
 		KLWV.retiring := Map("typing", Pending)
 		AssertTrue(KLWV_Open("typing", "new-store"))
 		AssertEqual("new-store", Pending["metrics_dir"], "opening cannot borrow a half-retired host")
 		_HC_Retiring := true
-		HealthCheck_ShowWindow("report")
-		AssertEqual("report", _HC_PendingMode, "diagnostics retain the latest mode until retirement ends")
+		HealthCheck_ShowWindow()
+		AssertTrue(_HC_PendingOpen, "diagnostics retain the latest request until retirement ends")
 		OldSerial := _HC_PendingSerial
-		HealthCheck_ShowWindow("newer-mode")
-		_HC_ResumePending("report", OldSerial)
-		AssertEqual("newer-mode", _HC_PendingMode, "a scheduled predecessor cannot overwrite a newer request")
+		HealthCheck_ShowWindow()
+		NewSerial := _HC_PendingSerial
+		AssertTrue(NewSerial > OldSerial, "the newer request owns the pending serial")
+		_HC_ResumePending(OldSerial)
+		AssertTrue(_HC_PendingOpen, "a scheduled predecessor cannot consume a newer request")
+		AssertEqual(NewSerial, _HC_PendingSerial, "a scheduled predecessor cannot overwrite a newer request")
 	} finally {
 		KLWV.retiring := SavedRetiring
 		_HC_Retiring := SavedHcRetiring
-		_HC_PendingMode := HadPending ? SavedPending : unset
+		_HC_PendingOpen := SavedPending
 		_HC_RequestSerial := SavedSerial, _HC_PendingSerial := SavedPendingSerial
 	}
 }

@@ -15,8 +15,7 @@
  *    the prefilled issue fields, redacted too;
  * 4. unticking "Include details" drops the opt-in values before any export;
  * 5. a probe answer fills its fields; an action result reaches the status
- *    line; the Linux bridge response is routed to the same entry point;
- * 6. report mode opens the preview.
+ *    line; the Linux bridge response is routed to the same entry point.
  * ==============================================================================
  */
 
@@ -237,10 +236,10 @@ function snapshot(detailed) {
 	};
 }
 
-function init(page, detailed, mode) {
+function init(page, detailed) {
 	page.sandbox.window.receiveDiagnostics({
 		type: 'init',
-		config: { schema, redaction, context, mode: mode || null },
+		config: { schema, redaction, context },
 		snapshot: snapshot(detailed)
 	});
 }
@@ -481,7 +480,7 @@ function init(page, detailed, mode) {
 	const page = loadPage();
 	const message = {
 		type: 'init',
-		config: { schema, redaction, context, mode: 'report' },
+		config: { schema, redaction, context },
 		snapshot: snapshot(false)
 	};
 	page.sandbox.window.__hostBridgeResponse(
@@ -491,8 +490,6 @@ function init(page, detailed, mode) {
 	);
 	if (page.elements['btn-copy'].disabled)
 		fail('the Linux bridge response did not initialise the page');
-	if (!page.elements.preview.open) fail('report mode does not open the preview');
-	if (!page.elements['btn-report'].focused) fail('report mode does not focus the report button');
 	if (page.elements['preview-text'].textContent.includes('Secret Keyboard'))
 		fail('a snapshot without details shows a device name');
 }
@@ -996,5 +993,5 @@ if (failures.length > 0) {
 	process.exit(1);
 }
 console.log(
-	'[OK] diagnostics page behaviour: ready, preview, buttons, details, probes, results and report mode.'
+	'[OK] diagnostics page behaviour: ready, preview, buttons, details, probes and results.'
 );

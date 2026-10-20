@@ -620,7 +620,6 @@ local function init_message(session)
 			schema    = documents.schema,
 			redaction = documents.redaction,
 			context   = require("ui.healthcheck.report").redaction_context(),
-			mode      = session.mode,
 		},
 		snapshot = session.snapshot,
 	}
@@ -740,9 +739,7 @@ function M.on_message(payload, state, context)
 		_session = {
 			epoch    = epoch,
 			detailed = false,
-			mode     = M._pending_mode,
 		}
-		M._pending_mode = nil
 		_session.snapshot = M.build_snapshot(state, false)
 		local message = init_message(_session)
 		start_probes(_session, state)
@@ -778,20 +775,16 @@ function M.on_window_closed(epoch)
 	cancel_probes(previous)
 end
 
---- Opens the diagnostics window, in report mode when asked: the page then
---- starts from the preview of what is shared and the report button. An open
---- window is replaced, as on macOS and Windows: bringing it forward would keep
---- its mode and its stale snapshot.
---- @param mode string|nil "report" or nil.
+--- Opens the diagnostics window. An open window is replaced, as on macOS and
+--- Windows: bringing it forward would keep its stale snapshot.
 --- @return boolean opened
-function M.open(mode)
+function M.open()
 	local manager = require("ui.webview_manager")
 	local epoch = manager.current_epoch("healthcheck")
 	if epoch ~= nil and not manager.hide("healthcheck", epoch) then
 		Logger.error(LOG, "The open diagnostics window could not be replaced.")
 		return false
 	end
-	M._pending_mode = mode
 	return manager.show("healthcheck", require("infra.i18n").get_locale())
 end
 
