@@ -3111,14 +3111,19 @@ These are software implementations; final hardware verification remains below.
       listened; XNU's `tcp_input` drops a SYN matching a TCPS_CLOSED socket
       without a RST, so CFNetwork waited on it until the deadline. The
       fixture now releases the port (a RST on every OS); the same fixture
-      serves the PAC/WPAD and bootstrap XCTest wire methods. After two green
-      runs on both architectures, drop `macos-native-http` and
-      `macos-native-pac` from the v1.0.3 profile. That run's Intel model receiving still exits 1 silently;
+      serves the PAC/WPAD and bootstrap XCTest wire methods. On dev run
+      39374014338 (the first carrying it) all three PAC/WPAD/bootstrap
+      methods passed; test01 did not run there because the Swift step had
+      already failed on the Brew acceptance. After two green runs on both
+      architectures, drop `macos-native-http` and `macos-native-pac` from the
+      v1.0.3 profile. That run's Intel model receiving still exits 1 silently;
       cca8eb94 prints its closed failure fields from the next run on.
       `native_pac_source_fixture.py` has the same accept-loop handshake (2 s).
       The Managed Ollama build job of that run failed in the native Go tests
-      with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade fails where
-      Homebrew clones `homebrew/core` on the hosted runner. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
+      with no test named; 13b6f5c7 now prints the failed Go tests. - Brew archive: the receipt now passes; the upgrade failed where
+      Homebrew clones `homebrew/core` ("Could not resolve host": the
+      acceptance sandbox has no network and API installs are off). 3d298e30
+      gives the owned prefix an empty core tap repository. - Model receiving: green on Intel (run 39143423366); Apple silicon's pull
       hit a deadline, likely the same proxy fallback. - Shortcuts discovery, launch AppleEvents and the 27 owned-runtime XCTest
       methods: fixes are committed but never reached a fully green Build
       and Install-and-launch run, because a plain dispatch keeps the
@@ -3157,6 +3162,12 @@ These are software implementations; final hardware verification remains below.
       for the watcher's verdict before replying (3a0ef8a9); the updater gate
       now names the refused command and its stderr tail (bbfbfa78); the
       PAC source fixture's TLS handshake left the accept loop (9267439a).
+      The tone case failed once more after 3a0ef8a9 (the old field's verdict,
+      then the refocus events); d6812d90 waits for a 300 ms quiet verdict.
+      New on dev run 39375032517: Linux `input-display` window switching
+      (`run_window_switch_receipts.py`) found no visible `owned111_active`
+      xmessage within its deliberate 5 s deadline, with openbox up and the
+      child alive; root-cause from its next failure.
 - [ ] **Deploy site fails after every CI run until dev reaches main.**
       `workflow_run` always reads `deploy-site.yml` from the default branch.
       Main still lacks the job guard of 53c94136 (start the receiver only for
