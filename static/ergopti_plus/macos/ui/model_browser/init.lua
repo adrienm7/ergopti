@@ -89,7 +89,13 @@ local ASSETS_DIR = (Paths.shared("ui/model_browser") or "") .. "/"
 --- @return boolean submitted Whether the native view accepted the script.
 local function submit_javascript(view, code)
 	local failures = _javascript_failures
+	local session, controller, focus_owner = _session, _ucc, _focus_owner
+	local function current()
+		return focus_owner ~= nil and _focus_owner == focus_owner and _wv == view
+			and _ucc == controller and _session == session and _wv_committed == true
+	end
 	local function report(category)
+		if not current() then return end
 		if failures[category] then return end
 		failures[category] = true
 		-- Native errors can echo the catalogue payload; report only fixed metadata
@@ -102,7 +108,7 @@ local function submit_javascript(view, code)
 	end)
 	if not ok then report("submission raised"); return false end
 	if result ~= view then report("submission refused"); return false end
-	return true
+	return current()
 end
 
 --- Queues catalogue scripts until the native page reports readiness.
