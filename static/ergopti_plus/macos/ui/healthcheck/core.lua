@@ -420,6 +420,11 @@ local ADAPTER_SPECS = {
 		wired    = true,
 	},
 	{
+		id       = "adapters.ledger_append",
+		contract = { "cleanup", "recover", "flush" },
+		wired    = true,
+	},
+	{
 		id       = "adapters.graphics_renderer",
 		contract = { "createWindow", "destroyWindow", "drawBitmap", "show", "hide" },
 		wired    = true,

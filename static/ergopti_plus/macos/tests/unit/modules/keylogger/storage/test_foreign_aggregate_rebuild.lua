@@ -10,6 +10,7 @@
 --- ============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 -- Two readers, because there are two trees. The driver half is converted below
 -- to a SELECTOR so moving or splitting a keylogger module cannot turn these
@@ -80,7 +81,7 @@ helpers.describe("keylogger-device-log-privacy", function()
 	for _, phase in ipairs({ "clear", "replay" }) do
 		helpers.it("keylogger-device-log-privacy: " .. phase .. " refusal keeps its error without logging the device prefix", function()
 			helpers.with_stub_scope({
-				"infra.logger", "modules.keylogger.log_manager", "modules.keylogger.sqlite_writer",
+				"infra.logger", "adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.sqlite_writer",
 				"modules.keylogger.aggregator", "modules.keylogger.rotation", "modules.keylogger.export",
 				"keylogger.metrics", "adapters.file_system", "adapters.timer_scheduler",
 			}, function()
@@ -118,7 +119,7 @@ helpers.describe("keylogger-device-log-privacy", function()
 						return {}
 					end,
 				}
-				local manager = helpers.load_with_stubs("modules.keylogger.log_manager")
+				local manager = EmptyLedger.load()
 				manager.ingest_once()
 				helpers.assert_eq(calls, 1)
 				helpers.assert_eq(applied, false)

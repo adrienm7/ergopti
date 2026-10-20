@@ -102,7 +102,7 @@ local function ingest_errors(sync_foreign_data_sql)
 		"modules.keylogger.rotation",
 		"modules.keylogger.export",
 		"keylogger.metrics",
-		"modules.keylogger.log_manager",
+		"adapters.ledger_append", "modules.keylogger.log_manager",
 	}, function()
 		local errors = {}
 		local logger = helpers.make_logger_stub()

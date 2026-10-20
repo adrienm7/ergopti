@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 local Logger = helpers.load_with_stubs("infra.logger")
 
@@ -61,7 +62,7 @@ local function fresh_manager()
 	}
 	package.loaded["keylogger.metrics"] = {}
 	package.loaded["modules.keylogger.log_manager"] = nil
-	return helpers.load_with_stubs("modules.keylogger.log_manager")
+	return EmptyLedger.load()
 end
 
 helpers.describe("keylogger.log_manager: callback failure visibility", function()

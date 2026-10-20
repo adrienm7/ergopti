@@ -13,7 +13,7 @@ local Fixture = require("tests.support.data_sql_outbox_fixture")
 local OWNERS = {
 	"adapters.file_system", "infra.timings", "keylogger.metrics",
 	"modules.keylogger.aggregator", "modules.keylogger.export",
-	"modules.keylogger.log_manager", "modules.keylogger.rotation",
+	"adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "infra.logger",
 	"adapters.timer_scheduler", "modules.keylogger.timestamp",
 }

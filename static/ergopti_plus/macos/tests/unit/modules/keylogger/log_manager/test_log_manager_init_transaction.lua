@@ -12,6 +12,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 
 
@@ -33,7 +34,7 @@ helpers.describe("log_manager — initialization transaction", function()
 			"modules.keylogger.rotation",
 			"modules.keylogger.export",
 			"keylogger.metrics",
-			"modules.keylogger.log_manager",
+			"adapters.ledger_append", "modules.keylogger.log_manager",
 		}
 		local saved = {}
 		for _, slot in ipairs(slots) do saved[slot] = package.loaded[slot] end
@@ -166,7 +167,7 @@ helpers.describe("log_manager — initialization transaction", function()
 				},
 			}
 
-			lm = helpers.load_with_stubs("modules.keylogger.log_manager", hs_overrides)
+			lm = EmptyLedger.load(hs_overrides)
 			local state = { LOG_DIR = "/tmp/ergopti-log-manager-transaction" }
 			local first_call_ok, first_result = pcall(lm.init, state)
 			helpers.assert_true(first_call_ok,
