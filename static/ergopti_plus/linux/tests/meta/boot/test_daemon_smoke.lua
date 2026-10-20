@@ -154,6 +154,38 @@ helpers.describe("daemon smoke (ergopti_hotstrings)", function()
           .. "feature cannot leave Ctrl+G and user assignments active")
     end)
 
+    -- A physical Backspace reaches the control callback, never on_char, and the
+    -- daemon used to record nothing for it: the metrics counted only the
+    -- deletions a hotstring made (physical-backspace-corrections).
+    helpers.it("physical-backspace-corrections: the control callback records every admitted Backspace", function()
+      local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
+      local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
+      local fh = io.open(driver_root .. "/ergopti_hotstrings.lua", "r")
+      helpers.assert_true(fh ~= nil, "daemon file is readable")
+      local src = fh:read("*a"); fh:close()
+      local control_start = assert(src:find("local function handle_control", 1, true))
+      local control_end = assert(src:find("local on_control = input_capture_gate.guard(handle_control)", control_start, true))
+      local body = src:sub(control_start, control_end - 1)
+      local paused = body:find("if script_actions.is_paused() then return end", 1, true)
+      local branch = body:find('if key_name == "backspace" then', 1, true)
+      local record = body:find("keylogger.record_correction(app_id,", 1, true)
+      local privacy = branch and body:find("secure_focus_guard.blocks_text()", branch, true)
+      local undo = body:find("injector.inject(remaining - 1", 1, true)
+      helpers.assert_true(paused ~= nil and branch ~= nil and record ~= nil and undo ~= nil,
+        "the control callback must route Backspace to the keylogger")
+      helpers.assert_true(paused < branch and branch < record,
+        "a paused daemon records nothing, so the correction follows the pause gate")
+      helpers.assert_true(privacy ~= nil and privacy < record,
+        "a correction is admitted under the same privacy verdict as a character")
+      helpers.assert_true(record < undo,
+        "the undo returns early, and the press deleted a character whatever happens next")
+      -- Only one keylogger entry exists for a press: on_char never sees Backspace.
+      local handle_char = src:sub(assert(src:find("local function handle_char", 1, true)),
+        assert(src:find("local function handle_physical", 1, true)) - 1)
+      helpers.assert_true(handle_char:find("record_correction", 1, true) == nil,
+        "the text callback never records a correction, so a press is counted once")
+    end)
+
     helpers.it("routes recurring pumps through the runtime failure guard", function()
       local self_path = debug.getinfo(1, "S").source:gsub("^@", "")
       local driver_root = (self_path:match("^(.*)[/\\]tests[/\\]") or "."):gsub("\\", "/")
