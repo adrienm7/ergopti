@@ -48,12 +48,16 @@ global _HC_ProbeRun := 0
 ; @param Epoch {Integer} The window the answers belong to.
 ; @param Schema {Map} The diagnostics schema.
 ; @param Publish {Func} (Epoch, Id, Result, Sections) receives each answer once.
-HealthCheck_StartProbes(Epoch, Schema, Publish) {
+; @param LocalOnly {Boolean} Start only the probes that read local files.
+HealthCheck_StartProbes(Epoch, Schema, Publish, LocalOnly := false, Overrides := 0) {
 	global _HC_ProbeRun
 	HealthCheck_CancelProbes()
 	Run := { Epoch: Epoch, Cancelled: false, Requests: [], Publish: Publish }
 	_HC_ProbeRun := Run
 	Probes := Schema["probes"]
+	_HC_ProbeConfiguration(Run, Probes["configuration"], Overrides)
+	if LocalOnly
+		return
 	Github := Probes["github_api"]
 	_HC_ProbeHttp(Run, "github_api", Github["url"],
 		Map("User-Agent", HC_PROBE_USER_AGENT, "Accept", "application/vnd.github+json"),
@@ -334,4 +338,43 @@ HealthCheck_CpuShares(Before, After) {
 	return Map(
 		"system",  Round(Busy * 1000 / Total) / 10,
 		"process", Round((After["process"] - Before["process"]) * 1000 / Total) / 10)
+}
+
+
+
+
+
+; ==============================
+; ==============================
+; ======= 4/ Local Files =======
+; ==============================
+; ==============================
+
+; Starts the configuration probe: the user's files are read and parsed on a
+; timer after the snapshot is out, so phase A never pays for them. The answer
+; is the two configuration sections, or a timeout when the collection outlasts
+; the probe's deadline.
+; @param Run {Object}
+; @param Config {Map} The probe's schema entry.
+; @param Overrides {Map|Integer} Replacements for tests: path_of, clock.
+_HC_ProbeConfiguration(Run, Config, Overrides := 0) {
+	Started := A_TickCount
+	_HC_ProbeStarted("configuration", "timeout " . Config["timeout_ms"] . " ms")
+	SetTimer(_HC_ProbeConfigurationRun.Bind(Run, Started, Overrides), -1)
+}
+
+; Runs the collection of the configuration probe and publishes its answer.
+_HC_ProbeConfigurationRun(Run, Started, Overrides) {
+	if Run.Cancelled {
+		_HC_ProbeFinish(Run, "configuration", Started, Map("state", "cancelled"))
+		return
+	}
+	try {
+		Answer := HealthCheck_ConfigurationProbe(HealthCheck_Config()["schema"], Overrides)
+	} catch as Err {
+		LoggerWarn("Healthcheck", "The configuration probe failed: {1}", Err.Message)
+		_HC_ProbeFinish(Run, "configuration", Started, Map("state", "error", "cleanup", "settled"))
+		return
+	}
+	_HC_ProbeFinish(Run, "configuration", Started, Answer["result"], Answer["sections"])
 }

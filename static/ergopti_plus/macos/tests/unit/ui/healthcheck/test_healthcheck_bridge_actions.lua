@@ -6,7 +6,8 @@
 --- Drives the real diagnostics window through its usercontent message handler,
 --- the way the shared page posts to it:
 --- 1. "ready" answers with the page's configuration and the first snapshot,
----    and keeps subprocess probes opt-in;
+---    and keeps subprocess probes opt-in (only the local configuration probe
+---    runs without it);
 --- 2. an action the allowlist refuses changes nothing and is logged;
 --- 3. copy writes the redacted report, and a refused clipboard keeps the
 ---    window open and says so to the page;
@@ -37,7 +38,7 @@ local function load_window(controls)
 	package.loaded["hs"] = hs_stub
 
 	local context = {
-		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0,
+		scripts = {}, deleted = 0, released = 0, every = 0, cancelled_probes = 0, started_probes = 0, local_runs = 0, cancelled_local_runs = 0,
 		copied = {}, warnings = {}, errors = {}, opened_urls = {}, spawned = {}, focused = 0, effects = {},
 	}
 	local logger = helpers.make_logger_stub()
@@ -63,7 +64,13 @@ local function load_window(controls)
 		end,
 	}
 	package.loaded["ui.healthcheck.probes"] = {
-		start = function(_, snapshot, on_result)
+		start = function(_, snapshot, on_result, options)
+			-- The local configuration probe runs without the opt-in: it is
+			-- counted apart from the subprocess probes
+			if options and options.local_only == true then
+				context.local_runs = context.local_runs + 1
+				return { cancel = function() context.cancelled_local_runs = context.cancelled_local_runs + 1 end }
+			end
 			context.probe_result = on_result
 			context.started_probes = context.started_probes + 1
 			context.probe_snapshot = snapshot
@@ -207,6 +214,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			helpers.assert_eq(messages[1].config.context.case_insensitive, true)
 			helpers.assert_eq(messages[1].snapshot.driver, "macos")
 			helpers.assert_eq(context.started_probes, 0, "opening the window must not start subprocess probes")
+			helpers.assert_eq(context.local_runs, 1, "opening the window starts only the local configuration probe")
 			helpers.assert_eq(messages[1].snapshot.extensive, false)
 			context.page({ body = { action = "refresh", extensive = true } })
 			helpers.assert_eq(context.started_probes, 1)
@@ -339,6 +347,7 @@ helpers.describe("diagnostics window: the page's bridge (macOS)", function()
 			context.page({ body = { action = "close" } })
 			helpers.assert_eq(context.deleted, 1)
 			helpers.assert_eq(context.cancelled_probes, 1)
+			helpers.assert_eq(context.cancelled_local_runs, 1, "the opt-in replaced the local run")
 			helpers.assert_eq(context.released, 1)
 		end)
 	end)

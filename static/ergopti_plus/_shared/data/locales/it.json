@@ -3362,6 +3362,7 @@
 	"menu.about.startup_other_command_reason": "Altro comando di avvio: L’avvio è configurato per un altro comando o un’altra installazione. L’impostazione esistente viene mantenuta.",
 	"menu.llm.model_parent_with_health": "%sModello selezionato: %s",
 	"config.read_only.newer_schema": "Questa configurazione è stata salvata da una versione più recente di ErgoptiPlus. Le impostazioni sono state conservate. Aggiorna ErgoptiPlus e ricaricalo prima di modificare le impostazioni.",
+	"healthcheck.deep_tests.configuration": "Lettura della configurazione",
 	"menu.llm.save_unavailable": "Non disponibile: riprendi ErgoptiPlus se è in pausa oppure apri Diagnostica per verificare perché non è possibile salvare le impostazioni.",
 	"healthcheck.collection.start": "Raccogli diagnostica Windows",
 	"healthcheck.collection.guided": "Passaggi guidati con tastiera e schermo",

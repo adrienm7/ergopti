@@ -717,7 +717,6 @@ function M.run(opts)
 		return value
 	end
 
-	local configuration = section("configuration", function() return H.collect_configuration(schema) end)
 	local sections = {
 		paths       = section("paths", function() return H.collect_paths(schema.report.subdir) end),
 		versions    = section("versions", H.collect_versions),
@@ -725,8 +724,10 @@ function M.run(opts)
 		system      = section("system", function() return H.collect_system(detailed, os.time() - _load_time) end),
 		input       = section("input", H.collect_input),
 		features    = section("features", function() return H.collect_features(_menu_state) end),
-		configuration_files = configuration.files or { items = {} },
-		configuration = configuration.settings or { items = {} },
+		-- Filled by the configuration probe: reading and decoding the files is far
+		-- over the phase A budget
+		configuration_files = { items = {} },
+		configuration = { items = {} },
 		unavailable = section("platform_coverage", H.collect_unavailable),
 		ai          = section("ai", H.collect_ai),
 		network     = section("network", H.collect_network),
@@ -759,6 +760,13 @@ function M.run(opts)
 			table.concat(undeclared, ", "))
 	end
 	Logger.success(LOG, "Diagnostics collected in %.1f ms.", elapsed)
+	-- A report from the Debug menu has no page to keep responsive: its
+	-- configuration is collected now, after phase A was measured
+	if opts.complete_local == true then
+		local err = require("healthcheck.configuration").complete(snapshot,
+			H.configuration_context(schema, opts.configuration))
+		if err then Logger.error(LOG, "The configuration could not be collected: %s.", err) end
+	end
 	return snapshot
 end
 
@@ -805,8 +813,8 @@ end
 local function start_probes(session)
 	Cleanup.archive(session)
 	Cleanup.refresh(session)
-	if session.snapshot.extensive ~= true then return end
 	local captured = session.snapshot
+	-- Without the extensive opt-in only the local probes run (the configuration)
 	session.probes = require("ui.healthcheck.probes").start(M.config().schema, session.snapshot,
 		function(id, result, sections)
 			if _session ~= session or session.snapshot ~= captured then return end
@@ -816,7 +824,7 @@ local function start_probes(session)
 				for key, value in pairs(values) do target[key] = value end
 			end
 			send(session, { type = "probe", id = id, result = result, sections = sections })
-		end)
+		end, { local_only = session.snapshot.extensive ~= true })
 end
 
 --- The page's first message: its configuration and the first snapshot.

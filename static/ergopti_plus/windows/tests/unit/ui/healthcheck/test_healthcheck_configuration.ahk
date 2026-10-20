@@ -171,3 +171,143 @@ _HCCfgT_InvalidAndMissingConfig() {
 }
 Test("diagnostics configuration: invalid and missing inputs are explicit (healthcheck-configuration-states)",
 	_HCCfgT_InvalidAndMissingConfig)
+
+; The configuration is a probe, never phase A. The fixture is a slow reader: the
+; driver's own config.toml made long enough that collecting it costs many
+; times the phase A budget. Phase A, measured by the snapshot itself, must stay
+; far below that cost, with the sections empty and the probe pending (a
+; regression that collects it synchronously again pays the whole read).
+_HCCfgT_PhaseANeverReads() {
+	global _ConfigDir, _AhkSubDir
+	SavedDir := _ConfigDir, SavedSub := _AhkSubDir
+	Schema := HealthCheck_Config()["schema"]
+	Budget := Schema["phase_a_budget_ms"]
+	Root := A_Temp . "\cfgdiag_phase_a_" . A_TickCount . "_" . Random(1000, 9999)
+	DirCreate(Root . "\autohotkey")
+	Text := ""
+	loop 1000
+		Text .= "[s" . A_Index . "]`nk = " . Chr(34) . "x" . Chr(34) . "`n"
+	FileAppend(Text, Root . "\autohotkey\config.toml", "UTF-8")
+	try {
+		_ConfigDir := Root . "\", _AhkSubDir := "autohotkey\"
+		Started := _HealthCheck_NowMs()
+		Collected := HealthCheck_CollectConfiguration(Schema)
+		ReadMs := _HealthCheck_NowMs() - Started
+		AssertEqual("ok", Collected["files"]["items"][2]["state"], "the slow fixture is the config.toml read")
+		AssertTrue(ReadMs > 20 * Budget, "the fixture must cost many phase A budgets to read, not " . ReadMs . " ms")
+		Snapshot := HealthCheck_Run()
+		PhaseA := Snapshot["sections"]["developer"]["phase_a_ms"]
+		AssertTrue(PhaseA < ReadMs / 2,
+			"phase A took " . PhaseA . " ms against a " . Round(ReadMs) . " ms read: the configuration was read synchronously")
+		AssertEqual(0, Snapshot["sections"]["configuration"]["items"].Length)
+		AssertEqual(0, Snapshot["sections"]["configuration_files"]["items"].Length)
+		AssertEqual("pending", Snapshot["probes"]["configuration"]["state"])
+		AssertEqual("not_run", Snapshot["probes"]["github_api"]["state"])
+	} finally {
+		_ConfigDir := SavedDir, _AhkSubDir := SavedSub
+		DirDelete(Root, true)
+	}
+}
+Test("diagnostics configuration: phase A never reads the configuration (healthcheck-configuration-phase-a)",
+	_HCCfgT_PhaseANeverReads)
+
+_HCCfgT_PendingProbes() {
+	Schema := HealthCheck_Config()["schema"]
+	Quick := _HealthCheck_PendingProbes(Schema, 0)
+	AssertEqual("pending", Quick["configuration"]["state"], "a local probe needs no opt-in")
+	for Id, Result in Quick {
+		if Id != "configuration"
+			AssertEqual("not_run", Result["state"], Id . " stays opt-in")
+	}
+	for Id, Result in _HealthCheck_PendingProbes(Schema, 1)
+		AssertEqual("pending", Result["state"], Id)
+}
+Test("diagnostics configuration: only the local probe is pending without the opt-in (healthcheck-configuration-not-run)",
+	_HCCfgT_PendingProbes)
+
+_HCCfgT_ProbeDeadline() {
+	Schema := HealthCheck_Config()["schema"]
+	Deadline := Schema["probes"]["configuration"]["timeout_ms"]
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	try {
+		PathOf := (Id) => Root . "\" . Id . ".toml"
+		Fast := 0
+		FastClock := () => (Fast += 10)
+		Ok := HealthCheck_ConfigurationProbe(Schema, Map("path_of", PathOf, "clock", FastClock))
+		AssertEqual("ok", Ok["result"]["state"])
+		AssertEqual("settled", Ok["result"]["cleanup"])
+		AssertEqual(10, Ok["result"]["ms"])
+		AssertEqual(2, Ok["sections"].Count, "both sections are filled")
+		Slow := 0
+		SlowClock := () => (Slow += Deadline + 1)
+		Late := HealthCheck_ConfigurationProbe(Schema, Map("path_of", PathOf, "clock", SlowClock))
+		AssertEqual("timeout", Late["result"]["state"])
+		AssertEqual("deadline_expired", Late["result"]["detail"])
+		AssertEqual("settled", Late["result"]["cleanup"])
+		AssertEqual(0, Late["sections"].Count, "a late answer must not fill the sections")
+	} finally {
+		DirDelete(Root, true)
+	}
+}
+Test("diagnostics configuration: an answer past the deadline is a timeout without sections (healthcheck-configuration-timeout)",
+	_HCCfgT_ProbeDeadline)
+
+; A reader whose disk fails on every file.
+_HCCfgT_BrokenReader(Id) {
+	throw Error("disk on fire")
+}
+
+_HCCfgT_CompleteStates() {
+	Schema := HealthCheck_Config()["schema"]
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	try {
+		Snapshot := Map("probes", Map("configuration", Map("state", "pending")),
+			"sections", Map("configuration_files", Map("items", []), "configuration", Map("items", [])))
+		AssertTrue(HealthCheck_CompleteConfiguration(Snapshot, Schema, Map("path_of", (Id) => Root . "\" . Id . ".toml")))
+		AssertEqual("ok", Snapshot["probes"]["configuration"]["state"])
+		AssertEqual(1, Snapshot["sections"]["configuration"]["items"].Length)
+		Broken := Map("probes", Map("configuration", Map("state", "pending")),
+			"sections", Map("configuration_files", Map("items", []), "configuration", Map("items", [])))
+		AssertFalse(HealthCheck_CompleteConfiguration(Broken, Schema, Map("path_of", _HCCfgT_BrokenReader)))
+		AssertEqual("error", Broken["probes"]["configuration"]["state"], "a failing reader is an error, never an empty success")
+		AssertEqual(0, Broken["sections"]["configuration"]["items"].Length)
+	} finally {
+		DirDelete(Root, true)
+	}
+}
+Test("diagnostics configuration: a completed report names ok and error explicitly (healthcheck-configuration-complete)",
+	_HCCfgT_CompleteStates)
+
+; The probe runs on a timer after the caller returned, alone when local-only.
+_HCCfgT_LocalProbeRun() {
+	Schema := HealthCheck_Config()["schema"]
+	Root := _HCCfgT_Fixture('[script]`nlog_level = "INFO"`n')
+	Published := []
+	Publish := (Epoch, Id, Result, Sections) => Published.Push(Map("id", Id, "result", Result, "sections", Sections))
+	try {
+		HealthCheck_StartProbes(1, Schema, Publish, true, Map("path_of", (Id) => Root . "\" . Id . ".toml"))
+		AssertEqual(0, Published.Length, "nothing is published before the timer runs")
+		Waited := 0
+		while Published.Length < 1 && Waited < 3000 {
+			Sleep(25)
+			Waited += 25
+		}
+		Sleep(200)
+		AssertEqual(1, Published.Length, "only the local probe answers")
+		AssertEqual("configuration", Published[1]["id"])
+		AssertEqual("ok", Published[1]["result"]["state"])
+		AssertEqual(1, Published[1]["sections"]["configuration"]["items"].Length)
+		; A cancelled run publishes nothing
+		Published := []
+		Publish := (Epoch, Id, Result, Sections) => Published.Push(Map("id", Id))
+		HealthCheck_StartProbes(2, Schema, Publish, true, Map("path_of", (Id) => Root . "\" . Id . ".toml"))
+		HealthCheck_CancelProbes()
+		Sleep(300)
+		AssertEqual(0, Published.Length, "a cancelled run publishes nothing")
+	} finally {
+		HealthCheck_CancelProbes()
+		DirDelete(Root, true)
+	}
+}
+Test("diagnostics configuration: the local probe answers alone on a timer and honours cancel (healthcheck-configuration-probe-run)",
+	_HCCfgT_LocalProbeRun)

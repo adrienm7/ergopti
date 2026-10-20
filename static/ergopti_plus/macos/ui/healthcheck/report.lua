@@ -417,7 +417,7 @@ function M.report_bug(opts, overrides, complete)
 	return menu_request("report_bug", overrides, complete, function(owner)
 		local bridge = require("ui.healthcheck.core")
 		local documents = bridge.config()
-		local snapshot = bridge.run({ state = state })
+		local snapshot = bridge.run({ state = state, complete_local = true })
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
 		local document = Share.document(snapshot, documents.schema,

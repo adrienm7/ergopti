@@ -304,9 +304,10 @@ end
 
 --- The daemon's snapshot without the window, the probes not run.
 --- @return table snapshot, table documents
-local function menu_snapshot()
+local function menu_snapshot(complete_local)
 	local bridge = require("ui.healthcheck.bridge")
-	return bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false), bridge.config()
+	return bridge.build_snapshot(require("ui.webview_manager").get_daemon_state(), false, false, complete_local == true),
+		bridge.config()
 end
 
 --- Reports a bug exactly as the diagnostics page's report button does, without
@@ -317,7 +318,7 @@ end
 --- @return table|nil cancellable request
 function M.report_bug(overrides, complete)
 	return menu_request("report_bug", overrides, complete, function(owner)
-		local snapshot, documents = menu_snapshot()
+		local snapshot, documents = menu_snapshot(true)
 		assert(type(snapshot) == "table" and type(snapshot.sections) == "table"
 			and type(snapshot.sections.paths) == "table", "the diagnostics snapshot has no paths section")
 		local document = Share.document(snapshot, documents.schema,
