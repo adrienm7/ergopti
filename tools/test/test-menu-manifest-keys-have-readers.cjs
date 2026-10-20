@@ -303,6 +303,50 @@ for (const key of Object.keys(startup.sources)) {
 		'withdrawn actual native route cannot read a compiled section'
 	);
 }
+// The optional replay metadata extends the real native callee ABI. Its exact
+// empty default and fail-fast guard retain the three-argument cold caller;
+// relaxing either must not earn credit through a signature-only match.
+const startupDispatcher = 'windows/infra/menu_dispatcher.ahk';
+for (const [name, before, after] of [
+	[
+		'old native signature',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback) {'
+	],
+	[
+		'required replay argument',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity) {'
+	],
+	[
+		'nonempty replay default',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "foreign") {'
+	],
+	[
+		'removed replay type guard',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is String)',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif false'
+	],
+	[
+		'wrong replay type guard',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is String)',
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {\n\t\tif !(ReplayIdentity is Integer)'
+	]
+]) {
+	const original = startup.sources[startupDispatcher];
+	assert.equal(original.split(before).length - 1, 1, name + ' has one actual mutation coordinate');
+	const changed = original.replace(before, after);
+	assert.notEqual(changed, original, name + ' changes the actual native source');
+	assert.deepEqual(
+		startupReaderSections({
+			...startup,
+			sources: { ...startup.sources, [startupDispatcher]: changed }
+		}),
+		[],
+		name + ' cannot authenticate the native startup reader'
+	);
+}
 assert.deepEqual(
 	startupReaderSections({ ...startup, generated: '' }),
 	[],
@@ -434,6 +478,44 @@ assert.deepEqual(
 	['shortcut_extension_result_frame'],
 	'the real declared construction reads its original frame'
 );
+// Replay metadata runs inside the same closed template route. These helpers
+// and its strict field admission cannot be withdrawn or redirected while still
+// claiming the declared shortcut result frame is genuinely consumed.
+for (const [name, before, after] of [
+	[
+		'withdraw declared replay parent owner',
+		'_MR_DeclaredReplayGroupIdentity(Item, ManifestKey) {',
+		'_ForeignReplayParent(Item, ManifestKey) {'
+	],
+	[
+		'withdraw canonical replay identity owner',
+		'_MR_ReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {',
+		'_ForeignReplayIdentity(ManifestKey, RowId, Kind := "command", Value := unset) {'
+	],
+	[
+		'redirect declared parent identity',
+		'return _MR_ReplayIdentity(ManifestKey, _MR_Get(Item, "id"), "container")',
+		'return "foreign"'
+	],
+	[
+		'relax replay metadata admission',
+		'Type(Row[ReplayField]) != "String"',
+		'Type(Row[ReplayField]) != "Integer"'
+	]
+]) {
+	assert.equal(
+		shortcutRendererSource.split(before).length - 1,
+		1,
+		name + ' has one actual coordinate'
+	);
+	const changed = shortcutRendererSource.replace(before, after);
+	assert.notEqual(changed, shortcutRendererSource, name + ' changes the actual route');
+	assert.deepEqual(
+		shortcutConstructionReaderSections(manifest, shortcutWindowsSource, changed),
+		[],
+		name + ' cannot authenticate the shortcut frame reader'
+	);
+}
 const shortcutOriginalFrame = manifest.shortcut_extension_construction_ahk.result_frame;
 const shortcutCandidate = (mutate) => {
 	const candidate = structuredClone(manifest);

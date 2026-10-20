@@ -455,8 +455,13 @@ function nativeStartupRows(inputs, platform) {
 	}
 	// Native receiver and callback wrapper transport through the genuine default
 	// RegisterMenuItem callee. Full dispatcher lifecycle remains its own suite.
-	const native = body(dispatcher, 'RegisterMenuItem(MenuObj, ItemName, Callback) {');
+	const native = body(
+		dispatcher,
+		'RegisterMenuItem(MenuObj, ItemName, Callback, ReplayIdentity := "") {'
+	);
 	const prefix = tokensOf(`
+    if !(ReplayIdentity is String)
+      throw TypeError("A menu replay identity must be a String.")
     global _MenuDispatchCallbacks, _MenuDispatchLastFire, _MenuDispatcherEpoch, _MenuDispatchTokens, _MenuDispatchTokenCounter
     TrackedObj := { ItemId: 0, Callback: Callback, Epoch: _MenuDispatcherEpoch, Token: 0 }
     Wrapper := (Args*) => _TrackedDispatch(TrackedObj, Args*)
