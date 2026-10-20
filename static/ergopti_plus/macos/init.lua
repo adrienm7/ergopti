@@ -1164,7 +1164,7 @@ do
 	else
 		context_error = "the generated action catalogue could not be loaded: " .. tostring(action_catalogue)
 	end
-	ConfigMigrate.boot({
+	local migration = ConfigMigrate.boot({
 		context       = context,
 		context_error = context_error,
 		path          = config_paths.get("ConfigTomlPath"),
@@ -1172,6 +1172,15 @@ do
 		registry_path = require("infra.paths").shared(ConfigMigrate.REGISTRY_PATH),
 		file_adapter  = file_system,
 	})
+	-- A file saved by a newer build stays untouched and read-only for the
+	-- session: say so, or every change the user makes silently fails to stick.
+	local notice = ConfigMigrate.read_only_notice_key(migration)
+	if notice then
+		local sent, notice_error = require("infra.notifications").notify(i18n.get(notice), nil, "warning")
+		if not sent then
+			Logger.error(LOG, "The newer-configuration notice was not shown: %s.", tostring(notice_error))
+		end
+	end
 end
 Boot.mark("Config schema migration")
 Boot.stage("First-launch guard (onboarding check)")

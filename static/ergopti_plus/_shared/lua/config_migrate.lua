@@ -1235,6 +1235,22 @@ function M.read_only_reason(path)
 	return writer().write_refusal(path)
 end
 
+-- The locale key of the notice a newer file earns, shared with the Windows
+-- driver's refused-save notification (config_io.ahk).
+M.NEWER_SCHEMA_NOTICE_KEY = "config.read_only.newer_schema"
+
+--- Names the notice a boot result asks the driver to show once: a file saved
+--- by a newer build is preserved and read-only, and the user must update and
+--- reload before changing settings. Other refusals keep their log diagnostics.
+--- @param result table|nil The table M.boot or M.run returned.
+--- @return string|nil key The locale key, or nil when no notice is due.
+function M.read_only_notice_key(result)
+	if type(result) == "table" and result.status == "newer" and result.read_only == true then
+		return M.NEWER_SCHEMA_NOTICE_KEY
+	end
+	return nil
+end
+
 --- Migrates a config file at boot. Every outcome other than "absent",
 --- "current" and "migrated" leaves the file untouched and refuses every later
 --- write to it for the session.
