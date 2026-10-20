@@ -1253,9 +1253,11 @@ function M.start_async_sink(scheduler, transport_overrides)
 		on_rejected = _deliver_async_record,
 		on_failed = function(detail) _on_async_sink_failed(detail, owner) end,
 		-- A stall the worker recovered from is not fatal any more, so it has to
-		-- stay visible in the log it delayed.
+		-- stay visible in the log it delayed. The ACK is read on the main run loop,
+		-- so a busy boot or menu rebuild also "stalls" it; that is only a warning
+		-- once lines were actually shed (issue #95: nine WARN lines, none shed).
 		on_stall_recovered = function(stalled_ms, shed)
-			_log("WARNING", "logger", "Native logger stalled %d ms before acknowledging; "
+			_log(shed > 0 and "WARNING" or "INFO", "logger", "Native logger stalled %d ms before acknowledging; "
 				.. "%d DEBUG/TRACE/DONE line(s) were shed meanwhile.", stalled_ms, shed)
 		end,
 	}
