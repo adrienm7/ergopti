@@ -35,6 +35,9 @@ local MACOS_PREFERENCE_COMMANDS = {
 local cached_preferences = {}
 local pending_probe = nil
 local boot_notified = false
+-- Last logged posture per system group ("conflict" or "disabled"). Every menu
+-- rebuild asks for the active conflicts, so only a change is worth a line.
+local logged_posture = {}
 local SETTINGS_URL = "x-apple.systempreferences:com.apple.Trackpad-Settings.extension"
 local THREE_FINGER_DRAG_KEYS = { "TrackpadThreeFingerDrag", "com.apple.trackpad.threeFingerDragGesture" }
 
@@ -284,12 +287,20 @@ function M.on_action_changed(slot, new_action)
 	local grp = SLOT_TO_GROUP[slot]
 	if not grp then return nil end
 	if macos_gesture_is_disabled(grp, cached_preferences) then
-		Logger.debug(LOG, "Native macOS gesture '%s' is disabled — conflict warning suppressed.", grp.key)
+		if logged_posture[grp.key] ~= "disabled" then
+			logged_posture[grp.key] = "disabled"
+			Logger.debug(LOG, "Native macOS gesture '%s' is disabled — conflict warning suppressed.", grp.key)
+		end
 		return nil
 	end
-	
-	Logger.warn(LOG, string.format("Potential macOS system conflict detected for slot: %s.", slot))
-	
+
+	-- An expected condition: the user bound a gesture macOS also uses, and the
+	-- caller shows the notice. Log it once per posture change, not per query.
+	if logged_posture[grp.key] ~= "conflict" then
+		logged_posture[grp.key] = "conflict"
+		Logger.info(LOG, "Native macOS gesture '%s' is enabled and overlaps slot %s.", grp.key, slot)
+	end
+
 	-- A line of dashes forces the blockAlert dialog to be wide enough in UI
 	local sep = string.rep("─", 26)
 	return {
