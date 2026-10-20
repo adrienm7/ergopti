@@ -288,3 +288,25 @@ for _LRPE_Mode in ["features-unpublished", "category-unpublished", "category-mas
 	"published-on", "published-off", "kana-held", "inert-ordering"]
 	Test("number row edges: " . _LRPE_Mode . " keeps actual static admission safe (number-row-edges-boot-admission)",
 		_LRPS_LevelCustody.Bind(0, false, _LRPE_ChildSource, [_LRPE_Mode], "PASS number-row-edges-admission"))
+
+
+_LRPCM_ChildSource() {
+	global _DriverDir
+	Source := _NRP_LayoutSource()
+	Start := InStr(Source, "_MagicKeyHotkeys := LayoutRegistry_MagicKeyHotkeys(")
+	Finish := InStr(Source, "`nRegisterShiftLayer()", , Start)
+	AssertTrue(Start > 0 && Finish > Start, "the genuine magic producer must be bounded before Shift registration")
+	Extra := "#Include " . _DriverDir . "\infra\magic_editor.ahk`n"
+	for Name in ["RemapKey", "LayoutRegistry_MagicKeyHotkeys"] {
+		Definition := _DriverFuncBody(Name)
+		AssertTrue(Definition != "", "the genuine magic dependency must exist: " . Name)
+		Extra .= Definition . "`n"
+	}
+	Extra .= "_LRPCM_RegisterMagic() {`n global ScriptInformation, Features`n"
+		. SubStr(Source, Start, Finish - Start) . "`n}`n"
+	return _LRPS_ChildSource("layout_row_chosen_magic_body.ahk", Extra)
+}
+
+for _LRPCM_Row in ["number", "top", "home", "bottom"]
+	Test("layout rows: chosen magic on " . _LRPCM_Row . " keeps only its plain press (layout-row-chosen-magic-scope)",
+		_LRPS_LevelCustody.Bind(0, false, _LRPCM_ChildSource, [_LRPCM_Row], "PASS layout-row-chosen-magic"))

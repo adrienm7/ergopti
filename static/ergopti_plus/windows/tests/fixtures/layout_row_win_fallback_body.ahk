@@ -8,7 +8,7 @@ global Features := Map("layout", Map("ergopti_base", true,
 	"emulate_number_row", true, "emulate_top_row", true,
 	"emulate_home_row", true, "emulate_bottom_row", true),
 	"hotstrings", Map("magic_key", Map("replace", Map("enabled", false))))
-global ScriptInformation := Map("MagicKeySourceScan", "SC039")
+global ScriptInformation := Map("MagicKeySourceChosen", false, "MagicKeySourceScan", "SC039")
 global RemappedList := Map(), KeyboardShortcutAssignments := Map(), LayerEnabled := false
 global _LRPW_Emits := []
 
