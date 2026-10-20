@@ -671,7 +671,7 @@ _LLM_Accept_ClaimAndDispatch(Presented, AcceptFn := unset, AutomationGeneration 
  * Second canonical acceptance primitive: inserts slot SlotIdx of the exact
  * prediction whose validation chord (val_modifiers + digit) the native owner
  * consumed. It runs after the chord's modifiers were released, so it demands
- * the same record and surface, the chosen slot still active and painted, no
+ * the same offer, the chosen slot still active and painted, no
  * modifier held (it would alter the injected text), and verified focus in the
  * control that owns the render (llm-val-chord-inserts).
  * @param {Object} ExpectedRecord - Record named by the consumed jump receipt.
@@ -706,8 +706,12 @@ _LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
 	if !IsObject(Presented) || !IsObject(ExpectedRecord)
 			|| !IsObject(ExpectedSurface)
 		return "no prediction offers an acceptable snapshot"
-	if ObjPtr(Presented.Record) != ObjPtr(ExpectedRecord)
-			|| ObjPtr(Presented.Surface) != ObjPtr(ExpectedSurface)
+	; The chord's own jump repaints the tooltip before its modifiers are
+	; released, and a repaint publishes a successor record and surface for the
+	; same offer, sharing its lifecycle: comparing the exact record refused every
+	; chord, so it only moved the highlight (val-chord-survives-own-repaint).
+	; Another offer always carries another lifecycle.
+	if !_LLM_Accept_SameOffer(Presented, ExpectedRecord)
 		return "another prediction replaced the one the chord named"
 	if !(SlotIdx is Integer) || SlotIdx < 1
 			|| !(Presented.Slots is Array) || SlotIdx > Presented.Slots.Length
@@ -724,6 +728,15 @@ _LLM_Accept_SlotRefusal(Presented, ExpectedRecord, ExpectedSurface, SlotIdx,
 	if !_LLM_Accept_FocusMatchesSource(InputSnapshot, Presented.AcceptSource)
 		return "the focus is not the control the prediction was rendered for"
 	return ""
+}
+
+; Whether the presented snapshot belongs to the offer whose record a receipt
+; named: the same lifecycle object, which every repaint of that offer keeps.
+_LLM_Accept_SameOffer(Presented, ExpectedRecord) {
+	if !Presented.HasOwnProp("Lifecycle") || !ExpectedRecord.HasOwnProp("Lifecycle")
+		return false
+	return IsObject(Presented.Lifecycle) && IsObject(ExpectedRecord.Lifecycle)
+		&& ObjPtr(Presented.Lifecycle) == ObjPtr(ExpectedRecord.Lifecycle)
 }
 
 ; Only the newest chord may insert: a second Alt+N while Alt is still held
