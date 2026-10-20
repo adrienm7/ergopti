@@ -494,7 +494,7 @@ for (const [label, jobs, artifacts, pattern] of [
 		'a failed qualifying cell',
 		[qualifier('arm64'), qualifier('amd64', { conclusion: 'failure' })],
 		bothInputs,
-		/Managed Ollama \(Intel\)\) cell concluded failure/
+		/Managed Ollama \(macOS 15, Intel\)\) cell concluded failure/
 	],
 	[
 		'a cancelled qualifying cell',

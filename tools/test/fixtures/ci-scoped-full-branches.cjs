@@ -136,7 +136,7 @@ function projectScopedSteps(text, rel) {
 						'macos-native-http',
 						'Receive actual independent managed HTTP native clients'
 					],
-					'Run Swift launcher tests': [
+					'Run Swift launcher tests on macOS 26': [
 						'macos-native-pac',
 						'Qualify actual native PAC and WPAD XCTest controls'
 					]

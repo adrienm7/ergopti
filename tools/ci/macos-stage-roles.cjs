@@ -66,8 +66,50 @@ function validateContext(value) {
 	return value;
 }
 
-function cell(role, runner, architecture, timeout, scenario = '') {
-	return { role, runner, architecture, timeout_minutes: timeout, scenario };
+/**
+ * The one owner of each cell host: its runner label and, on macOS, the
+ * version every job, lot and step name states. The Swift launcher classes
+ * run on macOS 15 in E2E and again on macOS 26 in Build; that repetition is
+ * deliberate cross-version coverage, not duplicated work to remove.
+ */
+const HOSTS = Object.freeze({
+	stubbed: Object.freeze({ runner: 'ubuntu-latest', macos: null }),
+	arm64: Object.freeze({ runner: 'macos-15', macos: '15' }),
+	amd64: Object.freeze({ runner: 'macos-15-intel', macos: '15' }),
+	host: Object.freeze({ runner: 'macos-latest', macos: '26' })
+});
+
+function cell(role, architecture, timeout, scenario = '') {
+	assert.ok(Object.hasOwn(HOSTS, architecture), 'Unknown cell host');
+	return {
+		role,
+		runner: HOSTS[architecture].runner,
+		architecture,
+		timeout_minutes: timeout,
+		scenario
+	};
+}
+
+/** The macOS version a cell runs on, as its names state it ("macOS 15"). */
+function macosName(architecture) {
+	assert.ok(Object.hasOwn(HOSTS, architecture) && HOSTS[architecture].macos, 'Not a macOS host');
+	return 'macOS ' + HOSTS[architecture].macos;
+}
+
+/** Refuses a macOS runner whose actual version is not the one its names state. */
+function confirmMacosVersion(selected, productVersion) {
+	const architecture = Object.keys(HOSTS).find((key) => HOSTS[key].runner === selected.runner);
+	assert.ok(architecture && HOSTS[architecture].macos, 'Not a macOS cell runner');
+	assert.match(
+		String(productVersion),
+		/^[1-9][0-9]*(?:\.[0-9]+)*$/,
+		'Invalid macOS product version'
+	);
+	assert.equal(
+		String(productVersion).split('.')[0],
+		HOSTS[architecture].macos,
+		'The runner is not the ' + macosName(architecture) + ' its names state'
+	);
 }
 
 const MODULE_GROUPS = path.resolve(
@@ -106,9 +148,7 @@ function unitGroups() {
 function plan(stage, context) {
 	validateContext(context);
 	if (stage === 'unit')
-		return unitGroups().map((group) =>
-			cell('lua-unit-meta', 'ubuntu-latest', 'stubbed', 360, group)
-		);
+		return unitGroups().map((group) => cell('lua-unit-meta', 'stubbed', 360, group));
 	// Each managed-ollama-build cell runs the clean native source build of the
 	// managed-ollama-native cell of its architecture, beside it; the sealed bytes
 	// travel through tools/ci/managed-ollama-handoff.cjs.
@@ -117,38 +157,37 @@ function plan(stage, context) {
 	// clean build anyway. Apple silicon keeps one cell that runs both.
 	if (stage === 'e2e') {
 		const rows = [
-			cell('e2e-hs', 'ubuntu-latest', 'stubbed', 360),
-			cell('tooltip-canvas', 'macos-15', 'arm64', 10),
-			cell('managed-ollama-native', 'macos-15', 'arm64', 60),
-			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 60, 'runtime'),
-			cell('managed-ollama-native', 'macos-15-intel', 'amd64', 45, 'xctest'),
-			cell('managed-ollama-build', 'macos-15', 'arm64', 60),
-			cell('managed-ollama-build', 'macos-15-intel', 'amd64', 60)
+			cell('e2e-hs', 'stubbed', 360),
+			cell('tooltip-canvas', 'arm64', 10),
+			cell('managed-ollama-native', 'arm64', 60),
+			cell('managed-ollama-native', 'amd64', 60, 'runtime'),
+			cell('managed-ollama-native', 'amd64', 45, 'xctest'),
+			cell('managed-ollama-build', 'arm64', 60),
+			cell('managed-ollama-build', 'amd64', 60)
 		];
 		if (context.event_name === 'workflow_dispatch' && !context.release)
 			rows.push(
-				cell('item36-native', 'macos-latest', 'host', 25),
-				cell('lease-silence-native', 'macos-15', 'arm64', 20),
-				cell('lease-silence-native', 'macos-15-intel', 'amd64', 20)
+				cell('item36-native', 'host', 25),
+				cell('lease-silence-native', 'arm64', 20),
+				cell('lease-silence-native', 'amd64', 20)
 			);
 		return rows;
 	}
-	if (stage === 'build') return [cell('package-macos', 'macos-latest', 'host', 45)];
+	if (stage === 'build') return [cell('package-macos', 'host', 45)];
 	assert.equal(stage, 'testbuild');
-	const runners = context.release ? ['macos-15', 'macos-15-intel'] : ['macos-15'];
+	const architectures = context.release ? ['arm64', 'amd64'] : ['arm64'];
 	return [
-		...runners.flatMap((runner) =>
-			launchLots(context.scenarios, runners.length).map((lot) =>
+		...architectures.flatMap((architecture) =>
+			launchLots(context.scenarios, architectures.length).map((lot) =>
 				cell(
 					'launch',
-					runner,
-					runner === 'macos-15' ? 'arm64' : 'amd64',
+					architecture,
 					LAUNCH_SETUP_MINUTES + LAUNCH_SCENARIO_MINUTES * lot.length,
 					lot.join(LOT_SEPARATOR)
 				)
 			)
 		),
-		cell('cold-bootstrap-native', 'macos-15', 'arm64', 90)
+		cell('cold-bootstrap-native', 'arm64', 90)
 	];
 }
 
@@ -206,7 +245,7 @@ function roleLot(stage, role, architecture, scenario) {
 		assert.equal(typeof value, 'string', 'Invalid human lot ' + name);
 	const native = () => {
 		assert.ok(['arm64', 'amd64'].includes(architecture), 'Unknown human lot architecture');
-		return architecture === 'arm64' ? 'Apple silicon' : 'Intel';
+		return macosName(architecture) + ', ' + (architecture === 'arm64' ? 'Apple silicon' : 'Intel');
 	};
 	if (stage === 'unit' && role === 'lua-unit-meta') {
 		assert.equal(architecture, 'stubbed');
@@ -224,7 +263,7 @@ function roleLot(stage, role, architecture, scenario) {
 	) {
 		assert.equal(architecture, 'amd64', 'Only the Intel managed native role is split');
 		// The runtime cell keeps the name the build handoff and Build wait for.
-		return scenario === 'runtime' ? 'Managed Ollama (Intel)' : 'Native XCTest (Intel)';
+		return (scenario === 'runtime' ? 'Managed Ollama (' : 'Native XCTest (') + native() + ')';
 	}
 	assert.equal(scenario, '', 'Unexpected scenario for this human lot');
 	switch (stage + '/' + role) {
@@ -233,19 +272,19 @@ function roleLot(stage, role, architecture, scenario) {
 			return 'Virtual-keyboard replay (stubbed)';
 		case 'e2e/tooltip-canvas':
 			assert.equal(architecture, 'arm64');
-			return 'Tooltip canvas (Apple silicon)';
+			return 'Tooltip canvas (' + native() + ')';
 		case 'e2e/managed-ollama-native':
 			return 'Managed Ollama (' + native() + ')';
 		case 'e2e/managed-ollama-build':
 			return 'Managed Ollama build (' + native() + ')';
 		case 'e2e/item36-native':
 			assert.equal(architecture, 'host');
-			return 'Archive update controls';
+			return 'Archive update controls (' + macosName(architecture) + ')';
 		case 'e2e/lease-silence-native':
 			return 'Lease silence (' + native() + ')';
 		case 'testbuild/cold-bootstrap-native':
 			assert.equal(architecture, 'arm64');
-			return 'Cold native bootstrap (Apple silicon)';
+			return 'Cold native bootstrap (' + native() + ')';
 		default:
 			throw new Error('Unknown human lot stage or role');
 	}
@@ -624,6 +663,19 @@ function main(args) {
 		fs.appendFileSync(process.env.GITHUB_OUTPUT, 'cell=' + JSON.stringify(selected) + '\n');
 	} else if (command === 'admit') {
 		assert.equal(args.length, 4);
+		// A macOS cell runs on the macOS version its job and lot names state.
+		if (process.platform === 'darwin')
+			confirmMacosVersion(
+				stage === 'build'
+					? plan('build', context)[0]
+					: selectLot(
+							stage,
+							process.env.MACOS_STAGE_LOT,
+							parseClosedJson(process.env.MACOS_STAGE_METADATA),
+							context
+						),
+				execFileSync('sw_vers', ['-productVersion'], { encoding: 'utf8', timeout: 10000 }).trim()
+			);
 		save(
 			output,
 			admit(
@@ -678,6 +730,9 @@ module.exports = {
 	STAGES,
 	JOBS,
 	PREDECESSORS,
+	HOSTS,
+	macosName,
+	confirmMacosVersion,
 	priorStages,
 	plan,
 	launchLots,

@@ -1050,7 +1050,7 @@ if (macosSmokeStep !== null) {
 function nativeSparkleFixtureProblems(steps, fixture) {
 	const problems = [];
 	const install = steps.filter((step) => step.name === 'Install Sparkle signing tool');
-	const tests = steps.filter((step) => step.name === 'Run Swift launcher tests');
+	const tests = steps.filter((step) => step.name === 'Run Swift launcher tests on macOS 26');
 	if (
 		install.length !== 1 ||
 		tests.length !== 1 ||
@@ -1210,7 +1210,7 @@ for (const [name, steps, fixture, refuses] of nativeSparkleControls) {
 // stops the whole release after every box has run.
 const MACOS_ORDER = [
 	'Install Sparkle signing tool',
-	'Run Swift launcher tests',
+	'Run Swift launcher tests on macOS 26',
 	'Build ErgoptiPlus.app',
 	'Record signed CI archive source',
 	'Smoke test built ErgoptiPlus.app (crash-on-launch guard)',

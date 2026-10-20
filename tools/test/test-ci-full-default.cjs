@@ -850,7 +850,7 @@ check(
 	() => {
 		const original = source.find((entry) => entry.rel === MAC);
 		const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
-		const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+		const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 		assert.ok(
 			code.includes(
 				'node tools/ci/dev-release-qualification.cjs --scope macos-native-pac --receipt "$pac_receipt"'
@@ -859,9 +859,9 @@ check(
 		assert.ok(code.includes('elif [ "$mode" = full ]; then\n    :'));
 		assert.ok(code.includes('--pac-skip-pattern "$pac_receipt"'));
 		assert.equal(code.split(' --pac-qualification-receipt "$pac_receipt"').length, 3);
-		const full = Full.runOf(Full.step(Full.job('package-macos'), 'Run Swift launcher tests')).join(
-			'\n'
-		);
+		const full = Full.runOf(
+			Full.step(Full.job('package-macos'), 'Run Swift launcher tests on macOS 26')
+		).join('\n');
 		assert.ok(
 			full.includes(
 				'script -q /dev/null swift test --package-path static/ergopti_plus/macos/launcher --scratch-path "$RUNNER_TEMP/swift-launcher-ci" 2>&1 | tee "$xctest_log"'
@@ -896,7 +896,7 @@ check(
 check('embedded Swift admission refuses omitted collector binding or changed source gate', () => {
 	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
-	const step = Raw.step(job.body, 'Run Swift launcher tests');
+	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const receiptOption = ' --pac-qualification-receipt "$pac_receipt"';
 	const missing = step.replace(receiptOption, '');
 	assert.notEqual(missing, step);
@@ -908,7 +908,7 @@ check('embedded Swift admission refuses omitted collector binding or changed sou
 check('Swift PAC arguments preserve empty and selected arrays under nounset', () => {
 	const original = source.find((entry) => entry.rel === MAC);
 	const job = Raw.jobsOfText(original.text, MAC).find((entry) => entry.id === 'package-macos');
-	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const safe = '${pac_skip_args[@]+"${pac_skip_args[@]}"}';
 	assert.ok(code.includes(' ' + safe + ' 2>&1 | tee "$xctest_log"'));
 	assert.equal(code.includes(' "${pac_skip_args[@]}" 2>&1'), false);
@@ -1328,7 +1328,7 @@ owned_python() {
 check('v101 package joins only validated PAC and Brew identities', () => {
 	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
-	const step = Raw.step(job.body, 'Run Swift launcher tests');
+	const step = Raw.step(job.body, 'Run Swift launcher tests on macOS 26');
 	const code = Raw.runOf(step).join('\n');
 	for (const token of [
 		'test "$brew_mode" = deferred',
@@ -1344,16 +1344,16 @@ check('v101 package joins only validated PAC and Brew identities', () => {
 	assert.ok(
 		code.includes('--pac-skip-pattern "$pac_receipt" --brew-qualification-receipt "$brew_receipt"')
 	);
-	const full = Full.runOf(Full.step(Full.job('package-macos'), 'Run Swift launcher tests')).join(
-		'\n'
-	);
+	const full = Full.runOf(
+		Full.step(Full.job('package-macos'), 'Run Swift launcher tests on macOS 26')
+	).join('\n');
 	assert.equal(full.includes('brew_evidence_args'), false);
 	assert.equal(full.includes('--brew-qualification-receipt'), false);
 });
 check('v103 package defers Brew and owned-runtime only while PAC stays mandatory', () => {
 	const entry = source.find((file) => file.rel === MAC);
 	const job = Raw.jobsOfText(entry.text, MAC).find((row) => row.id === 'package-macos');
-	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests')).join('\n');
+	const code = Raw.runOf(Raw.step(job.body, 'Run Swift launcher tests on macOS 26')).join('\n');
 	const start = code.indexOf('pac_receipt=');
 	const end = code.indexOf('set +e\nscript -q');
 	assert.ok(start >= 0 && end > start);

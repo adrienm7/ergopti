@@ -38,6 +38,8 @@ const OFFICIAL_RECEIPT = 'official-input-receipt.json';
 const PRODUCER_LOG = 'managed-ollama-producer-build.log';
 const MANIFEST = 'handoff.json';
 const LABELS = Object.freeze({ arm64: 'Apple silicon', amd64: 'Intel' });
+// The visible cell names, macOS version included, come from the stage plan owner.
+const { roleLot } = require('./macos-stage-roles.cjs');
 const POLL_MILLISECONDS = 15000;
 
 const sha256 = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -79,13 +81,15 @@ function artifactName(context) {
 /** The visible matrix cell name of the producer; the lane prefix may differ. */
 function producerJobSuffix(architecture) {
 	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
-	return 'E2E tests (Managed Ollama build (' + LABELS[architecture] + '))';
+	return 'E2E tests (' + roleLot('e2e', 'managed-ollama-build', architecture, '') + ')';
 }
 
 /** The visible matrix cell name of the cell that qualifies one architecture's inputs. */
 function qualifierJobSuffix(architecture) {
 	assert.ok(Object.hasOwn(LABELS, architecture), 'Unknown handoff architecture');
-	return 'E2E tests (Managed Ollama (' + LABELS[architecture] + '))';
+	// The Intel role runs as two cells; its runtime cell uploads the inputs.
+	const scenario = architecture === 'amd64' ? 'runtime' : '';
+	return 'E2E tests (' + roleLot('e2e', 'managed-ollama-native', architecture, scenario) + ')';
 }
 
 /** The qualified native inputs one qualifying cell uploads for the application build. */

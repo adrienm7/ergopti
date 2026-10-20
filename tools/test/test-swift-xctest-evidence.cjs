@@ -405,7 +405,7 @@ try {
 	assert.match(result.stdout, /Swift XCTest evidence could not be judged/);
 
 	// stepField folds scalars for structural checks; execute the actual literal.
-	const step = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests');
+	const step = pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests on macOS 26');
 	const header = /^([ ]+)run: \|[ \t]*$/m.exec(step);
 	assert.notEqual(header, null, 'the native command owner is a YAML literal block');
 	const indentation = header[1].length + 2;
@@ -714,7 +714,7 @@ try {
 		assert.throws(() => assertTisRetention(changed), assert.AssertionError, before);
 	}
 	const commands = pipeline
-		.runOf(pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests'))
+		.runOf(pipeline.step(pipeline.job('package-macos'), 'Run Swift launcher tests on macOS 26'))
 		.join('\n');
 	assert.match(commands, /mktemp -d .*tis-session\.XXXXXX/);
 	assert.match(commands, /randomBytes\(32\)/);

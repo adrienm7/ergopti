@@ -1129,7 +1129,7 @@
 		{
 			"file": ".github/workflows/ci-macos.yml",
 			"job": "package-macos",
-			"step": "Run Swift launcher tests",
+			"step": "Run Swift launcher tests on macOS 26",
 			"protocol": 13,
 			"owner_job": "e2e-hs",
 			"owner_step": "Qualify actual native PAC and WPAD XCTest controls"

@@ -479,7 +479,7 @@
 		{
 			"id": "package-macos",
 			"metadata": {
-				"name": "Build",
+				"name": "Build (macOS 26)",
 				"permissions": {
 					"contents": "read",
 					"actions": "read"
@@ -591,7 +591,7 @@
 					"timeout-minutes": 5
 				},
 				{
-					"name": "Run Swift launcher tests",
+					"name": "Run Swift launcher tests on macOS 26",
 					"id": "swift-launcher-tests",
 					"if": "${{ steps.stage-admission.outcome == 'success' }}",
 					"timeout-minutes": 10

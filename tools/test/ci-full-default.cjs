@@ -322,7 +322,7 @@ const FULL_STEPS = [
 	[
 		'.github/workflows/ci-macos.yml',
 		'package-macos',
-		'Run Swift launcher tests',
+		'Run Swift launcher tests on macOS 26',
 		"${{ steps.stage-admission.outcome == 'success' }}"
 	],
 	[
