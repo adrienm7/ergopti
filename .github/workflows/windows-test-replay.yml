@@ -50,6 +50,12 @@ jobs:
           node tools/test/test-compact-data-sql.cjs
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Receive native Windows model environment controls
+        shell: pwsh
+        run: |
+          node tools/test/test-managed-ollama-protocol.cjs --windows-model-port
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Install the authenticated AutoHotkey runtime
         shell: pwsh
         run: |
