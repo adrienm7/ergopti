@@ -229,10 +229,10 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 
 	helpers.it("(lease-pong-budget) a PONG waits well past the worker's own command budget", function()
 		-- dev.152 still saw "timeout waiting for PONG 1" at start-up: the worker
-		-- answers within its private command budget of 1.75 s
-		-- (kPrivateCommandAckTimeoutSeconds in RemapLeaseWorker.swift), and the
-		-- 2.0 s deadline left 0.25 s for the pipe and a busy main thread.
-		local WORKER_COMMAND_BUDGET_SEC = 1.75
+		-- answers within its private command budget of 2.5 s
+		-- (kPrivateCommandAckTimeoutSeconds in RemapLeaseWorker.swift), and a
+		-- deadline 0.25 s over it left nothing for the pipe and a busy main thread.
+		local WORKER_COMMAND_BUDGET_SEC = 2.5
 		local MIN_LATENCY_MARGIN_SEC = 2.0
 		with_fixture(function(load_controller)
 			local controller, ctx = load_controller()
@@ -521,13 +521,13 @@ helpers.describe("karabiner lease controller: acknowledged commands", function()
 			local controller, ctx = load_controller()
 			controller.init()
 			controller.start()
-			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 4.0,
-				"READY covers native worker startup plus one atomic mode write")
+			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 7.5,
+				"READY covers the 3 s guardian ARM, one 2.5 s mode write and 2 s of latency")
 			ctx.chunk(1, "READY\n")
 
 			controller.pause()
-			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 3.75,
-				"PAUSED/RESUMED cover the worker's 1.75 s command budget plus 2 s of latency")
+			helpers.assert_eq(ctx.timers[#ctx.timers].delay, 4.5,
+				"PAUSED/RESUMED cover the worker's 2.5 s command budget plus 2 s of latency")
 			ctx.chunk(1, "PAUSED\n")
 
 			controller.stop("budget proof")

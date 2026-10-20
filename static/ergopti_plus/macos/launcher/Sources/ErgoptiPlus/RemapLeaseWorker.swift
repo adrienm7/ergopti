@@ -66,7 +66,20 @@ private let kFirstReservedSocketDescriptor: Int32 = 4
 private let kMaximumHeartbeatSeconds: TimeInterval = 86_400
 let kDefaultHeartbeatSeconds: TimeInterval = 5
 let kCLITimeoutSeconds: TimeInterval = 1.5
-private let kPrivateCommandAckTimeoutSeconds: TimeInterval = 1.75
+/// Covers, beyond one CLI child's own timeout, its spawn, the reap polls, the
+/// SIGTERM grace and the private socket round trip. At 0.25 s the outer deadline
+/// won that race on a loaded Mac: the inner's PING_FAILED and FAILED answers never
+/// arrived, so one slow karabiner_cli lost the whole lease (issue #95).
+let kPrivateCommandSettlementMarginSeconds: TimeInterval = 1.0
+let kPrivateCommandAckTimeoutSeconds = kCLITimeoutSeconds + kPrivateCommandSettlementMarginSeconds
+/// Hammerspoon main-thread time the inner tolerates without a PING before it
+/// treats the silence as a lost outer. A lazily built window filter blocked that
+/// thread for 4.8 s and then 3.3 s; each stall fenced a healthy lease and exited
+/// 73 (issue #95). A dead Hammerspoon still fences at once: its
+/// stdin EOF reaches the outer without waiting for this budget.
+let kHostStallAllowanceSeconds: TimeInterval = 10
+/// Silence beyond the heartbeat interval after which the inner fences.
+let kLeaseInnerSilenceSlackSeconds = kPrivateCommandAckTimeoutSeconds + kHostStallAllowanceSeconds
 private let kPrivateFenceAckTimeoutSeconds: TimeInterval = 3.75
 let kFenceConfirmationGraceSeconds: TimeInterval = 0.25
 private let kRequiredFenceTransportCount = 2
@@ -1524,6 +1537,7 @@ final class KarabinerLeaseInnerRuntime {
 	private let executor: LeaseCLIExecuting
 	private let cliTimeout: TimeInterval
 	private let fenceConfirmationGrace: TimeInterval
+	private let outerSilenceSlack: TimeInterval
 	private let uptime: () -> TimeInterval
 	private let sleep: (useconds_t) -> Void
 
@@ -1534,6 +1548,7 @@ final class KarabinerLeaseInnerRuntime {
 	///   - executor: Exact direct-child executor.
 	///   - cliTimeout: Per-child timeout.
 	///   - fenceConfirmationGrace: Minimum monotonic separation between clean transports.
+	///   - outerSilenceSlack: Silence beyond the heartbeat interval before fencing.
 	///   - uptime: Monotonic clock used for confirmation separation.
 	///   - sleep: Retry delay primitive injectable for deterministic tests.
 	init(
@@ -1542,6 +1557,7 @@ final class KarabinerLeaseInnerRuntime {
 		executor: LeaseCLIExecuting,
 		cliTimeout: TimeInterval = kCLITimeoutSeconds,
 		fenceConfirmationGrace: TimeInterval = kFenceConfirmationGraceSeconds,
+		outerSilenceSlack: TimeInterval = kLeaseInnerSilenceSlackSeconds,
 		uptime: @escaping () -> TimeInterval = {
 			ProcessInfo.processInfo.systemUptime
 		},
@@ -1552,6 +1568,7 @@ final class KarabinerLeaseInnerRuntime {
 		self.executor = executor
 		self.cliTimeout = cliTimeout
 		self.fenceConfirmationGrace = fenceConfirmationGrace
+		self.outerSilenceSlack = outerSilenceSlack
 		self.uptime = uptime
 		self.sleep = sleep
 	}
@@ -1562,9 +1579,10 @@ final class KarabinerLeaseInnerRuntime {
 		while true {
 			// ACTIVATE is the Hammerspoon-originated bootstrap liveness pulse. The
 			// recurring Lua timer first fires at heartbeatSeconds, while this inner
-			// permits the additional private-command slack before declaring silence.
+			// permits the private-command budget plus a main-thread stall allowance
+			// before declaring silence.
 			let event = channel.nextEvent(
-				timeout: identity.heartbeatSeconds + kPrivateCommandAckTimeoutSeconds
+				timeout: identity.heartbeatSeconds + outerSilenceSlack
 			)
 			switch event {
 			case .peerClosed, .outerSilent:

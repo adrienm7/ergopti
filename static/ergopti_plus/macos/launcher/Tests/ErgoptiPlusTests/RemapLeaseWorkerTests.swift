@@ -3838,16 +3838,17 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			heartbeatSeconds: 0.01
 		)
 		let executor = ScriptedLeaseCLIExecutor(results: [], probeCalls: [])
+		// The production slack adds a ten-second main-thread stall allowance; the
+		// mechanism under test is the same with the private command budget alone.
+		let silenceSlack = kPrivateCommandAckTimeoutSeconds
 		let runtime = KarabinerLeaseInnerRuntime(
 			identity: identity,
 			channel: SocketLeaseInnerChannel(descriptor: privateSockets[1]),
 			executor: executor,
-			cliTimeout: 0.05
+			cliTimeout: 0.05,
+			outerSilenceSlack: silenceSlack
 		)
-		var acknowledgementDeadline = LeasePrivateCommandDeadline()
-		acknowledgementDeadline.arm(for: .activate(kLeaseModeActive), now: 0)
-		let expectedSilence = identity.heartbeatSeconds
-			+ (acknowledgementDeadline.deadline ?? 0)
+		let expectedSilence = identity.heartbeatSeconds + silenceSlack
 
 		let started = ProcessInfo.processInfo.systemUptime
 		let exitCode = runtime.run()
@@ -3924,7 +3925,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			modeName: "ergopti_mode_\(token)",
 			revokedName: "ergopti_revoked_\(token)",
 			initialMode: kLeaseModeActive,
-			heartbeatSeconds: 5
+			heartbeatSeconds: kDefaultHeartbeatSeconds
 		)
 		let runtime = KarabinerLeaseOuterRuntime(
 			identity: identity,
@@ -3935,14 +3936,15 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 			parentInputDescriptor: parentPipe[0],
 			parentOutputDescriptor: outputDescriptor
 		)
+		let silenceBudget = kDefaultHeartbeatSeconds + kLeaseInnerSilenceSlackSeconds
 		let started = ProcessInfo.processInfo.systemUptime
 		let exitCode = runtime.run()
 		let elapsed = ProcessInfo.processInfo.systemUptime - started
 		XCTAssertEqual(exitCode, LeaseWorkerExit.innerFailed.rawValue)
 		XCTAssertEqual(recovery.calls, 0, "the no-effect test must never reach canonical CLI fallback")
-		XCTAssertGreaterThanOrEqual(elapsed, 6.75,
-			"the actual inner must exhaust its unchanged five-second pulse plus 1.75-second slack")
-		XCTAssertLessThan(elapsed, 12,
+		XCTAssertGreaterThanOrEqual(elapsed, silenceBudget,
+			"the actual inner must exhaust its five-second pulse plus the production silence slack")
+		XCTAssertLessThan(elapsed, silenceBudget + 5.25,
 			"the exact native silence and replacement fence must finish within the test bound")
 		XCTAssertEqual(try String(contentsOf: output, encoding: .utf8), "READY\n",
 			"no STOP or PING was sent; outer failure must not invent a terminal public acknowledgement")
@@ -4745,9 +4747,9 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 		] {
 			var deadline = LeasePrivateCommandDeadline()
 			deadline.arm(for: command, now: now)
-			XCTAssertEqual(deadline.deadline, 101.75)
-			XCTAssertFalse(deadline.isExpired(at: 101.749))
-			XCTAssertTrue(deadline.isExpired(at: 101.75))
+			XCTAssertEqual(deadline.deadline, 102.5)
+			XCTAssertFalse(deadline.isExpired(at: 102.499))
+			XCTAssertTrue(deadline.isExpired(at: 102.5))
 		}
 
 		var fenceDeadline = LeasePrivateCommandDeadline()
@@ -5467,7 +5469,7 @@ final class KarabinerLeaseWorkerTests: XCTestCase {
 						groupStopStatus = Darwin.killpg(groupID, SIGSTOP)
 					}
 				}
-				return 2
+				return kPrivateCommandAckTimeoutSeconds + 0.25
 			}
 		)
 
