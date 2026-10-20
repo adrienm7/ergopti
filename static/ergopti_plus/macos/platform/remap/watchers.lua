@@ -31,7 +31,6 @@ local M = {}
 local hs             = hs
 local Logger         = require("infra.logger")
 local InputSourceBroker = require("adapters.input_source_broker")
-local TaskLifecycle  = require("adapters.task_lifecycle")
 local Timings        = require("infra.timings")
 local Keycodes       = require("infra.keycodes")
 local ShellRunner    = require("adapters.shell_runner")
@@ -39,7 +38,6 @@ local TimerScheduler = require("adapters.timer_scheduler")
 local KeyState       = require("adapters.key_state")
 local MouseControl   = require("adapters.mouse_control")
 local Registrar      = require("adapters.hotkey_registrar")
-local KePaths        = require("platform.remap.ke_paths")
 local LeaseContract  = require("platform.remap.lease_contract")
 local KeVariables   = require("platform.remap.ke_variables")
 -- Layout observation does not own keyboard-control resources. Acquire this
@@ -57,24 +55,17 @@ local MOD_SHIFT = "shift"
 local MOD_ALT = "alt"
 local MOD_CTRL = "ctrl"
 
-local KARABINER_CLI = KePaths.CLI
-
 -- macOS can emit two input-source change notifications in rapid succession
 -- during a layout switch — debouncing coalesces them into a single rebuild.
 -- Shared cross-driver value ([debounce] input_source_ms).
 local INPUT_SOURCE_DEBOUNCE_SEC = Timings.sec("debounce", "input_source_ms")
 
 -- mouseMoved fires at display refresh rate (~60–120 fps); capping the
--- subprocess check prevents CPU spikes when CapsWord is not even active.
+-- CapsWord check keeps the hottest eventtap cheap when CapsWord is not active.
 -- Shared cross-driver value ([ui] capsword_check_interval_ms).
 local NANOSECONDS_PER_SECOND = 1000000000
 local CAPSWORD_CHECK_INTERVAL_NS = Timings.sec("ui", "capsword_check_interval_ms")
 	* NANOSECONDS_PER_SECOND
-
--- karabiner_cli's exit status for options it does not recognise (cxxopts parse
--- error, src/bin/cli/src/main.cpp). No released karabiner_cli has a
--- --get-variable option, so the probe gets this status on every Mac.
-local KARABINER_CLI_UNKNOWN_OPTION_EXIT = 2
 
 -- Holds the pending debounce timer so consecutive notifications within the
 -- window supersede the previous one instead of triggering parallel rebuilds.
@@ -139,21 +130,11 @@ local _input_source_callback_owned = false
 -- whose stop fails remains physically live but becomes logically inert at once.
 local _input_source_watcher_gen = 0
 
--- Monotonic timestamp of the last CapsWord subprocess check.
+-- Monotonic timestamp of the last CapsWord check.
 local _capsword_last_check_ns = 0
 
--- Guard against spawning concurrent async checks while one is already in flight.
+-- Set while an accepted CapsWord clear settles, so pointer events queue no duplicate.
 local _capsword_check_pending = false
--- Set once karabiner_cli refused the probe's option: no later pointer event
--- spawns it again. A CapsWord this driver activated is still cancelled.
-local _capsword_probe_unsupported = false
--- Max time to wait for the karabiner_cli probe to complete before force-releasing
--- the pending lock. The async task only fires its callback on process EXIT, so a
--- started-but-hung/zombied CLI would otherwise leave the lock set forever (F-L6).
-local CAPSWORD_PROBE_TIMEOUT_SEC = 1.5
--- Watchdog timer declared ABOVE deactivate_capsword (closure-nil rule) so the task
--- callback can cancel it and the watchdog callback can reach the pending flag.
-local _capsword_probe_watchdog = nil
 
 -- Delayed CapsLock LED correction and the optional gestures-engine hook are
 -- lease-owned too; both must be cancellable when Ergopti remapping goes inert.
@@ -162,25 +143,10 @@ local _gestures_engine = nil
 local _capsword_listener_owned = false
 local _capsword_timer_cleanup_backlog = {}
 
--- Monotonic probe generation. A terminated or timed-out probe's callback still
--- fires, and it used to clear _capsword_check_pending and cancel the watchdog
--- unconditionally — the SUCCESSOR probe's, by then. The sibling layout read in
--- this same module was generation-gated for exactly this; the CapsWord probe was
--- not, so a slow probe could unlock a fresh one and leave two racing.
-local _capsword_gen = 0
--- Generation of an accepted CapsWord clear. Ordinary follow-up probes must not
--- cancel its delayed LED correction, but a newer clear or lifecycle restart must.
--- Separate lifecycle generation for installed event/touch callbacks. Probe
--- generations change on every query, so they cannot identify which watcher
--- closure owns an event queued before stop/restart.
+-- Lifecycle generation for installed event/touch callbacks: it identifies which
+-- watcher closure owns an event queued before stop/restart.
 local _capsword_watcher_gen = 0
 
--- GC root for the CapsWord probe tasks. An hs.task that is not referenced from a
--- GC root can be collected mid-run, which kills the subprocess and means its
--- completion callback never fires — here that would leave KE with capsword=1 and
--- the next spacebar would switch CapsLock back on. Canonical spelling recognised
--- by tests/meta/lua_safety/test_gc_retention.lua. Entries are released in the callbacks.
-local _active_tasks = {}
 -- Partial starts return nil to their caller, so this module must retain any
 -- eventtap whose rollback failed; no outer layer ever received that capability.
 local _capsword_watcher_backlog = {}
@@ -366,31 +332,32 @@ local function stop_layout_poll_timer(timer_handle, label)
 	return false
 end
 
---- Resets CapsWord: clears the KE variable then turns off the CapsLock LED.
---- Uses a time-based throttle and async hs.task to avoid blocking the Hammerspoon
---- main loop — hs.execute is synchronous and would lag the mouse at ~10 calls/sec.
-local function deactivate_capsword(capsword_variable_name, watcher_gen)
+--- Cancels a CapsWord this driver knows to be active: one it activated, or one
+--- whose Karabiner control signal it observed. karabiner_cli has no option to
+--- read a variable (no --get-variable), so no other activation can be detected
+--- and none is cleared. The clear is serialized and asynchronous; a throttle and
+--- a pending flag keep pointer events from queuing duplicates.
+--- @param watcher_gen number Watcher lifecycle generation.
+local function deactivate_capsword(watcher_gen)
 	if watcher_gen ~= _capsword_watcher_gen then return end
 	if not drain_scheduled_backlog(_capsword_timer_cleanup_backlog,
 		"CapsWord timer backlog") then
-		Logger.error(LOG, "CapsWord probe blocked by prior timer cleanup debt.")
+		Logger.error(LOG, "CapsWord clear blocked by prior timer cleanup debt.")
 		return
 	end
-	-- Throttle: mouseMoved fires at display refresh rate — cap subprocess spawns
+	-- Throttle: mouseMoved fires at display refresh rate.
 	local now_ns = TimerScheduler.now_ns()
 	if now_ns - _capsword_last_check_ns < CAPSWORD_CHECK_INTERVAL_NS then return end
-	-- Skip if a check is already in flight to avoid concurrent async tasks
+	-- Skip while an accepted clear is still settling.
 	if _capsword_check_pending then return end
 	_capsword_last_check_ns   = now_ns
 	_capsword_check_pending   = true
-	_capsword_gen             = _capsword_gen + 1
-	local my_capsword_gen     = _capsword_gen
 	local supersede_callback_fired = false
 	local function finish_superseded_activation(ok, reason, revision)
 		supersede_callback_fired = true
 		complete_capsword_clear(watcher_gen, ok, reason, revision)
 	end
-	local supersede_ok, superseded_or_err, my_probe_revision = pcall(
+	local supersede_ok, superseded_or_err = pcall(
 		KeVariables.supersede_capsword_activation,
 		finish_superseded_activation
 	)
@@ -400,159 +367,13 @@ local function deactivate_capsword(capsword_variable_name, watcher_gen)
 			tostring(superseded_or_err))
 		return
 	end
-	if superseded_or_err == true or supersede_callback_fired then
-		-- A known local activation was either queued for clearing or failed with
-		-- a visible settlement. Do not race it with a second probe-owned write.
-		return
+	-- An accepted clear, or one that already settled, owns the pending flag.
+	if superseded_or_err == true or supersede_callback_fired then return end
+	_capsword_check_pending = false
+	if superseded_or_err ~= false then
+		Logger.error(LOG, "CapsWord activation supersession returned an invalid result: %s.",
+			tostring(superseded_or_err))
 	end
-	if superseded_or_err ~= false
-		or type(my_probe_revision) ~= "number"
-		or my_probe_revision < 0
-		or my_probe_revision ~= math.floor(my_probe_revision) then
-		_capsword_check_pending = false
-		Logger.error(LOG, "CapsWord activation supersession returned an invalid revision: %s.",
-			tostring(my_probe_revision))
-		return
-	end
-	if _capsword_probe_unsupported then
-		_capsword_check_pending = false
-		return
-	end
-	local function abandon_probe(failed_task, reason)
-		if watcher_gen ~= _capsword_watcher_gen
-			or my_capsword_gen ~= _capsword_gen then return end
-		-- A start/scheduling failure can still produce a late task callback. Move
-		-- the generation first so that callback cannot mutate a successor probe.
-		_capsword_gen = _capsword_gen + 1
-		_capsword_check_pending = false
-		if _capsword_probe_watchdog then
-			if not cancel_scheduled_timer(_capsword_probe_watchdog, "Abandoned CapsWord watchdog") then
-				retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
-			end
-			_capsword_probe_watchdog = nil
-		end
-		if failed_task then
-			-- Signal acceptance does not release the native task. Only its exact
-			-- completion callback removes the GC root, even after abandonment.
-			if not TaskLifecycle.terminate(failed_task, "Abandoned CapsWord probe") then
-				Logger.error(LOG, "Abandoned CapsWord task termination failed; retained for retry.")
-			end
-		end
-		if reason then Logger.error(LOG, "%s", reason) end
-	end
-
-	-- Async get: unblocks the main loop immediately; callback fires on completion
-	local task
-	local function finish_probe(exit_code, stdout, _)
-		if task then _active_tasks[task] = nil end
-		-- A superseded probe releases nothing: the flag and the watchdog it would
-		-- clear belong to the probe that replaced it.
-		if watcher_gen ~= _capsword_watcher_gen
-			or my_capsword_gen ~= _capsword_gen then return end
-		if _capsword_probe_watchdog then
-			if not cancel_scheduled_timer(_capsword_probe_watchdog, "Completed CapsWord watchdog") then
-				retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
-			end
-			_capsword_probe_watchdog = nil
-		end
-		if exit_code == KARABINER_CLI_UNKNOWN_OPTION_EXIT then
-			_capsword_check_pending = false
-			_capsword_probe_unsupported = true
-			Logger.warn(LOG,
-				"karabiner_cli cannot read variables (--get-variable is not one of its options, exit %d): "
-					.. "a pointer event now cancels only a CapsWord this driver activated.",
-				KARABINER_CLI_UNKNOWN_OPTION_EXIT)
-			return
-		end
-		if exit_code ~= 0 then
-			_capsword_check_pending = false
-			Logger.error(LOG, "CapsWord variable probe exited with status %s.", tostring(exit_code))
-			return
-		end
-		if tonumber(stdout) ~= 1 then
-			_capsword_check_pending = false
-			return
-		end
-
-		Logger.trace(LOG, "Pointer event while CapsWord active — deactivating…")
-
-		local clear_callback_fired = false
-		local function finish_conditional_clear(ok, reason, revision)
-			clear_callback_fired = true
-			complete_capsword_clear(watcher_gen, ok, reason, revision)
-		end
-		local clear_ok, accepted_or_err = pcall(
-			KeVariables.set_if_revision,
-			"capsword",
-			0,
-			my_probe_revision,
-			finish_conditional_clear
-		)
-		if not clear_ok then
-			if not clear_callback_fired then _capsword_check_pending = false end
-			Logger.error(LOG, "Conditional CapsWord clear raised: %s", tostring(accepted_or_err))
-			return
-		end
-		if accepted_or_err ~= true and not clear_callback_fired then
-			_capsword_check_pending = false
-			Logger.error(LOG, "Conditional CapsWord clear was rejected without settlement.")
-		end
-		return
-
-	end
-	local task_or_err = TaskLifecycle.native("CapsWord variable probe",
-		KARABINER_CLI,
-		function(...) Logger.pcall(LOG, finish_probe, ...) end,
-		{"--get-variable", capsword_variable_name}
-	)
-	task = task_or_err
-	-- Nil means the CLI binary is absent; release the lock immediately so the guard is not permanent.
-	if not task then
-		abandon_probe(nil, "CapsWord check task is nil; CLI binary absent (karabiner-capsword-lock-leak).")
-		return
-	end
-	-- If task:start() returns false the callback never fires — release the lock so subsequent
-	-- pointer events are not permanently blocked (karabiner-capsword-lock-leak).
-	_active_tasks[task] = true
-	if not TaskLifecycle.start(task, "CapsWord variable probe") then
-		abandon_probe(task,
-			"CapsWord check task failed to start (karabiner-capsword-lock-leak).")
-		return
-	end
-	-- Started OK, but the async task fires its callback only on process EXIT. Arm a watchdog
-	-- so a CLI that starts then hangs/zombies still releases the pending lock instead
-	-- of permanently disabling trackpad auto-deactivation of CapsWord (F-L6). Scheduled
-	-- via the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
-	-- properly attributed to the adapter boundary (PF-1).
-	if _capsword_probe_watchdog then
-		if not cancel_scheduled_timer(_capsword_probe_watchdog, "Superseded CapsWord watchdog") then
-			retain_cleanup_handle(_capsword_timer_cleanup_backlog, _capsword_probe_watchdog)
-		end
-		_capsword_probe_watchdog = nil
-	end
-	local watchdog
-	local ok_watchdog, watchdog_or_err, watchdog_committed = pcall(
-		TimerScheduler.after,
-		CAPSWORD_PROBE_TIMEOUT_SEC,
-		function()
-			if watcher_gen ~= _capsword_watcher_gen
-				or my_capsword_gen ~= _capsword_gen
-				or _capsword_probe_watchdog ~= watchdog then return end
-			_capsword_probe_watchdog = nil
-			if _capsword_check_pending then
-				Logger.debug(LOG, "CapsWord probe timed out — releasing lock (karabiner-capsword-lock-leak).")
-				abandon_probe(task, nil)
-			end
-		end
-	)
-	watchdog = ok_watchdog and watchdog_or_err or nil
-	if watchdog_committed ~= true or type(watchdog) ~= "table" or watchdog.fired then
-		abandon_probe(task, ok_watchdog
-			and "CapsWord probe watchdog could not be armed."
-			or "CapsWord probe watchdog raised: " .. tostring(watchdog_or_err))
-		return
-	end
-	_capsword_probe_watchdog = watchdog
 end
 
 --- Starts the eventtap watching for any pointer event that signals the user
@@ -564,6 +385,8 @@ end
 --- @param lease_token string Exact active generation token.
 --- @return hs.eventtap|nil The running eventtap watcher instance.
 function M.start_gesture_watcher(gestures_engine, lease_token)
+	-- The lease token gates the control-signal listener below; refuse a token
+	-- that cannot even name the generation's CapsWord variable.
 	local scoped_name, scope_err = LeaseContract.runtime_variable_name("capsword", lease_token)
 	if not scoped_name then
 		Logger.error(LOG, "CapsWord watcher refused — %s.", tostring(scope_err))
@@ -578,10 +401,9 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		ControlSentinels = owner_or_err
 	end
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
-	_capsword_gen = _capsword_gen + 1
 	local watcher_gen = _capsword_watcher_gen
 	local function deactivate_current_capsword()
-		return deactivate_capsword(scoped_name, watcher_gen)
+		return deactivate_capsword(watcher_gen)
 	end
 	local ev = hs.eventtap.event.types
 	local watcher
@@ -596,8 +418,8 @@ function M.start_gesture_watcher(gestures_engine, lease_token)
 		},
 		function(_event)
 			if watcher_gen ~= _capsword_watcher_gen then return false end
-			-- This is the hottest eventtap. Keep the full probe entry guarded even
-			-- though each async constructor/completion also has its own file-log boundary.
+			-- This is the hottest eventtap. Keep the full entry guarded even though
+			-- each asynchronous clear settlement also has its own file-log boundary.
 			Logger.pcall(LOG, deactivate_current_capsword)
 			return false
 		end
@@ -682,7 +504,6 @@ end
 --- @param watcher table|nil Eventtap returned by start_gesture_watcher().
 function M.stop_gesture_watcher(watcher)
 	_capsword_watcher_gen = _capsword_watcher_gen + 1
-	_capsword_gen = _capsword_gen + 1
 	_capsword_check_pending = false
 	_capsword_last_check_ns = 0
 	local all_stopped = true
@@ -705,13 +526,6 @@ function M.stop_gesture_watcher(watcher)
 			all_stopped = false
 		end
 	end
-	if _capsword_probe_watchdog then
-		if cancel_scheduled_timer(_capsword_probe_watchdog, "CapsWord probe watchdog") then
-			_capsword_probe_watchdog = nil
-		else
-			all_stopped = false
-		end
-	end
 	if _capsword_led_timer then
 		if cancel_scheduled_timer(_capsword_led_timer, "CapsWord LED timer") then
 			_capsword_led_timer = nil
@@ -727,17 +541,6 @@ function M.stop_gesture_watcher(watcher)
 			all_stopped = false
 		end
 	end
-	local tasks = {}
-	for task in pairs(_active_tasks) do tasks[#tasks + 1] = task end
-	for _, task in ipairs(tasks) do
-		if not TaskLifecycle.terminate(task, "CapsWord probe teardown") then
-			Logger.error(LOG, "CapsWord probe task termination failed; retained for retry.")
-			all_stopped = false
-		end
-	end
-	-- A signal can be accepted while the original process is still running.
-	-- Completions release only their captured task, including during reentry.
-	if next(_active_tasks) ~= nil then all_stopped = false end
 	if _gestures_engine and type(_gestures_engine.set_any_touch_hook) == "function" then
 		local stopped, stop_err = pcall(_gestures_engine.set_any_touch_hook, nil)
 		if stopped then
@@ -1035,7 +838,7 @@ function M.start_input_source_watcher(on_change)
 		-- Arm the watchdog alongside the guard so a read whose completion callback
 		-- never fires still releases it and the next tick can retry. Scheduled via
 		-- the TimerScheduler adapter (not raw hs.timer.doAfter) so this OS call is
-		-- attributed to the adapter boundary, mirroring the CapsWord probe watchdog.
+		-- attributed to the adapter boundary.
 		if _layout_poll_watchdog then
 			if not cancel_scheduled_timer(_layout_poll_watchdog, "Superseded layout watchdog") then
 				retain_cleanup_handle(_layout_watchdog_cleanup_backlog, _layout_poll_watchdog)
