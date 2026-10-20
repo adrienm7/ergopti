@@ -305,7 +305,31 @@ control('legacy family receipt missing mandatory C refused', () =>
 		runner.evidenceCount('ownership', ownershipEvidence.split('\n').slice(1).join('\n'), HEAD)
 	)
 );
-assert.equal(count, 49, 'Independent C receipt extension floor changed');
+control('refused child names its command and bounded stderr tail', () => {
+	assert.equal(
+		runner.refusedChildSummary('/usr/bin/git', {
+			status: 128,
+			signal: null,
+			error: null,
+			stdout: 'never shown',
+			stderr:
+				"Cloning into 'source'...\nfatal: unable to access 'https://github.com/q66/cffi-lua.git/'\n"
+		}),
+		"git exit 128; stderr: Cloning into 'source'... | fatal: unable to access 'https://github.com/q66/cffi-lua.git/'"
+	);
+	assert.equal(
+		runner.refusedChildSummary('meson', { status: null, signal: 'SIGKILL', stderr: '' }),
+		'meson signal SIGKILL'
+	);
+	assert.equal(runner.refusedChildSummary('cc', undefined), 'cc no result');
+	const long = runner.refusedChildSummary('cc', {
+		status: 1,
+		signal: null,
+		stderr: 'x'.repeat(1000)
+	});
+	assert.equal(long, 'cc exit 1; stderr: ' + 'x'.repeat(400));
+});
+assert.equal(count, 50, 'Independent C receipt extension floor changed');
 console.log('[OK] Linux updater namespace receipts: 17 source controls passed; no native credit.');
 
 // Actual filesystem admission controls; no child process or native qualification.

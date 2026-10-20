@@ -55,6 +55,7 @@ const SUMMARY = {
 	ownership: 'Native updater temporary ownership receipts: 12 checks, 0 failures',
 	allocation: 'Native updater temporary allocation receipts: 12 checks, 0 failures'
 };
+const STDERR_TAIL_CHARS = 400;
 function refused() {
 	throw new Error('Temporary updater native admission or physical closure refused.');
 }
@@ -96,6 +97,25 @@ function ordinary(filename) {
 	const fact = fs.lstatSync(filename);
 	if (!fact.isFile() || fact.isSymbolicLink()) refused();
 	return fact;
+}
+/**
+ * Names a refused child command and its bounded stderr tail, so a CI failure
+ * says which step failed (a network clone, a build) instead of only its phase.
+ * @param {string} command Executable path or name.
+ * @param {object|undefined} result The owned child phase result.
+ * @returns {string} One line without the child's stdout.
+ */
+function refusedChildSummary(command, result) {
+	const outcome = !result
+		? 'no result'
+		: result.error
+			? 'error ' + (result.error.code || result.error.message)
+			: result.signal != null
+				? 'signal ' + result.signal
+				: 'exit ' + result.status;
+	const stderr = typeof result?.stderr === 'string' ? result.stderr.trim() : '';
+	const tail = stderr.slice(-STDERR_TAIL_CHARS).replace(/\s*\n\s*/g, ' | ');
+	return path.basename(String(command)) + ' ' + outcome + (tail ? '; stderr: ' + tail : '');
 }
 function closed(result) {
 	return result && !result.error && result.signal == null && Number.isInteger(result.status);
@@ -250,6 +270,7 @@ async function run({
 		log('[DEFERRED] Temporary updater native qualification requires Linux; no native receipt.');
 		return 0;
 	}
+	let refusedChild = '';
 	let phase = 'source-admission',
 		cancelled = false;
 	const deadline = process.hrtime.bigint() + 1200000n * 1000000n;
@@ -347,7 +368,10 @@ async function run({
 				gateDeadline: deadline
 			});
 			sourceCurrent();
-			if (!closed(result) || (!allowFailure && !complete(result))) refused();
+			if (!closed(result) || (!allowFailure && !complete(result))) {
+				refusedChild = refusedChildSummary(command, result);
+				refused();
+			}
 			return result;
 		}
 		const actualHead = await child('git', ['-C', root, 'rev-parse', 'HEAD']);
@@ -700,7 +724,8 @@ async function run({
 		error(
 			'[FAIL] Linux updater temporary native ' +
 				phase +
-				': admission or physical closure refused; private evidence retained.'
+				': admission or physical closure refused; private evidence retained.' +
+				(refusedChild ? ' Refused command: ' + refusedChild : '')
 		);
 		return 1;
 	} finally {
@@ -760,5 +785,6 @@ module.exports = {
 	namespaceReceipt,
 	evidenceCount,
 	captureReceipt,
-	cryptoReceipt
+	cryptoReceipt,
+	refusedChildSummary
 };
