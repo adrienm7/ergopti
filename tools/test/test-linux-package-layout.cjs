@@ -677,6 +677,51 @@ for (const staleSurface of [
 	}
 }
 
+// ─── 10. The .rpm asset is named after the architecture it is built for ─────
+//
+// ROOT CAUSE ENCODED: 1731adf7e9 built the .rpm for x86_64 because it carries a
+// native x86_64 library, yet the release asset kept the name
+// ErgoptiPlus-linux-noarch.rpm, telling an aarch64 user it would install. The
+// asset name is derived here from the packager's ARCH, which the spec's
+// BuildArch also uses, so the name and the package cannot disagree again.
+
+const RPM_BUILDER = 'tools/build/build-linux-rpm.sh';
+const rpmBuilderSrc = read(RPM_BUILDER);
+const rpmArchMatch = rpmBuilderSrc.match(/^ARCH="([^"]+)"$/m);
+if (!rpmArchMatch) {
+	errors.push(`${RPM_BUILDER}: must declare the package architecture as ARCH="...".`);
+} else {
+	const rpmArch = rpmArchMatch[1];
+	if (rpmArch !== 'x86_64') {
+		errors.push(
+			`${RPM_BUILDER}: ARCH is "${rpmArch}", but the bundle carries the x86_64 native ` +
+				'archive backend, so the .rpm must be built for x86_64.'
+		);
+	}
+	if (!/^BuildArch:\s+\$ARCH$/m.test(rpmBuilderSrc)) {
+		errors.push(`${RPM_BUILDER}: the spec's BuildArch must be $ARCH, the asset's architecture.`);
+	}
+	const RPM_ASSET = `ErgoptiPlus-linux-${rpmArch}.rpm`;
+	for (const [rel, minimum] of [
+		['.github/workflows/ci-linux.yml', 4],
+		['.github/workflows/ci.yml', 3]
+	]) {
+		const text = read(rel);
+		const count = text.split(RPM_ASSET).length - 1;
+		if (count < minimum) {
+			errors.push(
+				`${rel}: names ${RPM_ASSET} ${count} time(s), expected at least ${minimum} ` +
+					'(staging, metadata log and upload; release check, table and notes).'
+			);
+		}
+		for (const asset of text.match(/ErgoptiPlus-[A-Za-z0-9_.-]+/g) ?? []) {
+			if (/noarch/i.test(asset)) {
+				errors.push(`${rel}: Linux asset "${asset}" claims noarch; the packages are x86_64.`);
+			}
+		}
+	}
+}
+
 if (errors.length > 0) {
 	console.error(
 		'\x1b[31m[ERROR] Linux package layout diverges from the canonical runtime layout:\x1b[0m'

@@ -3733,7 +3733,7 @@ jobs:
           rename_one "$(find build/linux -maxdepth 1 -name '*.deb' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-linux-amd64.deb ".deb"
           rename_one "$(find build/linux/rpm/RPMS -name '*.rpm' -type f 2>/dev/null | head -1)" \
-              build/linux/ErgoptiPlus-linux-noarch.rpm ".rpm"
+              build/linux/ErgoptiPlus-linux-x86_64.rpm ".rpm"
           rename_one "$(find build/linux -maxdepth 1 -name '*.AppImage' -type f 2>/dev/null | head -1)" \
               build/linux/ErgoptiPlus-x86_64.AppImage "AppImage"
 
@@ -3747,8 +3747,8 @@ jobs:
         run: |
           set -euo pipefail
           dpkg-deb --info build/linux/ErgoptiPlus-linux-amd64.deb
-          rpm -qip build/linux/ErgoptiPlus-linux-noarch.rpm
-          rpm -qlp build/linux/ErgoptiPlus-linux-noarch.rpm | sed -n '1,20p'
+          rpm -qip build/linux/ErgoptiPlus-linux-x86_64.rpm
+          rpm -qlp build/linux/ErgoptiPlus-linux-x86_64.rpm | sed -n '1,20p'
 
       # The no-root path the release notes point every other distribution at. It
       # is the only format whose installer is our own script rather than a
@@ -3813,7 +3813,7 @@ jobs:
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}
             build/linux/${{ env.LINUX_BUNDLE_ASSET }}.sha256
             build/linux/ErgoptiPlus-linux-amd64.deb
-            build/linux/ErgoptiPlus-linux-noarch.rpm
+            build/linux/ErgoptiPlus-linux-x86_64.rpm
             build/linux/ErgoptiPlus-x86_64.AppImage
 
       - name: Record mandatory package evidence
