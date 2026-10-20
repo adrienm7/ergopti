@@ -135,11 +135,28 @@ _SICU_Case(Owner, Mode) {
 			Sleep(10)
 		}
 		AssertEqual(1, State.Calls, "the native child must settle once: " . State.ErrorText . State.Output)
+		if Owner == "prototype" {
+			; Keep actual measurements even on success, not only in a red assertion.
+			for Line in StrSplit(State.Output, "`n", "`r")
+				if InStr(Line, "MEASURE ") == 1 || InStr(Line, "RECEIPT ") == 1
+					_TestPrint("# endchars-prototype " . Line)
+		}
 		AssertEqual(0, State.Code, "native capture refused or failed: " . State.ErrorText . State.Output)
 		AssertEqual("", State.ErrorText, "native parse/runtime errors must not be hidden: " . State.Output)
+		if Owner == "prototype" {
+			Series := "\d+(?:,\d+){7}"
+			Measure := "m)^MEASURE case=" . CaseName . " runtime=2\.0\.26 qpf=[1-9]\d* samples=8"
+				. " build_ticks=\d+ validation_ticks=\d+ builds=1 literal_units=64515 literal_bytes=129032 native_endchars_capacity_bytes=129024"
+				. " source_derived_capacity=true constructor_endkeys_units=64522 constructor_named_key=Enter clock_ticks=" . Series . " cache_ticks=" . Series
+				. " reference_ctor_ticks=" . Series . " candidate_ctor_ticks=" . Series
+				. " constructor_order=reference_then_candidate includes_destruction=true hook_pooling=false\r?$"
+			AssertTrue(RegExMatch(State.Output, Measure) > 0,
+				"the native prototype must publish its complete unthresholded construction and cache measurements: " . State.Output)
+		}
 		AssertTrue(RegExMatch(State.Output, "m)^RECEIPT source_scope=parent_execution_manifest .*case=" . CaseName . " ") > 0,
 			"the exact native case requires its UTF-16 capture receipt: " . State.Output)
-		AssertTrue(RegExMatch(State.Output, "m)^PASS native-inputhook-unicode-capture\r?$") > 0,
+		Ack := Owner == "prototype" ? "native-inputhook-endchars-prototype" : "native-inputhook-unicode-capture"
+		AssertTrue(RegExMatch(State.Output, "m)^PASS " . Ack . "\r?$") > 0,
 			"the complete scalar and independent-letter goldens must pass: " . State.Output)
 		AssertTrue(RegExMatch(State.Output, "m)^NATURAL_EXIT code=0 native_input_debt=false\r?$") > 0,
 			"the inserted native batch must drain before natural exit: " . State.Output)
@@ -185,3 +202,7 @@ for _SICU_Owner in ["one-shot", "dead-key"]
 	for _SICU_Mode in ["a", "AB", "surrogate"]
 		Test("Unicode scalar capture: " . _SICU_Owner . " " . _SICU_Mode . " (inputhook-unicode-capture)",
 			_SICU_Case.Bind(_SICU_Owner, _SICU_Mode))
+
+for _SICU_PrototypeMode in ["a", "AB", "surrogate", "open-brace", "close-brace", "punctuation", "enter"]
+	Test("native EndChars prototype: " . _SICU_PrototypeMode . " keeps one scalar and reports cost (inputhook-endchars-prototype)",
+		_SICU_Case.Bind("prototype", _SICU_PrototypeMode))
