@@ -113,7 +113,9 @@ local function with_undo(options, body)
 				terminators_mod = { is_terminator = function() return false end },
 				RepeatKey = { is_enabled = function() return false end }, opts = { dry_run = false },
 				keylogger = { is_password_app = function() return false end, suppress = function() end,
-					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end },
+					unsuppress = function() end, on_keydown = function() end, record_hotstring = function() end,
+					-- The physical Backspace that requests the Undo is a manual correction.
+					record_correction = function() observations.corrections = (observations.corrections or 0) + 1 end },
 				engine = { reset = function() end, apply_expansion = function() end, on_char = function()
 					return { trigger = options.trigger, replacement = "ZZ", backspace_count = 1,
 						is_private = options.private == true }
@@ -123,6 +125,7 @@ local function with_undo(options, body)
 			character("x", 30)
 			helpers.assert_type(undo(), "table", "Main must arm the Undo through its real expansion ACK path")
 			control("backspace", {})
+			helpers.assert_eq(observations.corrections, 1, "the Undo Backspace still counts as one manual correction")
 			observations.undo = undo(); observations.clipboard = clipboard
 			body(observations)
 		end)
