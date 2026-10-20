@@ -121,6 +121,19 @@ SQLite flush before advancing virtual time; a readable rollback is not a
 committed configuration snapshot. Shutdown assertions require actual native
 close acknowledgments, independently of the clock being simulated.
 
+### project-linux-capsword-rewrites-the-buffer-only
+
+The tray CapsWord (`modules/shortcuts/manager.lua`, `toggle_caps_word`) only
+changes the character `handle_char` hands the hotstring engine: the key itself
+was already forwarded unchanged, so the application never receives a capital.
+The native CapsWord of `platform/remap/tap_hold_engine.lua`, which does emit
+capitals, stays publicly denied (catalogue action `caps_word` is AHK-only)
+until its source/output join is qualified, and keeps its fixed cancel controls.
+The [shortcuts.caps_word] auto-off settings end the tray session (delimiters,
+delay, pointer kinds through the hook's `onPointerEvent`). Action: wire the
+same policy into the native engine when that denial is lifted; do not mistake
+the tray toggle for working output.
+
 ## Linux native boundaries
 
 ### project-linux-absence-needs-enoent

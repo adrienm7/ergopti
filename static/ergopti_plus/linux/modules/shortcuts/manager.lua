@@ -19,8 +19,11 @@
 ---    consumption callback; this module owns its switch
 ---    (shortcuts.wrap_text_if_selected) and the wrap-pair catalogue.
 --- 2. CapsWord: toggled via menu or shortcut. When active, the next word's
----    first letter is capitalized and CapsWord auto-disengages. Hooked into
----    the daemon's on_char for per-keystroke processing.
+---    first letter is capitalized. It switches itself off on what
+---    [shortcuts.caps_word] names (a delay without a keystroke, a checked
+---    delimiter, a checked pointer kind), through the shared policy and
+---    modules/shortcuts/caps_word_auto_off. Hooked into the daemon's on_char,
+---    control-key and pointer callbacks.
 --- 3. Text transforms: clipboard-based transforms that copy the selection,
 ---    apply a transform function, paste the result, and restore the clipboard.
 --- ==============================================================================
@@ -39,6 +42,9 @@ local EventLoop = require("adapters.event_loop")
 local ComboEmitter = require("modules.gestures.combo_emitter")
 local Injector = require("modules.hotstrings.injector")
 local EvdevCodes = require("infra.evdev_codes")
+local Monotonic = require("infra.monotonic")
+local CapsWordPolicy = require("caps_word.auto_off")
+local CapsWordAutoOff = require("modules.shortcuts.caps_word_auto_off")
 local LOG = "modules.shortcuts.manager"
 local _configuration_owner = nil
 local ENABLED_PATH = "shortcuts.enabled"
@@ -354,11 +360,72 @@ end
 
 local _caps_word_active = false
 local _caps_word_triggered = false  -- true after first letter capitalized, waiting for word end
+-- What ends this CapsWord session on its own (modules/shortcuts/caps_word_auto_off),
+-- compiled when it was switched on; nil while CapsWord is off.
+local _caps_word_policy = nil
+-- Monotonic time of the last keystroke of the session, for the idle delay.
+local _caps_word_last_ms = nil
+-- Bumped by every session start and stop, so a queued idle check of an earlier
+-- session never ends a later one.
+local _caps_word_session = 0
 
 --- Returns whether CapsWord is currently active.
 --- @return boolean
 function M.is_caps_word_active()
 	return _caps_word_active
+end
+
+-- Both idle checks take the clock resolution off the measured gap: without
+-- luv the clock counts whole seconds, and two keys typed together would read a
+-- second apart (project-linux-coarse-clock-overstates-a-gap).
+
+--- Ends the current CapsWord session, naming why once.
+--- @param reason string What ended it, for the log.
+local function end_caps_word(reason)
+	if not _caps_word_active then return end
+	_caps_word_active, _caps_word_triggered = false, false
+	_caps_word_policy, _caps_word_last_ms = nil, nil
+	_caps_word_session = _caps_word_session + 1
+	Logger.info(LOG, "CapsWord: OFF (%s).", reason)
+end
+
+--- Queues the idle check of one session on the daemon loop: it ends the
+--- session once the delay has passed since its last keystroke, or queues
+--- itself again for the time still left.
+--- @param session integer Session the check belongs to.
+--- @param delay_ms number Milliseconds until the earliest possible expiry.
+local function schedule_idle_check(session, delay_ms)
+	local queued = EventLoop.defer(function()
+		if session ~= _caps_word_session or not _caps_word_active or not _caps_word_policy then return end
+		local now = Monotonic.now_ms()
+		if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
+			end_caps_word("no keystroke for the configured delay")
+			return
+		end
+		schedule_idle_check(session,
+			CapsWordPolicy.idle_delay_ms(_caps_word_policy) + Monotonic.resolution_ms() - (now - _caps_word_last_ms))
+	end, math.max(0, delay_ms))
+	if not queued then Logger.error(LOG, "CapsWord idle check could not be queued; the delay will not apply.") end
+end
+
+--- Starts a CapsWord session with the settings in force now.
+--- @return boolean started
+local function start_caps_word()
+	-- Read now, not cached from boot: a scope restore or a hand edit applies to
+	-- the next CapsWord without any disk access on the input path.
+	CapsWordAutoOff.refresh()
+	local called, policy = pcall(CapsWordAutoOff.policy)
+	if not called or type(policy) ~= "table" then
+		Logger.error(LOG, "CapsWord refused: its auto-off settings do not compile: %s.", tostring(policy))
+		return false
+	end
+	_caps_word_session = _caps_word_session + 1
+	_caps_word_active, _caps_word_triggered = true, false
+	_caps_word_policy, _caps_word_last_ms = policy, Monotonic.now_ms()
+	local delay = CapsWordPolicy.idle_delay_ms(policy)
+	if delay then schedule_idle_check(_caps_word_session, delay) end
+	Logger.info(LOG, "CapsWord: ON (idle delay %s).", delay and (delay .. " ms") or "never")
+	return true
 end
 
 --- Toggles CapsWord on/off via the menu.
@@ -368,10 +435,62 @@ function M.toggle_caps_word()
 	record("caps_word")
 	-- Metric delivery is protected external code and can reserve configuration.
 	if _configuration_owner ~= nil then return false end
-	_caps_word_active = not _caps_word_active
-	_caps_word_triggered = false
-	Logger.info(LOG, "CapsWord: %s", _caps_word_active and "ON" or "OFF")
+	if _caps_word_active then
+		end_caps_word("switched off")
+		return true
+	end
+	return start_caps_word()
+end
+
+--- Stamps a keystroke of the session and ends it when the delay before it was
+--- longer than the configured one.
+--- @return boolean active Whether CapsWord is still on.
+local function observe_caps_word_keystroke()
+	if not _caps_word_active or not _caps_word_policy then return false end
+	local now = Monotonic.now_ms()
+	if CapsWordPolicy.idle_expired(_caps_word_policy, _caps_word_last_ms, now - Monotonic.resolution_ms()) then
+		end_caps_word("no keystroke for the configured delay")
+		return false
+	end
+	_caps_word_last_ms = now
 	return true
+end
+
+--- Ends CapsWord on a typed checked delimiter, before the character is processed.
+--- @param ch string Characters of one typed event.
+--- @return boolean ended
+function M.caps_word_observe_text(ch)
+	if not observe_caps_word_keystroke() then return false end
+	if CapsWordPolicy.ends_on_text(_caps_word_policy, ch) then
+		end_caps_word("delimiter typed")
+		return true
+	end
+	return false
+end
+
+--- Ends CapsWord on a control key that is a checked delimiter (a modified Tab
+--- or Enter reaches the control callback, not the text one).
+--- @param key_name string The hook's control-key name.
+--- @return boolean ended
+function M.caps_word_observe_control(key_name)
+	if not observe_caps_word_keystroke() then return false end
+	if CapsWordPolicy.is_terminator_key(key_name) and CapsWordPolicy.ends_on_key(_caps_word_policy, key_name) then
+		end_caps_word("delimiter key " .. key_name)
+		return true
+	end
+	return false
+end
+
+--- Ends CapsWord on a pointer event of a checked kind.
+--- @param kind string|nil Declared pointer kind; nil for an event of no kind.
+--- @return boolean ended
+function M.caps_word_observe_pointer(kind)
+	if not _caps_word_active or not _caps_word_policy or kind == nil then return false end
+	if CapsWordPolicy.ends_on_pointer(_caps_word_policy, kind) then
+		end_caps_word("pointer " .. kind)
+		return true
+	end
+	return false
 end
 
 --- Processes a character for CapsWord.
@@ -586,10 +705,7 @@ function M.set_enabled(enabled)
 
 	_enabled = enabled
 	collision_generation = collision_generation + 1
-	if not enabled then
-		_caps_word_active = false
-		_caps_word_triggered = false
-	end
+	if not enabled then end_caps_word("shortcuts disabled") end
 	Logger.info(LOG, "Shortcuts %s.", enabled and "enabled" or "disabled")
 	return true
 end
@@ -697,6 +813,8 @@ function M.init(opts)
 	-- Reset CapsWord state so init() gives a clean slate for tests.
 	_caps_word_active = false
 	_caps_word_triggered = false
+	_caps_word_policy, _caps_word_last_ms = nil, nil
+	_caps_word_session = _caps_word_session + 1
 	_config_path = opts.config_path or require("infra.config_paths").config("config.toml")
 	_persist = opts.persist == true
 
