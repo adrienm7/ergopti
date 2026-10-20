@@ -71,6 +71,12 @@ global _KeyCombinationPressAssignments := Map()
 ; with the slots, so the criterion of the pair hotkeys only looks a key up.
 global _KeyCombinationScanNames := Map()
 global _KeyCombinationKeysByScanName := Map()
+; The pair menu last shown. A transient Menu held only by a local dies when
+; KeyCombinationShowPairMenu returns, and AHK runs the chosen item's callback
+; only after Show returns, so the click found no item: pairs could not be
+; changed while the ² key could (report of October 15). The next pair menu
+; replaces it.
+global _KeyCombinationPairMenu := 0
 
 ; The id of the pair « First held, then Second ».
 ; @param First {String} Tap-hold key id of the key held first.
@@ -743,6 +749,8 @@ KeyCombinationShowPairMenu(PairId, PairLabel, ShowFn := 0) {
 	Getters := Map("key_combination_pair_assigned", () => KeyCombinationTapOf(PairId) != KEY_COMBINATION_NONE
 		or KeyCombinationHoldOf(PairId) != KEY_COMBINATION_NONE)
 	PairMenu := MenuRenderer_Build("key_combination_pair_menu", "Shortcuts", "", "", ListProviders, Commands, Getters)
+	global _KeyCombinationPairMenu
+	_KeyCombinationPairMenu := PairMenu
 	if HasMethod(ShowFn, "Call")
 		return ShowFn.Call(PairMenu)
 	PairMenu.Show()
