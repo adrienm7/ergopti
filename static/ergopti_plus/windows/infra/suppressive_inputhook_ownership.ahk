@@ -81,8 +81,8 @@ SIHO_StopOwned(Token, Hook) {
 		return false
 	}
 	; A concurrent lifecycle Stop may already have removed this exact token.
-	SIHO_Unregister(Token, Hook)
-	return true
+	; Only the terminal path which still retires it may dispatch captured input.
+	return SIHO_Unregister(Token, Hook)
 }
 
 ; Removes only the exact token/object pair. A stale finally therefore cannot

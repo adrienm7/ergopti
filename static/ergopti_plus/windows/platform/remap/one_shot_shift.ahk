@@ -36,8 +36,12 @@ OneShotShift() {
 		try {
 				ihvText.Wait()
 		} finally {
-				SIHO_StopOwned(OwnerToken, ihvText)
+				CaptureSettled := SIHO_StopOwned(OwnerToken, ihvText)
 		}
+		; Pause can finish and resume before this older Wait unwinds. Its exact
+		; owner acknowledgement remains revoked even when Suspend is false again.
+		if !CaptureSettled
+				return
 		; Guard against a suspend that arrived while Wait() was blocking — discard
 		; the captured input and leave the shift state clean for the next resume
 		if A_IsSuspended {

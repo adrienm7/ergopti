@@ -164,3 +164,5 @@ _SIHO_RefusedOneShotShiftClearsItsLogicalLatch() {
 
 Test("input hooks: refused one-shot shift admission clears its logical latch",
 	_SIHO_RefusedOneShotShiftClearsItsLogicalLatch)
+
+#Include test_suppressive_capture_settlement.ahk
