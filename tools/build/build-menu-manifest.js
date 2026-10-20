@@ -228,7 +228,40 @@ function idleResetChoices(feature) {
 	);
 }
 
+/**
+ * Projects the CapsWord inactivity presets (seconds, 0 = never) from their
+ * numeric feature. Unlike the hotstring idle reset there is no free entry: the
+ * menu offers exactly these values.
+ */
+function capsWordIdleTimeoutChoices(feature) {
+	const values = feature?.preset_values;
+	if (
+		feature?.type !== 'number' ||
+		!Array.isArray(values) ||
+		values.length < 2 ||
+		values.some(
+			(value, index) =>
+				!Number.isSafeInteger(value) || value < 0 || (index > 0 && value <= values[index - 1])
+		) ||
+		values[0] !== 0 ||
+		!values.includes(feature.default) ||
+		!values.includes(feature.recommended)
+	)
+		throw new Error(
+			'caps_word.idle_timeout: presets need ascending whole seconds from 0 containing the defaults'
+		);
+	return values.map((value) =>
+		value === 0
+			? { value, i18n: 'menu.caps_word.idle_timeout_never' }
+			: { value, i18n: 'menu.caps_word.idle_timeout_unit', label_prefix: `${value} ` }
+	);
+}
+
 const CHOICE_REGISTRIES = {
+	'caps_word.idle_timeout': {
+		path: 'shortcuts.caps_word.idle_timeout_seconds',
+		project: capsWordIdleTimeoutChoices
+	},
 	'hotstrings.idle_reset': { path: 'hotstrings.idle_reset_seconds', project: idleResetChoices },
 	'llm.indentation': { path: 'llm.display.pred_indent', project: indentationChoices },
 	'updater.channels': { path: 'updater.channel', project: updaterChannelChoices },

@@ -3941,6 +3941,80 @@ local function _build_shortcuts(ctx)
 		return ManifestMenu.build("script_control_group", "Shortcuts", nil, nil, chords_ctx, chord_providers)
 	end
 
+	-- « CapsWord : désactivation automatique », declared by
+	-- caps_word_auto_off_group: the delay choice, one checkbox per delimiter of
+	-- the hotstring catalogue (in its order, with its separators and labels) and
+	-- one per declared pointer kind. Each change is published, then cached, and
+	-- applies to the CapsWord running now from its next event.
+	group_builders["caps_word_auto_off"] = function()
+		local ok_settings, AutoOff = pcall(require, "modules.shortcuts.caps_word_auto_off")
+		local ok_policy, Policy = pcall(require, "caps_word.auto_off")
+		if not ok_settings or not ok_policy then
+			Logger.error(LOG, "CapsWord auto-off settings unavailable — the shortcuts submenu loses them.")
+			return nil
+		end
+		-- Read once per build: a scope restore or a hand edit shows here.
+		AutoOff.refresh()
+		local settings = AutoOff.settings()
+		local function changed(committed)
+			if committed ~= true then
+				show_error(i18n_safe("dialog.bulk_toggle.save_failed"), i18n_safe("common.error_title"))
+				return false
+			end
+			if type(ctx.on_menu_changed) == "function" then ctx.on_menu_changed() end
+			return true
+		end
+		local checked = {}
+		for _, key in ipairs(settings.terminators) do checked[key] = true end
+		local boundaries = ManifestMenu.template_rows("hotstrings_parameter_boundary", {}, {}, {})
+		local providers_cw = {}
+		providers_cw["caps_word_terminators"] = function()
+			local rows = {}
+			for _, row in ipairs(Policy.terminator_rows()) do
+				if row.separator then
+					for _, boundary in ipairs(boundaries or {}) do rows[#rows + 1] = boundary end
+				else
+					local key = row.key
+					rows[#rows + 1] = {
+						label = (i18n_safe(row.label_key):gsub("★", MagicKey.get())),
+						checked = checked[key] == true,
+						action = function() return changed(AutoOff.set_terminator(key, not checked[key])) end,
+					}
+				end
+			end
+			return rows
+		end
+		local cw_ctx = {}
+		for key, value in pairs(ctx) do cw_ctx[key] = value end
+		cw_ctx.commands = {}
+		for key, value in pairs(ctx.commands or {}) do cw_ctx.commands[key] = value end
+		cw_ctx.state_getters = {}
+		for key, value in pairs(ctx.state_getters or {}) do cw_ctx.state_getters[key] = value end
+		cw_ctx.commands["caps_word_idle_timeout"] = function(seconds)
+			return changed(AutoOff.set_idle_timeout_seconds(seconds))
+		end
+		cw_ctx.state_getters["shortcuts.caps_word.idle_timeout_seconds"] = function()
+			return settings.idle_timeout_seconds
+		end
+		-- One checkbox per kind the manifest declares, in its order; a kind
+		-- this driver cannot see is drawn greyed with its own reason.
+		providers_cw["caps_word_pointer_kinds"] = function()
+			local rows = {}
+			for _, entry in ipairs(AutoOff.pointer_kind_rows()) do
+				local kind = entry.kind
+				local row = { label = i18n_safe(entry.label_key), checked = settings.pointer[kind] == true }
+				if entry.available then
+					row.action = function() return changed(AutoOff.set_pointer(kind, not settings.pointer[kind])) end
+				else
+					row.checked, row.disabled, row.disabled_reason_key = false, true, entry.reason_key
+				end
+				rows[#rows + 1] = row
+			end
+			return rows
+		end
+		return ManifestMenu.build("caps_word_auto_off_group", "Shortcuts", nil, nil, cw_ctx, providers_cw)
+	end
+
 	-- The wrap-symbol picker. The manifest called it Windows-only until
 	-- 2026-08-06 while this driver had been drawing it all along; it is a shared
 	-- `list` row now, in the same position on all three drivers.

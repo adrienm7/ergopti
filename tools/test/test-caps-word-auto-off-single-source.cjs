@@ -9,9 +9,9 @@
  * the hotstring delimiter catalogue (_shared/core/domain/Terminators.spec.js),
  * whose built-in keys are the only valid shortcuts.caps_word.terminators
  * values; the pointer kinds are the [shortcuts.caps_word.pointer] features.
- * This gate pins the defaults and the shared corpus to those declarations and
- * refuses a driver CapsWord source that spells a delimiter list or the presets
- * itself.
+ * This gate pins the defaults, the shared corpus and the menu rows to those
+ * declarations and refuses a driver CapsWord source that spells a delimiter
+ * list or the delay presets itself.
  *
  * WHY:
  * Each driver detects these events natively, so each needs the same lists. A
@@ -66,6 +66,9 @@ const flattened = toml.parse(
 );
 const feature = (prefix, id) =>
 	(flattened.entries || []).find((entry) => entry.path_prefix === prefix && entry.id === id);
+const menu = JSON.parse(
+	fs.readFileSync(path.join(SP, '_shared', 'modules', 'menu', 'menu_manifest.json'), 'utf8')
+);
 const corpus = JSON.parse(fs.readFileSync(CORPUS, 'utf8'));
 const en = JSON.parse(fs.readFileSync(EN, 'utf8'));
 
@@ -132,6 +135,12 @@ check(
 	'the corpus pointer_kinds must be the manifest kinds in order'
 );
 for (const entry of kinds) {
+	// Windows labels a kind its platforms leave out from this spelling: the
+	// generated unavailable entries carry no description_key.
+	check(
+		entry.description_key === `menu.caps_word.pointer.${entry.id}`,
+		`pointer kind ${entry.id}: its description_key must be menu.caps_word.pointer.${entry.id}`
+	);
 	check(entry.type === 'boolean', `pointer kind ${entry.id} must be a boolean feature`);
 	check(
 		typeof en[entry.description_key] === 'string',
@@ -145,7 +154,44 @@ for (const entry of kinds) {
 	}
 }
 
-// 4. No driver CapsWord source spells a delimiter list or the delay presets.
+// 4. Menu: the submenu offers exactly these declarations on every driver.
+const group = menu.caps_word_auto_off_group || [];
+check(
+	(menu.shortcuts_menu || []).some(
+		(row) => row.type === 'group' && row.id === 'caps_word_auto_off'
+	),
+	'the Shortcuts menu must open the caps_word_auto_off group'
+);
+const choice = group[0];
+check(
+	choice && choice.type === 'choice' && choice.path === 'shortcuts.caps_word.idle_timeout_seconds',
+	'caps_word_auto_off_group must open with the delay choice row'
+);
+if (choice && choice.type === 'choice' && Array.isArray(presets)) {
+	check(
+		same(
+			choice.choices.map((entry) => entry.value),
+			presets
+		),
+		'the delay row must offer exactly the preset_values, in order'
+	);
+	check(
+		choice.choices[0].i18n === 'menu.caps_word.idle_timeout_never',
+		'0 must be labelled as never'
+	);
+	check(!('custom_command' in choice), 'the delay row offers no free entry');
+}
+check(
+	group.some((row) => row.type === 'list' && row.id === 'caps_word_terminators'),
+	'the delimiter rows must come from the caps_word_terminators provider'
+);
+check(
+	group.some((row) => row.type === 'list' && row.id === 'caps_word_pointer_kinds') &&
+		!group.some((row) => row.type === 'check'),
+	'the pointer rows must come from the caps_word_pointer_kinds provider, one per declared kind'
+);
+
+// 5. No driver CapsWord source spells a delimiter list or the delay presets.
 const forbidden = catalogueKeys.filter((key) => !NATIVE_KEYS.has(key));
 const presetSpelling = new RegExp(
 	`[\\[{(]\\s*${(idle?.preset_values || []).join('\\s*,\\s*')}\\s*[\\]})]`
@@ -162,10 +208,15 @@ function walk(directory, out) {
 	}
 	return out;
 }
+// The CapsWord sources are the files named after it: a shared menu file that
+// merely opens the submenu also lists wrap symbols such as "period".
 for (const driver of ['windows', 'macos', 'linux']) {
-	for (const file of walk(path.join(SP, driver), [])) {
+	const sources = walk(path.join(SP, driver), []).filter((file) =>
+		/caps_?word/i.test(path.basename(file))
+	);
+	check(sources.length >= 2, `${driver}: expected at least two CapsWord sources to scan`);
+	for (const file of sources) {
 		const source = fs.readFileSync(file, 'utf8');
-		if (!/caps_?word/i.test(source)) continue;
 		const rel = path.relative(SP, file).replace(/\\/g, '/');
 		for (const key of forbidden) {
 			check(

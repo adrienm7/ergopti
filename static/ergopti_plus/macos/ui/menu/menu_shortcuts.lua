@@ -842,6 +842,8 @@ function M.build(ctx)
 			return require("ui.menu.menu_tap_holds").build_key_combinations(ctx)
 		end,
 		["script_control"] = script_control_group,
+		-- « CapsWord : désactivation automatique », the [shortcuts.caps_word] settings.
+		["caps_word_auto_off"] = function() return require("ui.menu.menu_caps_word").build(ctx) end,
 	}
 
 	-- The keyboard slots are a list, not a group: their rows are the user's own

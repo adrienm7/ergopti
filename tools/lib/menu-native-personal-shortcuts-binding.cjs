@@ -214,7 +214,7 @@ function personalRegistration(unit) {
 	r.take(':= _SC_Getters()');
 	const groups = r.name();
 	r.take(
-		':= Map("key_combinations", () => _SC_KeyCombinationsSubmenu(), "script_control", () => _SC_ScriptControlSubmenu())'
+		':= Map("key_combinations", () => _SC_KeyCombinationsSubmenu(), "caps_word_auto_off", () => _SC_CapsWordAutoOffSubmenu(), "script_control", () => _SC_ScriptControlSubmenu())'
 	);
 	r.take(
 		'return MenuRenderer_Build("shortcuts_menu", "Shortcuts", ' +

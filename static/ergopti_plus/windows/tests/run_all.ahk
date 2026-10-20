@@ -499,6 +499,7 @@ InstallSendNoOps()
 #Include unit/modules/hotstrings/catalogue/test_hotstrings_cache.ahk
 #Include unit/modules/hotstrings/catalogue/test_hotstring_language_packs.ahk
 #Include unit/ui/menu/test_menu_languages_and_global_separator.ahk
+#Include unit/ui/menu/test_caps_word_auto_off_submenu.ahk
 #Include unit/modules/dynamic_hotstrings/test_dynamic_hotstrings_module.ahk
 #Include unit/modules/hotstrings/personal/test_user_hotstrings.ahk
 #Include unit/modules/hotstrings/personal/test_user_hotstrings_native.ahk
