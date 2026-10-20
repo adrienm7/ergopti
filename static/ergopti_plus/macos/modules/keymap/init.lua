@@ -39,6 +39,7 @@ local MagicKeySource = require("modules.keymap.magic_key_source")
 local Terminators = require("keymap.terminators")
 local Perf       = require("infra.perf")
 local HotPath    = require("infra.hotpath_profiler")
+local KeystrokeIntegrity = require("infra.keystroke_integrity")
 local HidDiagnosticMailbox = require("modules.diagnostics.hid_diagnostic_mailbox")
 
 local M   = {}
@@ -1932,6 +1933,11 @@ local function onKeyDown(e)
 			tostring(_tc_chars), _tc_dbg_checks_ms or 0, _tc_dbg_preview_ms or 0)
 	end
 	HotPath.log_if_slow("keydown", t0_hot, hot_detail)
+	-- Owned echoes are the driver's own output; only physical presses (replays
+	-- included) enter the integrity ring.
+	if provenance_status ~= EventProvenance.STATUS_OWNED then
+		KeystrokeIntegrity.note(not ok and "error" or (result == true and "consumed" or "passed"))
+	end
 	if not ok then
 		pcall(Logger.error, LOG, "Keyboard interception failure: %s.", tostring(result))
 		if abort_requires_consumption then

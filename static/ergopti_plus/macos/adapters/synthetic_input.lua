@@ -1166,6 +1166,14 @@ local function finish_batch(batch, status)
 	tx.pending_batches = tx.pending_batches - 1
 	assert(tx.pending_batches >= 0,
 		"adapters.synthetic_input: transaction batch count underflow")
+	-- The original of a physical replay was consumed when it was queued, so a
+	-- replay that ends before its post is a typed key the user never sees.
+	if batch.mode == "physical" and status ~= "dispatched"
+		and batch.physical_owner and batch.physical_owner.ordinal == 1 then
+		pcall(require("infra.keystroke_integrity").report_drop, string.format(
+			"their delayed replay ended %s before it was posted (%s)",
+			status, tostring(tx.failure or "no failure detail")))
+	end
 	for _, callback in ipairs(tx.dispatched_callbacks) do
 		invoke_lifecycle("on_dispatched", callback, tx, batch, status)
 	end
@@ -3363,6 +3371,7 @@ pump_physical_batch = function(batch)
 	owner.ordinal = 2
 	owner.awaiting_settlement = true
 	owner.status = "queued"
+	require("infra.keystroke_integrity").note("replay_posted")
 end
 
 
@@ -4039,6 +4048,9 @@ function M.claim_physical_fence(event)
 		defer_diagnostic("error", "Cannot claim synthetic physical-input fence - %s.",
 			tostring(adoption_or_err))
 		return nil
+	end
+	if adoption_or_err and adoption_or_err.consume_original == true then
+		require("infra.keystroke_integrity").note("replay_queued")
 	end
 	return adoption_or_err
 end
