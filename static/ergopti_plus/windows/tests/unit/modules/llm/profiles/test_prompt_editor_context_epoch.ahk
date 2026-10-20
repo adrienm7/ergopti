@@ -103,7 +103,7 @@ _PEC_InstallFixture() {
 	global _PromptEdWeb_CloseHook, _PromptEdWeb_EvalHook
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
 	global _PromptEdWeb_InitName, _PromptEdWeb_InitPrompt, _PromptEdWeb_InitBatch
-	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
+	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial, _PromptEdWeb_OpeningSource
 	global _LLM_Menu
 	global _PEC_Deferred, _PEC_Persisted, _PEC_Closed, _PEC_Evaluated
 
@@ -119,6 +119,7 @@ _PEC_InstallFixture() {
 		"init_batch", _PromptEdWeb_InitBatch,
 		"context_epoch", _PromptEdWeb_ContextEpoch,
 		"epoch_serial", _PromptEdWeb_EpochSerial,
+		"opening_source", _PromptEdWeb_OpeningSource,
 		"llm_menu", _LLM_Menu
 	)
 
@@ -132,6 +133,7 @@ _PEC_InstallFixture() {
 	_PromptEdWeb_InitPrompt  := ""
 	_PromptEdWeb_InitBatch   := false
 	_PromptEdWeb_ContextEpoch := 0
+	_PromptEdWeb_OpeningSource := 0
 	_PromptEdWeb_EpochSerial  := 0
 	_LLM_Menu := Map(
 		"user_profiles", [
@@ -153,7 +155,7 @@ _PEC_RestoreFixture(Previous) {
 	global _PromptEdWeb_CloseHook, _PromptEdWeb_EvalHook
 	global _PromptEdWeb_IsEdit, _PromptEdWeb_EditId
 	global _PromptEdWeb_InitName, _PromptEdWeb_InitPrompt, _PromptEdWeb_InitBatch
-	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial
+	global _PromptEdWeb_ContextEpoch, _PromptEdWeb_EpochSerial, _PromptEdWeb_OpeningSource
 	global _LLM_Menu
 
 	_PromptEdWeb_DeferHook    := Previous["defer_hook"]
@@ -167,6 +169,7 @@ _PEC_RestoreFixture(Previous) {
 	_PromptEdWeb_InitBatch    := Previous["init_batch"]
 	_PromptEdWeb_ContextEpoch := Previous["context_epoch"]
 	_PromptEdWeb_EpochSerial  := Previous["epoch_serial"]
+	_PromptEdWeb_OpeningSource := Previous["opening_source"]
 	_LLM_Menu                  := Previous["llm_menu"]
 }
 
@@ -385,3 +388,5 @@ _PEC_SavePayloadRejectsMalformedScalars() {
 }
 Test("prompt-editor: save payload rejects malformed scalar fields",
 	_PEC_SavePayloadRejectsMalformedScalars)
+
+#Include test_llm_profile_opening_image.ahk
