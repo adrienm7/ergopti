@@ -223,6 +223,11 @@ _MagicEditorEffectivePlain(Code, Scan, Native) {
 	if NumberRowEffectiveMode() == "digits" {
 		if Numeric >= 0x02 && Numeric <= 0x0B
 			return { Count: 1, Text: Numeric == 0x0B ? "0" : String(Numeric - 1) }
+	} else if !KeylayoutEmulation_LayerIsActive("ergopti_base") {
+		; « Symbols first » on the native or built-in row (NumberRowSymbolsFirstText).
+		Swapped := NumberRowSymbolsFirstText(Numeric, false, NumberRowForegroundLayout(), false)
+		if Swapped != ""
+			return { Count: StrLen(Swapped), Text: Swapped }
 	}
 	if _KLE_BaseCriterion(Scan, false) && KLE_KeyCodes.Has(Scan) {
 		Shift := false

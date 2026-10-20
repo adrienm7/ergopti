@@ -674,6 +674,43 @@ SC00B:: _DigitRowDown("0")
 SC00B Up:: _DigitRowUp("0")
 #HotIf
 
+; « Symbols first » on a row no registry layout owns (the OS layout's or the
+; built-in Ergopti one): the registry emulation types its own levels swapped
+; (keylayout_emulation.ahk), so these stand down while it owns the row.
+#HotIf NumberRowEffectiveMode() == "symbols" && !KeylayoutEmulation_LayerIsActive("ergopti_base")
+SC002:: _NumberRowSymbolsFirstSend(0x02, false)
++SC002:: _NumberRowSymbolsFirstSend(0x02, true)
+SC003:: _NumberRowSymbolsFirstSend(0x03, false)
++SC003:: _NumberRowSymbolsFirstSend(0x03, true)
+SC004:: _NumberRowSymbolsFirstSend(0x04, false)
++SC004:: _NumberRowSymbolsFirstSend(0x04, true)
+SC005:: _NumberRowSymbolsFirstSend(0x05, false)
++SC005:: _NumberRowSymbolsFirstSend(0x05, true)
+SC006:: _NumberRowSymbolsFirstSend(0x06, false)
++SC006:: _NumberRowSymbolsFirstSend(0x06, true)
+SC007:: _NumberRowSymbolsFirstSend(0x07, false)
++SC007:: _NumberRowSymbolsFirstSend(0x07, true)
+SC008:: _NumberRowSymbolsFirstSend(0x08, false)
++SC008:: _NumberRowSymbolsFirstSend(0x08, true)
+SC009:: _NumberRowSymbolsFirstSend(0x09, false)
++SC009:: _NumberRowSymbolsFirstSend(0x09, true)
+SC00A:: _NumberRowSymbolsFirstSend(0x0A, false)
++SC00A:: _NumberRowSymbolsFirstSend(0x0A, true)
+SC00B:: _NumberRowSymbolsFirstSend(0x0B, false)
++SC00B:: _NumberRowSymbolsFirstSend(0x0B, true)
+#HotIf
+
+; The level is read again on the layout of the press: a layout switch between
+; the criterion and this thread leaves nothing to type, which is logged.
+_NumberRowSymbolsFirstSend(Sc, Shift, *) {
+	Text := NumberRowSymbolsFirstText(Sc, Shift, GetForegroundKeyboardLayout(), GetKeyState("CapsLock", "T"))
+	if Text == "" {
+		try LoggerWarn("Layout", "SC{1:03X}: symbols first no longer applies on the layout of the press; nothing typed.", Sc)
+		return
+	}
+	_DigitShiftSend(Text)
+}
+
 ; On OS layouts where digits are behind Shift (e.g. AZERTY, bépo), swap
 ; the layers: Shift+digit-key produces the OS native symbol (passthrough),
 ; while the unshifted key already sends the digit via the block above.

@@ -402,6 +402,11 @@ KeylayoutEmulation_PressNative(Sc, Shift, Caps, Hkl) {
 			Native := {Count: 1, Text: Mod(Code - 1, 10) . ""}
 		else if Shift && DigitRowIsSwapped(Hkl) && Code >= 0x02 && Code <= 0x0B
 			Native := {Count: 1, Text: DigitRowSwapSymbol(Code, Hkl)}
+	} else if Code >= 0x02 && Code <= 0x0B {
+		; « Symbols first » on the native row continues a registry dead key too.
+		Swapped := NumberRowSymbolsFirstText(Code, Shift, Hkl, Caps)
+		if Swapped != ""
+			Native := {Count: 1, Text: Swapped}
 	}
 	Transitions := KLE_Compositions.Get(KLE_State, Map())
 	if Native.Count > 0 && Transitions.Has(Native.Text) {
