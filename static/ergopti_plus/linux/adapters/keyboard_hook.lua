@@ -282,6 +282,10 @@ local _reported_missing = false
 
 -- Called when a pointer button is pressed, if the caller asked for it.
 local _on_click = nil
+-- Called with ("press", code) for every press of an observed pointer and with
+-- ("motion", axis) for every EV_REL report (a movement or a wheel turn), if
+-- the caller asked for it: CapsWord ends on the pointer kinds it names.
+local _on_pointer_event = nil
 
 -- Set while XKB cannot tell the keys' roles or capture them, so that is
 -- logged once and not at every key event; the next press XKB answers in full
@@ -2490,6 +2494,13 @@ local function _dispatch_pointer(ev)
 		_remapper:activity()
 		local at_ms=_event_clock_now_ms(); if at_ms then _tick_remapper(at_ms) end
 	end
+	if _on_pointer_event then
+		if ev.type == InputEvent.EV_REL then
+			_call_callback("pointer event callback", _on_pointer_event, "motion", ev.code)
+		elseif ev.type == EVDEV_TYPE_KEY and ev.value == InputEvent.VALUE_DOWN then
+			_call_callback("pointer event callback", _on_pointer_event, "press", ev.code)
+		end
+	end
 end
 
 local function _read_source(source)
@@ -3720,6 +3731,7 @@ function M.start(opts)
 	if type(options.onPhysical) == "function" then _on_physical = options.onPhysical end
 	if type(options.onHold) == "function" then _on_hold = options.onHold end
 	if type(options.onClick) == "function" then _on_click = options.onClick end
+	if type(options.onPointerEvent) == "function" then _on_pointer_event = options.onPointerEvent end
 	_on_consume = type(options.onConsume) == "function" and options.onConsume or nil
 	_on_desync = type(options.onDesync) == "function" and options.onDesync or nil
 	if type(options.layout) == "string"  then _layout   = options.layout end

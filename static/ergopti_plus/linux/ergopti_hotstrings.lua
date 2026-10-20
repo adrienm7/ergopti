@@ -184,6 +184,8 @@ local gestures = RuntimeGuard.optional_require("modules.gestures.manager")
 
 -- Shortcuts manager (optional — wrap symbols, CapsWord, text manipulation).
 local shortcuts = RuntimeGuard.optional_require("modules.shortcuts.manager")
+-- Names the CapsWord pointer kind of a native event; the manager loads it.
+local CapsWordAutoOff = shortcuts and require("modules.shortcuts.caps_word_auto_off") or nil
 
 -- Window info tracker (optional — provides app_id for keylogger per-app stats).
 local window_info = RuntimeGuard.optional_require("adapters.window_info")
@@ -1075,6 +1077,12 @@ local function main()
 		end
 		if script_actions.is_paused() then return end
 
+		-- A checked CapsWord delimiter ends CapsWord before anything else reads
+		-- the character, the bare Tab included (it returns just below).
+		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
+			shortcuts.caps_word_observe_text(ch)
+		end
+
 		-- The raw Tab has already been passed through to the desktop. Its target
 		-- control is not necessarily focused yet, so invalidate now and wait for
 		-- the off-input-path settle/probe cycle. Nothing from the new control may
@@ -1549,6 +1557,11 @@ local function main()
 			})
 		end
 		if script_actions.is_paused() then return end
+		-- A modified Tab or Enter reaches here, not the text callback: it ends
+		-- CapsWord when its delimiter is checked; any control key keeps it awake.
+		if shortcuts and shortcuts.is_enabled() and shortcuts.is_caps_word_active() then
+			shortcuts.caps_word_observe_control(key_name)
+		end
 		-- A control key is a keystroke too: the idle pause is measured from it.
 		-- Whatever it does to the buffer follows, so its verdict is not needed.
 		WordReset.observe_key(math.floor(Monotonic.now_ms()))
@@ -1755,6 +1768,18 @@ local function main()
 		engine:reset(at_word_start)
 		Logger.debug(LOG, "Pointer click — text privacy state invalidated, buffer reset (word start: %s).",
 			tostring(at_word_start))
+	end
+
+	-- A pointer event of a checked kind ends CapsWord: the hand has left the
+	-- keyboard. The hook reports every press of an observed pointer (a button or
+	-- a touchpad contact) and every EV_REL report (a movement or a wheel turn),
+	-- so this returns at once while CapsWord is off.
+	local function on_pointer_event(kind_of_event, code)
+		if not (shortcuts and shortcuts.is_caps_word_active()) then return end
+		local kind
+		if kind_of_event == "press" then kind = CapsWordAutoOff.pointer_kind_of_button(code)
+		else kind = CapsWordAutoOff.pointer_kind_of_motion() end
+		shortcuts.caps_word_observe_pointer(kind)
 	end
 
 	-- 8.7b) Restore the word-delimiter choices.
@@ -2668,6 +2693,7 @@ local function main()
 		onChar  = on_char,
 		onKey   = on_control,
 		onClick = on_click,
+		onPointerEvent = on_pointer_event,
 		onPhysical = on_physical,
 		onConsume = on_consume,
 		onDesync = function()
