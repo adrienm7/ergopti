@@ -888,15 +888,20 @@ function uploadMatrixPaths(listedPath, entry, job, candidate) {
 	assert.equal(job.id, 'launch');
 	assertMacLotSource(job);
 	assert.equal(candidate.name, 'Retain source-bound AppleEvent launch qualification receipt');
-	assert.equal(
-		listedPath,
-		'${{ runner.temp }}/stable-macos-launch-appleevents-${{ env.MACOS_STAGE_SCENARIO }}-${{ env.MACOS_STAGE_RUNNER }}.json'
+	// A launch lot lists each AppleEvent scenario it may hold; its runner comes from metadata.
+	const scenario = ['clean', 'karabiner_config'].find(
+		(name) =>
+			listedPath ===
+			'${{ runner.temp }}/stable-macos-launch-appleevents-' +
+				name +
+				'-${{ env.MACOS_STAGE_RUNNER }}.json'
 	);
+	assert.ok(scenario, 'Unknown AppleEvent launch receipt path');
 	assert.equal(
 		pipeline.stepField(candidate.body, 'if'),
 		MacStage.condition(
 			'launch',
-			"env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config'"
+			"contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__clean__') || contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__karabiner_config__')"
 		)
 	);
 	assert(
@@ -930,15 +935,9 @@ function uploadMatrixPaths(listedPath, entry, job, candidate) {
 		]
 	);
 
-	return ['clean', 'karabiner_config'].flatMap((scenario) =>
-		rows
-			.filter((row) => row.scenario === scenario)
-			.map((row) =>
-				listedPath
-					.replace('${{ env.MACOS_STAGE_SCENARIO }}', scenario)
-					.replace('${{ env.MACOS_STAGE_RUNNER }}', row.runner)
-			)
-	);
+	return rows
+		.filter((row) => MacRoles.lotScenarios(row.scenario).includes(scenario))
+		.map((row) => listedPath.replace('${{ env.MACOS_STAGE_RUNNER }}', row.runner));
 }
 
 /**
@@ -1830,15 +1829,19 @@ check('actual AppleEvent upload expands four closed matrix receipt paths', () =>
 		.steps(job.body)
 		.find((row) => row.name === 'Retain source-bound AppleEvent launch qualification receipt');
 	const listed = uploadPaths(candidate.body);
-	assert.equal(listed.length, 1);
-	assert.deepEqual(uploadMatrixPaths(listed[0], entry, job, candidate), [
-		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15.json',
-		'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15-intel.json',
-		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15.json',
-		'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15-intel.json'
-	]);
+	assert.equal(listed.length, 2);
+	assert.deepEqual(
+		listed.flatMap((path) => uploadMatrixPaths(path, entry, job, candidate)),
+		[
+			'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15.json',
+			'${{ runner.temp }}/stable-macos-launch-appleevents-clean-macos-15-intel.json',
+			'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15.json',
+			'${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-macos-15-intel.json'
+		]
+	);
 	for (const [changedPath, changedEntry, changedJob, changedCandidate] of [
-		[listed[0].replace('env.MACOS_STAGE_SCENARIO', 'matrix.foreign'), entry, job, candidate],
+		[listed[0].replace('env.MACOS_STAGE_RUNNER', 'matrix.foreign'), entry, job, candidate],
+		[listed[0].replace('-clean-', '-upgraded-'), entry, job, candidate],
 		["${{ matrix['foreign'] }}/receipt.json", entry, job, candidate],
 		["${{ env['MACOS_STAGE_FOREIGN'] }}/receipt.json", entry, job, candidate],
 		...[
@@ -1878,12 +1881,7 @@ check('actual AppleEvent upload expands four closed matrix receipt paths', () =>
 				body: candidate.body.replace("steps.stage-admission.outcome == 'success'", 'true')
 			}
 		],
-		[
-			listed[0],
-			entry,
-			job,
-			{ ...candidate, body: candidate.body.replace("env.MACOS_STAGE_SCENARIO == 'clean'", 'true') }
-		],
+		[listed[0], entry, job, { ...candidate, body: candidate.body.replace("'__clean__'", "'__'") }],
 		[
 			listed[0],
 			entry,

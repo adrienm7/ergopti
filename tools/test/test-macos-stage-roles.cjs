@@ -254,13 +254,15 @@ check('release launch preserves both arches and every canonical supplied scenari
 			.plan('testbuild', ctx)
 			.map((cell) => [cell.role, cell.runner, cell.scenario, cell.timeout_minutes]),
 		[
-			...['macos-15', 'macos-15-intel'].flatMap((runner) =>
-				context.scenarios.map((scenario) => ['launch', runner, scenario, 12])
-			),
+			// Two lots per architecture: with the cold bootstrap, five jobs at once.
+			...['macos-15', 'macos-15-intel'].flatMap((runner) => [
+				['launch', runner, 'clean__karabiner_config', 16],
+				['launch', runner, 'upgraded', 11]
+			]),
 			['cold-bootstrap-native', 'macos-15', '', 90]
 		]
 	);
-	assert.equal(complete(ctx).proof.chain[3].cells.length, 7);
+	assert.equal(complete(ctx).proof.chain[3].cells.length, 5);
 });
 check('complete proof preserves original mandatory native verdict map', () => {
 	assert.deepEqual(
@@ -557,11 +559,9 @@ check('installed-app lots expose every exact scenario and release architecture',
 	});
 	assert.deepEqual(roles.displayPlan('testbuild', { ...context, release: true }).matrix, {
 		lot: [
-			'Installed app: clean (Apple silicon)',
-			'Installed app: karabiner config (Apple silicon)',
+			'Installed app: clean, karabiner config (Apple silicon)',
 			'Installed app: upgraded (Apple silicon)',
-			'Installed app: clean (Intel)',
-			'Installed app: karabiner config (Intel)',
+			'Installed app: clean, karabiner config (Intel)',
 			'Installed app: upgraded (Intel)',
 			'Cold native bootstrap (Apple silicon)'
 		]
@@ -606,22 +606,28 @@ check(
 		);
 		assert.throws(
 			() => roles.humanLot('testbuild', { ...roles.plan('testbuild', context)[0], scenario: '' }),
-			/regular expression/
+			/Invalid launch lot/
 		);
+		for (const scenario of ['clean__', 'clean___upgraded', 'clean__clean', 'Clean'])
+			assert.throws(
+				() => roles.humanLot('testbuild', { ...roles.plan('testbuild', context)[0], scenario }),
+				/launch lot/
+			);
 		assert.throws(() => roles.displayPlan('build', context), /no human lot matrix/);
 	}
 );
 const lotContext = { ...context, event_name: 'workflow_dispatch', release: true };
 const lotStage = 'testbuild';
 const lotPlan = roles.displayPlan(lotStage, lotContext);
-const selectedLot = 'Installed app: clean (Apple silicon)';
+const selectedLot = 'Installed app: clean, karabiner config (Apple silicon)';
 for (const [name, mutate] of [
 	['missing selected lot', (map) => delete map[selectedLot]],
-	['missing unselected lot', (map) => delete map['Installed app: clean (Intel)']],
+	['missing unselected lot', (map) => delete map['Installed app: clean, karabiner config (Intel)']],
 	['foreign lot alias', (map) => (map.foreign = structuredClone(map[selectedLot]))],
 	[
 		'duplicate cell under another authored lot',
-		(map) => (map['Installed app: clean (Intel)'] = structuredClone(map[selectedLot]))
+		(map) =>
+			(map['Installed app: clean, karabiner config (Intel)'] = structuredClone(map[selectedLot]))
 	],
 	['wrong role', (map) => (map[selectedLot].role = 'cold-bootstrap-native')],
 	['wrong runner', (map) => (map[selectedLot].runner = 'macos-latest')],
@@ -842,6 +848,13 @@ check('role labels retain the independent authored human names without runtime m
 			'Installed app: karabiner config (Apple silicon)'
 		],
 		['testbuild', 'launch', 'amd64', 'upgraded', 'Installed app: upgraded (Intel)'],
+		[
+			'testbuild',
+			'launch',
+			'amd64',
+			'clean__karabiner_config',
+			'Installed app: clean, karabiner config (Intel)'
+		],
 		['testbuild', 'cold-bootstrap-native', 'arm64', '', 'Cold native bootstrap (Apple silicon)']
 	])
 		assert.equal(roles.roleLot(stage, role, architecture, scenario), expected);
@@ -1434,5 +1447,106 @@ check('a Build older than its Unit predecessor is a backward lineage', () => {
 	);
 });
 assert.equal(controls, 189, 'all prior 175 controls and fourteen stage graph controls execute');
+
+// Launch lots: four launch jobs beside the cold bootstrap, each scenario once.
+function checkLaunchLotLoop(workflow) {
+	const steps = workflow.jobs.launch.steps.filter((step) =>
+		(step.if ?? '').includes("env.MACOS_STAGE_ROLE == 'launch'")
+	);
+	const names = steps.map((step) => step.name);
+	const fresh = names.indexOf('Record the fresh runner state before the first launch');
+	const loop = names.indexOf('Install, launch and judge every scenario of the lot');
+	assert.ok(fresh >= 0 && loop === fresh + 1, 'the fresh runner is recorded right before the lot');
+	assert.match(steps[fresh].run, /macos_launch_reset_test\.py\n/);
+	assert.match(
+		steps[fresh].run,
+		/macos_launch_reset\.py snapshot "\$RUNNER_TEMP\/launch-fresh-runner\.json"/
+	);
+	const run = steps[loop].run;
+	assert.match(run, /read -r -a scenarios <<< "\$\{MACOS_STAGE_SCENARIO\/\/__\/ \}"/);
+	const body = run.slice(run.indexOf('for scenario in "${scenarios[@]}"; do'));
+	// The scenario runs with errexit in its own subshell; its failure is recorded, not fatal.
+	assert.match(
+		body,
+		/\n\s+set \+e\n\s+\(set -euo pipefail; launch_one "\$scenario"\)\n\s+scenario_status=\$\?\n\s+set -e\n/
+	);
+	// The reset runs after every scenario, outside the scenario's own failure.
+	assert.match(
+		body,
+		/scenario_status=\$\?[\s\S]*python3 tools\/diagnostics\/macos_launch_reset\.py restore "\$RUNNER_TEMP\/launch-fresh-runner\.json"\ndone\nexit "\$lot_status"/
+	);
+	for (const command of [
+		'--ci-install "$RUNNER_TEMP/package" /Applications "$stamp"',
+		'--scope macos-launch-appleevents',
+		'python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app',
+		'node tools/test/desktop-ci-evidence.cjs record-macos'
+	])
+		assert.equal(run.split(command).length, 2, command + ' runs once per scenario');
+	assert.ok(!names.includes('Install the package the way a user does'));
+}
+check(
+	'launch lots run every scenario once, four jobs at a time, from a proved fresh runner',
+	() => {
+		for (const [scenarios, runners, sizes] of [
+			[context.scenarios, 1, [1, 1, 1]],
+			[Array.from({ length: 11 }, (_, index) => 's' + index), 1, [3, 3, 2, 3]],
+			[Array.from({ length: 13 }, (_, index) => 's' + index), 2, [7, 6]],
+			[['clean'], 2, [1]]
+		]) {
+			const lots = roles.launchLots(scenarios, runners);
+			assert.deepEqual(
+				lots.map((lot) => lot.length),
+				sizes
+			);
+			assert.deepEqual(lots.flat(), scenarios);
+		}
+		assert.throws(() => roles.launchLots(['a__b'], 1), /lot separator/);
+		assert.throws(() => roles.launchLots(['clean'], 3), /runner count/);
+		for (const release of [false, true]) {
+			const cells = roles.plan('testbuild', { ...context, release });
+			const launches = cells.filter((cell) => cell.role === 'launch');
+			assert.ok(launches.length <= 4, 'at most four launch jobs');
+			assert.deepEqual(
+				launches.flatMap((cell) => [cell.runner + '/' + roles.lotScenarios(cell.scenario)].flat()),
+				launches.map((cell) => cell.runner + '/' + roles.lotScenarios(cell.scenario))
+			);
+			for (const runner of release ? ['macos-15', 'macos-15-intel'] : ['macos-15'])
+				assert.deepEqual(
+					launches
+						.filter((cell) => cell.runner === runner)
+						.flatMap((cell) => roles.lotScenarios(cell.scenario)),
+					context.scenarios
+				);
+		}
+		const workflow = YAML.parse(
+			fs.readFileSync(path.resolve(__dirname, '../../.github/workflows/ci-macos.yml'), 'utf8')
+		);
+		checkLaunchLotLoop(workflow);
+		const loopName = 'Install, launch and judge every scenario of the lot';
+		for (const [label, mutate] of [
+			[
+				'no reset after a scenario',
+				(run) =>
+					run.replace(
+						'\n  python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"',
+						''
+					)
+			],
+			['a scenario failure that stops the reset', (run) => run.replace('set +e\n', '')],
+			[
+				'one scenario per job',
+				(run) => run.replace('${MACOS_STAGE_SCENARIO//__/ }', '$MACOS_STAGE_SCENARIO')
+			]
+		]) {
+			const mutated = structuredClone(workflow);
+			const step = mutated.jobs.launch.steps.find((candidate) => candidate.name === loopName);
+			const before = step.run;
+			step.run = mutate(step.run);
+			assert.notEqual(step.run, before, label + ' must change the workflow');
+			assert.throws(() => checkLaunchLotLoop(mutated), undefined, label);
+		}
+	}
+);
+assert.equal(controls, 190, 'all prior 189 controls and the launch lot control execute');
 
 console.log('macos-stage-roles: ' + controls + ' controls passed');

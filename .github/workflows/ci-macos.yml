@@ -2611,10 +2611,11 @@ jobs:
           name: ci-macos-archive-source
           path: ${{ runner.temp }}/package
 
-      # Reproduce a browser download: the archive and everything unpacked from
-      # it carry com.apple.quarantine until the user runs the documented xattr
-      # command from the release notes.
-      - name: Install the package the way a user does
+      # One job launches the scenarios of its lot in turn. Each still starts
+      # from a fresh runner: the state recorded here, before the first install,
+      # is restored and proved again after every scenario, and a runner that
+      # cannot be proved fresh stops the lot (macos_launch_reset.py).
+      - name: Record the fresh runner state before the first launch
         env:
           SEED_TAG: 'v0.0.0-dev.24'
           MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
@@ -2626,41 +2627,55 @@ jobs:
         if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
         run: |
           set -euo pipefail
-          test ! -e /Applications/ErgoptiPlus.app
-          stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
-          node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
-              > "$RUNNER_TEMP/package-install.json"
-          node - "$RUNNER_TEMP/package-install.json" >> "$GITHUB_ENV" <<'NODE'
+          python3 tools/diagnostics/macos_launch_reset_test.py
+          python3 tools/diagnostics/macos_launch_reset.py snapshot "$RUNNER_TEMP/launch-fresh-runner.json"
+
+      # Reproduce a browser download: the archive and everything unpacked from
+      # it carry com.apple.quarantine until the user runs the documented xattr
+      # command from the release notes. Per scenario: install, record the launch
+      # qualification scope, launch over the seeded user state and judge it,
+      # record the mandatory evidence, then reset the runner. A failed scenario
+      # does not hide the others; the step fails if any of them failed.
+      - name: Install, launch and judge every scenario of the lot
+        env:
+          SEED_TAG: 'v0.0.0-dev.24'
+          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
+          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
+          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
+          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
+          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
+          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
+        run: |
+          set -euo pipefail
+          launch_one() {
+            local scenario="$1"
+            local output="$RUNNER_TEMP/launch-gate/$scenario"
+            local receipt="$RUNNER_TEMP/launch-qualification-$scenario.json"
+            test ! -e /Applications/ErgoptiPlus.app
+            stamp="0083;$(printf '%x' "$(date +%s)");Safari;$(uuidgen)"
+            node tools/build/macos-release-archives.cjs --ci-install "$RUNNER_TEMP/package" /Applications "$stamp" \
+                > "$RUNNER_TEMP/package-install-$scenario.json"
+            node - "$RUNNER_TEMP/package-install-$scenario.json" > "$RUNNER_TEMP/package-install-$scenario.env" <<'NODE'
           const fs = require('node:fs');
           const receipt = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
           if (typeof receipt.archive !== 'string' || /[\r\n]/.test(receipt.archive)) throw Error('Invalid installed archive path');
           process.stdout.write('MACOS_INSTALL_ARCHIVE=' + receipt.archive + '\n');
           NODE
-          xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
-          xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
-          if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
-              echo "::error::the documented quarantine removal left an attribute behind"
-              exit 1
-          fi
-          lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
-          echo "runner machine: $(uname -m)"
-
-      - name: Record the launch qualification scope
-        env:
-          SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
-          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
-          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
-          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
-        run: |
-          set -euo pipefail
-          node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
-              --scenario "${{ env.MACOS_STAGE_SCENARIO }}" --runner "${{ env.MACOS_STAGE_RUNNER }}" \
-              --receipt "$RUNNER_TEMP/launch-qualification.json"
-          node - "$RUNNER_TEMP/launch-qualification.json" "${{ env.MACOS_STAGE_SCENARIO }}" "${{ env.MACOS_STAGE_RUNNER }}" <<'NODE'
+            MACOS_INSTALL_ARCHIVE="$(sed -n 's/^MACOS_INSTALL_ARCHIVE=//p' "$RUNNER_TEMP/package-install-$scenario.env")"
+            test -n "$MACOS_INSTALL_ARCHIVE"
+            xattr -r -w com.apple.quarantine "$stamp" /Applications/ErgoptiPlus.app
+            xattr -dr com.apple.quarantine /Applications/ErgoptiPlus.app
+            if xattr -r /Applications/ErgoptiPlus.app | grep -q com.apple.quarantine; then
+                echo "::error::the documented quarantine removal left an attribute behind"
+                exit 1
+            fi
+            lipo -archs /Applications/ErgoptiPlus.app/Contents/MacOS/ErgoptiPlus
+            echo "runner machine: $(uname -m)"
+            node tools/ci/dev-release-qualification.cjs --scope macos-launch-appleevents \
+                --scenario "$scenario" --runner "$MATRIX_RUNNER" \
+                --receipt "$receipt"
+            node - "$receipt" "$scenario" "$MATRIX_RUNNER" <<'NODE'
           const fs = require('node:fs');
           const policy = require('./tools/ci/dev-release-qualification.cjs');
           const scenario = process.argv[3], runner = process.argv[4];
@@ -2671,6 +2686,31 @@ jobs:
             JSON.stringify(receipt) + '\n', { flag: 'wx' }
           );
           NODE
+            python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app \
+                "$output" "$scenario" --seed-tag "$SEED_TAG" \
+                --qualification-receipt "$receipt"
+            node tools/test/desktop-ci-evidence.cjs record-macos \
+                "$output/result.json" \
+                "$MACOS_INSTALL_ARCHIVE" \
+                "$output/evidence.json"
+          }
+          read -r -a scenarios <<< "${MACOS_STAGE_SCENARIO//__/ }"
+          test "${#scenarios[@]}" -gt 0
+          lot_status=0
+          for scenario in "${scenarios[@]}"; do
+            echo "::group::Installed app: $scenario"
+            set +e
+            (set -euo pipefail; launch_one "$scenario")
+            scenario_status=$?
+            set -e
+            echo "::endgroup::"
+            if [ "$scenario_status" -ne 0 ]; then
+                echo "::error::Installed app: $scenario failed with status $scenario_status"
+                lot_status=1
+            fi
+            python3 tools/diagnostics/macos_launch_reset.py restore "$RUNNER_TEMP/launch-fresh-runner.json"
+          done
+          exit "$lot_status"
 
       - name: Retain source-bound AppleEvent launch qualification receipt
         env:
@@ -2681,43 +2721,14 @@ jobs:
           ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
           ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
           ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (env.MACOS_STAGE_SCENARIO == 'clean' || env.MACOS_STAGE_SCENARIO == 'karabiner_config') }}
+        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' && (contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__clean__') || contains(format('__{0}__', env.MACOS_STAGE_SCENARIO), '__karabiner_config__')) }}
         uses: actions/upload-artifact@v4
         with:
           name: assets-qualification-launch-macos-${{ env.MACOS_STAGE_RUNNER }}-${{ env.MACOS_STAGE_SCENARIO }}
-          path: ${{ runner.temp }}/stable-macos-launch-appleevents-${{ env.MACOS_STAGE_SCENARIO }}-${{ env.MACOS_STAGE_RUNNER }}.json
+          path: |
+            ${{ runner.temp }}/stable-macos-launch-appleevents-clean-${{ env.MACOS_STAGE_RUNNER }}.json
+            ${{ runner.temp }}/stable-macos-launch-appleevents-karabiner_config-${{ env.MACOS_STAGE_RUNNER }}.json
           if-no-files-found: error
-
-      - name: Launch over the user state and judge it
-        env:
-          SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
-          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
-          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
-          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
-        run: >
-          python3 tools/diagnostics/macos_launch_gate.py /Applications/ErgoptiPlus.app
-          "$RUNNER_TEMP/launch-gate" "${{ env.MACOS_STAGE_SCENARIO }}" --seed-tag "$SEED_TAG"
-          --qualification-receipt "$RUNNER_TEMP/launch-qualification.json"
-
-      - name: Record mandatory launch evidence
-        env:
-          SEED_TAG: 'v0.0.0-dev.24'
-          MATRIX_RUNNER: '${{ env.MACOS_STAGE_RUNNER }}'
-          ERGOPTI_DEV_RELEASE_RELEASE: '${{ inputs.release }}'
-          ERGOPTI_DEV_RELEASE_PRERELEASE: '${{ inputs.prerelease }}'
-          ERGOPTI_DEV_RELEASE_CHANNEL: '${{ inputs.channel }}'
-          ERGOPTI_DEV_RELEASE_TAG: '${{ inputs.tag }}'
-          ERGOPTI_DEV_RELEASE_VERSION: '${{ inputs.version }}'
-        if: ${{ steps.stage-admission.outcome == 'success' && env.MACOS_STAGE_ROLE == 'launch' }}
-        run: >
-          node tools/test/desktop-ci-evidence.cjs record-macos
-          "$RUNNER_TEMP/launch-gate/result.json"
-          "$MACOS_INSTALL_ARCHIVE"
-          "$RUNNER_TEMP/launch-gate/evidence.json"
 
       - name: Retain launch evidence
         env:
