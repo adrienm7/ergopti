@@ -1,0 +1,9 @@
+{
+	"expected_count": 1,
+	"filters": [
+		{
+			"contains": "artifact curl: actual Schannel staging and SSPI bare NTLM CONNECT with no Negotiate downgrade",
+			"expected_count": 1
+		}
+	]
+}
