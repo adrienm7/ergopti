@@ -1,0 +1,21 @@
+{
+	"expected_count": 4,
+	"filters": [
+		{
+			"contains": "Saved API validation: after-test-replace (llm-api-post-save-validation-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Saved API validation: off-on (llm-api-post-save-validation-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Saved API validation: yes (llm-api-post-save-validation-owner)",
+			"expected_count": 1
+		},
+		{
+			"contains": "Saved API validation: disabled (llm-api-post-save-validation-owner)",
+			"expected_count": 1
+		}
+	]
+}
