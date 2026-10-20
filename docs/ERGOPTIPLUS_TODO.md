@@ -2999,6 +2999,44 @@ These are software implementations; final hardware verification remains below.
 
 ## Ordered TODO
 
+- [ ] **Handover to the Windows session (October 20, 07:35 UTC).** The Linux
+      container session stops here; the next session runs on the maintainer's
+      Windows PC (real AHK, native Windows suites without a CI round trip).
+      State: dev `6f0fec69` is pushed; `fix/*` were fast-forwarded to
+      `c5b3c3c4`. On dev run 39379134161 Linux and Windows are fully green;
+      macOS failed only in the Swift step (26 owned-runtime methods, fixed by
+      0b7428c8). Run 39383079224 (cea9f7ee: ACL fix, Openbox barrier) was in
+      progress: read it first, then the run of `6f0fec69`. Native macOS
+      deferred scopes: PAC/WPAD/bootstrap and model receiving green twice,
+      Brew acceptance green once; test01, owned-runtime, Shortcuts discovery
+      and launch AppleEvents still to observe on hosted runs.
+      Maintainer decisions of October 20, to apply without asking again.
+      Retained menu clicks that meet a reload: replay them in the successor
+      (see the October 17 log-review item). Windows release list: persist the
+      complete list JSON and its ETag on disk, rewritten only when the ETag
+      changes, so a 304 after a restart costs no quota (#95 point 3).
+      config.toml spacing: keep the 5/3 blank-line style and align
+      `windows/_generated/config_template.toml` through its generator
+      (`npm run build:manifest`), never by hand. Linux
+      `ui/personal_info_editor/bridge_toml.lua` is the raw `personal_info.toml`
+      editor (bridge `personal_toml_editor`; Windows has
+      `ui/personal_toml_editor.ahk`, macOS opens the file from its menu): wire
+      it on Linux (BRIDGE_MODULES in `ui/webview_manager.lua` and a menu entry)
+      for parity, do not delete it. CI: move the Flatpak into its own parallel
+      Linux job built from the same bundle artifact, keep the release lane's
+      package receipts exact, validate on a `tmp/*` branch before dev. dev to
+      main: only with the next release; Deploy site failures on main are
+      expected until then.
+      Windows session order (all four requested): run the AHK suites locally
+      (config, managed network, artifact curl groups, then the full suite);
+      implement the click replay; persist the release list; reproduce the Windows
+      reports on the real machine (key combinations after c89d74eb, number-row
+      precedence, `TOML_ParseDocument` cost, prediction-key and script-chord
+      stalls of item 114). Keep pinned ruff 0.15.8 and Prettier before every
+      commit. After touching a sealed Windows updater source, reseal its
+      cohort inputs with `seal-windows-updater-original-source.cjs` (in
+      `tools/ci/`, `--ref <commit> --write`).
+
 - [ ] **GitHub issue #96 (Windows, v1.0.3): fixed on dev, to release and
       answer.** Cause: a category created in the editor took the neutral-off
       default of an undeclared personal section, so "metiers" never loaded
@@ -3037,6 +3075,7 @@ These are software implementations; final hardware verification remains below.
       curl adapter reads the final header frame it already captures, Windows
       reads both headers). Still to do: Windows keeps the list ETag in memory
       only (`_UpdaterFetchCache`), so each restart spends a full request.
+      Decision (October 20): persist the complete list JSON and its ETag.
       (4) Karabiner lease: repeated "timeout waiting for READY", "watchdog
       exited unexpectedly (exit 73)" and "timeout waiting for PONG"; needs a
       Mac reproduction. (5) The shortcut on the key left of "1" still targets
@@ -3150,7 +3189,8 @@ These are software implementations; final hardware verification remains below.
       before): the Flatpak build alone sets it. A builder cache is out (package
       jobs compile clean, `test-ci-pipeline-wiring.cjs`), so the gain is a
       separate Flatpak job built from the same bundle artifact, letting the
-      other install cells start about four minutes earlier. Next steps: build the Linux
+      other install cells start about four minutes earlier. Decision
+      (October 20): do it, validated on a `tmp/*` branch first. Next steps: build the Linux
       packages per format in parallel (keeping every install cell bound to the
       exact bytes it installs), and keep the graph symmetric (one row per OS,
       the same columns). All unit suites are already sharded by module group:
@@ -3228,6 +3268,8 @@ These are software implementations; final hardware verification remains below.
       item 5, `linux/ui/personal_info_editor/bridge_toml.lua` is registered in
       no `webview_manager.lua` BRIDGE_MODULES entry and only its own tests load
       it: retire it with those tests, or wire it, before adding coverage.
+      Decision (October 20): wire it, it is the Linux raw personal_info.toml
+      editor matching Windows and macOS.
       Duplicate 5: only the logger pair was a real duplicate (folded into
       `test_logger_file_sinks.lua`); the other three pairs test different
       owners. Duplicate 8: the five macOS absence-only files are deleted;
@@ -3242,7 +3284,8 @@ These are software implementations; final hardware verification remains below.
       retained toggle is refused with an error notification and lost
       (`terminal_barrier_busy`, four toasts in one session). Decide one
       contract: replay the retained intents in the successor, or drop them with
-      one localized notice that names the restart. `ConfigWriteLeaseBusy`
+      one localized notice that names the restart. Decision (October 20):
+      replay them in the successor. `ConfigWriteLeaseBusy`
       deliberately ignores a terminal owner, so the fix belongs in
       `MenuCommandRun` and the startup retention owner, not in the lease.
 - [~] **Windows log review, October 17: a transient keylogger flush refuses Quit.**
@@ -3284,7 +3327,8 @@ These are software implementations; final hardware verification remains below.
       before a nested one), while `windows/_generated/config_template.toml`
       uses one. Header-only sections then read as runs of five. Maintainer
       decision: keep the five-line style or render one separator in every
-      writer (both codecs, template and their corpora).
+      writer (both codecs, template and their corpora). Decision (October 20):
+      keep 5/3 and regenerate the template with that spacing.
 
 - [ ] **Maintainer request, October 13: configuration in diagnostic reports.**
       Include the user's TOML configuration files and their resolution order in
