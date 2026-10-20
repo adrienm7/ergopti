@@ -28,6 +28,8 @@ const fs = require('node:fs');
 const os = require('node:os');
 const { performance } = require('node:perf_hooks');
 const { loadInventory, selectFeature } = require('./lib/js-feature-inventory.cjs');
+const { spawnPlan } = require('./lib/js-suite-spawn.cjs');
+const { SKIP_PREFIX } = require('./lib/host-capabilities.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 let FULL = false;
@@ -140,11 +142,12 @@ for (const check of checks) {
 	const checkStartedAt = performance.now();
 	let r;
 	try {
-		r = spawnSync(check.cmd === '$NODE_EXECUTABLE' ? process.execPath : check.cmd, check.args, {
+		const plan = spawnPlan(check, process.execPath);
+		r = spawnSync(plan.command, plan.args, {
 			cwd: ROOT,
 			encoding: 'utf8',
 			maxBuffer: MAX_CAPTURE_BYTES,
-			shell: true
+			shell: plan.shell
 		});
 	} catch (error) {
 		r = { status: null, error, spawnThrew: true, stderr: error?.stack || String(error) };
@@ -165,6 +168,12 @@ for (const check of checks) {
 		duration_ms: durationMs
 	});
 	console.log(`  ${ok ? 'PASS' : 'FAIL'} ${ordinal}/${checks.length} — ${check.name}`);
+	// A local host may lack a capability a case needs; name it so a PASS here
+	// never reads as having executed that case.
+	const notExecuted = String(r.stdout || '')
+		.split(/\r?\n/)
+		.filter((line) => line.startsWith(SKIP_PREFIX));
+	for (const line of notExecuted) console.log(`    ${line}`);
 	console.log(`    duration: ${durationMs.toFixed(3)} ms (${ordinal}/${checks.length})`);
 	const result = {
 		...check,
@@ -175,6 +184,7 @@ for (const check of checks) {
 		errorCode: r.error?.code,
 		spawnError: Boolean(r.error),
 		spawnThrew: r.spawnThrew === true,
+		notExecuted,
 		stdout: r.stdout || '',
 		stderr: r.stderr || ''
 	};
@@ -183,6 +193,7 @@ for (const check of checks) {
 }
 
 const failed = results.filter((r) => !r.ok);
+const notExecuted = results.filter((r) => r.notExecuted.length > 0);
 recordTiming({
 	type: 'complete',
 	executed_count: results.length,
@@ -199,6 +210,12 @@ for (const result of [...results].sort((a, b) => b.durationMs - a.durationMs).sl
 }
 
 console.log('\n' + '-'.repeat(50));
+if (notExecuted.length > 0) {
+	const cases = notExecuted.reduce((total, r) => total + r.notExecuted.length, 0);
+	console.log(`${cases} case(s) in ${notExecuted.length} check(s) were NOT EXECUTED on this host:`);
+	for (const r of notExecuted) console.log(`  - ${r.name} (${r.repro})`);
+	console.log('');
+}
 if (failed.length === 0) {
 	console.log(`✅  All ${results.length} JS check(s) passed.`);
 	if (!FULL)

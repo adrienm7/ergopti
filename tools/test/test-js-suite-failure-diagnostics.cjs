@@ -37,7 +37,14 @@ function run(failure, options = {}) {
 			{
 				__dirname,
 				require(name) {
-					if (name === './lib/js-feature-inventory.cjs') return require(name);
+					if (
+						[
+							'./lib/js-feature-inventory.cjs',
+							'./lib/js-suite-spawn.cjs',
+							'./lib/host-capabilities.cjs'
+						].includes(name)
+					)
+						return require(name);
 					if (name === 'child_process')
 						return {
 							spawnSync(_command, _args, settings) {
@@ -482,5 +489,58 @@ assert.doesNotMatch(failureUpload, /continue-on-error|core-js-timings|assets-qua
 const download = pipeline.findStep('Download completed feature timings').body;
 assert.match(download, /^ {10}pattern: core-js-timings-\*$/m);
 assert.doesNotMatch(download, /core-js-failures/, 'raw text cannot enter the strict timing union');
+
+// A passing check that could not execute a case on this host must say so in
+// the summary instead of reading as a plain pass.
+{
+	const skipped = run({
+		status: 0,
+		stdout: 'ok 1 - executed\nSKIP (not executed): synthetic case: synthetic reason\n'
+	});
+	assert.ifError(skipped.thrown);
+	assert.equal(skipped.exitCode, 0, 'a not-executed case alone does not fail the suite');
+	assert.match(skipped.output, /^ {4}SKIP \(not executed\): synthetic case: synthetic reason$/m);
+	assert.match(skipped.output, /^1 case\(s\) in 1 check\(s\) were NOT EXECUTED on this host:$/m);
+	const plain = run({ status: 0, stdout: 'ok 1 - executed\n' });
+	assert.doesNotMatch(plain.output, /NOT EXECUTED/);
+}
+
+// A Node installed under a directory with a space ("C:\Program Files\nodejs")
+// once turned every "$NODE_EXECUTABLE" check into the command "C:\Program":
+// the runner spawned it through a shell, which joins the program unquoted.
+// Start a real Node through the plan from a path that contains a space.
+{
+	const { spawnSync } = require('node:child_process');
+	const { spawnPlan } = require('./lib/js-suite-spawn.cjs');
+	const spacedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ergopti js suite spawn '));
+	try {
+		const spacedNode = path.join(spacedRoot, 'node with space' + path.extname(process.execPath));
+		// Windows refuses unprivileged symlinks and hard links into Program Files.
+		if (process.platform === 'win32') fs.copyFileSync(process.execPath, spacedNode);
+		else fs.symlinkSync(process.execPath, spacedNode);
+		const probe = path.join(spacedRoot, 'probe arg.cjs');
+		fs.writeFileSync(probe, 'process.stdout.write(JSON.stringify(process.argv.slice(2)));\n');
+		const plan = spawnPlan(
+			{ id: 'probe', cmd: '$NODE_EXECUTABLE', args: [probe, 'a b', '&echo injected'] },
+			spacedNode
+		);
+		assert.equal(plan.shell, false, 'the Node executable path must not pass through a shell');
+		const result = spawnSync(plan.command, plan.args, { encoding: 'utf8', shell: plan.shell });
+		assert.equal(result.error, undefined, `spawn failed: ${result.error}`);
+		assert.equal(result.status, 0, `spaced Node path must start: ${result.stderr}`);
+		assert.deepEqual(JSON.parse(result.stdout), ['a b', '&echo injected']);
+	} finally {
+		fs.rmSync(spacedRoot, { recursive: true, force: true });
+	}
+	assert.deepEqual(spawnPlan({ id: 'n', cmd: 'npm', args: ['run', 'x'] }, process.execPath), {
+		command: 'npm',
+		args: ['run', 'x'],
+		shell: true
+	});
+	assert.throws(
+		() => spawnPlan({ id: 'u', cmd: 'python', args: [] }, process.execPath),
+		/unsupported/
+	);
+}
 
 console.log('JS suite failure diagnostics: OK');
