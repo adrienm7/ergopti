@@ -69,8 +69,9 @@ _LRCC_Check() {
 		Loop 2 {
 			Enabled := A_Index == 1 ? _LRCC_Row : !_LRCC_Row
 			Features["layout"]["emulate_" . Row] := Enabled
+			AdmittedHost := _LRCC_Index == 1 || (_LRCC_Index <= 3 ? !Microsoft : Microsoft)
 			Expected := !Enabled ? ["event", "{Blind}{" . Sc . "}"]
-				: (_LRCC_Index <= 3 || Microsoft ? [_LRCC_Index == 1 ? "event" : "final", Outputs[_LRCC_Index]] : "")
+				: (AdmittedHost ? [_LRCC_Index == 1 ? "event" : "final", Outputs[_LRCC_Index]] : "")
 			; For the wildcard zoom declarations the physical stroke includes
 			; Shift+Ctrl, where the less-specific row wildcard cannot win first.
 			; We test each real context's admission, not a second hook resolver.
