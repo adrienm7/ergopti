@@ -207,7 +207,7 @@ _LMNM_ModelCaptionCounts(Body) {
 	Join := _LMNM_ExecutableStatement(Body,
 		'm)^[ \t]*(for) Row in DefaultRows[ \t]*\n[ \t]*HeadRows\.Push\(Row\)[ \t]*$', 2)
 	Draw := _LMNM_ExecutableStatement(Body,
-		'm)^[ \t]*(MenuRenderer_AppendRows)\(m, "llm_menu", "llm_model", HeadRows\)[ \t]*$', 1)
+		'm)^[ \t]*(Rows) := HeadRows[ \t]*$', 1)
 	if !(Head && DefaultSeed && DefaultGuard && DefaultPosition && Join && Draw
 		&& Head < DefaultSeed && DefaultSeed < DefaultGuard && DefaultGuard < DefaultPosition
 		&& DefaultPosition < Join && Join < Draw && _LMNM_DefaultBranchContains(Body, DefaultGuard, DefaultPosition, Join))
@@ -240,7 +240,7 @@ _LMNM_DeclaredCaptionRouteControls() {
 	AssertEqual(0, _LMNM_ModelCaptionCounts("").Count)
 	for Needle in ['HeadRows := MenuRenderer_TemplateRows', 'DefaultRows := MenuRenderer_TemplateRows',
 		'default_name := _LLM_DefaultFor', 'if (default_name != "") {',
-		'MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)', 'HeadRows.Push(Row)'] {
+		'Rows := HeadRows', 'HeadRows.Push(Row)'] {
 		Assert(InStr(Body, Needle) > 0, "the actual-body mutation must change its real subject")
 		AssertEqual(0, _LMNM_ModelCaptionCounts(StrReplace(Body, Needle, "WithdrawnCaptionRoute")).Count,
 			"a declaration disconnected from its real consumer gets no source credit")

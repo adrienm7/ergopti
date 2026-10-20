@@ -256,13 +256,14 @@ LLM_Menu_BuildModelMenu() {
 		return m
 	for Row in HeaderRows
 		HeadRows.Push(Row)
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", HeadRows)
+	; Every section joins one row list, which MenuRenderer_FillFromList draws.
+	Rows := HeadRows
 
 	; Curated catalogue — provider → family → model. Family boundaries are
 	; rendered as separators inside the provider submenu (matches HS's
 	; ``models_manager`` behaviour: no per-family sub-sub-menu).
 	presets := LLM_GetModelPresets()
-	presets_used := _LLM_Menu_AppendCatalogue(m, presets, active, deps_ready)
+	presets_used := _LLM_Menu_AppendCatalogue(Rows, presets, active, deps_ready)
 
 	; Catalogue fallback: when models.json fails to load OR no entry in the
 	; catalogue advertises an Ollama URL (e.g. an MLX-only catalogue), fall
@@ -281,20 +282,20 @@ LLM_Menu_BuildModelMenu() {
 		; needs to clear a configured model (llm-no-model-row-clobbered). The
 		; selector already reads "no model" and stays clickable, so the
 		; placeholder never carried information the menu was not showing.
-		TagRows := []
 		for tag in installed {
-			TagRows.Push(Map(
+			Rows.Push(Map(
 				"label",   tag,
 				"checked", (tag == active),
 				"action",  _LLM_Menu_MakeSetModelHandler(tag)))
 		}
-		MenuRenderer_AppendRows(m, "llm_menu", "llm_model", TagRows)
 	}
 
 	; Visual model browser — exposes the shared models.json catalogue with
 	; params / RAM / speed columns so the user can compare specs before
 	; picking. Mirrors the HS visual chooser in ui/menu/menu_llm/models_manager.
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", _LLM_Menu_ModelTailRows())
+	for Row in _LLM_Menu_ModelTailRows()
+		Rows.Push(Row)
+	MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => Rows)
 	return m
 }
 
@@ -316,14 +317,14 @@ _LLM_Menu_ModelTailRows() {
 }
 
 /**
- * Appends one provider submenu per catalogue entry to ``m``. Skips entries
+ * Appends one provider row per catalogue entry to the model picker rows. Skips entries
  * with no installable Ollama variant (MLX-only models on Windows would
  * dead-end every click). Returns True when at least one row was added.
  *
  * Kept as a free helper rather than nested inside ``BuildModelMenu`` so the
  * provider loop reads top-to-bottom without three layers of indentation.
  *
- * @param {Menu}    m          - Target model menu being assembled.
+ * @param {Array}   Rows       - Model picker rows being assembled.
  * @param {Array}   presets    - Provider list from ``LLM_GetModelPresets``.
  * @param {string}  active     - Currently selected model name (for the checkmark).
  * @param {Boolean} deps_ready - True when the Ollama daemon is confirmed reachable;
@@ -331,12 +332,11 @@ _LLM_Menu_ModelTailRows() {
  *                               the menu never blocks while the feature is off.
  * @returns {Boolean} True when the catalogue produced at least one entry.
  */
-_LLM_Menu_AppendCatalogue(m, presets, active, deps_ready := true) {
-	Rows := _LLM_Menu_CatalogueRows(presets, active, deps_ready)
-	if (Rows.Length == 0)
-		return false
-	MenuRenderer_AppendRows(m, "llm_menu", "llm_model", Rows)
-	return true
+_LLM_Menu_AppendCatalogue(Rows, presets, active, deps_ready := true) {
+	Catalogue := _LLM_Menu_CatalogueRows(presets, active, deps_ready)
+	for Row in Catalogue
+		Rows.Push(Row)
+	return Catalogue.Length > 0
 }
 
 /**
