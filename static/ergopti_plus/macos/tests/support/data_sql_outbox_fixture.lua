@@ -8,6 +8,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 local MODULE_KEYS = {
 	"adapters.file_system",
@@ -15,7 +16,7 @@ local MODULE_KEYS = {
 	"keylogger.metrics",
 	"modules.keylogger.aggregator",
 	"modules.keylogger.export",
-	"modules.keylogger.log_manager",
+	"adapters.ledger_append", "modules.keylogger.log_manager",
 	"modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer",
 	"infra.logger",
@@ -106,7 +107,7 @@ local function run_refused_transaction(failure)
 		}
 
 		package.loaded["modules.keylogger.log_manager"] = nil
-		local manager = helpers.load_with_stubs("modules.keylogger.log_manager")
+		local manager = EmptyLedger.load()
 		manager.ingest_once()
 		manager.ingest_once()
 		observations.next_event_id = next_event_id

@@ -103,6 +103,7 @@ graph TD
         MACOS_keyboard_geometry["KeyboardGeometry.lua"]
         MACOS_keyboard_hook["KeyboardHook.lua"]
         MACOS_keyboard_source_probe["KeyboardSourceProbe.lua"]
+        MACOS_ledger_append["LedgerAppend.lua"]
         MACOS_log_transport["LogTransport.lua"]
         MACOS_managed_ollama_bootstrap["ManagedOllamaBootstrap.lua"]
         MACOS_managed_ollama_daemon["ManagedOllamaDaemon.lua"]

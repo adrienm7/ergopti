@@ -9,6 +9,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 
 local function load_fixture(options)
@@ -143,7 +144,7 @@ local function load_fixture(options)
 		create_if_absent = function() return true, "created" end,
 		read = function() return nil end,
 	}
-	local log_manager = helpers.load_with_stubs("modules.keylogger.log_manager", {
+	local log_manager = EmptyLedger.load({
 		timer = timer_stub,
 		fs = {
 			attributes = function() return nil end,
@@ -270,7 +271,7 @@ helpers.describe("log_manager deferred action boundaries", function()
 end)
 
 for _, name in ipairs({
-	"modules.keylogger.log_manager", "modules.keylogger.rotation",
+	"adapters.ledger_append", "modules.keylogger.log_manager", "modules.keylogger.rotation",
 	"modules.keylogger.sqlite_writer", "modules.keylogger.aggregator",
 	"modules.keylogger.export", "keylogger.metrics", "infra.logger",
 	"adapters.timer_scheduler",

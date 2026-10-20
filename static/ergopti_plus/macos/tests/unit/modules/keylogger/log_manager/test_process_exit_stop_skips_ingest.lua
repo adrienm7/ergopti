@@ -16,6 +16,7 @@
 --- ==============================================================================
 
 local helpers = require("tests.helpers")
+local EmptyLedger = require("tests.support.keylogger.absent_ledger_file_system")
 
 
 
@@ -102,7 +103,7 @@ package.loaded["adapters.file_system"] = {
 }
 
 	package.loaded["modules.keylogger.log_manager"] = nil
-	local lm = helpers.load_with_stubs("modules.keylogger.log_manager", {
+	local lm = EmptyLedger.load({
 		fs      = { attributes = function() return nil end, dir = function() return function() return nil end end },
 		execute = function() return "" end,
 	})
