@@ -8,6 +8,7 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 	const os = require('node:os');
 	const path = require('node:path');
 	const { execFileSync } = require('node:child_process');
+	const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 	const reader = require('../diagnostics/item36_xctest_evidence.cjs');
 	const stageSource = require('./fixtures/macos-stage-source.cjs');
 	const full = require('../diagnostics/swift_xctest_evidence.cjs');
@@ -308,6 +309,8 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 		fs.writeFileSync(capture, valid);
 		const source = path.join(temporary, 'before.json'),
 			verdict = path.join(temporary, 'verdict.json');
+		// Probe before the CLI's console is silenced, so a skip stays visible.
+		const symlinkCaseRuns = canRunSymlinkCase('real-CLI-symlink-capture-refused');
 		const originalLog = console.log,
 			originalError = console.error;
 		console.log = () => {};
@@ -365,17 +368,19 @@ module.exports = function run({ workflow, admitItem36Selector, ITEM36_FILTER }) 
 				)
 			);
 			fs.writeFileSync(source, JSON.stringify(before));
-			const link = path.join(temporary, 'capture-link');
-			fs.symlinkSync(capture, link);
-			check('real-CLI-symlink-capture-refused', () =>
-				assert.equal(
-					reader.main(
-						['judge', link, '0', '0', candidate, source, path.join(temporary, 'link.json')],
-						temporary
-					),
-					1
-				)
-			);
+			if (symlinkCaseRuns) {
+				const link = path.join(temporary, 'capture-link');
+				fs.symlinkSync(capture, link);
+				check('real-CLI-symlink-capture-refused', () =>
+					assert.equal(
+						reader.main(
+							['judge', link, '0', '0', candidate, source, path.join(temporary, 'link.json')],
+							temporary
+						),
+						1
+					)
+				);
+			}
 			fs.writeFileSync(capture, Buffer.from([0xff]));
 			check('real-CLI-invalid-UTF8-refused', () =>
 				assert.equal(

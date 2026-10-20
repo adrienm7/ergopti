@@ -75,6 +75,7 @@
 'use strict';
 
 const pipeline = require('./ci-full-default.cjs');
+const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 const scoped = require('./fixtures/ci-scoped-full-branches.cjs');
 const macRole = require('./fixtures/macos-stage-source.cjs');
 const LinuxE2E = require('./fixtures/linux-e2e-shards.cjs');
@@ -7077,16 +7078,22 @@ function checkNativePacSourceReceipts() {
 		count++;
 		fs.unlinkSync(path.join(repository, unbound));
 		fs.unlinkSync(capture);
-		fs.symlinkSync(before, capture);
-		assert.notEqual(judge(), 0);
-		count++;
-		fs.unlinkSync(capture);
+		const symlinkCaseRuns = canRunSymlinkCase(
+			'native PAC source receipt refuses a symlinked capture'
+		);
+		if (symlinkCaseRuns) {
+			fs.symlinkSync(before, capture);
+			assert.notEqual(judge(), 0);
+			count++;
+			fs.unlinkSync(capture);
+		}
 		write('capture.log', Buffer.from([0xff]));
 		assert.notEqual(judge(), 0);
 		count++;
-		assert.equal(count, 22);
+		const expected = symlinkCaseRuns ? 22 : 21;
+		assert.equal(count, expected);
 		console.log(
-			'PASS: native PAC source receipt controls=22; constructed transcripts/native execution unqualified.'
+			`PASS: native PAC source receipt controls=${expected}; constructed transcripts/native execution unqualified.`
 		);
 	} finally {
 		fs.rmSync(repository, { recursive: true, force: true });

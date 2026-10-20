@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { pythonExecutable } = require('../../lib/python.cjs');
 const ROOT = path.resolve(__dirname, '../../..');
 
 module.exports = function createInputSourceQualification(guardedStep) {
@@ -131,12 +132,22 @@ module.exports = function createInputSourceQualification(guardedStep) {
 		}
 		console.log('PASS: native input-source execution-bypass controls=3; native execution UNRUN.');
 		// Pipeline owns these controls even when standalone leaf delegations are disabled.
-		execFileSync('python3', [path.join(__dirname, '../test_input_source_xctest_isolation.py')], {
-			cwd: ROOT,
-			stdio: 'pipe'
-		});
+		// A bare "python3" is the Microsoft Store alias on Windows, not CPython.
+		execFileSync(
+			pythonExecutable(),
+			[path.join(__dirname, '../test_input_source_xctest_isolation.py')],
+			{
+				cwd: ROOT,
+				stdio: 'pipe'
+			}
+		);
+		// Windows has no POSIX process groups: the Python file skips those three.
+		if (process.platform === 'win32')
+			console.log(
+				'SKIP (not executed): 3 isolated input-source process-group controls need POSIX process groups; hosted CI lanes execute them'
+			);
 		console.log(
-			'PASS: isolated native input-source receipt controls=17; Swift/native execution UNRUN.'
+			`PASS: isolated native input-source receipt controls=${process.platform === 'win32' ? 14 : 17}; Swift/native execution UNRUN.`
 		);
 	}
 

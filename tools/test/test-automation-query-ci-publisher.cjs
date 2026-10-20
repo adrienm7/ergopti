@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { canRunSymlinkCase } = require('./lib/host-capabilities.cjs');
 const ROOT = path.resolve(__dirname, '../..');
 const build = fs.readFileSync(path.join(ROOT, 'tools/build/build_macos_app.sh'), 'utf8');
 const sign = build.match(/^codesign_native_runtime\(\) \{[\s\S]*?^\}/m)[0];
@@ -214,7 +215,19 @@ const admission = spawnSync(
 	}
 );
 assert(!admission.error && admission.signal === null && admission.status === 0, admission.stderr);
+// Only the linked-decoder case needs a symlink; a local Windows host without
+// the privilege reports it skipped with that reason, every CI lane runs it.
+const symlinkCaseRuns = canRunSymlinkCase(
+	'linked decoder refuses even when bytes, hash and Git match'
+);
 assert(
-	/Ran 12 tests in /.test(admission.stderr) && /\nOK\s*$/.test(admission.stderr),
+	/Ran 12 tests in /.test(admission.stderr) &&
+		(symlinkCaseRuns ? /\nOK\s*$/ : /\nOK \(skipped=1\)\s*$/).test(admission.stderr),
 	'all twelve additional decoder and main authentication controls execute'
 );
+if (!symlinkCaseRuns)
+	assert.match(
+		admission.stderr,
+		/test_linked_decoder_refuses_even_when_bytes_hash_and_git_match .*\.\.\. skipped 'not executed: this Windows account lacks the symlink privilege/,
+		'the only skipped admission control is the symlink case'
+	);

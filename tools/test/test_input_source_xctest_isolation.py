@@ -3,6 +3,7 @@
 import hashlib
 import importlib
 import json
+import os
 import shutil
 import sys
 import textwrap
@@ -35,6 +36,13 @@ def transcript(method=METHOD, status="passed", style="swift"):
         f"Test Case '{identity}' {status} (0.001 seconds).\n"
         "Test Suite 'Selected tests' passed at time\n"
     )
+
+
+# The isolation runner retires each child through its POSIX process group.
+POSIX_GROUPS = unittest.skipUnless(
+    hasattr(os, "killpg"),
+    "not executed: needs POSIX process groups (os.killpg); hosted CI lanes execute it",
+)
 
 
 class IsolationControls(unittest.TestCase):
@@ -141,6 +149,7 @@ class IsolationControls(unittest.TestCase):
             summary = json.loads((evidence / "isolated-forward/summary.json").read_text())
             self.assertFalse(summary["passed"])
 
+    @POSIX_GROUPS
     def test_each_child_has_its_own_bounded_process_group_and_is_reaped(self):
         process = Mock(pid=321)
         process.wait.side_effect = [
@@ -166,6 +175,7 @@ class IsolationControls(unittest.TestCase):
             process.wait.call_args_list, [call(timeout=120), call(timeout=5), call(timeout=5)]
         )
 
+    @POSIX_GROUPS
     def test_exit_between_timeout_and_signal_is_reaped_and_remains_a_refusal(self):
         process = Mock(pid=321)
         process.wait.side_effect = [isolation.subprocess.TimeoutExpired("swift", 120), 0]
@@ -187,6 +197,7 @@ class IsolationControls(unittest.TestCase):
                     isolation.run_child(["missing"], Path(directory) / "log"), (127, 0)
                 )
 
+    @POSIX_GROUPS
     def test_real_zero_exit_parent_with_live_descendant_is_refused_and_retired(self):
         controller = textwrap.dedent("""
             import ctypes, json, os, subprocess, sys, tempfile, threading, time

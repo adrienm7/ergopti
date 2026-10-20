@@ -206,8 +206,9 @@ function trace(sources, entry) {
 								path,
 								__dirname: path.join(__dirname, 'fixtures'),
 								ROOT: path.resolve(__dirname, '../..'),
+								pythonExecutable: () => 'RESOLVED_CPYTHON',
 								execFileSync(command, args, options) {
-									assert.equal(command, 'python3');
+									assert.equal(command, 'RESOLVED_CPYTHON');
 									assert.deepEqual(Array.from(args), [
 										path.join(__dirname, 'test_input_source_xctest_isolation.py')
 									]);
