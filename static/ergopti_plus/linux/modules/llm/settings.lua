@@ -147,8 +147,10 @@ end
 --- Changes one setting.
 --- @param name string
 --- @param value number
+--- @param expected_source table|nil Exact source retained by a deferred editor.
+--- @param admission function|nil Final originating configuration admission.
 --- @return boolean Whether it was accepted.
-function M.set(name, value)
+function M.set(name, value, expected_source, admission)
 	local default = shipped()[name]
 	if default == nil then
 		Logger.error(LOG, "set(): '%s' has no shipped default — refusing to store it.", tostring(name))
@@ -181,7 +183,11 @@ function M.set(name, value)
 		return false
 	end
 	local persisted
-	if value == default then
+	if expected_source ~= nil or admission ~= nil then
+		if type(expected_source) ~= "table" or type(admission) ~= "function"
+			or type(Storage.set_many) ~= "function" then return false end
+		persisted = Storage.set_many({ [PREF_PREFIX .. name] = value }, expected_source, admission)
+	elseif value == default then
 		-- Back to the default means back to no entry, so the shipped answer stays
 		-- live for this user rather than being pinned at the moment they touched it.
 		persisted = Storage.delete(PREF_PREFIX .. name)
