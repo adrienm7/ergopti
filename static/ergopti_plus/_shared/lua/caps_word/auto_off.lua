@@ -35,7 +35,7 @@ local MS_PER_SECOND = 1000
 -- Built-in delimiter key -> its characters, from the generated catalogue only.
 local CHARS_BY_KEY = {}
 for _, def in ipairs(Catalogue) do
-	if def.key then CHARS_BY_KEY[def.key] = def.chars end
+	if def.key and not def.custom then CHARS_BY_KEY[def.key] = def.chars end
 end
 
 
@@ -219,7 +219,9 @@ end
 function M.terminator_rows()
 	local rows = {}
 	for _, def in ipairs(Catalogue) do
-		if def.key then
+		-- keymap.terminators appends custom delimiters to this table at run
+		-- time; they carry a label, not a label_key, and are not offered here.
+		if def.key and not def.custom then
 			rows[#rows + 1] = { key = def.key, label_key = def.label_key }
 		elseif def.type == "separator" then
 			rows[#rows + 1] = { separator = true }
@@ -245,7 +247,7 @@ function M.with_terminator(list, key, checked)
 	wanted[key] = checked or nil
 	local out = {}
 	for _, def in ipairs(Catalogue) do
-		if def.key and wanted[def.key] then out[#out + 1] = def.key end
+		if def.key and not def.custom and wanted[def.key] then out[#out + 1] = def.key end
 	end
 	return out
 end
