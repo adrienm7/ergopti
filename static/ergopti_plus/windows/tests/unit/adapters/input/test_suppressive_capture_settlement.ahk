@@ -112,6 +112,9 @@ _SICU_ChildSource() {
 
 _SICU_Case(Owner, Mode) {
 	global _SharedDir
+	static RetirementDebt := 0
+	if IsObject(RetirementDebt)
+		throw Error("A previous native capture child remains unretired. Further native input is refused.")
 	CaseName := Owner . "-" . Mode
 	Script := A_Temp . "\ergopti_native_unicode_capture_" . A_ScriptHwnd . "_" . A_TickCount . "_" . Random(1000, 999999) . ".ahk"
 	AssertFalse(FileExist(Script), "the native capture child requires a fresh owned source")
@@ -162,6 +165,10 @@ _SICU_Case(Owner, Mode) {
 		if !IsObject(Primary)
 			Primary := Err
 	}
+	; Preserve the handle and source before any primary error escapes. The
+	; next case must not inject while this parent's exact child can still run.
+	if !Retired
+		RetirementDebt := { handle: Handle, script: Script }
 	try {
 		if Retired && !IsObject(Primary)
 			FileDelete(Script)
