@@ -39,6 +39,9 @@
  * 6. The version reaches the lanes only through ci.yml: each OS caller must
  *    pass the version output of validate's plan, or a lane would stamp an empty
  *    version on a release.
+ * 7. A packager job may instead unpack the verified tarball another job built
+ *    (the parallel Flatpak job): the step that unpacks it into build/linux must
+ *    verify the stamp of the unpacked tree before any packager runs.
  * ==============================================================================
  */
 
@@ -72,6 +75,9 @@ const PACKAGER_WRAPPERS = {
 	'tools/build/build-linux-appimage.sh': ['bash tools/build/appimage-oldest-lts.sh build']
 };
 const PKGBUILD_REL = 'tools/build/PKGBUILD';
+// The step that unpacks an already stamped bundle and verifies its stamp.
+const UNPACK_TAR = /\btar\s+-xzf\b[^\n]*\s-C\s+build\/linux\b/;
+const UNPACK_VERIFY = 'write_build_stamp.sh verify build/linux/_shared';
 
 const COMMIT_ENV = /^ERGOPTI_BUILD_COMMIT:\s*\$\{\{\s*github\.sha\s*\}\}\s*$/;
 const VERSION_ENV = /^ERGOPTI_BUILD_VERSION:\s*\$\{\{\s*inputs\.version\s*\}\}\s*$/;
@@ -209,6 +215,12 @@ function checkWorkflow(text, rel) {
 		let assembledLinux = false;
 		for (const step of job.steps) {
 			const where = `${rel}:${step.line} (job ${job.name}, step "${step.name}")`;
+			// An unpacked bundle counts as stamped only once its stamp is verified
+			// after the unpack, in the same step.
+			const unpackAt = step.run.search(UNPACK_TAR);
+			if (unpackAt >= 0 && step.run.indexOf(UNPACK_VERIFY, unpackAt) > unpackAt) {
+				assembledLinux = true;
+			}
 			const env = step.env.concat(job.env);
 			for (const [script, invocation] of Object.entries(STAMPING_BUILDS)) {
 				if (!invocation.test(step.run)) continue;
@@ -431,6 +443,26 @@ for (const box of VERSIONED_BOXES) {
 			`self-check: dropping the plan's version from the ${box} caller went unnoticed — this guard cannot fail`
 		);
 	}
+}
+
+// The unpack-and-verify path must be able to fail too: dropping the verify
+// from every step that unpacks a bundle has to be reported.
+let unpackCarriers = 0;
+for (const { rel, text } of workflows) {
+	// The verify that follows an unpack (past its `test -f` checks), and no other.
+	const verifyAfterUnpack =
+		/(\btar\s+-xzf\b[^\n]*\s-C\s+build\/linux\b[^\n]*\n(?:[ \t]*test\s[^\n]*\n)*)[ \t]*bash tools\/build\/write_build_stamp\.sh verify build\/linux\/_shared[^\n]*\n/g;
+	if (!parseJobs(text).some((job) => job.steps.some((step) => UNPACK_TAR.test(step.run)))) continue;
+	unpackCarriers++;
+	const mutated = text.replace(verifyAfterUnpack, '$1');
+	if (mutated === text || checkWorkflow(mutated, rel).errors.length === 0) {
+		errors.push(
+			`self-check: removing the unpacked-bundle stamp verify from ${rel} went unnoticed — this guard cannot fail`
+		);
+	}
+}
+if (unpackCarriers < 1) {
+	errors.push('no pipeline workflow unpacks a stamped bundle any more — the Flatpak job moved');
 }
 
 // Each build entry point writes the stamp; each packager verifies its copy.
