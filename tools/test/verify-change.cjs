@@ -431,12 +431,14 @@ const RULES = [
 	},
 	{
 		gate: 'macos-tooltip-canvas',
-		why: 'native canvas and WebView diagnostic ownership and observer controls require their complete pure Python suites',
+		why: 'native canvas and WebView diagnostic ownership and observer controls require their complete pure Python and Lua observer suites',
 		match: (f) =>
 			f.startsWith('tools/diagnostics/macos_tooltip_canvas') ||
 			f.startsWith('tools/diagnostics/macos_webview_binding') ||
 			f.startsWith('tools/diagnostics/macos_physical_shortcuts_close') ||
 			f.startsWith('tools/diagnostics/macos_action_picker_pool') ||
+			f.startsWith('tools/diagnostics/macos_layout_manager_pool') ||
+			f.startsWith('tools/diagnostics/macos_permission_dialog_pool') ||
 			f.startsWith('tools/diagnostics/macos_webview_raw_delete') ||
 			f === 'tools/diagnostics/macos_owned_process.py' ||
 			f === 'tools/test/run-macos-tooltip-canvas-tests.cjs'
