@@ -98,13 +98,19 @@ local function fresh_harness(overrides)
 	h.settings = require("infra.capsword_auto_off")
 	local state = {}
 	for key, value in pairs(h.settings.DEFAULT_STATE) do state[key] = value end
+	-- Each case names its settings: these pin a known base, "shipped" keeps
+	-- the manifest defaults themselves.
+	if not (overrides and overrides.shipped) then
+		state.caps_word_idle_timeout_seconds = 0
+		state.caps_word_terminators = { "space", "tab", "enter" }
+	end
 	local pointer = {}
 	for kind, enabled in pairs(state.caps_word_pointer) do pointer[kind] = enabled end
 	state.caps_word_pointer = pointer
 	for key, value in pairs(overrides or {}) do
 		-- caps_word_pointer_<kind> overrides one kind of the pointer table.
 		local kind = key:match("^caps_word_pointer_(.+)$")
-		if kind then pointer[kind] = value else state[key] = value end
+		if kind then pointer[kind] = value elseif key ~= "shipped" then state[key] = value end
 	end
 	helpers.assert_true(h.settings.apply_state(state), "the test settings must compile")
 
@@ -262,7 +268,7 @@ helpers.describe("CapsWord watcher: a typed delimiter ends CapsWord only when ch
 		local h = fresh_harness()
 		activate(h)
 		key(h, NBSP)
-		helpers.assert_eq(h.supersede_calls, 0, "the default delimiters exclude the no-break space")
+		helpers.assert_eq(h.supersede_calls, 0, "Space, Tab and Enter exclude the no-break space")
 		local checked = fresh_harness({ caps_word_terminators = { "space", "nbsp" } })
 		activate(checked)
 		key(checked, NBSP)
@@ -287,7 +293,7 @@ end)
 -- ===================================
 
 helpers.describe("CapsWord watcher: the inactivity delay", function()
-	helpers.it("never arms a timer at 0, the default", function()
+	helpers.it("never arms a timer at 0 (never)", function()
 		local h = fresh_harness()
 		activate(h)
 		helpers.assert_eq(#h.timers, 0)
@@ -340,5 +346,39 @@ helpers.describe("CapsWord watcher: the inactivity delay", function()
 		h.active = true
 		helpers.assert_true(h.watchers.note_capsword_activated())
 		helpers.assert_true(timers_at(h, 1)[1] ~= nil)
+	end)
+end)
+
+
+
+
+
+-- ===================================
+-- ===================================
+-- ======= 5/ Shipped Defaults =======
+-- ===================================
+-- ===================================
+
+helpers.describe("CapsWord watcher: the shipped defaults end CapsWord on typed punctuation", function()
+	-- Karabiner no longer has the "." and "," exits (keys g and v): the typed
+	-- characters end CapsWord here, whatever layout key, layer or dead key
+	-- produced them, and a French spaced-punctuation carrier counts as typed.
+	for _, text in ipairs({ ".", ",", ";", "\xE2\x80\xAF;", "\xC2\xA0", "\xE2\x80\xAF" }) do
+		helpers.it(string.format("ends CapsWord on %q", text), function()
+			local h = fresh_harness({ shipped = true })
+			activate(h)
+			key(h, text)
+			helpers.assert_eq(#h.writers, 1, "a shipped delimiter ends CapsWord")
+		end)
+	end
+
+	helpers.it("arms the shipped inactivity delay at the activation", function()
+		local h = fresh_harness({ shipped = true })
+		activate(h)
+		local delay = require("caps_word.auto_off").idle_delay_ms(h.settings.policy()) / 1000
+		helpers.assert_eq(delay, require("infra.manifest_reader").default_for("shortcuts.caps_word.idle_timeout_seconds"),
+			"the shipped delay is the manifest default")
+		helpers.assert_eq(delay, 10, "10 s (maintainer decision of 2026-10-20)")
+		helpers.assert_true(timers_at(h, delay)[1] ~= nil, "the delay counts from the activation")
 	end)
 end)

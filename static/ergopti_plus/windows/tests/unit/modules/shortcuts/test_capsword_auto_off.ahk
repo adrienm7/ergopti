@@ -245,7 +245,7 @@ _CWAO_ReadConfigDefaultsAndOutdated() {
 	try {
 		CapsWordAutoOffReadConfig(Map())
 		Policy := CapsWordAutoOff.Configured
-		AssertEqual(0, CapsWordAutoOffIdleDelayMs(Policy), "no delay by default")
+		AssertEqual(10000, CapsWordAutoOffIdleDelayMs(Policy), "10 s by default (maintainer decision of 2026-10-20)")
 		for Key in ManifestDefaultFor("shortcuts.caps_word.terminators")
 			AssertTrue(CapsWordAutoOffEndsOnKey(Policy, Key), Key . " is a default delimiter")
 		for Kind in CapsWordAutoOffPointerKinds()
@@ -254,7 +254,7 @@ _CWAO_ReadConfigDefaultsAndOutdated() {
 			"shortcuts.caps_word", Map("idle_timeout_seconds", "5", "terminators", ["hyphen", "comma", "comma"]),
 			"shortcuts.caps_word.pointer", Map("middle_click", 0, "left_click", "yes")))
 		Policy := CapsWordAutoOff.Configured
-		AssertEqual(0, CapsWordAutoOffIdleDelayMs(Policy), "a quoted delay is outdated and reads as the default")
+		AssertEqual(10000, CapsWordAutoOffIdleDelayMs(Policy), "a quoted delay is outdated and reads as the default")
 		AssertTrue(CapsWordAutoOffEndsOnKey(Policy, "comma"), "the valid delimiter is kept once")
 		AssertFalse(CapsWordAutoOffEndsOnKey(Policy, "space"), "a stored list replaces the default one")
 		AssertFalse(CapsWordAutoOffEndsOnPointer(Policy, "middle_click"), "a stored false is read")

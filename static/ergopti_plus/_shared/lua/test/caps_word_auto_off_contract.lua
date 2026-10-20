@@ -32,7 +32,7 @@ function M.run(helpers, corpus_path)
 
 	helpers.describe("Shared CapsWord auto-off policy", function()
 		helpers.it("compiles valid settings and refuses each malformed one by name", function()
-			helpers.assert_eq(#corpus.compile, 13, "complete compile vectors")
+			helpers.assert_eq(#corpus.compile, 14, "complete compile vectors")
 			for _, row in ipairs(corpus.compile) do
 				local policy, reason = compile(row.idle, row.terminators, row.pointer)
 				if row.valid then
@@ -51,7 +51,7 @@ function M.run(helpers, corpus_path)
 		end)
 
 		helpers.it("ends CapsWord on a typed payload only through a checked delimiter", function()
-			helpers.assert_eq(#corpus.text, 26, "complete text vectors")
+			helpers.assert_eq(#corpus.text, 40, "complete text vectors")
 			for _, row in ipairs(corpus.text) do
 				local policy = assert(compile(0, row.terminators, "all_true"))
 				helpers.assert_eq(Policy.ends_on_text(policy, row.text), row.expected,

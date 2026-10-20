@@ -123,6 +123,30 @@ for (const field of ['default', 'recommended']) {
 	);
 }
 
+// The shipped defaults are a maintainer decision (2026-10-20): 10 s and the
+// eight delimiters below. A parameter of CapsWord, so the neutral value and
+// the preset agree and both restore and clear land on them.
+check(
+	idle && idle.default === 10 && idle.recommended === 10,
+	'the CapsWord delay ships at 10 s, as default and as recommended value'
+);
+const SHIPPED_DELIMITERS = [
+	'space',
+	'nbsp',
+	'nnbsp',
+	'tab',
+	'enter',
+	'comma',
+	'semicolon',
+	'period'
+];
+for (const field of ['default', 'recommended']) {
+	check(
+		same(terminators ? terminators[field] : undefined, SHIPPED_DELIMITERS),
+		`shortcuts.caps_word.terminators.${field} must be the eight shipped delimiters in catalogue order`
+	);
+}
+
 // 3. Pointer kinds: one boolean feature each, mirrored by the shared corpus; a
 // platform that cannot see a kind says why in its own language.
 const kinds = (flattened.entries || []).filter(

@@ -59,3 +59,38 @@ _CWSM_RendersEveryRow() {
 	}
 }
 Test("caps-word submenu: the delay, each delimiter and each pointer kind are drawn", _CWSM_RendersEveryRow)
+
+; A fresh install (no [shortcuts.caps_word] stored) ticks the eight shipped
+; delimiters, the maintainer's decision of 2026-10-20, and nothing else.
+_CWSM_FreshInstallTicksTheShippedDelimiters() {
+	SavedValues := CapsWordAutoOff.Values, SavedPolicy := CapsWordAutoOff.Configured
+	try {
+		CapsWordAutoOffReadConfig(Map())
+		AssertEqual(10, CapsWordAutoOffValues()["idle_timeout_seconds"], "the delay starts at 10 s")
+		Shipped := Map()
+		for Key in ManifestDefaultFor("shortcuts.caps_word.terminators")
+			Shipped[Key] := true
+		Rows := _CWSM_Rows()
+		Ticked := ""
+		for Row in CapsWordAutoOffTerminatorRows() {
+			if Row.Has("separator")
+				continue
+			Label := t(Row["label_key"]), Found := 0
+			for Drawn in Rows {
+				if Drawn["label"] != Label
+					continue
+				Found++
+				AssertEqual(Shipped.Has(Row["key"]), (Drawn["state"] & 0x8) != 0, Row["key"] . " follows the shipped default")
+				if Drawn["state"] & 0x8
+					Ticked .= (Ticked == "" ? "" : ",") . Row["key"]
+			}
+			AssertEqual(1, Found, Row["key"] . " has exactly one row")
+		}
+		AssertEqual("space,nbsp,nnbsp,tab,enter,comma,semicolon,period", Ticked,
+			"the eight shipped delimiters are ticked, in catalogue order")
+	} finally {
+		CapsWordAutoOff.Values := SavedValues
+		CapsWordAutoOff.Configured := SavedPolicy
+	}
+}
+Test("caps-word submenu: a fresh install ticks the eight shipped delimiters", _CWSM_FreshInstallTicksTheShippedDelimiters)

@@ -34,7 +34,7 @@ _CWAOP_Join(List) {
 
 _CWAOP_CompileVectors() {
 	Corpus := _CWAOP_Corpus()
-	AssertEqual(13, Corpus["compile"].Length, "complete compile vectors")
+	AssertEqual(14, Corpus["compile"].Length, "complete compile vectors")
 	for Row in Corpus["compile"] {
 		Policy := _CWAOP_Compile(Corpus, Row["idle"], Row["terminators"], Row["pointer"], &Reason)
 		if Row["valid"] {
@@ -55,7 +55,7 @@ Test("caps-word auto-off policy: compiles valid settings and names each refusal"
 
 _CWAOP_TextVectors() {
 	Corpus := _CWAOP_Corpus()
-	AssertEqual(26, Corpus["text"].Length, "complete text vectors")
+	AssertEqual(40, Corpus["text"].Length, "complete text vectors")
 	for Row in Corpus["text"] {
 		Policy := _CWAOP_Compile(Corpus, 0, Row["terminators"], "all_true")
 		AssertEqual(Row["expected"], CapsWordAutoOffEndsOnText(Policy, Row["text"]),
