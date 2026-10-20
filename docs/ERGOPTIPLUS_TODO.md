@@ -553,6 +553,14 @@ fallback (L63); multi-group XKB recovery (L100).
   apply it stays ticked, greyed and suffixed « — non appliqué », and applies again by itself.
 - **Moving the Karabiner lease token out of the rule text** is impossible: Karabiner compares
   variables only to fixed values. Fewer recovery deploys need fewer lease failures first.
-- **The fourth CI duration optimisation** was deliberately not done by the maintainer.
+- **Do not deduplicate the macOS Swift launcher XCTest classes between E2E and Build.** The managed
+  native E2E cells run the SDK, logger and daily-log cohorts on macOS 15 (Apple silicon and Intel);
+  Build's full Swift run repeats them on macOS 26 (`macos-latest`). Skipping them in Build saves
+  about 42 s of 364 s of test time (measured 2026-10-20, run 39388400901) and nothing on the
+  critical path, and drops their only macOS 26 coverage. The repetition is deliberate cross-version
+  coverage; job, lot and step names state each cell's macOS version, read from `HOSTS` in
+  `tools/ci/macos-stage-roles.cjs`.
+- **Windows unit shards are grouped by test category, not by duration.** A new test file with no
+  category fails a gate; a minute more of wall time buys a CI whose red job says what broke.
 - **Maintainer workflow**: partial work is delivered into dev after the feasible container or CI
   work, with native or device gaps documented here rather than holding a branch.
