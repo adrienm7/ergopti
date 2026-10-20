@@ -261,8 +261,10 @@ for Mode in ["original", "label", "missing", "wrong_owner", "clicked", "extra_ca
 
 _LBMD_ModelPickerBoundaryConsumer() {
 	Body := _StripFullLineComments(_DriverFuncBody("LLM_Menu_BuildModelMenu"))
-	AssertContains(Body, 'MenuRenderer_AppendRows(m, "llm_menu", "llm_model", _LLM_Menu_ModelTailRows())',
+	AssertContains(Body, 'for Row in _LLM_Menu_ModelTailRows()',
 		"the actual native model-menu consumer must render the complete tail provider")
+	AssertContains(Body, 'MenuRenderer_FillFromList(m, "llm_menu", "llm_model", (*) => Rows)',
+		"the joined picker rows are drawn by the renderer, never appended by the driver")
 	Tail := _StripFullLineComments(_DriverFuncBody("_LLM_Menu_ModelTailRows"))
 	AssertContains(Tail, 'MenuRenderer_StatusRows("llm_menu", "llm_model", "model_picker_tail")')
 	AssertContains(Tail, '"llm_add_model_entry", (*) => LLM_Menu_PromptAddModel()', "original Add dialog callback body remains native")

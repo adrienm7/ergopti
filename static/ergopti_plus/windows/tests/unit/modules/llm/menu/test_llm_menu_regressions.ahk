@@ -383,7 +383,7 @@ Test_LLM_Regression_ModelMenuAlwaysBuildsCatalogue() {
 	; while Ollama is not confirmed up.
 	AssertContains(body, "deps_ready := LLM_Deps_IsReady()",
 		"menu_models must resolve deps_ready once for the catalogue build")
-	AssertContains(body, "_LLM_Menu_AppendCatalogue(m, presets, active, deps_ready)",
+	AssertContains(body, "_LLM_Menu_AppendCatalogue(Rows, presets, active, deps_ready)",
 		"menu_models must always append the full catalogue, threaded with deps_ready")
 }
 Test("LLM regression: model menu always appends the full catalogue (deps_ready-threaded)",
