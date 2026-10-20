@@ -88,6 +88,49 @@ helpers.describe("linux-sqlite-category-projection", function()
 			end)
 		end
 	end)
+	-- The manifest read the category raw, and the CLI's JSON mode cuts raw TEXT
+	-- at NUL: a saved "row\0tail" reached the dashboard as "row".
+	helpers.it("linux-sqlite-manifest-category-nul: the manifest quotes the category before the CLI", function()
+		local category = "Updated\r\nrow\0tail"
+		local statements = with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return Json.encode({ { date = "2000-01-01", app = "owned", chars = 1, category_json = Json.encode(category) },
+					{ date = "2000-01-01", app = "plain", chars = 1, category_json = "null" } })
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.category, category, "the complete category reaches the dashboard")
+			helpers.assert_eq(manifest["2000-01-01"].plain.category, "Unknown", "no saved category keeps the default")
+			helpers.assert_eq(complete, true)
+		end)
+		local base
+		for _, sql in ipairs(statements) do
+			if sql:find("FROM agg_app_day ", 1, true) then base = sql end
+		end
+		helpers.assert_contains(base, "json_quote(MAX(category)) AS category_json")
+	end)
+	helpers.it("linux-sqlite-manifest-category-nul: an invalid quoted category leaves the manifest incomplete", function()
+		with_stubbed_sqlite(function(sql)
+			if sql:find("FROM agg_app_day ", 1, true) then
+				return Json.encode({ { date = "2000-01-01", app = "owned", chars = 1, category_json = "{not json" } })
+			end
+			return "[]"
+		end, function(reader)
+			local manifest, complete = reader.read_manifest("/db/metrics.sqlite")
+			helpers.assert_eq(manifest["2000-01-01"].owned.category, "Unknown")
+			helpers.assert_eq(complete, false, "a projection that could not read the category is never cached")
+		end)
+	end)
+	-- decode_lossless answers nil for malformed text instead of raising, so a
+	-- pcall around it accepted a corrupt category as "no category saved".
+	helpers.it("linux-sqlite-manifest-category-nul: a malformed saved category refuses the override map", function()
+		with_stubbed_sqlite(function()
+			return Json.encode({ { app_json = Json.encode("first"), score_json = Json.encode("1"), category_json = "{not json" } })
+		end, function(reader)
+			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", "local"))
+		end)
+	end)
 	helpers.it("category projection rejects an absent device before opening SQLite", function()
 		local statements = with_stubbed_sqlite(function() error("must not dispatch") end, function(reader)
 			helpers.assert_nil(reader.read_user_categories("/db/metrics.sqlite", ""))

@@ -136,6 +136,21 @@ local function get_entry(manifest, date, app)
 	return manifest[date][app]
 end
 
+--- Decodes an optional TEXT value that SQL quoted with json_quote.
+--- decode_lossless answers nil for malformed text rather than raising, and a
+--- null token for SQL NULL; an absent column is an absent value.
+--- @param quoted string|nil The json_quote output.
+--- @return boolean valid
+--- @return string|nil text
+local function decode_optional_text(quoted)
+	if quoted == nil then return true, nil end
+	if type(quoted) ~= "string" then return false, nil end
+	local value = Json.decode_lossless(quoted)
+	if Json.is_null(value) then return true, nil end
+	if type(value) == "string" then return true, value end
+	return false, nil
+end
+
 --- Merges persisted error buckets while retaining identical device contributions.
 local function merge_error_buckets(target, row)
 	if not ok_json or type(row.e_buckets_json) ~= "string" then return end
@@ -171,8 +186,7 @@ function M.read_user_categories(sqlite_path, device_id)
 		-- category or malformed score into a different, apparently valid value.
 		local ok_app, name = pcall(Json.decode, row.app_json)
 		local ok_score, raw_score = pcall(Json.decode, row.score_json)
-		local ok_category, category = pcall(Json.decode_lossless, row.category_json)
-		if ok_category and Json.is_null(category) then category = nil end
+		local ok_category, category = decode_optional_text(row.category_json)
 		local score = ok_score and type(raw_score) == "string" and tonumber(raw_score) or nil
 		if not ok_app or type(name) ~= "string" or name == "" or not score
 			or score ~= score or score == math.huge or score == -math.huge
@@ -205,10 +219,18 @@ SELECT date, app, SUM(chars) AS chars, SUM(pauses) AS pauses,
        SUM(hs_triggers) AS hs_triggers, SUM(llm_triggers) AS llm_triggers,
        SUM(hs_suggested) AS hs_suggested, SUM(llm_suggested) AS llm_suggested,
        SUM(hs_input_chars) AS hs_input_chars, SUM(llm_input_chars) AS llm_input_chars,
-       SUM(app_time_ms) AS app_time_ms, MAX(category) AS category
+       SUM(app_time_ms) AS app_time_ms, json_quote(MAX(category)) AS category_json
 FROM agg_app_day%s GROUP BY date, app;
 ]], filters(start_date, end_date, apps)))
 	for _, row in ipairs(rows) do
+		-- Quoted in SQL as read_user_categories quotes it: the CLI's JSON mode
+		-- cuts raw TEXT at NUL, so a saved category came back shortened.
+		local valid, category = decode_optional_text(row.category_json)
+		if not valid then
+			Logger.warn(LOG, "SQLite application category is invalid; manifest projection incomplete.")
+			complete, category = false, nil
+		end
+		row.category = category
 		local entry = get_entry(manifest, row.date, row.app)
 		entry.chars = row.chars or 0
 		entry.pauses = row.pauses or 0
