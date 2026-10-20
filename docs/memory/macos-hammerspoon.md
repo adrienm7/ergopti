@@ -1298,3 +1298,65 @@ checks the unfiltered output's final key to decide whether to restore previously
 held modifiers; retain the existing never-posted trailer for timed modifier
 holds as well as immediate ones. Keep historical recognition graphs on their
 original immediate-hold recipe rather than deriving them from modern timer rules.
+
+## Packaging, AppleEvents, and native builds
+
+### project-appleevent-status-codes
+
+For AppleEvents to the embedded Hammerspoon, only -1744 (consent required) and
+-1743 (consent denied) in `NSOSStatusErrorDomain` speak about consent; -10004 is
+a privilege error, -600 a port discovery failure, and a signal 11 is a crash,
+not a refusal. A hosted runner can never answer the Automation consent dialog,
+so Brew, Shortcuts and launch AppleEvent acceptance needs a real Mac or an
+explicit opt-in lane. In JXA, integer getters on `NSError` and `NSNumber` are
+bridged as strings: compare them as strings.
+
+### project-macos-native-build-grammar-traps
+
+The Seatbelt sandbox network grammar accepts the host `localhost` or `*` only,
+not `127.0.0.1:*`. Carbon `RunApplicationEventLoop` is 32-bit only: use
+`ReceiveNextEvent` with `AEProcessEvent`. `codesign --display` prints the
+designated requirement as a commented `# designated => ` record, so a parser
+must accept the bare and the commented prefix. In Swift, an unparenthesised cast
+in a `case` pattern parses as an as-pattern, `lipo -verify_arch` is greedy (put
+the file first), and an Apple SSL server-policy leaf certificate needs the
+serverAuth EKU. A native Ollama build needs an explicit macOS SDK and a writable
+Go cache, and compiles to a fresh file before replacing the extracted CLI.
+
+### project-macos-release-archive-preference
+
+The macOS updater prefers the `.app.tar.xz` asset, accepts the ZIP only when the
+preferred asset is absent, and refuses a malformed or ambiguous preferred
+archive; appcast dates come from the explicit source revision, never the clock.
+The Homebrew cask process matcher must treat the bundle's dot literally (it once
+matched foreign names such as `ErgoptiPlusXapp`). Stable `ergoptiplus` and
+`ergoptiplus@dev` are separate casks: switching is uninstall then install, and
+the configuration is kept.
+
+### project-macos-missing-acl-is-an-empty-acl
+
+Apple's Libc returns NULL with ENOENT from `acl_get_fd_np` for a file that has
+no extended ACL. Reading that as a refusal made every owned-runtime check fail
+in milliseconds with "protection"; treat it as the empty ACL, and refuse only
+other errors.
+
+### project-macos-lua-tests-run-on-lua54
+
+The Hammerspoon test harness needs Lua 5.4 (`table.pack`, native bitwise
+operators); running the macOS tests under LuaJIT fails for reasons unrelated to
+the code under test. The Mac version shown to users comes from the outer
+launcher plist; the shared build stamp names the commit.
+
+### project-karabiner-off-is-the-lease-workaround
+
+Configuration > Ergopti uses Karabiner > Off is the supported workaround while
+Karabiner lease failures (exit 73, READY or PONG timeouts on Apple silicon) are
+unexplained; it preserves the user's personal Karabiner rules. Do not infer
+guardian retirement from a signal, a missing handle or a hidden dialog.
+
+### project-macos-writer-lease-is-advisory
+
+The macOS configuration writer rechecks bytes under its canonical writer lease
+before a conditional unlink, but the lease is advisory: an editor that does not
+cooperate can still replace the path between compare and unlink. Its
+capabilities are process-local, not a journal that survives a crash or VM exit.

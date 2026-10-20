@@ -99,6 +99,24 @@ duplicate-API-entry-ID wedge was argued from remembered v1-style `==`
 semantics; measuring showed validator `Map.Has` dedup and consumer `==`
 matching already agreed, killing the candidate.
 
+### project-ahk-map-is-a-class-and-base-is-inheritance
+
+On AutoHotkey 2.0.26 `Map` is a Class: retain `Map.Call` as the Func, not `Map`.
+`BoundFunc.Name` is empty, and a Call-property observer receives the implicit
+receiver as its first argument. An object initializer key named `Base` changes
+inheritance (a Map or Array prototype then fails with "Invalid base"), so store
+a captured prototype under another name such as `OriginalBase`. Map fixtures
+must set `CaseSense` before inserting data, or the setting raises. A named
+readonly Func cannot be an output variable, and an `Integer` in a spawn argv
+slot is refused: pass strings.
+
+### project-ahk-source-masker-consumes-quoted-runs
+
+Source-scanning helpers that mask strings and comments must consume a quoted run
+atomically: a regex that takes one PCRE frame per code unit overflows on a large
+literal. `InStr` with a NUL needle fails on stored UTF-16 text, so never use it
+to detect an embedded NUL.
+
 ## Startup and callbacks
 
 ### project-ahk-entry-smoke-is-the-startup-proof
@@ -276,6 +294,33 @@ progress » (2026-10-01). Every menu command, native or rescued by the retry,
 now goes through `MenuCommandRun`, which waits for `ConfigWriteLeaseBusy()` to
 clear on a one-shot timer (bounded, then the command runs and reports its own
 refusal). A new dispatch path must go through it too.
+
+### project-ahk-reload-sees-the-long-script-path
+
+AutoHotkey 2.0.26 expands an 8.3 script filename before `Reload`, so a successor
+that compares its first script argument with the spelling it was launched with
+sees a mismatch. Normalize both sides with `GetLongPathNameW` before comparing;
+the same short/long split affects `A_Temp` (see
+`project-ahk-temp-path-spelling`).
+
+### project-ahk-fileappend-holds-the-transcript
+
+`FileAppend` opens its target exclusively while it writes, so a CI reader that
+tails an AHK transcript while the process runs gets ERROR_SHARING_VIOLATION
+(32). Read the transcript only after the AHK process has exited.
+
+### project-ahk-readiness-reads-once-per-admission
+
+The driver readiness getter can turn false only while menus rebuild after
+initialization. Read it once per admission or delivery decision; reading it
+twice lets a rebuild in between produce two different answers for one event.
+
+### project-ahk-same-entry-runs-replace-each-other
+
+Two invocations of the same AHK entry script replace each other (single
+instance), and the replaced one still exits 0, so exit 0 is not success.
+Serialize same-entry test runs, and never run the startup smoke while the
+maintainer's resident driver runs: it is not session-isolated.
 
 ## Input, suspension, and menus
 
@@ -512,6 +557,14 @@ callback (`test_script_chords_follow_their_slot.ahk`).
 
 Tests of injected input must prove provenance and destination, not merely that a
 key-shaped event appeared in a hook.
+
+### project-ahk-menu-release-after-terminal-shutdown
+
+The installed app once crashed on File/Exit with `0xC0000374` (heap corruption).
+Releasing the tray tree recursively did not fix it; releasing every owned `Menu`
+flat, by exact owner, after the terminal shutdown is accepted did. Detached menu
+rows (for example the AI menu) must keep their own native `Menu` target rather
+than the published global handle, which a rebuild replaces.
 
 ## Tap-holds and synthetic modifiers
 
@@ -971,3 +1024,32 @@ clipped content or leave its edge unframed. `CreateRoundRectRgn` excludes one
 extra right and bottom pixel, hence the `W + 1, H + 1` in the region owner.
 Derive both surfaces from `_TooltipSurfaceGeometry`. The headless test harness
 never loads the TOML corner radius, so tests that need arcs set it themselves.
+
+### project-windows-native-dll-has-one-generator
+
+The hardened x64 native DLL and its manifest change together and only through
+the official MSVC builder (`-UpdateTracked`, then its drift check); never edit
+either by hand or apply a saved patch to the binary. The hook-free build treats
+a potentially uninitialized variable as an error (C4701 with C2220). The builder
+must load `Get-FileHash` from the PowerShell host that executes it: a Node
+launcher can leak a PowerShell 7 module path into Windows PowerShell 5.1 and
+break hashing.
+
+### project-ahk-test-runner-context
+
+Under `tests/run_all.ahk`, `A_ScriptDir` is `windows/tests`, so read driver
+sources through the central source-owner reader, not relative to `A_ScriptDir`.
+There is no `AssertDeepEqual` (use `_LVS_DeepEqual` with `AssertEqual`),
+`FeatureState` is not initialized by the runner, and a fixture must restore
+every global it changes (caches, locale, `_SharedDir`, number-row protocol,
+keyboard defaults) exactly. The suite watchdog is `_SUITE_MAX_TIMEOUT_MS` (120
+min, pinned by `test-ahk-suite-manifest.cjs`): shard the suite rather than
+raising it.
+
+### project-windows-tls-fixture-git-prefix
+
+The native Windows TLS fixture takes OpenSSL tools from exactly one Git for
+Windows prefix that contains `git.exe` (mingw64 or ucrt64), with no cross-prefix
+fallback. Hosted Git 2.56 moved the SDK from mingw64 to ucrt64, which is why the
+seven managed-network `native_tls` cases started failing; check the prefix first
+when they fail.
