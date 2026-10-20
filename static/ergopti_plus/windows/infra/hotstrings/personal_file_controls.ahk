@@ -179,23 +179,31 @@ class PersonalFileControls {
 		Count := 0
 		for Id, Owner in this.owners
 			Count += Owner.ActiveCount()
-		; Sources without an exclusive gate retain their generic registration.
-		for Record in this.inventory {
-			if !this.owners.Has(Record["owner"])
-				Count += Record.Get("count", 0)
-		}
 		return Count
 	}
 
-	/** Load real native mappings through an explicit owner, retaining generic unavailable packs. */
+	/**
+	 * The identity gate the live engine and the preview share: only a source the
+	 * adoption admitted with an exclusive owner is active. A refused source (an
+	 * alias of the primary or of another file, an ambiguous or unreadable one)
+	 * stays unavailable, as on macOS and Linux; loading it as a whole-file pack
+	 * fired the primary's mappings a second time, past the personal category gate.
+	 */
+	static ActiveOwner(Record) {
+		return this.owners.Get(Record["owner"], 0)
+	}
+
+	/** Load real native mappings only through their adopted owner. */
 	static Register() {
 		this.Refresh()
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], this.owners[Record["owner"]])
+			Owner := this.ActiveOwner(Record)
+			if Owner
+				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"], Owner)
 			else
-				LoadExtTomlFile(Pack["Path"], Pack["Label"], "", Pack["PersonalSource"])
+				LoggerWarn("PersonalFiles", "Personal hotstring file '{1}' is not loaded ({2}): it stays unavailable until its identity is unique and readable.",
+					Pack["Path"], Record.Get("reason", "unavailable-owner"))
 		}
 	}
 
@@ -203,10 +211,8 @@ class PersonalFileControls {
 	static BuildPreview(Index, TriggerSet) {
 		for Record in this.inventory {
 			Pack := Record["pack"]
-			if this.owners.Has(Record["owner"])
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], this.owners[Record["owner"]])
-			else
-				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"])
+			if Owner := this.ActiveOwner(Record)
+				_RegisterExtPackTriggers(Pack["Path"], Pack["Label"], Index, TriggerSet, "", Pack["PersonalSource"], Owner)
 		}
 	}
 }
