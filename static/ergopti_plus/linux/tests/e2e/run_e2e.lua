@@ -736,6 +736,17 @@ do
 	end
 end
 
+do
+	if not ON_WINDOWS then
+		local fixture = driver_root .. "/tests/e2e/clipboard_deadline_child.lua"
+		local output, status = ChildCapture.run(sh_quoted(assert(arg[-1])) .. " " .. sh_quoted(fixture))
+		assert_true("clipboard-deadline: refused preparation emits no paste and retains restoration",
+			status == 0 and output == "E2E_CLIPBOARD_DEADLINE_CLEAN\n")
+	else
+		print("  SKIP  clipboard process deadlines require the native POSIX target")
+	end
+end
+
 -- Final summary.
 local total = pass_count + fail_count
 print(string.format("\n1..%d", total))
