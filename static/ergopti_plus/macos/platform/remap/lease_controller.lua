@@ -35,14 +35,22 @@ local LeaseHelper    = require("platform.remap.lease_helper")
 
 local LOG = "karabiner.lease"
 
-local READY_ACK_TIMEOUT_SEC = 4.0
--- The worker answers every PING, PAUSE and RESUME within its own private
--- command budget (kPrivateCommandAckTimeoutSeconds, 1.75 s, in
--- launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift) or fences itself, so
--- this deadline only has to detect a dead worker. It keeps 2 s over that
--- budget for pipe and main-thread latency: at 2.0 s the margin was 0.25 s, and
--- a start-up busy with its first builds saw "timeout waiting for PONG 1".
-local COMMAND_ACK_TIMEOUT_SEC = 3.75
+-- The native worker's own budgets, mirrored from
+-- launcher/Sources/ErgoptiPlus/RemapLeaseWorker.swift (kPrivateCommandAckTimeoutSeconds)
+-- and RemapLeaseGuardian.swift (kGuardianArmTimeoutSeconds); a parity test reads
+-- both sources. The worker answers every PING, PAUSE and RESUME within its
+-- command budget or fences itself, so the deadlines below only detect a dead
+-- worker and keep a margin over the worker's worst case for pipe and
+-- main-thread latency: at 0.25 s a busy start-up saw "timeout waiting for PONG 1".
+local WORKER_COMMAND_BUDGET_SEC = 2.5
+local WORKER_GUARDIAN_ARM_BUDGET_SEC = 3.0
+local ACK_LATENCY_MARGIN_SEC = 2.0
+-- READY follows the guardian ARM handshake and then one ACTIVATE write. At
+-- 4.0 s it was shorter than the worker's own 4.75 s worst case, and recoveries
+-- that redeployed karabiner.json timed out waiting for READY (issue #95).
+local READY_ACK_TIMEOUT_SEC = WORKER_GUARDIAN_ARM_BUDGET_SEC + WORKER_COMMAND_BUDGET_SEC
+	+ ACK_LATENCY_MARGIN_SEC
+local COMMAND_ACK_TIMEOUT_SEC = WORKER_COMMAND_BUDGET_SEC + ACK_LATENCY_MARGIN_SEC
 local STOP_ACK_TIMEOUT_SEC = 7.0
 -- An ACK timeout that fires this much later than due was held by a parked run
 -- loop (a modal dialog, a busy main thread). The worker's answer may be waiting
@@ -1073,8 +1081,9 @@ local function process_line(generation, line)
 		if not arm_heartbeat_timer(generation) then return end
 		-- The just-completed ACTIVATE is the HS-originated bootstrap pulse. Retain
 		-- the first-fire-after-5s timer before publishing the live phase; the inner
-		-- allows 1.75s additional command slack, so a pre-first-tick hang still
-		-- reaches exact fencing rather than creating an unbounded bootstrap gap.
+		-- allows its command budget plus a main-thread stall allowance on top, so
+		-- a pre-first-tick hang still reaches exact fencing rather than creating
+		-- an unbounded bootstrap gap.
 		local ready_phase = generation.initial_paused and "paused" or "active"
 		local ready_reason = generation.initial_paused and "ready-paused" or "ready"
 		-- As with command completion, hide the older queue before any lifecycle or
