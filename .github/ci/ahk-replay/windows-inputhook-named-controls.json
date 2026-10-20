@@ -1,0 +1,65 @@
+{
+	"expected_count": 38,
+	"filters": [
+		{
+			"contains": "inputhook-named-key-tokenization",
+			"expected_count": 1
+		},
+		{
+			"contains": "inputhook-scalar-reader",
+			"expected_count": 24
+		},
+		{
+			"contains": "Magic Key capture settlement: character cancel",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: one-shot end-key",
+			"expected_count": 1
+		},
+		{
+			"contains": "capture settlement: dead-key end-key",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: one-shot control-after-high",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar refusal: dead-key control-after-high",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar control: dead-key uses native canonical Insert",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot enter",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key enter",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot backspace",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key backspace",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: one-shot delete",
+			"expected_count": 1
+		},
+		{
+			"contains": "scalar dispatch: dead-key delete",
+			"expected_count": 1
+		},
+		{
+			"contains": "native EndChars prototype: enter",
+			"expected_count": 1
+		}
+	]
+}

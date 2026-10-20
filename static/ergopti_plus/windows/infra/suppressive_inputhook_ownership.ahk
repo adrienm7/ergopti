@@ -222,7 +222,8 @@ _SIHO_ReadScalar(Hook, NamedKeys) {
 		return Result
 	}
 	if StrLen(EndKey) > 1 {
-		for Name in StrSplit(NamedKeys, "{}") {
+		; In v2, a String delimiter is one substring, not a character set.
+		for Name in StrSplit(NamedKeys, ["{", "}"]) {
 			if Name != "" && EndKey = Name {
 				Result.Kind := "control", Result.Name := EndKey
 				Result.Reason := Text == "" ? "" : "incomplete-control-prefix"
