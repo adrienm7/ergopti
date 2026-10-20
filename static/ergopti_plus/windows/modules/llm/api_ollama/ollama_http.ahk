@@ -1,5 +1,7 @@
 ﻿; modules/llm/api_ollama/ollama_http.ahk
 
+#Include curl_tree_owner.ahk
+
 ; ==============================================================================
 ; MODULE: Ollama API — Sync HTTP Client
 ; DESCRIPTION:
@@ -236,15 +238,15 @@ _LLM_OllamaAuxDeletePaths(Paths, DeleteFn := 0) {
 	return true
 }
 
-_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner) {
+_LLM_CurlArtifactRun(Command, WorkingDir, Options, &Pid, &ProcessOwner, TreeFactoryFn := unset) {
 	Environment := 0
 	CreationFlags := 0x08000000
 	if Command is Map {
 		if !Command.Has("command_line") or !Command.Has("environment")
 			throw TypeError("A curl launch record requires a command and environment.")
 		Environment := _LLM_CurlBuildEnvironment(Command["environment"])
-		Command := Command["command_line"]
-		CreationFlags |= 0x00000400
+		return _LLM_CurlArtifactRunTree(Command["command_line"], Environment, WorkingDir,
+			&Pid, &ProcessOwner, TreeFactoryFn?)
 	}
 	if !(Command is String) or Command == ""
 		throw TypeError("A curl launch requires a nonempty command string.")
@@ -292,7 +294,7 @@ _LLM_CurlRunOwned(RunFn, Command, WorkingDir, Options, &Pid, Port := 0) {
 		throw Err
 	}
 	if !(ProcessOwner is Map) or ProcessOwner.Get("released", true)
-			or !ProcessOwner.Get("handle", 0)
+			or (!ProcessOwner.Get("handle", 0) && !IsObject(ProcessOwner.Get("tree", 0)))
 		throw Error("Curl launcher returned without an exact process owner.")
 	if ProcessOwner.Get("pid", 0) != Pid {
 		_LLM_CurlReleaseProcess(ProcessOwner, true, Port)
@@ -375,11 +377,13 @@ _LLM_CurlTryReleaseProcess(ProcessOwner, Terminate := false, Port := 0) {
 		if ProcessOwner.Get("releasing", false)
 			return false
 		Handle := ProcessOwner.Get("handle", 0)
-		if !Handle
+		if !Handle && !IsObject(ProcessOwner.Get("tree", 0))
 			return false
 		ProcessOwner["releasing"] := true
 	} finally Critical(PreviousCritical)
 	try {
+		if ProcessOwner.Has("tree")
+			return _LLM_CurlTryReleaseTree(ProcessOwner, Terminate)
 		if Terminate {
 			TerminateFn := _LLM_CurlArtifactPortFn(Port,
 				"terminate_process", _LLM_CurlTerminateProcessExact)
@@ -443,6 +447,8 @@ _LLM_CurlReleaseEntryProcess(Entry, Terminate := false, Port := 0) {
 _LLM_CurlProcessExited(ProcessOwner, Port := 0) {
 	if !(ProcessOwner is Map) or ProcessOwner.Get("released", false)
 		return true
+	if ProcessOwner.Has("tree")
+		return ProcessOwner.Get("terminal", 0) is Map
 	Handle := ProcessOwner.Get("handle", 0)
 	if !Handle
 		return false
@@ -766,9 +772,7 @@ _LLM_Ollama_PingPoll(ProcessOwner, tmp_out, tmp_status, tmp_exit, on_result, sta
 		"read_terminal", _LLM_CurlReadTerminal)
 	Terminal := ReadTerminalFn.Call(tmp_status, tmp_exit, tmp_out)
 	if _LLM_CurlTerminalComplete(Terminal) {
-		WaitFn := _LLM_CurlArtifactPortFn(Port, "wait_process", _LLM_CurlWaitProcessExact)
-		Stopped := !Structured || ProcessOwner.Get("released", false)
-			|| WaitFn.Call(ProcessOwner.Get("handle", 0)) == 0
+		Stopped := !Structured || _LLM_CurlProcessExited(ProcessOwner, Port)
 		if Stopped && _LLM_CurlReleaseProcess(ProcessOwner, false, Port) {
 			reachable := Structured ? Map("ok", Terminal["exit"] == 0 && Terminal["body_read"],
 				"status", Terminal["status"], "body", Terminal["body"])

@@ -715,9 +715,11 @@ _GSWO_AllEntryPointsShareOwnership() {
 	Assert(InStr(CancelWorker, 'Reason == "shutdown"') > 0
 		&& InStr(CancelWorker, "_GestureScreenshotCleanupStage") > 0,
 		"shutdown cancellation must clean a stage which already exists before AHK exits")
-	Assert(InStr(TreeSpawner,
-		"handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
-		&& InStr(TreeSpawner, "_SR_TreeHandleTerminate(state, true)") > 0,
+	TreeConstructor := _DriverFuncBody("_SR_NewTreeOwnedTask")
+	Assert(TreeConstructor != "", "the canonical tree constructor must exist")
+	Assert(InStr(TreeSpawner, "_SR_NewTreeOwnedTask(") > 0
+		&& InStr(TreeConstructor, "handle.requestTerminate := _SR_TreeOwnedRequestTerminate") > 0
+		&& InStr(TreeConstructor, "_SR_TreeHandleTerminate(state, true)") > 0,
 		"screenshot cancellation must retain completion ownership while using the synchronous native tree fence")
 	Assert(RegExMatch(TreeCreate,
 		"\b([A-Za-z_][A-Za-z0-9_]*)\s*:=\s*PLC_CreateProcessWithInheritedHandles\b", &CreatePort) > 0,

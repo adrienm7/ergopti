@@ -689,3 +689,63 @@ _OHTD_EnableCancelCase(World) {
 }
 Test("Ollama structured delivery: cancelling actual enable before ACK keeps late refusal inert",
 	_OHTD_WithFixture.Bind(_OHTD_EnableCancelCase))
+
+
+_OHTD_TreeRequestTerminate(World, *) {
+	World["tree_terminates"] += 1
+	return true
+}
+
+_OHTD_TreeRawWait(World, Handle) {
+	World["raw_waits"] += 1
+	return 258
+}
+
+_OHTD_PingTreeCompletion(World) {
+	Body := '{"version":"0.12.3"}'
+	World["terminal"] := Map("complete", true, "exit", 0, "status", 200,
+		"body_read", true, "body", Body)
+	World["terminal_reads"] := 0
+	World["tree_terminates"] := 0
+	World["raw_waits"] := 0
+	Task := {requestTerminate: _OHTD_TreeRequestTerminate.Bind(World)}
+	Process := Map("pid", 50400, "handle", 0, "tree", Task, "terminal", 0,
+		"released", false, "releasing", false, "cleanup_debt_id", 0)
+	Owner := World["owner"]
+	Port := Map("read_terminal", _OHTC_PidReceipt_ReadTerminal.Bind(World),
+		"wait_process", _OHTD_TreeRawWait.Bind(World))
+	Callback := _OHTD_Delivered.Bind(World)
+	try {
+		AssertTrue(LLM_AuxBindResources(Owner, Map("process_pid", Process["pid"],
+			"cancel", _LLM_CurlReleaseProcess.Bind(Process, true))))
+		_LLM_Ollama_PingPoll(Process, "body", "status", "exit", Callback, A_TickCount, Owner, Port, true)
+		AssertEqual(0, World["callback_calls"], "a complete sidecar cannot waive pending tree settlement")
+		AssertEqual(0, World["finalizer_calls"], "pending native custody cannot release dependent artifacts")
+		AssertFalse(Process["released"])
+		AssertTrue(Process["tree"] == Task, "the exact pending task remains the process authority")
+		AssertTrue(LLM_AuxIsCurrent(Owner))
+
+		; Exercise the real callback bridge used only after canonical Job quiescence.
+		_LLM_CurlTreeCompleted(Process, 0)
+		_LLM_Ollama_PingPoll(Process, "body", "status", "exit", Callback, A_TickCount, Owner, Port, true)
+		_OHTD_AssertDelivered(World)
+		AssertTrue(World["result"]["ok"])
+		AssertEqual(200, World["result"]["status"])
+		AssertEqual(Body, World["result"]["body"], "the typed version receipt reaches the real structured callback")
+		AssertTrue(LLM_EnableReceipt(World["result"])["admitted"])
+		AssertEqual(1, World["finalizer_calls"], "physical handback retires the original dependent artifacts once")
+		AssertTrue(Process["released"])
+		AssertEqual(0, Process["tree"])
+		AssertEqual(0, World["tree_terminates"], "natural tree completion never requests termination")
+		AssertEqual(0, World["raw_waits"], "a tree owner must never be observed through an empty process handle")
+		_LLM_Ollama_PingPoll(Process, "body", "status", "exit", Callback, A_TickCount, Owner, Port, true)
+		AssertEqual(1, World["callback_calls"], "a late poll cannot duplicate the committed structured receipt")
+	} finally {
+		if !Process["released"] {
+			_LLM_CurlTreeCompleted(Process, 0)
+			AssertTrue(_LLM_CurlReleaseProcess(Process, true), "the controlled tree receipt must retire before ledger restoration")
+		}
+	}
+}
+Test("Ollama enable receipt: actual tree completion delivers the structured version once (curl-tree-structured-ping)",
+	_OHTD_WithFixture.Bind(_OHTD_PingTreeCompletion))

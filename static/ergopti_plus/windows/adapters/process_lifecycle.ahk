@@ -305,12 +305,19 @@ PLC_TerminateProcessHandle(Handle, ExitCode := 1) {
 ; Creates a child with inherited handles into caller-owned native buffers. The
 ; PROCESS_INFORMATION buffer remains caller-owned so an OnExit thread can claim
 ; its handles atomically if creation and shutdown race.
-PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo) {
+PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo,
+		Environment := 0, WorkingDir := "") {
 	if !(ApplicationPath is String) or ApplicationPath = ""
 		throw TypeError("CreateProcessW requires an application path")
 	if !(CommandBuffer is Buffer) or !(StartupInfo is Buffer)
 		or !(ProcessInfo is Buffer)
 		throw TypeError("CreateProcessW requires native buffers")
+	if (!(Environment is Integer) || Environment != 0) && !(Environment is Buffer)
+		throw TypeError("CreateProcessW requires an inherited or private environment")
+	if !(WorkingDir is String)
+		throw TypeError("CreateProcessW requires a working directory string")
+	if Environment is Buffer
+		CreationFlags |= 0x00000400
 	Created := DllCall("Kernel32\CreateProcessW",
 		"Str", ApplicationPath,
 		"Ptr", CommandBuffer.Ptr,
@@ -318,8 +325,8 @@ PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFl
 		"Ptr", 0,
 		"Int", true,
 		"UInt", CreationFlags,
-		"Ptr", 0,
-		"Ptr", 0,
+		"Ptr", Environment is Buffer ? Environment.Ptr : 0,
+		"Ptr", WorkingDir == "" ? 0 : StrPtr(WorkingDir),
 		"Ptr", StartupInfo.Ptr,
 		"Ptr", ProcessInfo.Ptr,
 		"Int")

@@ -1,0 +1,16 @@
+{
+	"expected_count": 21,
+	"filters": [
+		{ "contains": "shell-raw-tree-launch", "expected_count": 2 },
+		{ "contains": "curl-wrapped-tree-retirement", "expected_count": 2 },
+		{ "contains": "curl-tree-retirement-debt", "expected_count": 1 },
+		{ "contains": "curl-tree-structured-ping", "expected_count": 1 },
+		{ "contains": "curl-literal-paths", "expected_count": 6 },
+		{ "contains": "shell-native-argv", "expected_count": 6 },
+		{ "contains": "shell-native-literal-percent", "expected_count": 2 },
+		{
+			"contains": "Ollama enable receipt: native wait and auxiliary settlement precede confirmed version delivery",
+			"expected_count": 1
+		}
+	]
+}

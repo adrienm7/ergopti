@@ -1231,6 +1231,37 @@ ShellRunner_ValidateSpawnArgs(Executable, Args) {
  */
 ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 		BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	return _SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics)
+}
+
+/**
+ * Owns a trusted complete command line with a private Unicode environment.
+ * Unlike the argv entry, this preserves shell syntax already composed by its
+ * caller. Both entries share native construction, Job custody and retirement.
+ */
+ShellRunner_SpawnTreeOwnedCommand(ApplicationPath, CommandLine, Environment, WorkingDir := "", OnDone?,
+		OnChunk?, BeforeNativeAdoptFn?, MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false) {
+	if !(ApplicationPath is String) || !RegExMatch(ApplicationPath, "^[A-Za-z]:\\")
+			|| !(CommandLine is String) || CommandLine == "" || !(WorkingDir is String)
+		throw TypeError("A raw tree launch requires an absolute application and command strings.")
+	for Text in [ApplicationPath, CommandLine, WorkingDir] {
+		Loop StrLen(Text)
+			if NumGet(StrPtr(Text), (A_Index - 1) * 2, "UShort") == 0
+				throw ValueError("Raw tree launch strings cannot contain NUL.")
+	}
+	if !(Environment is Buffer) || Environment.Size < 4 || Mod(Environment.Size, 2)
+			|| NumGet(Environment, Environment.Size - 4, "UInt") != 0
+		throw TypeError("A raw tree launch requires a terminated Unicode environment block.")
+	Captured := Buffer(Environment.Size, 0)
+	DllCall("RtlMoveMemory", "Ptr", Captured, "Ptr", Environment, "UPtr", Environment.Size)
+	Launch := Map("command", CommandLine, "environment", Captured, "directory", WorkingDir)
+	return _SR_NewTreeOwnedTask(ApplicationPath, [], OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes, CaptureOutput, PrivateDiagnostics, Launch)
+}
+
+_SR_NewTreeOwnedTask(Executable, Args, OnDone?, OnChunk?, BeforeNativeAdoptFn?,
+		MaxOutputBytes := 0, CaptureOutput := true, PrivateDiagnostics := false, NativeLaunch := 0) {
 	global _SR_TaskCounter
 	local previous_critical := Critical("On")
 	local task_id := 0
@@ -1242,14 +1273,14 @@ ShellRunner_SpawnTreeOwned(Executable, Args, OnDone?, OnChunk?,
 	local bad_arg_index := PrivateDiagnostics == true ? 0 : validation["bad_arg_index"]
 	local validation_error := validation["error"]
 
-	; This API receives an executable and argv, never shell syntax. Launch it
-	; directly: cmd.exe expands %VAR% before the child can parse argv, even when
-	; the argument is quoted. stdout/stderr capture is attached natively below.
-	local cmd := _SR_BuildDirectCommandLine(Executable, Args)
+	; The argv entry quotes once; the trusted command entry keeps its exact
+	; caller-composed shell text. Both attach stdout/stderr natively below.
+	local cmd := NativeLaunch is Map ? NativeLaunch["command"] : _SR_BuildDirectCommandLine(Executable, Args)
 	local state := Map(
 		"TaskId", task_id,
 		"Executable", Executable,
 		"Command", cmd,
+		"NativeLaunch", NativeLaunch,
 		"TmpFile", "",
 		"CaptureDir", "",
 		"CaptureOutput", capture_output,
@@ -2170,8 +2201,15 @@ _SR_TreeNewTerminalClaim(State, Callback, AccountingConfirmedZero) {
 
 ; This private seam receives the per-call capsule, never a global debt fence.
 _SR_TreeCreateSuspendedForState(Executable, CommandLine, CapturePath, Carrier) {
+	Launch := Carrier["State"].Get("NativeLaunch", 0)
+	Create := Launch is Map ? _SR_TreeCreatePrivateEnvironment.Bind(Launch) : PLC_CreateProcessWithInheritedHandles
 	return _SR_TreeCreateSuspended(Executable, CommandLine, CapturePath, true,
-		PLC_CreateProcessWithInheritedHandles, _SR_TreeCloseLaunchStream, Carrier)
+		Create, _SR_TreeCloseLaunchStream, Carrier)
+}
+
+_SR_TreeCreatePrivateEnvironment(Launch, ApplicationPath, CommandBuffer, CreationFlags, StartupInfo, ProcessInfo) {
+	return PLC_CreateProcessWithInheritedHandles(ApplicationPath, CommandBuffer, CreationFlags, StartupInfo,
+		ProcessInfo, Launch["environment"], Launch["directory"])
 }
 
 _SR_TreeCreationFailureCarrier(State, AdoptFn := _SR_TreeAttachCreationFailure) {
